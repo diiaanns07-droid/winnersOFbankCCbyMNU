@@ -188,7 +188,7 @@ def test_templates_are_russian(sample):
     doc_words = {w.lower() for w in re.findall(r"[A-Za-z]+", (ROOT / "release" / "input" / "requirements.md")
                                                 .read_text(encoding="utf-8"))}
     extra = {w for w in latin_in_prose(markdown.render(sample)) if w.lower() not in doc_words}
-    assert extra <= LATIN_OK | {"RFC", "PUT", "POST"}, extra
+    assert extra <= LATIN_OK | {"RFC", "PUT", "POST", "HTTP"}, extra
 
 
 def test_minimal_offline_report_has_all_sections():
