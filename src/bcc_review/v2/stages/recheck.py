@@ -195,13 +195,24 @@ def load_answers(source: Any) -> dict:
     return parse_answers_text(text)
 
 
+_STOP = {"при", "для", "или", "как", "что", "это", "его", "она", "они", "все", "без", "над", "под", "про", "чем",
+         "так", "уже", "ещё", "еще", "тот", "эти", "той", "том", "кто", "где", "the", "and", "какие", "какой", "каком",
+         "какая", "есть", "быть", "если", "либо", "также"}
+
+
 def _tokens(s: str) -> set[str]:
-    return {w[:6] for w in re.findall(r"[a-zа-яё0-9]{4,}", _cl._norm(s))}
+    """Грубые основы слов: окончания русских падежей не мешают совпадению («сумме» ~ «суммы»)."""
+    words = [w for w in re.findall(r"[a-zа-яё0-9]{3,}", _cl._norm(s)) if w not in _STOP]
+    return {w if len(w) <= 4 else w[:min(6, max(4, len(w) - 2))] for w in words}
 
 
 def _topic_score(hint: str, q: dict) -> float:
-    a, b = _tokens(hint), _tokens(f"{q.get('topic', '')} {q.get('question', '')}")
-    return len(a & b) / max(1, len(a))
+    """Доля слов подсказки в теме (вес 2) и в тексте вопроса (вес 1)."""
+    h = _tokens(hint)
+    if not h:
+        return 0.0
+    topic, text = _tokens(q.get("topic", "")), _tokens(q.get("question", ""))
+    return (2 * len(h & topic) + len((h & text) - topic)) / (2 * len(h))
 
 
 def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | None = None) -> dict:
@@ -213,14 +224,19 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     for a in parsed.get("answers") or []:
         q = by_id.get(a["id"])
         hint = a.get("topic_hint") or ""
-        if hint and (q is None or _topic_score(hint, q) < 0.34):
-            best = max(questions, key=lambda x: _topic_score(hint, x), default=None)
-            if best is not None and _topic_score(hint, best) >= 0.5:
-                if q is not None and best["id"] != q["id"]:
+        if hint and questions:
+            # номера вопросов от прогона к прогону меняются: при подсказке темы решает тема
+            scored = sorted(((_topic_score(hint, x), x) for x in questions),
+                            key=lambda t: (-t[0], t[1]["id"] in answered, t[1]["id"] != a["id"]))
+            s_best, best = scored[0]
+            s_second = scored[1][0] if len(scored) > 1 else 0.0
+            s_num = _topic_score(hint, q) if q is not None else -1.0
+            if s_best >= 0.4 and (s_best > s_second or s_num == s_best):
+                if best is not q and s_num < s_best:
                     warnings.append(f"recheck: ответ {a['id']} [{hint}] отнесён к {best['id']} по теме")
-                q = best
+                    q = best
             elif a.get("choice") is None and a.get("text"):
-                q = None
+                q = None  # тема не совпала однозначно ни с одним вопросом — это общее решение
         if q is None:
             if a.get("text"):
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
@@ -241,6 +257,11 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             warnings.append(f"recheck: ответ на {q['id']} не задаёт правила — вопрос остаётся открытым")
             continue
         comment = a.get("comment") or ""
+        if q["id"] in answered:  # второй ответ на тот же вопрос дополняет первый
+            prev = answered[q["id"]]
+            prev["answer"] = prev["answer"] + "; " + text + (f" ({comment})" if comment else "")
+            prev["choice"] = prev["choice"] if prev["choice"] == label else ""
+            continue
         answered[q["id"]] = {"question_id": q["id"], "topic": q.get("topic", ""), "question": q.get("question", ""),
                              "choice": label, "answer": text + (f" ({comment})" if comment else ""),
                              "finding_ids": list(q.get("finding_ids") or [])}

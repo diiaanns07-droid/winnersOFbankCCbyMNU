@@ -237,12 +237,13 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
             continue
         seen_keys.append(key)
         sev = [by_id[fid].get("severity", "minor") for fid in ids]
+        # блокирующий — только вопрос по critical или по major из «исправить первым» (priority 1–7 судьи)
         if "critical" in sev:
             blocking = True
-        elif "major" in sev:
-            blocking = bool(q.get("blocking"))
         else:
-            blocking = False
+            blocking = bool(q.get("blocking")) and any(
+                by_id[fid].get("severity") == "major" and 1 <= int(by_id[fid].get("priority") or 0) <= 7
+                and by_id[fid].get("blocks", "both") != "none" for fid in ids)
         prio = min((int(by_id[fid].get("priority") or 0) or 99) for fid in ids)
         kept.append({
             "id": "", "topic": str(q.get("topic", "")).strip()[:80], "finding_ids": ids, "to": _role(q.get("to")),
