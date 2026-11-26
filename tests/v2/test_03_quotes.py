@@ -226,6 +226,7 @@ def test_kind_and_level_fields(md, pdf):
     assert dv.line(md, 64)["kind"] == "table_row" and dv.line(md, 61)["kind"] == "table_header"
     assert dv.line(md, 167)["kind"] == "code" and dv.line(md, 2)["kind"] == ""
     assert dv.line(pdf, 23)["kind"] == "heading" and dv.line(pdf, 25)["kind"] == "list_item"
+    assert dv.line(md, 8)["heading"] is True and dv.line(md, 38)["heading"] is False and dv.line(pdf, 23)["heading"]
 
 
 def test_batch_quote_is_document_text(md):

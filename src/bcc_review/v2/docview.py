@@ -11,7 +11,8 @@
   блок даёт несколько строк. Для PDF у каждой строки есть страница.
 
 Сверх контракта у строки есть ``kind`` (вид блока читателя: heading, paragraph, list_item, table_header, table_row,
-code; пусто у пустой строки) и ``level`` (уровень заголовка, у остальных 0) — для нарезки и правил.
+code; пусто у пустой строки), ``level`` (уровень заголовка, у остальных 0) и ``heading`` (строка — заголовок) —
+для нарезки, правил и HTML (CONTRACT, раздел 9).
 
 ``numbered(view)`` — текст для модели: «L038| …», для PDF «L045| [с.3] …».
 Номер строки, страницу и раздел считает код, а не модель.
@@ -218,7 +219,7 @@ def _text_lines(text: str, doc: dict | None) -> list[dict]:
             kind = "heading" if _MD_HEADING.match(src) else ("table_row" if " | " in t else "paragraph")
         out.append({"n": k, "text": t, "page": None, "section": sections[k] or cur_section,
                     "src_line": k, "block_id": block_ids[k], "kind": kind,
-                    "level": levels[k] if kind == "heading" else 0})
+                    "level": levels[k] if kind == "heading" else 0, "heading": kind == "heading"})
     return out
 
 
@@ -265,7 +266,8 @@ def _block_lines(doc: dict) -> list[dict]:
                 t = _BULLET_GLYPH.sub("", t.lstrip())
             out.append({"n": len(out) + 1, "text": _clean(t), "page": page, "section": sec,
                         "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
-                        "level": _level(b) if b.get("kind") == "heading" else 0})
+                        "level": _level(b) if b.get("kind") == "heading" else 0,
+                        "heading": b.get("kind") == "heading"})
     return out
 
 

@@ -219,7 +219,8 @@ def view_from_html(text: str, *, file: str = "document.html") -> dict:
         for part in b["lines"]:
             lines.append({"n": len(lines) + 1, "text": part, "page": None, "section": section,
                           "src_line": b["src_line"], "block_id": bid, "kind": b["kind"],
-                          "level": (b["level"] or 1) if b["kind"] == "heading" else 0})
+                          "level": (b["level"] or 1) if b["kind"] == "heading" else 0,
+                          "heading": b["kind"] == "heading"})
     h1 = next((" ".join(b["lines"]).strip() for b in blocks if b["kind"] == "heading" and b["level"] == 1), "")
     doc_title = h1 or title or next((ln["text"] for ln in lines if ln["text"].strip()), "") or Path(file).stem
     if h1:  # заголовок документа в разделах не повторяем
