@@ -1,0 +1,23 @@
+{
+  "_synthetic": true,
+  "_note": "429 со spend-limit (error_code enforced_spend_limit_reached).",
+  "name": "spend_cap_429",
+  "response": {
+    "status": 429,
+    "headers": {
+      "request-id": "req_synth_429_cap",
+      "content-type": "application/json"
+    },
+    "body": {
+      "type": "error",
+      "error": {
+        "type": "rate_limit_error",
+        "message": "You have reached your monthly spend limit",
+        "details": {
+          "error_code": "enforced_spend_limit_reached"
+        }
+      },
+      "request_id": "req_synth_429_cap"
+    }
+  }
+}
