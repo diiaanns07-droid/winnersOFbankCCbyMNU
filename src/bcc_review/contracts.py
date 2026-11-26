@@ -299,7 +299,7 @@ DEFS: dict[str, Any] = {
                                 "quad": {"type": "array"}}, ["start", "end", "rect"])),
         "part": _STR, "path": _STR, "runs": {"type": "array"},
         "level": {"type": "integer", "minimum": 1}, "columns": _STRS, "empty": {"type": "boolean"},
-        "bbox": {"type": "array", "items": {"type": "number"}}, "table": {"type": "integer"},
+        "bbox": {"type": "array", "items": {"type": "number"}}, "table": {},
         "row": {"type": "integer"}, "furniture": {"type": "boolean"}, "lang": _NSTR,
     }),
     "Block": _obj({"id": _STR, "kind": _enum(BLOCK_KINDS), "section": _STRS, "text": _STR, "loc": _ref("Loc")},
@@ -465,6 +465,37 @@ REPORT_SCHEMA: dict[str, Any] = {
     "additionalProperties": True,
     "$defs": DEFS,
 }
+
+
+def as_plain(obj: Any) -> Any:
+    """Объект модуля → dict контракта: поддерживает ``to_dict()`` и dataclass."""
+    if hasattr(obj, "to_dict") and callable(obj.to_dict):
+        return obj.to_dict()
+    if hasattr(obj, "__dataclass_fields__"):
+        return asdict(obj)
+    return obj
+
+
+def normalize_document(doc: dict[str, Any]) -> dict[str, Any]:
+    """Привести Document читателя к единой форме стыка (движок вызывает после чтения):
+
+    * ``section`` — полный путь заголовков от корня (если читатель дал ``loc.section_ids``);
+    * ``loc.columns`` — заголовки столбцов для строк таблиц (если они лежат в ``loc.table.columns``).
+    """
+    doc = as_plain(doc)
+    blocks = doc.get("blocks", [])
+    heads = {b["id"]: b["text"] for b in blocks if b.get("kind") == "heading"}
+    for b in blocks:
+        loc = b.setdefault("loc", {})
+        ids = loc.get("section_ids")
+        if isinstance(ids, list) and ids and all(i in heads for i in ids):
+            path = [heads[i] for i in ids]
+            if not b.get("section") or b["section"] == path[-len(b["section"]):]:
+                b["section"] = path
+        tbl = loc.get("table")
+        if b.get("kind") in ("table_header", "table_row") and "columns" not in loc and isinstance(tbl, dict)                 and isinstance(tbl.get("columns"), list):
+            loc["columns"] = list(tbl["columns"])
+    return doc
 
 
 def subschema(name: str) -> dict[str, Any]:

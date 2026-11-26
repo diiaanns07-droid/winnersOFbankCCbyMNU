@@ -190,18 +190,33 @@ class Engine:
         if res.func is None:
             raise UsageError(f"чтение {path.suffix} недоступно: модуль {slot} не подключён ({res.error})")
         t = time.monotonic()
-        doc = res.func(path)
+        doc = C.normalize_document(res.func(path))
         errs = C.validation_errors(doc, C.subschema("Document"))
         if errs and res.origin == "team":
             self.warn("contract_violation", f"{res.label}: Document нарушает контракт ({errs[0]}); использован резерв", "read")
             fb = self.mods.get(slot, prefer_fallback=True)
             if fb.func is not None:
-                doc, res = fb.func(path), fb
+                doc, res = C.normalize_document(fb.func(path)), fb
                 errs = C.validation_errors(doc, C.subschema("Document"))
         if errs:
             raise ContractError("Document нарушает контракт: " + "; ".join(errs[:5]))
+        if res.origin == "team" and slot == "read_text" and self._mostly_utf8_misdecoded(path, doc):
+            self.warn("contract_violation", f"{res.label}: файл в UTF-8 с битыми байтами прочитан как однобайтовая "
+                      "кодировка; использован резервный читатель с пометкой неполного чтения", "read")
+            fb = self.mods.get(slot, prefer_fallback=True)
+            doc, res = C.normalize_document(fb.func(path)), fb
         self.mark("read", "ok", implementation=res.label, t=t)
         return doc
+
+    @staticmethod
+    def _mostly_utf8_misdecoded(path: Path, doc: dict[str, Any]) -> bool:
+        """Защита стыка: читатель сменил кодировку, хотя файл — UTF-8 с единичными битыми байтами."""
+        codes = {w.get("code") for w in doc.get("warnings", []) if isinstance(w, dict)}
+        if not codes & {"encoding_fallback", "encoding_guess"} or codes & set(PARTIAL_READ_CODES):
+            return False
+        data = path.read_bytes()
+        bad = data.decode("utf-8", errors="replace").count("�")
+        return 0 < bad <= max(8, len(data) // 50)
 
     # ------------------------------------------------------------------ основной сценарий
     def run(self) -> dict[str, Any]:
