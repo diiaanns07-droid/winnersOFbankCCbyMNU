@@ -1093,11 +1093,12 @@ def _render_check(f: dict, members: list[dict]) -> str:
 
 
 def _check_severity(ctx: Any, response: dict, by_id: dict[str, dict], warnings: list[str]) -> dict:
-    """Второй короткий вызов: перепроверка critical и major по шкале; уровень можно только понизить."""
+    """Второй короткий вызов: перепроверка critical по шкале; уровень можно только понизить.
+    Major не перепроверяется: на живых прогонах проверка снимала верные major (расхождение терминов, связей)."""
     response = {**response, "findings": [dict(f) for f in response.get("findings") or []]}  # ответ модели не меняем
     todo = []
     for f in response["findings"]:
-        if _s(f.get("severity")) not in {"critical", "major"}:
+        if _s(f.get("severity")) != "critical":
             continue
         members = [by_id[c] for c in (_s(x) for x in f.get("candidate_ids") or []) if c in by_id]
         if members:
