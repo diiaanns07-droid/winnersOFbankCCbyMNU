@@ -210,3 +210,28 @@ def test_find_cli_windows_prefers_exe_then_node_script(monkeypatch, tmp_path):
     cmd = str(tmp_path / "claude.cmd")
     which = {"claude.cmd": cmd, "node": r"C:\node\node.exe"}.get
     assert find_cli({}, which=which) == [r"C:\node\node.exe", str(script)]
+
+
+# --------------------------------------------------------------------------- записанные ответы настоящего CLI
+
+from pathlib import Path  # noqa: E402
+
+RECORDED = Path(__file__).parent / "fixtures" / "02_providers"
+
+
+def test_recorded_real_success_haiku():
+    raw = (RECORDED / "claude_cli_ok_haiku.json").read_text(encoding="utf-8")
+    r = provider(FakeRunner(raw)).invoke(model="haiku", messages=MESSAGES, schema=SCHEMA, timeout_s=30)
+    assert r["data"] == {"city": "Астана"}
+    assert r["model"] == "claude-haiku-5-5" and r["meta"]["fallback_used"] is False
+    assert r["usage"]["input_tokens"] == 2026 and r["usage"]["output_tokens"] == 139
+    assert r["cost_usd"] > 0
+
+
+def test_recorded_real_404_unknown_model():
+    raw = (RECORDED / "claude_cli_404_model.json").read_text(encoding="utf-8")
+    with pytest.raises(ProviderError) as e:
+        provider(FakeRunner(raw, returncode=1, stderr="[claude-code:unrecognized_model]")).invoke(
+            model="nonexistent-model-xyz", messages=MESSAGES, schema=SCHEMA, timeout_s=30)
+    assert e.value.kind == "not_found" and e.value.status == 404
+    assert "opus, sonnet или haiku" in e.value.message

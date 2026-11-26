@@ -173,10 +173,14 @@ def explain(exc: BaseException, provider: str | None = None) -> str:
     name = provider or getattr(exc, "provider", None) or ""
     name = ALIASES.get(str(name), str(name))
     title = TITLES.get(name, name or "модели")
-    advice = _ADVICE.get((name, exc.kind)) or _GENERIC.get(exc.kind, _GENERIC["unknown"])
     message = (exc.message or exc.kind).strip()
+    if exc.kind == "not_configured" and "pip install" in message:
+        advice = "Установите зависимости: pip install -r requirements.txt (или пакет из сообщения) и повторите."
+    else:
+        advice = _ADVICE.get((name, exc.kind)) or _GENERIC.get(exc.kind, _GENERIC["unknown"])
     head = f"Провайдер {title}: {message}"
-    if advice.split(":")[0] in message:
+    urls = [w for w in advice.split() if w.startswith("http")]
+    if any(u.rstrip(".,;") in message for u in urls):
         return head
     return f"{head}\nЧто сделать: {advice}"
 
@@ -300,7 +304,10 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
                 ids = [str(m.get("id")) for m in instance.list_models()]
             except ProviderError as exc:
                 out(f"  {NO} Список моделей (models.list) не получен: {explain(exc, 'gemini')}")
-                problems.append("Ключ Gemini не прошёл проверку списком моделей.")
+                problems.append({"auth": "Ключ Gemini отклонён: проверьте GEMINI_API_KEY.",
+                                 "not_configured": f"Gemini не настроен: {exc.message}",
+                                 "network": "Нет соединения с Google API: проверьте интернет и прокси."}.get(
+                    exc.kind, f"Список моделей Gemini не получен ({exc.kind})."))
             else:
                 for m in chain:
                     out(f"  {OK if m in ids else NO} {m}" + ("" if m in ids else " — нет у этого ключа"))
