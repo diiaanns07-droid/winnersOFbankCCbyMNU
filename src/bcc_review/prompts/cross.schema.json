@@ -1,0 +1,589 @@
+{
+  "$comment": "Схемы ответов LLM-стадий №06 (подмножество JSON Schema без $ref — совместимо с response_schema Gemini).",
+  "cross.pairs": {
+    "type": "object",
+    "properties": {
+      "pairs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "pair_id": {
+              "type": "string"
+            },
+            "verdict": {
+              "type": "string",
+              "enum": [
+                "conflict",
+                "compatible",
+                "question",
+                "gap",
+                "unrelated"
+              ]
+            },
+            "a": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "condition": {
+                  "type": "string"
+                },
+                "moment": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "block_id": {
+                  "type": "string"
+                },
+                "constraints": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "var": {
+                        "type": "string"
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "eq",
+                          "ne",
+                          "lt",
+                          "le",
+                          "gt",
+                          "ge",
+                          "in",
+                          "not_in",
+                          "between",
+                          "outside",
+                          "inside",
+                          "is_true",
+                          "is_false",
+                          "contains"
+                        ]
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "var",
+                      "op"
+                    ]
+                  }
+                }
+              }
+            },
+            "b": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "condition": {
+                  "type": "string"
+                },
+                "moment": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "block_id": {
+                  "type": "string"
+                },
+                "constraints": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "var": {
+                        "type": "string"
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "eq",
+                          "ne",
+                          "lt",
+                          "le",
+                          "gt",
+                          "ge",
+                          "in",
+                          "not_in",
+                          "between",
+                          "outside",
+                          "inside",
+                          "is_true",
+                          "is_false",
+                          "contains"
+                        ]
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "var",
+                      "op"
+                    ]
+                  }
+                }
+              }
+            },
+            "witness": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "var": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "document",
+                          "illustrative"
+                        ]
+                      },
+                      "block_id": {
+                        "type": "string"
+                      },
+                      "quote": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "var",
+                      "value",
+                      "source"
+                    ]
+                  }
+                },
+                "outcome_a": {
+                  "type": "string"
+                },
+                "outcome_b": {
+                  "type": "string"
+                },
+                "outcome_target": {
+                  "type": "string"
+                },
+                "outcome_a_value": {
+                  "type": "string"
+                },
+                "outcome_b_value": {
+                  "type": "string"
+                },
+                "evidence_a": {
+                  "type": "object",
+                  "properties": {
+                    "block_id": {
+                      "type": "string"
+                    },
+                    "quote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "block_id",
+                    "quote"
+                  ]
+                },
+                "evidence_b": {
+                  "type": "object",
+                  "properties": {
+                    "block_id": {
+                      "type": "string"
+                    },
+                    "quote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "block_id",
+                    "quote"
+                  ]
+                }
+              },
+              "required": [
+                "input",
+                "outcome_a",
+                "outcome_b",
+                "evidence_a",
+                "evidence_b"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "impact": {
+              "type": "string"
+            },
+            "question": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "promise": {
+              "type": "object",
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "block_id",
+                "quote"
+              ]
+            },
+            "searched_for": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "pair_id",
+            "verdict"
+          ]
+        }
+      }
+    },
+    "required": [
+      "pairs"
+    ]
+  },
+  "cross.coverage": {
+    "type": "object",
+    "properties": {
+      "obligations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "obligation_id": {
+              "type": "string"
+            },
+            "branches": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "obligation_id",
+            "branches"
+          ]
+        }
+      },
+      "links": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "obligation_id": {
+              "type": "string"
+            },
+            "acceptance_id": {
+              "type": "string"
+            },
+            "relation": {
+              "type": "string",
+              "enum": [
+                "checks",
+                "checks_branch",
+                "contradicts",
+                "unrelated"
+              ]
+            },
+            "branches_checked": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "explanation": {
+              "type": "string"
+            },
+            "a": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "condition": {
+                  "type": "string"
+                },
+                "moment": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "block_id": {
+                  "type": "string"
+                },
+                "constraints": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "var": {
+                        "type": "string"
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "eq",
+                          "ne",
+                          "lt",
+                          "le",
+                          "gt",
+                          "ge",
+                          "in",
+                          "not_in",
+                          "between",
+                          "outside",
+                          "inside",
+                          "is_true",
+                          "is_false",
+                          "contains"
+                        ]
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "var",
+                      "op"
+                    ]
+                  }
+                }
+              }
+            },
+            "b": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "condition": {
+                  "type": "string"
+                },
+                "moment": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "block_id": {
+                  "type": "string"
+                },
+                "constraints": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "var": {
+                        "type": "string"
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "eq",
+                          "ne",
+                          "lt",
+                          "le",
+                          "gt",
+                          "ge",
+                          "in",
+                          "not_in",
+                          "between",
+                          "outside",
+                          "inside",
+                          "is_true",
+                          "is_false",
+                          "contains"
+                        ]
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "var",
+                      "op"
+                    ]
+                  }
+                }
+              }
+            },
+            "witness": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "var": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "document",
+                          "illustrative"
+                        ]
+                      },
+                      "block_id": {
+                        "type": "string"
+                      },
+                      "quote": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "var",
+                      "value",
+                      "source"
+                    ]
+                  }
+                },
+                "outcome_a": {
+                  "type": "string"
+                },
+                "outcome_b": {
+                  "type": "string"
+                },
+                "outcome_target": {
+                  "type": "string"
+                },
+                "outcome_a_value": {
+                  "type": "string"
+                },
+                "outcome_b_value": {
+                  "type": "string"
+                },
+                "evidence_a": {
+                  "type": "object",
+                  "properties": {
+                    "block_id": {
+                      "type": "string"
+                    },
+                    "quote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "block_id",
+                    "quote"
+                  ]
+                },
+                "evidence_b": {
+                  "type": "object",
+                  "properties": {
+                    "block_id": {
+                      "type": "string"
+                    },
+                    "quote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "block_id",
+                    "quote"
+                  ]
+                }
+              },
+              "required": [
+                "input",
+                "outcome_a",
+                "outcome_b",
+                "evidence_a",
+                "evidence_b"
+              ]
+            }
+          },
+          "required": [
+            "obligation_id",
+            "acceptance_id",
+            "relation"
+          ]
+        }
+      }
+    },
+    "required": [
+      "links"
+    ]
+  }
+}

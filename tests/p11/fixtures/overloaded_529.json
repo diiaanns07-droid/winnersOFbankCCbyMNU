@@ -1,0 +1,21 @@
+{
+  "_synthetic": true,
+  "_note": "Перегрузка API.",
+  "name": "overloaded_529",
+  "response": {
+    "status": 529,
+    "headers": {
+      "request-id": "req_synth_529",
+      "content-type": "application/json",
+      "retry-after-ms": "1"
+    },
+    "body": {
+      "type": "error",
+      "error": {
+        "type": "overloaded_error",
+        "message": "Overloaded"
+      },
+      "request_id": "req_synth_529"
+    }
+  }
+}

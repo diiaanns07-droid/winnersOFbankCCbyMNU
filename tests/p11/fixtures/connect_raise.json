@@ -1,0 +1,6 @@
+{
+  "_synthetic": true,
+  "name": "connect_raise",
+  "raise": "connect",
+  "_note": "ConnectError транспорта."
+}

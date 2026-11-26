@@ -1,0 +1,21 @@
+{
+  "_synthetic": true,
+  "_note": "Временный лимит с Retry-After: 7.",
+  "name": "rate_limit_429_retry_after",
+  "response": {
+    "status": 429,
+    "headers": {
+      "request-id": "req_synth_429",
+      "content-type": "application/json",
+      "retry-after": "7"
+    },
+    "body": {
+      "type": "error",
+      "error": {
+        "type": "rate_limit_error",
+        "message": "Number of request tokens has exceeded your per-minute rate limit"
+      },
+      "request_id": "req_synth_429"
+    }
+  }
+}
