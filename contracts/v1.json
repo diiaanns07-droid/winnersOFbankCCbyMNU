@@ -281,9 +281,7 @@
             "type": "number"
           }
         },
-        "table": {
-          "type": "integer"
-        },
+        "table": {},
         "row": {
           "type": "integer"
         },

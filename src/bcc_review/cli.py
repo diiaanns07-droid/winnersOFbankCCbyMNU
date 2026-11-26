@@ -120,7 +120,9 @@ def cmd_verify(argv: list[str]) -> int:
     mods = Modules()
     verifier = mods.get("verify_report")
     suffix = Path(args.source).suffix.lower()
-    reader = mods.get(READERS[suffix]).func if suffix in READERS else None
+    raw_reader = mods.get(READERS[suffix]).func if suffix in READERS else None
+    # тот же путь чтения, что у движка: читатель модуля + нормализация стыка
+    reader = (lambda p: C.normalize_document(raw_reader(p))) if raw_reader else None
     try:
         try:
             result = verifier.func(args.report, args.source, reader=reader)
@@ -133,12 +135,17 @@ def cmd_verify(argv: list[str]) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     elif result["ok"]:
         c = result.get("counts", {})
-        print(f"verify: OK — источник, {c.get('evidence', 0)} опор, счётчики и паспорт согласованы "
+        n = c.get("confirmed", c.get("evidence", 0))
+        print(f"verify: OK — SHA-256 источника совпадает, опор подтверждено {n}, счётчики и паспорт согласованы "
               f"({verifier.label})")
+        for w in result.get("warnings", [])[:10]:
+            print(f"  ! {w.get('message', w) if isinstance(w, dict) else w}")
     else:
         print(f"verify: найдено расхождений: {len(result['errors'])}", file=sys.stderr)
         for e in result["errors"][:50]:
-            print(f"  - {e}", file=sys.stderr)
+            text = e.get("message", e) if isinstance(e, dict) else e
+            where = f"{e.get('code')} {e.get('path', '')}: " if isinstance(e, dict) else ""
+            print(f"  - {where}{text}", file=sys.stderr)
     return C.EXIT_OK if result["ok"] else C.EXIT_VERIFY_FAILED
 
 

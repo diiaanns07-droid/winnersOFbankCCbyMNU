@@ -1,0 +1,20 @@
+{
+  "_synthetic": true,
+  "_note": "Слишком сложная схема.",
+  "name": "schema_too_complex_400",
+  "response": {
+    "status": 400,
+    "headers": {
+      "request-id": "req_synth_400_schema",
+      "content-type": "application/json"
+    },
+    "body": {
+      "type": "error",
+      "error": {
+        "type": "invalid_request_error",
+        "message": "Schema is too complex for compilation."
+      },
+      "request_id": "req_synth_400_schema"
+    }
+  }
+}
