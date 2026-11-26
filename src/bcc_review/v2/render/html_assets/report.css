@@ -407,6 +407,7 @@ tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transpa
 .a-no { background: var(--crit-soft); color: var(--crit); }
 .a-part { background: var(--major-soft); color: var(--major); }
 .a-na { background: var(--surface-3); color: var(--ink-2); }
+.deriv { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
 .warnmark { display: inline-block; font-weight: 650; color: var(--major); }
 table.tc td:nth-child(3) { min-width: 160px; }
 table.cl td:first-child { width: 42%; }

@@ -501,7 +501,7 @@ def _doc_pane(view: dict | None, findings: list[dict], report: dict) -> str:
             prev_page = page
         text = ln.get("text", "")
         cls = ["ln"]
-        heading = ln.get("heading")
+        heading = ln.get("heading") or (ln.get("level") or 1 if ln.get("kind") == "heading" else 0)
         if not heading and text.strip() and ln.get("section"):
             last = str(ln["section"]).split("›")[-1].strip()
             heading = 1 if last and text.strip() == last else 0
@@ -833,8 +833,11 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
     if acc:
         rows = [[_req_link(a.get("row_requirement_id", ""), reqs_by_id), e(a.get("row_facts", "")),
                  " ".join(_req_link(r, reqs_by_id) for r in a.get("rule_requirement_ids") or []),
-                 e(a.get("expected_by_rules", "")), e(a.get("stated", "")),
-                 f'<span class="ans {verdict_cls.get(a.get("verdict"), "a-na")}">{e(verdict_lbl.get(a.get("verdict"), a.get("verdict", "")))}</span>']
+                 e(a.get("expected_by_rules", "")) + (f'<div class="deriv">{e(a["derivation"])}</div>' if a.get("derivation") else ""),
+                 e(a.get("stated", "")),
+                 f'<span class="ans {verdict_cls.get(a.get("verdict"), "a-na")}">{e(verdict_lbl.get(a.get("verdict"), a.get("verdict", "")))}</span>'
+                 + (f'<div class="deriv">{e(a.get("explanation") or a.get("fix"))}</div>'
+                    if a.get("verdict") == "conflict" and (a.get("explanation") or a.get("fix")) else "")]
                 for a in acc]
         parts.append('<h3 class="sub">Исполнение критериев приёмки</h3><p class="lead">Ожидаемый результат выведен '
                      'из правил документа и сравнён с тем, что записано в критерии.</p>'
