@@ -14,12 +14,13 @@
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any
 
 NAME = "architect"
 PROMPT = "lens_architect"
 SOURCE = "lens:architect"
-MAX_CANDIDATES = 14
+MAX_CANDIDATES = 12
 
 KINDS = ["event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
          "missing_element", "incomplete", "ambiguity", "unverifiable", "non_singular", "design_constraint",
@@ -114,12 +115,92 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
     return {"candidates": out[:max_candidates], "inventory": inventory}
 
 
-def run(ctx: Any) -> dict:
-    """Запуск линзы через общий механизм `stages/lens.py` (№01) с собственной схемой и постобработкой."""
+OUTPUT_LIMIT = re.compile(r"output token|max_tokens|max output tokens|обрезан|лимит\w* выход", re.I)
+API_KINDS = {"api", "integration", "data", "architecture"}
+# Провайдеры, у которых лимит ответа 32 000 безопасен (их собственный лимит по умолчанию — 32 000, №02).
+# У слабых моделей в лимит входит рассуждение: haiku на этой линзе тратит 24–45 тыс. токенов, и запрос
+# с 16 000 впустую падает через ~5 минут. Для локальных моделей (openai) остаётся общий лимит линз.
+WIDE_OUTPUT_PROVIDERS = {"claude_cli", "gemini", "anthropic", "mock"}
+WIDE_OUTPUT_TOKENS = 32000
+
+
+def _is_output_limit(exc: BaseException) -> bool:
+    return getattr(exc, "kind", "") == "truncated" or bool(OUTPUT_LIMIT.search(str(exc)))
+
+
+def split_requirements(requirements: list) -> list[list[str]]:
+    """Две части для повтора при переполнении вывода: контракт и данные — отдельно от остального."""
+    ids = [r.get("id") for r in requirements or [] if isinstance(r, dict) and r.get("id")]
+    api = [r.get("id") for r in requirements or [] if isinstance(r, dict) and r.get("id")
+           and r.get("kind") in API_KINDS]
+    rest = [i for i in ids if i not in set(api)]
+    if not api or not rest:
+        half = max(1, len(ids) // 2)
+        api, rest = ids[:half], ids[half:]
+    return [part for part in (api, rest) if part]
+
+
+def _run_parts(ctx: Any) -> dict:
+    from . import lens  # каркас №01
+    from ..llm import merge_lists
+
+    system, user = ctx.prompt(f"lens_{NAME}")
+    schema = lens.schema_for(NAME)
+    parts, failed = [], []
+    for ids in split_requirements(getattr(ctx, "requirements", None) or []):
+        try:
+            parts.append(ctx.llm.ask(f"lens_{NAME}", system, user + lens.FOCUS.format(ids=", ".join(ids)),
+                                     schema, max_output_tokens=output_limit(ctx)))
+        except Exception as exc:  # noqa: BLE001 — одна часть не должна ронять другую
+            failed.append(f"{ids[0]}…{ids[-1]}: {exc}")
+            if not parts and _is_output_limit(exc):
+                break  # и половина не уместилась: дело в рассуждении модели, вторая часть не поможет
+    if not parts:
+        raise RuntimeError("Линза «Архитектор»: обе части не выполнены — " + "; ".join(failed))
+    if failed and hasattr(ctx, "warn"):
+        ctx.warn("Линза «Архитектор»: часть требований не проверена — " + "; ".join(failed)[:300])
+    return merge_lists(parts)
+
+
+def _ask_whole(ctx: Any) -> dict:
+    """Один запрос на весь документ. При обрезке `LLMClient.ask` (№01) сам повторяет с удвоенным лимитом."""
     from . import lens  # каркас №01
 
-    raw = lens.run(ctx, NAME)
+    stage = f"lens_{NAME}"
+    if hasattr(lens, "prompts") and not lens.prompts.exists(stage):
+        ctx.warn(f"Линза «{NAME}»: нет промпта {stage}.md — этап пропущен")
+        return {"candidates": []}
+    system, user = ctx.prompt(stage)
+    return ctx.llm.ask(stage, system, user, lens.schema_for(NAME), max_output_tokens=output_limit(ctx))
+
+
+def output_limit(ctx: Any) -> int:
+    from . import lens  # каркас №01
+
+    base = int(getattr(lens, "MAX_OUTPUT_TOKENS", 16000))
+    name = str(getattr(getattr(ctx, "llm", None), "provider_name", "") or "")
+    return max(base, WIDE_OUTPUT_TOKENS) if name in WIDE_OUTPUT_PROVIDERS else base
+
+
+def run(ctx: Any) -> dict:
+    """Запуск линзы с собственной схемой (`SCHEMA`) и постобработкой.
+
+    Линза сверяет места по всему документу (обещание в одной части, операция — в другой), поэтому пакет
+    требований сначала не делится: один запрос, при обрезке — повтор с удвоенным лимитом ответа (`llm.ask`).
+    Если и так не уместилось — два запроса: требования контракта, данных и интеграции отдельно от остальных
+    (документ модель видит целиком). Деление глубже не помогает: у слабых моделей лимит съедает рассуждение,
+    а не объём ответа (замер haiku, статус №07).
+    """
+    try:
+        raw = _ask_whole(ctx)
+    except Exception as exc:  # noqa: BLE001
+        if not _is_output_limit(exc) or len(getattr(ctx, "requirements", None) or []) < 2:
+            raise
+        if hasattr(ctx, "warn"):
+            ctx.warn("Линза «Архитектор»: ответ не уместился в лимит вывода — повтор двумя частями")
+        raw = _run_parts(ctx)
+    raw = dict(raw or {})
     reqs = {r.get("id") for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)}
     result = postprocess(raw, requirement_ids=reqs or None)
-    extras = {k: v for k, v in (raw or {}).items() if k not in ("candidates", "inventory")}
+    extras = {k: v for k, v in raw.items() if k not in ("candidates", "inventory")}
     return {**extras, **result}

@@ -138,20 +138,72 @@ def rule_verdict(report: dict) -> dict:
     return out
 
 
+_READY_RU = {"no": "нельзя", "conditional": "с условиями", "yes": "можно", "undetermined": "не определено",
+             "none": "не вынесен"}
+
+
+def _restore_resolved(report: dict) -> None:
+    """Режим --answers: конвейер кладёт в findings только оставшиеся дефекты, а вопросы, чек-лист и «исправить
+    первым» ссылаются и на снятые. Снятые возвращаются в перечень с status_after_answers=resolved — ссылки
+    остаются целыми, в счётчики и вердикт снятые не входят."""
+    before = report.get("findings_before")
+    if not report.get("clarification") or not isinstance(before, list):
+        return
+    findings = report.setdefault("findings", [])
+    have = {f.get("id") for f in findings if isinstance(f, dict)}
+    for f in before:
+        if isinstance(f, dict) and f.get("id") and f["id"] not in have:
+            findings.append({**f, "status_after_answers": "resolved"})
+            have.add(f["id"])
+
+
+def _after_summary(report: dict, rule: dict) -> str:
+    cl = report.get("clarification") or {}
+    s = compute_summary(report)["findings"]
+    bv = (cl.get("before") or {}).get("verdict") or {}
+    text = (f"После ответов владельца разработка — {_READY_RU.get(rule['development'], '—')}, тестирование — "
+            f"{_READY_RU.get(rule['testing'], '—')}: критичных дефектов {s['critical']}, существенных {s['major']}, "
+            f"незначительных {s['minor']}. Снято ответами {cl.get('resolved', 0)}, уточнено {cl.get('changed', 0)}, "
+            f"новых конфликтов {len(cl.get('new_findings') or [])}.")
+    if bv:
+        text += (f" До ответов: разработка — {_READY_RU.get(bv.get('development'), '—')}, тестирование — "
+                 f"{_READY_RU.get(bv.get('testing'), '—')}.")
+    return text
+
+
 def finalize(report: dict) -> dict:
-    """Досчитать поля, которые считает код. Вердикт не перезаписывается, если его уже поставил конвейер."""
+    """Досчитать поля, которые считает код: summary и вердикт по правилу (CONTRACT 5).
+
+    Если вердикт конвейера расходится с правилом (например, после ответов владельца), ставится вердикт по правилу,
+    иначе отчёт не прошёл бы verify; обоснование при этом пересчитывается."""
     report.setdefault("schema", SCHEMA_ID)
     for key in ("excluded", "rejected", "acceptance_checks", "pair_checks", "trace", "glossary",
                 "test_cases", "questions", "checklist"):
         report.setdefault(key, [])
+    _restore_resolved(report)
     report["summary"] = compute_summary(report)
     verdict = report.setdefault("verdict", {})
     rule = rule_verdict(report)
+    changed = any(verdict.get(k) not in (None, rule[k]) for k in ("development", "testing"))
     for k in ("development", "testing"):
-        verdict.setdefault(k, rule[k])
+        verdict[k] = rule[k]
+    if report.get("clarification"):
+        cl = report["clarification"]
+        cl.setdefault("before", {}).setdefault("summary", verdict.get("summary", ""))
+        if changed or not verdict.get("summary"):
+            verdict["summary"] = _after_summary(report, rule)
+    elif changed:
+        report.setdefault("run", {}).setdefault("warnings", []).append(
+            "вердикт конвейера расходился с правилом кода и пересчитан по правилу")
     verdict.setdefault("summary", "")
-    verdict.setdefault("fix_first", [f["id"] for f in sorted(
-        (f for f in open_findings(report) if f.get("priority")), key=lambda f: f["priority"])][:7])
+    open_ids = {f.get("id") for f in open_findings(report)}
+    fix = [i for i in verdict.get("fix_first") or [] if i in open_ids]
+    if not fix:
+        fix = [f["id"] for f in sorted((f for f in open_findings(report) if f.get("priority")),
+                                       key=lambda f: f["priority"])][:7]
+    if not fix:
+        fix = [f["id"] for f in open_findings(report) if f.get("severity") in ("critical", "major")][:5]
+    verdict["fix_first"] = fix
     return report
 
 

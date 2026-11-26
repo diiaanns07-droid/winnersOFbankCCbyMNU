@@ -228,6 +228,39 @@ def render_summary(s: dict, per_case: list[dict], label: str) -> str:
     return "\n".join(L) + "\n"
 
 
+def corpus_table() -> str:
+    """Таблица всех сохранённых прогонов корпуса (evaluation/v2/corpus_results/*/summary.json)."""
+    rows = []
+    for p in sorted((ROOT / "evaluation" / "v2" / "corpus_results").glob("*/summary.json")):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        rows.append(d)
+    rows.sort(key=lambda d: d.get("at", ""))
+    L = ["| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Тревог на 8 чистых | "
+         "critical / major на чистых | Вердикт «нельзя» на чистых | Recall по типам | Мин | Вызовов |",
+         "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: |"]
+    for d in rows:
+        h, c = d["harness"], d["clean"]
+        types = ", ".join(f"{k} {v.get('tp', 0)}/{(v.get('tp') or 0) + (v.get('fn') or 0)}"
+                          for k, v in sorted(d.get("per_issue_type", {}).items()) if (v.get('tp') or 0) + (v.get('fn') or 0))
+        L.append(f"| {d['label']} | {d['cases']} ({d['failed']}) | {h.get('tp')} | {h.get('fp')} | {h.get('fn')} | "
+                 f"{h.get('duplicates')} | {_f(h.get('precision'))} | {_f(h.get('recall'))} | {_f(h.get('f1'))} | "
+                 f"{h.get('clean_false_alarms')} | {c['critical']} / {c['major']} | {c['verdict_no']} | {types} | "
+                 f"{d['time']['total_s'] / 60:.1f} | {d['time']['calls']} |")
+    return "\n".join(L)
+
+
+def update_results() -> None:
+    import re as _re
+
+    res = ROOT / "evaluation" / "v2" / "RESULTS.md"
+    text = res.read_text(encoding="utf-8")
+    st, en = "<!-- corpus:start -->", "<!-- corpus:end -->"
+    table = corpus_table()
+    if st in text and en in text:
+        text = _re.sub(_re.escape(st) + r".*?" + _re.escape(en), lambda m: st + "\n" + table + "\n" + en, text, flags=_re.S)
+        res.write_text(text, encoding="utf-8")
+
+
 def _f(x) -> str:
     return "—" if x is None else (f"{x:.3f}" if isinstance(x, float) else str(x))
 
@@ -235,7 +268,7 @@ def _f(x) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.corpus", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub = ap.add_subparsers(dest="action", required=True)
     for name in ("run", "score"):
         p = sub.add_parser(name)
         p.add_argument("--out", required=True)
@@ -243,10 +276,12 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--cases", nargs="*", help="id кейсов или префиксы (по умолчанию все)")
         p.add_argument("--mode", default="rules_plus_llm")
         p.add_argument("--label", default="")
+        p.add_argument("--save", action="store_true",
+                       help="сохранить сводку, метрики и предсказания в evaluation/v2/corpus_results/<метка>")
         if name == "run":
             p.add_argument("--provider", default="claude_cli")
             p.add_argument("--model", default="haiku")
-            p.add_argument("--cmd", default=DEFAULT_CMD, help="шаблон команды агента: {python} {input} {output} "
+            p.add_argument("--cmd", dest="cmd_tpl", default=DEFAULT_CMD, help="шаблон команды агента: {python} {input} {output} "
                                                               "{provider} {model}")
             p.add_argument("--jobs", type=int, default=3)
             p.add_argument("--timeout", type=int, default=1800)
@@ -258,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
 
-    if a.cmd == "adapt":
+    if a.action == "adapt":
         rep = json.loads(Path(a.report).read_text(encoding="utf-8"))
         for r in adapt_report(rep, sha256_file(a.source), a.mode):
             print(json.dumps(r, ensure_ascii=False))
@@ -267,28 +302,41 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     cases = select_cases(a.format, a.cases)
-    if a.cmd == "run":
+    if a.action == "run":
         t0 = time.monotonic()
         log = []
         with cf.ThreadPoolExecutor(max_workers=max(1, a.jobs)) as ex:
-            futs = [ex.submit(run_one, c, out, a.cmd, a.provider, a.model, a.timeout, a.reuse) for c in cases]
+            futs = [ex.submit(run_one, c, out, a.cmd_tpl, a.provider, a.model, a.timeout, a.reuse) for c in cases]
             for fu in cf.as_completed(futs):
                 r = fu.result()
                 log.append(r)
                 print(f"{r['case_id']}: rc={r['rc']} {r.get('seconds')} с", flush=True)
         (out / "run_log.json").write_text(json.dumps({"cases": sorted(log, key=lambda x: x["case_id"]),
                                                       "wall_s": round(time.monotonic() - t0, 1),
-                                                      "provider": a.provider, "model": a.model, "cmd": a.cmd},
+                                                      "provider": a.provider, "model": a.model, "cmd": a.cmd_tpl},
                                                      ensure_ascii=False, indent=2), encoding="utf-8")
     preds, per_case = build_predictions(out, cases, a.mode)
     metrics = harness_score(out, preds, a.format)
     s = summarize(metrics, per_case)
     label = a.label or out.name
-    (out / "summary.json").write_text(json.dumps({"label": label, **s, "per_case": per_case}, ensure_ascii=False,
-                                                 indent=2), encoding="utf-8")
+    from .measure import slugify
+    from .score import astana_now
+
+    (out / "summary.json").write_text(json.dumps({"label": label, "at": astana_now(), **s, "per_case": per_case},
+                                                 ensure_ascii=False, indent=2), encoding="utf-8")
     text = render_summary(s, per_case, label)
     (out / "summary.md").write_text(text, encoding="utf-8")
     print(text)
+    if a.save:
+        import shutil
+
+        dest = ROOT / "evaluation" / "v2" / "corpus_results" / slugify(label)
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in ("summary.md", "summary.json", "predictions.jsonl", "harness/metrics.json", "harness/matrix.jsonl"):
+            if (out / f).exists():
+                shutil.copy(out / f, dest / Path(f).name)
+        print(f"сохранено: {dest.relative_to(ROOT)}")
+        update_results()
     return 0
 
 

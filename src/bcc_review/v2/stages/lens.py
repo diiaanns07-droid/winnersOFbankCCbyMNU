@@ -16,7 +16,7 @@ from .. import prompts
 from ..llm import merge_lists
 from ..types import CANDIDATES_SCHEMA
 
-MAX_OUTPUT_TOKENS = 16000
+MAX_OUTPUT_TOKENS = 16000  # при обрезке llm.ask сам повторяет с 32 000 (рассуждение входит в лимит), затем делит
 FOCUS = ("\n\nОграничение этого запроса: ответ предыдущего запроса не поместился в лимит. Проверяй только "
          "требования {ids} (документ остальной — для контекста). Кандидатов по другим требованиям не выдавай.")
 
@@ -42,6 +42,8 @@ def run(ctx: Any, name: str) -> dict:
         ctx.warn(f"Линза «{name}»: нет промпта {stage}.md — этап пропущен")
         return {"candidates": []}
     schema = schema_for(name)
+    mod = module(name)
+    max_out = int(getattr(mod, "MAX_OUTPUT_TOKENS", 0) or MAX_OUTPUT_TOKENS) if mod else MAX_OUTPUT_TOKENS
     system, user = ctx.prompt(stage)
     reqs = [r.get("id") for r in ctx.requirements or [] if r.get("id")]
 
@@ -52,9 +54,9 @@ def run(ctx: Any, name: str) -> dict:
 
     llm = ctx.llm
     if reqs and hasattr(llm, "ask_split"):
-        data = llm.ask_split(stage, build, reqs, schema, merge_lists, max_output_tokens=MAX_OUTPUT_TOKENS)
+        data = llm.ask_split(stage, build, reqs, schema, merge_lists, max_output_tokens=max_out)
     else:
-        data = llm.ask(stage, system, user, schema, max_output_tokens=MAX_OUTPUT_TOKENS)
+        data = llm.ask(stage, system, user, schema, max_output_tokens=max_out)
     data = dict(data or {})
     data.setdefault("candidates", [])
     for c in data["candidates"]:

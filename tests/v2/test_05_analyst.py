@@ -121,6 +121,66 @@ def test_run_wraps_lens_run():
     assert calls == ["analyst"] and len(out["candidates"]) == 1 and out["extra"] == 1
 
 
+class _FakeLLM:
+    def __init__(self):
+        self.calls = []
+
+    def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+        self.calls.append(("ask", stage, max_output_tokens))
+        return {"candidates": [_cand("a", lines=(1,))]}
+
+    def ask_split(self, stage, build, items, schema, merge, *, max_output_tokens=16000):
+        self.calls.append(("ask_split", stage, max_output_tokens, list(items)))
+        return {"candidates": [_cand("a", lines=(1,)), _cand("b", lines=(2,))]}
+
+
+class _FakeCtx:
+    def __init__(self, llm):
+        self.llm, self.requirements, self.marker = llm, [{"id": "R-01"}, {"id": "R-02"}], "ctx"
+
+    def prompt(self, name):
+        return "sys", f"user:{name}"
+
+
+def _lens_like(ctx, name):
+    """Как stages/lens.run: ask_split по требованиям с лимитом 16 000."""
+    ids = [r["id"] for r in ctx.requirements]
+    assert ctx.marker == "ctx"  # прочие атрибуты контекста доступны
+    return ctx.llm.ask_split(f"lens_{name}", lambda items: ctx.prompt(f"lens_{name}"), ids, {}, None,
+                             max_output_tokens=16000)
+
+
+def test_run_raises_output_budget_for_lens_calls():
+    mod = _load_stage()
+    llm = _FakeLLM()
+    out = mod.run(_FakeCtx(llm), lens_run=_lens_like)
+    assert llm.calls == [("ask_split", "lens_analyst", mod.MAX_OUTPUT_TOKENS, ["R-01", "R-02"])]
+    assert mod.MAX_OUTPUT_TOKENS >= 32000 and len(out["candidates"]) == 2
+
+
+def test_output_budget_falls_back_to_ask_without_split():
+    mod = _load_stage()
+
+    class OnlyAsk:
+        def __init__(self):
+            self.calls = []
+
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            self.calls.append(max_output_tokens)
+            return {"candidates": []}
+
+    llm = OnlyAsk()
+    mod.run(_FakeCtx(llm), lens_run=_lens_like)
+    assert llm.calls == [mod.MAX_OUTPUT_TOKENS]
+
+
+def test_output_budget_keeps_bigger_limit():
+    mod = _load_stage()
+    llm = _FakeLLM()
+    mod._OutputBudget(llm, 1000).ask("s", "a", "b", {}, max_output_tokens=50000)
+    assert llm.calls == [("ask", "s", 50000)]
+
+
 @pytest.mark.parametrize("bad", [None, [], [None, "x", 3]])
 def test_postprocess_tolerates_garbage(bad):
     assert _load_stage().postprocess(bad) == []

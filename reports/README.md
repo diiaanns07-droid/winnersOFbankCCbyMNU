@@ -20,6 +20,6 @@ python -m bcc_review verify reports/requirements.json release/input/requirements
 
 | Отчёт | Команда |
 | :--- | :--- |
-| `requirements.*` | `python -m bcc_review release/input/requirements.md reports/requirements.md --provider claude_cli --model opus --no-cache --export html,jira` |
-| `requirements_pdf.*` | `python -m bcc_review release/input/requirements.pdf reports/requirements_pdf.md --provider claude_cli --model opus --no-cache --export html,jira` |
-| `requirements.gemini.*` | `python -m bcc_review release/input/requirements.md reports/requirements.gemini.md --provider gemini --no-cache --export html,jira` |
+| `requirements.*` | `python -m bcc_review release/input/requirements.md reports/requirements.md --provider claude_cli --model opus --no-cache --export jira` |
+| `requirements_pdf.*` | `python -m bcc_review release/input/requirements.pdf reports/requirements_pdf.md --provider claude_cli --model opus --no-cache --export jira,pdf` |
+| `requirements.gemini.*` | `python -m bcc_review release/input/requirements.md reports/requirements.gemini.md --provider gemini --no-cache --export jira` |

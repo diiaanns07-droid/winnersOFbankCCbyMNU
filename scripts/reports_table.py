@@ -2,6 +2,7 @@
 
     python scripts/reports_table.py reports            # печать таблицы
     python scripts/reports_table.py reports --write    # вписать таблицу в reports/README.md между маркерами
+    python scripts/reports_table.py reports --src cashback=evaluation/dev/.../source.md   # исходник не из release/input
 
 Для каждого отчёта заново запускается `python -m bcc_review verify ОТЧЁТ.json ИСХОДНИК`: исходник берётся из
 паспорта (document.file) и ищется в release/input/, рядом с отчётом и по пути из паспорта.
@@ -32,7 +33,11 @@ def _get(d: dict, *path, default=None):
     return d
 
 
-def _find_source(report: Path, data: dict) -> Path | None:
+def _find_source(report: Path, data: dict, overrides: dict[str, str] | None = None) -> Path | None:
+    stem = report.name[: -len(".json")]
+    for key in (stem, stem.split(".", 1)[0]):
+        if overrides and key in overrides:
+            return Path(overrides[key])
     name = _get(data, "document", "file", default="") or ""
     candidates = [Path(name), ROOT / name, ROOT / "release" / "input" / Path(name).name, report.parent / Path(name).name]
     for c in candidates:
@@ -54,10 +59,10 @@ def _minutes(seconds) -> str:
         s = float(seconds)
     except (TypeError, ValueError):
         return "—"
-    return f"{s / 60:.1f} мин" if s >= 60 else f"{s:.0f} с"
+    return (f"{s / 60:.1f} мин" if s >= 60 else f"{s:.0f} с").replace(".", ",")
 
 
-def rows(reports_dir: Path) -> list[dict]:
+def rows(reports_dir: Path, overrides: dict[str, str] | None = None) -> list[dict]:
     out = []
     for path in sorted(reports_dir.glob("*.json")):
         try:
@@ -68,7 +73,7 @@ def rows(reports_dir: Path) -> list[dict]:
             continue
         run = data.get("run", {})
         findings = _get(data, "summary", "findings", default={}) or {}
-        source = _find_source(path, data)
+        source = _find_source(path, data, overrides)
         models = run.get("models_used") or [run.get("model_requested") or "—"]
         commit = str(run.get("commit") or "—")[:7] + ("-dirty" if run.get("dirty") else "")
         out.append({
@@ -108,9 +113,12 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="таблица прогонов из паспортов отчётов")
     p.add_argument("reports_dir", nargs="?", default=str(ROOT / "reports"))
     p.add_argument("--write", action="store_true", help="вписать таблицу в README.md каталога отчётов")
+    p.add_argument("--src", action="append", default=[], metavar="ОТЧЁТ=ИСХОДНИК",
+                   help="исходник для отчёта (имя файла отчёта без .json или его начало до точки)")
     args = p.parse_args(argv)
     d = Path(args.reports_dir)
-    items = rows(d)
+    overrides = dict(item.split("=", 1) for item in args.src if "=" in item)
+    items = rows(d, overrides)
     text = table(items)
     if not args.write:
         print(text)

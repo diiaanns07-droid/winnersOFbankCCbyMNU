@@ -93,8 +93,14 @@ def test_ask_split_halves_truncated_batch():
     assert llm.stats["split"] >= 2
 
 
+def test_truncated_retries_with_bigger_limit_then_raises():
+    llm = client([ProviderError("truncated", "x"), {"items": ["ok"]}])
+    assert llm.ask("s", "sys", "u", SCHEMA, max_output_tokens=8000) == {"items": ["ok"]}
+    assert llm.stats["expanded"] == 1
+
+
 def test_truncated_single_item_raises():
-    llm = client([ProviderError("truncated", "x")])
+    llm = client([ProviderError("truncated", "x")] * 3)
     with pytest.raises(Truncated):
         llm.ask_split("s", lambda it: ("sys", "u"), ["one"], SCHEMA, merge_lists)
 
@@ -233,3 +239,56 @@ def test_cli_routes_engine_and_help(capsys):
     from bcc_review.__main__ import _engine
     assert _engine(["--engine", "v1", "a.md", "b.md"]) == ("v1", ["a.md", "b.md"])
     assert _engine(["a.md", "b.md"]) == ("v2", ["a.md", "b.md"])
+
+
+def test_raw_responses_saved_for_mock_fixtures(tmp_path):
+    report, _, _ = _run(tmp_path)
+    resp = tmp_path / "runs" / report["run"]["run_id"] / "responses"
+    assert (resp / "segment.json").is_file() and (resp / "judge.json").is_file()
+    assert isinstance(json.loads((resp / "judge.json").read_text(encoding="utf-8")), list)
+
+
+def test_recorded_official_run_reproduces_verdict(tmp_path):
+    """Записанные ответы живого прогона sonnet (tests/v2/fixtures/official) дают тот же вердикт без сети."""
+    report, _, _ = _run(tmp_path)
+    sev = [f["severity"] for f in report["findings"]]
+    assert report["run"]["status"] == "complete"
+    assert sev.count("critical") >= 2 and len(sev) >= 15
+    assert report["verdict"]["development"] == "no"
+    assert all(e.get("verified") != "missing" for f in report["findings"] for e in f.get("evidence") or [])
+
+
+def test_cli_output_limit_error_is_treated_as_truncation():
+    err = ProviderError("unknown", "claude -p вернул ошибку (success). [claude -p, модель haiku: API Error: Claude's "
+                                   "response exceeded the 16000 output token maximum.")
+    llm = client([err, {"items": ["ok"]}])
+    assert llm.ask("s", "sys", "u", SCHEMA) == {"items": ["ok"]}
+    assert llm.stats["expanded"] == 1
+
+
+def test_fatal_provider_error_stops_further_calls():
+    llm = client([ProviderError("auth", "ключ не принят"), {"items": ["never"]}])
+    with pytest.raises(LLMError):
+        llm.ask("a", "s", "u1", SCHEMA)
+    with pytest.raises(LLMError) as e:
+        llm.ask("b", "s", "u2", SCHEMA)
+    assert e.value.kind == "auth" and llm.stats["calls"] == 1
+
+
+def test_bad_provider_config_gives_rules_report_with_explanation(tmp_path, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    report, _, out = _run(tmp_path, provider="anthropic")
+    assert out.is_file()
+    assert report["run"].get("model_error") and report["run"]["warnings"][0] == report["run"]["model_error"]
+
+
+def test_acceptance_checks_linked_to_findings():
+    p = pipeline.Pipeline.__new__(pipeline.Pipeline)
+    p.warnings = []
+    extras = {"acceptance_checks": [{"row_requirement_id": "R-14"}, {"row_requirement_id": "R-15"}],
+              "pair_checks": [], "glossary": []}
+    kept = [{"id": "C-001", "acceptance_row": "R-14"}, {"id": "C-002"}]
+    findings = [{"id": "D-01", "candidate_ids": ["C-001", "C-002"]}]
+    p._link(extras, kept, findings)
+    assert extras["acceptance_checks"][0]["finding_ids"] == ["D-01"]
+    assert extras["acceptance_checks"][1]["finding_ids"] == []
