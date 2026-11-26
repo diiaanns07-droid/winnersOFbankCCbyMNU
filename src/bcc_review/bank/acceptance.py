@@ -53,9 +53,11 @@ UNIT = (
 )
 _NUM_RE = re.compile(NUM)
 _UNIT_RE = re.compile(UNIT, re.I)
+# «включительно» после числа: через пробел или в скобках («до N ₸ (включительно)»).
+INCL = r"(?:\s*\(\s*включительно\s*\)|\s+включительно)"
 _RANGE_FROM_TO = re.compile(
-    rf"(?<!\w)от\s+(?P<a>{NUM_CORE})\s*(?P<ua>{UNIT})?(?P<ainc>\s+включительно)?\s+до\s+(?P<b>{NUM_CORE})(?:\s*(?P<ub>{UNIT}))?"
-    rf"(?P<binc>(?:\s+[^\s.,;:()]+){{0,2}}?\s+включительно)?",
+    rf"(?<!\w)от\s+(?P<a>{NUM_CORE})\s*(?P<ua>{UNIT})?(?P<ainc>{INCL})?\s+до\s+(?P<b>{NUM_CORE})(?:\s*(?P<ub>{UNIT}))?"
+    rf"(?P<binc>(?:\s+[^\s.,;:()]+){{0,2}}?{INCL})?",
     re.I,
 )
 _RANGE_DASH = re.compile(
@@ -63,7 +65,7 @@ _RANGE_DASH = re.compile(
 )
 _BOUND = re.compile(
     rf"(?<!\w)(?P<op>не\s+менее|не\s+меньше|не\s+ниже|не\s+более|не\s+больше|не\s+выше|не\s+превыша\w*|"
-    rf"минимум|максимум|более|больше|свыше|выше|менее|меньше|ниже|до|≥|≤|>=|<=|>|<)\s*(?P<v>{NUM_CORE})\s*(?P<u>{UNIT})?(?P<inc>\s+включительно)?",
+    rf"минимум|максимум|более|больше|свыше|выше|менее|меньше|ниже|до|≥|≤|>=|<=|>|<)\s*(?P<v>{NUM_CORE})\s*(?P<u>{UNIT})?(?P<inc>{INCL})?",
     re.I,
 )
 _LOW_INC = {"не менее", "не меньше", "не ниже", "минимум", "≥", ">="}
@@ -73,6 +75,10 @@ _HIGH_EXC = {"менее", "меньше", "ниже", "<"}
 _SUBJECT = re.compile(
     r"порог|сумм|лимит|значени|размер|количеств|длин|диапазон|amount|limit|возраст|срок|ставк|процент|комисси|балл"
 )
+# Сумма одной операции (перевод, платёж, покупка…), а не настройка, которую задаёт клиент.
+_OPERATION = re.compile(r"операци|перевод|плат[её]ж|покупк|сняти\w* наличн|списани|транзакц")
+# Отказ при выходе за лимит: «перевод сверх лимита отклоняется с сообщением «…»».
+_LIMIT_REJECT = re.compile(r"(?:сверх|выше|больше|превышени\w*|превыша\w*)\s+(?:\w+\s+){0,2}?лимит\w*|лимит\w*\s+превыш\w*")
 _INC_HINT = re.compile(r"обе\s+границ\w*\s+включ\w*|границ\w*\s+(?:диапазона\s+)?включ\w*|включая\s+границ\w*")
 _EXC_HINT = re.compile(r"границ\w*\s+не\s+включ\w*|не\s+включая\s+границ|исключая\s+границ")
 _INT_HINT = re.compile(r"цел\w+\s+(?:числ|значени|сумм)|целочислен|(?<!\w)цел(?:ый|ое|ая|ые|ого|ым)\b|\binteger\b|\bint(?:32|64)?\b")
@@ -238,6 +244,15 @@ class Range:
     evidence: list[dict]
     notes: list[str]
     param: Param | None = None
+    operation: bool = False  # граница суммы одной операции: исход — операция проводится или отклоняется
+
+    @property
+    def one_sided(self) -> bool:
+        return (self.lo is None) != (self.hi is None)
+
+    def inside(self, v: Decimal) -> bool:
+        """Строго внутри диапазона: исход не зависит от включённости границ."""
+        return (self.lo is None or v > self.lo) and (self.hi is None or v < self.hi)
 
     @property
     def step(self) -> Decimal:
@@ -403,6 +418,9 @@ class Ctx:
         self.unit = ""
         self.month = 0
         self.range_main: Range | None = None
+        self.limit_reject: tuple[str, dict, str | None] | None = None  # правило отказа сверх лимита, опора, сообщение
+        self.bound_spans: dict[str, set[tuple[str, int, int]]] = {}  # вопрос о включённости → цитата границы
+        self.ext_questions: dict[str, Any] = {}  # Question №08 по id
 
     # --- обязательство и опоры
     def ev(self, block: Block, span: tuple[int, int]) -> dict:
@@ -562,6 +580,12 @@ def extract_rules(ctx: Ctx) -> None:
     if ctx.rules.get("ui_error"):
         r = ctx.rules["ui_error"][0]
         ctx.ui_error = (r.text, ctx.rule_ev(r))
+    for b, s, e, t in _units(ctx):
+        if _LIMIT_REJECT.search(t) and re.search(r"отклоня\w*|отказ\w*|запрещ\w*|не\s+(?:проводит|выполня)\w*", t):
+            seg = b.text[s:e]
+            m = re.search(r"«([^»]+)»|\"([^\"]+)\"", seg)
+            ctx.limit_reject = (seg, ctx.ev(b, (s, e)), (m.group(1) or m.group(2)) if m else None)
+            break
     # Месячное правило: база расчёта и часовой пояс.
     for r in ctx.rules.get("month", []):
         basis = r.data.get("basis", "")
@@ -611,6 +635,7 @@ def extract_ranges(ctx: Ctx) -> None:
             unit = unit_canon(m.group("ub") or m.group("ua"))
             inc = True if m.group("binc") else (True if m.group("ainc") else None)
             rng = _make_range(ctx, b, (s, e), (s + m.start(), s + m.end()), level, _subject(seg[: m.start()]) , lo, hi, inc, inc, unit, t)
+            rng.operation = _is_operation(seg[: m.start()])
             ctx.ranges.append(rng)
             taken.append((m.start(), m.end()))
         for m in _RANGE_DASH.finditer(seg):
@@ -620,7 +645,9 @@ def extract_ranges(ctx: Ctx) -> None:
             if hi <= lo or _MONTHS_AFTER.match(seg[m.end():]) or not (m.group("ua") or m.group("ub") or re.search(r"диапазон|допустим|значени|порог|лимит|сумм", t)):
                 continue
             unit = unit_canon(m.group("ub") or m.group("ua"))
-            ctx.ranges.append(_make_range(ctx, b, (s, e), (s + m.start(), s + m.end()), level, _subject(seg[: m.start()]), lo, hi, None, None, unit, t))
+            rng = _make_range(ctx, b, (s, e), (s + m.start(), s + m.end()), level, _subject(seg[: m.start()]), lo, hi, None, None, unit, t)
+            rng.operation = _is_operation(seg[: m.start()])
+            ctx.ranges.append(rng)
             taken.append((m.start(), m.end()))
         lows: list[tuple[Decimal, bool | None, str, tuple[int, int]]] = []
         highs: list[tuple[Decimal, bool | None, str, tuple[int, int]]] = []
@@ -635,8 +662,8 @@ def extract_ranges(ctx: Ctx) -> None:
             sp = (s + m.start(), s + m.end())
             if op in _LOW_INC or op in _LOW_EXC:
                 lows.append((v, op in _LOW_INC, u, sp))
-            elif op in _HIGH_INC or op in _HIGH_EXC:
-                highs.append((v, op in _HIGH_INC, u, sp))
+            elif op in _HIGH_INC or op in _HIGH_EXC or op.startswith("не превыша"):
+                highs.append((v, op in _HIGH_INC or op.startswith("не превыша"), u, sp))
             elif op == "до":
                 highs.append((v, True if m.group("inc") else None, u, sp))
         if lows or highs:
@@ -647,8 +674,10 @@ def extract_ranges(ctx: Ctx) -> None:
             subj = re.findall(r"[\wё]+", t[sm.start():])[0] if sm else "значение"
             qs = min(x[3][0] for x in (lo, hi) if x)
             qe = max(x[3][1] for x in (lo, hi) if x)
-            ctx.ranges.append(_make_range(ctx, b, (s, e), (qs, qe), level, subj, lo[0] if lo else None, hi[0] if hi else None,
-                                          lo[1] if lo else None, hi[1] if hi else None, unit, t))
+            rng = _make_range(ctx, b, (s, e), (qs, qe), level, subj, lo[0] if lo else None, hi[0] if hi else None,
+                              lo[1] if lo else None, hi[1] if hi else None, unit, t)
+            rng.operation = _is_operation(b.text[s:qs])
+            ctx.ranges.append(rng)
     for t in ctx.scan.params:
         for p in _params_of(ctx, t):
             if p.location == "response" or p.logic_cell is None:
@@ -684,6 +713,11 @@ def extract_ranges(ctx: Ctx) -> None:
     for rng in ctx.ranges:
         if rng.integer is None and all(v is None or v == v.to_integral_value() for v in (rng.lo, rng.hi)):
             rng.notes.append("целочисленность в тексте не указана: шаг 1 принят по виду границ")
+
+
+def _is_operation(prefix: str) -> bool:
+    """Граница относится к сумме одной операции: «Сумма одной операции перевода — до N»."""
+    return bool(_OPERATION.search(norm(prefix)))
 
 
 def _subject(prefix: str) -> str:
@@ -858,28 +892,38 @@ def _second_threshold(ctx: Ctx) -> Decimal:
 
 
 def gen_ranges(ctx: Ctx) -> None:
+    """Значения у границ с шагом диапазона (1 или 0,01 единицы — по тексту).
+
+    У границы с известной включённостью — пара «за границей / на границе». Если включённость не указана,
+    сама граница открыта до решения владельца, а рядом добавляется соседнее значение внутри: его исход от
+    решения не зависит. У одностороннего лимита («до N», «не более N») — всегда три точки
+    «граница − шаг, граница, граница + шаг»: другой границы, которая проверила бы приём, нет.
+    """
     for rng in ctx.ranges:
         step = rng.step
+        one = rng.one_sided
         pts: list[tuple[str, Decimal, str]] = []
         if rng.lo is not None:
-            if rng.lo_inc is True:
-                pts += [("lo-1", rng.lo - step, "reject"), ("lo", rng.lo, "accept")]
-            elif rng.lo_inc is False:
-                pts += [("lo", rng.lo, "reject"), ("lo+1", rng.lo + step, "accept")]
-            else:
-                pts += [("lo-1", rng.lo - step, "reject"), ("lo", rng.lo, "open")]
+            inc = rng.lo_inc
+            if inc is not False or one:
+                pts.append(("lo-1", rng.lo - step, "reject"))
+            pts.append(("lo", rng.lo, "accept" if inc is True else "reject" if inc is False else "open"))
+            if (inc is not True or one) and rng.inside(rng.lo + step):
+                pts.append(("lo+1", rng.lo + step, "accept"))
         if rng.hi is not None:
-            if rng.hi_inc is True:
-                pts += [("hi", rng.hi, "accept"), ("hi+1", rng.hi + step, "reject")]
-            elif rng.hi_inc is False:
-                pts += [("hi-1", rng.hi - step, "accept"), ("hi", rng.hi, "reject")]
-            else:
-                pts += [("hi", rng.hi, "open"), ("hi+1", rng.hi + step, "reject")]
+            inc = rng.hi_inc
+            if (inc is not True or one) and rng.inside(rng.hi - step) and all(v != rng.hi - step for _, v, _ in pts):
+                pts.append(("hi-1", rng.hi - step, "accept"))
+            pts.append(("hi", rng.hi, "accept" if inc is True else "reject" if inc is False else "open"))
+            if inc is not False or one:
+                pts.append(("hi+1", rng.hi + step, "reject"))
         if rng.integer and rng.lo is not None and rng.hi is not None and rng.hi - rng.lo >= 1:
             pts.append(("fraction", rng.lo + Decimal("0.5"), "reject"))
         for pos, val, outcome in pts:
             _range_case(ctx, rng, pos, val, outcome)
 
+
+_INCLUDED, _EXCLUDED = "граница включена", "граница не включена"  # варианты вопроса о включённости
 
 _POS_LABEL = {
     "lo-1": "на {step} ниже нижней границы", "lo": "нижняя граница", "lo+1": "на {step} выше нижней границы",
@@ -892,10 +936,13 @@ def _range_case(ctx: Ctx, rng: Range, pos: str, val: Decimal, outcome: str) -> N
     label = _POS_LABEL[pos].format(step=with_unit(rng.step, rng.unit))
     shown = with_unit(val, rng.unit)
     subject = rng.subject
-    values = {"input": jnum(val), "unit": rng.unit, "boundary": pos, "range": [jnum(rng.lo) if rng.lo is not None else None, jnum(rng.hi) if rng.hi is not None else None]}
+    values = {"input": jnum(val), "unit": rng.unit, "step": jnum(rng.step), "boundary": pos,
+              "range": [jnum(rng.lo) if rng.lo is not None else None, jnum(rng.hi) if rng.hi is not None else None]}
     key = f"{rng.key}:{pos}"
     notes = list(rng.notes)
     anchor = (rng.block, rng.span)
+    if outcome == "open":  # по этой цитате замечание о неоднозначности находит свой сценарий
+        ctx.bound_spans[f"{rng.key}:inclusive"] = _spans(rng.evidence[:1])
     if rng.level == "api" and ctx.api is not None and rng.param is not None:
         api, p = ctx.api, rng.param
         query = _query(ctx, p.name, _plain(val))
@@ -914,8 +961,8 @@ def _range_case(ctx: Ctx, rng: Range, pos: str, val: Decimal, outcome: str) -> N
             _api_reject_case(ctx, key, f"{title_core}: {label} — отклоняется", pre, act, rej, anchor, evid, values, notes, p)
         else:
             opts = [
-                {"label": "граница включена", "expected": ok[0], "basis": "граница входит в диапазон", "evidence": ok[1]},
-                {"label": "граница не включена", "expected": _rej_text(rej), "basis": "граница не входит в диапазон", "evidence": [e for o in rej for e in o["evidence"]]},
+                {"label": _INCLUDED, "expected": ok[0], "basis": "граница входит в диапазон", "evidence": ok[1]},
+                {"label": _EXCLUDED, "expected": _rej_text(rej), "basis": "граница не входит в диапазон", "evidence": [e for o in rej for e in o["evidence"]]},
             ]
             ctx.add(key, kind="boundary", level="api", title=f"{title_core}: {label} — включена ли граница", precondition=pre, action=act,
                     options=opts, question=(f"{rng.key}:inclusive", f"Включены ли границы диапазона `{p.name}` {rng.describe()}?"),
@@ -923,25 +970,37 @@ def _range_case(ctx: Ctx, rng: Range, pos: str, val: Decimal, outcome: str) -> N
         return
     src = ctx.src(Rule("range", rng.block, rng.span))
     pre = f"Правило {src}: «{ctx.quote(Rule('range', rng.block, rng.span))}». Допустимо {rng.describe()}"
-    act = f"задать {subject} {shown} ({label})"
-    accept = f"значение {shown} принимается и сохраняется"
-    reject = f"значение {shown} отклоняется, {subject} не сохраняется"
     evid = list(rng.evidence)
-    if ctx.ui_error:
-        reject += f"; {ctx.ui_error[0].rstrip('.').strip()[0].lower()}{ctx.ui_error[0].rstrip('.').strip()[1:]}"
-        if outcome != "accept":
-            evid.append(ctx.ui_error[1])
-    title_core = f"{subject.capitalize()} {shown}"
+    if rng.operation:
+        act = f"провести операцию на {shown} ({label})"
+        accept = f"операция на {shown} проводится"
+        reject = f"операция на {shown} отклоняется"
+        if ctx.limit_reject and pos in ("hi", "hi+1"):
+            text, rev, msg = ctx.limit_reject
+            reject += f" с сообщением «{msg}»" if msg else f" по правилу «{short(text.strip(), 90).rstrip('.')}»"
+            if outcome != "accept":
+                evid.append(rev)
+        title_core = f"Операция на {shown}"
+    else:
+        act = f"задать {subject} {shown} ({label})"
+        accept = f"значение {shown} принимается и сохраняется"
+        reject = f"значение {shown} отклоняется, {subject} не сохраняется"
+        if ctx.ui_error:
+            reject += f"; {ctx.ui_error[0].rstrip('.').strip()[0].lower()}{ctx.ui_error[0].rstrip('.').strip()[1:]}"
+            if outcome != "accept":
+                evid.append(ctx.ui_error[1])
+        title_core = f"{subject.capitalize()} {shown}"
     if outcome == "accept":
-        ctx.add(key, kind="boundary", level=rng.level, title=f"{title_core}: {label} — принимается", precondition=pre, action=act,
+        verb = "проводится" if rng.operation else "принимается"
+        ctx.add(key, kind="boundary", level=rng.level, title=f"{title_core}: {label} — {verb}", precondition=pre, action=act,
                 expected=accept, anchor=anchor, evidence=evid, values=values, notes=notes)
     elif outcome == "reject":
         ctx.add(key, kind="boundary", level=rng.level, title=f"{title_core}: {label} — отклоняется", precondition=pre, action=act,
                 expected=reject, anchor=anchor, evidence=evid, values=values, notes=notes)
     else:
         opts = [
-            {"label": "граница включена", "expected": accept, "basis": "граница входит в диапазон", "evidence": []},
-            {"label": "граница не включена", "expected": reject, "basis": "граница не входит в диапазон", "evidence": []},
+            {"label": _INCLUDED, "expected": accept, "basis": "граница входит в диапазон", "evidence": []},
+            {"label": _EXCLUDED, "expected": reject, "basis": "граница не входит в диапазон", "evidence": []},
         ]
         ctx.add(key, kind="boundary", level=rng.level, title=f"{title_core}: {label} — включена ли граница", precondition=pre, action=act,
                 options=opts, question=(f"{rng.key}:inclusive", f"Включены ли границы диапазона {rng.describe()} в правиле {src}?"),
@@ -1579,9 +1638,14 @@ def _tc_spans(tc: dict) -> set[tuple[str, int, int]]:
     return spans
 
 
+# Замечания, после которых исход сценария неизвестен: по ним открытый вопрос о границе берёт вопрос №08.
+_UNDECIDED_KINDS = {"ambiguity", "unverifiable"}
+
+
 def link_findings(ctx: Ctx, findings: list[Any], questions: list[Any]) -> None:
     by_finding_q: dict[str, str] = {}
     for q in questions:
+        ctx.ext_questions.setdefault(str(g(q, "id")), q)
         for fid in as_list(g(q, "finding_ids")) + as_list(g(q, "finding_id")):
             by_finding_q.setdefault(str(fid), str(g(q, "id")))
     for i, f in enumerate(findings):
@@ -1610,9 +1674,20 @@ def link_findings(ctx: Ctx, findings: list[Any], questions: list[Any]) -> None:
             continue
         if not fsp:
             continue
+        undecided = norm(g(f, "kind") or "") in _UNDECIDED_KINDS
+        qid = by_finding_q.get(fid) or (str(g(f, "question_id")) if g(f, "question_id") else None)
         for tc in ctx.tcs:
             if _overlap(_tc_spans(tc), fsp) and fid not in tc["finding_ids"]:
                 tc["finding_ids"].append(fid)
+            # Неоднозначность на цитате самой границы — причина открытого вопроса о включённости:
+            # вопрос пакета получает её id, а при вопросе №08 по ней — и его id (два вопроса на одно не задаются).
+            bound = ctx.bound_spans.get(tc["_qkey"] or "")
+            if undecided and tc["status"] == "open" and bound and _overlap(bound, fsp):
+                q = ctx.questions[tc["_qkey"]]
+                if fid not in q["finding_ids"]:
+                    q["finding_ids"].append(fid)
+                if qid and not q["existing"]:
+                    q.update(id=qid, existing=True)
 
 
 def _ev_list(ctx: Ctx, value: Any) -> list[dict]:
@@ -1816,6 +1891,63 @@ def _choose(dec_: Any, options: list[dict]) -> dict | None:
     return None
 
 
+_SIDE_EXC = re.compile(r"не\s+включ|не\s+входит|не\s+допуска|недопуст|не\s+разреш|строго\s+(?:меньше|ниже|больше|выше)|исключ\w*\s+границ")
+_SIDE_INC = re.compile(r"включ\w*|входит|не\s+более|не\s+больше|не\s+превыша\w*|≤|<=|≥|>=|допуска\w*|допустим\w*|разреш\w*")
+
+
+def _bound_side(text: str, value: Decimal | None = None) -> bool | None:
+    """Включена ли граница по тексту ответа: True, False или None (текст этого не говорит).
+
+    Если в тексте есть сама граница (новая формулировка «… до N ₸ включительно»), включённость берётся тем же
+    разбором, что и в документе: «не более N», «N включительно» — да; «меньше N» — нет; «до N» без
+    «включительно» — по-прежнему неизвестно. Иначе — по словам ответа («граница включена», «не входит»).
+    """
+    t = norm(text)
+    if value is not None:
+        for m in _BOUND.finditer(t):
+            if dec(m.group("v")) != value:
+                continue
+            op = re.sub(r"\s+", " ", m.group("op").lower())
+            if m.group("inc") or op in _LOW_INC or op in _HIGH_INC or op.startswith("не превыша"):
+                return True
+            if op in _LOW_EXC or op in _HIGH_EXC:
+                return False
+            return None  # «до N» без «включительно» — та же неоднозначность
+    if _SIDE_EXC.search(t):
+        return False
+    if _SIDE_INC.search(t):
+        return True
+    return None
+
+
+def _choose_boundary(dec_: Any, options: list[dict], ext_q: Any, value: Decimal | None = None) -> dict | None:
+    """Вариант вопроса о включённости по решению на вопрос №08.
+
+    Буква ответа относится к вариантам вопроса №08 («A. Уточнить формулировку…»), а не к вариантам
+    сценария, поэтому по букве берётся текст варианта №08, к нему — остаток ответа, примечание и новый текст
+    правок. Вариант выбирается, только если все эти тексты, где есть сигнал, говорят одно и то же.
+    """
+    s = norm(decision_value(dec_))
+    texts: list[str] = []
+    m = re.match(r"^(?:вариант\s+)?([a-hа-е])(?:$|[).:\s-])", s)
+    if m:
+        idx = "abcdefgh".find(_LETTER.get(m.group(1), m.group(1)))
+        opts = as_list(g(ext_q, "options"))
+        if 0 <= idx < len(opts):
+            texts.append(str(opts[idx]))
+        texts.append(s[m.end():])
+    else:
+        texts.append(s)
+    # Decision из answers.md №08: буква — в ``choice``, полный ответ — в ``answer``, «Формулировка: …» — в ``wording``.
+    texts += [str(g(dec_, k) or "") for k in ("answer", "wording", "comment", "note")]
+    texts += [str(g(e, "new") or "") for e in as_list(g(dec_, "edits"))]
+    sides = {x for x in (_bound_side(t, value) for t in texts) if x is not None}
+    if len(sides) != 1:
+        return None
+    want = _INCLUDED if sides.pop() else _EXCLUDED
+    return next((o for o in options if o["label"] == want), None)
+
+
 def apply_decisions(ctx: Ctx, decisions: Iterable[Any]) -> None:
     decs = decisions_by_question(decisions)
     for tc in ctx.tcs:
@@ -1826,9 +1958,21 @@ def apply_decisions(ctx: Ctx, decisions: Iterable[Any]) -> None:
         if d is None:
             continue
         before = tc["expected"]
-        chosen = _choose(d, tc["options"])
         did = decision_id(d)
         text = decision_text(d)
+        q = ctx.questions.get(tc["_qkey"]) if tc["_qkey"] else None
+        if tc["kind"] == "boundary" and q is not None and q["existing"]:
+            at = tc["values"].get("input")
+            chosen = _choose_boundary(d, tc["options"], ctx.ext_questions.get(str(qid)), Decimal(str(at)) if at is not None else None)
+            if chosen is None:
+                tc["notes"].append(f"решение {did} по вопросу {qid} не говорит, входит ли граница в диапазон: исход на границе не согласован")
+                ctx.warnings.append(W(
+                    "bank.decision_unmapped",
+                    f"Решение {did} по вопросу {qid} не задаёт включённость границы: сценарий «{short(tc['title'], 80)}» остаётся открытым.",
+                    decision_id=did, key=tc["key"]))
+                continue
+        else:
+            chosen = _choose(d, tc["options"])
         if chosen is not None:
             tc["expected"] = chosen["expected"]
             for o in tc["options"]:

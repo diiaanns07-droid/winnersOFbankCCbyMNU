@@ -73,11 +73,14 @@ def test_range_without_inclusivity_keeps_boundaries_open():
     text = fx.replace_all([("от 1 000 до 1 000 000 ₸ включительно", "от 5 до 9 ₸")])
     _, pack = run(text)
     biz = {t["values"]["boundary"]: t for t in pack["test_cases"] if t["level"] == "business" and t["kind"] == "boundary"}
-    assert set(biz) == {"lo-1", "lo", "hi", "hi+1", "fraction"}  # «целый» в Ф-1 остался → есть и дробное значение
+    # «целый» в Ф-1 остался → есть и дробное значение; соседи внутри (6 и 8) проверяемы при любом решении.
+    assert set(biz) == {"lo-1", "lo", "lo+1", "hi-1", "hi", "hi+1", "fraction"}
     assert biz["lo"]["status"] == "open" and biz["hi"]["status"] == "open"
     assert biz["lo"]["open_question_id"] == biz["hi"]["open_question_id"]
     assert biz["lo-1"]["status"] == "draft" and "отклоняется" in biz["lo-1"]["expected"]
     assert biz["lo-1"]["values"]["input"] == 4 and biz["hi+1"]["values"]["input"] == 10
+    for pos, v in (("lo+1", 6), ("hi-1", 8)):
+        assert biz[pos]["status"] == "draft" and biz[pos]["values"]["input"] == v and "принимается" in biz[pos]["expected"]
 
 
 def test_exclusive_bounds_shift_inner_values():
