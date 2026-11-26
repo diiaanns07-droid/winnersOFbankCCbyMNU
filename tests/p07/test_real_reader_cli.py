@@ -124,8 +124,12 @@ def test_cli_accepts_correct_pair(tmp_path: Path, good_report: dict) -> None:
     assert plain.returncode == 0 and data["ok"]
     assert data["implementation"]["reader"].endswith("bcc_review.readers.text:read_text")
     assert data["implementation"]["verify"].startswith("bcc_review.verification:verify_report")
+    # повтор фразы в блоке выделен опорой требования R-001.2: место подтверждено, а не «неоднозначно»
     assert {k: data["counts"][k] for k in ("checked", "confirmed", "ambiguous", "rejected")} == \
-        {"checked": 2, "confirmed": 1, "ambiguous": 1, "rejected": 0}
+        {"checked": 2, "confirmed": 2, "ambiguous": 0, "rejected": 0}
+    assert data["counts"]["repeats"] == {"objects": 1, "places": 1, "places_distinguished": 1,
+                                         "places_undistinguished": 0}
+    assert data["repeats"][0]["verdicts"][0]["detail"].endswith("внутри опоры R-001.2, другие вхождения вне её")
 
 
 @pytest.mark.parametrize(
