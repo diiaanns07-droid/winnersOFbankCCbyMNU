@@ -1,11 +1,11 @@
 # №05 — проверка отдельного требования: передача
 
 Ветка: `claude/practical-ride-4z65ch` (назначена платформой вместо `bcc/p05-individual`). В неё влит
-`bcc/integration` @ `6be9e97` (контракт v1 из `431f76d`, движок, модули №01, №04, №06, №07, №11, №17). Точка входа
-совпадает с таблицей в `contracts/HANDOFF.md`. Движок сам выбирает модуль №05: `run.modules.review_individual = team:bcc_review.analysis.individual:review_individual`.
+`bcc/integration` @ `6a6c503` (контракт v1 из `431f76d`, движок, срезы 01–17). Точка входа совпадает с таблицей в
+`contracts/HANDOFF.md`. Движок сам выбирает модуль №05: `run.modules.review_individual = team:bcc_review.analysis.individual:review_individual`.
 
-В `bcc/integration @ 6be9e97` влита версия №05 `72c10bd`. Правки `f91f296` (`failed`, `individual#N`, `basis`, `rule_id`)
-и второго прохода (область действия определения) там ещё отсутствуют: их нужно влить из этой ветки.
+В `bcc/integration @ 6a6c503` влита версия №05 `f91f296`. Второго прохода (область действия определения, `4930afa`) там
+ещё нет: его нужно влить из этой ветки. Зона №05 в интеграции поверх `f91f296` не менялась, конфликтов нет.
 
 ## Что входит
 | Файл | Назначение |
@@ -106,13 +106,16 @@
 ```bash
 python3.11 -m venv .venv && .venv/bin/pip install -e ".[dev,pdf,anthropic]"
 .venv/bin/python -m pytest tests/p05 -q       # 74 passed
-.venv/bin/python -m pytest tests -q           # 622 passed, 18 skipped, 1 failed: tests/p11/test_anthropic_success.py::test_from_fixture_files_entry_point (падает и на чистой bcc/integration @ 6be9e97, не №05)
+.venv/bin/python -m pytest tests -q           # ветка + 6a6c503: 1181 passed, 14 skipped, 13 failed — все 13 падают и на чистой bcc/integration @ 6a6c503 (там 14, плюс нестабильный p15 restart); №05 среди причин нет
 .venv/bin/python -m pytest tests/p05/test_scope.py tests/p05/test_asker_cache.py -q
 python -m bcc_review tests/p05/fixtures/transfer_other_product.md report.md --offline-lint
 ```
 
-Стык в отдельной копии `bcc/integration @ 6be9e97` (worktree, поверх наложены только файлы №05): 622 passed, 18 skipped, тот же 1 failed в p11.
-Сквозной прогон движка на трёх ТЗ (`--offline-lint`). Участвовали модули команды: `read_text` №01, `build_inventory` №04, `load_criteria` и `review_individual` №05, `review_set` №06, `resolve_candidate` №07; плюс правила движка `runtime/fallback/rules.py`. Результат: ТЗ 1 — 0 замечаний; ТЗ 2 и ТЗ 3 — по одному `verifiable major confirmed` (`rule_id: vague.reference`). Кнопка не дала замечаний ни у одного модуля.
+Стык в отдельных копиях (worktree):
+* `bcc/integration @ 6be9e97` с наложенными файлами №05 — 622 passed, 18 skipped, 1 failed (p11, как и без №05);
+* чистая `6a6c503` против ветки (`6a6c503` + второй проход) — одинаковый список падений соседних модулей. Причины: схема `Warning` у №02; `Document` объектом вместо `dict` у №04 и №08; тексты отчётов у №09 и №15; выделения в PDF у №14; режим оценки у №16; `entry_point` у №11.
+
+Сквозной прогон движка на трёх ТЗ (`--offline-lint`, ветка с `6a6c503`). Участвовали модули команды: `read_text` №01, `build_inventory` №04, `load_criteria` и `review_individual` №05, `review_set` №06, `resolve_candidate`/`resolve_hint` №07, `build_questions` №08; `build_bank_pack` пока резервный. Плюс правила движка `runtime/fallback/rules.py`. Результат: ТЗ 1 — 0 замечаний; ТЗ 2 и ТЗ 3 — по одному `verifiable major confirmed` (`rule_id: vague.reference`). Кнопка не дала замечаний ни у одного модуля.
 
 Кэш (`test_asker_cache.py`). Участвуют настоящие `runtime.asker.Asker`, `runtime.mock.MockAdapter`, `runtime.core.Cache/Budget/StageStats/Tracer` и `runtime.context.ContextBuilder`; ответ `individual` валиден по схеме №05:
 * вызов 1: `adapter.calls = ['individual#1']`, `physical = 1`, `cache_hits = 0`;
