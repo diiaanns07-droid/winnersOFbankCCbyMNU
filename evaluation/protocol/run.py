@@ -58,15 +58,13 @@ def main():
     inputs=parser.add_mutually_exclusive_group(required=True)
     inputs.add_argument("--vault", type=Path, help="Custodian directory with sealed reference")
     inputs.add_argument("--input-pack", type=Path, help="Input documents and a sealed manifest, without labels")
-    parser.add_argument("--input-seal", type=Path, help="Published receipt for a separate input-only panel")
+    parser.add_argument("--input-seal", type=Path, help="Published receipt for the requested candidate and corpus or input-only panel")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--mode", choices=["rules_only","rules_plus_llm"],required=True)
     parser.add_argument("--suite", choices=["all","panel"],required=True)
     args=parser.parse_args()
     product, out = args.product.resolve(), args.out.resolve()
     mode=args.mode
-    if args.input_seal and not args.input_pack:
-        parser.error("--input-seal requires --input-pack")
     seal=read(args.input_seal or HERE/"seal.json")
     if args.input_pack:
         corpus=args.input_pack.resolve()
@@ -79,9 +77,15 @@ def main():
     else:
         vault=args.vault.resolve()
         corpus=vault/"corpus"
-        if digest(vault/"sealed-files.json")!=seal["corpus_index_sha256"]:
+        if digest(vault/"sealed-files.json")!=seal.get("corpus_index_sha256"):
             parser.error("Custodian index differs from public seal")
-        for rel,expected in read(vault/"sealed-files.json").items():
+        index=read(vault/"sealed-files.json")
+        commitments={"full_manifest_sha256":"all.manifest.json","main_manifest_sha256":"main.manifest.json",
+                     "panel_manifest_sha256":"panel.manifest.json","gold_sha256":"all.labels.jsonl",
+                     "main_gold_sha256":"main.labels.jsonl","panel_gold_sha256":"panel.labels.jsonl"}
+        if any(key not in seal or index.get(name)!=seal[key] for key,name in commitments.items()):
+            parser.error("Full-corpus manifests or references differ from the candidate receipt")
+        for rel,expected in index.items():
             if digest(corpus/rel)!=expected: parser.error("Input hash mismatch: "+rel)
     if git(product,"rev-parse","HEAD")!=seal["agent_sha"] or git(product,"status","--porcelain"):
         parser.error("Run requires a clean checkout of the exact product SHA in seal.json")
