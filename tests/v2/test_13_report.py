@@ -309,3 +309,10 @@ def test_render_never_crashes_on_broken_data(sample):
         md = markdown.render(r)
         assert "## Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
         assert "BCC Review" in console.summary(r), name
+
+
+def test_line_refs_from_model_text_become_russian():
+    assert markdown.prose("см. L038 и L39–L40") == "см. строка 38 и строки 39–40"
+    assert markdown.cell("a | L7") == "a \\| строка 7"
+    assert markdown.source_name("lens:что-то") == "проверка ролью"
+    assert markdown.source_name("rules:units") == "правило «units»"
