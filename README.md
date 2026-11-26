@@ -37,7 +37,7 @@
 git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
 cd winnersOFbankCCbyMNU
 py -3.12 -m venv .venv
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt -e .
 ```
@@ -297,7 +297,7 @@ docker run --rm --env-file .env -v "$(pwd)/reports:/app/reports" bcc-review rele
 | Сообщение или симптом | Что сделать |
 | :--- | :--- |
 | `No module named bcc_review` | окружение не активировано или не выполнен шаг 1: `python -m pip install -r requirements.txt -e .` |
-| «запуск сценариев отключён в этой системе» при `Activate.ps1` | выполните `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` в том же окне |
+| «запуск сценариев отключён в этой системе» при `Activate.ps1` | выполните `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force` в том же окне |
 | нет ключа / неверный ключ Gemini | проверьте строку `GEMINI_API_KEY=` в `.env` (без кавычек и пробелов) и `python -m bcc_review doctor` |
 | 429, квота исчерпана | подождите минуту и повторите; повторный прогон берёт готовые ответы из кэша |
 | 503, модель перегружена | агент сам переключится на запасную модель; список — `GEMINI_FALLBACK_MODELS` |

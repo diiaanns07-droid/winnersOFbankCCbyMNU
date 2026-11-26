@@ -7,7 +7,7 @@ name: Тесты
 # минуты Actions общие (macOS считается x10), а веток исполнителей десятки.
 on:
   push:
-    branches: [main, master, "bcc/v2", "v2/16-release"]
+    branches: [main, master, "bcc/v2"]
     tags: ["v2.*"]
     paths-ignore: ["docs/**", "presentation/**"]
   pull_request:
