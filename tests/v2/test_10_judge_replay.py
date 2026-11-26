@@ -47,9 +47,12 @@ def test_official_replay():
     all_placed(res, [c["id"] for c in cands])
     crit = [f for f in res["findings"] if f["severity"] == "critical"]
     assert 3 <= len(crit) <= 7
-    # К1 (38↔64), К2 (39↔40), К4 (29/52/103), К3 (121/163/171) — critical
-    for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}):
+    # К1 (38↔64), К2 (39↔40), К3 (121/163/171) — critical
+    for need in ({38, 64}, {39, 40}, {121, 163}):
         assert any(need <= lines(f) for f in crit), need
+    # К4 (29/52/103) в этом неполном наборе нашёл один ревьюер (нет линзы архитектора и правил) → major
+    k4 = next(f for f in res["findings"] if {52, 103} <= lines(f))
+    assert k4["severity"] == "major" and any("один ревьюер" in w for w in res["warnings"])
     assert 15 <= len(res["findings"]) <= 45
     assert res["checklist_source"] == "document" and len(res["checklist"]) == 14
     v = judge.compute_verdict(res["findings"])

@@ -499,3 +499,24 @@ def test_split_parts_keep_key_references():
     assert "F01" not in res["verdict_summary"] and "D-0" in res["verdict_summary"]
     assert "F01" not in res["checklist"][0]["comment"]
     assert len(res["checklist"][0]["finding_ids"]) == 2
+
+
+def test_missing_element_critical_needs_two_reviewers():
+    def mk(cid, line, q, src, kind="missing_element"):
+        return cand(cid, line, q, kind=kind, criterion="set_complete", source=src)
+    cs = [mk("C-001", 52, "Приложение читает и сохраняет настройки", "lens:architect"),
+          mk("C-002", 103, "Функциональные требования: чтение порога", "rules:promises.read_operation"),
+          mk("C-003", 21, "сообщение оператора связи", "consistency"),
+          cand("C-004", 46, "в течение минуты", kind="unverifiable", source="lens:qa")]
+    fs = [finding("F01", ["C-001", "C-002"], severity="critical", kind="missing_element",
+                  criterion="set_complete", scenario="Нечем прочитать.", impact="Экран не сделать.", priority=1),
+          finding("F02", ["C-003"], severity="critical", kind="missing_element", criterion="set_complete",
+                  scenario="Нет интерфейса.", impact="Не реализовать.", priority=2),
+          finding("F03", ["C-004"], kind="unverifiable", criterion="verifiable")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert sev["C-001"] == "critical" and sev["C-003"] == "major"
+    assert any("один ревьюер" in w for w in res["warnings"])
+    # мало источников в прогоне (например, повторная проверка №11) — правило не действует
+    res2 = judge.run(Ctx(FakeLLM(response([fs[1]]))), [cs[2]])
+    assert res2["findings"][0]["severity"] == "critical"

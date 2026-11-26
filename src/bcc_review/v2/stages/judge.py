@@ -81,6 +81,10 @@ NEVER_CRITICAL_KINDS = {"placeholder", "terminology", "traceability", "duplicate
 NEVER_CRITICAL_CRITERIA = {"conforming", "language", "ranked", "modifiable", "traceable", "necessary",
                            "singular", "risk", "set_comprehensible"}
 
+# Пропуск (critical по пункту «в») должен заметить больше одного ревьюера: «не описано» легко заявить ложно.
+MISSING_KINDS = {"missing_element", "incomplete"}
+MIN_SOURCES_FOR_CONSENSUS = 3  # правило действует, если в прогоне не меньше трёх разных источников
+
 # Противоречие (critical по пункту «а» шкалы) доказывается цитатами двух разных мест.
 CONFLICT_KINDS = {"event_conflict", "status_conflict", "boundary_conflict", "contradiction", "unit_mismatch"}
 
@@ -668,7 +672,11 @@ def _valid_reqs(ids: Iterable[str], known: set[str]) -> list[str]:
     return list(dict.fromkeys(out))
 
 
-def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str]) -> None:
+def _source_family(src: str) -> str:
+    return "rules" if src.startswith("rules:") else src
+
+
+def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
         why = ""
@@ -682,6 +690,9 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str]) -> N
             why = "дефект ничего не блокирует"
         elif f["kind"] in CONFLICT_KINDS and len({e["line_start"] for e in f["evidence"]}) < 2:
             why = "противоречие подтверждено цитатой только одного места"
+        elif (f["kind"] in MISSING_KINDS and run_sources >= MIN_SOURCES_FOR_CONSENSUS
+              and len({_source_family(_s(m.get("source"))) for m in members}) < 2):
+            why = "пропуск заметил только один ревьюер"
         if why:
             f["severity"] = "major"
             _warn(ctx, warnings, f"судья: {f['title'][:60]!r} понижен до major ({why})")
@@ -768,6 +779,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     known_reqs = {_s(r.get("id")) for r in requirements or [] if _s(r.get("id"))}
     cluster_of = {cid: gi for gi, g in enumerate(clusters) for cid in g}
     placed: dict[str, str] = {}  # C-id → ключ дефекта или "rejected"
+    run_sources = len({_source_family(_s(c.get("source"))) for c in candidates if _s(c.get("source"))})
 
     # 1. дефекты судьи: только известные кандидаты, каждый не более одного раза
     drafts: list[dict] = []
@@ -865,7 +877,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             "_members": members,
             "_first_line": evidence[0]["line_start"],
         }
-        _calibrate(item, members, ctx, warnings)
+        _calibrate(item, members, ctx, warnings, run_sources)
         findings.append(item)
 
     findings = _merge_no_id(findings, ctx, warnings)
