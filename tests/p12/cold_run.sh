@@ -14,12 +14,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VENV="${P12_VENV:-$(mktemp -d)/venv}"
 
 "$PY" -m venv "$VENV"
-"$VENV/bin/python" -m pip install -q --disable-pip-version-check "google-genai==3.6.1" "jsonschema>=4.18" "pytest>=8"
-
-export PYTHONPATH="$ROOT/src"
 cd "$ROOT"
+"$VENV/bin/python" -m pip install -q --disable-pip-version-check -e ".[dev]" "google-genai==3.6.1"
 "$VENV/bin/python" -c "import sys, google.genai as g; print('python', sys.version.split()[0], '| google-genai', g.__version__)"
-"$VENV/bin/python" -m pytest tests/p12 -q -p no:cacheprovider -rs
+"$VENV/bin/python" -m pytest tests/contract tests/p12 -q -p no:cacheprovider -rs
 
 if [ -z "${GEMINI_API_KEY:-}" ]; then
   echo "GEMINI_API_KEY не задан: живая часть пропущена (см. tests/p12/README.md, раздел «Живая проверка»)."

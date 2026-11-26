@@ -32,10 +32,11 @@ def test_one_finding_passes_full_schema(make_adapter, fake, schema) -> None:
     assert result["model"] == "gemini-2.5-flash"
     assert result["request_id"] == "syn-ok-one-0001"
     assert result["usage"] == {"input_tokens": 812, "output_tokens": 143, "thinking_tokens": 246,
-                               "cached_tokens": None, "total_tokens": 1201, "physical_calls": 1}
+                               "cache_read_input_tokens": None, "total_tokens": 1201, "physical_calls": 1}
+    assert result["stop_reason"] == "STOP"
     meta = result["meta"]
     assert meta["fallback_used"] is False and meta["attempts"] == []
-    assert meta["finish_reason"] == "STOP" and meta["called_model"] == "gemini-2.5-flash"
+    assert meta["called_model"] == "gemini-2.5-flash"
     assert meta["schema_adjustments"], "журнал приведения схемы передаётся в meta"
 
 

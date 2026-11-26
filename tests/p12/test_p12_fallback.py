@@ -18,7 +18,7 @@ def test_no_fallback_unless_configured(make_adapter, fake, schema) -> None:
     fake.on(PRIMARY, "err_404_model").on(LITE, "ok_one_finding_lite")
     with pytest.raises(ProviderError) as info:
         invoke(make_adapter(), schema)
-    assert info.value.kind is ErrorKind.MODEL_UNAVAILABLE
+    assert info.value.kind == ErrorKind.NOT_FOUND
     assert fake.calls_for(LITE) == 0 and info.value.physical_calls == 1
     assert info.value.detail["model_chain"] == [PRIMARY]
 
@@ -52,7 +52,7 @@ def test_every_model_tried_once_then_exact_error(make_adapter, fake, schema) -> 
         invoke(make_adapter(fallback_models=[LITE, PRIMARY, LATEST, LITE]), schema)
     err = info.value
     assert [r["model"] for r in fake.requests] == [PRIMARY, LITE, LATEST]
-    assert err.kind is ErrorKind.RATE_LIMITED and err.retry_after == 39.0 and err.model == LATEST
+    assert err.kind == ErrorKind.RATE_LIMIT and err.retry_after_s == 39.0 and err.model == LATEST
     assert err.physical_calls == 3 and [a["model"] for a in err.attempts] == [PRIMARY, LITE, LATEST]
 
 
@@ -61,13 +61,13 @@ def test_every_model_tried_once_then_exact_error(make_adapter, fake, schema) -> 
     ("max_tokens_truncated", ErrorKind.TRUNCATED),
     ("schema_violation", ErrorKind.INVALID_OUTPUT),
     ("err_400_schema_too_complex", ErrorKind.BAD_REQUEST),
-    ("prompt_blocked", ErrorKind.BLOCKED),
+    ("prompt_blocked", ErrorKind.REFUSAL),
 ])
 def test_no_fallback_for_non_model_specific_failures(make_adapter, fake, schema, failure, kind) -> None:
     fake.on(PRIMARY, failure).on(LITE, "ok_one_finding_lite")
     with pytest.raises(ProviderError) as info:
         invoke(make_adapter(fallback_models=[LITE]), schema)
-    assert info.value.kind is kind and fake.calls_for(LITE) == 0
+    assert info.value.kind == kind and fake.calls_for(LITE) == 0
 
 
 def test_fallback_respects_remaining_budget(make_adapter, fake, schema) -> None:
@@ -75,7 +75,7 @@ def test_fallback_respects_remaining_budget(make_adapter, fake, schema) -> None:
     with pytest.raises(ProviderError) as info:
         invoke(make_adapter(fallback_models=[LITE], min_attempt_s=5), schema, timeout_s=60)
     err = info.value
-    assert err.kind is ErrorKind.OVERLOADED and fake.calls_for(LITE) == 0 and err.physical_calls == 1
+    assert err.kind == ErrorKind.OVERLOADED and fake.calls_for(LITE) == 0 and err.physical_calls == 1
     assert err.attempts[-1] == {"model": LITE, "skipped": "budget", "remaining_s": 3.0}
 
 
@@ -89,7 +89,7 @@ def test_fallback_gets_only_the_remaining_budget(make_adapter, fake, schema) -> 
 def test_fallback_kinds_are_configurable(make_adapter, fake, schema) -> None:
     fake.on(PRIMARY, "err_503_overloaded").on(LITE, "ok_one_finding_lite")
     with pytest.raises(ProviderError):
-        invoke(make_adapter(fallback_models=[LITE], fallback_on=[ErrorKind.MODEL_UNAVAILABLE]), schema)
+        invoke(make_adapter(fallback_models=[LITE], fallback_on=[ErrorKind.NOT_FOUND]), schema)
     assert fake.calls_for(LITE) == 0
 
 
@@ -109,7 +109,7 @@ def test_env_settings_explicit_list_only() -> None:
 def test_bad_env_number_is_config_error() -> None:
     with pytest.raises(ProviderError) as info:
         settings_from_env({"GEMINI_MIN_ATTEMPT_S": "пять"})
-    assert info.value.kind is ErrorKind.CONFIG
+    assert info.value.kind == ErrorKind.NOT_CONFIGURED
 
 
 def test_model_disabled_for_rest_of_run_after_quota_or_404(make_adapter, fake, schema) -> None:
@@ -118,7 +118,7 @@ def test_model_disabled_for_rest_of_run_after_quota_or_404(make_adapter, fake, s
     invoke(adapter, schema)
     second = invoke(adapter, schema)
     assert fake.calls_for(PRIMARY) == 1 and fake.calls_for(LITE) == 2
-    assert second["meta"]["attempts"] == [{"model": PRIMARY, "skipped": "quota_exhausted", "earlier_in_run": True}]
+    assert second["meta"]["attempts"] == [{"model": PRIMARY, "skipped": "quota", "earlier_in_run": True}]
     assert second["usage"]["physical_calls"] == 1 and second["meta"]["fallback_used"] is True
     adapter.reset_model_state()
     invoke(adapter, schema)
@@ -132,7 +132,7 @@ def test_remembered_failure_without_fallback_costs_no_call(make_adapter, fake, s
         invoke(adapter, schema)
     with pytest.raises(ProviderError) as info:
         invoke(adapter, schema)
-    assert info.value.kind is ErrorKind.MODEL_UNAVAILABLE and info.value.physical_calls == 0
+    assert info.value.kind == ErrorKind.NOT_FOUND and info.value.physical_calls == 0
     assert info.value.detail["remembered"] is True and len(fake.requests) == 1
 
 

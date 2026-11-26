@@ -15,7 +15,7 @@ def run_main(capsys, argv):
 def test_doctor_without_key_explains_what_to_do(monkeypatch, capsys) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     code, out = run_main(capsys, ["doctor"])
-    assert code == 2 and out["ok"] is False and out["kind"] == "config"
+    assert code == 2 and out["ok"] is False and out["kind"] == "not_configured"
     assert "GEMINI_API_KEY" in out["message"] and out["physical_calls"] == 0
 
 
@@ -37,7 +37,7 @@ def test_doctor_quota_exit_code(monkeypatch, capsys, make_adapter, fake) -> None
     adapter = make_adapter()
     monkeypatch.setattr(gemini.GeminiAdapter, "from_env", classmethod(lambda cls, *a, **k: adapter))
     code, out = run_main(capsys, ["doctor", "--model", "gemini-2.5-flash"])
-    assert code == 3 and out["kind"] == "rate_limited" and out["retry_after"] == 39.0
+    assert code == 3 and out["kind"] == "rate_limit" and out["retry_after_s"] == 39.0
 
 
 def test_models_command(monkeypatch, capsys, make_adapter) -> None:

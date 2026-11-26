@@ -43,7 +43,11 @@ def test_synthetic_schema_is_reduced_to_supported_subset() -> None:
     assert candidates["minItems"] == 0 and candidates["type"] == "array"
     item = candidates["items"]
     assert item["additionalProperties"] is False
-    assert item["properties"]["criterion"]["description"] == "Код критерия И1–И9 или Н1–Н8"
+    assert item["properties"]["criterion"]["description"] == (
+        'Код критерия И1–И9 или Н1–Н8 [ограничения: pattern="^(И[1-9]|Н[1-8])$"]'), "pattern уходит подсказкой"
+    assert item["properties"]["hints"]["items"]["properties"]["quote"]["description"] == (
+        "Дословная подстрока block.text [ограничения: minLength=1]")
+    assert item["properties"]["title"]["description"] == "[ограничения: minLength=1, maxLength=200]"
     assert item["properties"]["hints"]["items"]["required"] == ["block_id", "quote"]
     assert set(item["required"]) >= {"scope", "severity", "hints"}
     actions = {(e["path"], e["keyword"]) for e in log}
@@ -52,6 +56,8 @@ def test_synthetic_schema_is_reduced_to_supported_subset() -> None:
     assert ("/properties/candidates/items/properties/inspected_block_ids", "uniqueItems") in actions
     assert ("/properties/stage", "const") in actions
     assert ("/", "$id") in actions
+    moved = {e["keyword"] for e in log if e["action"] == "moved to description"}
+    assert moved == {"pattern", "minLength", "maxLength", "uniqueItems"}
     assert not any(e["keyword"] == "$defs" for e in log), "корневые $defs удаляются молча после подстановки"
 
 
@@ -82,7 +88,8 @@ def test_formats_and_type_lists() -> None:
     assert "format" not in p["url"]
     assert p["n"] == {"type": "integer"}
     assert p["maybe"] == {"anyOf": [{"type": "array", "items": {"type": "string"}, "maxItems": 3}, {"type": "null"}]}
-    assert {"path": "/properties/url", "keyword": "format:uri", "action": "dropped"} in log
+    assert {"path": "/properties/url", "keyword": "format:uri", "action": "moved to description"} in log
+    assert p["url"]["description"] == '[ограничения: format="uri"]'
 
 
 @pytest.mark.parametrize("schema, needle", [
@@ -119,4 +126,4 @@ def test_messages_mapping_roles_merge_and_blocks() -> None:
 def test_bad_messages_are_provider_errors(messages: list[dict[str, Any]]) -> None:
     with pytest.raises(ProviderError) as info:
         to_gemini_messages(messages)
-    assert info.value.kind is ErrorKind.BAD_REQUEST and not info.value.retryable
+    assert info.value.kind == ErrorKind.BAD_REQUEST and not info.value.transient

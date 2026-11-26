@@ -16,7 +16,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from p12_support import synthetic_schema
 
-from bcc_review.providers.gemini import GeminiAdapter, ProviderError, settings_from_env
+from bcc_review.providers.gemini import GeminiAdapter, ProviderError
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("P12_LIVE") != "1" or not os.environ.get("GEMINI_API_KEY"),
@@ -28,15 +28,14 @@ SYSTEM = ("Ты аналитик банка и проверяешь требов
 
 
 def ask(adapter: GeminiAdapter, user: str) -> dict:
-    model = settings_from_env()["model"]
     try:
-        result = adapter.invoke(model=model, messages=[{"role": "system", "content": SYSTEM},
+        result = adapter.invoke(model=None, messages=[{"role": "system", "content": SYSTEM},
                                                        {"role": "user", "content": user}],
                                 schema=synthetic_schema(), timeout_s=120)
     except ProviderError as err:
         pytest.fail(f"Gemini: {json.dumps(err.to_dict(), ensure_ascii=False)}")
-    meta_keys = ("requested_model", "called_model", "fallback_used", "finish_reason", "latency_s")
-    passport = {k: result[k] for k in ("model", "request_id", "usage")}
+    meta_keys = ("requested_model", "called_model", "fallback_used", "latency_s")
+    passport = {k: result[k] for k in ("model", "request_id", "stop_reason", "usage")}
     passport["meta"] = {k: result["meta"][k] for k in meta_keys}
     print(json.dumps(passport, ensure_ascii=False))
     Draft202012Validator(synthetic_schema()).validate(result["data"])

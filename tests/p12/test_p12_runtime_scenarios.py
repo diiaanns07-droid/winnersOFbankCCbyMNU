@@ -34,8 +34,8 @@ def test_429_until_deadline_stops_without_infinite_loop(make_adapter, fake, sche
     assert len(fake.requests) == 3 < HARD_LOOP_GUARD
     assert clock.sleeps == [39.0, 39.0], "runtime ждёт ровно retry_after от сервера"
     first, second = result.stages
-    assert first["status"] == "unavailable" and first["kind"] == "rate_limited" and first["retry_after"] == 39.0
-    assert second == {"stage": "set_check", "status": "unavailable", "kind": "rate_limited",
+    assert first["status"] == "unavailable" and first["kind"] == "rate_limit" and first["retry_after_s"] == 39.0
+    assert second == {"stage": "set_check", "status": "unavailable", "kind": "rate_limit",
                       "reason": "провайдер недоступен после предыдущего этапа"}
     assert result.status == "failed" and result.physical_calls == 3
 
@@ -48,7 +48,7 @@ def test_provider_disconnect_after_two_stages_gives_partial(make_adapter, fake, 
     assert [s["status"] for s in result.stages] == ["done", "done", "unavailable", "unavailable", "unavailable"]
     assert result.stages[0]["data"]["candidates"][0]["severity"] == "major"
     assert result.stages[1]["data"]["candidates"] == []
-    assert {s["kind"] for s in result.stages[2:]} == {"model_unavailable"}
+    assert {s["kind"] for s in result.stages[2:]} == {"not_found"}
     assert "GEMINI_MODEL" in result.stages[2]["message"]
     assert result.physical_calls == 3 == len(fake.requests), "после отказа модели вызовов больше нет"
 
@@ -75,11 +75,13 @@ def test_truncated_stage_never_counts_as_complete(make_adapter, fake, schema, cl
     assert result.stages[2]["status"] == "done", "усечение — ошибка этапа, а не всего провайдера"
 
 
-def test_empty_response_is_retried_then_reported(make_adapter, fake, schema, clock) -> None:
-    fake.on(PRIMARY, "empty_no_candidates")
-    result = run(make_adapter(), schema, clock, names=["requirements"])
-    assert result.status == "failed" and result.stages[0]["kind"] == "empty"
-    assert len(fake.requests) == 4, "1 вызов + 3 ретрая runtime, дальше стоп"
+def test_empty_response_is_reported_not_complete(make_adapter, fake, schema, clock) -> None:
+    fake.on(PRIMARY, "ok_one_finding", "empty_no_candidates", "ok_empty")
+    result = run(make_adapter(), schema, clock, names=STAGE_NAMES[:3])
+    assert result.status == "partial"
+    assert (result.stages[1]["kind"], result.stages[1]["subkind"]) == ("invalid_output", "empty_candidates")
+    assert result.stages[1]["retries"] == 0, "invalid_output по контракту не временная: движок не повторяет"
+    assert result.stages[2]["status"] == "done" and len(fake.requests) == 3
 
 
 def test_invalid_key_stops_everything_with_clear_message(make_adapter, fake, schema, clock) -> None:

@@ -1,10 +1,10 @@
 """Эталонный мини-runtime для сценарных тестов №12.
 
-Это НЕ runtime Max. Модуль повторяет только протокол, который Max реализует у
-себя: общий дедлайн, ограниченные ретраи по ``retryable`` и ``retry_after``,
-учёт физических вызовов, честный статус complete|partial|failed. Тесты на нём
-показывают, что данных ``ProviderError`` достаточно, чтобы runtime остановился
-без бесконечного цикла и пометил недоступные этапы.
+Это НЕ движок Max. Модуль повторяет только протокол из contracts/HANDOFF.md, которого ждёт
+адаптер: общий дедлайн, ограниченные повторы только для ``ProviderError.transient`` с паузой
+``retry_after_s`` (иначе своя), учёт физических вызовов, честный статус complete|partial|failed.
+Тесты на нём показывают, что данных ошибки достаточно, чтобы движок остановился без
+бесконечного цикла и пометил недоступные этапы.
 """
 
 from __future__ import annotations
@@ -13,11 +13,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from bcc_review.providers.gemini import ErrorKind, ProviderError
+from bcc_review.contracts import ProviderError
 
 # После этих категорий провайдер считается выключенным до конца прогона.
-PROVIDER_DOWN = frozenset({ErrorKind.CONFIG, ErrorKind.AUTH, ErrorKind.MODEL_UNAVAILABLE,
-                           ErrorKind.QUOTA_EXHAUSTED})
+PROVIDER_DOWN = frozenset({"not_configured", "auth", "not_found", "quota"})
 HARD_LOOP_GUARD = 50
 
 
@@ -41,7 +40,7 @@ def run_stages(
     adapter: Any,
     stages: Sequence[Stage],
     *,
-    model: str,
+    model: str | None,
     deadline_s: float,
     clock: Callable[[], float],
     sleep: Callable[[float], None],
@@ -53,7 +52,7 @@ def run_stages(
     down: ProviderError | None = None
     for stage in stages:
         if down is not None:
-            result.stages.append({"stage": stage.name, "status": "unavailable", "kind": str(down.kind),
+            result.stages.append({"stage": stage.name, "status": "unavailable", "kind": down.kind,
                                   "reason": "провайдер недоступен после предыдущего этапа"})
             continue
         retries = 0
@@ -66,16 +65,17 @@ def run_stages(
             try:
                 res = adapter.invoke(model=model, messages=stage.messages, schema=stage.schema, timeout_s=remaining)
             except ProviderError as err:
-                result.physical_calls += err.physical_calls
-                wait = err.retry_after if err.retry_after is not None else base_backoff_s * (2 ** retries)
+                result.physical_calls += getattr(err, "physical_calls", 1)
+                wait = err.retry_after_s if err.retry_after_s is not None else base_backoff_s * (2 ** retries)
                 fits = (clock() - started) + wait < deadline_s
-                if err.retryable and retries < max_retries and fits:
+                if err.transient and retries < max_retries and fits:
                     retries += 1
                     sleep(wait)
                     continue
-                result.stages.append({"stage": stage.name, "status": "unavailable", "kind": str(err.kind),
-                                      "retry_after": err.retry_after, "retries": retries, "message": err.message})
-                if err.kind in PROVIDER_DOWN or err.kind in (ErrorKind.RATE_LIMITED, ErrorKind.OVERLOADED):
+                result.stages.append({"stage": stage.name, "status": "unavailable", "kind": err.kind,
+                                      "subkind": getattr(err, "subkind", None), "retry_after_s": err.retry_after_s,
+                                      "retries": retries, "message": err.message})
+                if err.kind in PROVIDER_DOWN or err.transient:
                     down = err
                 break
             else:

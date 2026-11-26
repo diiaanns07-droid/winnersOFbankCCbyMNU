@@ -1,23 +1,26 @@
-"""Адаптер Gemini (Google Gen AI SDK) для семантических этапов bcc_review.
+"""Адаптер Gemini (Google Gen AI SDK) для семантических этапов bcc_review (№12).
 
-Контракт (общий с адаптером Anthropic, исполнитель №11):
+Контракт v1 (``bcc_review.contracts.ProviderAdapter``, общий с №11):
 
     GeminiAdapter().invoke(*, model, messages, schema, timeout_s)
-        -> {"data", "usage", "model", "request_id", "meta"}
+        -> {"data", "usage", "model", "request_id", "stop_reason", "meta"}
 
-* ``messages`` — список ``{"role": "system"|"user"|"assistant", "content": str | [{"type": "text", "text": str}]}``;
+* ``messages`` — ``{"role": "system"|"user"|"assistant", "content": str | [{"type": "text", "text": str}]}``;
 * ``schema`` — полная JSON Schema (draft 2020-12) ожидаемого объекта;
-* ``timeout_s`` — бюджет всего вызова, включая резервную модель.
+* ``timeout_s`` — бюджет всего вызова, включая резервную модель;
+* ``model=None`` — модель из ``GEMINI_MODEL`` (по умолчанию ``gemini-2.5-flash``).
 
-Адаптер делает ровно одну попытку на модель: SDK-ретраи выключены, повторы,
-общий таймер и выбор другого провайдера принадлежат runtime. Резервная модель
-вызывается только из явно заданного списка (``GEMINI_FALLBACK_MODELS``), каждая
-модель не более одного раза и только если в бюджете осталось ``min_attempt_s``.
+Ошибка — :class:`GeminiError`, подкласс общего ``bcc_review.contracts.ProviderError``:
+``kind`` из ``PROVIDER_ERROR_KINDS``, ``retry_after_s`` только из ответа сервера,
+``transient`` решает, повторяет ли движок. Точная причина — в ``subkind``.
 
-Ответ принимается только при ``finish_reason == STOP``, непустом тексте, валидном
-JSON и полной валидации по исходной схеме. Всё остальное становится
-``ProviderError`` с точной категорией (``kind``). Других исключений ``invoke``
-наружу не выпускает.
+Адаптер делает ровно одну попытку на модель: SDK-ретраи выключены, повторы, общий
+таймер и выбор другого провайдера принадлежат движку. Резервная модель вызывается
+только из явно заданного списка (``GEMINI_FALLBACK_MODELS``), каждая не более одного
+раза и только если в бюджете осталось ``min_attempt_s``.
+
+Ответ принимается только при ``finish_reason == STOP``, непустом тексте, валидном JSON
+и полной валидации по исходной схеме. Других исключений ``invoke`` наружу не выпускает.
 
 Проверка с реальным ключом: ``python -m bcc_review.providers.gemini models|doctor``.
 """
@@ -35,6 +38,11 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import StrEnum
 from typing import Any
 
+from bcc_review.contracts import PROVIDER_ERROR_KINDS, ProviderError
+
+__all__ = ["DEFAULT_MODEL", "ErrorKind", "GeminiAdapter", "GeminiError", "ProviderError",
+           "classify_api_error", "settings_from_env", "to_gemini_messages", "to_gemini_schema"]
+
 PROVIDER = "gemini"
 DEFAULT_MODEL = "gemini-2.5-flash"
 DEFAULT_MIN_ATTEMPT_S = 5.0
@@ -47,79 +55,59 @@ MODELS_HELP = "Список моделей, доступных ключу: pytho
 
 
 class ErrorKind(StrEnum):
-    CONFIG = "config"                        # нет ключа, SDK или зависимости
-    AUTH = "auth"                            # ключ недействителен, доступ или регион запрещены
-    RATE_LIMITED = "rate_limited"            # 429, минутный лимит (RPM/TPM)
-    QUOTA_EXHAUSTED = "quota_exhausted"      # 429, дневная квота или лимит 0 у модели
-    OVERLOADED = "overloaded"                # 503/500/502: перегрузка или сбой сервера
-    MODEL_UNAVAILABLE = "model_unavailable"  # 404: модели нет или она снята
-    TIMEOUT = "timeout"                      # клиентский тайм-аут, 504, бюджет исчерпан
-    NETWORK = "network"                      # DNS, соединение, прокси
-    BAD_REQUEST = "bad_request"              # 400: запрос или схема отвергнуты
-    BLOCKED = "blocked"                      # фильтр безопасности, recitation и т. п.
-    EMPTY = "empty"                          # нет кандидатов или текста
-    TRUNCATED = "truncated"                  # MAX_TOKENS: выходной бюджет исчерпан
-    INVALID_OUTPUT = "invalid_output"        # не JSON или не проходит схему
+    """Категории — строго из словаря контракта v1 (``PROVIDER_ERROR_KINDS``)."""
+
+    NOT_CONFIGURED = "not_configured"  # нет ключа, SDK, модели; неверное число в env
+    AUTH = "auth"                      # ключ недействителен, доступ, регион или биллинг
+    RATE_LIMIT = "rate_limit"          # 429, минутный лимит (RPM/TPM)                    временная
+    QUOTA = "quota"                    # 429, дневная квота или limit 0 у модели
+    OVERLOADED = "overloaded"          # 503 UNAVAILABLE                                  временная
+    SERVER = "server"                  # 500, 502 и прочие 5xx                             временная
+    NOT_FOUND = "not_found"            # 404: модели нет или она снята
+    TIMEOUT = "timeout"                # клиентский тайм-аут, 504, 408                     временная
+    NETWORK = "network"                # DNS, соединение, прокси                           временная
+    BAD_REQUEST = "bad_request"        # 400: запрос или схема отвергнуты
+    REFUSAL = "refusal"                # блокировка запроса или ответа фильтром
+    TRUNCATED = "truncated"            # MAX_TOKENS: выходной бюджет исчерпан
+    INVALID_OUTPUT = "invalid_output"  # пустой content, не JSON, не по схеме, finish != STOP
     UNKNOWN = "unknown"
 
 
-RETRYABLE = frozenset({
-    ErrorKind.RATE_LIMITED, ErrorKind.OVERLOADED, ErrorKind.TIMEOUT,
-    ErrorKind.NETWORK, ErrorKind.EMPTY, ErrorKind.INVALID_OUTPUT,
-})
+assert {k.value for k in ErrorKind} <= set(PROVIDER_ERROR_KINDS), "словарь kind разошёлся с контрактом"
+
 # Ошибки, при которых имеет смысл резервная модель: квоты и доступность у Gemini
 # считаются отдельно по каждой модели.
-FALLBACK_ON = frozenset({
-    ErrorKind.MODEL_UNAVAILABLE, ErrorKind.QUOTA_EXHAUSTED,
-    ErrorKind.OVERLOADED, ErrorKind.RATE_LIMITED,
-})
-# Отказы, которые не пройдут до конца прогона: модель с ними больше не вызывается
-# этим экземпляром адаптера (экономия квоты и времени), пока не вызван reset_model_state().
-STICKY = frozenset({ErrorKind.MODEL_UNAVAILABLE, ErrorKind.QUOTA_EXHAUSTED})
+FALLBACK_ON = frozenset({ErrorKind.NOT_FOUND, ErrorKind.QUOTA, ErrorKind.OVERLOADED,
+                         ErrorKind.SERVER, ErrorKind.RATE_LIMIT})
+# Отказы, которые не пройдут до конца прогона: модель с ними больше не вызывается этим
+# экземпляром адаптера (экономия квоты и времени), пока не вызван reset_model_state().
+STICKY = frozenset({ErrorKind.NOT_FOUND, ErrorKind.QUOTA})
 
 
-def _shared_error_base() -> type[Exception]:
-    """Общий ProviderError из bootstrap (Max/№11), если он уже есть в пакете."""
-    for name in ("bcc_review.providers.base", "bcc_review.providers.errors"):
-        try:
-            module = __import__(name, fromlist=["ProviderError"])
-        except ImportError:
-            continue
-        base = getattr(module, "ProviderError", None)
-        if isinstance(base, type) and issubclass(base, Exception):
-            return base
-    return Exception
-
-
-class ProviderError(_shared_error_base()):  # type: ignore[misc]
-    """Единственный тип ошибки, который выпускает ``invoke``."""
+class GeminiError(ProviderError):
+    """Общий ProviderError контракта плюс подробности Gemini."""
 
     def __init__(
         self,
         kind: ErrorKind | str,
         message: str,
         *,
-        provider: str = PROVIDER,
+        subkind: str | None = None,
         model: str | None = None,
         status: int | None = None,
-        retryable: bool | None = None,
-        retry_after: float | None = None,
+        retry_after_s: float | None = None,
         retry_after_source: str | None = None,
         request_id: str | None = None,
+        usage: dict[str, Any] | None = None,
         physical_calls: int = 0,
         attempts: list[dict[str, Any]] | None = None,
         detail: dict[str, Any] | None = None,
     ) -> None:
-        Exception.__init__(self, message)  # базовый класс bootstrap может иметь иную сигнатуру
-        self.kind = ErrorKind(kind)
-        self.message = message
-        self.provider = provider
-        self.model = model
-        self.status = status
-        self.retryable = self.kind in RETRYABLE if retryable is None else retryable
-        self.retry_after = retry_after
+        super().__init__(str(kind), message, retry_after_s=retry_after_s, status=status,
+                         request_id=request_id, usage=usage, model=model)
+        self.provider = PROVIDER
+        self.subkind = subkind
         self.retry_after_source = retry_after_source
-        self.request_id = request_id
         self.physical_calls = physical_calls
         self.attempts = attempts or []
         self.detail = detail or {}
@@ -130,10 +118,10 @@ class ProviderError(_shared_error_base()):  # type: ignore[misc]
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "kind": str(self.kind), "message": self.message, "provider": self.provider,
-            "model": self.model, "status": self.status, "retryable": self.retryable,
-            "retry_after": self.retry_after, "retry_after_source": self.retry_after_source,
-            "request_id": self.request_id, "physical_calls": self.physical_calls,
+            "kind": self.kind, "subkind": self.subkind, "transient": self.transient, "message": self.message,
+            "provider": self.provider, "model": self.model, "status": self.status,
+            "retry_after_s": self.retry_after_s, "retry_after_source": self.retry_after_source,
+            "request_id": self.request_id, "usage": self.usage, "physical_calls": self.physical_calls,
             "attempts": self.attempts, "detail": self.detail,
         }
 
@@ -151,14 +139,14 @@ def _env_float(environ: Mapping[str, str], name: str, default: float | None) -> 
     try:
         return float(raw)
     except ValueError:
-        raise ProviderError(ErrorKind.CONFIG, f"{name}={raw!r}: ожидается число.") from None
+        raise GeminiError(ErrorKind.NOT_CONFIGURED, f"{name}={raw!r}: ожидается число.", subkind="bad_env") from None
 
 
 def parse_model_list(raw: str | Iterable[str] | None) -> list[str]:
     items = raw.split(",") if isinstance(raw, str) else list(raw or [])
     seen: list[str] = []
     for item in items:
-        item = item.strip().removeprefix("models/")
+        item = (item or "").strip().removeprefix("models/")
         if item and item not in seen:
             seen.append(item)
     return seen
@@ -193,6 +181,10 @@ _SCHEMA_MAPS = ("properties",)
 _SCHEMA_LISTS = ("anyOf", "prefixItems")
 _FORMATS = frozenset({"date-time", "date", "time"})
 _SILENT_DROP = frozenset({"$schema", "$id", "$comment", "$defs", "definitions"})
+# Удалённые ограничения на значение дописываются в description: модель о них знает,
+# а соблюдение всё равно проверяет локальная валидация.
+_HINTABLE = frozenset({"pattern", "minLength", "maxLength", "uniqueItems", "multipleOf",
+                       "exclusiveMinimum", "exclusiveMaximum", "minProperties", "maxProperties", "format"})
 
 
 class SchemaConversionError(ValueError):
@@ -214,8 +206,8 @@ def _resolve_ref(root: Mapping[str, Any], ref: str) -> Any:
 def to_gemini_schema(schema: Mapping[str, Any]) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Явное приведение JSON Schema к подмножеству для Gemini.
 
-    Возвращает (схема для провода, журнал изменений). Журнал попадает в meta и
-    в отчёт о совместимости; полный контроль остаётся за локальной валидацией.
+    Возвращает (схема для провода, журнал изменений). Журнал попадает в meta и в отчёт
+    о совместимости; полный контроль остаётся за локальной валидацией.
     """
     log: list[dict[str, str]] = []
 
@@ -237,6 +229,7 @@ def to_gemini_schema(schema: Mapping[str, Any]) -> tuple[dict[str, Any], list[di
             return conv(merged, path, refs + (ref,))
 
         out: dict[str, Any] = {}
+        hints: list[str] = []
         for key, value in node.items():
             here = f"{path}/{key}"
             if key in _PASSTHROUGH:
@@ -253,16 +246,19 @@ def to_gemini_schema(schema: Mapping[str, Any]) -> tuple[dict[str, Any], list[di
             elif key == "const":
                 out["enum"] = [copy.deepcopy(value)]
                 note(path, key, "rewritten as enum")
-            elif key == "format":
-                if value in _FORMATS:
-                    out[key] = value
-                else:
-                    note(path, f"format:{value}", "dropped")
+            elif key == "format" and value in _FORMATS:
+                out[key] = value
             elif key in _SILENT_DROP:
                 if not (key in ("$defs", "definitions") and path == ""):
                     note(path, key, "dropped")
             else:
-                note(path, key, "dropped")
+                note(path, f"format:{value}" if key == "format" else key,
+                     "moved to description" if key in _HINTABLE else "dropped")
+                if key in _HINTABLE:
+                    hints.append(f"{key}={json.dumps(value, ensure_ascii=False)}")
+        if hints:
+            suffix = f"[ограничения: {', '.join(hints)}]"
+            out["description"] = f"{out['description']} {suffix}" if out.get("description") else suffix
 
         types = out.get("type")
         if isinstance(types, list):
@@ -289,6 +285,10 @@ def to_gemini_schema(schema: Mapping[str, Any]) -> tuple[dict[str, Any], list[di
 # --------------------------------------------------------------------------- messages
 
 
+def _bad_messages(text: str) -> GeminiError:
+    return GeminiError(ErrorKind.BAD_REQUEST, text, subkind="messages")
+
+
 def _text_of(content: Any, index: int) -> str:
     if isinstance(content, str):
         return content
@@ -299,10 +299,10 @@ def _text_of(content: Any, index: int) -> str:
             if is_text and isinstance(block.get("text"), str):
                 chunks.append(block["text"])
             else:
-                raise ProviderError(ErrorKind.BAD_REQUEST,
-                                    f"messages[{index}]: поддерживаются только текстовые блоки, получено {block!r:.80}")
+                raise _bad_messages(f"messages[{index}]: поддерживаются только текстовые блоки, "
+                                    f"получено {block!r:.80}")
         return "\n\n".join(chunks)
-    raise ProviderError(ErrorKind.BAD_REQUEST, f"messages[{index}].content: ожидается строка или список блоков")
+    raise _bad_messages(f"messages[{index}].content: ожидается строка или список блоков")
 
 
 def to_gemini_messages(messages: Sequence[Mapping[str, Any]]) -> tuple[str | None, list[dict[str, Any]]]:
@@ -317,13 +317,13 @@ def to_gemini_messages(messages: Sequence[Mapping[str, Any]]) -> tuple[str | Non
             system.append(text)
             continue
         if role not in roles:
-            raise ProviderError(ErrorKind.BAD_REQUEST, f"messages[{i}].role={role!r} не поддерживается")
+            raise _bad_messages(f"messages[{i}].role={role!r} не поддерживается")
         if contents and contents[-1]["role"] == roles[role]:
             contents[-1]["parts"].append({"text": text})
         else:
             contents.append({"role": roles[role], "parts": [{"text": text}]})
     if not any(c["role"] == "user" for c in contents):
-        raise ProviderError(ErrorKind.BAD_REQUEST, "messages: нет ни одного сообщения пользователя")
+        raise _bad_messages("messages: нет ни одного сообщения пользователя")
     return ("\n\n".join(system) or None), contents
 
 
@@ -384,8 +384,8 @@ def _error_body(exc: Any) -> tuple[dict[str, Any], list[Mapping[str, Any]]]:
     return body, details
 
 
-def classify_api_error(exc: Any, model: str) -> ProviderError:
-    """Переводит errors.APIError SDK в ProviderError с точной категорией."""
+def classify_api_error(exc: Any, model: str) -> GeminiError:
+    """Переводит errors.APIError SDK в GeminiError с категорией контракта и точным subkind."""
     body, details = _error_body(exc)
     code = int(getattr(exc, "code", None) or body.get("code") or 0)
     status = str(body.get("status") or getattr(exc, "status", "") or "")
@@ -403,50 +403,53 @@ def classify_api_error(exc: Any, model: str) -> ProviderError:
     low = server_msg.lower()
     where = f"{code} {status}".strip()
 
-    def err(kind: ErrorKind, text: str, **kw: Any) -> ProviderError:
-        return ProviderError(kind, text, model=model, status=code or None, retry_after=retry_after,
-                             retry_after_source=source, detail=detail, **kw)
+    def err(kind: ErrorKind, subkind: str, text: str) -> GeminiError:
+        return GeminiError(kind, text, subkind=subkind, model=model, status=code or None,
+                           retry_after_s=retry_after, retry_after_source=source, detail=detail)
 
     if "API_KEY_INVALID" in reasons or "api key not valid" in low or "api key expired" in low:
-        return err(ErrorKind.AUTH, f"Gemini отклонил ключ API ({where}, API_KEY_INVALID). "
-                                   f"Проверьте GEMINI_API_KEY в .env. {KEY_HELP}")
+        return err(ErrorKind.AUTH, "invalid_key", f"Gemini отклонил ключ API ({where}, API_KEY_INVALID). "
+                                                  f"Проверьте GEMINI_API_KEY в .env. {KEY_HELP}")
     if code == 429 or status == "RESOURCE_EXHAUSTED":
         quota = ", ".join(quota_ids) or "квота не указана"
-        limit_zero = any(str(v.get("quotaValue", "")).strip() == "0" for v in violations) or "limit: 0" in low
-        per_day = any("perday" in q.lower() for q in quota_ids)
-        if limit_zero:
-            detail["limit_zero"] = True
-            return err(ErrorKind.QUOTA_EXHAUSTED, f"У модели {model} для этого ключа нулевая квота ({quota}): "
-                                                  f"на бесплатном тарифе модель недоступна. {MODELS_HELP}",
-                       retryable=False)
-        if per_day:
-            return err(ErrorKind.QUOTA_EXHAUSTED, f"Исчерпана дневная квота модели {model} ({quota}). Повтор в этом "
-                                                  f"запуске бесполезен: дождитесь сброса квоты, задайте другую модель "
-                                                  "(GEMINI_MODEL / GEMINI_FALLBACK_MODELS) или другой ключ.",
-                       retryable=False)
+        if any(str(v.get("quotaValue", "")).strip() == "0" for v in violations) or "limit: 0" in low:
+            return err(ErrorKind.QUOTA, "limit_zero",
+                       f"У модели {model} для этого ключа нулевая квота ({quota}): на бесплатном тарифе "
+                       f"модель недоступна. {MODELS_HELP}")
+        if any("perday" in q.lower() for q in quota_ids):
+            return err(ErrorKind.QUOTA, "per_day",
+                       f"Исчерпана дневная квота модели {model} ({quota}). Повтор в этом запуске бесполезен: "
+                       "дождитесь сброса квоты, задайте другую модель (GEMINI_MODEL / GEMINI_FALLBACK_MODELS) "
+                       "или другой ключ.")
         wait = f" Сервер просит повторить через {retry_after:g} с." if retry_after is not None else ""
-        return err(ErrorKind.RATE_LIMITED, f"Превышен лимит запросов к модели {model} ({where}; {quota}).{wait}")
+        return err(ErrorKind.RATE_LIMIT, "per_minute" if quota_ids else "unspecified",
+                   f"Превышен лимит запросов к модели {model} ({where}; {quota}).{wait}")
     if code in (401, 403) or status in ("UNAUTHENTICATED", "PERMISSION_DENIED"):
-        return err(ErrorKind.AUTH, f"Gemini запретил доступ ({where}): {server_msg or 'нет доступа'}. "
-                                   "Проверьте GEMINI_API_KEY и что Generative Language API включён "
-                                   f"для проекта ключа. {KEY_HELP}")
+        return err(ErrorKind.AUTH, "permission_denied",
+                   f"Gemini запретил доступ ({where}): {server_msg or 'нет доступа'}. Проверьте GEMINI_API_KEY "
+                   f"и что Generative Language API включён для проекта ключа. {KEY_HELP}")
     if code == 400 and status == "FAILED_PRECONDITION":
-        return err(ErrorKind.AUTH, f"Gemini недоступен для этого ключа ({where}): {server_msg}. "
-                                   "Обычно это регион без бесплатного тарифа или не подключённый биллинг.")
+        return err(ErrorKind.AUTH, "location_or_billing",
+                   f"Gemini недоступен для этого ключа ({where}): {server_msg}. Обычно это регион без "
+                   "бесплатного тарифа или не подключённый биллинг.")
     if code == 404 or status == "NOT_FOUND" or ("not found" in low and "model" in low):
-        return err(ErrorKind.MODEL_UNAVAILABLE, f"Модель {model} недоступна этому ключу или снята с API ({where}). "
-                                                f"{MODELS_HELP}; затем задайте GEMINI_MODEL.")
+        return err(ErrorKind.NOT_FOUND, "model",
+                   f"Модель {model} недоступна этому ключу или снята с API ({where}). {MODELS_HELP}; "
+                   "затем задайте GEMINI_MODEL.")
     if code in (408, 504) or status == "DEADLINE_EXCEEDED":
-        return err(ErrorKind.TIMEOUT, f"Gemini не уложился во время ответа ({where}) для модели {model}.")
-    if code in (500, 502, 503) or status in ("UNAVAILABLE", "INTERNAL"):
-        return err(ErrorKind.OVERLOADED, f"Модель {model} временно перегружена или недоступна ({where}).")
+        return err(ErrorKind.TIMEOUT, "server_timeout", f"Gemini не уложился во время ответа ({where}), "
+                                                        f"модель {model}.")
+    if code == 503 or status == "UNAVAILABLE":
+        return err(ErrorKind.OVERLOADED, "http_503", f"Модель {model} временно перегружена ({where}).")
+    if code >= 500 or status == "INTERNAL":
+        return err(ErrorKind.SERVER, f"http_{code or 500}", f"Сбой сервера Gemini ({where}), модель {model}.")
     if 400 <= code < 500:
-        if "schema" in low:
+        rejected = "schema" in low
+        if rejected:
             detail["schema_rejected"] = True
-        return err(ErrorKind.BAD_REQUEST, f"Gemini отклонил запрос ({where}): {server_msg[:300]}")
-    if code >= 500:
-        return err(ErrorKind.OVERLOADED, f"Сбой сервера Gemini ({where}) для модели {model}.")
-    return err(ErrorKind.UNKNOWN, f"Неожиданный ответ Gemini ({where}): {server_msg[:300]}")
+        return err(ErrorKind.BAD_REQUEST, "schema_rejected" if rejected else f"http_{code}",
+                   f"Gemini отклонил запрос ({where}): {server_msg[:300]}")
+    return err(ErrorKind.UNKNOWN, f"http_{code}", f"Неожиданный ответ Gemini ({where}): {server_msg[:300]}")
 
 
 def _transport_kind(exc: BaseException) -> ErrorKind | None:
@@ -467,8 +470,8 @@ def _sdk() -> tuple[Any, Any, Any]:
         from google import genai
         from google.genai import errors, types
     except ImportError as exc:
-        raise ProviderError(ErrorKind.CONFIG, "Не установлен пакет google-genai: pip install google-genai "
-                                              f"({exc}).", retryable=False) from None
+        raise GeminiError(ErrorKind.NOT_CONFIGURED, "Не установлен пакет google-genai: pip install google-genai "
+                                                    f"({exc}).", subkind="missing_sdk") from None
     return genai, types, errors
 
 
@@ -476,11 +479,13 @@ def _validator(schema: Mapping[str, Any]) -> Any:
     try:
         from jsonschema import Draft202012Validator
     except ImportError:
-        raise ProviderError(ErrorKind.CONFIG, "Не установлен пакет jsonschema: pip install jsonschema") from None
+        raise GeminiError(ErrorKind.NOT_CONFIGURED, "Не установлен пакет jsonschema: pip install jsonschema",
+                          subkind="missing_jsonschema") from None
     try:
         Draft202012Validator.check_schema(schema)
     except Exception as exc:  # noqa: BLE001 - jsonschema.SchemaError
-        raise ProviderError(ErrorKind.BAD_REQUEST, f"Схема этапа некорректна: {getattr(exc, 'message', exc)}") from None
+        raise GeminiError(ErrorKind.BAD_REQUEST, f"Схема этапа некорректна: {getattr(exc, 'message', exc)}",
+                          subkind="invalid_schema") from None
     return Draft202012Validator(schema)
 
 
@@ -506,7 +511,7 @@ def _usage(meta: Any) -> dict[str, int | None]:
         "input_tokens": get("prompt_token_count"),
         "output_tokens": get("candidates_token_count"),
         "thinking_tokens": get("thoughts_token_count"),
-        "cached_tokens": get("cached_content_token_count"),
+        "cache_read_input_tokens": get("cached_content_token_count"),
         "total_tokens": get("total_token_count"),
     }
 
@@ -523,6 +528,7 @@ class GeminiAdapter:
         self,
         api_key: str | None = None,
         *,
+        model: str | None = None,
         fallback_models: Iterable[str] | str | None = None,
         min_attempt_s: float = DEFAULT_MIN_ATTEMPT_S,
         temperature: float | None = None,
@@ -534,6 +540,7 @@ class GeminiAdapter:
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._api_key = api_key
+        self.default_model = (model or "").strip().removeprefix("models/") or DEFAULT_MODEL
         self.fallback_models = parse_model_list(fallback_models)
         self.min_attempt_s = float(min_attempt_s)
         self.temperature = temperature
@@ -544,13 +551,12 @@ class GeminiAdapter:
         self._http_client = http_client
         self._clock = clock
         self._client: Any = None
-        self._sticky: dict[str, ProviderError] = {}
+        self._sticky: dict[str, GeminiError] = {}
         self._schemas: dict[str, tuple[dict[str, Any], list[dict[str, str]], Any]] = {}
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None, **overrides: Any) -> GeminiAdapter:
         cfg = settings_from_env(environ)
-        cfg.pop("model")
         cfg.update(overrides)
         return cls(**cfg)
 
@@ -559,11 +565,12 @@ class GeminiAdapter:
     def _get_client(self) -> Any:
         if self._client is None:
             if not self._api_key:
-                raise ProviderError(ErrorKind.CONFIG, "Не задан GEMINI_API_KEY. Добавьте строку GEMINI_API_KEY=<ключ> "
-                                                      f"в .env или в окружение. {KEY_HELP}", retryable=False)
+                raise GeminiError(ErrorKind.NOT_CONFIGURED, "Не задан GEMINI_API_KEY. Добавьте строку "
+                                                            f"GEMINI_API_KEY=<ключ> в .env или в окружение. {KEY_HELP}",
+                                  subkind="missing_key")
             genai, types, _ = _sdk()
             options = types.HttpOptions(
-                retry_options=types.HttpRetryOptions(attempts=1),  # повторы делает runtime, не SDK
+                retry_options=types.HttpRetryOptions(attempts=1),  # повторы делает движок, не SDK
                 httpx_client=self._http_client,
             )
             self._client = genai.Client(api_key=self._api_key, http_options=options)
@@ -580,10 +587,8 @@ class GeminiAdapter:
 
     # -- helpers --------------------------------------------------------------
 
-    def model_chain(self, model: str) -> list[str]:
-        primary = (model or "").strip().removeprefix("models/")
-        if not primary:
-            raise ProviderError(ErrorKind.CONFIG, f"Не указана модель Gemini (GEMINI_MODEL). {MODELS_HELP}")
+    def model_chain(self, model: str | None) -> list[str]:
+        primary = (model or "").strip().removeprefix("models/") or self.default_model
         return parse_model_list([primary, *self.fallback_models])
 
     def _schema_bundle(self, schema: Mapping[str, Any]) -> tuple[dict[str, Any], list[dict[str, str]], Any]:
@@ -593,7 +598,8 @@ class GeminiAdapter:
             try:
                 wire, log = to_gemini_schema(schema)
             except SchemaConversionError as exc:
-                raise ProviderError(ErrorKind.BAD_REQUEST, f"Схему нельзя передать в Gemini: {exc}") from None
+                raise GeminiError(ErrorKind.BAD_REQUEST, f"Схему нельзя передать в Gemini: {exc}",
+                                  subkind="schema_conversion") from None
             self._schemas[key] = (wire, log, validator)
         return self._schemas[key]
 
@@ -621,56 +627,75 @@ class GeminiAdapter:
         """Проверка ответа: только STOP + непустой текст + JSON + полная схема."""
         usage = _usage(getattr(response, "usage_metadata", None))
         request_id = getattr(response, "response_id", None)
-        info = {"usage": usage, "model_version": getattr(response, "model_version", None)}
+        info: dict[str, Any] = {"model_version": getattr(response, "model_version", None)}
 
-        def fail(kind: ErrorKind, text: str, **detail: Any) -> ProviderError:
-            # retryable берётся из категории: EMPTY/INVALID_OUTPUT — да, TRUNCATED/BLOCKED — нет.
-            return ProviderError(kind, text, model=model, request_id=request_id, detail={**info, **detail})
+        def fail(kind: ErrorKind, subkind: str, text: str, **detail: Any) -> GeminiError:
+            return GeminiError(kind, text, subkind=subkind, model=model, request_id=request_id, usage=usage,
+                               detail={**info, **detail})
 
         feedback = getattr(response, "prompt_feedback", None)
         block = _enum_name(getattr(feedback, "block_reason", None))
         if block and block != "BLOCKED_REASON_UNSPECIFIED":
-            raise fail(ErrorKind.BLOCKED, f"Gemini заблокировал запрос фильтром ({block}).", block_reason=block)
+            raise fail(ErrorKind.REFUSAL, f"prompt_{block.lower()}",
+                       f"Gemini заблокировал запрос фильтром ({block}).")
         candidates = getattr(response, "candidates", None) or []
         if not candidates:
-            raise fail(ErrorKind.EMPTY, "Gemini вернул ответ без кандидатов: content пуст.")
+            raise fail(ErrorKind.INVALID_OUTPUT, "empty_candidates",
+                       "Gemini вернул ответ без кандидатов: content пуст.")
         candidate = candidates[0]
         finish = _enum_name(getattr(candidate, "finish_reason", None))
         parts = getattr(getattr(candidate, "content", None), "parts", None) or []
         text = "".join(p.text for p in parts if getattr(p, "text", None) and not getattr(p, "thought", False))
         info["finish_reason"] = finish
         if finish == "MAX_TOKENS":
-            raise fail(ErrorKind.TRUNCATED,
+            raise fail(ErrorKind.TRUNCATED, "max_tokens",
                        f"Ответ Gemini обрезан по лимиту выходных токенов (MAX_TOKENS): выдано "
                        f"{usage['output_tokens']} ток., рассуждения {usage['thinking_tokens']} ток. "
                        "JSON неполный, результат не принят.", text_chars=len(text))
         if finish in _SAFETY_REASONS:
-            raise fail(ErrorKind.BLOCKED, f"Gemini остановил ответ фильтром ({finish}).")
+            raise fail(ErrorKind.REFUSAL, f"finish_{finish.lower()}",
+                       f"Gemini остановил ответ фильтром ({finish}).")
         if not text.strip():
-            raise fail(ErrorKind.EMPTY, f"Gemini вернул пустой content (finish_reason={finish}).")
+            raise fail(ErrorKind.INVALID_OUTPUT, "empty_text",
+                       f"Gemini вернул пустой content (finish_reason={finish}).")
         if finish != "STOP":
-            raise fail(ErrorKind.INVALID_OUTPUT, f"Ответ Gemini не завершён штатно (finish_reason={finish}).")
+            raise fail(ErrorKind.INVALID_OUTPUT, f"finish_{(finish or 'none').lower()}",
+                       f"Ответ Gemini не завершён штатно (finish_reason={finish}).")
         try:
             data = json.loads(_strip_fence(text))
         except json.JSONDecodeError as exc:
-            raise fail(ErrorKind.INVALID_OUTPUT, f"Ответ Gemini не является JSON: {exc.msg} (позиция {exc.pos}).",
-                       snippet=text[:200]) from None
+            raise fail(ErrorKind.INVALID_OUTPUT, "not_json",
+                       f"Ответ Gemini не является JSON: {exc.msg} (позиция {exc.pos}).", snippet=text[:200]) from None
         problems = sorted(validator.iter_errors(data), key=lambda e: list(e.absolute_path))
         if problems:
             listed = [{"path": "/" + "/".join(map(str, e.absolute_path)), "error": e.message[:200]}
                       for e in problems[:5]]
             first = listed[0]
-            raise fail(ErrorKind.INVALID_OUTPUT, f"Ответ Gemini не прошёл проверку по схеме: {first['path']}: "
-                                                 f"{first['error']} (всего нарушений: {len(problems)}).",
-                       violations=listed)
-        return data, {**info, "request_id": request_id}
+            raise fail(ErrorKind.INVALID_OUTPUT, "schema_mismatch",
+                       f"Ответ Gemini не прошёл проверку по схеме: {first['path']}: {first['error']} "
+                       f"(всего нарушений: {len(problems)}).", violations=listed)
+        return data, {**info, "usage": usage, "request_id": request_id}
+
+    def _transport_error(self, exc: Exception, model: str, remaining: float, errors: Any) -> GeminiError:
+        kind = _transport_kind(exc)
+        name = type(exc).__name__
+        if kind is ErrorKind.TIMEOUT:
+            return GeminiError(kind, f"Gemini не ответил за {remaining:.0f} с (модель {model}).",
+                               subkind="client_timeout", model=model)
+        if kind is ErrorKind.NETWORK:
+            return GeminiError(kind, f"Нет соединения с {API_HOST}: {name}: {exc}. Проверьте сеть и прокси.",
+                               subkind=name, model=model)
+        if isinstance(exc, errors.UnknownApiResponseError):
+            return GeminiError(ErrorKind.INVALID_OUTPUT, f"Gemini вернул нечитаемый ответ: {exc}",
+                               subkind="unreadable_response", model=model)
+        return GeminiError(ErrorKind.UNKNOWN, f"Сбой вызова Gemini: {name}: {exc}", subkind=name, model=model)
 
     # -- public ---------------------------------------------------------------
 
     def invoke(
         self,
         *,
-        model: str,
+        model: str | None,
         messages: Sequence[Mapping[str, Any]],
         schema: Mapping[str, Any],
         timeout_s: float,
@@ -689,23 +714,23 @@ class GeminiAdapter:
 
         attempts: list[dict[str, Any]] = []
         calls = 0
-        last: ProviderError | None = None
+        last: GeminiError | None = None
         for index, current in enumerate(chain):
             earlier = self._sticky.get(current)
             if earlier is not None:
-                attempts.append({"model": current, "skipped": str(earlier.kind), "earlier_in_run": True})
-                last = ProviderError(earlier.kind, earlier.message, model=current, status=earlier.status,
-                                     retryable=earlier.retryable, retry_after=earlier.retry_after,
-                                     retry_after_source=earlier.retry_after_source,
-                                     detail={**earlier.detail, "remembered": True})
+                attempts.append({"model": current, "skipped": earlier.kind, "earlier_in_run": True})
+                last = GeminiError(earlier.kind, earlier.message, subkind=earlier.subkind, model=current,
+                                   status=earlier.status, retry_after_s=earlier.retry_after_s,
+                                   retry_after_source=earlier.retry_after_source,
+                                   detail={**earlier.detail, "remembered": True})
                 continue
             remaining = deadline - self._clock()
             if index > 0 and remaining < self.min_attempt_s:
                 attempts.append({"model": current, "skipped": "budget", "remaining_s": round(max(remaining, 0.0), 3)})
                 break
             if remaining <= 0:
-                last = ProviderError(ErrorKind.TIMEOUT, f"Бюджет вызова Gemini ({timeout_s:g} с) исчерпан до запроса.",
-                                     model=current, detail={"reason": "budget_exhausted_before_call"})
+                last = GeminiError(ErrorKind.TIMEOUT, f"Бюджет вызова Gemini ({timeout_s:g} с) исчерпан до запроса.",
+                                   subkind="budget_exhausted_before_call", model=current)
                 break
             call_started = self._clock()
             calls += 1
@@ -714,24 +739,12 @@ class GeminiAdapter:
                     model=current, contents=contents,
                     config=self._config(types, current, system, wire, remaining, temp, max_tokens))
                 data, info = self._accept(response, current, validator)
-            except ProviderError as exc:
+            except GeminiError as exc:
                 last = exc
             except errors.APIError as exc:
                 last = classify_api_error(exc, current)
             except Exception as exc:  # noqa: BLE001 - наружу выходит только ProviderError
-                kind = _transport_kind(exc)
-                if kind is ErrorKind.TIMEOUT:
-                    last = ProviderError(kind, f"Gemini не ответил за {remaining:.0f} с (модель {current}).",
-                                         model=current)
-                elif kind is ErrorKind.NETWORK:
-                    last = ProviderError(kind, f"Нет соединения с {API_HOST}: {type(exc).__name__}: {exc}. "
-                                               "Проверьте сеть и прокси.", model=current)
-                elif isinstance(exc, errors.UnknownApiResponseError):
-                    last = ProviderError(ErrorKind.INVALID_OUTPUT, f"Gemini вернул нечитаемый ответ: {exc}",
-                                         model=current)
-                else:
-                    last = ProviderError(ErrorKind.UNKNOWN, f"Сбой вызова Gemini: {type(exc).__name__}: {exc}",
-                                         model=current, retryable=False)
+                last = self._transport_error(exc, current, remaining, errors)
             else:
                 version = info.get("model_version")
                 return {
@@ -739,6 +752,7 @@ class GeminiAdapter:
                     "usage": {**info["usage"], "physical_calls": calls},
                     "model": version or current,
                     "request_id": info.get("request_id"),
+                    "stop_reason": info.get("finish_reason"),
                     "meta": {
                         "provider": PROVIDER,
                         "requested_model": chain[0],
@@ -746,13 +760,13 @@ class GeminiAdapter:
                         "model_version": version,
                         "fallback_used": current != chain[0],
                         "attempts": attempts,
-                        "finish_reason": info.get("finish_reason"),
                         "schema_adjustments": schema_log,
                         "latency_s": round(self._clock() - call_started, 3),
                     },
                 }
-            attempts.append({"model": current, "kind": str(last.kind), "status": last.status,
-                             "retry_after": last.retry_after, "elapsed_s": round(self._clock() - call_started, 3)})
+            attempts.append({"model": current, "kind": last.kind, "subkind": last.subkind, "status": last.status,
+                             "retry_after_s": last.retry_after_s,
+                             "elapsed_s": round(self._clock() - call_started, 3)})
             if last.kind in STICKY:
                 self._sticky[current] = last
             if last.kind not in self.fallback_on:
@@ -773,6 +787,8 @@ class GeminiAdapter:
             models = list(client.models.list(config={"page_size": 200}))
         except errors.APIError as exc:
             raise classify_api_error(exc, "models.list") from None
+        except Exception as exc:  # noqa: BLE001
+            raise self._transport_error(exc, "models.list", 0, errors) from None
         rows = []
         for item in models:
             actions = list(getattr(item, "supported_actions", None) or [])
@@ -848,8 +864,8 @@ DOCTOR_MESSAGES = [
                                 "Требование R-002, блок b2: «Порог задаётся от 1 000 до 1 000 000 ₸.»\n"
                                 "Найди дефекты формулировок."},
 ]
-EXIT_CODES = {ErrorKind.CONFIG: 2, ErrorKind.AUTH: 2, ErrorKind.RATE_LIMITED: 3,
-              ErrorKind.QUOTA_EXHAUSTED: 3, ErrorKind.MODEL_UNAVAILABLE: 4}
+EXIT_CODES = {ErrorKind.NOT_CONFIGURED: 2, ErrorKind.AUTH: 2, ErrorKind.RATE_LIMIT: 3, ErrorKind.QUOTA: 3,
+              ErrorKind.NOT_FOUND: 4}
 
 
 def _print(obj: Any) -> None:
@@ -865,25 +881,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--timeout", type=float, default=90.0)
     args = parser.parse_args(argv)
     try:
-        settings = settings_from_env()
         adapter = GeminiAdapter.from_env()
         if args.command == "models":
             _print(adapter.list_models())
             return 0
         genai, _, _ = _sdk()
-        result = adapter.invoke(model=args.model or settings["model"], messages=DOCTOR_MESSAGES,
-                                schema=DOCTOR_SCHEMA, timeout_s=args.timeout)
+        result = adapter.invoke(model=args.model, messages=DOCTOR_MESSAGES, schema=DOCTOR_SCHEMA,
+                                timeout_s=args.timeout)
         meta = result["meta"]
         _print({"ok": True, "sdk": getattr(genai, "__version__", None),
                 "requested_model": meta["requested_model"], "model": result["model"],
                 "called_model": meta["called_model"], "fallback_used": meta["fallback_used"],
-                "request_id": result["request_id"], "latency_s": meta["latency_s"], "usage": result["usage"],
-                "finish_reason": meta["finish_reason"], "candidates": len(result["data"]["candidates"]),
+                "request_id": result["request_id"], "stop_reason": result["stop_reason"],
+                "latency_s": meta["latency_s"], "usage": result["usage"],
+                "candidates": len(result["data"]["candidates"]),
                 "schema_adjustments": len(meta["schema_adjustments"])})
         return 0
-    except ProviderError as exc:
+    except GeminiError as exc:
         _print({"ok": False, **exc.to_dict()})
-        return EXIT_CODES.get(exc.kind, 1)
+        return EXIT_CODES.get(ErrorKind(exc.kind), 1)
 
 
 if __name__ == "__main__":
