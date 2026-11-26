@@ -778,17 +778,24 @@ def _card(c: _Ctx, f: dict) -> list[str]:
     srcs = [source_name(s) for s in f.get("sources") or []]
     if srcs:
         meta.append("**Нашли:** " + ", ".join(dict.fromkeys(srcs)))
-    out += [" · ".join(meta) + badge, ""]
     evs = []
     for ev in f.get("evidence") or []:
         warn = " ⚠️ цитата не сверена" if ev.get("verified") == "missing" else ""
         evs.append(f"{esc(place(ev))}: {quote_md(ev.get('quote'))}{warn}")
-    if c.level >= 3 and f.get("severity") != "critical":
-        out += ["**Где:** " + "; ".join(evs), ""]
+    compact = c.level >= 3 and f.get("severity") != "critical"
+    if compact and c.level >= 4:
+        out += [" · ".join(meta) + badge + "  ", "**Где:** " + "; ".join(evs), ""]
+    elif compact:
+        out += [" · ".join(meta) + badge, "", "**Где:** " + "; ".join(evs), ""]
     else:
-        out += [f"- {e}" for e in evs] + [""]
-    fields = [("Проблема", f.get("problem")), ("Сценарий", f.get("scenario")), ("Последствия", f.get("impact")),
-              ("Что исправить", f.get("recommendation"))]
+        out += [" · ".join(meta) + badge, ""] + [f"- {e}" for e in evs] + [""]
+    if compact and c.level >= 4 and f.get("scenario") and f.get("impact"):
+        fields = [("Проблема", f.get("problem")),
+                  ("Сценарий и последствия", f"{str(f['scenario']).rstrip('. ')}. {f['impact']}"),
+                  ("Что исправить", f.get("recommendation"))]
+    else:
+        fields = [("Проблема", f.get("problem")), ("Сценарий", f.get("scenario")), ("Последствия", f.get("impact")),
+                  ("Что исправить", f.get("recommendation"))]
     body = [f"**{name}.** {prose(val)}" for name, val in fields if val]
     src = _rewrite_from(f)
     if src is not None:
@@ -1169,7 +1176,7 @@ def _appendix_method(c: _Ctx) -> list[str]:
 # ================================================================== сборка
 
 MAX_LINES = 900
-MAX_LEVEL = 3
+MAX_LEVEL = 4
 
 
 _LIST_KEYS = ("requirements", "excluded", "findings", "rejected", "acceptance_checks", "pair_checks", "trace",
