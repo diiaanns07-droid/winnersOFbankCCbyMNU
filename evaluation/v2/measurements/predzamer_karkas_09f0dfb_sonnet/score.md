@@ -70,6 +70,17 @@
 * **С15** Логика метода, п. 5, и обязательность полей — найден кандидатом (lens:architect), судья не взял; владельцы: judge №10; близкие: D-15 (match); кандидаты: lens:architect lens:architect#7
 * **С17** UI описан неполно — найден кандидатом (consistency, lens:risk, rules:promises.read_operation), судья не взял; владельцы: judge №10; близкие: D-03 (disputed, no_match); D-09 (disputed, no_match); D-22 (disputed, no_match); кандидаты: consistency consistency#4, lens:risk lens:risk#9, rules:promises.read_operation rules#1
 
+## Вклад этапов (кандидаты до судьи, детерминированно)
+
+| Этап | Кандидатов | К | С | Только у него |
+| :--- | ---: | :--- | ---: | :--- |
+| consistency | 15 | К2, К4 | 8/20 | — |
+| lens:analyst | 9 | К2, К5 | 6/20 | — |
+| lens:architect | 14 | К3, К4, К5 | 12/20 | С15 |
+| lens:qa | 7 | К1, К2, К3, К4 | 6/20 | С14 |
+| lens:risk | 16 | К1, К2, К5 | 12/20 | С10, С11 |
+| rules | 15 | К3, К4 | 8/20 | — |
+
 ## Дубли
 
 * D-14 → С2: Для чужой карты указаны 403 и 404 (consistency, lens:architect, rules:api.status_404, lens:qa)

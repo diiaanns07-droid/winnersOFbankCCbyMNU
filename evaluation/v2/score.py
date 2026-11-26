@@ -353,6 +353,29 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         misses.append({"gold": it["id"], "level": it["level"], "title": it["title"], "where": where,
                        "owners": owner, "near": near[:3], "seen_in": seen_in[:4]})
 
+    # вклад этапов: какие пункты эталона нашли кандидаты каждой линзы/набора/правил до судьи
+    stage_recall: dict[str, dict] = {}
+    for c in cands:
+        src = c["sources"][0] if c["sources"] else "?"
+        if src in ("rejected", "quotes:rejected"):
+            continue
+        key = src.split(":")[0] + ":" + src.split(":")[1] if src.startswith("lens:") else src.split(":")[0]
+        st = stage_recall.setdefault(key, {"candidates": 0, "items": set()})
+        st["candidates"] += 1
+        for it in items:
+            if it["level"] != "minor" and pair_info(it, c)["status"] == "match":
+                st["items"].add(it["id"])
+    stage_recall_out = {}
+    for k, v in sorted(stage_recall.items()):
+        ids = sorted(v["items"], key=lambda g: _gold_order(items, g))
+        stage_recall_out[k] = {"candidates": v["candidates"], "K": [g for g in ids if g.startswith("К")],
+                               "C": [g for g in ids if g.startswith("С")],
+                               "only_here": []}
+    for k, v in stage_recall_out.items():
+        others = set().union(*[set(o["K"] + o["C"]) for kk, o in stage_recall_out.items() if kk != k]) \
+            if len(stage_recall_out) > 1 else set()
+        v["only_here"] = [g for g in v["K"] + v["C"] if g not in others]
+
     k_found = found("critical", assign)
     k_as_crit = [r["gold"] for r in sev_rows if r["level"] == "critical" and r["severity"] == "critical"]
     c_found = found("major", assign)
@@ -436,6 +459,7 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                        for fid, gid in sorted(dups.items())],
         "outside": out_rows,
         "misses": misses,
+        "stage_recall": stage_recall_out,
         "gates": gates,
         "arbiter": {"mode": arbiter, **arb_calls},
         "seconds": round(time.monotonic() - t0, 2),
@@ -590,6 +614,12 @@ def render_md(res: dict, label: str = "") -> str:
         L.append(f"* **{m['gold']}** {m['title']} — {m['where']}; владельцы: {owners}"
                  + (f"; близкие: {near}" if near else "")
                  + (f"; кандидаты: {', '.join(x['source'] + ' ' + x['id'] for x in m['seen_in'])}" if m["seen_in"] else ""))
+    if res.get("stage_recall"):
+        L += ["", "## Вклад этапов (кандидаты до судьи, детерминированно)", "",
+              "| Этап | Кандидатов | К | С | Только у него |", "| :--- | ---: | :--- | ---: | :--- |"]
+        for k, v in res["stage_recall"].items():
+            L.append(f"| {k} | {v['candidates']} | {', '.join(v['K']) or '—'} | {len(v['C'])}/20 | "
+                     f"{', '.join(v['only_here']) or '—'} |")
     L += ["", "## Дубли", ""]
     L += [f"* {d['finding']} → {d['gold']}: {_cut(d['title'])} ({', '.join(d['sources'])})" for d in res["duplicates"]] or ["* нет"]
     L += ["", "## Вне эталона", ""]
