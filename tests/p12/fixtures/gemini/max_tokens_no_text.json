@@ -1,0 +1,24 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": []
+        },
+        "finishReason": "MAX_TOKENS",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 812,
+      "candidatesTokenCount": 0,
+      "totalTokenCount": 2860,
+      "thoughtsTokenCount": 2048
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-trunc-0007"
+  }
+}

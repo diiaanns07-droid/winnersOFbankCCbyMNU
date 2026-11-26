@@ -602,6 +602,13 @@ class _Fact:
     db_field: str | None = None
 
 
+class _Warning(dict):
+    """Контрактный ``Warning``-объект, который при ``str()`` читается как «код: сообщение»."""
+
+    def __str__(self) -> str:
+        return f"{self['code']}: {self['message']}"
+
+
 @dataclass
 class _Fate:
     atoms: list[_Atom] = field(default_factory=list)
@@ -715,7 +722,7 @@ class _Inventory:
 
     def _warn(self, code: str, message: str, block_ids: Iterable[str] = ()) -> None:
         """Предупреждение по контракту v1: ``{code, message, stage, block_ids}``; повтор не дублируется."""
-        item = {"code": code, "message": message, "stage": STAGE, "block_ids": list(dict.fromkeys(block_ids))}
+        item = _Warning(code=code, message=message, stage=STAGE, block_ids=list(dict.fromkeys(block_ids)))
         if item not in self.warnings:
             self.warnings.append(item)
 
@@ -1770,9 +1777,7 @@ class _Inventory:
         accounted = set(req_blocks) | set(excl_by_block)
         unprocessed = [b.id for b in self.blocks if b.id not in accounted]
         reasons = {bid: unproc.get(bid) or self.fates[bid].unprocessed or "Блок не получил судьбу." for bid in unprocessed}
-        if unprocessed:
-            self._warn("unprocessed_blocks",
-                       f"не обработано {_blocks_word(len(unprocessed))}: " + ", ".join(unprocessed), unprocessed)
+        # остаток показан в unprocessed_block_ids и block_coverage; предупреждение о нём выдаёт движок
         fact_out = self._facts_out(_unique_facts(facts), spans_by_req)
         coverage = self._coverage(requirements, ordered_units, req_blocks, excl_by_block, unprocessed, reasons,
                                   mode, llm_status, calls, model_missed, fallback_blocks)

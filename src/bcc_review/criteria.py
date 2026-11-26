@@ -71,6 +71,17 @@ class Criterion:
     def applies(self, role: str) -> bool:
         return role not in self.not_for
 
+    # Совместимость с резервным справочником движка: crit[code]["name"], ["standard"], ["question"].
+    def __getitem__(self, key: str) -> Any:
+        d = self.to_dict()
+        d["standard"] = "; ".join(self.source)
+        d["definition"] = self.definition
+        return d[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in ("code", "short", "kind", "scope", "name", "question", "source", "not_for", "checklist",
+                       "standard", "definition")
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "code": self.code,
@@ -191,11 +202,36 @@ class Criteria:
         """Короткая метка версии: ``1.0.0+<12 символов SHA-256>``."""
         return f"{self.version}+{self.fingerprint[:12]}"
 
-    def get(self, key: str) -> Criterion:
+    def get(self, key: str, default: Any = KeyError) -> Criterion | Any:
+        """Критерий по коду, метке или имени; без ``default`` неизвестный ключ — KeyError."""
         c = self.resolve(key)
         if c is None:
-            raise KeyError(f"неизвестный критерий: {key!r}")
+            if default is KeyError:
+                raise KeyError(f"неизвестный критерий: {key!r}")
+            return default
         return c
+
+    # Mapping-доступ, как у резервного справочника движка: {code: {name, scope, standard, question}}.
+    def __getitem__(self, code: str) -> Criterion:
+        return self.get(code)
+
+    def __iter__(self):
+        return iter(c.code for c in self.criteria)
+
+    def __len__(self) -> int:
+        return len(self.criteria)
+
+    def __contains__(self, code: object) -> bool:
+        return isinstance(code, str) and self.resolve(code) is not None
+
+    def keys(self) -> list[str]:
+        return [c.code for c in self.criteria]
+
+    def values(self) -> list[Criterion]:
+        return list(self.criteria)
+
+    def items(self) -> list[tuple[str, Criterion]]:
+        return [(c.code, c) for c in self.criteria]
 
     def resolve(self, key: str | None) -> Criterion | None:
         """Код контракта («unambiguous»), метка («И3») или русское имя → критерий."""

@@ -1,0 +1,11 @@
+{
+  "audit": {
+    "checked": 39,
+    "confirmed": 38,
+    "ambiguous": 0,
+    "rejected": 1,
+    "note": "Учтена каждая подсказка-цитата кандидатов (включая опоры witness): confirmed — найдена в тексте блока, ambiguous — в нескольких блоках, rejected — не найдена. Смысл проверяется отдельно (meaning_status)."
+  },
+  "verified": 21,
+  "rejected": 0
+}

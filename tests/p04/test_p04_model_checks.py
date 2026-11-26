@@ -98,7 +98,9 @@ def test_missed_block_after_single_retry_is_explicit_residue():
     assert inv["block_coverage"]["level"] == "partial" and inv["block_coverage"]["llm_status"] == "partial"
     assert inv["block_coverage"]["model_missed_block_ids"] == [DESIGN]
     assert DESIGN in inv["block_coverage"]["explanation"]
-    assert warned(inv, "unprocessed_blocks", DESIGN)
+    # остаток — в unprocessed_block_ids и объяснении; предупреждение о нём выдаёт движок, дубля нет
+    assert not warned(inv, "unprocessed_blocks")
+    assert next(b for b in inv["block_coverage"]["blocks"] if b["block_id"] == DESIGN)["fate"] == "unprocessed"
 
 
 def test_missed_numbered_block_falls_back_to_rules_with_mark():

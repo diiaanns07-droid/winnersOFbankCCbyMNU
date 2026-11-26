@@ -1,0 +1,32 @@
+{
+  "case_id": "cashback.base",
+  "family": "cashback",
+  "kind": "base",
+  "ops": [],
+  "variants": [],
+  "seeds": [],
+  "generator_version": "1.0.0",
+  "base_case_id": null,
+  "base_source_sha256": null,
+  "source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+  "semantic_sha256": "83a0a0bfbb581fd0648ec5187549189e9f96c13ac376dc3b0b0c0385447b779c",
+  "transformation": [],
+  "expected_effect": [
+    "Без изменений (чистый контроль)."
+  ],
+  "diff": "",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "label_id": "cashback.base#clean",
+      "case_id": "cashback.base",
+      "family": "cashback",
+      "source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "visibility": "public",
+      "explanation": "Чистая базовая спецификация: любая находка — ложная тревога."
+    }
+  ]
+}
