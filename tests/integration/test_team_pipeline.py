@@ -4,6 +4,7 @@
 """
 
 import importlib.util
+from pathlib import Path
 
 import pytest
 
@@ -112,3 +113,13 @@ def test_analyst_decision_with_team_decisions_module(tmp_path, monkeypatch, bcc_
     omission = next(f["id"] for f in r1["findings"] if f["kind"] == "omission")
     assert any(omission in e["old_ids"] for e in r2["diff"]["persisting"])
     assert main(["verify", str(tmp_path / "r2.json"), str(tmp_path / r2["run"]["source_name"])]) == C.EXIT_OK
+
+
+def test_docx_input_and_annotated_export(tmp_path):
+    src = Path(__file__).resolve().parents[1] / "p03" / "fixtures" / "case_requirements.docx"
+    if not (_present("bcc_review.readers.docx") and src.exists()):
+        pytest.skip("№03 ещё не влит")
+    rep = run(tmp_path, src, offline_lint=True, exports=("docx",))
+    _check(tmp_path, rep, src)
+    assert rep["document"]["format"] == "docx"
+    assert (tmp_path / "report.annotated.docx").exists()
