@@ -4,7 +4,7 @@
 
     AnthropicAdapter.invoke(*, model, messages, schema, timeout_s)
         -> {"data": <объект по схеме>, "usage": {...}, "model": <фактическая модель>,
-            "request_id": <request-id ответа>}
+            "request_id": <request-id ответа>, "stop_reason": <stop_reason ответа>}
 
 Любая ошибка интеграции поднимается как общий ``bcc_review.contracts.ProviderError``
 (kind из ``PROVIDER_ERROR_KINDS``; message, retry_after_s, status, request_id, usage,
@@ -772,7 +772,8 @@ class AnthropicAdapter:
             fallback_used=fallback_used,
             enum_fixes=enum_fixes,
         )
-        return {"data": data, "usage": usage, "model": actual_model, "request_id": request_id}
+        return {"data": data, "usage": usage, "model": actual_model, "request_id": request_id,
+                "stop_reason": getattr(response, "stop_reason", None)}
 
     # ------------------------------------------------------ подготовка запроса
 

@@ -11,7 +11,8 @@ from bcc_review.providers.anthropic import AnthropicAdapter, ProviderError
 
 adapter = AnthropicAdapter(on_physical_call=budget.count)  # живой режим, читает ANTHROPIC_* из окружения
 res = adapter.invoke(model=None, messages=msgs, schema=stage_schema, timeout_s=180)
-res == {"data": <dict по схеме>, "usage": {...}, "model": "<фактическая модель>", "request_id": "req_..."}
+res == {"data": <dict по схеме>, "usage": {...}, "model": "<фактическая модель>", "request_id": "req_...",
+       "stop_reason": "end_turn"}   # все поля contracts.ProviderAdapter
 ```
 
 * `model=None` берёт `ANTHROPIC_MODEL`, по умолчанию `claude-opus-5-5`. Ведущие сообщения `role=system`
@@ -169,7 +170,33 @@ HTTP 200 + `max_tokens` → `truncated` с usage. Валидный JSON неве
 Мутационная проверка: тесты ловят каждую из пяти внесённых поломок — повторы SDK, отключённое
 редактирование секретов, отключённая проверка схемы, игнорирование max_tokens, потеря неоднозначности 429.
 
-## 8. Открытые зависимости
+## 8. Памятка Max: что об одном ответе видно в report.json и trace.jsonl (срез 2821989)
+
+Проверено в `tests/p11/test_response_metadata.py`: `Engine.make_ask → Asker → AnthropicAdapter → RecordedTransport`,
+итог — из `Engine.run_individual`, `build_checks` и `build_run`. Таблица исходов печатается в конце pytest.
+
+| исход ответа | POST | GET | `run.model` | `run.mode` | `stages[individual]` | где виден `kind` |
+| :--- | :-: | :-: | :--- | :--- | :--- | :--- |
+| валидный по схеме | 1 | 1 | claude-opus-5-5 | `rules_plus_llm` | `ok` | — |
+| оборван по `max_tokens` | 1 | 1 | claude-opus-5-5 | `rules_only` | `failed` | `requirements[].review_reason`: «…: truncated: …» |
+| ошибка схемы | 1 | 1 | claude-opus-5-5 | `rules_only` | `failed` | там же, `invalid_output` |
+| отказ до генерации | 1 | 1 | claude-opus-5-5 | `rules_only` | `failed` | там же, `refusal` |
+| тот же ответ из кэша | 0 | 0 | claude-opus-5-5 | `rules_plus_llm` | `ok` | — |
+
+* `run.calls.physical` — число `invoke` (= POST при `max_retries=0`). Служебный `GET /v1/models/{id}` в отчёт
+  не входит, он есть только в `adapter.passport()["physical_calls"]["models"]`.
+* `run.model`, `models_seen` и `tokens` учитывают и неуспешные ответы: токены за усечение и отказ видны.
+* `stages[].reason` при ошибке — общая фраза «…ошибки перехвачены модулем», без `kind`. `kind` попадает только
+  в `requirements[].review_reason`. Статус `cached` из `STAGE_STATUSES` движок не ставит.
+* `request_id` и `stop_reason` в report.json нет. В трассе `request_id` есть только у `call_ok`. У `call_error`
+  нет ни `request_id`, ни токенов, они есть в `adapter.journal` / `adapter.last_call`.
+* Кэш: `cache_hit` в трассе содержит только `stage, model, cache_key` (12 знаков). Происхождение прежнего
+  ответа (`request_id`, `usage`, `requested_model`) лежит в файле `<cache>/<key[:2]>/<key>.json`, найти его
+  можно по `cache_key`. В отчёте отличие видно только по `calls.physical=0`, `cache_hits=1`, `tokens=0`.
+* Ошибка схемы у этого адаптера — 1 POST без повтора: схему проверяет адаптер (`invalid_output`), а этого kind
+  нет в `TRANSIENT_KINDS`. Поэтому однократный повтор Asker по `call_invalid` здесь не срабатывает. Решать Max.
+
+## 9. Открытые зависимости
 
 1. **Закрыто:** общий `ProviderError` — `bcc_review.contracts` (срез `2821989`). Адаптер импортирует его
    напрямую, локальной копии и поиска по `bcc_review.providers.base` / `bcc_review.errors` больше нет;
@@ -177,3 +204,6 @@ HTTP 200 + `max_tokens` → `truncated` с usage. Валидный JSON неве
 2. **Max:** `contracts/v1.json`. Пока его нет, стыковой тест схемы пропускается.
 3. **Max и №18:** живой демо-вызов с ключом команды не выполнялся: ключа в этой среде нет, отдельный
    интеграционный запуск не выделен. Результат подписать полями `res["model"]` и `passport()`.
+4. **Max:** коммит с `stop_reason` проверен без настоящего SDK: пакета `anthropic` в среде не было, тесты шли поверх
+   локальной заглушки вне репозитория (56 passed, 1 skipped). На `anthropic==2.14.0` нужно повторить
+   `python -m pytest tests/p11 -q`.
