@@ -258,20 +258,23 @@
   if (dla) {
     dla.addEventListener("click", function () {
       var data = JSON.parse($("#report-data").textContent);
-      var md = ["# Ответы на вопросы ревью", "", "Документ: " + ((data.document || {}).title || ""), ""];
-      var answers = [];
+      var LET = "ABCDEFGH";
+      var md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
+        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.",
+        "> Передайте файл агенту: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers этот_файл.md", ""];
+      var n = 0;
       (data.questions || []).forEach(function (qq) {
         var pick = $('input[name="' + qq.id + '"]:checked');
         var own = $('textarea[data-own="' + qq.id + '"]');
-        var opt = pick ? (qq.options || [])[+pick.value] : "";
-        var text = own && own.value.trim() ? own.value.trim() : "";
-        if (!opt && !text) return;
-        answers.push({ question_id: qq.id, option_index: pick ? +pick.value : null, option: opt || "", text: text });
-        md.push("## " + qq.id + ". " + qq.question, "", "Ответ: " + (opt || text), text && opt ? "Комментарий: " + text : "", "");
+        var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
+        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
+        if (!val) return;
+        n++;
+        md.push(qq.id + (qq.topic ? " [" + qq.topic + "]" : "") + ": " + val);
       });
-      if (!answers.length) { toast("Отметьте хотя бы один ответ"); return; }
-      download(base + ".answers.json", JSON.stringify({ schema: "bcc-review/answers-1", answers: answers }, null, 2), "application/json");
-      download(base + ".answers.md", md.filter(function (x, i, a) { return !(x === "" && a[i - 1] === ""); }).join("\n"), "text/markdown");
+      if (!n) { toast("Отметьте хотя бы один ответ"); return; }
+      download(base + ".answers.md", md.join("\n") + "\n", "text/markdown");
+      toast("Ответов в файле: " + n);
     });
   }
 

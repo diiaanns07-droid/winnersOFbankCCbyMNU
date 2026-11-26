@@ -125,3 +125,29 @@ def test_cli_writes_file(tmp_path):
 def test_js_syntax():
     js = Path(H.ASSETS / "report.js")
     subprocess.run(["node", "--check", str(js)], check=True)
+
+
+def test_clarification_and_rewrites_tabs(report, view):
+    r = copy.deepcopy(report)
+    r["questions"][0]["topic"] = "лимит уведомлений в месяц"
+    r["clarification"] = {
+        "answers": [{"question_id": "Q-01"}], "decisions": [], "unanswered": ["Q-02"],
+        "changes": [{"finding_id": "D-01", "title": "Ф-3 и Ф-4", "severity_before": "critical", "status": "resolved",
+                     "severity_after": "", "reason": "Ответ Q-01 выбирает одно правило", "question_ids": ["Q-01"],
+                     "title_after": ""}],
+        "new_findings": [], "before": {"verdict": {"development": "no", "testing": "no"},
+                                       "findings": {"critical": 5, "major": 12, "minor": 3}},
+        "after": {"verdict": {"development": "conditional", "testing": "no"},
+                  "findings": {"critical": 4, "major": 12, "minor": 3}},
+        "resolved": 1, "changed": 0, "open": 0}
+    r["rewrites"] = [{"finding_id": "D-01", "edits": [{"action": "replace", "line": 40, "was": "независимо от истории",
+                                                      "became": "<уточнить: сбрасывается ли лимит>", "applied": True}]}]
+    r["findings"][0]["status_after_answers"] = "resolved"
+    page = H.render_html(r, view)
+    assert ">До и после<" in page and ">Исправленное ТЗ<" in page
+    assert "С условиями" in page and "закрыт" in page
+    assert "&lt;уточнить: сбрасывается ли лимит&gt;" in page
+    assert 'data-topic="лимит уведомлений в месяц"' in page
+    assert page.count('role="tabpanel"') == 10
+    # латинские буквы вариантов, как ждёт --answers (№11)
+    assert '<span class="ol">A</span>' in page and '<span class="ol">B</span>' in page

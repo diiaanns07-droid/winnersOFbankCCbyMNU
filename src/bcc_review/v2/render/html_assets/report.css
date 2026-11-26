@@ -419,6 +419,12 @@ table.kv th { width: 210px; font-size: 13px; text-transform: none; letter-spacin
 .ol { flex: none; font-weight: 700; color: var(--brand); min-width: 14px; }
 .own { display: block; font-size: 12px; color: var(--ink-3); font-weight: 600; margin-top: 4px; }
 .own textarea { display: block; width: 100%; margin-top: 3px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--surface); resize: vertical; font-weight: 400; font-size: 13.5px; }
+.topic { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--brand); margin-top: 8px; }
+.qcard .evs { margin-top: 8px; }
+.was { font-family: var(--mono); font-size: 12.5px; background: var(--crit-soft); border-radius: 6px; padding: 4px 7px; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--crit) 60%, transparent); white-space: pre-wrap; }
+.became { font-family: var(--mono); font-size: 12.5px; background: var(--ok-soft); border-radius: 6px; padding: 4px 7px; white-space: pre-wrap; }
+table.rw td:nth-child(4), table.rw td:nth-child(5) { min-width: 240px; }
+table.ba { max-width: 720px; }
 .why { margin: 8px 0 0; color: var(--ink-2); font-size: 13.5px; }
 .foot { padding: 18px clamp(16px, 3vw, 32px) 28px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 50; box-shadow: var(--shadow-lg); }

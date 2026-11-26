@@ -602,6 +602,10 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
                                        " ".join(ev.get("quote", "") for ev in f.get("evidence") or []),
                                        " ".join(f.get("requirement_ids") or []), KIND_LABEL.get(kind, "")) if x)
     prio_html = f'<span class="prio" title="Порядок исправления">Исправить №{prio}</span>' if prio else ""
+    after = f.get("status_after_answers") or (f.get("recheck") or {}).get("status")
+    if after in STATUS_AFTER:
+        lbl, cls = STATUS_AFTER[after]
+        prio_html = f'<span class="ans {cls}" title="После ответов владельца">{lbl}</span>' + prio_html
     return f"""<article class="card sev-{sev}" id="{e(fid)}" tabindex="0" data-idx="{idx}" data-sev="{sev}"
  data-rank="{SEV_RANK[sev]}" data-prio="{prio}" data-line="{_first_line(f)}" data-kind="{e(kind)}"
  data-src="{e(" ".join(src_keys))}" data-blocks="{e(blocks)}" data-lines="{e(" ".join(ev_lines))}" data-search="{e(search.lower())}">
@@ -674,6 +678,23 @@ def _table(head: list[str], rows: list[list[str]], cls: str = "") -> str:
     return f'<div class="tw"><table class="{cls}"><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
+OPTION_LETTERS = "ABCDEFGH"
+
+
+def _ev_list(evs: list) -> str:
+    items = []
+    for ev in evs or []:
+        if not isinstance(ev, dict):
+            continue
+        a = ev.get("line_start") or ev.get("line")
+        b = ev.get("line_end") or a
+        icon, vcls, vtitle = VERIFIED.get(ev.get("verified", ""), ("", "", ""))
+        items.append(f'<li><button type="button" class="ev" data-ls="{e(a)}" data-le="{e(b)}" title="Показать в документе">'
+                     f'<span class="evl">{e(_lines_label(ev))}</span><q>{e(ev.get("quote", ""))}</q>'
+                     + (f'<span class="vf {vcls}" title="{e(vtitle)}">{icon}</span>' if icon else "") + "</button></li>")
+    return f'<ul class="evs">{"".join(items)}</ul>' if items else ""
+
+
 def _questions(report: dict, by_id: dict) -> str:
     qs = report.get("questions") or []
     if not qs:
@@ -682,20 +703,82 @@ def _questions(report: dict, by_id: dict) -> str:
     for q in qs:
         qid = q.get("id", "")
         opts = "".join(
-            f'<li><label><input type="radio" name="{e(qid)}" value="{i}"><span class="ol">{chr(0x410 + i) if i < 32 else i + 1}</span>'
-            f'{e(o)}</label></li>' for i, o in enumerate(q.get("options") or []))
+            f'<li><label><input type="radio" name="{e(qid)}" value="{i}"><span class="ol">'
+            f'{OPTION_LETTERS[i] if i < len(OPTION_LETTERS) else i + 1}</span>{e(o)}</label></li>'
+            for i, o in enumerate(q.get("options") or []))
         links = " ".join(_finding_link(fid, by_id) for fid in q.get("finding_ids") or [])
         block = '<span class="badge sev-critical">Блокирует</span>' if q.get("blocking") else ""
-        items.append(f"""<article class="qcard" data-q="{e(qid)}">
+        topic = f'<div class="topic">{e(q.get("topic"))}</div>' if q.get("topic") else ""
+        items.append(f"""<article class="qcard" data-q="{e(qid)}" data-topic="{e(q.get("topic", ""))}">
   <header class="ch"><span class="fid">{e(qid)}</span>{block}<span class="to">Кому: <b>{e(q.get("to", ""))}</b></span><span class="qlinks">{links}</span></header>
-  <h3 class="ct">{e(q.get("question", ""))}</h3>
+  {topic}<h3 class="ct">{e(q.get("question", ""))}</h3>
+  {_ev_list(q.get("evidence") or [])}
   {f'<ol class="opts">{opts}</ol>' if opts else ''}
   <label class="own">Свой ответ<textarea rows="2" data-own="{e(qid)}" placeholder="Если ни один вариант не подходит"></textarea></label>
   {f'<p class="why"><b>Зачем:</b> {e(q.get("why"))}</p>' if q.get("why") else ''}
 </article>""")
-    return (f'<div class="qtools"><p>Отметьте варианты и скачайте ответы — их можно передать агенту для '
-            f'перепроверки (<code>--answers</code>).</p><button type="button" class="btn" id="dlanswers">'
-            f'Скачать ответы</button></div><div class="qlist">{"".join(items)}</div>')
+    return (f'<div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент '
+            f'перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p>'
+            f'<button type="button" class="btn" id="dlanswers">Скачать ответы</button></div>'
+            f'<div class="qlist">{"".join(items)}</div>')
+
+
+STATUS_AFTER = {"resolved": ("закрыт", "a-yes"), "changed": ("изменён", "a-part"), "open": ("открыт", "a-no"),
+                "new": ("новый", "a-no")}
+
+
+def _clarification(report: dict, by_id: dict) -> str:
+    c = report.get("clarification") or {}
+    if not c:
+        return ""
+    b, a = c.get("before") or {}, c.get("after") or {}
+    vb, va = b.get("verdict") or {}, a.get("verdict") or {}
+    fb, fa = b.get("findings") or {}, a.get("findings") or {}
+    vcls = {"no": "a-no", "conditional": "a-part", "yes": "a-yes"}
+
+    def vcell(v: str) -> str:
+        return f'<span class="ans {vcls.get(v, "a-na")}">{e(VERDICT_LABEL.get(v, "—"))}</span>'
+
+    rows = [["Начинать разработку", vcell(vb.get("development", "")), vcell(va.get("development", ""))],
+            ["Начинать тестирование", vcell(vb.get("testing", "")), vcell(va.get("testing", ""))]]
+    rows += [[f"Замечания: {SEV_LABEL[s].lower()}", _fmt_int(fb.get(s, 0)), _fmt_int(fa.get(s, 0))] for s in SEV_ORDER]
+    out = [f'<p class="lead">Ответов на вопросы: {len(c.get("answers") or [])}, общих решений: '
+           f'{len(c.get("decisions") or [])}, без ответа: {len(c.get("unanswered") or [])}. Оценка «после» '
+           f'предполагает, что ответы внесены в документ. Закрыто: {_fmt_int(c.get("resolved", 0))}, изменено: '
+           f'{_fmt_int(c.get("changed", 0))}, осталось открытыми: {_fmt_int(c.get("open", 0))}, новых: '
+           f'{len(c.get("new_findings") or [])}.</p>',
+           _table(["Показатель", "До ответов", "После ответов"], rows, "ba")]
+    ch = c.get("changes") or []
+    if ch:
+        crow = []
+        for x in ch:
+            lbl, cls = STATUS_AFTER.get(x.get("status", ""), (x.get("status", ""), "a-na"))
+            sb, sa = x.get("severity_before", ""), x.get("severity_after", "")
+            crow.append([_finding_link(x.get("finding_id", ""), by_id) + " " + e(x.get("title_after") or x.get("title", "")),
+                         e(SEV_LABEL.get(sb, sb).lower()), f'<span class="ans {cls}">{e(lbl)}</span>',
+                         e(SEV_LABEL.get(sa, sa).lower()) if sa else "—", e(x.get("reason", "")),
+                         ", ".join(e(q) for q in x.get("question_ids") or [])])
+        out.append('<h3 class="sub">Что изменилось по замечаниям</h3>'
+                   + _table(["Замечание", "Было", "Статус", "Стало", "Почему", "Ответ"], crow))
+    return "".join(out)
+
+
+def _rewrites(report: dict, by_id: dict) -> str:
+    rws = report.get("rewrites") or []
+    if not rws:
+        return ""
+    rows = []
+    for r in rws:
+        for ed in r.get("edits") or []:
+            act = "заменить" if ed.get("action") == "replace" else "добавить после"
+            ok = ('<span class="ans a-yes">внесено</span>' if ed.get("applied")
+                  else '<span class="ans a-na">не найдено в тексте</span>')
+            rows.append([_finding_link(r.get("finding_id", ""), by_id),
+                         f'<a class="lnref" href="#L{e(ed.get("line"))}" data-line="{e(ed.get("line"))}">строка {e(ed.get("line"))}</a>',
+                         e(act), f'<div class="was">{e(ed.get("was", ""))}</div>', f'<div class="became">{e(ed.get("became", ""))}</div>', ok])
+    return ('<p class="lead">Исправленная редакция ТЗ по критичным и существенным замечаниям: каждая правка '
+            'привязана к замечанию и строке. Значения, которые должен выбрать бизнес, помечены «&lt;уточнить: …&gt;».</p>'
+            + _table(["Замечание", "Где", "Действие", "Было", "Стало", "Итог"], rows, "rw"))
 
 
 def _tests(report: dict, reqs_by_id: dict) -> str:
@@ -868,6 +951,9 @@ def render_html(report: dict, view: dict | None = None) -> str:
     tabs = [
         ("findings", "Замечания", len(findings), _findings_panel(findings, view, report, reqs_by_id)),
         ("questions", "Вопросы", len(report.get("questions") or []), _questions(report, by_id)),
+        ("clarify", "До и после", None, _clarification(report, by_id)),
+        ("rewrites", "Исправленное ТЗ", sum(len(r.get("edits") or []) for r in report.get("rewrites") or []),
+         _rewrites(report, by_id)),
         ("tests", "Тест-кейсы", len(report.get("test_cases") or []), _tests(report, reqs_by_id)),
         ("checklist", "Чек-лист банка", len(report.get("checklist") or []), _checklist(report, by_id)),
         ("checks", "Проверки", len(report.get("acceptance_checks") or []) + len(report.get("pair_checks") or []),
@@ -876,6 +962,7 @@ def render_html(report: dict, view: dict | None = None) -> str:
         ("rejected", "Отклонённые", len(report.get("rejected") or []), _rejected(report)),
         ("passport", "Паспорт", None, _passport(report)),
     ]
+    tabs = [t for t in tabs if t[0] not in ("clarify", "rewrites") or t[3]]
     nav = "".join(
         f'<button type="button" role="tab" class="tab" id="t-{k}" aria-controls="p-{k}" aria-selected="{"true" if i == 0 else "false"}" '
         f'data-tab="{k}">{lbl}{f"<span class=cnt>{n}</span>" if n is not None else ""}</button>'
