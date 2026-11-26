@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from conftest import evidence_ok
+from p06_helpers import evidence_ok
 
 from bcc_review.analysis.cross import eval_constraint, outcomes_incompatible, sentence_spans
 from bcc_review.analysis.facts import (
@@ -20,7 +20,7 @@ DOC = {
 
 def test_resolver_exact_normalized_relocated_rejected():
     audit = Audit()
-    r = Resolver(DocView(DOC), audit=audit)
+    r = Resolver(DocView(DOC), external=False, audit=audit)  # локальный путь №06
     ev = r({"block_id": "b1", "quote": "Клиент видит порог \"1 000 ₸\""})  # пробелы, Markdown и кавычки
     assert ev and evidence_ok(DOC, ev) and ev["quote"].startswith("Клиент   **видит**")
     ev2 = r({"block_id": "b1", "quote": "Порог хранится в тенге"})  # не тот блок → перенос
@@ -29,6 +29,24 @@ def test_resolver_exact_normalized_relocated_rejected():
     assert r({"block_id": "b1", "quote": "порог в тиынах"}) is None
     d = audit.as_dict()
     assert (d["checked"], d["confirmed"], d["relocated"], d["ambiguous"], d["rejected"]) == (4, 1, 1, 1, 1)
+
+
+def test_default_resolver_is_07_and_counts_statuses():
+    """По умолчанию цитаты проверяет №07 (или резерв движка) — ответы {status, evidence}."""
+    from bcc_review.analysis.facts import auto_resolver
+
+    if auto_resolver() is None:
+        import pytest
+
+        pytest.skip("резолвер №07 и резерв движка недоступны вне ветки интеграции")
+    audit = Audit()
+    r = Resolver(DocView(DOC), audit=audit)
+    assert audit.via_07
+    ev = r({"block_id": "b1", "quote": "Клиент   **видит** порог"})
+    assert ev and evidence_ok(DOC, ev)
+    assert r({"block_id": "b1", "quote": "порог в тиынах"}) is None
+    d = audit.as_dict()
+    assert d["checked"] == 2 and d["confirmed"] == 1 and d["rejected"] == 1 and "№07" in d["note"]
 
 
 def test_external_resolver_from_07_is_authoritative():
@@ -79,7 +97,7 @@ def test_hints_from_04_enrich_and_reject():
     amount = [f for f in fs.facts if f.field == "amount"][0]
     assert amount.unit == "KZT" and amount.range["min_inclusive"] is True and amount.range["min_minor"] == 100_000
     assert "№04:unit" in amount.enriched_by
-    assert any("отклонена" in w for w in fs.warnings)
+    assert any("без подтверждённой опоры не использованы: 1" in w for w in fs.warnings)
     out = reconcile_facts(doc, hints)
     assert out["evidence_audit"]["rejected"] == 1
 
@@ -102,3 +120,11 @@ def test_constraints_and_outcomes():
     assert not outcomes_incompatible({"outcome_a": "push «Платёж выполнен»", "outcome_b": "push «Платёж отменён»"})[0]
     assert not outcomes_incompatible({"outcome_a": "1 ₸", "outcome_b": "100 тиын", "outcome_a_value": "1 ₸",
                                       "outcome_b_value": "100 тиын"})[0]
+
+
+def test_sentence_spans_ignore_pdf_soft_wraps():
+    t = "В расходы\nвходят проведённые покупки. Возврат уменьшает расходы месяца исходной\nпокупки."
+    assert [t[a:b] for a, b in sentence_spans(t)] == ["В расходы\nвходят проведённые покупки.",
+                                                      "Возврат уменьшает расходы месяца исходной\nпокупки."]
+    t2 = "Первое правило.\nВторое правило\nпродолжается.\n* пункт списка"
+    assert [t2[a:b] for a, b in sentence_spans(t2)] == ["Первое правило.", "Второе правило\nпродолжается.", "пункт списка"]

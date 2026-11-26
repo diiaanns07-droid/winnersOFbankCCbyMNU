@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from conftest import FIXTURES, requirements_from
+from p06_helpers import FIXTURES, requirements_from
 
 from bcc_review.analysis.cross import review_set
 from p06_mdloader import load_markdown
@@ -19,13 +19,13 @@ def test_push_through_service_is_not_a_promised_api_read():
     doc = load_markdown("# Д\n\n## Часть A\n\n### Требования к интеграции\n"
                         "Клиент получает push через сервис уведомлений.\n" + API_TAIL)
     res = review_set(doc, [])
-    assert [c for c in res["candidates"] if c["kind"] == "missing_contract"] == []
+    assert [c for c in res["candidates"] if c.get("subkind") == "missing_contract"] == []
 
 
 def test_explicit_api_read_promise_without_read_method_is_a_gap():
     doc = load_markdown("# Д\n\n## Часть A\n\n### Требования к интеграции\n"
                         "Приложение получает настройки через REST API.\n" + API_TAIL)
-    gaps = [c for c in review_set(doc, [])["candidates"] if c["kind"] == "missing_contract"]
+    gaps = [c for c in review_set(doc, [])["candidates"] if c.get("subkind") == "missing_contract"]
     assert len(gaps) == 1 and gaps[0]["found"] == ["POST /alerts/saveLimit — сохранение"]
 
 
@@ -62,7 +62,7 @@ def test_result_is_json_serializable_and_contract_shaped(name):
         assert c["scope"] in ("requirement", "set") and c["severity"] in ("critical", "major", "minor")
         if c["kind"] == "conflict":
             assert {"input", "outcome_a", "outcome_b", "evidence_a", "evidence_b"} <= set(c["witness"])
-        if c["kind"] == "missing_contract":
+        if c.get("subkind") == "missing_contract":
             assert c["inspected_block_ids"]
     for cv in res["coverage"]:
         assert {"req_id", "obligation", "acceptance_ids", "status", "explanation", "hints"} <= set(cv)

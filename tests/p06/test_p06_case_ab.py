@@ -8,19 +8,20 @@
 
 import pytest
 
-from conftest import ScriptedAsk, block_with, evidence_ok, requirements_from
+from p06_helpers import ScriptedAsk, block_with, evidence_ok, requirements_from
 
 from bcc_review.analysis.cross import review_set
 from bcc_review.analysis.facts import reconcile_facts
 
 
 def by_kind(res, kind):
-    return [c for c in res["candidates"] if c["kind"] == kind]
+    return [c for c in res["candidates"] if c.get("subkind") == kind]
 
 
-@pytest.mark.parametrize("mode", ["row", "table"])
-def test_offline_case_findings(load, mode):
-    doc = load("case_ab.md", table_mode=mode)
+@pytest.mark.parametrize("loader,mode", [("engine", "row"), ("p06", "row"), ("p06", "table")])
+def test_offline_case_findings(load, loader, mode):
+    """Штатный читатель движка и синтетический (с разметкой, строка/целая таблица) дают одно и то же."""
+    doc = load("case_ab.md", loader=loader, table_mode=mode)
     reqs = requirements_from(doc)
     assert [r["source_id"] for r in reqs] == ["Ф-1", "Ф-2", "Ф-3", "Ф-4"]
     res = review_set(doc, reqs)
@@ -32,9 +33,9 @@ def test_offline_case_findings(load, mode):
     assert w["evidence_a"]["quote"] == "Месяц определяется по дате совершения покупки в Алматы."
     assert w["evidence_b"]["quote"] == "Февральский счётчик вырос на 4 000 ₸"
     assert (w["outcome_a_value"], w["outcome_b_value"]) == ("январь", "февраль")
-    assert {x["value"] for x in w["input"]["document_data"]} >= {"31 января в 23:58", "1 февраля в 00:03 по Алматы"}
-    assert all(evidence_ok(doc, x["evidence"]) for x in w["input"]["document_data"])
-    assert w["input"]["illustrative"][0]["value"] == "Алматы (UTC+5)"
+    assert {x["value"] for x in w["input_detail"]["document_data"]} >= {"31 января в 23:58", "1 февраля в 00:03 по Алматы"}
+    assert all(evidence_ok(doc, x["evidence"]) for x in w["input_detail"]["document_data"])
+    assert w["input_detail"]["illustrative"][0]["value"] == "Алматы (UTC+5)"
     assert k1[0]["req_ids"] == ["R-02"] and k1[0]["acceptance_ids"] == ["AC-2"]
 
     # К4: обещание, границы просмотра и что искали
@@ -42,10 +43,11 @@ def test_offline_case_findings(load, mode):
     assert len(gap) == 1
     g = gap[0]
     assert "читает и сохраняет настройки" in g["promise"]["quote"] and evidence_ok(doc, g["promise"])
-    assert g["inspected_scope"]["span"] == "строки 95–197"
+    assert g["inspected_scope"]["span"] in ("строки 95–197", "строки 95–198")  # читатели по-разному считают ограду кода
     assert g["found"] == ["GET /alerts/saveLimit — сохранение"]
     assert any("get/read/list" in s for s in g["searched_for"])
-    assert {block_with(doc, "**Controller**")["id"], block_with(doc, "Проверьте сумму")["id"]} <= set(g["inspected_block_ids"])
+    controller = next(b["id"] for b in doc["blocks"] if "AlertsController" in b["text"] and "table" in b["kind"])
+    assert {controller, block_with(doc, "Проверьте сумму")["id"]} <= set(g["inspected_block_ids"])
 
     # 200-ERROR и 400: только вопрос
     q = [c for c in by_kind(res, "question") if "HTTP 200" in c["title"]]
@@ -74,7 +76,7 @@ def test_facts_table_has_exact_money_and_evidence(case_doc):
     purchase = [f for f in facts if f["field"] == "сумму покупки"][0]
     assert purchase["unit"] == "tiyn"
     for f in facts:
-        assert evidence_ok(case_doc, f["evidence"]), f["id"]
+        assert f["evidence"] and all(evidence_ok(case_doc, e) for e in f["evidence"]), f["id"]
         for k in ("subject", "field", "scope", "direction", "type", "value", "range", "unit", "condition", "evidence"):
             assert k in f
 
@@ -146,7 +148,7 @@ def test_case_with_scripted_model_confirms_k2_k3(case_doc):
     res = review_set(doc, requirements_from(doc), ask)
     assert len(ask.matched) == 2, ask.matched
     stages = [c[0] for c in ask.calls]
-    assert stages.count("cross.pairs") == 2 and stages.count("cross.coverage") == 1
+    assert stages.count("cross#pairs") == 2 and stages.count("cross#coverage") == 1
     assert res["stats"]["mode"] == "rules_plus_llm" and res["stats"]["llm_calls"] == 3
 
     conf = {c["title"]: c for c in by_kind(res, "conflict")}
@@ -196,9 +198,9 @@ def test_fabricated_quote_is_rejected_and_counted(case_doc):
 
 
 def test_provider_failure_keeps_rule_results(case_doc):
-    ask = ScriptedAsk(fail_stages={"cross.pairs", "cross.coverage"})
+    ask = ScriptedAsk(fail_stages={"cross#pairs", "cross#coverage"})
     res = review_set(case_doc, requirements_from(case_doc), ask)
-    assert res["stats"]["status"] == "partial" and set(res["stats"]["llm_failed"]) == {"cross.pairs", "cross.coverage"}
+    assert res["stats"]["status"] == "partial" and set(res["stats"]["llm_failed"]) == {"cross#pairs", "cross#coverage"}
     assert any("не удалось" in w for w in res["warnings"])
     assert by_kind(res, "conflict") and by_kind(res, "missing_contract")
     assert res["coverage_summary"]["denominator"] == 10 and res["coverage_summary"]["covered"] == 0
@@ -211,6 +213,6 @@ def test_cross_section_pass_covers_role_pairs(case_doc):
     for rp in ("business_rules×acceptance", "business_rules×business_rules", "business_rules×ui",
                "business_rules×integration", "integration×api", "ui×api", "acceptance×api"):
         assert roles.get(rp, 0) > 0, (rp, roles)
-    sent = [p for stage, payload, _ in ask.calls if stage == "cross.pairs" for p in payload["pairs"]]
+    sent = [p for stage, payload, _ in ask.calls if stage == "cross#pairs" for p in payload["input"]["pairs"]]
     assert len(sent) == res["stats"]["pairs_selected"] <= 60
     assert {p["selected_by"] for p in sent} == {"facts_hint", "cross_section", "entities"}

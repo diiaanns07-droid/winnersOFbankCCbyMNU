@@ -3,7 +3,7 @@
 не порождают противоречия ни в правилах, ни после «наивного» ответа модели.
 """
 
-from conftest import ScriptedAsk, requirements_from
+from p06_helpers import ScriptedAsk, requirements_from
 
 from bcc_review.analysis.cross import review_set
 
@@ -60,4 +60,4 @@ def test_naive_model_conflict_without_constraints_is_not_confirmed(load):
     res = review_set(doc, requirements_from(doc), ask)
     assert [c for c in res["candidates"] if c["kind"] == "conflict"] == []
     # без общего условия кандидат может уйти №08 только вопросом
-    assert all(c["kind"] == "question" for c in res["candidates"])
+    assert all(c.get("subkind") == "question" for c in res["candidates"])

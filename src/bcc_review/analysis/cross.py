@@ -34,6 +34,7 @@ from typing import Any, Callable, Optional
 
 from .facts import (
     MONTH_NAMES,
+    _is_adj,
     Audit,
     DocView,
     FactSet,
@@ -58,8 +59,13 @@ __all__ = ["review_set", "reconcile_facts", "summarize_coverage", "STAGE_PAIRS",
 
 from .facts import reconcile_facts  # noqa: E402 — реэкспорт по протоколу
 
-STAGE_PAIRS = "cross.pairs"
-STAGE_COVERAGE = "cross.coverage"
+# «#» — подэтап: учёт движка (StageStats.base) сводит их в этап «cross» паспорта
+STAGE_PAIRS = "cross#pairs"
+STAGE_COVERAGE = "cross#coverage"
+PARTIAL_READ_CODES = ("partial_read", "unreadable_page", "decode_error", "ocr_required", "truncated_input")
+# Покрытие приёмкой считается по обязательствам этих разделов; контракт API, примеры, схемы и цели — вне знаменателя.
+COVERAGE_GROUPS = {"business_rules", "integration", "data", "nfr", "ui", "other"}
+COVERAGE_ROLES = {"api_logic"}
 COVERAGE_STATUSES = ("covered", "partial", "conflict", "uncovered", "unknown")
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -77,9 +83,25 @@ class Req:
     block_ids: list
     evidence: list
 
+    unique_label: bool = True
+
+    def _sid(self) -> str:
+        sid = (self.source_id or "").strip()
+        return sid if re.fullmatch(r"[A-Za-zА-Яа-яЁё]{1,6}[-‑–]?\d+(?:\.\d+)*", sid) else ""
+
+    @property
+    def key(self) -> str:
+        """Ключ обязательств: ID документа («Ф-1»), если он уникален, иначе ID нарезки."""
+        sid = self._sid()
+        return sid if sid and self.unique_label else self.id
+
     @property
     def label(self) -> str:
-        return self.source_id or self.id
+        """Подпись для людей: «Ф-1», а при атомарной нарезке — «Ф-2, R-003.1»."""
+        sid = self._sid()
+        if sid and not self.unique_label:
+            return f"{sid}, {self.id}"
+        return sid or self.id
 
 
 @dataclass
@@ -106,28 +128,41 @@ class Acc:
 
 
 def sentence_spans(text: str, start: int = 0, end: Optional[int] = None) -> list[tuple[int, int]]:
-    """Предложения с координатами; не режет «1 000.» внутри чисел, «т. д.» и время 23:58."""
+    """Предложения с координатами.
+
+    Не режет «1 000.» внутри чисел, «т. д.», время 23:58 и мягкие переносы строк PDF: перевод строки
+    завершает предложение только после знака конца предложения или перед маркером пункта списка.
+    """
     end = len(text) if end is None else end
     out = []
     s = start
     i = start
     while i < end:
         ch = text[i]
-        if ch in ".!?;\n":
-            j = i + 1
+        boundary = False
+        j = i + 1
+        if ch in ".!?;":
             while j < end and text[j] in ".!?;":
                 j += 1
             k = j
-            while k < end and text[k] in " \t*":
+            while k < end and text[k] in " \t*\n":
                 k += 1
-            boundary = ch == "\n" or k >= end or text[k].isupper() or text[k] in "«\"(•*-"
-            if ch == "." and i > 0 and text[i - 1].isdigit() and k < end and text[k].isdigit():
+            boundary = k >= end or text[k].isupper() or text[k] in "«\"(•*-" or text[k].isdigit() and "\n" in text[j:k]
+            if ch == "." and i > 0 and text[i - 1].isdigit() and k < end and text[k].isdigit() and "\n" not in text[j:k]:
                 boundary = False
-            if boundary:
-                out.append((s, j))
-                s = k
-                i = k
-                continue
+        elif ch == "\n":
+            k = j
+            while k < end and text[k] in " \t":
+                k += 1
+            prev = text[s:i].rstrip()
+            boundary = bool(prev) and (prev[-1] in ".!?;:" or bool(re.match(r"[*\-•]\s|\d{1,3}[.)]\s", text[k:k + 4])))
+        else:
+            k = j
+        if boundary:
+            out.append((s, j))
+            s = k
+            i = k
+            continue
         i += 1
     if s < end and text[s:end].strip():
         out.append((s, end))
@@ -185,6 +220,11 @@ def _norm_requirements(view: DocView, requirements: Any, warnings: list) -> list
             warnings.append(f"{rid}: нет block_ids текущего документа — требование не участвует в покрытии.")
         out.append(Req(rid, d.get("source_id"), str(d.get("text") or ""), bids, evs))
     if out:
+        counts: dict[str, int] = {}
+        for r in out:
+            counts[r.source_id or ""] = counts.get(r.source_id or "", 0) + 1
+        for r in out:
+            r.unique_label = counts.get(r.source_id or "", 0) == 1
         return out
     # Запасной путь: требования из разделов бизнес-правил.
     n = 0
@@ -200,12 +240,24 @@ def _norm_requirements(view: DocView, requirements: Any, warnings: list) -> list
     return out
 
 
-def _obligations(view: DocView, reqs: list[Req], acc_blocks: set) -> list[Obligation]:
+def _coverable(view: DocView, bid: str) -> bool:
+    if "code" in view.kind(bid):
+        return False
+    return view.group(bid) in COVERAGE_GROUPS or view.role.get(bid) in COVERAGE_ROLES
+
+
+def _obligations(view: DocView, reqs: list[Req], acc_blocks: set, excluded: Optional[list] = None) -> list[Obligation]:
     obls: list[Obligation] = []
     for r in reqs:
         n = 0
-        for bid in r.block_ids:
-            if bid in acc_blocks or view.role.get(bid) in ("template", "heading"):
+        bids = [b for b in r.block_ids if b not in acc_blocks]
+        if excluded is not None and bids and not any(_coverable(view, b) for b in bids):
+            groups = sorted({ROLE_RU.get(view.group(b), view.group(b)) for b in bids})
+            excluded.append({"req_id": r.id, "label": r.label,
+                             "reason": f"раздел «{', '.join(groups)}»: контракт, пример, схема или паспорт — "
+                                       f"проверяется сравнением фактов, а не приёмкой"})
+        for bid in bids:
+            if view.role.get(bid) in ("template", "heading") or not _coverable(view, bid):
                 continue
             text = view.text(bid)
             spans = [(int(e["start"]), int(e["end"])) for e in r.evidence
@@ -217,7 +269,7 @@ def _obligations(view: DocView, reqs: list[Req], acc_blocks: set) -> list[Obliga
                 for a, b in sentence_spans(text, s0, e0):
                     n += 1
                     q = text[a:b]
-                    obls.append(Obligation(f"{r.label}#{n}", r.id, r.label, strip_md(q),
+                    obls.append(Obligation(f"{r.key}#{n}", r.id, r.label, " ".join(strip_md(q).split()),
                                            {"block_id": bid, "start": a, "end": b, "quote": q},
                                            branches_of(q), view.group(bid)))
     return obls
@@ -254,7 +306,7 @@ def _acceptance(view: DocView, fs: FactSet, reqs: list[Req]) -> list[Acc]:
                     cells[name] = row[ci].ev()
             r = by_block.get(bid)
             aid = r.id if r and r.block_ids == [bid] and rows_in_block.get(bid) == 1 else f"AC-{n}"
-            items.append(Acc(aid, f"Приёмка №{n}" if aid.startswith("AC-") else (r.label if r else aid), bid,
+            items.append(Acc(aid, f"Приёмка №{n}" + ("" if aid.startswith("AC-") else f" ({aid})"), bid,
                              text[a:b], a, cells, {"block_id": bid, "start": a, "end": b, "quote": text[a:b]},
                              r.id if r else None))
             table_blocks.add(bid)
@@ -280,14 +332,25 @@ _MISSING_RX = re.compile(r"(?:страниц\w*|page|стр\.)\s*№?\s*(\d+)", 
 _MISSING_WORDS = re.compile(r"пропущ|не извлеч|не распозн|не прочит|ошибк|missing|failed|skipp|unreadable|empty", re.I)
 
 
+def partial_read(view: DocView) -> list[str]:
+    """Предупреждения документа с кодами неполного чтения (контракт v1, PARTIAL_READ_CODES)."""
+    out = []
+    for w in view.warnings():
+        d = as_dict(w) if not isinstance(w, str) else {}
+        if d.get("code") in PARTIAL_READ_CODES:
+            out.append(f"{d['code']}: {d.get('message', '')}".strip(": "))
+    return out
+
+
 def missing_pages(view: DocView) -> list[int]:
     pages: set[int] = set()
     for w in view.warnings():
         d = as_dict(w) if not isinstance(w, str) else {}
         if d:
-            kind = str(d.get("kind") or d.get("code") or "")
+            code = str(d.get("code") or d.get("kind") or "")
             pg = d.get("page") or d.get("pages")
-            if pg is not None and re.search(r"page|страниц|missing|пропуск", kind + " " + str(d.get("message", "")), re.I):
+            if pg is not None and (code in PARTIAL_READ_CODES or
+                                   re.search(r"page|страниц|missing|пропуск", code + " " + str(d.get("message", "")), re.I)):
                 for p in (pg if isinstance(pg, (list, tuple)) else [pg]):
                     try:
                         pages.add(int(p))
@@ -483,6 +546,7 @@ def _load_prompt(name: str) -> str:
 
 def _load_schema(stage: str) -> dict:
     p = PROMPTS_DIR / "cross.schema.json"
+    stage = stage.replace(".", "#")
     if p.exists():
         try:
             return json.loads(p.read_text(encoding="utf-8")).get(stage, {"type": "object"})
@@ -504,7 +568,8 @@ class CrossReview:
         self.reqs = _norm_requirements(self.view, requirements, self.warnings)
         self.acc = _acceptance(self.view, self.fs, self.reqs)
         acc_blocks = {a.block_id for a in self.acc}
-        self.obls = _obligations(self.view, self.reqs, acc_blocks)
+        self.cov_excluded: list[dict] = []
+        self.obls = _obligations(self.view, self.reqs, acc_blocks, self.cov_excluded)
         self.block_reqs: dict[str, list[str]] = {}
         for r in self.reqs:
             for b in r.block_ids:
@@ -513,6 +578,9 @@ class CrossReview:
         self.candidates: list[dict] = []
         self.comparisons: list[dict] = list(self.fs.comparisons)
         self.missing = missing_pages(self.view)
+        self.partial = partial_read(self.view)
+        self.ask_ok = 0
+        self.ask_error: Optional[BaseException] = None
         self.max_pairs = max_pairs
         self.pairs_per_call = pairs_per_call
         self.stats: dict = {"mode": "rules_plus_llm" if ask else "rules_only", "llm_calls": 0, "llm_failed": []}
@@ -534,15 +602,19 @@ class CrossReview:
 
     # ----------------------------------------------------------- вспомогательное
     def req_ids_for(self, *evs: Optional[dict]) -> list[str]:
+        """Требования, чьи обязательства или опоры перекрывают фрагмент; иначе — все требования блока."""
         out: list[str] = []
         for e in evs:
-            if not e:
+            sp = self._span(e)
+            if not sp:
                 continue
-            bid = e.get("block_id")
-            for o in self.obls:
-                if o.hint["block_id"] == bid and e.get("start", 0) < o.hint["end"] and o.hint["start"] < e.get("end", 10**9):
-                    out.append(o.req_id)
-            out += self.block_reqs.get(bid, [])
+            bid, s0, e0 = sp
+            hit = [o.req_id for o in self.obls if o.hint["block_id"] == bid and s0 < o.hint["end"] and o.hint["start"] < e0]
+            if not hit:
+                hit = [r.id for r in self.reqs for ev in r.evidence
+                       if str(ev.get("block_id")) == bid and isinstance(ev.get("start"), int)
+                       and s0 < ev.get("end", 0) and ev["start"] < e0]
+            out += hit or self.block_reqs.get(bid, [])
         return list(dict.fromkeys(out))
 
     def acc_ids_for(self, *evs: Optional[dict]) -> list[str]:
@@ -574,10 +646,11 @@ class CrossReview:
         acc = self.acc_ids_for(*sides)
         if acc:
             cand.setdefault("acceptance_ids", acc)
-        key = (cand["kind"], tuple(sorted({(h["block_id"]) for h in hints})))
+        key = (cand.get("subkind"), tuple(sorted({(h["block_id"]) for h in hints})))
         for c in self.candidates:
-            if (c["kind"], tuple(sorted({h["block_id"] for h in c.get("hints", [])}))) == key:
-                c.setdefault("confirmed_by", []).append(cand.get("origin", "?"))
+            if (c.get("subkind"), tuple(sorted({h["block_id"] for h in c.get("hints", [])}))) == key:
+                if cand.get("origin", "?") not in c.setdefault("confirmed_by", []):
+                    c["confirmed_by"].append(cand.get("origin", "?"))
                 if cand.get("slots") and not c.get("slots"):
                     c["slots"] = cand["slots"]
                 return
@@ -617,11 +690,16 @@ class CrossReview:
                 if re.match(r"^\s*(для|при|у|в случае|если)\b", norm(prefix)):
                     cond |= key_set(prefix)
                 cond |= key_set(m.group("qual"))
+                lead = re.findall(r"[A-Za-zА-Яа-яЁё]+", prefix)
+                obj = text[m.start("unit"): m.end("qual")].strip(" ,")
+                if lead and _is_adj(lead[-1]):
+                    obj = f"{lead[-1]} {obj}"
                 out.append({
                     "block_id": bid, "unit": unit, "gran": gran, "cond": cond, "event": event.strip(),
                     "event_keys": key_set(event), "tz": tz, "offset": tz_offset(tz),
                     "ev": {"block_id": bid, "start": sent[0], "end": sent[1], "quote": text[sent[0]:sent[1]]},
                     "unit_key": keys_of(m.group("unit"))[:1],
+                    "object": obj[:1].upper() + obj[1:],
                 })
         return out
 
@@ -687,9 +765,10 @@ class CrossReview:
 
     def period_checks(self) -> None:
         anchors = self.anchors()
+        dated = self.dated_rules()
+        self._missing_anchor(anchors, dated)
         if not anchors:
             return
-        dated = self.dated_rules()
         # P2: два правила привязки к разным событиям для одного объекта
         for i, a in enumerate(anchors):
             for b in anchors[i + 1:]:
@@ -717,6 +796,11 @@ class CrossReview:
         pre = acc.cells.get("pre", acc.hint)["quote"]
         subject = re.split(r"[:,\d]", strip_md(pre), maxsplit=1)[0]
         subj_keys = key_set(subject)
+        head = (keys_of(subject) or [None])[0]
+        own = anc["cond"] - set().union(*[s["cond"] for s in siblings]) if siblings else set()
+        others = set().union(*[s["cond"] - anc["cond"] for s in siblings]) if siblings else set()
+        if head and head in own | others:
+            return head in own  # «Возврат покупки»: тип операции задаёт главное слово, а не дополнение
         if not anc["cond"]:
             return not any((s["cond"] - anc["cond"]) & subj_keys for s in siblings)
         disc = anc["cond"] - set().union(*[s["cond"] for s in siblings]) if siblings else set()
@@ -808,7 +892,8 @@ class CrossReview:
             "evidence_a": ev_a, "evidence_b": ev_b,
         }
         cmp = self.log("period", "mismatch", f"{acc.label} противоречит правилу «{anc['ev']['quote']}» на границе периода.")
-        a_label = ", ".join(self.req_ids_for(ev_a, anc["ev"])) or "правило"
+        labels = {r.id: r.label for r in self.reqs}
+        a_label = "; ".join(labels.get(x, x) for x in self.req_ids_for(ev_a, anc["ev"])) or "правило"
         note = ""
         if a_st.offset is None:
             note = (f" Без пояса у «{a_st.text}» пример можно прочитать иначе (например, в UTC), но и тогда "
@@ -843,12 +928,105 @@ class CrossReview:
             "outcome_a_value": "январь", "outcome_b_value": "февраль",
             "evidence_a": a["ev"], "evidence_b": b["ev"],
         }
-        cmp = self.log("period_anchor", "mismatch", f"Два правила привязывают «{a['unit']}» к разным событиям при одинаковых условиях.")
+        obj = a["object"]
+        wa, wb = self._where(a["ev"]), self._where(b["ev"])
+        cmp = self.log("period_anchor", "mismatch",
+                       f"«{obj}» привязан к разным событиям при одинаковых условиях: «{a['event']}» ({wa}) и «{b['event']}» ({wb}).")
         self.add(make_candidate(
-            "conflict", f"«{a['unit']}» определяется по разным событиям: «{a['event']}» и «{b['event']}»",
-            "Для события на стыке периодов два правила дают разные периоды.", [a["ev"], b["ev"]],
-            witness=witness, origin="rules", comparison_id=cmp["id"],
+            "conflict", f"{obj} определяется по разным датам: «{a['event']}» и «{b['event']}»",
+            f"Операция с моментом «{a['event']}» 31 января в 23:58 и моментом «{b['event']}» 1 февраля в 00:03 "
+            f"по {wa} относится к январю, по {wb} — к февралю. От выбора зависят месяц начисления и правило, "
+            f"которое к ней применяется; тест на стык месяцев нельзя написать однозначно.",
+            [a["ev"], b["ev"]], witness=witness, origin="rules", comparison_id=cmp["id"], cause_object=obj,
+            blocked_decision=(f"по какой дате относить операцию к периоду «{obj.lower()}» — «{a['event']}» или "
+                              f"«{b['event']}» — и какой месяц ожидать в тесте на стыке"),
+            recommendation=f"Оставить одно правило для «{obj.lower()}» (одну дату и часовой пояс) и исправить второе место.",
+            places=[{"where": wa, **a["ev"]}, {"where": wb, **b["ev"]}],
             checks={"evidence": "program", "preconditions": "program", "outcomes": "program"},
+        ))
+
+    def _where(self, ev: dict) -> str:
+        """«КЭШ-2 (Функциональные требования, строка 7)»: требование, раздел и место в исходнике."""
+        labels = {r.id: r.label for r in self.reqs}
+        rids = [labels.get(x, x) for x in self.req_ids_for(ev)]
+        sec = self.view.section(ev["block_id"])
+        sp = self.view.lines(ev["block_id"])
+        loc = ""
+        if sp:
+            loc = (f"строка {sp[1]}" if sp[1] == sp[2] else f"строки {sp[1]}–{sp[2]}") if sp[0] == "line" else f"стр. {sp[1]}"
+        place = ", ".join(x for x in (strip_md(sec[-1]) if sec else "", loc) if x)
+        return f"{', '.join(rids)} ({place})" if rids else place
+
+    # ----------------------------------------------------------- нет правила привязки при смене правила на границе
+    _GOVERNED = re.compile(r"(ставк\w*|тариф\w*|комисси\w*|кэшб[эе]к\w*|кешб[эе]к\w*|лимит\w*|цен[аы]\w*)(\s+[а-яё]+)?", re.I)
+    _DATE_KINDS = re.compile(r"дат\w*\s+(совершени\w*|проведени\w*|списани\w*|авторизаци\w*|клиринг\w*|зачислени\w*)", re.I)
+
+    def _missing_anchor(self, anchors: list, dated: list) -> None:
+        """Значение меняется на границе дат («до 31 марта — 1 %», «с 1 апреля — 2 %»), но правила, по какой
+        дате относить событие к периоду, нет, а событие в документе имеет моменты по разные стороны границы."""
+        if len(dated) < 2 or len({norm(r["value"]) for r in dated}) < 2:
+            return
+        if any(a["gran"] in ("month", "value") for a in anchors):
+            return
+        straddle = None
+        for acc in self.acc:
+            stamps = find_stamps(acc.text)
+            sides = []
+            for st in stamps:
+                hits = [r for r in dated if self._in_interval(st.in_offset(st.offset), r) is True]
+                sides.append(tuple(sorted({norm(r["value"]) for r in hits})))
+            if len(stamps) >= 2 and all(sides) and len(set(sides)) > 1:
+                straddle = (acc, stamps, sides)
+                break
+        kinds_ev = []
+        for bid in self.view.ids:
+            if self.view.group(bid) in ("template", "heading", "testing"):
+                continue
+            t = self.view.text(bid)
+            for m in self._DATE_KINDS.finditer(t):
+                kinds_ev.append((norm(m.group(1))[:6], {"block_id": bid, "start": m.start(), "end": m.end(), "quote": t[m.start():m.end()]}))
+        if straddle is None and len({k for k, _ in kinds_ev}) < 2:
+            return
+        gm = self._GOVERNED.search(dated[0]["ev"]["quote"])
+        obj = (gm.group(0).strip() if gm else "значение правила").lower()
+        rule_hints = [r["ev"] for r in dated]
+        inspected = [b for b in self.view.ids if self.view.role.get(b) not in ("heading", "template")
+                     and self.view.group(b) not in ("acceptance", "testing")]
+        sections = list(dict.fromkeys(" / ".join(strip_md(x) for x in self.view.section(b)[1:]) or self.view.scope(b)
+                                      for b in inspected))
+        spans = [s for s in (self.view.lines(b) for b in inspected) if s]
+        span = None
+        if spans:
+            kind = "строки" if spans[0][0] == "line" else "страницы"
+            span = f"{kind} {min(s[1] for s in spans)}–{max(s[2] for s in spans)}"
+        values = " и ".join(dict.fromkeys(r["value"] for r in dated))
+        if straddle:
+            acc, stamps, sides = straddle
+            ev_st = [{"block_id": acc.block_id, "start": acc.base + st.start, "end": acc.base + st.end,
+                      "quote": self.view.text(acc.block_id)[acc.base + st.start: acc.base + st.end]} for st in stamps]
+            moments = " и ".join(f"«{st.text}»" for st in stamps)
+            question = (f"По какой дате определяется {obj} на границе периода? В примере «{acc.label}» моменты {moments} "
+                        f"попадают под разные значения ({values}). Какое значение применить и в каком часовом поясе "
+                        f"считать границу?")
+            hints = rule_hints + ev_st
+            impact = (f"Для события из примера «{acc.label}» ({moments}) документ допускает оба значения: {values}. "
+                      f"Разработчик и тестировщик выберут дату сами, и результаты разойдутся.")
+        else:
+            kinds = " и ".join(dict.fromkeys(f"«{e['quote']}»" for _, e in kinds_ev))
+            question = (f"По какой дате определяется {obj} на границе периода: документ упоминает {kinds}, "
+                        f"а значения разные ({values}). Какую дату брать и в каком часовом поясе?")
+            hints = rule_hints + [e for _, e in kinds_ev][:2]
+            impact = f"Значение «{obj}» меняется на границе дат ({values}), но не сказано, по какой дате это решать."
+        self.log("period_anchor", "undetermined", f"Нет правила, по какой дате применять «{obj}»: {question}")
+        self.add(make_candidate(
+            "missing_rule", f"Нет правила, по какой дате определяется «{obj}» на границе периода", impact, hints,
+            origin="rules", question=question, inspected_block_ids=inspected,
+            inspected_scope={"sections": sections, "span": span},
+            searched_for=[f"правило вида «… определяется по дате …» для «{obj}», расчётного месяца или периода",
+                          "указание, к какой дате (совершения, проведения, списания) относится граница «до …» / «с …»",
+                          "часовой пояс границы периода"],
+            found=[f"«{r['ev']['quote']}»" for r in dated],
+            blocked_decision=f"какое значение «{obj}» применить к событию на границе периода и что ожидать в тесте",
         ))
 
     # ----------------------------------------------------------- обещанный метод без контракта
@@ -919,12 +1097,13 @@ class CrossReview:
             span = f"{'строки' if 'line' in kinds else 'страницы'} {lo}–{hi}"
         sections = list(dict.fromkeys(" / ".join(self.view.section(b)[1:]) for b in api_blocks if self.view.section(b)))
         found = [f"{e['method'] or '—'} {e['path']} — {self._OP_RU.get(e['op'] or '', 'операция не определена')}" for e in eps]
-        if self.missing:
+        if self.missing or self.partial:
+            where = f"страницах {', '.join(map(str, self.missing))}" if self.missing else "непрочитанной части документа"
             self.add(make_candidate(
-                "question", f"Обещано {self._OP_RU[op]}, метод не найден — но часть страниц не извлечена",
-                "Нельзя утверждать отсутствие метода, пока не прочитаны все страницы.",
+                "question", f"Обещано {self._OP_RU[op]}, метод не найден — но документ прочитан не полностью",
+                "Нельзя утверждать отсутствие метода, пока не прочитан весь документ.",
                 [promise], origin="rules", inspected_block_ids=api_blocks, missing_pages=self.missing,
-                question=f"Есть ли на страницах {', '.join(map(str, self.missing))} метод для операции «{self._OP_RU[op]}»?"))
+                question=f"Есть ли на {where} метод для операции «{self._OP_RU[op]}»?"))
             return
         self.add(make_candidate(
             "missing_contract",
@@ -944,16 +1123,29 @@ class CrossReview:
         us: list[Unit] = []
         acc_blocks = {a.block_id for a in self.acc}
         used = set(acc_blocks)
+        seen_units: set = set()
         for r in self.reqs:
             bids = [b for b in r.block_ids if b not in acc_blocks and self.view.role.get(b) not in ("template", "heading")]
             if not bids:
                 continue
             b0 = bids[0]
-            q = self.view.text(b0).rstrip()
             g = self.view.group(b0)
-            us.append(Unit(r.label, g if g not in ("other",) else "business_rules", b0,
-                           "\n".join(self.view.text(b).rstrip() for b in bids),
-                           {"block_id": b0, "start": 0, "end": len(q), "quote": q}, r.id, r.label))
+            # атомарная нарезка: своё предложение (evidence-спан), а не весь блок, иначе пары дублируются
+            spans = [e for e in r.evidence if str(e.get("block_id")) in bids and isinstance(e.get("start"), int)
+                     and isinstance(e.get("end"), int)]
+            if spans:
+                text = "\n".join(self.view.text(str(e["block_id"]))[e["start"]:e["end"]] for e in spans)
+                e0 = spans[0]
+                hint = {"block_id": str(e0["block_id"]), "start": e0["start"], "end": e0["end"],
+                        "quote": self.view.text(str(e0["block_id"]))[e0["start"]:e0["end"]]}
+            else:
+                q = self.view.text(b0).rstrip()
+                text = "\n".join(self.view.text(b).rstrip() for b in bids)
+                hint = {"block_id": b0, "start": 0, "end": len(q), "quote": q}
+            if (b0, text) in seen_units:
+                continue
+            seen_units.add((b0, text))
+            us.append(Unit(r.label, g if g not in ("other",) else "business_rules", b0, text, hint, r.id, r.label))
             used |= set(bids)
         for a in self.acc:
             us.append(Unit(a.aid, "acceptance", a.block_id, a.text, a.hint, a.req_id, a.label))
@@ -1023,7 +1215,7 @@ class CrossReview:
         for u in us:
             by_block.setdefault(u.block_id, u)
         for c in self.candidates:
-            if c["kind"] != "question":
+            if c.get("subkind") != "question":
                 continue
             bids = list(dict.fromkeys(h["block_id"] for h in c.get("hints", [])))
             for i, x in enumerate(bids):
@@ -1066,6 +1258,9 @@ class CrossReview:
         try:
             res = self.ask(stage, payload, _load_schema(stage))
         except Exception as exc:  # noqa: BLE001 — сбой модели не должен ронять детерминированный анализ
+            if type(exc).__name__ in ("AskError", "BudgetExhausted") or any(
+                    c.__name__ == "AskError" for c in type(exc).__mro__):
+                self.ask_error = exc
             self.stats["llm_failed"].append(stage)
             self.warnings.append(f"{stage}: обращение к модели не удалось ({type(exc).__name__}: {exc}); "
                                  f"результат построен по правилам.")
@@ -1079,6 +1274,7 @@ class CrossReview:
             self.stats["llm_failed"].append(stage)
             self.warnings.append(f"{stage}: ответ модели не является объектом JSON.")
             return None
+        self.ask_ok += 1
         return res
 
     def llm_pairs(self, pairs: list) -> None:
@@ -1097,12 +1293,13 @@ class CrossReview:
                 items.append({"pair_id": pid, "selected_by": how,
                               "a": {"block_id": a.block_id, "label": a.label, "role": ROLE_RU.get(a.group, a.group), "text": a.text},
                               "b": {"block_id": b.block_id, "label": b.label, "role": ROLE_RU.get(b.group, b.group), "text": b.text}})
+            block_ids = list(dict.fromkeys(x for it in items for x in (it["a"]["block_id"], it["b"]["block_id"])))
             payload = {
-                "instructions": _load_prompt("cross.pairs.md"),
-                "document_title": get(self.view.document, "title"),
-                "document": doc_blocks if small else None,
-                "facts": self._facts_brief(),
-                "pairs": items,
+                "task": _load_prompt("cross.pairs.md"),
+                "input": {"document_title": get(self.view.document, "title"), "facts": self._facts_brief(),
+                          "pairs": items, "blocks": None if small else
+                          [x for x in doc_blocks if x["block_id"] in set(block_ids)]},
+                "context": {"mode": "auto", "block_ids": block_ids},
             }
             res = self._call(STAGE_PAIRS, payload)
             if not res:
@@ -1125,14 +1322,16 @@ class CrossReview:
                      units=[a.uid, b.uid])
             return
         if verdict == "gap":
-            promise = self.resolver(as_dict(r.get("promise")) or {"block_id": a.block_id, "quote": as_dict(r.get("a")).get("quote") or a.hint["quote"]})
+            promise = self.resolver(self._hint_or(r.get("promise"), a.block_id, as_dict(r.get("a")).get("quote") or a.hint["quote"]))
             if promise is None:
                 return
-            api_blocks = [x for x in self.view.ids if self.view.group(x) == "api"]
+            sub = "missing_contract" if b.group == "api" else "missing_rule"
+            inspected = [x for x in self.view.ids if self.view.group(x) == b.group and self.view.role.get(x) != "heading"]
             self.add(make_candidate(
-                "missing_contract", str(r.get("title") or f"Обещание без контракта: {a.label}"),
-                str(r.get("impact") or "Обещанная операция не описана в контракте."), [promise], origin="llm",
-                inspected_block_ids=api_blocks, searched_for=list(r.get("searched_for") or []), promise=promise, slots=slots))
+                sub, str(r.get("title") or f"Обещание без опоры в разделе «{ROLE_RU.get(b.group, b.group)}»: {a.label}"),
+                str(r.get("impact") or "Обещанное не описано в просмотренном разделе."), [promise], origin="llm",
+                inspected_block_ids=inspected, searched_for=[x for x in (r.get("searched_for") or []) if x],
+                promise=promise, slots=slots, question=str(r.get("question") or "") or None))
             return
         status, details = self.verify(r, a, b)
         if status == "verified":
@@ -1158,17 +1357,23 @@ class CrossReview:
                 hints, origin="llm", question=q, reason=details.get("reason"), slots=slots,
                 condition_a=slots["a"].get("condition"), condition_b=slots["b"].get("condition")))
 
+    @staticmethod
+    def _hint_or(h: Any, block_id: str, quote: Any) -> dict:
+        d = as_dict(h)
+        if d.get("quote"):
+            return {"block_id": d.get("block_id") or block_id, "quote": d["quote"]}
+        return {"block_id": block_id, "quote": str(quote or "")}
+
     def verify(self, r: dict, a: Unit, b: Unit) -> tuple[str, dict]:
         w = as_dict(r.get("witness"))
         sa, sb = as_dict(r.get("a")), as_dict(r.get("b"))
-        ha = as_dict(w.get("evidence_a")) or {"block_id": a.block_id, "quote": sa.get("quote") or ""}
-        hb = as_dict(w.get("evidence_b")) or {"block_id": b.block_id, "quote": sb.get("quote") or ""}
-        ha.setdefault("block_id", a.block_id)
-        hb.setdefault("block_id", b.block_id)
-        ev_a, ev_b = self.resolver(ha), self.resolver(hb)
+        if not (w.get("input") or w.get("outcome_a") or w.get("outcome_b")):
+            return "unverified", {"evidence_a": None, "evidence_b": None, "reason": "модель не построила witness"}
+        ha = self._hint_or(w.get("evidence_a"), a.block_id, sa.get("quote"))
+        hb = self._hint_or(w.get("evidence_b"), b.block_id, sb.get("quote"))
+        ev_a = self.resolver(ha) if ha["quote"] else None
+        ev_b = self.resolver(hb) if hb["quote"] else None
         out: dict = {"evidence_a": ev_a, "evidence_b": ev_b}
-        if not w:
-            return "unverified", {**out, "reason": "модель не построила witness"}
         if ev_a is None or ev_b is None:
             return "unverified", {**out, "reason": "одна из опор не найдена в тексте текущего входа"}
         if (ev_a["block_id"], ev_a["start"], ev_a["end"]) == (ev_b["block_id"], ev_b["start"], ev_b["end"]):
@@ -1177,7 +1382,7 @@ class CrossReview:
         for it in w.get("input") or []:
             it = as_dict(it)
             var, val = it.get("var"), it.get("value")
-            if var is None:
+            if not var:
                 continue
             assign[_var(var)] = val
             if norm(it.get("source")) == "document":
@@ -1191,7 +1396,12 @@ class CrossReview:
             return "unverified", {**out, "reason": "witness без входа"}
         results = {}
         for side, s in (("a", sa), ("b", sb)):
-            cons = [as_dict(c) for c in (s.get("constraints") or [])]
+            s = {**s, "constraints": [c for c in (s.get("constraints") or []) if as_dict(c).get("var")]}
+            if side == "a":
+                sa = s
+            else:
+                sb = s
+            cons = [as_dict(c) for c in (s.get("constraints") or []) if as_dict(c).get("var")]
             results[side] = [eval_constraint(c, assign, self.fs) for c in cons]
         if any(x is False for x in results["a"] + results["b"]):
             bad = [f"{side}: {as_dict(c).get('var')} {as_dict(c).get('op')} {as_dict(c).get('value')}"
@@ -1218,14 +1428,16 @@ class CrossReview:
     def llm_coverage(self) -> None:
         if not self.ask or not self.obls or not self.acc:
             return
-        payload = {
-            "instructions": _load_prompt("cross.coverage.md"),
+        payload = {"task": _load_prompt("cross.coverage.md"), "context": {
+            "mode": "auto", "block_ids": list(dict.fromkeys([o.hint["block_id"] for o in self.obls] + [a.block_id for a in self.acc]))},
+            "input": {}}
+        payload["input"] = {
             "obligations": [{"obligation_id": o.oid, "requirement": o.label, "text": o.hint["quote"], "branches": o.branches}
                             for o in self.obls],
             "acceptance": [{"acceptance_id": a.aid, "label": a.label, "block_id": a.block_id, "text": a.text,
                             **{k: v["quote"] for k, v in a.cells.items()}} for a in self.acc],
             "known_conflicts": [{"title": c["title"], "acceptance_ids": c.get("acceptance_ids", []), "req_ids": c.get("req_ids", [])}
-                                for c in self.candidates if c["kind"] == "conflict"],
+                                for c in self.candidates if c.get("subkind") == "conflict"],
             "facts": self._facts_brief(),
         }
         res = self._call(STAGE_COVERAGE, payload)
@@ -1313,7 +1525,8 @@ class CrossReview:
                         continue
                     if rel == "contradicts":
                         verified = None
-                        if ln.get("witness"):
+                        lw = as_dict(ln.get("witness"))
+                        if lw.get("input") or lw.get("outcome_a"):
                             st, det = self.verify({"witness": ln["witness"], "a": ln.get("a") or {}, "b": ln.get("b") or {}},
                                                   _unit_of_obl(o), _unit_of_acc(a))
                             if st == "verified":
@@ -1375,10 +1588,11 @@ class CrossReview:
                 status = "partial"
                 expl.insert(0, "Связь найдена только по общим сущностям (режим без модели); что приёмка проверяет все "
                                f"ветви ({len(br_norm)}), не установлено — covered не присваивается.")
-            elif self.missing:
+            elif self.missing or self.partial:
                 status = "unknown"
-                expl.insert(0, f"Связанной приёмки не найдено, но страницы {', '.join(map(str, self.missing))} не извлечены — "
-                               f"отсутствие проверки не доказано.")
+                where = (f"страницы {', '.join(map(str, self.missing))} не извлечены" if self.missing
+                         else "документ прочитан не полностью (" + "; ".join(self.partial[:2]) + ")")
+                expl.insert(0, f"Связанной приёмки не найдено, но {where} — отсутствие проверки не доказано.")
             elif self.llm_links is None and "cross.coverage" in self.stats["llm_failed"] and not lex.get(o.oid):
                 status = "uncovered"
                 expl.insert(0, "Модель недоступна; по сущностям ни одна строка приёмки не связана с обязательством.")
@@ -1386,6 +1600,7 @@ class CrossReview:
                 status = "uncovered"
                 expl.insert(0, "Ни одна строка приёмки не проверяет обязательство." if acc_section_present
                             else "В документе нет критериев приёмки.")
+            evs = [dict(o.hint)] + [dict(acc_by_id[x["acceptance_id"]].hint) for x in links if x["acceptance_id"] in acc_by_id]
             cov.append({
                 "req_id": o.req_id,
                 "obligation_id": o.oid,
@@ -1394,6 +1609,7 @@ class CrossReview:
                 "status": status,
                 "explanation": " ".join(expl),
                 "hints": _dedupe_hints(hints),
+                "evidence": [e for i, e in enumerate(evs) if e not in evs[:i]],
                 "branches": branches,
                 "branches_checked": [b for b in branches if norm(b) in checked],
                 "links": links,
@@ -1404,7 +1620,7 @@ class CrossReview:
         conflicts = [c for c in self.candidates if c["kind"] == "conflict"]
         keep = []
         for c in self.candidates:
-            if c["kind"] == "question":
+            if c.get("subkind") == "question":
                 qb = {h["block_id"] for h in c.get("hints", [])}
                 hit = next((x for x in conflicts if qb and qb <= {h["block_id"] for h in x.get("hints", [])}), None)
                 if hit:
@@ -1431,14 +1647,22 @@ class CrossReview:
         cov = self.coverage()
         if self.ask and self.stats["llm_failed"]:
             self.stats["status"] = "partial"
+            if self.ask_ok == 0 and self.ask_error is not None:
+                # Ни один вызов не удался: отдаём AskError движку — он отметит этап failed и
+                # перезапустит модуль с ask=None (тот же результат правил, честный статус прогона).
+                raise self.ask_error
         else:
             self.stats["status"] = "complete"
+        for f in self.fs.facts:
+            f.req_ids = list(dict.fromkeys(f.req_ids + self.block_reqs.get((f.evidence or {}).get("block_id"), [])))
+        summary = summarize_coverage(cov, self.reqs)
+        summary["excluded"] = self.cov_excluded
         return {
             "facts": [f.to_dict() for f in self.fs.facts],
             "coverage": cov,
             "candidates": self.candidates,
             "warnings": list(dict.fromkeys(self.warnings)),
-            "coverage_summary": summarize_coverage(cov, self.reqs),
+            "coverage_summary": summary,
             "comparisons": self.comparisons,
             "evidence_audit": self.audit.as_dict(),
             "stats": self.stats,

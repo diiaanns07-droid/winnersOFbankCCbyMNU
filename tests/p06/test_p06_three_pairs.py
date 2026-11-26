@@ -8,7 +8,7 @@
 
 from decimal import Decimal
 
-from conftest import evidence_ok, requirements_from
+from p06_helpers import evidence_ok, requirements_from
 
 from bcc_review.analysis.cross import review_set
 from bcc_review.analysis.facts import reconcile_facts
@@ -26,11 +26,11 @@ def test_only_explicit_bounds_mismatch_is_confirmed(load):
     assert w["evidence_a"]["quote"] == "от 100 до 500 000 ₸ включительно"
     assert w["evidence_b"]["quote"] == "100–300 000"
     # минимальный пример: иллюстративное значение отделено от границ из документа
-    assert w["input"]["illustrative"][0]["value"] == "300 001 ₸"
-    assert {x["value"] for x in w["input"]["document_data"]} == {"100 ₸–500 000 ₸", "100 ₸–300 000 ₸"}
+    assert w["input_detail"]["illustrative"][0]["value"] == "300 001 ₸"
+    assert {x["value"] for x in w["input_detail"]["document_data"]} == {"100 ₸–500 000 ₸", "100 ₸–300 000 ₸"}
     assert "допустимо" in w["outcome_a"] and "отклоняется" in w["outcome_b"]
     # нет вопросов: остальные пары совместимы
-    assert [x for x in res["candidates"] if x["kind"] == "question"] == []
+    assert [x for x in res["candidates"] if x.get("subkind") == "question"] == []
 
 
 def test_tenge_and_tiyn_same_amount_compatible(load):
@@ -73,5 +73,5 @@ def test_type_mismatch_without_stated_conversion_goes_to_question():
         "| `limit` | string | При успехе | Лимит |\n"
     )
     res = review_set(doc, [])
-    assert [c["kind"] for c in res["candidates"]] == ["question"]
+    assert [c["subkind"] for c in res["candidates"]] == ["question"]
     assert res["candidates"][0]["severity"] == "minor"

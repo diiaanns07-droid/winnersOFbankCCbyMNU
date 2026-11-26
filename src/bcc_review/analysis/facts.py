@@ -445,6 +445,7 @@ class Audit:
     relocated: int = 0
     rejected: int = 0
     notes: list = dc_field(default_factory=list)
+    via_07: bool = False
 
     def as_dict(self) -> dict:
         return {
@@ -453,13 +454,14 @@ class Audit:
             "ambiguous": self.ambiguous,
             "relocated": self.relocated,
             "rejected": self.rejected,
-            "explanation": (
+            "note": (
                 "Подсказки {block_id, quote} модулей №04 и LLM-стадий №06. confirmed — точное "
                 "совпадение block.text[start:end] == quote (включая нормализацию пробелов, ё и "
                 "Markdown с пересчётом координат); ambiguous — цитата встречается в блоке "
                 "несколько раз, выбрано первое вхождение или по контексту; relocated — цитата "
                 "найдена ровно в одном другом блоке; rejected — не найдена, опора не используется. "
-                "Детерминированные опоры, вычисленные из таблиц, сюда не входят."
+                "Детерминированные опоры, вычисленные из таблиц, сюда не входят. "
+                + ("Цитаты проверены резолвером №07." if self.via_07 else "Цитаты проверены локальным резолвером №06.")
             ),
             "notes": list(self.notes[:50]),
         }
@@ -490,18 +492,70 @@ def _norm_with_map(text: str) -> tuple[str, list[int]]:
     return "".join(out), idx
 
 
+def auto_resolver() -> Optional[Callable]:
+    """resolve_hint №07 (bcc_review.analysis.evidence), иначе резерв движка; None — только локально."""
+    for mod_name in ("bcc_review.analysis.evidence", "bcc_review.runtime.fallback.evidence"):
+        try:
+            import importlib
+
+            fn = getattr(importlib.import_module(mod_name), "resolve_hint")
+            fn.__p06_source__ = mod_name  # type: ignore[attr-defined]
+            return fn
+        except Exception:  # noqa: BLE001 — модуля может не быть в ветке
+            continue
+    return None
+
+
 class Resolver:
     """Превращает подсказку {block_id, quote} в Evidence текущего документа.
 
-    Если передан внешний резолвер №07 (``external(document, hint) -> Evidence | None``),
-    решение принимает он; локальный путь — запасной и соблюдает тот же инвариант
+    ``external`` — резолвер №07: ``resolve_hint(document, hint[, index=…, relocate=…])`` с ответом
+    ``{status: matched|missing|ambiguous, evidence}`` либо функция, возвращающая Evidence | None.
+    ``None`` — найти №07 автоматически; ``False`` — только локальный путь с тем же инвариантом
     ``block.text[start:end] == quote``.
     """
 
-    def __init__(self, view: "DocView", external: Optional[Callable] = None, audit: Optional[Audit] = None):
+    def __init__(self, view: "DocView", external: Any = None, audit: Optional[Audit] = None):
         self.view = view
-        self.external = external
+        self.external = auto_resolver() if external is None else (external or None)
         self.audit = audit or Audit()
+        self.audit.via_07 = self.external is not None
+        self._ext_kwargs: dict = {}
+        self._ext_relocate = False
+        if self.external is not None:
+            import inspect
+
+            try:
+                params = inspect.signature(self.external).parameters
+            except (TypeError, ValueError):
+                params = {}
+            self._ext_relocate = "relocate" in params
+            if "index" in params:
+                try:
+                    import importlib
+
+                    mod = importlib.import_module(self.external.__module__)
+                    idx_cls = getattr(mod, "DocumentIndex", None)
+                    if idx_cls is not None and hasattr(idx_cls, "of"):
+                        self._ext_kwargs["index"] = idx_cls.of(view.document)
+                except Exception:  # noqa: BLE001
+                    pass
+
+    def _external(self, hint: dict) -> tuple[Optional[Evidence], str]:
+        """(Evidence | None, matched|relocated|ambiguous|missing)."""
+        res = self.external(self.view.document, hint, **self._ext_kwargs)
+        if isinstance(res, dict) and "status" in res:
+            st = res.get("status")
+            if st == "missing" and self._ext_relocate and hint.get("block_id"):
+                res2 = self.external(self.view.document, hint, relocate=True, **self._ext_kwargs)
+                if isinstance(res2, dict) and res2.get("status") == "matched":
+                    return as_dict(res2.get("evidence")), "relocated"
+            if st == "matched":
+                ev = as_dict(res.get("evidence"))
+                return ev, ("relocated" if hint.get("block_id") and ev.get("block_id") != hint.get("block_id") else "matched")
+            return None, str(st or "missing")
+        ev = as_dict(res) if res is not None else None
+        return (ev, "matched") if ev else (None, "missing")
 
     def __call__(self, hint: Any, *, relocate: bool = True) -> Optional[Evidence]:
         a = self.audit
@@ -513,18 +567,27 @@ class Resolver:
             a.notes.append(f"пустая цитата (block {bid or '—'})")
             return None
         if self.external is not None:
+            h = {"block_id": bid or None, "quote": quote}
+            if get(hint, "context"):
+                h["context"] = get(hint, "context")
             try:
-                ev = self.external(self.view.document, as_dict(hint) or {"block_id": bid, "quote": quote})
+                ev, how = self._external(h)
             except Exception as exc:  # noqa: BLE001 — внешний модуль не должен ронять анализ
                 a.notes.append(f"резолвер №07 упал: {exc!r}; использован локальный")
-                ev = None
             else:
-                ev = as_dict(ev) if ev is not None else None
                 if ev and self.check(ev):
-                    a.confirmed += 1
+                    if how == "relocated":
+                        a.relocated += 1
+                        a.notes.append(f"№07: цитата найдена в {ev['block_id']} (подсказка {bid or '—'})")
+                    else:
+                        a.confirmed += 1
                     return {k: ev[k] for k in ("block_id", "start", "end", "quote")}
-                a.rejected += 1
-                a.notes.append(f"№07 отклонил: {quote[:60]!r}")
+                if how == "ambiguous":
+                    a.ambiguous += 1
+                    a.notes.append(f"№07: цитата неоднозначна ({quote[:60]!r}) — нужен контекст")
+                else:
+                    a.rejected += 1
+                    a.notes.append(f"№07 не нашёл цитату: {quote[:60]!r}")
                 return None
         ev = self._local(bid, quote, get(hint, "context"))
         if ev is not None:
@@ -676,7 +739,16 @@ class DocView:
             self.by_id[bid] = b
         self.pos = {bid: i for i, bid in enumerate(self.ids)}
         self.role = {bid: block_role(self.section(bid), self.kind(bid)) for bid in self.ids}
-        self.part = {bid: part_key(self.section(bid)) for bid in self.ids}
+        self.part = {bid: part_key(self.own_section(bid)) for bid in self.ids}
+
+    def own_section(self, bid: str) -> list[str]:
+        """Раздел блока; заголовок относится к собственному разделу (читатели расходятся в этом)."""
+        sec = self.section(bid)
+        if self.role.get(bid) == "heading":
+            t = strip_md(self.text(bid))
+            if not sec or strip_md(sec[-1]) != t:
+                sec = sec + [t]
+        return sec
 
     def text(self, bid: str) -> str:
         return str(get(self.by_id.get(bid), "text", "") or "")
@@ -939,11 +1011,15 @@ class Fact:
     def ev_for(self, slot: str) -> Optional[Evidence]:
         return self.cells.get(slot) or self.evidence
 
+    req_ids: list = dc_field(default_factory=list)
+
     def to_dict(self) -> dict:
+        """Форма Fact контракта v1: subject/field — строки, evidence — массив Evidence."""
+        subject = self.subject or (self.scope.split(" / ")[-1] if self.scope else "") or "документ"
         d = {
             "id": self.id,
-            "subject": self.subject,
-            "field": self.field,
+            "subject": subject,
+            "field": self.field or "",
             "scope": self.scope,
             "direction": self.direction,
             "type": self.type,
@@ -951,7 +1027,8 @@ class Fact:
             "range": self.range,
             "unit": self.unit,
             "condition": self.condition,
-            "evidence": self.evidence,
+            "evidence": [self.evidence] if self.evidence else [],
+            "req_ids": list(self.req_ids),
             "binding": self.binding,
             "aliases": list(self.aliases),
             "source": self.source,
@@ -1091,7 +1168,7 @@ class _FactBuilder:
                     mm = re.search(r"\b(GET|POST|PUT|PATCH|DELETE)\b", v.clean, re.I)
                     if mm:
                         method = (mm.group(1).upper(), v)
-                elif re.search(r"url|endpoint|путь|адрес", k) and "type" not in k:
+                elif re.search(r"(?:^|\s)(?:request\s+)?url\b|endpoint|путь|адрес", k) and "type" not in k:
                     for pm in re.finditer(r"`(/[^`\s]+)`|(?<![\w`])(/[A-Za-z][\w{}\-./]*)", v.text):
                         p = pm.group(1) or pm.group(2)
                         s = v.start + (pm.start(1) if pm.group(1) else pm.start(2))
@@ -1502,50 +1579,87 @@ def _hint_range(r: Any, unit: Optional[str]) -> Optional[dict]:
     return make_range(a, b, unit, d.get("min_inclusive"), d.get("max_inclusive"))
 
 
+def _hint_evidence(h: dict, resolver: "Resolver") -> list[Evidence]:
+    """Опоры подсказки: готовые Evidence №04 (с проверкой инварианта) или hints/hint через резолвер."""
+    out: list[Evidence] = []
+    for e in h.get("evidence") or []:
+        e = as_dict(e)
+        if e and resolver.check(e):
+            out.append({k: e[k] for k in ("block_id", "start", "end", "quote")})
+    if out:
+        return out
+    hints = [as_dict(x) for x in (h.get("hints") or [])] or [as_dict(h.get("hint"))] or []
+    if not any(hints) and h.get("quote"):
+        hints = [{k: h.get(k) for k in ("block_id", "quote", "context") if h.get(k) is not None}]
+    for hint in hints:
+        if hint and hint.get("quote"):
+            ev = resolver(hint)
+            if ev:
+                out.append(ev)
+    return out
+
+
 def merge_hints(facts: list[Fact], fact_hints: Any, resolver: Resolver, warnings: list[str]) -> list[Fact]:
-    """Обогащает детерминированные факты подсказками №04; новые факты — только с опорой."""
+    """Обогащает детерминированные факты подсказками №04; новые факты — только с опорой и содержанием.
+
+    Формат №04: ``{id, subject, field, direction (request|response|business), type, value, unit, range,
+    condition, required, size, values, db_field, hints[], evidence[], req_ids}``; принимаются и
+    упрощённые ``{field, …, hint: {block_id, quote}}``.
+    """
     added: list[Fact] = []
+    rejected = 0
     for h in _iter_hints(fact_hints):
-        hint = as_dict(h.get("hint")) or {k: h.get(k) for k in ("block_id", "quote", "context") if h.get(k) is not None}
-        ev = resolver(hint) if hint else None
-        if ev is None:
-            warnings.append(f"Подсказка №04 отклонена: цитата не найдена ({str(hint.get('quote', ''))[:60]!r}).")
+        evs = _hint_evidence(h, resolver)
+        if not evs:
+            rejected += 1
             continue
         unit = unit_of(h.get("unit")) or (str(h.get("unit")) if h.get("unit") else None)
+        direction = h.get("direction") if h.get("direction") in ("request", "response") else None
+        size = h.get("size")
         slots = {
             "subject": h.get("subject"),
             "field": h.get("field") or h.get("name"),
-            "direction": (h.get("direction") or None),
+            "direction": direction,
             "type": norm_type(h.get("type")) if h.get("type") else None,
             "unit": unit,
             "condition": h.get("condition"),
             "range": _hint_range(h.get("range"), unit),
+            "binding": h.get("db_field") or h.get("binding"),
+            "enum": [str(x) for x in h.get("values")] if isinstance(h.get("values"), list) and h.get("values") else None,
+            "mandatory": h.get("required") if isinstance(h.get("required"), bool) else None,
+            "size": parse_size(size) if isinstance(size, str) and size else (size if isinstance(size, dict) else None),
         }
         val = h.get("value")
         target = None
         for f in facts:
             fe = f.evidence or {}
-            if fe.get("block_id") != ev["block_id"]:
+            if not any(fe.get("block_id") == e["block_id"] and fe.get("start", 0) < e["end"] and e["start"] < fe.get("end", 0)
+                       for e in evs):
                 continue
-            overlap = fe.get("start", 0) < ev["end"] and ev["start"] < fe.get("end", 0)
-            same_field = not slots["field"] or (tuple(keys_of(slots["field"])) in f.alias_keys())
-            if overlap and same_field:
+            if not slots["field"] or tuple(keys_of(slots["field"])) in f.alias_keys() or not f.field:
                 target = f
                 break
+        req_ids = [str(x) for x in h.get("req_ids") or []]
         if target is None:
-            f = Fact(source="hint", evidence=ev)
+            informative = slots["field"] or val is not None or (slots["range"] and slots["range"].get("min") is not None)
+            if not informative:
+                continue  # уточнение без поля («обе границы включены») уже учтено разбором раздела
+            f = Fact(source="hint", evidence=evs[0], req_ids=req_ids)
             for k, v in slots.items():
                 if v is not None:
                     setattr(f, k, v)
+            if len(evs) > 1:
+                f.cells.update({f"hint{i}": e for i, e in enumerate(evs[1:], 1)})
             if val is not None:
-                pv = parse_money(str(val)) if unit in MONEY_UNITS or parse_money(str(val)) else None
+                pv = parse_money(str(val)) if unit in MONEY_UNITS else None
                 if pv:
                     f.value, f.unit, f.value_minor = dec_str(pv[0]), pv[1], pv[2]
                 else:
                     f.value = val
-            f.enriched_by.append("№04")
+            f.enriched_by.append(f"№04:{h.get('id') or 'hint'}")
             added.append(f)
             continue
+        target.req_ids = list(dict.fromkeys(target.req_ids + req_ids))
         for k, v in slots.items():
             if v is None:
                 continue
@@ -1555,23 +1669,45 @@ def merge_hints(facts: list[Fact], fact_hints: Any, resolver: Resolver, warnings
                 target.enriched_by.append(f"№04:{k}")
             elif k == "range":
                 if (cur.get("min"), cur.get("max")) != (v.get("min"), v.get("max")):
-                    warnings.append(f"{target.id or target.field}: диапазон из подсказки №04 расходится с разбором, оставлен разбор.")
+                    warnings.append(f"{target.field}: диапазон из подсказки №04 расходится с разбором, оставлен разбор.")
                 for inc in ("min_inclusive", "max_inclusive"):
                     if cur.get(inc) is None and v.get(inc) is not None:
                         cur[inc] = v[inc]
                         target.enriched_by.append(f"№04:{inc}")
+            elif k in ("subject", "field", "condition", "size", "enum", "mandatory"):
+                continue  # формулировки и вспомогательные слоты не спорят с разбором таблицы
             elif norm(cur) != norm(v):
                 warnings.append(f"{target.field}: «{k}» из подсказки №04 ({v}) расходится с разбором ({cur}), оставлен разбор.")
+    if rejected:
+        warnings.append(f"Подсказки №04 без подтверждённой опоры не использованы: {rejected}.")
     return added
 
 
 # =============================================================== 10. сравнения
 
+# подвид №06 → (kind контракта, criterion из SET_CRITERIA, severity по умолчанию)
 _DEFAULT_CRITERIA = {
-    "conflict": ("consistency", "critical"),
-    "missing_contract": ("completeness", "critical"),
-    "question": ("consistency", "major"),
-    "type_question": ("consistency", "minor"),
+    "conflict": ("set_consistent", "critical"),
+    "missing_contract": ("set_complete", "critical"),
+    "missing_rule": ("set_complete", "critical"),
+    "question": ("set_consistent", "major"),
+    "type_question": ("set_consistent", "minor"),
+}
+CONTRACT_KIND = {"conflict": "conflict", "missing_contract": "omission", "missing_rule": "omission", "question": "ambiguity",
+                 "type_question": "ambiguity"}
+_BLOCKED = {
+    "conflict": "какой исход реализовать и какой ожидать в тесте для общего входа",
+    "missing_contract": "как клиенту выполнить обещанную операцию и чем её проверить",
+    "missing_rule": "какое правило применить в ситуации, которую текст не определяет",
+    "question": "какой исход заложить в реализацию и в тест",
+    "type_question": "как сериализовать поле в контрактных тестах",
+}
+_RECOMMEND = {
+    "conflict": "Выбрать один исход для этого входа, исправить вторую формулировку и добавить пример приёмки на этот вход.",
+    "missing_contract": "Описать метод для обещанной операции (URL, REST type, параметры, ответ, статусы) или убрать обещание.",
+    "missing_rule": "Добавить правило, по которому однозначно выбирается исход, и пример приёмки на границе.",
+    "question": "Уточнить условие у автора требования и зафиксировать исход в тексте и в приёмке.",
+    "type_question": "Указать формат поля в ответе и правило преобразования из запроса.",
 }
 
 
@@ -1608,20 +1744,70 @@ def criteria_for(kind: str) -> tuple[str, str]:
 
 def make_candidate(kind: str, title: str, impact: str, hints: list, *, req_ids: Iterable = (),
                    scope: str = "set", severity: Optional[str] = None, criterion: Optional[str] = None,
-                   cand_kind: Optional[str] = None, **extra: Any) -> dict:
-    crit, sev = criteria_for(cand_kind or kind)
+                   cand_kind: Optional[str] = None, origin: str = "rules", **extra: Any) -> dict:
+    """Candidate контракта v1. ``kind`` — подвид №06 (conflict|missing_contract|question),
+    в выходе он лежит в ``subkind``, а ``kind`` берётся из словаря контракта (conflict|omission|ambiguity)."""
+    sub = cand_kind or kind
+    crit, sev = criteria_for(sub)
     c = {
         "scope": scope,
-        "kind": kind,
+        "kind": CONTRACT_KIND.get(kind, kind),
+        "subkind": kind,
         "criterion": criterion or crit,
         "severity": severity or sev,
         "title": title,
         "impact": impact,
         "req_ids": list(dict.fromkeys(req_ids)),
         "hints": [{"block_id": h["block_id"], "quote": h["quote"]} for h in hints if h and h.get("quote")],
+        "recommendation": extra.pop("recommendation", None) or _RECOMMEND.get(sub, _RECOMMEND["question"]),
+        "blocked_decision": extra.pop("blocked_decision", None) or _BLOCKED.get(sub, _BLOCKED["question"]),
+        "source": "llm" if origin == "llm" else "rules",
+        "stage": "cross",
+        "origin": origin,
     }
+    w = extra.pop("witness", None)
+    if w:
+        c["witness"] = draft_witness(w)
+        c["cause"] = {"object": str(extra.pop("cause_object", "") or title),
+                      "condition": c["witness"]["input"], "outcomes": [c["witness"]["outcome_a"], c["witness"]["outcome_b"]]}
     c.update(extra)
     return c
+
+
+def _input_text(detail: Any) -> str:
+    if isinstance(detail, str):
+        return detail
+    d = as_dict(detail)
+    parts = [str(d.get("description") or "").rstrip(".")]
+    doc = [f"{x.get('name')} = «{x.get('value')}»" for x in d.get("document_data") or []]
+    ill = [f"{x.get('name')} = {x.get('value')}" + (f" ({x.get('why')})" if x.get("why") else "")
+           for x in d.get("illustrative") or []]
+    if doc:
+        parts.append("данные документа: " + "; ".join(doc))
+    if ill:
+        parts.append("иллюстративно: " + "; ".join(ill))
+    return ". ".join(p for p in parts if p) + "."
+
+
+def draft_witness(w: dict) -> dict:
+    """WitnessDraft контракта (input — строка, hint_a/hint_b) + Evidence и структура входа для отчёта."""
+    if "input_detail" in w:
+        return w
+    ea, eb = w.get("evidence_a"), w.get("evidence_b")
+    out = {
+        "input": _input_text(w.get("input")),
+        "outcome_a": str(w.get("outcome_a") or ""),
+        "outcome_b": str(w.get("outcome_b") or ""),
+        "hint_a": {"block_id": ea["block_id"], "quote": ea["quote"]} if ea else {"quote": ""},
+        "hint_b": {"block_id": eb["block_id"], "quote": eb["quote"]} if eb else {"quote": ""},
+        "evidence_a": ea,
+        "evidence_b": eb,
+        "input_detail": w.get("input") if isinstance(w.get("input"), dict) else {"description": str(w.get("input") or "")},
+    }
+    for k in ("outcome_a_value", "outcome_b_value", "outcome_target"):
+        if w.get(k) not in (None, ""):
+            out[k] = w[k]
+    return out
 
 
 def _dim(unit: Optional[str]) -> Optional[str]:
@@ -1752,9 +1938,9 @@ class Comparator:
         ina, inb = _within(ra, v), _within(rb, v)
         val = _fmt_val(v, a)
         ok, no = "значение допустимо", "значение отклоняется как выходящее за границы"
-        evа, evb = a.ev_for("range"), b.ev_for("range")
+        ev_a, evb = a.ev_for("range"), b.ev_for("range")
         doc_items = [
-            {"name": f"границы по {_label(a, self.view)}", "value": f"{_fmt_val(ra[0], a)}–{_fmt_val(ra[1], a)}", "evidence": evа},
+            {"name": f"границы по {_label(a, self.view)}", "value": f"{_fmt_val(ra[0], a)}–{_fmt_val(ra[1], a)}", "evidence": ev_a},
             {"name": f"границы по {_label(b, self.view)}", "value": f"{_fmt_val(rb[0], b)}–{_fmt_val(rb[1], b)}", "evidence": evb},
         ]
         illus = [] if from_doc else [{
@@ -1764,12 +1950,12 @@ class Comparator:
         witness = {
             "input": {
                 "description": f"Задать «{a.field}» = {val}",
-                "document_data": doc_items + ([{"name": a.field, "value": val, "evidence": evа if ina else evb}] if from_doc else []),
+                "document_data": doc_items + ([{"name": a.field, "value": val, "evidence": ev_a if ina else evb}] if from_doc else []),
                 "illustrative": illus,
             },
             "outcome_a": f"{ok if ina else no} (по {_label(a, self.view)})",
             "outcome_b": f"{ok if inb else no} (по {_label(b, self.view)})",
-            "evidence_a": evа,
+            "evidence_a": ev_a,
             "evidence_b": evb,
         }
         cmp = self.log("range", "mismatch", [a, b],
@@ -1779,7 +1965,7 @@ class Comparator:
             f"Разные границы «{a.field}»: {doc_items[0]['value']} и {doc_items[1]['value']}",
             f"Для значения {val} одна часть документа требует принять ввод, другая — отклонить; разработка "
             f"и тесты не смогут выполнить оба утверждения.",
-            [evа, evb], witness=witness, origin="facts", comparison_id=cmp["id"],
+            [ev_a, evb], witness=witness, origin="facts", comparison_id=cmp["id"],
             checks={"evidence": "program", "preconditions": "program", "outcomes": "program"},
         ))
 

@@ -1,6 +1,6 @@
 {
-  "$comment": "Схемы ответов LLM-стадий №06 (подмножество JSON Schema без $ref — совместимо с response_schema Gemini).",
-  "cross.pairs": {
+  "$comment": "Схемы ответов LLM-стадий №06 по правилам контракта v1: additionalProperties=false, полный required, без $ref и ограничений длины. Отсутствующее значение — пустая строка или пустой массив.",
+  "cross#pairs": {
     "type": "object",
     "properties": {
       "pairs": {
@@ -81,11 +81,25 @@
                     },
                     "required": [
                       "var",
-                      "op"
-                    ]
+                      "op",
+                      "value"
+                    ],
+                    "additionalProperties": false
                   }
                 }
-              }
+              },
+              "required": [
+                "object",
+                "owner",
+                "condition",
+                "moment",
+                "units",
+                "expected",
+                "quote",
+                "block_id",
+                "constraints"
+              ],
+              "additionalProperties": false
             },
             "b": {
               "type": "object",
@@ -147,11 +161,25 @@
                     },
                     "required": [
                       "var",
-                      "op"
-                    ]
+                      "op",
+                      "value"
+                    ],
+                    "additionalProperties": false
                   }
                 }
-              }
+              },
+              "required": [
+                "object",
+                "owner",
+                "condition",
+                "moment",
+                "units",
+                "expected",
+                "quote",
+                "block_id",
+                "constraints"
+              ],
+              "additionalProperties": false
             },
             "witness": {
               "type": "object",
@@ -190,8 +218,12 @@
                     "required": [
                       "var",
                       "value",
-                      "source"
-                    ]
+                      "source",
+                      "block_id",
+                      "quote",
+                      "why"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "outcome_a": {
@@ -222,7 +254,8 @@
                   "required": [
                     "block_id",
                     "quote"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "evidence_b": {
                   "type": "object",
@@ -237,16 +270,22 @@
                   "required": [
                     "block_id",
                     "quote"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
+                "description",
                 "input",
                 "outcome_a",
                 "outcome_b",
+                "outcome_target",
+                "outcome_a_value",
+                "outcome_b_value",
                 "evidence_a",
                 "evidence_b"
-              ]
+              ],
+              "additionalProperties": false
             },
             "title": {
               "type": "string"
@@ -273,7 +312,8 @@
               "required": [
                 "block_id",
                 "quote"
-              ]
+              ],
+              "additionalProperties": false
             },
             "searched_for": {
               "type": "array",
@@ -284,16 +324,27 @@
           },
           "required": [
             "pair_id",
-            "verdict"
-          ]
+            "verdict",
+            "a",
+            "b",
+            "witness",
+            "title",
+            "impact",
+            "question",
+            "reason",
+            "promise",
+            "searched_for"
+          ],
+          "additionalProperties": false
         }
       }
     },
     "required": [
       "pairs"
-    ]
+    ],
+    "additionalProperties": false
   },
-  "cross.coverage": {
+  "cross#coverage": {
     "type": "object",
     "properties": {
       "obligations": {
@@ -314,7 +365,8 @@
           "required": [
             "obligation_id",
             "branches"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "links": {
@@ -406,11 +458,25 @@
                     },
                     "required": [
                       "var",
-                      "op"
-                    ]
+                      "op",
+                      "value"
+                    ],
+                    "additionalProperties": false
                   }
                 }
-              }
+              },
+              "required": [
+                "object",
+                "owner",
+                "condition",
+                "moment",
+                "units",
+                "expected",
+                "quote",
+                "block_id",
+                "constraints"
+              ],
+              "additionalProperties": false
             },
             "b": {
               "type": "object",
@@ -472,11 +538,25 @@
                     },
                     "required": [
                       "var",
-                      "op"
-                    ]
+                      "op",
+                      "value"
+                    ],
+                    "additionalProperties": false
                   }
                 }
-              }
+              },
+              "required": [
+                "object",
+                "owner",
+                "condition",
+                "moment",
+                "units",
+                "expected",
+                "quote",
+                "block_id",
+                "constraints"
+              ],
+              "additionalProperties": false
             },
             "witness": {
               "type": "object",
@@ -515,8 +595,12 @@
                     "required": [
                       "var",
                       "value",
-                      "source"
-                    ]
+                      "source",
+                      "block_id",
+                      "quote",
+                      "why"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "outcome_a": {
@@ -547,7 +631,8 @@
                   "required": [
                     "block_id",
                     "quote"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "evidence_b": {
                   "type": "object",
@@ -562,28 +647,42 @@
                   "required": [
                     "block_id",
                     "quote"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
+                "description",
                 "input",
                 "outcome_a",
                 "outcome_b",
+                "outcome_target",
+                "outcome_a_value",
+                "outcome_b_value",
                 "evidence_a",
                 "evidence_b"
-              ]
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
             "obligation_id",
             "acceptance_id",
-            "relation"
-          ]
+            "relation",
+            "branches_checked",
+            "explanation",
+            "a",
+            "b",
+            "witness"
+          ],
+          "additionalProperties": false
         }
       }
     },
     "required": [
+      "obligations",
       "links"
-    ]
+    ],
+    "additionalProperties": false
   }
 }
