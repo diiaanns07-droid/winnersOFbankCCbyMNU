@@ -156,7 +156,7 @@ GEMINI_FALLBACK_MODELS=
 | `doctor` и `models` против живого API с фальшивым ключом | `auth/invalid_key`, `transient=false`, русское сообщение со ссылкой на AI Studio, exit 2, ключ не выводится |
 | `doctor` без ключа | `not_configured/missing_key`, 0 сетевых вызовов, exit 2 |
 | `pytest tests/contract tests/p12` на Python 3.13.18 | 133 passed, 4 skipped (адаптер №11 не влит, 3 живых теста без ключа) |
-| `cold_run.sh` на свежем клоне, Python **3.11.18**, чистый venv, `pip install -e ".[dev]" google-genai==3.6.1` | см. раздел 9 передачи |
+| `cold_run.sh` на свежем клоне, Python **3.11.18**, чистый venv, `pip install -e ".[dev]" google-genai==3.6.1` | exit 0: те же 133 passed и 4 skipped; `doctor` из этого venv против живого API даёт `auth/invalid_key`, exit 2 |
 | ruff (E,F,W,B,UP,I), mypy по адаптеру | чисто |
 
 **Не проверено** (нужен ключ команды): успешный `generateContent` с `response_json_schema` на реальной модели,
@@ -211,10 +211,10 @@ P12_LIVE=1 python -m pytest tests/p12/test_p12_live.py -v -s
 
 ## 9. Открытые вопросы к Max
 
-1. **`src/bcc_review/providers/__init__.py` нет.** С `pip install -e .` и `PYTHONPATH=src` подпакет
-   работает как namespace-пакет, но обычный `pip install .` с `packages.find` его не включит. Нужен пустой
-   `__init__.py` (его создаёт Max, чтобы №11 и №12 не конфликтовали) или `find_namespace`.
-2. В `pyproject.toml` нет extra для Gemini. Предложение: `gemini = ["google-genai==3.6.1"]` и добавить его в `all`.
-3. `invalid_output` в контракте не временная, поэтому пустой content (`subkind` `empty_candidates` или
+1. В `pyproject.toml` нет extra для Gemini. Предложение: `gemini = ["google-genai==3.6.1"]` и добавить его в `all`.
+2. `invalid_output` в контракте не временная, поэтому пустой content (`subkind` `empty_candidates` или
    `empty_text`) движок не повторит. Если повтор нужен, его можно включить по `subkind`, не меняя словарь.
-4. Схема №11 разрешает `null` для списков, контракт — нет (раздел 4).
+3. Схема №11 разрешает `null` для списков, контракт — нет (раздел 4).
+
+Проверено: `src/bcc_review/providers/` без `__init__.py` попадает и в обычный `pip install .`
+(у `packages.find` в `pyproject.toml` по умолчанию `namespaces = true`), импорт адаптера работает.

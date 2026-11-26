@@ -20,7 +20,7 @@ cd "$ROOT"
 "$VENV/bin/python" -m pytest tests/contract tests/p12 -q -p no:cacheprovider -rs
 
 if [ -z "${GEMINI_API_KEY:-}" ]; then
-  echo "GEMINI_API_KEY не задан: живая часть пропущена (см. tests/p12/README.md, раздел «Живая проверка»)."
+  echo "GEMINI_API_KEY не задан: живая часть пропущена (см. tests/p12/README.md, раздел 7)."
   exit 0
 fi
 echo "== models.list (ключ видит эти модели с generateContent)"
