@@ -74,7 +74,7 @@ def test_clean_base_replay():
 
 
 def test_official_full_69_candidates_replay():
-    """69 кандидатов (4 линзы, набор, правила) → компактная подача, 25–45 дефектов, К1–К4 critical."""
+    """69 кандидатов (4 линзы, набор, правила) → компактная подача, 25–45 дефектов, К1–К5 critical."""
     cands, res, llm = replay("official.full", ROOT / "release/input/requirements.md",
                              ROOT / "tests/v2/fixtures/official/segment.json")
     assert len(cands) == 69 and len(llm.calls) == 2
@@ -83,7 +83,8 @@ def test_official_full_69_candidates_replay():
     assert 25 <= len(res["findings"]) <= 45
     crit = [f for f in res["findings"] if f["severity"] == "critical"]
     assert 3 <= len(crit) <= 7
-    for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}):
+    # К1 (38↔64), К2 (39↔40), К4 (52/103), К3 (121/163), К5 (событие: 23/38/46)
+    for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}, {23, 38, 46}):
         assert any(need <= lines(f) for f in crit), need
     assert res["severity_changes"]                   # вторая проверка применена
     assert not any(f["severity"] == "critical" and f["kind"] in judge.NEVER_CRITICAL_KINDS for f in res["findings"])
