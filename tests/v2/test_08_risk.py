@@ -190,9 +190,11 @@ def test_saved_live_answers_keep_key_event(path):
 
 @pytest.mark.parametrize("path", sorted(FIXTURES.glob("clean_*.json")), ids=lambda p: p.stem)
 def test_saved_live_answers_on_clean_bases(path):
-    """Сохранённые живые ответы на чистых базах корпуса: 0 critical и не больше 3 major после постобработки."""
+    """Сохранённые живые ответы на чистых базах корпуса после постобработки: 0 critical; major — не больше 2
+    у sonnet (цель линзы) и не больше 4 у haiku (слабая модель, остаток отсеивает судья)."""
     case = path.stem.removeprefix("clean_").rsplit("_", 2)[0]
     doc = (ROOT / "evaluation" / "dev" / "corpus" / "cases" / f"{case}.base" / "source.md").read_text(encoding="utf-8")
     kept, _ = lens_risk.postprocess(json.loads(path.read_text(encoding="utf-8"))["candidates"], doc)
     sev = [c["severity"] for c in kept]
-    assert sev.count("critical") == 0 and sev.count("major") <= 3, sev
+    limit = 2 if "sonnet" in path.stem else 4
+    assert sev.count("critical") == 0 and sev.count("major") <= limit, sev
