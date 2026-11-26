@@ -230,6 +230,92 @@ def twin_phrase_doc(path: Path, *, orphan_markers: bool = False, footnote: bool 
     return path
 
 
+AMOUNT = "50 000 ₸"
+AMOUNTS_HEADING = "3. Уведомление о расходах"
+AMOUNTS_USER_COMMENT = "Пользователь: лимит push совпадает с порогом? Проверить с бизнесом."
+
+
+def amounts_doc(path: Path, *, user_comment: bool = False) -> Path:
+    """Сумма ``AMOUNT`` один раз в основном тексте и дважды в таблице.
+
+    * заголовок «3. Уведомление о расходах» (Heading 1) и автонумерованный список 1–3;
+      сумма стоит в пункте 2;
+    * таблица «Параметр | Значение | Примечание» с шапкой ``tblHeader``: в строке 2
+      сумма разбита на жирный run «50 000» и курсивный run « ₸», в строке 3 -- один run;
+    * ``user_comment``: на сумме в строке 3 уже стоит комментарий пользователя.
+    """
+    d = docx.Document()
+    d.add_heading(AMOUNTS_HEADING, 1)
+    d.add_paragraph("Клиент задаёт порог уведомления в приложении.", style="List Number")
+    p = d.add_paragraph(style="List Number")
+    p.add_run("Push отправляется, когда расходы за месяц достигают ")
+    p.add_run(AMOUNT)
+    p.add_run(".")
+    d.add_paragraph("Порог хранится в тенге без тиынов.", style="List Number")
+    table = d.add_table(rows=3, cols=3)
+    table.style = "Table Grid"
+    for i, h in enumerate(("Параметр", "Значение", "Примечание")):
+        table.cell(0, i).text = h
+    table.rows[0]._tr.get_or_add_trPr().append(parse_xml(f'<w:tblHeader {nsdecls("w")}/>'))
+    table.cell(1, 0).text = "Порог по умолчанию"
+    split = table.cell(1, 1).paragraphs[0]
+    split.add_run("50 000").bold = True
+    split.add_run(" ₸").italic = True
+    table.cell(1, 2).text = "задаётся при выпуске карты"
+    table.cell(2, 0).text = "Лимит суммы push"
+    whole = table.cell(2, 1).paragraphs[0].add_run(AMOUNT)
+    table.cell(2, 2).text = "один push в месяц"
+    d.add_paragraph("Итоговые значения согласует владелец продукта.")
+    if user_comment:
+        d.add_comment(whole, text=AMOUNTS_USER_COMMENT, author="Аналитик банка", initials="АБ")
+    d.save(path)
+    return path
+
+
+def amounts_mock_script(doc: Document) -> dict[str, Any]:
+    """Записанные ответы модели для движка (провайдер mock) по ``amounts_doc``.
+
+    Инвентарь: пункты 1–3 и две строки таблицы; набор: замечание на сумму в строке 2,
+    замечание на ту же сумму в строке 3, пропуск без цитаты и выдуманная цитата
+    «60 000 ₸». Последние два движок отсекает до экспорта (report.rejected).
+    """
+    ref = {b.loc["ref"]: b.id for b in doc.blocks}
+    r2, r3 = ref["t1.r2"], ref["t1.r3"]
+
+    def issue(title, quotes, cause, kind="ambiguity", criterion="unambiguous", severity="major", req=("R-004",)):
+        return {"kind": kind, "criterion": criterion, "severity": severity, "title": title,
+                "impact": "Разработчик и тестировщик поймут сумму по-разному.", "blocked_decision": "Какую сумму проверять",
+                "recommendation": "Сослаться на пункт 2.", "quotes": quotes, "req_ids": list(req),
+                "cause": {"object": cause, "condition": "настройка", "outcomes": ["a", "b"]},
+                "inspected_block_ids": [r2, r3]}
+
+    script = {
+        "inventory": {"items": [
+            {"source_id": "1", "kind": "functional", "text": "Клиент задаёт порог",
+             "evidence": [{"block_id": ref["p2"], "quote": "Клиент задаёт порог уведомления"}]},
+            {"source_id": "2", "kind": "functional", "text": "Push при сумме",
+             "evidence": [{"block_id": ref["p3"], "quote": AMOUNT}]},
+            {"source_id": "3", "kind": "data", "text": "Порог в тенге",
+             "evidence": [{"block_id": ref["p4"], "quote": "Порог хранится в тенге"}]},
+            {"source_id": None, "kind": "contract", "text": "Порог по умолчанию", "evidence": [{"block_id": r2, "quote": AMOUNT}]},
+            {"source_id": None, "kind": "contract", "text": "Лимит суммы push", "evidence": [{"block_id": r3, "quote": AMOUNT}]}],
+            "excluded": [{"category": "structure", "reason": "заголовок и шапка", "block_ids": [ref["p1"], ref["t1.r1"]]},
+                         {"category": "other", "reason": "организационная фраза", "block_ids": [ref["p5"]]}],
+            "facts": [], "done": True},
+        "individual": {"requirements": []},
+        "cross": {"conflicts": [], "coverage": [], "facts": [], "issues": [
+            issue("Порог по умолчанию повторяет сумму пункта 2", [{"block_id": r2, "quote": AMOUNT}], "порог по умолчанию"),
+            issue("Лимит суммы push совпадает с порогом без объяснения", [{"block_id": r3, "quote": AMOUNT}],
+                  "лимит суммы push", kind="duplicate", criterion="necessary", severity="minor", req=("R-005",)),
+            issue("Нет правила для суммы ниже 1 000 ₸", [], "сумма ниже 1 000 ₸", kind="omission",
+                  criterion="set_complete", req=("R-002",)),
+            issue("Опора, которой нет в документе", [{"block_id": r3, "quote": "60 000 ₸"}], "лимит 60 000 ₸",
+                  severity="minor", req=("R-005",))]},
+        "verify_meaning": {"__verdicts__": "confirmed"},
+    }
+    return script
+
+
 # --------------------------------------------------------------- отчёт
 
 

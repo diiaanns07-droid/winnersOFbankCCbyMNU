@@ -5,6 +5,33 @@
 Пустые `readers/__init__.py` и `exports/__init__.py` нужны как пакеты: при слиянии с
 №01/№02/№13/№14/№17 одинаковые пустые файлы конфликта не дают.
 
+## Третий проход: сумма в тексте и две такие же в таблице (после `b399dcc`)
+
+Вход — `p03_fixtures.amounts_doc` (пример: `tests/p03/evidence/amounts/`): заголовок
+«3. Уведомление о расходах», автонумерованный список 1–3, «50 000 ₸» в пункте 2 и дважды в
+таблице; в строке 2 сумма разбита на жирный «50 000» и курсивный « ₸»; вариант
+`user_comment=True` — на сумме в строке 3 уже комментарий пользователя.
+
+* Диапазоны и тела комментариев на двух одинаковых суммах уже были верны на `b399dcc`
+  (`test_p03_amounts.py::test_two_amounts_ranges_match_their_comment_bodies`, оба варианта).
+* Не хватало счётчика пропусков: сводка писала «отмечено в тексте: 2» без «из N», а через
+  движок в `report.json` о пропусках не попадало ничего (`write_docx` отдаёт только путь).
+  Правка: `AnnotationResult.counts` (`findings`, `findings_anchored`, `evidence`,
+  `evidence_anchored`, `comments_added`, `skipped`), в сводке «Отмечено в тексте: X из N
+  замечаний (опор Y из M)» и причина по каждому пропуску, предупреждение
+  `docx_export_unanchored`. Если `report` — dict, `write_docx` дописывает предупреждения
+  экспорта в `report["warnings"]`; у движка это `self.warnings`, и он пишет их в
+  `report.json` после экспорта — правка движка не нужна.
+* Сквозной путь (`test_p03_stitch.py`, после слияния с интеграцией): `--offline-lint`
+  (правила без модели) и mock с записанными ответами; каждая опора — ровно один
+  комментарий своего замечания на том же диапазоне.
+
+**Max.** (1) В интеграции №03 стоит на `d2e8f30`; второй и третий проходы — в `bcc/p03-word`.
+(2) Движок отсекает кандидатов без опоры до экспорта (`engine.py`, этап evidence), поэтому
+DOCX-счётчик в реальном пути показывает «N из N», а пропуск виден в `report.rejected` и
+`run.evidence_audit`. Кандидат без единой цитаты (пропуск требования без `quotes`) в
+`evidence_audit` не считается: `checked/rejected` растут только по подсказкам.
+
 ## Второй проход: комментарий на точном вхождении (после `d2e8f30`)
 
 Вход: фраза «порог от 1 000 до 1 000 000 ₸» в обычном абзаце (на ней комментарий
@@ -166,7 +193,8 @@ ID замечания в панели примечаний.
 
 ```bash
 python -m pip install -e ".[dev]" "python-docx>=1.2"
-python -m pytest tests/contract tests/p03 -o addopts=""   # 62 passed, 1 skipped (стык без движка); 3.13 и 3.11
+python -m pytest tests/contract tests/p03 -o addopts=""   # 65 passed, 1 skipped (стык без движка); 3.13 и 3.11
+python tests/p03/evidence/make_amounts_evidence.py         # пример «сумма в тексте и две в таблице»
 python tests/p03/evidence/make_evidence.py         # пересобрать доказательства
 python tests/p03/fixtures/build_case_docx.py requirements.md tests/p03/fixtures/case_requirements.docx
 ```

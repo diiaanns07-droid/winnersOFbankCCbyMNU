@@ -187,3 +187,35 @@ def runs_with_format(p: Any) -> list[tuple[str, bool, bool]]:
         bold = b is not None and b.get(w("val"), "1") not in ("0", "false", "off")
         out.append((text, bold, ancestor(r, "hyperlink") is not None))
     return out
+
+
+def runs_bold_italic(p: Any) -> list[tuple[str, bool, bool]]:
+    """(текст, жирный, курсив) для run с видимым текстом (прямое оформление run)."""
+    def on(r: Any, tag: str) -> bool:
+        el = r.find(f"{w('rPr')}/{w(tag)}")
+        return el is not None and el.get(w("val"), "1") not in ("0", "false", "off")
+
+    out = []
+    for r in p.iter(w("r")):
+        text = "".join(visible(el) for el in walk(r))
+        if text and ancestor(r, "del") is None:
+            out.append((text, on(r, "b"), on(r, "i")))
+    return out
+
+
+def range_map(path: Path, ids: Any, document: Any) -> dict[int, dict[str, Any]]:
+    """Карта диапазонов: id -> ячейка/абзац границ, координаты в блоке, охват, первая строка тела."""
+    root = part(path)
+    bodies = comments(path)
+    out = {}
+    for cid in ids:
+        start, end = marker(root, cid, "start"), marker(root, cid, "end")
+        nodes = []
+        for mk in (start, end):
+            tc = ancestor(mk, "tc")
+            nodes.append(full_path(tc) if tc is not None else full_path(ancestor(mk, "p")))
+        block, s, e, _ = block_span(path, cid, document)
+        out[cid] = {"start_node": nodes[0], "end_node": nodes[1], "block_id": block, "start": s, "end": e,
+                    "covered": covered_text(path, cid), "author": bodies[cid][0],
+                    "head": bodies[cid][1].splitlines()[0], "body": bodies[cid][1]}
+    return out

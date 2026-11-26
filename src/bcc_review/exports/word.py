@@ -85,6 +85,15 @@ PRECISION_RU = {
     "cell": "ячейка таблицы целиком",
 }
 _PRECISION_RANK = {"exact": 0, "run": 1, "paragraph": 2, "cell": 3}
+SKIP_REASON_RU = {
+    "no_evidence": "у замечания нет текстовой опоры",
+    "quote_not_found": "цитаты нет в тексте блока",
+    "quote_ambiguous": "цитата встречается в блоке несколько раз, координаты её не подтверждают",
+    "block_not_found": "блока нет в документе",
+    "block_text_mismatch": "текст блока в отчёте не совпадает с документом",
+    "quote_is_separator": "цитата состоит только из разделителя",
+}
+_NOT_PUBLISHED = ("status_not_reportable",)
 _ISO = "ISO/IEC/IEEE 29148:2018"
 # Подписи кодов критериев контракта (contracts.INDIVIDUAL_CRITERIA / SET_CRITERIA).
 CRITERIA_RU = {
@@ -181,6 +190,38 @@ class AnnotationResult:
     comments_before: int = 0
     comments_after: int = 0
     checks: dict[str, Any] = field(default_factory=dict)
+    findings_total: int = 0  # публикуемые замечания (confirmed / needs_review)
+    evidence_total: int = 0  # их опоры без повторов
+
+    @property
+    def counts(self) -> dict[str, int]:
+        """Счётчик: сколько замечаний и опор отмечено в тексте и сколько пропущено."""
+        return {
+            "findings": self.findings_total,
+            "findings_anchored": len({a.finding_id for a in self.anchors}),
+            "evidence": self.evidence_total,
+            "evidence_anchored": len(self.anchors),
+            "comments_added": len(self.anchors),
+            "skipped": len([s for s in self.skipped if s.reason not in _NOT_PUBLISHED]),
+        }
+
+    def unanchored_ru(self) -> list[str]:
+        """«F-C — у замечания нет текстовой опоры» для замечаний без единого комментария."""
+        anchored = {a.finding_id for a in self.anchors}
+        out, seen = [], set()
+        for s in self.skipped:
+            if s.reason in _NOT_PUBLISHED or s.finding_id in anchored or s.finding_id in seen:
+                continue
+            seen.add(s.finding_id)
+            out.append(f"{s.finding_id} — {SKIP_REASON_RU.get(s.reason, s.reason)}")
+        partial = sorted({s.finding_id for s in self.skipped if s.finding_id in anchored})
+        out += [f"{fid} — отмечена только часть опор" for fid in partial]
+        return out
+
+    def counts_ru(self) -> str:
+        c = self.counts
+        return (f"отмечено {c['findings_anchored']} из {c['findings']} замечаний "
+                f"(опор {c['evidence_anchored']} из {c['evidence']})")
 
     @property
     def complete(self) -> bool:
@@ -191,6 +232,7 @@ class AnnotationResult:
     def to_dict(self) -> dict[str, Any]:
         d = dataclasses.asdict(self)
         d["complete"] = self.complete
+        d["counts"] = self.counts
         return d
 
     def warnings(self) -> list[dict[str, Any]]:
@@ -205,6 +247,11 @@ class AnnotationResult:
             out.append({"code": f"docx_export_{s.reason}", "stage": "export_docx",
                         "message": f"{s.finding_id}: комментарий не поставлен — {s.detail}",
                         "block_ids": [s.block_id] if s.block_id else []})
+        if self.counts["skipped"]:  # общий счётчик пропусков, в том числе замечаний без опоры
+            out.append({"code": "docx_export_unanchored", "stage": "export_docx",
+                        "message": f"В {self.artifact} {self.counts_ru()}; без места в тексте: "
+                                   + "; ".join(self.unanchored_ru()) + ".",
+                        "block_ids": sorted({s.block_id for s in self.skipped if s.block_id})})
         return out
 
     def summary_ru(self) -> str:
@@ -273,7 +320,7 @@ def _question_and_fix(report: dict[str, Any], finding: dict[str, Any]) -> tuple[
             question = _text(q.get("prompt") or q.get("question") or q.get("text"))
             options = [o for o in (q.get("options") or []) if isinstance(o, str) and o.strip()]
             if question and options:
-                question += " Варианты: " + " / ".join(options[:3]) + "."
+                question += " Варианты: " + " / ".join(o.strip().rstrip(".") for o in options[:3]) + "."
             if question:
                 break
     if not question:
@@ -812,6 +859,7 @@ def annotate_docx(
             result.skipped.append(Skipped(f.get("id"), None, "status_not_reportable",
                                           f"статус «{f.get('status')}» не публикуется в документе"))
             continue
+        result.findings_total += 1
         evs = [e for e in f.get("evidence") or [] if isinstance(e, dict)]
         if not evs:
             result.skipped.append(Skipped(f.get("id"), None, "no_evidence",
@@ -823,6 +871,7 @@ def annotate_docx(
             if key in seen:
                 continue
             seen.add(key)
+            result.evidence_total += 1
             targets.append((order.get(ev.get("block_id"), 10**9), ev.get("start") or 0, fi, f, ev, evs))
     targets.sort(key=lambda t: t[:3])
 
@@ -930,14 +979,14 @@ def _summary_comment(doc: Any, first: BlockSpec, rep: dict[str, Any], findings: 
     for f in findings:
         if f.get("severity") in counts:
             counts[f["severity"]] += 1
-    anchored = {a.finding_id for a in result.anchors}
     lines = ["Сводка ревью ТЗ (BCC Review)"]
     lines += _verdict_lines(rep)
     lines.append(f"Замечаний: {len(findings)} (критичных {counts['critical']}, существенных {counts['major']}, "
-                 f"незначительных {counts['minor']}); отмечено в тексте: {len(anchored)}.")
-    loose = [f.get("id") for f in findings if f.get("id") not in anchored]
+                 f"незначительных {counts['minor']}).")
+    lines.append(result.counts_ru().replace("отмечено", "Отмечено в тексте:", 1) + ".")
+    loose = result.unanchored_ru()
     if loose:
-        lines.append("Без места в тексте (пропуски и замечания к набору): " + ", ".join(str(x) for x in loose[:20]))
+        lines.append("Без места в тексте: " + "; ".join(loose[:20]) + ".")
     lines.append("Подробности, доказательства и вопросы — в отчёте ревью.")
     p0, pn = first.paragraphs[0], first.paragraphs[-1]
     if first.kind == "heading":
@@ -953,8 +1002,17 @@ def write_docx(report: Any, input_path: Path | str, output_path: Path | str, **o
     Для DOCX другой версии поднимает :class:`SourceMismatchError`, для входа
     не-DOCX -- :class:`UnsupportedSourceError`. У обоих есть ``.result``
     (:class:`AnnotationResult`) с объяснением на русском.
+
+    Если ``report`` -- dict со списком ``warnings``, туда дописываются
+    предупреждения экспорта, включая счётчик ``docx_export_unanchored``
+    («отмечено X из N замечаний (опор Y из M)») при пропусках.
     """
     result = annotate_docx(report, input_path, output_path, **options)
+    if result.status == "written" and isinstance(report, dict) and isinstance(report.get("warnings"), list):
+        # Движок получает от write_docx только путь, а report.json пишет после экспорта
+        # из того же объекта: так счётчик пропусков попадает в отчёт без правок движка.
+        known = {(w.get("code"), w.get("message")) for w in report["warnings"] if isinstance(w, dict)}
+        report["warnings"].extend(w for w in result.warnings() if (w["code"], w["message"]) not in known)
     if result.status == "source_mismatch":
         raise SourceMismatchError(result.message, result)
     if result.status == "unsupported_input":

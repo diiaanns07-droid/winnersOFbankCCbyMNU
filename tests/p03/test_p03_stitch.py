@@ -100,3 +100,99 @@ def test_engine_export_puts_each_comment_on_its_own_copy(tmp_path, monkeypatch):
     summary = [cid for cid, text in new.items() if text.startswith("Сводка ревью")]
     assert len(summary) == 1 and ox.covered_text(out, summary[0]) == ""
     assert ox.comments(out)[0] == ox.comments(src)[0] and ox.hyperlinks(out) == ox.hyperlinks(src)
+
+
+# ------------------------------------------------- сумма в тексте и две такие же в таблице
+
+
+def _engine_env(monkeypatch, force_fallback: str | None):
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY", "BCC_FORCE_FALLBACK"):
+        monkeypatch.delenv(var, raising=False)
+    if force_fallback:
+        monkeypatch.setenv("BCC_FORCE_FALLBACK", force_fallback)
+    monkeypatch.setattr(engine, "load_dotenv", lambda *a, **k: None)
+
+
+def _check_engine_docx(src, outdir):
+    """Каждая опора отчёта -- ровно один комментарий своего замечания на том же диапазоне."""
+    rep = json.loads((outdir / "report.json").read_text(encoding="utf-8"))
+    out = outdir / "report.annotated.docx"
+    assert rep.get("exports", {}).get("docx") == str(out)
+    assert hashlib.sha256(src.read_bytes()).hexdigest() == rep["document"]["id"]
+    before = ox.comments(src)
+    new = sorted(set(ox.comments(out)) - set(before))
+    rmap = ox.range_map(out, new, read_docx(out))
+    blocks = {b["id"]: b for b in rep["document"]["blocks"]}
+    placed = {}
+    for f in rep["findings"]:
+        for ev in f["evidence"]:
+            hits = [cid for cid, r in rmap.items() if r["head"].startswith(f"[{f['id']}]")
+                    and (r["block_id"], r["start"], r["end"]) == (ev["block_id"], ev["start"], ev["end"])]
+            assert len(hits) == 1, (f["id"], ev, hits)
+            r = rmap[hits[0]]
+            assert r["start_node"] == r["end_node"] == locate(blocks[ev["block_id"]], ev["start"], ev["end"])["path"]
+            assert r["covered"] == ev["quote"]
+            placed[(f["id"], r["start_node"])] = r
+    for uid, value in before.items():  # комментарий пользователя цел
+        assert ox.comments(out)[uid] == value
+    out_doc = read_docx(out)
+    assert [b.loc["list"]["label"] for b in out_doc.blocks if b.kind == "list_item"] == ["1.", "2.", "3."]
+    assert out_doc.blocks[0].text == "3. Уведомление о расходах" and out_doc.blocks[0].loc["style"] == "Heading 1"
+    return rep, out, rmap, placed
+
+
+@pytest.mark.parametrize("user_comment", [False, True], ids=["clean", "with_user_comment"])
+def test_engine_offline_lint_amounts_real_rules(tmp_path, monkeypatch, user_comment):
+    """Без модели: детерминированные правила движка → опоры №07 → write_docx → повторное открытие."""
+    from p03_fixtures import amounts_doc
+
+    _engine_env(monkeypatch, None)
+    src = amounts_doc(tmp_path / "amounts.docx", user_comment=user_comment)
+    opts = RunOptions.coerce({"offline_lint": True, "exports": ["docx"], "cache_dir": str(tmp_path / "cache"),
+                              "use_cache": False, "artifacts_dir": str(tmp_path / "artifacts")})
+    engine.run_review(src, tmp_path / "out" / "report.md", options=opts)
+    rep, out, rmap, placed = _check_engine_docx(src, tmp_path / "out")
+    assert rep["run"]["mode"] == "rules_only" and rep["findings"], "правила не дали ни одного замечания"
+    assert rep["run"]["modules"]["read_docx"].startswith("team:")
+
+
+@pytest.mark.parametrize("user_comment", [False, True], ids=["clean", "with_user_comment"])
+def test_engine_two_table_amounts_two_anchors_and_skip_counters(tmp_path, monkeypatch, user_comment):
+    """Записанные ответы модели (mock): два замечания на две одинаковые суммы в таблице,
+    пропуск без цитаты и выдуманная цитата. Каждое тело -- на своём диапазоне; пропуски
+    видны в счётчике движка, а сводка DOCX считает только дошедшие замечания."""
+    from p03_fixtures import AMOUNT, amounts_doc, amounts_mock_script
+
+    _engine_env(monkeypatch, "review_individual,review_set")
+    src = amounts_doc(tmp_path / "amounts.docx", user_comment=user_comment)
+    doc = read_docx(src)
+
+    script = amounts_mock_script(doc)
+    (tmp_path / "mock.json").write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+    opts = RunOptions.coerce({"provider": "mock", "mock_script": str(tmp_path / "mock.json"), "exports": ["docx"],
+                              "cache_dir": str(tmp_path / "cache"), "use_cache": False,
+                              "artifacts_dir": str(tmp_path / "artifacts")})
+    engine.run_review(src, tmp_path / "out" / "report.md", options=opts)
+    rep, out, rmap, placed = _check_engine_docx(src, tmp_path / "out")
+
+    cell2 = "/w:document/w:body/w:tbl[1]/w:tr[2]/w:tc[2]"
+    cell3 = "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[2]"
+    by_title = {f["title"]: f["id"] for f in rep["findings"]}
+    fa, fb = by_title["Порог по умолчанию повторяет сумму пункта 2"], by_title["Лимит суммы push совпадает с порогом без объяснения"]
+    assert placed[(fa, cell2)]["covered"] == placed[(fb, cell3)]["covered"] == AMOUNT
+    assert placed[(fa, cell2)]["body"].startswith(f"[{fa}] Существенный")
+    assert placed[(fb, cell3)]["body"].startswith(f"[{fb}] Незначительный")
+    # пропуски отсечены движком до экспорта и видны в его счётчике
+    titles_rejected = {x["candidate"]["title"] for x in rep.get("rejected", [])}
+    assert {"Нет правила для суммы ниже 1 000 ₸", "Опора, которой нет в документе"} <= titles_rejected
+    assert rep["run"]["evidence_audit"]["rejected"] >= 1
+    # сводка DOCX считает дошедшие до экспорта замечания; пропусков на уровне DOCX нет
+    summary = [r for r in rmap.values() if r["head"].startswith("Сводка ревью")]
+    n_ev = sum(len(f["evidence"]) for f in rep["findings"])
+    assert len(summary) == 1
+    assert f"Отмечено в тексте: {len(rep['findings'])} из {len(rep['findings'])} замечаний (опор {n_ev} из {n_ev})." \
+        in summary[0]["body"]
+    assert not [w for w in rep["warnings"] if w.get("code") == "docx_export_unanchored"]
+    mods = rep["run"]["modules"]
+    assert mods["read_docx"].startswith("team:") and mods["resolve_candidate"].startswith("team:")
+    assert mods["provider"].endswith("MockAdapter")

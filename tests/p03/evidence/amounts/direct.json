@@ -1,0 +1,79 @@
+{
+ "input": "amounts.docx",
+ "status": "written",
+ "counts": {
+  "findings": 4,
+  "findings_anchored": 2,
+  "evidence": 3,
+  "evidence_anchored": 2,
+  "comments_added": 2,
+  "skipped": 2
+ },
+ "skipped": [
+  {
+   "finding_id": "F-C",
+   "block_id": null,
+   "reason": "no_evidence",
+   "detail": "у замечания нет текстовой опоры; оно указано в общем комментарии"
+  },
+  {
+   "finding_id": "F-D",
+   "block_id": "b0007",
+   "reason": "quote_not_found",
+   "detail": "цитаты нет в тексте блока"
+  }
+ ],
+ "warnings": [
+  {
+   "code": "docx_export_quote_not_found",
+   "stage": "export_docx",
+   "message": "F-D: комментарий не поставлен — цитаты нет в тексте блока",
+   "block_ids": [
+    "b0007"
+   ]
+  },
+  {
+   "code": "docx_export_unanchored",
+   "stage": "export_docx",
+   "message": "В direct.annotated.docx отмечено 2 из 4 замечаний (опор 2 из 3); без места в тексте: F-C — у замечания нет текстовой опоры; F-D — цитаты нет в тексте блока.",
+   "block_ids": [
+    "b0007"
+   ]
+  }
+ ],
+ "ranges": [
+  {
+   "comment_id": 2,
+   "author": "BCC Review",
+   "head": "Сводка ревью ТЗ (BCC Review)",
+   "block_id": "b0001",
+   "start": 0,
+   "end": 25,
+   "node": "/w:document/w:body/w:p[1]",
+   "covered": "3. Уведомление о расходах",
+   "existing": false
+  },
+  {
+   "comment_id": 0,
+   "author": "BCC Review",
+   "head": "[F-A] Существенный · подтверждено",
+   "block_id": "b0006",
+   "start": 21,
+   "end": 29,
+   "node": "/w:document/w:body/w:tbl[1]/w:tr[2]/w:tc[2]",
+   "covered": "50 000 ₸",
+   "existing": false
+  },
+  {
+   "comment_id": 1,
+   "author": "BCC Review",
+   "head": "[F-B] Незначительный · подтверждено",
+   "block_id": "b0007",
+   "start": 19,
+   "end": 27,
+   "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[2]",
+   "covered": "50 000 ₸",
+   "existing": false
+  }
+ ]
+}

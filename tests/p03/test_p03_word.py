@@ -234,7 +234,10 @@ def test_unproven_quotes_are_never_anchored(tmp_path):
         "F-5": "no_evidence", "F-6": "status_not_reportable"}
     assert not res.complete
     assert {w["code"] for w in res.warnings()} == {
-        "docx_export_quote_not_found", "docx_export_quote_ambiguous", "docx_export_block_not_found"}
+        "docx_export_quote_not_found", "docx_export_quote_ambiguous", "docx_export_block_not_found",
+        "docx_export_unanchored"}
+    assert res.counts == {"findings": 6, "findings_anchored": 2, "evidence": 5, "evidence_anchored": 2,
+                          "comments_added": 2, "skipped": 4}
     # в таблицу ничего не поставлено: там цитаты нет
     assert [cid for cid in markers(out) if "tc" in start_marker_ancestors(out, cid)] == []
     summary = comments(out)[res.summary_comment_id][1]
