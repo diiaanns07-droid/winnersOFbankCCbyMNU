@@ -126,7 +126,7 @@ python -m tests.p10.make_samples
 ```
 
 * `python -m pytest tests/p10 -q` — 76 passed (Python 3.11 и 3.13).
-* `python -m pytest tests -q` — 1247 passed, 15 skipped, 7 failed; те же 7 падают и на чистом 11a8f1f
+* `python -m pytest tests -q` — 1249 passed, 15 skipped, 7 failed; те же 7 падают и на чистом 11a8f1f
   (p04, p08, p09, p11, p14, p15, p16 — вне `bank/`), там 1231 passed.
 * `python -m pytest tests/contract tests/integration -q` на 2821989 + №10 — 167 passed; интеграционные
   тесты движка идут через модуль `team:bcc_review.bank.checklist`.
