@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-from bcc_review.providers.anthropic import AnthropicAdapter
 from bcc_review.runtime.asker import Asker
 from bcc_review.runtime.mock import MockAdapter
 
@@ -136,9 +135,14 @@ def test_patch_fails_loudly_if_asker_changes() -> None:
         patched_source("class Asker:\n    pass\n")
 
 
+def test_anthropic_adapter_is_not_gated() -> None:
+    pytest.importorskip("anthropic", reason="адаптер №11 требует необязательный пакет anthropic")
+    from bcc_review.providers.anthropic import AnthropicAdapter
+    assert not getattr(AnthropicAdapter, "supports_call_gate", False)
+
+
 def test_gate_is_opt_in_for_other_adapters() -> None:
     assert not getattr(MockAdapter, "supports_call_gate", False)
-    assert not getattr(AnthropicAdapter, "supports_call_gate", False)
     from bcc_review.runtime.context import ContextBuilder
     from bcc_review.runtime.core import Budget, Cache, StageStats, Tracer
 

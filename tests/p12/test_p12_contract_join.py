@@ -117,7 +117,7 @@ def test_p11_adapter_signature_if_present() -> None:
     try:
         module = importlib.import_module("bcc_review.providers.anthropic")
     except ImportError:
-        pytest.skip("адаптер №11 ещё не влит в эту ветку")
+        pytest.skip("адаптер №11 недоступен: не влит или не установлен пакет anthropic")
     theirs = inspect.signature(module.AnthropicAdapter.invoke).parameters
     for name in ("model", "messages", "schema", "timeout_s"):
         assert name in theirs and theirs[name].kind is inspect.Parameter.KEYWORD_ONLY
