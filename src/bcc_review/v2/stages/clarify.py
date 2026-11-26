@@ -167,6 +167,26 @@ def build_messages(ctx: Any, stage: str, var: str, block: str, marker: str) -> t
     return system, user
 
 
+def _merge(parts: list) -> dict:
+    out: dict = {}
+    for part in parts:
+        for k, v in (part or {}).items():
+            if isinstance(v, list):
+                out.setdefault(k, []).extend(v)
+            elif k not in out:
+                out[k] = v
+    return out
+
+
+def ask_items(ctx: Any, stage: str, items: list, build, schema: dict, max_output_tokens: int = 16000) -> dict:
+    """Вызов модели по пакету ``items``: ``ask_split`` каркаса (делит пакет при обрезке), иначе ``ask``."""
+    llm = ctx.llm
+    if hasattr(llm, "ask_split") and len(items) > 1:
+        return llm.ask_split(stage, build, items, schema, _merge, max_output_tokens=max_output_tokens) or {}
+    system, user = build(items)
+    return llm.ask(stage, system, user, schema, max_output_tokens=max_output_tokens) or {}
+
+
 def _role(value: str) -> str:
     v = str(value or "").strip()
     if v in ROLES:
@@ -271,11 +291,12 @@ def run(ctx: Any, findings: list[dict]) -> dict:
     relevant = [f for f in findings if f.get("severity") in ("critical", "major")] or list(findings)
     if not relevant:
         return {"questions": []}
-    block = format_findings(relevant)
-    system, user = build_messages(ctx, STAGE, "findings", block, "Задание: вопросы владельцу")
+    def build(items: list) -> tuple[str, str]:
+        return build_messages(ctx, STAGE, "findings", format_findings(items), "Задание: вопросы владельцу")
+
     warnings: list[str] = []
     try:
-        raw = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=8000)
+        raw = ask_items(ctx, STAGE, relevant, build, SCHEMA, max_output_tokens=12000)
     except Exception as exc:  # noqa: BLE001 — вопросы не должны ронять весь прогон
         _warn(ctx, f"clarify: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); вопросы не сформированы")
         return {"questions": [], "status": "failed"}

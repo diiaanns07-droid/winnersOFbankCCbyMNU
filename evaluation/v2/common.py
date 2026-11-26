@@ -216,7 +216,10 @@ LATIN_ALLOW = {
     "asia", "almaty", "content", "type", "true", "false", "null", "ok", "error", "nfr", "crud", "csv", "uuid",
     "idempotency", "key", "sequence", "diagram", "query", "body", "header", "mandatory", "string", "integer",
     "boolean", "int", "bit", "db", "sql", "cvv", "pan", "otp", "pin", "kyc", "aml", "p95", "p99",
+    "csrf", "xss", "cors", "origin", "usd", "eur", "rub", "kzt", "iban", "swift", "sms", "email", "mvp", "fifo",
+    "rpo", "rto", "dto", "dlq", "kafka", "redis", "postgresql", "ttl", "etag", "nfc", "qr", "ios", "android",
 }
+_CODE_ID = re.compile(r"[a-z]+[A-Z]\w*|\w*_\w+")  # camelCase и snake_case — имена полей и методов, не английский текст
 _LATIN_WORD = re.compile(r"(?<![A-Za-z0-9_$./-])[A-Za-z][A-Za-z]{2,}(?![A-Za-z0-9_])")
 
 
@@ -228,7 +231,7 @@ def latin_words(text: str, allowed: set[str]) -> list[str]:
     out = []
     for m in _LATIN_WORD.finditer(text or ""):
         w = m.group(0)
-        if w.lower() in LATIN_ALLOW or w.lower() in allowed:
+        if w.lower() in LATIN_ALLOW or w.lower() in allowed or _CODE_ID.fullmatch(w):
             continue
         out.append(w)
     return out
