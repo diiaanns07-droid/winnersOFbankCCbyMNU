@@ -674,6 +674,8 @@ def _passport(c: _Ctx) -> list[str]:
         ["Длительность", duration(run.get("duration_s"))],
         ["Статус прогона", STATUS.get(run.get("status"), run.get("status") or "—")],
         ["Этапы", cell(stage_txt)],
+        ["Файлы отчёта", "рядом с этим файлом: `.json` — все данные и полные цитаты (по нему работает `verify`), "
+                         "`.html` — интерактивная версия"],
     ]
     cl = c.r.get("clarification") or {}
     if cl:
