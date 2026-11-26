@@ -1,0 +1,109 @@
+{
+  "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+  "family": "transfer_limit",
+  "kind": "combo",
+  "ops": [
+    "two_statuses",
+    "drop_promised"
+  ],
+  "variants": [
+    "range_200_error",
+    "no_read_method"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "transfer_limit.base",
+  "base_source_sha256": "f614c16e33c76e795523a58c875a3dbb6078e6710d043725e8fd3b7305ee910a",
+  "source_sha256": "2c9f6201b99375d469033ed165d3d85fc6f20ebbcc5a06982f043cf59d1fe04f",
+  "semantic_sha256": "95647e5d78b2c41ebf9e7df52281427b2330b5d1e72d2b2b43de5a7a62384202",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 77,
+      "after": "| `limit` | integer | Да |",
+      "removed": "",
+      "inserted": "Если лимит вне диапазона, метод возвращает 200 с телом `{\"result\":\"ERROR\"}`.",
+      "mutation_op": "two_statuses",
+      "variant": "range_200_error"
+    },
+    {
+      "op": "delete_section",
+      "base_line": 47,
+      "removed": "### Метод getTransferLimit\n\n| Поле | Значение |\n| :--- | :--- |\n| **REST type** | GET |\n| **Request URL** | `/limits/phone-transfers` |\n| **Authorization** | Bearer, сессия клиента |\n\n#### Ответ 200\n\n| Parameter | Format | Description |\n| :--- | :--- | :--- |\n| `limit` | string | Лимит в тенге, целое число |\n| `used` | string | Использовано за текущие сутки, в тенге с двумя знаками после точки |\n\nПример: `{\"limit\":\"100000\",\"used\":\"60000.00\"}`.\n\n",
+      "inserted": "",
+      "mutation_op": "drop_promised",
+      "variant": "no_read_method"
+    }
+  ],
+  "expected_effect": [
+    "Лимит вне диапазона получает 200 по примечанию и 400 по таблице статусов.",
+    "Интеграция обещает метод getTransferLimit, а ЛП-6 — показ остатка, но метода чтения в части B нет."
+  ],
+  "diff": "--- base/source.md\n+++ transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method/source.md\n@@ -46,19 +46,2 @@\n \n-### Метод getTransferLimit\n-\n-| Поле | Значение |\n-| :--- | :--- |\n-| **REST type** | GET |\n-| **Request URL** | `/limits/phone-transfers` |\n-| **Authorization** | Bearer, сессия клиента |\n-\n-#### Ответ 200\n-\n-| Parameter | Format | Description |\n-| :--- | :--- | :--- |\n-| `limit` | string | Лимит в тенге, целое число |\n-| `used` | string | Использовано за текущие сутки, в тенге с двумя знаками после точки |\n-\n-Пример: `{\"limit\":\"100000\",\"used\":\"60000.00\"}`.\n-\n ### Метод setTransferLimit\n@@ -78,2 +61,4 @@\n \n+Если лимит вне диапазона, метод возвращает 200 с телом `{\"result\":\"ERROR\"}`.\n+\n ### Статусы\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "family": "transfer_limit",
+      "source_sha256": "2c9f6201b99375d469033ed165d3d85fc6f20ebbcc5a06982f043cf59d1fe04f",
+      "visibility": "public",
+      "label_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method#1",
+      "issue_type": "status_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Если лимит вне диапазона, метод возвращает 200 с телом `{\"result\":\"ERROR\"}`.",
+          "locator": "md:L62"
+        },
+        {
+          "role": "b",
+          "quote": "400 | Лимит вне диапазона от 10 000 до 3 000 000 или не целое число",
+          "locator": "md:L69"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "setTransferLimit с limit=5000.",
+      "explanation": "Лимит вне диапазона получает 200 по примечанию и 400 по таблице статусов.",
+      "mutation": {
+        "op": "two_statuses",
+        "variant": "range_200_error"
+      }
+    },
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "family": "transfer_limit",
+      "source_sha256": "2c9f6201b99375d469033ed165d3d85fc6f20ebbcc5a06982f043cf59d1fe04f",
+      "visibility": "public",
+      "label_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method#2",
+      "issue_type": "missing_element",
+      "anchors": [
+        {
+          "role": "promise",
+          "quote": "Приложение читает лимит и использованную сумму методом getTransferLimit и меняет лимит методом setTransferLimit.",
+          "locator": "md:L35"
+        },
+        {
+          "role": "promise",
+          "quote": "Приложение показывает лимит и остаток лимита на текущие сутки.",
+          "locator": "md:L29"
+        }
+      ],
+      "anchor_policy": "any",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:completeness",
+      "scenario": null,
+      "explanation": "Интеграция обещает метод getTransferLimit, а ЛП-6 — показ остатка, но метода чтения в части B нет.",
+      "mutation": {
+        "op": "drop_promised",
+        "variant": "no_read_method"
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "case_id": "cashback.paraphrase.rate",
+  "family": "cashback",
+  "kind": "mutant",
+  "ops": [
+    "paraphrase"
+  ],
+  "variants": [
+    "rate"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cashback.base",
+  "base_source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+  "source_sha256": "4fc3cb6483c9673176491bef29a5b9c7db744410c5eea56f8f76e2b8ec09753f",
+  "semantic_sha256": "b9da6360f30a506546987d52c3a908e74a4619920940552c973caffeaf88d602",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 27,
+      "removed": "Ставка кэшбэка составляет 5 % от суммы покупки.",
+      "inserted": "Кэшбэк равен 5 % суммы покупки.",
+      "mutation_op": "paraphrase",
+      "variant": "rate"
+    }
+  ],
+  "expected_effect": [
+    "Смысл КБ-3 не меняется. Новых находок быть не должно."
+  ],
+  "diff": "--- base/source.md\n+++ cashback.paraphrase.rate/source.md\n@@ -26,3 +26,3 @@\n * **КБ-2.** Кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно.\n-* **КБ-3.** Ставка кэшбэка составляет 5 % от суммы покупки.\n+* **КБ-3.** Кэшбэк равен 5 % суммы покупки.\n * **КБ-4.** Сумма кэшбэка за месяц не превышает 10 000 ₸.\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.paraphrase.rate",
+      "family": "cashback",
+      "source_sha256": "4fc3cb6483c9673176491bef29a5b9c7db744410c5eea56f8f76e2b8ec09753f",
+      "visibility": "public",
+      "label_id": "cashback.paraphrase.rate#clean",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "explanation": "Смысл КБ-3 не меняется. Новых находок быть не должно."
+    },
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.paraphrase.rate",
+      "family": "cashback",
+      "source_sha256": "4fc3cb6483c9673176491bef29a5b9c7db744410c5eea56f8f76e2b8ec09753f",
+      "visibility": "public",
+      "label_id": "cashback.paraphrase.rate#control",
+      "issue_type": null,
+      "anchors": [
+        {
+          "role": "control",
+          "quote": "Кэшбэк равен 5 % суммы покупки.",
+          "locator": "md:L27"
+        }
+      ],
+      "expected_outcome": "absent",
+      "explanation": "Перефразированное место: находка здесь — ложная тревога."
+    }
+  ]
+}

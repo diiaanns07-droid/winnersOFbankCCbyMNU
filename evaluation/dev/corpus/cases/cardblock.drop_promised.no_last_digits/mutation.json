@@ -1,0 +1,61 @@
+{
+  "case_id": "cardblock.drop_promised.no_last_digits",
+  "family": "cardblock",
+  "kind": "mutant",
+  "ops": [
+    "drop_promised"
+  ],
+  "variants": [
+    "no_last_digits"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cardblock.base",
+  "base_source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+  "source_sha256": "0e938348350c94af8c969b7102e23baef3dce5ebdeeb860adb262b2d33735d7f",
+  "semantic_sha256": "ab049e5ab7c717deb3bacc0ecd87774572352954f88fb1f0b254b8ed44eb1310",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 33,
+      "removed": "Хранить идентификатор карты, последние четыре цифры номера карты, статус,",
+      "inserted": "Хранить идентификатор карты, статус,",
+      "mutation_op": "drop_promised",
+      "variant": "no_last_digits"
+    }
+  ],
+  "expected_effect": [
+    "БК-7 обещает последние четыре цифры в push, а в данных их больше нет."
+  ],
+  "diff": "--- base/source.md\n+++ cardblock.drop_promised.no_last_digits/source.md\n@@ -32,3 +32,3 @@\n ### Требования к данным\n-Хранить идентификатор карты, последние четыре цифры номера карты, статус, срок блокировки в сутках, время блокировки по UTC+5 и инициатора изменения.\n+Хранить идентификатор карты, статус, срок блокировки в сутках, время блокировки по UTC+5 и инициатора изменения.\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.drop_promised.no_last_digits",
+      "family": "cardblock",
+      "source_sha256": "0e938348350c94af8c969b7102e23baef3dce5ebdeeb860adb262b2d33735d7f",
+      "visibility": "public",
+      "label_id": "cardblock.drop_promised.no_last_digits#1",
+      "issue_type": "missing_element",
+      "anchors": [
+        {
+          "role": "promise",
+          "quote": "После блокировки клиент получает push «Карта •• NNNN заблокирована», где NNNN — последние четыре цифры номера карты.",
+          "locator": "md:L30"
+        }
+      ],
+      "anchor_policy": "any",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:completeness",
+      "scenario": null,
+      "explanation": "БК-7 обещает последние четыре цифры в push, а в данных их больше нет.",
+      "mutation": {
+        "op": "drop_promised",
+        "variant": "no_last_digits"
+      }
+    }
+  ]
+}

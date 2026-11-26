@@ -1,0 +1,61 @@
+{
+  "case_id": "autopay.drop_promised.no_409_status",
+  "family": "autopay",
+  "kind": "mutant",
+  "ops": [
+    "drop_promised"
+  ],
+  "variants": [
+    "no_409_status"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "autopay.base",
+  "base_source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+  "source_sha256": "1b98dda67c255d26acabea531aee6ed2f77b3b6bc14fcb7b64f0149c7016fdc5",
+  "semantic_sha256": "b8be3c74b33e3b9ed01dd20362279045093020968eb882f2ab49df2b76f82a77",
+  "transformation": [
+    {
+      "op": "delete_line",
+      "base_line": 102,
+      "removed": "| 409 | Настройка для карты уже существует | `{\"message\":\"Автопополнение уже подключено\"}` |\n",
+      "inserted": "",
+      "mutation_op": "drop_promised",
+      "variant": "no_409_status"
+    }
+  ],
+  "expected_effect": [
+    "Логика метода возвращает 409, но статус 409 и его тело не описаны."
+  ],
+  "diff": "--- base/source.md\n+++ autopay.drop_promised.no_409_status/source.md\n@@ -101,3 +101,2 @@\n | 404 | Карта или настройка не найдена либо карта не принадлежит клиенту | `{\"message\":\"Не найдено\"}` |\n-| 409 | Настройка для карты уже существует | `{\"message\":\"Автопополнение уже подключено\"}` |\n | 500 | Внутренняя ошибка сервиса | `{\"message\":\"Ошибка сервиса\"}` |\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "autopay.drop_promised.no_409_status",
+      "family": "autopay",
+      "source_sha256": "1b98dda67c255d26acabea531aee6ed2f77b3b6bc14fcb7b64f0149c7016fdc5",
+      "visibility": "public",
+      "label_id": "autopay.drop_promised.no_409_status#1",
+      "issue_type": "missing_element",
+      "anchors": [
+        {
+          "role": "promise",
+          "quote": "Если настройка для карты уже существует, вернуть 409.",
+          "locator": "md:L73"
+        }
+      ],
+      "anchor_policy": "any",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:completeness",
+      "scenario": null,
+      "explanation": "Логика метода возвращает 409, но статус 409 и его тело не описаны.",
+      "mutation": {
+        "op": "drop_promised",
+        "variant": "no_409_status"
+      }
+    }
+  ]
+}

@@ -1,0 +1,3578 @@
+{
+  "requirements": [
+    {
+      "id": "R-001.1",
+      "group": "R-001",
+      "source_id": null,
+      "source_ref": "Дизайн процесса UI",
+      "kind": "ui",
+      "text": "Карты → Расходы → Уведомления.",
+      "block_ids": [
+        "b0019"
+      ],
+      "hints": [
+        {
+          "block_id": "b0019",
+          "quote": "Карты → Расходы → Уведомления."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0019",
+          "start": 0,
+          "end": 30,
+          "quote": "Карты → Расходы → Уведомления."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Дизайн процесса UI"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-001.2",
+      "group": "R-001",
+      "source_id": null,
+      "source_ref": "Дизайн процесса UI",
+      "kind": "ui",
+      "text": "На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить».",
+      "block_ids": [
+        "b0019"
+      ],
+      "hints": [
+        {
+          "block_id": "b0019",
+          "quote": "На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0019",
+          "start": 31,
+          "end": 115,
+          "quote": "На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Дизайн процесса UI"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-001.3",
+      "group": "R-001",
+      "source_id": null,
+      "source_ref": "Дизайн процесса UI",
+      "kind": "ui",
+      "text": "При ошибке ввода сообщение появляется под полем.",
+      "block_ids": [
+        "b0019"
+      ],
+      "hints": [
+        {
+          "block_id": "b0019",
+          "quote": "При ошибке ввода сообщение появляется под полем."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0019",
+          "start": 116,
+          "end": 164,
+          "quote": "При ошибке ввода сообщение появляется под полем."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Дизайн процесса UI"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-002.1",
+      "group": "R-002",
+      "source_id": "Ф-1",
+      "source_ref": "Функциональные требования › Ф-1",
+      "kind": "functional",
+      "text": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
+      "block_ids": [
+        "b0024"
+      ],
+      "hints": [
+        {
+          "block_id": "b0024",
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-002.2",
+      "group": "R-002",
+      "source_id": "Ф-1",
+      "source_ref": "Функциональные требования › Ф-1",
+      "kind": "functional",
+      "text": "По умолчанию уведомление выключено.",
+      "block_ids": [
+        "b0024"
+      ],
+      "hints": [
+        {
+          "block_id": "b0024",
+          "quote": "По умолчанию уведомление выключено."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 93,
+          "end": 128,
+          "quote": "По умолчанию уведомление выключено."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-003.1",
+      "group": "R-003",
+      "source_id": "Ф-2",
+      "source_ref": "Функциональные требования › Ф-2",
+      "kind": "functional",
+      "text": "Месяц определяется по дате совершения покупки в Алматы.",
+      "block_ids": [
+        "b0025"
+      ],
+      "hints": [
+        {
+          "block_id": "b0025",
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 7,
+          "end": 62,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-003.2",
+      "group": "R-003",
+      "source_id": "Ф-2",
+      "source_ref": "Функциональные требования › Ф-2",
+      "kind": "functional",
+      "text": "В расходы входят проведённые покупки.",
+      "block_ids": [
+        "b0025"
+      ],
+      "hints": [
+        {
+          "block_id": "b0025",
+          "quote": "В расходы входят проведённые покупки."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 63,
+          "end": 100,
+          "quote": "В расходы входят проведённые покупки."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-003.3",
+      "group": "R-003",
+      "source_id": "Ф-2",
+      "source_ref": "Функциональные требования › Ф-2",
+      "kind": "functional",
+      "text": "Возврат уменьшает расходы месяца исходной покупки.",
+      "block_ids": [
+        "b0025"
+      ],
+      "hints": [
+        {
+          "block_id": "b0025",
+          "quote": "Возврат уменьшает расходы месяца исходной покупки."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 101,
+          "end": 151,
+          "quote": "Возврат уменьшает расходы месяца исходной покупки."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-003.4",
+      "group": "R-003",
+      "source_id": "Ф-2",
+      "source_ref": "Функциональные требования › Ф-2",
+      "kind": "functional",
+      "text": "Переводы и снятие наличных исключаются.",
+      "block_ids": [
+        "b0025"
+      ],
+      "hints": [
+        {
+          "block_id": "b0025",
+          "quote": "Переводы и снятие наличных исключаются."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 152,
+          "end": 191,
+          "quote": "Переводы и снятие наличных исключаются."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-004.1",
+      "group": "R-004",
+      "source_id": "Ф-3",
+      "source_ref": "Функциональные требования › Ф-3",
+      "kind": "functional",
+      "text": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push.",
+      "block_ids": [
+        "b0026"
+      ],
+      "hints": [
+        {
+          "block_id": "b0026",
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 7,
+          "end": 106,
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-004.2",
+      "group": "R-004",
+      "source_id": "Ф-3",
+      "source_ref": "Функциональные требования › Ф-3",
+      "kind": "functional",
+      "text": "На карту приходится максимум один такой push за календарный месяц.",
+      "block_ids": [
+        "b0026"
+      ],
+      "hints": [
+        {
+          "block_id": "b0026",
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 107,
+          "end": 173,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-005.1",
+      "group": "R-005",
+      "source_id": "Ф-4",
+      "source_ref": "Функциональные требования › Ф-4",
+      "kind": "functional",
+      "text": "При изменении порога накопленная сумма сохраняется.",
+      "block_ids": [
+        "b0027"
+      ],
+      "hints": [
+        {
+          "block_id": "b0027",
+          "quote": "При изменении порога накопленная сумма сохраняется."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 7,
+          "end": 58,
+          "quote": "При изменении порога накопленная сумма сохраняется."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-005.2",
+      "group": "R-005",
+      "source_id": "Ф-4",
+      "source_ref": "Функциональные требования › Ф-4",
+      "kind": "functional",
+      "text": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки.",
+      "block_ids": [
+        "b0027"
+      ],
+      "hints": [
+        {
+          "block_id": "b0027",
+          "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 59,
+          "end": 166,
+          "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-006",
+      "group": "R-006",
+      "source_id": null,
+      "source_ref": "Нефункциональные требования",
+      "kind": "nonfunctional",
+      "text": "Сервис передаёт push на отправку в течение минуты после получения события.",
+      "block_ids": [
+        "b0031"
+      ],
+      "hints": [
+        {
+          "block_id": "b0031",
+          "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0031",
+          "start": 0,
+          "end": 74,
+          "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Нефункциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-007",
+      "group": "R-007",
+      "source_id": null,
+      "source_ref": "Требования к данным",
+      "kind": "data",
+      "text": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге.",
+      "block_ids": [
+        "b0033"
+      ],
+      "hints": [
+        {
+          "block_id": "b0033",
+          "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0033",
+          "start": 0,
+          "end": 117,
+          "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к данным"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-008.1",
+      "group": "R-008",
+      "source_id": null,
+      "source_ref": "Требования к интеграции",
+      "kind": "integration",
+      "text": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API».",
+      "block_ids": [
+        "b0035"
+      ],
+      "hints": [
+        {
+          "block_id": "b0035",
+          "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0035",
+          "start": 0,
+          "end": 109,
+          "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к интеграции"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-008.2",
+      "group": "R-008",
+      "source_id": null,
+      "source_ref": "Требования к интеграции",
+      "kind": "integration",
+      "text": "Повторная доставка одного события процессинга сохраняет исходный итог.",
+      "block_ids": [
+        "b0035"
+      ],
+      "hints": [
+        {
+          "block_id": "b0035",
+          "quote": "Повторная доставка одного события процессинга сохраняет исходный итог."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0035",
+          "start": 110,
+          "end": 180,
+          "quote": "Повторная доставка одного события процессинга сохраняет исходный итог."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к интеграции"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-009",
+      "group": "R-009",
+      "source_id": null,
+      "source_ref": "Критерии приемки › строка 1",
+      "kind": "acceptance",
+      "text": "Исходные условия: Расходы 48 500 ₸, порог 50 000 ₸; Действие: Провести покупку на 1 500 ₸; Ожидаемый результат: Итог 50 000 ₸ и один push",
+      "block_ids": [
+        "b0041"
+      ],
+      "hints": [
+        {
+          "block_id": "b0041",
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Критерии приемки"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-010",
+      "group": "R-010",
+      "source_id": null,
+      "source_ref": "Критерии приемки › строка 2",
+      "kind": "acceptance",
+      "text": "Исходные условия: Покупка 31 января в 23:58 на 4 000 ₸; Действие: Провести 1 февраля в 00:03 по Алматы; Ожидаемый результат: Февральский счётчик вырос на 4 000 ₸",
+      "block_ids": [
+        "b0042"
+      ],
+      "hints": [
+        {
+          "block_id": "b0042",
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 114,
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Критерии приемки"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-011",
+      "group": "R-011",
+      "source_id": null,
+      "source_ref": "Критерии приемки › строка 3",
+      "kind": "acceptance",
+      "text": "Исходные условия: Расходы 19 900 ₸, порог 20 000 ₸; Действие: Перевести 500 ₸; Ожидаемый результат: Счётчик показывает 19 900 ₸",
+      "block_ids": [
+        "b0043"
+      ],
+      "hints": [
+        {
+          "block_id": "b0043",
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0043",
+          "start": 0,
+          "end": 80,
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Критерии приемки"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-012",
+      "group": "R-012",
+      "source_id": null,
+      "source_ref": "Общие параметры › строка 2",
+      "kind": "contract",
+      "text": "REST type: GET",
+      "block_ids": [
+        "b0068"
+      ],
+      "hints": [
+        {
+          "block_id": "b0068",
+          "quote": "REST type | GET"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0068",
+          "start": 0,
+          "end": 15,
+          "quote": "REST type | GET"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Общие параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-013",
+      "group": "R-013",
+      "source_id": null,
+      "source_ref": "Общие параметры › строка 3",
+      "kind": "contract",
+      "text": "Authorization: Bearer, сессия владельца карты",
+      "block_ids": [
+        "b0069"
+      ],
+      "hints": [
+        {
+          "block_id": "b0069",
+          "quote": "Authorization | Bearer, сессия владельца карты"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0069",
+          "start": 0,
+          "end": 46,
+          "quote": "Authorization | Bearer, сессия владельца карты"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Общие параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-014",
+      "group": "R-014",
+      "source_id": null,
+      "source_ref": "Общие параметры › строка 6",
+      "kind": "contract",
+      "text": "Request URL: Dev: /alerts/saveLimit. Prod: —",
+      "block_ids": [
+        "b0072"
+      ],
+      "hints": [
+        {
+          "block_id": "b0072",
+          "quote": "Request URL | Dev: /alerts/saveLimit . Prod: —"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0072",
+          "start": 0,
+          "end": 46,
+          "quote": "Request URL | Dev: /alerts/saveLimit . Prod: —"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Общие параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-015",
+      "group": "R-015",
+      "source_id": "1",
+      "source_ref": "Логика работы метода › 1",
+      "kind": "contract",
+      "text": "Проверить пользовательскую сессию.",
+      "block_ids": [
+        "b0080"
+      ],
+      "hints": [
+        {
+          "block_id": "b0080",
+          "quote": "Проверить пользовательскую сессию."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0080",
+          "start": 3,
+          "end": 37,
+          "quote": "Проверить пользовательскую сессию."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Логика работы метода"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-016",
+      "group": "R-016",
+      "source_id": "2",
+      "source_ref": "Логика работы метода › 2",
+      "kind": "contract",
+      "text": "Проверить принадлежность карты клиенту.",
+      "block_ids": [
+        "b0081"
+      ],
+      "hints": [
+        {
+          "block_id": "b0081",
+          "quote": "Проверить принадлежность карты клиенту."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0081",
+          "start": 3,
+          "end": 42,
+          "quote": "Проверить принадлежность карты клиенту."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Логика работы метода"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-017",
+      "group": "R-017",
+      "source_id": "3",
+      "source_ref": "Логика работы метода › 3",
+      "kind": "contract",
+      "text": "Проверить сумму и переключатель.",
+      "block_ids": [
+        "b0082"
+      ],
+      "hints": [
+        {
+          "block_id": "b0082",
+          "quote": "Проверить сумму и переключатель."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0082",
+          "start": 3,
+          "end": 35,
+          "quote": "Проверить сумму и переключатель."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Логика работы метода"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-018",
+      "group": "R-018",
+      "source_id": "4",
+      "source_ref": "Логика работы метода › 4",
+      "kind": "contract",
+      "text": "Заменить настройку и вернуть результат сохранения.",
+      "block_ids": [
+        "b0083"
+      ],
+      "hints": [
+        {
+          "block_id": "b0083",
+          "quote": "Заменить настройку и вернуть результат сохранения."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0083",
+          "start": 3,
+          "end": 53,
+          "quote": "Заменить настройку и вернуть результат сохранения."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Логика работы метода"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-019",
+      "group": "R-019",
+      "source_id": "5",
+      "source_ref": "Логика работы метода › 5",
+      "kind": "contract",
+      "text": "При отклонении суммы вернуть прежнее состояние и результат ERROR.",
+      "block_ids": [
+        "b0084"
+      ],
+      "hints": [
+        {
+          "block_id": "b0084",
+          "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0084",
+          "start": 3,
+          "end": 68,
+          "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Логика работы метода"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-020",
+      "group": "R-020",
+      "source_id": "1",
+      "source_ref": "Особые правила › 1",
+      "kind": "contract",
+      "text": "Целое число тенге, обе границы включены.",
+      "block_ids": [
+        "b0086"
+      ],
+      "hints": [
+        {
+          "block_id": "b0086",
+          "quote": "Целое число тенге, обе границы включены."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0086",
+          "start": 3,
+          "end": 43,
+          "quote": "Целое число тенге, обе границы включены."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Особые правила"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-021",
+      "group": "R-021",
+      "source_id": "2",
+      "source_ref": "Особые правила › 2",
+      "kind": "contract",
+      "text": "Повторное сохранение заменяет действующую настройку.",
+      "block_ids": [
+        "b0087"
+      ],
+      "hints": [
+        {
+          "block_id": "b0087",
+          "quote": "Повторное сохранение заменяет действующую настройку."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0087",
+          "start": 3,
+          "end": 55,
+          "quote": "Повторное сохранение заменяет действующую настройку."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Особые правила"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-022",
+      "group": "R-022",
+      "source_id": "3",
+      "source_ref": "Особые правила › 3",
+      "kind": "contract",
+      "text": "Изменение порога сохраняет накопленные расходы.",
+      "block_ids": [
+        "b0088"
+      ],
+      "hints": [
+        {
+          "block_id": "b0088",
+          "quote": "Изменение порога сохраняет накопленные расходы."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0088",
+          "start": 3,
+          "end": 50,
+          "quote": "Изменение порога сохраняет накопленные расходы."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Особые правила"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-023",
+      "group": "R-023",
+      "source_id": null,
+      "source_ref": "Path-параметры",
+      "kind": "contract",
+      "text": "Path-параметры: Не используются.",
+      "block_ids": [
+        "b0093"
+      ],
+      "hints": [
+        {
+          "block_id": "b0093",
+          "quote": "Не используются."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0093",
+          "start": 0,
+          "end": 16,
+          "quote": "Не используются."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Параметры запроса",
+        "Path-параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-024",
+      "group": "R-024",
+      "source_id": null,
+      "source_ref": "Query-параметры › строка 1",
+      "kind": "contract",
+      "text": "Parameter: cardId; Format: string; Size: 1–64; Mandatory: Да; Logic: Карта клиента; Description: Идентификатор карты; DB field: card_id",
+      "block_ids": [
+        "b0096"
+      ],
+      "hints": [
+        {
+          "block_id": "b0096",
+          "quote": "cardId | string | 1–64 | Да | Карта клиента | Идентификатор карты | card_id"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0096",
+          "start": 0,
+          "end": 75,
+          "quote": "cardId | string | 1–64 | Да | Карта клиента | Идентификатор карты | card_id"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Параметры запроса",
+        "Query-параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-025",
+      "group": "R-025",
+      "source_id": null,
+      "source_ref": "Query-параметры › строка 2",
+      "kind": "contract",
+      "text": "Parameter: amount; Format: integer; Size: 32 bit; Mandatory: Да; Logic: 1 000–1 000 000; Description: Порог в тенге; DB field: limit_kzt",
+      "block_ids": [
+        "b0097"
+      ],
+      "hints": [
+        {
+          "block_id": "b0097",
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Параметры запроса",
+        "Query-параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-026",
+      "group": "R-026",
+      "source_id": null,
+      "source_ref": "Query-параметры › строка 3",
+      "kind": "contract",
+      "text": "Parameter: enabled; Format: integer; Size: 1 знак; Mandatory: Да; Logic: 0 или 1; Description: Признак включения; DB field: enabled",
+      "block_ids": [
+        "b0098"
+      ],
+      "hints": [
+        {
+          "block_id": "b0098",
+          "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0098",
+          "start": 0,
+          "end": 71,
+          "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Параметры запроса",
+        "Query-параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-027",
+      "group": "R-027",
+      "source_id": null,
+      "source_ref": "Request body",
+      "kind": "contract",
+      "text": "Request body: • Content-Type: application/json.",
+      "block_ids": [
+        "b0100"
+      ],
+      "hints": [
+        {
+          "block_id": "b0100",
+          "quote": "• Content-Type: application/json ."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0100",
+          "start": 0,
+          "end": 34,
+          "quote": "• Content-Type: application/json ."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Параметры запроса",
+        "Request body"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-028",
+      "group": "R-028",
+      "source_id": null,
+      "source_ref": "Request body",
+      "kind": "contract",
+      "text": "• Тело не используется.",
+      "block_ids": [
+        "b0101"
+      ],
+      "hints": [
+        {
+          "block_id": "b0101",
+          "quote": "• Тело не используется."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0101",
+          "start": 0,
+          "end": 23,
+          "quote": "• Тело не используется."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Параметры запроса",
+        "Request body"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-029.1",
+      "group": "R-029",
+      "source_id": null,
+      "source_ref": "Ответ",
+      "kind": "contract",
+      "text": "Если результат 200 или 201 — успешный.",
+      "block_ids": [
+        "b0103"
+      ],
+      "hints": [
+        {
+          "block_id": "b0103",
+          "quote": "Если результат 200 или 201 — успешный."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0103",
+          "start": 0,
+          "end": 38,
+          "quote": "Если результат 200 или 201 — успешный."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-029.2",
+      "group": "R-029",
+      "source_id": null,
+      "source_ref": "Ответ",
+      "kind": "contract",
+      "text": "Если результат 400, 401 и далее — неуспешный.",
+      "block_ids": [
+        "b0103"
+      ],
+      "hints": [
+        {
+          "block_id": "b0103",
+          "quote": "Если результат 400, 401 и далее — неуспешный."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0103",
+          "start": 39,
+          "end": 84,
+          "quote": "Если результат 400, 401 и далее — неуспешный."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-030",
+      "group": "R-030",
+      "source_id": null,
+      "source_ref": "Ответ › строка 1",
+      "kind": "contract",
+      "text": "Parameter: result; Format: string; Logic: OK / ERROR; Description: Исход сохранения; DB field: —",
+      "block_ids": [
+        "b0105"
+      ],
+      "hints": [
+        {
+          "block_id": "b0105",
+          "quote": "result | string | OK / ERROR | Исход сохранения | —"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0105",
+          "start": 0,
+          "end": 51,
+          "quote": "result | string | OK / ERROR | Исход сохранения | —"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-031",
+      "group": "R-031",
+      "source_id": null,
+      "source_ref": "Ответ › строка 2",
+      "kind": "contract",
+      "text": "Parameter: amount; Format: string; Logic: При успехе; Description: Порог в тенге; DB field: limit_kzt",
+      "block_ids": [
+        "b0106"
+      ],
+      "hints": [
+        {
+          "block_id": "b0106",
+          "quote": "amount | string | При успехе | Порог в тенге | limit_kzt"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0106",
+          "start": 0,
+          "end": 56,
+          "quote": "amount | string | При успехе | Порог в тенге | limit_kzt"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-032",
+      "group": "R-032",
+      "source_id": null,
+      "source_ref": "Ответ › строка 3",
+      "kind": "contract",
+      "text": "Parameter: enabled; Format: string; Logic: «0» или «1»; Description: Признак включения; DB field: enabled",
+      "block_ids": [
+        "b0107"
+      ],
+      "hints": [
+        {
+          "block_id": "b0107",
+          "quote": "enabled | string | «0» или «1» | Признак включения | enabled"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0107",
+          "start": 0,
+          "end": 60,
+          "quote": "enabled | string | «0» или «1» | Признак включения | enabled"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-033",
+      "group": "R-033",
+      "source_id": null,
+      "source_ref": "Ответ › строка 4",
+      "kind": "contract",
+      "text": "Parameter: message; Format: string; Logic: При ошибке; Description: Описание ошибки; DB field: —",
+      "block_ids": [
+        "b0108"
+      ],
+      "hints": [
+        {
+          "block_id": "b0108",
+          "quote": "message | string | При ошибке | Описание ошибки | —"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0108",
+          "start": 0,
+          "end": 51,
+          "quote": "message | string | При ошибке | Описание ошибки | —"
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-034",
+      "group": "R-034",
+      "source_id": "200",
+      "source_ref": "Статусы › 200",
+      "kind": "contract",
+      "text": "Ответ в случае успешного выполнения метода.",
+      "block_ids": [
+        "b0110"
+      ],
+      "hints": [
+        {
+          "block_id": "b0110",
+          "quote": "Ответ в случае успешного выполнения метода."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0110",
+          "start": 5,
+          "end": 48,
+          "quote": "Ответ в случае успешного выполнения метода."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Статусы"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-035",
+      "group": "R-035",
+      "source_id": "400",
+      "source_ref": "Статусы › 400",
+      "kind": "contract",
+      "text": "Ответ в случае, если параметры запроса заполнены неверно.",
+      "block_ids": [
+        "b0111"
+      ],
+      "hints": [
+        {
+          "block_id": "b0111",
+          "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0111",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Статусы"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-036",
+      "group": "R-036",
+      "source_id": "401",
+      "source_ref": "200. Successful — Created › 401",
+      "kind": "contract",
+      "text": "Ответ в случае, если запрос выполнен без необходимой авторизации.",
+      "block_ids": [
+        "b0116"
+      ],
+      "hints": [
+        {
+          "block_id": "b0116",
+          "quote": "Ответ в случае, если запрос выполнен без необходимой авторизации."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0116",
+          "start": 5,
+          "end": 70,
+          "quote": "Ответ в случае, если запрос выполнен без необходимой авторизации."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Статусы",
+        "200. Successful — Created"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-037",
+      "group": "R-037",
+      "source_id": "403",
+      "source_ref": "200. Successful — Created › 403",
+      "kind": "contract",
+      "text": "Ответ в случае, если на указанный ресурс доступ запрещен.",
+      "block_ids": [
+        "b0117"
+      ],
+      "hints": [
+        {
+          "block_id": "b0117",
+          "quote": "Ответ в случае, если на указанный ресурс доступ запрещен."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0117",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если на указанный ресурс доступ запрещен."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Статусы",
+        "200. Successful — Created"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-038",
+      "group": "R-038",
+      "source_id": "500",
+      "source_ref": "200. Successful — Created › 500",
+      "kind": "contract",
+      "text": "Ответ в случае, если произошла внутренняя ошибка сервера.",
+      "block_ids": [
+        "b0118"
+      ],
+      "hints": [
+        {
+          "block_id": "b0118",
+          "quote": "Ответ в случае, если произошла внутренняя ошибка сервера."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0118",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если произошла внутренняя ошибка сервера."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Статусы",
+        "200. Successful — Created"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-039",
+      "group": "R-039",
+      "source_id": "403",
+      "source_ref": "403. Unsuccessful — Forbidden",
+      "kind": "contract",
+      "text": "Для чужой карты возвращается 404, как и для отсутствующей карты.",
+      "block_ids": [
+        "b0124"
+      ],
+      "hints": [
+        {
+          "block_id": "b0124",
+          "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0124",
+          "start": 0,
+          "end": 64,
+          "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
+        }
+      ],
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Статусы",
+        "403. Unsuccessful — Forbidden"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    }
+  ],
+  "fact_hints": [
+    {
+      "id": "F-001",
+      "subject": null,
+      "field": "порог",
+      "direction": "business",
+      "type": "integer",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0024",
+          "quote": "целый порог от"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 43,
+          "end": 57,
+          "quote": "целый порог от"
+        }
+      ],
+      "req_ids": [
+        "R-002.1"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-002",
+      "subject": null,
+      "field": null,
+      "direction": "business",
+      "type": null,
+      "value": null,
+      "unit": "тенге",
+      "range": {
+        "min": 1000,
+        "max": 1000000,
+        "min_inclusive": true,
+        "max_inclusive": true
+      },
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0024",
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 55,
+          "end": 91,
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        }
+      ],
+      "req_ids": [
+        "R-002.1"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-003",
+      "subject": null,
+      "field": "уведомление",
+      "direction": "business",
+      "type": null,
+      "value": "выключено",
+      "unit": null,
+      "range": null,
+      "condition": "по умолчанию",
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0024",
+          "quote": "По умолчанию уведомление выключено"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 93,
+          "end": 127,
+          "quote": "По умолчанию уведомление выключено"
+        }
+      ],
+      "req_ids": [
+        "R-002.2"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-004",
+      "subject": null,
+      "field": "сумму покупки",
+      "direction": "business",
+      "type": null,
+      "value": null,
+      "unit": "тиын",
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0033",
+          "quote": "сумму покупки в тиынах"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0033",
+          "start": 60,
+          "end": 82,
+          "quote": "сумму покупки в тиынах"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-005",
+      "subject": null,
+      "field": "порог",
+      "direction": "business",
+      "type": null,
+      "value": null,
+      "unit": "тенге",
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0033",
+          "quote": "отправки и порог в тенге"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0033",
+          "start": 92,
+          "end": 116,
+          "quote": "отправки и порог в тенге"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-006",
+      "subject": null,
+      "field": null,
+      "direction": null,
+      "type": "integer",
+      "value": null,
+      "unit": "тенге",
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0086",
+          "quote": "Целое число тенге"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0086",
+          "start": 3,
+          "end": 20,
+          "quote": "Целое число тенге"
+        }
+      ],
+      "req_ids": [
+        "R-020"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-007",
+      "subject": null,
+      "field": null,
+      "direction": null,
+      "type": null,
+      "value": null,
+      "unit": null,
+      "range": {
+        "min": null,
+        "max": null,
+        "min_inclusive": true,
+        "max_inclusive": true
+      },
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0086",
+          "quote": "обе границы включены"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0086",
+          "start": 22,
+          "end": 42,
+          "quote": "обе границы включены"
+        }
+      ],
+      "req_ids": [
+        "R-020"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-008",
+      "subject": null,
+      "field": "cardId",
+      "direction": "request",
+      "type": "string",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": "Карта клиента",
+      "required": true,
+      "size": "1–64",
+      "values": null,
+      "db_field": "card_id",
+      "hints": [
+        {
+          "block_id": "b0096",
+          "quote": "cardId"
+        },
+        {
+          "block_id": "b0096",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0096",
+          "quote": "Карта клиента"
+        },
+        {
+          "block_id": "b0096",
+          "quote": "Идентификатор карты"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0096",
+          "start": 0,
+          "end": 6,
+          "quote": "cardId"
+        },
+        {
+          "block_id": "b0096",
+          "start": 9,
+          "end": 15,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0096",
+          "start": 30,
+          "end": 43,
+          "quote": "Карта клиента"
+        },
+        {
+          "block_id": "b0096",
+          "start": 46,
+          "end": 65,
+          "quote": "Идентификатор карты"
+        }
+      ],
+      "req_ids": [
+        "R-024"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-009",
+      "subject": null,
+      "field": "amount",
+      "direction": "request",
+      "type": "integer",
+      "value": null,
+      "unit": "тенге",
+      "range": {
+        "min": 1000,
+        "max": 1000000,
+        "min_inclusive": null,
+        "max_inclusive": null
+      },
+      "condition": null,
+      "required": true,
+      "size": "32 bit",
+      "values": null,
+      "db_field": "limit_kzt",
+      "hints": [
+        {
+          "block_id": "b0097",
+          "quote": "amount"
+        },
+        {
+          "block_id": "b0097",
+          "quote": "integer"
+        },
+        {
+          "block_id": "b0097",
+          "quote": "1 000–1 000 000"
+        },
+        {
+          "block_id": "b0097",
+          "quote": "Порог в тенге"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 6,
+          "quote": "amount"
+        },
+        {
+          "block_id": "b0097",
+          "start": 9,
+          "end": 16,
+          "quote": "integer"
+        },
+        {
+          "block_id": "b0097",
+          "start": 33,
+          "end": 48,
+          "quote": "1 000–1 000 000"
+        },
+        {
+          "block_id": "b0097",
+          "start": 51,
+          "end": 64,
+          "quote": "Порог в тенге"
+        }
+      ],
+      "req_ids": [
+        "R-025"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-010",
+      "subject": null,
+      "field": "enabled",
+      "direction": "request",
+      "type": "integer",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": true,
+      "size": "1 знак",
+      "values": [
+        "0",
+        "1"
+      ],
+      "db_field": "enabled",
+      "hints": [
+        {
+          "block_id": "b0098",
+          "quote": "enabled",
+          "context": "enabled | integer |"
+        },
+        {
+          "block_id": "b0098",
+          "quote": "integer"
+        },
+        {
+          "block_id": "b0098",
+          "quote": "0 или 1"
+        },
+        {
+          "block_id": "b0098",
+          "quote": "Признак включения"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0098",
+          "start": 0,
+          "end": 7,
+          "quote": "enabled"
+        },
+        {
+          "block_id": "b0098",
+          "start": 10,
+          "end": 17,
+          "quote": "integer"
+        },
+        {
+          "block_id": "b0098",
+          "start": 34,
+          "end": 41,
+          "quote": "0 или 1"
+        },
+        {
+          "block_id": "b0098",
+          "start": 44,
+          "end": 61,
+          "quote": "Признак включения"
+        }
+      ],
+      "req_ids": [
+        "R-026"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-011",
+      "subject": null,
+      "field": "result",
+      "direction": "response",
+      "type": "string",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": [
+        "OK",
+        "ERROR"
+      ],
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0105",
+          "quote": "result"
+        },
+        {
+          "block_id": "b0105",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0105",
+          "quote": "OK / ERROR"
+        },
+        {
+          "block_id": "b0105",
+          "quote": "Исход сохранения"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0105",
+          "start": 0,
+          "end": 6,
+          "quote": "result"
+        },
+        {
+          "block_id": "b0105",
+          "start": 9,
+          "end": 15,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0105",
+          "start": 18,
+          "end": 28,
+          "quote": "OK / ERROR"
+        },
+        {
+          "block_id": "b0105",
+          "start": 31,
+          "end": 47,
+          "quote": "Исход сохранения"
+        }
+      ],
+      "req_ids": [
+        "R-030"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-012",
+      "subject": null,
+      "field": "amount",
+      "direction": "response",
+      "type": "string",
+      "value": null,
+      "unit": "тенге",
+      "range": null,
+      "condition": "При успехе",
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": "limit_kzt",
+      "hints": [
+        {
+          "block_id": "b0106",
+          "quote": "amount"
+        },
+        {
+          "block_id": "b0106",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0106",
+          "quote": "При успехе"
+        },
+        {
+          "block_id": "b0106",
+          "quote": "Порог в тенге"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0106",
+          "start": 0,
+          "end": 6,
+          "quote": "amount"
+        },
+        {
+          "block_id": "b0106",
+          "start": 9,
+          "end": 15,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0106",
+          "start": 18,
+          "end": 28,
+          "quote": "При успехе"
+        },
+        {
+          "block_id": "b0106",
+          "start": 31,
+          "end": 44,
+          "quote": "Порог в тенге"
+        }
+      ],
+      "req_ids": [
+        "R-031"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-013",
+      "subject": null,
+      "field": "enabled",
+      "direction": "response",
+      "type": "string",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": [
+        "0",
+        "1"
+      ],
+      "db_field": "enabled",
+      "hints": [
+        {
+          "block_id": "b0107",
+          "quote": "enabled",
+          "context": "enabled | string | "
+        },
+        {
+          "block_id": "b0107",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0107",
+          "quote": "«0» или «1»"
+        },
+        {
+          "block_id": "b0107",
+          "quote": "Признак включения"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0107",
+          "start": 0,
+          "end": 7,
+          "quote": "enabled"
+        },
+        {
+          "block_id": "b0107",
+          "start": 10,
+          "end": 16,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0107",
+          "start": 19,
+          "end": 30,
+          "quote": "«0» или «1»"
+        },
+        {
+          "block_id": "b0107",
+          "start": 33,
+          "end": 50,
+          "quote": "Признак включения"
+        }
+      ],
+      "req_ids": [
+        "R-032"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-014",
+      "subject": null,
+      "field": "message",
+      "direction": "response",
+      "type": "string",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": "При ошибке",
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0108",
+          "quote": "message"
+        },
+        {
+          "block_id": "b0108",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0108",
+          "quote": "При ошибке"
+        },
+        {
+          "block_id": "b0108",
+          "quote": "Описание ошибки"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0108",
+          "start": 0,
+          "end": 7,
+          "quote": "message"
+        },
+        {
+          "block_id": "b0108",
+          "start": 10,
+          "end": 16,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0108",
+          "start": 19,
+          "end": 29,
+          "quote": "При ошибке"
+        },
+        {
+          "block_id": "b0108",
+          "start": 32,
+          "end": 47,
+          "quote": "Описание ошибки"
+        }
+      ],
+      "req_ids": [
+        "R-033"
+      ],
+      "origin": "rules"
+    }
+  ],
+  "excluded": [
+    {
+      "category": "structure",
+      "reason": "Заголовок раздела: задаёт путь section для вложенных блоков.",
+      "block_ids": [
+        "b0001",
+        "b0004",
+        "b0005",
+        "b0014",
+        "b0016",
+        "b0018",
+        "b0020",
+        "b0021",
+        "b0023",
+        "b0028",
+        "b0030",
+        "b0032",
+        "b0034",
+        "b0036",
+        "b0037",
+        "b0039",
+        "b0044",
+        "b0061",
+        "b0062",
+        "b0063",
+        "b0065",
+        "b0079",
+        "b0085",
+        "b0089",
+        "b0091",
+        "b0092",
+        "b0094",
+        "b0099",
+        "b0102",
+        "b0109",
+        "b0112",
+        "b0119",
+        "b0121",
+        "b0123",
+        "b0125",
+        "b0127"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Уведомление о расходах по карте",
+        "Уведомление о расходах по карте › Часть A. Новый функционал",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Общие сведения",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Цели",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Архитектура решения",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Дизайн процесса UI",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к изменениям",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к изменениям › BPMN схема процесса",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Sequence Diagram",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Нефункциональные требования",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к данным",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к интеграции",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к тестированию",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к тестированию › Тестирование требований",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Критерии приемки",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Ревью требований",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Блок согласующих",
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Блок согласующих › Подразделение ФИО ответственного Подпись",
+        "Уведомление о расходах по карте › Часть B. REST API",
+        "Уведомление о расходах по карте › Часть B. REST API › Общие параметры",
+        "Уведомление о расходах по карте › Часть B. REST API › Логика работы метода",
+        "Уведомление о расходах по карте › Часть B. REST API › Особые правила",
+        "Уведомление о расходах по карте › Часть B. REST API › Схема",
+        "Уведомление о расходах по карте › Часть B. REST API › Параметры запроса",
+        "Уведомление о расходах по карте › Часть B. REST API › Параметры запроса › Path-параметры",
+        "Уведомление о расходах по карте › Часть B. REST API › Параметры запроса › Query-параметры",
+        "Уведомление о расходах по карте › Часть B. REST API › Параметры запроса › Request body",
+        "Уведомление о расходах по карте › Часть B. REST API › Ответ",
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы",
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 200. Successful — Created",
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 400. Unsuccessful — Bad request",
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 401. Unsuccessful — Unauthorized",
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 403. Unsuccessful — Forbidden",
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 404",
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 500. Unsuccessful — Internal server error"
+      ]
+    },
+    {
+      "category": "preamble",
+      "reason": "Раздел «Уведомление о расходах по карте»: вводный или описательный текст без обязательства.",
+      "block_ids": [
+        "b0002",
+        "b0003"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Общие сведения»: названия колонок.",
+      "block_ids": [
+        "b0006"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Общие сведения"
+      ]
+    },
+    {
+      "category": "metadata",
+      "reason": "Таблица «Общие сведения»: метаданные документа или задачи.",
+      "block_ids": [
+        "b0007",
+        "b0008",
+        "b0009",
+        "b0010",
+        "b0011",
+        "b0012",
+        "b0013"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Общие сведения"
+      ]
+    },
+    {
+      "category": "goal",
+      "reason": "Цель или ожидаемая польза: обоснование для трассировки, а не проверяемое обязательство.",
+      "block_ids": [
+        "b0015"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Цели"
+      ]
+    },
+    {
+      "category": "placeholder",
+      "reason": "Раздел «Тестирование требований»: заглушка вместо содержания.",
+      "block_ids": [
+        "b0038"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Требования к тестированию › Тестирование требований"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Критерии приемки»: названия колонок.",
+      "block_ids": [
+        "b0040"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Критерии приемки"
+      ]
+    },
+    {
+      "category": "review_checklist",
+      "reason": "Раздел «Ревью требований»: служебная часть шаблона ревью, а не требование к продукту.",
+      "block_ids": [
+        "b0045"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Ревью требований"
+      ]
+    },
+    {
+      "category": "review_checklist",
+      "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны.",
+      "block_ids": [
+        "b0046",
+        "b0047",
+        "b0048",
+        "b0049",
+        "b0050",
+        "b0051",
+        "b0052",
+        "b0053",
+        "b0054",
+        "b0055",
+        "b0056",
+        "b0057",
+        "b0058",
+        "b0059",
+        "b0060"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть A. Новый функционал › Ревью требований"
+      ]
+    },
+    {
+      "category": "preamble",
+      "reason": "Раздел «Часть B. REST API»: вводный текст перед подразделами.",
+      "block_ids": [
+        "b0064"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Общие параметры»: названия колонок.",
+      "block_ids": [
+        "b0066"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Общие параметры"
+      ]
+    },
+    {
+      "category": "metadata",
+      "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка).",
+      "block_ids": [
+        "b0067",
+        "b0070",
+        "b0071",
+        "b0075",
+        "b0076",
+        "b0077",
+        "b0078"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Общие параметры"
+      ]
+    },
+    {
+      "category": "example",
+      "reason": "Таблица «Общие параметры»: пример вызова, опора для сверки с контрактом.",
+      "block_ids": [
+        "b0073"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Общие параметры"
+      ]
+    },
+    {
+      "category": "placeholder",
+      "reason": "Таблица «Общие параметры»: значение «Swagger» не заполнено.",
+      "block_ids": [
+        "b0074"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Общие параметры"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Query-параметры»: названия колонок.",
+      "block_ids": [
+        "b0095"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Параметры запроса › Query-параметры"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Ответ»: названия колонок.",
+      "block_ids": [
+        "b0104"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Ответ"
+      ]
+    },
+    {
+      "category": "example",
+      "reason": "Раздел «200. Successful — Created»: пример запроса или ответа, опора для сверки с контрактом.",
+      "block_ids": [
+        "b0113",
+        "b0115"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 200. Successful — Created"
+      ]
+    },
+    {
+      "category": "fragment",
+      "reason": "Раздел «200. Successful — Created»: служебная связка «или».",
+      "block_ids": [
+        "b0114"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 200. Successful — Created"
+      ]
+    },
+    {
+      "category": "example",
+      "reason": "Раздел «400. Unsuccessful — Bad request»: пример запроса или ответа, опора для сверки с контрактом.",
+      "block_ids": [
+        "b0120"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 400. Unsuccessful — Bad request"
+      ]
+    },
+    {
+      "category": "example",
+      "reason": "Раздел «401. Unsuccessful — Unauthorized»: пример запроса или ответа, опора для сверки с контрактом.",
+      "block_ids": [
+        "b0122"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 401. Unsuccessful — Unauthorized"
+      ]
+    },
+    {
+      "category": "example",
+      "reason": "Раздел «404»: пример запроса или ответа, опора для сверки с контрактом.",
+      "block_ids": [
+        "b0126"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 404"
+      ]
+    },
+    {
+      "category": "example",
+      "reason": "Раздел «500. Unsuccessful — Internal server error»: пример запроса или ответа, опора для сверки с контрактом.",
+      "block_ids": [
+        "b0128"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Уведомление о расходах по карте › Часть B. REST API › Статусы › 500. Unsuccessful — Internal server error"
+      ]
+    }
+  ],
+  "unprocessed_block_ids": [
+    "b0017",
+    "b0022",
+    "b0029",
+    "b0090"
+  ],
+  "warnings": [],
+  "block_coverage": {
+    "mode": "rules_only",
+    "llm_status": "not_used",
+    "level": "partial",
+    "total_blocks": 128,
+    "requirement_blocks": 39,
+    "excluded_blocks": 85,
+    "unprocessed_blocks": 4,
+    "accounted_ratio": 0.9688,
+    "requirements": 49,
+    "source_units": 39,
+    "by_kind": {
+      "ui": 3,
+      "functional": 10,
+      "nonfunctional": 1,
+      "data": 1,
+      "integration": 2,
+      "acceptance": 3,
+      "contract": 29
+    },
+    "by_origin": {
+      "rules": 49
+    },
+    "excluded_by_category": {
+      "structure": 41,
+      "preamble": 3,
+      "metadata": 14,
+      "goal": 1,
+      "placeholder": 2,
+      "review_checklist": 16,
+      "example": 7,
+      "fragment": 1
+    },
+    "calls": {
+      "used": 0,
+      "budget": 0,
+      "windows": 0,
+      "retry_calls": 0,
+      "failed": 0,
+      "truncated": 0
+    },
+    "model_missed_block_ids": [],
+    "fallback_block_ids": [],
+    "evidence": {
+      "checked": 0,
+      "exact": 0,
+      "repaired": 0,
+      "rejected": 0,
+      "empty": 0,
+      "items_rejected": 0,
+      "facts_rejected": 0,
+      "source_ids_cleared": 0,
+      "source_ids_filled": 0,
+      "duplicates_merged": 0,
+      "context_linked": 0,
+      "excluded_unknown_ids": 0,
+      "conflicts_resolved": 0
+    },
+    "evidence_audit": {
+      "checked": 0,
+      "confirmed": 0,
+      "ambiguous": 0,
+      "rejected": 0,
+      "note": "Опоры этапа inventory: цитата модели принята, если она дословная или после нормализации пробелов, кавычек, тире и разметки найдена в блоке; тогда она заменена фрагментом источника (исправлено 0). Неоднозначные — цитата встречается в блоке не один раз и снабжена context. Правила дают опоры из текста напрямую и здесь не считаются."
+    },
+    "blocks": [
+      {
+        "block_id": "b0001",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0002",
+        "fate": "excluded",
+        "ref": "preamble",
+        "reason": "Раздел «Уведомление о расходах по карте»: вводный или описательный текст без обязательства."
+      },
+      {
+        "block_id": "b0003",
+        "fate": "excluded",
+        "ref": "preamble",
+        "reason": "Раздел «Уведомление о расходах по карте»: вводный или описательный текст без обязательства."
+      },
+      {
+        "block_id": "b0004",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0005",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0006",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Общие сведения»: названия колонок."
+      },
+      {
+        "block_id": "b0007",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0008",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0009",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0010",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0011",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0012",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0013",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0014",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0015",
+        "fate": "excluded",
+        "ref": "goal",
+        "reason": "Цель или ожидаемая польза: обоснование для трассировки, а не проверяемое обязательство."
+      },
+      {
+        "block_id": "b0016",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0017",
+        "fate": "unprocessed",
+        "ref": null,
+        "reason": "Раздел «Архитектура решения» (design): описание без явного номера; обязательства выделяет семантический этап."
+      },
+      {
+        "block_id": "b0018",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0019",
+        "fate": "requirement",
+        "ref": [
+          "R-001.1",
+          "R-001.2",
+          "R-001.3"
+        ]
+      },
+      {
+        "block_id": "b0020",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0021",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0022",
+        "fate": "unprocessed",
+        "ref": null,
+        "reason": "Раздел «BPMN схема процесса» (design): описание без явного номера; обязательства выделяет семантический этап."
+      },
+      {
+        "block_id": "b0023",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0024",
+        "fate": "requirement",
+        "ref": [
+          "R-002.1",
+          "R-002.2"
+        ]
+      },
+      {
+        "block_id": "b0025",
+        "fate": "requirement",
+        "ref": [
+          "R-003.1",
+          "R-003.2",
+          "R-003.3",
+          "R-003.4"
+        ]
+      },
+      {
+        "block_id": "b0026",
+        "fate": "requirement",
+        "ref": [
+          "R-004.1",
+          "R-004.2"
+        ]
+      },
+      {
+        "block_id": "b0027",
+        "fate": "requirement",
+        "ref": [
+          "R-005.1",
+          "R-005.2"
+        ]
+      },
+      {
+        "block_id": "b0028",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0029",
+        "fate": "unprocessed",
+        "ref": null,
+        "reason": "Раздел «Sequence Diagram» (design): описание без явного номера; обязательства выделяет семантический этап."
+      },
+      {
+        "block_id": "b0030",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0031",
+        "fate": "requirement",
+        "ref": [
+          "R-006"
+        ]
+      },
+      {
+        "block_id": "b0032",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0033",
+        "fate": "requirement",
+        "ref": [
+          "R-007"
+        ]
+      },
+      {
+        "block_id": "b0034",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0035",
+        "fate": "requirement",
+        "ref": [
+          "R-008.1",
+          "R-008.2"
+        ]
+      },
+      {
+        "block_id": "b0036",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0037",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0038",
+        "fate": "excluded",
+        "ref": "placeholder",
+        "reason": "Раздел «Тестирование требований»: заглушка вместо содержания."
+      },
+      {
+        "block_id": "b0039",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0040",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Критерии приемки»: названия колонок."
+      },
+      {
+        "block_id": "b0041",
+        "fate": "requirement",
+        "ref": [
+          "R-009"
+        ]
+      },
+      {
+        "block_id": "b0042",
+        "fate": "requirement",
+        "ref": [
+          "R-010"
+        ]
+      },
+      {
+        "block_id": "b0043",
+        "fate": "requirement",
+        "ref": [
+          "R-011"
+        ]
+      },
+      {
+        "block_id": "b0044",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0045",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Раздел «Ревью требований»: служебная часть шаблона ревью, а не требование к продукту."
+      },
+      {
+        "block_id": "b0046",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0047",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0048",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0049",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0050",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0051",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0052",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0053",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0054",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0055",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0056",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0057",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0058",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0059",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0060",
+        "fate": "excluded",
+        "ref": "review_checklist",
+        "reason": "Таблица «Ревью требований»: чек-лист ревью, варианты отметок не выбраны."
+      },
+      {
+        "block_id": "b0061",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0062",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0063",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0064",
+        "fate": "excluded",
+        "ref": "preamble",
+        "reason": "Раздел «Часть B. REST API»: вводный текст перед подразделами."
+      },
+      {
+        "block_id": "b0065",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0066",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Общие параметры»: названия колонок."
+      },
+      {
+        "block_id": "b0067",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0068",
+        "fate": "requirement",
+        "ref": [
+          "R-012"
+        ]
+      },
+      {
+        "block_id": "b0069",
+        "fate": "requirement",
+        "ref": [
+          "R-013"
+        ]
+      },
+      {
+        "block_id": "b0070",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0071",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0072",
+        "fate": "requirement",
+        "ref": [
+          "R-014"
+        ]
+      },
+      {
+        "block_id": "b0073",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Таблица «Общие параметры»: пример вызова, опора для сверки с контрактом."
+      },
+      {
+        "block_id": "b0074",
+        "fate": "excluded",
+        "ref": "placeholder",
+        "reason": "Таблица «Общие параметры»: значение «Swagger» не заполнено."
+      },
+      {
+        "block_id": "b0075",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0076",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0077",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0078",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0079",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0080",
+        "fate": "requirement",
+        "ref": [
+          "R-015"
+        ]
+      },
+      {
+        "block_id": "b0081",
+        "fate": "requirement",
+        "ref": [
+          "R-016"
+        ]
+      },
+      {
+        "block_id": "b0082",
+        "fate": "requirement",
+        "ref": [
+          "R-017"
+        ]
+      },
+      {
+        "block_id": "b0083",
+        "fate": "requirement",
+        "ref": [
+          "R-018"
+        ]
+      },
+      {
+        "block_id": "b0084",
+        "fate": "requirement",
+        "ref": [
+          "R-019"
+        ]
+      },
+      {
+        "block_id": "b0085",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0086",
+        "fate": "requirement",
+        "ref": [
+          "R-020"
+        ]
+      },
+      {
+        "block_id": "b0087",
+        "fate": "requirement",
+        "ref": [
+          "R-021"
+        ]
+      },
+      {
+        "block_id": "b0088",
+        "fate": "requirement",
+        "ref": [
+          "R-022"
+        ]
+      },
+      {
+        "block_id": "b0089",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0090",
+        "fate": "unprocessed",
+        "ref": null,
+        "reason": "Раздел «Схема»: схема в блоке кода; обязательства выделяет семантический этап."
+      },
+      {
+        "block_id": "b0091",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0092",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0093",
+        "fate": "requirement",
+        "ref": [
+          "R-023"
+        ]
+      },
+      {
+        "block_id": "b0094",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0095",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Query-параметры»: названия колонок."
+      },
+      {
+        "block_id": "b0096",
+        "fate": "requirement",
+        "ref": [
+          "R-024"
+        ]
+      },
+      {
+        "block_id": "b0097",
+        "fate": "requirement",
+        "ref": [
+          "R-025"
+        ]
+      },
+      {
+        "block_id": "b0098",
+        "fate": "requirement",
+        "ref": [
+          "R-026"
+        ]
+      },
+      {
+        "block_id": "b0099",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0100",
+        "fate": "requirement",
+        "ref": [
+          "R-027"
+        ]
+      },
+      {
+        "block_id": "b0101",
+        "fate": "requirement",
+        "ref": [
+          "R-028"
+        ]
+      },
+      {
+        "block_id": "b0102",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0103",
+        "fate": "requirement",
+        "ref": [
+          "R-029.1",
+          "R-029.2"
+        ]
+      },
+      {
+        "block_id": "b0104",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Ответ»: названия колонок."
+      },
+      {
+        "block_id": "b0105",
+        "fate": "requirement",
+        "ref": [
+          "R-030"
+        ]
+      },
+      {
+        "block_id": "b0106",
+        "fate": "requirement",
+        "ref": [
+          "R-031"
+        ]
+      },
+      {
+        "block_id": "b0107",
+        "fate": "requirement",
+        "ref": [
+          "R-032"
+        ]
+      },
+      {
+        "block_id": "b0108",
+        "fate": "requirement",
+        "ref": [
+          "R-033"
+        ]
+      },
+      {
+        "block_id": "b0109",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0110",
+        "fate": "requirement",
+        "ref": [
+          "R-034"
+        ]
+      },
+      {
+        "block_id": "b0111",
+        "fate": "requirement",
+        "ref": [
+          "R-035"
+        ]
+      },
+      {
+        "block_id": "b0112",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0113",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Раздел «200. Successful — Created»: пример запроса или ответа, опора для сверки с контрактом."
+      },
+      {
+        "block_id": "b0114",
+        "fate": "excluded",
+        "ref": "fragment",
+        "reason": "Раздел «200. Successful — Created»: служебная связка «или»."
+      },
+      {
+        "block_id": "b0115",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Раздел «200. Successful — Created»: пример запроса или ответа, опора для сверки с контрактом."
+      },
+      {
+        "block_id": "b0116",
+        "fate": "requirement",
+        "ref": [
+          "R-036"
+        ]
+      },
+      {
+        "block_id": "b0117",
+        "fate": "requirement",
+        "ref": [
+          "R-037"
+        ]
+      },
+      {
+        "block_id": "b0118",
+        "fate": "requirement",
+        "ref": [
+          "R-038"
+        ]
+      },
+      {
+        "block_id": "b0119",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0120",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Раздел «400. Unsuccessful — Bad request»: пример запроса или ответа, опора для сверки с контрактом."
+      },
+      {
+        "block_id": "b0121",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0122",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Раздел «401. Unsuccessful — Unauthorized»: пример запроса или ответа, опора для сверки с контрактом."
+      },
+      {
+        "block_id": "b0123",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0124",
+        "fate": "requirement",
+        "ref": [
+          "R-039"
+        ]
+      },
+      {
+        "block_id": "b0125",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0126",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Раздел «404»: пример запроса или ответа, опора для сверки с контрактом."
+      },
+      {
+        "block_id": "b0127",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0128",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Раздел «500. Unsuccessful — Internal server error»: пример запроса или ответа, опора для сверки с контрактом."
+      }
+    ],
+    "explanation": "Учтено 124 из 128 блоков (96.9%). Требования: 49 атомарных из 39 исходных пунктов; опорных блоков: 39. Исключено 85 блоков с причинами (structure 41, review_checklist 16, metadata 14, example 7, preamble 3, placeholder 2, fragment 1, goal 1). Не обработано 4 блока: b0017 — Раздел «Архитектура решения» (design): описание без явного номера; обязательства выделяет семантический этап; b0022 — Раздел «BPMN схема процесса» (design): описание без явного номера; обязательства выделяет семантический этап; b0029 — Раздел «Sequence Diagram» (design): описание без явного номера; обязательства выделяет семантический этап; b0090 — Раздел «Схема»: схема в блоке кода; обязательства выделяет семантический этап. Режим rules_only: нарезка по явным номерам, строкам таблиц и абзацам разделов требований; модель не вызывалась, атомарность — до предложения."
+  },
+  "mode": "rules_only",
+  "version": "p04-inventory/1.0"
+}

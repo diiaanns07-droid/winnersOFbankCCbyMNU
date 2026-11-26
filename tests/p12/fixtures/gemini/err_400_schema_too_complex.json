@@ -1,0 +1,11 @@
+{
+  "http_status": 400,
+  "headers": {},
+  "body": {
+    "error": {
+      "code": 400,
+      "message": "The specified schema produces a constraint that has too many states for serving. Typical causes of this error are schemas with lots of text (for example, very long property or enum names), schemas with long array length limits (especially when nested), or schemas using complex value matchers.",
+      "status": "INVALID_ARGUMENT"
+    }
+  }
+}
