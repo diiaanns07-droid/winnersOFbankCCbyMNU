@@ -174,6 +174,62 @@ def rich_doc(path: Path) -> Path:
     return path
 
 
+TWIN = "порог от 1 000 до 1 000 000 ₸"
+TWIN_URL = "https://bank.example/limits"
+
+
+def twin_phrase_doc(path: Path, *, orphan_markers: bool = False, footnote: bool = False,
+                    heading: bool = False) -> Path:
+    """Одна фраза ``TWIN`` в обычном абзаце и в ячейке таблицы.
+
+    * в абзаце на фразе уже стоит комментарий автора;
+    * в ячейке фраза разрезана между жирным run и внешней гиперссылкой, а перед
+      ней стоит удалённый при рецензировании текст «порог от 500 » -- соседняя
+      почти-копия, которой нет в текущей версии;
+    * ``orphan_markers``: вокруг копии в абзаце остались маркеры commentRange
+      с ``w:id`` следующего свободного номера, но без записи в comments.xml
+      (так бывает после удаления комментария внешним инструментом);
+    * ``footnote``: в ячейке после фразы стоит знак сноски с текстом про ту же фразу;
+    * ``heading``: перед абзацем есть заголовок (по умолчанию нет -- первым блоком
+      документа идёт абзац с первой копией фразы).
+    """
+    d = docx.Document()
+    if heading:
+        d.add_heading("Ф-1. Порог уведомления", 1)
+    p = d.add_paragraph("Клиент задаёт ")
+    target = p.add_run(TWIN)
+    p.add_run(" включительно.")
+    d.add_comment(target, text="Автор: границы согласованы с бизнесом.", author="Автор ТЗ", initials="АТ")
+    if orphan_markers:
+        start = parse_xml(f'<w:commentRangeStart {nsdecls("w")} w:id="1"/>')
+        end = parse_xml(f'<w:commentRangeEnd {nsdecls("w")} w:id="1"/>')
+        target._r.addprevious(start)
+        p._p.append(end)
+    table = d.add_table(rows=2, cols=2)
+    table.style = "Table Grid"
+    table.cell(0, 0).text, table.cell(0, 1).text = "Параметр", "Правило"
+    table.cell(1, 0).text = "amount"
+    rid = d.part.relate_to(TWIN_URL, RT.HYPERLINK, is_external=True)
+    cell_p = table.cell(1, 1).paragraphs[0]._p
+    note = '<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="1"/></w:r>' \
+        if footnote else ""
+    for el in list(parse_xml(  # list(): перенос детей при обходе пропускал бы элементы
+        f'<w:p {nsdecls("w", "r")}>'
+        '<w:del w:id="901" w:author="Автор ТЗ" w:date="2026-11-01T10:00:00Z"><w:r>'
+        '<w:delText xml:space="preserve">порог от 500 </w:delText></w:r></w:del>'
+        '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">порог от 1 000</w:t></w:r>'
+        f'<w:hyperlink r:id="{rid}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/>'
+        '</w:rPr><w:t xml:space="preserve"> до 1 000 000 ₸</w:t></w:r></w:hyperlink>'
+        f'{note}<w:r><w:t xml:space="preserve"> включительно.</w:t></w:r></w:p>'
+    )):
+        cell_p.append(el)
+    if footnote:
+        add_footnotes_part(d, {1: f"Сумма {TWIN} указана без учёта комиссий."})
+    d.add_paragraph("Конец раздела.")
+    d.save(path)
+    return path
+
+
 # --------------------------------------------------------------- отчёт
 
 
