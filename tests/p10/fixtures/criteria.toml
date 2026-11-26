@@ -1,0 +1,59 @@
+# Синтетический criteria.toml с кодами критериев контракта v1 (INDIVIDUAL_CRITERIA, SET_CRITERIA).
+# Направление №05 публикует настоящий src/bcc_review/criteria.toml; поле bank_topics —
+# предложение №10 для связи критерия со строками банковского чек-листа
+# (допустимые темы — bcc_review.bank.checklist.TOPICS).
+schema_version = "1"
+
+[criteria.necessary]
+code = "И1"
+title = "Необходимость"
+standard = "ISO/IEC/IEEE 29148:2018, 5.2.5"
+bank_topics = ["business"]
+
+[criteria.appropriate]
+code = "И2"
+title = "Уместность"
+standard = "ISO/IEC/IEEE 29148:2018, 5.2.5"
+
+[criteria.unambiguous]
+code = "И3"
+title = "Однозначность"
+bank_topics = ["testability"]
+
+[criteria.complete]
+code = "И4"
+title = "Полнота"
+bank_topics = ["business"]
+
+[criteria.verifiable]
+code = "И7"
+title = "Проверяемость"
+bank_topics = ["testability"]
+
+[criteria.correct]
+code = "И8"
+title = "Корректность"
+bank_topics = ["consistency"]
+
+[criteria.conforming]
+code = "И9"
+title = "Соответствие шаблону"
+bank_topics = ["structure"]
+
+[criteria.set_complete]
+code = "Н1"
+title = "Полнота набора"
+standard = "ISO/IEC/IEEE 29148:2018, 5.2.6"
+bank_topics = ["business"]
+
+[criteria.set_consistent]
+code = "Н2"
+title = "Согласованность набора"
+standard = "ISO/IEC/IEEE 29148:2018, 5.2.6"
+bank_topics = ["consistency"]
+
+[criteria.traceable]
+code = "Н8"
+title = "Прослеживаемость"
+standard = "IEEE 830-1998, 4.3.8"
+bank_topics = ["business", "versioning"]
