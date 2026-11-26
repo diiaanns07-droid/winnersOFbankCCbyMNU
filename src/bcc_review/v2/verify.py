@@ -151,7 +151,7 @@ def verify_report(report: dict | str | Path, source: str | Path) -> dict:
             f"SHA-256 исходника {sha[:12]}… не совпадает с записанным {str(doc.get('sha256'))[:12]}…")
     if doc.get("file") and Path(doc["file"]).name != src.name:
         warnings.append(f"имя файла в отчёте «{doc['file']}», проверяется «{src.name}»")
-    lines, _pages = load_lines(src)
+    lines, pages = load_lines(src)
     if doc.get("lines") not in (None, len(lines)):
         warnings.append(f"в отчёте {doc.get('lines')} строк документа, при чтении — {len(lines)}")
 
@@ -166,6 +166,9 @@ def verify_report(report: dict | str | Path, source: str | Path) -> dict:
             ls = int(ev.get("line_start") or 0)
             le = int(ev.get("line_end") or ls)
             problem = check_quote(ev.get("quote", ""), ls, le, lines, ev.get("verified", ""))
+            if not problem and ev.get("page") and 0 < ls <= len(pages) and pages[ls - 1] \
+                    and int(ev["page"]) != int(pages[ls - 1]):
+                problem = f"указана страница {ev['page']}, а строка {ls} на странице {pages[ls - 1]}"
             if problem:
                 err("quote", f"{f.get('id')} цитата №{i}", f"«{_short(ev.get('quote', ''))}» {problem}")
             else:
@@ -240,6 +243,10 @@ def main(argv: list[str] | None = None) -> int:
         result = verify_report(Path(args.report), Path(args.source))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"verify: не удалось прочитать вход: {exc}", file=sys.stderr)
+        return EXIT_VERIFY_FAILED
+    except (TypeError, AttributeError, KeyError) as exc:
+        print(f"verify: report.json повреждён или не по схеме bcc-review/2 ({type(exc).__name__}: {exc})",
+              file=sys.stderr)
         return EXIT_VERIFY_FAILED
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))

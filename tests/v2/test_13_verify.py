@@ -107,3 +107,10 @@ def test_unreadable_input_is_exit_4(tmp_path, capsys):
 def test_normalize_matches_contract():
     assert verify.normalize("«Порог» — **5 000** ₸") == verify.normalize('"порог" - 5 000 ₸')
     assert verify.normalize("* пункт списка") == "пункт списка"
+
+
+def test_garbage_report_is_exit_4(tmp_path, capsys):
+    p = tmp_path / "r.json"
+    p.write_text(json.dumps({"schema": "bcc-review/2", "findings": [1, 2], "document": [], "run": "x"}),
+                 encoding="utf-8")
+    assert verify.main([str(p), str(SOURCE)]) == 4
