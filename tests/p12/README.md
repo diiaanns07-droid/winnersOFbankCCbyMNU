@@ -302,3 +302,62 @@ python -m tests.p12.p12_budget
 На прежнем адаптере (`gemini.py` из 6f7bfbf в отдельной копии дерева) `test_p12_asker_budget.py` даёт 17 падений
 из 24, а `test_p12_engine_budget.py` — 2 из 2. На действующем 6a6c503 (тот же адаптер) оба файла вместе дают
 19 падений из 27.
+
+## 11. Путь жюри: установленный пакет → `python -m bcc_review` (третий проход)
+
+**Кандидат:** `bcc/integration` **2821989**. В нём `gemini.py` из первого прохода (`6f7bfbf`, влит в
+`ced537d`); из второго прохода не вошло ничего: ни конструктор с чтением окружения, ни `call_gate`. Патча
+`max_asker_call_gate.diff` в `asker.py` нет (0 из 4 замен). Движок создаёт адаптер как `GeminiAdapter()` без
+аргументов, поэтому профиль Gemini из `release/README.md` (`$env:GEMINI_API_KEY` + `--provider gemini`) на
+кандидате при **заданном** ключе уходит в rules_only с причиной «Не задан GEMINI_API_KEY».
+
+Проверялись временные копии (git worktree, локальные коммиты, не публикуются):
+
+* **A** = 2821989 как есть;
+* **B** = A + `gemini.py` и `tests/p12` из 5f6b545 (`a48500d`);
+* **C** = B + `max_asker_call_gate.diff` (`49b1111`).
+
+Каждая копия установлена командой `pip install ".[gemini]"` (не editable) в чистый venv. Пакет импортировался
+из `venv/lib/python3.12/site-packages/bcc_review`; Python 3.12.3 (B повторно на 3.11.18), google-genai 3.6.1
+(подобран по `>=1.0`). Запуск из отдельного каталога с абсолютным путём к
+`contracts/examples/two_linked_requirements.md`:
+
+```bash
+python -m bcc_review INPUT.md OUT.md --provider gemini --max-calls 2 --max-seconds 90 --no-cache
+python -m bcc_review verify OUT.json INPUT.md
+```
+
+В случае с ключом задан синтетический `GEMINI_API_KEY`, только в окружении. Подменён только самый нижний
+HTTP-транспорт SDK (`httpx2.HTTPTransport.handle_request`) через `tests/p12/jury/observer/sitecustomize.py`
+в `PYTHONPATH`, код пакета не меняется. Ответ — конверт фикстуры `ok_empty.json`, в нём объект под
+`responseJsonSchema` этого же запроса. Наблюдатель считает каждое `socket.connect` (положительный контроль: 1).
+
+| Сборка | Ключ из окружения | Транспорт | Физические вызовы | Режим и статус отчёта | verify |
+|---|---|---|---|---|---|
+| A 2821989 | нет | сеть не трогалась: HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| A 2821989 | синтетический | HTTPTransport подменён: **HTTP 0**, socket 0 | **0** | rules_only / partial; «Не задан GEMINI_API_KEY» — ключ не прочитан | OK |
+| B a48500d | нет | HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| B a48500d | синтетический | HTTP 2, socket 0, ключ в заголовке из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
+| C 49b1111 | нет | HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| C 49b1111 | синтетический | HTTP 2, socket 0, ключ из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
+
+До модели дошёл только этап `inventory` (модуль №04 сделал два запроса, оба успешные). Затем лимит 2
+исчерпан: `individual` и `cross` получили отказ бюджета, его перехватили модули, этапы помечены `failed`;
+`bank` размечен по правилам. Итог `partial` при таком бюджете честный. Без ключа пользователь видит
+`Прогон: partial, режим rules_only … модель не вызывалась`, `Вызовы модели: 0 физических`.
+
+Повторить (CANDIDATE_DIR — checkout кандидата, например worktree на `bcc/integration`):
+
+```bash
+bash tests/p12/jury/run_jury_path.sh CANDIDATE_DIR "метка" python3.12
+```
+
+Тест в процессе (`cli.main(argv)` с теми же аргументами, штатные конструктор, провайдер и Asker, подменён
+`HTTPTransport.handle_request`): `tests/p12/test_p12_jury_cli.py`. На B проходит. На `gemini.py` кандидата
+падает с причиной «GeminiAdapter() не отправил ни одного запроса: ключ из окружения не прочитан».
+
+Попутно: при обычной установке вне checkout `run.agent_commit = null`. `agent_commit()` вызывает
+`git rev-parse` в каталоге `site-packages`, а `release/README.md` требует коммит в паспорте. Для такой
+установки нужен `BCC_AGENT_COMMIT` или запись коммита при сборке (зона Max).
+
+Живой ответ Gemini не измерен: в сессии нет рабочего ключа, `test_p12_live.py::test_live_one_finding` пропущен.
