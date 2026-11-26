@@ -106,6 +106,7 @@ def test_conflict_becomes_critical_with_both_quotes():
     assert "R-01 (П-1)" in cand["title"] and "R-03" in cand["title"]
     assert cand["scenario"] and cand["impact"] and cand["question"]
     assert cand["rewrite"] == "Итог 12" and cand["source"] == "lens:qa"
+    assert cand["origin"] == "acceptance_check" and cand["acceptance_row"] == "R-03"
 
 
 def test_undefined_becomes_major_and_match_gives_nothing():

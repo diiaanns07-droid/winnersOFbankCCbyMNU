@@ -262,6 +262,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
             "blocks": "both",
             "source": SOURCE,
             "origin": "acceptance_check",
+            "acceptance_row": c["row_requirement_id"] or f"L{c['row_line']}",
             "derivation": c["derivation"],
         }
     return {
@@ -282,6 +283,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
         "blocks": "testing",
         "source": SOURCE,
         "origin": "acceptance_check",
+        "acceptance_row": c["row_requirement_id"] or f"L{c['row_line']}",
         "derivation": c["derivation"],
     }
 
