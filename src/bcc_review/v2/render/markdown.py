@@ -1076,8 +1076,10 @@ def _conclusion(c: _Ctx) -> list[str]:
     if first:
         out += ["**Что исправить в первую очередь**", ""]
         for i, f in enumerate(first, 1):
-            out.append(f"{i}. {c.f_link(f['id'], True)} {prose(f.get('title'))}. Что сделать: "
-                       f"{prose(shorten(f.get('recommendation'), 260))}")
+            rec = shorten(f.get("recommendation"), 260)
+            if len(rec) > 1 and rec[0].isupper() and rec[1].islower():
+                rec = rec[0].lower() + rec[1:]  # после двоеточия — со строчной
+            out.append(f"{i}. {c.f_link(f['id'], True)} {prose(f.get('title'))}. Что сделать: {prose(rec)}")
         out.append("")
     nc = [x for x in c.r.get("not_checked") or [] if isinstance(x, str)]
     if nc:
