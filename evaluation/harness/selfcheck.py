@@ -15,10 +15,11 @@ from pathlib import Path
 
 from . import POLICY_VERSION, __version__, harness_sha256
 from .schema import Manifest, parse_gold, parse_predictions, read_jsonl
-from .score import score
+from .score import matrix_rows, score
 from .taxonomy import Taxonomy
 
 CONTROLS = Path(__file__).resolve().parent / "controls"
+OPEN_CONTROLS = Path(__file__).resolve().parents[1] / "dev" / "controls"
 
 
 class Ratio(tuple):
@@ -136,6 +137,42 @@ def collect() -> list[dict]:
     add("повтор формата MD+DOCX", "micro как у одного MD", fe["micro_equals_md_only"], both["micro"] == md_only["micro"])
     add("повтор формата MD+DOCX", "кейсов в per_format.docx", fe["per_format_docx_cases"],
         both["per_format"]["docx"]["cases_measured"])
+
+    # --- открытый корпус: похожая цитата у двух дефектов, дубль находки, чистый документ с тревогой
+    if (OPEN_CONTROLS / "expected.json").exists():
+        oe = json.loads((OPEN_CONTROLS / "expected.json").read_text(encoding="utf-8"))["expected"]
+        og = read_jsonl(OPEN_CONTROLS / "labels.jsonl")
+        op = read_jsonl(OPEN_CONTROLS / "predictions.jsonl")
+        om = Manifest.load(OPEN_CONTROLS / "manifest.json")
+        oruns = [r for r in op if r["record"] == "run"]
+        ofinds = [r for r in op if r["record"] == "finding"]
+        for policy in ("hierarchy", "exact"):
+            e = oe[policy]
+            m = _run(tax, og, op, policy, manifest=om)
+            label = f"открытый корпус, {policy}"
+            for k, title in (("tp", "TP"), ("fp", "FP"), ("fn", "FN"), ("duplicates", "дубли"),
+                             ("pending_adjudication", "на разборе"), ("clean_false_alarms", "тревоги на чистом"),
+                             ("tp_parent_level", "TP уровня parent")):
+                add(label, title, e[k], m["micro"][k])
+            for k in ("precision", "recall", "f1", "precision_strict"):
+                add(label, k, _f(e[k]), m["micro"][k])
+            if policy == "hierarchy":
+                got = sorted([r["outcome"], r["case_id"], r.get("label_id"), r.get("defect_id")] for r in matrix_rows(m))
+                add(label, "матрица TP/FP/FN/DUP (строк)", len(e["matrix"]),
+                    len(got) if got == sorted(e["matrix"]) else f"{len(got)} (другие)")
+                for cid, exp in e["per_case"].items():
+                    for k, v in exp.items():
+                        add(f"открытый корпус, кейс {cid.split('.')[0]}", k, _f(v), m["per_case"][cid][k])
+            outs = {_canon(_run(tax, og, oruns + list(perm), policy, manifest=om))
+                    for perm in itertools.permutations(ofinds)}
+            add(label, "разных результатов на 120 перестановках находок", 1, len(outs))
+        z = _run(tax, og, oruns, manifest=om)
+        ze = oe["no_findings"]
+        for k, v in ze["micro"].items():
+            add("открытый корпус, без находок", k, _f(v), z["micro"][k])
+        for cid, exp in ze["per_case"].items():
+            for k, v in exp.items():
+                add(f"открытый корпус, без находок, {cid.split('.')[0]}", k, _f(v), z["per_case"][cid][k])
     return rows
 
 

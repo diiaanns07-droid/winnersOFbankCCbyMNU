@@ -149,3 +149,73 @@ rules_plus_llm с подставным LLM — TP 11, FP 33, FN 17, 99 вызо�
 * **Корпус v1.1 (моя зона):** в `transfer_limit.base` поле `limit` в ответе — string, в запросе —
   integer. Движок это находит (6 FP). Это кандидат `new_real_defect`; исправлю в следующей версии
   корпуса с новым смысловым хешем.
+
+---
+
+# Третий проход: измерение, которое можно повторить (0.1.2, `bcc-eval-policy/1`)
+
+Версия: `python -m evaluation.harness --version` →
+`0.1.2 bcc-eval-policy/1 7b54d224c8115c5ec18c71ade817df4e53911ed53324c1e3f131c06bc0dc4660`.
+Счётные правила те же, что в 0.1.0. Новое:
+* `matrix.jsonl`, `--out-dir`, `run --docs` (манифест по SHA-256);
+* короткие каталоги отчётов;
+* контроли на открытом корпусе.
+
+## Одна команда для GPT Pro (закрытый корпус, без правок кода)
+
+```bash
+python -m evaluation.harness run --gold CLOSED/labels.jsonl --docs CLOSED/docs --mode rules_only --out out/closed
+```
+
+Результаты: `metrics.json`, `matrix.jsonl`, `adjudication.jsonl`, `summary.txt`, `manifest.json`, `predictions.jsonl`.
+Нужен checkout `bcc/integration` с этим модулем; Max вливает его вместе со срезом.
+
+## Замечания Max по `545ff52` (60/64 на Windows)
+
+* **WinError 206 (3 теста `test_fake_product_reports_are_contract_valid[md|pdf|docx]`).** Каталог отчёта был
+  полным `render_id`; вместе с `report.artifacts/stages/…` это 140 символов относительного пути.
+  Теперь каталог — 12 hex: худший путь 65 символов от `--out` с артефактами движка.
+  Тест `test_report_paths_fit_windows_budget` держит запас ≤ 80.
+* **«Тест ждёт чистое дерево» (1).** На Linux не воспроизвёлся. Наиболее вероятный кандидат —
+  `test_dev_corpus_has_no_closed_material`: он обходил все файлы на диске. Теперь он смотрит только
+  отслеживаемые git файлы (`git ls-files evaluation/dev`) и не падает от локальных неотслеживаемых файлов.
+  Если на Windows падает другой тест, нужно его имя.
+
+## Контроли на открытом корпусе: ручной ответ / счётчик
+
+Ручной ответ — `evaluation/dev/controls/expected.json`; таблица — `controls/SELFCHECK.md` (98 строк, 0 расхождений).
+
+```bash
+python -m evaluation.harness --gold evaluation/dev/controls/labels.jsonl --pred evaluation/dev/controls/predictions.jsonl --manifest evaluation/dev/controls/manifest.json --out-dir out/controls
+```
+
+| Исход | Кейс | Дефект | Находка | Почему |
+| :--- | :--- | :--- | :--- | :--- |
+| TP | cardblock.combo…(похожая цитата) | #1 | F-07 | обе опоры, exact |
+| FP | cardblock.combo… | — | F-08 | только общая опора БК-2: спор с #1 и #2, на разборе |
+| FN | cardblock.combo… | #2 | — | кандидаты F-07, F-08 покрывают 1 из 2 опор |
+| TP | transfer_limit.event_conflict.cancel_no_restore | #1 | F-02 | parent; равная оценка с F-01, меньший `pred_key` |
+| DUP | transfer_limit.event_conflict.cancel_no_restore | #1 | F-01 | оставлена F-02 |
+| FP | cashback.base | — | F-01 | ложная тревога на чистом документе |
+
+Итог: TP 2, FP 2, FN 1, дубли 1; P 2/4, R 2/3, F1 4/7. В режиме exact: TP 1, FP 4, FN 2.
+Без находок: P = null, R = 0/3, у `cashback.base` P, R, F1 = null.
+На 120 перестановках находок в обоих режимах результат один; файл в обратном порядке строк через
+CLI даёт ту же матрицу.
+
+## Тот же вход через настоящий движок (реальная выдача, не контроль)
+
+`evaluation/dev/results/controls_rules_only.json`. Тестовая копия `/tmp/s16`: `bcc/integration` @ `2821989`
+плюс эта ветка (поэтому `agent_commit` с `-dirty`).
+* Режим `rules_only`, провайдер `none`, 0 вызовов, `read_text` — командный.
+* TP 0, FP 17, FN 3; 5 ложных тревог на `cashback.base`.
+* `matrix.jsonl` совпадает побайтно в двух прогонах: sha256 `a4f41bf5…`.
+
+## Где запускалось
+
+| Где | Python | Результат |
+| :--- | :--- | :--- |
+| рабочий каталог ветки (без движка) | 3.13 | `tests/p16`: 84 passed, 2 skipped (стык с движком) |
+| короткий путь `/tmp/s16` (интеграция + ветка) | 3.13 | 86 passed; `selfcheck` 0 расхождений; сквозной сценарий выше |
+| короткий путь `/tmp/s16` | 3.11.18 | 86 passed; `selfcheck` 0 расхождений |
+| Windows | — | недоступен в этой среде; защита — тест длины путей |

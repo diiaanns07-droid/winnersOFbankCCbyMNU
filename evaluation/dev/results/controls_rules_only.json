@@ -1,0 +1,350 @@
+{
+ "schema": "bcc-eval-controls-run/1",
+ "what": "Три открытых контроля через действующий CLI продукта (rules_only): реальная выдача движка, не ручные находки.",
+ "command": "python -m evaluation.harness run --gold evaluation/dev/controls/labels.jsonl --docs d --mode rules_only --out o",
+ "docs": "d/ — копии трёх source.md контролей (similar_quote.md, duplicate.md, clean_alarm.md)",
+ "product": {
+  "bcc/integration": "2821989bc5a3691a26352de28ae4a11aae677360",
+  "agent_commit_in_reports": [
+   "2821989bc5a3691a26352de28ae4a11aae677360-dirty"
+  ]
+ },
+ "harness": "0.1.2 bcc-eval-policy/1 7b54d224c8115c5ec18c71ade817df4e53911ed53324c1e3f131c06bc0dc4660",
+ "mode": "rules_only",
+ "transport": [
+  "mode=rules_only, provider=none, model=—"
+ ],
+ "implementations": {
+  "build_bank_pack": [
+   "fallback:bcc_review.runtime.fallback.bank:build_bank_pack"
+  ],
+  "build_inventory": [
+   "team:bcc_review.analysis.inventory:build_inventory"
+  ],
+  "build_questions": [
+   "team:bcc_review.decisions.clarify:build_questions"
+  ],
+  "load_criteria": [
+   "team:bcc_review.criteria:load_criteria"
+  ],
+  "read_text": [
+   "team:bcc_review.readers.text:read_text"
+  ],
+  "reconcile_facts": [
+   "team:bcc_review.analysis.facts:reconcile_facts"
+  ],
+  "resolve_candidate": [
+   "team:bcc_review.analysis.evidence:resolve_candidate"
+  ],
+  "resolve_hint": [
+   "team:bcc_review.analysis.evidence:resolve_hint"
+  ],
+  "review_individual": [
+   "team:bcc_review.analysis.individual:review_individual"
+  ],
+  "review_set": [
+   "team:bcc_review.analysis.cross:review_set"
+  ]
+ },
+ "independent_cases": 3,
+ "missing_measurements": [],
+ "micro": {
+  "tp": 0,
+  "fp": 17,
+  "fn": 3,
+  "duplicates": 0,
+  "precision": 0.0,
+  "recall": 0.0,
+  "f1": 0.0,
+  "pending_adjudication": 0,
+  "clean_false_alarms": 5
+ },
+ "matrix_sha256": "a4f41bf5203e390bde4440702ffdbfc952c55b414e80a95ba8a9d8d102fbcc10",
+ "matrix": [
+  {
+   "background": false,
+   "case_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30",
+   "defect_id": "F-004",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "0645cb1661276b33",
+   "pred_type": "traceability",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30",
+   "defect_id": "F-003",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "9b5e1dcebdb20ab4",
+   "pred_type": "traceability",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30",
+   "defect_id": "F-002",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "a49baf2ea83dd8a6",
+   "pred_type": "non_singular",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30",
+   "defect_id": "F-001",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "b820c815ee2f5934",
+   "pred_type": "terminology",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "case_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30",
+   "claimed_by_group": [],
+   "defect_id": null,
+   "gold_type": "boundary_conflict",
+   "label_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30#1",
+   "near_miss_defect_ids": [],
+   "outcome": "FN",
+   "pred_key": null
+  },
+  {
+   "case_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30",
+   "claimed_by_group": [],
+   "defect_id": null,
+   "gold_type": "boundary_conflict",
+   "label_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30#2",
+   "near_miss_defect_ids": [],
+   "outcome": "FN",
+   "pred_key": null
+  },
+  {
+   "background": false,
+   "case_id": "cashback.base",
+   "defect_id": "F-002",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "10221e6e79fd4967",
+   "pred_type": "non_singular",
+   "reasons": [
+    "clean_false_alarm"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "cashback.base",
+   "defect_id": "F-005",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "48e973b6d940df81",
+   "pred_type": "traceability",
+   "reasons": [
+    "clean_false_alarm"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "cashback.base",
+   "defect_id": "F-001",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "9927ec9f22355925",
+   "pred_type": "terminology",
+   "reasons": [
+    "clean_false_alarm"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "cashback.base",
+   "defect_id": "F-004",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "e3ca94b6f365f7bf",
+   "pred_type": "traceability",
+   "reasons": [
+    "clean_false_alarm"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "cashback.base",
+   "defect_id": "F-003",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "f528ea4708dfaf75",
+   "pred_type": "unverifiable",
+   "reasons": [
+    "clean_false_alarm"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-005",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "039de883d5f637c8",
+   "pred_type": "traceability",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-003",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "5559f973dcd6b070",
+   "pred_type": "non_singular",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-007",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "55d82b77a41ad530",
+   "pred_type": "ambiguity",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-001",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "5d4ec0e51eaaf2c7",
+   "pred_type": "incomplete",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-006",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "9e3b751c9c8bf223",
+   "pred_type": "traceability",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-008",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "bcc99d538ddaaedb",
+   "pred_type": "ambiguity",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-002",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "bfcb6231e1107689",
+   "pred_type": "contradiction",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "background": false,
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "defect_id": "F-004",
+   "disputed_reasons": [],
+   "disputed_with": [],
+   "label_id": null,
+   "outcome": "FP",
+   "pending": false,
+   "pred_key": "e170a6a60809c18b",
+   "pred_type": "traceability",
+   "reasons": [
+    "unexplained"
+   ]
+  },
+  {
+   "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+   "claimed_by_group": [],
+   "defect_id": null,
+   "gold_type": "event_conflict",
+   "label_id": "transfer_limit.event_conflict.cancel_no_restore#1",
+   "near_miss_defect_ids": [],
+   "outcome": "FN",
+   "pred_key": null
+  }
+ ]
+}

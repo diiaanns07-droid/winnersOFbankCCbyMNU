@@ -1,0 +1,70 @@
+{
+  "schema": "bcc-eval-manifest/1",
+  "visibility": "public",
+  "note": "Контроли на открытом корпусе. Ручной ответ — expected.json.",
+  "cases": [
+    {
+      "case_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30",
+      "family": "cardblock",
+      "kind": "control",
+      "control": "similar_quote",
+      "primary_render": "md",
+      "renders": [
+        {
+          "render_id": "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30@md",
+          "format": "md",
+          "path": "cases/cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30/source.md",
+          "sha256": "44ebf30a56e5baab0aff655c39dbdf3433b0ee28a0550d0761da003d01038eaf"
+        }
+      ]
+    },
+    {
+      "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+      "family": "transfer_limit",
+      "kind": "control",
+      "control": "duplicate",
+      "primary_render": "md",
+      "renders": [
+        {
+          "render_id": "transfer_limit.event_conflict.cancel_no_restore@md",
+          "format": "md",
+          "path": "../corpus/cases/transfer_limit.event_conflict.cancel_no_restore/source.md",
+          "sha256": "7366bf4b0486c35dbccad3516d1424912373e02d5b54ae52b94ddcdd30382d80",
+          "bytes": 5141,
+          "render_check": {
+            "anchors_total": 2,
+            "tokens_present": 2,
+            "exact_sequence": 2,
+            "missing_anchor_quotes": [],
+            "source_token_coverage": 1.0,
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cashback.base",
+      "family": "cashback",
+      "kind": "control",
+      "control": "clean_alarm",
+      "primary_render": "md",
+      "renders": [
+        {
+          "render_id": "cashback.base@md",
+          "format": "md",
+          "path": "../corpus/cases/cashback.base/source.md",
+          "sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+          "bytes": 5970,
+          "render_check": {
+            "anchors_total": 0,
+            "tokens_present": 0,
+            "exact_sequence": 0,
+            "missing_anchor_quotes": [],
+            "source_token_coverage": 1.0,
+            "ok": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -180,7 +180,9 @@ def score(gold: list[GoldLabel], preds: list[Prediction], runs: list[RunRecord],
                 warnings.append(f"кейс {cid} есть в эталоне, но не в манифесте")
                 continue
             shas = {r["sha256"] for r in case.get("renders", [])}
-            if labs[0].source_sha256 not in shas:
+            if not shas:
+                warnings.append(f"кейс {cid}: в манифесте нет ни одного представления (файл не найден)")
+            elif labs[0].source_sha256 not in shas:
                 raise ProtocolError(f"кейс {cid}: source_sha256 эталона не совпадает ни с одним представлением "
                                     "в манифесте (разные версии корпуса?)")
 
@@ -399,6 +401,37 @@ def score(gold: list[GoldLabel], preds: list[Prediction], runs: list[RunRecord],
         "unlabeled": unlabeled,
         "warnings": warnings,
     }
+
+
+def matrix_rows(metrics: dict[str, Any]) -> list[dict]:
+    """Фактическая матрица сопоставления: одна строка на TP, FP, FN и дубль (machine-readable).
+
+    Порядок: case_id, затем TP, DUP, FP, FN, затем ключи — не зависит от порядка входных строк.
+    """
+    by_key = {x["pred_key"]: x.get("defect_id") for x in [*metrics["true_positives"], *metrics["false_positives"],
+                                                           *metrics["duplicates"], *metrics["new_real_defects"]]}
+    rows: list[dict] = []
+    for t in metrics["true_positives"]:
+        rows.append({"outcome": "TP", "case_id": t["case_id"], "label_id": t["label_id"], "defect_id": t["defect_id"],
+                     "pred_key": t["pred_key"], "gold_type": t["gold_type"], "pred_type": t["pred_type"],
+                     "match_level": t["match_level"], "anchor_share": t["anchor_share"]})
+    for d in metrics["duplicates"]:
+        rows.append({"outcome": "DUP", "case_id": d["case_id"], "label_id": d.get("duplicate_of"),
+                     "defect_id": d.get("defect_id"), "pred_key": d["pred_key"], "pred_type": d["pred_type"],
+                     "kept_defect_id": by_key.get(d.get("kept_pred_key")), "kept_pred_key": d.get("kept_pred_key")})
+    for f in metrics["false_positives"]:
+        rows.append({"outcome": "FP", "case_id": f["case_id"], "label_id": None, "defect_id": f.get("defect_id"),
+                     "pred_key": f["pred_key"], "pred_type": f["pred_type"], "reasons": f["reasons"],
+                     "pending": f["pending"], "disputed_with": [n["label_id"] for n in f["near"]],
+                     "disputed_reasons": [n["reason"] for n in f["near"]], "background": f["background"]})
+    for n in metrics["false_negatives"]:
+        rows.append({"outcome": "FN", "case_id": n["case_id"], "label_id": n["label_id"], "defect_id": None,
+                     "pred_key": None, "gold_type": n["gold_type"],
+                     "near_miss_defect_ids": sorted(by_key.get(k) or k for k in n["near_misses"]),
+                     "claimed_by_group": sorted(by_key.get(k) or k for k in n["claimed_by_group"])})
+    order = {"TP": 0, "DUP": 1, "FP": 2, "FN": 3}
+    rows.sort(key=lambda r: (r["case_id"], order[r["outcome"]], r.get("label_id") or "", r.get("pred_key") or ""))
+    return rows
 
 
 def adjudication_sheet(metrics: dict[str, Any], seed: str | None = None, sample: int | None = None) -> list[dict]:

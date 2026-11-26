@@ -123,11 +123,26 @@ def test_physical_renders_share_case_id_and_contain_text():
     assert by_case["edge.empty"]["renders"][0]["bytes"] == 0
 
 
+def _dev_files() -> list[str]:
+    """Файлы dev-набора, которые попадут в публикацию: отслеживаемые git, иначе — все на диске.
+
+    Локальные неотслеживаемые файлы (кэш, прогоны, редактор) не должны ронять проверку изоляции.
+    """
+    try:
+        out = subprocess.run(["git", "ls-files", "evaluation/dev"], cwd=REPO, capture_output=True, text=True,
+                             timeout=30)
+        if out.returncode == 0 and out.stdout.strip():
+            return [Path(x).name.lower() for x in out.stdout.splitlines()]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return [p.name.lower() for p in (REPO / "evaluation" / "dev").rglob("*") if "__pycache__" not in p.parts]
+
+
 def test_dev_corpus_has_no_closed_material():
     assert manifest()["visibility"] == "public"
     assert all(r["visibility"] == "public" for r in labels())
-    names = [p.name.lower() for p in (REPO / "evaluation" / "dev").rglob("*")]
-    assert not any("closed" in n or "private" in n or "hidden" in n for n in names)
+    names = _dev_files()
+    assert names and not any("closed" in n or "private" in n or "hidden" in n for n in names)
 
 
 def test_leakcheck_detects_copied_closed_quote(tmp_path):

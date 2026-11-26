@@ -11,6 +11,7 @@ rules_only запускается в «сетевой песочнице»: из
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import platform
@@ -32,6 +33,55 @@ CACHE_POLICIES = ("off", "on")
 DEFAULT_PRODUCT_CMD = f"{shlex.quote(sys.executable)} -m bcc_review {{input}} {{output}}"
 SECRET_ENV = re.compile(r"(API_KEY|_TOKEN|SECRET|^ANTHROPIC_|^GEMINI_|^GOOGLE_|^OPENAI_|^VERTEX)", re.I)
 DEAD_PROXY = "http://127.0.0.1:9"
+
+
+DOC_FORMATS = {".md": "md", ".markdown": "md", ".txt": "txt", ".pdf": "pdf", ".docx": "docx", ".html": "html",
+               ".htm": "html"}
+
+
+def manifest_from_docs(gold_path: str, docs_dir: str, out_path: Path) -> dict:
+    """Манифест для закрытого набора без ручной работы: файл → case_id по SHA-256 из source_sha256 эталона.
+
+    Каждый кейс получает ровно то представление, которое размечено (primary_render). Файлы, чьих SHA-256 нет
+    в эталоне, перечисляются в unmatched_files; кейсы без файла попадут в пропуски измерения.
+    """
+    from .schema import read_jsonl, sha256_file
+    gold = read_jsonl(gold_path)
+    by_sha: dict[str, set[str]] = {}
+    family: dict[str, str] = {}
+    for row in gold:
+        if isinstance(row.get("source_sha256"), str) and isinstance(row.get("case_id"), str):
+            by_sha.setdefault(row["source_sha256"], set()).add(row["case_id"])
+            family[row["case_id"]] = row.get("family", "")
+    cases: dict[str, dict] = {cid: {"case_id": cid, "family": family[cid], "renders": [], "primary_render": None}
+                              for cid in sorted(family)}
+    unmatched = []
+    for p in sorted(Path(docs_dir).rglob("*")):
+        if not p.is_file():
+            continue
+        sha = sha256_file(p)
+        fmt = DOC_FORMATS.get(p.suffix.lower())
+        if sha not in by_sha or fmt is None:
+            unmatched.append(str(p))
+            continue
+        for cid in sorted(by_sha[sha]):
+            if any(r["sha256"] == sha for r in cases[cid]["renders"]):
+                continue
+            cases[cid]["renders"].append({"render_id": f"{cid}@{fmt}", "format": fmt, "path": str(p.resolve()),
+                                          "sha256": sha})
+            cases[cid]["primary_render"] = fmt
+    data = {"schema": "bcc-eval-manifest/1", "built_from": {"gold": str(Path(gold_path).resolve()),
+                                                            "docs": str(Path(docs_dir).resolve())},
+            "visibility": "closed-local", "cases": list(cases.values())}
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"path": out_path, "cases": len(cases), "matched": sum(len(c["renders"]) for c in cases.values()),
+            "cases_without_file": [c for c, v in cases.items() if not v["renders"]], "unmatched_files": unmatched}
+
+
+def report_dir_name(render_id: str) -> str:
+    """Короткое устойчивое имя каталога отчёта: 12 hex от SHA-256 render_id (соответствие — reports/index.json)."""
+    return hashlib.sha256(render_id.encode("utf-8")).hexdigest()[:12]
 
 
 def mode_args(mode: str, provider: str | None, cache: str = "off") -> list[str]:
@@ -102,14 +152,20 @@ def run_manifest(manifest_path: str, mode: str, out_dir: str, taxonomy: Taxonomy
         "python": platform.python_version(), "platform": platform.platform(),
     }
     rows: list[dict] = []
+    index: dict[str, str] = {}
     for cid, want, r in select_renders(manifest, fmt, cases, limit):
         base = {"record": "run", "case_id": cid, "mode": mode, "format": want,
                 "manifest_sha256": manifest.sha256, "cache": cache_cfg}
         if r is None:
-            rows.append({**base, "status": "failed", "violations": [f"нет представления формата {want}"]})
+            why = (f"нет представления формата {want}" if want else
+                   "нет файла с SHA-256 из эталона (кейс без документа)")
+            rows.append({**base, "status": "failed", "violations": [why]})
             continue
         src = root / r["path"]
-        dst_md = out / "reports" / r["render_id"].replace("@", "__") / "report.md"
+        # короткий каталог: на Windows полный render_id + артефакты движка превышали 260 символов (WinError 206)
+        short = report_dir_name(r["render_id"])
+        index[short] = r["render_id"]
+        dst_md = out / "reports" / short / "report.md"
         dst_md.parent.mkdir(parents=True, exist_ok=True)
         cmd = [a.replace("{input}", str(src)).replace("{output}", str(dst_md)) for a in shlex.split(product_cmd)]
         cmd += mode_args(mode, provider, cache) + (extra_args or [])
@@ -155,6 +211,8 @@ def run_manifest(manifest_path: str, mode: str, out_dir: str, taxonomy: Taxonomy
         rows.extend(got)
     config["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     config["renders"] = sum(1 for x in rows if x.get("record") == "run")
+    (out / "reports" / "index.json").write_text(json.dumps(dict(sorted(index.items())), ensure_ascii=False, indent=1)
+                                               + "\n", encoding="utf-8")
     (out / "run_config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     write_jsonl(out / "predictions.jsonl", rows)
     return config

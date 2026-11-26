@@ -79,6 +79,24 @@ python -m evaluation.dev open-run --product-src ../stand/src --out out/open_run
 
 Зафиксированный результат лежит в `results/`.
 
+## Контрольные случаи на открытом корпусе (`controls/`)
+
+Ручной ответ — `controls/expected.json`, записан до запуска CLI.
+
+| Случай | Документ | Находки | Ручной ответ |
+| :--- | :--- | :--- | :--- |
+| два дефекта с похожей цитатой | `cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30` (собран генератором, общая опора БК-2) | F-07: строка API + БК-2; F-08: только БК-2 | TP #1←F-07, FP F-08 (спор с #1 и #2), FN #2 |
+| дефект и дубль находки | `transfer_limit.event_conflict.cancel_no_restore` | F-01 и F-02, `kind=conflict`, одинаковые цитаты | TP #1←F-02 (меньший `pred_key`), DUP F-01 |
+| чистый документ с тревогой | `cashback.base` | F-01 `ambiguity` | FP F-01 (`clean_false_alarm`) |
+
+```bash
+python -m evaluation.harness --gold evaluation/dev/controls/labels.jsonl --pred evaluation/dev/controls/predictions.jsonl --manifest evaluation/dev/controls/manifest.json --out-dir out/controls
+python -m evaluation.dev controls --check
+```
+
+Итог: TP 2, FP 2, FN 1, дубли 1; P 2/4, R 2/3. Режим `--type-match exact`: TP 1, FP 4, FN 2.
+Без находок: P = null, R = 0/3. Контроли ссылаются на документы корпуса seed 1 и его хеш не меняют.
+
 ## Изоляция закрытого набора
 
 * В dev-корпусе только `visibility: public`. Тест `test_dev_corpus_has_no_closed_material`
@@ -105,7 +123,12 @@ python -m evaluation.dev open-run --product-src ../stand/src --out out/open_run
    python -m evaluation.harness leakcheck --dev evaluation/dev/corpus --fingerprint closed.fp.json
    ```
    Выводятся только количества совпадений (SHA-256 файлов, case_id, 5–8-граммы цитат); код 1 — утечка.
-4. Прогон двух режимов на одном манифесте и одной настройке кэша (ключ выдаёт команда, координирует №18):
+4. Одна команда без ручного манифеста (файлы сопоставляются с эталоном по SHA-256):
+   ```bash
+   python -m evaluation.harness run --gold closed_labels.jsonl --docs closed_docs/ --mode rules_only --out out/closed
+   ```
+   Результаты: `metrics.json`, `matrix.jsonl`, `adjudication.jsonl`, `summary.txt`.
+   Прогон двух режимов на одном манифесте и одной настройке кэша (ключ выдаёт команда, координирует №18):
    ```bash
    python -m evaluation.harness run --manifest closed/manifest.json --mode rules_only --out out/closed/ro --gold closed_labels.jsonl
    python -m evaluation.harness run --manifest closed/manifest.json --mode rules_plus_llm --provider gemini --out out/closed/llm --gold closed_labels.jsonl
