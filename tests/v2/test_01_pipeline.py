@@ -233,3 +233,20 @@ def test_cli_routes_engine_and_help(capsys):
     from bcc_review.__main__ import _engine
     assert _engine(["--engine", "v1", "a.md", "b.md"]) == ("v1", ["a.md", "b.md"])
     assert _engine(["a.md", "b.md"]) == ("v2", ["a.md", "b.md"])
+
+
+def test_raw_responses_saved_for_mock_fixtures(tmp_path):
+    report, _, _ = _run(tmp_path)
+    resp = tmp_path / "runs" / report["run"]["run_id"] / "responses"
+    assert (resp / "segment.json").is_file() and (resp / "judge.json").is_file()
+    assert isinstance(json.loads((resp / "judge.json").read_text(encoding="utf-8")), list)
+
+
+def test_recorded_official_run_reproduces_verdict(tmp_path):
+    """Записанные ответы живого прогона sonnet (tests/v2/fixtures/official) дают тот же вердикт без сети."""
+    report, _, _ = _run(tmp_path)
+    sev = [f["severity"] for f in report["findings"]]
+    assert report["run"]["status"] == "complete"
+    assert sev.count("critical") >= 2 and len(sev) >= 15
+    assert report["verdict"]["development"] == "no"
+    assert all(e.get("verified") != "missing" for f in report["findings"] for e in f.get("evidence") or [])
