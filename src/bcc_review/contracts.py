@@ -305,7 +305,7 @@ DEFS: dict[str, Any] = {
     "Block": _obj({"id": _STR, "kind": _enum(BLOCK_KINDS), "section": _STRS, "text": _STR, "loc": _ref("Loc")},
                   ["id", "kind", "section", "text", "loc"]),
     "Warning": {"anyOf": [_STR, _obj({"code": _STR, "message": _STR, "stage": _STR, "block_ids": _STRS,
-                                      "page": {"type": "integer", "minimum": 1}},
+                                      "page": {"type": ["integer", "null"], "minimum": 1}},
                                      ["code", "message"])]},
     "Document": _obj({
         "id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},

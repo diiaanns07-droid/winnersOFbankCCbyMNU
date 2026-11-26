@@ -386,6 +386,20 @@ class Engine:
                 last = exc
         raise last  # type: ignore[misc]
 
+    @staticmethod
+    def _module_question(patcher, q: Optional[dict[str, Any]]) -> Any:
+        """Вопрос из отчёта в форме модуля №08 (Question.from_dict с вариантами и правками), если она есть."""
+        if q is None or patcher.origin != "team":
+            return q
+        try:
+            import importlib
+
+            pkg = patcher.path.split(":")[0].rsplit(".", 1)[0]
+            question_cls = getattr(importlib.import_module(pkg + ".clarify"), "Question", None)
+            return question_cls.from_dict(q) if question_cls is not None else q
+        except (ImportError, AttributeError, TypeError, ValueError):
+            return q
+
     def apply_answers(self, document: dict[str, Any]) -> dict[str, Any]:
         """Ответы аналитика → правки → новая редакция отдельным файлом → её проверка.
 
@@ -409,7 +423,7 @@ class Engine:
             q = questions.get(d.get("question_id"))
             fid = (q.get("finding_ids") or [None])[0] if q else None
             patch = C.as_plain(self._call_flex(patcher.func, document, findings.get(fid), obj,
-                                               variants=[{"question": q}, {}]))
+                                               variants=[{"question": self._module_question(patcher, q)}, {}]))
             edits.extend(patch.get("edits", []))
             for w in patch.get("warnings", []):
                 self.warn("answers", str(w), "answers")
