@@ -18,6 +18,7 @@ import importlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -26,9 +27,9 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
-from bcc_review.contracts import ProviderError
+from bcc_review.contracts import PROVIDER_ERROR_KINDS, ProviderError
 
-__all__ = ["FATAL_KINDS", "PROVIDER_NAMES", "explain", "is_fatal", "load_dotenv", "main", "make_provider",
+__all__ = ["FATAL_KINDS", "PROVIDER_NAMES", "explain", "headline", "is_fatal", "load_dotenv", "main", "make_provider",
            "resolve_auto", "run_doctor"]
 
 PROVIDER_NAMES = ("auto", "claude_cli", "gemini", "anthropic", "openai", "mock", "offline")
@@ -176,23 +177,87 @@ def is_fatal(exc: BaseException) -> bool:
     return isinstance(exc, ProviderError) and exc.kind in FATAL_KINDS or getattr(exc, "kind", None) in FATAL_KINDS
 
 
-def explain(exc: BaseException, provider: str | None = None) -> str:
-    """Одна-две строки по-русски: что случилось и что сделать. Для вывода пользователю без трейсбэка."""
-    if not isinstance(exc, ProviderError):
-        return f"Ошибка: {exc}. {DOCTOR_HINT}"
-    name = provider or getattr(exc, "provider", None) or ""
-    name = ALIASES.get(str(name), str(name))
+_WRAP_PREFIXES = ("модель недоступна в этом прогоне:",)
+
+
+def _kind_message(exc: BaseException) -> tuple[str | None, str]:
+    """(kind, текст) для ProviderError и обёрток вроде LLMError (у них есть ``kind`` и ``message``)."""
+    kind = getattr(exc, "kind", None)
+    kind = kind if kind in PROVIDER_ERROR_KINDS else None
+    message = str(getattr(exc, "message", None) or exc or "").strip()
+    stage = getattr(exc, "stage", None)
+    if stage and message.startswith(f"{stage}:"):
+        message = message[len(stage) + 1:].strip()
+    if kind and message.startswith(f"{kind}:"):
+        message = message[len(kind) + 1:].strip()
+    for prefix in _WRAP_PREFIXES:
+        if message.lower().startswith(prefix):
+            message = message[len(prefix):].strip()
+    return kind, message or (kind or "")
+
+
+def headline(exc: BaseException, provider: str | None = None) -> str:
+    """Одна строка для первой строки консоли и отчёта: что случилось и что сделать (без подробностей сервера)."""
+    kind, message = _kind_message(exc)
+    name = ALIASES.get(str(provider or getattr(exc, "provider", "") or ""), str(provider or getattr(exc, "provider", "") or ""))
+    low = message.lower()
+    if kind is None:
+        return f"Ошибка: {message}. {DOCTOR_HINT}"
+    if kind == "not_configured" and "pip install" in low:
+        pkg = re.search(r"pip install ([\w.=<>,\-\[\]]+)", message)
+        return (f"Не установлен нужный пакет{(' ' + pkg.group(1)) if pkg else ''}: выполните "
+                "«pip install -r requirements.txt» и повторите.")
+    if name == "gemini":
+        if kind == "not_configured":
+            return ("Не задан ключ Gemini. Получите бесплатный ключ на https://aistudio.google.com/apikey и добавьте "
+                    "в файл .env строку GEMINI_API_KEY=<ключ>.")
+        if kind == "auth":
+            return ("Google не принял ключ Gemini (GEMINI_API_KEY): проверьте, что он скопирован целиком, без кавычек и "
+                    "пробелов, или создайте новый на https://aistudio.google.com/apikey.")
+        if kind == "quota":
+            reset = re.search(r"восстановится около ([^.]+)", message)
+            if reset:
+                return (f"Дневная квота бесплатного ключа Gemini исчерпана на всех моделях цепочки. Квота восстановится "
+                        f"около {reset.group(1)}; сейчас можно взять другой ключ.")
+            if "нулевая квота" in low or "limit_zero" in low or "limit: 0" in low:
+                return ("Модели Gemini из цепочки недоступны этому ключу на бесплатном тарифе (квота 0). Список доступных "
+                        "моделей: python -m bcc_review doctor; затем GEMINI_MODEL=<модель> в .env.")
+            return "Квота ключа Gemini исчерпана. Подождите, возьмите другой ключ или задайте другую модель (GEMINI_MODEL)."
+        if kind == "rate_limit":
+            wait = getattr(exc, "retry_after_s", None)
+            when = f" через {int(wait) + 1} с" if isinstance(wait, (int, float)) and wait > 0 else " через минуту"
+            return (f"Превышен лимит запросов в минуту бесплатного ключа Gemini (агент уже ждал и повторял). Повторите"
+                    f"{when}; можно уменьшить параллельность: GEMINI_CONCURRENCY=2 в .env.")
+        if kind == "not_found":
+            return ("Модели Gemini из цепочки недоступны этому ключу. Список доступных моделей: python -m bcc_review "
+                    "doctor; затем GEMINI_MODEL=<модель> в .env.")
+        if kind == "network":
+            return ("Нет соединения с Google Gemini (generativelanguage.googleapis.com): проверьте интернет, прокси "
+                    "(HTTPS_PROXY) и брандмауэр.")
+        if kind in ("overloaded", "server"):
+            return ("Gemini перегружен: все модели цепочки не ответили после повторов. Повторите через несколько минут "
+                    "или задайте GEMINI_MODEL=<другая модель>.")
+        if kind == "timeout":
+            return "Gemini не ответил вовремя даже после повторов. Повторите через несколько минут."
     title = TITLES.get(name, name or "модели")
-    message = (exc.message or exc.kind).strip()
-    if exc.kind == "not_configured" and "pip install" in message:
-        advice = "Установите зависимости: pip install -r requirements.txt (или пакет из сообщения) и повторите."
-    else:
-        advice = _ADVICE.get((name, exc.kind)) or _GENERIC.get(exc.kind, _GENERIC["unknown"])
-    head = f"Провайдер {title}: {message}"
-    urls = [w for w in advice.split() if w.startswith("http")]
-    if any(u.rstrip(".,;") in message for u in urls):
+    advice = _ADVICE.get((name, kind)) or _GENERIC.get(kind, _GENERIC["unknown"])
+    return f"{title}: {_first_sentence(message)} Что сделать: {advice}"
+
+
+def _first_sentence(text: str, limit: int = 160) -> str:
+    text = " ".join(text.split())
+    m = re.match(r"(.+?[.!?])(\s|$)", text)
+    out = m.group(1) if m else text
+    return out if len(out) <= limit else out[: limit - 1].rstrip() + "…"
+
+
+def explain(exc: BaseException, provider: str | None = None) -> str:
+    """Первая строка — :func:`headline` (что случилось и что сделать), вторая — подробности провайдера."""
+    kind, message = _kind_message(exc)
+    head = headline(exc, provider)
+    if kind is None or not message or message in head:
         return head
-    return f"{head}\nЧто сделать: {advice}"
+    return f"{head}\nПодробности: {message}"
 
 
 # --------------------------------------------------------------------------- doctor

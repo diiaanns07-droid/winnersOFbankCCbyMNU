@@ -151,3 +151,59 @@ def test_is_fatal():
     assert is_fatal(ProviderError("auth", "x")) and is_fatal(ProviderError("quota", "x"))
     assert is_fatal(ProviderError("not_configured", "x"))
     assert not is_fatal(ProviderError("overloaded", "x")) and not is_fatal(ValueError("x"))
+
+
+# --------------------------------------------------------------------------- первая строка для жюри
+
+from bcc_review.v2.providers.doctor import headline  # noqa: E402
+
+
+def wrapped(kind, message, **kw):
+    """Ошибка так, как её отдаёт LLMClient после фатального сбоя этапа."""
+    from bcc_review.v2.llm import LLMError
+    err = ProviderError(kind, message, **kw)
+    return LLMError("lens_qa", kind, "модель недоступна в этом прогоне: " + err.message)
+
+
+@pytest.mark.parametrize("kind,message,expect", [
+    ("not_configured", "Не задан GEMINI_API_KEY. Бесплатный ключ: https://aistudio.google.com/apikey",
+     ["Не задан ключ Gemini", "GEMINI_API_KEY=<ключ>", "aistudio.google.com/apikey"]),
+    ("auth", "Gemini отклонил ключ API (400 INVALID_ARGUMENT, API_KEY_INVALID). Проверьте GEMINI_API_KEY в .env.",
+     ["Google не принял ключ Gemini", "без кавычек"]),
+    ("quota", "Все модели Gemini из цепочки недоступны (…). Исчерпана дневная квота модели gemini-3.5-flash-lite. "
+              "Квота восстановится около 13:00 завтра по местному времени (полночь по тихоокеанскому времени США).",
+     ["Дневная квота", "13:00 завтра", "другой ключ"]),
+    ("not_found", "Модель gemini-3.8-flash недоступна этому ключу или снята с API (404 NOT_FOUND).",
+     ["недоступны этому ключу", "python -m bcc_review doctor", "GEMINI_MODEL"]),
+    ("network", "Нет соединения с generativelanguage.googleapis.com: ConnectError.",
+     ["Нет соединения с Google Gemini", "HTTPS_PROXY"]),
+    ("rate_limit", "Превышен лимит запросов к модели gemini-3.8-flash (429).", ["лимит запросов в минуту", "GEMINI_CONCURRENCY"]),
+    ("overloaded", "Все модели Gemini из цепочки недоступны (… перегружена ×4).", ["Gemini перегружен"]),
+])
+def test_headline_for_jury_scenarios(kind, message, expect):
+    for exc in (ProviderError(kind, message), wrapped(kind, message)):
+        line = headline(exc, "gemini")
+        assert "\n" not in line and len(line) <= 260
+        for part in expect:
+            assert part in line, (part, line)
+        assert "модель недоступна в этом прогоне" not in line
+        full = explain(exc, "gemini")
+        assert full.splitlines()[0] == line
+
+
+def test_headline_missing_package_and_other_providers():
+    line = headline(ProviderError("not_configured", "Не установлен пакет google-genai: pip install google-genai"), "gemini")
+    assert "pip install -r requirements.txt" in line and "google-genai" in line
+    line = headline(ProviderError("not_configured", "Не задан ANTHROPIC_API_KEY."), "anthropic")
+    assert "ANTHROPIC_API_KEY" in line and "\n" not in line
+    line = headline(wrapped("auth", "Claude Code не авторизован."), "claude_cli")
+    assert "claude" in line.lower() and "войдите" in line
+
+
+def test_daily_reset_time_in_gemini_quota_error():
+    import datetime as dt
+    from bcc_review.v2.providers.gemini import _us_pacific_offset_h, daily_reset_local
+    assert _us_pacific_offset_h(dt.datetime(2026, 11, 27, 0, 0)) == -8      # зима: PST
+    assert _us_pacific_offset_h(dt.datetime(2026, 7, 1, 0, 0)) == -7        # лето: PDT
+    text = daily_reset_local(dt.datetime(2026, 11, 26, 20, 0, tzinfo=dt.timezone.utc))
+    assert "по местному времени" in text and "полночь по тихоокеанскому" in text
