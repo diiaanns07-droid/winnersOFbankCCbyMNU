@@ -58,7 +58,7 @@ from ._common import (
     run_info,
 )
 
-__all__ = ["COLUMNS", "DEFAULT_PRIORITY", "write_jira_csv", "jira_rows", "select_jira_groups"]
+__all__ = ["COLUMNS", "DEFAULT_PRIORITY", "write_jira_csv", "jira_rows", "select_jira_groups", "check_jira_csv"]
 
 COLUMNS = ["Summary", "Description", "Issue Type", "Priority", "Labels"]
 DEFAULT_PRIORITY = {"critical": "Highest", "major": "High", "minor": "Low"}
@@ -265,7 +265,49 @@ def write_jira_csv(report: Any, output_path: str | os.PathLike[str], **options: 
     return path
 
 
+def check_jira_csv(csv_path: str | os.PathLike[str], report: Any, **options: Any) -> list[str]:
+    """Сверить Jira CSV с Report. Пустой список — расхождений нет.
+
+    Файл читается обычным ``csv.reader``. Проверяются заголовок, число записей
+    (= уникальные подтверждённые дефекты, если не включены находки на проверке),
+    ID основной находки каждой первопричины и побайтное совпадение всех полей
+    с тем, что экспорт строит из этого Report.
+    """
+    with open(csv_path, newline="", encoding="utf-8") as fh:
+        rows = list(csv.reader(fh))
+    problems: list[str] = []
+    if not rows or rows[0] != COLUMNS:
+        return [f"заголовок CSV {rows[0] if rows else []} вместо {COLUMNS}"]
+    data = as_report_dict(report)
+    expected = jira_rows(data, **options)
+    got = [dict(zip(COLUMNS, r, strict=False)) for r in rows[1:]]
+    want_ids = [str(g["primary"].get("id")) for g in select_jira_groups(data, options.get("include_needs_review", False))]
+    got_ids = [m.group(1) if (m := re.match(r"^\[([^\]]+)\]", r.get("Summary", ""))) else "?" for r in got]
+    if got_ids != want_ids:
+        problems.append(f"ID записей CSV {got_ids}, ожидалось {want_ids}")
+    if not options.get("include_needs_review"):
+        from ._common import (
+            summary_numbers,  # noqa: PLC0415 — та же сводка, что в Markdown
+        )
+
+        unique = summary_numbers(data)["defects_unique"]
+        if len(got) != unique:
+            problems.append(f"записей CSV {len(got)}, уникальных подтверждённых дефектов в Report {unique}")
+    for i, (g, w) in enumerate(zip(got, expected, strict=False), 1):
+        for col in COLUMNS:
+            if g.get(col) != w[col]:
+                problems.append(f"запись {i} ({got_ids[i - 1]}): поле {col} не совпадает с Report")
+    return problems
+
+
 def _main(argv: list[str]) -> int:
+    if len(argv) == 3 and argv[0] == "--check":
+        problems = check_jira_csv(Path(argv[1]), Path(argv[2]))
+        if problems:
+            print("Расхождения:", *problems, sep="\n  ")
+            return 4
+        print("Jira CSV совпадает с Report.")
+        return 0
     if len(argv) == 2:
         print(write_jira_csv(Path(argv[0]), argv[1]))
         return 0
