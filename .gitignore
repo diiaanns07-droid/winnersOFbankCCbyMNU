@@ -8,3 +8,5 @@ __pycache__/
 build/
 dist/
 /out/
+/runs/
+/reports/my/
