@@ -1,0 +1,359 @@
+"""Этап revise (№11): «было → стало» по critical и major и исправленная редакция документа.
+
+Модель предлагает правки (замена фрагмента строки или вставка после строки), код их применяет к исходному
+тексту и помечает: ``[изменено: D-02]`` у заменённой строки, ``[добавлено: D-05]`` у новой. Если на вопрос
+по дефекту есть ответ владельца (режим ``--answers``), подставляется он; иначе значение, которое должен
+выбрать бизнес, остаётся маркером ``<уточнить: …>``.
+
+Правка, фрагмент которой не найден в документе, не применяется (в ``rewrites`` у неё ``applied: false``) —
+исправленная редакция никогда не содержит текста, который модель «вспомнила» неточно.
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any
+
+from bcc_review.v2.stages import clarify as _cl
+
+STAGE = "revise"
+_SEV = {"critical": 0, "major": 1, "minor": 2}
+_PENDING = re.compile(r"<\s*уточнить\s*:[^>]*>", re.I)
+
+SCHEMA: dict = {
+    "type": "object", "additionalProperties": False, "required": ["rewrites"],
+    "properties": {"rewrites": {"type": "array", "items": {
+        "type": "object", "additionalProperties": False, "required": ["finding_id", "summary", "edits"],
+        "properties": {
+            "finding_id": {"type": "string"},
+            "summary": {"type": "string"},
+            "edits": {"type": "array", "minItems": 1, "maxItems": 4, "items": {
+                "type": "object", "additionalProperties": False, "required": ["action", "line", "old", "new"],
+                "properties": {
+                    "action": {"type": "string", "enum": ["replace", "insert_after"]},
+                    "line": {"type": "integer"},
+                    "old": {"type": "string"},
+                    "new": {"type": "string"},
+                }}},
+        }}}},
+}
+
+
+# --------------------------------------------------------------------------- исходный текст
+def _source_lines(ctx: Any, view: Any) -> tuple[list[str], bool]:
+    """Строки, к которым применяются правки: исходный MD/TXT (номера строк совпадают с view) или текст view."""
+    vlines = _cl._lines(view)
+    opts = getattr(ctx, "options", None) or {}
+    if not isinstance(opts, dict):
+        opts = vars(opts) if hasattr(opts, "__dict__") else {}
+    cands = [opts.get(k) for k in ("input", "doc", "path", "input_path", "source")]
+    if isinstance(view, dict):
+        cands += [view.get("path"), view.get("file")]
+    for c in cands:
+        if not c:
+            continue
+        p = Path(str(c))
+        if p.suffix.lower() in (".md", ".markdown", ".txt") and p.exists():
+            raw = p.read_text(encoding="utf-8-sig").splitlines()
+            if not vlines or len(raw) == len(vlines) or abs(len(raw) - len(vlines)) <= 1:
+                return raw, True
+    return [str(x.get("text", "")) for x in vlines], False
+
+
+_CMAP = str.maketrans({"«": '"', "»": '"', "“": '"', "”": '"', "„": '"', "'": '"', "—": "-", "–": "-",
+                       "‑": "-", "−": "-", " ": " ", " ": " ", " ": " "})
+
+
+def _cnorm(s: str) -> str:
+    """Нормализация 1:1 по символам: позиции в строке сохраняются."""
+    return s.translate(_CMAP).lower()
+
+
+def find_span(raw: str, old: str) -> tuple[int, int] | None:
+    """Где в исходной строке стоит фрагмент ``old`` (с точностью до кавычек, тире, пробелов и разметки)."""
+    if not old.strip():
+        return None
+    i = raw.find(old)
+    if i >= 0:
+        return i, i + len(old)
+    target = _cnorm(old).strip()
+    target = re.sub(r"\*\*|`|__", "", target)
+    parts: list[str] = []
+    for ch in target:
+        if ch.isspace():
+            if not parts or parts[-1] != r"(?:\s|\*\*|`|__)+":
+                parts.append(r"(?:\s|\*\*|`|__)+")
+        else:
+            parts.append(re.escape(ch) + r"(?:\*\*|`|__)*")
+    if not parts:
+        return None
+    m = re.search("".join(parts), _cnorm(raw))
+    if not m:
+        return None
+    end = m.end()
+    while end > m.start() and raw[end - 1] in "*`_" and not old.rstrip().endswith(raw[end - 1]):
+        end -= 1
+    return m.start(), end
+
+
+def _is_row(s: str) -> bool:
+    t = s.strip()
+    return t.startswith("|") and t.endswith("|") and t.count("|") >= 2
+
+
+def _fences(lines: list[str]) -> list[bool]:
+    inside, out = False, []
+    for s in lines:
+        if s.strip().startswith("```"):
+            out.append(True)
+            inside = not inside
+            continue
+        out.append(inside)
+    return out
+
+
+def _with_mark(text: str, mark: str) -> str:
+    if _is_row(text):
+        t = text.rstrip()
+        return t[:-1].rstrip() + f" {mark} |"
+    return text.rstrip() + f" {mark}"
+
+
+# --------------------------------------------------------------------------- применение правок
+def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | None = None) -> dict:
+    """Применяет правки к строкам документа. Возвращает ``{"markdown", "rewrites", "stats"}``."""
+    warnings = warnings if warnings is not None else []
+    n = len(lines)
+    text = list(lines)
+    changed: dict[int, list[str]] = {}
+    inserts: dict[int, list[tuple[str, str]]] = {}
+    fence = _fences(lines)
+    used_spans: dict[int, list[tuple[int, int]]] = {}
+    out_rewrites: list[dict] = []
+    stats = {"replaced": 0, "inserted": 0, "not_applied": 0, "pending": 0}
+
+    def locate(line_no: int, old: str) -> tuple[int, tuple[int, int]] | None:
+        order = [line_no - 1] + [line_no - 1 + d for k in range(1, 3) for d in (-k, k)]
+        order += sorted(range(n), key=lambda i: abs(i - (line_no - 1)))
+        seen: set[int] = set()
+        for i in order:
+            if i in seen or not 0 <= i < n:
+                continue
+            seen.add(i)
+            span = find_span(text[i], old)
+            if span:
+                return i, span
+        return None
+
+    for rw in rewrites:
+        fid = rw["finding_id"]
+        rec_edits = []
+        for e in rw.get("edits") or []:
+            action, line_no = e.get("action"), int(e.get("line") or 0)
+            old, new = str(e.get("old") or ""), str(e.get("new") or "").strip("\n")
+            rec = {"action": action, "line": line_no, "was": old, "became": new, "applied": False}
+            if action == "replace":
+                hit = locate(line_no, old) if old.strip() else None
+                if hit is None:
+                    stats["not_applied"] += 1
+                    warnings.append(f"revise: {fid}: фрагмент «{old[:60]}» не найден — правка не применена")
+                    rec_edits.append(rec)
+                    continue
+                i, (a, b) = hit
+                if any(not (b <= x or a >= y) for x, y in used_spans.get(i, [])):
+                    stats["not_applied"] += 1
+                    warnings.append(f"revise: {fid}: фрагмент строки {i + 1} уже изменён другой правкой")
+                    rec_edits.append(rec)
+                    continue
+                was = text[i][a:b]
+                new_line = text[i][:a] + new + text[i][b:]
+                if new_line.count("**") % 2:
+                    new_line = new_line.replace("**", "")
+                delta = len(new) - (b - a)
+                used_spans[i] = [(x if x < a else x + delta, y if y <= a else y + delta) for x, y in used_spans.get(i, [])]
+                used_spans[i].append((a, a + len(new)))
+                text[i] = new_line
+                changed.setdefault(i, [])
+                if fid not in changed[i]:
+                    changed[i].append(fid)
+                rec.update(applied=True, line=i + 1, was=was)
+                stats["replaced"] += 1
+            elif action == "insert_after":
+                if not new.strip() or not 1 <= line_no <= n:
+                    stats["not_applied"] += 1
+                    warnings.append(f"revise: {fid}: вставка после строки {line_no} вне документа — не применена")
+                    rec_edits.append(rec)
+                    continue
+                anchor = line_no - 1
+                new_rows = [s for s in new.splitlines() if s.strip()]
+                if fence[anchor]:  # внутри блока кода — после его конца
+                    while anchor + 1 < n and fence[anchor + 1]:
+                        anchor += 1
+                elif _is_row(lines[anchor]) and not all(_is_row(s) for s in new_rows):
+                    while anchor + 1 < n and _is_row(lines[anchor + 1]):
+                        anchor += 1
+                elif not _is_row(lines[anchor]) and anchor + 1 < n and _is_row(lines[anchor + 1]) \
+                        and all(_is_row(s) for s in new_rows):
+                    anchor += 1  # строки таблицы после заголовка раздела — в конец таблицы
+                    while anchor + 1 < n and _is_row(lines[anchor + 1]):
+                        anchor += 1
+                for s in new_rows:
+                    inserts.setdefault(anchor, []).append((s, fid))
+                rec.update(applied=True, line=anchor + 1, was="")
+                stats["inserted"] += len(new_rows)
+            else:
+                stats["not_applied"] += 1
+                rec_edits.append(rec)
+                continue
+            stats["pending"] += len(_PENDING.findall(new))
+            rec_edits.append(rec)
+        out_rewrites.append({**{k: v for k, v in rw.items() if k != "edits"}, "edits": rec_edits})
+
+    out: list[str] = []
+    inside = False
+    fence_marks: list[str] = []
+    for i, s in enumerate(text):
+        fids = changed.get(i, [])
+        is_fence = s.strip().startswith("```")
+        if is_fence:
+            out.append(s)
+            if inside and fence_marks:  # закрывающая граница блока кода — пометка отдельной строкой
+                out.append(f"[изменено: {', '.join(fence_marks)} — пример выше]")
+                fence_marks = []
+            inside = not inside
+        elif fids and inside:
+            out.append(s)
+            fence_marks += [f for f in fids if f not in fence_marks]
+        elif fids:
+            out.append(_with_mark(s, f"[изменено: {', '.join(fids)}]"))
+        else:
+            out.append(s)
+        for row, fid in inserts.get(i, []):
+            out.append(_with_mark(row, f"[добавлено: {fid}]"))
+    return {"markdown": "\n".join(out) + "\n", "rewrites": out_rewrites, "stats": stats}
+
+
+def _header(title: str, answered: bool, stats: dict) -> list[str]:
+    note = ("Значения выбраны по ответам владельца." if answered else
+            "Ответов владельца нет: значения, которые выбирает бизнес, оставлены маркером <уточнить: …>.")
+    return [f"> Исправленная редакция документа «{title}», подготовлена агентом ревью. "
+            f"Пометки: [изменено: D-…] — формулировка заменена, [добавлено: D-…] — новое требование или критерий "
+            f"приёмки. {note} Заменено фрагментов: {stats['replaced']}, добавлено строк: {stats['inserted']}.", ""]
+
+
+def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
+    """Ответы из режима ``--answers`` (``clarification`` или результат ``recheck.resolve_answers``)."""
+    if not answers:
+        return "—", {}
+    answered = answers.get("answers") if "answers" in answers and "changes" in answers else answers.get("answered")
+    answered = answered or []
+    decisions = answers.get("decisions") or []
+    rows, by_finding = [], {}
+    for a in answered:
+        rows.append(f"{a.get('question_id')} ({a.get('topic', '')}) → {', '.join(a.get('finding_ids', []))}: "
+                    f"{a.get('answer', '')}")
+        for fid in a.get("finding_ids", []):
+            by_finding.setdefault(fid, []).append(a.get("question_id"))
+    rows += [f"Общее решение владельца: {d}" for d in decisions]
+    return ("\n".join(rows) or "—"), by_finding
+
+
+# --------------------------------------------------------------------------- этап
+def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
+    """``{"rewrites": [...], "revised_markdown": str, "stats": {...}}`` по critical и major."""
+    view = ctx.view
+    targets = sorted((f for f in findings if f.get("severity") in ("critical", "major")),
+                     key=lambda f: (_SEV.get(f.get("severity"), 2), int(f.get("priority") or 0) or 99))
+    title = (view.get("title") if isinstance(view, dict) else getattr(view, "title", "")) or "документ"
+    lines, _raw = _source_lines(ctx, view)
+    if not targets:
+        return {"rewrites": [], "revised_markdown": "", "stats": {"replaced": 0, "inserted": 0, "not_applied": 0,
+                                                                  "pending": 0}}
+    ans_text, by_finding = _answers_block(answers)
+    block = _cl.format_findings(targets)
+    system, user = ctx.prompt(STAGE, findings=block, answers=ans_text)
+    if block[:200] not in user:
+        extra = f"<дефекты>\n{block}\n</дефекты>\n\n<ответы>\n{ans_text}\n</ответы>"
+        idx = user.find("Задание: исправленная редакция")
+        user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+    warnings: list[str] = []
+    try:
+        raw = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=16000) or {}
+    except Exception as exc:  # noqa: BLE001
+        _cl._warn(ctx, f"revise: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); редакция не построена")
+        return {"rewrites": [], "revised_markdown": "", "stats": {}, "status": "failed"}
+    by_id = {f["id"]: f for f in targets}
+    rewrites = []
+    for rw in raw.get("rewrites") or []:
+        fid = str(rw.get("finding_id", "")).strip()
+        if fid not in by_id:
+            continue
+        f = by_id[fid]
+        rewrites.append({"finding_id": fid, "title": f.get("title", ""), "severity": f.get("severity", ""),
+                         "summary": str(rw.get("summary", "")).strip(), "edits": rw.get("edits") or [],
+                         "answer_ids": by_finding.get(fid, [])})
+    order = {f["id"]: i for i, f in enumerate(targets)}
+    rewrites.sort(key=lambda r: order.get(r["finding_id"], 999))
+    applied = apply_edits(lines, rewrites, warnings)
+    for r in applied["rewrites"]:
+        r["pending"] = sum(len(_PENDING.findall(e.get("became", ""))) for e in r["edits"])
+    body = applied["markdown"].splitlines()
+    head = _header(title, bool(by_finding), applied["stats"])
+    # пометка-шапка после заголовка документа (первая строка «# …»), иначе в начале
+    if body and body[0].lstrip().startswith("#"):
+        md = "\n".join([body[0], ""] + head + body[1:]) + "\n"
+    else:
+        md = "\n".join(head + body) + "\n"
+    for w in warnings:
+        _cl._warn(ctx, w)
+    missing = [f["id"] for f in targets if f["id"] not in {r["finding_id"] for r in rewrites}]
+    return {"rewrites": applied["rewrites"], "revised_markdown": md, "stats": {**applied["stats"],
+            "findings": len(targets), "with_rewrite": len(rewrites), "without_rewrite": missing}}
+
+
+def revised_path(report_path: str | Path) -> Path:
+    """``reports/requirements.md`` → ``reports/requirements.revised.md``."""
+    p = Path(report_path)
+    stem = p.name[:-len(p.suffix)] if p.suffix else p.name
+    return p.with_name(f"{stem}.revised.md")
+
+
+def write(report_path: str | Path, result: dict) -> Path | None:
+    """Пишет исправленную редакцию рядом с отчётом; возвращает путь или ``None``, если редакции нет."""
+    md = result.get("revised_markdown") or ""
+    if not md.strip():
+        return None
+    out = revised_path(report_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+    return out
+
+
+_S = {"critical": "критичный", "major": "существенный", "minor": "незначительный"}
+
+
+def render_markdown(result: dict, revised_file: str = "") -> str:
+    """Раздел отчёта «Было → стало» (№13 может вставить как есть или нарисовать сам)."""
+    rws = [r for r in result.get("rewrites") or [] if any(e.get("applied") for e in r.get("edits", []))]
+    if not rws:
+        return ""
+    st = result.get("stats") or {}
+    out = ["## Исправленная редакция: было → стало", "",
+           f"Правки по {len(rws)} дефектам: заменено фрагментов {st.get('replaced', 0)}, добавлено строк "
+           f"{st.get('inserted', 0)}, осталось решений владельца (<уточнить>) {st.get('pending', 0)}."
+           + (f" Полный текст: `{revised_file}`." if revised_file else ""), ""]
+    for r in rws:
+        out.append(f"### {r['finding_id']} ({_S.get(r.get('severity', ''), '')}) {r.get('title', '')}")
+        if r.get("summary"):
+            out.append(r["summary"])
+        out.append("")
+        for e in r["edits"]:
+            if not e.get("applied"):
+                continue
+            if e["action"] == "replace":
+                out.append(f"* строка {e['line']}, было: «{e['was']}»")
+                out.append(f"  стало: «{e['became']}»" if e["became"] else "  стало: фрагмент удалён")
+            else:
+                out.append(f"* после строки {e['line']} добавлено: «{e['became'].strip()}»")
+        out.append("")
+    return "\n".join(out)
