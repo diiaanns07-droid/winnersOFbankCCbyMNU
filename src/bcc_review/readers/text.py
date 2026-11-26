@@ -25,7 +25,9 @@
 ``**``/``*``/``_``/``~~``, обратных кавычек кода, экранирующих ``\\``, крайних ``|`` таблицы и
 хвостовых пробелов жёсткого переноса. Разделители зафиксированы так:
 
-* ``"\\n"`` стоит между физическими строками одного блока (абзац, пункт списка, код, цитата);
+* ``"\\n"`` стоит между физическими строками одного блока (абзац, пункт списка, код, цитата).
+  Внутри ``кода`` в обратных кавычках вместо него стоит синтетический ``" "`` (CommonMark 6.1),
+  поэтому имя метода, перенесённое редактором по пробелу, остаётся в ``block.text`` одной строкой;
 * ``" | "`` стоит между ячейками строки таблицы. Если в источнике между ячейками ровно ``" | "``
   (канонический GFM), разделитель считается дословной копией;
 * ``<br>`` даёт ``"\\n"``, HTML-сущность даёт её символ;
@@ -396,6 +398,7 @@ def _inline(raw: _Buf, notes: frozenset[str] = frozenset()) -> tuple[_Buf, list[
     s = "".join(ch)
     drop = [False] * n
     lit = [False] * n
+    space: set[int] = set()  # перевод строки внутри `кода` → пробел (CommonMark 6.1)
     repl: dict[int, tuple[int, str]] = {}
     links: list[tuple[int, int, str]] = []
 
@@ -433,6 +436,8 @@ def _inline(raw: _Buf, notes: frozenset[str] = frozenset()) -> tuple[_Buf, list[
                 drop[t] = True
             for t in range(j, close):
                 lit[t] = True
+                if orig[t][3] == _J:  # имя метода, перенесённое редактором, остаётся одной строкой
+                    space.add(t)
             body = s[j:close]
             if len(body) >= 2 and body[0] in " \n" and body[-1] in " \n" and body.strip(" \n"):
                 drop[j] = drop[close - 1] = True
@@ -574,7 +579,7 @@ def _inline(raw: _Buf, notes: frozenset[str] = frozenset()) -> tuple[_Buf, list[
             i = end
             continue
         if not drop[i]:
-            out.chars.append(ch[i])
+            out.chars.append(" " if i in space else ch[i])
             out.orig.append(orig[i])
         i += 1
     before[n] = len(out)
