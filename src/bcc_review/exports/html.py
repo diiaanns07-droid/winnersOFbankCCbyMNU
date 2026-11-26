@@ -834,6 +834,21 @@ class _Renderer:
         self.questions = _dicts(self.r.get("questions"))
         self.decisions = _decisions_by_question(self.r)
         self.qfp = {_question_id(q, i): question_fingerprint(self.r, q) for i, q in enumerate(self.questions)}
+        # Decision привязан, только если его Q-ID есть в этом прогоне и отпечаток не противоречит.
+        self.dec_attached: list[dict[str, Any]] = []
+        self.dec_unattached: list[tuple[dict[str, Any], str]] = []
+        for d in _dicts(self.r.get("decisions")):
+            qid = str(d.get("question_id"))
+            if qid not in self.qfp:
+                self.dec_unattached.append((d, f"в этом прогоне нет вопроса {qid}: Q-ID относится к прогону, где был задан вопрос"))
+                continue
+            state = _decision_state(self.r, d, self.qfp[qid])
+            if state in ("ok", "qid_only"):
+                self.dec_attached.append(d)
+            elif state == "other_question":
+                self.dec_unattached.append((d, f"отпечаток вопроса не совпал с {qid} этого прогона"))
+            else:
+                self.dec_unattached.append((d, "ответ дан к другой версии документа"))
         self.crit_labels = _criteria_labels(self.r)
         self.render_warnings: list[str] = []
         if replaced[0]:
@@ -1172,10 +1187,18 @@ class _Renderer:
         for a in _as_list(_first(v, "first_actions", default=[])):
             if isinstance(a, str):
                 act_items.append(f"<li>{_e(a)}</li>")
-        answered = sum(len(x) for x in self.decisions.values())
-        dec_html = (
-            f'<p class="small">Учтено ответов на вопросы: <a href="#questions">{answered}</a>.</p>' if answered else ""
-        )
+        dec_html = ""
+        if self.dec_attached or self.dec_unattached:
+            dec_html = (
+                f'<p class="small">Ответов из --answers: {len(self.dec_attached) + len(self.dec_unattached)}; '
+                f'привязано к вопросам этого прогона: <a href="#questions">{len(self.dec_attached)}</a>'
+                + (
+                    f'; <a class="warn" href="#ans-unattached">без вопроса: {len(self.dec_unattached)}</a>'
+                    if self.dec_unattached
+                    else ""
+                )
+                + ".</p>"
+            )
         basis = _first(v, "basis", "summary", default="")
         return (
             '<section id="summary" class="summary" aria-labelledby="summary-h">'
@@ -1543,9 +1566,27 @@ class _Renderer:
             f'<p class="pre">{_e(d.get("answer") or "")}</p>{note}{edits_html}</div>'
         )
 
+    def unattached_html(self) -> str:
+        if not self.dec_unattached:
+            return ""
+        rows = "".join(
+            f"<li><b>{_e(d.get('question_id'))}</b> — {_e(reason)}."
+            f'<p class="pre">{_e(d.get("answer") or "")}</p>'
+            f'<p class="small muted">source_sha256 {_e(str(d.get("source_sha256") or "—")[:12])}…'
+            f'{"; правок: " + str(len(_dicts(d.get("edits")))) if _dicts(d.get("edits")) else ""}</p></li>'
+            for d, reason in self.dec_unattached
+        )
+        return (
+            '<div class="banner banner-warn" id="ans-unattached" role="region" aria-labelledby="ans-unattached-h">'
+            '<h3 id="ans-unattached-h">Ответы из --answers без вопроса в этом прогоне</h3>'
+            '<p class="small">Прогон учёл файл ответов, но заново построил вопросы, и эти ответы не относятся ни к одному '
+            "из них. Ни к какому вопросу ниже они не приписаны; проверьте, учтено ли решение в тексте документа.</p>"
+            f'<ul class="orphans">{rows}</ul></div>'
+        )
+
     def questions_section(self) -> str:
         if not self.questions:
-            return self.section("questions", "Открытые вопросы", "", empty="Уточняющих вопросов нет.")
+            return self.section("questions", "Открытые вопросы", self.unattached_html(), empty="Уточняющих вопросов нет.")
         items = []
         for i, q in enumerate(self.questions):
             qid = _question_id(q, i)
@@ -1600,7 +1641,7 @@ class _Renderer:
         return self.section(
             "questions",
             f"Открытые вопросы ({open_q} из {len(self.questions)})",
-            tools + f'<ol class="qa-list">{"".join(items)}</ol>',
+            self.unattached_html() + tools + f'<ol class="qa-list">{"".join(items)}</ol>',
             empty="",
         )
 

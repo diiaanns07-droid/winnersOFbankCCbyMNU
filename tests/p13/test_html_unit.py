@@ -290,7 +290,7 @@ def test_verdict_and_first_actions_on_top(report):
     assert "Что сделать первым" in top
     actions = re.findall(r"<li>([^<]+) <span class=\"refs\">", top)
     assert actions[0].startswith("Решить, допускается ли второй push"), "первые действия упорядочены по order"
-    assert "Учтено ответов на вопросы" in top
+    assert "Ответов из --answers: 1; привязано к вопросам этого прогона: <a href=\"#questions\">1</a>." in top
     assert "блокируют тестирование" in top
 
 
@@ -434,3 +434,21 @@ def test_all_variants_render(any_variant, tmp_path):
     c = parse(out.read_text(encoding="utf-8"))
     for b in rep["document"]["blocks"]:
         assert c.texts[b["id"]] == b["text"]
+
+
+def test_decisions_without_question_in_this_run_are_visible(report):
+    """Движок заново строит вопросы: Decision с Q-ID прошлого прогона не должен пропасть из HTML."""
+    for i, q in enumerate(report["questions"]):
+        q["id"] = f"Q-{i + 1:03d}"  # нумерация нового прогона
+    report["decisions"] = [
+        {"question_id": "Q-01", "source_sha256": report["document"]["id"], "answer": "Да: повторный push разрешён.", "edits": []},
+    ]
+    text = H.render_html(report)
+    qs = section(text, "questions")
+    assert "Ответы из --answers без вопроса в этом прогоне" in qs and "Да: повторный push разрешён." in qs
+    assert "в этом прогоне нет вопроса Q-01" in qs
+    top = text[text.index('id="summary"') : text.index('id="workspace"')]
+    assert "привязано к вопросам этого прогона: <a href=\"#questions\">0</a>" in top and "без вопроса: 1" in top
+    assert "Ответ учтён при этом прогоне" not in qs
+    report["questions"] = []
+    assert "Да: повторный push разрешён." in section(H.render_html(report), "questions")
