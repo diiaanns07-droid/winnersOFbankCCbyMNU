@@ -15,6 +15,8 @@ from typing import Any, Iterable
 
 STAGE = "clarify"
 MAX_QUESTIONS = 10
+# лимит вывода с запасом: модели с рассуждением (haiku, Gemini Flash) тратят на него до 3/4 ответа
+OUTPUT_TOKENS = 24000
 OPTION_LETTERS = "ABCD"
 
 ROLES = ("Владелец продукта", "Аналитик", "Архитектор", "ИБ", "Тестирование")
@@ -296,7 +298,7 @@ def run(ctx: Any, findings: list[dict]) -> dict:
 
     warnings: list[str] = []
     try:
-        raw = ask_items(ctx, STAGE, relevant, build, SCHEMA, max_output_tokens=12000)
+        raw = ask_items(ctx, STAGE, relevant, build, SCHEMA, max_output_tokens=OUTPUT_TOKENS)
     except Exception as exc:  # noqa: BLE001 — вопросы не должны ронять весь прогон
         _warn(ctx, f"clarify: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); вопросы не сформированы")
         return {"questions": [], "status": "failed"}

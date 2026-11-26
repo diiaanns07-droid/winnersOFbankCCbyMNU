@@ -409,7 +409,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         return system, user
 
     try:
-        raw = _cl.ask_items(ctx, STAGE, affected, build, SCHEMA, max_output_tokens=12000)
+        raw = _cl.ask_items(ctx, STAGE, affected, build, SCHEMA, max_output_tokens=32000)
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"recheck: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); дефекты оставлены открытыми")
         for g in out_findings:
