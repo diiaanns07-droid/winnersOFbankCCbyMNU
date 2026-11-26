@@ -28,7 +28,8 @@ def _json(p: Path) -> dict:
 
 
 def _segment(case: str) -> list[dict]:
-    return _json(FIX / case / "segment.json")["requirements"]
+    """Нарезка, с которой записаны ответы модели (копия из bcc/v2 f26f06a): №04 меняет свои фикстуры, ID сдвигаются."""
+    return _json(QA / "segments" / f"{case}.json")["requirements"]
 
 
 def _check(**kw) -> dict:
@@ -144,6 +145,20 @@ def test_rows_keyed_by_line_and_resolved_by_line():
     assert "в строке 31" in no_table["candidates"][0]["title"]
 
 
+def test_line_wins_over_model_id():
+    out = lens_qa.postprocess({"acceptance_checks": [_check(row_requirement_id="R-04", row_line=30)]}, REQS)
+    assert out["acceptance_checks"][0]["row_requirement_id"] == "R-03"
+
+
+def test_recorded_answers_survive_resegmentation():
+    """Текущая нарезка №04 (другие ID): строки приёмки всё равно сопоставляются по номеру строки."""
+    reqs = _json(FIX / "official" / "segment.json")["requirements"]
+    out = lens_qa.postprocess(_json(QA / "official.sonnet.json"), reqs)
+    rows = {r["id"] for r in reqs if r["kind"] == "acceptance"}
+    assert {c["row_requirement_id"] for c in out["acceptance_checks"]} == rows
+    assert sum(c.get("origin") == "acceptance_check" for c in out["candidates"]) == 1
+
+
 def test_duplicate_row_dropped_and_missing_row_reported():
     out = lens_qa.postprocess({"acceptance_checks": [_check(), _check()]}, REQS)
     assert len(out["acceptance_checks"]) == 1
@@ -185,11 +200,11 @@ def test_test_cases_numbered_capped_and_undefined_marked():
     raw[2] = dict(tc, then="Итог 12. Не определено требованиями: код ответа", expected_defined=True)
     out = lens_qa.postprocess({"test_cases": raw}, REQS)
     tests = out["test_cases"]
-    assert len(tests) == 15 and [t["id"] for t in tests[:3]] == ["T-01", "T-02", "T-03"]
+    assert len(tests) == lens_qa.MAX_TEST_CASES and [t["id"] for t in tests[:3]] == ["T-01", "T-02", "T-03"]
     assert list(tests[0])[0] == "id"
     assert tests[1]["then"].startswith("Не определено требованиями") and not tests[1]["expected_defined"]
     assert not tests[2]["expected_defined"]
-    assert any("оставлено 15" in w for w in out["warnings"])
+    assert any(f"оставлено {lens_qa.MAX_TEST_CASES}" in w for w in out["warnings"])
 
 
 # ---------------------------------------------------------------- записанные ответы модели
@@ -206,7 +221,7 @@ def test_official_k1_found_via_acceptance_checks(model):
     assert {"R-14", "R-06"} <= set(k1[0]["requirement_ids"])
     assert {38, 64} <= {e["line"] for e in k1[0]["evidence"]}
     assert out["warnings"] == [] or all("тест-кейсов" in w for w in out["warnings"])
-    assert 10 <= len(out["test_cases"]) <= 15
+    assert 10 <= len(out["test_cases"]) <= lens_qa.MAX_TEST_CASES
 
 
 @pytest.mark.parametrize("case", ["autopay.base", "cardblock.base", "cashback.base", "transfer_limit.base"])
@@ -312,3 +327,58 @@ def test_run_survives_failed_extra_call():
     out = lens_qa.run(_Ctx(llm, REQS))
     assert len(out["acceptance_checks"]) == 1
     assert any("перегрузка" in w for w in out["warnings"])
+
+
+def test_run_truncated_main_answer_falls_back_to_split_calls():
+    from bcc_review.v2.llm import Truncated
+
+    class _Trunc(_LLM):
+        def ask(self, stage, system, user, schema, **kw):
+            self.calls.append((stage, user))
+            if stage == "lens_qa":
+                raise Truncated(stage)
+            if stage == "lens_qa_short":
+                assert "пустой список" in user
+                return {"acceptance_checks": [], "candidates": [], "test_cases": [
+                    {"requirement_ids": ["R-01"], "title": "Граница", "given": "Значение 12", "when": "Добавить 1",
+                     "then": "Итог 12", "gap": "", "expected_defined": True}]}
+            return {"acceptance_checks": [_check(verdict="match"), _check(row_requirement_id="R-04", row_line=31,
+                                                                          stated_line=31)],
+                    "candidates": [], "test_cases": []}
+
+    warned: list[str] = []
+    ctx = _Ctx(_Trunc([]), REQS)
+    ctx.warn = warned.append
+    out = lens_qa.run(ctx)
+    assert [s for s, _ in ctx.llm.calls] == ["lens_qa", "lens_qa_short", "lens_qa_rows"]
+    assert len(out["acceptance_checks"]) == 2 and out["test_cases"][0]["id"] == "T-01"
+    assert out["_partial"] is True and any("обрезан" in w for w in warned)
+    assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_provider_error_about_output_limit_counts_as_truncation():
+    from bcc_review.v2.llm import LLMError
+
+    class _CliLimit(_LLM):
+        def ask(self, stage, system, user, schema, **kw):
+            self.calls.append((stage, user))
+            if stage == "lens_qa":
+                raise LLMError(stage, "unknown", "claude -p: API Error: Claude's response exceeded the 16000 "
+                                                 "output token maximum.")
+            return {"acceptance_checks": [_check(verdict="match"), _check(row_requirement_id="R-04", row_line=31,
+                                                                          stated_line=31, verdict="match")]
+                    if stage == "lens_qa_rows" else [], "candidates": [], "test_cases": []}
+
+    out = lens_qa.run(_Ctx(_CliLimit([]), REQS))
+    assert len(out["acceptance_checks"]) == 2 and out["_partial"] is True
+
+
+def test_other_provider_errors_are_not_swallowed():
+    from bcc_review.v2.llm import LLMError
+
+    class _Down(_LLM):
+        def ask(self, stage, system, user, schema, **kw):
+            raise LLMError(stage, "network", "соединение разорвано")
+
+    with pytest.raises(LLMError):
+        lens_qa.run(_Ctx(_Down([]), REQS))
