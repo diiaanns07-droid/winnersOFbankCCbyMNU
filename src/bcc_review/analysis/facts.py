@@ -202,6 +202,72 @@ def _head_phrase(prefix: str, max_tokens: int = 2) -> tuple[Optional[str], Optio
     return " ".join(head), adj
 
 
+# Слова, которые стоят между величиной и числом, но саму величину не называют: «задаётся целым числом от …»,
+# «Поле days вне диапазона от …».
+_NOT_QTY = frozenset("""
+    число числом числа значение значением значения целым целое целого целый целая дробным дробное натуральным
+    диапазон диапазона диапазоне пределах пределов интервале интервала
+""".split())
+_QTY_PREP = _PREP | {"вне"}
+_QTY_LABEL = frozenset("поле параметр атрибут".split())
+_COPULA = ("составля", "равн", "явля", "быть", "будет", "станов")
+
+
+def _qty_group(words: list[str], *, drop_pp: bool) -> list[str]:
+    out: list[str] = []
+    skip = 0
+    for w in words:
+        lw = w.lower().replace("ё", "е")
+        if skip:
+            skip -= 1
+            continue
+        if drop_pp and lw in _QTY_PREP:
+            skip = 1  # предложная группа «на карте», «от суммы» — обстоятельство, а не величина
+            continue
+        if lw.isdigit() or lw in _NOT_QTY or (lw in STOPWORDS and lw not in _PREP):
+            continue
+        out.append(w)
+    while out and out[-1].lower() in _QTY_PREP:
+        out.pop()
+    if len(out) > 1 and out[0].lower() in _QTY_LABEL:
+        out = out[1:]  # «Поле days» → «days»
+    return out
+
+
+def _quantity(prefix: str) -> tuple[Optional[str], frozenset]:
+    """Величина, к которой относится граница, и ключи её клаузы.
+
+    Возвратный глагол или связка («задаётся», «составляет», «должна быть») — величина в подлежащем:
+    «Порог баланса задаётся целым числом от …». Переходный глагол — величина в прямом дополнении:
+    «Клиент задаёт лимит целым числом от …», «Банк резервирует на карте сумму от …». Без глагола —
+    вся именная группа без служебных слов («Лимит вне диапазона от …»).
+    """
+    parts = re.split(r"[.;|\n]|:(?=\s|$)", strip_md(prefix))
+    clause = next((c for c in reversed(parts) if re.search(r"[A-Za-zА-Яа-яЁё]{2}", c)), "")
+    clause = re.sub(r"^\W*(?:[A-Za-zА-Яа-яЁё]{1,5}-\d+(?:\.\d+)*)\.?\W*", "", clause)
+    toks = _WORD.findall(clause)
+    # первое слово предложения в требованиях — подлежащее, даже если похоже на глагол («Лимит»)
+    vi = next((i for i, t in enumerate(toks) if i > 0 and _is_verb(t)), None)
+    if vi is None:
+        name = _qty_group(toks, drop_pp=True)
+    else:
+        verb = toks[vi].lower().replace("ё", "е")
+        subj = _qty_group(toks[:vi], drop_pp=False)
+        obj = _qty_group(toks[vi + 1:], drop_pp=True)
+        linking = verb.endswith(("ся", "сь")) or verb.startswith(_COPULA)
+        name = subj if (linking or not obj) and subj else obj
+    return (" ".join(name) or None), frozenset(key_set(clause))
+
+
+def _head_key(name: Any) -> Optional[str]:
+    """Основа главного слова именной группы: первое слово, не являющееся прилагательным."""
+    words = [w for w in _WORD.findall(strip_md(name)) if w.lower() not in STOPWORDS and len(w) >= 3 and not w.isdigit()]
+    for w in words:
+        if not _is_adj(w):
+            return keys_of(w)[0] if keys_of(w) else None
+    return keys_of(words[0])[0] if words and keys_of(words[0]) else None
+
+
 def _actor(sentence: str) -> Optional[str]:
     """Субъект действия: слова от начала предложения до первого глагола."""
     s = re.sub(r"^\W*(?:[A-Za-zА-Яа-яЁё]{1,4}-\d+(?:\.\d+)*)\.?\W*", "", strip_md(sentence))
@@ -231,6 +297,14 @@ _RANGE_TEXT_RE = re.compile(
     re.I,
 )
 _RANGE_DASH_RE = re.compile(rf"(?P<a>{NUM})\s*(?P<cura>{CUR})?\s*[–—-]\s*(?P<b>{NUM})\s*(?P<curb>{CUR})?", re.I)
+# Две границы словами: «не меньше 200 ₸ и не больше 5 000 ₸», «не меньше 1 000 ₸ и строго меньше 2 000 000 ₸».
+# «не меньше/не больше» включают границу, «больше/меньше/свыше» — исключают.
+_RANGE_WORDS_RE = re.compile(
+    rf"(?<![А-Яа-яЁёA-Za-z])(?P<lo>не\s+меньше|не\s+менее|(?:строго\s+)?больше|(?:строго\s+)?более|свыше)\s+"
+    rf"(?P<a>{NUM})\s*(?P<cura>{CUR})?\s*,?\s*(?:но\s+|и\s+|а\s+)?"
+    rf"(?P<hi>не\s+больше|не\s+более|(?:строго\s+)?меньше|(?:строго\s+)?менее)\s+(?P<b>{NUM})\s*(?P<curb>{CUR})?",
+    re.I,
+)
 _UNIT_STMT_RE = re.compile(r"\s(?:в|во)\s+(?P<u>тиын\w*|тиин\w*|тенге|kzt)\b", re.I)
 _MONEY_DEF_RE = re.compile(
     rf"(?P<conn>\s+(?:—|-|–|составляет|равн[аоы]|равен|в размере|хранится как|хранится в виде|=)\s+|\s*:\s*)"
@@ -998,6 +1072,7 @@ class Fact:
     cells: dict = dc_field(default_factory=dict)
     notes: list = dc_field(default_factory=list)
     enriched_by: list = dc_field(default_factory=list)
+    context: frozenset = frozenset()  # ключи клаузы текстового факта до числа (для выравнивания по полному имени)
 
     def alias_keys(self) -> set[tuple]:
         out = set()
@@ -1330,7 +1405,11 @@ class _FactBuilder:
     def _scan(self, bid: str, text: str, base: int, role: str, label: Optional[str]) -> None:
         full = self.view.text(bid)
         taken: list[tuple[int, int]] = []
-        for m in _RANGE_TEXT_RE.finditer(text):
+        bounds = [(m, (True, True) if m.group("incl") else (None, None)) for m in _RANGE_TEXT_RE.finditer(text)]
+        for m in _RANGE_WORDS_RE.finditer(text):
+            if not any(m2.start() < m.end() and m.start() < m2.end() for m2, _ in bounds):
+                bounds.append((m, (norm(m.group("lo")).startswith("не"), norm(m.group("hi")).startswith("не"))))
+        for m, (lo_incl, hi_incl) in sorted(bounds, key=lambda x: x[0].start()):
             if re.match(rf"\s*(?:{_MONTH_WORDS})", text[m.end("b"):], re.I):
                 continue
             a, b = parse_num(m.group("a")), parse_num(m.group("b"))
@@ -1338,12 +1417,14 @@ class _FactBuilder:
                 continue
             unit = unit_of(m.group("cura") or m.group("curb"))
             phrase, adj = _head_phrase(text[: m.start()])
-            incl = True if m.group("incl") else None
-            f = Fact(field=phrase, source="text", unit=unit)
+            name, context = _quantity(text[: m.start()])
+            f = Fact(field=name or phrase, source="text", unit=unit, context=context)
+            if name and phrase and tuple(keys_of(phrase)) != tuple(keys_of(name)):
+                f.notes.append(f"рядом с числом: «{phrase}»")
             f.subject = _actor(text[: m.start()])
             if adj and norm_type(adj) == "integer":
                 f.type = "integer"
-            f.range = make_range(a, b, unit, incl, incl)
+            f.range = make_range(a, b, unit, lo_incl, hi_incl)
             f.evidence = evidence_of(bid, full, base + m.start(), base + m.end())
             f.cells["range"] = f.evidence
             self.add(f)
@@ -1816,12 +1897,18 @@ def _dim(unit: Optional[str]) -> Optional[str]:
     return unit
 
 
-def _range_minor(f: Fact) -> Optional[tuple[Decimal, Decimal, Optional[bool], Optional[bool]]]:
+def _range_minor(f: Fact, unit: Optional[str] = None) -> Optional[tuple[Decimal, Decimal, Optional[bool], Optional[bool]]]:
+    """Границы в тиынах для денег; ``unit`` — единица, если у факта она не указана (берётся у второго факта)."""
     r = f.range
     if not r:
         return None
     if _dim(f.unit) == "money":
         lo, hi = r.get("min_minor"), r.get("max_minor")
+        if lo is None or hi is None:
+            return None
+        return Decimal(lo), Decimal(hi), r.get("min_inclusive"), r.get("max_inclusive")
+    if f.unit is None and _dim(unit) == "money":
+        lo, hi = to_minor(Decimal(r["min"]), unit), to_minor(Decimal(r["max"]), unit)
         if lo is None or hi is None:
             return None
         return Decimal(lo), Decimal(hi), r.get("min_inclusive"), r.get("max_inclusive")
@@ -1847,13 +1934,35 @@ def _fmt_val(v: Decimal, f: Fact) -> str:
     return fmt_num(v)
 
 
+def _qty_name(*facts: Fact) -> str:
+    """Самое полное человеческое имя величины среди выровненных фактов: «Сумма резерва», а не «сумму» или «amount»."""
+    names = [n for f in facts for n in ([f.field] if f.source == "text" else []) + list(f.aliases) + [f.field] if n]
+    return max(names, key=lambda n: len(keys_of(n))) if names else "значение"
+
+
+_UNIT_IN = {"KZT": "тенге", "tiyn": "тиынах"}
+
+
 def aligned(a: Fact, b: Fact) -> bool:
     if a.binding and b.binding:
         return norm(a.binding) == norm(b.binding)
     if a.source in ("table", "example") and b.source in ("table", "example") and a.subject and b.subject \
             and a.subject != b.subject:
         return False
-    return bool(a.alias_keys() & b.alias_keys())
+    return bool(a.alias_keys() & b.alias_keys()) or _named_in_clause(a, b) or _named_in_clause(b, a)
+
+
+def _named_in_clause(q: Fact, t: Fact) -> bool:
+    """Текстовый факт t назван коротко («Банк резервирует на карте сумму от …» → «сумму»), а полное имя q
+    («Сумма резерва») целиком входит в клаузу t и начинается с того же главного слова."""
+    if t.source != "text" or not t.context or not t.field:
+        return False
+    head, tk = _head_key(t.field), keys_of(t.field)
+    for name in [q.field, *q.aliases]:
+        k = keys_of(name) if name else []
+        if len(k) > len(tk) and _head_key(name) == head and set(k) <= t.context:
+            return True
+    return False
 
 
 class Comparator:
@@ -1903,7 +2012,11 @@ class Comparator:
             return
         if _dim(a.unit) != _dim(b.unit) and a.unit and b.unit:
             return
-        ra, rb = _range_minor(a), _range_minor(b)
+        if a.unit != b.unit and _dim(a.unit) == _dim(b.unit) == "money" and \
+                (Decimal(a.range["min"]), Decimal(a.range["max"])) == (Decimal(b.range["min"]), Decimal(b.range["max"])):
+            self._unit_conflict(a, b)  # те же числа, другая единица — это расхождение единиц, а не границ
+            return
+        ra, rb = _range_minor(a, b.unit), _range_minor(b, a.unit)  # единица не указана — как у второго факта
         if ra is None or rb is None:
             return
         if ra[:2] == rb[:2]:
@@ -1934,14 +2047,51 @@ class Comparator:
                 self._range_conflict(a, b, ra, rb, v, from_doc=v in bounds)
                 return
 
+    def _unit_conflict(self, a: Fact, b: Fact) -> None:
+        """Одни и те же числа одной величины записаны в ₸ и в тиынах: значения расходятся в 100 раз."""
+        name = _qty_name(a, b)
+        lo, hi = Decimal(a.range["min"]), Decimal(a.range["max"])
+        nums = f"{fmt_num(lo)}–{fmt_num(hi)}"
+        ua, ub = UNIT_LABEL[a.unit], UNIT_LABEL[b.unit]
+        va, vb = fmt_money(to_minor(lo, a.unit), "tiyn"), fmt_money(to_minor(lo, b.unit), "tiyn")
+        ev = lambda f: f.evidence if f.source == "table" else f.ev_for("range")  # noqa: E731 — строка таблицы несёт и число, и единицу
+        ea, eb = ev(a), ev(b)
+        witness = {
+            "input": {"description": f"«{name}» на нижней границе: {fmt_num(lo)}",
+                      "document_data": [{"name": f"границы по {_label(a, self.view)}", "value": f"{nums} {ua}", "evidence": ea},
+                                        {"name": f"границы по {_label(b, self.view)}", "value": f"{nums} {ub}", "evidence": eb}],
+                      "illustrative": []},
+            "outcome_a": f"{fmt_num(lo)} {ua} = {va} (по {_label(a, self.view)})",
+            "outcome_b": f"{fmt_num(lo)} {ub} = {vb} (по {_label(b, self.view)})",
+            "outcome_a_value": va, "outcome_b_value": vb, "outcome_target": f"«{name}» в тиынах",
+            "evidence_a": ea, "evidence_b": eb,
+        }
+        cmp = self.log("unit", "mismatch", [a, b],
+                       f"Одни и те же числа {nums} у «{name}» записаны в {_UNIT_IN[a.unit]} и в {_UNIT_IN[b.unit]}: "
+                       f"значения расходятся в 100 раз.")
+        self.candidates.append(make_candidate(
+            "conflict", f"«{name}»: одни и те же числа {nums} в {_UNIT_IN[a.unit]} и в {_UNIT_IN[b.unit]}",
+            f"Одна величина описана в разных единицах: {fmt_num(lo)} {ua} = {va}, а {fmt_num(lo)} {ub} = {vb}. "
+            f"Реализация и тесты получат значения, отличающиеся в 100 раз.",
+            [ea, eb], witness=witness, origin="facts", comparison_id=cmp["id"], conflict_type="unit_mismatch",
+            cause_object=name,
+            blocked_decision=f"в какой единице передавать, хранить и проверять «{name}»",
+            recommendation=f"Указать одну единицу для «{name}» во всех разделах (или пересчитать числа) и добавить "
+                           f"пример приёмки со значением на границе.",
+            checks={"evidence": "program", "preconditions": "program", "outcomes": "program"},
+        ))
+
     def _range_conflict(self, a: Fact, b: Fact, ra: tuple, rb: tuple, v: Decimal, from_doc: bool) -> None:
         ina, inb = _within(ra, v), _within(rb, v)
-        val = _fmt_val(v, a)
+        fa = a if a.unit or not b.unit else b  # формат денег: единица не указана — как у второго факта
+        fb = b if b.unit or not a.unit else a
+        val = _fmt_val(v, fa)
+        name = _qty_name(a, b)
         ok, no = "значение допустимо", "значение отклоняется как выходящее за границы"
         ev_a, evb = a.ev_for("range"), b.ev_for("range")
         doc_items = [
-            {"name": f"границы по {_label(a, self.view)}", "value": f"{_fmt_val(ra[0], a)}–{_fmt_val(ra[1], a)}", "evidence": ev_a},
-            {"name": f"границы по {_label(b, self.view)}", "value": f"{_fmt_val(rb[0], b)}–{_fmt_val(rb[1], b)}", "evidence": evb},
+            {"name": f"границы по {_label(a, self.view)}", "value": f"{_fmt_val(ra[0], fa)}–{_fmt_val(ra[1], fa)}", "evidence": ev_a},
+            {"name": f"границы по {_label(b, self.view)}", "value": f"{_fmt_val(rb[0], fb)}–{_fmt_val(rb[1], fb)}", "evidence": evb},
         ]
         illus = [] if from_doc else [{
             "name": a.field, "value": val,
@@ -1949,8 +2099,8 @@ class Comparator:
         }]
         witness = {
             "input": {
-                "description": f"Задать «{a.field}» = {val}",
-                "document_data": doc_items + ([{"name": a.field, "value": val, "evidence": ev_a if ina else evb}] if from_doc else []),
+                "description": f"Задать «{name}» = {val}",
+                "document_data": doc_items + ([{"name": name, "value": val, "evidence": ev_a if ina else evb}] if from_doc else []),
                 "illustrative": illus,
             },
             "outcome_a": f"{ok if ina else no} (по {_label(a, self.view)})",
@@ -1958,14 +2108,18 @@ class Comparator:
             "evidence_a": ev_a,
             "evidence_b": evb,
         }
+        same = ra[:2] == rb[:2]
         cmp = self.log("range", "mismatch", [a, b],
-                       f"Разные границы одного поля: {doc_items[0]['value']} и {doc_items[1]['value']}; при {val} исходы расходятся.")
+                       (f"Граница {val} у «{name}» включена в одном месте и исключена в другом." if same else
+                        f"Разные границы одного поля: {doc_items[0]['value']} и {doc_items[1]['value']}; при {val} исходы расходятся."))
         self.candidates.append(make_candidate(
             "conflict",
-            f"Разные границы «{a.field}»: {doc_items[0]['value']} и {doc_items[1]['value']}",
+            (f"«{name}»: граница {val} включена в одном месте и исключена в другом" if same else
+             f"Разные границы «{name}»: {doc_items[0]['value']} и {doc_items[1]['value']}"),
             f"Для значения {val} одна часть документа требует принять ввод, другая — отклонить; разработка "
             f"и тесты не смогут выполнить оба утверждения.",
-            [ev_a, evb], witness=witness, origin="facts", comparison_id=cmp["id"],
+            [ev_a, evb], witness=witness, origin="facts", comparison_id=cmp["id"], conflict_type="boundary_conflict",
+            cause_object=name,
             checks={"evidence": "program", "preconditions": "program", "outcomes": "program"},
         ))
 
