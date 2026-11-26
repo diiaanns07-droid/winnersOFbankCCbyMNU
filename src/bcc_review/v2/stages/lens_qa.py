@@ -398,20 +398,45 @@ def retry_instruction(missing: list[str]) -> str:
             + ", ".join(missing) + ". Сделай acceptance_checks только для них; candidates и test_cases — пустые.")
 
 
+def focus_instruction(rows: list[str], rest: int) -> str:
+    """Добавка к первому вызову, если строк приёмки больше :data:`BATCH_ROWS`: остальные идут отдельными вызовами."""
+    return ("\n\n### Дополнительно\nВ этом ответе исполни только строки критериев приёмки "
+            + ", ".join(rows) + f". Остальные {rest} строк будут исполнены отдельным запросом. "
+            "candidates и test_cases — по всему документу, как обычно.")
+
+
+BATCH_ROWS = 10
+
+
+def _ask_rows(ctx: Any, system: str, user: str, rows: list[str], stage: str, warnings: list[str]) -> list:
+    try:
+        extra = ctx.llm.ask(stage, system, user + retry_instruction(rows), SCHEMA) or {}
+    except Exception as exc:  # дополнительный вызов — улучшение, а не условие работы линзы
+        warnings.append(f"{STAGE}: строки приёмки {', '.join(rows)} не исполнены: {exc}")
+        return []
+    return [c for c in extra.get("acceptance_checks") or [] if isinstance(c, Mapping)]
+
+
 def run(ctx: Any) -> dict:
-    """Запуск линзы на контексте каркаса v2 (ctx.prompt, ctx.llm, ctx.requirements)."""
+    """Запуск линзы на контексте каркаса v2 (ctx.prompt, ctx.llm, ctx.requirements).
+
+    Вызовы: один основной; если строк приёмки больше BATCH_ROWS — по одному на каждые следующие BATCH_ROWS строк
+    (ответ не упирается в лимит вывода); затем не больше одного повтора по строкам, которые модель пропустила.
+    """
     system, user = ctx.prompt(STAGE)
-    data = dict(ctx.llm.ask(STAGE, system, user, SCHEMA) or {})
     reqs = list(getattr(ctx, "requirements", None) or [])
-    missing = missing_rows([normalize_check(c) for c in data.get("acceptance_checks") or []
-                            if isinstance(c, Mapping)], reqs)
+    rows = acceptance_rows(reqs)
+    first, later = rows[:BATCH_ROWS], rows[BATCH_ROWS:]
+    warnings: list[str] = []
+    main_user = user + focus_instruction(first, len(later)) if later else user
+    data = dict(ctx.llm.ask(STAGE, system, main_user, SCHEMA) or {})
+    checks = [c for c in data.get("acceptance_checks") or [] if isinstance(c, Mapping)]
+    for i in range(0, len(later), BATCH_ROWS):
+        checks += _ask_rows(ctx, system, user, later[i:i + BATCH_ROWS], f"{STAGE}_rows", warnings)
+    missing = missing_rows([normalize_check(c) for c in checks], reqs)
     if missing:
-        try:
-            extra = ctx.llm.ask(f"{STAGE}_retry", system, user + retry_instruction(missing), SCHEMA) or {}
-            data["acceptance_checks"] = list(data.get("acceptance_checks") or []) + list(
-                extra.get("acceptance_checks") or [])
-        except Exception as exc:  # повтор — улучшение, а не условие работы линзы
-            data.setdefault("_warnings", []).append(f"{STAGE}: повтор по пропущенным строкам не удался: {exc}")
+        checks += _ask_rows(ctx, system, user, missing[:BATCH_ROWS], f"{STAGE}_retry", warnings)
+    data["acceptance_checks"] = checks
     out = postprocess(data, reqs)
-    out["warnings"] = list(data.get("_warnings") or []) + out["warnings"]
+    out["warnings"] = warnings + out["warnings"]
     return out

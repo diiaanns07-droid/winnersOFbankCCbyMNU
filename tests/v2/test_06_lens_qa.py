@@ -281,3 +281,34 @@ def test_other_topic_both_acceptance_conflicts_found():
     assert len(crit) == 2 and all(c["severity"] == "critical" for c in crit)
     assert {19, 39} <= {e["line"] for e in crit[0]["evidence"]}
     assert {20, 40} <= {e["line"] for e in crit[1]["evidence"]}
+
+
+def test_run_batches_many_acceptance_rows():
+    reqs = [{"id": f"R-{i:02d}", "source_id": "", "kind": "acceptance", "line_start": 100 + i, "line_end": 100 + i}
+            for i in range(1, 24)]
+
+    def answer(ids):
+        return {"acceptance_checks": [_check(row_requirement_id=r, row_line=100 + int(r[2:]), verdict="match")
+                                      for r in ids], "candidates": [], "test_cases": []}
+
+    ids = [r["id"] for r in reqs]
+    llm = _LLM([answer(ids[:10]), answer(ids[10:20]), answer(ids[20:])])
+    out = lens_qa.run(_Ctx(llm, reqs))
+    assert len(llm.calls) == 3
+    assert "R-01" in llm.calls[0][1] and "13 строк" in llm.calls[0][1]
+    assert "R-11" in llm.calls[1][1] and "R-21" in llm.calls[2][1]
+    assert len(out["acceptance_checks"]) == 23 and out["warnings"] == []
+
+
+def test_run_survives_failed_extra_call():
+    class _Failing(_LLM):
+        def ask(self, stage, system, user, schema, **kw):
+            if self.calls:
+                self.calls.append((stage, user))
+                raise RuntimeError("перегрузка")
+            return super().ask(stage, system, user, schema)
+
+    llm = _Failing([{"acceptance_checks": [_check(verdict="match")], "candidates": [], "test_cases": []}])
+    out = lens_qa.run(_Ctx(llm, REQS))
+    assert len(out["acceptance_checks"]) == 1
+    assert any("перегрузка" in w for w in out["warnings"])
