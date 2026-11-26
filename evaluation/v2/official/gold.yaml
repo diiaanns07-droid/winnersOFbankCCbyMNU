@@ -1,0 +1,795 @@
+# Эталон дефектов официального документа хакатона (release/input/requirements.md, 198 строк).
+# Источник: docs/task-analysis.md, раздел 5 (К1–К5, С1–С20, незначительные М1–М8).
+# Формат bcc-v2-gold/1, читает evaluation/v2/score.py.
+#
+# Поля дефекта:
+#   id, level (critical|major|minor) — уровень в эталоне, severity_ok — какая серьёзность в отчёте считается верной;
+#   title, essence — суть; parent — общий id для частей одного эталонного пункта (М2а…М2д → М2);
+#   anchors.groups — группы строк-опор («38», «165-171», «40,126»); для конфликта — обе стороны;
+#   anchors.policy — all: замечание должно сослаться на каждую группу; any: достаточно одной;
+#   keywords.groups — регулярные выражения (регистр не важен, ё = е) по тексту замечания без цитат;
+#   keywords.min — сколько групп должно совпасть; kinds — допустимые `kind` (несовпадение не запрещает пару,
+#   но снижает оценку); related — близкие пункты эталона (подсказка арбитру).
+# Номера строк — по release/input/requirements.md; для PDF счётчик находит строки по тексту цитат.
+schema: bcc-v2-gold/1
+document: release/input/requirements.md
+sha256: e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381
+expected_verdict: {development: "no", testing: "no"}
+fix_order: [К2, К5, К4, К3, К1]
+targets:
+  findings_min: 25
+  findings_max: 45
+  report_lines_max: 900
+  critical_found_min: 5
+  critical_as_critical_min: 4
+  major_found_min: 16
+
+items:
+  # ───────────────────────────── 🔴 критичные ─────────────────────────────
+  - id: К1
+    level: critical
+    severity_ok: [critical]
+    title: 'Критерий приёмки №2 противоречит Ф-2'
+    essence: >-
+      Ф-2 относит покупку к месяцу по дате совершения, значит, покупка 31.01 в 23:58 попадает в январь,
+      а критерий приёмки №2 ожидает рост февральского счётчика. У «31 января 23:58» нет часового пояса.
+    anchors:
+      policy: all
+      groups:
+        - {lines: "38", quote: "Месяц определяется по дате совершения покупки в Алматы."}
+        - {lines: "64", quote: "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"}
+    keywords:
+      min: 2
+      groups:
+        - 'приемк|критери|ожидаем'
+        - 'феврал|январ|23:58|00:03|31\.01|01\.02|31 январ|1 феврал'
+        - 'совершени|дат[аеуы]? (покупк|совершен)|по дате|месяц[ауе]? (покупк|расход)|отнесен|относ'
+    kinds: [event_conflict, contradiction, incorrect, boundary_conflict, unit_mismatch, ambiguity]
+    owners: [qa, consistency]
+    related: [С9, С18, М8]
+
+  - id: К2
+    level: critical
+    severity_ok: [critical]
+    title: 'Ф-3 противоречит Ф-4'
+    essence: >-
+      Ф-3 разрешает не больше одного push за календарный месяц, Ф-4 требует push после смены порога
+      «независимо от истории». Если push в этом месяце уже был, требования дают противоположные ответы.
+    anchors:
+      policy: all
+      groups:
+        - {lines: "39", quote: "На карту приходится максимум один такой push за календарный месяц."}
+        - {lines: "40,126", quote: "следующее достижение вызывает push независимо от истории предыдущей настройки"}
+    keywords:
+      min: 2
+      groups:
+        - 'один|одного|максимум|не более|не больше|лимит|ограничени'
+        - 'независимо|истори|повторн|втор(ой|ого)|еще (один|раз)'
+        - 'смен|изменени|нов(ый|ого|ому) порог'
+    kinds: [event_conflict, contradiction, ambiguity, incomplete, boundary_conflict]
+    owners: [consistency, analyst]
+    related: [С8, М4а]
+
+  - id: К3
+    level: critical
+    severity_ok: [critical]
+    title: 'Неверная сумма в API описана двумя способами (400 и 200 с ERROR)'
+    essence: >-
+      Статус 400 — «параметры заполнены неверно», но пример ответа 200 содержит result=ERROR «Проверьте сумму»;
+      200 назван успешным, а заголовок «200. Successful — Created» соответствует коду 201.
+    anchors:
+      policy: all
+      groups:
+        - {lines: "121,151,162,163,178-181", quote: "Ответ в случае, если параметры запроса заполнены неверно."}
+        - {lines: "165-171", quote: "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"}
+    keywords:
+      min: 2
+      groups:
+        - '\b400\b|bad request'
+        - '\b200\b|created|\b201\b'
+        - 'error|ошибк|отклонени|неверн|некоррект|успешн'
+    kinds: [status_conflict, contradiction, api_contract, ambiguity, incorrect]
+    owners: [architect, consistency]
+    related: [С2, С15, С19]
+
+  - id: К4
+    level: critical
+    severity_ok: [critical]
+    title: 'Нет метода чтения настроек'
+    essence: >-
+      Часть A: приложение читает и сохраняет настройки через дочерний документ, UI показывает порог и сумму
+      за месяц; в части B описан только метод сохранения, чтения настроек и суммы за месяц нет.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "52", quote: "Приложение читает и сохраняет настройки через дочерний документ"}
+        - {lines: "29", quote: "На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»."}
+        - {lines: "103", quote: "Сохранение порога. Функциональные требования: чтение порога"}
+    keywords:
+      min: 2
+      groups:
+        - 'чтени|читае|получени|получить|загрузк|отобра|показ|get-метод|метод.{0,20}(чтени|получени)'
+        - 'нет|отсутств|не описан|не определ|только (метод )?сохранени|не предусмотр|единственн'
+        - 'метод|api|endpoint|эндпоинт|контракт|операци'
+    kinds: [missing_element, incomplete, api_contract, traceability, contradiction]
+    owners: [architect, consistency]
+    related: [М6, С17]
+
+  - id: К5
+    level: critical
+    severity_ok: [critical]
+    title: 'Не определены событие процессинга и «проведённая покупка»'
+    essence: >-
+      Неясно, что такое «проведённая» покупка: авторизация (холд) или клиринг через 1–3 дня. Цель «в момент
+      покупки» и НФТ «в течение минуты» несовместимы с подсчётом клиринговых операций; не описаны состав
+      события, тип операции, ссылка возврата на исходную покупку.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "38", quote: "В расходы входят проведённые покупки."}
+        - {lines: "23", quote: "Дать клиенту возможность узнать о достижении личного бюджета в момент покупки."}
+        - {lines: "34", quote: "Проведение покупки → пересчёт расходов"}
+        - {lines: "43", quote: "Процессинг → сервис расходов: проведена покупка."}
+        - {lines: "46", quote: "Сервис передаёт push на отправку в течение минуты после получения события."}
+    keywords:
+      min: 2
+      groups:
+        - 'клиринг|холд|захолд|блокировк\w* средств|финансов\w* (подтвержд|проведени)|авторизаци\w*.{0,60}(клиринг|списани|проведени|расчет)|(клиринг|списани|проведени|расчет).{0,60}авторизаци'
+        - 'проведенн|проведен\w* покуп|что (считается|значит|такое) .{0,3}проведен|состав\w* событ|тип\w* событ|событи\w* (от )?процессинг|момент\w* (учета|проведени|отнесени)'
+        - 'событи|в момент покупки|момент покупки|в течение минуты|задержк|через \d.{0,5}(дн|сут)'
+    kinds: [ambiguity, incomplete, missing_element, contradiction, event_conflict, infeasible, terminology]
+    owners: [risk, analyst]
+    related: [С7, С13, С14]
+
+  # ───────────────────────────── 🟠 существенные ─────────────────────────────
+  - id: С1
+    level: major
+    severity_ok: [major, critical]
+    title: 'GET для изменения данных; параметры в URL; Content-Type без тела'
+    essence: >-
+      saveLimit меняет данные, но объявлен как GET (по RFC 9110 GET безопасен); cardId и порог попадают в URL
+      и логи прокси; указан Content-Type application/json, хотя тело не используется.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "104", quote: "GET"}
+        - {lines: "108,109", quote: "curl -G"}
+        - {lines: "147,148", quote: "Тело не используется."}
+    keywords:
+      min: 2
+      groups:
+        - '\bget\b|content-type|тел[оа] (запроса )?не использ|query|строк\w* запроса'
+        - 'безопасн|идемпотент|изменя|сохранени|запис|\bpost\b|\bput\b|\bpatch\b|url|лог|кэш|прокси|тело'
+    kinds: [api_contract, security, design_constraint, incorrect, contradiction, ops_risk]
+    owners: [architect, risk]
+    related: [С20]
+
+  - id: С2
+    level: major
+    severity_ok: [major, critical]
+    title: '403 ↔ 404; 201 не описан; «400, 401 и далее» — открытый перечень'
+    essence: >-
+      Под заголовком «403. Forbidden» сказано «возвращается 404», кода 404 нет в списке статусов; 201 упомянут,
+      но не описан; «400, 401 и далее» — открытый перечень статусов.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "188-193", quote: "Для чужой карты возвращается 404, как и для отсутствующей карты."}
+        - {lines: "175", quote: "Ответ в случае, если на указанный ресурс доступ запрещен."}
+        - {lines: "151", quote: "Если результат 400, 401 и далее — неуспешный."}
+    keywords:
+      min: 2
+      groups:
+        - '\b403\b|\b404\b|\b201\b|и далее|forbidden|not found'
+        - 'нет|отсутств|не описан|противореч|расход|не совпад|не указан|открыт|перечень|заголов|неясно'
+    kinds: [status_conflict, contradiction, api_contract, incomplete, missing_element, ambiguity]
+    owners: [architect]
+    related: [К3, С19]
+
+  - id: С3
+    level: major
+    severity_ok: [major]
+    title: 'Типы полей amount и enabled в запросе и ответе расходятся'
+    essence: 'amount и enabled в запросе integer, в ответе string.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "143,144", quote: "integer"}
+        - {lines: "156,157", quote: "string"}
+    keywords:
+      min: 2
+      groups:
+        - 'integer|string|строк|числ|тип'
+        - 'amount|enabled|сумм|признак|поле|поля'
+    kinds: [unit_mismatch, api_contract, contradiction, incorrect, terminology]
+    owners: [architect]
+    related: [С15]
+
+  - id: С4
+    level: major
+    severity_ok: [major, critical]
+    title: 'Сумма покупки в тиынах, порог в тенге — правил пересчёта нет'
+    essence: 'Сумма покупки хранится в тиынах, порог в тенге; правила пересчёта и округления не заданы.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "49", quote: "сумму покупки в тиынах, признак отправки и порог в тенге"}
+        - {lines: "143", quote: "Порог в тенге"}
+    keywords:
+      min: 2
+      groups:
+        - 'тиын'
+        - 'тенге|₸|пересч|округл|единиц|конверт|перевод\w* (в|из)|сравн'
+    kinds: [unit_mismatch, ambiguity, incomplete, contradiction]
+    owners: [analyst, architect]
+    related: [С7]
+
+  - id: С5
+    level: major
+    severity_ok: [major, critical]
+    title: 'Держатель ↔ владелец ↔ клиент'
+    essence: >-
+      Ф-1 даёт право держателю карты, API авторизует «сессию владельца», логика проверяет «принадлежность
+      клиенту». У дополнительной карты держатель и владелец — разные люди.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "37", quote: "Держатель активной карты KZT задаёт целый порог"}
+        - {lines: "105", quote: "Bearer, сессия владельца карты"}
+        - {lines: "118", quote: "Проверить принадлежность карты клиенту."}
+    keywords:
+      min: 2
+      groups:
+        - 'держател'
+        - 'владел|дополнительн\w* карт|принадлежн'
+    kinds: [terminology, contradiction, ambiguity, security, incorrect]
+    owners: [analyst, risk]
+    related: []
+
+  - id: С6
+    level: major
+    severity_ok: [major]
+    title: '«Активная карта KZT» не определена и не проверяется в API'
+    essence: 'Не определено, что такое активная карта KZT; в шагах 1–5 логики API нет проверки активности и валюты.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "37", quote: "Держатель активной карты KZT"}
+        - {lines: "117-121", quote: "Проверить сумму и переключатель."}
+    keywords:
+      min: 2
+      groups:
+        - 'активн'
+        - '\bkzt\b|валют|провер|статус карт|заблокир|определени|не определ'
+    kinds: [incomplete, ambiguity, missing_element, contradiction, api_contract]
+    owners: [analyst, architect]
+    related: [С5]
+
+  - id: С7
+    level: major
+    severity_ok: [major]
+    title: 'Требования к данным неполны'
+    essence: >-
+      В данных нет признака enabled (а API пишет его в БД), типа операции, ссылки возврата на исходную покупку,
+      накопленной суммы, истории push для Ф-4.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "49", quote: "Хранить идентификатор карты, месяц, идентификатор операции"}
+        - {lines: "144", quote: "Признак включения"}
+    keywords:
+      min: 2
+      groups:
+        - 'данн|хранит|хранени|модел\w* данн|бд|баз[аеыу]'
+        - 'enabled|признак\w* включ|тип\w* операци|ссылк|исходн\w* покуп|накоплен|истори|состояни|нет пол|не хран|отсутств'
+    kinds: [missing_element, incomplete, set_complete, traceability, api_contract]
+    owners: [architect]
+    related: [К5, С4, С12]
+
+  - id: С8
+    level: major
+    severity_ok: [major, critical]
+    title: 'Ф-4 не описывает случай «сумма ≥ нового порога» и что считать изменением'
+    essence: >-
+      Ф-4 описывает только случай «накопленная сумма ниже нового порога»; что делать, если она уже не ниже,
+      не сказано. Неясно, считается ли изменением пересохранение того же значения, выключение и включение.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "40", quote: "Если она ниже нового порога, следующее достижение вызывает push"}
+        - {lines: "125,126", quote: "Повторное сохранение заменяет действующую настройку."}
+    keywords:
+      min: 2
+      groups:
+        - 'нов\w* порог|изменени\w* порог|смен\w* порог|снижени\w* порог|понижени|пересохран|повторн\w* сохранени'
+        - 'выше|≥|больше|превыша|уже (достиг|выше|превыш)|не ниже|равн|тот же|то же значени|выключ|отключ|не описан|не определ'
+    kinds: [incomplete, missing_element, ambiguity, boundary_conflict, event_conflict]
+    owners: [analyst, consistency]
+    related: [К2]
+
+  - id: С9
+    level: major
+    severity_ok: [major, critical]
+    title: 'Какой месяц у лимита push и в каком поясе'
+    essence: >-
+      «Календарный месяц» Ф-3 — в каком поясе? Месяц покупки или месяц отправки (покупка 31.01,
+      проведение 01.02)?
+    anchors:
+      policy: any
+      groups:
+        - {lines: "39", quote: "максимум один такой push за календарный месяц"}
+        - {lines: "38", quote: "Месяц определяется по дате совершения покупки в Алматы."}
+    keywords:
+      min: 2
+      groups:
+        - 'календарн|месяц\w* (лимит|push|отправк|уведомлен)|границ\w* месяц|рубеж'
+        - 'пояс|utc|алмат|отправк|проведени|совершени|какой месяц|какому месяцу|чей месяц'
+    kinds: [ambiguity, incomplete, unit_mismatch, boundary_conflict]
+    owners: [analyst]
+    related: [К1, М8]
+
+  - id: С10
+    level: major
+    severity_ok: [major, critical]
+    title: 'Возвраты не описаны полностью'
+    essence: >-
+      Возврат в феврале уменьшает уже закрытый январь; частичные и множественные возвраты; возврат после
+      push — возвращается ли право на повторный push?
+    anchors:
+      policy: any
+      groups:
+        - {lines: "38", quote: "Возврат уменьшает расходы месяца исходной покупки."}
+    keywords:
+      min: 2
+      groups:
+        - 'возврат'
+        - 'частичн|нескольк\w* возврат|множествен|закрыт|после (отправк|push|уведомл)|повторн|друг\w* месяц|следующ\w* месяц|прошл\w* месяц|предыдущ\w* месяц|отрицательн|ниже порога|снова'
+    kinds: [incomplete, ambiguity, missing_element, event_conflict]
+    owners: [risk, analyst]
+    related: [К5, С7]
+
+  - id: С11
+    level: major
+    severity_ok: [major]
+    title: 'Открытый перечень исключений из расходов'
+    essence: >-
+      Исключены переводы и снятие наличных, а платежи, квази-кэш, комиссии, покупки в другой валюте
+      (по какому курсу) не названы.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "38", quote: "Переводы и снятие наличных исключаются."}
+    keywords:
+      min: 2
+      groups:
+        - 'исключ|перевод|сняти|наличн|вид\w* операц|тип\w* операц'
+        - 'платеж|квази|комисс|валют|курс|перечень|открыт|проч|друг\w* (операц|тип)|не перечисл|не определ|полный список|оплат'
+    kinds: [incomplete, ambiguity, missing_element]
+    owners: [risk, analyst]
+    related: [К5]
+
+  - id: С12
+    level: major
+    severity_ok: [major]
+    title: 'Содержимое push не определено'
+    essence: >-
+      Какую «сумму» передавать в push (покупки, накопленную, порог)? Откуда последние 4 цифры карты, если
+      в данных хранится только идентификатор?
+    anchors:
+      policy: any
+      groups:
+        - {lines: "43", quote: "передать последние четыре цифры карты и сумму при достижении порога"}
+        - {lines: "49", quote: "Хранить идентификатор карты"}
+    keywords:
+      min: 2
+      groups:
+        - 'цифр|содержани|текст\w* (уведомл|push|сообщ)|состав\w* (уведомл|push|сообщ)|содержим|шаблон\w* (уведомл|сообщ)'
+        - 'сумм|карт|хран|данн|какую|какая|откуда'
+    kinds: [incomplete, ambiguity, missing_element, api_contract]
+    owners: [analyst, architect]
+    related: [С7]
+
+  - id: С13
+    level: major
+    severity_ok: [major]
+    title: 'НФТ неполны и непроверяемы'
+    essence: >-
+      Какой «сервис», от какого события считать минуту, какой перцентиль; «клиент получает push» на стороне
+      системы непроверяемо; нет НФТ доступности, нагрузки, аудита, ИБ.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "46", quote: "Сервис передаёт push на отправку в течение минуты после получения события."}
+        - {lines: "39", quote: "клиент получает push"}
+    keywords:
+      min: 2
+      groups:
+        - 'минут|нфт|нефункц|производит|задержк|врем\w* (доставк|отправк|обработк)|sla|доступност|нагрузк'
+        - 'перцентил|процентил|p9|от какого|отсчет|доступност|нагрузк|аудит|какой сервис|измер|проверя|непровер|нельзя провер|не задан|отсутств|не указ'
+    kinds: [unverifiable, incomplete, ambiguity, missing_element, set_complete]
+    owners: [qa, risk]
+    related: [К5]
+
+  - id: С14
+    level: major
+    severity_ok: [major, critical]
+    title: 'Идемпотентность и гонки не определены'
+    essence: >-
+      «Повторная доставка сохраняет исходный итог» — не определены ключ дедупликации и «исходный итог»;
+      два параллельных события у порога могут дать два push.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "52", quote: "Повторная доставка одного события процессинга сохраняет исходный итог."}
+    keywords:
+      min: 1
+      groups:
+        - 'повторн\w* доставк|идемпотент|дедупл|дубл\w* событ|гонк|параллел|одновремен|конкурент|исходн\w* итог|ключ\w* (дедупл|идемп|событ)'
+    kinds: [ambiguity, incomplete, missing_element, ops_risk, unverifiable]
+    owners: [risk, architect]
+    related: [К5]
+
+  - id: С15
+    level: major
+    severity_ok: [major]
+    title: 'Логика метода, п. 5, и обязательность полей'
+    essence: >-
+      «Вернуть прежнее состояние» — какое, если amount в ответе есть только «при успехе»? Нет реакции на неверный
+      enabled. Обязателен ли amount при enabled=0 (Mandatory = Да)?
+    anchors:
+      policy: any
+      groups:
+        - {lines: "121", quote: "При отклонении суммы вернуть прежнее состояние и результат ERROR."}
+        - {lines: "143,144", quote: "32 bit | Да"}
+        - {lines: "156", quote: "При успехе"}
+    keywords:
+      min: 1
+      groups:
+        - 'прежн\w* состояни|вернуть прежн|enabled ?= ?0|enabled ?равн\w* 0|неверн\w* enabled|некоррект\w* enabled|недопустим\w* enabled|mandatory|обязательн\w* (пол|парамет|amount)|amount.{0,40}(обязат|enabled ?= ?0)|(enabled ?= ?0|выключени\w* уведомлени).{0,60}amount'
+    kinds: [ambiguity, incomplete, api_contract, contradiction, missing_element]
+    owners: [architect]
+    related: [К3, С3]
+
+  - id: С16
+    level: major
+    severity_ok: [major]
+    title: 'Архитектура ↔ sequence ↔ BPMN; компоненты названы по-разному'
+    essence: >-
+      В архитектуре нет связи «сервис расходов → настройки»; один компонент назван по-разному (учёт расходов /
+      сервис расходов; сервис push / сервис уведомлений; сервис настроек / настройки / хранилище настроек);
+      BPMN линейный, без ветвей; «при достижении» ≠ «переход снизу вверх» Ф-3.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "26", quote: "Мобильное приложение → сервис настроек. Карточный процессинг → учёт расходов → сервис push."}
+        - {lines: "43", quote: "Сервис расходов → настройки: получить порог карты."}
+        - {lines: "34", quote: "проверка порога → при достижении отправка push → завершение"}
+        - {lines: "19", quote: "Мобильный банк, карточный процессинг, сервис уведомлений"}
+        - {lines: "130", quote: "Приложение → AlertsController → хранилище настроек → AlertsController → приложение."}
+    keywords:
+      min: 2
+      groups:
+        - 'архитектур|sequence|последовательност|компонент|bpmn|схем|диаграмм|взаимодейств'
+        - 'назван|по-разному|разн\w* (назв|имен|термин)|нет связ|отсутств\w* связ|ветв|не совпад|расходятся|линейн|не отраж|не показ|другое имя|синоним'
+    kinds: [terminology, contradiction, incomplete, traceability, set_consistent, missing_element]
+    owners: [consistency, architect]
+    related: [М1]
+
+  - id: С17
+    level: major
+    severity_ok: [major]
+    title: 'UI описан неполно'
+    essence: >-
+      Нет выбора карты, текстов ошибок, начального состояния поля, реакции на 401/404/500; «сумма за месяц» —
+      с начала месяца или с момента включения; копятся ли расходы при выключенном уведомлении.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "29", quote: "При ошибке ввода сообщение появляется под полем."}
+        - {lines: "37", quote: "По умолчанию уведомление выключено."}
+    keywords:
+      min: 2
+      groups:
+        - 'экран|\bui\b|интерфейс|пол[еяю] (ввод|«порог)|выбор\w* карт|переключател|начальн\w* (состояни|значени)|сообщени\w* (об )?ошибк|текст\w* ошибк'
+        - 'ошибк|выбор\w* карт|начальн|с начала месяца|с момента включ|401|404|500|копят|накаплива|при выключенн|не описан|отсутств|какое сообщ'
+    kinds: [incomplete, ambiguity, missing_element]
+    owners: [analyst, qa]
+    related: [К4]
+
+  - id: С18
+    level: major
+    severity_ok: [major]
+    title: 'Критерии приёмки неполны'
+    essence: >-
+      Нет предусловий (уведомление включено, push ещё не было), ссылок на ID требований; не покрыты границы
+      999 / 1 000 / 1 000 000 / 1 000 001, возвраты, Ф-4, лимит одного push, идемпотентность, ошибки API;
+      критерий №3 не проверяет, что push не отправлен.
+    anchors:
+      policy: any
+      groups:
+        - {lines: "61-65", quote: "Исходные условия | Действие | Ожидаемый результат"}
+    keywords:
+      min: 2
+      groups:
+        - 'приемк|критери|тест|сценари'
+        - 'предуслови|исходн\w* услови|границ|999|1 000 001|покрыт|не провер|не покрыва|ссылк\w* на|отсутств|нет (критери|сценари|провер)|не отправ|не указан|включен'
+    kinds: [incomplete, unverifiable, missing_element, set_complete, traceability, set_validatable]
+    owners: [qa]
+    related: [К1]
+
+  - id: С19
+    level: major
+    severity_ok: [major, minor]
+    title: 'Ответы 400/401/404/500 без поля result'
+    essence: 'Тела ответов 400/401/404/500 не содержат поле result, хотя оно есть в таблице ответа.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "155", quote: "Исход сохранения"}
+        - {lines: "178-198", quote: "{\"message\":\"Некорректный запрос\"}"}
+    keywords:
+      min: 2
+      groups:
+        - '\bresult\b|поле (результ|исход)'
+        - 'нет|отсутств|без |не содерж|не соответств|расход|неединообраз'
+    kinds: [api_contract, incomplete, contradiction, missing_element, status_conflict]
+    owners: [architect]
+    related: [К3, С2]
+
+  - id: С20
+    level: major
+    severity_ok: [major, minor]
+    title: 'Prod URL, Swagger и $BASE не заданы'
+    essence: 'Prod URL «—», Swagger «—», переменная $BASE не определена.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "108", quote: "Prod: —"}
+        - {lines: "109", quote: "$BASE"}
+        - {lines: "110", quote: "Swagger"}
+    keywords:
+      min: 2
+      groups:
+        - '\bprod\b|swagger|\$?base\b|продуктив|адрес|\burl\b|окружени'
+        - 'не указ|не определ|прочерк|«—»|пуст|отсутств|не заполн|нет'
+    kinds: [placeholder, incomplete, missing_element, api_contract]
+    owners: [architect, rules]
+    related: [С1]
+
+  # ───────────────────────────── 🟡 незначительные ─────────────────────────────
+  - id: М1
+    level: minor
+    severity_ok: [minor, major]
+    title: 'Терминология не едина, глоссария нет'
+    essence: '«личный бюджет» ↔ «порог» ↔ saveLimit / limit_kzt; глоссария нет.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "23", quote: "личного бюджета"}
+        - {lines: "103", quote: "Сохранение порога"}
+        - {lines: "143", quote: "limit_kzt"}
+    keywords:
+      min: 1
+      groups:
+        - 'бюджет|глоссари|терминолог|единообраз\w* термин|разн\w* термин'
+    kinds: [terminology, ambiguity]
+    owners: [consistency]
+    related: [С16]
+
+  - id: М2а
+    parent: М2
+    level: minor
+    severity_ok: [minor, major]
+    title: 'Раздел «Тестирование требований» — заглушка'
+    essence: '«заполняются тестировщиками» — раздел не заполнен.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "54-57", quote: "заполняются тестировщиками"}
+    keywords:
+      min: 1
+      groups:
+        - 'тестировщик|не заполн|незаполн|заглушк|пуст|тестировани\w* требовани'
+    kinds: [placeholder, incomplete, missing_element]
+    owners: [rules, qa]
+    related: [С18]
+
+  - id: М2б
+    parent: М2
+    level: minor
+    severity_ok: [minor]
+    title: 'Версия и дата документа не заполнены'
+    essence: 'Версия и дата документа не заполнены, версионность не зафиксирована.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "68", quote: "Документ (версия/дата) в источнике не заполнен."}
+        - {lines: "85", quote: "Поддерживается версионность документа / зафиксирована"}
+    keywords:
+      min: 1
+      groups:
+        - 'верси|дат[аы] документ|ревизи'
+    kinds: [placeholder, incomplete, missing_element, traceability]
+    owners: [rules]
+    related: []
+
+  - id: М2в
+    parent: М2
+    level: minor
+    severity_ok: [minor, major]
+    title: 'Чек-лист ревью без отметок'
+    essence: 'Чек-лист «Ревью требований» приведён как шаблон, отметки не проставлены.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "67-85", quote: "Пункты чек-листа приведены как в шаблоне, отметки не проставлены."}
+    keywords:
+      min: 1
+      groups:
+        - 'чек-лист|чеклист|отметк|ревью требован'
+    kinds: [placeholder, incomplete]
+    owners: [rules]
+    related: [М7]
+
+  - id: М2г
+    parent: М2
+    level: minor
+    severity_ok: [minor]
+    title: 'Блок согласующих пуст'
+    essence: 'Согласующие не указаны.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "87-91", quote: "Блок согласующих"}
+    keywords:
+      min: 1
+      groups:
+        - 'согласу|согласован|подпис|ответственн'
+    kinds: [placeholder, incomplete, traceability]
+    owners: [rules]
+    related: []
+
+  - id: М2д
+    parent: М2
+    level: minor
+    severity_ok: [minor]
+    title: 'Нет задачи в Jira — источник требований не прослеживается'
+    essence: 'Задачи в Jira нет, источник требований не прослеживается.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "20", quote: "Практикум без Jira-задачи"}
+    keywords:
+      min: 1
+      groups:
+        - 'jira|задач\w* в|прослежива|источник'
+    kinds: [traceability, placeholder, missing_element]
+    owners: [rules, consistency]
+    related: []
+
+  - id: М3
+    level: minor
+    severity_ok: [minor]
+    title: 'Нет ID у НФТ, данных, интеграции; нет приоритетов'
+    essence: 'Нет ID у НФТ, данных и интеграции; нет приоритетов (IEEE 830, 4.3.5).'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "36-52", quote: "Нефункциональные требования"}
+    keywords:
+      min: 1
+      groups:
+        - 'идентификатор\w* требован|нет id|без id|не имеют id|номер\w* требован|нумерац|приоритет|ранжир'
+    kinds: [traceability, conforming, other, placeholder, incomplete]
+    owners: [rules]
+    related: []
+
+  - id: М4а
+    parent: М4
+    level: minor
+    severity_ok: [minor]
+    title: 'Дубль Ф-4 и Особых правил, п. 3'
+    essence: 'Ф-4 (строка 40) и п. 3 Особых правил (строка 126) повторяют одно правило.'
+    anchors:
+      policy: all
+      groups:
+        - {lines: "40", quote: "При изменении порога накопленная сумма сохраняется."}
+        - {lines: "126", quote: "Изменение порога сохраняет накопленные расходы."}
+    keywords:
+      min: 1
+      groups:
+        - 'дубл|повторя|дублир|продублир|в двух местах|двух местах'
+    kinds: [duplicate, modifiable, other]
+    owners: [consistency]
+    related: [К2]
+
+  - id: М4б
+    parent: М4
+    level: minor
+    severity_ok: [minor, major]
+    title: 'В п. 1 Особых правил границы не названы'
+    essence: '«Целое число тенге, обе границы включены» — сами границы не названы.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "124", quote: "Целое число тенге, обе границы включены."}
+    keywords:
+      min: 1
+      groups:
+        - 'границ'
+    kinds: [incomplete, ambiguity, boundary_conflict, traceability]
+    owners: [analyst]
+    related: []
+
+  - id: М5
+    level: minor
+    severity_ok: [minor, major]
+    title: 'Неатомарные требования Ф-1, Ф-2, Ф-3'
+    essence: 'В Ф-2 четыре правила в одном пункте, в Ф-1 и Ф-3 — по два-три.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "37", quote: "Держатель активной карты KZT"}
+        - {lines: "38", quote: "Месяц определяется"}
+        - {lines: "39", quote: "Когда расходы переходят"}
+    keywords:
+      min: 1
+      groups:
+        - 'атомар|единичн|неединичн|несколько (правил|требован|обязательств|услови)|четыре правила|в одном пункте|разбить|разделить|сразу несколько'
+    kinds: [non_singular]
+    owners: [analyst]
+    related: []
+
+  - id: М6
+    level: minor
+    severity_ok: [minor, major]
+    title: 'Description метода бессвязен'
+    essence: '«Сохранение порога. Функциональные требования: чтение порога» — описание метода противоречит себе.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "103", quote: "Сохранение порога. Функциональные требования: чтение порога"}
+    keywords:
+      min: 2
+      groups:
+        - 'description|описани\w* метод|назначени\w* метод|поле description'
+        - 'противореч|бессвяз|не соответств|некоррект|смешан|одновременно|непонятн|ошибочн|сохранени\w*.{0,30}чтени|чтени\w*.{0,30}сохранени'
+    kinds: [contradiction, ambiguity, incorrect, terminology]
+    owners: [architect]
+    related: [К4]
+
+  - id: М7
+    level: minor
+    severity_ok: [minor, major]
+    title: 'Схема отката не описана'
+    essence: 'Чек-лист требует схему отката (строка 76), в документе её нет; нужен выключатель функции.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "76", quote: "Реализация задачи/проекта предусматривает схему отката решений"}
+    keywords:
+      min: 1
+      groups:
+        - 'откат|feature|флаг|скрыти\w* функционал|выключател\w* функци|rollback'
+    kinds: [missing_element, ops_risk, incomplete, placeholder]
+    owners: [risk]
+    related: [М2в]
+
+  - id: М8
+    level: minor
+    severity_ok: [minor, major]
+    title: '«В Алматы» вместо явного часового пояса'
+    essence: '«в Алматы» стоит заменить на «UTC+5 (Asia/Almaty)»; с 1 марта 2024 года в Казахстане единый пояс UTC+5.'
+    anchors:
+      policy: any
+      groups:
+        - {lines: "38", quote: "в Алматы"}
+        - {lines: "64", quote: "по Алматы"}
+    keywords:
+      min: 1
+      groups:
+        - 'utc|часов\w* пояс|asia/almaty|gmt|смещени'
+    kinds: [ambiguity, unit_mismatch, terminology]
+    owners: [analyst, rules]
+    related: [К1, С9]
+

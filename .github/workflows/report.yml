@@ -1,0 +1,88 @@
+name: Сформировать отчёт
+
+# Ручной запуск агента на документе из репозитория. Ключ Gemini берётся из секрета
+# репозитория GEMINI_API_KEY (Settings -> Secrets and variables -> Actions -> New repository secret).
+# Отчёт (.md, .json, .html, .jira.csv) и журнал прогона лежат в артефактах запуска.
+
+on:
+  workflow_dispatch:
+    inputs:
+      input:
+        description: "Файл требований в репозитории"
+        default: "release/input/requirements.md"
+        required: true
+      provider:
+        description: "Провайдер модели"
+        type: choice
+        options: [gemini, offline, mock]
+        default: gemini
+      model:
+        description: "Модель (пусто — по умолчанию провайдера)"
+        default: ""
+        required: false
+      export:
+        description: "Дополнительные форматы через запятую"
+        default: "html,jira"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Отчёт по ${{ inputs.input }} (${{ inputs.provider }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      INPUT_FILE: ${{ inputs.input }}
+      PROVIDER: ${{ inputs.provider }}
+      MODEL: ${{ inputs.model }}
+      EXPORT: ${{ inputs.export }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Установка
+        run: python -m pip install -r requirements.txt -e .
+
+      - name: Проверка входа и ключа
+        run: |
+          if [ ! -f "$INPUT_FILE" ]; then
+            echo "::error::Файл не найден в репозитории: $INPUT_FILE"; exit 1
+          fi
+          if [ "$PROVIDER" = "gemini" ] && [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Не задан секрет репозитория GEMINI_API_KEY (Settings -> Secrets and variables -> Actions)"; exit 1
+          fi
+
+      - name: Прогон агента
+        run: |
+          stem="$(basename "${INPUT_FILE%.*}")"
+          out="out/report/${stem}.${PROVIDER}.md"
+          args=(--provider "$PROVIDER" --no-cache)
+          if [ -n "$MODEL" ]; then args+=(--model "$MODEL"); fi
+          if [ -n "$EXPORT" ]; then args+=(--export "$EXPORT"); fi
+          python -m bcc_review "$INPUT_FILE" "$out" "${args[@]}"
+          echo "REPORT_JSON=${out%.md}.json" >> "$GITHUB_ENV"
+
+      - name: verify
+        run: python -m bcc_review verify "$REPORT_JSON" "$INPUT_FILE"
+
+      - name: Отчёт в артефакты
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ inputs.provider }}-${{ github.run_number }}
+          path: |
+            out/report/
+            runs/
+          if-no-files-found: warn
+          retention-days: 30

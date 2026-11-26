@@ -1,0 +1,24 @@
+# Зависимости агента bcc-review с зафиксированными версиями.
+# Проверено на Python 3.11 и 3.12 (Windows, macOS, Linux).
+#
+# Установка вместе с самим агентом (из корня репозитория):
+#   python -m pip install -r requirements.txt -e .
+
+# Проверка JSON-ответов модели по схеме
+jsonschema==4.26.0
+
+# Google Gemini (провайдер по умолчанию, бесплатный ключ Google AI Studio)
+google-genai==3.6.1
+
+# Claude API (провайдер anthropic)
+anthropic==2.14.0
+
+# Чтение PDF и экспорт PDF с выделениями. Ветка 1.x: версии 2.x тянут onnxruntime (+200 МБ).
+pymupdf==1.28.2
+fonttools==4.69.1
+
+# Чтение DOCX и экспорт Word с комментариями
+python-docx==1.2.0
+
+# Тесты (нужны только разработчикам и CI)
+pytest==9.2.0
