@@ -766,6 +766,36 @@ def _garbled(text: str) -> bool:
     return latin >= 0.7 and bool(words) and sum(w.lower() in COMMON_EN for w in words) / len(words) < 0.03
 
 
+def _unmapped(c: str) -> bool:
+    """Символ без кодировки Unicode: глиф без ToUnicode или .notdef (U+FFFD) либо частная область."""
+    return c == '\ufffd' or '\ue000' <= c <= '\uf8ff'
+
+
+def _point_decode_errors(warnings: list[dict], blocks: list[Block]) -> None:
+    """decode_error страницы → блоки, где стоят символы без кодировки (поле block_ids контракта).
+
+    Знак на месте такого символа (например, «≥», набранный шрифтом без этого глифа) читалка не
+    восстанавливает и по соседним строкам не угадывает: в тексте остаётся «�», а предупреждение
+    называет блоки, чтобы №06/№07 исключили это условие из сравнений, а №13/№14 показали место.
+    """
+    for warning in warnings:
+        if warning['code'] != 'decode_error' or warning['severity'] != 'warning' or 'page' not in warning:
+            continue
+        page = warning['page']
+        hits = [b for b in blocks if b['loc'].get('page') == page and not b['loc'].get('furniture')
+                and any(map(_unmapped, b['text']))]
+        if not hits:
+            continue
+        ids = [b['id'] for b in hits]
+        pua = any(c != '\ufffd' for b in hits for c in b['text'] if _unmapped(c))
+        shown = '«�» или символы частной области Unicode' if pua else '«�»'
+        where = f'блоке {ids[0]}' if len(ids) == 1 else 'блоках ' + ', '.join(ids)
+        warning['block_ids'] = ids
+        warning['message'] = (f'Страница {page}: {warning["count"]} символ(ов) без кодировки Unicode в {where} '
+                              f'(в тексте — {shown}). Знак на их месте не восстановлен: условие, сумму или цитату '
+                              'с ним сверяйте с оригиналом (например, ₸ или «≥» шрифтом без этого глифа).')
+
+
 def ocr_languages() -> str | None:
     """Языки локального OCR, если PyMuPDF реально видит tessdata; иначе None."""
     try:
@@ -834,6 +864,7 @@ def read_pdf(path: Path | str, *, ocr: str = 'auto', password: str | None = None
 
     _link_tables(pages, warnings)
     blocks = _emit(pages)
+    _point_decode_errors(warnings, blocks)
     _link_continuations(blocks)
     extraction = _extraction(pages, blocks)
     if extraction['completeness'] < 1.0:
@@ -921,9 +952,10 @@ def _classify(page: dict, ocr_langs: str | None, ocr_mode: str, warnings: list[d
     images = [tuple(info['bbox']) for info in pg.get_image_info() if _area(info['bbox']) >= 0.02 * page_area]
     image_area = sum(_area(b) for b in images)
     text_boxes = [u.vbox for u in content]
-    unmapped = sum(c == '\ufffd' or '\ue000' <= c <= '\uf8ff' for c in text)
+    unmapped = sum(map(_unmapped, text))
     garbled = letters > 0 and _garbled(text)
     if unmapped and not garbled:
+        # block_ids и сообщение с номерами блоков дописывает _point_decode_errors, когда у блоков появятся ID.
         warnings.append(_warn('decode_error', 'warning', no,
                               f'Страница {no}: {unmapped} символ(ов) без кодировки Unicode (показаны как �); '
                               'цитаты с ними, например со знаком ₸, не совпадут с оригиналом.', count=unmapped))
