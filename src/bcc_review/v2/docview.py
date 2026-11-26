@@ -21,9 +21,14 @@ code; пусто у пустой строки), ``level`` (уровень заг
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from pathlib import Path
 from typing import Any, Iterable
+
+# PyMuPDF без пакета pymupdf_layout печатает в stdout совет его поставить — это засоряет вывод агента
+# (просьба №16). Переменная проверяется в момент разбора страницы, поэтому достаточно задать её здесь.
+os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")
 
 SECTION_SEP = " › "
 FORMATS = {".md": "md", ".markdown": "md", ".txt": "txt", ".pdf": "pdf", ".docx": "docx",
