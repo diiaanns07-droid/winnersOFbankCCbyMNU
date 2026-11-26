@@ -1,0 +1,32 @@
+{
+  "case_id": "transfer_limit.base",
+  "family": "transfer_limit",
+  "kind": "base",
+  "ops": [],
+  "variants": [],
+  "seeds": [],
+  "generator_version": "1.0.0",
+  "base_case_id": null,
+  "base_source_sha256": null,
+  "source_sha256": "f614c16e33c76e795523a58c875a3dbb6078e6710d043725e8fd3b7305ee910a",
+  "semantic_sha256": "c423580abb79add1a22a2a9b9b5e38b13c10a26f8ec7d83d27ba8ca16cc12647",
+  "transformation": [],
+  "expected_effect": [
+    "Без изменений (чистый контроль)."
+  ],
+  "diff": "",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "label_id": "transfer_limit.base#clean",
+      "case_id": "transfer_limit.base",
+      "family": "transfer_limit",
+      "source_sha256": "f614c16e33c76e795523a58c875a3dbb6078e6710d043725e8fd3b7305ee910a",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "visibility": "public",
+      "explanation": "Чистая базовая спецификация: любая находка — ложная тревога."
+    }
+  ]
+}

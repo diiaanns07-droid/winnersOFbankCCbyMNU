@@ -1,0 +1,66 @@
+{
+  "case_id": "autopay.range_boundary.trigger_at_threshold",
+  "family": "autopay",
+  "kind": "mutant",
+  "ops": [
+    "range_boundary"
+  ],
+  "variants": [
+    "trigger_at_threshold"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "autopay.base",
+  "base_source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+  "source_sha256": "49164e0d6e04f45dd101533ff20d92ccb7813de226732bdd44960a36e9ff97ba",
+  "semantic_sha256": "fcb20106a7c9404989ac4d9fc74d7e36f6318adc06151ed99f4ca34e20053892",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 27,
+      "removed": "сообщает баланс ниже порога, банк списывает",
+      "inserted": "сообщает баланс не выше порога, банк списывает",
+      "mutation_op": "range_boundary",
+      "variant": "trigger_at_threshold"
+    }
+  ],
+  "expected_effect": [
+    "Баланс, равный порогу, вызывает пополнение по АП-4 и не вызывает по критерию приёмки."
+  ],
+  "diff": "--- base/source.md\n+++ autopay.range_boundary.trigger_at_threshold/source.md\n@@ -26,3 +26,3 @@\n * **АП-3.** Сумма пополнения задаётся целым числом от 500 до 20 000 ₸ включительно.\n-* **АП-4.** Если уведомление о балансе сообщает баланс ниже порога, банк списывает сумму пополнения с карты и пополняет номер.\n+* **АП-4.** Если уведомление о балансе сообщает баланс не выше порога, банк списывает сумму пополнения с карты и пополняет номер.\n * **АП-5.** За одни сутки выполняется не больше трёх автопополнений одного номера.\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "autopay.range_boundary.trigger_at_threshold",
+      "family": "autopay",
+      "source_sha256": "49164e0d6e04f45dd101533ff20d92ccb7813de226732bdd44960a36e9ff97ba",
+      "visibility": "public",
+      "label_id": "autopay.range_boundary.trigger_at_threshold#1",
+      "issue_type": "boundary_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Если уведомление о балансе сообщает баланс не выше порога, банк списывает сумму пополнения с карты и пополняет номер.",
+          "locator": "md:L27"
+        },
+        {
+          "role": "b",
+          "quote": "Оператор сообщает баланс 1 000 ₸ | Пополнение не выполняется",
+          "locator": "md:L46"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "Порог 1 000 ₸, оператор сообщает баланс ровно 1 000 ₸.",
+      "explanation": "Баланс, равный порогу, вызывает пополнение по АП-4 и не вызывает по критерию приёмки.",
+      "mutation": {
+        "op": "range_boundary",
+        "variant": "trigger_at_threshold"
+      }
+    }
+  ]
+}
