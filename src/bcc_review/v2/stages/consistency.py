@@ -446,15 +446,32 @@ def minor_glossary_candidate(entries: list[dict]) -> dict | None:
     }
 
 
-def merge_conflicts(cands: list[dict]) -> list[dict]:
-    """Конфликты одного вида, у которых общая строка (одно правило против нескольких мест), — одно замечание."""
+def _blocks(c: dict, requirements: list[dict]) -> set:
+    """Места кандидата: строки цитат и многострочные блоки требований, в которые они попали
+    (пример тела ответа на несколько строк — одно место)."""
+    out: set = set()
+    for e in c["evidence"]:
+        if not _found(e):
+            continue
+        a, b = _span(e)
+        out.update(("L", n) for n in range(a, b + 1))
+        for r in requirements:
+            rs, re_ = r.get("line_start") or 0, r.get("line_end") or 0
+            if rs and re_ > rs and rs <= b and a <= re_:
+                out.add(("R", r.get("id")))
+    return out
+
+
+def merge_conflicts(cands: list[dict], requirements: list[dict] | None = None) -> list[dict]:
+    """Конфликты одного вида, у которых общее место (одно правило против нескольких мест), — одно замечание."""
     out: list[dict] = []
+    reqs = requirements or []
     for c in cands:
         host = None
         if c["kind"] in CONFLICT_KINDS:
+            mine = _blocks(c, reqs)
             for o in out:
-                if o["kind"] == c["kind"] and o["severity"] == c["severity"] and any(
-                        _overlap(e1, e2) for e1 in o["evidence"] for e2 in c["evidence"] if _found(e1) and _found(e2)):
+                if o["kind"] == c["kind"] and o["severity"] == c["severity"] and mine & _blocks(o, reqs):
                     host = o
                     break
         if host is None:
@@ -579,7 +596,7 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
             if undefined > MAX_UNDEFINED_CANDIDATES:
                 continue
         pair_cands.append(c)
-    pair_cands = merge_conflicts(pair_cands)
+    pair_cands = merge_conflicts(pair_cands, requirements)
     candidates.extend(pair_cands)
 
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]

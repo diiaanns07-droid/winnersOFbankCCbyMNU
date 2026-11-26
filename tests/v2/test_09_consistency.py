@@ -343,3 +343,15 @@ def test_old_answers_without_basis_still_work():
     del p["basis"]
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
     assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_conflicts_touching_one_multiline_requirement_are_merged():
+    reqs = REQS + [{"id": "R-09", "source_id": "", "kind": "api", "line_start": 9, "line_end": 10}]
+    p1 = pair(a="R-02", b="R-09", quote_b="Хранить идентификатор вклада", line_b=9, kind="status_conflict")
+    p2 = pair(a="R-04", b="R-09", quote_a="Минимальная сумма вклада — 10 000.", line_a=5,
+              quote_b="Клиент открывает вклад", line_b=10, kind="status_conflict", title="второй")
+    out = C.postprocess(answer(pair_checks=[p1, p2]), VIEW, reqs)
+    assert len(out["candidates"]) == 1
+    assert sorted(e["line"] for e in out["candidates"][0]["evidence"]) == [3, 5, 9, 10]
+    out = C.postprocess(answer(pair_checks=[p1, p2]), VIEW, REQS)  # без многострочного блока — два замечания
+    assert len(out["candidates"]) == 2

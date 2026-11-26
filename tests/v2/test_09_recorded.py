@@ -86,7 +86,7 @@ def test_negative_control_clean_base_has_no_conflicts(model):
             assert not ({25, 26} <= lines_of(c)), c["title"]
 
 
-@pytest.mark.parametrize("model", ["haiku", "sonnet"])
+@pytest.mark.parametrize("model", ["haiku", "sonnet", "opus"])
 def test_official_document_set_level_findings(model):
     out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
     crit = [c for c in out["candidates"] if c["severity"] == "critical"]
