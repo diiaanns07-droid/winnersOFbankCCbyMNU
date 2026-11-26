@@ -194,3 +194,22 @@ def test_no_document_words_in_rules_code():
         text = p.read_text(encoding="utf-8")
         for w in BANNED:
             assert w not in text, (p.name, w)
+
+
+STYLES = ROOT / "tests" / "v2" / "fixtures" / "12_styles"
+
+
+def test_other_style_document_detected():
+    """Другой стиль ТЗ: метод «GET /path», статусы «404 Not Found — …», таблицы «Поле | Тип»."""
+    out = rules.run(fallback_load(STYLES / "alt_defects.md"))
+    src = _sources(out)
+    for need in ("rules:api.get_mutation", "rules:api.field_types", "rules:api.status_409", "rules:api.status_403",
+                 "rules:api.content_type_without_body", "rules:units.currency_mix", "rules:promises.read_operation"):
+        assert need in src, need
+    raw = (STYLES / "alt_defects.md").read_text(encoding="utf-8").splitlines()
+    assert all(_quote_found(raw, e) for c in out["candidates"] for e in c["evidence"])
+
+
+def test_other_style_clean_document():
+    out = rules.run(fallback_load(STYLES / "alt_clean.md"))
+    assert out["candidates"] == [], [c["title"] for c in out["candidates"]]

@@ -14,7 +14,8 @@ from ._text import Doc, Line, Table, candidate, cell_quote, ev, fmt_list, norm, 
 HTTP_VERBS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
 SAFE_VERBS = ("GET", "HEAD")
 
-VERB_KEYS = ("rest type", "http method", "http-метод", "метод запроса", "тип запроса", "method", "http verb")
+VERB_KEYS = ("rest type", "http method", "http-метод", "метод запроса", "тип запроса", "method", "http verb",
+             "метод", "тип метода", "http")
 URL_KEYS = ("request url", "url", "endpoint", "адрес", "путь", "path")
 DESC_KEYS = ("description", "описание", "назначение")
 
@@ -52,7 +53,7 @@ MENTION = re.compile(
     r"(?:возвра\w*|верн\w*|результат\w*|статус\w*|код\w*|ответ\w*|http)\s*:?\s+(?:код\w*\s+|статус\w*\s+)?"
     rf"({CODE}(?:\s*(?:,|или|либо|и|/)\s*{CODE})*)",
     re.I)
-DECL_LIST = re.compile(rf"^({CODE})\s*[.:)]\s*\S")
+DECL_LIST = re.compile(rf"^(?:HTTP\s+)?({CODE})(?:\s*[.:)]\s*\S|\s+[A-Za-z][A-Za-z \-]{{1,30}}?\s*[—–:\-]\s*\S|\s*[—–]\s*\S)")
 DECL_OTVET = re.compile(rf"^(?:ответ|response)\s+({CODE})\b", re.I)
 BARE_CODE = re.compile(rf"^({CODE})\.?$")
 ERROR_JSON = re.compile(
@@ -155,20 +156,28 @@ def find_methods(doc: Doc) -> list[Method]:
                 verb = m.group(1).upper()
         if verb is None:
             m = VERB_PATH.match(x.text)
-            if m and x.cells is None:
+            if m and x.cells is None and not x.is_code:
                 verb = m.group(1).upper()
         if verb is None:
             continue
         # начало блока: заголовок «Метод X» выше (до 10 строк) или начало таблицы
         start = x.n
-        j = idx - 1
-        while j >= 0 and (L[j].cells is not None or L[j].is_sep or not L[j].text):
-            if L[j].cells is not None:
-                start = L[j].n
-            j -= 1
-            if idx - j > 30:
-                break
+        if x.cells is not None:  # тип запроса в таблице общих параметров: блок начинается с её заголовка
+            j = idx - 1
+            while j >= 0 and idx - j <= 30:
+                if L[j].cells is not None:
+                    start = L[j].n
+                elif not (L[j].is_sep or (not L[j].text and j > 0 and L[j - 1].cells is not None)):
+                    break
+                j -= 1
         meth = Method(verb=verb, verb_line=x, start=start)
+        if x.cells is None:
+            vm = VERB_PATH.match(x.text)
+            if vm:
+                meth.url, meth.url_line = vm.group(2), x
+                nm = re.search(r"\(([a-z]+[A-Z]\w*)\)|\b([a-z]+[A-Z]\w*)\b", x.text[vm.end():])
+                if nm:
+                    meth.name, meth.name_line = nm.group(1) or nm.group(2), x
         for k in range(idx - 1, max(-1, idx - 12), -1):
             hm = METHOD_HEADING.match(L[k].text)
             if hm:

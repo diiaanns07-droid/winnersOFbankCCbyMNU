@@ -46,7 +46,7 @@ def _stem(phrase: str) -> str:
 
 def _conversion(doc: Doc, major: str, minor: str) -> Line | None:
     rx = re.compile(rf"1\s*(?:{major})\s*=\s*100\s*(?:{minor})|100\s*(?:{minor})\s*=\s*1\s*(?:{major})|"
-                    rf"(?:пересч\w*|перев\w*|конверт\w*|округл\w*)[^.]{{0,60}}(?:{minor})|"
+                    rf"(?:пересч\w*|конверт\w*|округл\w*)[^.]{{0,60}}(?:{minor})|"
                     rf"(?:{minor})[^.]{{0,60}}(?:пересч\w*|округл\w*|конверт\w*)", re.I)
     for x in doc.lines:
         if x.text and rx.search(x.joined):
