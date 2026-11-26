@@ -1,0 +1,416 @@
+{
+  "schema_version": "1.0",
+  "run": {
+    "run_id": "example-0001",
+    "parent_run_id": null,
+    "source_sha256": "d2fdddd837cbe1d70668056124589274830a9e89c29e78bc504edb89197b22d0",
+    "source_name": "two_linked_requirements.md",
+    "agent_version": "0.1.0",
+    "agent_commit": null,
+    "provider": "mock",
+    "model": "mock-1",
+    "requested_model": "mock-1",
+    "models_seen": [
+      "mock-1"
+    ],
+    "mode": "mock",
+    "status": "complete",
+    "status_reasons": [],
+    "started_at": "2026-11-26T00:00:00Z",
+    "finished_at": "2026-11-26T00:00:01Z",
+    "duration_s": 1.0,
+    "calls": {
+      "physical": 2,
+      "cache_hits": 0,
+      "failed": 0,
+      "retries": 0
+    },
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0
+    },
+    "budget": {
+      "max_calls": 40,
+      "max_seconds": 1500.0,
+      "max_tokens": null,
+      "exhausted": false,
+      "reason": null
+    },
+    "stages": [
+      {
+        "name": "read",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "cross",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null,
+        "model": "mock-1"
+      },
+      {
+        "name": "verify_meaning",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null,
+        "model": "mock-1"
+      }
+    ],
+    "incomplete_stages": [],
+    "modules": {},
+    "context_policy": "full",
+    "evidence_audit": {
+      "checked": 2,
+      "confirmed": 2,
+      "ambiguous": 0,
+      "rejected": 0,
+      "note": "Считаются подсказки (hints) кандидатов: каждая цитата ищется в тексте блока."
+    },
+    "options": {}
+  },
+  "document": {
+    "id": "d2fdddd837cbe1d70668056124589274830a9e89c29e78bc504edb89197b22d0",
+    "title": "Пример: два связанных требования",
+    "format": "markdown",
+    "source_name": "two_linked_requirements.md",
+    "blocks": [
+      {
+        "id": "b0001",
+        "kind": "heading",
+        "section": [],
+        "text": "Пример: два связанных требования",
+        "loc": {
+          "line_start": 1,
+          "line_end": 1,
+          "map": [
+            [
+              0,
+              1,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0002",
+        "kind": "heading",
+        "section": [
+          "Пример: два связанных требования"
+        ],
+        "text": "Функциональные требования",
+        "loc": {
+          "line_start": 3,
+          "line_end": 3,
+          "map": [
+            [
+              0,
+              3,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0003",
+        "kind": "list_item",
+        "section": [
+          "Пример: два связанных требования",
+          "Функциональные требования"
+        ],
+        "text": "Ф-1. На карту приходится максимум один push за календарный месяц.",
+        "loc": {
+          "line_start": 4,
+          "line_end": 4,
+          "map": [
+            [
+              0,
+              4,
+              4
+            ],
+            [
+              4,
+              4,
+              10
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0004",
+        "kind": "list_item",
+        "section": [
+          "Пример: два связанных требования",
+          "Функциональные требования"
+        ],
+        "text": "Ф-2. После изменения порога следующее достижение вызывает push независимо от истории.",
+        "loc": {
+          "line_start": 5,
+          "line_end": 5,
+          "map": [
+            [
+              0,
+              5,
+              4
+            ],
+            [
+              4,
+              5,
+              10
+            ]
+          ]
+        }
+      }
+    ],
+    "warnings": []
+  },
+  "requirements": [
+    {
+      "id": "R-01",
+      "source_id": "Ф-1",
+      "text": "Ф-1. На карту приходится максимум один push за календарный месяц.",
+      "block_ids": [
+        "b0003"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0003",
+          "start": 0,
+          "end": 65,
+          "quote": "Ф-1. На карту приходится максимум один push за календарный месяц."
+        }
+      ],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-02",
+      "source_id": "Ф-2",
+      "text": "Ф-2. После изменения порога следующее достижение вызывает push независимо от истории.",
+      "block_ids": [
+        "b0004"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 0,
+          "end": 85,
+          "quote": "Ф-2. После изменения порога следующее достижение вызывает push независимо от истории."
+        }
+      ],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    }
+  ],
+  "checks": [
+    {
+      "req_id": "R-01",
+      "criterion": "correct",
+      "status": "issue",
+      "reason": "Противоречит связанному требованию (F-001).",
+      "finding_ids": [
+        "F-001"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "Исход наблюдаем: push отправлен или нет.",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "correct",
+      "status": "issue",
+      "reason": "Противоречит связанному требованию (F-001).",
+      "finding_ids": [
+        "F-001"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "Исход наблюдаем: push отправлен или нет.",
+      "finding_ids": [],
+      "source": "llm"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-001",
+      "scope": "set",
+      "kind": "conflict",
+      "criterion": "set_consistent",
+      "severity": "critical",
+      "title": "Лимит одного push в месяц противоречит push после смены порога",
+      "impact": "Разработчик не знает, отправлять ли второй push в месяце: клиент либо не получит уведомление, либо получит лишнее.",
+      "blocked_decision": "Логика отправки push после смены порога в месяце, где push уже был",
+      "req_ids": [
+        "R-01",
+        "R-02"
+      ],
+      "hints": [
+        {
+          "block_id": "b0003",
+          "quote": "максимум один push за календарный месяц"
+        },
+        {
+          "block_id": "b0004",
+          "quote": "следующее достижение вызывает push независимо от истории"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0003",
+          "start": 25,
+          "end": 64,
+          "quote": "максимум один push за календарный месяц"
+        },
+        {
+          "block_id": "b0004",
+          "start": 28,
+          "end": 84,
+          "quote": "следующее достижение вызывает push независимо от истории"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "Обе цитаты найдены; при одном входе требования дают несовместимые исходы.",
+      "recommendation": "Явно указать, сбрасывает ли смена порога месячный лимит push.",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": {
+        "input": "Push в этом месяце уже был, клиент снизил порог, расходы снова достигли порога",
+        "outcome_a": "Push не отправляется (лимит один в месяц)",
+        "outcome_b": "Push отправляется (независимо от истории)",
+        "evidence_a": {
+          "block_id": "b0003",
+          "start": 25,
+          "end": 64,
+          "quote": "максимум один push за календарный месяц"
+        },
+        "evidence_b": {
+          "block_id": "b0004",
+          "start": 28,
+          "end": 84,
+          "quote": "следующее достижение вызывает push независимо от истории"
+        }
+      },
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": {
+        "object": "месячный лимит push",
+        "condition": "смена порога после отправленного push",
+        "outcomes": [
+          "не отправлять",
+          "отправить"
+        ]
+      },
+      "source": "llm",
+      "stage": "cross",
+      "notes": []
+    }
+  ],
+  "facts": [],
+  "coverage": [],
+  "questions": [
+    {
+      "id": "Q-001",
+      "finding_ids": [
+        "F-001"
+      ],
+      "prompt": "Сбрасывает ли смена порога месячный лимит push?",
+      "options": [
+        "Да, после смены порога разрешён ещё один push",
+        "Нет, лимит один push в месяц сохраняется"
+      ],
+      "affected_req_ids": [
+        "R-01",
+        "R-02"
+      ]
+    }
+  ],
+  "checklist": [],
+  "test_cases": [],
+  "decisions": [],
+  "diff": null,
+  "verdict": {
+    "development": {
+      "status": "not_ready",
+      "reasons": [
+        "Подтверждён критичный конфликт F-001"
+      ],
+      "finding_ids": [
+        "F-001"
+      ]
+    },
+    "testing": {
+      "status": "not_ready",
+      "reasons": [
+        "Ожидаемый результат для сценария F-001 не определён"
+      ],
+      "finding_ids": [
+        "F-001"
+      ]
+    },
+    "first_actions": [
+      {
+        "order": 1,
+        "action": "Решить вопрос Q-001 и исправить Ф-1 или Ф-2",
+        "finding_ids": [
+          "F-001"
+        ]
+      }
+    ],
+    "basis": "Подтверждённое критичное замечание блокирует разработку и тестирование."
+  },
+  "summary": {
+    "requirements": 2,
+    "reviewed_requirements": 2,
+    "findings": 1,
+    "by_severity": {
+      "critical": 1,
+      "major": 0,
+      "minor": 0
+    },
+    "by_status": {
+      "confirmed": 1,
+      "needs_review": 0
+    },
+    "critical_ids": [
+      "F-001"
+    ],
+    "checks": {
+      "pass": 2,
+      "issue": 2,
+      "unknown": 0,
+      "na": 0
+    }
+  },
+  "warnings": [],
+  "excluded": [
+    {
+      "block_ids": [
+        "b0001",
+        "b0002"
+      ],
+      "reason": "Заголовки, не требования"
+    }
+  ],
+  "rejected": []
+}
