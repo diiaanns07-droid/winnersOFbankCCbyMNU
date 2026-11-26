@@ -46,7 +46,7 @@ class Collector(HTMLParser):
             self.texts[self.block] = ""
         if "data-text" in a:
             self.in_text = True
-        if self.in_text and tag == "span" and "data-ev" in a:
+        if self.in_text and tag in ("span", "mark") and "data-ev" in a:
             self.cur_ev = a["data-ev"].split()
             s, e = map(int, a["data-cp"].split(":"))
             for ev in self.cur_ev:
@@ -54,7 +54,7 @@ class Collector(HTMLParser):
                 self.ev_block[ev].add(self.block)
 
     def handle_endtag(self, tag):
-        if tag == "span":
+        if tag in ("span", "mark"):
             self.cur_ev = None
         if tag == "div" and self.in_text:
             self.in_text = False
@@ -187,7 +187,7 @@ def test_overlapping_ranges_share_segment(report):
     owners = {ev_id: set(ev["f"]) for ev_id, ev in vm["ev"].items()}
     shared = [
         ids
-        for ids in (seg.split() for seg in re.findall(r'<span class="hl[^"]*" data-ev="([^"]+)"', text))
+        for ids in (seg.split() for seg in re.findall(r'<(?:span|mark) class="hl[^"]*" data-ev="([^"]+)"', text))
         if {"F-002", "F-008"} <= set().union(*(owners[e] for e in ids))
     ]
     assert shared, "нет общего сегмента F-002 и F-008"
@@ -452,3 +452,10 @@ def test_decisions_without_question_in_this_run_are_visible(report):
     assert "Ответ учтён при этом прогоне" not in qs
     report["questions"] = []
     assert "Да: повторный push разрешён." in section(H.render_html(report), "questions")
+
+
+def test_finding_evidence_is_semantic_mark(report):
+    """Опора замечания — <mark> (ожидание интеграционного теста движка), опора требования без замечаний — <span>."""
+    text = H.render_html(report)
+    assert '<mark class="hl" data-ev=' in text and '<span class="hl hl-q" data-ev=' in text
+    assert 'id="finding-F-001"' in text

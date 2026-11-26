@@ -227,6 +227,7 @@ main { max-width: 1800px; margin: 0 auto; padding: 0 16px 48px; }
 .sec-mark { font-size: 0.75rem; color: var(--muted); margin: 10px 0 0; text-transform: none; }
 
 /* подсветка: фон по серьёзности, линия разной формы — не только цвет */
+mark.hl { background: transparent; color: inherit; }
 .hl { border-radius: 2px; text-decoration-line: underline; text-underline-offset: 3px; text-decoration-skip-ink: none; cursor: pointer; }
 .hl[data-sev="critical"] { background: var(--crit-hl); text-decoration-style: solid; text-decoration-thickness: 2px; text-decoration-color: var(--crit); }
 .hl[data-sev="major"] { background: var(--major-hl); text-decoration-style: dashed; text-decoration-thickness: 2px; text-decoration-color: var(--major); }

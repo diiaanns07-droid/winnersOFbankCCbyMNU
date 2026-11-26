@@ -507,7 +507,9 @@ def _segments(text: str, evs: list[_Ev], sev_of: Mapping[str, str]) -> str:
             attrs.append(f'data-sev="{SEVERITY_ORDER[min(ranks)]}"')
         if not fids:
             cls += " hl-q"
-        out.append(f'<span class="{cls}" {" ".join(attrs)}>{piece}</span>')
+        # Опора замечания — семантическая подсветка <mark>; опоры требований и фактов без замечаний — <span>.
+        tag = "mark" if fids else "span"
+        out.append(f'<{tag} class="{cls}" {" ".join(attrs)}>{piece}</{tag}>')
     return "".join(out)
 
 
