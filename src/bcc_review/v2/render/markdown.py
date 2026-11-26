@@ -161,8 +161,24 @@ def esc(text) -> str:
     return _HTML_START.sub(r"\\<", s)
 
 
+_LREF = re.compile(r"\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+
+
+def _lref(m: re.Match) -> str:
+    return f"строки {m.group(1)}–{m.group(2)}" if m.group(2) else f"строка {m.group(1)}"
+
+
+def prose(text) -> str:
+    """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»."""
+    return _LREF.sub(_lref, esc(text))
+
+
 def cell(text) -> str:
-    return esc(text).replace("|", "\\|")
+    """Ячейка таблицы: текст модели или этапа, «L038» → «строка 38», «|» экранирован."""
+    return prose(text).replace("|", "\\|")
+
+
+pcell = cell
 
 
 def shorten(text, limit: int = QUOTE_LIMIT) -> str:
@@ -281,7 +297,11 @@ def source_name(src: str) -> str:
     s = str(src or "")
     if s.startswith("rules:"):
         return f"правило «{s.split(':', 1)[1]}»"
-    return SOURCES.get(stage_key(s), s)
+    if s in SOURCES or stage_key(s) in SOURCES:
+        return SOURCES.get(stage_key(s), SOURCES.get(s))
+    if s.startswith("lens"):
+        return "проверка ролью"
+    return f"этап `{s}`" if s else "—"
 
 
 def table(header: list[str], rows: list[list[str]], align: list[str] | None = None) -> list[str]:
@@ -447,8 +467,7 @@ def _brief(c: _Ctx) -> list[str]:
                  [[f"**{READINESS.get(v.get('development'), '—')}**", f"**{READINESS.get(v.get('testing'), '—')}**"]],
                  [":---:", ":---:"])
     out += ["", _counts_line(c), ""]
-    if v.get("summary"):
-        out += [esc(v["summary"]), ""]
+    out += [prose(v.get("summary") or _auto_reason(c)), ""]
     blockers = [f for f in c.findings if f.get("blocks") in BLOCKING and (
         f.get("severity") == "critical" or (c.offline and f.get("rule_conflict")))]
     blockers.sort(key=lambda f: (f.get("priority") or 99, _id_num(f.get("id"))))
@@ -465,7 +484,7 @@ def _brief(c: _Ctx) -> list[str]:
             row = [f"{SEV_ICON.get(f.get('severity'), '')} [{f['id']}](#{anchor(f['id'])}) {cell(f.get('title'))}", where]
             if not same:
                 row.append(BLOCKS.get(f.get("blocks"), "—"))
-            rows.append(row + [cell(first_sentence(f.get("impact") or f.get("problem"), 170))])
+            rows.append(row + [pcell(first_sentence(f.get("impact") or f.get("problem"), 170))])
         out += table(["Дефект", "Где"] + ([] if same else ["Блокирует"]) + ["Почему блокирует"], rows)
         out.append("")
     else:
@@ -703,7 +722,7 @@ def _per_requirement(c: _Ctx) -> list[str]:
                          ", ".join(c.req_label(r) for r in f.get("requirement_ids") or []) or "документ",
                          cell(_criterion_name(f.get("criterion"))),
                          cell(place(ev)) + ": " + quote_md(ev.get("quote"), 90, in_table=True),
-                         cell(f.get("recommendation"))])
+                         pcell(f.get("recommendation"))])
         out += table(["Дефект", "Суть", "Требования", "Критерий", "Где", "Что исправить"], rows)
         out.append("")
     else:
@@ -739,7 +758,7 @@ def _card(c: _Ctx, f: dict) -> list[str]:
     sev = f.get("severity")
     badge = {"changed": " · уточнён после ответов", "new": " · новый после ответов"}.get(
         f.get("status_after_answers") or f.get("status"), "")
-    out = [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(sev, '')} {f['id']}. {esc(f.get('title'))}", ""]
+    out = [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(sev, '')} {f['id']}. {prose(f.get('title'))}", ""]
     meta = []
     reqs = [c.req_label(r) for r in f.get("requirement_ids") or []]
     meta.append("**Требования:** " + (", ".join(reqs) if reqs else "документ в целом"))
@@ -761,15 +780,15 @@ def _card(c: _Ctx, f: dict) -> list[str]:
         out += [f"- {e}" for e in evs] + [""]
     fields = [("Проблема", f.get("problem")), ("Сценарий", f.get("scenario")), ("Последствия", f.get("impact")),
               ("Что исправить", f.get("recommendation"))]
-    body = [f"**{name}.** {esc(val)}" for name, val in fields if val]
+    body = [f"**{name}.** {prose(val)}" for name, val in fields if val]
     src = _rewrite_from(f)
     if src is not None:
         body.append(f"**Было → стало.** {lines_word(src.get('line_start'), src.get('line_end')).capitalize()}: "
-                    f"{quote_md(src.get('quote'))} → «{esc(f.get('rewrite'))}»")
+                    f"{quote_md(src.get('quote'))} → «{prose(f.get('rewrite'))}»")
     if f.get("question"):
         qids = c.q_by_finding.get(f["id"], [])
         link = (" → " + ", ".join(f"[{q}](#{anchor(q)})" for q in qids)) if qids else ""
-        body.append(f"**Вопрос владельцу.** {esc(f['question'])}{link}")
+        body.append(f"**Вопрос владельцу.** {prose(f['question'])}{link}")
     out += [line + "  " if i < len(body) - 1 else line for i, line in enumerate(body)]
     return out + [""]
 
@@ -922,13 +941,13 @@ def _conclusion(c: _Ctx) -> list[str]:
     out += table(["Работа", "Решение"], [["Разработка", f"**{READINESS.get(v.get('development'), '—')}**"],
                                          ["Тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     reason = v.get("summary") or _auto_reason(c)
-    out += [f"**Обоснование.** {esc(reason)}", ""]
+    out += [f"**Обоснование.** {prose(reason)}", ""]
     first = _fix_first(c)
     if first:
         out += ["**Что исправить в первую очередь**", ""]
         for i, f in enumerate(first, 1):
-            out.append(f"{i}. {c.f_link(f['id'], True)} {esc(f.get('title'))}. Что сделать: "
-                       f"{esc(shorten(f.get('recommendation'), 260))}")
+            out.append(f"{i}. {c.f_link(f['id'], True)} {prose(f.get('title'))}. Что сделать: "
+                       f"{prose(shorten(f.get('recommendation'), 260))}")
         out.append("")
     nc = [x for x in c.r.get("not_checked") or [] if isinstance(x, str)]
     if nc:
@@ -972,22 +991,31 @@ def _appendix_questions(c: _Ctx) -> list[str]:
             head.append(f"кому: {esc(q['to'])}")
         if q.get("finding_ids"):
             head.append(f"к {c.f_links(q['finding_ids'])}")
-        lines = [" · ".join(head), esc(q.get("question"))]
+        lines = [" · ".join(head), prose(q.get("question"))]
         evs = [e for e in q.get("evidence") or [] if isinstance(e, dict) and e.get("quote")]
         if evs:
             lines.append("Где: " + "; ".join(f"{lines_word(e.get('line_start'), e.get('line_end'))} "
                                              f"{quote_md(e.get('quote'), 90)}" for e in evs[:3]))
-        opts = q.get("options") or []
-        if opts:
-            lines.append("Варианты: " + "; ".join(f"**{LETTERS[i] if i < len(LETTERS) else i + 1}** {esc(o)}"
-                                                  for i, o in enumerate(opts)))
+        opts = [o for o in q.get("options") or [] if str(o).strip()]
+        tail = []
         if q.get("why"):
-            lines.append(f"Зачем: {esc(q['why'])}")
+            tail.append(f"Зачем: {prose(q['why'])}")
         a = answered.get(q.get("id"))
         if a:
             choice = f"{a['choice']} — " if a.get("choice") else ""
-            lines.append(f"**Ответ владельца:** {esc(choice + str(a.get('answer') or ''))}")
-        out += [ln + "  " if i < len(lines) - 1 else ln for i, ln in enumerate(lines)] + [""]
+            tail.append(f"**Ответ владельца:** {prose(choice + str(a.get('answer') or ''))}")
+        letter = [LETTERS[i] if i < len(LETTERS) else str(i + 1) for i in range(len(opts))]
+        if opts and c.level < 2:
+            out += [ln + "  " if i < len(lines) - 1 else ln for i, ln in enumerate(lines)] + [""]
+            out += [f"- **{letter[i]}** {prose(o)}" for i, o in enumerate(opts)] + [""]
+            lines = tail
+        else:
+            if opts:
+                lines.append("Варианты: " + "; ".join(f"**{letter[i]}** {prose(str(o).rstrip('. '))}"
+                                                      for i, o in enumerate(opts)))
+            lines += tail
+        if lines:
+            out += [ln + "  " if i < len(lines) - 1 else ln for i, ln in enumerate(lines)] + [""]
     out += _clarification_details(c)
     return out
 
