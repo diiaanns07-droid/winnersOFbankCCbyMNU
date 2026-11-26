@@ -20,6 +20,9 @@
   ``paragraph`` -- абзац(ы) с цитатой целиком, ``cell`` -- ячейка целиком.
   Для сноски и текстового поля комментарий ставится на абзац, где стоит знак
   сноски или рамка: Word не комментирует эти места напрямую.
+* Комментарий к ячейке строки данных называет её место: заголовок столбца из всех
+  строк шапки (в том числе объединённой: «Лимит за сутки / Сумма, ₸») и строку по
+  первой ячейке (:func:`place_line`) -- шапка может быть на другой странице.
 * Уже имеющиеся комментарии, форматирование и текст сохраняются. После записи
   копия открывается повторно и проверяется (см. ``AnnotationResult.checks``).
 """
@@ -67,6 +70,7 @@ __all__ = [
     "verify_annotated",
     "comment_spans",
     "build_comment_text",
+    "place_line",
     "DocxReadError",
 ]
 
@@ -347,8 +351,13 @@ def build_comment_text(
     question: str | None = None,
     fix: str | None = None,
     other_places: Iterable[str] = (),
+    place: str | None = None,
 ) -> str:
-    """Текст комментария: ID, серьёзность, последствие, вопрос или исправление, точность."""
+    """Текст комментария: ID, серьёзность, последствие, вопрос или исправление, место, точность.
+
+    ``place`` -- строка «Место: …» для ячейки таблицы (см. :func:`place_line`): заголовок
+    столбца из шапки и строка, к которым относится ячейка комментария.
+    """
     fid = finding.get("id") or "—"
     sev = SEVERITY_RU.get(str(finding.get("severity")), str(finding.get("severity") or "серьёзность не указана"))
     status = STATUS_RU.get(str(finding.get("status")), finding.get("status"))
@@ -377,6 +386,8 @@ def build_comment_text(
     req_ids = finding.get("req_ids") or []
     if req_ids:
         lines.append("Требования: " + ", ".join(str(r) for r in req_ids))
+    if place:
+        lines.append(place)
     others = [o for o in other_places if o]
     if others:
         lines.append("Связанное место: " + "; ".join(others))
@@ -384,6 +395,26 @@ def build_comment_text(
         lines.append(f"Точные слова: «{_short(quote, 120)}»")
     lines.append(f"Привязка: {PRECISION_RU.get(precision, precision)}" + (f" ({reason})" if reason else ""))
     return "\n".join(lines)
+
+
+def place_line(block: Any, place: dict[str, Any]) -> str | None:
+    """«Место: Таблица 1, строка 4, столбец 2 «Лимит за сутки / Сумма, ₸»; строка «Л-2. …»».
+
+    Только для ячейки строки данных с заголовком столбца: шапка может быть на другой
+    странице или собрана из объединённых ячеек, а в заголовке -- единица правила
+    («за сутки»). Строка названа текстом её первой непустой ячейки, если комментарий
+    стоит не в ней. Для абзаца и ячейки шапки -- ``None``.
+    """
+    cell = place.get("cell")
+    if place.get("anchor") != "cell" or not cell or not cell.get("column_header"):
+        return None
+    line = f"Место: {place['label']}"
+    loc = block.loc if hasattr(block, "loc") else (block.get("loc") or {})
+    text = block.text if hasattr(block, "text") else (block.get("text") or "")
+    key = next((c for c in loc.get("cells") or [] if text[c["start"]:c["end"]].strip()), None)
+    if key is not None and key["ref"] != cell["ref"]:
+        line += f"; строка «{_short(text[key['start']:key['end']], 60)}»"
+    return line
 
 
 def _verdict_lines(report: dict[str, Any]) -> list[str]:
@@ -915,7 +946,8 @@ def annotate_docx(
                     others.append(lab)
         question, fix = _question_and_fix(rep, f)
         text = build_comment_text(f, quote=quote, precision=plan.precision, reason=plan.reason,
-                                  question=question, fix=fix, other_places=others)
+                                  question=question, fix=fix, other_places=others,
+                                  place=place_line(spec, place))
         cid = _apply(doc, plan, text, author, initials, reserved)
         plans[cid] = (plan, start, end)
         result.anchors.append(Anchor(
