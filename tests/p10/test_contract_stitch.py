@@ -80,6 +80,11 @@ def test_engine_end_to_end_uses_bank_module(tmp_path, engine_env, provider):
     from bcc_review.cli import main as cli_main
 
     assert cli_main(["verify", str(tmp_path / "report.json"), str(fx.CASE_MD)]) == C.EXIT_OK
+    # опоры строк — содержательные цитаты: ни шапок таблиц, ни меток «Ф-1.»
+    quotes = [e["quote"] for row in rows for e in row["evidence"] if e["quote"].strip("| ")]
+    assert all(len(q) >= 4 for q in quotes) and not any(q.startswith(("Parameter |", "Ф-1.")) for q in quotes)
+    kinds8 = {f["kind"] for f in rep["findings"] if f["id"] in rows[7]["machine"]["blocking_finding_ids"][:1]}
+    assert not kinds8 or kinds8 <= {"conflict", "incorrect"} or rows[7]["machine"]["blocking_finding_ids"] == []
     opened = [t for t in rep["test_cases"] if t.get("status") == "open"]
     assert opened and all(t["open_question_id"] is None and t["open_question"]["id"] for t in opened)
     bank_warn = [w for w in rep["warnings"] if isinstance(w, dict) and w.get("stage") == "bank"]

@@ -215,8 +215,8 @@ class Block:
         return self._norm
 
     @property
-    def is_heading(self) -> bool:
-        return "head" in self.kind or self.kind in {"title", "h1", "h2", "h3", "h4", "h5", "h6"}
+    def is_heading(self) -> bool:  # table_header — строка таблицы, не заголовок раздела
+        return self.kind.startswith("heading") or self.kind in {"title", "h1", "h2", "h3", "h4", "h5", "h6"}
 
     @property
     def is_code(self) -> bool:
@@ -966,13 +966,15 @@ def snippet(doc: Doc, scan: Scan, block: Block) -> dict:
         if cells:
             s, e = _cut_span(blk.text, cells[0].start, cells[-1].end)
             return doc.ev(blk, s, e)
-    for s, e in sentences(block.text):
-        seg = block.text[s:e]
-        if _SEP_LINE.match(seg) or not norm(seg):
-            continue
+    spans = [(s, e) for s, e in sentences(block.text) if norm(block.text[s:e]) and not _SEP_LINE.match(block.text[s:e])]
+    meaningful = [(s, e) for s, e in spans if not _ID_LABEL.match(norm(block.text[s:e]))]
+    for s, e in meaningful or spans:  # «Ф-1.» — метка требования, опорой служит его текст
         s, e = _cut_span(block.text, s, e)
         return doc.ev(block, s, e)
     return doc.ev(block, 0, min(len(block.text), 180))
+
+
+_ID_LABEL = re.compile(r"^[\w]{1,6}(?:[-.]\d+)+\.?$|^\d+[.)]?$")
 
 
 def _is_placeholder(text: str) -> bool:
@@ -1165,6 +1167,25 @@ def normalize_findings(doc: Doc, findings: Iterable[Any], crit: Mapping[str, set
                {str(x) for x in as_list(g(f, "req_ids"))}, f, signals, crit_topics, crits, evs)
         )
     return out
+
+
+# Виды замечаний, которые лучше всего обосновывают «Нет» у строки темы.
+_PREFERRED_KINDS = {"consistency": ("conflict", "incorrect"), "testability": ("unverifiable", "ambiguity"),
+                    "business": ("omission", "incomplete"), "data": ("omission", "incomplete"),
+                    "integration": ("conflict", "omission", "incorrect")}
+
+
+def _best_ev(f: NF) -> dict:
+    """Самая содержательная опора замечания: самая длинная цитата (слово «клиенту» хуже предложения)."""
+    return max(f.evidence, key=lambda e: len(e["quote"]))
+
+
+def _evidence_rank(f: NF, topic: Topic | None) -> tuple:
+    kind = norm(g(f.raw, "kind") or "")
+    preferred = _PREFERRED_KINDS.get(topic.id if topic else "", ())
+    quote = len(_best_ev(f)["quote"]) if f.evidence else 0
+    order = preferred.index(kind) if kind in preferred else len(preferred)
+    return (0 if f.severity == "critical" else 1, order, 0 if quote >= 15 else 1)
 
 
 def _maps(f: NF, topic: Topic, row_crit: set[str] | None) -> bool:
@@ -1515,11 +1536,12 @@ def _row(
     row["machine"] = {"value": machine.value or "unknown", "basis": machine.basis, "finding_ids": fids,
                       "blocking_finding_ids": [f.id for f in mapped if f.status == "confirmed" and f.severity in BLOCKING]}
     row["approval"] = approval
-    blocking = [f for f in mapped if f.status == "confirmed" and f.severity in BLOCKING]
-    fevs = [f.evidence[0] for f in blocking if f.evidence][:3]
+    blocking = sorted((f for f in mapped if f.status == "confirmed" and f.severity in BLOCKING),
+                      key=lambda f: _evidence_rank(f, topic))
+    fevs = [_best_ev(f) for f in blocking if f.evidence][:3]
     row["evidence"] = _dedupe_ev(pres.evidence + pres.negative + (approval["evidence"] if approval else []) + fevs)
     if blocking and blocking[0].evidence:
-        e = blocking[0].evidence[0]
+        e = _best_ev(blocking[0])
         notes.insert(0, f"Ключевое замечание: {blocking[0].id} «{short(blocking[0].title, 80)}» — «{short(e['quote'], 70)}» ({doc.label(e)})")
     row["note"] = _compose_note(doc, row, pres, machine, approval, source_value, external, source_note, notes)
     if approval is not None and approval["status"] == "requires_confirmation":
