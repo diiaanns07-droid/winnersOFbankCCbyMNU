@@ -122,6 +122,11 @@ def test_conflict_without_rule_quote_is_not_a_conflict():
     assert all(c["severity"] != "critical" for c in out["candidates"])
 
 
+def test_conflict_with_identical_expected_is_match():
+    out = lens_qa.postprocess({"acceptance_checks": [_check(expected_by_rules="Итог 15.", stated="итог 15")]}, REQS)
+    assert out["acceptance_checks"][0]["verdict"] == "match" and out["candidates"] == []
+
+
 def test_conflict_kind_defaults_to_contradiction():
     out = lens_qa.postprocess({"acceptance_checks": [_check(conflict_kind="none")]}, REQS)
     assert out["candidates"][0]["kind"] == "contradiction"
@@ -264,3 +269,15 @@ def test_run_without_missing_rows_makes_one_call():
     llm = _LLM([full])
     out = lens_qa.run(_Ctx(llm, REQS))
     assert len(llm.calls) == 1 and out["candidates"] == []
+
+
+def test_other_topic_both_acceptance_conflicts_found():
+    """Документ другой тематики (release/input/other_topic_cashback.md): D1 — строка 2 приёмки ↔ правило окна
+    выбора (L39 ↔ L19), D2 — строка 3 превышает месячный потолок (L40 ↔ L20)."""
+    out = lens_qa.postprocess(_json(QA / "other_topic_cashback.sonnet.json"))
+    verdicts = {c["row_line"]: c["verdict"] for c in out["acceptance_checks"]}
+    assert verdicts == {38: "match", 39: "conflict", 40: "conflict"}
+    crit = [c for c in out["candidates"] if c.get("origin") == "acceptance_check"]
+    assert len(crit) == 2 and all(c["severity"] == "critical" for c in crit)
+    assert {19, 39} <= {e["line"] for e in crit[0]["evidence"]}
+    assert {20, 40} <= {e["line"] for e in crit[1]["evidence"]}

@@ -185,6 +185,10 @@ def normalize_check(raw: Mapping[str, Any]) -> dict:
         "explanation": _s(raw.get("explanation")),
         "fix": _s(raw.get("fix")),
     }
+    if c["verdict"] == "conflict" and c["stated"] and _norm(c["expected_by_rules"]).rstrip(".") == _norm(
+            c["stated"]).rstrip("."):
+        # Модель сама вывела ровно заявленный результат — это совпадение, а не противоречие.
+        c["verdict"] = "match"
     if c["verdict"] == "conflict":
         # Конфликт без цитаты правила не доказан: остаётся вопросом к документу, а не противоречием.
         if not c["rule_evidence"]:
