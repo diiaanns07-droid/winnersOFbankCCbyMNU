@@ -13,7 +13,7 @@ from evaluation.harness.schema import ProtocolError
 
 from .helpers import do_score, gold_row, pred_row, run_row
 
-HAND = Path(__file__).parent / "fixtures" / "hand_example"
+HAND = Path(__file__).resolve().parents[2] / "evaluation" / "harness" / "controls" / "hand_2tp"
 REPO = Path(__file__).resolve().parents[2]
 
 A1 = "Возврат покупки уменьшает кэшбэк следующего начисления."

@@ -33,6 +33,13 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("check", help="перегенерировать и сверить смысловые хеши с корпусом")
     c.add_argument("--corpus", default="evaluation/dev/corpus")
     c.add_argument("--with-binaries", action="store_true", help="сверить и байты PDF/DOCX")
+    o = sub.add_parser("open-run", help="один воспроизводимый прогон dev-набора через CLI продукта (rules_only)")
+    o.add_argument("--out", required=True)
+    o.add_argument("--product-src", help="каталог src checkout bcc/integration (добавляется в PYTHONPATH)")
+    o.add_argument("--product-cmd", help="шаблон команды продукта с {input} и {output}")
+    k = sub.add_parser("controls", help="собрать или сверить три контрольных случая на открытом корпусе")
+    k.add_argument("--out", default=None, help="каталог (по умолчанию evaluation/dev/controls)")
+    k.add_argument("--check", action="store_true", help="только сверить закоммиченные файлы с генератором")
     h = sub.add_parser("hash", help="напечатать смысловой хеш корпуса без записи файлов")
     h.add_argument("--seeds", default="1")
     h.add_argument("--all-variants", action="store_true")
@@ -49,6 +56,20 @@ def main(argv: list[str] | None = None) -> int:
         for cid, fmt, chk in bad:
             print(f"  ВНИМАНИЕ: {cid}@{fmt}: текст после рендера неполный: {chk}")
         return 1 if bad else 0
+    if a.cmd == "open-run":
+        from .open_run import open_run
+        s = open_run(a.out, a.product_src, a.product_cmd)
+        print(json.dumps(s, ensure_ascii=False, indent=2))
+        return 0
+    if a.cmd == "controls":
+        from . import controls
+        out = Path(a.out) if a.out else controls.OUT
+        if a.check:
+            problems = controls.check(out)
+            print("OK: контроли воспроизводятся" if not problems else "\n".join(problems))
+            return 0 if not problems else 1
+        print("\n".join(controls.write(out)))
+        return 0
     if a.cmd == "hash":
         seeds = _seeds(a.seeds)
         cases = generate_cases(seeds, a.all_variants)

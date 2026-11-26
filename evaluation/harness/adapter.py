@@ -164,6 +164,7 @@ def report_to_rows(report: dict, taxonomy: Taxonomy, *, render_id: str | None = 
         "agent_version": run.get("agent_version"), "agent_commit": run.get("agent_commit"),
         "run_id": run.get("run_id"), "status_reasons": run.get("status_reasons") or [],
         "incomplete_stages": run.get("incomplete_stages") or [], "findings": len(rows),
+        "modules": run.get("modules") or {},
         "empty_input_warning": empty_warning,
     }
     if extra_run:

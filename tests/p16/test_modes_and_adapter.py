@@ -257,17 +257,39 @@ def _product_ready() -> bool:
         return out.with_suffix(".json").exists()
 
 
-def test_real_product_rules_only_if_engine_connected(tmp_path, monkeypatch):
-    """Стыковой тест с настоящим продуктом: включается, когда движок пишет report.json."""
+def _engine_cmd(monkeypatch) -> str:
     if not _product_ready():
         pytest.skip("python -m bcc_review ещё не пишет OUTPUT.json (cli.py — временная оболочка bootstrap)")
     monkeypatch.setenv("PYTHONPATH", str(REPO / "src"))
-    cmd = f"{shlex.quote(sys.executable)} -m bcc_review {{input}} {{output}}"
+    return f"{shlex.quote(sys.executable)} -m bcc_review {{input}} {{output}}"
+
+
+def test_real_product_rules_only_if_engine_connected(tmp_path, monkeypatch):
+    """Стык с настоящим движком (rules_only): канонический Report, 0 вызовов, песочница, адаптер."""
+    cmd = _engine_cmd(monkeypatch)
+    cases = ["cashback.base", "cashback.two_statuses.bad_category_200", "edge.empty"]
     cfg = run_manifest(str(CORPUS / "manifest.json"), "rules_only", str(tmp_path), TAX, product_cmd=cmd,
-                       cases=["cashback.base", "cashback.two_statuses.bad_category_200", "edge.empty"], cwd=str(REPO))
-    runs = [r for r in read_jsonl(tmp_path / "predictions.jsonl") if r["record"] == "run"]
-    assert cfg["network_sandbox"] and all(r["status"] != "failed" for r in runs), runs
-    assert all(r["physical_calls"] == 0 and not r["violations"] for r in runs), runs
+                       cases=cases, cwd=str(REPO))
+    runs = {r["case_id"]: r for r in read_jsonl(tmp_path / "predictions.jsonl") if r["record"] == "run"}
+    assert cfg["network_sandbox"] and set(runs) == set(cases)
+    assert all(r["physical_calls"] == 0 and not r["violations"] and r["mode"] == "rules_only" for r in runs.values())
+    assert all(r["modules"].get("read_text", "").startswith(("team:", "fallback:")) for r in runs.values())
+    # пустой файл: движок пишет Report со status=failed; по политике v1 это пропуск измерения
+    assert runs["edge.empty"]["status"] == "failed" and runs["edge.empty"]["empty_input_warning"] is True
+    assert all(runs[c]["status"] in ("complete", "partial") for c in cases[:2])
     for rep_path in (tmp_path / "reports").rglob("report.json"):
         rep = json.loads(rep_path.read_text(encoding="utf-8"))
         contracts.validate(rep)
+        assert contracts.evidence_errors(rep) == []
+
+
+def test_real_product_mock_transport_if_engine_connected(tmp_path, monkeypatch):
+    """Стык в режиме mock: подставной транспорт движка, сеть закрыта, вызовы и токены видны."""
+    cmd = _engine_cmd(monkeypatch)
+    cfg = run_manifest(str(CORPUS / "manifest.json"), "mock", str(tmp_path), TAX, product_cmd=cmd,
+                       cases=["cashback.two_statuses.bad_category_200"], cwd=str(REPO))
+    run = next(r for r in read_jsonl(tmp_path / "predictions.jsonl") if r["record"] == "run")
+    assert cfg["network_sandbox"] and cfg["mode_args"][:2] == ["--provider", "mock"]
+    assert run["mode"] == "mock" and run["provider"] == "mock" and run["physical_calls"] > 0 and not run["violations"]
+    rep = json.loads(Path(run["report_path"]).read_text(encoding="utf-8"))
+    contracts.validate(rep)

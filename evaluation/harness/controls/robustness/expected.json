@@ -1,0 +1,56 @@
+{
+  "schema": "bcc-eval-control/1",
+  "control": "robustness",
+  "policy": "опубликованная политика счётчика 0.1.0 (545ff52): anchor_policy all, coverage ≥ 0.6, паросочетание максимальной мощности, дубли вне precision, null при пустом знаменателе",
+  "fixed_before_run": "Ответ выведен вручную из графа ниже и записан до запуска счётчика.",
+  "graph": {
+    "labels": {
+      "A = rb.conflict#A": "event_conflict, опоры a+b (обе обязательны)",
+      "B = rb.conflict#B": "status_conflict, опоры a+b (обе обязательны)"
+    },
+    "predictions": {
+      "X-group": "contradiction (родитель A и B), цитирует все 4 опоры → допустима к A и к B на уровне parent",
+      "Y-event": "event_conflict, опоры A.a+A.b → допустима только к A (exact)",
+      "Z-event-repeat": "явный дубль Y с другим defect_id → допустима только к A (exact)",
+      "W-one-side": "event_conflict, только опора A.b → частичная опора одной стороны противоречия, на разбор",
+      "V-clean-alarm": "ambiguity на чистом контроле rb.clean → ложная тревога"
+    },
+    "derivation": [
+      "B достижима только через X, значит в паросочетании максимальной мощности X→B.",
+      "A закрывает Y или Z. Оценки равны (exact, доля 1.0), выбор — меньший устойчивый pred_key: Y 89b067c8f1ee21f3 < Z bfdf18f0d5f4d48d → Y→A, Z — дубль A.",
+      "W покрывает 1 из 2 опор A → FP, pending (partial_anchors:1/2). V на чистом документе → FP, clean_false_alarm.",
+      "В режиме exact X (parent) недопустима ни к A, ни к B: X → FP pending, B → FN."
+    ]
+  },
+  "expected": {
+    "hierarchy": {
+      "tp": 2, "fp": 2, "fn": 0, "duplicates": 1, "pending_adjudication": 1,
+      "clean_false_alarms": 1, "tp_parent_level": 1,
+      "precision": "2/4", "recall": "2/2", "f1": "4/6", "precision_strict": "2/5",
+      "tp_pairs": {"rb.conflict#A": "Y-event", "rb.conflict#B": "X-group"},
+      "duplicates_of": {"Z-event-repeat": "rb.conflict#A"},
+      "disputed_pairs": [["W-one-side", "rb.conflict#A", "partial_anchors:1/2"]],
+      "independent_cases": 3,
+      "per_case": {
+        "rb.conflict": {"precision": "2/3", "recall": "2/2", "precision_strict": "2/4"},
+        "rb.clean": {"precision": "0/1", "recall": null, "f1": "0/1"},
+        "rb.clean_empty": {"precision": null, "recall": null, "f1": null}
+      }
+    },
+    "exact": {
+      "tp": 1, "fp": 3, "fn": 1, "duplicates": 1, "pending_adjudication": 2,
+      "clean_false_alarms": 1, "tp_parent_level": 0,
+      "precision": "1/4", "recall": "1/2", "f1": "2/6", "precision_strict": "1/5",
+      "tp_pairs": {"rb.conflict#A": "Y-event"},
+      "duplicates_of": {"Z-event-repeat": "rb.conflict#A"},
+      "disputed_pairs": [["W-one-side", "rb.conflict#A", "partial_anchors:1/2"],
+                         ["X-group", "rb.conflict#A", "parent_type_under_exact_policy:contradiction~event_conflict"],
+                         ["X-group", "rb.conflict#B", "parent_type_under_exact_policy:contradiction~status_conflict"]],
+      "independent_cases": 3
+    },
+    "format_repeat": {
+      "note": "те же находки rb.conflict поданы ещё и для DOCX того же case_id",
+      "independent_cases": 3, "micro_equals_md_only": true, "per_format_docx_cases": 1
+    }
+  }
+}

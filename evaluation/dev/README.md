@@ -58,6 +58,45 @@ python -m evaluation.dev generate --out /tmp/c --seeds 1,2,3 --all-variants
   совпадают (`check --with-binaries`). На другой машине байты PDF могут отличаться из-за версии
   шрифта DejaVu или reportlab. Смысловой хеш от этого не зависит, а закоммиченные файлы — эталон.
 
+## Воспроизводимый прогон через CLI продукта
+
+```bash
+git worktree add --detach ../stand origin/bcc/integration
+git -C ../stand checkout origin/bcc/p03-word -- src/bcc_review/readers/docx.py   # пока №03 не влит
+python -m evaluation.dev open-run --product-src ../stand/src --out out/open_run
+```
+
+Прогон идёт в режиме `rules_only` с `--no-cache`, сеть закрыта песочницей. Состав:
+* MD всех кейсов, кроме `autopay.event_conflict.insufficient_funds_credit`;
+* DOCX кейса `cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict`;
+* отдельный прогон `autopay.event_conflict.insufficient_funds_credit`, прерванный таймаутом счётчика 0.001 с.
+  Он технически не завершён (`failed`) и виден как пропуск измерения.
+
+`summary.json` содержит:
+* число независимых кейсов, пропуски измерения, режим;
+* физические вызовы, транспорт, реализации модулей;
+* `results_sha256` — хеш смысловых итогов без времени и путей.
+
+Зафиксированный результат лежит в `results/`.
+
+## Контрольные случаи на открытом корпусе (`controls/`)
+
+Ручной ответ — `controls/expected.json`, записан до запуска CLI.
+
+| Случай | Документ | Находки | Ручной ответ |
+| :--- | :--- | :--- | :--- |
+| два дефекта с похожей цитатой | `cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30` (собран генератором, общая опора БК-2) | F-07: строка API + БК-2; F-08: только БК-2 | TP #1←F-07, FP F-08 (спор с #1 и #2), FN #2 |
+| дефект и дубль находки | `transfer_limit.event_conflict.cancel_no_restore` | F-01 и F-02, `kind=conflict`, одинаковые цитаты | TP #1←F-02 (меньший `pred_key`), DUP F-01 |
+| чистый документ с тревогой | `cashback.base` | F-01 `ambiguity` | FP F-01 (`clean_false_alarm`) |
+
+```bash
+python -m evaluation.harness --gold evaluation/dev/controls/labels.jsonl --pred evaluation/dev/controls/predictions.jsonl --manifest evaluation/dev/controls/manifest.json --out-dir out/controls
+python -m evaluation.dev controls --check
+```
+
+Итог: TP 2, FP 2, FN 1, дубли 1; P 2/4, R 2/3. Режим `--type-match exact`: TP 1, FP 4, FN 2.
+Без находок: P = null, R = 0/3. Контроли ссылаются на документы корпуса seed 1 и его хеш не меняют.
+
 ## Изоляция закрытого набора
 
 * В dev-корпусе только `visibility: public`. Тест `test_dev_corpus_has_no_closed_material`
@@ -84,7 +123,12 @@ python -m evaluation.dev generate --out /tmp/c --seeds 1,2,3 --all-variants
    python -m evaluation.harness leakcheck --dev evaluation/dev/corpus --fingerprint closed.fp.json
    ```
    Выводятся только количества совпадений (SHA-256 файлов, case_id, 5–8-граммы цитат); код 1 — утечка.
-4. Прогон двух режимов на одном манифесте и одной настройке кэша (ключ выдаёт команда, координирует №18):
+4. Одна команда без ручного манифеста (файлы сопоставляются с эталоном по SHA-256):
+   ```bash
+   python -m evaluation.harness run --gold closed_labels.jsonl --docs closed_docs/ --mode rules_only --out out/closed
+   ```
+   Результаты: `metrics.json`, `matrix.jsonl`, `adjudication.jsonl`, `summary.txt`.
+   Прогон двух режимов на одном манифесте и одной настройке кэша (ключ выдаёт команда, координирует №18):
    ```bash
    python -m evaluation.harness run --manifest closed/manifest.json --mode rules_only --out out/closed/ro --gold closed_labels.jsonl
    python -m evaluation.harness run --manifest closed/manifest.json --mode rules_plus_llm --provider gemini --out out/closed/llm --gold closed_labels.jsonl

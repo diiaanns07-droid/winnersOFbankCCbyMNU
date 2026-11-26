@@ -24,8 +24,8 @@
 python -m pytest tests/p16 tests/contract          # 92 passed, 1 skipped (тот же набор в venv на 3.11 — зелёный)
 python -m evaluation.dev hash --seeds 1             # 8ddcb3f85b7d6f2d2392dddd5ea4ee1744f1a4fb1e35b7a9e807e44b041f7288 (дважды)
 python -m evaluation.dev check --corpus evaluation/dev/corpus --with-binaries   # OK: корпус воспроизводится
-python -m evaluation.harness --gold tests/p16/fixtures/hand_example/labels.jsonl \
-       --pred tests/p16/fixtures/hand_example/predictions_with_duplicate.jsonl --out /tmp/m.json
+python -m evaluation.harness --gold evaluation/harness/controls/hand_2tp/labels.jsonl \
+       --pred evaluation/harness/controls/hand_2tp/predictions_with_duplicate.jsonl --out /tmp/m.json
 # TP=2 FP=1 FN=1 дубли=1; precision=0.6667 = 2/3; recall=0.6667 = 2/3; precision_strict=0.5
 ```
 
@@ -81,3 +81,141 @@ rules_plus_llm с подставным LLM — TP 11, FP 33, FN 17, 99 вызо�
   добавьте `--format pdf` и `--format docx`.
 * **№02/№03**: PDF и DOCX корпуса с `render_check` — регрессионный вход для парсеров.
   В PDF токены 4 из 15 опор идут не подряд из-за переносов в ячейках таблиц.
+
+---
+
+# Второй проход: устойчивость счётчика (0.1.1, `bcc-eval-policy/1`)
+
+Версия для GPT Pro: `python -m evaluation.harness --version` →
+`0.1.1 bcc-eval-policy/1 e1a4d18b5be80a466f6762e0975d8e96cc9099f82ee56e3731bbecb0ce4bfe1f`.
+Хеш покрывает `evaluation/harness/*.py` и `taxonomy.toml` и пишется в каждый `metrics.json`
+(`harness_sha256`, `policy_version`).
+
+## Порядок работы
+1. `af8f633`: контрольный граф и ручной ответ (`controls/robustness/expected.json`) до запуска.
+   На коде 0.1.0 падали 5 тестов `tests/p16/test_robustness.py`. Счётные метрики во всех 120
+   перестановках совпадали с ручным ответом. Но при равных оценках TP получала то Y, то Z
+   (по 60/60 перестановок), в `exact` менялся порядок FP, конфликтующие строки run брались по
+   порядку, сводка не называла правило типов.
+2. Минимальная правка `matching.py`: при равной оценке выбор по `pred_key`, метки по `label_id`,
+   отсортированные списки. В `score.py` из разных строк run одного представления берётся худший
+   статус. В сводке появились режим, правило типов, число TP уровня parent и хеш версии.
+   Тот же вход повторно: 1 результат на 120 перестановках в обоих режимах.
+
+## Ручной ответ / счётчик (`python -m evaluation.harness selfcheck`, полная таблица — `controls/SELFCHECK.md`)
+
+| Контроль | Ручной ответ | Счётчик |
+| :--- | :--- | :--- |
+| hand_2tp | TP 2, FP 1, FN 1; P 2/3, R 2/3 | 2, 1, 1; 0.6667, 0.6667 |
+| hand_2tp + повтор F-2 | дубли 1; P 2/3; P_strict 2/4 | 1; 0.6667; 0.5 |
+| граф A/B, hierarchy | TP 2 (A←Y, B←X), FP 2, FN 0, дубль Z, спорная W↔A | совпадает |
+| граф A/B, exact | TP 1 (A←Y), FP 3, FN 1, спорные W↔A, X↔A, X↔B | совпадает |
+| 120 перестановок находок / 24 перестановки эталона | 1 результат | 1 / 1 |
+| повтор формата MD+DOCX | 3 независимых кейса, micro как у MD | 3, равно |
+| пустые знаменатели | rb.clean_empty: P, R, F1 = null; rb.clean: R = null | совпадает |
+
+## Открытый прогон через CLI продукта (реальные метрики, не контроль)
+
+`evaluation/dev/results/open_run_rules_only.json`, команда — `evaluation/dev/README.md`.
+Тестовая копия: `bcc/integration` @ `6be9e97` + `readers/docx.py` из `bcc/p03-word` @ `d2e8f30`.
+Режим `rules_only`, провайдер `none`, 0 физических вызовов, сеть закрыта.
+
+| Показатель | Значение |
+| :--- | :--- |
+| Независимых кейсов / размечено | 31 / 33 |
+| Пропуски измерения | 2: прерванный таймаутом прогон `autopay.event_conflict.insufficient_funds_credit`; `edge.empty` (движок: status=failed) |
+| Физических представлений | 32 (MD 31, DOCX 1 того же case_id, что в MD) |
+| TP / FP / FN | 0 / 160 / 27; precision 0/160, recall 0/27 |
+| Ложные тревоги на чистых | 40 на 8 из 8 измеренных |
+| results_sha256 | `ae71bea74dc0fd43c8bb3649ab6b0c84316f9312c889ea8844814ff45e2f8f31` (3 прогона подряд) |
+| Код счётчика 0.1.0 на тех же строках | те же micro, per_format, per_case, пропуски |
+
+Реализации из `Report.run.modules`:
+* командные: `read_text`, `read_docx` (из p03), `build_inventory`, `review_individual`, `review_set`,
+  `reconcile_facts`, `resolve_hint`, `resolve_candidate`, `load_criteria`;
+* резервные: `build_questions`, `build_bank_pack`.
+
+Режим `mock` проверен стыковым тестом на одном кейсе: подставной транспорт движка, 6 вызовов,
+сеть закрыта.
+
+## Оставшиеся зависимости
+* **Max / №07:** находки `omission` цитируют фрагменты по 2 токена («Приложение читает»), и 3 верных
+  по типу пропуска метода чтения не засчитываются по политике v1 (порог 3 токена). Нужны цитаты
+  до законченного фрагмента, либо решение GPT Pro о политике v2.
+* **Max:** пустой файл даёт Report со `status=failed` при коде выхода 0. По политике v1 это пропуск
+  измерения. Если пустой вход должен считаться измеренным, нужен `complete` или `partial`
+  с предупреждением.
+* **№03:** `read_docx` пока не влит в `bcc/integration`, в реестре у него нет резервной реализации.
+* **Корпус v1.1 (моя зона):** в `transfer_limit.base` поле `limit` в ответе — string, в запросе —
+  integer. Движок это находит (6 FP). Это кандидат `new_real_defect`; исправлю в следующей версии
+  корпуса с новым смысловым хешем.
+
+---
+
+# Третий проход: измерение, которое можно повторить (0.1.2, `bcc-eval-policy/1`)
+
+Версия: `python -m evaluation.harness --version` →
+`0.1.2 bcc-eval-policy/1 7b54d224c8115c5ec18c71ade817df4e53911ed53324c1e3f131c06bc0dc4660`.
+Счётные правила те же, что в 0.1.0. Новое:
+* `matrix.jsonl`, `--out-dir`, `run --docs` (манифест по SHA-256);
+* короткие каталоги отчётов;
+* контроли на открытом корпусе.
+
+## Одна команда для GPT Pro (закрытый корпус, без правок кода)
+
+```bash
+python -m evaluation.harness run --gold CLOSED/labels.jsonl --docs CLOSED/docs --mode rules_only --out out/closed
+```
+
+Результаты: `metrics.json`, `matrix.jsonl`, `adjudication.jsonl`, `summary.txt`, `manifest.json`, `predictions.jsonl`.
+Нужен checkout `bcc/integration` с этим модулем; Max вливает его вместе со срезом.
+
+## Замечания Max по `545ff52` (60/64 на Windows)
+
+* **WinError 206 (3 теста `test_fake_product_reports_are_contract_valid[md|pdf|docx]`).** Каталог отчёта был
+  полным `render_id`; вместе с `report.artifacts/stages/…` это 140 символов относительного пути.
+  Теперь каталог — 12 hex: худший путь 65 символов от `--out` с артефактами движка.
+  Тест `test_report_paths_fit_windows_budget` держит запас ≤ 80.
+* **«Тест ждёт чистое дерево» (1).** На Linux не воспроизвёлся. Наиболее вероятный кандидат —
+  `test_dev_corpus_has_no_closed_material`: он обходил все файлы на диске. Теперь он смотрит только
+  отслеживаемые git файлы (`git ls-files evaluation/dev`) и не падает от локальных неотслеживаемых файлов.
+  Если на Windows падает другой тест, нужно его имя.
+
+## Контроли на открытом корпусе: ручной ответ / счётчик
+
+Ручной ответ — `evaluation/dev/controls/expected.json`; таблица — `controls/SELFCHECK.md` (98 строк, 0 расхождений).
+
+```bash
+python -m evaluation.harness --gold evaluation/dev/controls/labels.jsonl --pred evaluation/dev/controls/predictions.jsonl --manifest evaluation/dev/controls/manifest.json --out-dir out/controls
+```
+
+| Исход | Кейс | Дефект | Находка | Почему |
+| :--- | :--- | :--- | :--- | :--- |
+| TP | cardblock.combo…(похожая цитата) | #1 | F-07 | обе опоры, exact |
+| FP | cardblock.combo… | — | F-08 | только общая опора БК-2: спор с #1 и #2, на разборе |
+| FN | cardblock.combo… | #2 | — | кандидаты F-07, F-08 покрывают 1 из 2 опор |
+| TP | transfer_limit.event_conflict.cancel_no_restore | #1 | F-02 | parent; равная оценка с F-01, меньший `pred_key` |
+| DUP | transfer_limit.event_conflict.cancel_no_restore | #1 | F-01 | оставлена F-02 |
+| FP | cashback.base | — | F-01 | ложная тревога на чистом документе |
+
+Итог: TP 2, FP 2, FN 1, дубли 1; P 2/4, R 2/3, F1 4/7. В режиме exact: TP 1, FP 4, FN 2.
+Без находок: P = null, R = 0/3, у `cashback.base` P, R, F1 = null.
+На 120 перестановках находок в обоих режимах результат один; файл в обратном порядке строк через
+CLI даёт ту же матрицу.
+
+## Тот же вход через настоящий движок (реальная выдача, не контроль)
+
+`evaluation/dev/results/controls_rules_only.json`. Тестовая копия `/tmp/s16`: `bcc/integration` @ `2821989`
+плюс эта ветка (поэтому `agent_commit` с `-dirty`).
+* Режим `rules_only`, провайдер `none`, 0 вызовов, `read_text` — командный.
+* TP 0, FP 17, FN 3; 5 ложных тревог на `cashback.base`.
+* `matrix.jsonl` совпадает побайтно в двух прогонах: sha256 `a4f41bf5…`.
+
+## Где запускалось
+
+| Где | Python | Результат |
+| :--- | :--- | :--- |
+| рабочий каталог ветки (без движка) | 3.13 | `tests/p16`: 84 passed, 2 skipped (стык с движком) |
+| короткий путь `/tmp/s16` (интеграция + ветка) | 3.13 | 86 passed; `selfcheck` 0 расхождений; сквозной сценарий выше |
+| короткий путь `/tmp/s16` | 3.11.18 | 86 passed; `selfcheck` 0 расхождений |
+| Windows | — | недоступен в этой среде; защита — тест длины путей |

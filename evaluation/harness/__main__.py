@@ -7,6 +7,7 @@
     adapt-labels  плоские метки (defect_id, type, quote, related_quote, …) → эталон
     run           прогон продукта по манифесту в режиме rules_only | rules_plus_llm
     compare       таблица режимов по нескольким metrics.json
+    selfcheck     контрольная арифметика: ручной ответ против счётчика, перестановки, повтор формата
     fingerprint   хеш-отпечаток закрытого набора (без текста)
     leakcheck     проверка, что закрытые ответы не попали в dev-корпус
 """
@@ -21,10 +22,10 @@ from . import __version__
 from .adapter import adapt_report_files, file_info, flat_labels_to_gold
 from .schema import (Manifest, ProtocolError, parse_decisions, parse_gold, parse_predictions, read_jsonl,
                      write_jsonl)
-from .score import adjudication_sheet, score
+from .score import adjudication_sheet, matrix_rows, score
 from .taxonomy import Taxonomy
 
-SUBCOMMANDS = ("adapt", "adapt-labels", "run", "compare", "fingerprint", "leakcheck", "score")
+SUBCOMMANDS = ("adapt", "adapt-labels", "run", "compare", "fingerprint", "leakcheck", "score", "selfcheck")
 
 
 def _fmt(v: float | None, num: int, den: int) -> str:
@@ -43,6 +44,9 @@ def summary(m: dict) -> str:
         f"precision_strict={'null' if mi['precision_strict'] is None else round(mi['precision_strict'], 4)}",
         f"чистые документы: {m['clean_controls']['false_alarms']} ложных тревог на "
         f"{m['clean_controls']['cases_with_alarms']}/{m['clean_controls']['cases']} кейсах",
+        f"режим: {m['policy']['mode'] or '—'}; правило типов: {m['policy']['type_match']} "
+        f"(совпадений уровня parent: {mi['tp_parent_level']}); формат: {m['policy']['render_format']}",
+        f"счётчик {m['harness_version']} ({m['policy_version']}), sha256 {m['harness_sha256'][:16]}",
     ]
     for w in m.get("warnings", []):
         lines.append(f"предупреждение: {w}")
@@ -53,7 +57,9 @@ def cmd_score(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.harness", description="Подсчёт TP/FP/FN и метрик")
     ap.add_argument("--gold", required=True, help="эталон labels.jsonl")
     ap.add_argument("--pred", required=True, help="predictions.jsonl (строки finding и run)")
-    ap.add_argument("--out", required=True, help="куда записать metrics.json")
+    ap.add_argument("--out", help="куда записать metrics.json")
+    ap.add_argument("--out-dir", help="каталог результатов: metrics.json, matrix.jsonl, adjudication.jsonl, summary.txt")
+    ap.add_argument("--matrix-out", help="записать матрицу TP/FP/FN/DUP (jsonl)")
     ap.add_argument("--manifest", help="manifest.json корпуса: связывает представления с case_id")
     ap.add_argument("--adjudication", help="решения разбора (jsonl: pred_key, decision, label_id)")
     ap.add_argument("--adjudication-out", help="записать лист разбора по всем FP")
@@ -66,6 +72,13 @@ def cmd_score(argv: list[str]) -> int:
     ap.add_argument("--taxonomy", help="другой taxonomy.toml")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
+    if not (a.out or a.out_dir):
+        ap.error("нужен --out или --out-dir")
+    if a.out_dir:
+        d = Path(a.out_dir)
+        a.out = a.out or str(d / "metrics.json")
+        a.matrix_out = a.matrix_out or str(d / "matrix.jsonl")
+        a.adjudication_out = a.adjudication_out or str(d / "adjudication.jsonl")
     tax = Taxonomy.load(a.taxonomy)
     gold = parse_gold(read_jsonl(a.gold), tax)
     preds, runs = parse_predictions(read_jsonl(a.pred), tax)
@@ -80,8 +93,13 @@ def cmd_score(argv: list[str]) -> int:
     Path(a.out).write_text(json.dumps(m, ensure_ascii=False, indent=2, sort_keys=False) + "\n", encoding="utf-8")
     if a.adjudication_out:
         write_jsonl(a.adjudication_out, adjudication_sheet(m, a.review_seed, a.review_sample))
+    if a.matrix_out:
+        write_jsonl(a.matrix_out, matrix_rows(m))
+    text = summary(m)
+    if a.out_dir:
+        (Path(a.out_dir) / "summary.txt").write_text(text + "\n", encoding="utf-8")
     if not a.quiet:
-        print(summary(m))
+        print(text)
     return 0
 
 
@@ -120,7 +138,9 @@ def cmd_adapt_labels(argv: list[str]) -> int:
 def cmd_run(argv: list[str]) -> int:
     from .runner import DEFAULT_PRODUCT_CMD, MODES, run_manifest
     ap = argparse.ArgumentParser(prog="python -m evaluation.harness run")
-    ap.add_argument("--manifest", required=True)
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--manifest", help="manifest.json корпуса")
+    src.add_argument("--docs", help="каталог документов: манифест строится по SHA-256 файлов из --gold")
     ap.add_argument("--mode", required=True, choices=MODES)
     ap.add_argument("--out", required=True, help="каталог прогона")
     ap.add_argument("--format", help="md | pdf | docx (по умолчанию primary_render)")
@@ -138,6 +158,14 @@ def cmd_run(argv: list[str]) -> int:
     ap.add_argument("--taxonomy")
     a = ap.parse_args(argv)
     tax = Taxonomy.load(a.taxonomy)
+    if a.docs:
+        if not a.gold:
+            ap.error("--docs требует --gold: файлы сопоставляются с кейсами по source_sha256 эталона")
+        from .runner import manifest_from_docs
+        built = manifest_from_docs(a.gold, a.docs, Path(a.out) / "manifest.json")
+        a.manifest = str(built["path"])
+        print(f"манифест по SHA-256: кейсов {built['cases']}, найдено файлов {built['matched']}, "
+              f"кейсов без файла {len(built['cases_without_file'])}, лишних файлов {len(built['unmatched_files'])}")
     cfg = run_manifest(a.manifest, a.mode, a.out, tax, fmt=a.format, product_cmd=a.product_cmd,
                        provider=a.provider, cache=a.cache, cache_dir=a.cache_dir,
                        cases=a.cases.split(",") if a.cases else None, limit=a.limit, timeout=a.timeout,
@@ -145,8 +173,7 @@ def cmd_run(argv: list[str]) -> int:
     print(f"прогонов: {cfg['renders']}, режим {cfg['mode']}, песочница сети: {cfg['network_sandbox']} → {a.out}")
     if a.gold:
         return cmd_score(["--gold", a.gold, "--pred", str(Path(a.out) / "predictions.jsonl"),
-                          "--manifest", a.manifest, "--out", str(Path(a.out) / "metrics.json"),
-                          "--adjudication-out", str(Path(a.out) / "adjudication.jsonl"),
+                          "--manifest", a.manifest, "--out-dir", a.out,
                           *(["--render-format", a.format] if a.format else []),
                           *(["--taxonomy", a.taxonomy] if a.taxonomy else [])])
     return 0
@@ -192,16 +219,23 @@ def cmd_leakcheck(argv: list[str]) -> int:
     return 1 if res["leak"] else 0
 
 
+def _selfcheck(argv: list[str]) -> int:
+    from .selfcheck import main as selfcheck_main
+    return selfcheck_main(argv)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["--version"]:
-        print(__version__)
+        from . import POLICY_VERSION, harness_sha256
+        print(f"{__version__} {POLICY_VERSION} {harness_sha256()}")
         return 0
     cmd = argv[0] if argv and argv[0] in SUBCOMMANDS else "score"
     if argv and argv[0] in SUBCOMMANDS:
         argv = argv[1:]
     handlers = {"score": cmd_score, "adapt": cmd_adapt, "adapt-labels": cmd_adapt_labels, "run": cmd_run,
-                "compare": cmd_compare, "fingerprint": cmd_fingerprint, "leakcheck": cmd_leakcheck}
+                "compare": cmd_compare, "fingerprint": cmd_fingerprint, "leakcheck": cmd_leakcheck,
+                "selfcheck": _selfcheck}
     try:
         return handlers[cmd](argv)
     except ProtocolError as exc:

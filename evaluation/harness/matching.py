@@ -100,8 +100,10 @@ def match_case(case_id: str, labels: list[GoldLabel], preds: list[Prediction], t
                type_match: str = "hierarchy", decisions: dict[str, Decision] | None = None,
                doc_tokens: list[str] | None = None) -> CaseResult:
     decisions = decisions or {}
-    present = [l for l in labels if l.expected_outcome == "present"]
-    controls = [l for l in labels if l.expected_outcome == "absent"]
+    # устойчивый порядок: метки по label_id, находки по pred_key (а не по номеру входной строки)
+    present = sorted((l for l in labels if l.expected_outcome == "present"), key=lambda l: l.label_id)
+    controls = sorted((l for l in labels if l.expected_outcome == "absent"), key=lambda l: l.label_id)
+    preds = sorted(preds, key=lambda p: p.key)
     is_clean = any(l.expected_outcome == "clean" for l in labels)
     label_idx = {l.label_id: i for i, l in enumerate(present)}
 
@@ -138,7 +140,8 @@ def match_case(case_id: str, labels: list[GoldLabel], preds: list[Prediction], t
     for pi in eligible:
         eligible[pi].sort(key=lambda li: (-info[(pi, li)].score, present[li].label_id))
     best = {pi: max((info[(pi, li)].score for li in lis), default=0.0) for pi, lis in eligible.items()}
-    order = sorted(range(len(preds)), key=lambda pi: (-best.get(pi, 0.0), pi))
+    # при равной оценке первой обрабатывается находка с меньшим pred_key: выбор TP/дубля не зависит от порядка строк
+    order = sorted(range(len(preds)), key=lambda pi: (-best.get(pi, 0.0), preds[pi].key))
 
     match_of_label: dict[int, int] = {}
 
@@ -174,9 +177,9 @@ def match_case(case_id: str, labels: list[GoldLabel], preds: list[Prediction], t
     for li, lab in enumerate(present):
         if li in match_of_label:
             continue
-        claimed = [preds[pi].key for pi, lis in eligible.items() if li in lis and pi in matched_pred]
-        near_preds = [preds[pi].key for pi, items in near.items()
-                      if any(x["label_id"] == lab.label_id for x in items)]
+        claimed = sorted(preds[pi].key for pi, lis in eligible.items() if li in lis and pi in matched_pred)
+        near_preds = sorted(preds[pi].key for pi, items in near.items()
+                            if any(x["label_id"] == lab.label_id for x in items))
         res.fn.append({"case_id": case_id, "label_id": lab.label_id, "gold_type": lab.issue_type,
                        "gold_severity": lab.severity, "claimed_by_group": claimed, "near_misses": near_preds})
     for pi, p in enumerate(preds):
@@ -214,4 +217,7 @@ def match_case(case_id: str, labels: list[GoldLabel], preds: list[Prediction], t
         if d and d.decision == "false_alarm":
             res.decided_false_alarm.append({"pred_key": p.key, "reviewer": d.reviewer})
         res.fp.append(fp)
+    for lst in (res.fp, res.duplicates, res.new_real):
+        lst.sort(key=lambda x: x["pred_key"])
+    res.fn.sort(key=lambda x: x["label_id"])
     return res

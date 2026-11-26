@@ -1,0 +1,55 @@
+{
+  "schema": "bcc-eval-manifest/1",
+  "visibility": "public",
+  "note": "Контрольный граф сопоставлений: ручной ответ в expected.json.",
+  "cases": [
+    {
+      "case_id": "rb.conflict",
+      "family": "robustness",
+      "kind": "control",
+      "primary_render": "md",
+      "renders": [
+        {
+          "render_id": "rb.conflict@md",
+          "format": "md",
+          "path": "conflict.md",
+          "sha256": "a13d699d85e11b824c885af9cf55efb2998203310bed56b3ef6963d544fcfb60"
+        },
+        {
+          "render_id": "rb.conflict@docx",
+          "format": "docx",
+          "path": "conflict.docx",
+          "sha256": "1508fc02792a20524c1162432bf76e7934deb0f681996428c349910adfe8f3e2"
+        }
+      ]
+    },
+    {
+      "case_id": "rb.clean",
+      "family": "robustness",
+      "kind": "control",
+      "primary_render": "md",
+      "renders": [
+        {
+          "render_id": "rb.clean@md",
+          "format": "md",
+          "path": "clean.md",
+          "sha256": "d85aae8d35bb5bfd45c864ee9cbee7b537c43865fac0b8190482dfb8936eb9aa"
+        }
+      ]
+    },
+    {
+      "case_id": "rb.clean_empty",
+      "family": "robustness",
+      "kind": "control",
+      "primary_render": "md",
+      "renders": [
+        {
+          "render_id": "rb.clean_empty@md",
+          "format": "md",
+          "path": "clean_empty.md",
+          "sha256": "c21a9bae3425478a9f2e312f962d81418f01f8d682bc887d6a7f34e07b23aebb"
+        }
+      ]
+    }
+  ]
+}

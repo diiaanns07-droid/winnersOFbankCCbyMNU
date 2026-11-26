@@ -1,0 +1,61 @@
+{
+  "schema": "bcc-eval-control/1",
+  "control": "open_corpus_controls",
+  "policy": "bcc-eval-policy/1 (счётчик 0.1.1): anchor_policy all, покрытие опоры ≥ 0.6, паросочетание максимальной мощности, при равной оценке — меньший pred_key, дубли вне precision, null при пустом знаменателе",
+  "fixed_before_run": "Ответ выведен вручную по графу ниже и записан до запуска CLI подсчёта.",
+  "cases": {
+    "C1 = cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30": {
+      "#1 boundary_conflict": "опоры: «больше 1 и меньше 30; без поля — бессрочно» + БК-2",
+      "#2 boundary_conflict": "опоры: «400 | Поле days меньше 1 или не меньше 30» + БК-2 (БК-2 общая с #1)",
+      "F-07": "цитирует строку API и БК-2 → покрывает обе опоры #1; к #2 не подходит: «меньше 30» в «не меньше 30» отличается отрицанием",
+      "F-08": "цитирует только общую БК-2 → по 1 из 2 опор у #1 и у #2 → спорная, на разбор, ни один дефект не закрывает",
+      "итог": "TP #1←F-07; FP F-08 (pending, спор с #1 и #2); FN #2"
+    },
+    "C2 = transfer_limit.event_conflict.cancel_no_restore": {
+      "#1 event_conflict": "опоры ЛП-4 и ЛП-7",
+      "F-01, F-02": "kind=conflict → contradiction (родитель event_conflict), обе цитируют обе опоры, оценка равна",
+      "выбор": "меньший pred_key: F-02 785602d57dc4c914 < F-01 e3f4026b819d2892 → TP #1←F-02, F-01 — дубль",
+      "итог": "TP #1←F-02 (parent); DUP F-01"
+    },
+    "C3 = cashback.base": {
+      "F-01": "ambiguity на чистом документе → ложная тревога",
+      "итог": "FP F-01 (clean_false_alarm, не на разборе)"
+    }
+  },
+  "expected": {
+    "hierarchy": {
+      "tp": 2, "fp": 2, "fn": 1, "duplicates": 1, "pending_adjudication": 1, "clean_false_alarms": 1,
+      "tp_parent_level": 1,
+      "precision": "2/4", "recall": "2/3", "f1": "4/7", "precision_strict": "2/5",
+      "matrix": [
+        ["TP", "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30", "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30#1", "F-07"],
+        ["FP", "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30", null, "F-08"],
+        ["FN", "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30", "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30#2", null],
+        ["FP", "cashback.base", null, "F-01"],
+        ["TP", "transfer_limit.event_conflict.cancel_no_restore", "transfer_limit.event_conflict.cancel_no_restore#1", "F-02"],
+        ["DUP", "transfer_limit.event_conflict.cancel_no_restore", "transfer_limit.event_conflict.cancel_no_restore#1", "F-01"]
+      ],
+      "disputed": {"F-08": ["cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30#1",
+                            "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30#2"]},
+      "per_case": {
+        "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30": {"precision": "1/2", "recall": "1/2"},
+        "transfer_limit.event_conflict.cancel_no_restore": {"precision": "1/1", "recall": "1/1", "precision_strict": "1/2"},
+        "cashback.base": {"precision": "0/1", "recall": null, "f1": "0/1"}
+      },
+      "independent_cases": 3
+    },
+    "exact": {
+      "tp": 1, "fp": 4, "fn": 2, "duplicates": 0, "pending_adjudication": 3, "clean_false_alarms": 1,
+      "tp_parent_level": 0,
+      "precision": "1/5", "recall": "1/3", "f1": "2/8", "precision_strict": "1/5"
+    },
+    "no_findings": {
+      "note": "те же строки run без находок: нулевые знаменатели",
+      "micro": {"precision": null, "recall": "0/3", "f1": "0/3"},
+      "per_case": {
+        "cashback.base": {"precision": null, "recall": null, "f1": null},
+        "cardblock.combo.range_boundary-days_api_exclusive+range_boundary-days_400_at_30": {"precision": null, "recall": "0/2"}
+      }
+    }
+  }
+}
