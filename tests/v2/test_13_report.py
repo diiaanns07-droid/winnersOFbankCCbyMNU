@@ -24,11 +24,15 @@ REQUIRED_HEADINGS = [
     "></a>Приложение Б. Черновик тест-кейсов", "></a>Приложение В. Чек-лист", "></a>Приложение Г. Было → стало",
     "></a>Приложение Д. Как работал агент", "></a>Приложение Е. Методика",
 ]
-# латиница, допустимая в шаблонах отчёта (имена стандартов, форматов, провайдеров, команда verify)
-LATIN_OK = {"BCC", "Review", "SHA", "JSON", "json", "API", "ISO", "IEC", "IEEE", "UTC", "python", "bcc_review",
-            "verify", "report", "Markdown", "PDF", "DOCX", "Word", "HTML", "Claude", "Code", "CLI", "claude", "p",
-            "Gemini", "Google", "Anthropic", "OpenAI", "Ollama", "vLLM", "rejected", "md", "R", "D", "Q", "T", "C",
-            "dev", "mock", "m", "ID", "README"}
+# латиница, допустимая в тексте отчёта вне `кода` и «кавычек» (так же считает счётчик №15)
+LATIN_OK = {"ISO", "IEC", "IEEE", "UTC", "API", "JSON", "PDF", "DOCX", "HTML"}
+_LATIN = re.compile(r"(?<![A-Za-z0-9_$./-])[A-Za-z][A-Za-z]{2,}(?![A-Za-z0-9_])")
+
+
+def latin_in_prose(md: str) -> set[str]:
+    prose = re.sub(r"`[^`]*`|«[^»]*»", "", md)
+    prose = re.sub(r'<a id="[\w-]+"></a>|\(#[\w-]+\)', "", prose)
+    return set(_LATIN.findall(prose))
 
 
 @pytest.fixture()
@@ -127,7 +131,7 @@ def test_sections_in_order_and_budget(sample):
 
 def test_header_says_generated_and_verified(sample):
     first = markdown.render(sample).split("\n")[2]
-    assert "без ручных правок" in first and "коммит c0b8368" in first and "все 67 цитат сверены" in first
+    assert "без ручных правок" in first and "коммит `c0b8368`" in first and "все 67 цитат сверены" in first
 
 
 def test_first_screen(sample):
@@ -177,11 +181,14 @@ def test_no_internal_jargon(sample):
         assert bad not in md, bad
 
 
-def test_templates_are_russian():
-    md = markdown.render(minimal()).replace("x.md", "").replace("abcdef1", "")
-    md = re.sub(r'<a id="[\w-]+"></a>|\(#[\w-]+\)', "", md)  # якоря навигации — не текст
-    words = set(re.findall(r"[A-Za-z][A-Za-z_]*", md))
-    assert words <= LATIN_OK, words - LATIN_OK
+def test_templates_are_russian(sample):
+    for r in (minimal(), minimal(provider="claude_cli", models_used=["claude-opus-5-5"], model_requested="opus",
+                                 status="partial", stages={"judge": "failed"})):
+        assert latin_in_prose(markdown.render(r)) <= LATIN_OK
+    doc_words = {w.lower() for w in re.findall(r"[A-Za-z]+", (ROOT / "release" / "input" / "requirements.md")
+                                                .read_text(encoding="utf-8"))}
+    extra = {w for w in latin_in_prose(markdown.render(sample)) if w.lower() not in doc_words}
+    assert extra <= LATIN_OK | {"RFC", "PUT", "POST"}, extra
 
 
 def test_minimal_offline_report_has_all_sections():

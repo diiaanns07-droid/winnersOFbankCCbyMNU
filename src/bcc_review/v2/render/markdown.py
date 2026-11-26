@@ -106,18 +106,18 @@ STAGE_STATUS = {"ok": "✅ выполнен", "partial": "⚠️ частичн�
 SOURCES = {"analyst": "аналитик", "qa": "тестировщик", "architect": "архитектор", "risk": "риски",
            "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр"}
 PROVIDERS = {
-    "claude_cli": "Claude Code CLI (claude -p)", "gemini": "Google Gemini API", "anthropic": "Anthropic API",
-    "openai": "OpenAI-совместимый сервер (Ollama, vLLM и др.)", "mock": "тестовый: ответы из файлов",
+    "claude_cli": "«Claude Code», команда `claude -p`", "gemini": "«Google Gemini», API", "anthropic": "«Anthropic», API",
+    "openai": "сервер, совместимый с «OpenAI» («Ollama», «vLLM» и др.)", "mock": "тестовый: ответы из файлов",
     "offline": "без модели (только правила)",
 }
 STATUS = {"complete": "завершён полностью", "partial": "завершён частично", "failed": "завершён со сбоем"}
-FORMATS = {"md": "Markdown", "txt": "текст", "pdf": "PDF", "docx": "Word (DOCX)", "html": "HTML"}
+FORMATS = {"md": "«Markdown»", "txt": "текст", "pdf": "PDF", "docx": "DOCX", "html": "HTML"}
 CHECK_ANSWER = {"да": "✅ Да", "нет": "❌ Нет", "частично": "⚠️ Частично", "не требуется": "— Не требуется"}
 LETTERS = "абвгдежзик"
-NAV = [("passport", "1. Паспорт"), ("segmentation", "2. Нарезка"), ("per-requirement", "3. Требования"),
-       ("set-check", "4. Набор"), ("summary", "5. Сводка"), ("conclusion", "6. Итог"), ("questions", "А. Вопросы"),
-       ("tests", "Б. Тест-кейсы"), ("checklist", "В. Чек-лист"), ("rewrites", "Г. Было → стало"),
-       ("how", "Д. Как работал агент"), ("method", "Е. Методика")]
+# якоря разделов — короткие коды, чтобы в тексте отчёта не было английских слов
+NAV = [("s1", "1. Паспорт"), ("s2", "2. Нарезка"), ("s3", "3. Требования"), ("s4", "4. Набор"), ("s5", "5. Сводка"),
+       ("s6", "6. Итог"), ("pa", "А. Вопросы"), ("pb", "Б. Тест-кейсы"), ("pv", "В. Чек-лист"),
+       ("pg", "Г. Было → стало"), ("pd", "Д. Как работал агент"), ("pe", "Е. Методика")]
 
 
 def h2(anchor_id: str, title: str) -> str:
@@ -397,7 +397,7 @@ def _counts_line(c: _Ctx) -> str:
 def _header(c: _Ctx) -> list[str]:
     title = c.doc.get("title") or c.doc.get("file") or "документ"
     run = c.run
-    commit = str(run.get("commit") or "")[:7] or "не записан"
+    commit = f"`{str(run.get('commit'))[:7]}`" if run.get("commit") else "не записан"
     dirty = ", рабочая копия с изменениями" if run.get("dirty") else ""
     ok, total = c.summary.get("quotes_verified", 0), c.summary.get("quotes_total")
     if total is None:
@@ -411,7 +411,7 @@ def _header(c: _Ctx) -> list[str]:
     else:
         quotes = f"исходник {src}, цитат в дефектах нет"
     out = [f"# Ревью требований: «{esc(title)}»", "",
-           f"> Сформирован агентом {esc(run.get('agent') or 'BCC Review')} {esc(run.get('version') or '')} "
+           f"> Сформирован агентом «{esc(run.get('agent') or 'BCC Review')}» {esc(run.get('version') or '')} "
            f"(коммит {commit}{dirty}) без ручных правок; {quotes}. Проверка повторяется командой "
            f"`python -m bcc_review verify отчёт.json исходник`."]
     status = run.get("status")
@@ -425,7 +425,8 @@ def _header(c: _Ctx) -> list[str]:
         out += [">", "> ⛔ Прогон завершился сбоем: вердикт не вынесен, ниже — то, что успели проверить."]
     if c.offline:
         out += [">", "> Режим без модели: работали только детерминированные правила. Поиск противоречий, "
-                     "проверка критериев приёмки и вопросы владельцу требуют модели (README, раздел о ключе)."]
+                     "проверка критериев приёмки и вопросы владельцу требуют модели (инструкция «README», раздел о "
+                     "ключе)."]
     return out + [""]
 
 
@@ -513,9 +514,9 @@ def _passport(c: _Ctx) -> list[str]:
         stamp = f"{st:%d.%m.%Y %H:%M} (UTC+5)"
     else:
         stamp = "—"
-    models = ", ".join(run.get("models_used") or []) or ("не использовалась" if c.offline else "—")
+    models = ", ".join(f"`{m}`" for m in run.get("models_used") or []) or ("не использовалась" if c.offline else "—")
     asked = run.get("model_requested")
-    model = models + (f" (запрошена: {esc(asked)})" if asked and asked not in (run.get("models_used") or []) else "")
+    model = models + (f" (запрошена: `{asked}`)" if asked and asked not in (run.get("models_used") or []) else "")
     calls = run.get("calls") or {}
     tok = run.get("tokens") or {}
     fmt = FORMATS.get(doc.get("format"), doc.get("format") or "—")
@@ -532,15 +533,16 @@ def _passport(c: _Ctx) -> list[str]:
     else:
         stage_txt = f"выполнено {len(stages) - len(bad)} из {len(stages)}; " + "; ".join(bad)
     cost = run.get("cost_usd")
-    commit = esc(run.get("commit") or "не записан") + (" (рабочая копия с изменениями)" if run.get("dirty") else "")
+    commit = (f"`{run['commit']}`" if run.get("commit") else "не записан") + \
+        (" (рабочая копия с изменениями)" if run.get("dirty") else "")
     rows = [
         ["Документ", f"«{cell(doc.get('title') or '—')}»"],
-        ["Файл", f"{cell(doc.get('file') or '—')} · {fmt} · {size}"],
-        ["SHA-256 файла", f"`{doc.get('sha256') or '—'}`"],
+        ["Файл", f"`{doc.get('file') or '—'}` · {fmt} · {size}"],
+        ["Хеш файла (`SHA-256`)", f"`{doc.get('sha256') or '—'}`"],
         ["Дата и время", stamp],
-        ["Модель", cell(model)],
-        ["Провайдер", cell(PROVIDERS.get(run.get("provider"), run.get("provider") or "—"))],
-        ["Агент", f"{cell(run.get('agent') or 'BCC Review')} {cell(run.get('version') or '')}, коммит {commit}"],
+        ["Модель", model.replace("|", "\\|")],
+        ["Провайдер", PROVIDERS.get(run.get("provider")) or f"`{run.get('provider') or '—'}`"],
+        ["Агент", f"«{cell(run.get('agent') or 'BCC Review')}» {cell(run.get('version') or '')}, коммит {commit}"],
         ["Обращений к модели", f"{num(calls.get('total', 0))} (из кэша {num(calls.get('cached', 0))}, "
                                f"с ошибкой {num(calls.get('failed', 0))}, делений пакета {num(calls.get('split', 0))})"],
         ["Токены", f"вход {num(tok.get('input', 0))}, выход {num(tok.get('output', 0))}"
@@ -552,15 +554,15 @@ def _passport(c: _Ctx) -> list[str]:
     warns = (run.get("warnings") or []) + (doc.get("warnings") or [])
     if warns:
         rows.append(["Предупреждения", cell("; ".join(warns[:5]) + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else ""))])
-    return [h2("passport", "1. Паспорт прогона"), ""] + table(["Поле", "Значение"], rows) + [""]
+    return [h2("s1", "1. Паспорт прогона"), ""] + table(["Поле", "Значение"], rows) + [""]
 
 
 def _segmentation(c: _Ctx) -> list[str]:
     reqs = c.reqs
-    out = [h2("segmentation", "2. Нарезка требований"), "",
+    out = [h2("s2", "2. Нарезка требований"), "",
            f"Выделено {len(reqs)} {plural(len(reqs), 'требование', 'требования', 'требований')}. ID R-… присвоены "
            f"агентом в порядке документа; в столбце «ID в документе» — номер или пункт документа, если он есть. "
-           f"Дословная цитата каждого требования сохранена в report.json.", ""]
+           f"Дословная цитата каждого требования сохранена в `report.json`.", ""]
     if not reqs:
         return out + ["Требования не выделены: этап нарезки не дал результата (приложение Д).", ""]
     rows = []
@@ -582,7 +584,7 @@ def _segmentation(c: _Ctx) -> list[str]:
 
 
 def _per_requirement(c: _Ctx) -> list[str]:
-    out = [h2("per-requirement", "3. Проверка каждого требования"), ""]
+    out = [h2("s3", "3. Проверка каждого требования"), ""]
     by_req: dict[str, list[dict]] = {}
     doc_level = []
     for f in c.findings:
@@ -710,7 +712,7 @@ def _card(c: _Ctx, f: dict) -> list[str]:
 
 
 def _set_check(c: _Ctx) -> list[str]:
-    out = [h2("set-check", "4. Проверка набора требований"), "", "### 4.1. Критерии набора", ""]
+    out = [h2("s4", "4. Проверка набора требований"), "", "### 4.1. Критерии набора", ""]
     rows = []
     for k in SET_CRITERIA:
         fs = [f for f in c.findings if _set_bucket(f) == k]
@@ -826,7 +828,7 @@ def _summary(c: _Ctx) -> list[str]:
             ["Дефектов всего", f"{total}: " + " · ".join(f"{SEV_ICON[k]} {fs.get(k, 0)}" for k in SEV_ICON)],
             ["Цитат сверено программой", f"{ok} из {qt}"],
             ["Вопросов владельцу", f"{len(qs)}, из них блокирующих {sum(1 for q in qs if q.get('blocking'))}"]]
-    out = [h2("summary", "5. Сводка"), ""] + table(["Показатель", "Значение"], rows) + [""]
+    out = [h2("s5", "5. Сводка"), ""] + table(["Показатель", "Значение"], rows) + [""]
     out += ["**Критичные дефекты по видам** (п. 6 ТЗ: непроверяемые, противоречивые, неполные)", ""]
     rows = []
     for cat in ("contradictory", "unverifiable", "incomplete", "other"):
@@ -853,7 +855,7 @@ def _summary(c: _Ctx) -> list[str]:
 
 def _conclusion(c: _Ctx) -> list[str]:
     v = c.verdict
-    out = [h2("conclusion", "6. Итог"), ""]
+    out = [h2("s6", "6. Итог"), ""]
     out += table(["Работа", "Решение"], [["Разработка", f"**{READINESS.get(v.get('development'), '—')}**"],
                                          ["Тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     reason = v.get("summary") or _auto_reason(c)
@@ -883,7 +885,7 @@ def _auto_reason(c: _Ctx) -> str:
 
 def _appendix_questions(c: _Ctx) -> list[str]:
     qs = c.r.get("questions") or []
-    out = [h2("questions", "Приложение А. Вопросы владельцу"), ""]
+    out = [h2("pa", "Приложение А. Вопросы владельцу"), ""]
     if not qs:
         return out + ["Вопросов нет" + (" (режим без модели)." if c.offline else "."), ""]
     blocking = sum(1 for q in qs if q.get("blocking"))
@@ -909,7 +911,7 @@ def _appendix_questions(c: _Ctx) -> list[str]:
 
 def _appendix_tests(c: _Ctx) -> list[str]:
     tc = c.r.get("test_cases") or []
-    out = [h2("tests", "Приложение Б. Черновик тест-кейсов"), ""]
+    out = [h2("pb", "Приложение Б. Черновик тест-кейсов"), ""]
     if not tc:
         return out + ["Тест-кейсы не составлялись" + (" (режим без модели)." if c.offline else "."), ""]
     undefined = sum(1 for t in tc if t.get("expected_defined") is False)
@@ -924,7 +926,7 @@ def _appendix_tests(c: _Ctx) -> list[str]:
 
 def _appendix_checklist(c: _Ctx) -> list[str]:
     cl = c.r.get("checklist") or []
-    out = [h2("checklist", "Приложение В. Чек-лист «Ревью требований», заполненный агентом"), ""]
+    out = [h2("pv", "Приложение В. Чек-лист «Ревью требований», заполненный агентом"), ""]
     if not cl:
         return out + ["Чек-лист не заполнялся" + (" (режим без модели)." if c.offline else "."), ""]
     out += ["Пункты чек-листа банка; ответ агента обоснован дефектами отчёта. Итоговую отметку ставит ответственный.", ""]
@@ -934,7 +936,7 @@ def _appendix_checklist(c: _Ctx) -> list[str]:
 
 
 def _appendix_rewrites(c: _Ctx) -> list[str]:
-    out = [h2("rewrites", "Приложение Г. Было → стало"), ""]
+    out = [h2("pg", "Приложение Г. Было → стало"), ""]
     items = []
     for rw in c.r.get("rewrites") or []:
         if rw.get("after") or rw.get("rewrite"):
@@ -948,7 +950,7 @@ def _appendix_rewrites(c: _Ctx) -> list[str]:
             if src is not None:
                 items.append((f["id"], src.get("line_start"), src.get("line_end"), src.get("quote"), f.get("rewrite")))
     if not items and c.level >= 2:
-        return out + ["Формулировки «было → стало» приведены в карточках раздела 3.2 и в report.json.", ""]
+        return out + ["Формулировки «было → стало» приведены в карточках раздела 3.2 и в `report.json`.", ""]
     if not items:
         return out + ["Готовых формулировок нет.", ""]
     out += ["Готовые формулировки для правки ТЗ; «<уточнить: …>» — место, где нужен ответ владельца.", ""]
@@ -965,7 +967,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
     run = c.run
     stages = run.get("stages") or {}
     stats = run.get("stage_stats") or {}
-    out = [h2("how", "Приложение Д. Как работал агент"), ""]
+    out = [h2("pd", "Приложение Д. Как работал агент"), ""]
     if stages:
         rows = []
         for k, v in stages.items():
@@ -996,7 +998,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
                          cell(r.get("title")), reason.replace("|", "\\|")])
         out += table(["Кандидат", "Источник", "Что предлагалось", "Почему отклонён"], rows)
         if len(rej) > limit:
-            out += ["", f"Ещё {len(rej) - limit} — в report.json, поле rejected."]
+            out += ["", f"Ещё {len(rej) - limit} — в `report.json`, поле `rejected`."]
         out.append("")
     warns = run.get("warnings") or []
     if warns:
@@ -1005,7 +1007,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
 
 
 def _appendix_method(c: _Ctx) -> list[str]:
-    out = [h2("method", "Приложение Е. Методика"), "",
+    out = [h2("pe", "Приложение Е. Методика"), "",
            "Статическое ревью текста до разработки: программа не запускается. Документ нумеруется построчно; "
            "проверяющие роли (аналитик, тестировщик, архитектор, риски, набор целиком) предлагают кандидатов с "
            "дословными цитатами; программа находит каждую цитату в документе и сама определяет строку; судья "
@@ -1125,7 +1127,7 @@ def _render_level(report: dict, level: int) -> str:
         except Exception as exc:  # noqa: BLE001 — один сломанный раздел не должен лишить аналитика отчёта
             head = [f"## {title}", ""] if title else []
             parts.append(head + [f"⚠️ Раздел не построен: в данных прогона ошибка ({esc(type(exc).__name__)}: "
-                                 f"{esc(shorten(str(exc), 160))}). Полные данные — в report.json.", ""])
+                                 f"{esc(shorten(str(exc), 160))}). Полные данные — в `report.json`.", ""])
     lines = [ln for part in parts for ln in part]
     while lines and not lines[-1].strip():
         lines.pop()
