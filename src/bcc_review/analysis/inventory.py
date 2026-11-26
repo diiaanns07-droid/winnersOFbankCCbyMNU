@@ -190,6 +190,9 @@ _CONNECTOR_RE = re.compile(
     re.I,
 )
 _ARROW_RE = re.compile(r"→|->|=>")
+_BULLET_RE = re.compile(r"[ \t]*[•◦▪‣·][ \t]+")
+# Поля шаблона согласования: строка из двух и более таких полей — шапка таблицы, даже если ридер дал заголовок.
+_APPROVAL_FIELD_RE = re.compile(r"подразделени|\bфио\b|подпис|должност|согласующ|signature|\bsign\b")
 
 _LABEL_RE = re.compile(
     r"""^[ \t]*(?:[*+•\-][ \t]+)?               # маркер списка
@@ -512,6 +515,11 @@ def _segments(text: str) -> list[_Segment]:
             cur.end = e
     if cur:
         segs.append(cur)
+    for seg in segs:  # маркер списка из PDF («• ») — оформление, а не текст пункта
+        if seg.label is None:
+            m = _BULLET_RE.match(text, seg.start, seg.end)
+            if m:
+                seg.start = m.end()
     return segs
 
 
@@ -717,6 +725,8 @@ class _Inventory:
         self.header_block: dict[str, str] = {}
         self._group_tables()
         self._collect_labels()
+        self.parent_label = self._continuations()
+        self.owners = self._label_owners()
         self.fates: dict[str, _Fate] = {}
         self._rule_fates()
 
@@ -747,6 +757,9 @@ class _Inventory:
                 sec = [sec]
             loc = _get(raw, "loc") or {}
             marker = _get(raw, "marker") or _get(raw, "number") or _get(loc, "marker") or _get(loc, "number")
+            lst = _get(loc, "list")
+            if marker in (None, "") and lst is not None and _get(lst, "ordered") and _get(lst, "number") is not None:
+                marker = str(_get(lst, "number"))  # №01 выносит «1.» из текста в loc.list
             blocks.append(
                 _Block(
                     idx=len(blocks),
@@ -895,11 +908,18 @@ class _Inventory:
                     return t
         return None
 
+    def segments_of(self, b: _Block) -> list[_Segment]:
+        """Сегменты блока; номер списка из loc (``marker``) достаётся первому сегменту без своего номера."""
+        segs = _segments(b.text)
+        if b.marker and segs and segs[0].label is None:
+            segs[0] = _Segment(b.marker, segs[0].start, segs[0].end)
+        return segs
+
     def _collect_labels(self) -> None:
         for b in self.blocks:
             if self.is_heading(b) or b.id in self.row_of:
                 continue
-            for seg in _segments(b.text):
+            for seg in self.segments_of(b):
                 if seg.label:
                     self.labels.setdefault(b.id, []).append((seg.start, seg.end, seg.label))
         for t in self.tables:
@@ -916,6 +936,54 @@ class _Inventory:
                 if lab:
                     for c in r.cells:
                         self.labels.setdefault(c.block_id, []).append((c.start, c.end, lab))
+
+    def _continuations(self) -> dict[str, tuple[str, str]]:
+        """Блок без номера сразу за пронумерованным абзацем того же раздела — продолжение этого пункта.
+
+        Только прямое соседство (без цепочек): так «следующей строкой» уточнение или исключение остаётся
+        при своём пункте, даже если стык окон прошёл между ними, а заключительный абзац раздела
+        не прилипает к последнему пункту. Код, таблицы и заголовки не наследуют номер.
+        """
+        out: dict[str, tuple[str, str]] = {}
+        for prev, b in zip(self.blocks, self.blocks[1:]):
+            if b.section != prev.section or b.id in self.labels or not b.text.strip():
+                continue
+            if any(self.is_heading(x) or self.is_code(x) or x.id in self.row_of for x in (prev, b)):
+                continue
+            labels = self.labels.get(prev.id)
+            if labels:
+                out[b.id] = (labels[-1][2], prev.id)
+        return out
+
+    def _label_owners(self) -> dict[str, list[str]]:
+        """Номер пункта → блоки, где этот пункт написан: с номером, его продолжение, текст под таким заголовком."""
+        owners: dict[str, list[str]] = {}
+        for b in self.blocks:
+            labs = [lab for _, _, lab in self.labels.get(b.id, [])]
+            if b.id in self.parent_label:
+                labs.append(self.parent_label[b.id][0])
+            hl = None if self.is_heading(b) else self.heading_label(b.section)
+            if hl:
+                labs.append(hl)
+            for lab in labs:
+                bucket = owners.setdefault(_norm_label(lab), [])
+                if b.id not in bucket:
+                    bucket.append(b.id)
+        return owners
+
+    def _pick_by_wording(self, candidates: list[str], item_text: str) -> str | None:
+        """Из нескольких блоков с одной цитатой — тот, что лучше всех совпадает с формулировкой пункта."""
+        words = {w for w in re.findall(r"\w+", _kw(item_text)) if len(w) >= 3 or w.isdigit()}
+        if not words:
+            return None
+        scored = []
+        for bid in candidates:
+            have = set(re.findall(r"\w+", _kw(self.by_id[bid].text)))
+            scored.append((len(words & have), bid))
+        scored.sort(key=lambda x: -x[0])
+        if scored[0][0] > 0 and (len(scored) == 1 or scored[0][0] > scored[1][0]):
+            return scored[0][1]
+        return None
 
     @staticmethod
     def _col(header: list[str], pat: re.Pattern[str]) -> int | None:
@@ -956,6 +1024,14 @@ class _Inventory:
     def _rule_prose(self, b: _Block) -> _Fate:
         text = b.text
         if self.is_heading(b):
+            fields = {m.group(0)[:6] for m in _APPROVAL_FIELD_RE.finditer(_kw(text))}
+            if len(fields) >= 2:
+                owner = [h for h in b.section if _kw(h) != _kw(text)]
+                name = owner[-1] if owner else self._section_name(b.section)
+                self._warn("table_header_as_heading",
+                           f"шапка таблицы согласования прочитана как заголовок: «{_clean(text)}»", [b.id])
+                return self._excl("approval", f"Таблица «{name}»: поля подразделения, ФИО и подписи не заполнены "
+                                              "и не являются требованиями.")
             return self._excl("structure", "Заголовок раздела: задаёт путь section для вложенных блоков.")
         if not text.strip():
             return self._excl("empty")
@@ -984,9 +1060,14 @@ class _Inventory:
             )
         if _CONNECTOR_RE.match(_clean(text)):
             return self._excl("fragment", f"Раздел «{name}»: служебная связка «{_clean(text)}».")
-        segs = _segments(text)
+        segs = self.segments_of(b)
         labeled = any(s.label for s in segs)
         modal = bool(_MODAL_RE.search(text))
+        parent = self.parent_label.get(b.id)
+        if parent and not labeled and self.fates.get(parent[1]) and self.fates[parent[1]].atoms:
+            atoms = self._prose_atoms(b, segs, role, inherited=parent[0])
+            if atoms:
+                return _Fate(atoms=atoms, facts=self._text_facts_for(atoms))
         if labeled or role in _REQ_ROLES or modal:
             if not labeled and role != "acceptance" and not modal and self.has_children(b.section):
                 return self._excl("preamble", f"Раздел «{name}»: вводный текст перед подразделами.")
@@ -999,7 +1080,8 @@ class _Inventory:
         return _Fate(unprocessed=f"Раздел «{name}»: нет номера, модальности и признаков раздела требований; "
                                  "решение за семантическим этапом.")
 
-    def _prose_atoms(self, b: _Block, segs: list[_Segment], role: str | None) -> list[_Atom]:
+    def _prose_atoms(self, b: _Block, segs: list[_Segment], role: str | None,
+                     inherited: str | None = None) -> list[_Atom]:
         kind = self.kind_for(b.section)
         no_split = role == "acceptance"
         heading = self._section_name(b.section)
@@ -1013,7 +1095,10 @@ class _Inventory:
                     continue
                 if len(cleaned.split()) < 4 and not seg.label:
                     cleaned = f"{_clean(heading)}: {cleaned}"
-                sid, src = (seg.label, "label") if seg.label else ((head_label, "heading") if head_label else (None, None))
+                if seg.label or inherited:
+                    sid, src = seg.label or inherited, "label"
+                else:
+                    sid, src = (head_label, "heading") if head_label else (None, None)
                 atoms.append(_Atom(kind, cleaned, sid, [self._hint(b.id, a, z)], "rules", src))
         return atoms
 
@@ -1273,13 +1358,15 @@ class _Inventory:
 
     # ------------------------------------------------------------ проверка ответа модели
 
-    def _resolve_hint(self, ev: Any, window: list[str], forbidden: set[str]) -> _Hint | None:
-        hint = self._resolve_hint_inner(ev, window, forbidden)
+    def _resolve_hint(self, ev: Any, window: list[str], forbidden: set[str], *, owners: list[str] | None = None,
+                      item_text: str = "") -> _Hint | None:
+        hint = self._resolve_hint_inner(ev, window, forbidden, owners or [], item_text)
         if hint is not None and self.by_id[hint.block_id].text.count(hint.quote) > 1:
             self.stats.hints_ambiguous += 1
         return hint
 
-    def _resolve_hint_inner(self, ev: Any, window: list[str], forbidden: set[str]) -> _Hint | None:
+    def _resolve_hint_inner(self, ev: Any, window: list[str], forbidden: set[str], owners: list[str],
+                            item_text: str) -> _Hint | None:
         st = self.stats
         st.hints_checked += 1
         if not isinstance(ev, Mapping):
@@ -1292,6 +1379,17 @@ class _Inventory:
             st.hints_rejected += 1
             self._warn("empty_quote", f"пустая цитата у блока {bid or '?'} отклонена", [bid] if bid in self.by_id else [])
             return None
+        if owners and bid not in owners:
+            # номер пункта из ответа указывает на другой блок, где та же цитата тоже есть: опора — блок пункта
+            for own in owners:
+                if own in forbidden or own not in window:
+                    continue
+                found = _locate(quote, self.by_id[own].text)
+                if found:
+                    st.hints_repaired += 1
+                    self._warn("hint_relocated", f"блок «{bid}» не относится к пункту с указанным номером; "
+                                                 f"цитата найдена в его блоке {own}", [own])
+                    return self._hint(own, found[0], found[1])
         if bid in self.by_id and bid not in forbidden:
             found = _locate(quote, self.by_id[bid].text)
             if found:
@@ -1303,16 +1401,28 @@ class _Inventory:
                     self._warn("quote_normalized", f"цитата в {bid} заменена дословным фрагментом источника", [bid])
                 return self._hint(bid, s, e)
         # поиск в других блоках окна: сначала обрабатываемые, затем контекст
-        for other in window:
-            if other == bid or other in forbidden:
-                continue
-            found = _locate(quote, self.by_id[other].text)
-            if found:
-                st.hints_repaired += 1
-                why = "неизвестный блок" if bid not in self.by_id else (
-                    "блок шаблона/структуры" if bid in forbidden else "цитата не из этого блока")
-                self._warn("hint_relocated", f"{why} «{bid}» → цитата найдена в {other}", [other])
-                return self._hint(other, found[0], found[1])
+        candidates = [(other, f) for other in window if other != bid and other not in forbidden
+                      for f in [_locate(quote, self.by_id[other].text)] if f]
+        why = "неизвестный блок" if bid not in self.by_id else (
+            "блок шаблона/структуры" if bid in forbidden else "цитата не из этого блока")
+        chosen = None
+        if len(candidates) == 1:
+            chosen = candidates[0]
+        elif candidates:
+            pick = self._pick_by_wording([c[0] for c in candidates], item_text)
+            chosen = next((c for c in candidates if c[0] == pick), None)
+            if chosen is None:
+                st.hints_rejected += 1
+                self._warn("hint_ambiguous", f"{why} «{bid}»: цитата «{quote.strip()[:40]}» есть в блоках "
+                                             + ", ".join(c[0] for c in candidates) + "; опора не угадывается",
+                           [c[0] for c in candidates])
+                return None
+        if chosen is not None:
+            other, found = chosen
+            st.hints_repaired += 1
+            how = "" if len(candidates) == 1 else " (выбран по формулировке пункта)"
+            self._warn("hint_relocated", f"{why} «{bid}» → цитата найдена в {other}{how}", [other])
+            return self._hint(other, found[0], found[1])
         st.hints_rejected += 1
         if bid in forbidden:
             self._warn("hint_rejected", f"опора в блоке {bid} (структура или шаблон согласования/ревью) не подтверждает требование", [bid])
@@ -1336,6 +1446,9 @@ class _Inventory:
                         return lab, "label"
                 if hb.marker and _norm_label(hb.marker) == s:
                     return hb.marker, "label"
+                parent = self.parent_label.get(hb.id)
+                if parent and _norm_label(parent[0]) == s:
+                    return parent[0], "label"  # продолжение пункта: номер стоит в предыдущем блоке
                 hl = self.heading_label(hb.section)
                 if hl and _norm_label(hl) == s:
                     return hl, "heading"
@@ -1351,6 +1464,8 @@ class _Inventory:
         else:
             if b.marker:
                 filled = (b.marker, "label")
+            elif b.id in self.parent_label:
+                filled = (self.parent_label[b.id][0], "label")
             elif self.heading_label(b.section):
                 filled = (self.heading_label(b.section), "heading")
         if filled[0] is not None:
@@ -1382,8 +1497,11 @@ class _Inventory:
             if evs is None:
                 evs = it.get("hints")
             hints: list[_Hint] = []
+            given = _none_if_empty(it.get("source_id"))
+            owners = self.owners.get(_norm_label(given), []) if given is not None else []
+            item_text = str(it.get("text") or "")
             for ev in evs if isinstance(evs, list) else []:
-                h = self._resolve_hint(ev, window, forbidden)
+                h = self._resolve_hint(ev, window, forbidden, owners=owners if not hints else None, item_text=item_text)
                 if h and not any(x.block_id == h.block_id and x.start == h.start and x.end == h.end for x in hints):
                     hints.append(h)
             if not hints:
@@ -1392,6 +1510,13 @@ class _Inventory:
                            if isinstance(ev, Mapping) and str(ev.get("block_id")) in self.by_id]
                 self._warn("item_rejected",
                            f"пункт без подтверждённой цитаты отброшен: «{_clean(str(it.get('text') or ''))[:60]}»", claimed)
+                continue
+            if owners and not any(h.block_id in owners for h in hints):
+                # номер существует в документе, но ни одна опора не лежит в его пункте: не сливаем с чужим пунктом
+                self.stats.items_rejected += 1
+                self._warn("item_rejected", f"пункт «{given}» опирается только на блоки другого пункта "
+                                            f"({', '.join(h.block_id for h in hints)}): «{_clean(item_text)[:60]}»",
+                           [h.block_id for h in hints])
                 continue
             hints.sort(key=lambda h: (self.by_id[h.block_id].idx, h.start, h.end))
             anchor_core = [h for h in hints if h.block_id in core_set]
@@ -1630,8 +1755,9 @@ class _Inventory:
                 calls["retry_calls"] += 1
                 call(core, ctx, i, len(rplan), "retry", "llm_retry")
         elif pending and retry:
-            self._warn("llm_budget", f"повтор не выполнен — бюджет вызовов исчерпан ({calls['used']} из {budget})",
-                       [b.id for b in pending])
+            why = ("движок сообщил BudgetExhausted" if stop["budget"]
+                   else f"бюджет модуля исчерпан ({calls['used']} из {budget})")
+            self._warn("llm_budget", f"повтор не выполнен — {why}", [b.id for b in pending])
         atoms = self._link_windows(atoms)
         missed = [b.id for b in process if b.id not in covered]
         unproc: dict[str, str] = {}
@@ -1906,7 +2032,7 @@ class _Inventory:
                          "модель не вызывалась, атомарность — до предложения.")
         else:
             parts.append(
-                f"Модель вызвана {_times_word(calls['used'])} при бюджете {calls['budget']} (окон {calls['windows']}, "
+                f"Обращений к ask: {calls['used']} при пределе модуля {calls['budget']} (окон {calls['windows']}, "
                 f"повторов {calls['retry_calls']}, сбоев {calls['failed']}, обрезанных ответов {calls['truncated']}); "
                 f"цитат проверено {st.hints_checked}: дословно {st.hints_exact}, исправлено {st.hints_repaired}, "
                 f"отклонено {st.hints_rejected}; пунктов отброшено {st.items_rejected}.")

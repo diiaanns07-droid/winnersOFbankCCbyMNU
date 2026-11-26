@@ -18,7 +18,8 @@ from pathlib import Path
 import pytest
 
 from bcc_review.analysis.inventory import RESPONSE_SCHEMA, build_inventory, build_payload
-from p04_support import QuoteModel, ScriptedModel, assert_invariants, fixture_document, load_spec
+from p04_support import (QuoteModel, ScriptedModel, assert_invariants, fixture_document, load_spec,
+                         published_document)
 
 C = pytest.importorskip("bcc_review.contracts", reason="bootstrap bcc/integration не в checkout")
 
@@ -146,10 +147,8 @@ def test_engine_runs_this_module_and_reads_warnings(tmp_path):
 def test_engine_model_branch_with_mock_provider(tmp_path):
     """Ветка с моделью через движок: payload → asker (схема, контекст) → mock → проверка №04."""
     engine = pytest.importorskip("bcc_review.engine", reason="движок ещё не влит")
-    from bcc_review.runtime.modules import Modules
-
     src = Path(__file__).resolve().parent / "fixtures" / "case_requirements.md"
-    doc = Modules().get("read_text").func(src)  # Document читателя движка: его ID блоков
+    doc, _ = published_document(src)  # Document опубликованного читателя (№01) после normalize_document
     entry = QuoteModel(load_spec("case_model_spec.json"), doc).respond(build_payload(doc, attach_text=False)[0])
     base = Path(__file__).resolve().parents[1] / "integration" / "fixtures" / "mock_bcc.json"
     script = json.loads(base.read_text(encoding="utf-8")) if base.exists() else {}
@@ -168,3 +167,14 @@ def test_engine_model_branch_with_mock_provider(tmp_path):
     assert not any("не попали" in w["message"] for w in report["warnings"] if w.get("stage") == "inventory")
     C.validate(report)
     assert C.evidence_errors(report) == []
+
+
+def test_published_reader_list_numbers_reach_source_id():
+    """№01 выносит «1.» из block.text в loc.list.number — номер всё равно становится source_id."""
+    pytest.importorskip("bcc_review.runtime.modules", reason="рантайм движка не в checkout")
+    doc, reader = published_document(Path(__file__).resolve().parent / "fixtures" / "case_requirements.md")
+    inv = build_inventory(doc)
+    assert_invariants(doc, inv)
+    refs = [r["source_ref"] for r in inv["requirements"] if r["section"][-1] in ("Логика работы метода", "Особые правила")]
+    assert refs == [f"Логика работы метода › {n}" for n in "12345"] + [f"Особые правила › {n}" for n in "123"], reader
+    assert len(inv["requirements"]) == 49

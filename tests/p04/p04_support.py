@@ -330,3 +330,276 @@ def assert_contract(doc: dict[str, Any], inv: dict[str, Any]) -> None:
     report["requirements"] = inv["requirements"]
     if report["document"]:
         assert C.evidence_errors(report) == []
+
+
+# --------------------------------------------------------------------------- транспорт движка
+_CTX_LINE = re.compile(r"^\[(b\d{4,})\] ?(.*)$")
+_K_LABEL = re.compile(r"^(?P<label>[А-ЯЁA-Z]{1,4}-\d+)\.\s+(?P<body>.+)$")
+_EXCEPTION = re.compile(r"^Исключение:\s+(?P<body>.+)$")
+
+
+def _undecorate(rendered: str) -> str:
+    """Текст блока из рендера ``runtime.context.render_block`` (снимает «• », «## », «| … |»)."""
+    s = rendered
+    s = re.sub(r"^\(заголовок таблицы\) ", "", s)
+    if s.startswith("• "):
+        return s[2:]
+    if re.match(r"^#{1,6} ", s):
+        return s.split(" ", 1)[1]
+    if s.startswith("| ") and s.endswith(" |"):
+        return s[2:-2]
+    return s
+
+
+def visible_blocks(messages: list[dict[str, Any]]) -> dict[str, str]:
+    """Блоки, которые модель действительно видит в контексте сообщений Asker: ``{id: текст}``."""
+    seen: dict[str, list[str]] = {}
+    cur = None
+    for msg in messages:
+        if msg["role"] != "user" or "ВХОДНЫЕ ДАННЫЕ (JSON):" in msg["content"]:
+            continue
+        for line in msg["content"].split("\n"):
+            m = _CTX_LINE.match(line)
+            if m:
+                cur = m.group(1)
+                seen[cur] = [m.group(2)]
+            elif cur is not None and line and not line.startswith(("ФРАГМЕНТЫ", "ДОКУМЕНТ", "ИНДЕКС")):
+                seen[cur].append(line)
+    return {bid: _undecorate("\n".join(lines)) for bid, lines in seen.items()}
+
+
+class WindowContentAdapter:
+    """Детерминированный «провайдер» за ``runtime.asker.Asker``.
+
+    Отвечает только по тому, что Asker реально передал: тексты — из контекста сообщений
+    (``[b0004] …``), список окна и разделы — из ``input.blocks``. Правила ответа:
+    «К-1. …» → обязательство с номером; «Исключение: …» → обязательство с номером ближайшего
+    видимого в окне пункта того же раздела (иначе null); «→» → design; «Документ …» → preamble.
+    Порядок выдачи меняется от вызова к вызову. ``faults = {номер_вызова: "truncated"}`` имитирует
+    ``ProviderError("truncated")`` адаптера (stop_reason=max_tokens по HANDOFF).
+    """
+
+    name = "mock"
+    params = {"mock": True, "p04": "window-content"}
+
+    def __init__(self, *, overeager: bool = False, faults: dict[int, str] | None = None):
+        self.overeager = overeager
+        self.faults = dict(faults or {})
+        self.calls: list[dict[str, Any]] = []
+
+    def invoke(self, *, model: str, messages: list[dict[str, Any]], schema: Any, timeout_s: float) -> dict[str, Any]:
+        from bcc_review.contracts import ProviderError
+
+        n = len(self.calls)
+        body = messages[-1]["content"]
+        inp = json.loads(body.split("ВХОДНЫЕ ДАННЫЕ (JSON):\n", 1)[1])
+        texts = visible_blocks(messages)
+        self.calls.append({"input": inp, "visible": sorted(texts), "context_lines": len(texts)})
+        if self.faults.get(n) == "truncated":
+            raise ProviderError("truncated", "mock: ответ обрезан по max_tokens", model=model)
+        listed = inp["blocks"]
+        answer_for = [b for b in listed if b["process"] or self.overeager]
+        items, excluded = [], []
+        for b in answer_for:
+            text = texts.get(b["id"], b.get("text") or "")
+            if not text:
+                continue  # блока нет в переданном контексте — модель о нём не знает
+            m, e = _K_LABEL.match(text), _EXCEPTION.match(text)
+            if m:
+                items.append({"source_id": m["label"], "kind": "functional",
+                              "text": f"Правило {m['label']}: {m['body'].rstrip('.')}",
+                              "evidence": [{"block_id": b["id"], "quote": m["body"]}]})
+            elif e:
+                parent = None
+                for prev in listed[: listed.index(b)][::-1]:
+                    pm = _K_LABEL.match(texts.get(prev["id"], ""))
+                    if prev["section"] == b["section"] and pm:
+                        parent = pm["label"]
+                        break
+                items.append({"source_id": parent, "kind": "functional",
+                              "text": f"Исключение из правила: {e['body'].rstrip('.')}",
+                              "evidence": [{"block_id": b["id"], "quote": e["body"]}]})
+            elif "→" in text:
+                excluded.append({"category": "design", "reason": "Схема без самостоятельного обязательства",
+                                 "block_ids": [b["id"]]})
+            elif text.startswith("Документ "):
+                excluded.append({"category": "preamble", "reason": "Вводный текст", "block_ids": [b["id"]]})
+            else:
+                items.append({"source_id": None, "kind": "functional", "text": text,
+                              "evidence": [{"block_id": b["id"], "quote": text}]})
+        items = items[::-1] if n % 2 == 0 else items[1:] + items[:1]  # порядок выдачи меняется
+        data = {"items": items, "excluded": excluded[::-1], "facts": [], "done": True}
+        return {"data": data, "usage": {"input_tokens": len(body) // 4, "output_tokens": 0}, "model": "p04-window-content",
+                "request_id": f"p04-{n + 1}", "stop_reason": "end_turn"}
+
+
+def engine_ask(document: dict[str, Any], adapter: Any, *, max_calls: int = 40):
+    """``ask`` из опубликованного рантайма движка: ContextBuilder → Asker → adapter, общий Budget."""
+    from bcc_review.runtime.asker import Asker
+    from bcc_review.runtime.context import ContextBuilder
+    from bcc_review.runtime.core import Budget, Cache, StageStats, Tracer
+
+    budget = Budget(max_calls, 600.0)
+    asker = Asker(adapter=adapter, provider="mock", model="p04-window-content", budget=budget,
+                  cache=Cache(None, enabled=False), stats=StageStats(), tracer=Tracer(None, "p04"),
+                  context=ContextBuilder(document), max_retries=0, sleep=lambda s: None)
+    return asker, budget
+
+
+def published_document(path: Path | str) -> tuple[dict[str, Any], str]:
+    """Document тем же путём, что у движка (``bcc_review.engine.read_document``), и метка реализации ридера."""
+    from bcc_review.engine import READERS, read_document
+    from bcc_review.runtime.modules import Modules
+
+    path = Path(path)
+    return read_document(path), Modules().get(READERS[path.suffix.lower()]).label
+
+
+# --------------------------------------------------------------------------- PDF из того же Markdown
+def md_to_html(text: str) -> str:
+    """Тот же Markdown — в HTML для ``insert_htmlbox`` (приём команды из tests/integration/test_fallback_pdf.py)."""
+    import html as _html
+
+    out: list[str] = []
+    rows: list[list[str]] = []
+
+    def flush_table() -> None:
+        if not rows:
+            return
+        out.append("<table>")
+        for n, cells in enumerate(rows):
+            tag = "th" if n == 0 else "td"
+            out.append("<tr>" + "".join(f"<{tag}>{_html.escape(c) or '&nbsp;'}</{tag}>" for c in cells) + "</tr>")
+        out.append("</table>")
+        rows.clear()
+
+    for line in text.split("\n"):
+        s = line.strip()
+        if s.startswith("|"):
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            if not all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c) or not any(cells):
+                rows.append(cells)
+            continue
+        flush_table()
+        m = _HEADING.match(s)
+        if m:
+            level = len(m.group(1))
+            out.append(f"<h{level}>{_html.escape(m.group(2))}</h{level}>")
+        elif s:
+            out.append(f"<p>{_html.escape(s)}</p>")
+    flush_table()
+    return "\n".join(out)
+
+
+def build_pdf_from_md(md_path: Path, pdf_path: Path) -> Path:
+    import pymupdf
+
+    css = "body{font-family:sans-serif;font-size:11pt} table{border-collapse:collapse} td,th{border:1px solid #000;padding:3px}"
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_htmlbox(pymupdf.Rect(50, 50, 545, 800), md_to_html(Path(md_path).read_text(encoding="utf-8")), css=css)
+    doc.save(pdf_path)
+    return pdf_path
+
+
+def naming_answer(doc: dict[str, Any]) -> dict[str, Any]:
+    """Ответ «модели» для fixtures/close_conditions.md с двумя типичными ошибками LLM.
+
+    Условия названы общим именем «Снятие наличных»; у пункта У-2 указан block_id соседнего У-1,
+    у строки лимита 500 000 ₸ — несуществующий блок. Каждое условие обязано получить свою опору.
+    """
+    by_label = {}
+    rows = []
+    for b in doc["blocks"]:
+        m = re.match(r"^(У-\d+)\.", b["text"])
+        if m:
+            by_label[m.group(1)] = b["id"]
+        if b["kind"] == "table_row" and b["text"].startswith("Снятие наличных"):
+            rows.append(b["id"])
+    u1 = by_label["У-1"]
+    assert "У-2" in by_label, "в фикстуре должен быть пункт У-2"
+    items = [
+        {"source_id": "У-1", "kind": "functional", "text": "Снятие наличных без комиссии",
+         "evidence": [{"block_id": u1, "quote": "Снятие наличных"}]},
+        {"source_id": "У-2", "kind": "functional", "text": "Снятие наличных за рубежом с комиссией 1 %",
+         "evidence": [{"block_id": u1, "quote": "Снятие наличных"}]},
+        {"source_id": None, "kind": "functional", "text": "Лимит снятия наличных 500 000 ₸ в сутки",
+         "evidence": [{"block_id": "b9999", "quote": "Снятие наличных"}]},
+        {"source_id": None, "kind": "functional", "text": "Лимит снятия наличных за рубежом 200 000 ₸ в сутки",
+         "evidence": [{"block_id": rows[-1], "quote": "Снятие наличных за рубежом"}]},
+    ]
+    return {"items": items, "excluded": [], "facts": [], "done": True}
+
+
+class StaticAdapter:
+    """Провайдер за Asker, который отвечает заранее заданным объектом (запись внешнего ответа)."""
+
+    name = "mock"
+    params = {"p04": "static"}
+
+    def __init__(self, data: dict[str, Any]):
+        self.data = data
+        self.calls = 0
+
+    def invoke(self, *, model: str, messages: list[dict[str, Any]], schema: Any, timeout_s: float) -> dict[str, Any]:
+        self.calls += 1
+        return {"data": copy.deepcopy(self.data), "usage": {}, "model": "p04-static", "request_id": str(self.calls),
+                "stop_reason": "end_turn"}
+
+
+_FOLD_CMP = str.maketrans({"«": '"', "»": '"', "“": '"', "”": '"', "–": "-", "—": "-", "‑": "-", "ё": "е", "Ё": "е",
+                           "­": None})
+
+
+def norm_text(s: str) -> str:
+    """Нормализация для сопоставления реестров разных форматов: регистр, пробелы, кавычки, тире, разметка."""
+    import unicodedata
+
+    s = unicodedata.normalize("NFKC", s or "").translate(_FOLD_CMP)
+    s = re.sub(r"[*`|]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip().lower()
+    return re.sub(r"\s+([.,;:!?])", r"\1", s)
+
+
+def registry_key(r: dict[str, Any]) -> tuple[str, Any, str]:
+    """Ключ требования для сравнения форматов: содержание опор, исходное обозначение, раздел."""
+    return (norm_text(" ".join(e["quote"] for e in r["evidence"])), r["source_id"],
+            norm_text(r["section"][-1]) if r["section"] else "")
+
+
+def compare_registries(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> dict[str, Any]:
+    """Пары требований двух реестров по (содержание, номер, раздел) и классификация расхождений."""
+    import difflib
+
+    left = list(a)
+    right = list(b)
+    pairs = []
+    for x in list(left):
+        k = registry_key(x)
+        y = next((y for y in right if registry_key(y) == k), None)
+        if y is not None:
+            pairs.append((x, y))
+            left.remove(x)
+            right.remove(y)
+    issues = []
+    for x in left:
+        kx = registry_key(x)
+        best = max(right, key=lambda y: difflib.SequenceMatcher(None, kx[0], registry_key(y)[0]).ratio(), default=None)
+        if best is None:
+            issues.append({"cause": "потерянный пункт", "a": x["id"], "b": None})
+            continue
+        kb = registry_key(best)
+        ratio = difflib.SequenceMatcher(None, kx[0], kb[0]).ratio()
+        if kx[0] in kb[0] and kx[0] != kb[0] and len(kb[0]) > 1.5 * len(kx[0]):
+            cause = "объединение нескольких правил"
+        elif "|" in " ".join(e["quote"] for e in x["evidence"] + best["evidence"]) and ratio < 0.9:
+            cause = "часть таблицы"
+        elif ratio >= 0.9:
+            cause = "только оформление"
+        else:
+            cause = "потерянный пункт"
+        issues.append({"cause": cause, "a": x["id"], "b": best["id"], "ratio": round(ratio, 3),
+                       "a_key": kx, "b_key": kb})
+        right.remove(best)
+    issues += [{"cause": "потерянный пункт", "a": None, "b": y["id"]} for y in right]
+    return {"pairs": len(pairs), "issues": issues}
