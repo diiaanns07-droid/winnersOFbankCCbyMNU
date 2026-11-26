@@ -114,6 +114,8 @@ def _fences(lines: list[str]) -> list[bool]:
 
 def _balance_markup(line: str) -> str:
     """После замены внутри разметки убрать непарные ``**`` и обратные кавычки."""
+    if line.strip().startswith("```"):
+        return line
     if line.count("**") % 2:
         line = line.replace("**", "")
     if line.count("`") % 2:

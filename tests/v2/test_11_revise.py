@@ -138,3 +138,25 @@ def test_non_markdown_source_uses_view_lines():
     view = load_view()
     lines, raw = revise._source_lines(type("C", (), {"options": {}})(), {"lines": view["lines"], "file": "x.pdf"})
     assert not raw and lines[36].startswith("Ф-1.")
+
+
+def test_real_sonnet_edits_apply_cleanly():
+    """Ответ sonnet на официальном документе: все правки применены, разметка не сломана."""
+    raw = json.loads((FIX / "revise.json").read_text(encoding="utf-8"))
+    findings = json.loads((FIX / "findings.json").read_text(encoding="utf-8"))["findings"]
+    ctx = FakeCtx(FakeLLM(raw))
+    ctx.options = {"input": str(DOC)}
+    res = revise.run(ctx, findings)
+    st = res["stats"]
+    assert st["not_applied"] == 0 and st["replaced"] >= 20 and st["inserted"] >= 10
+    md = res["revised_markdown"]
+    assert md.count("```") % 2 == 0
+    for line in md.splitlines():
+        if line.startswith("|"):
+            assert line.rstrip().endswith("|"), line
+        if not line.startswith("```"):
+            assert line.count("`") % 2 == 0, line
+    assert "[изменено: D-01]" in md and "[добавлено: D-19]" in md
+    # каждый critical получил правку
+    crit = {f["id"] for f in findings if f["severity"] == "critical"}
+    assert crit <= {r["finding_id"] for r in res["rewrites"]}
