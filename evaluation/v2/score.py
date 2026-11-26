@@ -28,7 +28,7 @@ DEFAULT_CACHE = ROOT / "evaluation" / "v2" / "official" / "arbiter_cache.jsonl"
 LEVEL_ORDER = {"critical": 0, "major": 1, "minor": 2}
 SEV_RU = {"critical": "критичный", "major": "существенный", "minor": "незначительный"}
 OWNER_NO = {"analyst": "№05", "qa": "№06", "architect": "№07", "risk": "№08", "consistency": "№09",
-            "judge": "№10", "rules": "№12", "segment": "№04"}
+            "judge": "№10", "rules": "№12", "segment": "№04", "quotes": "№03"}
 
 
 def load_gold(path: str | Path) -> dict:
@@ -311,6 +311,9 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
 
     # промахи и их владельцы
     cands = normalize_candidates(report.get("rejected") or [], "rejected")
+    for c in cands:  # кандидаты, отсеянные сверкой цитат, тоже лежат в rejected — отличаем по причине
+        if re.search(r"цитат\w*.{0,30}не найден", str(c.get("reason", "")), re.I):
+            c["sources"] = ["quotes:rejected"]
     cands += _stage_candidates(run_dir)
     for c in cands:
         c["_lines"], _ = finding_lines(c, lines, same_doc or bool(run_dir))
@@ -330,12 +333,17 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
             if p["status"] == "match":
                 seen_in.append({"source": c["sources"][0] if c["sources"] else "?", "id": c["id"],
                                 "title": c["title"][:120], "reason": c.get("reason", "")[:160]})
-        if seen_in and any(s["source"] == "rejected" for s in seen_in):
+        lens_seen = [x for x in seen_in if x["source"] not in ("rejected", "quotes:rejected")]
+        seen_in = [x for x in seen_in if x["source"] != "quotes:rejected" or not lens_seen]
+        if any(x["source"] == "rejected" for x in seen_in):
             where = "найден кандидатом, отклонён судьёй"
             owner = ["judge"]
-        elif seen_in:
-            where = "найден кандидатом, потерян до отчёта (судья не взял)"
+        elif lens_seen:
+            where = "найден кандидатом (" + ", ".join(sorted({x["source"] for x in lens_seen})) + "), судья не взял"
             owner = ["judge"]
+        elif seen_in:
+            where = "найден кандидатом, но отсеян сверкой цитат (цитата не найдена)"
+            owner = list(it["owners"]) + ["quotes"]
         elif near:
             where = "есть близкое замечание, но не та проблема или не те строки"
             owner = list(it["owners"]) + ["judge"]
@@ -488,7 +496,11 @@ def _gate(name: str, value: str, ok: bool | None) -> dict:
     return {"metric": name, "value": value, "ok": ok}
 
 
+CANDIDATE_STAGES = ("lens_", "consistency", "rules")
+
+
 def _stage_candidates(run_dir: str | None) -> list[dict]:
+    """Кандидаты этапов прогона: выход линз, набора и правил; отсеянные сверкой цитат — отдельно."""
     if not run_dir:
         return []
     out = []
@@ -501,14 +513,15 @@ def _stage_candidates(run_dir: str | None) -> list[dict]:
         except (OSError, json.JSONDecodeError):
             continue
         stage = p.stem
-        for lst in _find_candidate_lists(data):
-            out += normalize_candidates(lst, stage if ":" in stage else _stage_source(stage))
+        output = data.get("output") if isinstance(data.get("output"), dict) else data
+        if stage.startswith(CANDIDATE_STAGES):
+            src = stage.replace("lens_", "lens:")
+            for c in normalize_candidates(output.get("candidates") or [], src):
+                c["sources"] = [c["raw"].get("source") or src]
+                out.append(c)
+        elif stage == "quotes":
+            out += normalize_candidates(output.get("rejected") or [], "quotes:rejected")
     return out
-
-
-def _stage_source(stage: str) -> str:
-    s = stage.replace("lens_", "lens:")
-    return s
 
 
 def _find_candidate_lists(obj: Any, depth: int = 0) -> list[list]:
