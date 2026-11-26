@@ -39,6 +39,7 @@ from ._common import (
     FINDING,
     FORMAT_LABEL,
     INDIVIDUAL_CODES,
+    LINK_LABEL,
     MEANING_LABEL,
     MODE_LABEL,
     NBSP,
@@ -71,6 +72,7 @@ from ._common import (
     fmt_ratio,
     group_findings,
     kind_name,
+    merged_candidates,
     of_count,
     partial_read_warnings,
     provider_state,
@@ -165,6 +167,19 @@ READINESS_LABEL = {
     "unconfirmed_failed": "❔ Не подтверждено: прогон завершился ошибкой",
 }
 CHECK_STATE_LABEL = {"full": "✅ полностью", "partial": "◐ частично", "none": "✖ не проверено"}
+TOP_FINDINGS = 5      # сколько подтверждённых дефектов показать на первом экране (критичные — все)
+BANNER_REASONS = 3    # сколько причин неполного прогона показать в плашке (полный список — в паспорте)
+
+
+def _code(text: Any) -> str:
+    """Значение внутри `кода`: без Markdown-экранирования, обратные кавычки убираются."""
+    return str(text).replace("`", "")
+
+
+def top_confirmed_groups(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Подтверждённые первопричины по убыванию серьёзности, при равенстве — порядок Report."""
+    confirmed = [g for g in groups if g["confirmed"]]
+    return sorted(confirmed, key=lambda g: (severity_rank(g["primary"]), groups.index(g)))
 REQ_KIND_LABEL = {
     "functional": "функциональное",
     "nonfunctional": "нефункциональное",
@@ -318,11 +333,13 @@ class _Renderer:
         fmt = FORMAT_LABEL.get(str(doc.get("format") or "").lower(), str(doc.get("format") or "—"))
         status = self.info["status"]
         self.emit(f"# Отчёт о проверке требований: «{esc(title)}»", "")
+        mode = self.info["mode"]
         self.emit(
             f"**Документ:** {esc(doc.get('source_name') or title)} ({esc(fmt)}) · "
-            f"**Прогон:** {esc(RUN_STATUS_LABEL.get(status, status))} · "
-            f"**Дата:** {esc(fmt_datetime(self.info['started_at']))} · "
-            f"**Модель:** {esc(self.info['model'] or 'нет данных')}",
+            f"**Прогон:** {esc(RUN_STATUS_LABEL.get(status, status))} (`{_code(status)}`) · "
+            f"**Режим:** {esc(MODE_LABEL.get(mode, mode or 'не указан'))} (`{_code(mode or '—')}`) · "
+            f"**Модель:** {esc(self.model_label())} · "
+            f"**Дата:** {esc(fmt_datetime(self.info['started_at']))}",
             "",
         )
         n = self.nums
@@ -332,7 +349,10 @@ class _Renderer:
             f"частично — {fmt_int(n['requirements_partial'])}, "
             f"не проверено — {fmt_int(n['requirements_not_reviewed'])}."
         )
-        reasons = "; ".join(self.info["status_reasons"])
+        all_reasons = self.info["status_reasons"]
+        reasons = "; ".join(r.rstrip(". ") for r in all_reasons[:BANNER_REASONS])
+        if len(all_reasons) > BANNER_REASONS:
+            reasons += f" и ещё {fmt_int(len(all_reasons) - BANNER_REASONS)} — полный список в паспорте"
         why = f" Причина: {esc(reasons.rstrip('. '))}." if reasons else ""
         stages = self.info["incomplete_stages"]
         stage_note = f" Незавершённые этапы: {esc(', '.join(stages))}." if stages else ""
@@ -370,7 +390,7 @@ class _Renderer:
         for part, label in (("development", "Разработка"), ("testing", "Тестирование")):
             shown, reasons, part_notes = self.readiness_cell(part)
             ids = verdict_part(self.r, part)["finding_ids"]
-            basis = "; ".join(esc(r) for r in reasons) or "Основание в verdict не указано"
+            basis = "; ".join(esc(self.brief_reason(r)) for r in reasons) or "Основание в verdict не указано"
             if ids:
                 basis += f" ({', '.join(self.link_finding(x) for x in ids)})"
             rows.append([label, shown, basis])
@@ -379,6 +399,7 @@ class _Renderer:
         for note in notes:
             self.emit(f"> ⚠️ {esc(note)}", "")
         self.exporter_notes.extend(notes)
+        self.emit(self.totals_line(), "")
 
         crit_groups = [g for g in self.groups if g["confirmed"] and g["severity"] == "critical"]
         checked_any = self.nums["requirements_reviewed"] + self.nums["requirements_partial"]
@@ -388,13 +409,29 @@ class _Renderer:
             for i, g in enumerate(crit_groups, 1):
                 extra = ""
                 if g["others"]:
-                    extra = " Та же первопричина: " + ", ".join(self.link_finding(m.get("id")) for m in g["others"]) + "."
+                    extra = " Повтор той же первопричины: " + self.others_text(g, with_status=False) + "."
                 self.emit(f"{i}. {self.one_line(g['primary'])}{extra}")
             self.blank()
         elif not checked_any and not self.findings:
             self.emit("**Критичные проблемы:** не определены — проверка требований не выполнялась.", "")
         else:
             self.emit(f"**Критичные проблемы{scope_note}:** подтверждённых критичных дефектов нет.", "")
+        rest = [g for g in top_confirmed_groups(self.groups) if g["severity"] != "critical"]
+        shown = rest[: max(0, TOP_FINDINGS - len(crit_groups))]
+        if shown:
+            unique = self.nums["defects_unique"]
+            label = "Далее по важности" if crit_groups else "Самые важные подтверждённые замечания"
+            self.emit(
+                f"**{label}** (показано {fmt_int(len(crit_groups) + len(shown))} из {fmt_int(unique)} уникальных "
+                "подтверждённых; полный список — раздел 6):",
+                "",
+            )
+            for i, g in enumerate(shown, len(crit_groups) + 1):
+                extra = ""
+                if g["others"]:
+                    extra = " Повтор той же первопричины: " + self.others_text(g, with_status=False) + "."
+                self.emit(f"{i}. {self.one_line(g['primary'])}{extra}")
+            self.blank()
         pending = [f for f in self.findings if finding_status(f) == "needs_review" and severity_rank(f) == 0]
         if pending:
             links = ", ".join(self.link_finding(f.get("id")) for f in pending)
@@ -406,8 +443,41 @@ class _Renderer:
         else:
             self.emit("**Первое действие:** в `verdict.first_actions` не указано; порядок правок — в разделе 6.", "")
 
+    def model_label(self) -> str:
+        """Модель для шапки и паспорта: в режиме правил модель не вызывалась, а не «нет данных»."""
+        info = self.info
+        if not info["model"] and (info["mode"] == "rules_only" or info["provider"] in (None, "none")):
+            return "не вызывалась (только правила)"
+        model = info["model"] or "нет данных"
+        if info["mode"] == "mock" and info["model"]:
+            model += " (mock)"
+        return model
+
+    def brief_reason(self, reason: str) -> str:
+        """Основание вердикта для первого экрана: без повтора причин неполного прогона из плашки."""
+        reason = str(reason)
+        if len(reason) > 160 and any(sr and sr in reason for sr in self.info["status_reasons"]):
+            head = reason.split(":", 1)[0] if ":" in reason[:40] else "Прогон неполный"
+            return f"{head}: причины — в плашке выше"
+        return shorten(reason, 200)
+
+    def totals_line(self) -> str:
+        """Строка «Итоги» первого экрана; числа те же, что в сводке и маркере."""
+        n = self.nums
+        return (
+            f"**Итоги:** требований {fmt_int(n['requirements_total'])} (проверено полностью "
+            f"{fmt_int(n['requirements_reviewed'])}, частично {fmt_int(n['requirements_partial'])}, не проверено "
+            f"{fmt_int(n['requirements_not_reviewed'])}) · замечаний в Report {fmt_int(n['findings_total'])}: "
+            f"🔴 {fmt_int(n['findings_critical'])} · 🟠 {fmt_int(n['findings_major'])} · 🟡 {fmt_int(n['findings_minor'])} "
+            f"(подтверждено {fmt_int(n['findings_confirmed'])}, на проверке {fmt_int(n['findings_needs_review'])}) · "
+            f"уникальных подтверждённых дефектов {fmt_int(n['defects_unique'])}: 🔴 {fmt_int(n['defects_critical'])} · "
+            f"🟠 {fmt_int(n['defects_major'])} · 🟡 {fmt_int(n['defects_minor'])} — столько же записей в Jira CSV."
+        )
+
     def one_line(self, f: Mapping[str, Any]) -> str:
-        places = [self.idx.short_place(e.get("block_id"), e.get("start"), e.get("end")) for e in evidence_of(f)[:2]]
+        places = list(dict.fromkeys(
+            self.idx.short_place(e.get("block_id"), e.get("start"), e.get("end")) for e in evidence_of(f)[:2]
+        ))
         reqs = ", ".join(self.link_req(r) for r in as_list(f.get("req_ids")))
         where = f" — {esc(' и '.join(places))}" if places else ""
         req_part = f" Требования: {reqs}." if reqs else ""
@@ -431,7 +501,7 @@ class _Renderer:
         version = info["agent_version"] or "нет данных"
         if info["agent_commit"]:
             version += f" (коммит {info['agent_commit']})"
-        model = info["model"] or "нет данных"
+        model = self.model_label()
         if info["requested_model"] and info["requested_model"] != info["model"]:
             model += f" (запрошена {info['requested_model']})"
         if len(info["models_seen"]) > 1:
@@ -465,6 +535,7 @@ class _Renderer:
             ["Токены", self.tokens_text()],
             ["Этапы", self.stages_text()],
             ["Статус прогона", f"{esc(RUN_STATUS_LABEL.get(info['status'], info['status']))} (`{esc(info['status'])}`)"],
+            ["Причины статуса", "<br>".join(esc(r) for r in info["status_reasons"]) or "—"],
             [
                 "Охват проверки требований",
                 f"полностью {fmt_ratio(n['requirements_reviewed'], n['requirements_total'], REQ_GEN)}",
@@ -756,24 +827,37 @@ class _Renderer:
         questions = [q for q in self.questions.values() if fid in {str(x) for x in as_list(q.get("finding_ids"))}]
         if questions:
             self.emit("**Вопрос заказчику:** " + ", ".join(self.link_question(q.get("id")) for q in questions), "")
-        merged = as_list(f.get("merged_from"))
-        if merged:
-            self.emit(f"**Объединено при подготовке:** {esc(', '.join(str(m) for m in merged))}", "")
+        absorbed = merged_candidates(f)
+        if absorbed:
+            self.emit(f"**Объединено при подготовке:** {esc(', '.join(absorbed))}", "")
         group = self.group_of.get(fid)
         if group and len(group["members"]) > 1:
             if group["primary"] is f:
-                others = ", ".join(
-                    f"{self.link_finding(m.get('id'))} ({esc(SEVERITY_LABEL.get(str(m.get('severity')), ''))}, "
-                    f"{esc(STATUS_LABEL.get(finding_status(m), finding_status(m)))})"
-                    for m in group["others"]
-                )
-                self.emit(f"**Та же первопричина:** {others} — в сводке дефектов и Jira учтены как один дефект.", "")
-            else:
                 self.emit(
-                    f"**Та же первопричина, что у {self.link_finding(group['primary'].get('id'))}** — "
+                    f"**Та же первопричина:** {self.others_text(group)} — в сводке дефектов и Jira учтены как один "
+                    "дефект.",
+                    "",
+                )
+            else:
+                reason = LINK_LABEL.get(group["link_of"].get(fid, ""), "связь не указана")
+                self.emit(
+                    f"**Повтор первопричины {self.link_finding(group['primary'].get('id'))}** ({reason}) — "
                     "в сводке дефектов и Jira отдельно не считается.",
                     "",
                 )
+
+    def others_text(self, group: Mapping[str, Any], with_status: bool = True) -> str:
+        """Повторы первопричины со статусом и основанием связи."""
+        parts = []
+        for m in group["others"]:
+            mid = str(m.get("id"))
+            reason = LINK_LABEL.get(group["link_of"].get(mid, ""), "связь не указана")
+            detail = [esc(SEVERITY_LABEL.get(str(m.get("severity")), ""))] if with_status else []
+            if with_status:
+                detail.append(esc(STATUS_LABEL.get(finding_status(m), finding_status(m))))
+            detail.append(reason)
+            parts.append(f"{self.link_finding(mid)} ({', '.join(d for d in detail if d)})")
+        return ", ".join(parts)
 
     def witness_card(self, f: Mapping[str, Any], w: Mapping[str, Any]) -> None:
         reqs = [str(r) for r in as_list(f.get("req_ids"))]
@@ -923,8 +1007,8 @@ class _Renderer:
              f"подтверждено {fmt_int(n['findings_confirmed'])}, на проверке человеком {fmt_int(n['findings_needs_review'])}"],
             [SUMMARY_ROWS["unique"], f"{fmt_int(n['defects_unique'])}: {sev_unique}"],
             [SUMMARY_ROWS["merged"],
-             f"кандидатов в `merged_from`: {fmt_int(n['merged_candidates'])}; подтверждённых замечаний "
-             f"с общей первопричиной: {fmt_int(n['same_cause_merged'])}"],
+             f"поглощено кандидатов (`merged_from` без собственного): {fmt_int(n['merged_candidates'])}; "
+             f"повторов первопричины среди подтверждённых: {fmt_int(n['same_cause_merged'])}"],
             [SUMMARY_ROWS["rejected"], fmt_int(n["rejected"])],
             [SUMMARY_ROWS["checks"],
              f"{fmt_int(n['checks_pass'])} выполнено · {fmt_int(n['checks_issue'])} нарушено · "
@@ -951,7 +1035,8 @@ class _Renderer:
         note = (
             "Знаменатели: доли требований — от всех выделенных требований; «без замечаний» — от проверенных "
             "полностью; «Замечаний в Report» и «По статусу» — значения `summary`; «Уникальных дефектов» — "
-            "подтверждённые замечания после объединения по первопричине (`cause`); цитаты — от всех опор "
+            "подтверждённые замечания после объединения по явной связи (`duplicate_of`, `root_cause_id`, "
+            "`merged_from`) или по совпадению причины вместе с исходами (`cause`); цитаты — от всех опор "
             "замечаний, сверка `block.text[start:end] == quote` выполнена при экспорте."
         )
         if audit and audit.get("note"):
@@ -1148,7 +1233,11 @@ class _Renderer:
         if isinstance(diff, Mapping) and diff:
             prev = (diff.get("previous") or {}).get("source_sha256", "")
             cur = (diff.get("current") or {}).get("source_sha256", "")
-            self.emit(f"Сравнение редакций (`--compare`): было `{esc(str(prev)[:12])}…` → стало `{esc(str(cur)[:12])}…`.", "")
+            self.emit(
+                f"Сравнение с предыдущей редакцией (`--compare`): было `{esc(str(prev)[:12])}…` → "
+                f"стало `{esc(str(cur)[:12])}…`.",
+                "",
+            )
             rows = []
             for key, label in (("resolved", "Устранено"), ("persisting", "Осталось"), ("introduced", "Появилось"),
                                ("unassessed", "Не оценено")):
@@ -1339,6 +1428,45 @@ def check_markdown(markdown: str | os.PathLike[str], report: Any) -> list[str]:
         got = _row_numbers(md, label)
         if got[: len(want)] != want:
             problems.append(f"строка сводки «{label}»: видно {got[: len(want)]}, ожидалось {want}")
+    problems.extend(_check_first_screen(md, data, expected))
+    return problems
+
+
+_LIST_ID = re.compile(r"^\d+\. \[((?:\\.|[^\]])+)\]\(#")
+
+
+def _unescape(text: str) -> str:
+    return re.sub(r"\\(.)", r"\1", text)
+
+
+def _check_first_screen(md: str, data: Mapping[str, Any], e: Mapping[str, Any]) -> list[str]:
+    """Первый экран: статус и режим в шапке, оба вердикта, «Итоги» и ID главных находок."""
+    head = md.split("\n## 1. Паспорт прогона", 1)[0]
+    problems: list[str] = []
+    r = _Renderer(data)
+    info = r.info
+    header = next((line for line in head.splitlines() if line.startswith("**Документ:**")), "")
+    for want in (f"(`{info['status']}`)", f"(`{info['mode'] or '—'}`)", f"**Модель:** {esc(r.model_label())}"):
+        if want not in header:
+            problems.append(f"шапка: нет «{want}»")
+    for part, label in (("development", "Разработка"), ("testing", "Тестирование")):
+        shown = r.readiness_cell(part)[0]
+        if f"| {label} | {shown} |" not in head:
+            problems.append(f"первый экран: вердикт «{label}» не «{shown}»")
+    want_totals = [e["requirements_total"], e["requirements_reviewed"], e["requirements_partial"],
+                   e["requirements_not_reviewed"], e["findings_total"], e["findings_critical"], e["findings_major"],
+                   e["findings_minor"], e["findings_confirmed"], e["findings_needs_review"], e["defects_unique"],
+                   e["defects_critical"], e["defects_major"], e["defects_minor"]]
+    totals = next((line for line in head.splitlines() if line.startswith("**Итоги:**")), "")
+    got_totals = [int(x.replace(NBSP, "")) for x in re.findall(r"\d+(?:\u00a0\d{3})*", totals)]
+    if got_totals != want_totals:
+        problems.append(f"«Итоги» первого экрана: видно {got_totals}, ожидалось {want_totals}")
+    crit = [g for g in r.groups if g["confirmed"] and g["severity"] == "critical"]
+    rest = [g for g in top_confirmed_groups(r.groups) if g["severity"] != "critical"]
+    want_ids = [str(g["primary"]["id"]) for g in crit + rest[: max(0, TOP_FINDINGS - len(crit))]]
+    got_ids = [_unescape(m.group(1)) for m in (_LIST_ID.match(line) for line in head.splitlines()) if m]
+    if got_ids != want_ids:
+        problems.append(f"главные находки первого экрана: видно {got_ids}, ожидалось {want_ids}")
     return problems
 
 

@@ -48,7 +48,7 @@ def test_one_root_cause_one_record(tmp_path):
     _, rows = read_csv(write_jira_csv(build_report("complete"), tmp_path / "j.csv"))
     assert [r["Summary"].split("]")[0] + "]" for r in rows] == ["[F-001]", "[F-002]", "[F-003]", "[F-005]", "[F-007]"]
     f003 = next(r for r in rows if r["Summary"].startswith("[F-003]"))
-    assert "ID замечания: F-003 (та же первопричина: F-004)" in f003["Description"]
+    assert "ID замечания: F-003 (та же первопричина: F-004 — явная ссылка duplicate_of)" in f003["Description"]
     assert f003["Priority"] == "High"
     f002 = next(r for r in rows if r["Summary"].startswith("[F-002]"))
     assert "Объединено при подготовке: C-014" in f002["Description"]

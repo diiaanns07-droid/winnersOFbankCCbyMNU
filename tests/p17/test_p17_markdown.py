@@ -134,7 +134,7 @@ def test_same_cause_linked_both_ways_and_merged_from_shown():
     primary = section(md, '#### <a id="f-f-003"></a>F-003')
     dup = section(md, '#### <a id="f-f-004"></a>F-004')
     assert "**Та же первопричина:** [F-004](#f-f-004)" in primary
-    assert "**Та же первопричина, что у [F-003](#f-f-003)**" in dup
+    assert "**Повтор первопричины [F-003](#f-f-003)** (явная ссылка `duplicate_of`)" in dup
     assert "**Объединено при подготовке:** C-014" in section(md, '#### <a id="f-f-002"></a>F-002')
 
 
