@@ -44,6 +44,7 @@ BLOCKS = ["development", "testing", "both", "none"]
 CONFLICT_KINDS = ("event_conflict", "status_conflict", "boundary_conflict", "unit_mismatch", "contradiction")
 PAIR_KINDS = list(CONFLICT_KINDS) + ["ambiguity", "incomplete"]
 VERDICTS = ["conflict", "compatible", "undefined"]
+BASES = ["same_condition", "limit_removed", "value_mismatch", "none"]
 GLOSSARY_SEVERITIES = ["major", "minor", "none"]
 
 
@@ -72,6 +73,7 @@ PAIR_SCHEMA = _obj({
     "quote_a": _S, "line_a": _I, "quote_b": _S, "line_b": _I,
     "scenario": _S, "outcome_a": _S, "outcome_b": _S,
     "verdict": {"type": "string", "enum": VERDICTS},
+    "basis": {"type": "string", "enum": BASES},
     "kind": {"type": "string", "enum": PAIR_KINDS},
     "title": _S, "impact": _S, "recommendation": _S, "question": _S,
 })
@@ -243,6 +245,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         "quote_b": _s(p.get("quote_b")), "line_b": _int(p.get("line_b")) or 0,
         "scenario": _s(p.get("scenario")), "outcome_a": _s(p.get("outcome_a")), "outcome_b": _s(p.get("outcome_b")),
         "verdict": p.get("verdict") if p.get("verdict") in VERDICTS else "undefined",
+        "basis": p.get("basis") if p.get("basis") in BASES else "",
         "kind": p.get("kind") if p.get("kind") in PAIR_KINDS else "contradiction",
         "title": _s(p.get("title")), "impact": _s(p.get("impact")),
         "recommendation": _s(p.get("recommendation")), "question": _s(p.get("question")),
@@ -258,6 +261,11 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     # Разные предметы не сравниваются: конфликта между ними быть не может.
     if not pair["same_subject"]:
         pair["verdict"] = "compatible"
+    # Конфликт без названного основания (модель сама не нашла ни одного из трёх) — неопределённость.
+    if pair["verdict"] == "conflict" and pair["basis"] == "none":
+        pair["verdict"] = "undefined"
+        if pair["kind"] in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
+            pair["kind"] = "ambiguity"
     return pair
 
 

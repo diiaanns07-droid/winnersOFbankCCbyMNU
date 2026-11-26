@@ -44,7 +44,8 @@ def pair(**kw):
             "quote_b": "Пополнение через кассу доступно всегда", "line_b": 4,
             "scenario": "В квартале три пополнения онлайн, клиент пополняет в кассе.",
             "outcome_a": "четвёртое пополнение запрещено", "outcome_b": "пополнение разрешено",
-            "verdict": "conflict", "kind": "event_conflict", "title": "", "impact": "", "recommendation": "",
+            "verdict": "conflict", "basis": "limit_removed", "kind": "event_conflict", "title": "", "impact": "",
+            "recommendation": "",
             "question": ""}
     base.update(kw)
     return base
@@ -259,7 +260,8 @@ def test_prompt_is_russian():
                "terms", "problem", "severity", "major", "minor", "none", "trace", "functional", "nonfunctional",
                "data", "integration", "constraint", "requirement_id", "verified_by", "implemented_by", "note",
                "candidates", "missing_element", "set_consistent", "set_feasible", "set_complete", "modifiable",
-               "duplicate", "ranked", "traceable", "traceability", "critical", "requirement_ids", "blocks", "false", "HTTP"}
+               "duplicate", "ranked", "traceable", "traceability", "critical", "requirement_ids", "blocks", "false", "HTTP", "basis", "limit_removed", "same_condition",
+               "value_mismatch"}
     stray = {w for w in words if w.lower() not in allowed and w not in allowed}
     assert not stray, stray
 
@@ -327,3 +329,17 @@ def test_fallback_fuzzy_quote_near_hint():
     m = C._fallback_verify(VIEW, "Пополнение через кассы доступно всегда", 4)
     assert m and m["line_start"] == 4 and m["verified"] == "fuzzy"
     assert C._fallback_verify(VIEW, "Пополнение через кассы доступно всегда", 10) is None
+
+
+def test_conflict_without_basis_becomes_undefined_major():
+    out = C.postprocess(answer(pair_checks=[pair(basis="none", kind="status_conflict")]), VIEW, REQS)
+    assert out["pair_checks"][0]["verdict"] == "undefined"
+    [c] = out["candidates"]
+    assert c["severity"] == "major" and c["kind"] == "ambiguity"
+
+
+def test_old_answers_without_basis_still_work():
+    p = pair()
+    del p["basis"]
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["candidates"][0]["severity"] == "critical"
