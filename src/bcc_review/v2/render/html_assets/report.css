@@ -286,7 +286,16 @@ mark.q.on { outline: 2px solid var(--brand); outline-offset: 1px; }
 .fm.sev-minor { background: var(--minor); color: #1d1600; }
 :root[data-theme="dark"] .fm, :root[data-theme="dark"] .fm.sev-major { color: #160b00; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fm { color: #160b00; } }
+.fms .fm:nth-child(n+4) { display: none; }
+.fmore { font: 700 10.5px/16px var(--mono); padding: 0 5px; border-radius: 4px; color: var(--ink-2); background: var(--surface-3); }
+.ln:hover .fms .fm, .ln.sel .fms .fm { display: inline; }
+.ln:hover .fmore, .ln.sel .fmore { display: none; }
 .ln.sel { outline: 2px solid var(--brand); outline-offset: -2px; z-index: 1; }
+/* фокус: выбран дефект — остальная подсветка гаснет, видно только его цитаты */
+.doc.focus .ln.hl:not(.sel) { background: transparent; border-left-color: transparent; }
+.doc.focus mark.q:not(.on) { background: transparent; box-shadow: inset 0 -1px 0 var(--line-2); }
+.doc.focus .ln.hl:not(.sel) .fm { opacity: .35; }
+.doc.focus mark.q.on { box-shadow: none; }
 .ln.flash { animation: flash 1.2s ease-out; }
 @keyframes flash { 0% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--brand) 30%, transparent); } 100% { box-shadow: inset 0 0 0 999px transparent; } }
 .ln.rqsel { background: var(--brand-soft); border-left-color: var(--brand); }

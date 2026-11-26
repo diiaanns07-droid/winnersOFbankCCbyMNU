@@ -315,10 +315,12 @@ class PipelineRunner:
             if not st:
                 continue
             try:
-                status = json.loads(p.read_text(encoding="utf-8")).get("status", "ok")
+                rec = json.loads(p.read_text(encoding="utf-8"))
             except Exception:  # noqa: BLE001 — файл ещё пишется
                 continue
-            mark(st, STATE_OF.get(status, "done"))
+            mark(st, STATE_OF.get(rec.get("status", "ok"), "done"))
+            if isinstance(rec.get("seconds"), (int, float)):  # длительность самого этапа, а не время от старта
+                job.stage_times[st] = round(float(rec["seconds"]), 1)
         # этапы идут по порядку: всё до последнего завершённого последовательного этапа уже пройдено
         last = max((i for i, k in enumerate(order) if job.stages.get(k) in ("done", "failed", "skipped")
                     and k not in PARALLEL), default=-1)

@@ -521,8 +521,12 @@ def _doc_pane(view: dict | None, findings: list[dict], report: dict) -> str:
             attrs += f' data-ex="{e(excl[n])}"'
         body = _marked(text, spans.get(n, []), rank_name)
         tags = "".join(f'<span class="rtag">{e(r)}</span>' for r in req_start.get(n, []))
+        order = sorted(fids, key=lambda x: -SEV_RANK[fsev[x]])  # сначала самые серьёзные
         marks = "".join(f'<a class="fm sev-{fsev[fid]}" href="#{e(fid)}" data-goto="{e(fid)}">{e(fid)}</a>'
-                        for fid in fids)
+                        for fid in order)
+        if len(order) > 3:
+            marks += f'<span class="fmore" title="{e(" ".join(order[3:]))}">+{len(order) - 3}</span>'
+
         out.append(f'<div class="{" ".join(cls)}"{attrs}><span class="no">{n}</span>'
                    f'<span class="tx">{tags}{body or "&#8203;"}</span>'
                    + (f'<span class="fms">{marks}</span>' if marks else "") + "</div>")
