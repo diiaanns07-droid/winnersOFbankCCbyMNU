@@ -54,7 +54,8 @@ def _sources(out: dict) -> set[str]:
     res = set()
     for c in out["candidates"]:
         src = c["source"]
-        for base in ("rules:api.get_mutation", "rules:api.field_types", "rules:promises.named_method"):
+        for base in ("rules:api.get_mutation", "rules:api.field_types", "rules:promises.named_method",
+                     "rules:api.result_field_missing"):
             if src.startswith(base + "."):
                 src = base
         res.add(src)
@@ -67,7 +68,7 @@ def test_official_expected_detectors(official):
                  "rules:api.status_201", "rules:api.field_types", "rules:units.currency_mix",
                  "rules:language.open_list", "rules:api.success_with_error", "rules:promises.read_operation",
                  "rules:placeholder.dash", "rules:placeholder.tbd", "rules:placeholder.checklist",
-                 "rules:placeholder.approvals", "rules:placeholder.version"):
+                 "rules:placeholder.approvals", "rules:placeholder.version", "rules:api.result_field_missing"):
         assert need in src, need
     assert len(official["candidates"]) <= 16
 

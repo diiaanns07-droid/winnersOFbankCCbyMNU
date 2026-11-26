@@ -647,6 +647,65 @@ def rule_field_types(doc: Doc, methods: list[Method], out: dict) -> None:
                                      ("architect",), "api_contract"))
 
 
+RESULT_VALUES = re.compile(r"\b(OK|SUCCESS|SUCCEEDED)\b.*\b(ERROR|FAIL\w*|ERR)\b|\b(ERROR|FAIL\w*)\b.*\b(OK|SUCCESS)\b")
+JSON_KEY = re.compile(r'"([A-Za-z_][\w]*)"\s*:')
+
+
+def rule_result_field_missing(doc: Doc, methods: list[Method], out: dict) -> None:
+    """Общая таблица ответа задаёт поле-результат («OK / ERROR»), а тела ответов-ошибок его не содержат."""
+    decls, _ = collect_statuses(doc)
+    sections = _heading_sections(doc, decls)
+    for t in tables(doc):
+        if _table_role(doc, t) != "response":
+            continue
+        sec = (t.header.section or "").split("›")[-1]
+        if re.search(CODE, sec):
+            continue  # таблица описывает ответ конкретного кода, а не все ответы
+        near = [doc.get(k) for k in range(t.header.n - 1, max(0, t.header.n - 4), -1)]
+        if any(x is not None and x.is_heading and re.search(CODE, x.text) for x in near):
+            continue
+        ni = t.col(*NAME_COLS)
+        if ni is None:
+            continue
+        result_rows = [r for r in t.rows if r.cells and ni < len(r.cells) and IDENT.match(r.cells[ni])
+                       and RESULT_VALUES.search(" | ".join(r.cells[ni + 1:]))]
+        if not result_rows:
+            continue
+        row = result_rows[0]
+        field = row.cells[ni]
+        missing: list[tuple[int, Line]] = []
+        for d, body in sections:
+            if d.code < 400:
+                continue
+            js = [x for x in body if x.is_code and JSON_KEY.search(x.text)]
+            if js and not any(f'"{field}"' in x.text for x in js):
+                missing.append((d.code, js[0]))
+        if len(missing) < 2:
+            continue
+        codes = fmt_list([str(c) for c, _ in missing])
+        evidence = [cell_quote(row, ni, min(len(row.cells) - 1, ni + 2))] + [ev(x) for _, x in missing[:3]]
+        out["candidates"].append(candidate(
+            f"api.result_field_missing.{_slug(field)}",
+            title=f"Ответы {codes} не содержат поля {field}, хотя таблица ответа задаёт его для результата",
+            kind="api_contract", criterion="set_consistent", severity="major", blocks="development",
+            evidence=evidence,
+            problem=(f"В таблице ответа поле {field} — признак результата ({quoted(' | '.join(row.cells[ni + 1:ni + 3]))}), "
+                     f"без условия «при успехе» или «при ошибке». В примерах ответов {codes} этого поля нет — "
+                     "непонятно, приходит ли признак результата в ошибках."),
+            scenario=(f"Клиент разбирает ответ об ошибке и читает {field}, чтобы показать сообщение: поле отсутствует, "
+                      "разбор падает или ошибка показывается как неизвестная."),
+            impact="Разные реализации обработки ошибок у клиента и сервера; тесты контракта на ошибки не написать.",
+            recommendation=(f"Либо добавить {field} во все тела ошибок, либо указать в таблице ответа, при каких кодах "
+                            f"поле {field} присутствует."),
+            rewrite=f"{field} | <уточнить: тип> | Обязательно во всех ответах | Признак результата",
+            conflict=True,
+        ))
+        out["signals"].append(signal(f"api.result_field_missing.{_slug(field)}", row, evidence[0]["quote"],
+                                     f"Поле {field} задано в общей таблице ответа, но отсутствует в ответах {codes}.",
+                                     ("architect",), "api_contract"))
+        return
+
+
 def rule_inventory(doc: Doc, methods: list[Method], out: dict) -> None:
     if not methods:
         return
@@ -666,4 +725,5 @@ def run(doc: Doc, out: dict) -> None:
     rule_statuses(doc, methods, out)
     rule_success_with_error(doc, methods, out)
     rule_field_types(doc, methods, out)
+    rule_result_field_missing(doc, methods, out)
     rule_inventory(doc, methods, out)
