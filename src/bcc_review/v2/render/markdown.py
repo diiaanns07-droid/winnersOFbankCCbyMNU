@@ -340,6 +340,7 @@ class _Ctx:
             for fid in q.get("finding_ids", []) or []:
                 self.q_by_finding.setdefault(fid, []).append(q.get("id"))
         self.summary = report.get("summary") or jsonout.compute_summary(report)
+        self.edits = _applied_edits(report)
         self.verdict = report.get("verdict", {}) or {}
         self.offline = self.run.get("provider") == "offline" or (
             not self.run.get("models_used") and self.run.get("provider") not in ("mock",))
@@ -750,6 +751,22 @@ def _per_requirement(c: _Ctx) -> list[str]:
     return out
 
 
+def _applied_edits(report: dict) -> list[tuple[str, dict]]:
+    """Правки режима --revise (№11): [(D-…, {"line", "before", "after", "insert"})], только применённые."""
+    out = []
+    for rw in report.get("rewrites") or []:
+        if not isinstance(rw, dict):
+            continue
+        for e in rw.get("edits") or []:
+            if not isinstance(e, dict) or not e.get("applied") or not isinstance(e.get("line"), int):
+                continue
+            insert = e.get("action") == "insert"
+            out.append((str(rw.get("finding_id") or ""), {
+                "line": e["line"], "insert": insert, "before": "" if insert else str(e.get("was") or e.get("old") or ""),
+                "after": str(e.get("became") if e.get("became") is not None else e.get("new") or "")}))
+    return out
+
+
 def _rewrite_from(f: dict) -> dict | None:
     """Цитата, которую заменяет «стало»: та, где больше общих слов с новой формулировкой."""
     evs = f.get("evidence") or []
@@ -797,8 +814,16 @@ def _card(c: _Ctx, f: dict) -> list[str]:
         fields = [("Проблема", f.get("problem")), ("Сценарий", f.get("scenario")), ("Последствия", f.get("impact")),
                   ("Что исправить", f.get("recommendation"))]
     body = [f"**{name}.** {prose(val)}" for name, val in fields if val]
+    edits = [e for fid, e in c.edits if fid == f.get("id")]
     src = _rewrite_from(f)
-    if src is not None:
+    if edits:
+        for e in edits[:2]:
+            if e["insert"]:
+                body.append(f"**Добавить после строки {e['line']}.** «{prose(e['after'])}»")
+            else:
+                body.append(f"**Было → стало.** Строка {e['line']}: {quote_md(e['before'])} → "
+                            + (f"«{prose(e['after'])}»" if e["after"] else "удалить"))
+    elif src is not None:
         body.append(f"**Было → стало.** {lines_word(src.get('line_start'), src.get('line_end')).capitalize()}: "
                     f"{quote_md(src.get('quote'))} → «{prose(f.get('rewrite'))}»")
     if f.get("question"):
@@ -1081,28 +1106,41 @@ def _appendix_checklist(c: _Ctx) -> list[str]:
 def _appendix_rewrites(c: _Ctx) -> list[str]:
     out = [h2("pg", "Приложение Г. Было → стало"), ""]
     items = []
+    for fid, e in _applied_edits(c.r):
+        items.append((fid, e["line"], e["line"], e["before"], e["after"], e["insert"]))
     for rw in c.r.get("rewrites") or []:
-        if rw.get("after") or rw.get("rewrite"):
+        if not rw.get("edits") and (rw.get("after") or rw.get("rewrite")):
             items.append((rw.get("finding_id") or ", ".join(rw.get("finding_ids") or []), rw.get("line_start"),
-                          rw.get("line_end"), rw.get("before") or rw.get("quote") or "", rw.get("after") or rw.get("rewrite")))
+                          rw.get("line_end"), rw.get("before") or rw.get("quote") or "",
+                          rw.get("after") or rw.get("rewrite"), False))
+    from_revise = bool(items)
     if not items:
         for f in c.findings:
             if c.level >= 2 and f.get("severity") in ("critical", "major"):
                 continue
             src = _rewrite_from(f)
             if src is not None:
-                items.append((f["id"], src.get("line_start"), src.get("line_end"), src.get("quote"), f.get("rewrite")))
+                items.append((f["id"], src.get("line_start"), src.get("line_end"), src.get("quote"), f.get("rewrite"),
+                              False))
     if not items and c.level >= 2:
         return out + ["Формулировки «было → стало» приведены в карточках раздела 3.2 и в `report.json`.", ""]
     if not items:
         return out + ["Готовых формулировок нет.", ""]
-    out += ["Готовые формулировки для правки ТЗ; «<уточнить: …>» — место, где нужен ответ владельца.", ""]
-    rows = [[c.f_link(fid, True) if fid in c.f_by_id else esc(fid), lines_word(a, b).replace("строки ", "")
-             .replace("строка ", ""), quote_md(before, 120, in_table=True), cell(after)]
-            for fid, a, b, before, after in items]
+    st = c.r.get("revise_stats") or {}
+    if from_revise and st:
+        out += [f"Правки внесены программой в копию документа: заменено фрагментов {num(st.get('replaced', 0))}, "
+                f"добавлено строк {num(st.get('inserted', 0))}, не применено {num(st.get('not_applied', 0))}; "
+                f"«<уточнить: …>» — место, где нужен ответ владельца ({num(st.get('pending', 0))}).", ""]
+    else:
+        out += ["Готовые формулировки для правки ТЗ; «<уточнить: …>» — место, где нужен ответ владельца.", ""]
+    rows = [[c.f_link(fid, True) if fid in c.f_by_id else esc(fid),
+             (f"после {a}" if ins else lines_word(a, b).replace("строки ", "").replace("строка ", "")),
+             "—" if ins else quote_md(before, 120, in_table=True), cell(after) if after else "фрагмент удалён"]
+            for fid, a, b, before, after, ins in items]
     out += table(["Дефект", "Строка", "Было", "Стало"], rows)
     if c.r.get("revised_file"):
-        out += ["", f"Исправленный текст ТЗ целиком: «{esc(c.r['revised_file'])}»."]
+        from pathlib import PurePath
+        out += ["", f"Исправленный текст ТЗ целиком: `{PurePath(str(c.r['revised_file'])).name}` (рядом с отчётом)."]
     return out + [""]
 
 
@@ -1242,7 +1280,7 @@ def _clean(value, key: str = ""):
                 if isinstance(v, (int, float)) and not isinstance(v, bool):
                     out[k] = str(v)
                 continue
-            if k in ("evidence", "terms", "answers"):
+            if k in ("evidence", "terms", "answers", "edits", "changes"):
                 out[k] = [_clean(x, k) for x in v if isinstance(x, dict)] if isinstance(v, list) else []
             elif k in _ID_LIST_KEYS:
                 out[k] = [str(x) for x in v if isinstance(x, (str, int, float)) and str(x).strip()] \

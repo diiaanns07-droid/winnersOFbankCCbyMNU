@@ -318,3 +318,22 @@ def test_line_refs_from_model_text_become_russian():
     assert markdown.cell("a | L7") == "a \\| строка 7"
     assert markdown.source_name("lens:что-то") == "проверка ролью"
     assert markdown.source_name("rules:units") == "правило «units»"
+
+
+def test_revise_edits_rendered(sample):
+    r = copy.deepcopy(sample)
+    r["rewrites"] = [{"finding_id": "D-01", "title": "т", "severity": "critical", "summary": "с",
+                      "edits": [{"action": "replace", "line": 39, "old": "максимум один", "new": "не более <уточнить: N>",
+                                 "applied": True, "was": "максимум один", "became": "не более <уточнить: N>"},
+                                {"action": "insert", "line": 40, "old": "", "new": "Ф-5. Новое правило.",
+                                 "applied": True, "was": "", "became": "Ф-5. Новое правило."},
+                                {"action": "replace", "line": 41, "old": "x", "new": "y", "applied": False}]}]
+    r["revise_stats"] = {"replaced": 1, "inserted": 1, "not_applied": 1, "pending": 1}
+    r["revised_file"] = "/tmp/out/report.revised.md"
+    md = markdown.render(r)
+    card = md[md.find('id="d-01"'):md.find('id="d-02"')]
+    assert "**Было → стало.** Строка 39: «максимум один» → «не более <уточнить: N>»" in card
+    assert "**Добавить после строки 40.** «Ф-5. Новое правило.»" in card
+    app = md[md.find('id="pg"'):md.find('id="pd"')]
+    assert "| после 40 | — | Ф-5. Новое правило. |" in app and "не применено 1" in app
+    assert "`report.revised.md`" in app and "/tmp/out" not in app
