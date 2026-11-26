@@ -416,7 +416,7 @@ def _scope_for(req: _Req, doc: _Doc, crit: Criteria, owner: dict[str, str]) -> _
         elif general and any(general.search(h) for h in b.section):
             blocks_in[b.id] = "general"
     stop = frozenset(crit.raw.get("context", {}).get("scope", {}).get("stop_stems", []))
-    known = _numbers(req.body)
+    known = _numbers(req.body) | _numeral_words(req.body)
     for b in doc.blocks:
         if b.id in blocks_in:
             known |= _numbers(b.text)
@@ -493,18 +493,38 @@ def _definitions(scope: _Scope, doc: _Doc, crit: Criteria, kind: str) -> tuple[l
     return applicable, other
 
 
-def _out_of_scope_numbers(text: str, scope: _Scope, doc: _Doc) -> list[tuple[str, _Block]]:
-    """Числа из довода, которые есть только в блоках вне области действия пункта."""
+def _out_of_scope_numbers(text: str, scope: _Scope, doc: _Doc, crit: Criteria) -> list[tuple[str, _Block]]:
+    """Числа довода, взятые из определения того же предмета вне области действия пункта.
+
+    Совпадение числа с несвязанным блоком («3» в сроке возврата при тесте на 3 ввода ПИН-кода) заимствованием
+    не считается: учитываются только определения из ``other_scope`` с тем же предметом.
+    """
+    other = _definitions(scope, doc, crit, "any")[1]
     hits: list[tuple[str, _Block]] = []
     for m in _NUM_IN_TEXT.finditer(text or ""):
         n = _norm_num(m.group(0)).rstrip(".")
         if n in scope.known:
             continue
-        site = next((b for b in doc.blocks if b.id not in scope.own and b.id not in scope.blocks_in
-                     and n in _numbers(b.text)), None)
+        site = next((d.block for d in other if n in _numbers(d.block.text)), None)
         if site is not None:
             hits.append((m.group(0).strip(), site))
     return hits
+
+
+# Числительные словами: «после трёх неверных вводов» даёт пункту число 3.
+_NUMERAL_STEMS = (("одн", "1"), ("один", "1"), ("перв", "1"), ("два", "2"), ("двух", "2"), ("две", "2"), ("втор", "2"),
+                  ("три", "3"), ("трёх", "3"), ("трех", "3"), ("трет", "3"), ("четыр", "4"), ("пят", "5"),
+                  ("шест", "6"), ("сем", "7"), ("восем", "8"), ("девят", "9"), ("десят", "10"))
+
+
+def _numeral_words(text: str) -> set[str]:
+    out = set()
+    for w in re.findall(r"[а-яё]+", (text or "").lower()):
+        for stem, digit in _NUMERAL_STEMS:
+            if w.startswith(stem) and len(w) - len(stem) <= 4:
+                out.add(digit)
+                break
+    return out
 
 
 _MEASURE_CACHE: dict[str, dict[str, re.Pattern[str]]] = {}
@@ -747,6 +767,8 @@ def _rule_signals(req: _Req, doc: _Doc, crit: Criteria, owner: dict[str, str], s
                             continue  # то же место уже разобрано другим шаблоном группы
                         taken.append((sp.block_id, m.start(), m.end()))
                         term = sp.text[m.start(): m.end()]
+                        if _RECOMMEND.fullmatch(term):
+                            continue  # «желательно» — модальность, решает владелец (правило 7б), а не словарь
                         ctx = _context_quote(sp.text, m.start(), m.end(), crit)
                         if group.resolve == "definition":
                             sigs.append(_reference_signal(req, sp, term, ctx, code, group, strength, scope, doc, crit,
@@ -777,12 +799,12 @@ def _rule_signals(req: _Req, doc: _Doc, crit: Criteria, owner: dict[str, str], s
                             continue
                         s, rid = sev("vague", group=group.id)
                         if group.resolve == "none":
-                            title = f"«{term}»: {group.title.lower()}"
+                            title = f"{req.label}: «{term}» — {group.title.lower()}"
                             condition = f"В обязательстве «{ctx}» выражение «{term}» оставляет состав или условие открытым."
                             reason = f"«{term}» — {group.title.lower()}: перечень или условие обязательства не закрыты."
                             decision = f"Какие случаи покрывает «{ctx}» помимо названных"
                         else:
-                            title = f"«{term}» не задаёт измеримого значения ({group.title.lower()})"
+                            title = f"{req.label}: «{term}» не задаёт измеримого значения ({group.title.lower()})"
                             condition = f"В обязательстве «{ctx}» слово «{term}» не имеет числовой границы, и рядом её нет."
                             reason = f"«{term}» — {group.title.lower()}: измеримого ограничения нет ни в пункте, ни в соседних строках."
                             decision = f"Какую границу заложить вместо «{term}» и какой результат теста считать успехом"
@@ -887,6 +909,85 @@ def _rule_signals(req: _Req, doc: _Doc, crit: Criteria, owner: dict[str, str], s
                                   "без явной ссылки это определение не применяется." if elsewhere else ""),
                         root_cause=f"range:{a_val}-{b_val}",
                     ))
+
+    # 7б. Модальность: «желательно», «рекомендуется». Обязательность пункта — решение владельца:
+    # без модели правило не ставит серьёзность по словарю, а задаёт вопрос в штатном поле question.
+    c_unamb = target("unambiguous")
+    if c_unamb:
+        for sp in req.spans:
+            m = _RECOMMEND.search(_mask(sp.text, crit))
+            if not m:
+                continue
+            term = sp.text[m.start(): m.end()]
+            duty = _WS.sub(" ", sp.text[m.end():]).strip(" .;")
+            sigs.append(_Signal(
+                criterion=c_unamb, status="unknown", rule="modality.recommendation", kind="modality",
+                block_id=sp.block_id, quote=term, context=_context_quote(sp.text, m.start(), m.end(), crit),
+                reason=f"«{term}» делает правило рекомендательным: обязательность пункта не определена. Это решение "
+                       "владельца; по одному слову серьёзность не назначается.",
+                question=f"Правило «{_short(duty, 90)}» обязательное или рекомендательное? Если обязательное — "
+                         f"заменить «{term}» утвердительной формой; если рекомендательное — вынести из требований "
+                         "или пометить приоритетом.",
+            ))
+            break
+
+    # 7в. Единицы суммы. Знак валюты в заголовке действует на свой раздел и не переходит на соседние.
+    if c_unamb:
+        masked_body = "\n".join(_mask(sp.text, crit) for sp in req.spans)
+        if _MONEY.search(masked_body) and not _CURRENCY.search(masked_body):
+            for sp in req.spans:
+                m = _AMOUNT.search(_mask(sp.text, crit))
+                if not m:
+                    continue
+                amount = sp.text[m.start(): m.end()]
+                own_head = _unit_heading(req.section, doc)
+                if own_head:
+                    h, hb = own_head
+                    sigs.append(_Signal(
+                        criterion=c_unamb, status="pass", rule="units.heading", kind="units",
+                        reason=f"Единицы суммы «{amount}» заданы заголовком «{h}» [{hb}]: он действует на раздел пункта.",
+                    ))
+                    break
+                elsewhere = _unit_heading_elsewhere(req.section, doc)
+                s, rid = sev("units")
+                note = (f" Знак единиц в заголовке «{elsewhere[0]}» [{elsewhere[1]}] действует только на свой раздел."
+                        if elsewhere else "")
+                where = " › ".join(req.section[1:]) or " › ".join(req.section) or "без раздела"
+                sigs.append(_Signal(
+                    criterion=c_unamb, status="issue", rule="units.missing", kind="units",
+                    block_id=sp.block_id, quote=amount, context=_context_quote(sp.text, m.start(), m.end(), crit),
+                    severity=s, severity_rule=rid, finding_kind="ambiguity",
+                    title=f"{req.label}: у суммы «{amount}» не указаны единицы",
+                    condition=f"Сумму «{amount}» можно прочитать в тенге, тиынах или валюте счёта карты.",
+                    impact=why(rid) or "Без единиц разработчик выберет валюту сам, а тест не знает, какое значение отклонять.",
+                    fix=f"Указать единицы: «{amount} <уточнить у владельца: ₸, тиыны или валюта счёта?>» или задать их в заголовке раздела.",
+                    question=f"В каких единицах задано «{amount}»: в тенге, тиынах или валюте счёта карты?",
+                    blocked_decision=f"Разработка: в каких единицах сравнивать значение «{amount}»; приёмка: какое значение тест должен отклонить",
+                    targets=("development", "testing") if s != "minor" else (),
+                    reason=f"У суммы «{amount}» не указаны единицы ни в пункте, ни в заголовках его раздела «{where}».{note}",
+                    root_cause=f"units:{_slug(amount)}:{req.id}",
+                ))
+                break
+
+    # 7г. Термин с определением в общем разделе или по явной ссылке: где действует определение.
+    if c_unamb:
+        for b in doc.blocks:
+            link = scope.blocks_in.get(b.id)
+            if link not in ("explicit", "general"):
+                continue
+            g = _GLOSSARY.match(b.text)
+            if not g:
+                continue
+            rx = _term_rx(g.group("term"))
+            hit = rx.search(body) if rx else None
+            if hit:
+                label = _label_of(b)
+                sigs.append(_Signal(
+                    criterion=c_unamb, status="info", rule="term.defined", kind="term",
+                    reason=f"Термин «{body[hit.start(): hit.end()]}» определён в {label + ' ' if label else ''}[{b.id}] "
+                           f"раздела «{b.section[-1] if b.section else 'без раздела'}» "
+                           f"({'общий раздел' if link == 'general' else 'явная ссылка'}): определение действует на пункт.",
+                ))
 
     # 8. Единичность: несколько независимых предложений-обязательств.
     singular_cfg = crit.raw.get("rules", {}).get("singular", {})
@@ -1002,6 +1103,42 @@ def _reference_signal(req: _Req, sp: _Span, term: str, ctx: str, code: str, grou
         targets=("development", "testing") if s != "minor" else (),
         root_cause=f"reference:{_slug(term)}:{_slug(scope.title)}",
     )
+
+
+_RECOMMEND = re.compile(r"(?<![\w-])(?:желательн\w*|рекоменд\w*)(?![\w-])", _FLAGS)
+_CURRENCY = re.compile(r"₸|(?<![\w-])(?:тенге|тг|kzt|тиын\w*|usd|eur|rub|руб\w*|доллар\w*|евро|валют\w*)(?![\w-])|[$€]", _FLAGS)
+_MONEY = re.compile(r"(?<![\w-])(?:лимит\w*|сумм\w*|порог\w*|остат\w*|баланс\w*|плат[её]ж\w*|комисси\w*|стоимост\w*|"
+                    r"тариф\w*|перевод\w*|сняти\w*|кэшбэк\w*)(?![\w-])", _FLAGS)
+# Сумма: разряды через пробел («200 000») или не меньше 5 цифр; годы и коды не берутся.
+_AMOUNT = re.compile(r"(?<![\w.,-])(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d{5,})(?![\w]|[.,]\d)")
+_GLOSSARY = re.compile(r"^\s*(?:[-+•*]\s+)?[*_`]*(?:[A-ZА-ЯЁ]{1,6}-\d+(?:\.\d+)*[.:)]?)?[*_`]*\s*"
+                       r"(?P<term>[А-ЯЁA-Z][\w-]*(?:\s+[\w-]+){0,3}?)\s+[—–]\s+\S")
+
+
+def _term_rx(term: str) -> re.Pattern[str] | None:
+    """«Рабочий день» → «рабоч\\w*\\s+д\\w*»: основа длинного слова и первая буква короткого."""
+    words = [w for w in re.split(r"\s+", term.strip().lower()) if w]
+    if not words or len(words[0]) < 4:
+        return None
+    parts = [re.escape(w[:5] if len(w) >= 6 else w[:1]) + r"\w*" for w in words]
+    return re.compile(r"(?<![\w-])" + r"\s+".join(parts), _FLAGS)
+
+
+def _unit_heading(section: Sequence[str], doc: _Doc) -> tuple[str, str] | None:
+    """Ближайший заголовок пути пункта со знаком единиц и ID его блока."""
+    for i in range(len(section) - 1, -1, -1):
+        if _CURRENCY.search(section[i]):
+            hb = next((b.id for b in doc.blocks if b.kind == "heading" and b.text == section[i]
+                       and b.section == tuple(section[:i])), "")
+            return section[i], hb
+    return None
+
+
+def _unit_heading_elsewhere(section: Sequence[str], doc: _Doc) -> tuple[str, str] | None:
+    for b in doc.blocks:
+        if b.kind == "heading" and b.text not in section and _CURRENCY.search(b.text):
+            return b.text, b.id
+    return None
 
 
 def _sentences(text: str) -> list[str]:
@@ -1252,10 +1389,10 @@ def _ask_model(reqs: Sequence[_Req], doc: _Doc, crit: Criteria, signals: Mapping
                 if c is None or c.scope != "requirement" or status not in STATUSES:
                     _warn(warnings, "bad_check", f"{rid}: неизвестный критерий или статус: {_get(chk, 'criterion')!r}/{status!r}")
                     continue
-                if c.code in per:
-                    continue
-                per[c.code] = {k: _get(chk, k) for k in _ANSWER_FIELDS}
-                per[c.code]["status"] = status
+                rec = {k: _get(chk, k) for k in _ANSWER_FIELDS}
+                rec["status"] = status
+                # несколько записей по одному критерию — разные первопричины (два спорных термина)
+                per.setdefault(c.code, []).append(rec)
         for r in batch:
             if r.id not in answers and r.id not in failed:
                 failed[r.id] = f"этап {stage}: модель не вернула результат по требованию"
@@ -1409,6 +1546,7 @@ def _cand_from_signal(req: _Req, s: _Signal, crit: Criteria) -> dict[str, Any]:
         "rule_id": s.rule,
         "severity_rule": s.severity_rule,
         "calibration": notes,
+        "_heuristic": s.strength == "heuristic",
     }
 
 
@@ -1422,7 +1560,7 @@ def _cand_from_answer(req: _Req, c: Criterion, ans: Mapping[str, Any], block_id:
         notes.append("числа из правки модели вынесены в вопрос владельцу: " + ", ".join(inv_fix))
     reason = str(ans.get("reason") or "")
     condition = str(ans.get("condition") or "")
-    title = _short(condition or reason, 140)
+    title = _short(reason or condition, 140)  # заголовок — формулировка дефекта; сценарий остаётся в cause.condition
     kind = ans.get("kind") if ans.get("kind") in FINDING_KINDS else c.kind
     outcomes = [str(o) for o in (ans.get("outcomes") or []) if str(o).strip()]
     return {
@@ -1436,7 +1574,7 @@ def _cand_from_answer(req: _Req, c: Criterion, ans: Mapping[str, Any], block_id:
         "hints": [_hint(block_id, quote)],
         "recommendation": fix,
         "blocked_decision": str(ans.get("blocked_decision") or ""),
-        "cause": {"object": str(ans.get("root_cause") or quote), "condition": condition, "outcomes": outcomes},
+        "cause": {"object": quote, "condition": condition, "outcomes": outcomes},  # объект — дословная опора
         "source": "llm",
         "stage": STAGE,
         "blocks": list(_TARGETS.get(str(ans.get("blocks") or ""), [])),
@@ -1478,7 +1616,7 @@ def _assemble(reqs: Sequence[_Req], doc: _Doc, crit: Criteria, signals: Mapping[
                 checks.append(_check(req, c.code, "na", f"Не оценивается: {excl.reason}", "rules", answered=model is not None))
                 continue
             if not c.applies(req.role):
-                if model and model.get(c.code, {}).get("status") == "issue":
+                if model and any(a.get("status") == "issue" for a in model.get(c.code, [])):
                     _warn(warnings, "na_overridden", f"{req.id}/{c.code}: модель оценила неприменимый критерий; ответ не учтён")
                 checks.append(_check(
                     req, c.code, "na",
@@ -1490,10 +1628,14 @@ def _assemble(reqs: Sequence[_Req], doc: _Doc, crit: Criteria, signals: Mapping[
     return checks, acc.candidates
 
 
-def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] | None, asked: bool,
+def _decide(req: _Req, c: Criterion, own: list[_Signal], records: Sequence[Mapping[str, Any]] | None, asked: bool,
             answered: bool, doc: _Doc, crit: Criteria, scope: _Scope, acc: _Acc,
             warnings: list[dict]) -> dict[str, Any]:
     code = c.code
+    records = list(records or [])
+    issue_recs = [a for a in records if a.get("status") == "issue"]
+    # первичная запись: issue, если есть, иначе первая; issue-записи разбираются все (разные первопричины)
+    ans = issue_recs[0] if issue_recs else (records[0] if records else None)
     infos = list(dict.fromkeys(s.reason for s in own if s.status == "info"))
     own = [s for s in own if s.status != "info"]
 
@@ -1541,15 +1683,25 @@ def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] 
     reason = str(ans.get("reason") or "").strip()
 
     if status == "issue":
-        quote = str(ans.get("quote") or "").strip()
-        found = _find_quote(quote, req, doc)
-        if found:
-            block_id, literal = found
-            cand = _cand_from_answer(req, c, ans, block_id, literal, crit, scope.known)
-            refs = [acc.add(cand)] + [acc.add(_cand_from_signal(req, s, crit)) for s in issues]
-            return _check_here(req, code, "issue", reason or cand["title"], "rules+llm" if issues else "llm",
-                          severity=cand["severity"], candidate_refs=refs, question=cand["question"])
-        _warn(warnings, "quote_not_found", f"{req.id}/{code}: цитата модели не найдена в тексте: «{_short(quote, 80)}»")
+        accepted: list[tuple[Mapping[str, Any], dict[str, Any]]] = []
+        quote = ""
+        for rec in issue_recs:
+            q = str(rec.get("quote") or "").strip()
+            found = _find_quote(q, req, doc)
+            if found:
+                accepted.append((rec, _cand_from_answer(req, c, rec, found[0], found[1], crit, scope.known)))
+            else:
+                quote = quote or q
+                _warn(warnings, "quote_not_found", f"{req.id}/{code}: цитата модели не найдена в тексте: «{_short(q, 80)}»")
+        if accepted:
+            refs = [acc.add(cand) for _, cand in accepted] + [acc.add(_cand_from_signal(req, s, crit)) for s in issues]
+            worst = min((cand["severity"] for _, cand in accepted), key=crit.rank)
+            why_text = " ".join(dict.fromkeys(str(rec.get("reason") or "").strip() or cand["title"] for rec, cand in accepted))
+            if issues:  # основание правила (область действия, единицы, ссылка) сохраняется рядом с доводом модели
+                why_text += " Правила: " + " ".join(dict.fromkeys(s.reason for s in issues))
+            asks = " ".join(dict.fromkeys(cand["question"] for _, cand in accepted if cand.get("question")))
+            return _check_here(req, code, "issue", why_text, "rules+llm" if issues else "llm",
+                               severity=worst, candidate_refs=refs, question=asks)
         if issues:
             return rule_issue("Замечание модели отклонено: её цитата не найдена в тексте пункта.")
         return _check_here(
@@ -1560,7 +1712,7 @@ def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] 
 
     if status == "pass":
         if code in _SCOPED_CRITERIA:
-            foreign = _out_of_scope_numbers(reason, scope, doc)
+            foreign = _out_of_scope_numbers(reason, scope, doc, crit)
             if foreign:
                 n, site = foreign[0]
                 where = " › ".join(site.section[1:]) or " › ".join(site.section)
@@ -1632,7 +1784,18 @@ def _merge_candidates(cands: list[dict[str, Any]], crit: Criteria) -> tuple[list
             if (h["block_id"], h["quote"]) not in seen:
                 target["hints"].append(h)
                 seen.add((h["block_id"], h["quote"]))
-        if crit.rank(c["severity"]) < crit.rank(target["severity"]):
+        # словарь не повышает серьёзность: эвристическое правило уступает откалиброванной оценке модели
+        if c["source"] == "rules" and c.get("_heuristic") and "llm" in target["source"].split("+"):
+            if crit.rank(c["severity"]) < crit.rank(target["severity"]):
+                target.setdefault("calibration", []).append(
+                    f"серьёзность модели {target['severity']} сохранена: правило {c.get('rule_id')} ({c['severity']}) "
+                    "основано на словаре и её не повышает")
+        elif target["source"] == "rules" and target.get("_heuristic") and c["source"] == "llm":
+            if target["severity"] != c["severity"]:
+                target.setdefault("calibration", []).append(
+                    f"серьёзность модели {c['severity']} заменила словарную {target['severity']} правила {target.get('rule_id')}")
+            target["severity"] = c["severity"]
+        elif crit.rank(c["severity"]) < crit.rank(target["severity"]):
             target["severity"] = c["severity"]
         llm_wins = c["source"] == "llm" and target["source"] == "rules"
         target["source"] = "+".join(sorted(set(target["source"].split("+")) | set(c["source"].split("+"))))
@@ -1655,6 +1818,7 @@ def _merge_candidates(cands: list[dict[str, Any]], crit: Criteria) -> tuple[list
         refs[uid] = c["ref"]
     for c in out:
         c.pop("_uid", None)
+        c.pop("_heuristic", None)
         for k in [k for k, v in c.items() if v is None or v == ""]:
             if k not in ("impact", "title"):
                 c.pop(k)
