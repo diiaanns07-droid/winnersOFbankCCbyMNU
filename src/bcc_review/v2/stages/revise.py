@@ -40,6 +40,17 @@ SCHEMA: dict = {
 }
 
 
+CHECK_STAGE = "revise_check"
+_EDIT_ITEMS = SCHEMA["properties"]["rewrites"]["items"]["properties"]["edits"]
+CHECK_SCHEMA: dict = {
+    "type": "object", "additionalProperties": False, "required": ["fixes"],
+    "properties": {"fixes": {"type": "array", "maxItems": 12, "items": {
+        "type": "object", "additionalProperties": False, "required": ["finding_id", "problem", "edits"],
+        "properties": {"finding_id": {"type": "string"}, "problem": {"type": "string"}, "edits": _EDIT_ITEMS}}}},
+}
+_MARK = re.compile(r"\s*\[(изменено|добавлено|удалено): ([^\]]*)\]")
+
+
 # --------------------------------------------------------------------------- исходный текст
 def _source_lines(ctx: Any, view: Any) -> tuple[list[str], bool]:
     """Строки, к которым применяются правки: исходный MD/TXT (номера строк совпадают с view) или текст view."""
@@ -206,6 +217,20 @@ def _shape_block(rows: list[str], anchor: str) -> list[tuple[str, str]]:
 
 
 def _with_mark(text: str, mark: str) -> str:
+    m_new = _MARK.match(" " + mark)
+    found = list(_MARK.finditer(text))
+    if found and m_new:  # строка уже помечена (второй проход): добавленную строку не помечаем повторно
+        kinds = {f.group(1) for f in found}
+        if "добавлено" in kinds or m_new.group(1) in kinds:
+            f = next((f for f in found if f.group(1) == m_new.group(1)), None)
+            if f is None:
+                return text
+            ids = [x.strip() for x in f.group(2).split(",")]
+            extra = [x.strip() for x in m_new.group(2).split(",") if x.strip() not in ids]
+            if not extra:
+                return text
+            merged = f" [{f.group(1)}: {', '.join(ids + extra)}]"
+            return text[:f.start()] + merged + text[f.end():]
     if _is_row(text):
         t = text.rstrip()
         return t[:-1].rstrip() + f" {mark} |"
@@ -422,6 +447,13 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     order = {f["id"]: i for i, f in enumerate(targets)}
     rewrites.sort(key=lambda r: order.get(r["finding_id"], 999))
     applied = apply_edits(lines, rewrites, warnings)
+    opts = getattr(ctx, "options", None) or {}
+    check = {"fixes": [], "stats": {}}
+    if isinstance(opts, dict) and opts.get("revise_check", True) and applied["stats"].get("replaced", 0) + \
+            applied["stats"].get("inserted", 0):
+        check = _check_pass(ctx, applied, warnings)
+        if check.get("markdown"):
+            applied["markdown"] = check["markdown"]
     for r in applied["rewrites"]:
         r["pending"] = sum(len(_PENDING.findall(e.get("became", ""))) for e in r["edits"])
     body = applied["markdown"].splitlines()
@@ -434,8 +466,68 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     for w in warnings:
         _cl._warn(ctx, w)
     missing = [f["id"] for f in targets if f["id"] not in {r["finding_id"] for r in rewrites}]
-    return {"rewrites": applied["rewrites"], "revised_markdown": md, "stats": {**applied["stats"],
-            "findings": len(targets), "with_rewrite": len(rewrites), "without_rewrite": missing}}
+    return {"rewrites": applied["rewrites"], "revised_markdown": md, "check_fixes": check.get("fixes", []),
+            "stats": {**applied["stats"], "findings": len(targets), "with_rewrite": len(rewrites),
+                      "without_rewrite": missing, "check_fixes": len(check.get("fixes", [])),
+                      "check_edits": check.get("stats", {}).get("replaced", 0) + check.get("stats", {}).get("inserted", 0)}}
+
+
+def _changed_lines(md_lines: list[str]) -> list[str]:
+    rows = []
+    for i, s in enumerate(md_lines, 1):
+        for m in _MARK.finditer(s):
+            rows.append(f"L{i:03d} | {m.group(1)}: {m.group(2)}")
+    return rows
+
+
+def _number_markdown(ctx: Any, md: str) -> str:
+    """Нумерованный текст редакции так же, как модель видит исходный документ."""
+    try:
+        from bcc_review.v2 import docview  # type: ignore
+        view = docview.from_text(md, file="revised.md", fmt="md")
+        return docview.numbered(view)
+    except Exception:  # noqa: BLE001 — запасная нумерация без разметки
+        out = []
+        for i, s in enumerate(md.splitlines(), 1):
+            t = re.sub(r"\*\*|__|`", "", s).rstrip()
+            out.append(f"L{i:03d}| {t}")
+        return "\n".join(out)
+
+
+def _check_pass(ctx: Any, applied: dict, warnings: list[str]) -> dict:
+    """Второй проход: противоречия, которые внесли сами правки, и их исправление (1 вызов модели)."""
+    md = applied["markdown"]
+    md_lines = md.splitlines()
+    changes = _changed_lines(md_lines)
+    if not changes:
+        return {"fixes": []}
+    by_fid = {r["finding_id"]: r for r in applied["rewrites"]}
+    summary = "\n".join(f"{fid}: {r.get('title', '')} — {r.get('summary', '')}" for fid, r in by_fid.items())
+    block = "\n".join(changes) + "\n\nДефекты:\n" + summary
+    try:
+        from bcc_review.v2 import prompts as _p  # type: ignore
+        own, task = _p.task(CHECK_STAGE, changes=block)
+        system = own or _p.system()
+    except Exception:  # noqa: BLE001
+        system, user0 = ctx.prompt(CHECK_STAGE, changes=block)
+        task = user0[user0.find("<правки>"):] if "<правки>" in user0 else user0
+    user = f"<документ>\n{_number_markdown(ctx, md)}\n</документ>\n\n{task}"
+    try:
+        raw = ctx.llm.ask(CHECK_STAGE, system, user, CHECK_SCHEMA, max_output_tokens=12000) or {}
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"revise: самопроверка редакции не выполнена ({type(exc).__name__}: {str(exc)[:160]})")
+        return {"fixes": []}
+    fixes = [f for f in raw.get("fixes") or [] if f.get("edits")]
+    for f in fixes:
+        if f.get("finding_id") not in by_fid:
+            f["finding_id"] = next(iter(by_fid), "D-00")
+    if not fixes:
+        return {"fixes": [], "stats": {}}
+    res = apply_edits(md_lines, [{"finding_id": f["finding_id"], "summary": f.get("problem", ""),
+                                  "edits": f["edits"]} for f in fixes], warnings)
+    out_fixes = [{"finding_id": r["finding_id"], "problem": r.get("summary", ""), "edits": r["edits"]}
+                 for r in res["rewrites"]]
+    return {"fixes": out_fixes, "stats": res["stats"], "markdown": res["markdown"]}
 
 
 def flat_rewrites(result: dict) -> list[dict]:

@@ -172,6 +172,8 @@ def test_run_modes_answers_and_revise(tmp_path):
     class SeqLLM(FakeLLM):
         def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
             self.calls.append({"stage": stage, "user": user})
+            if stage == "revise_check":
+                return {"fixes": []}
             if stage == "recheck":
                 return {"decisions": [{"finding_id": "D-02", "status": "resolved", "reason": "ответ Q-02",
                                        "severity": "minor", "title": "", "problem": ""}], "candidates": []}
@@ -184,7 +186,7 @@ def test_run_modes_answers_and_revise(tmp_path):
     q2 = next(q for q in questions if "D-02" in q["finding_ids"])
     report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
     out = revise.run_modes(ctx, report, answers=f"{q2['id']}: A", do_revise=True, report_path=tmp_path / "r.md")
-    assert [c["stage"] for c in ctx.llm.calls] == ["recheck", "revise"]
+    assert [c["stage"] for c in ctx.llm.calls] == ["recheck", "revise", "revise_check"]
     assert out["clarification"]["resolved"] == 1
     assert q2["options"][0] in ctx.llm.calls[1]["user"], "ответ владельца подставляется в revise"
     assert Path(out["revised_file"]).name == "r.revised.md"
@@ -208,3 +210,40 @@ def test_inserted_block_gets_markdown_shape():
     assert out[i + 4] == "| REST type | GET [добавлено: D-03] |"
     assert out[i + 6:i + 10] == ["```json", '{"result":"OK","amount":50000}', "```", "[добавлено: D-03 — пример выше]"]
     assert out[i + 10] == "Статус 404 — карта не найдена. [добавлено: D-03]"
+
+
+def test_check_pass_fixes_conflict_introduced_by_edit():
+    """Второй проход: исправление на строках редакции, пометка объединяется, а не дублируется."""
+    findings = json.loads((FIX / "findings.json").read_text(encoding="utf-8"))["findings"]
+
+    class SeqLLM(FakeLLM):
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            self.calls.append({"stage": stage, "user": user})
+            if stage == "revise":
+                return {"rewrites": [{"finding_id": "D-02", "summary": "январь", "edits": [
+                    {"action": "replace", "line": 64, "old": "Февральский счётчик вырос на 4 000 ₸",
+                     "new": "Январский счётчик вырос на 4 000 ₸"}]}]}
+            # самопроверка идёт до шапки редакции: номера строк совпадают с исходными
+            return {"fixes": [{"finding_id": "D-02", "problem": "время без пояса", "edits": [
+                {"action": "replace", "line": 64, "old": "Покупка 31 января в 23:58",
+                 "new": "Покупка 31 января в 23:58 по UTC+5"}]}]}
+
+    ctx = FakeCtx(SeqLLM())
+    ctx.options = {"input": str(DOC)}
+    res = revise.run(ctx, findings)
+    md = res["revised_markdown"]
+    row = next(s for s in md.splitlines() if "Январский" in s)
+    assert row.startswith("| Покупка 31 января в 23:58 по UTC+5 на 4 000 ₸")
+    assert row.count("[изменено:") == 1 and row.endswith("[изменено: D-02] |")
+    check_user = ctx.llm.calls[1]["user"]
+    assert "[изменено: D-02]" in check_user and "<правки>" in check_user
+    assert res["stats"]["check_fixes"] == 1 and res["stats"]["check_edits"] == 1
+
+
+def test_check_pass_can_be_disabled():
+    findings = json.loads((FIX / "findings.json").read_text(encoding="utf-8"))["findings"]
+    ctx = FakeCtx(FakeLLM({"rewrites": [{"finding_id": "D-02", "summary": "", "edits": [
+        {"action": "replace", "line": 64, "old": "Февральский", "new": "Январский"}]}]}))
+    ctx.options = {"input": str(DOC), "revise_check": False}
+    revise.run(ctx, findings)
+    assert [c["stage"] for c in ctx.llm.calls] == ["revise"]

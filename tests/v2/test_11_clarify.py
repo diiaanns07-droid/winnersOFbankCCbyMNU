@@ -166,7 +166,7 @@ def test_schema_options_bounds():
     assert set(item["required"]) >= {"finding_ids", "to", "blocking", "question", "evidence", "options", "why"}
 
 
-@pytest.mark.parametrize("name", ["clarify", "recheck", "revise"])
+@pytest.mark.parametrize("name", ["clarify", "recheck", "revise", "revise_check"])
 def test_prompts_have_no_official_words(name):
     text = (ROOT / "src" / "bcc_review" / "v2" / "prompts" / f"{name}.md").read_text(encoding="utf-8").lower()
     for word in ("push", "savelimit", "тиын", "порог", "алматы", "ф-1", "ф-2", "кэшбэк", "₸", "alerts"):
