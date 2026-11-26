@@ -1,2 +1,7 @@
 out/
 deck.html
+# черновики до финального прогона: собираются build.py и shots.cjs; финальные добавляются через git add -f
+deck.pdf
+deck.pptx
+img/report_*.png
+img/web_*.png
