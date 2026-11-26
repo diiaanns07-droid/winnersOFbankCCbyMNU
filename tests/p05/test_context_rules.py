@@ -1,10 +1,8 @@
 """Доказательство 2 и ложные срабатывания: заголовок интерфейса, кнопки, примеры, цитаты клиента."""
-import re
-
 from bcc_review.analysis.individual import review_individual
 from bcc_review.criteria import load_criteria
 from tests.p05.docfix import block_of, requirement
-from tests.p05.helpers import cands_of, checks_of, doc_from_lines
+from tests.p05.helpers import cands_of, checks_of, doc_from_lines, wcodes
 
 
 def test_same_word_in_ui_heading_and_obligation():
@@ -31,7 +29,7 @@ def test_heading_block_inside_requirement_is_not_an_obligation():
     doc = doc_from_lines("# ТЗ", "## Функциональные требования", "### Быстрые платежи", "Платёж по шаблону проводится быстро.")
     head, body = block_of(doc, "Быстрые платежи"), block_of(doc, "Платёж по шаблону")
     req = {"id": "R1", "source_id": None, "text": "Быстрые платежи. Платёж по шаблону проводится быстро.",
-           "block_ids": [head["id"], body["id"]], "evidence": []}
+           "block_ids": [head["id"], body["id"]], "evidence": [], "review_status": "reviewed", "review_reason": None}
     res = review_individual(doc, [req])
     (cand,) = res["candidates"]
     assert [h["block_id"] for h in cand["hints"]] == [body["id"]]
@@ -54,7 +52,7 @@ def test_button_names_examples_and_customer_quotes_are_masked():
 def test_weak_word_is_unknown_with_question_not_a_defect():
     doc = doc_from_lines("# ТЗ", "## Функциональные требования", "- **Ф-1.** Курс конвертации фиксируется в момент авторизации операции.")
     res = review_individual(doc, [requirement(doc, "R1", "Ф-1", "Ф-1")])
-    chk = checks_of(res, "R1")["И7"]
+    chk = checks_of(res, "R1")["verifiable"]
     assert chk["status"] == "unknown" and chk["question"]
     assert res["candidates"] == []
 
@@ -63,8 +61,14 @@ def test_goal_section_uses_alternative_criterion_and_minor_severity():
     doc = doc_from_lines("# ТЗ", "## Цели", "Клиент оперативно узнаёт о расходах.")
     res = review_individual(doc, [requirement(doc, "R1", "оперативно")])
     chk = checks_of(res, "R1")
-    assert chk["И7"]["status"] == "na"  # цель валидируют, а не верифицируют
-    assert chk["И3"]["status"] == "issue" and chk["И3"]["severity"] == "minor"
+    assert chk["verifiable"]["status"] == "na"  # цель валидируют, а не верифицируют
+    assert chk["unambiguous"]["status"] == "issue" and chk["unambiguous"]["severity"] == "minor"
+
+
+def test_requirement_kind_from_inventory_overrides_section_role():
+    doc = doc_from_lines("# ТЗ", "## Прочее", "Клиент оперативно узнаёт о расходах.")
+    res = review_individual(doc, [requirement(doc, "R1", "оперативно", kind="goal")])
+    assert checks_of(res, "R1")["verifiable"]["status"] == "na"
 
 
 def test_open_list_loophole_and_dedup_across_requirements():
@@ -80,12 +84,12 @@ def test_open_list_loophole_and_dedup_across_requirements():
     reqs = [requirement(doc, "R1", "Ф-1", "Ф-1"), requirement(doc, "R2", "Ф-2", "Ф-2"),
             requirement(doc, "R3", "НФТ-1", "НФТ-1"), requirement(doc, "R4", "НФТ-2", "НФТ-2")]
     res = review_individual(doc, reqs)
-    assert checks_of(res, "R1")["И4"]["status"] == "issue"
-    assert checks_of(res, "R4")["И3"]["status"] == "issue"
+    assert checks_of(res, "R1")["complete"]["status"] == "issue"
+    assert checks_of(res, "R4")["unambiguous"]["status"] == "issue"
     speed = [c for c in res["candidates"] if c["hints"][0]["quote"] == "быстро"]
     assert len(speed) == 1 and speed[0]["req_ids"] == ["R2", "R3"]
     assert len(speed[0]["hints"]) == 2
-    assert checks_of(res, "R2")["И7"]["refs"] == checks_of(res, "R3")["И7"]["refs"] == [speed[0]["ref"]]
+    assert checks_of(res, "R2")["verifiable"]["candidate_refs"] == checks_of(res, "R3")["verifiable"]["candidate_refs"] == [speed[0]["ref"]]
 
 
 def test_placeholders_respect_table_semantics():
@@ -106,9 +110,15 @@ def test_placeholders_respect_table_semantics():
     res = review_individual(doc, reqs)
     assert cands_of(res, "R1") == []
     (sw,) = cands_of(res, "R2")
-    assert sw["severity"] == "minor" and sw["hints"][0]["quote"] == "**Swagger** | —"
+    assert sw["severity"] == "minor" and sw["kind"] == "placeholder" and sw["hints"][0]["quote"] == "Swagger | —"
     (tbd,) = cands_of(res, "R3")
     assert tbd["hints"][0]["quote"].endswith("TBD")
+
+
+def test_placeholder_with_markup_kept():
+    doc = doc_from_lines("# API", "## Общие параметры", "| **Swagger** | — |", keep_markup=True)
+    res = review_individual(doc, [requirement(doc, "R1", "Swagger")])
+    assert res["candidates"][0]["hints"][0]["quote"] == "**Swagger** | —"
 
 
 def test_stub_and_template_rows():
@@ -124,11 +134,11 @@ def test_stub_and_template_rows():
     reqs = [requirement(doc, "R1", "заполняются"), requirement(doc, "R2", "может быть протестировано")]
     res = review_individual(doc, reqs)
     stub = checks_of(res, "R1")
-    assert stub["И4"]["status"] == "issue" and stub["И4"]["severity"] == "minor"
-    assert {c["status"] for k, c in stub.items() if k != "И4"} == {"na"}
+    assert stub["complete"]["status"] == "issue" and stub["complete"]["severity"] == "minor"
+    assert {c["status"] for k, c in stub.items() if k != "complete"} == {"na"}
     assert {c["status"] for c in checks_of(res, "R2").values()} == {"na"}
     assert cands_of(res, "R2") == []
-    assert any(w.startswith("individual.template_rows") for w in res["warnings"])
+    assert "individual.template_rows" in wcodes(res)
 
 
 def test_design_decision_depends_on_document_level():
@@ -144,11 +154,11 @@ def test_design_decision_depends_on_document_level():
     )
     reqs = [requirement(doc, "R1", "И-1", "И-1"), requirement(doc, "R2", "И-2", "И-2"), requirement(doc, "R3", "Метод принимает")]
     res = review_individual(doc, reqs)
-    assert checks_of(res, "R1")["И2"]["status"] == "pass"
-    assert "ограничение" in checks_of(res, "R1")["И2"]["reason"]
-    assert checks_of(res, "R2")["И2"]["status"] == "unknown" and checks_of(res, "R2")["И2"]["question"]
-    assert checks_of(res, "R3")["И2"]["status"] == "pass"
-    assert "интерфейса" in checks_of(res, "R3")["И2"]["reason"]
+    assert checks_of(res, "R1")["appropriate"]["status"] == "pass"
+    assert "ограничение" in checks_of(res, "R1")["appropriate"]["reason"]
+    assert checks_of(res, "R2")["appropriate"]["status"] == "unknown" and checks_of(res, "R2")["appropriate"]["question"]
+    assert checks_of(res, "R3")["appropriate"]["status"] == "pass"
+    assert "интерфейса" in checks_of(res, "R3")["appropriate"]["reason"]
     assert res["candidates"] == []
 
 
@@ -165,12 +175,12 @@ def test_range_inclusivity():
     reqs = [requirement(doc, "R1", "Ф-1", "Ф-1"), requirement(doc, "R2", "Ф-2", "Ф-2"), requirement(doc, "R3", "`amount`")]
     res = review_individual(doc, reqs)
     r1 = checks_of(res, "R1")
-    assert r1["И3"]["status"] == "issue" and r1["И3"]["severity"] == "minor"
+    assert r1["unambiguous"]["status"] == "issue" and r1["unambiguous"]["severity"] == "minor"
     (cand,) = cands_of(res, "R1")
-    assert cand["hints"][0]["quote"] == "от 1 000 до 50 000" and "включительно" in cand["fix"]
-    r2 = checks_of(res, "R2")["И7"]
+    assert cand["hints"][0]["quote"] == "от 1 000 до 50 000" and "включительно" in cand["recommendation"]
+    r2 = checks_of(res, "R2")["verifiable"]
     assert r2["status"] == "pass" and "99 / 100 / 900 / 901" in r2["reason"]
-    r3 = checks_of(res, "R3")["И7"]
+    r3 = checks_of(res, "R3")["verifiable"]
     assert r3["status"] == "pass" and "включительно" in r3["reason"]
 
 

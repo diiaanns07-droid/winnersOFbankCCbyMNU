@@ -46,10 +46,13 @@ def _rx(pattern: str, where: str) -> re.Pattern[str]:
 
 @dataclass(frozen=True)
 class Criterion:
+    """Критерий: ``code`` — код контракта v1 (``unambiguous``), ``short`` — русская метка (``И3``)."""
+
     code: str
-    slug: str
+    short: str
     scope: str
     name: str
+    kind: str
     definition: str
     question: str
     source: tuple[str, ...]
@@ -57,13 +60,22 @@ class Criterion:
     checklist: tuple[str, ...] = ()
     pass_hint: str = ""
 
+    @property
+    def slug(self) -> str:  # совместимость: код контракта и есть slug
+        return self.code
+
+    @property
+    def label(self) -> str:
+        return f"{self.short} {self.name}"
+
     def applies(self, role: str) -> bool:
         return role not in self.not_for
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "code": self.code,
-            "slug": self.slug,
+            "short": self.short,
+            "kind": self.kind,
             "scope": self.scope,
             "name": self.name,
             "definition": self.definition,
@@ -165,12 +177,13 @@ class Criteria:
     patterns: dict[str, re.Pattern[str]]
     checklist: tuple[dict[str, Any], ...]
     individual: dict[str, Any]
+    kind_alias: dict[str, str] = field(default_factory=dict)
     _by_key: dict[str, Criterion] = field(default_factory=dict, repr=False)
 
     # --- справочник критериев -------------------------------------------------
     def __post_init__(self) -> None:
         for c in self.criteria:
-            for key in (c.code, c.slug, c.code.lower(), c.slug.lower(), c.name.lower()):
+            for key in (c.code, c.short, c.code.lower(), c.name.lower()):
                 self._by_key[key] = c
 
     @property
@@ -185,7 +198,7 @@ class Criteria:
         return c
 
     def resolve(self, key: str | None) -> Criterion | None:
-        """Код («И3»), slug («unambiguous») или русское имя → критерий."""
+        """Код контракта («unambiguous»), метка («И3») или русское имя → критерий."""
         if not key:
             return None
         k = str(key).strip()
@@ -195,8 +208,8 @@ class Criteria:
         for alias, c in self._by_key.items():
             if alias.lower().replace("ё", "е") == k:
                 return c
-        # «И3 Однозначность», «И3: ...»
-        m = re.match(r"^\s*([ИН]\d+)", str(key))
+        # «И3 Однозначность», «И3: ...», «unambiguous (И3)»
+        m = re.match(r"^\s*([ИН]\d+|[a-z_]+)", str(key))
         if m and m.group(1) in self._by_key:
             return self._by_key[m.group(1)]
         return None
@@ -232,6 +245,15 @@ class Criteria:
         return None
 
     # --- контекст ---------------------------------------------------------------
+    def role_for_kind(self, kind: str | None) -> str | None:
+        """Роль по ``Requirement.kind`` от №04 (таблица ``[context.kind_alias]``)."""
+        if not kind:
+            return None
+        k = str(kind).strip().lower()
+        if k in {r.id for r in self.roles}:
+            return k
+        return self.kind_alias.get(k)
+
     def role_for(self, section: Iterable[str]) -> str:
         """Роль пункта по самому глубокому подходящему заголовку раздела."""
         for heading in reversed([h for h in section if h]):
@@ -257,10 +279,11 @@ class Criteria:
 
     # --- отрисовка для промптов и отчёта ------------------------------------------
     def render_criteria(self, scope: str = "requirement") -> str:
-        lines = ["| Код | Критерий | Что проверить | Источник | Не применяется к |", "| :-- | :-- | :-- | :-- | :-- |"]
+        lines = ["| Код (criterion) | Метка | Критерий | Что проверить | Источник | Не применяется к |",
+                 "| :-- | :-- | :-- | :-- | :-- | :-- |"]
         for c in self.for_scope(scope):
             nf = ", ".join(sorted(c.not_for)) or "—"
-            lines.append(f"| {c.code} | {c.name} ({c.slug}) | {c.definition} Вопрос: {c.question} | {'; '.join(c.source)} | {nf} |")
+            lines.append(f"| {c.code} | {c.short} | {c.name} | {c.definition} Вопрос: {c.question} | {'; '.join(c.source)} | {nf} |")
         return "\n".join(lines)
 
     def render_severity(self) -> str:
@@ -338,9 +361,10 @@ def _parse(raw: dict[str, Any], *, fingerprint: str, source_path: str) -> Criter
         criteria.append(
             Criterion(
                 code=code,
-                slug=str(_req(c, "slug", where)),
+                short=str(c.get("short", code)),
                 scope=scope,
                 name=str(_req(c, "name", where)),
+                kind=str(c.get("kind", "other")),
                 definition=str(_req(c, "definition", where)),
                 question=str(_req(c, "question", where)),
                 source=tuple(_req(c, "source", where)),
@@ -479,6 +503,7 @@ def _parse(raw: dict[str, Any], *, fingerprint: str, source_path: str) -> Criter
         patterns=patterns,
         checklist=checklist,
         individual=dict(raw.get("individual", {})),
+        kind_alias={str(k).lower(): str(v) for k, v in ctx.get("kind_alias", {}).items()},
     )
 
 

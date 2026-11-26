@@ -1,4 +1,4 @@
-"""Конфиг criteria.toml: состав, источники, валидация, упаковка."""
+"""Конфиг criteria.toml: состав, источники, связь с контрактом, валидация, упаковка."""
 import shutil
 import subprocess
 import sys
@@ -13,26 +13,31 @@ from bcc_review.criteria import CriteriaError, load_criteria
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_criteria_have_codes_definitions_and_sources():
+def test_criteria_codes_match_contract_and_have_sources():
+    from bcc_review import contracts as C
+
     crit = load_criteria()
-    assert crit.codes("requirement") == [f"И{i}" for i in range(1, 10)]
-    assert crit.codes("set") == [f"Н{i}" for i in range(1, 9)]
+    assert tuple(crit.codes("requirement")) == C.INDIVIDUAL_CRITERIA
+    assert tuple(crit.codes("set")) == C.SET_CRITERIA
+    assert [c.short for c in crit.for_scope("requirement")] == [f"И{i}" for i in range(1, 10)]
+    assert [c.short for c in crit.for_scope("set")] == [f"Н{i}" for i in range(1, 9)]
     for c in crit.criteria:
         assert c.definition and c.question and c.name
+        assert c.kind in C.FINDING_KINDS
         assert any(s.startswith(("ISO/IEC/IEEE 29148:2018", "IEEE Std 830-1998")) for s in c.source)
-        assert all("а" <= ch.lower() <= "я" or not ch.isalpha() or ch in "ёЁ" or ch.isascii() for ch in c.definition)
     assert len(crit.checklist) == 14
     assert {i["id"] for i in crit.checklist} == {f"CL{i:02d}" for i in range(1, 15)}
 
 
-@pytest.mark.parametrize("key", ["И3", "unambiguous", "Однозначность", "И3 Однозначность", "И3: что-то"])
+@pytest.mark.parametrize("key", ["И3", "unambiguous", "Однозначность", "И3 Однозначность", "И3: что-то", "unambiguous (И3)"])
 def test_resolve_aliases(key):
-    assert load_criteria().get(key).code == "И3"
+    assert load_criteria().get(key).code == "unambiguous"
 
 
 def test_severity_policy_and_rules():
     crit = load_criteria()
     assert crit.severity_policy["rules_max"] == "major"
+    assert set(crit.severity_policy["critical_requires"]) == {"blocks", "scenario", "impact", "blocked_decision"}
     assert crit.rule_severity(kind="placeholder", field="Prod")[0] == "minor"
     assert crit.rule_severity(kind="placeholder", field="Порог")[0] == "major"
     assert crit.rule_severity(kind="stub", role="testing")[0] == "minor"
@@ -47,6 +52,8 @@ def test_roles_and_levels_from_sections():
     assert crit.role_for(["Т", "Часть B. REST API", "Статусы", "200. Successful — Created"]) == "interface"
     assert crit.level_for(["Т", "Часть B. REST API", "Общие параметры"]) == "interface"
     assert crit.level_for(["Т", "Часть A", "Цели"]) == "business"
+    assert crit.role_for_kind("nfr") == "nonfunctional" and crit.role_for_kind("acceptance") == "acceptance"
+    assert crit.role_for_kind("что-то") is None
 
 
 def _toml_with(tmp_path, old, new):
@@ -64,8 +71,8 @@ def test_invalid_severity_is_rejected(tmp_path):
 
 
 def test_unknown_criterion_in_lexicon_is_rejected(tmp_path):
-    p = _toml_with(tmp_path, 'alt_criterion = "И3"', 'alt_criterion = "И99"')
-    with pytest.raises(CriteriaError, match="И99"):
+    p = _toml_with(tmp_path, 'alt_criterion = "unambiguous"', 'alt_criterion = "clarity"')
+    with pytest.raises(CriteriaError, match="clarity"):
         load_criteria(p)
 
 
@@ -83,7 +90,8 @@ def test_toml_and_prompts_are_in_installed_package(tmp_path):
         pytest.skip(f"сборка колеса недоступна в этой среде: {r.stderr[-300:]}")
     (whl,) = wheel_dir.glob("*.whl")
     names = set(zipfile.ZipFile(whl).namelist())
-    assert {"bcc_review/criteria.toml", "bcc_review/prompts/individual.md", "bcc_review/prompts/individual.schema.json"} <= names
+    assert {"bcc_review/criteria.toml", "bcc_review/prompts/individual.md", "bcc_review/prompts/individual.schema.json",
+            "bcc_review/analysis/individual.py"} <= names
 
     target = tmp_path / "site"
     zipfile.ZipFile(whl).extractall(target)

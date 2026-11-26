@@ -20,14 +20,17 @@ title = "IEEE Recommended Practice for Software Requirements Specifications"
 note = "4.3 — свойства хорошей спецификации (4.3.1–4.3.8)."
 
 # ---------------------------------------------------------------------------
-# Критерии отдельного требования (scope = "requirement")
+# Критерии отдельного требования (scope = "requirement").
+# code — код контракта v1 (contracts.INDIVIDUAL_CRITERIA / SET_CRITERIA), его пишут в checks и candidates;
+# short — короткая русская метка для отчёта; kind — вид находки по умолчанию (contracts.FINDING_KINDS).
 # not_for — роли пунктов, к которым критерий не применяется (статус na).
 # Роли вычисляются по заголовкам разделов, см. [[context.role]].
 # ---------------------------------------------------------------------------
 
 [[criterion]]
-code = "И1"
-slug = "necessary"
+code = "necessary"
+short = "И1"
+kind = "other"
 scope = "requirement"
 name = "Необходимость"
 definition = "Без пункта в продукте останется пробел. Пункт связан с целью или бизнес-требованием и не повторяет другой пункт."
@@ -38,8 +41,9 @@ not_for = ["metadata", "template"]
 checklist = ["CL01", "CL10"]
 
 [[criterion]]
-code = "И2"
-slug = "appropriate"
+code = "appropriate"
+short = "И2"
+kind = "design_in_requirement"
 scope = "requirement"
 name = "Уместность уровня"
 definition = "Пункт говорит, что нужно, на уровне своего документа. Решение реализации допустимо, если документ описывает интерфейс или решение прямо задано как обязательное внешнее ограничение."
@@ -50,8 +54,9 @@ not_for = ["goal", "acceptance", "metadata", "testing", "template"]
 checklist = ["CL09"]
 
 [[criterion]]
-code = "И3"
-slug = "unambiguous"
+code = "unambiguous"
+short = "И3"
+kind = "ambiguity"
 scope = "requirement"
 name = "Однозначность"
 definition = "У формулировки одно толкование: определены субъект, термины, единицы, часовой пояс и границы диапазонов."
@@ -62,8 +67,9 @@ not_for = ["template"]
 checklist = ["CL06", "CL08"]
 
 [[criterion]]
-code = "И4"
-slug = "complete"
+code = "complete"
+short = "И4"
+kind = "incomplete"
 scope = "requirement"
 name = "Полнота"
 definition = "Указаны субъект, условие, действие, ограничения, реакция на ошибку и граничные случаи. Нет заглушек и пустых значений."
@@ -74,8 +80,9 @@ not_for = ["template"]
 checklist = ["CL07", "CL13"]
 
 [[criterion]]
-code = "И5"
-slug = "singular"
+code = "singular"
+short = "И5"
+kind = "non_singular"
 scope = "requirement"
 name = "Единичность"
 definition = "Один пункт — одно обязательство. Несколько независимых правил в одном пункте мешают трассировке и тестированию."
@@ -86,8 +93,9 @@ not_for = ["metadata", "template"]
 checklist = []
 
 [[criterion]]
-code = "И6"
-slug = "feasible"
+code = "feasible"
+short = "И6"
+kind = "infeasible"
 scope = "requirement"
 name = "Реализуемость"
 definition = "Пункт выполним при описанной архитектуре, данных и ограничениях. Нужные данные и компоненты существуют."
@@ -98,8 +106,9 @@ not_for = ["goal", "acceptance", "metadata", "testing", "template"]
 checklist = ["CL05", "CL09", "CL11"]
 
 [[criterion]]
-code = "И7"
-slug = "verifiable"
+code = "verifiable"
+short = "И7"
+kind = "unverifiable"
 scope = "requirement"
 name = "Проверяемость"
 definition = "Выполнение можно объективно доказать тестом, анализом, инспекцией или демонстрацией: есть измеримая граница и наблюдаемый результат."
@@ -110,8 +119,9 @@ not_for = ["goal", "metadata", "template"]
 checklist = ["CL06"]
 
 [[criterion]]
-code = "И8"
-slug = "correct"
+code = "correct"
+short = "И8"
+kind = "incorrect"
 scope = "requirement"
 name = "Корректность"
 definition = "Пункт верно отражает потребность и предметную область и не противоречит другим пунктам и критериям приёмки."
@@ -122,8 +132,9 @@ not_for = ["template"]
 checklist = ["CL08"]
 
 [[criterion]]
-code = "И9"
-slug = "conforming"
+code = "conforming"
+short = "И9"
+kind = "format"
 scope = "requirement"
 name = "Соответствие шаблону"
 definition = "Пункт оформлен по шаблону документа: единая терминология, идентификатор там, где шаблон его предусматривает."
@@ -138,8 +149,9 @@ checklist = ["CL02", "CL14"]
 # ---------------------------------------------------------------------------
 
 [[criterion]]
-code = "Н1"
-slug = "set_complete"
+code = "set_complete"
+short = "Н1"
+kind = "omission"
 scope = "set"
 name = "Полнота набора"
 definition = "Описаны все функции, данные, интерфейсы, ошибки и роли, которые следуют из целей и процесса. Для каждого чтения есть источник, для каждого хранения — поле."
@@ -148,8 +160,9 @@ source = ["ISO/IEC/IEEE 29148:2018, 5.2.6 Complete", "IEEE Std 830-1998, 4.3.3"]
 checklist = ["CL01", "CL03", "CL04", "CL07", "CL12"]
 
 [[criterion]]
-code = "Н2"
-slug = "consistent"
+code = "set_consistent"
+short = "Н2"
+kind = "conflict"
 scope = "set"
 name = "Согласованность"
 definition = "Пункты не дают несовместимых исходов для одного сценария; термины, типы и единицы совпадают."
@@ -158,8 +171,9 @@ source = ["ISO/IEC/IEEE 29148:2018, 5.2.6 Consistent", "IEEE Std 830-1998, 4.3.4
 checklist = ["CL08", "CL13"]
 
 [[criterion]]
-code = "Н3"
-slug = "set_feasible"
+code = "set_feasible"
+short = "Н3"
+kind = "infeasible"
 scope = "set"
 name = "Осуществимость набора"
 definition = "Весь набор выполним вместе в рамках архитектуры, сроков и ограничений."
@@ -168,8 +182,9 @@ source = ["ISO/IEC/IEEE 29148:2018, 5.2.6 Feasible"]
 checklist = ["CL09"]
 
 [[criterion]]
-code = "Н4"
-slug = "comprehensible"
+code = "set_comprehensible"
+short = "Н4"
+kind = "terminology"
 scope = "set"
 name = "Понятность"
 definition = "Из набора понятно, что ожидается от системы и как она связана с процессом; есть глоссарий для неочевидных терминов."
@@ -178,8 +193,9 @@ source = ["ISO/IEC/IEEE 29148:2018, 5.2.6 Comprehensible"]
 checklist = ["CL02", "CL12"]
 
 [[criterion]]
-code = "Н5"
-slug = "validatable"
+code = "set_validatable"
+short = "Н5"
+kind = "traceability"
 scope = "set"
 name = "Возможность валидации"
 definition = "Можно показать, что выполнение набора достигает целей: критерии приёмки связаны с требованиями и покрывают их."
@@ -188,8 +204,9 @@ source = ["ISO/IEC/IEEE 29148:2018, 5.2.6 Able to be validated"]
 checklist = ["CL06"]
 
 [[criterion]]
-code = "Н6"
-slug = "ranked"
+code = "ranked"
+short = "Н6"
+kind = "other"
 scope = "set"
 name = "Ранжирование"
 definition = "У требований указаны важность и стабильность, чтобы планировать работу и изменения."
@@ -198,8 +215,9 @@ source = ["IEEE Std 830-1998, 4.3.5"]
 checklist = []
 
 [[criterion]]
-code = "Н7"
-slug = "modifiable"
+code = "modifiable"
+short = "Н7"
+kind = "duplicate"
 scope = "set"
 name = "Модифицируемость"
 definition = "Каждое правило описано в одном месте, документ версионирован, изменения прослеживаются."
@@ -208,8 +226,9 @@ source = ["IEEE Std 830-1998, 4.3.7"]
 checklist = ["CL14"]
 
 [[criterion]]
-code = "Н8"
-slug = "traceable"
+code = "traceable"
+short = "Н8"
+kind = "traceability"
 scope = "set"
 name = "Прослеживаемость"
 definition = "У требований есть идентификаторы, источник (задача, бизнес-требование) и связь с критериями приёмки и тестами."
@@ -227,85 +246,85 @@ checklist = ["CL01", "CL10"]
 id = "CL01"
 text = "Техническое требование зафиксировано и покрывает бизнес-требование"
 match = 'покрывает бизнес-требован'
-criteria = ["И1", "Н1", "Н8"]
+criteria = ["necessary", "set_complete", "traceable"]
 
 [[checklist]]
 id = "CL02"
 text = "Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)"
 match = 'структурированное описание'
-criteria = ["И9", "Н4"]
+criteria = ["conforming", "set_comprehensible"]
 
 [[checklist]]
 id = "CL03"
 text = "Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений"
 match = 'sequence'
-criteria = ["Н1", "Н2"]
+criteria = ["set_complete", "set_consistent"]
 
 [[checklist]]
 id = "CL04"
 text = "Требование покрывает спецификацию UX/UI дизайна"
 match = 'ux/ui|ux\s*/\s*ui'
-criteria = ["Н1"]
+criteria = ["set_complete"]
 
 [[checklist]]
 id = "CL05"
 text = "Реализация задачи/проекта предусматривает схему отката решений"
 match = 'отката'
-criteria = ["И6", "Н1"]
+criteria = ["feasible", "set_complete"]
 
 [[checklist]]
 id = "CL06"
 text = "Требование может быть протестировано"
 match = 'может быть протестирован'
-criteria = ["И7", "Н5"]
+criteria = ["verifiable", "set_validatable"]
 
 [[checklist]]
 id = "CL07"
 text = "Требование предусматривает модель данных или поток, содержит описание"
 match = 'модель данных'
-criteria = ["И4", "Н1"]
+criteria = ["complete", "set_complete"]
 
 [[checklist]]
 id = "CL08"
 text = "Требование не имеет противоречий или явных показателей операционных рисков"
 match = 'противоречий'
-criteria = ["И8", "Н2"]
+criteria = ["correct", "set_consistent"]
 
 [[checklist]]
 id = "CL09"
 text = "Требование содержит архитектуру и согласовано с архитекторами"
 match = 'архитектур\w* и согласован'
-criteria = ["И2", "И6", "Н3"]
+criteria = ["appropriate", "feasible", "set_feasible"]
 
 [[checklist]]
 id = "CL10"
 text = "Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами"
 match = 'иные продукты'
-criteria = ["Н1", "Н8"]
+criteria = ["set_complete", "traceable"]
 
 [[checklist]]
 id = "CL11"
 text = "Структура требований не несёт изменений и рисков информационной безопасности"
 match = 'информационной безопасности'
-criteria = ["И4", "И6"]
+criteria = ["complete", "feasible"]
 
 [[checklist]]
 id = "CL12"
 text = "В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки"
 match = 'полного бизнес-процесса'
-criteria = ["Н1", "Н4"]
+criteria = ["set_complete", "set_comprehensible"]
 
 [[checklist]]
 id = "CL13"
 text = "Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия"
 match = 'интеграционн\w+ характер'
-criteria = ["И4", "Н2"]
+criteria = ["complete", "set_consistent"]
 
 [[checklist]]
 id = "CL14"
 text = "Поддерживается версионность документа / зафиксирована"
 match = 'версионност'
-criteria = ["И9", "Н7"]
+criteria = ["conforming", "modifiable"]
 
 # ---------------------------------------------------------------------------
 # Серьёзность. Калибруется через конкретную невозможность однозначно
@@ -333,8 +352,9 @@ test = "Подтверди, что исправление не меняет ни
 [severity.policy]
 # Детерминированные правила никогда не ставят critical: им не хватает контекста сценария.
 rules_max = "major"
-# critical от модели требует полей blocks (implement|verify|both) и scenario; иначе понижается.
-critical_requires = ["blocks", "scenario"]
+# critical от модели требует blocks (implement|verify|both), scenario, impact и blocked_decision; иначе понижается.
+# Те же impact и blocked_decision движок требует от критичного замечания по контракту v1.
+critical_requires = ["blocks", "scenario", "impact", "blocked_decision"]
 critical_fallback = "major"
 # Если замечание не мешает ни реализации, ни проверке (blocks = none), предел — minor.
 no_block_max = "minor"
@@ -443,7 +463,7 @@ why = "Несколько обязательств в одном пункте з
 # Пределы серьёзности для любых кандидатов, включая ответы модели.
 [[severity.cap]]
 id = "cap.release-field"
-criterion = ["И4"]
+criterion = ["complete"]
 quote = '\bprod\b|swagger'
 max = "major"
 why = "Отсутствие адреса промышленного контура или Swagger само по себе не блокирует разработку и тестирование."
@@ -512,6 +532,30 @@ match = 'функциональн|требовани'
 default_role = "functional"
 default_level = "business"
 
+# Requirement.kind от №04 точнее заголовков: если вид известен, роль берётся из этой таблицы.
+[context.kind_alias]
+functional = "functional"
+business = "functional"
+nonfunctional = "nonfunctional"
+non_functional = "nonfunctional"
+nfr = "nonfunctional"
+performance = "nonfunctional"
+data = "data"
+integration = "integration"
+api = "interface"
+interface = "interface"
+api_contract = "interface"
+ui = "ui"
+goal = "goal"
+business_goal = "goal"
+acceptance = "acceptance"
+acceptance_criterion = "acceptance"
+testing = "testing"
+process = "process"
+architecture = "process"
+metadata = "metadata"
+template = "metadata"
+
 [[context.level]]
 id = "interface"
 title = "Спецификация интерфейса"
@@ -524,7 +568,7 @@ title = "Бизнес-требования"
 match = ''
 note = "Решения реализации (технологии, таблицы, протоколы) уместны, только если прямо заданы как обязательное ограничение."
 
-# Признаки явно заданного внешнего ограничения для критерия И2.
+# Признаки явно заданного внешнего ограничения для критерия appropriate (И2).
 [context.constraint]
 markers = 'обязательн\w*\s+(?:использ|применя|ограничени)|требовани\w* (?:регулятора|иб|информационной безопасности|ндб|нацбанка)|стандарт\w* банка|по требованию|согласно (?:политик|стандарт|регламент)|ограничени\w* (?:платформы|банка|регулятора)|должн\w* использовать'
 design_terms = '\b(?:rest|get|post|put|patch|delete|json|xml|kafka|rabbitmq|redis|postgres\w*|oracle|sql|таблиц\w*|микросервис\w*|endpoint|эндпоинт\w*|топик\w*|очеред\w*)\b'
@@ -585,8 +629,8 @@ quantity = '(?:не более|не менее|не выше|не ниже|до|
 [[lexicon.vague]]
 id = "time"
 title = "Неизмеримый срок"
-criterion = "И7"
-alt_criterion = "И3"
+criterion = "verifiable"
+alt_criterion = "unambiguous"
 resolve = "time"
 strong = ['быстр\w*', 'оперативн\w*', 'своевременн\w*', 'мгновенн\w*', 'незамедлительн\w*', 'в реальном времени', 'в кратчайш\w+ срок\w*', 'как можно скорее', 'без задерж\w*']
 weak = ['в момент', 'немедленн\w*', 'сразу же']
@@ -596,8 +640,8 @@ fix = "Заменить «{term}» на «не позднее <уточнить 
 [[lexicon.vague]]
 id = "usability"
 title = "Субъективное качество интерфейса"
-criterion = "И7"
-alt_criterion = "И3"
+criterion = "verifiable"
+alt_criterion = "unambiguous"
 resolve = "quantity"
 strong = ['удобн\w*', 'интуитивн\w*', 'дружелюбн\w*', 'user[- ]friendly', 'красив\w*', 'наглядн\w*', 'современн\w*']
 weak = ['понятн\w*', 'легк\w*', 'просто\b']
@@ -607,8 +651,8 @@ fix = "Заменить «{term}» наблюдаемым критерием: «
 [[lexicon.vague]]
 id = "performance"
 title = "Неизмеримая производительность или объём"
-criterion = "И7"
-alt_criterion = "И3"
+criterion = "verifiable"
+alt_criterion = "unambiguous"
 resolve = "quantity"
 strong = ['эффективн\w*', 'оптимальн\w*', 'высок\w* производительн\w*', 'больш\w* (?:количеств|объ[её]м|нагрузк)\w*', 'достаточн\w*', 'приемлем\w*', 'разумн\w*']
 weak = ['значительн\w*', 'существенн\w*']
@@ -618,8 +662,8 @@ fix = "Заменить «{term}» числовой границей: «не б�
 [[lexicon.vague]]
 id = "quality"
 title = "Неизмеримое качество"
-criterion = "И7"
-alt_criterion = "И3"
+criterion = "verifiable"
+alt_criterion = "unambiguous"
 resolve = "quantity"
 strong = ['надёжн\w*', 'надежн\w*', 'стабильн\w*', 'адекватн\w*', 'нормальн\w*', 'как правило', 'в основном', 'при прочих равных']
 weak = ['корректн\w*', 'правильн\w*', 'безопасн\w*', 'обычно']
@@ -629,8 +673,8 @@ fix = "Заменить «{term}» наблюдаемым результатом
 [[lexicon.vague]]
 id = "loophole"
 title = "Лазейка: условие обязательства не задано"
-criterion = "И3"
-alt_criterion = "И3"
+criterion = "unambiguous"
+alt_criterion = "unambiguous"
 resolve = "none"
 strong = ['по возможности', 'при необходимости', 'если возможно', 'если требуется', 'по усмотрению', 'при желании', 'в случае необходимости', 'желательно', 'по мере возможности']
 weak = ['может быть']
@@ -640,8 +684,8 @@ fix = "Заменить «{term}» явным условием: «если <ут
 [[lexicon.vague]]
 id = "open_list"
 title = "Открытый перечень"
-criterion = "И4"
-alt_criterion = "И4"
+criterion = "complete"
+alt_criterion = "complete"
 resolve = "none"
 strong = ['и т\.\s?д\.?', 'и т\.\s?п\.?', 'и др\.', 'и пр\.', 'и прочее', 'и прочие', 'и так далее', 'и далее', 'и тому подобное', 'и другие']
 weak = []
@@ -653,7 +697,8 @@ fix = "Заменить «{term}» закрытым перечнем: «<уто�
 # ---------------------------------------------------------------------------
 
 [individual]
+# Требований в одном вызове ask (на кейсе BCC 27 пунктов → 2 вызова).
 batch_size = 15
-full_document_chars = 60000
-parent_context_chars = 4000
+# Сколько блоков родительского раздела просить у движка для каждого пункта (context.block_ids).
+parent_context_blocks = 40
 max_quote_chars = 300
