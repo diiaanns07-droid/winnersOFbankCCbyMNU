@@ -687,7 +687,7 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str]) -> N
     if f["severity"] != "minor" and f["criterion"] in {"conforming", "ranked"} and _NO_ID_RE.search(
             f["title"] + " " + f["problem"]):
         f["severity"] = "minor"
-    if f["severity"] == "minor" and f["blocks"] == "both":
+    if f["severity"] == "minor":
         f["blocks"] = "none"
 
 
@@ -782,9 +782,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
                 continue
             ids.append(cid)
         if not ids:
-            if f.get("candidate_ids"):
-                continue
-            _warn(ctx, warnings, f"судья: дефект {_cut(f.get('title'), 60)!r} без кандидатов отброшен")
+            if not f.get("candidate_ids") and _s(f.get("title")):
+                _warn(ctx, warnings, f"судья: дефект {_cut(f.get('title'), 60)!r} без кандидатов отброшен")
             continue
         for cid in ids:
             placed[cid] = key
@@ -1039,8 +1038,9 @@ def _render_check(f: dict, members: list[dict]) -> str:
 
 def _check_severity(ctx: Any, response: dict, by_id: dict[str, dict], warnings: list[str]) -> dict:
     """Второй короткий вызов: перепроверка critical и major по шкале; уровень можно только понизить."""
+    response = {**response, "findings": [dict(f) for f in response.get("findings") or []]}  # ответ модели не меняем
     todo = []
-    for f in response.get("findings") or []:
+    for f in response["findings"]:
         if _s(f.get("severity")) not in {"critical", "major"}:
             continue
         members = [by_id[c] for c in (_s(x) for x in f.get("candidate_ids") or []) if c in by_id]
@@ -1074,8 +1074,10 @@ def _check_severity(ctx: Any, response: dict, by_id: dict[str, dict], warnings: 
         changes[_s(f.get("key"))] = {"from": old, "to": new, "reason": _cut(ch.get("reason"), 300),
                                      "basis": _cut(ch.get("basis"), 200)}
     out = {**response, "_checks": changes}
-    if any(v["from"] == "critical" for v in changes.values()):
-        out["verdict_summary"] = _s(data.get("verdict_summary"))  # пусто → код напишет сам
+    if changes:
+        new_summary = _s(data.get("verdict_summary"))
+        if new_summary or any(v["from"] == "critical" for v in changes.values()):
+            out["verdict_summary"] = new_summary  # пусто после понижения critical → код напишет сам
     if changes:
         down = [v for v in changes.values()]
         _warn(ctx, warnings, f"проверка серьёзности понизила {len(down)} дефект(ов): "

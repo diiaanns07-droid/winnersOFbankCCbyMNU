@@ -22,11 +22,17 @@ FX = ROOT / "tests" / "v2" / "fixtures" / "10_judge"
 def replay(case: str, doc: Path, segment: Path):
     cands = json.loads((FX / f"{case}.candidates.json").read_text(encoding="utf-8"))["candidates"]
     resp = json.loads((FX / f"{case}.judge_sonnet.json").read_text(encoding="utf-8"))
+    check = FX / f"{case}.check_sonnet.json"
     reqs = json.loads(segment.read_text(encoding="utf-8"))["requirements"]
     for i, r in enumerate(reqs, 1):
         r.setdefault("id", f"R-{i:02d}")
-    llm = FakeLLM(resp)
-    res = judge.run(Ctx(llm, view=simple_view(doc), requirements=reqs), cands)
+    if check.exists():
+        llm = FakeLLM(resp, json.loads(check.read_text(encoding="utf-8")))
+        ctx = Ctx(llm, view=simple_view(doc), requirements=reqs, options={})
+    else:
+        llm = FakeLLM(resp)
+        ctx = Ctx(llm, view=simple_view(doc), requirements=reqs)
+    res = judge.run(ctx, cands)
     return cands, res, llm
 
 
@@ -62,3 +68,27 @@ def test_clean_base_replay():
     v = judge.compute_verdict(res["findings"])
     assert v["development"] != "no" and v["testing"] != "no"
     assert res["checklist_source"] == "bank" and len(res["checklist"]) == 14
+
+
+def test_official_full_69_candidates_replay():
+    """69 кандидатов (4 линзы, набор, правила) → компактная подача, 25–45 дефектов, К1–К4 critical."""
+    cands, res, llm = replay("official.full", ROOT / "release/input/requirements.md",
+                             ROOT / "tests/v2/fixtures/official/segment.json")
+    assert len(cands) == 69 and len(llm.calls) == 2
+    assert "  + C-" in llm.calls[0]["user"]          # компактная подача кластеров
+    all_placed(res, [c["id"] for c in cands])
+    assert 25 <= len(res["findings"]) <= 45
+    crit = [f for f in res["findings"] if f["severity"] == "critical"]
+    assert 3 <= len(crit) <= 7
+    for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}):
+        assert any(need <= lines(f) for f in crit), need
+    assert res["severity_changes"]                   # вторая проверка применена
+    assert not any(f["severity"] == "critical" and f["kind"] in judge.NEVER_CRITICAL_KINDS for f in res["findings"])
+
+
+def test_clean_base_full_replay():
+    base = ROOT / "evaluation/dev/corpus/cases/autopay.base/source.md"
+    cands, res, _ = replay("autopay.base.full", base, ROOT / "tests/v2/fixtures/autopay.base/segment.json")
+    all_placed(res, [c["id"] for c in cands])
+    assert not [f for f in res["findings"] if f["severity"] == "critical"]
+    assert judge.compute_verdict(res["findings"])["development"] != "no"
