@@ -888,6 +888,13 @@ def _coverage(c: _Ctx) -> list[str]:
     if not trace and not checked:
         return out + ["Трассировка не выполнялась" + (" (режим без модели)." if c.offline else "."), ""]
     covered, rows, bare = 0, [], []
+    # одинаковая заметка у многих непокрытых требований («трассировка не построена») — одной строкой
+    note_count: dict[str, int] = {}
+    for rid in rows_ids:
+        t = trace.get(rid, {})
+        if not (set(t.get("verified_by") or []) | checked.get(rid, set())) and t.get("note"):
+            note_count[t["note"]] = note_count.get(t["note"], 0) + 1
+    grouped: dict[str, list[str]] = {}
     for rid in rows_ids:
         t = trace.get(rid, {})
         by = set(t.get("verified_by") or []) | checked.get(rid, set())
@@ -895,6 +902,9 @@ def _coverage(c: _Ctx) -> list[str]:
             covered += 1
         elif not t.get("note"):
             bare.append(rid)
+            continue
+        elif note_count.get(t["note"], 0) >= 3:
+            grouped.setdefault(t["note"], []).append(rid)
             continue
         cells = []
         for aid in acc_ids:
@@ -907,8 +917,11 @@ def _coverage(c: _Ctx) -> list[str]:
         rows.append([c.req_label(rid)] + cells + [cell(t.get("note") or ("нет критерия приёмки" if not by else ""))])
     out += [f"Покрыто приёмкой {covered} из {len(rows_ids)} требований, которые должны проверяться. "
             f"✓ — критерий проверяет требование, ⛔ — критерий противоречит требованию, «·» — не проверяет.", ""]
-    out += table(["Требование"] + [c.req_label(a) for a in acc_ids] + ["Чего не хватает"], rows,
-                 [":---"] + [":---:"] * len(acc_ids) + [":---"])
+    if rows:
+        out += table(["Требование"] + [c.req_label(a) for a in acc_ids] + ["Чего не хватает"], rows,
+                     [":---"] + [":---:"] * len(acc_ids) + [":---"])
+    for note, ids in grouped.items():
+        out += ["", f"Без критерия приёмки — {cell(note)} ({len(ids)}): " + ", ".join(c.req_label(r) for r in ids) + "."]
     if bare:
         out += ["", f"Без критерия приёмки также ({len(bare)}): " + ", ".join(c.req_label(r) for r in bare) + "."]
     return out + [""]
@@ -1265,7 +1278,11 @@ def _render_level(report: dict, level: int) -> str:
             head = [f"## {title}", ""] if title else []
             parts.append(head + [f"⚠️ Раздел не построен: в данных прогона ошибка ({esc(type(exc).__name__)}: "
                                  f"{esc(shorten(str(exc), 160))}). Полные данные — в `report.json`.", ""])
-    lines = [ln for part in parts for ln in part]
+    lines = []
+    for ln in (ln for part in parts for ln in part):
+        if not ln.strip() and lines and not lines[-1].strip():
+            continue  # не больше одной пустой строки подряд
+        lines.append(ln)
     while lines and not lines[-1].strip():
         lines.pop()
     return "\n".join(lines) + "\n"
