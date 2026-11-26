@@ -227,9 +227,12 @@ def test_partial_and_failed_status_banners():
     md = markdown.render(minimal(status="partial", stages={"segment": "ok", "judge": "failed"}, provider="gemini",
                                  models_used=["gemini-x"]))
     assert "Прогон завершён частично" in md and "Судья" in md
-    r = minimal(status="failed")
+    r = minimal(status="failed", stages={"segment": "ok", "lens_qa": "failed"}, provider="gemini",
+                models_used=["gemini-x"])
     jsonout.finalize(r)
-    assert "вердикт не вынесен" in markdown.render(r)
+    md = markdown.render(r)
+    assert "вердикт не вынесен" in md and "Проверка не завершена: сбой этапов Тестировщик" in md
+    assert "Блокирующих дефектов не найдено" not in md
 
 
 def test_before_after_block(sample):

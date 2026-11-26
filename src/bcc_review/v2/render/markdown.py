@@ -548,7 +548,7 @@ def _brief(c: _Ctx) -> list[str]:
             rows.append(row + [pcell(first_sentence(f.get("impact") or f.get("problem"), 170))])
         out += table(["Дефект", "Где"] + ([] if same else ["Блокирует"]) + ["Почему блокирует"], rows)
         out.append("")
-    else:
+    elif c.run.get("status") != "failed":
         out += ["Блокирующих дефектов не найдено.", ""]
     first = _fix_first(c)
     if first:
@@ -1120,6 +1120,11 @@ def _conclusion(c: _Ctx) -> list[str]:
 
 
 def _auto_reason(c: _Ctx) -> str:
+    if c.run.get("status") == "failed":
+        bad = [stage_name(k) for k, v in (c.run.get("stages") or {}).items() if v == "failed"]
+        return ("Проверка не завершена: " + (f"сбой этапов {', '.join(bad)}" if bad else "прогон прерван")
+                + ". Отсутствие дефектов здесь не означает готовность документа — повторите прогон; причина — в "
+                  "приложении Д.")
     crit = [f for f in c.findings if f.get("severity") == "critical" and f.get("blocks") != "none"]
     if crit:
         return (f"Найдено {len(crit)} {plural(len(crit), 'критичный дефект', 'критичных дефекта', 'критичных дефектов')}, "
