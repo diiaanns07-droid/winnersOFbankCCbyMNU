@@ -60,6 +60,7 @@ ACCEPTANCE_CHECK_SCHEMA = _obj({
     "assumptions": _S,
     "rule_requirement_ids": _IDS,
     "rule_evidence": _EVIDENCE,
+    "derivation": _S,
     "expected_by_rules": _S,
     "stated": _S,
     "stated_line": _INT,
@@ -119,6 +120,11 @@ def _sentence(s: str) -> str:
     return s if not s or s[-1] in ".!?…»\"" else s + "."
 
 
+def _lower_first(s: str) -> str:
+    """«Итог 50» → «итог 50» внутри фразы; аббревиатуры («HTTP 400», «ОК») не трогаем."""
+    return s[0].lower() + s[1:] if len(s) > 1 and s[0].isupper() and s[1].islower() else s
+
+
 def _req_index(requirements: Iterable[Mapping[str, Any]] | None) -> dict[str, Mapping[str, Any]]:
     return {str(r.get("id")): r for r in requirements or [] if r.get("id")}
 
@@ -170,6 +176,7 @@ def normalize_check(raw: Mapping[str, Any]) -> dict:
         "rule_requirement_ids": _ids(raw.get("rule_requirement_ids")),
         "rule_evidence": [{"quote": _s(e.get("quote")), "line": _int(e.get("line"))}
                           for e in raw.get("rule_evidence") or [] if isinstance(e, Mapping) and _s(e.get("quote"))],
+        "derivation": _s(raw.get("derivation")),
         "expected_by_rules": _s(raw.get("expected_by_rules")),
         "stated": _s(raw.get("stated")),
         "stated_line": _int(raw.get("stated_line")) or _int(raw.get("row_line")),
@@ -193,11 +200,15 @@ def normalize_check(raw: Mapping[str, Any]) -> dict:
 
 
 def _row_evidence(c: Mapping[str, Any]) -> list[dict]:
+    """Цитаты строки приёмки: заявленный результат и вход (без дублей, если одна цитата содержит другую)."""
+    stated, row = c["stated"], c["row_quote"]
+    if row and stated and _norm(stated) in _norm(row):
+        return [{"quote": row, "line": c["row_line"]}]
     ev: list[dict] = []
-    if c["stated"]:
-        ev.append({"quote": c["stated"], "line": c["stated_line"]})
-    if c["row_quote"] and _norm(c["row_quote"]) not in _norm(c["stated"]):
-        ev.append({"quote": c["row_quote"], "line": c["row_line"]})
+    if stated:
+        ev.append({"quote": stated, "line": c["stated_line"]})
+    if row and _norm(row) not in _norm(stated):
+        ev.append({"quote": row, "line": c["row_line"]})
     return ev
 
 
@@ -231,22 +242,22 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
             "severity": "critical",
             "requirement_ids": req_ids,
             "evidence": rule_ev + _row_evidence(c),
-            "problem": (f"По {rules_label} на входе этого критерия получается: {expected}. "
-                        f"Критерий приёмки ожидает: «{stated}».{explanation}"),
-            "scenario": f"{facts}{assumptions} Исход по {rules_label}: {expected}. Исход по критерию: {stated}.",
+            "problem": (f"По {rules_label} на входе этого критерия результат — {_lower_first(expected) or 'другой'}, "
+                        f"а критерий приёмки ожидает «{stated}».{explanation}"),
+            "scenario": f"{facts}{assumptions} По {rules_label}: {expected}. По критерию: {stated}.",
             "impact": ("Реализация по правилу не пройдёт этот критерий приёмки, а реализация «под критерий» "
                        "нарушит правило: разработчик и тестировщик получат разный ожидаемый результат, "
                        "приёмка остановится до решения владельца продукта."),
             "recommendation": (f"Выбрать верный исход и исправить второе место: ожидаемый результат критерия "
                                f"{row_label} или текст {rules_label}."),
             "rewrite": c["fix"],
-            "question": (f"Какой результат верен для этого входа: по {rules_label} («{expected}») "
-                         f"или по критерию приёмки («{stated}»)?"),
+            "question": (f"Какой результат верен для этого входа: «{expected}» (по {rules_label}) "
+                         f"или «{stated}» (по критерию приёмки)?"),
             "blocks": "both",
             "source": SOURCE,
             "origin": "acceptance_check",
+            "derivation": c["derivation"],
         }
-    missing = f" {_sentence(expected)}" if expected else ""
     return {
         "title": f"Ожидаемый результат критерия приёмки {row_label} нельзя вывести из требований",
         "kind": "incomplete",
@@ -255,7 +266,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
         "requirement_ids": req_ids,
         "evidence": rule_ev + _row_evidence(c),
         "problem": (f"Критерий приёмки ожидает «{stated}», но правила документа не определяют результат "
-                    f"для этого входа.{missing}{explanation}"),
+                    f"для этого входа ({expected or 'правило не найдено'}).{explanation}"),
         "scenario": f"{facts}{assumptions} По требованиям исход не определён; по критерию: {stated}.",
         "impact": ("Тестировщик не может обосновать ожидаемый результат требованиями, а разработчик реализует "
                    "своё толкование: при приёмке возникнет спор, чья трактовка верна."),
@@ -265,6 +276,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
         "blocks": "testing",
         "source": SOURCE,
         "origin": "acceptance_check",
+        "derivation": c["derivation"],
     }
 
 
