@@ -1,7 +1,7 @@
 # №10. Чек-лист банка и приёмочные сценарии
 
 Код: `src/bcc_review/bank/checklist.py`, `src/bcc_review/bank/acceptance.py`. Тесты: `tests/p10/`.
-База: `bcc/integration` 6a6c503 (контракт v1 431f76d; влиты №01–09, 11–17).
+База: `bcc/integration` 2821989 (контракт v1 431f76d с дополнениями; влиты №01–09, 11–18).
 
 ```python
 from bcc_review.bank import build_bank_pack, collect_questions, render_markdown
@@ -95,16 +95,21 @@ LLM вызывается только после правил: этап `bank#ch
 ## Как проверить
 
 ```bash
-pip install -e ".[dev]"
-pytest tests/contract tests/p10
-pytest tests
+pip install -e ".[all,dev]"
+python -m pytest tests/p10 -q
+python -m pytest tests/contract tests/integration -q
+python -m bcc_review release/input/requirements.md out/requirements.md --offline-lint --no-cache
+python -m bcc_review verify out/requirements.json release/input/requirements.md
 python -m tests.p10.make_samples
 ```
 
-* `pytest tests/contract tests/p10` — 84 passed.
-* `pytest tests` на 6a6c503 — 1221 passed, 14 skipped, 13 failed. Нужны `pip install -e ".[all,dev]"`.
-  Все 13 падений есть и на чистой 6a6c503 без №10: №02 (5), №04, №08, №09, №11, №14, №15 (2), №16. Это
-  окружение и чужие стыки; новых падений №10 не добавляет.
+* `python -m pytest tests/p10 -q` — 58 passed (Python 3.11 и 3.13).
+* `python -m pytest tests/contract tests/integration -q` на 2821989 + №10 — 167 passed; интеграционные
+  тесты движка идут через модуль `team:bcc_review.bank.checklist`.
+* Публичный вход на выданном ТЗ (`release/input/requirements.md`, SHA-256 `e7dae55e…74381`): в паспорте
+  `run.modules.build_bank_pack = team:bcc_review.bank.checklist:build_bank_pack`, 14 строк чек-листа,
+  `verify` = OK. Офлайн (`--offline-lint`) этап `bank` = `partial`, 0 вызовов; с
+  `--provider mock --mock-script tests/integration/fixtures/mock_bcc.json` — `ok`, 1 вызов.
 * `python -m tests.p10.make_samples` пересобирает образцы в `tests/p10/samples/` (JSON и Markdown до и
   после решений).
 
@@ -120,9 +125,17 @@ python -m tests.p10.make_samples
 | пересчёт после `--answers` и перепроверки с причинами | `test_recheck_after_answers_recalculates_rows_with_reasons`, `test_owner_decision_confirms_approval_with_reason` |
 | сквозной `run_review` (mock и none): движок берёт модуль `team:`, Report валиден, опоры сходятся, `verify` №07 = OK | `test_engine_end_to_end_uses_bank_module` |
 | привязка строк к критериям по `[[checklist]]` №05 без ложных «Нет» у ИБ и UI | `test_team_criteria_toml_checklist_rows_link_criteria` |
+| иная тема со своим набором пунктов (`fixtures/other_topic_checklist.md`): строки и колонки — из документа, ни одной из 14 банковских формулировок в выходе, границы «от 1 до 3 … включительно» → 0/1/3/4 | `test_other_topic_uses_its_own_items_and_no_fixed_bank_wording` |
+| документ кэшбэка без таблицы (`release/input/other_topic_cashback.md`): чек-лист пуст, банковских строк нет | `test_release_cashback_without_table_has_no_bank_rows` |
+| у отметки «Нет» опора — цитаты блокирующих замечаний | `test_no_row_evidence_is_quoted_from_the_blocking_findings` |
 
 ## Передача соседям
 
+* **Max (перенос в интеграцию).** Ветка `claude/jolly-dijkstra-oakxea` уже содержит `bcc/integration`
+  2821989; её отличие от интеграции — только `src/bcc_review/bank/` и `tests/p10/`. Перенос одной командой
+  без истории ветки: `git checkout <SHA> -- src/bcc_review/bank tests/p10`, затем
+  `python -m pytest tests/p10 tests/contract tests/integration -q`. Резерв
+  `runtime/fallback/bank.py` можно оставить: движок сам выбирает модуль `team`.
 * **Max (движок).**
   1. В `run_bank` передавать `coverage=coverage, questions=questions`. При `--compare` или повторе после
      `--answers` передавать ещё `previous=<прежний report>`, а `complete=` — по `run.status`.

@@ -54,7 +54,8 @@ UNIT = (
 _NUM_RE = re.compile(NUM)
 _UNIT_RE = re.compile(UNIT, re.I)
 _RANGE_FROM_TO = re.compile(
-    rf"(?<!\w)от\s+(?P<a>{NUM_CORE})\s*(?P<ua>{UNIT})?(?P<ainc>\s+включительно)?\s+до\s+(?P<b>{NUM_CORE})\s*(?P<ub>{UNIT})?(?P<binc>\s+включительно)?",
+    rf"(?<!\w)от\s+(?P<a>{NUM_CORE})\s*(?P<ua>{UNIT})?(?P<ainc>\s+включительно)?\s+до\s+(?P<b>{NUM_CORE})(?:\s*(?P<ub>{UNIT}))?"
+    rf"(?P<binc>(?:\s+[^\s.,;:()]+){{0,2}}?\s+включительно)?",
     re.I,
 )
 _RANGE_DASH = re.compile(

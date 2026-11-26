@@ -1088,14 +1088,9 @@ def _presence_structure(doc: Doc, scan: Scan) -> Facet:
 
 
 def _presence_property(doc: Doc, requirements: list[Any]) -> Facet:
-    ev: list[dict] = []
-    for r in requirements:
-        ev += doc.evidence_of(r)[:1]
-        if len(ev) >= 2:
-            break
     n = len(requirements)
-    if n:
-        return Facet("yes", f"требования для проверки есть: {n}", ev, [], [])
+    if n:  # опора строки-свойства — замечания, а не первое попавшееся требование
+        return Facet("yes", f"требования для проверки есть: {n}", [], [], [])
     return Facet(None, "нарезка требований не передана", [], [], [])
 
 
@@ -1136,6 +1131,7 @@ class NF:
     signals: set[str] = field(default_factory=set)  # вид, текст, раздел опоры
     crit_topics: set[str] = field(default_factory=set)  # через критерий (bank_topics / встроенная таблица)
     criteria: set[str] = field(default_factory=set)
+    evidence: list[dict] = field(default_factory=list)  # проверенные опоры замечания
 
 
 # Строки-свойства: замечание по критерию строки относится к ней, где бы ни стояла опора.
@@ -1166,7 +1162,7 @@ def normalize_findings(doc: Doc, findings: Iterable[Any], crit: Mapping[str, set
                     signals.add(t.id)
         out.append(
             NF(str(g(f, "id") or f"F-{i + 1}"), status, sev, str(g(f, "title") or ""), signals | crit_topics, blocks,
-               {str(x) for x in as_list(g(f, "req_ids"))}, f, signals, crit_topics, crits)
+               {str(x) for x in as_list(g(f, "req_ids"))}, f, signals, crit_topics, crits, evs)
         )
     return out
 
@@ -1441,7 +1437,19 @@ def _row(
     if topic is None and llm is None:
         row["note"] = "Тема строки не распознана правилами; отметки не проставлены."
         if requires_approval:
-            row["approval"] = {"required": True, "role": role, "status": "requires_confirmation", "basis": "требует подтверждения", "evidence": [], "decision_id": None}
+            state, basis, aev = _approvers_state(doc, scan, role)
+            row["approval"] = {"required": True, "role": role, "status": "requires_confirmation",
+                               "basis": f"требует подтверждения: {basis}", "evidence": aev, "decision_id": None}
+            row["evidence"] = list(aev)
+            row["note"] = (f"Согласование{(' с ' + role) if role else ''}: требует подтверждения — {basis}. "
+                           "Наличие описания правилами не определено (тема строки не распознана).")
+            row["question"] = {
+                "id": f"Q-CHK-{pos:02d}", "kind": "approval",
+                "prompt": f"Строка {pos} чек-листа «{short(text, 90)}»: получено ли согласование{(' с ' + role) if role else ''}?",
+                "options": allowed["checked"] or ["Да", "Нет"], "finding_ids": [], "affected_req_ids": [],
+                "target": f"checklist:{row_id}:checked",
+            }
+            row["status"] = "needs_confirmation"
         return row
 
     # --- наличие
@@ -1507,7 +1515,12 @@ def _row(
     row["machine"] = {"value": machine.value or "unknown", "basis": machine.basis, "finding_ids": fids,
                       "blocking_finding_ids": [f.id for f in mapped if f.status == "confirmed" and f.severity in BLOCKING]}
     row["approval"] = approval
-    row["evidence"] = _dedupe_ev(pres.evidence + pres.negative + (approval["evidence"] if approval else []))
+    blocking = [f for f in mapped if f.status == "confirmed" and f.severity in BLOCKING]
+    fevs = [f.evidence[0] for f in blocking if f.evidence][:3]
+    row["evidence"] = _dedupe_ev(pres.evidence + pres.negative + (approval["evidence"] if approval else []) + fevs)
+    if blocking and blocking[0].evidence:
+        e = blocking[0].evidence[0]
+        notes.insert(0, f"Ключевое замечание: {blocking[0].id} «{short(blocking[0].title, 80)}» — «{short(e['quote'], 70)}» ({doc.label(e)})")
     row["note"] = _compose_note(doc, row, pres, machine, approval, source_value, external, source_note, notes)
     if approval is not None and approval["status"] == "requires_confirmation":
         row["question"] = {

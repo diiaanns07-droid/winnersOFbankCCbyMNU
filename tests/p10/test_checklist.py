@@ -312,3 +312,64 @@ def test_team_criteria_toml_checklist_rows_link_criteria():
     assert not {"F-S7", "F-S17"} & set(r[11]["finding_ids"]) and "F-S1" in r[11]["finding_ids"]
     # Артефакт (CL04 UX/UI: set_complete): нужна опора в разделе UI, критерий сам по себе не переносит K4.
     assert "F-K4" not in r[4]["finding_ids"] and "F-S17" in r[4]["finding_ids"]
+
+
+OTHER = fx.FIX / "other_topic_checklist.md"
+
+
+def test_other_topic_uses_its_own_items_and_no_fixed_bank_wording():
+    """Иная тема со своим набором пунктов: строки — из документа, банковские формулировки не появляются."""
+    import json
+
+    doc = fx.read_real(OTHER.read_text("utf-8"))
+    pack = build_bank_pack(doc, [], [], [], None)
+    rows = pack["checklist"]
+    assert [r["text"] for r in rows] == [
+        "Правила начисления кэшбэка описаны для всех категорий",
+        "Лимит начислений за месяц определён",
+        "Условия акции согласованы с юристами",
+        "Схема отката акции описана",
+        "Интеграция с сервисом лояльности описана",
+    ]
+    assert rows[0]["source"]["columns"] == {"text": "Пункт проверки", "available": "Описано", "checked": "Подтверждено", "note": "Комментарий"}
+    assert rows[2]["allowed"]["checked"] == ["Да", "Нет", "Н/П"] and rows[0]["allowed"]["checked"] == ["Да", "Нет"]
+    # согласование с юристами: человеческое подтверждение, отметка контракта unknown
+    assert rows[2]["approval"]["status"] == "requires_confirmation" and rows[2]["checked"] == "unknown"
+    assert rows[3]["cells"]["available"] == "Нет" and rows[4]["cells"]["available"] == "Да"
+    # пункты без распознанной темы не получают выдуманной отметки
+    assert rows[1]["topic"] is None and rows[1]["available"] == rows[1]["checked"] == "unknown"
+    blob = json.dumps(pack, ensure_ascii=False)
+    for text, _, _ in SOURCE_ROWS:
+        assert text not in blob, text
+    # запись №05 привязывается по смыслу (CL05 «отката» → строка об откате акции), но её текст не переносится
+    linked = {r["text"]: r["criteria_link"]["checklist_id"] for r in rows if r["criteria_link"]}
+    assert set(linked) <= {"Схема отката акции описана"}
+    assert "требует подтверждения" in rows[2]["note"] and rows[2]["question"]["id"] == "Q-CHK-03"
+    # границы КБ-1 «от 1 до 3 категорий включительно» выведены из текста: 0 и 4 отклоняются, 1 и 3 принимаются
+    b = {t["values"]["input"]: t for t in pack["test_cases"] if t["kind"] == "boundary" and t["values"].get("range") == [1, 3]}
+    assert set(b) == {0, 1, 3, 4} and all(t["status"] == "draft" for t in b.values())
+    assert "отклоняется" in b[0]["expected"] and "принимается" in b[1]["expected"]
+    assert "принимается" in b[3]["expected"] and "отклоняется" in b[4]["expected"]
+
+
+def test_release_cashback_without_table_has_no_bank_rows():
+    path = fx.FIX.parents[2] / "release" / "input" / "other_topic_cashback.md"
+    if not path.exists():
+        pytest.skip("release/input появляется в bcc/integration ≥ 2821989")
+    import json
+
+    doc = fx.read_real(path.read_text("utf-8"))
+    pack = build_bank_pack(doc, [], [], [], None)
+    assert pack["checklist"] == [] and "bank.checklist_absent" in {w.code for w in pack["warnings"]}
+    blob = json.dumps(pack, ensure_ascii=False)
+    assert not any(text in blob for text, _, _ in SOURCE_ROWS)
+
+
+def test_no_row_evidence_is_quoted_from_the_blocking_findings():
+    c, pack = pack_for()
+    row = pack["checklist"][7]  # противоречия: опора — сами противоречия, а не случайное требование
+    assert row["presence"]["evidence"] == []
+    quotes = [e["quote"] for e in row["evidence"]]
+    assert "Февральский счётчик вырос на 4 000 ₸" in quotes or any("Месяц определяется" in q for q in quotes)
+    assert "Ключевое замечание: F-K1" in row["note"]
+    assert_evidence(c["document"], row["evidence"])
