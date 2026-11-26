@@ -18,12 +18,18 @@
       },
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0023",
-        "start": 53,
-        "end": 89,
-        "quote": "от 1 000 до 1 000 000 ₸ включительно"
-      },
+      "evidence": [
+        {
+          "block_id": "b0023",
+          "start": 53,
+          "end": 89,
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        }
+      ],
+      "req_ids": [
+        "R-002.1",
+        "R-002.2"
+      ],
       "binding": null,
       "aliases": [],
       "source": "text",
@@ -39,7 +45,7 @@
     },
     {
       "id": "FX-002",
-      "subject": null,
+      "subject": "Требования к данным",
       "field": "сумму покупки",
       "scope": "Часть A. Новый функционал / Требования к данным",
       "direction": null,
@@ -48,12 +54,17 @@
       "range": null,
       "unit": "tiyn",
       "condition": null,
-      "evidence": {
-        "block_id": "b0032",
-        "start": 60,
-        "end": 82,
-        "quote": "сумму покупки в тиынах"
-      },
+      "evidence": [
+        {
+          "block_id": "b0032",
+          "start": 60,
+          "end": 82,
+          "quote": "сумму покупки в тиынах"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
       "binding": null,
       "aliases": [],
       "source": "text",
@@ -69,7 +80,7 @@
     },
     {
       "id": "FX-003",
-      "subject": null,
+      "subject": "Требования к данным",
       "field": "порог",
       "scope": "Часть A. Новый функционал / Требования к данным",
       "direction": null,
@@ -78,12 +89,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0032",
-        "start": 103,
-        "end": 116,
-        "quote": "порог в тенге"
-      },
+      "evidence": [
+        {
+          "block_id": "b0032",
+          "start": 103,
+          "end": 116,
+          "quote": "порог в тенге"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
       "binding": null,
       "aliases": [],
       "source": "text",
@@ -99,7 +115,7 @@
     },
     {
       "id": "FX-004",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Расходы",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -108,12 +124,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0040",
-        "start": 8,
-        "end": 16,
-        "quote": "48 500 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0040",
+          "start": 8,
+          "end": 16,
+          "quote": "48 500 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-009"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -130,7 +151,7 @@
     },
     {
       "id": "FX-005",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "порог",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -139,12 +160,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0040",
-        "start": 24,
-        "end": 32,
-        "quote": "50 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0040",
+          "start": 24,
+          "end": 32,
+          "quote": "50 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-009"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -161,7 +187,7 @@
     },
     {
       "id": "FX-006",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "покупку",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -170,12 +196,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0040",
-        "start": 55,
-        "end": 62,
-        "quote": "1 500 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0040",
+          "start": 55,
+          "end": 62,
+          "quote": "1 500 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-009"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -192,7 +223,7 @@
     },
     {
       "id": "FX-007",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Итог",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -201,12 +232,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0040",
-        "start": 70,
-        "end": 78,
-        "quote": "50 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0040",
+          "start": 70,
+          "end": 78,
+          "quote": "50 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-009"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -223,7 +259,7 @@
     },
     {
       "id": "FX-008",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Покупка",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -232,12 +268,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0041",
-        "start": 29,
-        "end": 36,
-        "quote": "4 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 29,
+          "end": 36,
+          "quote": "4 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-010"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -254,7 +295,7 @@
     },
     {
       "id": "FX-009",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "счётчик вырос",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -263,12 +304,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0041",
-        "start": 107,
-        "end": 114,
-        "quote": "4 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 107,
+          "end": 114,
+          "quote": "4 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-010"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -285,7 +331,7 @@
     },
     {
       "id": "FX-010",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Расходы",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -294,12 +340,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0042",
-        "start": 8,
-        "end": 16,
-        "quote": "19 900 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 8,
+          "end": 16,
+          "quote": "19 900 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-011"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -316,7 +367,7 @@
     },
     {
       "id": "FX-011",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "порог",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -325,12 +376,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0042",
-        "start": 24,
-        "end": 32,
-        "quote": "20 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 24,
+          "end": 32,
+          "quote": "20 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-011"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -347,7 +403,7 @@
     },
     {
       "id": "FX-012",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Перевести",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -356,12 +412,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0042",
-        "start": 45,
-        "end": 50,
-        "quote": "500 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 45,
+          "end": 50,
+          "quote": "500 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-011"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -378,7 +439,7 @@
     },
     {
       "id": "FX-013",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Счётчик показывает",
       "scope": "Часть A. Новый функционал / Критерии приемки",
       "direction": null,
@@ -387,12 +448,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0042",
-        "start": 72,
-        "end": 80,
-        "quote": "19 900 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 72,
+          "end": 80,
+          "quote": "19 900 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-011"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -417,13 +483,18 @@
       "value": null,
       "range": null,
       "unit": null,
-      "condition": null,
-      "evidence": {
-        "block_id": "b0096",
-        "start": 0,
-        "end": 75,
-        "quote": "cardId | string | 1–64 | Да | Карта клиента | Идентификатор карты | card_id"
-      },
+      "condition": "Карта клиента",
+      "evidence": [
+        {
+          "block_id": "b0096",
+          "start": 0,
+          "end": 75,
+          "quote": "cardId | string | 1–64 | Да | Карта клиента | Идентификатор карты | card_id"
+        }
+      ],
+      "req_ids": [
+        "R-024"
+      ],
       "binding": "card_id",
       "aliases": [
         "Идентификатор карты"
@@ -458,6 +529,9 @@
       },
       "notes": [
         "логика: Карта клиента"
+      ],
+      "enriched_by": [
+        "№04:condition"
       ]
     },
     {
@@ -478,12 +552,17 @@
       },
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0097",
-        "start": 0,
-        "end": 76,
-        "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
-      },
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      ],
+      "req_ids": [
+        "R-025"
+      ],
       "binding": "limit_kzt",
       "aliases": [
         "Порог"
@@ -547,12 +626,17 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0098",
-        "start": 0,
-        "end": 71,
-        "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled"
-      },
+      "evidence": [
+        {
+          "block_id": "b0098",
+          "start": 0,
+          "end": 71,
+          "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled"
+        }
+      ],
+      "req_ids": [
+        "R-026"
+      ],
       "binding": "enabled",
       "aliases": [
         "Признак включения"
@@ -606,12 +690,17 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0105",
-        "start": 0,
-        "end": 51,
-        "quote": "result | string | OK / ERROR | Исход сохранения | —"
-      },
+      "evidence": [
+        {
+          "block_id": "b0105",
+          "start": 0,
+          "end": 51,
+          "quote": "result | string | OK / ERROR | Исход сохранения | —"
+        }
+      ],
+      "req_ids": [
+        "R-030"
+      ],
       "binding": null,
       "aliases": [
         "Исход сохранения"
@@ -654,12 +743,17 @@
       "range": null,
       "unit": "KZT",
       "condition": "При успехе",
-      "evidence": {
-        "block_id": "b0106",
-        "start": 0,
-        "end": 56,
-        "quote": "amount | string | При успехе | Порог в тенге | limit_kzt"
-      },
+      "evidence": [
+        {
+          "block_id": "b0106",
+          "start": 0,
+          "end": 56,
+          "quote": "amount | string | При успехе | Порог в тенге | limit_kzt"
+        }
+      ],
+      "req_ids": [
+        "R-031"
+      ],
       "binding": "limit_kzt",
       "aliases": [
         "Порог"
@@ -704,12 +798,17 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0107",
-        "start": 0,
-        "end": 60,
-        "quote": "enabled | string | «0» или «1» | Признак включения | enabled"
-      },
+      "evidence": [
+        {
+          "block_id": "b0107",
+          "start": 0,
+          "end": 60,
+          "quote": "enabled | string | «0» или «1» | Признак включения | enabled"
+        }
+      ],
+      "req_ids": [
+        "R-032"
+      ],
       "binding": "enabled",
       "aliases": [
         "Признак включения"
@@ -759,12 +858,17 @@
       "range": null,
       "unit": null,
       "condition": "При ошибке",
-      "evidence": {
-        "block_id": "b0108",
-        "start": 0,
-        "end": 51,
-        "quote": "message | string | При ошибке | Описание ошибки | —"
-      },
+      "evidence": [
+        {
+          "block_id": "b0108",
+          "start": 0,
+          "end": 51,
+          "quote": "message | string | При ошибке | Описание ошибки | —"
+        }
+      ],
+      "req_ids": [
+        "R-033"
+      ],
       "binding": null,
       "aliases": [
         "Описание ошибки"
@@ -803,12 +907,18 @@
       "range": null,
       "unit": null,
       "condition": "успешного выполнения метода",
-      "evidence": {
-        "block_id": "b0110",
-        "start": 0,
-        "end": 48,
-        "quote": "200. Ответ в случае успешного выполнения метода."
-      },
+      "evidence": [
+        {
+          "block_id": "b0110",
+          "start": 0,
+          "end": 48,
+          "quote": "200. Ответ в случае успешного выполнения метода."
+        }
+      ],
+      "req_ids": [
+        "R-034",
+        "R-035"
+      ],
       "binding": null,
       "aliases": [],
       "source": "status",
@@ -825,12 +935,18 @@
       "range": null,
       "unit": null,
       "condition": "параметры запроса заполнены неверно",
-      "evidence": {
-        "block_id": "b0110",
-        "start": 49,
-        "end": 111,
-        "quote": "400. Ответ в случае, если параметры запроса заполнены неверно."
-      },
+      "evidence": [
+        {
+          "block_id": "b0110",
+          "start": 49,
+          "end": 111,
+          "quote": "400. Ответ в случае, если параметры запроса заполнены неверно."
+        }
+      ],
+      "req_ids": [
+        "R-034",
+        "R-035"
+      ],
       "binding": null,
       "aliases": [],
       "source": "status",
@@ -847,12 +963,15 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0111",
-        "start": 0,
-        "end": 25,
-        "quote": "200. Successful — Created"
-      },
+      "evidence": [
+        {
+          "block_id": "b0111",
+          "start": 0,
+          "end": 25,
+          "quote": "200. Successful — Created"
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "status_heading",
@@ -872,12 +991,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 200",
-      "evidence": {
-        "block_id": "b0112",
-        "start": 1,
-        "end": 14,
-        "quote": "\"result\":\"OK\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0112",
+          "start": 1,
+          "end": 14,
+          "quote": "\"result\":\"OK\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -905,12 +1027,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 200",
-      "evidence": {
-        "block_id": "b0112",
-        "start": 15,
-        "end": 31,
-        "quote": "\"amount\":\"50000\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0112",
+          "start": 15,
+          "end": 31,
+          "quote": "\"amount\":\"50000\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -938,12 +1063,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 200",
-      "evidence": {
-        "block_id": "b0112",
-        "start": 32,
-        "end": 45,
-        "quote": "\"enabled\":\"1\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0112",
+          "start": 32,
+          "end": 45,
+          "quote": "\"enabled\":\"1\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -971,12 +1099,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 200",
-      "evidence": {
-        "block_id": "b0114",
-        "start": 1,
-        "end": 17,
-        "quote": "\"result\":\"ERROR\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0114",
+          "start": 1,
+          "end": 17,
+          "quote": "\"result\":\"ERROR\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -1004,12 +1135,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 200",
-      "evidence": {
-        "block_id": "b0114",
-        "start": 18,
-        "end": 45,
-        "quote": "\"message\":\"Проверьте сумму\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0114",
+          "start": 18,
+          "end": 45,
+          "quote": "\"message\":\"Проверьте сумму\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -1037,12 +1171,19 @@
       "range": null,
       "unit": null,
       "condition": "запрос выполнен без необходимой авторизации",
-      "evidence": {
-        "block_id": "b0115",
-        "start": 0,
-        "end": 70,
-        "quote": "401. Ответ в случае, если запрос выполнен без необходимой авторизации."
-      },
+      "evidence": [
+        {
+          "block_id": "b0115",
+          "start": 0,
+          "end": 70,
+          "quote": "401. Ответ в случае, если запрос выполнен без необходимой авторизации."
+        }
+      ],
+      "req_ids": [
+        "R-036",
+        "R-037",
+        "R-038"
+      ],
       "binding": null,
       "aliases": [],
       "source": "status",
@@ -1059,12 +1200,19 @@
       "range": null,
       "unit": null,
       "condition": "на указанный ресурс доступ запрещен",
-      "evidence": {
-        "block_id": "b0115",
-        "start": 71,
-        "end": 133,
-        "quote": "403. Ответ в случае, если на указанный ресурс доступ запрещен."
-      },
+      "evidence": [
+        {
+          "block_id": "b0115",
+          "start": 71,
+          "end": 133,
+          "quote": "403. Ответ в случае, если на указанный ресурс доступ запрещен."
+        }
+      ],
+      "req_ids": [
+        "R-036",
+        "R-037",
+        "R-038"
+      ],
       "binding": null,
       "aliases": [],
       "source": "status",
@@ -1081,12 +1229,19 @@
       "range": null,
       "unit": null,
       "condition": "произошла внутренняя ошибка сервера",
-      "evidence": {
-        "block_id": "b0115",
-        "start": 134,
-        "end": 196,
-        "quote": "500. Ответ в случае, если произошла внутренняя ошибка сервера."
-      },
+      "evidence": [
+        {
+          "block_id": "b0115",
+          "start": 134,
+          "end": 196,
+          "quote": "500. Ответ в случае, если произошла внутренняя ошибка сервера."
+        }
+      ],
+      "req_ids": [
+        "R-036",
+        "R-037",
+        "R-038"
+      ],
       "binding": null,
       "aliases": [],
       "source": "status",
@@ -1103,12 +1258,15 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0116",
-        "start": 0,
-        "end": 31,
-        "quote": "400. Unsuccessful — Bad request"
-      },
+      "evidence": [
+        {
+          "block_id": "b0116",
+          "start": 0,
+          "end": 31,
+          "quote": "400. Unsuccessful — Bad request"
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "status_heading",
@@ -1128,12 +1286,15 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0118",
-        "start": 0,
-        "end": 32,
-        "quote": "401. Unsuccessful — Unauthorized"
-      },
+      "evidence": [
+        {
+          "block_id": "b0118",
+          "start": 0,
+          "end": 32,
+          "quote": "401. Unsuccessful — Unauthorized"
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "status_heading",
@@ -1153,12 +1314,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 401",
-      "evidence": {
-        "block_id": "b0119",
-        "start": 1,
-        "end": 27,
-        "quote": "\"message\":\"Требуется вход\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0119",
+          "start": 1,
+          "end": 27,
+          "quote": "\"message\":\"Требуется вход\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -1186,12 +1350,15 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0120",
-        "start": 0,
-        "end": 29,
-        "quote": "403. Unsuccessful — Forbidden"
-      },
+      "evidence": [
+        {
+          "block_id": "b0120",
+          "start": 0,
+          "end": 29,
+          "quote": "403. Unsuccessful — Forbidden"
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "status_heading",
@@ -1211,12 +1378,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 404",
-      "evidence": {
-        "block_id": "b0122",
-        "start": 1,
-        "end": 29,
-        "quote": "\"message\":\"Карта не найдена\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0122",
+          "start": 1,
+          "end": 29,
+          "quote": "\"message\":\"Карта не найдена\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -1244,12 +1414,15 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0123",
-        "start": 0,
-        "end": 41,
-        "quote": "500. Unsuccessful — Internal server error"
-      },
+      "evidence": [
+        {
+          "block_id": "b0123",
+          "start": 0,
+          "end": 41,
+          "quote": "500. Unsuccessful — Internal server error"
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "status_heading",
@@ -1269,12 +1442,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 500",
-      "evidence": {
-        "block_id": "b0124",
-        "start": 1,
-        "end": 27,
-        "quote": "\"message\":\"Ошибка сервиса\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0124",
+          "start": 1,
+          "end": 27,
+          "quote": "\"message\":\"Ошибка сервиса\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -1290,6 +1466,37 @@
       "notes": [
         "пример тела ответа для HTTP 500"
       ]
+    },
+    {
+      "id": "FX-039",
+      "subject": "Функциональные требования",
+      "field": "уведомление",
+      "scope": "Часть A. Новый функционал / Требования к изменениям / Функциональные требования",
+      "direction": null,
+      "type": null,
+      "value": "выключено",
+      "range": null,
+      "unit": null,
+      "condition": "по умолчанию",
+      "evidence": [
+        {
+          "block_id": "b0023",
+          "start": 91,
+          "end": 125,
+          "quote": "По умолчанию уведомление выключено"
+        }
+      ],
+      "req_ids": [
+        "R-002.2",
+        "R-002.1"
+      ],
+      "binding": null,
+      "aliases": [],
+      "source": "hint",
+      "role": "business_rules",
+      "enriched_by": [
+        "№04:F-003"
+      ]
     }
   ],
   "coverage": [
@@ -1303,6 +1510,14 @@
       "hints": [
         {
           "block_id": "b0018",
+          "quote": "Карты → Расходы → Уведомления."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0018",
+          "start": 0,
+          "end": 30,
           "quote": "Карты → Расходы → Уведомления."
         }
       ],
@@ -1325,6 +1540,14 @@
           "quote": "На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»."
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0018",
+          "start": 31,
+          "end": 115,
+          "quote": "На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»."
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -1344,6 +1567,14 @@
           "quote": "При ошибке ввода сообщение появляется под полем."
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0018",
+          "start": 116,
+          "end": 164,
+          "quote": "При ошибке ввода сообщение появляется под полем."
+        }
+      ],
       "branches": [
         "условие выполнено",
         "условие не выполнено"
@@ -1353,7 +1584,7 @@
     },
     {
       "req_id": "R-002.1",
-      "obligation_id": "Ф-1#1",
+      "obligation_id": "R-002.1#1",
       "obligation": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
       "acceptance_ids": [],
       "status": "uncovered",
@@ -1361,6 +1592,14 @@
       "hints": [
         {
           "block_id": "b0023",
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0023",
+          "start": 5,
+          "end": 90,
           "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
         }
       ],
@@ -1375,7 +1614,7 @@
     },
     {
       "req_id": "R-002.2",
-      "obligation_id": "Ф-1#1",
+      "obligation_id": "R-002.2#1",
       "obligation": "По умолчанию уведомление выключено.",
       "acceptance_ids": [],
       "status": "uncovered",
@@ -1383,6 +1622,14 @@
       "hints": [
         {
           "block_id": "b0023",
+          "quote": "По умолчанию уведомление выключено."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0023",
+          "start": 91,
+          "end": 126,
           "quote": "По умолчанию уведомление выключено."
         }
       ],
@@ -1394,15 +1641,13 @@
     },
     {
       "req_id": "R-003.1",
-      "obligation_id": "Ф-2#1",
+      "obligation_id": "R-003.1#1",
       "obligation": "Месяц определяется по дате совершения покупки в Алматы.",
       "acceptance_ids": [
-        "R-010",
-        "R-009",
-        "R-011"
+        "R-010"
       ],
       "status": "conflict",
-      "explanation": "R-010 противоречит обязательству — см. X-02 «R-010 противоречит правилу периода (R-003.1, R-003.2, R-003.3, R-003.4): событие на стыке периодов».",
+      "explanation": "Приёмка №2 (R-010) противоречит обязательству — см. X-02 «Приёмка №2 (R-010) противоречит правилу периода (Ф-2, R-003.1): событие на стыке периодов».",
       "hints": [
         {
           "block_id": "b0024",
@@ -1411,14 +1656,20 @@
         {
           "block_id": "b0041",
           "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 5,
+          "end": 60,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
         },
         {
-          "block_id": "b0040",
-          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
-        },
-        {
-          "block_id": "b0042",
-          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+          "block_id": "b0041",
+          "start": 0,
+          "end": 114,
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
         }
       ],
       "branches": [
@@ -1431,29 +1682,16 @@
           "relation": "contradicts",
           "source": "rules",
           "ref": "X-02"
-        },
-        {
-          "acceptance_id": "R-009",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 7.65
-        },
-        {
-          "acceptance_id": "R-011",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 4.13
         }
       ]
     },
     {
       "req_id": "R-003.2",
-      "obligation_id": "Ф-2#1",
+      "obligation_id": "R-003.2#1",
       "obligation": "В расходы входят проведённые покупки.",
       "acceptance_ids": [
-        "R-010",
         "R-009",
-        "R-011"
+        "R-010"
       ],
       "status": "partial",
       "explanation": "Связь найдена только по общим сущностям (режим без модели); что приёмка проверяет все ветви (1), не установлено — covered не присваивается.",
@@ -1463,16 +1701,32 @@
           "quote": "В расходы входят проведённые покупки."
         },
         {
-          "block_id": "b0041",
-          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
-        },
-        {
           "block_id": "b0040",
           "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
         },
         {
-          "block_id": "b0042",
-          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+          "block_id": "b0041",
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 61,
+          "end": 98,
+          "quote": "В расходы входят проведённые покупки."
+        },
+        {
+          "block_id": "b0040",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        },
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 114,
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
         }
       ],
       "branches": [
@@ -1481,33 +1735,25 @@
       "branches_checked": [],
       "links": [
         {
-          "acceptance_id": "R-010",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 7.0
-        },
-        {
           "acceptance_id": "R-009",
           "relation": "lexical",
           "source": "rules",
           "score": 7.65
         },
         {
-          "acceptance_id": "R-011",
+          "acceptance_id": "R-010",
           "relation": "lexical",
           "source": "rules",
-          "score": 4.13
+          "score": 5.39
         }
       ]
     },
     {
       "req_id": "R-003.3",
-      "obligation_id": "Ф-2#1",
+      "obligation_id": "R-003.3#1",
       "obligation": "Возврат уменьшает расходы месяца исходной покупки.",
       "acceptance_ids": [
-        "R-010",
-        "R-009",
-        "R-011"
+        "R-009"
       ],
       "status": "partial",
       "explanation": "Связь найдена только по общим сущностям (режим без модели); что приёмка проверяет все ветви (1), не установлено — covered не присваивается.",
@@ -1517,16 +1763,22 @@
           "quote": "Возврат уменьшает расходы месяца исходной покупки."
         },
         {
-          "block_id": "b0041",
-          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
+          "block_id": "b0040",
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 99,
+          "end": 149,
+          "quote": "Возврат уменьшает расходы месяца исходной покупки."
         },
         {
           "block_id": "b0040",
+          "start": 0,
+          "end": 90,
           "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
-        },
-        {
-          "block_id": "b0042",
-          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
         }
       ],
       "branches": [
@@ -1535,32 +1787,18 @@
       "branches_checked": [],
       "links": [
         {
-          "acceptance_id": "R-010",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 7.0
-        },
-        {
           "acceptance_id": "R-009",
           "relation": "lexical",
           "source": "rules",
-          "score": 7.65
-        },
-        {
-          "acceptance_id": "R-011",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 4.13
+          "score": 5.13
         }
       ]
     },
     {
       "req_id": "R-003.4",
-      "obligation_id": "Ф-2#1",
+      "obligation_id": "R-003.4#1",
       "obligation": "Переводы и снятие наличных исключаются.",
       "acceptance_ids": [
-        "R-010",
-        "R-009",
         "R-011"
       ],
       "status": "partial",
@@ -1571,15 +1809,21 @@
           "quote": "Переводы и снятие наличных исключаются."
         },
         {
-          "block_id": "b0041",
-          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
-        },
+          "block_id": "b0042",
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+        }
+      ],
+      "evidence": [
         {
-          "block_id": "b0040",
-          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+          "block_id": "b0024",
+          "start": 150,
+          "end": 189,
+          "quote": "Переводы и снятие наличных исключаются."
         },
         {
           "block_id": "b0042",
+          "start": 0,
+          "end": 80,
           "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
         }
       ],
@@ -1590,18 +1834,6 @@
       "branches_checked": [],
       "links": [
         {
-          "acceptance_id": "R-010",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 7.0
-        },
-        {
-          "acceptance_id": "R-009",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 7.65
-        },
-        {
           "acceptance_id": "R-011",
           "relation": "lexical",
           "source": "rules",
@@ -1611,7 +1843,7 @@
     },
     {
       "req_id": "R-004.1",
-      "obligation_id": "Ф-3#1",
+      "obligation_id": "R-004.1#1",
       "obligation": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push.",
       "acceptance_ids": [
         "R-009",
@@ -1630,6 +1862,26 @@
         },
         {
           "block_id": "b0042",
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 5,
+          "end": 104,
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        },
+        {
+          "block_id": "b0040",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        },
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 80,
           "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
         }
       ],
@@ -1657,11 +1909,10 @@
     },
     {
       "req_id": "R-004.2",
-      "obligation_id": "Ф-3#1",
+      "obligation_id": "R-004.2#1",
       "obligation": "На карту приходится максимум один такой push за календарный месяц.",
       "acceptance_ids": [
-        "R-009",
-        "R-011"
+        "R-009"
       ],
       "status": "partial",
       "explanation": "Связь найдена только по общим сущностям (режим без модели); что приёмка проверяет все ветви (2), не установлено — covered не присваивается.",
@@ -1673,10 +1924,20 @@
         {
           "block_id": "b0040",
           "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 105,
+          "end": 171,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
         },
         {
-          "block_id": "b0042",
-          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+          "block_id": "b0040",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
         }
       ],
       "branches": [
@@ -1689,33 +1950,29 @@
           "acceptance_id": "R-009",
           "relation": "lexical",
           "source": "rules",
-          "score": 7.31
-        },
-        {
-          "acceptance_id": "R-011",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 4.44
+          "score": 7.0
         }
       ]
     },
     {
       "req_id": "R-005.1",
-      "obligation_id": "Ф-4#1",
+      "obligation_id": "R-005.1#1",
       "obligation": "При изменении порога накопленная сумма сохраняется.",
-      "acceptance_ids": [
-        "R-009"
-      ],
-      "status": "partial",
-      "explanation": "Связь найдена только по общим сущностям (режим без модели); что приёмка проверяет все ветви (2), не установлено — covered не присваивается.",
+      "acceptance_ids": [],
+      "status": "uncovered",
+      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
       "hints": [
         {
           "block_id": "b0026",
           "quote": "При изменении порога накопленная сумма сохраняется."
-        },
+        }
+      ],
+      "evidence": [
         {
-          "block_id": "b0040",
-          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+          "block_id": "b0026",
+          "start": 5,
+          "end": 56,
+          "quote": "При изменении порога накопленная сумма сохраняется."
         }
       ],
       "branches": [
@@ -1723,18 +1980,11 @@
         "условие не выполнено"
       ],
       "branches_checked": [],
-      "links": [
-        {
-          "acceptance_id": "R-009",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 5.06
-        }
-      ]
+      "links": []
     },
     {
       "req_id": "R-005.2",
-      "obligation_id": "Ф-4#1",
+      "obligation_id": "R-005.2#1",
       "obligation": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки.",
       "acceptance_ids": [
         "R-009"
@@ -1748,6 +1998,20 @@
         },
         {
           "block_id": "b0040",
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 57,
+          "end": 164,
+          "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки."
+        },
+        {
+          "block_id": "b0040",
+          "start": 0,
+          "end": 90,
           "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
         }
       ],
@@ -1778,6 +2042,14 @@
           "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0030",
+          "start": 0,
+          "end": 74,
+          "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -1800,6 +2072,20 @@
         },
         {
           "block_id": "b0040",
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0032",
+          "start": 0,
+          "end": 117,
+          "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге."
+        },
+        {
+          "block_id": "b0040",
+          "start": 0,
+          "end": 90,
           "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
         }
       ],
@@ -1829,6 +2115,14 @@
           "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0034",
+          "start": 0,
+          "end": 109,
+          "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -1854,6 +2148,20 @@
           "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0034",
+          "start": 110,
+          "end": 180,
+          "quote": "Повторная доставка одного события процессинга сохраняет исходный итог."
+        },
+        {
+          "block_id": "b0040",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -1868,82 +2176,6 @@
       ]
     },
     {
-      "req_id": "R-012",
-      "obligation_id": "R-012#1",
-      "obligation": "REST type | GET",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0068",
-          "quote": "REST type | GET"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-013",
-      "obligation_id": "R-013#1",
-      "obligation": "Authorization | Bearer, сессия владельца карты",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0069",
-          "quote": "Authorization | Bearer, сессия владельца карты"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-014",
-      "obligation_id": "R-014#1",
-      "obligation": "Request URL | Dev: /alerts/saveLimit .",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0072",
-          "quote": "Request URL | Dev: /alerts/saveLimit ."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-014",
-      "obligation_id": "R-014#2",
-      "obligation": "Prod: —",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0072",
-          "quote": "Prod: —"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
       "req_id": "R-015",
       "obligation_id": "R-015#1",
       "obligation": "Проверить пользовательскую сессию.",
@@ -1953,6 +2185,14 @@
       "hints": [
         {
           "block_id": "b0080",
+          "quote": "Проверить пользовательскую сессию."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0080",
+          "start": 0,
+          "end": 34,
           "quote": "Проверить пользовательскую сессию."
         }
       ],
@@ -1975,6 +2215,14 @@
           "quote": "Проверить принадлежность карты клиенту."
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0081",
+          "start": 0,
+          "end": 39,
+          "quote": "Проверить принадлежность карты клиенту."
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -1991,6 +2239,14 @@
       "hints": [
         {
           "block_id": "b0082",
+          "quote": "Проверить сумму и переключатель."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0082",
+          "start": 0,
+          "end": 32,
           "quote": "Проверить сумму и переключатель."
         }
       ],
@@ -2013,6 +2269,14 @@
           "quote": "Заменить настройку и вернуть результат сохранения."
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0083",
+          "start": 0,
+          "end": 50,
+          "quote": "Заменить настройку и вернуть результат сохранения."
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -2029,6 +2293,14 @@
       "hints": [
         {
           "block_id": "b0084",
+          "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0084",
+          "start": 0,
+          "end": 65,
           "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
         }
       ],
@@ -2052,6 +2324,14 @@
           "quote": "Целое число тенге, обе границы включены."
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0086",
+          "start": 0,
+          "end": 40,
+          "quote": "Целое число тенге, обе границы включены."
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -2068,6 +2348,14 @@
       "hints": [
         {
           "block_id": "b0087",
+          "quote": "Повторное сохранение заменяет действующую настройку."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0087",
+          "start": 0,
+          "end": 52,
           "quote": "Повторное сохранение заменяет действующую настройку."
         }
       ],
@@ -2101,6 +2389,26 @@
           "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0088",
+          "start": 0,
+          "end": 47,
+          "quote": "Изменение порога сохраняет накопленные расходы."
+        },
+        {
+          "block_id": "b0040",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        },
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 80,
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -2119,376 +2427,18 @@
           "score": 4.44
         }
       ]
-    },
-    {
-      "req_id": "R-023",
-      "obligation_id": "R-023#1",
-      "obligation": "Не используются.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0093",
-          "quote": "Не используются."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-024",
-      "obligation_id": "R-024#1",
-      "obligation": "cardId | string | 1–64 | Да | Карта клиента | Идентификатор карты | card_id",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0096",
-          "quote": "cardId | string | 1–64 | Да | Карта клиента | Идентификатор карты | card_id"
-        }
-      ],
-      "branches": [
-        "нижняя граница",
-        "верхняя граница",
-        "значение ниже нижней границы",
-        "значение выше верхней границы"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-025",
-      "obligation_id": "R-025#1",
-      "obligation": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0097",
-          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
-        }
-      ],
-      "branches": [
-        "нижняя граница",
-        "верхняя граница",
-        "значение ниже нижней границы",
-        "значение выше верхней границы"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-026",
-      "obligation_id": "R-026#1",
-      "obligation": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0098",
-          "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled"
-        }
-      ],
-      "branches": [
-        "вариант: enabled | integer | 1 знак | да | 0",
-        "вариант: 1 | признак включения | enabled"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-027",
-      "obligation_id": "R-027#1",
-      "obligation": "Content-Type: application/json .",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0100",
-          "quote": "Content-Type: application/json ."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-028",
-      "obligation_id": "R-028#1",
-      "obligation": "Тело не используется.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0101",
-          "quote": "Тело не используется."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-029.1",
-      "obligation_id": "R-029.1#1",
-      "obligation": "Если результат 200 или 201 — успешный.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0103",
-          "quote": "Если результат 200 или 201 — успешный."
-        }
-      ],
-      "branches": [
-        "вариант: если результат 200",
-        "вариант: 201 - успешный.",
-        "условие выполнено",
-        "условие не выполнено"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-029.2",
-      "obligation_id": "R-029.2#1",
-      "obligation": "Если результат 400, 401 и далее — неуспешный.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0103",
-          "quote": "Если результат 400, 401 и далее — неуспешный."
-        }
-      ],
-      "branches": [
-        "условие выполнено",
-        "условие не выполнено"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-030",
-      "obligation_id": "R-030#1",
-      "obligation": "result | string | OK / ERROR | Исход сохранения | —",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0105",
-          "quote": "result | string | OK / ERROR | Исход сохранения | —"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-031",
-      "obligation_id": "R-031#1",
-      "obligation": "amount | string | При успехе | Порог в тенге | limit_kzt",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0106",
-          "quote": "amount | string | При успехе | Порог в тенге | limit_kzt"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-032",
-      "obligation_id": "R-032#1",
-      "obligation": "enabled | string | «0» или «1» | Признак включения | enabled",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0107",
-          "quote": "enabled | string | «0» или «1» | Признак включения | enabled"
-        }
-      ],
-      "branches": [
-        "вариант: enabled | string | \"0\"",
-        "вариант: \"1\" | признак включения | enabled"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-033",
-      "obligation_id": "R-033#1",
-      "obligation": "message | string | При ошибке | Описание ошибки | —",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0108",
-          "quote": "message | string | При ошибке | Описание ошибки | —"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-034",
-      "obligation_id": "200#1",
-      "obligation": "Ответ в случае успешного выполнения метода.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0110",
-          "quote": "Ответ в случае успешного выполнения метода."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-035",
-      "obligation_id": "400#1",
-      "obligation": "Ответ в случае, если параметры запроса заполнены неверно.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0110",
-          "quote": "Ответ в случае, если параметры запроса заполнены неверно."
-        }
-      ],
-      "branches": [
-        "условие выполнено",
-        "условие не выполнено"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-036",
-      "obligation_id": "401#1",
-      "obligation": "Ответ в случае, если запрос выполнен без необходимой авторизации.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0115",
-          "quote": "Ответ в случае, если запрос выполнен без необходимой авторизации."
-        }
-      ],
-      "branches": [
-        "условие выполнено",
-        "условие не выполнено"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-037",
-      "obligation_id": "403#1",
-      "obligation": "Ответ в случае, если на указанный ресурс доступ запрещен.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0115",
-          "quote": "Ответ в случае, если на указанный ресурс доступ запрещен."
-        }
-      ],
-      "branches": [
-        "условие выполнено",
-        "условие не выполнено"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-038",
-      "obligation_id": "500#1",
-      "obligation": "Ответ в случае, если произошла внутренняя ошибка сервера.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0115",
-          "quote": "Ответ в случае, если произошла внутренняя ошибка сервера."
-        }
-      ],
-      "branches": [
-        "условие выполнено",
-        "условие не выполнено"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-039",
-      "obligation_id": "403#1",
-      "obligation": "Для чужой карты возвращается 404, как и для отсутствующей карты.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0121",
-          "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
     }
   ],
   "candidates": [
     {
       "scope": "set",
-      "kind": "question",
-      "criterion": "consistency",
+      "kind": "ambiguity",
+      "subkind": "question",
+      "criterion": "set_consistent",
       "severity": "major",
       "title": "Один и тот же неверный ввод: HTTP 200 с ошибкой в теле или HTTP 400?",
       "impact": "Клиент не знает, по коду или по полю тела распознавать отказ; контрактные тесты неоднозначны.",
       "req_ids": [
-        "R-034",
         "R-035"
       ],
       "hints": [
@@ -2501,6 +2451,10 @@
           "quote": "400. Ответ в случае, если параметры запроса заполнены неверно."
         }
       ],
+      "recommendation": "Уточнить условие у автора требования и зафиксировать исход в тексте и в приёмке.",
+      "blocked_decision": "какой исход заложить в реализацию и в тест",
+      "source": "rules",
+      "stage": "cross",
       "origin": "facts",
       "comparison_id": "CMP-019",
       "question": "Если запрос отклонён из-за значения параметра («Проверьте сумму»), какой код возвращается: HTTP 200 с телом \"result\":\"ERROR\" или HTTP 400 («параметры запроса заполнены неверно»)?",
@@ -2514,15 +2468,13 @@
     {
       "scope": "set",
       "kind": "conflict",
-      "criterion": "consistency",
+      "subkind": "conflict",
+      "criterion": "set_consistent",
       "severity": "critical",
-      "title": "R-010 противоречит правилу периода (R-003.1, R-003.2, R-003.3, R-003.4): событие на стыке периодов",
+      "title": "Приёмка №2 (R-010) противоречит правилу периода (Ф-2, R-003.1): событие на стыке периодов",
       "impact": "Для одного события (31 января в 23:58 и 1 февраля в 00:03 по Алматы) правило и приёмка дают разные исходы: январь и февраль. Разработчик и тестировщик реализуют разное поведение. Без пояса у «31 января в 23:58» пример можно прочитать иначе (например, в UTC), но и тогда текст не фиксирует пояс — исправление требует явной зоны.",
       "req_ids": [
         "R-003.1",
-        "R-003.2",
-        "R-003.3",
-        "R-003.4",
         "R-010"
       ],
       "hints": [
@@ -2535,9 +2487,37 @@
           "quote": "Февральский счётчик вырос на 4 000 ₸"
         }
       ],
+      "recommendation": "Выбрать один исход для этого входа, исправить вторую формулировку и добавить пример приёмки на этот вход.",
+      "blocked_decision": "какой исход реализовать и какой ожидать в тесте для общего входа",
+      "source": "rules",
+      "stage": "cross",
+      "origin": "rules",
       "witness": {
-        "input": {
-          "description": "Событие из R-010: 31 января в 23:58; 1 февраля в 00:03 по Алматы",
+        "input": "Событие из Приёмка №2 (R-010): 31 января в 23:58; 1 февраля в 00:03 по Алматы. данные документа: момент «совершения покупки» = «31 января в 23:58»; другой момент того же события = «1 февраля в 00:03 по Алматы»; сумма = «4 000 ₸». иллюстративно: пояс времени момента = Алматы (UTC+5) (у «31 января в 23:58» пояс не указан; правило считает по «Алматы», и формулировка примера допускает это прочтение — значит, такой вход удовлетворяет обоим текстам).",
+        "outcome_a": "событие относится к периоду «январь»: момент «совершения покупки» — 31 января в 23:58",
+        "outcome_b": "событие учтено в периоде «февраль»: «Февральский счётчик вырос на 4 000 ₸»",
+        "hint_a": {
+          "block_id": "b0024",
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        },
+        "hint_b": {
+          "block_id": "b0041",
+          "quote": "Февральский счётчик вырос на 4 000 ₸"
+        },
+        "evidence_a": {
+          "block_id": "b0024",
+          "start": 5,
+          "end": 60,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        },
+        "evidence_b": {
+          "block_id": "b0041",
+          "start": 78,
+          "end": 114,
+          "quote": "Февральский счётчик вырос на 4 000 ₸"
+        },
+        "input_detail": {
+          "description": "Событие из Приёмка №2 (R-010): 31 января в 23:58; 1 февраля в 00:03 по Алматы",
           "document_data": [
             {
               "name": "момент «совершения покупки»",
@@ -2578,24 +2558,17 @@
             }
           ]
         },
-        "outcome_a": "событие относится к периоду «январь»: момент «совершения покупки» — 31 января в 23:58",
-        "outcome_b": "событие учтено в периоде «февраль»: «Февральский счётчик вырос на 4 000 ₸»",
         "outcome_a_value": "январь",
-        "outcome_b_value": "февраль",
-        "evidence_a": {
-          "block_id": "b0024",
-          "start": 5,
-          "end": 60,
-          "quote": "Месяц определяется по дате совершения покупки в Алматы."
-        },
-        "evidence_b": {
-          "block_id": "b0041",
-          "start": 78,
-          "end": 114,
-          "quote": "Февральский счётчик вырос на 4 000 ₸"
-        }
+        "outcome_b_value": "февраль"
       },
-      "origin": "rules",
+      "cause": {
+        "object": "Приёмка №2 (R-010) противоречит правилу периода (Ф-2, R-003.1): событие на стыке периодов",
+        "condition": "Событие из Приёмка №2 (R-010): 31 января в 23:58; 1 февраля в 00:03 по Алматы. данные документа: момент «совершения покупки» = «31 января в 23:58»; другой момент того же события = «1 февраля в 00:03 по Алматы»; сумма = «4 000 ₸». иллюстративно: пояс времени момента = Алматы (UTC+5) (у «31 января в 23:58» пояс не указан; правило считает по «Алматы», и формулировка примера допускает это прочтение — значит, такой вход удовлетворяет обоим текстам).",
+        "outcomes": [
+          "событие относится к периоду «январь»: момент «совершения покупки» — 31 января в 23:58",
+          "событие учтено в периоде «февраль»: «Февральский счётчик вырос на 4 000 ₸»"
+        ]
+      },
       "comparison_id": "CMP-020",
       "binds": [
         {
@@ -2636,17 +2609,15 @@
     },
     {
       "scope": "set",
-      "kind": "missing_contract",
-      "criterion": "completeness",
+      "kind": "omission",
+      "subkind": "missing_contract",
+      "criterion": "set_complete",
       "severity": "critical",
       "title": "Обещано чтение через контракт, но метода для этой операции в API нет",
-      "impact": "«Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API».» — в описании API (строки 97–198) найдено только: GET /alerts/saveLimit — сохранение. Клиент не сможет выполнить обещанную операцию, тест на неё не из чего написать.",
+      "impact": "«Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API».» — в описании API (строки 95–198) найдено только: GET /alerts/saveLimit — сохранение. Клиент не сможет выполнить обещанную операцию, тест на неё не из чего написать.",
       "req_ids": [
         "R-008.1",
-        "R-008.2",
-        "R-001.1",
-        "R-001.2",
-        "R-001.3"
+        "R-001.2"
       ],
       "hints": [
         {
@@ -2662,8 +2633,13 @@
           "quote": "чтение"
         }
       ],
+      "recommendation": "Описать метод для обещанной операции (URL, REST type, параметры, ответ, статусы) или убрать обещание.",
+      "blocked_decision": "как клиенту выполнить обещанную операцию и чем её проверить",
+      "source": "rules",
+      "stage": "cross",
       "origin": "rules",
       "inspected_block_ids": [
+        "b0063",
         "b0064",
         "b0065",
         "b0066",
@@ -2728,6 +2704,7 @@
       ],
       "inspected_scope": {
         "sections": [
+          "",
           "Часть B. REST API",
           "Часть B. REST API / Общие параметры",
           "Часть B. REST API / Логика работы метода",
@@ -2745,7 +2722,7 @@
           "Часть B. REST API / Статусы / 403. Unsuccessful — Forbidden",
           "Часть B. REST API / Статусы / 500. Unsuccessful — Internal server error"
         ],
-        "span": "строки 97–198"
+        "span": "строки 95–198"
       },
       "searched_for": [
         "URL или имя метода с глаголом чтения (get/read/list/fetch/load/show/find)",
@@ -2765,19 +2742,18 @@
     }
   ],
   "warnings": [
-    "Подсказка №04 отклонена: цитата не найдена ('').",
-    "Отобрано 139 пар, к модели отправлено 60 с наибольшим весом."
+    "Отобрано 121 пар, к модели отправлено 60 с наибольшим весом."
   ],
   "coverage_summary": {
-    "denominator": 47,
+    "denominator": 25,
     "covered": 0,
-    "partial": 10,
+    "partial": 9,
     "conflict": 1,
-    "uncovered": 36,
+    "uncovered": 15,
     "unknown": 0,
     "covered_ratio": 0.0,
-    "linked": 11,
-    "linked_ratio": 0.234,
+    "linked": 10,
+    "linked_ratio": 0.4,
     "by_requirement": [
       {
         "req_id": "R-001.1",
@@ -2802,70 +2778,70 @@
       },
       {
         "req_id": "R-002.1",
-        "label": "Ф-1",
+        "label": "Ф-1, R-002.1",
         "obligations": 1,
         "covered": 0,
         "status": "uncovered"
       },
       {
         "req_id": "R-002.2",
-        "label": "Ф-1",
+        "label": "Ф-1, R-002.2",
         "obligations": 1,
         "covered": 0,
         "status": "uncovered"
       },
       {
         "req_id": "R-003.1",
-        "label": "Ф-2",
+        "label": "Ф-2, R-003.1",
         "obligations": 1,
         "covered": 0,
         "status": "conflict"
       },
       {
         "req_id": "R-003.2",
-        "label": "Ф-2",
+        "label": "Ф-2, R-003.2",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
       },
       {
         "req_id": "R-003.3",
-        "label": "Ф-2",
+        "label": "Ф-2, R-003.3",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
       },
       {
         "req_id": "R-003.4",
-        "label": "Ф-2",
+        "label": "Ф-2, R-003.4",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
       },
       {
         "req_id": "R-004.1",
-        "label": "Ф-3",
+        "label": "Ф-3, R-004.1",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
       },
       {
         "req_id": "R-004.2",
-        "label": "Ф-3",
+        "label": "Ф-3, R-004.2",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
       },
       {
         "req_id": "R-005.1",
-        "label": "Ф-4",
+        "label": "Ф-4, R-005.1",
         "obligations": 1,
         "covered": 0,
-        "status": "partial"
+        "status": "uncovered"
       },
       {
         "req_id": "R-005.2",
-        "label": "Ф-4",
+        "label": "Ф-4, R-005.2",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
@@ -2897,27 +2873,6 @@
         "obligations": 1,
         "covered": 0,
         "status": "partial"
-      },
-      {
-        "req_id": "R-012",
-        "label": "R-012",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
-      },
-      {
-        "req_id": "R-013",
-        "label": "R-013",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
-      },
-      {
-        "req_id": "R-014",
-        "label": "R-014",
-        "obligations": 2,
-        "covered": 0,
-        "status": "uncovered"
       },
       {
         "req_id": "R-015",
@@ -2974,135 +2929,116 @@
         "obligations": 1,
         "covered": 0,
         "status": "partial"
+      }
+    ],
+    "note": "Знаменатель — число обязательств. linked (есть связанная приёмка) не равен covered: covered требует проверки всех ветвей без противоречия; conflict — приёмка спорит с обязательством.",
+    "excluded": [
+      {
+        "req_id": "R-012",
+        "label": "R-012",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
+      },
+      {
+        "req_id": "R-013",
+        "label": "R-013",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
+      },
+      {
+        "req_id": "R-014",
+        "label": "R-014",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-023",
         "label": "R-023",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-024",
         "label": "R-024",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-025",
         "label": "R-025",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-026",
         "label": "R-026",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-027",
         "label": "R-027",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-028",
         "label": "R-028",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-029.1",
         "label": "R-029.1",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-029.2",
         "label": "R-029.2",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-030",
         "label": "R-030",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-031",
         "label": "R-031",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-032",
         "label": "R-032",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-033",
         "label": "R-033",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-034",
-        "label": "200",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-034",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-035",
-        "label": "400",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-035",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-036",
-        "label": "401",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-036",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-037",
-        "label": "403",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-037",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-038",
-        "label": "500",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-038",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-039",
-        "label": "403",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-039",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       }
-    ],
-    "note": "Знаменатель — число обязательств. linked (есть связанная приёмка) не равен covered: covered требует проверки всех ветвей без противоречия; conflict — приёмка спорит с обязательством."
+    ]
   },
   "comparisons": [
     {
@@ -3317,7 +3253,7 @@
       "aspect": "period",
       "verdict": "mismatch",
       "fact_ids": [],
-      "explanation": "R-010 противоречит правилу «Месяц определяется по дате совершения покупки в Алматы.» на границе периода."
+      "explanation": "Приёмка №2 (R-010) противоречит правилу «Месяц определяется по дате совершения покупки в Алматы.» на границе периода."
     }
   ],
   "evidence_audit": {
@@ -3326,7 +3262,7 @@
     "ambiguous": 0,
     "relocated": 0,
     "rejected": 0,
-    "explanation": "Подсказки {block_id, quote} модулей №04 и LLM-стадий №06. confirmed — точное совпадение block.text[start:end] == quote (включая нормализацию пробелов, ё и Markdown с пересчётом координат); ambiguous — цитата встречается в блоке несколько раз, выбрано первое вхождение или по контексту; relocated — цитата найдена ровно в одном другом блоке; rejected — не найдена, опора не используется. Детерминированные опоры, вычисленные из таблиц, сюда не входят.",
+    "note": "Подсказки {block_id, quote} модулей №04 и LLM-стадий №06. confirmed — точное совпадение block.text[start:end] == quote (включая нормализацию пробелов, ё и Markdown с пересчётом координат); ambiguous — цитата встречается в блоке несколько раз, выбрано первое вхождение или по контексту; relocated — цитата найдена ровно в одном другом блоке; rejected — не найдена, опора не используется. Детерминированные опоры, вычисленные из таблиц, сюда не входят. Цитаты проверены резолвером №07.",
     "notes": []
   },
   "stats": {
@@ -3336,45 +3272,42 @@
     "pairs_considered": 2692,
     "pairs_selected": 60,
     "pairs_by_role": {
-      "api×api": 9,
+      "api×api": 4,
       "integration×api": 3,
-      "business_rules×process": 2,
+      "business_rules×process": 3,
+      "business_rules×api": 3,
+      "business_rules×business_rules": 5,
       "ui×business_rules": 3,
-      "business_rules×api": 2,
-      "business_rules×business_rules": 4,
-      "business_rules×acceptance": 10,
-      "business_rules×data": 2,
+      "business_rules×acceptance": 12,
       "ui×integration": 3,
       "ui×api": 3,
-      "business_rules×nfr": 2,
-      "business_rules×goals": 1,
+      "business_rules×nfr": 3,
+      "business_rules×goals": 3,
       "process×api": 2,
+      "business_rules×data": 3,
       "data×api": 3,
-      "business_rules×integration": 2,
       "api×process": 1,
-      "ui×acceptance": 3,
       "api×acceptance": 3,
-      "nfr×process": 1,
-      "acceptance×process": 1
+      "business_rules×integration": 3
     },
     "status": "complete"
   },
   "acceptance": [
     {
       "acceptance_id": "R-009",
-      "label": "R-009",
+      "label": "Приёмка №1 (R-009)",
       "block_id": "b0040",
       "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
     },
     {
       "acceptance_id": "R-010",
-      "label": "R-010",
+      "label": "Приёмка №2 (R-010)",
       "block_id": "b0041",
       "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
     },
     {
       "acceptance_id": "R-011",
-      "label": "R-011",
+      "label": "Приёмка №3 (R-011)",
       "block_id": "b0042",
       "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
     }

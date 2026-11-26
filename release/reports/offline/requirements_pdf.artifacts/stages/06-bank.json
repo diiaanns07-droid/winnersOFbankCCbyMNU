@@ -1,5 +1,5272 @@
 {
-  "checklist": [],
-  "test_cases": [],
-  "warnings": []
+  "checklist": [
+    {
+      "id": "CHK-01",
+      "position": 1,
+      "text": "Техническое требование зафиксировано и покрывает бизнес-требование",
+      "source_note": "",
+      "available": "yes",
+      "checked": "no",
+      "cells": {
+        "available": "Да",
+        "checked": "Нет"
+      },
+      "note": "Наличие: да — «Дать клиенту возможность узнать о достижении личного бюджета в момент покупки.» (с. 1). Автопроверка: нет — блокирующие замечания: F-002, F-004, F-007. Ключевое замечание: F-002 «Обещано чтение через контракт, но метода для этой операции в API нет» — «Приложение читает и сохраняет настройки через дочерний документ…» (с. 2).",
+      "finding_ids": [
+        "F-002",
+        "F-004",
+        "F-007",
+        "F-017",
+        "F-018",
+        "F-019",
+        "F-020",
+        "F-021",
+        "F-025",
+        "F-012"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0015",
+          "start": 0,
+          "end": 78,
+          "quote": "Дать клиенту возможность узнать о достижении личного бюджета в момент покупки."
+        },
+        {
+          "block_id": "b0024",
+          "start": 0,
+          "end": 6,
+          "quote": "• Ф-1."
+        },
+        {
+          "block_id": "b0031",
+          "start": 0,
+          "end": 74,
+          "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
+        },
+        {
+          "block_id": "b0035",
+          "start": 0,
+          "end": 109,
+          "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+        },
+        {
+          "block_id": "b0033",
+          "start": 60,
+          "end": 82,
+          "quote": "сумму покупки в тиынах"
+        },
+        {
+          "block_id": "b0103",
+          "start": 44,
+          "end": 70,
+          "quote": "результат 400, 401 и далее"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет"
+        ],
+        "checked": [
+          "Да",
+          "Нет"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "business",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Цели», «Функциональные требования», «Нефункциональные требования»",
+        "evidence": [
+          {
+            "block_id": "b0015",
+            "start": 0,
+            "end": 78,
+            "quote": "Дать клиенту возможность узнать о достижении личного бюджета в момент покупки."
+          },
+          {
+            "block_id": "b0024",
+            "start": 0,
+            "end": 6,
+            "quote": "• Ф-1."
+          },
+          {
+            "block_id": "b0031",
+            "start": 0,
+            "end": 74,
+            "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0014",
+          "b0015",
+          "b0023",
+          "b0024",
+          "b0025",
+          "b0026",
+          "b0027",
+          "b0030",
+          "b0031"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "блокирующие замечания: F-002, F-004, F-007",
+        "finding_ids": [
+          "F-002",
+          "F-004",
+          "F-007",
+          "F-017",
+          "F-018",
+          "F-019",
+          "F-020",
+          "F-021",
+          "F-025",
+          "F-012"
+        ],
+        "blocking_finding_ids": [
+          "F-002",
+          "F-004",
+          "F-007"
+        ]
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0047",
+        "evidence": {
+          "block_id": "b0047",
+          "start": 0,
+          "end": 66,
+          "quote": "Техническое требование зафиксировано и покрывает бизнес-требование"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет",
+          "checked": "Да / Нет"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL01",
+        "criteria": [
+          "necessary",
+          "set_complete",
+          "traceable"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-02",
+      "position": 2,
+      "text": "Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)",
+      "source_note": "",
+      "available": "yes",
+      "checked": "unknown",
+      "cells": {
+        "available": "Да",
+        "checked": null
+      },
+      "note": "Наличие: да — «Общие сведения» (с. 1). Автопроверка: не определено — семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается; незначительные: F-017, F-018.",
+      "finding_ids": [
+        "F-017",
+        "F-018"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0005",
+          "start": 0,
+          "end": 14,
+          "quote": "Общие сведения"
+        },
+        {
+          "block_id": "b0014",
+          "start": 0,
+          "end": 4,
+          "quote": "Цели"
+        },
+        {
+          "block_id": "b0016",
+          "start": 0,
+          "end": 19,
+          "quote": "Архитектура решения"
+        },
+        {
+          "block_id": "b0018",
+          "start": 0,
+          "end": 18,
+          "quote": "Дизайн процесса UI"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет"
+        ],
+        "checked": [
+          "Да",
+          "Нет"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "structure",
+      "presence": {
+        "value": "yes",
+        "basis": "документ разбит по разделам шаблона (19): «Общие сведения», «Цели», «Архитектура решения», «Дизайн процесса UI», «BPMN схема процесса», «Функциональные требования»",
+        "evidence": [
+          {
+            "block_id": "b0005",
+            "start": 0,
+            "end": 14,
+            "quote": "Общие сведения"
+          },
+          {
+            "block_id": "b0014",
+            "start": 0,
+            "end": 4,
+            "quote": "Цели"
+          },
+          {
+            "block_id": "b0016",
+            "start": 0,
+            "end": 19,
+            "quote": "Архитектура решения"
+          },
+          {
+            "block_id": "b0018",
+            "start": 0,
+            "end": 18,
+            "quote": "Дизайн процесса UI"
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0005",
+          "b0014",
+          "b0016",
+          "b0018",
+          "b0021",
+          "b0023",
+          "b0028",
+          "b0030",
+          "b0032",
+          "b0034",
+          "b0036",
+          "b0039",
+          "b0044",
+          "b0061",
+          "b0065",
+          "b0079",
+          "b0091",
+          "b0102",
+          "b0109"
+        ]
+      },
+      "machine": {
+        "value": "unknown",
+        "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается; незначительные: F-017, F-018",
+        "finding_ids": [
+          "F-017",
+          "F-018"
+        ],
+        "blocking_finding_ids": []
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "needs_confirmation",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0048",
+        "evidence": {
+          "block_id": "b0048",
+          "start": 0,
+          "end": 84,
+          "quote": "Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет",
+          "checked": "Да / Нет"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL02",
+        "criteria": [
+          "conforming",
+          "set_comprehensible"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-03",
+      "position": 3,
+      "text": "Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений",
+      "source_note": "",
+      "available": "yes",
+      "checked": "unknown",
+      "cells": {
+        "available": "Да",
+        "checked": null
+      },
+      "note": "Наличие: да — «Процессинг → сервис расходов: проведена покупка.» (с. 2). Автопроверка: не определено — семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается.",
+      "finding_ids": [],
+      "evidence": [
+        {
+          "block_id": "b0029",
+          "start": 0,
+          "end": 48,
+          "quote": "Процессинг → сервис расходов: проведена покупка."
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "checked": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "sequence",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Sequence Diagram»",
+        "evidence": [
+          {
+            "block_id": "b0029",
+            "start": 0,
+            "end": 48,
+            "quote": "Процессинг → сервис расходов: проведена покупка."
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0028",
+          "b0029"
+        ]
+      },
+      "machine": {
+        "value": "unknown",
+        "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
+        "finding_ids": [],
+        "blocking_finding_ids": []
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "needs_confirmation",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0049",
+        "evidence": {
+          "block_id": "b0049",
+          "start": 0,
+          "end": 78,
+          "quote": "Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет / Не требуется",
+          "checked": "Да / Нет / Не требуется"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL03",
+        "criteria": [
+          "set_complete",
+          "set_consistent"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-04",
+      "position": 4,
+      "text": "Требование покрывает спецификацию UX/UI дизайна",
+      "source_note": "",
+      "available": "yes",
+      "checked": "no",
+      "cells": {
+        "available": "Да",
+        "checked": "Нет"
+      },
+      "note": "Наличие: да — «Карты → Расходы → Уведомления.» (с. 1). Автопроверка: нет — блокирующие замечания: F-002. Ключевое замечание: F-002 «Обещано чтение через контракт, но метода для этой операции в API нет» — «Приложение читает и сохраняет настройки через дочерний документ…» (с. 2).",
+      "finding_ids": [
+        "F-002",
+        "F-013",
+        "F-012"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0019",
+          "start": 0,
+          "end": 30,
+          "quote": "Карты → Расходы → Уведомления."
+        },
+        {
+          "block_id": "b0035",
+          "start": 0,
+          "end": 109,
+          "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "checked": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "ui",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Дизайн процесса UI»",
+        "evidence": [
+          {
+            "block_id": "b0019",
+            "start": 0,
+            "end": 30,
+            "quote": "Карты → Расходы → Уведомления."
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0018",
+          "b0019"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "блокирующие замечания: F-002",
+        "finding_ids": [
+          "F-002",
+          "F-013",
+          "F-012"
+        ],
+        "blocking_finding_ids": [
+          "F-002"
+        ]
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0050",
+        "evidence": {
+          "block_id": "b0050",
+          "start": 0,
+          "end": 47,
+          "quote": "Требование покрывает спецификацию UX/UI дизайна"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет / Не требуется",
+          "checked": "Да / Нет / Не требуется"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL04",
+        "criteria": [
+          "set_complete"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-05",
+      "position": 5,
+      "text": "Реализация задачи/проекта предусматривает схему отката решений",
+      "source_note": "При невозможности отката — варианты скрытия функционала",
+      "available": "no",
+      "checked": "no",
+      "cells": {
+        "available": "Нет",
+        "checked": "Нет"
+      },
+      "note": "Наличие: нет — в документе нет описания по теме «Схема отката». Автопроверка: нет — проверять нечего: описания нет.",
+      "finding_ids": [],
+      "evidence": [],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "checked": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "rollback",
+      "presence": {
+        "value": "no",
+        "basis": "в документе нет описания по теме «Схема отката»",
+        "evidence": [],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0001",
+          "b0002",
+          "b0003",
+          "b0004",
+          "b0005",
+          "b0006",
+          "b0007",
+          "b0008",
+          "b0009",
+          "b0010",
+          "b0011",
+          "b0012",
+          "b0013",
+          "b0014",
+          "b0015",
+          "b0016",
+          "b0017",
+          "b0018",
+          "b0019",
+          "b0020",
+          "b0021",
+          "b0022",
+          "b0023",
+          "b0024",
+          "b0025",
+          "b0026",
+          "b0027",
+          "b0028",
+          "b0029",
+          "b0030",
+          "b0031",
+          "b0032",
+          "b0033",
+          "b0034",
+          "b0035",
+          "b0036",
+          "b0037",
+          "b0038",
+          "b0039",
+          "b0040",
+          "b0041",
+          "b0042",
+          "b0043",
+          "b0044",
+          "b0045",
+          "b0061",
+          "b0063",
+          "b0064",
+          "b0065",
+          "b0066",
+          "b0067",
+          "b0068",
+          "b0069",
+          "b0070",
+          "b0071",
+          "b0072",
+          "b0073",
+          "b0074",
+          "b0075",
+          "b0076",
+          "b0077",
+          "b0078",
+          "b0079",
+          "b0080",
+          "b0081",
+          "b0082",
+          "b0083",
+          "b0084",
+          "b0085",
+          "b0086",
+          "b0087",
+          "b0088",
+          "b0089",
+          "b0090",
+          "b0091",
+          "b0092",
+          "b0093",
+          "b0094",
+          "b0095",
+          "b0096",
+          "b0097",
+          "b0098",
+          "b0099",
+          "b0100",
+          "b0101",
+          "b0102",
+          "b0103",
+          "b0104",
+          "b0105",
+          "b0106",
+          "b0107",
+          "b0108",
+          "b0109",
+          "b0110",
+          "b0111",
+          "b0112",
+          "b0113",
+          "b0114",
+          "b0115",
+          "b0116",
+          "b0117",
+          "b0118",
+          "b0119",
+          "b0120",
+          "b0121",
+          "b0122",
+          "b0123",
+          "b0124",
+          "b0125",
+          "b0126",
+          "b0127",
+          "b0128"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "проверять нечего: описания нет",
+        "finding_ids": [],
+        "blocking_finding_ids": []
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0051",
+        "evidence": {
+          "block_id": "b0051",
+          "start": 0,
+          "end": 62,
+          "quote": "Реализация задачи/проекта предусматривает схему отката решений"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет / Не требуется",
+          "checked": "Да / Нет / Не требуется"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL05",
+        "criteria": [
+          "feasible",
+          "set_complete"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-06",
+      "position": 6,
+      "text": "Требование может быть протестировано",
+      "source_note": "",
+      "available": "yes",
+      "checked": "unknown",
+      "cells": {
+        "available": "Да",
+        "checked": null
+      },
+      "note": "Наличие: да — «Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push» (с. 2). Автопроверка: не определено — семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается; незначительные: F-014, F-016.",
+      "finding_ids": [
+        "F-014",
+        "F-016"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        },
+        {
+          "block_id": "b0038",
+          "start": 0,
+          "end": 26,
+          "quote": "заполняются тестировщиками"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет"
+        ],
+        "checked": [
+          "Да",
+          "Нет"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "testability",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Критерии приемки»",
+        "evidence": [
+          {
+            "block_id": "b0041",
+            "start": 0,
+            "end": 90,
+            "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+          }
+        ],
+        "negative_evidence": [
+          {
+            "block_id": "b0038",
+            "start": 0,
+            "end": 26,
+            "quote": "заполняются тестировщиками"
+          },
+          {
+            "block_id": "b0038",
+            "start": 0,
+            "end": 26,
+            "quote": "заполняются тестировщиками"
+          }
+        ],
+        "inspected_block_ids": [
+          "b0036",
+          "b0038",
+          "b0037",
+          "b0039",
+          "b0040",
+          "b0041",
+          "b0042",
+          "b0043"
+        ]
+      },
+      "machine": {
+        "value": "unknown",
+        "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается; незначительные: F-014, F-016",
+        "finding_ids": [
+          "F-014",
+          "F-016"
+        ],
+        "blocking_finding_ids": []
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "needs_confirmation",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0052",
+        "evidence": {
+          "block_id": "b0052",
+          "start": 0,
+          "end": 36,
+          "quote": "Требование может быть протестировано"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет",
+          "checked": "Да / Нет"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL06",
+        "criteria": [
+          "set_validatable",
+          "unambiguous",
+          "verifiable"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-07",
+      "position": 7,
+      "text": "Требование предусматривает модель данных или поток, содержит описание",
+      "source_note": "",
+      "available": "yes",
+      "checked": "no",
+      "cells": {
+        "available": "Да",
+        "checked": "Нет"
+      },
+      "note": "Наличие: да — «Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог…» (с. 2). Автопроверка: нет — блокирующие замечания: F-004. Ключевое замечание: F-004 «Суммы в единицах «тиын» и «тенге» без правила пересчёта» — «сумму покупки в тиынах» (с. 2).",
+      "finding_ids": [
+        "F-004",
+        "F-018"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0033",
+          "start": 0,
+          "end": 117,
+          "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге."
+        },
+        {
+          "block_id": "b0033",
+          "start": 60,
+          "end": 82,
+          "quote": "сумму покупки в тиынах"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "checked": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "data",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Требования к данным»",
+        "evidence": [
+          {
+            "block_id": "b0033",
+            "start": 0,
+            "end": 117,
+            "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге."
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0032",
+          "b0033"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "блокирующие замечания: F-004",
+        "finding_ids": [
+          "F-004",
+          "F-018"
+        ],
+        "blocking_finding_ids": [
+          "F-004"
+        ]
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0053",
+        "evidence": {
+          "block_id": "b0053",
+          "start": 0,
+          "end": 69,
+          "quote": "Требование предусматривает модель данных или поток, содержит описание"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет / Не требуется",
+          "checked": "Да / Нет / Не требуется"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL07",
+        "criteria": [
+          "complete",
+          "set_complete"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-08",
+      "position": 8,
+      "text": "Требование не имеет противоречий или явных показателей операционных рисков",
+      "source_note": "",
+      "available": "yes",
+      "checked": "no",
+      "cells": {
+        "available": "Да",
+        "checked": "Нет"
+      },
+      "note": "Наличие: да — требования для проверки есть: 49. Автопроверка: нет — блокирующие замечания: F-001, F-003, F-005, F-006, F-008, F-009, F-010, F-011. Ключевое замечание: F-001 «Приёмка №2 (R-010) противоречит правилу периода (Ф-2, R-003.1): событие на…» — «Месяц определяется по дате совершения покупки в Алматы.» (с. 2).",
+      "finding_ids": [
+        "F-001",
+        "F-003",
+        "F-005",
+        "F-006",
+        "F-008",
+        "F-009",
+        "F-010",
+        "F-011",
+        "F-013",
+        "F-016",
+        "F-024"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 7,
+          "end": 62,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        },
+        {
+          "block_id": "b0098",
+          "start": 0,
+          "end": 17,
+          "quote": "enabled | integer"
+        },
+        {
+          "block_id": "b0111",
+          "start": 0,
+          "end": 62,
+          "quote": "400. Ответ в случае, если параметры запроса заполнены неверно."
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет"
+        ],
+        "checked": [
+          "Да",
+          "Нет"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "consistency",
+      "presence": {
+        "value": "yes",
+        "basis": "требования для проверки есть: 49",
+        "evidence": [],
+        "negative_evidence": [],
+        "inspected_block_ids": []
+      },
+      "machine": {
+        "value": "no",
+        "basis": "блокирующие замечания: F-001, F-003, F-005, F-006, F-008, F-009, F-010, F-011",
+        "finding_ids": [
+          "F-001",
+          "F-003",
+          "F-005",
+          "F-006",
+          "F-008",
+          "F-009",
+          "F-010",
+          "F-011",
+          "F-013",
+          "F-016",
+          "F-024"
+        ],
+        "blocking_finding_ids": [
+          "F-001",
+          "F-006",
+          "F-009",
+          "F-011",
+          "F-005",
+          "F-008",
+          "F-003",
+          "F-010"
+        ]
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0054",
+        "evidence": {
+          "block_id": "b0054",
+          "start": 0,
+          "end": 74,
+          "quote": "Требование не имеет противоречий или явных показателей операционных рисков"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет",
+          "checked": "Да / Нет"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL08",
+        "criteria": [
+          "correct",
+          "set_consistent",
+          "unambiguous"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-09",
+      "position": 9,
+      "text": "Требование содержит архитектуру и согласовано с архитекторами",
+      "source_note": "Для архитектуры — чек-лист",
+      "available": "yes",
+      "checked": "unknown",
+      "cells": {
+        "available": "Да",
+        "checked": null
+      },
+      "note": "Наличие: да — «Мобильное приложение → сервис настроек.» (с. 1). Автопроверка: не определено — семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается. Согласование с архитекторами: требует подтверждения: в блоке согласующих нет ни ФИО, ни подписи (с. 4). Шаблон: «Для архитектуры — чек-лист» — итог за профильным чек-листом, требует подтверждения.",
+      "finding_ids": [],
+      "evidence": [
+        {
+          "block_id": "b0017",
+          "start": 0,
+          "end": 39,
+          "quote": "Мобильное приложение → сервис настроек."
+        },
+        {
+          "block_id": "b0062",
+          "start": 0,
+          "end": 44,
+          "quote": "Подразделение | ФИО ответственного | Подпись"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "checked": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "architecture",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Архитектура решения»",
+        "evidence": [
+          {
+            "block_id": "b0017",
+            "start": 0,
+            "end": 39,
+            "quote": "Мобильное приложение → сервис настроек."
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0016",
+          "b0017"
+        ]
+      },
+      "machine": {
+        "value": "unknown",
+        "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
+        "finding_ids": [],
+        "blocking_finding_ids": []
+      },
+      "approval": {
+        "required": true,
+        "role": "архитекторами",
+        "status": "requires_confirmation",
+        "basis": "требует подтверждения: в блоке согласующих нет ни ФИО, ни подписи",
+        "evidence": [
+          {
+            "block_id": "b0062",
+            "start": 0,
+            "end": 44,
+            "quote": "Подразделение | ФИО ответственного | Подпись"
+          }
+        ],
+        "decision_id": null
+      },
+      "not_required_basis": null,
+      "status": "needs_confirmation",
+      "question": {
+        "id": "Q-CHK-09",
+        "kind": "approval",
+        "prompt": "Строка 9 чек-листа «Требование содержит архитектуру и согласовано с архитекторами»: получено ли согласование с архитекторами?",
+        "options": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "finding_ids": [],
+        "affected_req_ids": [],
+        "target": "checklist:CHK-09:checked"
+      },
+      "changes": [],
+      "source": {
+        "block_id": "b0055",
+        "evidence": {
+          "block_id": "b0055",
+          "start": 0,
+          "end": 61,
+          "quote": "Требование содержит архитектуру и согласовано с архитекторами"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет / Не требуется",
+          "checked": "Да / Нет / Не требуется"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL09",
+        "criteria": [
+          "appropriate",
+          "feasible",
+          "set_feasible"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-10",
+      "position": 10,
+      "text": "Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами",
+      "source_note": "",
+      "available": "yes",
+      "checked": "unknown",
+      "cells": {
+        "available": "Да",
+        "checked": null
+      },
+      "note": "Наличие: да — «Влияние на ИС | Мобильный банк, карточный процессинг, сервис уведомлений» (с. 1). Автопроверка: нет — блокирующие замечания: F-002, F-004, F-007. Согласование с ответственными лицами: требует подтверждения: в блоке согласующих нет ни ФИО, ни подписи (с. 4). Ключевое замечание: F-002 «Обещано чтение через контракт, но метода для этой операции в API нет» — «Приложение читает и сохраняет настройки через дочерний документ…» (с. 2).",
+      "finding_ids": [
+        "F-002",
+        "F-004",
+        "F-007",
+        "F-019",
+        "F-020",
+        "F-021",
+        "F-025",
+        "F-012"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 0,
+          "end": 72,
+          "quote": "Влияние на ИС | Мобильный банк, карточный процессинг, сервис уведомлений"
+        },
+        {
+          "block_id": "b0062",
+          "start": 0,
+          "end": 44,
+          "quote": "Подразделение | ФИО ответственного | Подпись"
+        },
+        {
+          "block_id": "b0035",
+          "start": 0,
+          "end": 109,
+          "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+        },
+        {
+          "block_id": "b0033",
+          "start": 60,
+          "end": 82,
+          "quote": "сумму покупки в тиынах"
+        },
+        {
+          "block_id": "b0103",
+          "start": 44,
+          "end": 70,
+          "quote": "результат 400, 401 и далее"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "checked": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "impact",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Влияние на ИС»",
+        "evidence": [
+          {
+            "block_id": "b0012",
+            "start": 0,
+            "end": 72,
+            "quote": "Влияние на ИС | Мобильный банк, карточный процессинг, сервис уведомлений"
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0012"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "блокирующие замечания: F-002, F-004, F-007",
+        "finding_ids": [
+          "F-002",
+          "F-004",
+          "F-007",
+          "F-019",
+          "F-020",
+          "F-021",
+          "F-025",
+          "F-012"
+        ],
+        "blocking_finding_ids": [
+          "F-002",
+          "F-004",
+          "F-007"
+        ]
+      },
+      "approval": {
+        "required": true,
+        "role": "ответственными лицами",
+        "status": "requires_confirmation",
+        "basis": "требует подтверждения: в блоке согласующих нет ни ФИО, ни подписи",
+        "evidence": [
+          {
+            "block_id": "b0062",
+            "start": 0,
+            "end": 44,
+            "quote": "Подразделение | ФИО ответственного | Подпись"
+          }
+        ],
+        "decision_id": null
+      },
+      "not_required_basis": null,
+      "status": "needs_confirmation",
+      "question": {
+        "id": "Q-CHK-10",
+        "kind": "approval",
+        "prompt": "Строка 10 чек-листа «Все изменения, влияющие на иные продукты/системы в требовании, согласованы с…»: получено ли согласование с ответственными лицами?",
+        "options": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "finding_ids": [],
+        "affected_req_ids": [],
+        "target": "checklist:CHK-10:checked"
+      },
+      "changes": [],
+      "source": {
+        "block_id": "b0056",
+        "evidence": {
+          "block_id": "b0056",
+          "start": 0,
+          "end": 98,
+          "quote": "Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет / Не требуется",
+          "checked": "Да / Нет / Не требуется"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL10",
+        "criteria": [
+          "necessary",
+          "set_complete",
+          "traceable"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-11",
+      "position": 11,
+      "text": "Структура требований не несёт изменений и рисков информационной безопасности",
+      "source_note": "По информационной безопасности — чек-лист",
+      "available": "yes",
+      "checked": "no",
+      "cells": {
+        "available": "Да",
+        "checked": "Нет"
+      },
+      "note": "Наличие: да — «Authorization | Bearer, сессия владельца карты» (с. 4). Автопроверка: нет — блокирующие замечания: F-005. Шаблон: «По информационной безопасности — чек-лист» — итог за профильным чек-листом, требует подтверждения. Ключевое замечание: F-005 «Метод GET для изменяющей операции «/alerts/saveLimit»» — «/alerts/saveLimit» (с. 4).",
+      "finding_ids": [
+        "F-005"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0069",
+          "start": 0,
+          "end": 46,
+          "quote": "Authorization | Bearer, сессия владельца карты"
+        },
+        {
+          "block_id": "b0072",
+          "start": 19,
+          "end": 36,
+          "quote": "/alerts/saveLimit"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет"
+        ],
+        "checked": [
+          "Да",
+          "Нет"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "security",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Authorization»",
+        "evidence": [
+          {
+            "block_id": "b0069",
+            "start": 0,
+            "end": 46,
+            "quote": "Authorization | Bearer, сессия владельца карты"
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0069"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "блокирующие замечания: F-005",
+        "finding_ids": [
+          "F-005"
+        ],
+        "blocking_finding_ids": [
+          "F-005"
+        ]
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0057",
+        "evidence": {
+          "block_id": "b0057",
+          "start": 0,
+          "end": 76,
+          "quote": "Структура требований не несёт изменений и рисков информационной безопасности"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет",
+          "checked": "Да / Нет"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL11",
+        "criteria": [
+          "complete",
+          "feasible"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-12",
+      "position": 12,
+      "text": "В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки",
+      "source_note": "",
+      "available": "yes",
+      "checked": "unknown",
+      "cells": {
+        "available": "Да",
+        "checked": null
+      },
+      "note": "Наличие: да — «Проведение покупки → пересчёт расходов → проверка порога → при достижении отправка push → завершение.» (с. 1). Автопроверка: не определено — семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается.",
+      "finding_ids": [],
+      "evidence": [
+        {
+          "block_id": "b0022",
+          "start": 0,
+          "end": 101,
+          "quote": "Проведение покупки → пересчёт расходов → проверка порога → при достижении отправка push → завершение."
+        },
+        {
+          "block_id": "b0009",
+          "start": 0,
+          "end": 47,
+          "quote": "Бизнес-процесс | Информирование держателя карты"
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет"
+        ],
+        "checked": [
+          "Да",
+          "Нет"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "process",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «BPMN схема процесса», «Бизнес-процесс»",
+        "evidence": [
+          {
+            "block_id": "b0022",
+            "start": 0,
+            "end": 101,
+            "quote": "Проведение покупки → пересчёт расходов → проверка порога → при достижении отправка push → завершение."
+          },
+          {
+            "block_id": "b0009",
+            "start": 0,
+            "end": 47,
+            "quote": "Бизнес-процесс | Информирование держателя карты"
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0021",
+          "b0022",
+          "b0009"
+        ]
+      },
+      "machine": {
+        "value": "unknown",
+        "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
+        "finding_ids": [],
+        "blocking_finding_ids": []
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "needs_confirmation",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0058",
+        "evidence": {
+          "block_id": "b0058",
+          "start": 0,
+          "end": 85,
+          "quote": "В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки"
+        },
+        "location": "с. 3",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет",
+          "checked": "Да / Нет"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL12",
+        "criteria": [
+          "set_complete",
+          "set_comprehensible"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-13",
+      "position": 13,
+      "text": "Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия",
+      "source_note": "",
+      "available": "yes",
+      "checked": "no",
+      "cells": {
+        "available": "Да",
+        "checked": "Нет"
+      },
+      "note": "Наличие: да — «Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API».» (с. 2). Автопроверка: нет — блокирующие замечания: F-002, F-003, F-004, F-005, F-006, F-007, F-008, F-009, F-010, F-011. Ключевое замечание: F-002 «Обещано чтение через контракт, но метода для этой операции в API нет» — «Приложение читает и сохраняет настройки через дочерний документ…» (с. 2).",
+      "finding_ids": [
+        "F-002",
+        "F-003",
+        "F-004",
+        "F-005",
+        "F-006",
+        "F-007",
+        "F-008",
+        "F-009",
+        "F-010",
+        "F-011",
+        "F-013",
+        "F-019",
+        "F-022",
+        "F-023",
+        "F-024",
+        "F-025",
+        "F-012"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0035",
+          "start": 0,
+          "end": 109,
+          "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+        },
+        {
+          "block_id": "b0064",
+          "start": 0,
+          "end": 72,
+          "quote": "Дочерний документ части A: «Уведомление о расходах по карте — REST API»."
+        },
+        {
+          "block_id": "b0068",
+          "start": 0,
+          "end": 15,
+          "quote": "REST type | GET"
+        },
+        {
+          "block_id": "b0098",
+          "start": 0,
+          "end": 17,
+          "quote": "enabled | integer"
+        },
+        {
+          "block_id": "b0111",
+          "start": 0,
+          "end": 62,
+          "quote": "400. Ответ в случае, если параметры запроса заполнены неверно."
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ],
+        "checked": [
+          "Да",
+          "Нет",
+          "Не требуется"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "integration",
+      "presence": {
+        "value": "yes",
+        "basis": "описано: «Требования к интеграции», «Часть B. REST API», «REST type»",
+        "evidence": [
+          {
+            "block_id": "b0035",
+            "start": 0,
+            "end": 109,
+            "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API»."
+          },
+          {
+            "block_id": "b0064",
+            "start": 0,
+            "end": 72,
+            "quote": "Дочерний документ части A: «Уведомление о расходах по карте — REST API»."
+          },
+          {
+            "block_id": "b0068",
+            "start": 0,
+            "end": 15,
+            "quote": "REST type | GET"
+          }
+        ],
+        "negative_evidence": [],
+        "inspected_block_ids": [
+          "b0034",
+          "b0035",
+          "b0063",
+          "b0064",
+          "b0066",
+          "b0067",
+          "b0068",
+          "b0069",
+          "b0070",
+          "b0071",
+          "b0072",
+          "b0073",
+          "b0074",
+          "b0075",
+          "b0076",
+          "b0077",
+          "b0078",
+          "b0080",
+          "b0081",
+          "b0082",
+          "b0083",
+          "b0084",
+          "b0086",
+          "b0087",
+          "b0088",
+          "b0090",
+          "b0093",
+          "b0095",
+          "b0096",
+          "b0097",
+          "b0098",
+          "b0100",
+          "b0101",
+          "b0103",
+          "b0104",
+          "b0105",
+          "b0106",
+          "b0107",
+          "b0108",
+          "b0110",
+          "b0111",
+          "b0113",
+          "b0114",
+          "b0115",
+          "b0116",
+          "b0117",
+          "b0118",
+          "b0120",
+          "b0122",
+          "b0124",
+          "b0126",
+          "b0128"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "блокирующие замечания: F-002, F-003, F-004, F-005, F-006, F-007, F-008, F-009, F-010, F-011",
+        "finding_ids": [
+          "F-002",
+          "F-003",
+          "F-004",
+          "F-005",
+          "F-006",
+          "F-007",
+          "F-008",
+          "F-009",
+          "F-010",
+          "F-011",
+          "F-013",
+          "F-019",
+          "F-022",
+          "F-023",
+          "F-024",
+          "F-025",
+          "F-012"
+        ],
+        "blocking_finding_ids": [
+          "F-002",
+          "F-006",
+          "F-009",
+          "F-011",
+          "F-005",
+          "F-008",
+          "F-003",
+          "F-004",
+          "F-007",
+          "F-010"
+        ]
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0059",
+        "evidence": {
+          "block_id": "b0059",
+          "start": 0,
+          "end": 108,
+          "quote": "Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия"
+        },
+        "location": "с. 4",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет / Не требуется",
+          "checked": "Да / Нет / Не требуется"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL13",
+        "criteria": [
+          "complete",
+          "set_consistent"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    },
+    {
+      "id": "CHK-14",
+      "position": 14,
+      "text": "Поддерживается версионность документа / зафиксирована",
+      "source_note": "",
+      "available": "no",
+      "checked": "no",
+      "cells": {
+        "available": "Нет",
+        "checked": "Нет"
+      },
+      "note": "Наличие: нет — в документе прямо сказано, что версия или дата не заполнены: «Документ (версия/дата) в источнике не заполнен.» (с. 3). Автопроверка: нет — проверять нечего: описания нет.",
+      "finding_ids": [],
+      "evidence": [
+        {
+          "block_id": "b0045",
+          "start": 0,
+          "end": 47,
+          "quote": "Документ (версия/дата) в источнике не заполнен."
+        }
+      ],
+      "allowed": {
+        "available": [
+          "Да",
+          "Нет"
+        ],
+        "checked": [
+          "Да",
+          "Нет"
+        ]
+      },
+      "source_value": {
+        "available": null,
+        "checked": null
+      },
+      "topic": "versioning",
+      "presence": {
+        "value": "no",
+        "basis": "в документе прямо сказано, что версия или дата не заполнены",
+        "evidence": [],
+        "negative_evidence": [
+          {
+            "block_id": "b0045",
+            "start": 0,
+            "end": 47,
+            "quote": "Документ (версия/дата) в источнике не заполнен."
+          }
+        ],
+        "inspected_block_ids": [
+          "b0001",
+          "b0002",
+          "b0003",
+          "b0004",
+          "b0005",
+          "b0006",
+          "b0007",
+          "b0008",
+          "b0009",
+          "b0010",
+          "b0011",
+          "b0012",
+          "b0013",
+          "b0014",
+          "b0015",
+          "b0016",
+          "b0017",
+          "b0018",
+          "b0019",
+          "b0020",
+          "b0021",
+          "b0022",
+          "b0023",
+          "b0024",
+          "b0025",
+          "b0026",
+          "b0027",
+          "b0028",
+          "b0029",
+          "b0030",
+          "b0031",
+          "b0032",
+          "b0033",
+          "b0034",
+          "b0035",
+          "b0036",
+          "b0037",
+          "b0038",
+          "b0039",
+          "b0040",
+          "b0041",
+          "b0042",
+          "b0043",
+          "b0044",
+          "b0045",
+          "b0061",
+          "b0063",
+          "b0064",
+          "b0065",
+          "b0066",
+          "b0067",
+          "b0068",
+          "b0069",
+          "b0070",
+          "b0071",
+          "b0072",
+          "b0073",
+          "b0074",
+          "b0075",
+          "b0076",
+          "b0077",
+          "b0078",
+          "b0079",
+          "b0080",
+          "b0081",
+          "b0082",
+          "b0083",
+          "b0084",
+          "b0085",
+          "b0086",
+          "b0087",
+          "b0088",
+          "b0089",
+          "b0090",
+          "b0091",
+          "b0092",
+          "b0093",
+          "b0094",
+          "b0095",
+          "b0096",
+          "b0097",
+          "b0098",
+          "b0099",
+          "b0100",
+          "b0101",
+          "b0102",
+          "b0103",
+          "b0104",
+          "b0105",
+          "b0106",
+          "b0107",
+          "b0108",
+          "b0109",
+          "b0110",
+          "b0111",
+          "b0112",
+          "b0113",
+          "b0114",
+          "b0115",
+          "b0116",
+          "b0117",
+          "b0118",
+          "b0119",
+          "b0120",
+          "b0121",
+          "b0122",
+          "b0123",
+          "b0124",
+          "b0125",
+          "b0126",
+          "b0127",
+          "b0128"
+        ]
+      },
+      "machine": {
+        "value": "no",
+        "basis": "проверять нечего: описания нет",
+        "finding_ids": [],
+        "blocking_finding_ids": []
+      },
+      "approval": null,
+      "not_required_basis": null,
+      "status": "filled",
+      "question": null,
+      "changes": [],
+      "source": {
+        "block_id": "b0060",
+        "evidence": {
+          "block_id": "b0060",
+          "start": 0,
+          "end": 53,
+          "quote": "Поддерживается версионность документа / зафиксирована"
+        },
+        "location": "с. 4",
+        "columns": {
+          "text": "Проверка",
+          "available": "Создано или доступно",
+          "checked": "Проверено",
+          "note": "Примечания"
+        },
+        "cells": {
+          "available": "Да / Нет",
+          "checked": "Да / Нет"
+        }
+      },
+      "method": "rules",
+      "criteria_link": {
+        "checklist_id": "CL14",
+        "criteria": [
+          "conforming",
+          "modifiable"
+        ],
+        "source": "bcc_review.criteria (1.1.0+aaec434005e0)"
+      }
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "TC-01",
+      "key": "range:business:порог:1000:1000000:lo-1",
+      "kind": "boundary",
+      "level": "business",
+      "title": "Порог 999 ₸: на 1 ₸ ниже нижней границы — отклоняется",
+      "precondition": "Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)",
+      "action": "задать порог 999 ₸ (на 1 ₸ ниже нижней границы)",
+      "expected": "значение 999 ₸ отклоняется, порог не сохраняется; при ошибке ввода сообщение появляется под полем",
+      "gherkin": "Дано Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)\nКогда задать порог 999 ₸ (на 1 ₸ ниже нижней границы)\nТогда значение 999 ₸ отклоняется, порог не сохраняется; при ошибке ввода сообщение появляется под полем",
+      "req_ids": [
+        "R-002.1",
+        "R-001.3"
+      ],
+      "source_ids": [
+        "Ф-1",
+        "R-001.3"
+      ],
+      "obligation": {
+        "req_id": "R-002.1",
+        "source_id": "Ф-1",
+        "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
+        "evidence": {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        },
+        {
+          "block_id": "b0024",
+          "start": 55,
+          "end": 91,
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        },
+        {
+          "block_id": "b0019",
+          "start": 116,
+          "end": 164,
+          "quote": "При ошибке ввода сообщение появляется под полем."
+        }
+      ],
+      "values": {
+        "input": 999,
+        "unit": "₸",
+        "boundary": "lo-1",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-003",
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-02",
+      "key": "range:business:порог:1000:1000000:lo",
+      "kind": "boundary",
+      "level": "business",
+      "title": "Порог 1 000 ₸: нижняя граница — принимается",
+      "precondition": "Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)",
+      "action": "задать порог 1 000 ₸ (нижняя граница)",
+      "expected": "значение 1 000 ₸ принимается и сохраняется",
+      "gherkin": "Дано Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)\nКогда задать порог 1 000 ₸ (нижняя граница)\nТогда значение 1 000 ₸ принимается и сохраняется",
+      "req_ids": [
+        "R-002.1"
+      ],
+      "source_ids": [
+        "Ф-1"
+      ],
+      "obligation": {
+        "req_id": "R-002.1",
+        "source_id": "Ф-1",
+        "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
+        "evidence": {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        },
+        {
+          "block_id": "b0024",
+          "start": 55,
+          "end": 91,
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        }
+      ],
+      "values": {
+        "input": 1000,
+        "unit": "₸",
+        "boundary": "lo",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-003",
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-03",
+      "key": "range:business:порог:1000:1000000:hi",
+      "kind": "boundary",
+      "level": "business",
+      "title": "Порог 1 000 000 ₸: верхняя граница — принимается",
+      "precondition": "Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)",
+      "action": "задать порог 1 000 000 ₸ (верхняя граница)",
+      "expected": "значение 1 000 000 ₸ принимается и сохраняется",
+      "gherkin": "Дано Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)\nКогда задать порог 1 000 000 ₸ (верхняя граница)\nТогда значение 1 000 000 ₸ принимается и сохраняется",
+      "req_ids": [
+        "R-002.1"
+      ],
+      "source_ids": [
+        "Ф-1"
+      ],
+      "obligation": {
+        "req_id": "R-002.1",
+        "source_id": "Ф-1",
+        "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
+        "evidence": {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        },
+        {
+          "block_id": "b0024",
+          "start": 55,
+          "end": 91,
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        }
+      ],
+      "values": {
+        "input": 1000000,
+        "unit": "₸",
+        "boundary": "hi",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-003",
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-04",
+      "key": "range:business:порог:1000:1000000:hi+1",
+      "kind": "boundary",
+      "level": "business",
+      "title": "Порог 1 000 001 ₸: на 1 ₸ выше верхней границы — отклоняется",
+      "precondition": "Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)",
+      "action": "задать порог 1 000 001 ₸ (на 1 ₸ выше верхней границы)",
+      "expected": "значение 1 000 001 ₸ отклоняется, порог не сохраняется; при ошибке ввода сообщение появляется под полем",
+      "gherkin": "Дано Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)\nКогда задать порог 1 000 001 ₸ (на 1 ₸ выше верхней границы)\nТогда значение 1 000 001 ₸ отклоняется, порог не сохраняется; при ошибке ввода сообщение появляется под полем",
+      "req_ids": [
+        "R-002.1",
+        "R-001.3"
+      ],
+      "source_ids": [
+        "Ф-1",
+        "R-001.3"
+      ],
+      "obligation": {
+        "req_id": "R-002.1",
+        "source_id": "Ф-1",
+        "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
+        "evidence": {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        },
+        {
+          "block_id": "b0024",
+          "start": 55,
+          "end": 91,
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        },
+        {
+          "block_id": "b0019",
+          "start": 116,
+          "end": 164,
+          "quote": "При ошибке ввода сообщение появляется под полем."
+        }
+      ],
+      "values": {
+        "input": 1000001,
+        "unit": "₸",
+        "boundary": "hi+1",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-003",
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-05",
+      "key": "range:business:порог:1000:1000000:fraction",
+      "kind": "boundary",
+      "level": "business",
+      "title": "Порог 1 000,5 ₸: нецелое значение внутри диапазона — отклоняется",
+      "precondition": "Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)",
+      "action": "задать порог 1 000,5 ₸ (нецелое значение внутри диапазона)",
+      "expected": "значение 1 000,5 ₸ отклоняется, порог не сохраняется; при ошибке ввода сообщение появляется под полем",
+      "gherkin": "Дано Правило Ф-1: «Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно». Допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения)\nКогда задать порог 1 000,5 ₸ (нецелое значение внутри диапазона)\nТогда значение 1 000,5 ₸ отклоняется, порог не сохраняется; при ошибке ввода сообщение появляется под полем",
+      "req_ids": [
+        "R-002.1",
+        "R-001.3"
+      ],
+      "source_ids": [
+        "Ф-1",
+        "R-001.3"
+      ],
+      "obligation": {
+        "req_id": "R-002.1",
+        "source_id": "Ф-1",
+        "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
+        "evidence": {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 7,
+          "end": 92,
+          "quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно."
+        },
+        {
+          "block_id": "b0024",
+          "start": 55,
+          "end": 91,
+          "quote": "от 1 000 до 1 000 000 ₸ включительно"
+        },
+        {
+          "block_id": "b0019",
+          "start": 116,
+          "end": 164,
+          "quote": "При ошибке ввода сообщение появляется под полем."
+        }
+      ],
+      "values": {
+        "input": 1000.5,
+        "unit": "₸",
+        "boundary": "fraction",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-003",
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-06",
+      "key": "default:уведомление выключено",
+      "kind": "default",
+      "level": "business",
+      "title": "Значение по умолчанию: уведомление выключено",
+      "precondition": "Настройка ещё не сохранялась (новое состояние)",
+      "action": "открыть настройку или запросить её текущее состояние",
+      "expected": "уведомление выключено (значение по умолчанию)",
+      "gherkin": "Дано Настройка ещё не сохранялась (новое состояние)\nКогда открыть настройку или запросить её текущее состояние\nТогда уведомление выключено (значение по умолчанию)",
+      "req_ids": [
+        "R-002.2"
+      ],
+      "source_ids": [
+        "Ф-1"
+      ],
+      "obligation": {
+        "req_id": "R-002.2",
+        "source_id": "Ф-1",
+        "quote": "По умолчанию уведомление выключено.",
+        "evidence": {
+          "block_id": "b0024",
+          "start": 93,
+          "end": 128,
+          "quote": "По умолчанию уведомление выключено."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0024",
+          "start": 93,
+          "end": 128,
+          "quote": "По умолчанию уведомление выключено."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-07",
+      "key": "month:last_minute",
+      "kind": "month",
+      "level": "business",
+      "title": "Последняя минута месяца: покупка 31 января в 23:59",
+      "precondition": "Правило Ф-2: «Месяц определяется по дате совершения покупки в Алматы»",
+      "action": "совершить покупку на 1 500 ₸ 31 января в 23:59 по Алматы и провести её в тот же день",
+      "expected": "покупка учтена в расходах января",
+      "gherkin": "Дано Правило Ф-2: «Месяц определяется по дате совершения покупки в Алматы»\nКогда совершить покупку на 1 500 ₸ 31 января в 23:59 по Алматы и провести её в тот же день\nТогда покупка учтена в расходах января",
+      "req_ids": [
+        "R-003.1"
+      ],
+      "source_ids": [
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-003.1",
+        "source_id": "Ф-2",
+        "quote": "Месяц определяется по дате совершения покупки в Алматы.",
+        "evidence": {
+          "block_id": "b0025",
+          "start": 7,
+          "end": 62,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 7,
+          "end": 62,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        }
+      ],
+      "values": {
+        "date": "31.01",
+        "time": "23:59",
+        "tz": "Asia/Almaty"
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015",
+        "F-016"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "с 1 марта 2024 г. в Казахстане единый часовой пояс UTC+5"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-08",
+      "key": "month:tz_boundary",
+      "kind": "month",
+      "level": "business",
+      "title": "Часовой пояс: 00:00 1 февраля по Алматы — уже в феврале",
+      "precondition": "Правило Ф-2: «Месяц определяется по дате совершения покупки в Алматы»",
+      "action": "совершить покупку на 1 500 ₸ 1 февраля в 00:00 по Алматы (это 31 января 19:00 UTC) и провести её",
+      "expected": "покупка учтена в расходах февраля, а не января: месяц считается по местному времени, а не по UTC",
+      "gherkin": "Дано Правило Ф-2: «Месяц определяется по дате совершения покупки в Алматы»\nКогда совершить покупку на 1 500 ₸ 1 февраля в 00:00 по Алматы (это 31 января 19:00 UTC) и провести её\nТогда покупка учтена в расходах февраля, а не января: месяц считается по местному времени, а не по UTC",
+      "req_ids": [
+        "R-003.1"
+      ],
+      "source_ids": [
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-003.1",
+        "source_id": "Ф-2",
+        "quote": "Месяц определяется по дате совершения покупки в Алматы.",
+        "evidence": {
+          "block_id": "b0025",
+          "start": 7,
+          "end": 62,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 7,
+          "end": 62,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        }
+      ],
+      "values": {
+        "local": "01.02 00:00",
+        "utc": "31.01 19:00",
+        "offset": 5
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015",
+        "F-016"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "с 1 марта 2024 г. в Казахстане единый часовой пояс UTC+5"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-09",
+      "key": "event:not_final:проведенные покупки",
+      "kind": "event_type",
+      "level": "business",
+      "title": "Операция ещё не проведена — в расходы не входит",
+      "precondition": "Расходы месяца 48 500 ₸, порог 50 000 ₸; правило Ф-2: «В расходы входят проведённые покупки»",
+      "action": "поступает покупка на 1 500 ₸, которая ещё не проведена (например, только авторизована)",
+      "expected": "расходы остаются 48 500 ₸, push не отправляется; сумма учитывается после того, как покупка проведена",
+      "gherkin": "Дано Расходы месяца 48 500 ₸, порог 50 000 ₸; правило Ф-2: «В расходы входят проведённые покупки»\nКогда поступает покупка на 1 500 ₸, которая ещё не проведена (например, только авторизована)\nТогда расходы остаются 48 500 ₸, push не отправляется; сумма учитывается после того, как покупка проведена",
+      "req_ids": [
+        "R-003.2"
+      ],
+      "source_ids": [
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-003.2",
+        "source_id": "Ф-2",
+        "quote": "В расходы входят проведённые покупки.",
+        "evidence": {
+          "block_id": "b0025",
+          "start": 63,
+          "end": 100,
+          "quote": "В расходы входят проведённые покупки."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 63,
+          "end": 100,
+          "quote": "В расходы входят проведённые покупки."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "момент, когда покупка считается проведённой, требует определения в документе"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-10",
+      "key": "refund:cross_month",
+      "kind": "refund",
+      "level": "business",
+      "title": "Возврат в следующем месяце уменьшает месяц исходной покупки",
+      "precondition": "Правило Ф-2: «Возврат уменьшает расходы месяца исходной покупки». Расходы января: 48 500 ₸, в том числе покупка на 1 500 ₸ от 15 января; расходы февраля: 0",
+      "action": "3 февраля провести полный возврат этой покупки на 1 500 ₸",
+      "expected": "расходы января уменьшились на 1 500 ₸ (до 47 000 ₸); расходы февраля не изменились",
+      "gherkin": "Дано Правило Ф-2: «Возврат уменьшает расходы месяца исходной покупки». Расходы января: 48 500 ₸, в том числе покупка на 1 500 ₸ от 15 января; расходы февраля: 0\nКогда 3 февраля провести полный возврат этой покупки на 1 500 ₸\nТогда расходы января уменьшились на 1 500 ₸ (до 47 000 ₸); расходы февраля не изменились",
+      "req_ids": [
+        "R-003.3"
+      ],
+      "source_ids": [
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-003.3",
+        "source_id": "Ф-2",
+        "quote": "Возврат уменьшает расходы месяца исходной покупки.",
+        "evidence": {
+          "block_id": "b0025",
+          "start": 101,
+          "end": 151,
+          "quote": "Возврат уменьшает расходы месяца исходной покупки."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 101,
+          "end": 151,
+          "quote": "Возврат уменьшает расходы месяца исходной покупки."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-11",
+      "key": "event:exclude:снятие наличных",
+      "kind": "event_type",
+      "level": "business",
+      "title": "Исключённая операция «снятие наличных» не входит в расходы",
+      "precondition": "Расходы месяца 48 500 ₸, порог 50 000 ₸; правило Ф-2: «Переводы и снятие наличных исключаются»",
+      "action": "выполнить операцию «снятие наличных» на 1 500 ₸",
+      "expected": "расходы месяца остаются 48 500 ₸; push не отправляется",
+      "gherkin": "Дано Расходы месяца 48 500 ₸, порог 50 000 ₸; правило Ф-2: «Переводы и снятие наличных исключаются»\nКогда выполнить операцию «снятие наличных» на 1 500 ₸\nТогда расходы месяца остаются 48 500 ₸; push не отправляется",
+      "req_ids": [
+        "R-003.4"
+      ],
+      "source_ids": [
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-003.4",
+        "source_id": "Ф-2",
+        "quote": "Переводы и снятие наличных исключаются.",
+        "evidence": {
+          "block_id": "b0025",
+          "start": 152,
+          "end": 191,
+          "quote": "Переводы и снятие наличных исключаются."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 152,
+          "end": 191,
+          "quote": "Переводы и снятие наличных исключаются."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-12",
+      "key": "trigger:just_below",
+      "kind": "trigger",
+      "level": "business",
+      "title": "Расходы на 0,01 ₸ ниже порога — push нет",
+      "precondition": "Правило Ф-3: «Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push». Порог 50 000 ₸, в этом месяце push ещё не было, расходы 48 500 ₸",
+      "action": "провести покупку на 1 499,99 ₸",
+      "expected": "расходы 49 999,99 ₸ (ниже порога), push не отправляется",
+      "gherkin": "Дано Правило Ф-3: «Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push». Порог 50 000 ₸, в этом месяце push ещё не было, расходы 48 500 ₸\nКогда провести покупку на 1 499,99 ₸\nТогда расходы 49 999,99 ₸ (ниже порога), push не отправляется",
+      "req_ids": [
+        "R-004.1",
+        "R-007"
+      ],
+      "source_ids": [
+        "Ф-3",
+        "R-007"
+      ],
+      "obligation": {
+        "req_id": "R-004.1",
+        "source_id": "Ф-3",
+        "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push.",
+        "evidence": {
+          "block_id": "b0026",
+          "start": 7,
+          "end": 106,
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 7,
+          "end": 106,
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        },
+        {
+          "block_id": "b0033",
+          "start": 0,
+          "end": 117,
+          "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге."
+        }
+      ],
+      "values": {
+        "before": 48500,
+        "purchase": 1499.99,
+        "threshold": 50000
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-004",
+        "F-015",
+        "F-018"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "шаг 0,01 ₸: суммы покупок хранятся в тиынах (с. 2)"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-13",
+      "key": "trigger:already_above",
+      "kind": "trigger",
+      "level": "business",
+      "title": "Порог уже достигнут — новая покупка не даёт второго push",
+      "precondition": "Правило Ф-3: «Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push». Порог 50 000 ₸; в этом месяце push уже отправлен, расходы 51 500 ₸",
+      "action": "провести ещё одну покупку на 1 500 ₸",
+      "expected": "расходы 53 000 ₸; повторный push не отправляется: перехода «ниже порога → порог и выше» не было",
+      "gherkin": "Дано Правило Ф-3: «Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push». Порог 50 000 ₸; в этом месяце push уже отправлен, расходы 51 500 ₸\nКогда провести ещё одну покупку на 1 500 ₸\nТогда расходы 53 000 ₸; повторный push не отправляется: перехода «ниже порога → порог и выше» не было",
+      "req_ids": [
+        "R-004.1",
+        "R-004.2"
+      ],
+      "source_ids": [
+        "Ф-3"
+      ],
+      "obligation": {
+        "req_id": "R-004.1",
+        "source_id": "Ф-3",
+        "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push.",
+        "evidence": {
+          "block_id": "b0026",
+          "start": 7,
+          "end": 106,
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 7,
+          "end": 106,
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        },
+        {
+          "block_id": "b0026",
+          "start": 107,
+          "end": 173,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015",
+        "F-016"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-14",
+      "key": "cap:next_period",
+      "kind": "cap",
+      "level": "business",
+      "title": "Лимит push обнуляется в новом календарном месяце",
+      "precondition": "Правило Ф-3: «На карту приходится максимум один такой push за календарный месяц». В январе push уже отправлен при пороге 50 000 ₸",
+      "action": "в феврале расходы впервые за месяц достигают порога 50 000 ₸",
+      "expected": "push отправляется: лимит «один за календарный месяц» считается отдельно для февраля",
+      "gherkin": "Дано Правило Ф-3: «На карту приходится максимум один такой push за календарный месяц». В январе push уже отправлен при пороге 50 000 ₸\nКогда в феврале расходы впервые за месяц достигают порога 50 000 ₸\nТогда push отправляется: лимит «один за календарный месяц» считается отдельно для февраля",
+      "req_ids": [
+        "R-004.2"
+      ],
+      "source_ids": [
+        "Ф-3"
+      ],
+      "obligation": {
+        "req_id": "R-004.2",
+        "source_id": "Ф-3",
+        "quote": "На карту приходится максимум один такой push за календарный месяц.",
+        "evidence": {
+          "block_id": "b0026",
+          "start": 107,
+          "end": 173,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 107,
+          "end": 173,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015",
+        "F-016"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-15",
+      "key": "cap:recross_same_period",
+      "kind": "cap",
+      "level": "business",
+      "title": "Повторное достижение порога в том же месяце после возврата",
+      "precondition": "Правило Ф-3: «На карту приходится максимум один такой push за календарный месяц». В январе push отправлен при расходах 50 000 ₸; затем возврат на 1 500 ₸ снизил расходы до 48 500 ₸",
+      "action": "новая покупка на 1 500 ₸ снова доводит расходы до 50 000 ₸",
+      "expected": "push не отправляется: не больше чем один за календарный месяц",
+      "gherkin": "Дано Правило Ф-3: «На карту приходится максимум один такой push за календарный месяц». В январе push отправлен при расходах 50 000 ₸; затем возврат на 1 500 ₸ снизил расходы до 48 500 ₸\nКогда новая покупка на 1 500 ₸ снова доводит расходы до 50 000 ₸\nТогда push не отправляется: не больше чем один за календарный месяц",
+      "req_ids": [
+        "R-004.2",
+        "R-003.3"
+      ],
+      "source_ids": [
+        "Ф-3",
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-004.2",
+        "source_id": "Ф-3",
+        "quote": "На карту приходится максимум один такой push за календарный месяц.",
+        "evidence": {
+          "block_id": "b0026",
+          "start": 107,
+          "end": 173,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 107,
+          "end": 173,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        },
+        {
+          "block_id": "b0025",
+          "start": 101,
+          "end": 151,
+          "quote": "Возврат уменьшает расходы месяца исходной покупки."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015",
+        "F-016"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-16",
+      "key": "preserve:on_change",
+      "kind": "preserve",
+      "level": "business",
+      "title": "Смена порога сохраняет накопленные расходы",
+      "precondition": "Правило Ф-4: «При изменении порога накопленная сумма сохраняется». Расходы месяца 48 500 ₸, порог 50 000 ₸",
+      "action": "изменить порог на 100 000 ₸",
+      "expected": "накопленные расходы остаются 48 500 ₸; порог 100 000 ₸",
+      "gherkin": "Дано Правило Ф-4: «При изменении порога накопленная сумма сохраняется». Расходы месяца 48 500 ₸, порог 50 000 ₸\nКогда изменить порог на 100 000 ₸\nТогда накопленные расходы остаются 48 500 ₸; порог 100 000 ₸",
+      "req_ids": [
+        "R-005.1",
+        "R-022"
+      ],
+      "source_ids": [
+        "Ф-4",
+        "3"
+      ],
+      "obligation": {
+        "req_id": "R-005.1",
+        "source_id": "Ф-4",
+        "quote": "При изменении порога накопленная сумма сохраняется.",
+        "evidence": {
+          "block_id": "b0027",
+          "start": 7,
+          "end": 58,
+          "quote": "При изменении порога накопленная сумма сохраняется."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 7,
+          "end": 58,
+          "quote": "При изменении порога накопленная сумма сохраняется."
+        },
+        {
+          "block_id": "b0088",
+          "start": 3,
+          "end": 50,
+          "quote": "Изменение порога сохраняет накопленные расходы."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-17",
+      "key": "cap:override_conflict",
+      "kind": "conflict",
+      "level": "business",
+      "title": "Смена порога после push в том же месяце: Ф-3 или Ф-4",
+      "precondition": "В январе расходы достигли порога 50 000 ₸, push отправлен",
+      "action": "порог изменён на 100 000 ₸; затем покупка на 50 000 ₸ доводит расходы до 100 000 ₸",
+      "expected": "ОТКРЫТО до решения Q-BANK-161F75: A) push не отправляется: в январе push уже был (Ф-3: «На карту приходится максимум один такой push за календарный месяц»); B) отправлен push о достижении нового порога 100 000 ₸ (Ф-4: «Если она ниже нового порога, следующее достижение вызывает push…»)",
+      "gherkin": "Дано В январе расходы достигли порога 50 000 ₸, push отправлен\nКогда порог изменён на 100 000 ₸; затем покупка на 50 000 ₸ доводит расходы до 100 000 ₸\nТогда (открыто до решения Q-BANK-161F75): A) push не отправляется: в январе push уже был (Ф-3: «На карту приходится максимум один такой push за календарный месяц»); B) отправлен push о достижении нового порога 100 000 ₸ (Ф-4: «Если она ниже нового порога, следующее достижение вызывает push…»)",
+      "req_ids": [
+        "R-005.2",
+        "R-004.2"
+      ],
+      "source_ids": [
+        "Ф-4",
+        "Ф-3"
+      ],
+      "obligation": {
+        "req_id": "R-005.2",
+        "source_id": "Ф-4",
+        "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки.",
+        "evidence": {
+          "block_id": "b0027",
+          "start": 59,
+          "end": 166,
+          "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 59,
+          "end": 166,
+          "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки."
+        },
+        {
+          "block_id": "b0026",
+          "start": 107,
+          "end": 173,
+          "quote": "На карту приходится максимум один такой push за календарный месяц."
+        }
+      ],
+      "values": {
+        "threshold": 50000,
+        "new_threshold": 100000
+      },
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-161F75",
+        "kind": "outcome",
+        "prompt": "Отправлять ли второй push в том же месяце после смены порога: по Ф-3 — нет (не больше чем один за календарный месяц), по Ф-4 — да (независимо от истории)?",
+        "options": [
+          "A) лимит Ф-3: push не отправляется: в январе push уже был (Ф-3: «На карту приходится максимум один такой push за календарный месяц»)",
+          "B) сброс Ф-4: отправлен push о достижении нового порога 100 000 ₸ (Ф-4: «Если она ниже нового порога, следующее достижение вызывает push…»)"
+        ],
+        "affected_req_ids": [
+          "R-005.2",
+          "R-004.2"
+        ],
+        "finding_ids": [],
+        "existing": false,
+        "key": "rules:cap_vs_override"
+      },
+      "options": [
+        {
+          "label": "лимит Ф-3",
+          "expected": "push не отправляется: в январе push уже был (Ф-3: «На карту приходится максимум один такой push за календарный месяц»)",
+          "basis": "Ф-3",
+          "evidence": [
+            {
+              "block_id": "b0026",
+              "start": 107,
+              "end": 173,
+              "quote": "На карту приходится максимум один такой push за календарный месяц."
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "сброс Ф-4",
+          "expected": "отправлен push о достижении нового порога 100 000 ₸ (Ф-4: «Если она ниже нового порога, следующее достижение вызывает push…»)",
+          "basis": "Ф-4",
+          "evidence": [
+            {
+              "block_id": "b0027",
+              "start": 59,
+              "end": 166,
+              "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки."
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015",
+        "F-016"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-18",
+      "key": "timing:1мин:после получения события",
+      "kind": "timing",
+      "level": "business",
+      "title": "Срок: не позднее 1 мин после получения события",
+      "precondition": "Правило R-006: «Сервис передаёт push на отправку в течение минуты после получения события»",
+      "action": "подать событие в момент t0, по которому расходы достигают порога и зафиксировать время по журналу",
+      "expected": "действие выполнено не позднее t0 + 1 мин (60 с)",
+      "gherkin": "Дано Правило R-006: «Сервис передаёт push на отправку в течение минуты после получения события»\nКогда подать событие в момент t0, по которому расходы достигают порога и зафиксировать время по журналу\nТогда действие выполнено не позднее t0 + 1 мин (60 с)",
+      "req_ids": [
+        "R-006"
+      ],
+      "source_ids": [
+        "R-006"
+      ],
+      "obligation": {
+        "req_id": "R-006",
+        "source_id": null,
+        "quote": "Сервис передаёт push на отправку в течение минуты после получения события.",
+        "evidence": {
+          "block_id": "b0031",
+          "start": 0,
+          "end": 74,
+          "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0031",
+          "start": 0,
+          "end": 74,
+          "quote": "Сервис передаёт push на отправку в течение минуты после получения события."
+        }
+      ],
+      "values": {
+        "limit_seconds": 60
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-017"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "точка отсчёта и перцентиль измерения в требовании не указаны"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-19",
+      "key": "idempotency:redelivery",
+      "kind": "idempotency",
+      "level": "business",
+      "title": "Повторная доставка того же события процессинга",
+      "precondition": "Правило R-008.2: «Повторная доставка одного события процессинга сохраняет исходный итог». Порог 50 000 ₸; событие о покупке на 1 500 ₸ (идентификатор операции OP-1) обработано: расходы выросли с 48 500 ₸ до 50 000 ₸, отправлен один push",
+      "action": "то же событие (идентификатор операции OP-1) доставлено повторно",
+      "expected": "расходы остаются 50 000 ₸; повторный push не отправляется",
+      "gherkin": "Дано Правило R-008.2: «Повторная доставка одного события процессинга сохраняет исходный итог». Порог 50 000 ₸; событие о покупке на 1 500 ₸ (идентификатор операции OP-1) обработано: расходы выросли с 48 500 ₸ до 50 000 ₸, отправлен один push\nКогда то же событие (идентификатор операции OP-1) доставлено повторно\nТогда расходы остаются 50 000 ₸; повторный push не отправляется",
+      "req_ids": [
+        "R-008.2",
+        "R-007"
+      ],
+      "source_ids": [
+        "R-008.2",
+        "R-007"
+      ],
+      "obligation": {
+        "req_id": "R-008.2",
+        "source_id": null,
+        "quote": "Повторная доставка одного события процессинга сохраняет исходный итог.",
+        "evidence": {
+          "block_id": "b0035",
+          "start": 110,
+          "end": 180,
+          "quote": "Повторная доставка одного события процессинга сохраняет исходный итог."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0035",
+          "start": 110,
+          "end": 180,
+          "quote": "Повторная доставка одного события процессинга сохраняет исходный итог."
+        },
+        {
+          "block_id": "b0033",
+          "start": 0,
+          "end": 117,
+          "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-004",
+        "F-018"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-20",
+      "key": "acceptance:1:1",
+      "kind": "acceptance",
+      "level": "business",
+      "title": "Критерий приёмки 1: Итог 50 000 ₸ и один push",
+      "precondition": "Расходы 48 500 ₸, порог 50 000 ₸",
+      "action": "Провести покупку на 1 500 ₸",
+      "expected": "Итог 50 000 ₸ и один push",
+      "gherkin": "Дано Расходы 48 500 ₸, порог 50 000 ₸\nКогда Провести покупку на 1 500 ₸\nТогда Итог 50 000 ₸ и один push",
+      "req_ids": [
+        "R-009",
+        "R-004.1"
+      ],
+      "source_ids": [
+        "R-009",
+        "Ф-3"
+      ],
+      "obligation": {
+        "req_id": "R-009",
+        "source_id": null,
+        "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push",
+        "evidence": {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 90,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push"
+        },
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 32,
+          "quote": "Расходы 48 500 ₸, порог 50 000 ₸"
+        },
+        {
+          "block_id": "b0041",
+          "start": 35,
+          "end": 62,
+          "quote": "Провести покупку на 1 500 ₸"
+        },
+        {
+          "block_id": "b0041",
+          "start": 65,
+          "end": 90,
+          "quote": "Итог 50 000 ₸ и один push"
+        },
+        {
+          "block_id": "b0026",
+          "start": 7,
+          "end": 106,
+          "quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "acceptance_table",
+      "notes": [
+        "согласуется с Ф-3"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-21",
+      "key": "acceptance:1:2",
+      "kind": "acceptance",
+      "level": "business",
+      "title": "Критерий приёмки 2: Февральский счётчик вырос на 4 000 ₸",
+      "precondition": "Покупка 31 января в 23:58 на 4 000 ₸",
+      "action": "Провести 1 февраля в 00:03 по Алматы",
+      "expected": "ОТКРЫТО до решения Q-BANK-37005A: A) 4 000 ₸ учтены в расходах января (месяц по дате совершения); счётчик февраля не изменился; B) Февральский счётчик вырос на 4 000 ₸",
+      "gherkin": "Дано Покупка 31 января в 23:58 на 4 000 ₸\nКогда Провести 1 февраля в 00:03 по Алматы\nТогда (открыто до решения Q-BANK-37005A): A) 4 000 ₸ учтены в расходах января (месяц по дате совершения); счётчик февраля не изменился; B) Февральский счётчик вырос на 4 000 ₸",
+      "req_ids": [
+        "R-010",
+        "R-003.1"
+      ],
+      "source_ids": [
+        "R-010",
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-010",
+        "source_id": null,
+        "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸",
+        "evidence": {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 114,
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 114,
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы | Февральский счётчик вырос на 4 000 ₸"
+        },
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 36,
+          "quote": "Покупка 31 января в 23:58 на 4 000 ₸"
+        },
+        {
+          "block_id": "b0042",
+          "start": 39,
+          "end": 75,
+          "quote": "Провести 1 февраля в 00:03 по Алматы"
+        },
+        {
+          "block_id": "b0042",
+          "start": 78,
+          "end": 114,
+          "quote": "Февральский счётчик вырос на 4 000 ₸"
+        },
+        {
+          "block_id": "b0025",
+          "start": 7,
+          "end": 62,
+          "quote": "Месяц определяется по дате совершения покупки в Алматы."
+        }
+      ],
+      "values": {},
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-37005A",
+        "kind": "outcome",
+        "prompt": "Покупка 31 января в 23:58, проведённая 1 февраля в 00:03: учитывать её в январе (Ф-2, месяц по дате совершения) или в феврале (критерий приёмки 2)?",
+        "options": [
+          "A) в январе (Ф-2): 4 000 ₸ учтены в расходах января (месяц по дате совершения); счётчик февраля не изменился",
+          "B) в феврале (критерий приёмки 2): Февральский счётчик вырос на 4 000 ₸"
+        ],
+        "affected_req_ids": [
+          "R-010",
+          "R-003.1"
+        ],
+        "finding_ids": [
+          "F-001"
+        ],
+        "existing": false,
+        "key": "month:acceptance:1:2"
+      },
+      "options": [
+        {
+          "label": "в январе (Ф-2)",
+          "expected": "4 000 ₸ учтены в расходах января (месяц по дате совершения); счётчик февраля не изменился",
+          "basis": "Ф-2: «Месяц определяется по дате совершения покупки в Алматы»",
+          "evidence": [
+            {
+              "block_id": "b0025",
+              "start": 7,
+              "end": 62,
+              "quote": "Месяц определяется по дате совершения покупки в Алматы."
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "в феврале (критерий приёмки 2)",
+          "expected": "Февральский счётчик вырос на 4 000 ₸",
+          "basis": "критерий приёмки 2",
+          "evidence": [
+            {
+              "block_id": "b0042",
+              "start": 78,
+              "end": 114,
+              "quote": "Февральский счётчик вырос на 4 000 ₸"
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-001",
+        "F-015",
+        "F-016"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "acceptance_table",
+      "notes": [
+        "у времени «31 января в 23:58» не указан часовой пояс"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-22",
+      "key": "acceptance:1:3",
+      "kind": "acceptance",
+      "level": "business",
+      "title": "Критерий приёмки 3: Счётчик показывает 19 900 ₸",
+      "precondition": "Расходы 19 900 ₸, порог 20 000 ₸",
+      "action": "Перевести 500 ₸",
+      "expected": "Счётчик показывает 19 900 ₸",
+      "gherkin": "Дано Расходы 19 900 ₸, порог 20 000 ₸\nКогда Перевести 500 ₸\nТогда Счётчик показывает 19 900 ₸",
+      "req_ids": [
+        "R-011",
+        "R-003.4"
+      ],
+      "source_ids": [
+        "R-011",
+        "Ф-2"
+      ],
+      "obligation": {
+        "req_id": "R-011",
+        "source_id": null,
+        "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸",
+        "evidence": {
+          "block_id": "b0043",
+          "start": 0,
+          "end": 80,
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0043",
+          "start": 0,
+          "end": 80,
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸ | Перевести 500 ₸ | Счётчик показывает 19 900 ₸"
+        },
+        {
+          "block_id": "b0043",
+          "start": 0,
+          "end": 32,
+          "quote": "Расходы 19 900 ₸, порог 20 000 ₸"
+        },
+        {
+          "block_id": "b0043",
+          "start": 35,
+          "end": 50,
+          "quote": "Перевести 500 ₸"
+        },
+        {
+          "block_id": "b0043",
+          "start": 53,
+          "end": 80,
+          "quote": "Счётчик показывает 19 900 ₸"
+        },
+        {
+          "block_id": "b0025",
+          "start": 152,
+          "end": 191,
+          "quote": "Переводы и снятие наличных исключаются."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-015"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "acceptance_table",
+      "notes": [
+        "согласуется с Ф-2",
+        "дополнительно проверить: push не отправлен"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-23",
+      "key": "api:success",
+      "kind": "api_success",
+      "level": "api",
+      "title": "GET /alerts/saveLimit: корректный запрос сохраняет настройку",
+      "precondition": "Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты; все параметры корректны",
+      "action": "вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=50000&enabled=1`",
+      "expected": "успешный ответ HTTP 200, `result` = OK; сохранено cardId=demo-42, amount=50000, enabled=1",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты; все параметры корректны\nКогда вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=50000&enabled=1`\nТогда успешный ответ HTTP 200, `result` = OK; сохранено cardId=demo-42, amount=50000, enabled=1",
+      "req_ids": [
+        "R-014",
+        "R-012",
+        "R-013",
+        "R-018",
+        "R-034"
+      ],
+      "source_ids": [
+        "R-014",
+        "R-012",
+        "R-013",
+        "4",
+        "200"
+      ],
+      "obligation": {
+        "req_id": "R-014",
+        "source_id": null,
+        "quote": "Dev: /alerts/saveLimit . Prod: —",
+        "evidence": {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0113",
+          "start": 0,
+          "end": 46,
+          "quote": "{\"result\":\"OK\",\"amount\":\"50000\",\"enabled\":\"1\"}"
+        },
+        {
+          "block_id": "b0110",
+          "start": 5,
+          "end": 48,
+          "quote": "Ответ в случае успешного выполнения метода."
+        },
+        {
+          "block_id": "b0083",
+          "start": 3,
+          "end": 53,
+          "quote": "Заменить настройку и вернуть результат сохранения."
+        },
+        {
+          "block_id": "b0069",
+          "start": 16,
+          "end": 46,
+          "quote": "Bearer, сессия владельца карты"
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-003",
+        "F-005",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-24",
+      "key": "api:replace",
+      "kind": "api_replace",
+      "level": "api",
+      "title": "GET /alerts/saveLimit: повторное сохранение заменяет настройку",
+      "precondition": "Сохранена настройка `amount`=50000",
+      "action": "повторно вызвать GET /alerts/saveLimit с `amount`=1000000",
+      "expected": "действует одна настройка с `amount`=1000000, прежняя заменена",
+      "gherkin": "Дано Сохранена настройка `amount`=50000\nКогда повторно вызвать GET /alerts/saveLimit с `amount`=1000000\nТогда действует одна настройка с `amount`=1000000, прежняя заменена",
+      "req_ids": [
+        "R-021",
+        "R-012",
+        "R-014"
+      ],
+      "source_ids": [
+        "2",
+        "R-012",
+        "R-014"
+      ],
+      "obligation": {
+        "req_id": "R-021",
+        "source_id": "2",
+        "quote": "Повторное сохранение заменяет действующую настройку.",
+        "evidence": {
+          "block_id": "b0087",
+          "start": 3,
+          "end": 55,
+          "quote": "Повторное сохранение заменяет действующую настройку."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0087",
+          "start": 3,
+          "end": 55,
+          "quote": "Повторное сохранение заменяет действующую настройку."
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-005",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-25",
+      "key": "range:api:amount:1000:1000000:lo",
+      "kind": "boundary",
+      "level": "api",
+      "title": "`amount`=1000: нижняя граница — принимается",
+      "precondition": "Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000&enabled=1`",
+      "expected": "успешный ответ HTTP 200, `result` = OK; сохранено amount=1000",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты\nКогда вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000&enabled=1`\nТогда успешный ответ HTTP 200, `result` = OK; сохранено amount=1000",
+      "req_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "R-017",
+        "R-020",
+        "R-034"
+      ],
+      "source_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "3",
+        "1",
+        "200"
+      ],
+      "obligation": {
+        "req_id": "R-025",
+        "source_id": null,
+        "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+        "evidence": {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0097",
+          "start": 33,
+          "end": 48,
+          "quote": "1 000–1 000 000"
+        },
+        {
+          "block_id": "b0086",
+          "start": 3,
+          "end": 43,
+          "quote": "Целое число тенге, обе границы включены."
+        },
+        {
+          "block_id": "b0082",
+          "start": 3,
+          "end": 35,
+          "quote": "Проверить сумму и переключатель."
+        },
+        {
+          "block_id": "b0113",
+          "start": 0,
+          "end": 46,
+          "quote": "{\"result\":\"OK\",\"amount\":\"50000\",\"enabled\":\"1\"}"
+        },
+        {
+          "block_id": "b0110",
+          "start": 5,
+          "end": 48,
+          "quote": "Ответ в случае успешного выполнения метода."
+        }
+      ],
+      "values": {
+        "input": 1000,
+        "unit": "₸",
+        "boundary": "lo",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-004",
+        "F-005",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "включённость границ — по «Целое число тенге, обе границы включены.» (с. 4)"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-26",
+      "key": "range:api:amount:1000:1000000:hi",
+      "kind": "boundary",
+      "level": "api",
+      "title": "`amount`=1000000: верхняя граница — принимается",
+      "precondition": "Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000000&enabled=1`",
+      "expected": "успешный ответ HTTP 200, `result` = OK; сохранено amount=1000000",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты\nКогда вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000000&enabled=1`\nТогда успешный ответ HTTP 200, `result` = OK; сохранено amount=1000000",
+      "req_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "R-017",
+        "R-020",
+        "R-034"
+      ],
+      "source_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "3",
+        "1",
+        "200"
+      ],
+      "obligation": {
+        "req_id": "R-025",
+        "source_id": null,
+        "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+        "evidence": {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0097",
+          "start": 33,
+          "end": 48,
+          "quote": "1 000–1 000 000"
+        },
+        {
+          "block_id": "b0086",
+          "start": 3,
+          "end": 43,
+          "quote": "Целое число тенге, обе границы включены."
+        },
+        {
+          "block_id": "b0082",
+          "start": 3,
+          "end": 35,
+          "quote": "Проверить сумму и переключатель."
+        },
+        {
+          "block_id": "b0113",
+          "start": 0,
+          "end": 46,
+          "quote": "{\"result\":\"OK\",\"amount\":\"50000\",\"enabled\":\"1\"}"
+        },
+        {
+          "block_id": "b0110",
+          "start": 5,
+          "end": 48,
+          "quote": "Ответ в случае успешного выполнения метода."
+        }
+      ],
+      "values": {
+        "input": 1000000,
+        "unit": "₸",
+        "boundary": "hi",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-004",
+        "F-005",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "включённость границ — по «Целое число тенге, обе границы включены.» (с. 4)"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-27",
+      "key": "witness:F-006",
+      "kind": "conflict",
+      "level": "business",
+      "title": "Конфликт F-006: Типы полей расходятся между таблицами «Query-параметры» и «Ответ»…",
+      "precondition": "Поле «amount» передаётся по описанию обеих таблиц",
+      "action": "выполнить сценарий из условия конфликта",
+      "expected": "ОТКРЫТО до решения Q-BANK-A3DAD3: A) тип integer (таблица «Query-параметры»); B) тип string (таблица «Ответ»)",
+      "gherkin": "Дано Поле «amount» передаётся по описанию обеих таблиц\nКогда выполнить сценарий из условия конфликта\nТогда (открыто до решения Q-BANK-A3DAD3): A) тип integer (таблица «Query-параметры»); B) тип string (таблица «Ответ»)",
+      "req_ids": [
+        "R-025",
+        "R-031"
+      ],
+      "source_ids": [
+        "R-025",
+        "R-031"
+      ],
+      "obligation": {
+        "req_id": "R-025",
+        "source_id": null,
+        "quote": "amount | integer",
+        "evidence": {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 16,
+          "quote": "amount | integer"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 16,
+          "quote": "amount | integer"
+        },
+        {
+          "block_id": "b0106",
+          "start": 0,
+          "end": 15,
+          "quote": "amount | string"
+        }
+      ],
+      "values": {},
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-A3DAD3",
+        "kind": "outcome",
+        "prompt": "Конфликт F-006: какой исход верен — «тип integer (таблица «Query-параметры»)» или «тип string (таблица «Ответ»)»?",
+        "options": [
+          "A) исход A: тип integer (таблица «Query-параметры»)",
+          "B) исход B: тип string (таблица «Ответ»)"
+        ],
+        "affected_req_ids": [
+          "R-025",
+          "R-031"
+        ],
+        "finding_ids": [
+          "F-006"
+        ],
+        "existing": false,
+        "key": "witness:F-006"
+      },
+      "options": [
+        {
+          "label": "исход A",
+          "expected": "тип integer (таблица «Query-параметры»)",
+          "basis": "amount | integer",
+          "evidence": [
+            {
+              "block_id": "b0097",
+              "start": 0,
+              "end": 16,
+              "quote": "amount | integer"
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "исход B",
+          "expected": "тип string (таблица «Ответ»)",
+          "basis": "amount | string",
+          "evidence": [
+            {
+              "block_id": "b0106",
+              "start": 0,
+              "end": 15,
+              "quote": "amount | string"
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-006"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "witness",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-28",
+      "key": "range:api:amount:1000:1000000:lo-1",
+      "kind": "api_validation",
+      "level": "api",
+      "title": "`amount`=999: на 1 ₸ ниже нижней границы — отклоняется",
+      "precondition": "Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=999&enabled=1`",
+      "expected": "ОТКРЫТО до решения Q-BANK-A030E5: A) ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется; B) ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты\nКогда вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=999&enabled=1`\nТогда (открыто до решения Q-BANK-A030E5): A) ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется; B) ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+      "req_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "R-017",
+        "R-019",
+        "R-020",
+        "R-035"
+      ],
+      "source_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "3",
+        "5",
+        "1",
+        "400"
+      ],
+      "obligation": {
+        "req_id": "R-025",
+        "source_id": null,
+        "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+        "evidence": {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0097",
+          "start": 33,
+          "end": 48,
+          "quote": "1 000–1 000 000"
+        },
+        {
+          "block_id": "b0086",
+          "start": 3,
+          "end": 43,
+          "quote": "Целое число тенге, обе границы включены."
+        },
+        {
+          "block_id": "b0082",
+          "start": 3,
+          "end": 35,
+          "quote": "Проверить сумму и переключатель."
+        },
+        {
+          "block_id": "b0111",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+        },
+        {
+          "block_id": "b0120",
+          "start": 0,
+          "end": 33,
+          "quote": "{\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "block_id": "b0115",
+          "start": 0,
+          "end": 46,
+          "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+        },
+        {
+          "block_id": "b0084",
+          "start": 3,
+          "end": 68,
+          "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+        }
+      ],
+      "values": {
+        "input": 999,
+        "unit": "₸",
+        "boundary": "lo-1",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-A030E5",
+        "kind": "outcome",
+        "prompt": "Как GET /alerts/saveLimit отвечает на недопустимое значение `amount`: HTTP 400 (статус 400: «параметры запроса заполнены неверно») или HTTP 200 + ERROR (пример ответа 200 с ошибкой и «При отклонении суммы вернуть прежнее состояние и результат ERROR.»)?",
+        "options": [
+          "A) HTTP 400: ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+          "B) HTTP 200 + ERROR: ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки"
+        ],
+        "affected_req_ids": [
+          "R-025",
+          "R-012",
+          "R-014",
+          "R-017",
+          "R-019",
+          "R-020",
+          "R-035"
+        ],
+        "finding_ids": [
+          "F-009"
+        ],
+        "existing": false,
+        "key": "api-reject:amount"
+      },
+      "options": [
+        {
+          "label": "HTTP 400",
+          "expected": "ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+          "basis": "статус 400: «параметры запроса заполнены неверно»",
+          "evidence": [
+            {
+              "block_id": "b0111",
+              "start": 5,
+              "end": 62,
+              "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+            },
+            {
+              "block_id": "b0120",
+              "start": 0,
+              "end": 33,
+              "quote": "{\"message\":\"Некорректный запрос\"}"
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "HTTP 200 + ERROR",
+          "expected": "ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+          "basis": "пример ответа 200 с ошибкой и «При отклонении суммы вернуть прежнее состояние и результат ERROR.»",
+          "evidence": [
+            {
+              "block_id": "b0115",
+              "start": 0,
+              "end": 46,
+              "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+            },
+            {
+              "block_id": "b0084",
+              "start": 3,
+              "end": 68,
+              "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-004",
+        "F-005",
+        "F-009",
+        "F-010",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "включённость границ — по «Целое число тенге, обе границы включены.» (с. 4)"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-29",
+      "key": "range:api:amount:1000:1000000:hi+1",
+      "kind": "api_validation",
+      "level": "api",
+      "title": "`amount`=1000001: на 1 ₸ выше верхней границы — отклоняется",
+      "precondition": "Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000001&enabled=1`",
+      "expected": "ОТКРЫТО до решения Q-BANK-A030E5: A) ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется; B) ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты\nКогда вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000001&enabled=1`\nТогда (открыто до решения Q-BANK-A030E5): A) ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется; B) ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+      "req_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "R-017",
+        "R-019",
+        "R-020",
+        "R-035"
+      ],
+      "source_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "3",
+        "5",
+        "1",
+        "400"
+      ],
+      "obligation": {
+        "req_id": "R-025",
+        "source_id": null,
+        "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+        "evidence": {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0097",
+          "start": 33,
+          "end": 48,
+          "quote": "1 000–1 000 000"
+        },
+        {
+          "block_id": "b0086",
+          "start": 3,
+          "end": 43,
+          "quote": "Целое число тенге, обе границы включены."
+        },
+        {
+          "block_id": "b0082",
+          "start": 3,
+          "end": 35,
+          "quote": "Проверить сумму и переключатель."
+        },
+        {
+          "block_id": "b0111",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+        },
+        {
+          "block_id": "b0120",
+          "start": 0,
+          "end": 33,
+          "quote": "{\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "block_id": "b0115",
+          "start": 0,
+          "end": 46,
+          "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+        },
+        {
+          "block_id": "b0084",
+          "start": 3,
+          "end": 68,
+          "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+        }
+      ],
+      "values": {
+        "input": 1000001,
+        "unit": "₸",
+        "boundary": "hi+1",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-A030E5",
+        "kind": "outcome",
+        "prompt": "Как GET /alerts/saveLimit отвечает на недопустимое значение `amount`: HTTP 400 (статус 400: «параметры запроса заполнены неверно») или HTTP 200 + ERROR (пример ответа 200 с ошибкой и «При отклонении суммы вернуть прежнее состояние и результат ERROR.»)?",
+        "options": [
+          "A) HTTP 400: ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+          "B) HTTP 200 + ERROR: ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки"
+        ],
+        "affected_req_ids": [
+          "R-025",
+          "R-012",
+          "R-014",
+          "R-017",
+          "R-019",
+          "R-020",
+          "R-035"
+        ],
+        "finding_ids": [
+          "F-009"
+        ],
+        "existing": false,
+        "key": "api-reject:amount"
+      },
+      "options": [
+        {
+          "label": "HTTP 400",
+          "expected": "ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+          "basis": "статус 400: «параметры запроса заполнены неверно»",
+          "evidence": [
+            {
+              "block_id": "b0111",
+              "start": 5,
+              "end": 62,
+              "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+            },
+            {
+              "block_id": "b0120",
+              "start": 0,
+              "end": 33,
+              "quote": "{\"message\":\"Некорректный запрос\"}"
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "HTTP 200 + ERROR",
+          "expected": "ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+          "basis": "пример ответа 200 с ошибкой и «При отклонении суммы вернуть прежнее состояние и результат ERROR.»",
+          "evidence": [
+            {
+              "block_id": "b0115",
+              "start": 0,
+              "end": 46,
+              "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+            },
+            {
+              "block_id": "b0084",
+              "start": 3,
+              "end": 68,
+              "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-004",
+        "F-005",
+        "F-009",
+        "F-010",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "включённость границ — по «Целое число тенге, обе границы включены.» (с. 4)"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-30",
+      "key": "range:api:amount:1000:1000000:fraction",
+      "kind": "api_validation",
+      "level": "api",
+      "title": "`amount`=1000.5: нецелое значение внутри диапазона — отклоняется",
+      "precondition": "Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000.5&enabled=1`",
+      "expected": "ОТКРЫТО до решения Q-BANK-A030E5: A) ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется; B) ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; параметр `amount` (integer): допустимо 1 000–1 000 000 ₸ (обе границы включены, только целые значения); остальные параметры корректны; авторизация: Bearer, сессия владельца карты\nКогда вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=1000.5&enabled=1`\nТогда (открыто до решения Q-BANK-A030E5): A) ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется; B) ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+      "req_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "R-017",
+        "R-019",
+        "R-020",
+        "R-035"
+      ],
+      "source_ids": [
+        "R-025",
+        "R-012",
+        "R-014",
+        "3",
+        "5",
+        "1",
+        "400"
+      ],
+      "obligation": {
+        "req_id": "R-025",
+        "source_id": null,
+        "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+        "evidence": {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0097",
+          "start": 0,
+          "end": 76,
+          "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt"
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0097",
+          "start": 33,
+          "end": 48,
+          "quote": "1 000–1 000 000"
+        },
+        {
+          "block_id": "b0086",
+          "start": 3,
+          "end": 43,
+          "quote": "Целое число тенге, обе границы включены."
+        },
+        {
+          "block_id": "b0082",
+          "start": 3,
+          "end": 35,
+          "quote": "Проверить сумму и переключатель."
+        },
+        {
+          "block_id": "b0111",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+        },
+        {
+          "block_id": "b0120",
+          "start": 0,
+          "end": 33,
+          "quote": "{\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "block_id": "b0115",
+          "start": 0,
+          "end": 46,
+          "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+        },
+        {
+          "block_id": "b0084",
+          "start": 3,
+          "end": 68,
+          "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+        }
+      ],
+      "values": {
+        "input": 1000.5,
+        "unit": "₸",
+        "boundary": "fraction",
+        "range": [
+          1000,
+          1000000
+        ]
+      },
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-A030E5",
+        "kind": "outcome",
+        "prompt": "Как GET /alerts/saveLimit отвечает на недопустимое значение `amount`: HTTP 400 (статус 400: «параметры запроса заполнены неверно») или HTTP 200 + ERROR (пример ответа 200 с ошибкой и «При отклонении суммы вернуть прежнее состояние и результат ERROR.»)?",
+        "options": [
+          "A) HTTP 400: ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+          "B) HTTP 200 + ERROR: ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки"
+        ],
+        "affected_req_ids": [
+          "R-025",
+          "R-012",
+          "R-014",
+          "R-017",
+          "R-019",
+          "R-020",
+          "R-035"
+        ],
+        "finding_ids": [
+          "F-009"
+        ],
+        "existing": false,
+        "key": "api-reject:amount"
+      },
+      "options": [
+        {
+          "label": "HTTP 400",
+          "expected": "ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+          "basis": "статус 400: «параметры запроса заполнены неверно»",
+          "evidence": [
+            {
+              "block_id": "b0111",
+              "start": 5,
+              "end": 62,
+              "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+            },
+            {
+              "block_id": "b0120",
+              "start": 0,
+              "end": 33,
+              "quote": "{\"message\":\"Некорректный запрос\"}"
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "HTTP 200 + ERROR",
+          "expected": "ответ HTTP 200 с телом `{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}`; возвращается прежнее состояние настройки",
+          "basis": "пример ответа 200 с ошибкой и «При отклонении суммы вернуть прежнее состояние и результат ERROR.»",
+          "evidence": [
+            {
+              "block_id": "b0115",
+              "start": 0,
+              "end": 46,
+              "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+            },
+            {
+              "block_id": "b0084",
+              "start": 3,
+              "end": 68,
+              "quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR."
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-004",
+        "F-005",
+        "F-009",
+        "F-010",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "включённость границ — по «Целое число тенге, обе границы включены.» (с. 4)"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-31",
+      "key": "api:enum:enabled",
+      "kind": "api_validation",
+      "level": "api",
+      "title": "`enabled`=2: значение вне списка 0, 1 — отклоняется",
+      "precondition": "Метод GET /alerts/saveLimit; параметр `enabled`: допустимо 0, 1; остальные параметры корректны",
+      "action": "вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=50000&enabled=2`",
+      "expected": "ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; параметр `enabled`: допустимо 0, 1; остальные параметры корректны\nКогда вызвать `GET /alerts/saveLimit?cardId=demo-42&amount=50000&enabled=2`\nТогда ответ HTTP 400 с телом `{\"message\":\"Некорректный запрос\"}`; сохранённая настройка не меняется",
+      "req_ids": [
+        "R-026",
+        "R-012",
+        "R-014",
+        "R-017",
+        "R-035"
+      ],
+      "source_ids": [
+        "R-026",
+        "R-012",
+        "R-014",
+        "3",
+        "400"
+      ],
+      "obligation": {
+        "req_id": "R-026",
+        "source_id": null,
+        "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
+        "evidence": {
+          "block_id": "b0098",
+          "start": 0,
+          "end": 71,
+          "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0098",
+          "start": 0,
+          "end": 71,
+          "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled"
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0098",
+          "start": 34,
+          "end": 41,
+          "quote": "0 или 1"
+        },
+        {
+          "block_id": "b0082",
+          "start": 3,
+          "end": 35,
+          "quote": "Проверить сумму и переключатель."
+        },
+        {
+          "block_id": "b0111",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+        },
+        {
+          "block_id": "b0120",
+          "start": 0,
+          "end": 33,
+          "quote": "{\"message\":\"Некорректный запрос\"}"
+        }
+      ],
+      "values": {
+        "input": 2,
+        "allowed": [
+          "0",
+          "1"
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-005",
+        "F-010",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-32",
+      "key": "witness:F-024",
+      "kind": "conflict",
+      "level": "business",
+      "title": "Конфликт F-024: Content-Type «application/json» указан, хотя тело запроса не…",
+      "precondition": "Клиент формирует запрос по описанию раздела «Request body»",
+      "action": "выполнить сценарий из условия конфликта",
+      "expected": "ОТКРЫТО до решения Q-BANK-934FEC: A) передаёт тело с заголовком Content-Type: application/json; B) отправляет запрос без тела",
+      "gherkin": "Дано Клиент формирует запрос по описанию раздела «Request body»\nКогда выполнить сценарий из условия конфликта\nТогда (открыто до решения Q-BANK-934FEC): A) передаёт тело с заголовком Content-Type: application/json; B) отправляет запрос без тела",
+      "req_ids": [
+        "R-027",
+        "R-028"
+      ],
+      "source_ids": [
+        "R-027",
+        "R-028"
+      ],
+      "obligation": {
+        "req_id": "R-027",
+        "source_id": null,
+        "quote": "Content-Type: application/json",
+        "evidence": {
+          "block_id": "b0100",
+          "start": 2,
+          "end": 32,
+          "quote": "Content-Type: application/json"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0100",
+          "start": 2,
+          "end": 32,
+          "quote": "Content-Type: application/json"
+        },
+        {
+          "block_id": "b0101",
+          "start": 2,
+          "end": 22,
+          "quote": "Тело не используется"
+        }
+      ],
+      "values": {},
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-934FEC",
+        "kind": "outcome",
+        "prompt": "Конфликт F-024: какой исход верен — «передаёт тело с заголовком Content-Type: application/json» или «отправляет запрос без тела»?",
+        "options": [
+          "A) исход A: передаёт тело с заголовком Content-Type: application/json",
+          "B) исход B: отправляет запрос без тела"
+        ],
+        "affected_req_ids": [
+          "R-027",
+          "R-028"
+        ],
+        "finding_ids": [
+          "F-024"
+        ],
+        "existing": false,
+        "key": "witness:F-024"
+      },
+      "options": [
+        {
+          "label": "исход A",
+          "expected": "передаёт тело с заголовком Content-Type: application/json",
+          "basis": "Content-Type: application/json",
+          "evidence": [
+            {
+              "block_id": "b0100",
+              "start": 2,
+              "end": 32,
+              "quote": "Content-Type: application/json"
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "исход B",
+          "expected": "отправляет запрос без тела",
+          "basis": "Тело не используется",
+          "evidence": [
+            {
+              "block_id": "b0101",
+              "start": 2,
+              "end": 22,
+              "quote": "Тело не используется"
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-024"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "witness",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-33",
+      "key": "api:status:401",
+      "kind": "api_status",
+      "level": "api",
+      "title": "GET /alerts/saveLimit: статус 401 — запрос выполнен без необходимой авторизации",
+      "precondition": "Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать GET /alerts/saveLimit, когда запрос выполнен без необходимой авторизации",
+      "expected": "ответ HTTP 401 с телом `{\"message\":\"Требуется вход\"}`",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты\nКогда вызвать GET /alerts/saveLimit, когда запрос выполнен без необходимой авторизации\nТогда ответ HTTP 401 с телом `{\"message\":\"Требуется вход\"}`",
+      "req_ids": [
+        "R-036",
+        "R-012",
+        "R-014",
+        "R-015"
+      ],
+      "source_ids": [
+        "401",
+        "R-012",
+        "R-014",
+        "1"
+      ],
+      "obligation": {
+        "req_id": "R-036",
+        "source_id": "401",
+        "quote": "Ответ в случае, если запрос выполнен без необходимой авторизации.",
+        "evidence": {
+          "block_id": "b0116",
+          "start": 5,
+          "end": 70,
+          "quote": "Ответ в случае, если запрос выполнен без необходимой авторизации."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0116",
+          "start": 5,
+          "end": 70,
+          "quote": "Ответ в случае, если запрос выполнен без необходимой авторизации."
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0122",
+          "start": 0,
+          "end": 28,
+          "quote": "{\"message\":\"Требуется вход\"}"
+        },
+        {
+          "block_id": "b0080",
+          "start": 3,
+          "end": 37,
+          "quote": "Проверить пользовательскую сессию."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-003",
+        "F-005",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-34",
+      "key": "api:status:500",
+      "kind": "api_status",
+      "level": "api",
+      "title": "GET /alerts/saveLimit: статус 500 — произошла внутренняя ошибка сервера",
+      "precondition": "Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать GET /alerts/saveLimit, когда произошла внутренняя ошибка сервера",
+      "expected": "ответ HTTP 500 с телом `{\"message\":\"Ошибка сервиса\"}`",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты\nКогда вызвать GET /alerts/saveLimit, когда произошла внутренняя ошибка сервера\nТогда ответ HTTP 500 с телом `{\"message\":\"Ошибка сервиса\"}`",
+      "req_ids": [
+        "R-038",
+        "R-012",
+        "R-014"
+      ],
+      "source_ids": [
+        "500",
+        "R-012",
+        "R-014"
+      ],
+      "obligation": {
+        "req_id": "R-038",
+        "source_id": "500",
+        "quote": "Ответ в случае, если произошла внутренняя ошибка сервера.",
+        "evidence": {
+          "block_id": "b0118",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если произошла внутренняя ошибка сервера."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0118",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если произошла внутренняя ошибка сервера."
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0128",
+          "start": 0,
+          "end": 28,
+          "quote": "{\"message\":\"Ошибка сервиса\"}"
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-005",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-35",
+      "key": "api:mention:404:чужой карты",
+      "kind": "api_status",
+      "level": "api",
+      "title": "GET /alerts/saveLimit: для чужой карты — статус 403 или 404",
+      "precondition": "Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать GET /alerts/saveLimit для чужой карты",
+      "expected": "ОТКРЫТО до решения Q-BANK-668BB4: A) ответ HTTP 403; B) ответ HTTP 404 с телом `{\"message\":\"Карта не найдена\"}`",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты\nКогда вызвать GET /alerts/saveLimit для чужой карты\nТогда (открыто до решения Q-BANK-668BB4): A) ответ HTTP 403; B) ответ HTTP 404 с телом `{\"message\":\"Карта не найдена\"}`",
+      "req_ids": [
+        "R-039",
+        "R-012",
+        "R-014",
+        "R-016",
+        "R-037"
+      ],
+      "source_ids": [
+        "403",
+        "R-012",
+        "R-014",
+        "2"
+      ],
+      "obligation": {
+        "req_id": "R-039",
+        "source_id": "403",
+        "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты.",
+        "evidence": {
+          "block_id": "b0124",
+          "start": 0,
+          "end": 64,
+          "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0124",
+          "start": 0,
+          "end": 64,
+          "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0081",
+          "start": 3,
+          "end": 42,
+          "quote": "Проверить принадлежность карты клиенту."
+        },
+        {
+          "block_id": "b0123",
+          "start": 0,
+          "end": 29,
+          "quote": "403. Unsuccessful — Forbidden"
+        },
+        {
+          "block_id": "b0117",
+          "start": 5,
+          "end": 62,
+          "quote": "Ответ в случае, если на указанный ресурс доступ запрещен."
+        },
+        {
+          "block_id": "b0126",
+          "start": 0,
+          "end": 30,
+          "quote": "{\"message\":\"Карта не найдена\"}"
+        }
+      ],
+      "values": {},
+      "status": "open",
+      "open_question_id": null,
+      "open_question": {
+        "id": "Q-BANK-668BB4",
+        "kind": "outcome",
+        "prompt": "Какой статус возвращает GET /alerts/saveLimit для чужой карты: 403 (как в заголовке раздела) или 404 (как в тексте)?",
+        "options": [
+          "A) HTTP 403: ответ HTTP 403",
+          "B) HTTP 404: ответ HTTP 404 с телом `{\"message\":\"Карта не найдена\"}`"
+        ],
+        "affected_req_ids": [
+          "R-039",
+          "R-012",
+          "R-014",
+          "R-016",
+          "R-037"
+        ],
+        "finding_ids": [
+          "F-011"
+        ],
+        "existing": false,
+        "key": "api-status:403:404"
+      },
+      "options": [
+        {
+          "label": "HTTP 403",
+          "expected": "ответ HTTP 403",
+          "basis": "заголовок раздела «Unsuccessful — Forbidden» и описание статуса «на указанный ресурс доступ запрещен»",
+          "evidence": [
+            {
+              "block_id": "b0123",
+              "start": 0,
+              "end": 29,
+              "quote": "403. Unsuccessful — Forbidden"
+            },
+            {
+              "block_id": "b0117",
+              "start": 5,
+              "end": 62,
+              "quote": "Ответ в случае, если на указанный ресурс доступ запрещен."
+            }
+          ],
+          "id": "A"
+        },
+        {
+          "label": "HTTP 404",
+          "expected": "ответ HTTP 404 с телом `{\"message\":\"Карта не найдена\"}`",
+          "basis": "фраза «Для чужой карты возвращается 404, как и для отсутствующей карты.»",
+          "evidence": [
+            {
+              "block_id": "b0124",
+              "start": 0,
+              "end": 64,
+              "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
+            },
+            {
+              "block_id": "b0126",
+              "start": 0,
+              "end": 30,
+              "quote": "{\"message\":\"Карта не найдена\"}"
+            }
+          ],
+          "id": "B"
+        }
+      ],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-005",
+        "F-011",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-36",
+      "key": "api:mention:404:отсутствующей карты",
+      "kind": "api_status",
+      "level": "api",
+      "title": "GET /alerts/saveLimit: для отсутствующей карты — статус 404",
+      "precondition": "Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты",
+      "action": "вызвать GET /alerts/saveLimit для отсутствующей карты",
+      "expected": "ответ HTTP 404 с телом `{\"message\":\"Карта не найдена\"}`",
+      "gherkin": "Дано Метод GET /alerts/saveLimit; авторизация: Bearer, сессия владельца карты\nКогда вызвать GET /alerts/saveLimit для отсутствующей карты\nТогда ответ HTTP 404 с телом `{\"message\":\"Карта не найдена\"}`",
+      "req_ids": [
+        "R-039",
+        "R-012",
+        "R-014",
+        "R-016"
+      ],
+      "source_ids": [
+        "403",
+        "R-012",
+        "R-014",
+        "2"
+      ],
+      "obligation": {
+        "req_id": "R-039",
+        "source_id": "403",
+        "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты.",
+        "evidence": {
+          "block_id": "b0124",
+          "start": 0,
+          "end": 64,
+          "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0124",
+          "start": 0,
+          "end": 64,
+          "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."
+        },
+        {
+          "block_id": "b0068",
+          "start": 12,
+          "end": 15,
+          "quote": "GET"
+        },
+        {
+          "block_id": "b0072",
+          "start": 14,
+          "end": 46,
+          "quote": "Dev: /alerts/saveLimit . Prod: —"
+        },
+        {
+          "block_id": "b0126",
+          "start": 0,
+          "end": 30,
+          "quote": "{\"message\":\"Карта не найдена\"}"
+        },
+        {
+          "block_id": "b0081",
+          "start": 3,
+          "end": 42,
+          "quote": "Проверить принадлежность карты клиенту."
+        }
+      ],
+      "values": {},
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-005",
+        "F-012",
+        "F-013",
+        "F-022",
+        "F-023"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "статус 404 не входит в перечень статусов метода"
+      ],
+      "changes": [],
+      "draft": true
+    }
+  ],
+  "warnings": [
+    "Открытых сценариев без ссылки open_question_id: 8. Вызывающий не передал questions, поэтому вопросы пакета не попадут в Report.questions; они лежат в open_question и в collect_questions()."
+  ]
 }

@@ -772,10 +772,10 @@
     {
       "id": "R-015",
       "group": "R-015",
-      "source_id": null,
-      "source_ref": "Логика работы метода",
+      "source_id": "1",
+      "source_ref": "Логика работы метода › 1",
       "kind": "contract",
-      "text": "Логика работы метода: Проверить пользовательскую сессию.",
+      "text": "Проверить пользовательскую сессию.",
       "block_ids": [
         "b0080"
       ],
@@ -805,8 +805,8 @@
     {
       "id": "R-016",
       "group": "R-016",
-      "source_id": null,
-      "source_ref": "Логика работы метода",
+      "source_id": "2",
+      "source_ref": "Логика работы метода › 2",
       "kind": "contract",
       "text": "Проверить принадлежность карты клиенту.",
       "block_ids": [
@@ -838,8 +838,8 @@
     {
       "id": "R-017",
       "group": "R-017",
-      "source_id": null,
-      "source_ref": "Логика работы метода",
+      "source_id": "3",
+      "source_ref": "Логика работы метода › 3",
       "kind": "contract",
       "text": "Проверить сумму и переключатель.",
       "block_ids": [
@@ -871,8 +871,8 @@
     {
       "id": "R-018",
       "group": "R-018",
-      "source_id": null,
-      "source_ref": "Логика работы метода",
+      "source_id": "4",
+      "source_ref": "Логика работы метода › 4",
       "kind": "contract",
       "text": "Заменить настройку и вернуть результат сохранения.",
       "block_ids": [
@@ -904,8 +904,8 @@
     {
       "id": "R-019",
       "group": "R-019",
-      "source_id": null,
-      "source_ref": "Логика работы метода",
+      "source_id": "5",
+      "source_ref": "Логика работы метода › 5",
       "kind": "contract",
       "text": "При отклонении суммы вернуть прежнее состояние и результат ERROR.",
       "block_ids": [
@@ -937,8 +937,8 @@
     {
       "id": "R-020",
       "group": "R-020",
-      "source_id": null,
-      "source_ref": "Особые правила",
+      "source_id": "1",
+      "source_ref": "Особые правила › 1",
       "kind": "contract",
       "text": "Целое число тенге, обе границы включены.",
       "block_ids": [
@@ -970,8 +970,8 @@
     {
       "id": "R-021",
       "group": "R-021",
-      "source_id": null,
-      "source_ref": "Особые правила",
+      "source_id": "2",
+      "source_ref": "Особые правила › 2",
       "kind": "contract",
       "text": "Повторное сохранение заменяет действующую настройку.",
       "block_ids": [
@@ -1003,8 +1003,8 @@
     {
       "id": "R-022",
       "group": "R-022",
-      "source_id": null,
-      "source_ref": "Особые правила",
+      "source_id": "3",
+      "source_ref": "Особые правила › 3",
       "kind": "contract",
       "text": "Изменение порога сохраняет накопленные расходы.",
       "block_ids": [

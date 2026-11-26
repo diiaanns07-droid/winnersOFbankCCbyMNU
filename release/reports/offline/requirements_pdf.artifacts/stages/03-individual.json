@@ -3989,7 +3989,7 @@
       "kind": "incomplete",
       "criterion": "complete",
       "severity": "major",
-      "title": "«и далее»: открытый перечень",
+      "title": "R-029.2: «и далее» — открытый перечень",
       "impact": "Неоперациональное слово в обязательстве: реализацию и тест придётся строить на догадке.",
       "req_ids": [
         "R-029.2"
@@ -4077,10 +4077,10 @@
   "meta": {
     "stage": "individual",
     "mode": "rules_only",
-    "prompt_version": "individual/1.1.0+c439d48c2a36",
-    "criteria_version": "1.0.0",
-    "criteria_fingerprint": "541aca8bcdf0bbbee1f4018b1bbeffd5fabd516f8a46bd5bb4d0fff9abafbf3e",
-    "criteria_tag": "1.0.0+541aca8bcdf0",
+    "prompt_version": "individual/1.3.0+8039a432f121",
+    "criteria_version": "1.1.0",
+    "criteria_fingerprint": "aaec434005e0c603af16d47e86cb4a4151c68504e2d94a5e48cf5d52e4db6bb8",
+    "criteria_tag": "1.1.0+aaec434005e0",
     "calls": 0,
     "requirements": 49
   }

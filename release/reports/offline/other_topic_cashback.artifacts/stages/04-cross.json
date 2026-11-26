@@ -2,7 +2,7 @@
   "facts": [
     {
       "id": "FX-001",
-      "subject": null,
+      "subject": "Требования к данным",
       "field": "сумму кэшбэка",
       "scope": "Часть A. Бизнес-требования / Требования к данным",
       "direction": null,
@@ -11,12 +11,17 @@
       "range": null,
       "unit": "tiyn",
       "condition": null,
-      "evidence": {
-        "block_id": "b0020",
-        "start": 59,
-        "end": 81,
-        "quote": "сумму кэшбэка в тиынах"
-      },
+      "evidence": [
+        {
+          "block_id": "b0020",
+          "start": 59,
+          "end": 81,
+          "quote": "сумму кэшбэка в тиынах"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
       "binding": null,
       "aliases": [],
       "source": "text",
@@ -32,7 +37,7 @@
     },
     {
       "id": "FX-002",
-      "subject": null,
+      "subject": "Требования к данным",
       "field": "лимит",
       "scope": "Часть A. Бизнес-требования / Требования к данным",
       "direction": null,
@@ -41,12 +46,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0020",
-        "start": 84,
-        "end": 97,
-        "quote": "лимит в тенге"
-      },
+      "evidence": [
+        {
+          "block_id": "b0020",
+          "start": 84,
+          "end": 97,
+          "quote": "лимит в тенге"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
       "binding": null,
       "aliases": [],
       "source": "text",
@@ -62,7 +72,7 @@
     },
     {
       "id": "FX-003",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "месяц",
       "scope": "Часть A. Бизнес-требования / Критерии приемки",
       "direction": null,
@@ -71,12 +81,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0025",
-        "start": 42,
-        "end": 45,
-        "quote": "0 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 42,
+          "end": 45,
+          "quote": "0 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-009"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -93,7 +108,7 @@
     },
     {
       "id": "FX-004",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "кафе",
       "scope": "Часть A. Бизнес-требования / Критерии приемки",
       "direction": null,
@@ -102,12 +117,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0025",
-        "start": 66,
-        "end": 74,
-        "quote": "20 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 66,
+          "end": 74,
+          "quote": "20 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-009"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -124,7 +144,7 @@
     },
     {
       "id": "FX-005",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Начислено",
       "scope": "Часть A. Бизнес-требования / Критерии приемки",
       "direction": null,
@@ -133,12 +153,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0025",
-        "start": 87,
-        "end": 94,
-        "quote": "1 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 87,
+          "end": 94,
+          "quote": "1 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-009"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -155,7 +180,7 @@
     },
     {
       "id": "FX-006",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "месяц",
       "scope": "Часть A. Бизнес-требования / Критерии приемки",
       "direction": null,
@@ -164,12 +189,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0027",
-        "start": 16,
-        "end": 23,
-        "quote": "9 800 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 16,
+          "end": 23,
+          "quote": "9 800 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-011"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -186,7 +216,7 @@
     },
     {
       "id": "FX-007",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "выбранной категории",
       "scope": "Часть A. Бизнес-требования / Критерии приемки",
       "direction": null,
@@ -195,12 +225,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0027",
-        "start": 59,
-        "end": 67,
-        "quote": "10 000 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 59,
+          "end": 67,
+          "quote": "10 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-011"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -217,7 +252,7 @@
     },
     {
       "id": "FX-008",
-      "subject": null,
+      "subject": "Критерии приемки",
       "field": "Начислено",
       "scope": "Часть A. Бизнес-требования / Критерии приемки",
       "direction": null,
@@ -226,12 +261,17 @@
       "range": null,
       "unit": "KZT",
       "condition": null,
-      "evidence": {
-        "block_id": "b0027",
-        "start": 80,
-        "end": 85,
-        "quote": "500 ₸"
-      },
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 80,
+          "end": 85,
+          "quote": "500 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-011"
+      ],
       "binding": null,
       "aliases": [],
       "source": "acceptance",
@@ -257,12 +297,17 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0037",
-        "start": 0,
-        "end": 46,
-        "quote": "clientId | string | Да | Идентификатор клиента"
-      },
+      "evidence": [
+        {
+          "block_id": "b0037",
+          "start": 0,
+          "end": 46,
+          "quote": "clientId | string | Да | Идентификатор клиента"
+        }
+      ],
+      "req_ids": [
+        "R-014"
+      ],
       "binding": null,
       "aliases": [
         "Идентификатор клиента"
@@ -296,12 +341,17 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0038",
-        "start": 0,
-        "end": 52,
-        "quote": "categories | array | Да | Коды категорий, не более 3"
-      },
+      "evidence": [
+        {
+          "block_id": "b0038",
+          "start": 0,
+          "end": 52,
+          "quote": "categories | array | Да | Коды категорий, не более 3"
+        }
+      ],
+      "req_ids": [
+        "R-015"
+      ],
       "binding": null,
       "aliases": [
         "Коды категорий"
@@ -335,12 +385,17 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0041",
-        "start": 0,
-        "end": 43,
-        "quote": "categories | string | Сохранённые категории"
-      },
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 43,
+          "quote": "categories | string | Сохранённые категории"
+        }
+      ],
+      "req_ids": [
+        "R-016"
+      ],
       "binding": null,
       "aliases": [
         "Сохранённые категории"
@@ -373,12 +428,17 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0042",
-        "start": 0,
-        "end": 28,
-        "quote": "status | string | OK / ERROR"
-      },
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 28,
+          "quote": "status | string | OK / ERROR"
+        }
+      ],
+      "req_ids": [
+        "R-017"
+      ],
       "binding": null,
       "aliases": [
         "OK / ERROR"
@@ -411,12 +471,18 @@
       "range": null,
       "unit": null,
       "condition": "Успешное сохранение",
-      "evidence": {
-        "block_id": "b0044",
-        "start": 0,
-        "end": 25,
-        "quote": "200. Успешное сохранение."
-      },
+      "evidence": [
+        {
+          "block_id": "b0044",
+          "start": 0,
+          "end": 25,
+          "quote": "200. Успешное сохранение."
+        }
+      ],
+      "req_ids": [
+        "R-018",
+        "R-019"
+      ],
       "binding": null,
       "aliases": [],
       "source": "status",
@@ -433,12 +499,18 @@
       "range": null,
       "unit": null,
       "condition": "Неверные параметры",
-      "evidence": {
-        "block_id": "b0044",
-        "start": 26,
-        "end": 50,
-        "quote": "400. Неверные параметры."
-      },
+      "evidence": [
+        {
+          "block_id": "b0044",
+          "start": 26,
+          "end": 50,
+          "quote": "400. Неверные параметры."
+        }
+      ],
+      "req_ids": [
+        "R-018",
+        "R-019"
+      ],
       "binding": null,
       "aliases": [],
       "source": "status",
@@ -455,12 +527,15 @@
       "range": null,
       "unit": null,
       "condition": null,
-      "evidence": {
-        "block_id": "b0045",
-        "start": 0,
-        "end": 7,
-        "quote": "200. OK"
-      },
+      "evidence": [
+        {
+          "block_id": "b0045",
+          "start": 0,
+          "end": 7,
+          "quote": "200. OK"
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "status_heading",
@@ -480,12 +555,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 200",
-      "evidence": {
-        "block_id": "b0046",
-        "start": 1,
-        "end": 17,
-        "quote": "\"status\":\"ERROR\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0046",
+          "start": 1,
+          "end": 17,
+          "quote": "\"status\":\"ERROR\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -513,12 +591,15 @@
       "range": null,
       "unit": null,
       "condition": "HTTP 200",
-      "evidence": {
-        "block_id": "b0046",
-        "start": 18,
-        "end": 63,
-        "quote": "\"message\":\"Нельзя выбрать больше 3 категорий\""
-      },
+      "evidence": [
+        {
+          "block_id": "b0046",
+          "start": 18,
+          "end": 63,
+          "quote": "\"message\":\"Нельзя выбрать больше 3 категорий\""
+        }
+      ],
+      "req_ids": [],
       "binding": null,
       "aliases": [],
       "source": "example",
@@ -539,7 +620,7 @@
   "coverage": [
     {
       "req_id": "R-001.1",
-      "obligation_id": "КБ-1#1",
+      "obligation_id": "R-001.1#1",
       "obligation": "Клиент с активной дебетовой картой выбирает до 3 категорий кэшбэка на календарный месяц.",
       "acceptance_ids": [
         "R-009",
@@ -563,6 +644,32 @@
         },
         {
           "block_id": "b0027",
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 6,
+          "end": 94,
+          "quote": "Клиент с активной дебетовой картой выбирает до 3 категорий кэшбэка на календарный месяц."
+        },
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        },
+        {
+          "block_id": "b0026",
+          "start": 0,
+          "end": 101,
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        },
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
           "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
@@ -593,12 +700,10 @@
     },
     {
       "req_id": "R-001.2",
-      "obligation_id": "КБ-1#1",
+      "obligation_id": "R-001.2#1",
       "obligation": "Выбор доступен с 1 по 5 число месяца.",
       "acceptance_ids": [
-        "R-009",
-        "R-010",
-        "R-011"
+        "R-010"
       ],
       "status": "partial",
       "explanation": "Связь найдена только по общим сущностям (режим без модели); что приёмка проверяет все ветви (1), не установлено — covered не присваивается.",
@@ -608,16 +713,22 @@
           "quote": "Выбор доступен с 1 по 5 число месяца."
         },
         {
-          "block_id": "b0025",
-          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+          "block_id": "b0026",
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 95,
+          "end": 132,
+          "quote": "Выбор доступен с 1 по 5 число месяца."
         },
         {
           "block_id": "b0026",
+          "start": 0,
+          "end": 101,
           "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
-        },
-        {
-          "block_id": "b0027",
-          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
       "branches": [
@@ -626,22 +737,10 @@
       "branches_checked": [],
       "links": [
         {
-          "acceptance_id": "R-009",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 4.35
-        },
-        {
           "acceptance_id": "R-010",
           "relation": "lexical",
           "source": "rules",
-          "score": 4.75
-        },
-        {
-          "acceptance_id": "R-011",
-          "relation": "lexical",
-          "source": "rules",
-          "score": 4.35
+          "score": 5.02
         }
       ]
     },
@@ -671,6 +770,32 @@
         },
         {
           "block_id": "b0027",
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0013",
+          "start": 6,
+          "end": 113,
+          "quote": "За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента."
+        },
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        },
+        {
+          "block_id": "b0026",
+          "start": 0,
+          "end": 101,
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        },
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
           "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
@@ -724,6 +849,26 @@
           "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0014",
+          "start": 6,
+          "end": 75,
+          "quote": "Кэшбэк начисляется в течение 2 рабочих дней после проведения покупки."
+        },
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        },
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -769,6 +914,32 @@
         },
         {
           "block_id": "b0027",
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0015",
+          "start": 6,
+          "end": 70,
+          "quote": "Клиент может изменить выбранные категории в любой момент месяца."
+        },
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        },
+        {
+          "block_id": "b0026",
+          "start": 0,
+          "end": 101,
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        },
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
           "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
@@ -821,6 +992,26 @@
           "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0016",
+          "start": 6,
+          "end": 56,
+          "quote": "Кэшбэк за возвращённую покупку списывается и т. д."
+        },
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        },
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -850,6 +1041,14 @@
       "hints": [
         {
           "block_id": "b0018",
+          "quote": "Экран кэшбэка открывается быстро и удобно для клиента."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0018",
+          "start": 0,
+          "end": 54,
           "quote": "Экран кэшбэка открывается быстро и удобно для клиента."
         }
       ],
@@ -885,6 +1084,32 @@
         },
         {
           "block_id": "b0027",
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0020",
+          "start": 0,
+          "end": 98,
+          "quote": "Хранить идентификатор клиента, месяц, выбранные категории, сумму кэшбэка в тиынах и лимит в тенге."
+        },
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        },
+        {
+          "block_id": "b0026",
+          "start": 0,
+          "end": 101,
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        },
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
           "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
@@ -942,6 +1167,32 @@
           "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
         }
       ],
+      "evidence": [
+        {
+          "block_id": "b0022",
+          "start": 0,
+          "end": 84,
+          "quote": "Приложение получает и меняет выбранные категории через документ «Кэшбэк — REST API»."
+        },
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        },
+        {
+          "block_id": "b0026",
+          "start": 0,
+          "end": 101,
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        },
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
       "branches": [
         "основной сценарий"
       ],
@@ -966,166 +1217,14 @@
           "score": 3.9
         }
       ]
-    },
-    {
-      "req_id": "R-012",
-      "obligation_id": "R-012#1",
-      "obligation": "REST type | GET",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0033",
-          "quote": "REST type | GET"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-013",
-      "obligation_id": "R-013#1",
-      "obligation": "Request URL | /cashback/setCategories",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0034",
-          "quote": "Request URL | /cashback/setCategories"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-014",
-      "obligation_id": "R-014#1",
-      "obligation": "clientId | string | Да | Идентификатор клиента",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0037",
-          "quote": "clientId | string | Да | Идентификатор клиента"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-015",
-      "obligation_id": "R-015#1",
-      "obligation": "categories | array | Да | Коды категорий, не более 3",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0038",
-          "quote": "categories | array | Да | Коды категорий, не более 3"
-        }
-      ],
-      "branches": [
-        "первое срабатывание",
-        "повторное срабатывание не происходит"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-016",
-      "obligation_id": "R-016#1",
-      "obligation": "categories | string | Сохранённые категории",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0041",
-          "quote": "categories | string | Сохранённые категории"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-017",
-      "obligation_id": "R-017#1",
-      "obligation": "status | string | OK / ERROR",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0042",
-          "quote": "status | string | OK / ERROR"
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-018",
-      "obligation_id": "200#1",
-      "obligation": "Успешное сохранение.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0044",
-          "quote": "Успешное сохранение."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
-    },
-    {
-      "req_id": "R-019",
-      "obligation_id": "400#1",
-      "obligation": "Неверные параметры.",
-      "acceptance_ids": [],
-      "status": "uncovered",
-      "explanation": "Ни одна строка приёмки не проверяет обязательство.",
-      "hints": [
-        {
-          "block_id": "b0044",
-          "quote": "Неверные параметры."
-        }
-      ],
-      "branches": [
-        "основной сценарий"
-      ],
-      "branches_checked": [],
-      "links": []
     }
   ],
   "candidates": [
     {
       "scope": "set",
-      "kind": "question",
-      "criterion": "consistency",
+      "kind": "ambiguity",
+      "subkind": "question",
+      "criterion": "set_consistent",
       "severity": "minor",
       "title": "Тип «categories» различается: «categories» (Часть B. REST API / Параметры запроса, запрос) array, «categories» (Часть B. REST API / Ответ, ответ) string",
       "impact": "Клиент и сервер могут по-разному сериализовать поле; без оговорённого преобразования тесты контракта неоднозначны.",
@@ -1143,6 +1242,10 @@
           "quote": "string"
         }
       ],
+      "recommendation": "Указать формат поля в ответе и правило преобразования из запроса.",
+      "blocked_decision": "как сериализовать поле в контрактных тестах",
+      "source": "rules",
+      "stage": "cross",
       "origin": "facts",
       "comparison_id": "CMP-001",
       "question": "«categories» в одном месте array, в другом string. Это одно поле с разным представлением? Как значение преобразуется?",
@@ -1150,13 +1253,13 @@
     },
     {
       "scope": "set",
-      "kind": "question",
-      "criterion": "consistency",
+      "kind": "ambiguity",
+      "subkind": "question",
+      "criterion": "set_consistent",
       "severity": "major",
       "title": "Один и тот же неверный ввод: HTTP 200 с ошибкой в теле или HTTP 400?",
       "impact": "Клиент не знает, по коду или по полю тела распознавать отказ; контрактные тесты неоднозначны.",
       "req_ids": [
-        "R-018",
         "R-019"
       ],
       "hints": [
@@ -1169,6 +1272,10 @@
           "quote": "400. Неверные параметры."
         }
       ],
+      "recommendation": "Уточнить условие у автора требования и зафиксировать исход в тексте и в приёмке.",
+      "blocked_decision": "какой исход заложить в реализацию и в тест",
+      "source": "rules",
+      "stage": "cross",
       "origin": "facts",
       "comparison_id": "CMP-002",
       "question": "Если запрос отклонён из-за значения параметра («Нельзя выбрать больше 3 категорий»), какой код возвращается: HTTP 200 с телом \"status\":\"ERROR\" или HTTP 400 («Неверные параметры»)?",
@@ -1181,11 +1288,12 @@
     },
     {
       "scope": "set",
-      "kind": "missing_contract",
-      "criterion": "completeness",
+      "kind": "omission",
+      "subkind": "missing_contract",
+      "criterion": "set_complete",
       "severity": "critical",
       "title": "Обещано чтение через контракт, но метода для этой операции в API нет",
-      "impact": "«Приложение получает и меняет выбранные категории через документ «Кэшбэк — REST API».» — в описании API (строки 44–76) найдено только: GET /cashback/setCategories — сохранение. Клиент не сможет выполнить обещанную операцию, тест на неё не из чего написать.",
+      "impact": "«Приложение получает и меняет выбранные категории через документ «Кэшбэк — REST API».» — в описании API (строки 42–76) найдено только: GET /cashback/setCategories — сохранение. Клиент не сможет выполнить обещанную операцию, тест на неё не из чего написать.",
       "req_ids": [
         "R-008"
       ],
@@ -1195,8 +1303,13 @@
           "quote": "Приложение получает и меняет выбранные категории через документ «Кэшбэк — REST API»."
         }
       ],
+      "recommendation": "Описать метод для обещанной операции (URL, REST type, параметры, ответ, статусы) или убрать обещание.",
+      "blocked_decision": "как клиенту выполнить обещанную операцию и чем её проверить",
+      "source": "rules",
+      "stage": "cross",
       "origin": "rules",
       "inspected_block_ids": [
+        "b0028",
         "b0029",
         "b0030",
         "b0031",
@@ -1218,6 +1331,7 @@
       ],
       "inspected_scope": {
         "sections": [
+          "",
           "Часть B. REST API",
           "Часть B. REST API / Общие параметры",
           "Часть B. REST API / Параметры запроса",
@@ -1225,7 +1339,7 @@
           "Часть B. REST API / Статусы",
           "Часть B. REST API / Статусы / 200. OK"
         ],
-        "span": "строки 44–76"
+        "span": "строки 42–76"
       },
       "searched_for": [
         "URL или имя метода с глаголом чтения (get/read/list/fetch/load/show/find)",
@@ -1244,30 +1358,28 @@
       "ref": "X-03"
     }
   ],
-  "warnings": [
-    "Подсказка №04 отклонена: цитата не найдена ('')."
-  ],
+  "warnings": [],
   "coverage_summary": {
-    "denominator": 17,
+    "denominator": 9,
     "covered": 0,
     "partial": 8,
     "conflict": 0,
-    "uncovered": 9,
+    "uncovered": 1,
     "unknown": 0,
     "covered_ratio": 0.0,
     "linked": 8,
-    "linked_ratio": 0.471,
+    "linked_ratio": 0.889,
     "by_requirement": [
       {
         "req_id": "R-001.1",
-        "label": "КБ-1",
+        "label": "КБ-1, R-001.1",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
       },
       {
         "req_id": "R-001.2",
-        "label": "КБ-1",
+        "label": "КБ-1, R-001.2",
         "obligations": 1,
         "covered": 0,
         "status": "partial"
@@ -1320,65 +1432,51 @@
         "obligations": 1,
         "covered": 0,
         "status": "partial"
-      },
+      }
+    ],
+    "note": "Знаменатель — число обязательств. linked (есть связанная приёмка) не равен covered: covered требует проверки всех ветвей без противоречия; conflict — приёмка спорит с обязательством.",
+    "excluded": [
       {
         "req_id": "R-012",
         "label": "R-012",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-013",
         "label": "R-013",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-014",
         "label": "R-014",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-015",
         "label": "R-015",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-016",
         "label": "R-016",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-017",
         "label": "R-017",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-018",
-        "label": "200",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-018",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       },
       {
         "req_id": "R-019",
-        "label": "400",
-        "obligations": 1,
-        "covered": 0,
-        "status": "uncovered"
+        "label": "R-019",
+        "reason": "раздел «API»: контракт, пример, схема или паспорт — проверяется сравнением фактов, а не приёмкой"
       }
-    ],
-    "note": "Знаменатель — число обязательств. linked (есть связанная приёмка) не равен covered: covered требует проверки всех ветвей без противоречия; conflict — приёмка спорит с обязательством."
+    ]
   },
   "comparisons": [
     {
@@ -1408,7 +1506,7 @@
     "ambiguous": 0,
     "relocated": 0,
     "rejected": 0,
-    "explanation": "Подсказки {block_id, quote} модулей №04 и LLM-стадий №06. confirmed — точное совпадение block.text[start:end] == quote (включая нормализацию пробелов, ё и Markdown с пересчётом координат); ambiguous — цитата встречается в блоке несколько раз, выбрано первое вхождение или по контексту; relocated — цитата найдена ровно в одном другом блоке; rejected — не найдена, опора не используется. Детерминированные опоры, вычисленные из таблиц, сюда не входят.",
+    "note": "Подсказки {block_id, quote} модулей №04 и LLM-стадий №06. confirmed — точное совпадение block.text[start:end] == quote (включая нормализацию пробелов, ё и Markdown с пересчётом координат); ambiguous — цитата встречается в блоке несколько раз, выбрано первое вхождение или по контексту; relocated — цитата найдена ровно в одном другом блоке; rejected — не найдена, опора не используется. Детерминированные опоры, вычисленные из таблиц, сюда не входят. Цитаты проверены резолвером №07.",
     "notes": []
   },
   "stats": {
@@ -1416,18 +1514,18 @@
     "llm_calls": 0,
     "llm_failed": [],
     "pairs_considered": 386,
-    "pairs_selected": 52,
+    "pairs_selected": 59,
     "pairs_by_role": {
       "api×api": 4,
-      "business_rules×acceptance": 13,
+      "business_rules×acceptance": 16,
       "business_rules×data": 3,
       "integration×api": 3,
-      "business_rules×goals": 2,
+      "business_rules×goals": 3,
       "nfr×goals": 1,
-      "business_rules×business_rules": 8,
+      "business_rules×business_rules": 10,
       "data×api": 3,
       "business_rules×api": 3,
-      "business_rules×nfr": 2,
+      "business_rules×nfr": 3,
       "business_rules×integration": 3,
       "acceptance×api": 3,
       "data×acceptance": 3,
@@ -1438,19 +1536,19 @@
   "acceptance": [
     {
       "acceptance_id": "R-009",
-      "label": "R-009",
+      "label": "Приёмка №1 (R-009)",
       "block_id": "b0025",
       "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
     },
     {
       "acceptance_id": "R-010",
-      "label": "R-010",
+      "label": "Приёмка №2 (R-010)",
       "block_id": "b0026",
       "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
     },
     {
       "acceptance_id": "R-011",
-      "label": "R-011",
+      "label": "Приёмка №3 (R-011)",
       "block_id": "b0027",
       "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
     }

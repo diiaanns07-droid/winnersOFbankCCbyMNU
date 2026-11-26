@@ -1,9 +1,9 @@
-# Комплект релиза bcc-review: кандидат 2026-11-26
+# Комплект релиза bcc-review: сборка 8e8e95f (2026-11-26)
 
 Агент статического ревью ТЗ (BCC-HUB × MNU FinTech Hackathon). Комплект нужен, чтобы
 повторить прогон с нуля и сверить отчёт с источником без доверия к автору отчёта.
 
-**Версия агента:** ветка `bcc/integration`, коммит кода `f91d3b6f485e883d316c94fc5e032f1a8d6c2553`
+**Версия агента:** ветка `bcc/integration`, коммит сборки `8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803`
 (контракт Report v1.0, `contracts/v1.json`). Коммит записан в паспорте каждого отчёта
 (`run.agent_commit`) без пометки `-dirty`.
 
@@ -41,7 +41,8 @@ macOS и Linux: `python3.12 -m venv .venv && .venv/bin/python -m pip install -e 
 ```
 
 В паспорте: `run.mode = rules_only`, `run.status = partial`, `run.model = null`, 0 вызовов модели.
-Готовность «не определено»: без семантических этапов агент не утверждает, что документ готов.
+Готовность «можно начинать» в этом режиме невозможна: без семантических этапов агент её не утверждает.
+Если правила подтвердили критичный дефект, вердикт — «нельзя начинать»; иначе — «не определено».
 
 ## Итоговый живой прогон (владелец ключа)
 
@@ -50,9 +51,9 @@ macOS и Linux: `python3.12 -m venv .venv && .venv/bin/python -m pip install -e 
 
 ```powershell
 $env:ANTHROPIC_API_KEY = "<ключ>"
-.venv\Scripts\python -m bcc_review release\input\requirements.md release\reports\live\requirements.md --provider anthropic --no-cache --export html,jira,pdf
+.venv\Scripts\python -m bcc_review release\input\requirements.md release\reports\live\requirements.md --provider anthropic --no-cache --export html,jira --max-calls 40 --max-seconds 1800
 .venv\Scripts\python -m bcc_review verify release\reports\live\requirements.json release\input\requirements.md
-.venv\Scripts\python -m bcc_review release\input\other_topic_cashback.md release\reports\live\other_topic_cashback.md --provider anthropic --no-cache --export html
+.venv\Scripts\python -m bcc_review release\input\other_topic_cashback.md release\reports\live\other_topic_cashback.md --provider anthropic --no-cache --export html --max-calls 40 --max-seconds 1800
 .venv\Scripts\python -m bcc_review verify release\reports\live\other_topic_cashback.json release\input\other_topic_cashback.md
 ```
 
@@ -67,7 +68,7 @@ $env:GEMINI_API_KEY = "<ключ>"
 
 * `run.mode = "rules_plus_llm"`, `run.status = "complete"`, `run.incomplete_stages = []`;
 * `run.model` — фактическая модель из ответа провайдера, `run.calls.physical > 0`, `run.calls.cache_hits = 0`;
-* `run.agent_commit` совпадает с `git rev-parse HEAD` и без `-dirty`;
+* `run.agent_commit` — SHA сборки (`8e8e95f…` или новее) без `-dirty`;
 * `verify` печатает `OK`.
 
 Если бюджет или лимиты провайдера оборвали прогон, отчёт всё равно пишется: `run.status = partial`,
@@ -76,18 +77,21 @@ $env:GEMINI_API_KEY = "<ключ>"
 
 ## Что получено от настоящей модели
 
-Ничего. В сессии сборки ключа не было: все числа в `reports/offline` получены детерминированными
-правилами, `run.calls.physical = 0`. Живой прогон по командам выше остаётся за владельцем ключа.
+Ничего. В среде сборки командного ключа не было (`.env`, `ANTHROPIC_API_KEY`, `ant` — проверено): все числа
+в `reports/offline` получены детерминированными правилами, `run.calls.physical = 0`. Статус и готовая
+команда официального прогона — в `reports/live/README.md`.
 
 ## Отчёты офлайн-прогона в этом комплекте
 
-Сгенерированы на коммите `f91d3b6` командой из раздела «Повторить офлайн-отчёты» (`--no-cache`), `verify` — OK.
+Сгенерированы на коммите `8e8e95f` командой из раздела «Повторить офлайн-отчёты» (`--no-cache`), `verify` — OK.
 
-| Вход | Длительность прогона | Требований | Замечаний (сущ./незн.) | Опор проверено verify | `.md` | `.json` | `.html` |
-| :--- | ---: | ---: | :--- | ---: | ---: | ---: | ---: |
-| `requirements.md` | 1,2 с | 49 | 26 (12/14) | 319 | 294 КБ | 660 КБ | 723 КБ |
-| `requirements.pdf` | 6,3 с | 49 | 25 (11/14) | 309 | 288 КБ | 917 КБ | 701 КБ |
-| `other_topic_cashback.md` | 1,0 с | 20 | 19 (11/8) | 147 | 146 КБ | 289 КБ | 371 КБ |
+| Вход | Длительность прогона | Требований | Замечаний (крит./сущ./незн.) | Опор проверено verify | Готовность разр./тест. | `.md` | `.json` | `.html` |
+| :--- | ---: | ---: | :--- | ---: | :--- | ---: | ---: | ---: |
+| `requirements.md` | 1,2 с | 49 | 27 (2/11/14) | 590 | нельзя / нельзя | 326 КБ | 872 КБ | 1 044 КБ |
+| `requirements.pdf` | 4,4 с | 49 | 25 (2/10/13) | 585 | нельзя / нельзя | 323 КБ | 1 147 КБ | 1 030 КБ |
+| `other_topic_cashback.md` | 0,8 с | 20 | 19 (1/10/8) | 179 | нельзя / нельзя | 152 КБ | 323 КБ | 427 КБ |
 
-Критичных замечаний офлайн нет: противоречия К1, К2 и пропуски К4, К5 находят семантические этапы с моделью.
-Режим `rules_only` честно отмечен в паспорте, готовность к разработке и тестированию — «не определено».
+На официальном входе правила без модели подтверждают два критичных дефекта: приёмка №2 противоречит Ф-2
+(строки 64 и 38) и обещанное чтение настроек без метода чтения в API (строки 52, 29, 103). Противоречие
+Ф-3 и Ф-4 и неопределённое событие процессинга находят только этапы с моделью. Режим `rules_only` и статус
+`partial` честно отмечены в паспорте; «нельзя начинать» следует из подтверждённых критичных замечаний.
