@@ -72,6 +72,10 @@
     ``empty_section``).
 ``paragraph``
     ``parent`` = ID пункта списка, если абзац продолжает пункт после пустой строки.
+вложенные блоки
+    ``table_header``, каждая ``table_row``, fenced-``code``, ``quote`` и ``other`` (HTML-комментарий)
+    с отступом пункта получают ``parent`` = ID пункта; список после такого блока продолжается.
+    Так таблица приёмки под «1. Комиссия» остаётся связанной со своим правилом.
 ``list_item``
     ``list = {id, ordered, marker, number, depth, item}``. ``id`` — номер списка в документе,
     ``item`` — номер пункта в списке с 1, ``depth`` — вложенность с 0. У пункта чек-листа
@@ -717,6 +721,12 @@ class _Markdown:
         while self.lists and ind < self.lists[-1]["content"]:
             self.lists.pop()
 
+    def _nest(self, first: int) -> None:
+        """Блоки ``out[first:]`` лежат внутри открытого пункта списка: ``loc.parent`` = его строка."""
+        if self.lists:
+            for p in self.out[first:]:
+                p.loc["parent"] = self.lists[-1]["last"]  # ID подставит _finish
+
     def _part(self, ln: Line, c0: int | None = None) -> tuple[Line, int, int]:
         s = ln.text
         a = _lstrip_at(s, 0 if c0 is None else c0)
@@ -768,17 +778,26 @@ class _Markdown:
         if m and rel <= 3 and not (m["fence"][0] == "`" and "`" in m["info"]):
             self._flush()
             self._pop(ind)
-            return self._fence(i, m)
+            first = len(self.out)
+            nxt = self._fence(i, m)
+            self._nest(first)
+            return nxt
         if rel <= 3 and "|" in s:
             head = self._table_head(i)
             if head is not None:
                 self._flush()
-                self.lists.clear()
-                return self._table(i, *head)
+                self._pop(ind)  # таблица с отступом пункта остаётся в пункте, список не рвётся
+                first = len(self.out)
+                nxt = self._table(i, *head)
+                self._nest(first)
+                return nxt
         if rel <= 3 and _HTML_COMMENT.match(s):
             self._flush()
             self._pop(ind)
-            return self._comment(i)
+            first = len(self.out)
+            nxt = self._comment(i)
+            self._nest(first)
+            return nxt
         m = _QUOTE.match(s)
         if m and rel <= 3:
             c0 = _lstrip_at(s, m.end())
@@ -788,7 +807,8 @@ class _Markdown:
             self._flush()
             self._pop(ind)
             if c0 < len(s):
-                self.par = {"kind": "quote", "start": ln.no, "parts": [self._part(ln, c0)], "loc": {}}
+                qloc = {"parent": self.lists[-1]["last"]} if self.lists else {}
+                self.par = {"kind": "quote", "start": ln.no, "parts": [self._part(ln, c0)], "loc": qloc}
             else:
                 self.structural.add(ln.no)  # пустая строка цитаты разделяет абзацы
             return i + 1
@@ -1426,6 +1446,7 @@ def table_records(document: Document) -> list[dict[str, Any]]:
             "table": b.loc["table"]["index"],
             "header_id": b.loc["table"]["header_id"],
             "row": b.loc["row"],
+            "parent": b.loc.get("parent"),
             "line": b.loc["line_start"],
             "section": list(b.section),
             "direction": _direction(b.section),
