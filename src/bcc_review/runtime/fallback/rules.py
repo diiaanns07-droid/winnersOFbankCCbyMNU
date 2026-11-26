@@ -821,7 +821,6 @@ def _rule_placeholder(ctx: _Ctx) -> list[dict]:
 _TOD = re.compile(r"(?<![\d:.,])(?:[01]?\d|2[0-3]):[0-5]\d(?![\d:])")
 _DATE_BOUND = re.compile(
     r"(?<!\w)(?:календарн\w*\s+(?:месяц|д[ен]\w*|недел\w*|год\w*|сут\w*|квартал\w*)"
-    r"|в\s+течение\s+(?:суток|дня|календарн\w+\s+\w+)"
     r"|(?:конец|конца|концу|начало|начала|началу)\s+(?:дня|суток|месяца|года)"
     r"|полноч\w*|операционн\w*\s+д(?:ень|ня|ню)|по\s+дате\s+\w+"
     r"|дат[аеуы]\s+(?:совершения|проведения|операции|покупки|списания|платежа)"
@@ -848,7 +847,9 @@ def _rule_tz(ctx: _Ctx) -> list[dict]:
     «все времена в UTC+…» снимают замечание. Один кандидат на документ, несколько подсказок.
     """
     for b in ctx.blocks:
-        if _kind(b) in _PROSE_KINDS and _ZONE_EXPLICIT.search(_text(b)) and _ZONE_GLOBAL.search(_text(b)):
+        # явный пояс где-либо в тексте требований задаёт базу времени документа: остаточная неоднозначность
+        # слишком слаба для правила (её оценивает модель)
+        if _kind(b) in _PROSE_KINDS and _ZONE_EXPLICIT.search(_text(b)):
             return []
     spans: list[tuple[dict, int, int]] = []
     for b in ctx.blocks:
@@ -862,7 +863,9 @@ def _rule_tz(ctx: _Ctx) -> list[dict]:
         bounds = [(m.start(), m.end()) for m in _TOD.finditer(text)] + \
                  [(m.start(), m.end()) for m in _DATE_BOUND.finditer(text)
                   # в строках таблиц «Дата операции» — обычно описание поля, а не правило границы периода
-                  if not (_kind(b) == "table_row" and re.match(r"по\s+дате|дат", m.group(0), re.I))]
+                  if not (_kind(b) == "table_row" and re.match(r"по\s+дате|дат", m.group(0), re.I))
+                  # «30 календарных дней» — длительность, а не граница периода
+                  and not re.search(r"\d\s*$", text[:m.start()].rstrip()[-8:] + " ")]
         locals_ = [(m.start(), m.end()) for m in _ZONE_LOCAL.finditer(text)]
         if not bounds and not locals_:
             continue
@@ -1580,7 +1583,7 @@ def _rule_units(ctx: _Ctx) -> list[dict]:
 _TERM_GROUPS = (
     ("участник", True, (
         ("держатель карты", re.compile(r"(?<!\w)держател[ьяюеи]\w*(?:\s+(?:[\w-]+\s+){0,2}?карт\w*)?", re.I)),
-        ("владелец карты", re.compile(r"(?<!\w)владел\w*\s+(?:[\w-]+\s+){0,2}?(?:карт|сч[её]т)\w*", re.I)),
+        ("владелец карты", re.compile(r"(?<!\w)владел\w*\s+(?:[\w-]+\s+){0,2}?карт\w*", re.I)),
         ("клиент", re.compile(r"(?<!\w)клиент(?!ск)\w*", re.I)),
         ("пользователь", re.compile(r"(?<!\w)(?:пользовател(?!ьск)\w*|пользовательск\w*\s+сесси\w*)", re.I)),
     )),
@@ -1630,6 +1633,10 @@ def _rule_terms(ctx: _Ctx) -> list[dict]:
                         auth = (b, s, e)
         if len(first) < 2:
             continue
+        # «клиент», «пользователь», «владелец счёта» часто законно обозначают одно лицо; дефект — только когда
+        # разведены держатель и владелец карты (у дополнительной карты это разные люди)
+        if actor and not {"держатель карты", "владелец карты"} <= set(first):
+            continue
         labels = sorted(first, key=lambda lb: (ctx.pos[first[lb][0]["id"]], first[lb][1]))
         hints = [_hint(*first[lb]) for lb in labels]
         if auth is not None and auth not in first.values():
@@ -1661,8 +1668,9 @@ def _rule_terms(ctx: _Ctx) -> list[dict]:
 # =========================================================================== 12. RULE-READ-WITHOUT-METHOD
 _READ_SUBJECT = (r"(?:приложени\w*|клиент(?!ск)\w*|фронт\w*|интерфейс\w*|экран\w*|пользовател\w*"
                  r"|UI|app|client|frontend|screen)")
-_READ_VERB = r"(?:чита\w*|прочита\w*|запрашива\w*|загружа\w*|получа\w*|отобража\w*|показыва\w*|выводит\w*|видит\w*" \
-             r"|reads?|fetch\w*|retriev\w*|display\w*|shows?|loads?)"
+# «получает» и «загружает» не входят: получение поля в ответе на изменяющий запрос не обещает метод чтения
+_READ_VERB = r"(?:чита\w*|прочита\w*|запрашива\w*|отобража\w*|показыва\w*|выводит\w*|видит\w*" \
+             r"|reads?|retriev\w*|display\w*|shows?)"
 # Сильные утверждения (клиент читает/запрашивает, «чтение …», «на экране видны») идут в подсказки первыми,
 # слабые («показывает», «shall display») — только если сильных не хватило.
 _READ_CLAIM = re.compile(

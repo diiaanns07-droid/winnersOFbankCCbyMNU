@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import secrets
 import subprocess
@@ -44,7 +45,7 @@ def load_dotenv(path: str | Path = ".env") -> None:
     p = Path(path)
     if not p.is_file():
         return
-    for line in p.read_text(encoding="utf-8").splitlines():
+    for line in p.read_text(encoding="utf-8-sig").splitlines():  # BOM от Windows PowerShell 5.1
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -248,11 +249,16 @@ class Engine:
         excluded = list(inv.get("excluded", []))
         for w in inv.get("warnings", []):
             self.warn("inventory", str(w), "inventory")
-        if inv.get("unprocessed_block_ids"):
-            self.warn("unprocessed_blocks", "блоки не попали ни в требования, ни в исключения: "
-                      + ", ".join(inv["unprocessed_block_ids"][:30]), "inventory")
-        self.mark("inventory", "ok" if requirements else "failed",
-                  None if requirements else "не выделено ни одного требования", implementation=inv_mod.label, t=t)
+        added = self.cover_unprocessed(document, requirements, excluded, inv.get("unprocessed_block_ids"))
+        if added:
+            self.warn("unprocessed_blocks", f"нарезка не включила {len(added)} содержательных блоков ни в требования, "
+                      "ни в исключения; движок проверяет их как требования без классификации: "
+                      + ", ".join(r["id"] for r in added[:30]), "inventory")
+        # реестр полон: пропущенные модулем блоки покрыты движком (это видно в причине этапа и в предупреждении)
+        inv_status = "ok" if requirements else "failed"
+        inv_reason = ("не выделено ни одного требования" if not requirements else
+                      f"движок добавил требований из блоков, пропущенных нарезкой: {len(added)}" if added else None)
+        self.mark("inventory", inv_status, inv_reason, implementation=inv_mod.label, t=t)
         self.save_stage("inventory", inv)
         context.set_requirements(requirements)
         self.context_policy = context.policy
@@ -453,6 +459,55 @@ class Engine:
                   implementation=writer.label, t=t)
         return revised
 
+    FACTUAL_RULES = frozenset({
+        "RULE-HTTP-SEMANTICS", "RULE-BODY-CONTENT-TYPE", "RULE-STATUS-UNDEFINED", "RULE-STATUS-SUMMARY",
+        "RULE-STATUS-REASON", "RULE-STATUS-EXAMPLE", "RULE-STATUS-HEADING-BODY", "RULE-TYPE-MISMATCH",
+        "RULE-PLACEHOLDER", "RULE-EMPTY-SECTION", "RULE-MISSING-ID", "RULE-ACCEPTANCE-TRACE"})
+
+    _HEAD_ID = re.compile(r"^\s*([A-ZА-ЯЁ]{1,6}[-‑–]\d+(?:\.\d+)*|[A-Z]{2,6}\d+(?:\.\d+)*)[.):]?(\s|$)")
+    _CONTENT_KINDS = ("paragraph", "list_item", "table_row", "code", "quote", "other")
+
+    def cover_unprocessed(self, document: dict[str, Any], requirements: list[dict[str, Any]],
+                          excluded: list[dict[str, Any]], reported: Optional[list[str]]) -> list[dict[str, Any]]:
+        """Содержательные блоки, которые нарезка не включила ни в требования, ни в исключения, проверяются как
+        требования без классификации: у каждого требования должен быть результат проверки или явная причина.
+
+        ID в документе берётся из ближайшего заголовка вида «Б-1. …» (частый шаблон банковских ТЗ)."""
+        covered = {b for r in requirements for b in r["block_ids"]} | {b for e in excluded for b in e.get("block_ids", [])}
+        heads = {b["text"]: b for b in document["blocks"] if b["kind"] == "heading"}
+        added: list[dict[str, Any]] = []
+        known = {r["id"] for r in requirements}
+        for b in document["blocks"]:
+            if b["id"] in covered or b["kind"] not in self._CONTENT_KINDS or not b["text"].strip():
+                continue
+            if len(b["text"].strip()) < 3:
+                continue
+            source_id = None
+            for title in reversed(b.get("section") or []):
+                m = self._HEAD_ID.match(title)
+                if m:
+                    source_id = m.group(1)
+                    break
+                if title in heads:
+                    break
+            rid = f"R-U{len(added) + 1:02d}"
+            while rid in known:
+                rid += "x"
+            req = {"id": rid, "source_id": source_id, "text": b["text"], "block_ids": [b["id"]],
+                   "evidence": [{"block_id": b["id"], "start": 0, "end": len(b["text"]), "quote": b["text"]}],
+                   "hints": [], "kind": "unclassified", "section": list(b.get("section") or []),
+                   "review_status": "not_reviewed", "review_reason": "проверка ещё не выполнялась"}
+            if not C.validation_errors(req, C.subschema("Requirement")):
+                requirements.append(req)
+                added.append(req)
+                known.add(rid)
+        if reported and not added:
+            missing = [x for x in reported if x not in covered]
+            if missing:
+                self.warn("unprocessed_blocks", "нарезка сообщила о необработанных блоках: " + ", ".join(missing[:30]),
+                          "inventory")
+        return added
+
     def normalize_requirements(self, document: dict[str, Any], reqs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         by_id = {b["id"]: b for b in document["blocks"]}
         out = []
@@ -576,7 +631,10 @@ class Engine:
 
         # подтверждение смысла — отдельный от цитаты результат
         t = time.monotonic()
-        llm_items = [v for v in verified if v.get("source") != "rules" and v["anchor_status"] == "supported"]
+        # критику уходят кандидаты модели и эвристические правила; фактические правила (метод HTTP, коды
+        # статусов, типы полей, заглушки, ID) следуют из текста напрямую и остаются deterministic
+        llm_items = [v for v in verified if v["anchor_status"] == "supported"
+                     and (v.get("source") != "rules" or v.get("rule_id") not in self.FACTUAL_RULES)]
         if ask is None:
             self.mark("verify_meaning", "skipped", self.unavailable or "модель недоступна", t=t)
         elif llm_items:
@@ -604,7 +662,12 @@ class Engine:
                 if verdict["severity"] != v["severity"]:
                     v["notes"].append(f"серьёзность скорректирована критиком: {v['severity']} → {verdict['severity']}")
                     v["severity"] = verdict["severity"]
-                v["meaning_status"] = {"confirmed": "confirmed", "uncertain": "uncertain"}.get(verdict["verdict"], "rejected")
+                meaning = {"confirmed": "confirmed", "uncertain": "uncertain"}.get(verdict["verdict"], "rejected")
+                if meaning == "rejected" and v.get("source") == "rules" and v["severity"] == "critical":
+                    # критичное замечание правил критик не удаляет, а отправляет аналитику на проверку
+                    v["notes"].append("критик не подтвердил смысл критичного замечания правил: требует проверки")
+                    meaning = "uncertain"
+                v["meaning_status"] = meaning
             kept = []
             for v in verified:
                 if v["meaning_status"] == "rejected":
@@ -620,7 +683,7 @@ class Engine:
             else:
                 self.mark("verify_meaning", "ok", t=t)
         else:
-            self.mark("verify_meaning", "ok", "нет кандидатов модели для проверки", t=t)
+            self.mark("verify_meaning", "ok", "нет кандидатов для проверки смысла", t=t)
         audit["note"] = ("Учтена каждая подсказка-цитата кандидатов (включая опоры witness): confirmed — найдена в тексте "
                          "блока, ambiguous — в нескольких блоках, rejected — не найдена. Смысл проверяется отдельно "
                          "(meaning_status).")
