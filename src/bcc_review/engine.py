@@ -240,10 +240,10 @@ class Engine:
         t = time.monotonic()
         inv_mod = self.mods.get("build_inventory")
         try:
-            inv = inv_mod.func(document, ask_or_none)
+            inv = C.as_plain(inv_mod.func(document, ask_or_none))
         except AskError as exc:
             self.warn("stage_degraded", f"нарезка с моделью не удалась ({exc.kind}); детерминированная нарезка", "inventory")
-            inv = inv_mod.func(document, None)
+            inv = C.as_plain(inv_mod.func(document, None))
         requirements = self.normalize_requirements(document, inv.get("requirements", []))
         excluded = list(inv.get("excluded", []))
         for w in inv.get("warnings", []):
@@ -365,32 +365,72 @@ class Engine:
             self.status_reasons.append("документ прочитан не полностью: " + "; ".join(w.get("message", w["code"]) for w in bad[:3]))
             self.mark("read", "partial", "документ прочитан не полностью")
 
+    def _previous_report(self) -> Optional[dict[str, Any]]:
+        if not self.opts.compare_path:
+            return None
+        try:
+            return json.loads(Path(self.opts.compare_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    @staticmethod
+    def _call_flex(func, *args, variants: list[dict[str, Any]]):
+        """Вызвать модуль с первым набором именованных параметров, который он принимает."""
+        last: Optional[TypeError] = None
+        for kw in variants:
+            try:
+                return func(*args, **kw)
+            except TypeError as exc:
+                if "argument" not in str(exc) and "keyword" not in str(exc):
+                    raise
+                last = exc
+        raise last  # type: ignore[misc]
+
     def apply_answers(self, document: dict[str, Any]) -> dict[str, Any]:
+        """Ответы аналитика → правки → новая редакция отдельным файлом → её проверка.
+
+        Вопросы и находки, к которым относятся ответы, берутся из предыдущего отчёта (``--compare``).
+        """
         t = time.monotonic()
-        parsed = self.mods.get("parse_answers")
-        out = parsed.func(self.opts.answers_path, document)
-        if isinstance(out, list):
-            out = {"decisions": out, "warnings": []}
-        for w in out.get("warnings", []):
+        prev = self._previous_report() or {}
+        questions = {q.get("id"): q for q in prev.get("questions", [])}
+        findings = {f.get("id"): f for f in prev.get("findings", [])}
+        parser = self.mods.get("parse_answers")
+        raw = self._call_flex(parser.func, self.opts.answers_path, document, variants=[
+            {"questions": list(questions.values()), "expected_sha": document["id"]}, {}])
+        warnings = list(getattr(raw, "warnings", None) or (raw.get("warnings", []) if isinstance(raw, dict) else []))
+        items = raw.get("decisions", []) if isinstance(raw, dict) else list(raw)
+        for w in warnings:
             self.warn("answers", str(w), "answers")
-        self.decisions = out.get("decisions", [])
         patcher = self.mods.get("propose_patch")
-        edits = []
-        for d in self.decisions:
-            p = patcher.func(document, None, d)
-            edits.extend(p.get("edits", []))
-            for w in p.get("warnings", []):
+        edits, decisions = [], []
+        for obj in items:
+            d = C.as_plain(obj)
+            q = questions.get(d.get("question_id"))
+            fid = (q.get("finding_ids") or [None])[0] if q else None
+            patch = C.as_plain(self._call_flex(patcher.func, document, findings.get(fid), obj,
+                                               variants=[{"question": q}, {}]))
+            edits.extend(patch.get("edits", []))
+            for w in patch.get("warnings", []):
                 self.warn("answers", str(w), "answers")
+            d = {k: v for k, v in d.items() if v is not None}
+            if patch.get("edits"):
+                d["edits"] = [{k: e[k] for k in ("block_id", "start", "end", "old", "new")} for e in patch["edits"]]
+            if C.validation_errors(d, C.subschema("Decision")):
+                self.warn("answers", f"решение {d.get('question_id')} не привязано к редакции документа и не учтено",
+                          "answers")
+                continue
+            decisions.append(d)
+        self.decisions = decisions
         if not edits:
             self.mark("answers", "partial", "в ответах нет применимых правок: проверяется исходная редакция",
-                      implementation=parsed.label, t=t)
+                      implementation=parser.label, t=t)
             return document
         rev_path = self.out_md.parent / f"{self.input_path.stem}.rev-{self.run_id[:16]}{self.input_path.suffix}"
         writer = self.mods.get("write_revision")
-        try:
-            writer.func(document, edits, rev_path, source_path=self.input_path)
-        except TypeError:
-            writer.func(document, edits, rev_path)
+        self._call_flex(writer.func, document, edits, rev_path, variants=[
+            {"source": str(self.input_path), "questions": list(questions.values()) or None, "decisions": items},
+            {"source_path": self.input_path}, {}])
         self.revision_of = document["id"]
         self.reviewed_path = rev_path
         revised = self.read(rev_path)
@@ -736,11 +776,12 @@ class Engine:
         t = time.monotonic()
         mod = self.mods.get("build_questions")
         try:
-            out = mod.func(document, findings, ask)
+            out = C.as_plain(mod.func(document, findings, ask))
         except AskError as exc:
-            out = mod.func(document, findings, None)
+            out = C.as_plain(mod.func(document, findings, None))
             self.mark("questions", "partial", f"без модели: {exc.kind}", implementation=mod.label, t=t)
-            return out if isinstance(out, list) else out.get("questions", [])
+            return self.normalize_questions(out)
+        out = self.normalize_questions(out)
         rec = self.stats.get("questions")
         if ask is None:
             self.mark("questions", "partial", "вопросы построены по правилам без модели", implementation=mod.label, t=t)
@@ -748,15 +789,27 @@ class Engine:
             self.mark("questions", "partial", "модель не ответила: вопросы построены по правилам", implementation=mod.label, t=t)
         else:
             self.mark("questions", "ok", implementation=mod.label, t=t)
-        return out if isinstance(out, list) else out.get("questions", [])
+        return out
+
+    def normalize_questions(self, out: Any) -> list[dict[str, Any]]:
+        items = out if isinstance(out, list) else (out or {}).get("questions", [])
+        result = []
+        for q in items:
+            q = C.as_plain(q)
+            errs = C.validation_errors(q, C.subschema("Question"))
+            if errs:
+                self.warn("contract_violation", f"вопрос {q.get('id')} не по контракту: {errs[0]}", "questions")
+                continue
+            result.append(q)
+        return result
 
     def run_bank(self, document, requirements, findings, ask) -> dict[str, Any]:
         t = time.monotonic()
         mod = self.mods.get("build_bank_pack")
         try:
-            out = mod.func(document, requirements, findings, self.decisions, ask)
+            out = C.as_plain(mod.func(document, requirements, findings, self.decisions, ask))
         except AskError as exc:
-            out = mod.func(document, requirements, findings, self.decisions, None)
+            out = C.as_plain(mod.func(document, requirements, findings, self.decisions, None))
             out.setdefault("warnings", []).append(f"bank: {exc.kind}")
         degraded = ask is None or any("bank:" in str(w) for w in out.get("warnings", []))
         self.mark("bank", "partial" if degraded else "ok",
@@ -775,7 +828,7 @@ class Engine:
             self.mark("compare", "failed", f"предыдущий отчёт не прочитан: {exc}"[:300], t=t)
             return None
         mod = self.mods.get("compare_reports")
-        diff = mod.func(previous, report)
+        diff = C.as_plain(mod.func(previous, report))
         if diff["previous"]["source_sha256"] == diff["current"]["source_sha256"]:
             diff["warnings"].append("сравнивается та же редакция документа (SHA-256 совпадает)")
         # связи изменённых мест с набором: требования, связанные межсекционными ссылками
@@ -894,3 +947,18 @@ def run_review(input_path: str | Path, report_md: str | Path, *, options: RunOpt
     opts = RunOptions.coerce(options)
     load_dotenv()
     return Engine(input_path, report_md, opts).run()
+
+
+def read_document(path: str | Path) -> dict:
+    """Прочитать вход тем же путём, что движок: модуль владельца (или резерв) + нормализация стыка.
+
+    Для модулей и тестов, которым нужен Document как в отчёте (ID блоков, section, loc.columns).
+    """
+    p = Path(path)
+    slot = READERS.get(p.suffix.lower())
+    if slot is None:
+        raise UsageError(f"формат {p.suffix} не поддерживается")
+    res = Modules().get(slot)
+    if res.func is None:
+        raise UsageError(f"чтение {p.suffix} недоступно: {res.error}")
+    return C.normalize_document(res.func(p))

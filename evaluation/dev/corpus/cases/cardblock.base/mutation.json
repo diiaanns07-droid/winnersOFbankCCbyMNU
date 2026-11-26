@@ -1,0 +1,32 @@
+{
+  "case_id": "cardblock.base",
+  "family": "cardblock",
+  "kind": "base",
+  "ops": [],
+  "variants": [],
+  "seeds": [],
+  "generator_version": "1.0.0",
+  "base_case_id": null,
+  "base_source_sha256": null,
+  "source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+  "semantic_sha256": "dd7a6035aeb423d21ffc0ec7eda44f58e9e90a03594a094fc4b9dcf2741ba501",
+  "transformation": [],
+  "expected_effect": [
+    "Без изменений (чистый контроль)."
+  ],
+  "diff": "",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "label_id": "cardblock.base#clean",
+      "case_id": "cardblock.base",
+      "family": "cardblock",
+      "source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "visibility": "public",
+      "explanation": "Чистая базовая спецификация: любая находка — ложная тревога."
+    }
+  ]
+}

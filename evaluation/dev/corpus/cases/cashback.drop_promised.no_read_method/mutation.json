@@ -1,0 +1,66 @@
+{
+  "case_id": "cashback.drop_promised.no_read_method",
+  "family": "cashback",
+  "kind": "mutant",
+  "ops": [
+    "drop_promised"
+  ],
+  "variants": [
+    "no_read_method"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cashback.base",
+  "base_source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+  "source_sha256": "b956a025fbc8f6c0a1252c873e2e2ee7e0c181fef7f0506dbe68a9ccafbe0fa9",
+  "semantic_sha256": "1b36e75453609f28ce6af030db4bae41a077810cf1fdf19d4af0b759fcb08ee2",
+  "transformation": [
+    {
+      "op": "delete_section",
+      "base_line": 53,
+      "removed": "### Метод getCashback\n\n| Поле | Значение |\n| :--- | :--- |\n| **REST type** | GET |\n| **Request URL** | `/cashback/{cardId}` |\n| **Authorization** | Bearer, сессия клиента — владельца карты |\n\n#### Ответ 200\n\n| Parameter | Format | Description |\n| :--- | :--- | :--- |\n| `category` | string | Код выбранной категории: CAFE, TAXI или PHARMACY |\n| `accrued` | string | Кэшбэк текущего месяца в тенге с двумя знаками после точки |\n\nПример ответа для первого критерия приёмки: `{\"category\":\"TAXI\",\"accrued\":\"100.00\"}`.\n\n",
+      "inserted": "",
+      "mutation_op": "drop_promised",
+      "variant": "no_read_method"
+    }
+  ],
+  "expected_effect": [
+    "Метод getCashback обещан в интеграции и НФТ, но в части B не описан."
+  ],
+  "diff": "--- base/source.md\n+++ cashback.drop_promised.no_read_method/source.md\n@@ -52,19 +52,2 @@\n \n-### Метод getCashback\n-\n-| Поле | Значение |\n-| :--- | :--- |\n-| **REST type** | GET |\n-| **Request URL** | `/cashback/{cardId}` |\n-| **Authorization** | Bearer, сессия клиента — владельца карты |\n-\n-#### Ответ 200\n-\n-| Parameter | Format | Description |\n-| :--- | :--- | :--- |\n-| `category` | string | Код выбранной категории: CAFE, TAXI или PHARMACY |\n-| `accrued` | string | Кэшбэк текущего месяца в тенге с двумя знаками после точки |\n-\n-Пример ответа для первого критерия приёмки: `{\"category\":\"TAXI\",\"accrued\":\"100.00\"}`.\n-\n ### Метод saveCategory\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.drop_promised.no_read_method",
+      "family": "cashback",
+      "source_sha256": "b956a025fbc8f6c0a1252c873e2e2ee7e0c181fef7f0506dbe68a9ccafbe0fa9",
+      "visibility": "public",
+      "label_id": "cashback.drop_promised.no_read_method#1",
+      "issue_type": "missing_element",
+      "anchors": [
+        {
+          "role": "promise",
+          "quote": "Приложение читает настройки методом getCashback и сохраняет категорию методом saveCategory.",
+          "locator": "md:L40"
+        },
+        {
+          "role": "promise",
+          "quote": "Методы getCashback и saveCategory отвечают не дольше 500 мс для 95 % запросов",
+          "locator": "md:L34"
+        }
+      ],
+      "anchor_policy": "any",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:completeness",
+      "scenario": null,
+      "explanation": "Метод getCashback обещан в интеграции и НФТ, но в части B не описан.",
+      "mutation": {
+        "op": "drop_promised",
+        "variant": "no_read_method"
+      }
+    }
+  ]
+}

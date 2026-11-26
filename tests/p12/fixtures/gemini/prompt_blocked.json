@@ -1,0 +1,15 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "promptFeedback": {
+      "blockReason": "PROHIBITED_CONTENT"
+    },
+    "usageMetadata": {
+      "promptTokenCount": 812,
+      "totalTokenCount": 812
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-block-0010"
+  }
+}

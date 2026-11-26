@@ -1,0 +1,28 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Вот найденные замечания: требование R-001 размыто."
+            }
+          ]
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 812,
+      "candidatesTokenCount": 143,
+      "totalTokenCount": 1201,
+      "thoughtsTokenCount": 246
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-text-0013"
+  }
+}

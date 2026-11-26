@@ -1,0 +1,109 @@
+{
+  "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+  "family": "cardblock",
+  "kind": "combo",
+  "ops": [
+    "unit_change",
+    "two_statuses"
+  ],
+  "variants": [
+    "blocked_at_utc",
+    "reblock_200"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cardblock.base",
+  "base_source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+  "source_sha256": "594571f5bdd2425662d4bdbade0318357a59d90c6e4412a63e8431fb0bff1be9",
+  "semantic_sha256": "29a125522ae863698ff29afd703f150a017404d5fda6ebcb26a7511c911e7731",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 79,
+      "removed": "Поле `blockedAt` — время блокировки по UTC+5 в формате ISO 8601.",
+      "inserted": "Поле `blockedAt` — время блокировки по UTC в формате ISO 8601.",
+      "mutation_op": "unit_change",
+      "variant": "blocked_at_utc"
+    },
+    {
+      "op": "insert_after",
+      "base_line": 90,
+      "after": "| 500 | Внутренняя ошибка сервиса |",
+      "removed": "",
+      "inserted": "Повторная блокировка карты в статусе BLOCKED_BY_CLIENT возвращает 200 без изменений.",
+      "mutation_op": "two_statuses",
+      "variant": "reblock_200"
+    }
+  ],
+  "expected_effect": [
+    "Время блокировки хранится по UTC+5, а API описывает его по UTC (пример со смещением +05:00).",
+    "Повторная блокировка получает 200 по примечанию и 409 по таблице статусов."
+  ],
+  "diff": "--- base/source.md\n+++ cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200/source.md\n@@ -78,3 +78,3 @@\n \n-Ответ 200: `{\"status\":\"BLOCKED_BY_CLIENT\",\"blockedAt\":\"2026-11-01T10:15:00+05:00\",\"days\":30}`. Поле `blockedAt` — время блокировки по UTC+5 в формате ISO 8601.\n+Ответ 200: `{\"status\":\"BLOCKED_BY_CLIENT\",\"blockedAt\":\"2026-11-01T10:15:00+05:00\",\"days\":30}`. Поле `blockedAt` — время блокировки по UTC в формате ISO 8601.\n \n@@ -90 +90,3 @@\n | 500 | Внутренняя ошибка сервиса | `{\"message\":\"Ошибка сервиса\"}` |\n+\n+Повторная блокировка карты в статусе BLOCKED_BY_CLIENT возвращает 200 без изменений.\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "family": "cardblock",
+      "source_sha256": "594571f5bdd2425662d4bdbade0318357a59d90c6e4412a63e8431fb0bff1be9",
+      "visibility": "public",
+      "label_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200#1",
+      "issue_type": "unit_mismatch",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Поле `blockedAt` — время блокировки по UTC в формате ISO 8601.",
+          "locator": "md:L79"
+        },
+        {
+          "role": "b",
+          "quote": "время блокировки по UTC+5 и инициатора изменения",
+          "locator": "md:L33"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "Блокировка в 10:15 по Алматы, ответ getCardStatus.",
+      "explanation": "Время блокировки хранится по UTC+5, а API описывает его по UTC (пример со смещением +05:00).",
+      "mutation": {
+        "op": "unit_change",
+        "variant": "blocked_at_utc"
+      }
+    },
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "family": "cardblock",
+      "source_sha256": "594571f5bdd2425662d4bdbade0318357a59d90c6e4412a63e8431fb0bff1be9",
+      "visibility": "public",
+      "label_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200#2",
+      "issue_type": "status_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Повторная блокировка карты в статусе BLOCKED_BY_CLIENT возвращает 200 без изменений.",
+          "locator": "md:L92"
+        },
+        {
+          "role": "b",
+          "quote": "409 | Статус карты не позволяет операцию: блокировка не из ACTIVE или разблокировка не из BLOCKED_BY_CLIENT",
+          "locator": "md:L89"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "blockCard для карты, уже заблокированной клиентом.",
+      "explanation": "Повторная блокировка получает 200 по примечанию и 409 по таблице статусов.",
+      "mutation": {
+        "op": "two_statuses",
+        "variant": "reblock_200"
+      }
+    }
+  ]
+}

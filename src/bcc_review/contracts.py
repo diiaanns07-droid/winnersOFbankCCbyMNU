@@ -468,11 +468,17 @@ REPORT_SCHEMA: dict[str, Any] = {
 
 
 def as_plain(obj: Any) -> Any:
-    """Объект модуля → dict контракта: поддерживает ``to_dict()`` и dataclass."""
+    """Объект модуля → JSON-совместимые dict/list контракта (рекурсивно): ``to_dict()``, dataclass, кортежи."""
     if hasattr(obj, "to_dict") and callable(obj.to_dict):
-        return obj.to_dict()
-    if hasattr(obj, "__dataclass_fields__"):
-        return asdict(obj)
+        return as_plain(obj.to_dict())
+    if hasattr(obj, "__dataclass_fields__") and not isinstance(obj, type):
+        return as_plain(asdict(obj))
+    if isinstance(obj, Mapping):
+        return {str(k): as_plain(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set, frozenset)):
+        return [as_plain(v) for v in obj]
+    if isinstance(obj, Path):
+        return str(obj)
     return obj
 
 

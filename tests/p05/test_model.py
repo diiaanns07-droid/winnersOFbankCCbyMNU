@@ -79,11 +79,15 @@ def test_every_requirement_gets_checks_and_correct_one_has_no_invented_defect():
     assert {c["status"] for c in missed.values()} == {"unknown"}
     assert all("не вернула" in c["reason"] for c in missed.values())
     assert "individual.missing_answer" in wcodes(res)
+    assert res["failed"] == {"R4": "этап individual#1: модель не вернула результат по требованию"}
+    # движку: оценки модели помечены source=llm, у пропущенного пункта — rules
+    assert {c["source"] for c in checks_of(res, "R1").values()} == {"llm"}
+    assert {c["source"] for c in checks_of(res, "R4").values()} == {"rules"}
 
     # транспорт: один вызов, этап, payload {task, input, context}, схема с кодами из TOML
     assert len(ask.calls) == 1 and res["meta"]["calls"] == 1
     stage, payload, schema = ask.calls[0]
-    assert stage == STAGE == "individual"
+    assert stage == f"{STAGE}#1" == "individual#1"
     assert set(payload) == {"task", "input", "context"}
     item = schema["properties"]["results"]["items"]["properties"]["checks"]["items"]
     assert item["properties"]["criterion"]["enum"] == REQ_CODES
@@ -93,13 +97,35 @@ def test_every_requirement_gets_checks_and_correct_one_has_no_invented_defect():
 
 
 def test_transport_failure_degrades_to_unknown_without_crash():
-    from bcc_review.contracts import BudgetExhausted
+    from bcc_review.contracts import AskError, BudgetExhausted
 
     doc, reqs = _doc()
-    res = review_individual(doc, reqs, ask=FakeAsk(raises=BudgetExhausted("individual", "max_calls")))
+    res = review_individual(doc, reqs, ask=FakeAsk(raises=AskError("individual#1", "not_configured", "нет ключа")))
     assert len(res["checks"]) == len(reqs) * len(REQ_CODES)
     assert {c["status"] for c in res["checks"]} <= {"unknown", "na"}
-    assert any(w["code"] == "individual.ask_failed" and "BudgetExhausted" in w["message"] for w in res["warnings"])
+    assert any(w["code"] == "individual.ask_failed" and "not_configured" in w["message"] for w in res["warnings"])
+    assert set(res["failed"]) == {r["id"] for r in reqs} and "not_configured" in res["failed"]["R1"]
+
+
+def test_budget_exhausted_stops_remaining_batches(tmp_path):
+    from bcc_review.contracts import BudgetExhausted
+
+    text = resources.files("bcc_review").joinpath("criteria.toml").read_text("utf-8")
+    p = tmp_path / "criteria.toml"
+    p.write_text(text.replace("batch_size = 15", "batch_size = 1"), "utf-8")
+    doc, reqs = _doc()
+    ask = FakeAsk(raises=BudgetExhausted("individual#1", "max_calls"))
+    res = review_individual(doc, reqs, ask=ask, criteria=load_criteria(p))
+    assert len(ask.calls) == 1
+    assert res["failed"]["R1"].startswith("этап individual#1: budget_exhausted")
+    assert all(res["failed"][r].startswith("этап individual не запускался") for r in ("R2", "R3", "R4"))
+
+
+def test_rules_only_reports_every_requirement_as_failed_for_llm():
+    doc, reqs = _doc()
+    res = review_individual(doc, reqs)
+    assert set(res["failed"]) == {r["id"] for r in reqs}
+    assert {c["source"] for c in res["checks"]} == {"rules"}
 
 
 def test_generic_pass_is_not_accepted():
