@@ -16,6 +16,15 @@ from .conftest import BCC, FIX, run, write_script
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# Механика движка проверяется на тестовых двойниках со сценариями под схемы резервных этапов.
+# Полный конвейер с модулями команды — в test_team_pipeline.py.
+SEMANTIC_FALLBACK = "build_inventory,review_individual,review_set,reconcile_facts,load_criteria,resolve_hint,resolve_candidate"
+
+
+@pytest.fixture(autouse=True)
+def _engine_doubles(monkeypatch):
+    monkeypatch.setenv("BCC_FORCE_FALLBACK", SEMANTIC_FALLBACK)
+
 
 def by_kind(report, kind):
     return [f for f in report["findings"] if f["kind"] == kind]
@@ -437,7 +446,7 @@ def fake_inventory(document, ask=None):
 
 def fake_reconcile(document, fact_hints):
     facts = [{"id": f"FACT-T{i}", "subject": h["subject"], "field": h["field"], "value": h["value"], "unit": h["unit"],
-              "evidence": []} for i, h in enumerate(fact_hints, 1)]
+              "hints": h["hints"]} for i, h in enumerate(fact_hints, 1)]
     cand = {"scope": "set", "kind": "incomplete", "criterion": "set_consistent", "severity": "major",
             "title": "Сумма покупки в тиынах, порог в тенге: нет правила пересчёта", "impact": "Ошибка сравнения с порогом",
             "req_ids": ["R-12"], "hints": [h["hints"][0] for h in fact_hints], "source": "rules", "stage": "facts",
@@ -448,6 +457,7 @@ def fake_reconcile(document, fact_hints):
 def test_fact_hints_flow_through_reconcile(tmp_path, monkeypatch):
     from bcc_review.runtime import modules
 
+    monkeypatch.setenv("BCC_FORCE_FALLBACK", "review_individual,review_set")
     monkeypatch.setitem(modules.SLOTS, "build_inventory", ("tests.integration.test_engine:fake_inventory", None))
     monkeypatch.setitem(modules.SLOTS, "reconcile_facts", ("tests.integration.test_engine:fake_reconcile", None))
     rep = run(tmp_path, BCC, offline_lint=True)

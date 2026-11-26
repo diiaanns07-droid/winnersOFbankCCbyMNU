@@ -284,7 +284,7 @@ class Engine:
         # опоры, смысл, объединение
         candidates = []
         for src in (rules_out.get("candidates", []), ind.get("candidates", []), cross.get("candidates", [])):
-            candidates.extend(src)
+            candidates.extend(self.normalize_candidate(C.as_plain(c)) for c in src)
         verified, rejected, audit = self.verify_candidates(document, candidates, ask_or_none)
         findings = self.build_findings(verified, requirements)
         checks = self.build_checks(requirements, rules_out.get("checks", []) + ind.get("checks", []), findings,
@@ -323,6 +323,40 @@ class Engine:
         report["warnings"] = self.warnings
         self.finalize(report)
         return report
+
+    # ------------------------------------------------------------------ стыки
+    CRITERION_ALIASES = {"consistency": "set_consistent", "consistent": "set_consistent",
+                         "completeness": "set_complete", "coverage": "set_validatable", "validatable": "set_validatable",
+                         "traceability": "traceable", "comprehensible": "set_comprehensible", "ranking": "ranked",
+                         "feasibility": "feasible", "verifiability": "verifiable", "ambiguity": "unambiguous",
+                         "singularity": "singular", "necessity": "necessary", "correctness": "correct",
+                         "conformity": "conforming", "appropriateness": "appropriate"}
+
+    @property
+    def criteria_codes(self) -> set[str]:
+        crit = getattr(self, "criteria", None)
+        if crit is None:
+            return set()
+        codes = getattr(crit, "codes", None)
+        if codes is not None:
+            return set(codes() if callable(codes) else codes)
+        return set(crit) if isinstance(crit, dict) else set()
+
+    def normalize_candidate(self, c: dict[str, Any]) -> dict[str, Any]:
+        """Привести кандидата модуля к словарю контракта: коды критериев и виды дефектов."""
+        c = dict(c)
+        crit = c.get("criterion")
+        codes = self.criteria_codes or set(C.INDIVIDUAL_CRITERIA + C.SET_CRITERIA)
+        if crit not in codes and crit in self.CRITERION_ALIASES:
+            c["criterion"] = self.CRITERION_ALIASES[crit]
+        if c.get("kind") not in C.FINDING_KINDS:
+            c.setdefault("notes", []).append(f"вид дефекта модуля: {c.get('kind')}")
+            c["kind"] = {"question": "ambiguity", "gap": "omission", "contradiction": "conflict",
+                         "missing": "omission"}.get(c.get("kind"), "other")
+        if c.get("severity") not in C.SEVERITIES:
+            c["severity"] = {"blocker": "critical", "high": "major", "medium": "major", "low": "minor"}.get(
+                str(c.get("severity")).lower(), "minor")
+        return c
 
     # ------------------------------------------------------------------ этапы
     def check_partial_read(self, document: dict[str, Any]) -> None:
@@ -384,11 +418,19 @@ class Engine:
             out.append(item)
         return out
 
+    def _llm_successes(self) -> int:
+        asker = getattr(self, "asker", None)
+        return asker.successes if asker is not None else 0
+
+    def _no_model_reason(self) -> str:
+        return self.unavailable or "модуль не получил ни одного успешного ответа модели (ошибки перехвачены модулем)"
+
     def run_individual(self, document, requirements, ask) -> dict[str, Any]:
         t = time.monotonic()
         mod = self.mods.get("review_individual")
+        before = self._llm_successes()
         try:
-            out = mod.func(document, requirements, ask)
+            out = C.as_plain(mod.func(document, requirements, ask))
         except AskError as exc:
             self.mark("individual", "failed", f"{exc.kind}: {exc.message}"[:300], implementation=mod.label, t=t)
             out = mod.func(document, requirements, None)
@@ -398,6 +440,8 @@ class Engine:
         failed = out.get("failed") or {}
         if ask is None:
             self.mark("individual", "skipped", self.unavailable or "модель недоступна", implementation=mod.label, t=t)
+        elif self._llm_successes() == before:
+            self.mark("individual", "failed", self._no_model_reason(), implementation=mod.label, t=t)
         elif failed and len(failed) >= len(requirements):
             self.mark("individual", "failed", next(iter(failed.values())), implementation=mod.label, t=t)
         elif failed:
@@ -410,10 +454,13 @@ class Engine:
     def run_cross(self, document, requirements, ask, fact_hints) -> dict[str, Any]:
         t = time.monotonic()
         mod = self.mods.get("review_set")
+        before = self._llm_successes()
         try:
-            out = mod.func(document, requirements, ask, fact_hints=fact_hints)
+            out = C.as_plain(mod.func(document, requirements, ask, fact_hints=fact_hints))
             if ask is None:
                 self.mark("cross", "skipped", self.unavailable or "модель недоступна", implementation=mod.label, t=t)
+            elif self._llm_successes() == before:
+                self.mark("cross", "failed", self._no_model_reason(), implementation=mod.label, t=t)
             else:
                 self.mark("cross", "ok", implementation=mod.label, t=t)
         except AskError as exc:
@@ -539,7 +586,7 @@ class Engine:
                 notes.append("понижено до существенного: не указано бизнес-последствие или блокируемое решение")
             if c["kind"] == "conflict" and not c.get("witness"):
                 notes.append("конфликт без подтверждённой пары опор: требует проверки")
-            if getattr(self, "criteria", None) and c["criterion"] not in self.criteria:
+            if self.criteria_codes and c["criterion"] not in self.criteria_codes:
                 notes.append(f"критерий {c['criterion']!r} отсутствует в общем конфиге критериев")
             confirmed = (c["anchor_status"] == "supported" and c["meaning_status"] in ("confirmed", "deterministic")
                          and not (c["kind"] == "conflict" and not c.get("witness")))
@@ -575,7 +622,7 @@ class Engine:
                 continue
             key = (ch["req_id"], ch["criterion"])
             prev = checks.get(key)
-            if ch.get("source") == "llm":
+            if ch.get("source") not in ("rules", "engine", None):
                 llm_seen.setdefault(ch["req_id"], set()).add(ch["criterion"])
             if prev is None or (prev["status"] != "issue" and ch["status"] == "issue"):
                 checks[key] = {"req_id": ch["req_id"], "criterion": ch["criterion"], "status": ch["status"],
@@ -610,19 +657,57 @@ class Engine:
         crit_order = {c: i for i, c in enumerate(INDIVIDUAL_CRITERIA)}
         return sorted(checks.values(), key=lambda c: (order[c["req_id"]], crit_order[c["criterion"]]))
 
-    def build_facts_coverage(self, document, cross) -> tuple[list, list]:
+    @staticmethod
+    def _ev_list(value: Any) -> list[dict[str, Any]]:
+        if not value:
+            return []
+        items = value if isinstance(value, list) else [value]
+        return [e for e in items if isinstance(e, dict) and {"block_id", "start", "end", "quote"} <= set(e)]
+
+    def _resolved(self, document, hints) -> list[dict[str, Any]]:
         hint = self.mods.get("resolve_hint").func
-        facts = []
-        for f in cross.get("facts", []):
-            evs = [r["evidence"] for r in (hint(document, h) for h in f.get("hints", [])) if r["status"] == "matched"]
-            if evs or f.get("evidence"):
-                item = {k: v for k, v in f.items() if k != "hints"}
-                item["evidence"] = f.get("evidence") or evs
+        out = []
+        for h in hints or []:
+            r = hint(document, h)
+            if r.get("status") == "matched" and r.get("evidence") and r["evidence"] not in out:
+                out.append(r["evidence"])
+        return out
+
+    def normalize_fact(self, document, f: dict[str, Any], n: int) -> Optional[dict[str, Any]]:
+        f = C.as_plain(f)
+        evidence = self._ev_list(f.get("evidence")) or self._resolved(document, f.get("hints"))
+        if not evidence:
+            return None
+        item = {k: v for k, v in f.items() if k not in ("hints", "evidence")}
+        item.update(id=str(f.get("id") or f"FACT-{n:02d}"), subject=str(f.get("subject") or f.get("scope") or ""),
+                    field=str(f.get("field") or ""), value=f.get("value"), evidence=evidence,
+                    req_ids=[str(x) for x in f.get("req_ids") or []])
+        for key in ("unit", "type", "direction"):
+            if item.get(key) is not None and not isinstance(item[key], str):
+                item[key] = str(item[key])
+        return item if not C.validation_errors(item, C.subschema("Fact")) else None
+
+    def normalize_coverage(self, document, cv: dict[str, Any]) -> Optional[dict[str, Any]]:
+        cv = C.as_plain(cv)
+        item = {**cv, "hints": [h for h in cv.get("hints") or [] if isinstance(h, dict) and h.get("quote")],
+                "acceptance_ids": [str(x) for x in cv.get("acceptance_ids") or []],
+                "explanation": str(cv.get("explanation") or ""), "obligation": str(cv.get("obligation") or "")}
+        item["evidence"] = self._ev_list(cv.get("evidence")) or self._resolved(document, item["hints"])
+        if item.get("status") not in C.COVERAGE_STATUSES:
+            item["status"] = "unknown"
+        return item if not C.validation_errors(item, C.subschema("Coverage")) else None
+
+    def build_facts_coverage(self, document, cross) -> tuple[list, list]:
+        facts, dropped = [], 0
+        for n, f in enumerate(cross.get("facts", []), 1):
+            item = self.normalize_fact(document, f, n)
+            if item is None:
+                dropped += 1
+            elif item["id"] not in {x["id"] for x in facts}:
                 facts.append(item)
-        coverage = []
-        for cv in cross.get("coverage", []):
-            evs = [r["evidence"] for r in (hint(document, h) for h in cv.get("hints", [])) if r["status"] == "matched"]
-            coverage.append({**cv, "hints": cv.get("hints", []), "evidence": cv.get("evidence") or evs})
+        coverage = [c for c in (self.normalize_coverage(document, cv) for cv in cross.get("coverage", [])) if c]
+        if dropped:
+            self.warn("facts", f"факты без подтверждённой опоры не включены: {dropped}", "cross")
         return facts, coverage
 
     def run_reconcile_facts(self, document, fact_hints, facts):
@@ -638,14 +723,14 @@ class Engine:
             return facts, []
         merged = list(facts)
         n0 = len(merged)
+        known = {x["id"] for x in merged}
         for i, f in enumerate(out.get("facts", []), 1):
-            item = dict(f)
-            item.setdefault("id", f"FACT-R{i:02d}")
-            item.setdefault("evidence", [])
-            if not C.validation_errors(item, C.subschema("Fact")):
+            item = self.normalize_fact(document, f, i)
+            if item is not None and item["id"] not in known:
                 merged.append(item)
+                known.add(item["id"])
         self.mark("facts", "ok", f"фактов: {len(merged) - n0}", implementation=mod.label, t=t)
-        return merged, list(out.get("candidates", []))
+        return merged, [self.normalize_candidate(C.as_plain(c)) for c in out.get("candidates", [])]
 
     def run_questions(self, document, findings, ask) -> list[dict[str, Any]]:
         t = time.monotonic()
@@ -705,6 +790,9 @@ class Engine:
 
     # ------------------------------------------------------------------ паспорт и запись
     def build_run(self, audit: dict[str, Any]) -> dict[str, Any]:
+        for rec in self.stats.stages.values():
+            if rec.llm and rec.calls and rec.calls == rec.failed_calls and not rec.cache_hits and rec.status in ("ok", "cached"):
+                rec.status, rec.reason = "failed", rec.reason or "все вызовы модели на этапе неуспешны"
         tot = self.stats.totals()
         stages = [r.to_dict() for r in self.stats.stages.values()]
         incomplete = [s["name"] for s in stages if s["status"] in ("failed", "partial", "skipped")]

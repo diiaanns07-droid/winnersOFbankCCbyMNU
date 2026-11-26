@@ -540,7 +540,10 @@ def evidence_errors(report: Mapping[str, Any]) -> list[str]:
     if len(blocks) != len(report.get("document", {}).get("blocks", [])):
         errs.append("document.blocks: повторяющиеся id блоков")
 
-    def check_ev(where: str, ev: Mapping[str, Any]) -> None:
+    def check_ev(where: str, ev: Any) -> None:
+        if not isinstance(ev, Mapping) or not {"block_id", "start", "end", "quote"} <= set(ev):
+            errs.append(f"{where}: опора не в формате Evidence")
+            return
         b = blocks.get(ev.get("block_id"))
         if b is None:
             errs.append(f"{where}: блок {ev.get('block_id')!r} отсутствует")
