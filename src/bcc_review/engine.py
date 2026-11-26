@@ -242,6 +242,14 @@ class Engine:
         context.set_requirements(requirements)
         self.context_policy = context.policy
 
+        # общий конфиг критериев (№05) — коды и названия для проверки стыков
+        crit_mod = self.mods.get("load_criteria")
+        try:
+            self.criteria = crit_mod.func() if crit_mod.func else {}
+        except Exception as exc:  # конфиг команды не прочитан — справочник резерва
+            self.warn("criteria", f"{crit_mod.label}: {exc}; использован резервный справочник", "inventory")
+            self.criteria = self.mods.get("load_criteria", prefer_fallback=True).func()
+
         # правила (всегда, без модели)
         t = time.monotonic()
         try:
@@ -267,6 +275,15 @@ class Engine:
         checks = self.build_checks(requirements, rules_out.get("checks", []) + ind.get("checks", []), findings,
                                    ind.get("failed") or {}, ask_or_none is not None)
         facts, coverage = self.build_facts_coverage(document, cross)
+        facts, fact_candidates = self.run_reconcile_facts(document, inv.get("fact_hints") or [], facts)
+        if fact_candidates:
+            extra, extra_rej, extra_audit = self.verify_candidates(document, fact_candidates, None, stage="facts")
+            rejected += extra_rej
+            for k in ("checked", "confirmed", "ambiguous", "rejected"):
+                audit[k] += extra_audit[k]
+            findings = self.build_findings(verified + extra, requirements)
+            checks = self.build_checks(requirements, rules_out.get("checks", []) + ind.get("checks", []), findings,
+                                       ind.get("failed") or {}, ask_or_none is not None)
 
         # вопросы и чек-лист банка
         questions = self.run_questions(document, findings, ask_or_none)
@@ -405,13 +422,13 @@ class Engine:
                 res["anchor_status"] = "incomplete"
         return res
 
-    def verify_candidates(self, document, candidates, ask):
+    def verify_candidates(self, document, candidates, ask, stage: str = "verify_meaning"):
         t = time.monotonic()
         audit = {"checked": 0, "confirmed": 0, "ambiguous": 0, "rejected": 0}
         verified, rejected = [], []
         hint_mod = self.mods.get("resolve_hint")
         for n, c in enumerate(candidates, 1):
-            cid = f"C-{n:03d}"
+            cid = f"C-{n:03d}" if stage == "verify_meaning" else f"C-{stage}-{n:03d}"
             errs = C.validation_errors(c, C.subschema("Candidate"))
             if errs:
                 rejected.append({"candidate": c, "reason": f"нарушает контракт Candidate: {errs[0]}", "stage": "evidence"})
@@ -438,6 +455,8 @@ class Engine:
                 continue
             verified.append(item)
         self.mark("evidence", "ok", implementation=self.mods.get("resolve_candidate").label, t=t)
+        if stage != "verify_meaning":
+            return verified, rejected, audit
 
         # подтверждение смысла — отдельный от цитаты результат
         t = time.monotonic()
@@ -505,6 +524,8 @@ class Engine:
                 notes.append("понижено до существенного: не указано бизнес-последствие или блокируемое решение")
             if c["kind"] == "conflict" and not c.get("witness"):
                 notes.append("конфликт без подтверждённой пары опор: требует проверки")
+            if getattr(self, "criteria", None) and c["criterion"] not in self.criteria:
+                notes.append(f"критерий {c['criterion']!r} отсутствует в общем конфиге критериев")
             confirmed = (c["anchor_status"] == "supported" and c["meaning_status"] in ("confirmed", "deterministic")
                          and not (c["kind"] == "conflict" and not c.get("witness")))
             f = {"id": "", "scope": c["scope"], "kind": c["kind"], "criterion": c["criterion"], "severity": c["severity"],
@@ -588,6 +609,28 @@ class Engine:
             evs = [r["evidence"] for r in (hint(document, h) for h in cv.get("hints", [])) if r["status"] == "matched"]
             coverage.append({**cv, "hints": cv.get("hints", []), "evidence": cv.get("evidence") or evs})
         return facts, coverage
+
+    def run_reconcile_facts(self, document, fact_hints, facts):
+        """№04 даёт fact_hints, №06 сводит их в таблицу фактов и кандидатов-расхождений."""
+        mod = self.mods.get("reconcile_facts")
+        if mod.func is None or not fact_hints:
+            return facts, []
+        t = time.monotonic()
+        try:
+            out = mod.func(document, fact_hints)
+        except Exception as exc:
+            self.mark("facts", "failed", f"{type(exc).__name__}: {exc}"[:300], implementation=mod.label, t=t)
+            return facts, []
+        merged = list(facts)
+        n0 = len(merged)
+        for i, f in enumerate(out.get("facts", []), 1):
+            item = dict(f)
+            item.setdefault("id", f"FACT-R{i:02d}")
+            item.setdefault("evidence", [])
+            if not C.validation_errors(item, C.subschema("Fact")):
+                merged.append(item)
+        self.mark("facts", "ok", f"фактов: {len(merged) - n0}", implementation=mod.label, t=t)
+        return merged, list(out.get("candidates", []))
 
     def run_questions(self, document, findings, ask) -> list[dict[str, Any]]:
         t = time.monotonic()

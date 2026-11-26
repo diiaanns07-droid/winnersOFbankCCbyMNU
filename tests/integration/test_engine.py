@@ -71,7 +71,7 @@ def test_missing_promised_contract_confirmed(tmp_path, mock_script):
     rep = run(tmp_path, BCC, provider="mock", mock_script=write_script(tmp_path, mock_script))
     om = [f for f in by_kind(rep, "omission") if "метод чтения" in f["title"].lower()]
     assert om and om[0]["status"] == "confirmed"
-    assert om[0]["evidence"][0]["quote"].startswith("Приложение читает и сохраняет настройки")
+    assert any(e["quote"].startswith("Приложение читает и сохраняет настройки") for e in om[0]["evidence"])
 
 
 def test_fabricated_quote_rejected_not_reported(tmp_path, mock_script):
@@ -420,3 +420,38 @@ def test_exports_html_and_jira(tmp_path, mock_script):
     assert 'id="finding-F-001"' in html and "<mark" in html
     assert (tmp_path / "report.jira.csv").exists()
     assert any("экспорт pdf недоступен" in w["message"] for w in rep["warnings"] if isinstance(w, dict))
+
+
+# ---------------------------------------------------------------- факты №04 → №06 через движок
+def fake_inventory(document, ask=None):
+    from bcc_review.runtime.fallback.inventory import build_inventory
+
+    out = build_inventory(document, None)
+    out["fact_hints"] = [{"subject": "порог", "field": "единица", "direction": None, "type": "money", "value": "тенге",
+                          "unit": "KZT", "range": None, "hints": [{"block_id": None, "quote": "порог в тенге"}]},
+                         {"subject": "сумма покупки", "field": "единица", "direction": None, "type": "money",
+                          "value": "тиын", "unit": "KZT/100", "range": None,
+                          "hints": [{"block_id": None, "quote": "сумму покупки в тиынах"}]}]
+    return out
+
+
+def fake_reconcile(document, fact_hints):
+    facts = [{"id": f"FACT-T{i}", "subject": h["subject"], "field": h["field"], "value": h["value"], "unit": h["unit"],
+              "evidence": []} for i, h in enumerate(fact_hints, 1)]
+    cand = {"scope": "set", "kind": "incomplete", "criterion": "set_consistent", "severity": "major",
+            "title": "Сумма покупки в тиынах, порог в тенге: нет правила пересчёта", "impact": "Ошибка сравнения с порогом",
+            "req_ids": ["R-12"], "hints": [h["hints"][0] for h in fact_hints], "source": "rules", "stage": "facts",
+            "cause": {"object": "единицы суммы и порога", "condition": "сравнение с порогом", "outcomes": []}}
+    return {"facts": facts, "candidates": [cand]}
+
+
+def test_fact_hints_flow_through_reconcile(tmp_path, monkeypatch):
+    from bcc_review.runtime import modules
+
+    monkeypatch.setitem(modules.SLOTS, "build_inventory", ("tests.integration.test_engine:fake_inventory", None))
+    monkeypatch.setitem(modules.SLOTS, "reconcile_facts", ("tests.integration.test_engine:fake_reconcile", None))
+    rep = run(tmp_path, BCC, offline_lint=True)
+    assert {"FACT-T1", "FACT-T2"} <= {f["id"] for f in rep["facts"]}
+    units = [f for f in rep["findings"] if "тиын" in f["title"].lower() or "тиын" in " ".join(e["quote"] for e in f["evidence"])]
+    assert units and units[0]["anchor_status"] == "supported"
+    assert rep["run"]["modules"]["reconcile_facts"].startswith("team:")
