@@ -51,3 +51,17 @@ def test_p07_needs_block_binding_for_phrase_repeated_in_both_sections():
         res = evidence.resolve_hint(doc, {"block_id": _row(doc, line)["id"], "quote": phrase})
         place = evidence.locate(doc, res["evidence"])
         assert (res["status"], place["line"], place["section"][-1]) == ("matched", line, part)
+
+
+def test_p07_residual_ambiguity_same_number_twice_in_one_line():
+    """Строка 14 ``limit_spec``: «50 000 ₸» дважды в одном блоке — block_id не разрешает, нужен контекст."""
+    for name in ("limit_spec.lf.md", "limit_spec.crlf_bom.md"):
+        doc = read_text(Path(__file__).parent / "fixtures" / name).to_dict()
+        normalize = getattr(contracts, "normalize_document", None)
+        doc = normalize(doc) if normalize else doc
+        block = _row(doc, 14)
+        bare = evidence.resolve_hint(doc, {"block_id": block["id"], "quote": "50 000 ₸"})
+        assert (bare["status"], bare["reason"]) == ("ambiguous", "multiple_occurrences")
+        res = evidence.resolve_hint(doc, {"block_id": block["id"], "quote": "50 000 ₸", "before": "лимит "})
+        place = evidence.locate(doc, res["evidence"])
+        assert (res["status"], place["line"], place["col"], place["col_end"]) == ("matched", 14, 52, 60)
