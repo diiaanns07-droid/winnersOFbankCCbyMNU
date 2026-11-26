@@ -170,7 +170,7 @@ def test_unfulfilled_promises():
 
 # --- записанные живые ответы на официальном документе ---------------------------------------------
 
-@pytest.fixture(scope="module", params=["architect_sonnet.json", "architect_haiku.json"])
+@pytest.fixture(scope="module", params=["architect_sonnet.json", "architect_haiku.json", "architect_opus.json"])
 def recorded(request):
     return json.loads((FIX / request.param).read_text(encoding="utf-8"))
 
