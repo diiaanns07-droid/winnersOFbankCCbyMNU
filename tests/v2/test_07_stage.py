@@ -64,3 +64,52 @@ def test_recorded_quotes_verified_by_docview(ctx):
             if not m or m["verified"] not in ("exact", "normalized"):
                 bad.append((e.get("line"), e["quote"]))
     assert not bad, bad
+
+
+class _OverflowOnceLLM:
+    """Первый вызов — переполнение вывода, как у `claude -p` на слабой модели; дальше — части ответа."""
+
+    def __init__(self, answer: dict):
+        self.answer, self.calls = answer, []
+
+    def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+        from bcc_review.v2.llm import LLMError
+        self.calls.append(user[-2000:])
+        if len(self.calls) == 1:
+            raise LLMError(stage, "unknown", "API Error: Claude's response exceeded the 16000 output token maximum.")
+        half = len(self.calls) - 2
+        cands = self.answer["candidates"][half::2]
+        return {"inventory": self.answer["inventory"], "candidates": cands}
+
+
+def test_output_overflow_falls_back_to_two_parts(ctx):
+    answer = json.loads((MOCK / "lens_architect.json").read_text(encoding="utf-8"))
+    fake = _OverflowOnceLLM(answer)
+    local = Context(view=ctx.view, llm=fake, requirements=ctx.requirements, signals=ctx.signals)
+    out = lens.run_named(local, "architect")
+    assert len(fake.calls) == 3
+    assert "Ограничение этого запроса" in fake.calls[1] and "Ограничение этого запроса" in fake.calls[2]
+    assert any("двумя частями" in w for w in local.warnings)
+    assert len(out["candidates"]) == min(len(answer["candidates"]), lens_architect.MAX_CANDIDATES)
+    assert out["inventory"]["codes"]
+
+
+def test_split_requirements_api_vs_rest(ctx):
+    parts = lens_architect.split_requirements(ctx.requirements)
+    assert len(parts) == 2 and set(parts[0]).isdisjoint(parts[1])
+    kinds = {r["id"]: r["kind"] for r in ctx.requirements}
+    assert all(kinds[i] in lens_architect.API_KINDS for i in parts[0])
+    assert lens_architect.split_requirements([{"id": "R-01", "kind": "api"}, {"id": "R-02", "kind": "api"}]) == [
+        ["R-01"], ["R-02"]]
+
+
+def test_other_errors_are_not_swallowed(ctx):
+    from bcc_review.v2.llm import LLMError
+
+    class _Broken:
+        def ask(self, stage, *a, **k):
+            raise LLMError(stage, "auth", "нет ключа")
+
+    local = Context(view=ctx.view, llm=_Broken(), requirements=ctx.requirements, signals=ctx.signals)
+    with pytest.raises(LLMError):
+        lens.run_named(local, "architect")

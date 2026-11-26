@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any
 
 NAME = "architect"
@@ -114,11 +115,62 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
     return {"candidates": out[:max_candidates], "inventory": inventory}
 
 
+OUTPUT_LIMIT = re.compile(r"output token|max_tokens|max output tokens|обрезан|лимит\w* выход", re.I)
+API_KINDS = {"api", "integration", "data", "architecture"}
+
+
+def _is_output_limit(exc: BaseException) -> bool:
+    return getattr(exc, "kind", "") == "truncated" or bool(OUTPUT_LIMIT.search(str(exc)))
+
+
+def split_requirements(requirements: list) -> list[list[str]]:
+    """Две части для повтора при переполнении вывода: контракт и данные — отдельно от остального."""
+    ids = [r.get("id") for r in requirements or [] if isinstance(r, dict) and r.get("id")]
+    api = [r.get("id") for r in requirements or [] if isinstance(r, dict) and r.get("id")
+           and r.get("kind") in API_KINDS]
+    rest = [i for i in ids if i not in set(api)]
+    if not api or not rest:
+        half = max(1, len(ids) // 2)
+        api, rest = ids[:half], ids[half:]
+    return [part for part in (api, rest) if part]
+
+
+def _run_parts(ctx: Any) -> dict:
+    from . import lens  # каркас №01
+    from ..llm import merge_lists
+
+    system, user = ctx.prompt(f"lens_{NAME}")
+    schema = lens.schema_for(NAME)
+    parts, failed = [], []
+    for ids in split_requirements(getattr(ctx, "requirements", None) or []):
+        try:
+            parts.append(ctx.llm.ask(f"lens_{NAME}", system, user + lens.FOCUS.format(ids=", ".join(ids)),
+                                     schema, max_output_tokens=lens.MAX_OUTPUT_TOKENS))
+        except Exception as exc:  # noqa: BLE001 — одна часть не должна ронять другую
+            failed.append(f"{ids[0]}…{ids[-1]}: {exc}")
+    if not parts:
+        raise RuntimeError("Линза «Архитектор»: обе части не выполнены — " + "; ".join(failed))
+    if failed and hasattr(ctx, "warn"):
+        ctx.warn("Линза «Архитектор»: часть требований не проверена — " + "; ".join(failed)[:300])
+    return merge_lists(parts)
+
+
 def run(ctx: Any) -> dict:
-    """Запуск линзы через общий механизм `stages/lens.py` (№01) с собственной схемой и постобработкой."""
+    """Запуск линзы через общий механизм `stages/lens.py` (№01) с собственной схемой и постобработкой.
+
+    Если ответ не уместился в лимит вывода (слабые модели много рассуждают над описью), повтор двумя
+    запросами: требования контракта и данных — отдельно от остальных; документ модель видит целиком.
+    """
     from . import lens  # каркас №01
 
-    raw = lens.run(ctx, NAME)
+    try:
+        raw = lens.run(ctx, NAME)
+    except Exception as exc:  # noqa: BLE001
+        if not _is_output_limit(exc) or len(getattr(ctx, "requirements", None) or []) < 2:
+            raise
+        if hasattr(ctx, "warn"):
+            ctx.warn("Линза «Архитектор»: ответ не уместился в лимит вывода — повтор двумя частями")
+        raw = _run_parts(ctx)
     reqs = {r.get("id") for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)}
     result = postprocess(raw, requirement_ids=reqs or None)
     extras = {k: v for k, v in (raw or {}).items() if k not in ("candidates", "inventory")}
