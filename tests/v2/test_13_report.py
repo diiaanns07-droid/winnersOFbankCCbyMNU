@@ -337,3 +337,32 @@ def test_revise_edits_rendered(sample):
     app = md[md.find('id="pg"'):md.find('id="pd"')]
     assert "| после 40 | — | Ф-5. Новое правило. |" in app and "не применено 1" in app
     assert "`report.revised.md`" in app and "/tmp/out" not in app
+
+
+def test_stage_warnings_in_russian():
+    assert markdown.warn_text("проверка серьёзности понизила 2 дефект(ов): critical→major 0, major→minor 2") == \
+        "проверка серьёзности понизила 2 дефект(ов): критичный→существенный 0, существенный→незначительный 2"
+    assert markdown.warn_text("clarify: оставлено 10 вопросов из 11") == "Вопросы: оставлено 10 вопросов из 11"
+    assert markdown.prose("push при floor(расходы/100) ≥ порог") == "push при `floor(расходы/100)` ≥ порог"
+
+
+def test_links_inferred_for_set_checks_and_ids_in_text(sample):
+    r = copy.deepcopy(sample)
+    for p in r["pair_checks"]:
+        p["finding_ids"] = []
+    for a in r["acceptance_checks"]:
+        a["finding_ids"] = []
+    md = markdown.render(r)
+    pairs = md[md.find("### 4.2."):md.find("### 4.3.")]
+    assert "| ⛔ противоречат | [D-01](#d-01)" in pairs  # Ф-3 ↔ Ф-4 — оба требования в D-01
+    acc = md[md.find("### 4.3."):md.find("### 4.4.")]
+    assert "| ⛔ противоречит | [D-05](#d-05)" in acc
+    tests = md[md.find('id="pb"'):md.find('id="pv"')]
+    assert "(D-01)" not in tests and "([D-01](#d-01))" in tests  # упоминание в тексте — ссылка
+
+
+def test_candidate_count_excludes_non_proposing_stages(sample):
+    r = copy.deepcopy(sample)
+    r["run"]["stage_stats"]["quotes"]["candidates"] = 45
+    md = markdown.render(r)
+    assert "Кандидатов в дефекты: 45." in md

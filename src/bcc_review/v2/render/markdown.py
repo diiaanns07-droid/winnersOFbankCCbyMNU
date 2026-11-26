@@ -110,6 +110,7 @@ STAGES = {
 
 def stage_name(key: str) -> str:
     return STAGES.get(stage_key(key), (f"этап `{key}`",))[0]
+PROPOSING = {"rules", "analyst", "qa", "architect", "risk", "consistency"}  # этапы, которые предлагают кандидатов
 STAGE_STATUS = {"ok": "✅ выполнен", "partial": "⚠️ частично", "failed": "⛔ сбой", "skipped": "— пропущен"}
 SOURCES = {"analyst": "аналитик", "qa": "тестировщик", "architect": "архитектор", "risk": "риски",
            "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр"}
@@ -177,9 +178,38 @@ def _lref(m: re.Match) -> str:
     return f"{prep} {word}" if prep else word
 
 
+_CALL = re.compile(r"(?<![\w`])([A-Za-z_][A-Za-z0-9_.]*\([^()`\n]{0,60}\))")
+
+
+_IDREF = re.compile(r"(?<![\w\[#/`-])([DRQ]-\d{2,4})(?![\w-])")
+_KNOWN_IDS: set[str] = set()  # ID дефектов, требований и вопросов текущего отчёта (заполняет render)
+
+
+def _link_ids(text: str) -> str:
+    if not _KNOWN_IDS:
+        return text
+    return _IDREF.sub(lambda m: f"[{m.group(1)}](#{m.group(1).lower()})" if m.group(1) in _KNOWN_IDS else m.group(1),
+                      text)
+
+
 def prose(text) -> str:
-    """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»."""
-    return _LREF.sub(_lref, esc(text))
+    """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»;
+    выражения вида floor(x/100) — как код; упоминания D-…, R-…, Q-… — ссылки."""
+    return _link_ids(_CALL.sub(r"`\1`", _LREF.sub(_lref, esc(text))))
+
+
+_SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
+_STAGE_PREFIX = re.compile(r"^\s*([a-z_:]+):\s+")
+
+
+def warn_text(text) -> str:
+    """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», critical → критичный."""
+    s = " ".join(str(text or "").split())
+    m = _STAGE_PREFIX.match(s)
+    if m and stage_key(m.group(1)) in STAGES:
+        s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
+    s = _SEV_WORD.sub(lambda m: SEV_NAME[m.group(1)], s)
+    return prose(s)
 
 
 def cell(text) -> str:
@@ -616,7 +646,7 @@ def _passport(c: _Ctx) -> list[str]:
         ["Обращений к модели", f"{num(calls.get('total', 0))} (из кэша {num(calls.get('cached', 0))}, "
                                f"с ошибкой {num(calls.get('failed', 0))}, делений пакета {num(calls.get('split', 0))})"],
         ["Токены", f"вход {num(tok.get('input', 0))}, выход {num(tok.get('output', 0))}"
-                   + (f" · ≈ ${cost:.2f}" if isinstance(cost, (int, float)) and cost else "")],
+                   + (f" · ≈ {cost:.2f} $".replace(".", ",") if isinstance(cost, (int, float)) and cost else "")],
         ["Длительность", duration(run.get("duration_s"))],
         ["Статус прогона", STATUS.get(run.get("status"), run.get("status") or "—")],
         ["Этапы", cell(stage_txt)],
@@ -627,7 +657,8 @@ def _passport(c: _Ctx) -> list[str]:
                                          f"{len(cl.get('decisions') or [])}, без ответа {len(cl.get('unanswered') or [])}"])
     warns = (run.get("warnings") or []) + (doc.get("warnings") or [])
     if warns:
-        rows.append(["Предупреждения", cell("; ".join(warns[:5]) + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else ""))])
+        rows.append(["Предупреждения", "; ".join(warn_text(w) for w in warns[:5]).replace("|", "\\|")
+                     + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else "")])
     return [h2("s1", "1. Паспорт прогона"), ""] + table(["Поле", "Значение"], rows) + [""]
 
 
@@ -858,7 +889,7 @@ def _set_check(c: _Ctx) -> list[str]:
                     "undefined": "❔ не определено"}.get(p.get("verdict"), "—")
             rows.append([f"{c.req_label(p.get('a'))} ↔ {c.req_label(p.get('b'))}", cell(p.get("subject")),
                          cell(p.get("scenario")), cell(p.get("outcome_a")), cell(p.get("outcome_b")), mark,
-                         c.f_links(p.get("finding_ids"))])
+                         c.f_links(p.get("finding_ids") or _infer_pair(c, p))])
         out += table(["Пара", "Общий предмет", "Сценарий", "Исход по первому", "Исход по второму", "Итог", "Дефект"],
                      rows) + [""]
     else:
@@ -875,7 +906,8 @@ def _set_check(c: _Ctx) -> list[str]:
                     "undefined": "❔ правила не определяют"}.get(a.get("verdict"), "—")
             rows.append([c.req_label(a.get("row_requirement_id")), cell(a.get("row_facts")),
                          ", ".join(c.req_label(r) for r in a.get("rule_requirement_ids") or []) or "—",
-                         cell(a.get("expected_by_rules")), cell(a.get("stated")), mark, c.f_links(a.get("finding_ids"))])
+                         cell(a.get("expected_by_rules")), cell(a.get("stated")), mark,
+                         c.f_links(a.get("finding_ids") or _infer_acceptance(c, a))])
         out += table(["Критерий", "Исходные данные", "Правила", "Ожидается по правилам", "Указано в критерии",
                       "Итог", "Дефект"], rows) + [""]
     else:
@@ -889,11 +921,55 @@ def _set_check(c: _Ctx) -> list[str]:
         rows = [[cell(g.get("concept")),
                  ", ".join(f"«{cell(t.get('term'))}»" + (f" (строка {t['line']})" if t.get("line") else "")
                            for t in g.get("terms") or []),
-                 cell(g.get("problem")), c.f_links(g.get("finding_ids"))] for g in glossary]
+                 cell(g.get("problem")), c.f_links(g.get("finding_ids") or _infer_glossary(c, g))] for g in glossary]
         out += table(["Понятие", "Как названо в документе", "Проблема", "Дефект"], rows) + [""]
     else:
         out += ["Разночтений терминов не найдено.", ""]
     return out
+
+
+def _ev_lines(f: dict) -> set[int]:
+    out = set()
+    for e in f.get("evidence") or []:
+        a = e.get("line_start")
+        if isinstance(a, int):
+            b = e.get("line_end") if isinstance(e.get("line_end"), int) else a
+            out.update(range(a, b + 1))
+    return out
+
+
+def _infer_pair(c: _Ctx, p: dict) -> list[str]:
+    """Дефект для пары, если судья его не указал: оба требования или обе строки в одном дефекте."""
+    if p.get("verdict") == "compatible":
+        return []
+    a, b = p.get("a"), p.get("b")
+    la, lb = p.get("line_a"), p.get("line_b")
+    hits = []
+    for f in c.findings:
+        reqs = set(f.get("requirement_ids") or [])
+        lines = _ev_lines(f)
+        if (a in reqs and b in reqs) or (isinstance(la, int) and isinstance(lb, int) and la in lines and lb in lines):
+            hits.append(f)
+    hits.sort(key=lambda f: (f.get("kind") not in CONFLICT_KINDS, SEV_ORDER.get(f.get("severity"), 3)))
+    return [f["id"] for f in hits[:2]]
+
+
+def _infer_acceptance(c: _Ctx, a: dict) -> list[str]:
+    if a.get("verdict") == "match":
+        return []
+    row = a.get("row_requirement_id")
+    rules = set(a.get("rule_requirement_ids") or [])
+    hits = [f for f in c.findings if row in (f.get("requirement_ids") or [])
+            and (rules & set(f.get("requirement_ids") or []) or f.get("kind") in CONFLICT_KINDS)]
+    hits.sort(key=lambda f: (f.get("kind") not in CONFLICT_KINDS, SEV_ORDER.get(f.get("severity"), 3)))
+    return [f["id"] for f in hits[:2]]
+
+
+def _infer_glossary(c: _Ctx, g: dict) -> list[str]:
+    lines = {t.get("line") for t in g.get("terms") or [] if isinstance(t.get("line"), int)}
+    hits = [f for f in c.findings if (f.get("kind") == "terminology" or f.get("criterion") == "set_comprehensible")
+            and lines & _ev_lines(f)]
+    return [f["id"] for f in hits[:2]]
 
 
 def _coverage(c: _Ctx) -> list[str]:
@@ -1154,12 +1230,13 @@ def _appendix_how(c: _Ctx) -> list[str]:
         for k, v in stages.items():
             name, what = STAGES.get(stage_key(k), (stage_name(k), ""))
             st = stats.get(k) or {}
+            proposes = stage_key(k) in PROPOSING
             rows.append([name, what, STAGE_STATUS.get(v, v), num(st.get("calls")) if "calls" in st else "—",
                          duration(st.get("seconds")) if "seconds" in st else "—",
-                         num(st.get("candidates")) if "candidates" in st else "—"])
+                         num(st.get("candidates")) if proposes and "candidates" in st else "—"])
         out += table(["Этап", "Что делает", "Итог", "Вызовов", "Время", "Кандидатов"], rows,
                      [":---", ":---", ":---", ":---:", ":---:", ":---:"]) + [""]
-    proposed = sum(int((stats.get(k) or {}).get("candidates") or 0) for k in stats)
+    proposed = sum(int((stats.get(k) or {}).get("candidates") or 0) for k in stats if stage_key(k) in PROPOSING)
     accepted = sum(len(f.get("candidate_ids") or []) for f in c.r.get("findings") or [])
     rej = c.r.get("rejected") or []
     nfind = len(c.findings)
@@ -1186,7 +1263,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
         out.append("")
     warns = run.get("warnings") or []
     if warns:
-        out += ["**Предупреждения прогона**", ""] + [f"- {esc(w)}" for w in warns[:15]] + [""]
+        out += ["**Предупреждения прогона**", ""] + [f"- {warn_text(w)}" for w in warns[:15]] + [""]
     return out
 
 
@@ -1308,6 +1385,10 @@ def _sections():
 
 def _render_level(report: dict, level: int) -> str:
     c = _Ctx(_clean_report(report), level)
+    _KNOWN_IDS.clear()
+    _KNOWN_IDS.update(str(f.get("id")) for f in c.findings)
+    _KNOWN_IDS.update(str(q.get("id")) for q in c.reqs)
+    _KNOWN_IDS.update(str(q.get("id")) for q in c.r.get("questions") or [])
     parts = []
     for title, fn in _sections():
         try:
