@@ -416,3 +416,33 @@ def render_markdown(result: dict, revised_file: str = "") -> str:
                 out.append(f"* после строки {e['line']} добавлено: «{e['became'].strip()}»")
         out.append("")
     return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- точка входа для pipeline (№01)
+def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = False,
+              report_path: str | Path | None = None) -> dict:
+    """Режимы ``--answers`` и ``--revise`` одним вызовом после судьи и clarify.
+
+    ``report`` — собранный отчёт (``findings``, ``questions``, ``verdict``, ``run.status``).
+    Возвращает поля для ``report.json``: ``clarification``, ``findings_after``, ``rejected_after`` (при ответах),
+    ``rewrites``, ``revise_stats``, ``revised_file`` (при ``do_revise``) и ``markdown_sections`` — готовые разделы
+    «Уточнение: до и после» и «Исправленная редакция: было → стало» для отчёта (№13 может нарисовать свои).
+    """
+    from bcc_review.v2.stages import recheck  # локально: recheck импортирует clarify, revise — тоже
+
+    out: dict = {"markdown_sections": []}
+    clar = None
+    if answers:
+        a = recheck.apply_answers(ctx, report, answers)
+        clar = a["clarification"]
+        out.update(clarification=clar, findings_after=a["findings_after"], rejected_after=a["rejected_after"])
+        out["markdown_sections"].append(recheck.render_markdown(clar, a["findings_after"]))
+    if do_revise:
+        r = run(ctx, list(report.get("findings") or []), clar)
+        path = write(report_path, r) if report_path else None
+        out.update(rewrites=r.get("rewrites", []), revise_stats=r.get("stats", {}),
+                   revised_file=str(path) if path else "", revised_markdown=r.get("revised_markdown", ""))
+        section = render_markdown(r, path.name if path else "")
+        if section:
+            out["markdown_sections"].append(section)
+    return out

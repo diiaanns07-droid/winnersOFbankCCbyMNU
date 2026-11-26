@@ -160,3 +160,32 @@ def test_real_sonnet_edits_apply_cleanly():
     # каждый critical получил правку
     crit = {f["id"] for f in findings if f["severity"] == "critical"}
     assert crit <= {r["finding_id"] for r in res["rewrites"]}
+
+
+def test_run_modes_answers_and_revise(tmp_path):
+    from bcc_review.v2.stages import clarify as cl
+
+    findings = json.loads((FIX / "findings.json").read_text(encoding="utf-8"))["findings"]
+    questions = cl.run(FakeCtx(FakeLLM(json.loads((FIX / "clarify.json").read_text(encoding="utf-8")))),
+                       findings)["questions"]
+
+    class SeqLLM(FakeLLM):
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            self.calls.append({"stage": stage, "user": user})
+            if stage == "recheck":
+                return {"decisions": [{"finding_id": "D-02", "status": "resolved", "reason": "ответ Q-02",
+                                       "severity": "minor", "title": "", "problem": ""}], "candidates": []}
+            return {"rewrites": [{"finding_id": "D-02", "summary": "месяц по дате покупки", "edits": [
+                {"action": "replace", "line": 64, "old": "Февральский счётчик вырос на 4 000 ₸",
+                 "new": "Январский счётчик вырос на 4 000 ₸"}]}]}
+
+    ctx = FakeCtx(SeqLLM())
+    ctx.options = {"input": str(DOC)}
+    q2 = next(q for q in questions if "D-02" in q["finding_ids"])
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = revise.run_modes(ctx, report, answers=f"{q2['id']}: A", do_revise=True, report_path=tmp_path / "r.md")
+    assert [c["stage"] for c in ctx.llm.calls] == ["recheck", "revise"]
+    assert out["clarification"]["resolved"] == 1
+    assert q2["options"][0] in ctx.llm.calls[1]["user"], "ответ владельца подставляется в revise"
+    assert Path(out["revised_file"]).name == "r.revised.md"
+    assert len(out["markdown_sections"]) == 2 and "было → стало" in out["markdown_sections"][1]
