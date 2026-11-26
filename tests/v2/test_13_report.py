@@ -404,3 +404,11 @@ def test_identifiers_in_model_text_become_code():
     assert markdown.prose("поле limit_kzt и `уже код` и 1.5 и т.е.") == "поле `limit_kzt` и `уже код` и 1.5 и т.е."
     assert markdown.prose("путь /alerts/saveLimit. Дальше") == "путь `/alerts/saveLimit`. Дальше"
     assert markdown.prose("сумма 50 000 ₸, Ф-2, push, API") == "сумма 50 000 ₸, Ф-2, push, API"
+
+
+def test_stage_failure_warnings_readable():
+    assert markdown.warn_text("Этап lens_architect не выполнен: исчерпан бюджет вызовов модели (16)") == \
+        "Этап «Архитектор» не выполнен: исчерпан бюджет вызовов модели (16)"
+    assert markdown.warn_text("судья недоступен (BudgetExceeded: judge: budget: исчерпан бюджет вызовов модели (16)); "
+                              "реестр собран кодом") == \
+        "судья недоступен (исчерпан бюджет вызовов модели (16)); реестр собран кодом"

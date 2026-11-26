@@ -223,12 +223,20 @@ _SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
 _STAGE_PREFIX = re.compile(r"^\s*([a-z_:]+):\s+")
 
 
+_STAGE_WORD = re.compile(r"`?\b(?:lens[_:])?(segment|analyst|qa|architect|risk|consistency|judge|clarify|recheck|"
+                         r"revise)\b`?(?!\.)")
+_EXC = re.compile(r"\b[A-Z][A-Za-z]*(?:Error|Exceeded|Exception|Timeout)\b:\s*(?:[a-z_]+:\s*)*")
+
+
 def warn_text(text) -> str:
-    """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», critical → критичный."""
+    """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», «lens_risk» → «Риски», critical → критичный;
+    служебные префиксы исключений («BudgetExceeded: judge: budget:») убираются."""
     s = " ".join(str(text or "").split())
     m = _STAGE_PREFIX.match(s)
     if m and stage_key(m.group(1)) in STAGES:
         s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
+    s = _EXC.sub("", s)
+    s = _STAGE_WORD.sub(lambda m: f"«{STAGES[m.group(1)][0]}»", s)
     s = _SEV_WORD.sub(lambda m: SEV_NAME[m.group(1)], s)
     return prose(s)
 
