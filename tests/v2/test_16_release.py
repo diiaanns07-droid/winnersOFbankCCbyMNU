@@ -129,6 +129,11 @@ def test_readme_providers_match_cli():
 # --------------------------------------------------------------------------- .env.example
 
 
+def _env_documented() -> set[str]:
+    """Имена переменных из .env.example, включая закомментированные необязательные строки «# NAME=…»."""
+    return set(re.findall(r"^#?\s?([A-Z][A-Z0-9_]{2,})=", _read(ENV_EXAMPLE), flags=re.MULTILINE))
+
+
 def _env_example() -> dict[str, str]:
     values: dict[str, str] = {}
     for raw in _read(ENV_EXAMPLE).splitlines():
@@ -150,6 +155,10 @@ def test_env_example_has_no_secrets():
     text = _read(ENV_EXAMPLE)
     for label, pattern in SECRET_PATTERNS.items():
         assert not pattern.search(text), label
+    for line in text.splitlines():  # закомментированные ключи тоже пустые
+        m = re.match(r"^#\s?([A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD))=(.*)$", line)
+        if m:
+            assert m.group(2).strip() == "", f"{m.group(1)} в .env.example должен быть пустым"
 
 
 def test_env_example_lists_provider_variables():
@@ -166,7 +175,7 @@ def test_env_example_covers_variables_read_by_v2():
     used: set[str] = set()
     for path in V2_SRC.rglob("*.py"):
         used |= set(pattern.findall(path.read_text(encoding="utf-8")))
-    missing = sorted(used - set(_env_example()) - INTERNAL_ENV)
+    missing = sorted(used - _env_documented() - INTERNAL_ENV)
     assert not missing, f"переменные v2 не описаны в .env.example: {missing}"
 
 
