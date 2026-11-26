@@ -1,0 +1,1501 @@
+{
+  "requirements": [
+    {
+      "id": "R-001.1",
+      "group": "R-001",
+      "source_id": "КБ-1",
+      "source_ref": "Функциональные требования › КБ-1",
+      "kind": "functional",
+      "text": "Клиент с активной дебетовой картой выбирает до 3 категорий кэшбэка на календарный месяц.",
+      "block_ids": [
+        "b0012"
+      ],
+      "hints": [
+        {
+          "block_id": "b0012",
+          "quote": "Клиент с активной дебетовой картой выбирает до 3 категорий кэшбэка на календарный месяц."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 6,
+          "end": 94,
+          "quote": "Клиент с активной дебетовой картой выбирает до 3 категорий кэшбэка на календарный месяц."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-001.2",
+      "group": "R-001",
+      "source_id": "КБ-1",
+      "source_ref": "Функциональные требования › КБ-1",
+      "kind": "functional",
+      "text": "Выбор доступен с 1 по 5 число месяца.",
+      "block_ids": [
+        "b0012"
+      ],
+      "hints": [
+        {
+          "block_id": "b0012",
+          "quote": "Выбор доступен с 1 по 5 число месяца."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 95,
+          "end": 132,
+          "quote": "Выбор доступен с 1 по 5 число месяца."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-002",
+      "group": "R-002",
+      "source_id": "КБ-2",
+      "source_ref": "Функциональные требования › КБ-2",
+      "kind": "functional",
+      "text": "За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента.",
+      "block_ids": [
+        "b0013"
+      ],
+      "hints": [
+        {
+          "block_id": "b0013",
+          "quote": "За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0013",
+          "start": 6,
+          "end": 113,
+          "quote": "За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-003",
+      "group": "R-003",
+      "source_id": "КБ-3",
+      "source_ref": "Функциональные требования › КБ-3",
+      "kind": "functional",
+      "text": "Кэшбэк начисляется в течение 2 рабочих дней после проведения покупки.",
+      "block_ids": [
+        "b0014"
+      ],
+      "hints": [
+        {
+          "block_id": "b0014",
+          "quote": "Кэшбэк начисляется в течение 2 рабочих дней после проведения покупки."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0014",
+          "start": 6,
+          "end": 75,
+          "quote": "Кэшбэк начисляется в течение 2 рабочих дней после проведения покупки."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-004",
+      "group": "R-004",
+      "source_id": "КБ-4",
+      "source_ref": "Функциональные требования › КБ-4",
+      "kind": "functional",
+      "text": "Клиент может изменить выбранные категории в любой момент месяца.",
+      "block_ids": [
+        "b0015"
+      ],
+      "hints": [
+        {
+          "block_id": "b0015",
+          "quote": "Клиент может изменить выбранные категории в любой момент месяца."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0015",
+          "start": 6,
+          "end": 70,
+          "quote": "Клиент может изменить выбранные категории в любой момент месяца."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-005",
+      "group": "R-005",
+      "source_id": "КБ-5",
+      "source_ref": "Функциональные требования › КБ-5",
+      "kind": "functional",
+      "text": "Кэшбэк за возвращённую покупку списывается и т. д.",
+      "block_ids": [
+        "b0016"
+      ],
+      "hints": [
+        {
+          "block_id": "b0016",
+          "quote": "Кэшбэк за возвращённую покупку списывается и т. д."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0016",
+          "start": 6,
+          "end": 56,
+          "quote": "Кэшбэк за возвращённую покупку списывается и т. д."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Функциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-006",
+      "group": "R-006",
+      "source_id": null,
+      "source_ref": "Нефункциональные требования",
+      "kind": "nonfunctional",
+      "text": "Экран кэшбэка открывается быстро и удобно для клиента.",
+      "block_ids": [
+        "b0018"
+      ],
+      "hints": [
+        {
+          "block_id": "b0018",
+          "quote": "Экран кэшбэка открывается быстро и удобно для клиента."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0018",
+          "start": 0,
+          "end": 54,
+          "quote": "Экран кэшбэка открывается быстро и удобно для клиента."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Нефункциональные требования"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-007",
+      "group": "R-007",
+      "source_id": null,
+      "source_ref": "Требования к данным",
+      "kind": "data",
+      "text": "Хранить идентификатор клиента, месяц, выбранные категории, сумму кэшбэка в тиынах и лимит в тенге.",
+      "block_ids": [
+        "b0020"
+      ],
+      "hints": [
+        {
+          "block_id": "b0020",
+          "quote": "Хранить идентификатор клиента, месяц, выбранные категории, сумму кэшбэка в тиынах и лимит в тенге."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0020",
+          "start": 0,
+          "end": 98,
+          "quote": "Хранить идентификатор клиента, месяц, выбранные категории, сумму кэшбэка в тиынах и лимит в тенге."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Требования к данным"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-008",
+      "group": "R-008",
+      "source_id": null,
+      "source_ref": "Требования к интеграции",
+      "kind": "integration",
+      "text": "Приложение получает и меняет выбранные категории через документ «Кэшбэк — REST API».",
+      "block_ids": [
+        "b0022"
+      ],
+      "hints": [
+        {
+          "block_id": "b0022",
+          "quote": "Приложение получает и меняет выбранные категории через документ «Кэшбэк — REST API»."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0022",
+          "start": 0,
+          "end": 84,
+          "quote": "Приложение получает и меняет выбранные категории через документ «Кэшбэк — REST API»."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Требования к интеграции"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-009",
+      "group": "R-009",
+      "source_id": null,
+      "source_ref": "Критерии приемки › строка 1",
+      "kind": "acceptance",
+      "text": "Исходные условия: Выбрана категория «Кафе», кэшбэк за месяц 0 ₸; Действие: Покупка в кафе на 20 000 ₸; Ожидаемый результат: Начислено 1 000 ₸",
+      "block_ids": [
+        "b0025"
+      ],
+      "hints": [
+        {
+          "block_id": "b0025",
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0025",
+          "start": 0,
+          "end": 94,
+          "quote": "Выбрана категория «Кафе», кэшбэк за месяц 0 ₸ | Покупка в кафе на 20 000 ₸ | Начислено 1 000 ₸"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Критерии приемки"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-010",
+      "group": "R-010",
+      "source_id": null,
+      "source_ref": "Критерии приемки › строка 2",
+      "kind": "acceptance",
+      "text": "Исходные условия: 10 число месяца, выбраны 3 категории; Действие: Клиент меняет категорию «Кафе» на «Такси»; Ожидаемый результат: Категория изменена",
+      "block_ids": [
+        "b0026"
+      ],
+      "hints": [
+        {
+          "block_id": "b0026",
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0026",
+          "start": 0,
+          "end": 101,
+          "quote": "10 число месяца, выбраны 3 категории | Клиент меняет категорию «Кафе» на «Такси» | Категория изменена"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Критерии приемки"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-011",
+      "group": "R-011",
+      "source_id": null,
+      "source_ref": "Критерии приемки › строка 3",
+      "kind": "acceptance",
+      "text": "Исходные условия: Кэшбэк за месяц 9 800 ₸; Действие: Покупка в выбранной категории на 10 000 ₸; Ожидаемый результат: Начислено 500 ₸",
+      "block_ids": [
+        "b0027"
+      ],
+      "hints": [
+        {
+          "block_id": "b0027",
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0027",
+          "start": 0,
+          "end": 85,
+          "quote": "Кэшбэк за месяц 9 800 ₸ | Покупка в выбранной категории на 10 000 ₸ | Начислено 500 ₸"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть A. Бизнес-требования",
+        "Критерии приемки"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-012",
+      "group": "R-012",
+      "source_id": null,
+      "source_ref": "Общие параметры › строка 2",
+      "kind": "contract",
+      "text": "REST type: GET",
+      "block_ids": [
+        "b0033"
+      ],
+      "hints": [
+        {
+          "block_id": "b0033",
+          "quote": "REST type | GET"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0033",
+          "start": 0,
+          "end": 15,
+          "quote": "REST type | GET"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Общие параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-013",
+      "group": "R-013",
+      "source_id": null,
+      "source_ref": "Общие параметры › строка 3",
+      "kind": "contract",
+      "text": "Request URL: /cashback/setCategories",
+      "block_ids": [
+        "b0034"
+      ],
+      "hints": [
+        {
+          "block_id": "b0034",
+          "quote": "Request URL | /cashback/setCategories"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0034",
+          "start": 0,
+          "end": 37,
+          "quote": "Request URL | /cashback/setCategories"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Общие параметры"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-014",
+      "group": "R-014",
+      "source_id": null,
+      "source_ref": "Параметры запроса › строка 1",
+      "kind": "contract",
+      "text": "Parameter: clientId; Format: string; Mandatory: Да; Description: Идентификатор клиента",
+      "block_ids": [
+        "b0037"
+      ],
+      "hints": [
+        {
+          "block_id": "b0037",
+          "quote": "clientId | string | Да | Идентификатор клиента"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0037",
+          "start": 0,
+          "end": 46,
+          "quote": "clientId | string | Да | Идентификатор клиента"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Параметры запроса"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-015",
+      "group": "R-015",
+      "source_id": null,
+      "source_ref": "Параметры запроса › строка 2",
+      "kind": "contract",
+      "text": "Parameter: categories; Format: array; Mandatory: Да; Description: Коды категорий, не более 3",
+      "block_ids": [
+        "b0038"
+      ],
+      "hints": [
+        {
+          "block_id": "b0038",
+          "quote": "categories | array | Да | Коды категорий, не более 3"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0038",
+          "start": 0,
+          "end": 52,
+          "quote": "categories | array | Да | Коды категорий, не более 3"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Параметры запроса"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-016",
+      "group": "R-016",
+      "source_id": null,
+      "source_ref": "Ответ › строка 1",
+      "kind": "contract",
+      "text": "Parameter: categories; Format: string; Description: Сохранённые категории",
+      "block_ids": [
+        "b0041"
+      ],
+      "hints": [
+        {
+          "block_id": "b0041",
+          "quote": "categories | string | Сохранённые категории"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 43,
+          "quote": "categories | string | Сохранённые категории"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-017",
+      "group": "R-017",
+      "source_id": null,
+      "source_ref": "Ответ › строка 2",
+      "kind": "contract",
+      "text": "Parameter: status; Format: string; Description: OK / ERROR",
+      "block_ids": [
+        "b0042"
+      ],
+      "hints": [
+        {
+          "block_id": "b0042",
+          "quote": "status | string | OK / ERROR"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 28,
+          "quote": "status | string | OK / ERROR"
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Ответ"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-018",
+      "group": "R-018",
+      "source_id": "200",
+      "source_ref": "Статусы › 200",
+      "kind": "contract",
+      "text": "Успешное сохранение.",
+      "block_ids": [
+        "b0044"
+      ],
+      "hints": [
+        {
+          "block_id": "b0044",
+          "quote": "Успешное сохранение."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0044",
+          "start": 5,
+          "end": 25,
+          "quote": "Успешное сохранение."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Статусы"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-019",
+      "group": "R-019",
+      "source_id": "400",
+      "source_ref": "Статусы › 400",
+      "kind": "contract",
+      "text": "Неверные параметры.",
+      "block_ids": [
+        "b0044"
+      ],
+      "hints": [
+        {
+          "block_id": "b0044",
+          "quote": "Неверные параметры."
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0044",
+          "start": 31,
+          "end": 50,
+          "quote": "Неверные параметры."
+        }
+      ],
+      "section": [
+        "Кэшбэк за покупки в выбранных категориях",
+        "Часть B. REST API",
+        "Статусы"
+      ],
+      "origin": "rules",
+      "review_status": "not_reviewed",
+      "review_reason": null
+    }
+  ],
+  "fact_hints": [
+    {
+      "id": "F-001",
+      "subject": null,
+      "field": null,
+      "direction": "business",
+      "type": null,
+      "value": null,
+      "unit": "тенге",
+      "range": {
+        "min": null,
+        "max": 10000,
+        "min_inclusive": null,
+        "max_inclusive": true
+      },
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0013",
+          "quote": "не более 10 000 ₸"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0013",
+          "start": 76,
+          "end": 93,
+          "quote": "не более 10 000 ₸"
+        }
+      ],
+      "req_ids": [
+        "R-002"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-002",
+      "subject": null,
+      "field": "сумму кэшбэка",
+      "direction": "business",
+      "type": null,
+      "value": null,
+      "unit": "тиын",
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0020",
+          "quote": "сумму кэшбэка в тиынах"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0020",
+          "start": 59,
+          "end": 81,
+          "quote": "сумму кэшбэка в тиынах"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-003",
+      "subject": null,
+      "field": "и лимит",
+      "direction": "business",
+      "type": null,
+      "value": null,
+      "unit": "тенге",
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0020",
+          "quote": "и лимит в тенге"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0020",
+          "start": 82,
+          "end": 97,
+          "quote": "и лимит в тенге"
+        }
+      ],
+      "req_ids": [
+        "R-007"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-004",
+      "subject": null,
+      "field": "clientId",
+      "direction": "request",
+      "type": "string",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": true,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0037",
+          "quote": "clientId"
+        },
+        {
+          "block_id": "b0037",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0037",
+          "quote": "Идентификатор клиента"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0037",
+          "start": 0,
+          "end": 8,
+          "quote": "clientId"
+        },
+        {
+          "block_id": "b0037",
+          "start": 11,
+          "end": 17,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0037",
+          "start": 25,
+          "end": 46,
+          "quote": "Идентификатор клиента"
+        }
+      ],
+      "req_ids": [
+        "R-014"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-005",
+      "subject": null,
+      "field": "categories",
+      "direction": "request",
+      "type": "array",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": true,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0038",
+          "quote": "categories"
+        },
+        {
+          "block_id": "b0038",
+          "quote": "array"
+        },
+        {
+          "block_id": "b0038",
+          "quote": "Коды категорий, не более 3"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0038",
+          "start": 0,
+          "end": 10,
+          "quote": "categories"
+        },
+        {
+          "block_id": "b0038",
+          "start": 13,
+          "end": 18,
+          "quote": "array"
+        },
+        {
+          "block_id": "b0038",
+          "start": 26,
+          "end": 52,
+          "quote": "Коды категорий, не более 3"
+        }
+      ],
+      "req_ids": [
+        "R-015"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-006",
+      "subject": null,
+      "field": "categories",
+      "direction": "response",
+      "type": "string",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0041",
+          "quote": "categories"
+        },
+        {
+          "block_id": "b0041",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0041",
+          "quote": "Сохранённые категории"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0041",
+          "start": 0,
+          "end": 10,
+          "quote": "categories"
+        },
+        {
+          "block_id": "b0041",
+          "start": 13,
+          "end": 19,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0041",
+          "start": 22,
+          "end": 43,
+          "quote": "Сохранённые категории"
+        }
+      ],
+      "req_ids": [
+        "R-016"
+      ],
+      "origin": "rules"
+    },
+    {
+      "id": "F-007",
+      "subject": null,
+      "field": "status",
+      "direction": "response",
+      "type": "string",
+      "value": null,
+      "unit": null,
+      "range": null,
+      "condition": null,
+      "required": null,
+      "size": null,
+      "values": null,
+      "db_field": null,
+      "hints": [
+        {
+          "block_id": "b0042",
+          "quote": "status"
+        },
+        {
+          "block_id": "b0042",
+          "quote": "string"
+        },
+        {
+          "block_id": "b0042",
+          "quote": "OK / ERROR"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0042",
+          "start": 0,
+          "end": 6,
+          "quote": "status"
+        },
+        {
+          "block_id": "b0042",
+          "start": 9,
+          "end": 15,
+          "quote": "string"
+        },
+        {
+          "block_id": "b0042",
+          "start": 18,
+          "end": 28,
+          "quote": "OK / ERROR"
+        }
+      ],
+      "req_ids": [
+        "R-017"
+      ],
+      "origin": "rules"
+    }
+  ],
+  "excluded": [
+    {
+      "category": "structure",
+      "reason": "Заголовок раздела: задаёт путь section для вложенных блоков.",
+      "block_ids": [
+        "b0001",
+        "b0003",
+        "b0004",
+        "b0009",
+        "b0011",
+        "b0017",
+        "b0019",
+        "b0021",
+        "b0023",
+        "b0028",
+        "b0030",
+        "b0035",
+        "b0039",
+        "b0043",
+        "b0045"
+      ],
+      "cross_check": false,
+      "sections": [
+        "",
+        "Кэшбэк за покупки в выбранных категориях",
+        "Кэшбэк за покупки в выбранных категориях › Часть A. Бизнес-требования",
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API",
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API › Статусы"
+      ]
+    },
+    {
+      "category": "preamble",
+      "reason": "Раздел «Кэшбэк за покупки в выбранных категориях»: вводный или описательный текст без обязательства.",
+      "block_ids": [
+        "b0002"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Общие сведения»: названия колонок.",
+      "block_ids": [
+        "b0005"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть A. Бизнес-требования › Общие сведения"
+      ]
+    },
+    {
+      "category": "metadata",
+      "reason": "Таблица «Общие сведения»: метаданные документа или задачи.",
+      "block_ids": [
+        "b0006",
+        "b0007",
+        "b0008"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть A. Бизнес-требования › Общие сведения"
+      ]
+    },
+    {
+      "category": "goal",
+      "reason": "Цель или ожидаемая польза: обоснование для трассировки, а не проверяемое обязательство.",
+      "block_ids": [
+        "b0010"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть A. Бизнес-требования › Цели"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Критерии приемки»: названия колонок.",
+      "block_ids": [
+        "b0024"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть A. Бизнес-требования › Критерии приемки"
+      ]
+    },
+    {
+      "category": "preamble",
+      "reason": "Раздел «Часть B. REST API»: вводный текст перед подразделами.",
+      "block_ids": [
+        "b0029"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Общие параметры»: названия колонок.",
+      "block_ids": [
+        "b0031"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API › Общие параметры"
+      ]
+    },
+    {
+      "category": "metadata",
+      "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка).",
+      "block_ids": [
+        "b0032"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API › Общие параметры"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Параметры запроса»: названия колонок.",
+      "block_ids": [
+        "b0036"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API › Параметры запроса"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Ответ»: названия колонок.",
+      "block_ids": [
+        "b0040"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API › Ответ"
+      ]
+    },
+    {
+      "category": "example",
+      "reason": "Раздел «200. OK»: пример запроса или ответа, опора для сверки с контрактом.",
+      "block_ids": [
+        "b0046"
+      ],
+      "cross_check": true,
+      "sections": [
+        "Кэшбэк за покупки в выбранных категориях › Часть B. REST API › Статусы › 200. OK"
+      ]
+    }
+  ],
+  "unprocessed_block_ids": [],
+  "warnings": [],
+  "block_coverage": {
+    "mode": "rules_only",
+    "llm_status": "not_used",
+    "level": "complete",
+    "total_blocks": 46,
+    "requirement_blocks": 18,
+    "excluded_blocks": 28,
+    "unprocessed_blocks": 0,
+    "accounted_ratio": 1.0,
+    "requirements": 20,
+    "source_units": 19,
+    "by_kind": {
+      "functional": 6,
+      "nonfunctional": 1,
+      "data": 1,
+      "integration": 1,
+      "acceptance": 3,
+      "contract": 8
+    },
+    "by_origin": {
+      "rules": 20
+    },
+    "excluded_by_category": {
+      "structure": 20,
+      "preamble": 2,
+      "metadata": 4,
+      "goal": 1,
+      "example": 1
+    },
+    "calls": {
+      "used": 0,
+      "budget": 0,
+      "windows": 0,
+      "retry_calls": 0,
+      "failed": 0,
+      "truncated": 0
+    },
+    "model_missed_block_ids": [],
+    "fallback_block_ids": [],
+    "evidence": {
+      "checked": 0,
+      "exact": 0,
+      "repaired": 0,
+      "rejected": 0,
+      "empty": 0,
+      "items_rejected": 0,
+      "facts_rejected": 0,
+      "source_ids_cleared": 0,
+      "source_ids_filled": 0,
+      "duplicates_merged": 0,
+      "context_linked": 0,
+      "excluded_unknown_ids": 0,
+      "conflicts_resolved": 0
+    },
+    "evidence_audit": {
+      "checked": 0,
+      "confirmed": 0,
+      "ambiguous": 0,
+      "rejected": 0,
+      "note": "Опоры этапа inventory: цитата модели принята, если она дословная или после нормализации пробелов, кавычек, тире и разметки найдена в блоке; тогда она заменена фрагментом источника (исправлено 0). Неоднозначные — цитата встречается в блоке не один раз и снабжена context. Правила дают опоры из текста напрямую и здесь не считаются."
+    },
+    "blocks": [
+      {
+        "block_id": "b0001",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0002",
+        "fate": "excluded",
+        "ref": "preamble",
+        "reason": "Раздел «Кэшбэк за покупки в выбранных категориях»: вводный или описательный текст без обязательства."
+      },
+      {
+        "block_id": "b0003",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0004",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0005",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Общие сведения»: названия колонок."
+      },
+      {
+        "block_id": "b0006",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0007",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0008",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие сведения»: метаданные документа или задачи."
+      },
+      {
+        "block_id": "b0009",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0010",
+        "fate": "excluded",
+        "ref": "goal",
+        "reason": "Цель или ожидаемая польза: обоснование для трассировки, а не проверяемое обязательство."
+      },
+      {
+        "block_id": "b0011",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0012",
+        "fate": "requirement",
+        "ref": [
+          "R-001.1",
+          "R-001.2"
+        ]
+      },
+      {
+        "block_id": "b0013",
+        "fate": "requirement",
+        "ref": [
+          "R-002"
+        ]
+      },
+      {
+        "block_id": "b0014",
+        "fate": "requirement",
+        "ref": [
+          "R-003"
+        ]
+      },
+      {
+        "block_id": "b0015",
+        "fate": "requirement",
+        "ref": [
+          "R-004"
+        ]
+      },
+      {
+        "block_id": "b0016",
+        "fate": "requirement",
+        "ref": [
+          "R-005"
+        ]
+      },
+      {
+        "block_id": "b0017",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0018",
+        "fate": "requirement",
+        "ref": [
+          "R-006"
+        ]
+      },
+      {
+        "block_id": "b0019",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0020",
+        "fate": "requirement",
+        "ref": [
+          "R-007"
+        ]
+      },
+      {
+        "block_id": "b0021",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0022",
+        "fate": "requirement",
+        "ref": [
+          "R-008"
+        ]
+      },
+      {
+        "block_id": "b0023",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0024",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Критерии приемки»: названия колонок."
+      },
+      {
+        "block_id": "b0025",
+        "fate": "requirement",
+        "ref": [
+          "R-009"
+        ]
+      },
+      {
+        "block_id": "b0026",
+        "fate": "requirement",
+        "ref": [
+          "R-010"
+        ]
+      },
+      {
+        "block_id": "b0027",
+        "fate": "requirement",
+        "ref": [
+          "R-011"
+        ]
+      },
+      {
+        "block_id": "b0028",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0029",
+        "fate": "excluded",
+        "ref": "preamble",
+        "reason": "Раздел «Часть B. REST API»: вводный текст перед подразделами."
+      },
+      {
+        "block_id": "b0030",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0031",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Общие параметры»: названия колонок."
+      },
+      {
+        "block_id": "b0032",
+        "fate": "excluded",
+        "ref": "metadata",
+        "reason": "Таблица «Общие параметры»: описательные атрибуты (проект, роли, авторы, сводка)."
+      },
+      {
+        "block_id": "b0033",
+        "fate": "requirement",
+        "ref": [
+          "R-012"
+        ]
+      },
+      {
+        "block_id": "b0034",
+        "fate": "requirement",
+        "ref": [
+          "R-013"
+        ]
+      },
+      {
+        "block_id": "b0035",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0036",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Параметры запроса»: названия колонок."
+      },
+      {
+        "block_id": "b0037",
+        "fate": "requirement",
+        "ref": [
+          "R-014"
+        ]
+      },
+      {
+        "block_id": "b0038",
+        "fate": "requirement",
+        "ref": [
+          "R-015"
+        ]
+      },
+      {
+        "block_id": "b0039",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0040",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Шапка таблицы «Ответ»: названия колонок."
+      },
+      {
+        "block_id": "b0041",
+        "fate": "requirement",
+        "ref": [
+          "R-016"
+        ]
+      },
+      {
+        "block_id": "b0042",
+        "fate": "requirement",
+        "ref": [
+          "R-017"
+        ]
+      },
+      {
+        "block_id": "b0043",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0044",
+        "fate": "requirement",
+        "ref": [
+          "R-018",
+          "R-019"
+        ]
+      },
+      {
+        "block_id": "b0045",
+        "fate": "excluded",
+        "ref": "structure",
+        "reason": "Заголовок раздела: задаёт путь section для вложенных блоков."
+      },
+      {
+        "block_id": "b0046",
+        "fate": "excluded",
+        "ref": "example",
+        "reason": "Раздел «200. OK»: пример запроса или ответа, опора для сверки с контрактом."
+      }
+    ],
+    "explanation": "Учтено 46 из 46 блоков (100.0%). Требования: 20 атомарных из 19 исходных пунктов; опорных блоков: 18. Исключено 28 блоков с причинами (structure 20, metadata 4, preamble 2, example 1, goal 1). Необработанных блоков нет. Режим rules_only: нарезка по явным номерам, строкам таблиц и абзацам разделов требований; модель не вызывалась, атомарность — до предложения."
+  },
+  "mode": "rules_only",
+  "version": "p04-inventory/1.0"
+}
