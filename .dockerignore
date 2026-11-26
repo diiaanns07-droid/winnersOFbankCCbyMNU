@@ -1,4 +1,8 @@
-.git
+# из .git в образ попадают только HEAD и ссылки — чтобы записать коммит в паспорт отчёта
+.git/*
+!.git/HEAD
+!.git/refs
+!.git/packed-refs
 .github
 .venv
 venv
