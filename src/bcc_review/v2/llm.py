@@ -35,6 +35,16 @@ REPAIR_NOTE = ("\n\nПредыдущий ответ не прошёл прове
                "Верни полный ответ заново строго по схеме.")
 
 
+_TRUNC_MARKS = ("output token maximum", "max_tokens", "max output tokens", "maximum output tokens",
+                "response exceeded", "обрезан")
+
+
+def is_truncation(kind: str, message: str) -> bool:
+    """Обрезка по лимиту ответа: вид ``truncated`` или текст ошибки CLI/API («exceeded the 16000 output token maximum»)."""
+    msg = (message or "").lower()
+    return kind == "truncated" or any(m in msg for m in _TRUNC_MARKS)
+
+
 class LLMError(Exception):
     """Вызов не удался после повторов. ``kind`` — вид ошибки провайдера."""
 
@@ -249,7 +259,7 @@ class LLMClient:
                 self._account(stage, {"usage": getattr(exc, "usage", None) or {}}, seconds)
                 self._emit({"stage": stage, "model": model, "error": kind, "message": str(msg)[:300],
                             "seconds": round(seconds, 1), "attempt": attempt})
-                if kind == "truncated":
+                if is_truncation(kind, str(msg)):
                     raise Truncated(stage, str(msg)) from None
                 retry = (kind in TRANSIENT and not handles_retries and attempt < self.max_retries
                          and not (kind == "timeout" and timeouts >= MAX_TIMEOUT_RETRIES))
