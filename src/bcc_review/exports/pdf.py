@@ -991,7 +991,16 @@ class _Annotator:
                     return r, lines
         lines = [" · ".join(lines)]
         w, h = self._label_size(lines)
-        x = min(max(2.0, anchor.x0), dw - w - 2.0)
+        # компактная подпись в одну строку: ближайший свободный промежуток над или под выделением
+        xs = [min(max(2.0, anchor.x0), dw - w - 2.0), min(max(2.0, anchor.x1 - w), dw - w - 2.0)]
+        for dy in [k * 2.0 for k in range(40)]:
+            for y in (anchor.y0 - h - 0.8 - dy, anchor.y1 + 0.8 + dy):
+                for x in xs:
+                    r = pymupdf.Rect(x, y, x + w, y + h)
+                    if free(r):
+                        occupied.append(r)
+                        return r, lines
+        x = xs[0]
         r = pymupdf.Rect(x, max(1.0, anchor.y0 - h - 0.8), x + w, max(1.0, anchor.y0 - h - 0.8) + h)
         self.overlaps_text += 1
         occupied.append(r)
@@ -1271,6 +1280,17 @@ def _place_all(
             if lc.page is not None and (an.fid, an.role) not in first_loc:
                 first_loc[(an.fid, an.role)] = (lc, an)
 
+    # Одна видимая подпись на замечание и страницу: у F-014 восемь опор подряд, и восемь подписей
+    # выталкивали подписи соседних замечаний далеко от их выделений. Каждое выделение по-прежнему
+    # несёт свою полную заметку «часть k из n». Стороны противоречия подписываются отдельно.
+    grouped: dict[tuple[str, int], list[int]] = defaultdict(list)
+    for an, locs, _ in located:
+        if an.role == "evidence":
+            for lc in locs:
+                if lc.page is not None and lc.rects:
+                    grouped[(an.fid, lc.page)].append(an.part)
+    labelled: set[tuple[str, int]] = set()
+
     placements: list[Placement] = []
     label_rects: dict[tuple[str, str], tuple[int, pymupdf.Rect]] = {}
     for an, locs, base in located:
@@ -1327,9 +1347,18 @@ def _place_all(
                 anchor = ann.note(lc.page, sev, title, subject + " · без координат", note_content, tag + ":note")
                 pl.annot_names.append(NM_PREFIX + tag + ":note")
                 extra.append("без координат")
+            group = sorted(set(grouped.get((an.fid, lc.page), []))) if pl.status == "highlight" else []
+            if len(group) > 1:
+                if (an.fid, lc.page) in labelled:
+                    placements.append(pl)  # подпись уже стоит у первой части на этой странице
+                    continue
+                labelled.add((an.fid, lc.page))
+                extra = [f"части {_ranges(group)} из {an.parts}"] + (["на проверке"] if review else [])
             lines = [an.fid + (f" · {extra[0]}" if extra and an.role in ("a", "b") else ""), SEVERITY[sev]["word"]]
             rest = extra[1:] if an.role in ("a", "b") else extra
-            if rest:
+            if len(group) > 1:
+                lines += rest
+            elif rest:
                 lines.append(" · ".join(rest))
             label_text = f"{an.fid} · {SEVERITY[sev]['mark']} {SEVERITY[sev]['word']}" + (
                 f" · {' · '.join(extra)}" if extra else ""
@@ -1346,6 +1375,17 @@ def _place_all(
             ann.link(pno, rect, bp, br)
             ann.link(bp, br, pno, rect)
     return placements
+
+
+def _ranges(nums: list[int]) -> str:
+    """[1, 2, 3, 5] → «1–3, 5»."""
+    out: list[tuple[int, int]] = []
+    for n in nums:
+        if out and out[-1][1] == n - 1:
+            out[-1] = (out[-1][0], n)
+        else:
+            out.append((n, n))
+    return ", ".join(f"{a}–{b}" if b > a else str(a) for a, b in out)
 
 
 def _summary_text(
@@ -1776,6 +1816,7 @@ class _MdRenderer:
         x0 = self.X0 if x is None else x
         lead = size * lead_k
         vls = self.wrap(spans, self.X1 - x0, size)
+        page_of_label = -1
         for k, vl in enumerate(vls):
             self.ensure(lead)
             baseline = self.y + size * 1.02
@@ -1784,8 +1825,10 @@ class _MdRenderer:
             self.draw_line(vl, x0, baseline, size, color, ln_hint=ln)
             if bar:
                 self.ops[self.pno].append(("line", (self.X0 + 2, self.y), (self.X0 + 2, self.y + lead), (0.7, 0.72, 0.8), 1.6))
-            if k == 0:
-                self.gutter(ln, baseline)
+            if k == 0 or page_of_label != self.pno:
+                # продолжение строки после разрыва страницы помечается «(ln)», как повтор шапки
+                self.gutter(ln, baseline, repeated=k > 0)
+                page_of_label = self.pno
             self.y += lead
 
     # -- блоки Markdown
@@ -1905,13 +1948,15 @@ class _MdRenderer:
         self.y += 2
         for ln, text in body:
             spans = [_S(" " if c == "\t" else c, ln, k, "codeblock") for k, c in enumerate(text)]
+            page_of_label = -1
             for k, vl in enumerate(self.wrap(spans, self.X1 - self.X0 - 8, size, keep_space=True)):
                 self.ensure(lead)
                 self.ops[self.pno].append(("rect", pymupdf.Rect(self.X0, self.y, self.X1, self.y + lead), (0.95, 0.95, 0.97), None, 0))
                 baseline = self.y + size * 1.02
                 self.draw_line(vl, self.X0 + 4, baseline, size, ln_hint=ln)
-                if k == 0:
-                    self.gutter(ln, baseline)
+                if k == 0 or page_of_label != self.pno:
+                    self.gutter(ln, baseline, repeated=k > 0)
+                    page_of_label = self.pno
                 self.y += lead
         self.y += 3
 
@@ -1982,6 +2027,8 @@ class _MdRenderer:
                     )
             if start == 0 or repeated:
                 self.gutter(ln, first_base, repeated=repeated)
+            else:  # кусок строки таблицы, перенесённый на новую страницу
+                self.gutter(ln, first_base, repeated=True)
             self.y = y0 + h
 
         def new_page_with_header() -> None:
