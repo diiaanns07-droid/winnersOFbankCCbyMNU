@@ -413,3 +413,20 @@ def test_stage_failure_warnings_readable():
     assert markdown.warn_text("судья недоступен (BudgetExceeded: judge: budget: исчерпан бюджет вызовов модели (16)); "
                               "реестр собран кодом") == \
         "судья недоступен (исчерпан бюджет вызовов модели (16)); реестр собран кодом"
+
+
+def test_sixty_plus_findings_fit_budget(sample):
+    r = copy.deepcopy(sample)
+    base = list(r["findings"])
+    while len(r["findings"]) < 66:
+        f = copy.deepcopy(base[len(r["findings"]) % len(base)])
+        f["id"] = f"D-{len(r['findings']) + 1:02d}"
+        f["severity"] = "major" if f["severity"] == "critical" else f["severity"]
+        r["findings"].append(f)
+    del r["summary"]
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert md.count("\n") <= 900
+    for h in REQUIRED_HEADINGS:
+        assert h in md, h
+    assert md.count('<a id="d-') == 66  # у каждого дефекта есть якорь, даже в сжатом виде

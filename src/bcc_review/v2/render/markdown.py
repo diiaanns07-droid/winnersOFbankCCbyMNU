@@ -933,8 +933,33 @@ def _rewrite_from(f: dict) -> dict | None:
     return max(evs, key=lambda e: len(words & set(re.findall(r"\w{3,}", str(e.get("quote", "")).lower()))))
 
 
+def _card_compact(c: _Ctx, f: dict) -> list[str]:
+    """Карточка существенного дефекта для очень длинных отчётов (уровень сжатия 5): 5 строк вместо 10–12."""
+    rids = list(f.get("requirement_ids") or [])
+    meta = ["**Требования:** " + (", ".join(c.req_label(r) for r in rids) if rids else "документ в целом"),
+            f"**Критерий:** {esc(_criterion_name(f.get('criterion')))}"]
+    if f.get("blocks") and f.get("blocks") != "none":
+        meta.append(f"**Блокирует:** {BLOCKS.get(f['blocks'])}")
+    where = "; ".join(f"{esc(place(ev))}: {quote_md(ev.get('quote'), 120)}" for ev in (f.get("evidence") or [])[:3])
+    story = " ".join(x for x in (str(f.get("problem") or "").strip(), str(f.get("scenario") or "").strip(),
+                                 str(f.get("impact") or "").strip()) if x)
+    fix = f"**Что исправить.** {prose(f.get('recommendation'))}" if f.get("recommendation") else ""
+    if f.get("rewrite"):
+        fix += f" **Стало:** «{prose(shorten(f.get('rewrite'), 220))}»"
+    qids = c.q_by_finding.get(f.get("id"), [])
+    if qids:
+        fix += " **Вопрос:** " + ", ".join(f"[{q}](#{anchor(q)})" for q in qids)
+    lines = [" · ".join(meta), f"**Где:** {where}", f"**Суть.** {prose(story)}", fix.strip()]
+    lines = [ln for ln in lines if ln]
+    return [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(f.get('severity'), '')} {f['id']}. "
+            f"{prose(f.get('title'))}", ""] + [ln + "  " if i < len(lines) - 1 else ln
+                                               for i, ln in enumerate(lines)] + [""]
+
+
 def _card(c: _Ctx, f: dict) -> list[str]:
     sev = f.get("severity")
+    if c.level >= 5 and sev != "critical":
+        return _card_compact(c, f)
     badge = {"changed": " · уточнён после ответов", "new": " · новый после ответов"}.get(
         f.get("status_after_answers") or f.get("status"), "")
     out = [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(sev, '')} {f['id']}. {prose(f.get('title'))}", ""]
@@ -1438,7 +1463,7 @@ def _appendix_method(c: _Ctx) -> list[str]:
 # ================================================================== сборка
 
 MAX_LINES = 900
-MAX_LEVEL = 4
+MAX_LEVEL = 5
 
 
 _LIST_KEYS = ("requirements", "excluded", "findings", "rejected", "acceptance_checks", "pair_checks", "trace",
