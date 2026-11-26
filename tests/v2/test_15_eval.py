@@ -131,3 +131,30 @@ def test_prompts_have_no_official_document_words():
         pytest.skip("промптов v2 ещё нет")
     res = antifit.scan(paths)
     assert res == {}, "\n".join(f"{f}:{h['line']}: «{h['match']}» — {h['why']}" for f, hs in res.items() for h in hs)
+
+
+def test_corpus_adapter_and_strict_harness(tmp_path):
+    from evaluation.v2 import corpus
+
+    cases = corpus.select_cases("md", ["autopay.event_conflict", "cashback.base"])
+    labels = [json.loads(x) for x in (corpus.CORPUS / "labels.jsonl").read_text(encoding="utf-8").splitlines() if x]
+    for c in cases:
+        d = tmp_path / "reports" / corpus._dir_name(c["render_id"])
+        d.mkdir(parents=True)
+        fs = [{"id": "D-01", "kind": lb["issue_type"], "severity": "critical", "title": "конфликт",
+               "evidence": [{"quote": a["quote"], "line_start": 1, "line_end": 1} for a in lb["anchors"]]}
+              for lb in labels if lb["case_id"] == c["case_id"] and lb["expected_outcome"] == "present"]
+        if c["case_id"] == "cashback.base":
+            fs.append({"id": "D-02", "kind": "security", "severity": "major", "title": "ложная тревога",
+                       "evidence": [{"quote": "кэшбэк", "line_start": 3}]})
+        rep = {"run": {"status": "complete", "calls": {"total": 8}, "duration_s": 30}, "findings": fs,
+               "verdict": {"development": "yes", "testing": "conditional"}}
+        (d / "report.json").write_text(json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+    preds, per_case = corpus.build_predictions(tmp_path, cases, "rules_plus_llm")
+    rows = [json.loads(x) for x in preds.read_text(encoding="utf-8").splitlines()]
+    assert {r["record"] for r in rows} == {"finding", "run"}
+    assert any(r.get("issue_type") == "other" for r in rows)  # security → other
+    s = corpus.summarize(corpus.harness_score(tmp_path, preds, "md"), per_case)
+    assert s["harness"]["tp"] == 1 and s["harness"]["fn"] == 0
+    assert s["harness"]["clean_false_alarms"] == 1
+    assert s["clean"]["major"] == 1 and s["clean"]["verdict_no"] == 0
