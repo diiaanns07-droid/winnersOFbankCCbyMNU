@@ -1,0 +1,620 @@
+{
+  "schema_version": "1.0",
+  "run": {
+    "run_id": "cards-v1",
+    "parent_run_id": null,
+    "source_sha256": "efa7043b988b142e1f1b641411690c05492cda7e9067b910f7640fede664318a",
+    "source_name": "tz.md",
+    "agent_version": "0.1.0",
+    "agent_commit": null,
+    "provider": "mock",
+    "model": "mock-1",
+    "mode": "mock",
+    "status": "complete",
+    "status_reasons": [],
+    "started_at": "2026-11-26T10:00:00Z",
+    "finished_at": "2026-11-26T10:00:05Z",
+    "duration_s": 5.0,
+    "calls": {
+      "physical": 6,
+      "cache_hits": 0,
+      "failed": 0,
+      "retries": 0
+    },
+    "tokens": {
+      "input": 0,
+      "output": 0
+    },
+    "stages": [
+      {
+        "name": "read",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "inventory",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "rules",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "individual",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "cross",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "verify_meaning",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "questions",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "bank",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      }
+    ],
+    "incomplete_stages": [],
+    "evidence_audit": {
+      "checked": 0,
+      "confirmed": 0,
+      "ambiguous": 0,
+      "rejected": 0,
+      "note": "фикстура p09"
+    }
+  },
+  "document": {
+    "id": "efa7043b988b142e1f1b641411690c05492cda7e9067b910f7640fede664318a",
+    "title": "Уведомление о расходах по карте",
+    "format": "markdown",
+    "source_name": "tz.md",
+    "blocks": [
+      {
+        "id": "b0001",
+        "kind": "heading",
+        "section": [],
+        "text": "Уведомление о расходах по карте",
+        "loc": {
+          "line_start": 1,
+          "line_end": 1
+        }
+      },
+      {
+        "id": "b0002",
+        "kind": "heading",
+        "section": [
+          "Уведомление о расходах по карте"
+        ],
+        "text": "Дебетовые карты",
+        "loc": {
+          "line_start": 3,
+          "line_end": 3
+        }
+      },
+      {
+        "id": "b0003",
+        "kind": "heading",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Дебетовые карты"
+        ],
+        "text": "Функциональные требования",
+        "loc": {
+          "line_start": 5,
+          "line_end": 5
+        }
+      },
+      {
+        "id": "b0004",
+        "kind": "list_item",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Дебетовые карты",
+          "Функциональные требования"
+        ],
+        "text": "Д-1. По дебетовой карте push отправляется, когда расходы за календарный месяц достигают порога 50 000 ₸.",
+        "loc": {
+          "line_start": 7,
+          "line_end": 7
+        }
+      },
+      {
+        "id": "b0005",
+        "kind": "heading",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Дебетовые карты"
+        ],
+        "text": "Критерии приёмки",
+        "loc": {
+          "line_start": 9,
+          "line_end": 9
+        }
+      },
+      {
+        "id": "b0006",
+        "kind": "list_item",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Дебетовые карты",
+          "Критерии приёмки"
+        ],
+        "text": "Д-КП-1. Дебетовая карта: расходы 49 000 ₸, порог 50 000 ₸, покупка 1 000 ₸ — push не отправляется.",
+        "loc": {
+          "line_start": 11,
+          "line_end": 11
+        }
+      },
+      {
+        "id": "b0007",
+        "kind": "heading",
+        "section": [
+          "Уведомление о расходах по карте"
+        ],
+        "text": "Корпоративные карты",
+        "loc": {
+          "line_start": 13,
+          "line_end": 13
+        }
+      },
+      {
+        "id": "b0008",
+        "kind": "heading",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Корпоративные карты"
+        ],
+        "text": "Функциональные требования",
+        "loc": {
+          "line_start": 15,
+          "line_end": 15
+        }
+      },
+      {
+        "id": "b0009",
+        "kind": "list_item",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Корпоративные карты",
+          "Функциональные требования"
+        ],
+        "text": "К-1. По корпоративной карте push отправляется, когда расходы за календарный месяц достигают порога 500 000 ₸.",
+        "loc": {
+          "line_start": 17,
+          "line_end": 17
+        }
+      },
+      {
+        "id": "b0010",
+        "kind": "heading",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Корпоративные карты"
+        ],
+        "text": "Критерии приёмки",
+        "loc": {
+          "line_start": 19,
+          "line_end": 19
+        }
+      },
+      {
+        "id": "b0011",
+        "kind": "list_item",
+        "section": [
+          "Уведомление о расходах по карте",
+          "Корпоративные карты",
+          "Критерии приёмки"
+        ],
+        "text": "К-КП-1. Корпоративная карта: расходы 499 000 ₸, порог 500 000 ₸, покупка 1 000 ₸ — push не отправляется.",
+        "loc": {
+          "line_start": 21,
+          "line_end": 21
+        }
+      }
+    ],
+    "warnings": []
+  },
+  "requirements": [
+    {
+      "id": "R-1",
+      "source_id": "Д-1",
+      "text": "Д-1. По дебетовой карте push отправляется, когда расходы за календарный месяц достигают порога 50 000 ₸.",
+      "block_ids": [
+        "b0004"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 0,
+          "end": 104,
+          "quote": "Д-1. По дебетовой карте push отправляется, когда расходы за календарный месяц достигают порога 50 000 ₸."
+        }
+      ],
+      "kind": "functional",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Дебетовые карты",
+        "Функциональные требования"
+      ],
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-2",
+      "source_id": "Д-КП-1",
+      "text": "Д-КП-1. Дебетовая карта: расходы 49 000 ₸, порог 50 000 ₸, покупка 1 000 ₸ — push не отправляется.",
+      "block_ids": [
+        "b0006"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0006",
+          "start": 0,
+          "end": 98,
+          "quote": "Д-КП-1. Дебетовая карта: расходы 49 000 ₸, порог 50 000 ₸, покупка 1 000 ₸ — push не отправляется."
+        }
+      ],
+      "kind": "acceptance",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Дебетовые карты",
+        "Критерии приёмки"
+      ],
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-3",
+      "source_id": "К-1",
+      "text": "К-1. По корпоративной карте push отправляется, когда расходы за календарный месяц достигают порога 500 000 ₸.",
+      "block_ids": [
+        "b0009"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0009",
+          "start": 0,
+          "end": 109,
+          "quote": "К-1. По корпоративной карте push отправляется, когда расходы за календарный месяц достигают порога 500 000 ₸."
+        }
+      ],
+      "kind": "functional",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Корпоративные карты",
+        "Функциональные требования"
+      ],
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-4",
+      "source_id": "К-КП-1",
+      "text": "К-КП-1. Корпоративная карта: расходы 499 000 ₸, порог 500 000 ₸, покупка 1 000 ₸ — push не отправляется.",
+      "block_ids": [
+        "b0011"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0011",
+          "start": 0,
+          "end": 104,
+          "quote": "К-КП-1. Корпоративная карта: расходы 499 000 ₸, порог 500 000 ₸, покупка 1 000 ₸ — push не отправляется."
+        }
+      ],
+      "kind": "acceptance",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Корпоративные карты",
+        "Критерии приёмки"
+      ],
+      "review_status": "reviewed",
+      "review_reason": null
+    }
+  ],
+  "checks": [
+    {
+      "req_id": "R-1",
+      "criterion": "correct",
+      "status": "issue",
+      "finding_ids": [
+        "F-1"
+      ],
+      "reason": "correct: issue",
+      "source": "cross"
+    },
+    {
+      "req_id": "R-2",
+      "criterion": "correct",
+      "status": "issue",
+      "finding_ids": [
+        "F-1"
+      ],
+      "reason": "correct: issue",
+      "source": "cross"
+    },
+    {
+      "req_id": "R-3",
+      "criterion": "correct",
+      "status": "issue",
+      "finding_ids": [
+        "F-2"
+      ],
+      "reason": "correct: issue",
+      "source": "cross"
+    },
+    {
+      "req_id": "R-4",
+      "criterion": "correct",
+      "status": "issue",
+      "finding_ids": [
+        "F-2"
+      ],
+      "reason": "correct: issue",
+      "source": "cross"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-1",
+      "scope": "set",
+      "kind": "conflict",
+      "criterion": "set_consistent",
+      "severity": "critical",
+      "title": "Критерий приёмки противоречит правилу отправки push",
+      "impact": "Разработчик и тестировщик получат противоположные ожидания на границе порога.",
+      "blocked_decision": "Отправлять ли push, когда расходы ровно равны порогу",
+      "req_ids": [
+        "R-1",
+        "R-2"
+      ],
+      "hints": [
+        {
+          "block_id": "b0004",
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        {
+          "block_id": "b0006",
+          "quote": "push не отправляется"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 24,
+          "end": 94,
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        {
+          "block_id": "b0006",
+          "start": 77,
+          "end": 97,
+          "quote": "push не отправляется"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "recommendation": "Согласовать правило и критерий приёмки на границе порога.",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": {
+        "input": "Дебетовая карта: расходы 49 000 ₸, порог 50 000 ₸, покупка 1 000 ₸",
+        "outcome_a": "push отправляется: расходы достигли порога (Д-1)",
+        "outcome_b": "push не отправляется (критерий приёмки Д-КП-1)",
+        "evidence_a": {
+          "block_id": "b0004",
+          "start": 24,
+          "end": 94,
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        "evidence_b": {
+          "block_id": "b0006",
+          "start": 77,
+          "end": 97,
+          "quote": "push не отправляется"
+        }
+      },
+      "inspected_block_ids": [],
+      "stage": "cross",
+      "source": "llm"
+    },
+    {
+      "id": "F-2",
+      "scope": "set",
+      "kind": "conflict",
+      "criterion": "set_consistent",
+      "severity": "critical",
+      "title": "Критерий приёмки противоречит правилу отправки push",
+      "impact": "Разработчик и тестировщик получат противоположные ожидания на границе порога.",
+      "blocked_decision": "Отправлять ли push, когда расходы ровно равны порогу",
+      "req_ids": [
+        "R-3",
+        "R-4"
+      ],
+      "hints": [
+        {
+          "block_id": "b0009",
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        {
+          "block_id": "b0011",
+          "quote": "push не отправляется"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0009",
+          "start": 28,
+          "end": 98,
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        {
+          "block_id": "b0011",
+          "start": 83,
+          "end": 103,
+          "quote": "push не отправляется"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "recommendation": "Согласовать правило и критерий приёмки на границе порога.",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": {
+        "input": "Корпоративная карта: расходы 499 000 ₸, порог 500 000 ₸, покупка 1 000 ₸",
+        "outcome_a": "push отправляется: расходы достигли порога (К-1)",
+        "outcome_b": "push не отправляется (критерий приёмки К-КП-1)",
+        "evidence_a": {
+          "block_id": "b0009",
+          "start": 28,
+          "end": 98,
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        "evidence_b": {
+          "block_id": "b0011",
+          "start": 83,
+          "end": 103,
+          "quote": "push не отправляется"
+        }
+      },
+      "inspected_block_ids": [],
+      "stage": "cross",
+      "source": "llm"
+    }
+  ],
+  "facts": [],
+  "coverage": [
+    {
+      "req_id": "R-1",
+      "obligation": "По дебетовой карте push отправляется, когда расходы за календарный месяц достигают порога 50 000 ₸.",
+      "acceptance_ids": [
+        "R-2"
+      ],
+      "status": "conflict",
+      "explanation": "При одном входе правило и критерий приёмки дают разные исходы.",
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 24,
+          "end": 94,
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        {
+          "block_id": "b0006",
+          "start": 77,
+          "end": 97,
+          "quote": "push не отправляется"
+        }
+      ]
+    },
+    {
+      "req_id": "R-3",
+      "obligation": "По корпоративной карте push отправляется, когда расходы за календарный месяц достигают порога 500 000 ₸.",
+      "acceptance_ids": [
+        "R-4"
+      ],
+      "status": "conflict",
+      "explanation": "При одном входе правило и критерий приёмки дают разные исходы.",
+      "evidence": [
+        {
+          "block_id": "b0009",
+          "start": 28,
+          "end": 98,
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+        },
+        {
+          "block_id": "b0011",
+          "start": 83,
+          "end": 103,
+          "quote": "push не отправляется"
+        }
+      ]
+    }
+  ],
+  "questions": [],
+  "checklist": [],
+  "test_cases": [],
+  "decisions": [],
+  "diff": null,
+  "verdict": {
+    "development": {
+      "status": "not_ready",
+      "reasons": [],
+      "finding_ids": [
+        "F-1",
+        "F-2"
+      ]
+    },
+    "testing": {
+      "status": "not_ready",
+      "reasons": [],
+      "finding_ids": [
+        "F-1",
+        "F-2"
+      ]
+    },
+    "first_actions": []
+  },
+  "summary": {
+    "requirements": 4,
+    "reviewed_requirements": 4,
+    "findings": 2,
+    "by_severity": {
+      "critical": 2,
+      "major": 0,
+      "minor": 0
+    },
+    "by_status": {
+      "confirmed": 2,
+      "needs_review": 0
+    },
+    "critical_ids": [
+      "F-1",
+      "F-2"
+    ],
+    "checks": {
+      "pass": 0,
+      "issue": 4,
+      "unknown": 0,
+      "na": 0
+    }
+  },
+  "warnings": [],
+  "excluded": [],
+  "rejected": []
+}

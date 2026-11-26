@@ -59,7 +59,8 @@ def test_engine_calls_team_module_and_keeps_report_valid(tmp_path):
     status, e = by_old(diff)["F-001"]
     assert status == "unassessed" and e["reason_code"] in ("run_incomplete", "recheck_missing")
     assert e["recheck"]["scenario"] == prev["findings"][0]["witness"]["input"]
-    assert "Сравнение с" in pathlib.Path(tmp_path / "v2-report.md").read_text(encoding="utf-8")
+    md = pathlib.Path(tmp_path / "v2-report.md").read_text(encoding="utf-8")
+    assert "Сравнение" in md and e["reason"][:60] in md  # раздел сравнения писателя Markdown (№17 или резерв)
 
 
 def test_engine_same_document_cannot_close(tmp_path):
