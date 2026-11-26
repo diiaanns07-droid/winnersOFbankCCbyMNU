@@ -300,6 +300,9 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         prose = re.sub(r"```.*?```", "", md_text, flags=re.S)
         prose = re.sub(r"`[^`]*`|«[^»]*»|\"[^\"]*\"|https?://\S+", "", prose)
         md_english = sorted(set(latin_words(prose, vocab)))
+        sections = report_sections(md_text)
+    else:
+        sections = None
 
     run = report.get("run") or {}
     calls = run.get("calls") or {}
@@ -361,6 +364,8 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         _gate("цитаты найдены в документе", f"{q_total - q_missing}/{q_total}", q_missing == 0 and q_total > 0),
         _gate("строк отчёта", "—" if md_lines is None else str(md_lines),
               None if md_lines is None else md_lines <= tg.get("report_lines_max", 900)),
+        _gate("разделы п. 6 ТЗ", "—" if sections is None else f"{sum(sections.values())}/{len(sections)}",
+              None if sections is None else all(sections.values())),
         _gate("общие фразы", str(len(generic)), len(generic) == 0),
         _gate("английские слова", str(len(english) + len(md_english)), len(english) + len(md_english) == 0),
         _gate("вердикт разработка/тестирование",
@@ -414,6 +419,7 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                    "verified_field_missing": q_field_missing, "findings_without_evidence": no_evidence,
                    "missing_list": [q for q in quote_checks if q["found"] == "missing"][:30]},
         "language": {"generic": generic, "english": english, "english_report_md": md_english},
+        "report_sections": sections,
         "verdict": {"got": {k: verdict.get(k) for k in ("development", "testing")}, "expected": exp},
         "assignment": [{"gold": gid, "finding": fid, "title": fmap[fid]["title"], "severity": fmap[fid]["severity"],
                         "sources": fmap[fid]["sources"], "how": _how(pairs.get((gid, fid)), fid in extra_gold)}
@@ -427,6 +433,23 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         "seconds": round(time.monotonic() - t0, 2),
     }
     return res
+
+
+SECTION_PATTERNS = {
+    "паспорт прогона": r"паспорт|о прогоне|сведения о (прогоне|проверке)",
+    "нарезка требований": r"нарезк|требования документа|перечень требований|список требований|таблица требований|выделенные требования",
+    "проверка каждого требования": r"каждого требования|отдельн\w* требовани|по требованиям|замечани|дефект",
+    "проверка набора": r"набор|согласованност|целиком|прослеживаемост",
+    "сводка": r"сводк|кратко|статистик|итоги проверки",
+    "итог": r"итог|вердикт|можно ли начинать|заключени|исправить (в первую очередь|первым)",
+}
+
+
+def report_sections(md_text: str) -> dict[str, bool]:
+    """Обязательные разделы отчёта по п. 6 ТЗ: ищутся по заголовкам Markdown."""
+    heads = " \n".join(ln.lstrip("#").strip().lower().replace("ё", "е")
+                       for ln in md_text.splitlines() if ln.lstrip().startswith("#"))
+    return {name: bool(re.search(rx, heads)) for name, rx in SECTION_PATTERNS.items()}
 
 
 def _verdict(v: dict) -> dict:
@@ -562,6 +585,8 @@ def render_md(res: dict, label: str = "") -> str:
     if res["severity"]["critical_false"]:
         L += ["", "## Критичные вне К", ""]
         L += [f"* {x['finding']}: {_cut(x['title'])} — {x['reason']}" for x in res["severity"]["critical_false"]]
+    if res.get("report_sections") and not all(res["report_sections"].values()):
+        L += ["", "## Нет разделов п. 6 ТЗ", "", ", ".join(k for k, v in res["report_sections"].items() if not v)]
     if res["language"]["generic"]:
         L += ["", "## Общие фразы", ""]
         L += [f"* {g['finding']}.{g['field']}: «{g['phrase']}»" for g in res["language"]["generic"][:20]]
