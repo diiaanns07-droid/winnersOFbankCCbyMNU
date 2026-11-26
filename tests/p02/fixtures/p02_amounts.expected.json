@@ -1,0 +1,163 @@
+{
+ "source": "tests/p02/fixtures/make_fixtures.py: build_amounts",
+ "amount": "50 000 ₸",
+ "units": "пункты, начало — левый верхний угол неповёрнутой страницы (как у PyMuPDF)",
+ "table": {
+  "header": [
+   "№",
+   "Операция",
+   "Сумма, ₸"
+  ],
+  "rows": 13,
+  "pages": [
+   1,
+   2
+  ],
+  "moved_row": 13,
+  "link": "header_carried"
+ },
+ "card_table": {
+  "header": [
+   "Поле",
+   "Значение"
+  ],
+  "page": 2,
+  "rows": 3
+ },
+ "occurrences": [
+  {
+   "page": 1,
+   "where": "footer",
+   "row": null,
+   "glyphs": [
+    142.97,
+    807.47,
+    178.6,
+    815.47
+   ]
+  },
+  {
+   "page": 1,
+   "where": "paragraph",
+   "row": null,
+   "glyphs": [
+    183.77,
+    92.02,
+    230.53,
+    102.52
+   ]
+  },
+  {
+   "page": 1,
+   "where": "table",
+   "table": "operations",
+   "row": 1,
+   "cell": [
+    400.0,
+    540.0,
+    538.58,
+    560.0
+   ],
+   "glyphs": [
+    405.0,
+    546.02,
+    451.76,
+    556.52
+   ]
+  },
+  {
+   "page": 1,
+   "where": "table",
+   "table": "operations",
+   "row": 3,
+   "cell": [
+    400.0,
+    580.0,
+    538.58,
+    600.0
+   ],
+   "glyphs": [
+    405.0,
+    586.02,
+    451.76,
+    596.52
+   ]
+  },
+  {
+   "page": 1,
+   "where": "table",
+   "table": "operations",
+   "row": 8,
+   "cell": [
+    400.0,
+    680.0,
+    538.58,
+    700.0
+   ],
+   "glyphs": [
+    405.0,
+    686.02,
+    451.76,
+    696.52
+   ]
+  },
+  {
+   "page": 2,
+   "where": "footer",
+   "row": null,
+   "glyphs": [
+    142.97,
+    807.47,
+    178.6,
+    815.47
+   ]
+  },
+  {
+   "page": 2,
+   "where": "table",
+   "table": "operations",
+   "row": 13,
+   "cell": [
+    400.0,
+    60.0,
+    538.58,
+    80.0
+   ],
+   "glyphs": [
+    405.0,
+    66.02,
+    451.76,
+    76.52
+   ]
+  },
+  {
+   "page": 2,
+   "where": "paragraph",
+   "row": null,
+   "glyphs": [
+    198.85,
+    102.02,
+    245.61,
+    112.52
+   ]
+  },
+  {
+   "page": 2,
+   "where": "table",
+   "table": "card",
+   "row": 2,
+   "cell": [
+    226.77,
+    220.0,
+    538.58,
+    240.0
+   ],
+   "glyphs": [
+    231.77,
+    226.02,
+    278.53,
+    236.52
+   ]
+  }
+ ]
+}

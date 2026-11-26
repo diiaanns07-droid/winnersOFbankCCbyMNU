@@ -486,7 +486,12 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
     try:
         if rotation:
             page.set_rotation(0)
-        found = page.find_tables().tables
+        found = [(table, [list(row.cells) for row in table.rows], table.col_count, tuple(table.bbox),
+                  bool(getattr(table.header, 'external', False))) for table in page.find_tables().tables]
+        # Сетка из линеек, которую find_tables пропустил (PyMuPDF 2.x не видит таблицу из одной строки,
+        # например последнюю строку, перенесённую на следующую страницу).
+        found += [(None, rows, len(bounds) - 1, bbox, False)
+                  for rows, bounds, bbox in _ruled_grids(page, [item[3] for item in found])]
     except Exception as error:  # noqa: BLE001
         warnings.append(_warn('table_detection_failed', 'warning', page_no,
                               f'Страница {page_no}: таблицы не распознаны ({type(error).__name__}); текст сохранён блоками.'))
@@ -496,12 +501,10 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
             page.set_rotation(rotation)
     chars = [ch for lines in lines_blocks for line in lines for ch in line.chars if ch.c != ' ']
     tables = []
-    for table in found:
-        rows = [list(row.cells) for row in table.rows]
+    for table, rows, col_count, bbox, external in found:
         cells = [(r, c, box) for r, row in enumerate(rows) for c, box in enumerate(row) if box]
-        if table.col_count < 2 or len(cells) < 2:
+        if col_count < 2 or len(cells) < 2:
             continue                                # рамка вокруг абзаца, а не таблица
-        bbox = tuple(table.bbox)
         inside = [ch for ch in chars if _center_in(ch, bbox)]
         if inside and bbox[3] - bbox[1] < 0.8 * max(ch.bbox[3] - ch.bbox[1] for ch in inside):
             continue                                # «таблица» ниже собственного текста: подчёркивание, не сетка
@@ -518,8 +521,9 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
             assigned.setdefault((r, c), []).append(ch)
         bounds = sorted({round(box[0], 1) for _, _, box in cells} | {round(box[2], 1) for _, _, box in cells})
         record = {'bbox': bbox, 'rows': rows, 'assigned': assigned, 'chars': {id(ch) for ch in inside},
-                  'col_count': table.col_count, 'bounds': bounds,
-                  'header_external': bool(getattr(table.header, 'external', False))}
+                  'col_count': col_count, 'bounds': bounds, 'header_external': external,
+                  'row_bold': _row_bold(assigned, len(rows)),
+                  'source': 'find_tables' if table is not None else 'ruled_lines'}
         if not upright and inside:
             warnings.append(_warn('table_rotated_text', 'warning', page_no,
                                   f'Страница {page_no}: таблица {_r(bbox)} с текстом поперёк страницы; соответствие строк '
@@ -532,6 +536,94 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
             continue
         tables.append(record)
     return tables
+
+
+def _ruled_grids(page, known: list[tuple]) -> list[tuple[list[list], list[float], tuple]]:
+    """Таблицы из видимых линеек вне рамок find_tables: (rows, bounds, bbox) в формате find_tables.
+
+    Строка сетки — полоса между двумя горизонталями одной длины, закрытая вертикалями по краям;
+    ячейки делят вертикали, проходящие через всю полосу (объединённая ячейка просто шире). Линейки
+    бывают отрезками («l») и тонкими прямоугольниками («re», так рисует Chromium). Без двух колонок
+    и замкнутых ячеек сетки нет.
+    """
+    horizontal: list[list[float]] = []
+    vertical: list[list[float]] = []
+    for drawing in page.get_drawings():
+        for item in drawing.get('items', ()):
+            if item[0] == 'l':
+                a, b = item[1], item[2]
+                if abs(a.y - b.y) < 0.5:
+                    horizontal.append([min(a.x, b.x), max(a.x, b.x), (a.y + b.y) / 2])
+                elif abs(a.x - b.x) < 0.5:
+                    vertical.append([min(a.y, b.y), max(a.y, b.y), (a.x + b.x) / 2])
+            elif item[0] == 're':
+                r = item[1]
+                if r.height <= 2 < r.width:
+                    horizontal.append([r.x0, r.x1, (r.y0 + r.y1) / 2])
+                elif r.width <= 2 < r.height:
+                    vertical.append([r.y0, r.y1, (r.x0 + r.x1) / 2])
+    horizontal, vertical = _merge_segments(horizontal), _merge_segments(vertical)
+
+    def covers(x: float, top: float, bottom: float) -> bool:
+        return any(abs(v[2] - x) <= 1.5 and v[0] <= top + 1.5 and v[1] >= bottom - 1.5 for v in vertical)
+
+    bands = []
+    lines = sorted(horizontal, key=lambda h: h[2])
+    for i, upper in enumerate(lines):
+        lower = next((h for h in lines[i + 1:] if h[2] - upper[2] > 2 and abs(h[0] - upper[0]) <= 2
+                      and abs(h[1] - upper[1]) <= 2), None)
+        if lower is None:
+            continue
+        x0, x1, top, bottom = max(upper[0], lower[0]), min(upper[1], lower[1]), upper[2], lower[2]
+        if not (covers(x0, top, bottom) and covers(x1, top, bottom)):
+            continue
+        cuts = sorted({round(v[2], 1) for v in vertical
+                       if x0 + 2 < v[2] < x1 - 2 and v[0] <= top + 1.5 and v[1] >= bottom - 1.5})
+        if not cuts:
+            continue                                # одна колонка — рамка, а не таблица
+        box = (x0, top, x1, bottom)
+        if any(_intersection(box, k) > 0.2 * _area(box) for k in known):
+            continue                                # уже таблица find_tables (её рамка бывает обрезана по тексту)
+        bands.append((box, [x0, *cuts, x1]))
+    grids: list[list] = []
+    for box, cuts in bands:                         # смежные полосы с теми же краями — одна сетка
+        last = grids[-1][-1][0] if grids else None
+        if last and abs(last[3] - box[1]) <= 1 and abs(last[0] - box[0]) <= 2 and abs(last[2] - box[2]) <= 2:
+            grids[-1].append((box, cuts))
+        else:
+            grids.append([(box, cuts)])
+    out = []
+    for grid in grids:
+        bounds = sorted({round(x, 1) for _, cuts in grid for x in cuts})
+        rows = []
+        for box, cuts in grid:
+            row: list = [None] * (len(bounds) - 1)
+            for a, b in pairwise(cuts):
+                row[bounds.index(round(a, 1))] = (a, box[1], b, box[3])
+            rows.append(row)
+        out.append((rows, bounds, (grid[0][0][0], grid[0][0][1], grid[-1][0][2], grid[-1][0][3])))
+    return out
+
+
+def _merge_segments(segments: list[list[float]]) -> list[list[float]]:
+    """Отрезки одной прямой (±1 pt), касающиеся друг друга (зазор ≤ 2 pt), — одна линия."""
+    merged: list[list[float]] = []
+    for start, end, level in sorted(segments, key=lambda s: (round(s[2]), s[0])):
+        last = merged[-1] if merged else None
+        if last and abs(last[2] - level) <= 1 and start <= last[1] + 2:
+            last[1] = max(last[1], end)
+        else:
+            merged.append([start, end, level])
+    return merged
+
+
+def _row_bold(assigned: dict[tuple[int, int], list[Char]], count: int) -> list[bool | None]:
+    """Начертание строки таблицы: True — вся жирная, False — нет, None — пустая строка."""
+    out: list[bool | None] = []
+    for r in range(count):
+        chars = [ch for (row, _), group in assigned.items() if row == r for ch in group]
+        out.append(sum(ch.bold for ch in chars) / len(chars) > 0.9 if chars else None)
+    return out
 
 
 def _table_unit(record: dict, page_no: int, matrix, line_of: dict[int, Line]) -> Unit:
@@ -688,7 +780,9 @@ def ocr_languages() -> str | None:
 
 def _warn(code: str, severity: str, page: int | None, message: str, **extra) -> dict:
     """Warning контракта v1 ({code, message, stage}) плюс severity и page для показа и подсветки."""
-    warning = {'code': code, 'message': message, 'stage': STAGE, 'severity': severity, 'page': page}
+    warning = {'code': code, 'message': message, 'stage': STAGE, 'severity': severity}
+    if page is not None:
+        warning['page'] = page
     warning.update(extra)
     return warning
 
@@ -891,7 +985,7 @@ def _classify(page: dict, ocr_langs: str | None, ocr_mode: str, warnings: list[d
                               f'Страница {no}: {_STATUS[status]}; текст страницы не извлечён и не проверялся.{hint}',
                               page_status=status))
     if status == 'blank':
-        warnings.append(_warn('page_blank', 'info', no, f'Страница {no}: пустая страница.'))
+        warnings.append(_warn('empty_page', 'info', no, f'Страница {no}: пустая страница.'))   # INFO_WARNING_CODES
     page['status'], page['coverage'] = status, coverage
 
 
@@ -960,9 +1054,18 @@ def _role(unit: Unit, body: float, heading_sizes: dict[float, int], toc: dict) -
 def _link_tables(pages: list[dict], warnings: list[dict]) -> None:
     """Таблицы: шапка (в том числе из нескольких строк) и продолжение на следующей странице.
 
-    Продолжение — таблица первой на странице, если предыдущая страница кончается таблицей
-    с тем же числом колонок и теми же внутренними границами (±3 pt). Повторённая шапка
-    узнаётся по тексту; без повтора шапка берётся с предыдущей части (header_source = "page N").
+    Кандидат в продолжение — таблица первой на странице, если предыдущая страница кончается
+    таблицей с тем же числом колонок и теми же внутренними границами (±3 pt). Одной сетки мало:
+    две разные таблицы бывают одной ширины. Решение по видимым признакам (``_continuation``):
+
+    * первая строка повторяет шапку предыдущей части → продолжение (``link = repeated_header``);
+    * первая строка оформлена как шапка (жирная) и текст другой → новая таблица со своей шапкой
+      (``link = new_header``, ``adjacent_to`` — соседняя таблица);
+    * первая строка оформлена как данные, а у предыдущей части шапка выделена → продолжение без
+      повтора, шапка с прошлой части (``link = header_carried``, ``header_source = "page N"``);
+    * иначе связка неизвестна: отдельная таблица без имён колонок, ``link = uncertain``,
+      ``maybe_continues`` и предупреждение ``table_continuation_uncertain``. Значения, страница и
+      координаты сохраняются, чужая шапка не приписывается.
     """
     counter = 0
     previous: dict | None = None        # таблица, которой кончается предыдущая страница
@@ -970,43 +1073,83 @@ def _link_tables(pages: list[dict], warnings: list[dict]) -> None:
         ordered = page['ordered']
         for unit in (u for u in ordered if u.kind == 'table'):
             record = unit.table
-            cont = None
+            link = None
             if ordered[0] is unit and previous is not None:
                 if record['col_count'] == previous['col_count'] and _same_columns(record, previous):
-                    cont = previous
+                    link = _continuation(record, previous)
                 else:
                     warnings.append(_warn('table_continuation_unmatched', 'warning', page['no'],
                                           f'Страница {page["no"]}: таблица в начале страницы может продолжать таблицу '
                                           f'со страницы {previous["page"]}, но колонки не совпали; шапка не восстановлена.',
                                           pages=[previous['page'], page['no']]))
-            if cont:
-                record['id'], record['part'] = cont['id'], cont['part'] + 1
+            if link in ('repeated_header', 'header_carried'):
+                cont = previous
+                record['id'], record['part'], record['link'] = cont['id'], cont['part'] + 1, link
                 record['header'], record['header_first'] = cont['header'], cont['header_first']
+                record['style'] = cont['style']
                 record['row_base'] = cont['row_base'] + cont['data_rows']
-                if cont['header_first'] and [_norm(x) for x in _row_texts(record, 0)] == [_norm(x) for x in cont['header_first']]:
+                if link == 'repeated_header':
                     depth = max(1, len(cont['header_rows'] or [0]))
                     record['header_rows'], record['header_source'] = list(range(depth)), 'repeated'
                 else:
                     record['header_rows'], record['header_source'] = [], f'page {cont["page"]}'
             else:
                 counter += 1
-                record['id'], record['part'], record['row_base'] = f'T{counter}', 1, 0
-                if record['header_external']:
-                    record['header_rows'], record['header'], record['header_first'] = [], None, None
-                    record['header_source'] = None
-                else:
-                    record['header_rows'] = _header_rows(record)
-                    record['header_first'] = _row_texts(record, 0)
-                    record['header'] = _header_names(record)
-                    record['header_source'] = 'same_page'
-                    if record['header'] is None:
-                        warnings.append(_warn('table_header_unmapped', 'warning', page['no'],
-                                              f'Страница {page["no"]}: шапку таблицы {record["id"]} не удалось сопоставить '
-                                              'с колонками; строки сохранены без имён колонок.'))
+                _start_table(record, f'T{counter}', page['no'], warnings, uncertain=link == 'uncertain')
+                if link == 'new_header':
+                    record['link'], record['adjacent_to'] = link, previous['id']
+                elif link == 'uncertain':
+                    record['link'], record['maybe_continues'] = link, previous['id']
+                    warnings.append(_warn('table_continuation_uncertain', 'warning', page['no'],
+                                          f'Страница {page["no"]}: таблица в начале страницы стоит в той же сетке, что и '
+                                          f'таблица {previous["id"]} со страницы {previous["page"]}, но по оформлению нельзя '
+                                          f'понять, продолжение это или новая таблица. Сохранена как {record["id"]} без '
+                                          'имён колонок; значения и координаты не изменены.',
+                                          pages=[previous['page'], page['no']], table_id=record['id'],
+                                          maybe_continues=previous['id']))
             record['data_rows'] = len(record['rows']) - len(record['header_rows'])
             record['page'] = page['no']
         last = ordered[-1] if ordered else None
         previous = last.table if last is not None and last.kind == 'table' else None
+
+
+def _start_table(record: dict, table_id: str, page_no: int, warnings: list[dict], *, uncertain: bool) -> None:
+    """Новая таблица: шапка со своей страницы (или без шапки, если связка неизвестна)."""
+    record['id'], record['part'], record['row_base'], record['link'] = table_id, 1, 0, None
+    # PyMuPDF помечает шапку «внешней», если над таблицей жирный заголовок раздела («Общие сведения»).
+    # Если первая строка самой таблицы жирная, а данные — нет, шапка — она.
+    row_bold = record['row_bold']
+    own_header = bool(row_bold) and row_bold[0] is True and any(v is False for v in row_bold[1:])
+    if (record['header_external'] and not own_header) or uncertain:
+        record['header_rows'], record['header'], record['header_first'], record['header_source'] = [], None, None, None
+    else:
+        record['header_rows'] = _header_rows(record)
+        record['header_first'] = _row_texts(record, 0)
+        record['header'] = _header_names(record)
+        record['header_source'] = 'same_page'
+        if record['header'] is None:
+            warnings.append(_warn('table_header_unmapped', 'warning', page_no,
+                                  f'Страница {page_no}: шапку таблицы {table_id} не удалось сопоставить '
+                                  'с колонками; строки сохранены без имён колонок.'))
+    head = [record['row_bold'][r] for r in record['header_rows']]
+    data = [v for r, v in enumerate(record['row_bold']) if r not in record['header_rows'] and v is not None]
+    record['style'] = {'head': all(v is True for v in head) if head else None,
+                       'data': (True if all(data) else False if not any(data) else None) if data else None}
+
+
+def _continuation(record: dict, previous: dict) -> str:
+    """Связка таблицы в начале страницы с таблицей в конце прошлой (сетки уже совпали)."""
+    first = [_norm(x) for x in _row_texts(record, 0)]
+    if previous['header_first'] and first == [_norm(x) for x in previous['header_first']]:
+        return 'repeated_header'
+    style = previous['style']
+    marked = previous['header'] is not None and style['head'] is True and style['data'] is False
+    first_bold = record['row_bold'][0] if record['row_bold'] else None
+    if marked and first_bold is True:
+        return 'new_header'
+    if marked and first_bold is False:
+        return 'header_carried'
+    return 'uncertain'
 
 
 def _row_band(record: dict, r: int) -> tuple[float, float]:
@@ -1160,10 +1303,30 @@ def _table_rows(unit: Unit, page: dict) -> list[tuple[str, str, dict]]:
             'header_restored': bool(record['header']) and len(record['header']) == record['col_count'],
             'cells': meta,
         }
+        if record['header'] is not None:
+            loc['table']['columns'] = list(record['header'])      # движок кладёт их в loc.columns
+        for key in ('link', 'adjacent_to', 'maybe_continues'):
+            if record.get(key):
+                loc['table'][key] = record[key]
+        if record.get('source') == 'ruled_lines':
+            loc['table']['source'] = 'ruled_lines'          # сетку нашла читалка по линейкам, не find_tables
         if is_header and record['header_source'] == 'repeated':
             loc['table']['repeated_header'] = True
         out.append(('table_header' if is_header else 'table_row', ''.join(parts), loc))
     return out
+
+
+def _table_summary(table_id: str, group: list[tuple[int, dict]]) -> dict:
+    summary = {'id': table_id, 'pages': sorted({page for page, _ in group}), 'parts': max(t['part'] for _, t in group),
+               'header_restored': all(t['header_restored'] for _, t in group)}
+    links = sorted({t['link'] for _, t in group if t.get('link')})
+    if links:
+        summary['links'] = links
+    for key in ('adjacent_to', 'maybe_continues'):
+        value = next((t[key] for _, t in group if t.get(key)), None)
+        if value:
+            summary[key] = value
+    return summary
 
 
 def _extraction(pages: list[dict], blocks: list[Block]) -> dict:
@@ -1183,8 +1346,7 @@ def _extraction(pages: list[dict], blocks: list[Block]) -> dict:
         'pages_ocr': [p['no'] for p in pages if p['status'] in ('ocr', 'partial_ocr')],
         'pages_blank': [p['no'] for p in pages if p['status'] == 'blank'],
         # Многостраничные таблицы: восстановлено ли соответствие шапки и значений на всех частях.
-        'tables': [{'id': tid, 'pages': sorted({page for page, _ in group}), 'parts': max(t['part'] for _, t in group),
-                    'header_restored': all(t['header_restored'] for _, t in group)} for tid, group in parts.items()],
+        'tables': [_table_summary(tid, group) for tid, group in parts.items()],
         'method': 'среднее по непустым страницам: текст = 1, скан/нечитаемый шрифт/кривые = 0, '
                   'смешанная = площадь текста / (площадь текста + изображений без текста)',
     }
@@ -1259,7 +1421,7 @@ def diagnose_pdf(path: Path | str, *, ocr: str = 'auto') -> dict:
         return error.diagnostic | {'warnings': []}
     ext = document['extraction']
     has_text = any(b['kind'] != 'other' for b in document['blocks'])
-    pages_note = [w['message'] for w in document['warnings'] if w['severity'] == 'error' and w['page']]
+    pages_note = [w['message'] for w in document['warnings'] if w['severity'] == 'error' and w.get('page')]
     if ext['completeness'] >= 1.0:
         code = 'complete'
         message = f'PDF прочитан: {ext["content_pages"]} стр. с текстом, полнота 100%.'
@@ -1267,7 +1429,7 @@ def diagnose_pdf(path: Path | str, *, ocr: str = 'auto') -> dict:
             message += f' OCR на страницах {_pages_text(ext["pages_ocr"])}: сверьте цитаты.'
     else:
         code = 'partial' if has_text else 'no_text'
-        summary = next(w['message'] for w in document['warnings'] if w['code'] == 'partial_read' and w['page'] is None)
+        summary = next(w['message'] for w in document['warnings'] if w['code'] == 'partial_read' and 'page' not in w)
         message = ' '.join([summary] + pages_note[:3])
     return {'ok': code == 'complete', 'code': code, 'message': message, 'pages': ext['pages_unread'],
             'extraction': ext, 'warnings': document['warnings']}
