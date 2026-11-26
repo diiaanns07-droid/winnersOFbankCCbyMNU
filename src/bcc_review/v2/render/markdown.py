@@ -592,6 +592,10 @@ def _passport(c: _Ctx) -> list[str]:
         ["Статус прогона", STATUS.get(run.get("status"), run.get("status") or "—")],
         ["Этапы", cell(stage_txt)],
     ]
+    cl = c.r.get("clarification") or {}
+    if cl:
+        rows.append(["Ответы владельца", f"учтены: ответов {len(cl.get('answers') or [])}, общих решений "
+                                         f"{len(cl.get('decisions') or [])}, без ответа {len(cl.get('unanswered') or [])}"])
     warns = (run.get("warnings") or []) + (doc.get("warnings") or [])
     if warns:
         rows.append(["Предупреждения", cell("; ".join(warns[:5]) + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else ""))])
@@ -723,6 +727,10 @@ def _rewrite_from(f: dict) -> dict | None:
     evs = f.get("evidence") or []
     if not evs or not f.get("rewrite"):
         return None
+    target = f.get("rewrite_line")
+    for e in evs:
+        if target and e.get("line_start") == target:
+            return e
     words = set(re.findall(r"\w{3,}", f["rewrite"].lower()))
     return max(evs, key=lambda e: len(words & set(re.findall(r"\w{3,}", str(e.get("quote", "")).lower()))))
 
@@ -850,7 +858,7 @@ def _coverage(c: _Ctx) -> list[str]:
         by = set(t.get("verified_by") or []) | checked.get(rid, set())
         if by:
             covered += 1
-        elif c.level >= 1 and not t.get("note"):
+        elif not t.get("note"):
             bare.append(rid)
             continue
         cells = []
@@ -1060,10 +1068,12 @@ def _appendix_how(c: _Ctx) -> list[str]:
     accepted = sum(len(f.get("candidate_ids") or []) for f in c.r.get("findings") or [])
     rej = c.r.get("rejected") or []
     nfind = len(c.findings)
-    if proposed or accepted or rej:
-        out += [f"Кандидатов в дефекты: {proposed or accepted + len(rej)}; вошли в {nfind} "
-                f"{plural(nfind, 'дефект', 'дефекта', 'дефектов')} (с объединением дублей) — {accepted}; "
-                f"отклонено — {len(rej)}. Кандидат без найденной в документе цитаты в отчёт не попадает.", ""]
+    if accepted or rej:
+        total = accepted + len(rej)
+        extra = f" (по данным этапов предложено {proposed})" if proposed and proposed != total else ""
+        out += [f"Кандидатов в дефекты: {total}{extra}. Вошли в {nfind} "
+                f"{plural(nfind, 'дефект', 'дефекта', 'дефектов')} — {accepted} (дубли объединены); отклонено — "
+                f"{len(rej)}. Кандидат без найденной в документе цитаты в отчёт не попадает.", ""]
     if rej:
         out += ["**Отклонённые кандидаты**", ""]
         rows = []
