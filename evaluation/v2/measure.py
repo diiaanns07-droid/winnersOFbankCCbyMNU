@@ -122,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--arbiter", default="sonnet")
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--table", action="store_true", help="только пересобрать таблицу истории в RESULTS.md")
+    ap.add_argument("--no-cache", action="store_true", help="агент мимо кэша ответов модели (стабильность)")
+    ap.add_argument("--extra", default="", help="доп. аргументы агента, например «--runs-dir out/runs»")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     if a.table:
@@ -142,7 +144,8 @@ def main(argv: list[str] | None = None) -> int:
                 break
         run_dir = Path(a.run_dir) if a.run_dir else find_run_dir(src, "")
     else:
-        rc, log, dt = run_agent(Path(a.input), dest, a.cmd, a.provider, a.model, a.timeout)
+        cmd = a.cmd + (" --no-cache" if a.no_cache else "") + (f" {a.extra}" if a.extra else "")
+        rc, log, dt = run_agent(Path(a.input), dest, cmd, a.provider, a.model, a.timeout)
         print(f"агент: rc={rc}, {dt / 60:.1f} мин")
         if not (dest / "report.json").exists():
             js = sorted(dest.glob("*.json"))
@@ -167,7 +170,11 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     if not a.no_history:
         with HISTORY.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(sc.history_row(res, a.label), ensure_ascii=False) + "\n")
+            row = sc.history_row(res, a.label)
+            row["dir"] = str(dest.relative_to(ROOT))
+            row["K_missed"] = [g for g in ("К1", "К2", "К3", "К4", "К5") if g not in res["recall"]["critical"]["found"]]
+            row["C_missed"] = [m["gold"] for m in res["misses"] if m.get("level") == "major"]
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
         update_results()
     print(f"сохранено: {dest.relative_to(ROOT)}")
     return 0

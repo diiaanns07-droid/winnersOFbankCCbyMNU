@@ -24,7 +24,7 @@ import sys
 import time
 from pathlib import Path
 
-from .common import ROOT, sha256_file
+from .common import ROOT, sha256_file, source_owner
 
 CORPUS = ROOT / "evaluation" / "dev" / "corpus"
 HARNESS_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
@@ -142,8 +142,11 @@ def build_predictions(out: Path, cases: list[dict], mode: str) -> tuple[Path, li
         fs = rep.get("findings") or []
         v = rep.get("verdict") or {}
         run = rep.get("run") or {}
-        per_case.append({**_case_meta(c), "status": run.get("status"),
-                         "findings": len(fs),
+        per_case.append({**_case_meta(c), "status": run.get("status"), "run_id": run.get("run_id"),
+                         "commit": run.get("commit"), "findings": len(fs),
+                         "items": [{"id": f.get("id"), "severity": f.get("severity"), "kind": f.get("kind"),
+                                    "title": str(f.get("title") or "")[:140], "sources": list(f.get("sources") or [])}
+                                   for f in fs],
                          "by_severity": {s: sum(1 for f in fs if f.get("severity") == s)
                                          for s in ("critical", "major", "minor")},
                          "verdict": {"development": v.get("development"), "testing": v.get("testing")},
@@ -154,16 +157,96 @@ def build_predictions(out: Path, cases: list[dict], mode: str) -> tuple[Path, li
     return p, per_case
 
 
+# Кто отвечает за пропуск дефекта данного типа (заложенные дефекты корпуса), если ни один этап его не нашёл.
+TYPE_OWNERS = {"boundary_conflict": "№12, №06", "event_conflict": "№12, №09", "missing_element": "№05, №12",
+               "status_conflict": "№09, №07", "unit_mismatch": "№09, №12"}
+
+
+def details(per_case: list[dict], matrix: list[dict]) -> dict:
+    """Разбор по находкам: ложные (с источниками и владельцами), пропуски по типам, вклад источников."""
+    items = {(pc["case_id"], it["id"]): it for pc in per_case for it in pc.get("items") or []}
+    expected = {pc["case_id"]: pc["expected"] for pc in per_case}
+    by_source: dict[str, dict[str, int]] = {}
+    fp, fn, dup = [], [], 0
+
+    def bump(srcs: list[str], key: str) -> None:
+        for sname in {s.split(":", 1)[0] if s.startswith("rules") else s for s in srcs or ["?"]}:
+            by_source.setdefault(sname, {"tp": 0, "fp": 0, "fp_clean": 0})[key] += 1
+
+    for m in matrix:
+        it = items.get((m["case_id"], m.get("defect_id"))) or {}
+        if m["outcome"] == "TP":
+            bump(it.get("sources") or [], "tp")
+        elif m["outcome"] == "DUP":
+            dup += 1
+        elif m["outcome"] == "FP":
+            clean = expected.get(m["case_id"]) == "clean"
+            bump(it.get("sources") or [], "fp")
+            if clean:
+                bump(it.get("sources") or [], "fp_clean")
+            fp.append({"case_id": m["case_id"], "clean": clean, "id": m.get("defect_id"),
+                       "severity": it.get("severity"), "kind": it.get("kind"), "title": it.get("title"),
+                       "sources": it.get("sources") or [], "reasons": m.get("reasons") or m.get("disputed_reasons"),
+                       "owners": sorted({source_owner(x) for x in it.get("sources") or []})})
+        elif m["outcome"] == "FN":
+            near = [items.get((m["case_id"], d)) or {"id": d} for d in m.get("near_miss_defect_ids") or []]
+            fn.append({"case_id": m["case_id"], "label_id": m["label_id"], "type": m.get("gold_type"),
+                       "near": [{"id": x.get("id"), "title": x.get("title"), "sources": x.get("sources")} for x in near],
+                       "owners": TYPE_OWNERS.get(m.get("gold_type"), "?")})
+    return {"fp": fp, "fn": fn, "dup": dup, "by_source": dict(sorted(by_source.items()))}
+
+
+def candidate_predictions(out: Path, cases: list[dict], mode: str) -> Path | None:
+    """Предсказания из кандидатов этапов (линзы, набор, правила) до судьи — верхняя граница recall."""
+    from .score import CANDIDATE_STAGES
+
+    rows: list[dict] = []
+    seen = 0
+    runs_root = out / "runs"
+    for c in cases:
+        d = out / "reports" / _dir_name(c["render_id"])
+        rj = find_report_json(d) if d.exists() else None
+        rid = None
+        if rj:
+            try:
+                rid = (json.loads(rj.read_text(encoding="utf-8")).get("run") or {}).get("run_id")
+            except json.JSONDecodeError:
+                rid = None
+        sd = runs_root / str(rid) / "stages" if rid else None
+        if not sd or not sd.is_dir():
+            rows.append(failed_run_row(c["sha256"], "нет этапов прогона", mode))
+            continue
+        cands = []
+        for f in sorted(sd.glob("*.json")):
+            if not f.stem.startswith(CANDIDATE_STAGES):
+                continue
+            seen += 1
+            try:
+                out_ = json.loads(f.read_text(encoding="utf-8")).get("output") or {}
+            except json.JSONDecodeError:
+                continue
+            for i, cand in enumerate(out_.get("candidates") or [], 1):
+                if isinstance(cand, dict):
+                    cands.append({**cand, "id": f"{f.stem}#{i}", "sources": [cand.get("source") or f.stem]})
+        rows += adapt_report({"findings": cands, "run": {"status": "complete"}}, c["sha256"], mode)
+    if not seen:
+        return None
+    p = out / "candidates" / "predictions.jsonl"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    return p
+
+
 def _case_meta(c: dict) -> dict:
     return {"case_id": c["case_id"], "expected": c["expected"], "kind": c["kind"]}
 
 
-def harness_score(out: Path, preds: Path, fmt: str) -> dict:
-    hd = out / "harness"
+def harness_score(out: Path, preds: Path, fmt: str, sub: str = "harness") -> dict:
+    hd = out / sub
     cmd = [sys.executable, "-m", "evaluation.harness", "--gold", str(CORPUS / "labels.jsonl"), "--pred", str(preds),
            "--manifest", str(CORPUS / "manifest.json"), "--out-dir", str(hd), "--render-format", fmt]
     r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
-    (out / "harness.log").write_text(r.stdout + r.stderr, encoding="utf-8")
+    (out / f"{sub.replace('/', '_')}.log").write_text(r.stdout + r.stderr, encoding="utf-8")
     mp = hd / "metrics.json"
     if r.returncode != 0 or not mp.exists():
         raise SystemExit(f"счётчик harness: rc={r.returncode}\n{(r.stderr or r.stdout)[-1500:]}")
@@ -192,6 +275,8 @@ def summarize(metrics: dict, per_case: list[dict]) -> dict:
             "major": sum(c["by_severity"]["major"] for c in measured_clean),
             "docs_with_critical": sum(1 for c in measured_clean if c["by_severity"]["critical"] > 0),
             "docs_over_1_major": sum(1 for c in measured_clean if c["by_severity"]["major"] > 1),
+            "docs_over_1_finding": sum(1 for c in measured_clean if c["findings"] > 1),
+            "max_findings": max((c["findings"] for c in measured_clean), default=0),
             "verdict_no": sum(1 for c in measured_clean
                               if "no" in (c["verdict"].get("development"), c["verdict"].get("testing"))),
         },
@@ -213,12 +298,40 @@ def render_summary(s: dict, per_case: list[dict], label: str) -> str:
          f"{_f(h.get('recall'))} | {_f(h.get('f1'))} |", "",
          f"Чистые документы ({c['measured']}/{c['n']} измерено): замечаний {c['findings']}, critical {c['critical']}, "
          f"major {c['major']}; документов с critical {c['docs_with_critical']}, с > 1 major {c['docs_over_1_major']}, "
-         f"вердикт «нельзя» {c['verdict_no']}. Ложных тревог по счётчику: {h.get('clean_false_alarms')}.", "",
+         f"вердикт «нельзя» {c['verdict_no']}; документов с > 1 замечанием {c.get('docs_over_1_finding', '—')}, "
+         f"максимум на одном {c.get('max_findings', '—')}. Ложных тревог по счётчику: {h.get('clean_false_alarms')}.", "",
          "Recall по типам: " + ", ".join(f"{k} {v.get('tp', 0)}/{(v.get('tp') or 0) + (v.get('fn') or 0)}"
                                          for k, v in sorted(s.get("per_issue_type", {}).items())
                                          if (v.get('tp') or 0) + (v.get('fn') or 0)) + ".", "",
          f"Время {s['time']['total_s'] / 60:.1f} мин суммарно, вызовов {s['time']['calls']}, ${s['time']['cost_usd']}.",
-         "", "| Кейс | Ожидание | Статус | Замечаний (к/с/н) | Вердикт |", "| :--- | :--- | :--- | :--- | :--- |"]
+         ""]
+    if s.get("candidates"):
+        cd = s["candidates"]
+        L += [f"Кандидаты этапов до судьи (верхняя граница): TP {cd.get('tp')}/{(cd.get('tp') or 0) + (cd.get('fn') or 0)}, "
+              f"recall {_f(cd.get('recall'))}; по типам: " + ", ".join(
+                  f"{k} {v.get('tp', 0)}/{(v.get('tp') or 0) + (v.get('fn') or 0)}"
+                  for k, v in sorted(cd.get("per_issue_type", {}).items()) if (v.get('tp') or 0) + (v.get('fn') or 0)) + ".", ""]
+    dt = s.get("details") or {}
+    if dt.get("by_source"):
+        L += ["Вклад источников (замечание с несколькими источниками считается каждому):", "",
+              "| Источник | TP | FP | из них на чистых |", "| :--- | ---: | ---: | ---: |"]
+        L += [f"| {k} ({source_owner(k)}) | {v['tp']} | {v['fp']} | {v['fp_clean']} |" for k, v in dt["by_source"].items()]
+        L.append("")
+    if dt.get("fp"):
+        L += ["Ложные находки:", "", "| Кейс | Чистый | Серьёзность | Тип | Замечание | Источники | Владельцы |",
+              "| :--- | :---: | :--- | :--- | :--- | :--- | :--- |"]
+        for x in sorted(dt["fp"], key=lambda x: (not x["clean"], x["case_id"])):
+            L.append(f"| {x['case_id']} | {'да' if x['clean'] else ''} | {x.get('severity')} | {x.get('kind')} | "
+                     f"{str(x.get('title') or '').replace('|', '/')[:90]} | {', '.join(x['sources'])} | {', '.join(x['owners'])} |")
+        L.append("")
+    if dt.get("fn"):
+        L += ["Пропуски:", "", "| Кейс | Тип дефекта | Близкая находка (не засчитана) | Владельцы |", "| :--- | :--- | :--- | :--- |"]
+        for x in dt["fn"]:
+            near = "; ".join(f"{n.get('id')} {str(n.get('title') or '')[:60]} ({', '.join(n.get('sources') or [])})"
+                             for n in x["near"]) or "—"
+            L.append(f"| {x['case_id']} | {x['type']} | {near.replace('|', '/')} | {x['owners']} |")
+        L.append("")
+    L += ["| Кейс | Ожидание | Статус | Замечаний (к/с/н) | Вердикт |", "| :--- | :--- | :--- | :--- | :--- |"]
     for pc in per_case:
         bs = pc.get("by_severity") or {}
         v = pc.get("verdict") or {}
@@ -235,17 +348,21 @@ def corpus_table() -> str:
         d = json.loads(p.read_text(encoding="utf-8"))
         rows.append(d)
     rows.sort(key=lambda d: d.get("at", ""))
-    L = ["| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Тревог на 8 чистых | "
-         "critical / major на чистых | Вердикт «нельзя» на чистых | Recall по типам | Мин | Вызовов |",
-         "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: |"]
+    L = ["| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Recall кандидатов | "
+         "Тревог на 8 чистых | Чистых с > 1 замечанием | critical / major на чистых | Вердикт «нельзя» на чистых | "
+         "Recall по типам | Мин на кейс | Вызовов на кейс |",
+         "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: |"]
     for d in rows:
         h, c = d["harness"], d["clean"]
         types = ", ".join(f"{k} {v.get('tp', 0)}/{(v.get('tp') or 0) + (v.get('fn') or 0)}"
                           for k, v in sorted(d.get("per_issue_type", {}).items()) if (v.get('tp') or 0) + (v.get('fn') or 0))
+        n = max(1, d["cases"] - d["failed"])
+        cand = (d.get("candidates") or {}).get("recall")
         L.append(f"| {d['label']} | {d['cases']} ({d['failed']}) | {h.get('tp')} | {h.get('fp')} | {h.get('fn')} | "
                  f"{h.get('duplicates')} | {_f(h.get('precision'))} | {_f(h.get('recall'))} | {_f(h.get('f1'))} | "
-                 f"{h.get('clean_false_alarms')} | {c['critical']} / {c['major']} | {c['verdict_no']} | {types} | "
-                 f"{d['time']['total_s'] / 60:.1f} | {d['time']['calls']} |")
+                 f"{_f(cand)} | {h.get('clean_false_alarms')} | {c.get('docs_over_1_finding', '—')} | "
+                 f"{c['critical']} / {c['major']} | {c['verdict_no']} | {types} | "
+                 f"{d['time']['total_s'] / 60 / n:.1f} | {d['time']['calls'] / n:.1f} |")
     return "\n".join(L)
 
 
@@ -318,6 +435,22 @@ def main(argv: list[str] | None = None) -> int:
     preds, per_case = build_predictions(out, cases, a.mode)
     metrics = harness_score(out, preds, a.format)
     s = summarize(metrics, per_case)
+    matrix_p = out / "harness" / "matrix.jsonl"
+    matrix = [json.loads(x) for x in matrix_p.read_text(encoding="utf-8").splitlines() if x.strip()] \
+        if matrix_p.exists() else []
+    s["details"] = details(per_case, matrix)
+    run_log = out / "run_log.json"
+    if run_log.exists():
+        rl = json.loads(run_log.read_text(encoding="utf-8"))
+        s.update({"provider": rl.get("provider"), "model": rl.get("model"), "wall_s": rl.get("wall_s")})
+    s["commit"] = sorted({pc.get("commit") for pc in per_case if pc.get("commit")})
+    cand_preds = candidate_predictions(out, cases, a.mode) if (out / "runs").is_dir() else None
+    if cand_preds:
+        cm = harness_score(out, cand_preds, a.format, sub="candidates/harness")
+        cmi = cm.get("micro") or {}
+        s["candidates"] = {"tp": cmi.get("tp"), "fn": cmi.get("fn"), "recall": cmi.get("recall"),
+                           "per_issue_type": {k: {kk: v.get(kk) for kk in ("tp", "fn", "recall")}
+                                              for k, v in (cm.get("per_issue_type") or {}).items() if isinstance(v, dict)}}
     label = a.label or out.name
     from .measure import slugify
     from .score import astana_now

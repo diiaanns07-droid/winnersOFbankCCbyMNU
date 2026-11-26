@@ -59,13 +59,36 @@ python -m evaluation.v2.corpus run --out out/corpus --provider claude_cli --mode
 Для сравнения, v1 (ветка `bcc/eval-independent`, `docs/plan-v2/ref/BCC-quality-08d3af5.md`): правила — 0 из 28
 при 44 ложных тревогах на 8 из 8 чистых; с моделью F1 2,9 % (Gemini Flash-Lite) и 5,4 % (Claude).
 
-## Стабильность (3 прогона Opus)
+## Новые ТЗ №18 (`evaluation/v2/open2`, эталон каждого кейса, чистые версии)
+
+```bash
+python -m evaluation.v2.newtz run --out out/newtz --provider claude_cli --model sonnet --label "<метка>" --save
+```
+
+Recall — доля пунктов эталона кейса (сопоставление то же, что на официальном: цитаты ↔ строки-опоры, ключевые
+слова, для противоречия — обе стороны). На чистой версии любая находка — ложная тревога.
+
+<!-- newtz:start -->
+Будет заполнено после 08:00 (документы №18).
+<!-- newtz:end -->
+
+## Стабильность (3 прогона sonnet и 3 прогона Opus, без кэша)
+
+```bash
+python -m evaluation.v2.measure --label "стабильность sonnet 1/3" --model sonnet --no-cache   # ×3
+python -m evaluation.v2.aggregate stability m1/score.json m2/score.json m3/score.json --json evaluation/v2/stability/sonnet.json
+```
 
 Будет заполнено.
 
 ## Сравнение моделей
 
 Будет заполнено.
+
+## Ворота второй волны
+
+`python -m evaluation.v2.gate --save` — таблица ворот `docs/plan-v2/WAVE2.md` по последним замерам каждого вида
+с владельцами красного; результат — `evaluation/v2/GATE.md`.
 
 ## Ограничения
 
