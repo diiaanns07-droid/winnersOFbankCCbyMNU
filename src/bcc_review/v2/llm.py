@@ -101,6 +101,11 @@ class LLMClient:
         self.stats: dict[str, Any] = {"calls": 0, "cached": 0, "failed": 0, "split": 0, "repaired": 0,
                                       "retries": 0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
                                       "models_used": [], "seconds": 0.0, "by_stage": {}}
+        self.responses: dict[str, list] = {}  # сырые ответы по этапам в порядке вызовов — для mock-фикстур
+
+    def _record(self, stage: str, data: Any) -> None:
+        with self._lock:
+            self.responses.setdefault(stage, []).append(data)
 
     # ------------------------------------------------------------------ служебное
 
@@ -190,6 +195,7 @@ class LLMClient:
                 self.stats["cached"] += 1
                 self._stage_stats(stage)["cached"] += 1
             self._emit({"stage": stage, "cached": True, "model": cached.get("model"), "key": key[:16]})
+            self._record(stage, cached["data"])
             return cached["data"]
 
         handles_retries = bool(getattr(self.provider, "handles_retries", False))
@@ -207,6 +213,7 @@ class LLMClient:
                     continue
                 raise
             self._cache_put(key, {"data": data, "model": result.get("model"), "stage": stage})
+            self._record(stage, data)
             return data
         raise last or LLMError(stage, "unknown", "нет модели для вызова")
 
