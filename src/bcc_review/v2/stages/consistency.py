@@ -336,7 +336,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         "requirement_ids": ids, "evidence": [{k: v for k, v in e.items()} for e in evidence],
         "problem": problem, "scenario": scenario, "impact": impact, "recommendation": rec,
         "rewrite": "", "question": pair["question"], "blocks": "both",
-        "source": SOURCE, "origin": "pair_check",
+        "source": SOURCE, "origin": "pair_check", "pair_ids": [pair["id"]] if pair.get("id") else [],
     }
 
 
@@ -431,7 +431,7 @@ def glossary_to_candidate(g: dict) -> dict | None:
         "recommendation": (f"Выбрать одно название (например, «{first}»), заменить им остальные во всех частях "
                            f"документа и добавить его в глоссарий с определением."),
         "rewrite": "", "question": "", "blocks": "development" if severity == "major" else "none",
-        "source": SOURCE, "origin": "glossary",
+        "source": SOURCE, "origin": "glossary", "glossary_ids": [g["id"]] if g.get("id") else [],
     }
 
 
@@ -458,6 +458,7 @@ def minor_glossary_candidate(entries: list[dict]) -> dict | None:
         "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого "
                           "понятия.",
         "rewrite": "", "question": "", "blocks": "none", "source": SOURCE, "origin": "glossary",
+        "glossary_ids": [g["id"] for g, _ in found if g.get("id")],
     }
 
 
@@ -498,6 +499,9 @@ def merge_conflicts(cands: list[dict], requirements: list[dict] | None = None) -
         for rid in c["requirement_ids"]:
             if rid not in host["requirement_ids"]:
                 host["requirement_ids"].append(rid)
+        for pid in c.get("pair_ids") or []:
+            if pid not in host.setdefault("pair_ids", []):
+                host["pair_ids"].append(pid)
         host["problem"] += f" Также: {c['title']}."
         host.setdefault("merged_titles", []).append(c["title"])
     return out
@@ -598,6 +602,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
         seen.add(key)
         uniq.append(p)
     pairs = uniq[:MAX_PAIRS]
+    for i, p in enumerate(pairs, 1):
+        p["id"] = f"P-{i:02d}"
 
     candidates: list[dict] = []
     pair_cands: list[dict] = []
@@ -615,6 +621,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     candidates.extend(pair_cands)
 
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]
+    for i, g in enumerate(glossary, 1):
+        g["id"] = f"G-{i:02d}"
     for g in glossary:
         if g["severity"] == "major":
             c = glossary_to_candidate(g)
@@ -635,10 +643,40 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     for p in pairs:
         q = {k: v for k, v in p.items() if not k.startswith("_")}
         out_pairs.append(q)
-    out_glossary = [{"concept": g["concept"], "terms": [{"term": t["term"], "line": t["line"]} for t in g["terms"]],
+    out_glossary = [{"id": g["id"], "concept": g["concept"],
+                     "terms": [{"term": t["term"], "line": t["line"]} for t in g["terms"]],
                      "problem": g["problem"], "severity": g["severity"]} for g in glossary]
     return {"candidates": candidates, "pair_checks": out_pairs, "trace": trace, "glossary": out_glossary,
             "subjects": list(data.get("subjects") or [])}
+
+
+# ---------------------------------------------------------------- ссылки на итоговые дефекты
+
+def link_findings(pair_checks: list[dict], glossary: list[dict], candidates: list[dict],
+                  findings: list[dict]) -> None:
+    """Проставить ``finding_ids`` парам (P-xx) и понятиям глоссария (G-xx) по цепочке
+    пара → кандидат этапа (``pair_ids`` / ``glossary_ids``) → итоговый дефект (``candidate_ids``).
+    Вызывается конвейером после судьи; меняет списки на месте."""
+    by_cand: dict[str, list[str]] = {}
+    for f in findings or []:
+        for cid in f.get("candidate_ids") or []:
+            by_cand.setdefault(str(cid), []).append(str(f.get("id")))
+    by_pair: dict[str, list[str]] = {}
+    by_term: dict[str, list[str]] = {}
+    for c in candidates or []:
+        fids = by_cand.get(str(c.get("id")), [])
+        if not fids:
+            continue
+        for pid in c.get("pair_ids") or []:
+            by_pair.setdefault(pid, []).extend(fids)
+        for gid in c.get("glossary_ids") or []:
+            by_term.setdefault(gid, []).extend(fids)
+    for p in pair_checks or []:
+        if p.get("id") in by_pair:
+            p["finding_ids"] = list(dict.fromkeys(by_pair[p["id"]]))
+    for g in glossary or []:
+        if g.get("id") in by_term:
+            g["finding_ids"] = list(dict.fromkeys(by_term[g["id"]]))
 
 
 # ---------------------------------------------------------------- матрица покрытия

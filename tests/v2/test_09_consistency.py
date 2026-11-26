@@ -392,3 +392,18 @@ def test_run_does_not_swallow_other_errors():
     ctx.llm = Boom(None)
     with pytest.raises(RuntimeError):
         C.run(ctx)
+
+
+def test_link_findings_maps_pairs_and_glossary_to_final_defects():
+    g = {"concept": "распорядитель", "terms": [{"term": "Клиент", "line": 10}, {"term": "держатель счёта", "line": 10}],
+         "problem": "", "severity": "major"}
+    p2 = pair(b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7, title="второй")
+    out = C.postprocess(answer(pair_checks=[pair(), p2], glossary=[g]), VIEW, REQS)
+    assert [p["id"] for p in out["pair_checks"]] == ["P-01", "P-02"]
+    assert out["glossary"][0]["id"] == "G-01"
+    cands = [dict(c, id=f"C-{i:03d}") for i, c in enumerate(out["candidates"], 1)]  # как в pipeline._collect
+    assert cands[0]["pair_ids"] == ["P-01", "P-02"]  # склеенный конфликт
+    findings = [{"id": "D-01", "candidate_ids": ["C-001"]}, {"id": "D-02", "candidate_ids": ["C-002"]}]
+    C.link_findings(out["pair_checks"], out["glossary"], cands, findings)
+    assert out["pair_checks"][0]["finding_ids"] == ["D-01"] and out["pair_checks"][1]["finding_ids"] == ["D-01"]
+    assert out["glossary"][0]["finding_ids"] == ["D-02"]
