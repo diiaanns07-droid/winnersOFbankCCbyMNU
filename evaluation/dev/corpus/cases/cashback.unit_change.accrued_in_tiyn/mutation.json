@@ -1,0 +1,66 @@
+{
+  "case_id": "cashback.unit_change.accrued_in_tiyn",
+  "family": "cashback",
+  "kind": "mutant",
+  "ops": [
+    "unit_change"
+  ],
+  "variants": [
+    "accrued_in_tiyn"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cashback.base",
+  "base_source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+  "source_sha256": "386739bbc4f1f45e0dfc8c8c197c059785e6ed2814ff49c51ce55e50a81d9710",
+  "semantic_sha256": "24758c1a2e117fe7d4110b33458c7cdeb781644ab5d759fe5daaa6081bbe6740",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 66,
+      "removed": "Кэшбэк текущего месяца в тенге с двумя знаками после точки",
+      "inserted": "Кэшбэк текущего месяца в тиынах с двумя знаками после точки",
+      "mutation_op": "unit_change",
+      "variant": "accrued_in_tiyn"
+    }
+  ],
+  "expected_effect": [
+    "Поле accrued описано в тиынах, а пример для критерия приёмки «100 ₸» даёт 100.00."
+  ],
+  "diff": "--- base/source.md\n+++ cashback.unit_change.accrued_in_tiyn/source.md\n@@ -65,3 +65,3 @@\n | `category` | string | Код выбранной категории: CAFE, TAXI или PHARMACY |\n-| `accrued` | string | Кэшбэк текущего месяца в тенге с двумя знаками после точки |\n+| `accrued` | string | Кэшбэк текущего месяца в тиынах с двумя знаками после точки |\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.unit_change.accrued_in_tiyn",
+      "family": "cashback",
+      "source_sha256": "386739bbc4f1f45e0dfc8c8c197c059785e6ed2814ff49c51ce55e50a81d9710",
+      "visibility": "public",
+      "label_id": "cashback.unit_change.accrued_in_tiyn#1",
+      "issue_type": "unit_mismatch",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Кэшбэк текущего месяца в тиынах с двумя знаками после точки",
+          "locator": "md:L66"
+        },
+        {
+          "role": "b",
+          "quote": "Пример ответа для первого критерия приёмки: `{\"category\":\"TAXI\",\"accrued\":\"100.00\"}`",
+          "locator": "md:L68"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "Покупка «Такси» на 2 000 ₸, кэшбэк месяца 100 ₸, ответ getCashback.",
+      "explanation": "Поле accrued описано в тиынах, а пример для критерия приёмки «100 ₸» даёт 100.00.",
+      "mutation": {
+        "op": "unit_change",
+        "variant": "accrued_in_tiyn"
+      }
+    }
+  ]
+}
