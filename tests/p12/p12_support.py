@@ -85,12 +85,14 @@ class FakeGemini:
         match = self.URL.search(request.url.path)
         assert match, f"неожиданный URL {request.url}"
         model = match.group(1)
-        self.requests.append({
+        record = {
             "model": model,
+            "t": self.clock.now,
             "body": json.loads(request.content.decode("utf-8")),
             "timeout": request.extensions.get("timeout"),
             "headers": dict(request.headers),
-        })
+        }
+        self.requests.append(record)
         queue = self.script.get(model) or self.script.get("*")
         assert queue, f"для модели {model} нет сценария"
         step = queue.pop(0) if len(queue) > 1 else queue[0]
@@ -105,6 +107,7 @@ class FakeGemini:
             if isinstance(step, httpx_lib.Response):
                 return step
         fixture = load_fixture(step) if isinstance(step, str) else step
+        record["status"] = fixture["http_status"]
         return httpx_lib.Response(fixture["http_status"], json=fixture["body"], headers=fixture.get("headers") or {})
 
     def http_client(self) -> Any:

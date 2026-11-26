@@ -63,7 +63,10 @@ def run_stages(
                                       "reason": "общий дедлайн исчерпан"})
                 break
             try:
-                res = adapter.invoke(model=model, messages=stage.messages, schema=stage.schema, timeout_s=remaining)
+                # мини-runtime считает фактические запросы по usage.physical_calls / err.physical_calls,
+                # поэтому разрешает запасную модель внутри invoke без собственного лимита вызовов
+                res = adapter.invoke(model=model, messages=stage.messages, schema=stage.schema, timeout_s=remaining,
+                                     call_gate=lambda model_id: None)
             except ProviderError as err:
                 result.physical_calls += getattr(err, "physical_calls", 1)
                 wait = err.retry_after_s if err.retry_after_s is not None else base_backoff_s * (2 ** retries)

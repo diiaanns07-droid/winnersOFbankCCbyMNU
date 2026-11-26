@@ -14,9 +14,10 @@ import os
 
 import pytest
 from jsonschema import Draft202012Validator
-from p12_support import synthetic_schema
 
 from bcc_review.providers.gemini import GeminiAdapter, ProviderError
+
+from .p12_support import synthetic_schema
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("P12_LIVE") != "1" or not os.environ.get("GEMINI_API_KEY"),

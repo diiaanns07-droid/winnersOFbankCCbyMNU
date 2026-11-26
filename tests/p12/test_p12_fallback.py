@@ -3,15 +3,37 @@
 from __future__ import annotations
 
 import pytest
-from p12_support import MESSAGES
 
-from bcc_review.providers.gemini import ErrorKind, GeminiAdapter, ProviderError, settings_from_env
+from bcc_review.contracts import BudgetExhausted
+from bcc_review.providers.gemini import (
+    ErrorKind,
+    GeminiAdapter,
+    ProviderError,
+    settings_from_env,
+)
+
+from .p12_support import MESSAGES
 
 PRIMARY, LITE, LATEST = "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"
 
 
-def invoke(adapter, schema, timeout_s=60.0):
-    return adapter.invoke(model=PRIMARY, messages=MESSAGES, schema=schema, timeout_s=timeout_s)
+class Gate:
+    """call_gate вызывающего: пишет, какие дополнительные запросы он разрешил (или запретил)."""
+
+    def __init__(self, allow: bool = True) -> None:
+        self.allow = allow
+        self.calls: list[str] = []
+
+    def __call__(self, model_id: str) -> None:
+        self.calls.append(model_id)
+        if not self.allow:
+            raise BudgetExhausted("individual", "исчерпан лимит вызовов модели (1)")
+
+
+def invoke(adapter, schema, timeout_s=60.0, gate="allow"):
+    """По умолчанию — с разрешающим гейтом: эти тесты проверяют механику цепочки моделей."""
+    gate = Gate() if gate == "allow" else gate
+    return adapter.invoke(model=PRIMARY, messages=MESSAGES, schema=schema, timeout_s=timeout_s, call_gate=gate)
 
 
 def test_no_fallback_unless_configured(make_adapter, fake, schema) -> None:
@@ -142,3 +164,75 @@ def test_transient_failures_are_not_remembered(make_adapter, fake, schema) -> No
     with pytest.raises(ProviderError):
         invoke(adapter, schema)
     assert invoke(adapter, schema)["model"] == PRIMARY
+
+
+# --------------------------------------------------------------------------- граница бюджета до сетевого вызова
+
+
+def test_without_gate_one_invoke_sends_one_request(make_adapter, fake, schema) -> None:
+    """Asker учитывает один запрос на invoke: без гейта адаптер не делает второй generate_content."""
+    fake.on(PRIMARY, "err_503_overloaded").on(LITE, "ok_one_finding_lite")
+    adapter = make_adapter(fallback_models=[LITE])
+    with pytest.raises(ProviderError) as info:
+        invoke(adapter, schema, gate=None)
+    err = info.value
+    assert [r["model"] for r in fake.requests] == [PRIMARY] and err.physical_calls == 1
+    assert err.kind == "overloaded" and err.transient
+    assert err.detail["fallback_available"] == LITE
+    assert err.attempts[-1] == {"model": LITE, "skipped": "no_call_gate"}
+
+    second = invoke(adapter, schema, gate=None)  # повтор движка уходит сразу в запасную модель
+    assert [r["model"] for r in fake.requests] == [PRIMARY, LITE]
+    assert second["model"] == LITE and second["usage"]["physical_calls"] == 1
+    assert second["meta"]["fallback_used"] is True
+    assert second["meta"]["attempts"] == [{"model": PRIMARY, "skipped": "failed_in_previous_invoke"}]
+
+    fake.script[PRIMARY] = ["ok_one_finding"]
+    assert invoke(adapter, schema, gate=None)["model"] == PRIMARY, "после успеха снова основная модель"
+
+
+def test_gate_is_asked_only_for_extra_requests(make_adapter, fake, schema) -> None:
+    fake.on(PRIMARY, "err_503_overloaded", "ok_one_finding").on(LITE, "ok_one_finding_lite")
+    adapter = make_adapter(fallback_models=[LITE])
+    gate = Gate()
+    assert invoke(adapter, schema, gate=gate)["model"] == LITE
+    assert gate.calls == [LITE], "первый запрос invoke учитывает вызывающий, гейт — только запасной"
+    gate2 = Gate()
+    assert invoke(adapter, schema, gate=gate2)["model"] == PRIMARY and gate2.calls == []
+
+
+def test_gate_refusal_cancels_the_request(make_adapter, fake, schema) -> None:
+    fake.on(PRIMARY, "err_503_overloaded").on(LITE, "ok_one_finding_lite")
+    adapter = make_adapter(fallback_models=[LITE])
+    gate = Gate(allow=False)
+    with pytest.raises(ProviderError) as info:
+        invoke(adapter, schema, gate=gate)
+    err = info.value
+    assert gate.calls == [LITE] and [r["model"] for r in fake.requests] == [PRIMARY]
+    assert err.kind == "overloaded" and err.physical_calls == 1
+    assert err.attempts[-1]["skipped"] == "call_gate" and "BudgetExhausted" in err.detail["fallback_blocked"]
+    gate2 = Gate()
+    assert invoke(adapter, schema, gate=gate2)["model"] == LITE
+    assert gate2.calls == [], "запасная модель стала первым запросом следующего invoke"
+
+
+def test_remembered_primary_makes_fallback_the_first_request(make_adapter, fake, schema) -> None:
+    fake.on(PRIMARY, "err_429_rpd").on(LITE, "ok_one_finding_lite")
+    adapter = make_adapter(fallback_models=[LITE])
+    with pytest.raises(ProviderError):
+        invoke(adapter, schema, gate=None)
+    result = invoke(adapter, schema, gate=None)
+    assert result["model"] == LITE and fake.calls_for(PRIMARY) == 1 and result["usage"]["physical_calls"] == 1
+
+
+def test_engine_style_constructor_reads_environment(monkeypatch) -> None:
+    """Движок создаёт адаптер как GeminiAdapter() без аргументов (engine.setup_provider: res.func())."""
+    monkeypatch.setenv("GEMINI_API_KEY", "k-from-env")
+    monkeypatch.setenv("GEMINI_MODEL", "models/gemini-flash-latest")
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", LITE)
+    monkeypatch.setenv("GEMINI_TEMPERATURE", "0.3")
+    adapter = GeminiAdapter()
+    assert adapter._api_key == "k-from-env" and adapter.default_model == "gemini-flash-latest"
+    assert adapter.model_chain(None) == ["gemini-flash-latest", LITE]
+    assert adapter.params["temperature"] == 0.3
+    assert GeminiAdapter(api_key=None)._api_key is None, "явное значение важнее окружения"

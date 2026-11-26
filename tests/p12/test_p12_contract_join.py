@@ -13,10 +13,11 @@ import json
 from pathlib import Path
 
 import pytest
-from p12_support import FIXTURES, MESSAGES, ROOT, load_fixture, synthetic_schema
 
 from bcc_review import contracts
 from bcc_review.providers import gemini
+
+from .p12_support import FIXTURES, MESSAGES, ROOT, load_fixture, synthetic_schema
 
 P11_SCHEMA = FIXTURES / "shared" / "p11_schema_candidates.json"
 
