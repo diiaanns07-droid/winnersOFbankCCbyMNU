@@ -2,16 +2,49 @@
 
 Файлы направления: `src/bcc_review/analysis/cross.py`, `src/bcc_review/analysis/facts.py`,
 `src/bcc_review/prompts/cross.{pairs.md,coverage.md,schema.json}`, `tests/p06/`. Чужие файлы не менялись.
-Ветка `claude/epic-mccarthy-uhlsri` (назначена платформой вместо `bcc/p06-cross`) влита поверх
-`bcc/integration` @ `6be9e97`: срез 01+04–07+11+17, в котором уже лежит первая версия №06 (`ecaa84f`).
+Ветка `claude/epic-mccarthy-uhlsri` (назначена платформой вместо `bcc/p06-cross`), влита поверх
+`bcc/integration` @ `2821989`. В интеграции пока лежит первая версия №06 (`ecaa84f`): все пункты таблицы
+«Что движок выравнивает» для №06 закрыты начиная с `f1cd2d1`:
+* payload `{task, input, context}`;
+* `Fact.evidence` — список, `subject` — строка;
+* коды `set_consistent`/`set_complete`, виды из `FINDING_KINDS`;
+* `AskError` поднимается, если модель не ответила ни разу.
 
-Стык проверен на командных модулях: `read_text` №01, `build_inventory` №04, `resolve_*` №07, `load_criteria` №05.
-* Выход модуля проходит `contracts.validate` (Candidate, Fact, Coverage, EvidenceAudit).
-* `resolve_candidate` №07 даёт `supported` для конфликтов и пропусков.
-* `run_review` подключает модуль как `team:bcc_review.analysis.cross:review_set` и
-  `team:bcc_review.analysis.facts:reconcile_facts`; отчёт проходит `validate`, `evidence_errors == []`
-  и `verify` (`tests/integration/test_team_pipeline.py`).
-* Задвоения находок между `review_set` и отдельным вызовом `reconcile_facts` нет.
+**Имена этапов изменились:** `cross#pairs` и `cross#coverage` вместо `cross.pairs`/`cross.coverage`.
+`StageStats` сводит их в этап `cross`. Сценарий mock для №15 нужно писать под новые ключи.
+
+## Сквозной сценарий через настоящий Asker (`tests/p06/test_p06_asker_cashback.py`)
+
+Одна точка входа: `engine.read_document` → нарезка движка → `review_set(doc, reqs, Asker(...))`. Asker
+движка (контекст, кэш, бюджет, проверка схемы, `StageStats`) работает поверх `RecordedTransport`
+(`tests/p06/p06_helpers.py`), который воспроизводит кассету `fixtures/cassette_cashback.json` с
+имитированными ответами и записывает каждый физический запрос.
+
+1. `cashback_two_dates.md` — **конфликт.** Правило нашла программа, модель подтвердила его через Asker,
+   дубля нет. Две точные опоры:
+   * `b0005[7:89]`, строка 7 (КЭШ-2): «Расчётный месяц кэшбэка определяется по дате совершения покупки по времени Астаны.»
+   * `b0007[58:141]`, строка 10 (требования к интеграции): «Расчётный месяц кэшбэка определяется по дате проведения операции по времени Астаны.»
+   * Общий объект — «Расчётный месяц кэшбэка». `blocked_decision`: по какой дате относить операцию к месяцу.
+2. `cashback_by_operation.md` — **конфликта нет.** «Для покупок …» и «Для возвратов …» при разных условиях
+   совместимы. «Наивный» ответ модели отклонён проверкой ограничений (тип операции). Строка приёмки о
+   возврате проверена по правилу для возвратов.
+3. `cashback_missing_rule.md` — **пропуск правила** (`omission`, `set_complete`).
+   * Перечень просмотренных разделов и строки 6–13; что искали.
+   * Вопрос с моментами «31 марта в 23:58» / «1 апреля в 00:03» и ставками 1 % / 2 %.
+   * Все опоры — подстроки документа. Выдуманную отрицательную цитату модели отклонил №07 (`rejected=1`).
+
+Физических вызовов двойника — по 2 на документ (`cross#pairs` + `cross#coverage`), всего 6. Повтор с кэшем
+даёт 0 физических вызовов и `cache_hits=2`. Тот же сценарий 1 проходит через `run_review`: отчёт v1 валиден,
+находка конфликта с двумя опорами (строки 7 и 10), этап `cross`: `ok`, `calls=2`.
+
+```bash
+python -m pytest tests/p06 -q
+```
+
+```bash
+python tests/p06/demo_asker_cashback.py
+```
+Вывод сохранён в `tests/p06/sample/asker_cashback.txt`.
 
 ## Протокол (как вызывает движок)
 
@@ -75,17 +108,27 @@ reconcile_facts(document, fact_hints=None, *, resolve=None)
 python3 -m venv .venv && .venv/bin/pip install -e ".[all,dev]"
 ```
 
-```bash
-.venv/bin/python -m pytest -p no:cacheprovider
-```
-Python 3.11.18, весь репозиторий: **616 passed, 16 skipped, 1 failed**. Упал
-`tests/p11/test_anthropic_success.py::test_from_fixture_files_entry_point`: на чистой `bcc/integration`
-падает так же. Причина — `from conftest import FIXTURES` ловит `tests/p17/conftest.py`, см. «Кому что».
+HANDOFF интеграции советует запускать тесты по папкам. На `bcc/integration` @ `2821989` + №06, Python 3.11.18:
 
 ```bash
-python3 -m pytest tests/p06 tests/contract -p no:cacheprovider
+.venv/bin/python -m pytest tests/p06 -q
 ```
-Python 3.13.18: **76 passed, 1 skipped**. Без PyMuPDF пропускается паритет MD/PDF.
+**56 passed**.
+
+```bash
+.venv/bin/python -m pytest tests/contract -q
+```
+**29 passed**.
+
+```bash
+.venv/bin/python -m pytest tests/integration -q
+```
+**138 passed**.
+
+```bash
+python3 -m pytest tests/p06 -q
+```
+Python 3.13.18: **55 passed, 1 skipped** (без PyMuPDF пропускается паритет MD/PDF).
 
 ```bash
 ruff check --select E9,F --target-version py311 src/bcc_review/analysis/cross.py src/bcc_review/analysis/facts.py tests/p06
@@ -105,7 +148,7 @@ case_ab-scripted:           conflict=3 missing_contract=1;            coverage 0
 ```
 Образцы таблицы покрытия с доказательствами — `tests/p06/sample/case_ab-rules.md` и `case_ab-scripted.md`.
 
-## Проверенные случаи (tests/p06, 48 тестов)
+## Проверенные случаи (tests/p06, 56 тестов)
 
 1. **Граница периода, независимый сюжет** (кешбэк 1 % → 2 %).
    * Покупка 30.06 в 23:55 проведена 01.07 в 00:05; цитаты «…1 %…» и «…2 % — 200 ₸» дают разные исходы

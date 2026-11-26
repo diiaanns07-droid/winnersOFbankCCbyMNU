@@ -144,3 +144,76 @@ class ScriptedAsk:
 
         jsonschema.validate(result, schema)
         return result
+
+
+class RecordedTransport:
+    """Двойник провайдера за настоящим ``Asker`` (контракт ProviderAdapter.invoke).
+
+    Воспроизводит записанные ответы из кассеты и записывает каждый физический запрос: этап из строки
+    «ЭТАП: …», входные данные из тела сообщения и все сообщения (системное, контекст документа, задача).
+    Ответ для ``cross#pairs`` собирается по парам запроса: запись ``{"when": {"a", "b"}, "answer"}``
+    совпадает, если подстроки встречаются в текстах сторон (в любом порядке; стороны выравниваются).
+    Ответы кассеты — имитация модели для разработческой проверки, а не вывод живого провайдера.
+    """
+
+    name = "recorded"
+
+    def __init__(self, cassette, model: str = "recorded-1"):
+        if isinstance(cassette, (str, Path)):
+            cassette = json.loads(Path(cassette).read_text(encoding="utf-8"))
+        self.cassette = cassette
+        self.model = model
+        self.requests: list[dict] = []
+
+    def invoke(self, *, model, messages, schema, timeout_s):
+        body = messages[-1]["content"]
+        stage = re.search(r"^ЭТАП: (\S+)", body, re.M).group(1)
+        data_in = json.loads(body.split("ВХОДНЫЕ ДАННЫЕ (JSON):\n", 1)[1])
+        self.requests.append({"stage": stage, "input": data_in, "messages": messages, "schema": schema})
+        if stage == "cross#pairs":
+            out = []
+            for p in data_in["pairs"]:
+                for rec in self.cassette.get("cross#pairs", []):
+                    sa, sb = rec["when"]["a"], rec["when"]["b"]
+                    if sa in p["a"]["text"] and sb in p["b"]["text"]:
+                        ans = copy.deepcopy(rec["answer"])
+                    elif sb in p["a"]["text"] and sa in p["b"]["text"]:
+                        ans = _swap(rec["answer"])
+                    else:
+                        continue
+                    ans["pair_id"] = p["pair_id"]
+                    out.append(ans)
+                    break
+            data = {"pairs": out}
+        else:
+            data = copy.deepcopy(self.cassette.get(stage) or {})
+        data = fill(schema, data)
+        n = len(self.requests)
+        return {"data": data, "usage": {"input_tokens": sum(len(m["content"]) for m in messages) // 4,
+                                        "output_tokens": len(json.dumps(data, ensure_ascii=False)) // 4},
+                "model": self.model, "request_id": f"rec-{n}", "stop_reason": "end_turn"}
+
+
+def make_asker(document: dict, requirements: list, transport, cache_dir=None):
+    """Настоящий Asker движка (контекст, кэш, бюджет, проверка схемы, учёт вызовов) поверх двойника."""
+    from bcc_review.runtime.asker import Asker
+    from bcc_review.runtime.context import ContextBuilder
+    from bcc_review.runtime.core import Budget, Cache, StageStats, Tracer
+
+    stats = StageStats()
+    budget = Budget(40, 600.0)
+    asker = Asker(adapter=transport, provider="mock", model=transport.model, budget=budget,
+                  cache=Cache(cache_dir, enabled=cache_dir is not None), stats=stats, tracer=Tracer(None, "p06"),
+                  context=ContextBuilder(document, requirements), sleep=lambda s: None)
+    return asker, stats, budget
+
+
+def read_pipeline(path):
+    """Document и нарезка тем же путём, что у движка: engine.read_document + build_inventory (№04 или резерв)."""
+    from bcc_review.contracts import as_plain
+    from bcc_review.engine import read_document
+    from bcc_review.runtime.modules import Modules
+
+    doc = read_document(path)
+    inv = as_plain(Modules().get("build_inventory").func(doc))
+    return doc, inv

@@ -34,6 +34,7 @@ from typing import Any, Callable, Optional
 
 from .facts import (
     MONTH_NAMES,
+    _is_adj,
     Audit,
     DocView,
     FactSet,
@@ -648,7 +649,8 @@ class CrossReview:
         key = (cand.get("subkind"), tuple(sorted({(h["block_id"]) for h in hints})))
         for c in self.candidates:
             if (c.get("subkind"), tuple(sorted({h["block_id"] for h in c.get("hints", [])}))) == key:
-                c.setdefault("confirmed_by", []).append(cand.get("origin", "?"))
+                if cand.get("origin", "?") not in c.setdefault("confirmed_by", []):
+                    c["confirmed_by"].append(cand.get("origin", "?"))
                 if cand.get("slots") and not c.get("slots"):
                     c["slots"] = cand["slots"]
                 return
@@ -688,11 +690,16 @@ class CrossReview:
                 if re.match(r"^\s*(для|при|у|в случае|если)\b", norm(prefix)):
                     cond |= key_set(prefix)
                 cond |= key_set(m.group("qual"))
+                lead = re.findall(r"[A-Za-zА-Яа-яЁё]+", prefix)
+                obj = text[m.start("unit"): m.end("qual")].strip(" ,")
+                if lead and _is_adj(lead[-1]):
+                    obj = f"{lead[-1]} {obj}"
                 out.append({
                     "block_id": bid, "unit": unit, "gran": gran, "cond": cond, "event": event.strip(),
                     "event_keys": key_set(event), "tz": tz, "offset": tz_offset(tz),
                     "ev": {"block_id": bid, "start": sent[0], "end": sent[1], "quote": text[sent[0]:sent[1]]},
                     "unit_key": keys_of(m.group("unit"))[:1],
+                    "object": obj[:1].upper() + obj[1:],
                 })
         return out
 
@@ -758,9 +765,10 @@ class CrossReview:
 
     def period_checks(self) -> None:
         anchors = self.anchors()
+        dated = self.dated_rules()
+        self._missing_anchor(anchors, dated)
         if not anchors:
             return
-        dated = self.dated_rules()
         # P2: два правила привязки к разным событиям для одного объекта
         for i, a in enumerate(anchors):
             for b in anchors[i + 1:]:
@@ -788,6 +796,11 @@ class CrossReview:
         pre = acc.cells.get("pre", acc.hint)["quote"]
         subject = re.split(r"[:,\d]", strip_md(pre), maxsplit=1)[0]
         subj_keys = key_set(subject)
+        head = (keys_of(subject) or [None])[0]
+        own = anc["cond"] - set().union(*[s["cond"] for s in siblings]) if siblings else set()
+        others = set().union(*[s["cond"] - anc["cond"] for s in siblings]) if siblings else set()
+        if head and head in own | others:
+            return head in own  # «Возврат покупки»: тип операции задаёт главное слово, а не дополнение
         if not anc["cond"]:
             return not any((s["cond"] - anc["cond"]) & subj_keys for s in siblings)
         disc = anc["cond"] - set().union(*[s["cond"] for s in siblings]) if siblings else set()
@@ -915,12 +928,105 @@ class CrossReview:
             "outcome_a_value": "январь", "outcome_b_value": "февраль",
             "evidence_a": a["ev"], "evidence_b": b["ev"],
         }
-        cmp = self.log("period_anchor", "mismatch", f"Два правила привязывают «{a['unit']}» к разным событиям при одинаковых условиях.")
+        obj = a["object"]
+        wa, wb = self._where(a["ev"]), self._where(b["ev"])
+        cmp = self.log("period_anchor", "mismatch",
+                       f"«{obj}» привязан к разным событиям при одинаковых условиях: «{a['event']}» ({wa}) и «{b['event']}» ({wb}).")
         self.add(make_candidate(
-            "conflict", f"«{a['unit']}» определяется по разным событиям: «{a['event']}» и «{b['event']}»",
-            "Для события на стыке периодов два правила дают разные периоды.", [a["ev"], b["ev"]],
-            witness=witness, origin="rules", comparison_id=cmp["id"],
+            "conflict", f"{obj} определяется по разным датам: «{a['event']}» и «{b['event']}»",
+            f"Операция с моментом «{a['event']}» 31 января в 23:58 и моментом «{b['event']}» 1 февраля в 00:03 "
+            f"по {wa} относится к январю, по {wb} — к февралю. От выбора зависят месяц начисления и правило, "
+            f"которое к ней применяется; тест на стык месяцев нельзя написать однозначно.",
+            [a["ev"], b["ev"]], witness=witness, origin="rules", comparison_id=cmp["id"], cause_object=obj,
+            blocked_decision=(f"по какой дате относить операцию к периоду «{obj.lower()}» — «{a['event']}» или "
+                              f"«{b['event']}» — и какой месяц ожидать в тесте на стыке"),
+            recommendation=f"Оставить одно правило для «{obj.lower()}» (одну дату и часовой пояс) и исправить второе место.",
+            places=[{"where": wa, **a["ev"]}, {"where": wb, **b["ev"]}],
             checks={"evidence": "program", "preconditions": "program", "outcomes": "program"},
+        ))
+
+    def _where(self, ev: dict) -> str:
+        """«КЭШ-2 (Функциональные требования, строка 7)»: требование, раздел и место в исходнике."""
+        labels = {r.id: r.label for r in self.reqs}
+        rids = [labels.get(x, x) for x in self.req_ids_for(ev)]
+        sec = self.view.section(ev["block_id"])
+        sp = self.view.lines(ev["block_id"])
+        loc = ""
+        if sp:
+            loc = (f"строка {sp[1]}" if sp[1] == sp[2] else f"строки {sp[1]}–{sp[2]}") if sp[0] == "line" else f"стр. {sp[1]}"
+        place = ", ".join(x for x in (strip_md(sec[-1]) if sec else "", loc) if x)
+        return f"{', '.join(rids)} ({place})" if rids else place
+
+    # ----------------------------------------------------------- нет правила привязки при смене правила на границе
+    _GOVERNED = re.compile(r"(ставк\w*|тариф\w*|комисси\w*|кэшб[эе]к\w*|кешб[эе]к\w*|лимит\w*|цен[аы]\w*)(\s+[а-яё]+)?", re.I)
+    _DATE_KINDS = re.compile(r"дат\w*\s+(совершени\w*|проведени\w*|списани\w*|авторизаци\w*|клиринг\w*|зачислени\w*)", re.I)
+
+    def _missing_anchor(self, anchors: list, dated: list) -> None:
+        """Значение меняется на границе дат («до 31 марта — 1 %», «с 1 апреля — 2 %»), но правила, по какой
+        дате относить событие к периоду, нет, а событие в документе имеет моменты по разные стороны границы."""
+        if len(dated) < 2 or len({norm(r["value"]) for r in dated}) < 2:
+            return
+        if any(a["gran"] in ("month", "value") for a in anchors):
+            return
+        straddle = None
+        for acc in self.acc:
+            stamps = find_stamps(acc.text)
+            sides = []
+            for st in stamps:
+                hits = [r for r in dated if self._in_interval(st.in_offset(st.offset), r) is True]
+                sides.append(tuple(sorted({norm(r["value"]) for r in hits})))
+            if len(stamps) >= 2 and all(sides) and len(set(sides)) > 1:
+                straddle = (acc, stamps, sides)
+                break
+        kinds_ev = []
+        for bid in self.view.ids:
+            if self.view.group(bid) in ("template", "heading", "testing"):
+                continue
+            t = self.view.text(bid)
+            for m in self._DATE_KINDS.finditer(t):
+                kinds_ev.append((norm(m.group(1))[:6], {"block_id": bid, "start": m.start(), "end": m.end(), "quote": t[m.start():m.end()]}))
+        if straddle is None and len({k for k, _ in kinds_ev}) < 2:
+            return
+        gm = self._GOVERNED.search(dated[0]["ev"]["quote"])
+        obj = (gm.group(0).strip() if gm else "значение правила").lower()
+        rule_hints = [r["ev"] for r in dated]
+        inspected = [b for b in self.view.ids if self.view.role.get(b) not in ("heading", "template")
+                     and self.view.group(b) not in ("acceptance", "testing")]
+        sections = list(dict.fromkeys(" / ".join(strip_md(x) for x in self.view.section(b)[1:]) or self.view.scope(b)
+                                      for b in inspected))
+        spans = [s for s in (self.view.lines(b) for b in inspected) if s]
+        span = None
+        if spans:
+            kind = "строки" if spans[0][0] == "line" else "страницы"
+            span = f"{kind} {min(s[1] for s in spans)}–{max(s[2] for s in spans)}"
+        values = " и ".join(dict.fromkeys(r["value"] for r in dated))
+        if straddle:
+            acc, stamps, sides = straddle
+            ev_st = [{"block_id": acc.block_id, "start": acc.base + st.start, "end": acc.base + st.end,
+                      "quote": self.view.text(acc.block_id)[acc.base + st.start: acc.base + st.end]} for st in stamps]
+            moments = " и ".join(f"«{st.text}»" for st in stamps)
+            question = (f"По какой дате определяется {obj} на границе периода? В примере «{acc.label}» моменты {moments} "
+                        f"попадают под разные значения ({values}). Какое значение применить и в каком часовом поясе "
+                        f"считать границу?")
+            hints = rule_hints + ev_st
+            impact = (f"Для события из примера «{acc.label}» ({moments}) документ допускает оба значения: {values}. "
+                      f"Разработчик и тестировщик выберут дату сами, и результаты разойдутся.")
+        else:
+            kinds = " и ".join(dict.fromkeys(f"«{e['quote']}»" for _, e in kinds_ev))
+            question = (f"По какой дате определяется {obj} на границе периода: документ упоминает {kinds}, "
+                        f"а значения разные ({values}). Какую дату брать и в каком часовом поясе?")
+            hints = rule_hints + [e for _, e in kinds_ev][:2]
+            impact = f"Значение «{obj}» меняется на границе дат ({values}), но не сказано, по какой дате это решать."
+        self.log("period_anchor", "undetermined", f"Нет правила, по какой дате применять «{obj}»: {question}")
+        self.add(make_candidate(
+            "missing_rule", f"Нет правила, по какой дате определяется «{obj}» на границе периода", impact, hints,
+            origin="rules", question=question, inspected_block_ids=inspected,
+            inspected_scope={"sections": sections, "span": span},
+            searched_for=[f"правило вида «… определяется по дате …» для «{obj}», расчётного месяца или периода",
+                          "указание, к какой дате (совершения, проведения, списания) относится граница «до …» / «с …»",
+                          "часовой пояс границы периода"],
+            found=[f"«{r['ev']['quote']}»" for r in dated],
+            blocked_decision=f"какое значение «{obj}» применить к событию на границе периода и что ожидать в тесте",
         ))
 
     # ----------------------------------------------------------- обещанный метод без контракта
@@ -1017,16 +1123,29 @@ class CrossReview:
         us: list[Unit] = []
         acc_blocks = {a.block_id for a in self.acc}
         used = set(acc_blocks)
+        seen_units: set = set()
         for r in self.reqs:
             bids = [b for b in r.block_ids if b not in acc_blocks and self.view.role.get(b) not in ("template", "heading")]
             if not bids:
                 continue
             b0 = bids[0]
-            q = self.view.text(b0).rstrip()
             g = self.view.group(b0)
-            us.append(Unit(r.label, g if g not in ("other",) else "business_rules", b0,
-                           "\n".join(self.view.text(b).rstrip() for b in bids),
-                           {"block_id": b0, "start": 0, "end": len(q), "quote": q}, r.id, r.label))
+            # атомарная нарезка: своё предложение (evidence-спан), а не весь блок, иначе пары дублируются
+            spans = [e for e in r.evidence if str(e.get("block_id")) in bids and isinstance(e.get("start"), int)
+                     and isinstance(e.get("end"), int)]
+            if spans:
+                text = "\n".join(self.view.text(str(e["block_id"]))[e["start"]:e["end"]] for e in spans)
+                e0 = spans[0]
+                hint = {"block_id": str(e0["block_id"]), "start": e0["start"], "end": e0["end"],
+                        "quote": self.view.text(str(e0["block_id"]))[e0["start"]:e0["end"]]}
+            else:
+                q = self.view.text(b0).rstrip()
+                text = "\n".join(self.view.text(b).rstrip() for b in bids)
+                hint = {"block_id": b0, "start": 0, "end": len(q), "quote": q}
+            if (b0, text) in seen_units:
+                continue
+            seen_units.add((b0, text))
+            us.append(Unit(r.label, g if g not in ("other",) else "business_rules", b0, text, hint, r.id, r.label))
             used |= set(bids)
         for a in self.acc:
             us.append(Unit(a.aid, "acceptance", a.block_id, a.text, a.hint, a.req_id, a.label))
@@ -1206,11 +1325,13 @@ class CrossReview:
             promise = self.resolver(self._hint_or(r.get("promise"), a.block_id, as_dict(r.get("a")).get("quote") or a.hint["quote"]))
             if promise is None:
                 return
-            api_blocks = [x for x in self.view.ids if self.view.group(x) == "api"]
+            sub = "missing_contract" if b.group == "api" else "missing_rule"
+            inspected = [x for x in self.view.ids if self.view.group(x) == b.group and self.view.role.get(x) != "heading"]
             self.add(make_candidate(
-                "missing_contract", str(r.get("title") or f"Обещание без контракта: {a.label}"),
-                str(r.get("impact") or "Обещанная операция не описана в контракте."), [promise], origin="llm",
-                inspected_block_ids=api_blocks, searched_for=list(r.get("searched_for") or []), promise=promise, slots=slots))
+                sub, str(r.get("title") or f"Обещание без опоры в разделе «{ROLE_RU.get(b.group, b.group)}»: {a.label}"),
+                str(r.get("impact") or "Обещанное не описано в просмотренном разделе."), [promise], origin="llm",
+                inspected_block_ids=inspected, searched_for=[x for x in (r.get("searched_for") or []) if x],
+                promise=promise, slots=slots, question=str(r.get("question") or "") or None))
             return
         status, details = self.verify(r, a, b)
         if status == "verified":

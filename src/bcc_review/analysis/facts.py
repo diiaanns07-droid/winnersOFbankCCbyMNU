@@ -1689,20 +1689,23 @@ def merge_hints(facts: list[Fact], fact_hints: Any, resolver: Resolver, warnings
 _DEFAULT_CRITERIA = {
     "conflict": ("set_consistent", "critical"),
     "missing_contract": ("set_complete", "critical"),
+    "missing_rule": ("set_complete", "critical"),
     "question": ("set_consistent", "major"),
     "type_question": ("set_consistent", "minor"),
 }
-CONTRACT_KIND = {"conflict": "conflict", "missing_contract": "omission", "question": "ambiguity",
+CONTRACT_KIND = {"conflict": "conflict", "missing_contract": "omission", "missing_rule": "omission", "question": "ambiguity",
                  "type_question": "ambiguity"}
 _BLOCKED = {
     "conflict": "какой исход реализовать и какой ожидать в тесте для общего входа",
     "missing_contract": "как клиенту выполнить обещанную операцию и чем её проверить",
+    "missing_rule": "какое правило применить в ситуации, которую текст не определяет",
     "question": "какой исход заложить в реализацию и в тест",
     "type_question": "как сериализовать поле в контрактных тестах",
 }
 _RECOMMEND = {
     "conflict": "Выбрать один исход для этого входа, исправить вторую формулировку и добавить пример приёмки на этот вход.",
     "missing_contract": "Описать метод для обещанной операции (URL, REST type, параметры, ответ, статусы) или убрать обещание.",
+    "missing_rule": "Добавить правило, по которому однозначно выбирается исход, и пример приёмки на границе.",
     "question": "Уточнить условие у автора требования и зафиксировать исход в тексте и в приёмке.",
     "type_question": "Указать формат поля в ответе и правило преобразования из запроса.",
 }
