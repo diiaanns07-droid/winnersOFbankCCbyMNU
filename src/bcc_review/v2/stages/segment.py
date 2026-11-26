@@ -105,13 +105,18 @@ def _raw_source_lines(view: dict) -> list[str] | None:
 def heading_lines(view: dict) -> set[int]:
     """Номера строк-заголовков.
 
-    Признаки (любой): флаг строки от docview (`heading`/`is_heading`/`kind == heading`); строка исходного MD
-    начинается с «#»; текст строки совпадает с последним элементом её раздела (`section`).
+    Признаки (любой): текст строки совпадает с названием документа; флаг строки от docview
+    (`heading`/`is_heading`/`kind == heading`); строка исходного MD начинается с «#»; текст строки совпадает
+    с последним элементом её раздела (`section`).
     """
     out: set[int] = set()
     raw = _raw_source_lines(view)
+    title = _norm_heading(str(view.get("title") or ""))
     for ln in _lines(view):
         n = int(ln.get("n") or 0)
+        if title and _norm_heading(_text(ln)) == title:
+            out.add(n)  # заголовок документа: docview убирает его из `section`
+            continue
         if ln.get("heading") or ln.get("is_heading") or ln.get("kind") == "heading" or ln.get("level"):
             out.add(n)
             continue
@@ -511,6 +516,19 @@ def _followup_text(view: dict, uncovered: list[int]) -> str:
     return "\n".join(rows)
 
 
+def _done_table(requirements: list[dict], limit: int = 200) -> str:
+    rows = [f"L{r['line_start']:03d}–L{r['line_end']:03d} | {r.get('source_id') or '—'} | {r.get('kind', '')} | "
+            f"{r.get('summary', '')}" for r in requirements[:limit]]
+    return "\n".join(rows) or "(пока ничего)"
+
+
+def followup_task(task: str, follow_task: str, view: dict, uncovered: list[int], done: list[dict]) -> str:
+    """Текст дозапроса: правила нарезки + уже выделенные требования + непокрытые строки."""
+    body = follow_task.replace("{{uncovered}}", _followup_text(view, uncovered))
+    return (f"{task}\n\n<уже_выделено>\nстроки | source_id | вид | кратко\n{_done_table(done)}\n"
+            f"</уже_выделено>\n\n{body}")
+
+
 def _llm_available(ctx: Any) -> bool:
     llm = getattr(ctx, "llm", None)
     if llm is None or not callable(getattr(llm, "ask", None)):
@@ -637,10 +655,11 @@ def finalize(view: dict, raw: dict, headings: set[int] | None = None) -> tuple[l
     return reqs, excl
 
 
-def segment_from_response(view: dict, raw: dict, followup: Callable[[list[int]], dict] | None = None) -> dict:
+def segment_from_response(view: dict, raw: dict,
+                          followup: Callable[[list[int], list[dict]], dict] | None = None) -> dict:
     """Чистая часть этапа: ответ модели → требования с ID, исключения, покрытие.
 
-    `followup(uncovered) -> ответ модели` вызывается, если остались непокрытые строки.
+    `followup(uncovered, requirements) -> ответ модели` вызывается, если остались непокрытые строки.
     """
     headings = heading_lines(view)
     reqs, excl = finalize(view, raw, headings)
@@ -650,7 +669,7 @@ def segment_from_response(view: dict, raw: dict, followup: Callable[[list[int]],
     if uncovered and followup is not None:
         followup_calls = 1
         try:
-            extra = followup(uncovered) or {}
+            extra = followup(uncovered, reqs) or {}
             r2, e2 = finalize(view, extra, headings)
             reqs, excl = merge_items(reqs + r2, excl + e2)
         except Exception:  # noqa: BLE001 — дозапрос не обязателен: ниже код закроет пробелы сам
@@ -695,9 +714,8 @@ def run(ctx: Any) -> dict:
             failed = True
             _warn(ctx, f"Нарезка строк {start}–{end} не удалась: {exc}")
 
-    def followup(uncovered: list[int]) -> dict:
-        user = build_user(view, int(lines[0]["n"]), total, follow_task.replace(
-            "{{uncovered}}", _followup_text(view, uncovered)))
+    def followup(uncovered: list[int], done: list[dict]) -> dict:
+        user = build_user(view, int(lines[0]["n"]), total, followup_task(task, follow_task, view, uncovered, done))
         return ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS)
 
     if not raw["requirements"] and failed:

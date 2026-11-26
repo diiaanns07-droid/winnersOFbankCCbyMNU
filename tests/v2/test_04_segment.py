@@ -145,7 +145,7 @@ def test_dropped_requirement_is_detected_and_followup_called(official_view):
     raw["requirements"] = [r for r in raw["requirements"] if r["line_start"] != 46]
     calls = []
 
-    def followup(uncovered):
+    def followup(uncovered, done):
         calls.append(list(uncovered))
         return {"requirements": [{"source_id": "", "kind": "nonfunctional", "section": "", "summary": "НФТ",
                                   "quote": "Сервис передаёт push", "line_start": 46, "line_end": 46}],
@@ -161,7 +161,7 @@ def test_gaps_filled_by_code_when_followup_fails(official_view):
     raw = _official_raw()
     raw["requirements"] = [r for r in raw["requirements"] if r["line_start"] not in (46, 142)]
 
-    def followup(uncovered):
+    def followup(uncovered, done):
         raise RuntimeError("модель недоступна")
 
     out = sg.segment_from_response(official_view, raw, followup)
