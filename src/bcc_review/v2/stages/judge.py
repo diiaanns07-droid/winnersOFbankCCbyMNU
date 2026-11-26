@@ -201,12 +201,23 @@ def assign_schema() -> dict:
         "candidate_id": _S,
         "decision": {"type": "string", "enum": ["merge", "new", "reject"]},
         "finding_key": _S,
-        "reason_code": {"type": "string", "enum": [""] + _MODEL_REJECT_CODES},
+        "reason_code": _S,  # код причины при reject (проверяется кодом); иначе пустая строка
         "reason": _S,
         "title": _S,
         "severity": {"type": "string", "enum": SEVERITIES},
     })
     return _obj({"assignments": {"type": "array", "items": item}})
+
+
+def check_schema() -> dict:
+    """Схема второй проверки серьёзности (только понижение)."""
+    item = _obj({
+        "key": _S,
+        "basis": _S,
+        "severity": {"type": "string", "enum": SEVERITIES},
+        "reason": _S,
+    })
+    return _obj({"checks": {"type": "array", "items": item}, "verdict_summary": _S})
 
 
 # --- утилиты -----------------------------------------------------------------------------------
@@ -497,6 +508,13 @@ def _requirements_of(ctx: Any) -> list[dict]:
     if isinstance(reqs, dict):
         reqs = reqs.get("requirements")
     return list(reqs or [])
+
+
+def _option(ctx: Any, name: str, default: Any) -> Any:
+    opts = getattr(ctx, "options", None)
+    if isinstance(opts, dict):
+        return opts.get(name, default)
+    return getattr(opts, name, default) if opts is not None else default
 
 
 def _view_of(ctx: Any) -> dict:
@@ -900,8 +918,10 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             f[field] = _replace_keys(f[field], {k: v for k, v in key_map.items() if not k.startswith("C-")})
 
     fix_first = [f["id"] for f in sorted((f for f in clean if f["priority"] > 0), key=lambda f: f["priority"])]
+    changes = [{"id": key_map[k], **v} for k, v in (response.get("_checks") or {}).items() if k in key_map]
+    changes.sort(key=lambda x: x["id"])
     return {"findings": clean, "rejected": rejected, "checklist": final_check, "verdict_summary": summary,
-            "fix_first": fix_first, "warnings": warnings, "_placed": placed}
+            "fix_first": fix_first, "severity_changes": changes, "warnings": warnings, "_placed": placed}
 
 
 def _public(f: dict) -> dict:
@@ -980,8 +1000,10 @@ def _repair_missing(ctx: Any, missing: list[dict], response: dict, warnings: lis
         dec = _s(a.get("decision"))
         if dec == "merge" and _s(a.get("finding_key")) in keys:
             keys[_s(a.get("finding_key"))]["candidate_ids"].append(cid)
-        elif dec == "reject" and _s(a.get("reason_code")) in _MODEL_REJECT_CODES:
-            resp["rejected"].append({"candidate_id": cid, "reason_code": a["reason_code"],
+        elif dec == "reject":
+            code = _s(a.get("reason_code"))
+            resp["rejected"].append({"candidate_id": cid,
+                                     "reason_code": code if code in _MODEL_REJECT_CODES else "unrelated",
                                      "reason": _s(a.get("reason")), "line": 0})
         else:
             n_new += 1
@@ -995,6 +1017,71 @@ def _repair_missing(ctx: Any, missing: list[dict], response: dict, warnings: lis
             resp["findings"].append(nf)
             keys[nf["key"]] = nf
     return resp
+
+
+# --- вторая проверка серьёзности -----------------------------------------------------------------
+
+
+def _render_check(f: dict, members: list[dict]) -> str:
+    base = next((m for m in members if m["id"] == _s(f.get("base"))), members[0])
+    ev = _pick_evidence(members, base)
+    out = [f"{_s(f.get('key'))} · {_s(f.get('severity'))} · {_s(f.get('kind'))}/{_s(f.get('criterion'))} · "
+           f"основание судьи: {_cut(f.get('severity_basis'), 200) or '—'}",
+           f"  title: {_cut(_s(f.get('title')) or _s(base.get('title')), 200)}",
+           f"  problem: {_cut(_s(f.get('problem')) or _s(base.get('problem')), 500)}"]
+    scen = _s(f.get("scenario")) or _s(base.get("scenario"))
+    if scen:
+        out.append(f"  scenario: {_cut(scen, 400)}")
+    if ev:
+        out.append("  цитаты: " + "; ".join(f"L{e['line_start']:03d} «{_cut(e['quote'], 160)}»" for e in ev))
+    return "\n".join(out)
+
+
+def _check_severity(ctx: Any, response: dict, by_id: dict[str, dict], warnings: list[str]) -> dict:
+    """Второй короткий вызов: перепроверка critical и major по шкале; уровень можно только понизить."""
+    todo = []
+    for f in response.get("findings") or []:
+        if _s(f.get("severity")) not in {"critical", "major"}:
+            continue
+        members = [by_id[c] for c in (_s(x) for x in f.get("candidate_ids") or []) if c in by_id]
+        if members:
+            todo.append((f, members))
+    if not todo:
+        return response
+    block = "\n\n".join(_render_check(f, m) for f, m in todo)
+    summary = _s(response.get("verdict_summary")) or "—"
+    prompt = getattr(ctx, "prompt", None)
+    if callable(prompt):
+        system, user = prompt("judge_check", findings=block, summary=summary)
+    else:
+        from pathlib import Path
+        tpl = (Path(__file__).resolve().parents[1] / "prompts" / "judge_check.md").read_text(encoding="utf-8")
+        system, user = "", tpl.replace("{{findings}}", block).replace("{{summary}}", summary)
+    data = _ask(ctx, system, user, check_schema())
+    by_key = {_s(f.get("key")): f for f, _ in todo}
+    changes: dict[str, dict] = dict(response.get("_checks") or {})
+    for ch in data.get("checks") or []:
+        f = by_key.get(_s(ch.get("key")))
+        new = _s(ch.get("severity"))
+        if f is None or new not in SEV_RANK:
+            continue
+        old = _s(f.get("severity"))
+        if SEV_RANK[new] <= SEV_RANK[old]:
+            continue  # повышать нельзя; без изменений — пропускаем
+        if old == "critical" and new == "minor":
+            new = "major"  # не больше одной ступени за раз
+        f["severity"] = new
+        changes[_s(f.get("key"))] = {"from": old, "to": new, "reason": _cut(ch.get("reason"), 300),
+                                     "basis": _cut(ch.get("basis"), 200)}
+    out = {**response, "_checks": changes}
+    if any(v["from"] == "critical" for v in changes.values()):
+        out["verdict_summary"] = _s(data.get("verdict_summary"))  # пусто → код напишет сам
+    if changes:
+        down = [v for v in changes.values()]
+        _warn(ctx, warnings, f"проверка серьёзности понизила {len(down)} дефект(ов): "
+              f"critical→major {sum(1 for v in down if v['from'] == 'critical')}, "
+              f"major→minor {sum(1 for v in down if v['from'] == 'major')}")
+    return out
 
 
 # --- запасной реестр без модели --------------------------------------------------------------------
@@ -1093,6 +1180,13 @@ def run(ctx: Any, candidates: list[dict]) -> dict:
             _warn(ctx, warnings, f"судья пропустил {len(missing)} кандидат(ов); распределены повторным вызовом")
         except Exception as exc:  # noqa: BLE001
             _warn(ctx, warnings, f"повторный вызов судьи не удался ({type(exc).__name__})")
+
+    if getattr(ctx, "llm", None) is not None and not response.get("_fallback") and _option(ctx, "judge_check", True):
+        try:
+            response = _check_severity(ctx, response, {c["id"]: c for c in good}, warnings)
+        except Exception as exc:  # noqa: BLE001
+            _warn(ctx, warnings, f"вторая проверка серьёзности не удалась ({type(exc).__name__}); "
+                                 "оставлены уровни судьи")
 
     result = assemble(response, good, clusters, requirements=requirements, checklist=items, ctx=ctx,
                       warnings=warnings, pre_rejected=pre_rejected)

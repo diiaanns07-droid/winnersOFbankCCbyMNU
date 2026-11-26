@@ -54,8 +54,9 @@ class FakeLLM:
 
 
 class Ctx:
-    def __init__(self, llm=None, view=None, requirements=None):
+    def __init__(self, llm=None, view=None, requirements=None, options=None):
         self.llm = llm
+        self.options = {"judge_check": False} if options is None else options
         self.view = view if view is not None else simple_view(OFFICIAL)
         self.requirements = requirements if requirements is not None else json.loads(
             SEGMENT.read_text(encoding="utf-8"))["requirements"]
@@ -430,5 +431,48 @@ FORBIDDEN = ["push", "savelimit", "тиын", "порог", "алмат", "ф-1"
 def test_prompt_has_no_official_document_words():
     text = (SRC / "bcc_review" / "v2" / "prompts" / "judge.md").read_text(encoding="utf-8").lower()
     assert "{{candidates}}" in text and "{{checklist}}" in text
+    check = (SRC / "bcc_review" / "v2" / "prompts" / "judge_check.md").read_text(encoding="utf-8").lower()
+    assert "{{findings}}" in check and "{{summary}}" in check
     for w in FORBIDDEN:
         assert w not in text, w
+        assert w not in check, w
+
+
+def test_severity_check_only_lowers_and_rewrites_summary():
+    cs = [cand("C-001", 39, "максимум один такой push", kind="contradiction", criterion="set_consistent",
+               extra=[(40, "следующее достижение вызывает push")]),
+          cand("C-002", 21, "сообщение оператора связи", kind="missing_element", criterion="set_complete"),
+          cand("C-003", 46, "в течение минуты", kind="unverifiable", criterion="verifiable"),
+          cand("C-004", 49, "сумму покупки в тиынах", kind="unit_mismatch", criterion="correct")]
+    fs = [finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
+                  scenario="Вход: два исхода.", impact="Две реализации.", priority=1),
+          finding("F02", ["C-002"], severity="critical", kind="missing_element", criterion="set_complete",
+                  scenario="Нет интерфейса.", impact="Не реализовать.", priority=2),
+          finding("F03", ["C-003"], severity="major", kind="unverifiable", criterion="verifiable"),
+          finding("F04", ["C-004"], severity="minor", kind="unit_mismatch", criterion="correct")]
+    check = {"checks": [
+        {"key": "F01", "basis": "(а) L039 и L040", "severity": "critical", "reason": ""},
+        {"key": "F02", "basis": "нет обещания", "severity": "minor", "reason": "Документ не обещал интерфейс."},
+        {"key": "F03", "basis": "нет основания", "severity": "minor", "reason": "Второстепенный показатель."},
+        {"key": "F04", "basis": "м1", "severity": "critical", "reason": ""},   # повышать нельзя
+    ], "verdict_summary": "Нельзя начинать: F01 — противоречие."}
+    llm = FakeLLM(response(fs, summary="Нельзя: F01 и F02."), check)
+    res = judge.run(Ctx(llm, options={}), cs)
+    assert len(llm.calls) == 2
+    assert "<дефекты>" in llm.calls[1]["user"] and "F04" not in llm.calls[1]["user"]   # minor не проверяется
+    sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert sev == {"C-001": "critical", "C-002": "major", "C-003": "minor", "C-004": "minor"}
+    assert res["verdict_summary"] == "Нельзя начинать: D-01 — противоречие."
+    ch = {c["from"] + ">" + c["to"] for c in res["severity_changes"]}
+    assert ch == {"critical>major", "major>minor"}
+    assert any("проверка серьёзности" in w for w in res["warnings"])
+
+
+def test_severity_check_failure_keeps_judge_levels():
+    cs = [cand("C-001", 39, "максимум один такой push", kind="contradiction", criterion="set_consistent",
+               extra=[(40, "следующее достижение вызывает push")])]
+    fs = [finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
+                  scenario="Вход: два исхода.", impact="Две реализации.", priority=1)]
+    res = judge.run(Ctx(FakeLLM(response(fs), RuntimeError("503")), options={}), cs)
+    assert res["findings"][0]["severity"] == "critical"
+    assert any("вторая проверка" in w for w in res["warnings"])
