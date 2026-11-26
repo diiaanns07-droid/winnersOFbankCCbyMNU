@@ -939,6 +939,15 @@ def _passport(report: dict) -> str:
         ("SHA-256 документа", f'<code class="hash">{e(doc.get("sha256", "—"))}</code>'),
         ("Схема отчёта", e(report.get("schema", "—"))),
     ]
+    qs = report.get("quote_stats") or {}
+    if qs.get("quotes"):
+        how = ", ".join(f"{lbl} {qs[k]}" for k, lbl in (("exact", "дословно"), ("normalized", "после нормализации"),
+                                                          ("fuzzy", "нечётко"), ("missing", "не найдено")) if qs.get(k))
+        rows.insert(10, ("Сверка цитат кодом", f'{_fmt_int(qs.get("verified", 0))} из {_fmt_int(qs["quotes"])} цитат '
+                                               f'всех кандидатов найдены в документе <span class="muted">({e(how)})</span>'))
+    if qs.get("candidates_in") is not None:
+        rows.insert(11, ("Кандидаты", f'{_fmt_int(qs.get("candidates_in", 0))} от ревьюеров → {_fmt_int(qs.get("candidates_kept", 0))} '
+                                      f'с найденными цитатами → судье; отклонено {_fmt_int(qs.get("candidates_rejected", 0))}'))
     kv = "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in rows)
     stages = dict(run.get("stages") or {})
     stats = run.get("stage_stats") or {}
