@@ -169,3 +169,29 @@ def test_layout_fixes_do_not_touch_official_and_corpus():
     for case, n in (("autopay", 71), ("cardblock", 62), ("cashback", 62), ("transfer_limit", 56)):
         v = dv.load(ROOT / f"evaluation/dev/corpus/cases/{case}.base/source.pdf")
         assert len(v["lines"]) == n and v["warnings"] == [], case
+
+
+@needs_docx
+def test_official_docx_parity():
+    """release/input/requirements.docx (из MD, make_official_docx.py): все строки MD и все цитаты эталона на месте;
+    нумерация DOCX совпадает с PDF построчно — фикстура нарезки official_pdf годится и для DOCX."""
+    import json
+    md = dv.load(ROOT / "release/input/requirements.md")
+    dx = dv.load(ROOT / "release/input/requirements.docx")
+    assert dx["title"] == md["title"] and dx["warnings"] == [] and len(dx["lines"]) == 128
+    assert [ln["n"] for ln in dv.nonempty(md) if not Q.verify_quote(dx, ln["text"])] == []
+    assert "1. Проверить пользовательскую сессию." in _texts(dx) and "3. Изменение порога сохраняет накопленные расходы." in _texts(dx)
+    ref = json.loads((ROOT / "tests/v2/fixtures/03_reference_quotes.json").read_text(encoding="utf-8"))["quotes"]
+    for r in ref:
+        mm = Q.verify_quote(md, r["quote"], r["line"])
+        loc = Q.verify_quote(dx, dv.line(md, r["line"])["text"])
+        m = Q.verify_quote(dx, r["quote"], loc["line_start"])
+        assert m and m["section"] == mm["section"] and loc["line_start"] <= m["line_start"] <= loc["line_end"], r
+    if _has("pymupdf"):
+        pdf = dv.load(ROOT / "release/input/requirements.pdf")
+        same = sum(Q.normalize(a["text"]) == Q.normalize(b["text"]) for a, b in zip(dx["lines"], pdf["lines"]))
+        assert same >= 127
+    seg = json.loads((ROOT / "tests/v2/fixtures/official_pdf/segment.json").read_text(encoding="utf-8"))
+    for r in seg["requirements"]:
+        m = Q.verify_quote(dx, r["quote"], r["line_start"])
+        assert m and r["line_start"] - 2 <= m["line_start"] <= r["line_end"] + 2, r["id"]
