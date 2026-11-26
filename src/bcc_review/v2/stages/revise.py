@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -146,6 +147,64 @@ def _shape_insert(new: str, anchor: str) -> str:
     return t
 
 
+_SEP_CELL = re.compile(r"^\s*:?-{3,}:?\s*$")
+
+
+def _is_sep(row: str) -> bool:
+    cells = [c for c in row.strip().strip("|").split("|")]
+    return bool(cells) and all(_SEP_CELL.match(c) for c in cells)
+
+
+def _is_json(line: str) -> bool:
+    t = line.strip()
+    if not (t[:1] in "{[" and t[-1:] in "}]"):
+        return False
+    try:
+        json.loads(t)
+        return True
+    except ValueError:
+        return False
+
+
+def _shape_block(rows: list[str], anchor: str) -> list[tuple[str, str]]:
+    """Вставляемые строки → разметка документа: строки с « | » — таблица (с разделителем, если она новая),
+    строки-JSON — блок кода, остальное — в стиле соседней строки. Возвращает ``[(строка, вид)]``,
+    вид: ``mark`` — с пометкой, ``raw`` — как есть (разделитель таблицы, граница блока кода), ``note`` — пометка."""
+    out: list[tuple[str, str]] = []
+    i = 0
+    in_table = _is_row(anchor)
+    while i < len(rows):
+        t = rows[i].strip()
+        if _is_json(t):
+            j = i
+            while j < len(rows) and _is_json(rows[j]):
+                j += 1
+            out += [("```json", "raw")] + [(r.strip(), "raw") for r in rows[i:j]] + [("```", "raw"), ("", "note")]
+            i = j
+            continue
+        if " | " in t or _is_row(t):
+            j = i
+            while j < len(rows) and (" | " in rows[j] or _is_row(rows[j].strip())):
+                j += 1
+            block = ["| " + r.strip().strip("|").strip() + " |" for r in rows[i:j]]
+            if in_table or j - i == 1 and _is_row(anchor):
+                out += [(b, "raw" if _is_sep(b) else "mark") for b in block]
+            elif j - i >= 2:
+                ncols = block[0].count("|") - 1
+                if not _is_sep(block[1]):
+                    block.insert(1, "| " + " | ".join([":---"] * ncols) + " |")
+                if out and out[-1][0].strip():
+                    out.append(("", "raw"))  # таблице нужна пустая строка перед ней
+                out += [(b, "raw" if _is_sep(b) else "mark") for b in block]
+            else:
+                out.append((t, "mark"))
+            i = j
+            continue
+        out.append((_shape_insert(t, anchor), "mark"))
+        i += 1
+    return out
+
+
 def _with_mark(text: str, mark: str) -> str:
     if _is_row(text):
         t = text.rstrip()
@@ -230,8 +289,8 @@ def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | No
                     anchor += 1  # строки таблицы после заголовка раздела — в конец таблицы
                     while anchor + 1 < n and _is_row(lines[anchor + 1]):
                         anchor += 1
-                for s in new_rows:
-                    inserts.setdefault(anchor, []).append((_shape_insert(s, lines[anchor]), fid))
+                for text_, kind in _shape_block(new_rows, lines[anchor]):
+                    inserts.setdefault(anchor, []).append((text_, fid, kind))
                 rec.update(applied=True, line=anchor + 1, was="")
                 stats["inserted"] += len(new_rows)
             else:
@@ -287,8 +346,13 @@ def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | No
             out.append(_with_mark(s, f"[изменено: {', '.join(fids)}]"))
         else:
             out.append(s)
-        for row, fid in inserts.get(i, []):
-            out.append(_with_mark(row, f"[добавлено: {fid}]"))
+        for row, fid, kind in inserts.get(i, []):
+            if kind == "mark":
+                out.append(_with_mark(row, f"[добавлено: {fid}]"))
+            elif kind == "note":
+                out.append(f"[добавлено: {fid} — пример выше]")
+            else:
+                out.append(row)
     return {"markdown": "\n".join(out) + "\n", "rewrites": out_rewrites, "stats": stats}
 
 

@@ -206,6 +206,13 @@ def _tokens(s: str) -> set[str]:
     return {w if len(w) <= 4 else w[:min(6, max(4, len(w) - 2))] for w in words}
 
 
+def _text_score(text: str, q: dict) -> float:
+    """Доля слов темы и вопроса, встречающихся в самом ответе."""
+    a = _tokens(text)
+    b = _tokens(f"{q.get('topic', '')} {q.get('question', '')}")
+    return len(a & b) / max(1, len(b)) if a and b else 0.0
+
+
 def _topic_score(hint: str, q: dict) -> float:
     """Доля слов подсказки в теме (вес 2) и в тексте вопроса (вес 1)."""
     h = _tokens(hint)
@@ -221,26 +228,41 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     by_id = {q["id"]: q for q in questions}
     answered: dict[str, dict] = {}
     extra: list[str] = list(parsed.get("decisions") or [])
-    for a in parsed.get("answers") or []:
-        q = by_id.get(a["id"])
+    entries = list(parsed.get("answers") or [])
+    # номера вопросов от прогона к прогону меняются: ответ с темой в скобках привязывается по теме.
+    # Сопоставление глобальное: сначала самые уверенные пары «ответ — вопрос», каждый вопрос — одному ответу.
+    bound: dict[int, dict | None] = {}
+    pairs = []
+    for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
-        if hint and questions:
-            # номера вопросов от прогона к прогону меняются: при подсказке темы решает тема
-            scored = sorted(((_topic_score(hint, x), x) for x in questions),
-                            key=lambda t: (-t[0], t[1]["id"] in answered, t[1]["id"] != a["id"]))
-            s_best, best = scored[0]
-            s_second = scored[1][0] if len(scored) > 1 else 0.0
-            s_num = _topic_score(hint, q) if q is not None else -1.0
-            if s_best >= 0.4 and (s_best > s_second or s_num == s_best):
-                if best is not q and s_num < s_best:
-                    warnings.append(f"recheck: ответ {a['id']} [{hint}] отнесён к {best['id']} по теме")
-                    q = best
+        if not hint:
+            continue
+        for x in questions:
+            sc = _topic_score(hint, x) + 0.25 * _text_score(a.get("text", ""), x) + (0.01 if x["id"] == a["id"] else 0)
+            pairs.append((sc, k, x["id"]))
+    taken: set[str] = set()
+    for sc, k, qid in sorted(pairs, key=lambda t: -t[0]):
+        if sc < 0.4 or k in bound or qid in taken:
+            continue
+        bound[k] = by_id[qid]
+        taken.add(qid)
+    for k, a in enumerate(entries):
+        hint = a.get("topic_hint") or ""
+        q = by_id.get(a["id"])
+        if hint:
+            if k in bound:
+                if q is None or bound[k]["id"] != q["id"]:
+                    warnings.append(f"recheck: ответ {a['id']} [{hint}] отнесён к {bound[k]['id']} по теме")
+                q = bound[k]
             elif a.get("choice") is None and a.get("text"):
                 q = None  # тема не совпала однозначно ни с одним вопросом — это общее решение
+            elif q is not None and q["id"] in taken:
+                q = None
         if q is None:
             if a.get("text"):
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
-                warnings.append(f"recheck: {a['id']} нет среди вопросов прогона — ответ учтён как общее решение")
+                why = "тема не совпала ни с одним вопросом прогона" if hint else "такого вопроса нет в прогоне"
+                warnings.append(f"recheck: {a['id']}: {why} — ответ учтён как общее решение")
             else:
                 warnings.append(f"recheck: {a['id']} нет среди вопросов прогона — ответ пропущен")
             continue

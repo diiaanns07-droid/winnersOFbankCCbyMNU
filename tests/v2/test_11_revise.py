@@ -194,3 +194,17 @@ def test_run_modes_answers_and_revise(tmp_path):
                    "severity": "critical", "summary": "месяц по дате покупки", "action": "replace",
                    "line_start": 64, "line_end": 64, "before": "Февральский счётчик вырос на 4 000 ₸",
                    "after": "Январский счётчик вырос на 4 000 ₸", "answer_ids": [q2["id"]]}]
+
+
+def test_inserted_block_gets_markdown_shape():
+    new = ("#### Метод чтения\nПоле | Значение\nREST type | GET\nRequest URL | /x\n"
+           '{"result":"OK","amount":50000}\nСтатус 404 — карта не найдена.')
+    res = revise.apply_edits(LINES, [rw("D-03", ("insert_after", 198, "", new))])
+    out = res["markdown"].splitlines()
+    i = out.index("#### Метод чтения [добавлено: D-03]")
+    assert out[i + 1] == ""
+    assert out[i + 2] == "| Поле | Значение [добавлено: D-03] |"
+    assert out[i + 3] == "| :--- | :--- |"
+    assert out[i + 4] == "| REST type | GET [добавлено: D-03] |"
+    assert out[i + 6:i + 10] == ["```json", '{"result":"OK","amount":50000}', "```", "[добавлено: D-03 — пример выше]"]
+    assert out[i + 10] == "Статус 404 — карта не найдена. [добавлено: D-03]"
