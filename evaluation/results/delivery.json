@@ -1,0 +1,16 @@
+{
+  "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "corpus_version": "IE-corpus-1",
+  "full_vault_for_custodian_only": {
+    "file": "IE-custodian-v1.zip",
+    "bytes": 2537833,
+    "sha256": "6d90e2c56eda8fae4bd534c64f46a5abfea2a5b2e4902ecf63eb410c8bd9c8e9",
+    "members": 953
+  },
+  "six_inputs_for_operator": {
+    "file": "panel-inputs-v1.zip",
+    "bytes": 7182,
+    "sha256": "95965f89a7e6b2fe7273341f2226c676b8427092a8b41a7b5341f1af1578b623",
+    "members": 7
+  }
+}

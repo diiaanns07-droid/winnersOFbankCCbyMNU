@@ -1,0 +1,42 @@
+{
+  "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "actual_model": null,
+  "corpus_version": "IE-corpus-1",
+  "scorer_branch": "claude/sleepy-gates-1zbw4l",
+  "scorer_commit": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+  "tool_version": "0.1.2 bcc-eval-policy/1 7b54d224c8115c5ec18c71ade817df4e53911ed53324c1e3f131c06bc0dc4660",
+  "comparisons": [
+    {
+      "suite": "main",
+      "reference": "1.0",
+      "tp": 0,
+      "fp": 58,
+      "fn": 24,
+      "agreement": true
+    },
+    {
+      "suite": "main",
+      "reference": "1.1",
+      "tp": 18,
+      "fp": 40,
+      "fn": 24,
+      "agreement": true
+    },
+    {
+      "suite": "panel",
+      "reference": "1.0",
+      "tp": 0,
+      "fp": 19,
+      "fn": 6,
+      "agreement": true
+    },
+    {
+      "suite": "panel",
+      "reference": "1.1",
+      "tp": 5,
+      "fp": 14,
+      "fn": 6,
+      "agreement": true
+    }
+  ]
+}

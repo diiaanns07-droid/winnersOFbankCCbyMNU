@@ -55,19 +55,31 @@ def environment(product, mode):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--product", type=Path, required=True)
-    parser.add_argument("--vault", type=Path, required=True)
+    inputs=parser.add_mutually_exclusive_group(required=True)
+    inputs.add_argument("--vault", type=Path, help="Custodian directory with sealed reference")
+    inputs.add_argument("--input-pack", type=Path, help="Six input documents and public-hash manifest, without labels")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--mode", choices=["rules_only","rules_plus_llm"],required=True)
     parser.add_argument("--suite", choices=["all","panel"],required=True)
     args=parser.parse_args()
-    product, vault, out = map(Path.resolve,(args.product,args.vault,args.out))
+    product, out = args.product.resolve(), args.out.resolve()
     mode=args.mode
     seal=read(HERE/"seal.json")
-    corpus=vault/"corpus"
-    if digest(vault/"sealed-files.json")!=seal["corpus_index_sha256"]:
-        parser.error("Custodian index differs from public seal")
-    for rel,expected in read(vault/"sealed-files.json").items():
-        if digest(corpus/rel)!=expected: parser.error("Input hash mismatch: "+rel)
+    if args.input_pack:
+        corpus=args.input_pack.resolve()
+        if args.suite!="panel" or digest(corpus/"panel.manifest.json")!=seal["panel_manifest_sha256"]:
+            parser.error("Input-only execution requires the sealed panel manifest")
+        for case in read(corpus/"panel.manifest.json")["cases"]:
+            for render in case["renders"]:
+                if render["format"]=="md" and digest(corpus/render["path"])!=render["sha256"]:
+                    parser.error("Input hash mismatch: "+case["case_id"])
+    else:
+        vault=args.vault.resolve()
+        corpus=vault/"corpus"
+        if digest(vault/"sealed-files.json")!=seal["corpus_index_sha256"]:
+            parser.error("Custodian index differs from public seal")
+        for rel,expected in read(vault/"sealed-files.json").items():
+            if digest(corpus/rel)!=expected: parser.error("Input hash mismatch: "+rel)
     if git(product,"rev-parse","HEAD")!=seal["agent_sha"] or git(product,"status","--porcelain"):
         parser.error("Run requires a clean checkout of the exact product SHA in seal.json")
     if (product/".env").exists(): parser.error("Use the clean checkout and pass the live credential through the environment")
@@ -127,7 +139,7 @@ def main():
                     "input_tokens":(run.get("tokens") or {}).get("input"),"output_tokens":(run.get("tokens") or {}).get("output"),
                     "report":(rel/"report.json").as_posix() if rep else None,"report_sha256":digest(path) if rep else None,"contract_errors":errors}
             summaries.append(record)
-            if rep and identity and actual_ok:
+            if tech:
                 rows=report_to_rows(rep,tax,render_id=r["render_id"],case_id=cid,fmt=fmt,duration_s=wall)
             else:
                 rows=[{"record":"run","case_id":cid,"render_id":r["render_id"],"source_sha256":r["sha256"],"format":fmt,"mode":mode,"status":"failed"}]
@@ -139,7 +151,8 @@ def main():
             jsonl(out/"measurements.jsonl",summaries)
             jsonl(out/"predictions.jsonl",predictions)
             print(cid,fmt,run.get("status"),"verify",verify_rc,flush=True)
-    for name in (["main","panel"] if args.suite=="all" else ["panel"]):
+    score_suites=[] if args.input_pack else (["main","panel"] if args.suite=="all" else ["panel"])
+    for name in score_suites:
         ids={c["case_id"] for c in read(corpus/(name+".manifest.json"))["cases"]}
         selected=[x.copy() for x in predictions if x["case_id"] in ids and x.get("format")=="md"]
         for x in selected:
