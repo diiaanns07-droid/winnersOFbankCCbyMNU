@@ -42,9 +42,9 @@ SEV_LABEL = {"critical": "Критичный", "major": "Существенны�
 SEV_PLURAL = {"critical": "Критичных", "major": "Существенных", "minor": "Незначительных"}
 SEV_SHORT = {"critical": "Критичные", "major": "Существенные", "minor": "Незначительные"}
 
-VERDICT_LABEL = {"no": "Нельзя", "conditional": "С условиями", "yes": "Можно"}
+VERDICT_LABEL = {"no": "Нельзя", "conditional": "С условиями", "yes": "Можно", "undetermined": "Не определён"}
 VERDICT_HINT = {"no": "есть блокирующие дефекты", "conditional": "можно после исправления замечаний",
-                "yes": "блокирующих дефектов нет"}
+                "yes": "блокирующих дефектов нет", "undetermined": "проверка без модели: только формальные правила"}
 
 KIND_LABEL = {
     "event_conflict": "Конфликт исходов события", "status_conflict": "Конфликт статусов и кодов",
@@ -92,6 +92,7 @@ STAGE_LABEL = {
     "lens:analyst": "Линза «Аналитик»", "lens:qa": "Линза «Тестировщик»", "lens:architect": "Линза «Архитектор»",
     "lens:risk": "Линза «Риски»", "consistency": "Набор целиком", "quotes": "Сверка цитат", "judge": "Судья",
     "clarify": "Вопросы", "revise": "Исправленное ТЗ", "recheck": "Перепроверка", "report": "Отчёт",
+    "analyst": "Линза «Аналитик»", "qa": "Линза «Тестировщик»", "architect": "Линза «Архитектор»", "risk": "Линза «Риски»",
 }
 STAGE_STATE = {"ok": "готово", "partial": "частично", "failed": "ошибка", "skipped": "пропущен"}
 
@@ -402,6 +403,11 @@ def _hero(report: dict, findings: list[dict], by_id: dict) -> str:
             what += " Не завершены этапы: " + ", ".join(bad) + "."
         banner = f'<div class="banner warn" role="status">{e(what)} Подробности — во вкладке «Паспорт».</div>'
 
+    if run.get("provider") == "offline" or verdict.get("development") == "undetermined":
+        nc = report.get("not_checked") or []
+        nc_txt = (" Не проверялось: " + "; ".join(str(x.get("what", x) if isinstance(x, dict) else x) for x in nc[:6]) + ".") if nc else ""
+        banner += (f'<div class="banner info" role="status">Проверка без модели: найдены только формальные дефекты по '
+                   f'правилам, смысловые противоречия не искались.{e(nc_txt)}</div>')
     model = ", ".join(run.get("models_used") or []) or run.get("model_requested") or ""
     meta = []
     if model:
@@ -881,7 +887,7 @@ def _segmentation(report: dict, findings: list[dict]) -> str:
     return "".join(out)
 
 
-def _rejected(report: dict) -> str:
+def _rejected(report: dict, by_id: dict | None = None) -> str:
     rej = report.get("rejected") or []
     if not rej:
         return '<p class="none">Судья не отклонил ни одного кандидата.</p>'
@@ -891,7 +897,8 @@ def _rejected(report: dict) -> str:
         lines = ", ".join(_lines_label(x) for x in ev if isinstance(x, dict))
         rows.append([f'<span class="fid">{e(r.get("candidate_id") or r.get("id", ""))}</span>', e(r.get("title", "")),
                      e(_source_label(r.get("source", ""))) if r.get("source") else "", e(lines),
-                     e(r.get("reason", ""))])
+                     e(r.get("reason", "")) + (f' <span class="muted">→</span> {_finding_link(r["duplicate_of"], by_id or {})}'
+                                              if r.get("duplicate_of") else "")])
     return ('<p class="lead">Кандидаты, которые линзы предложили, а судья не включил в отчёт, — с причиной. '
             'Так видно, что точность важнее количества.</p>'
             + _table(["Кандидат", "Что предлагалось", "Кто", "Где", "Почему отклонено"], rows))
@@ -924,9 +931,25 @@ def _passport(report: dict) -> str:
         ("Схема отчёта", e(report.get("schema", "—"))),
     ]
     kv = "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in rows)
-    stages = run.get("stages") or {}
-    st = "".join(f'<li class="st st-{e(v)}"><span>{e(STAGE_LABEL.get(k, k))}</span><b>{e(STAGE_STATE.get(v, v))}</b></li>'
-                 for k, v in stages.items())
+    stages = dict(run.get("stages") or {})
+    stats = run.get("stage_stats") or {}
+    for k in stats:
+        if k not in stages and f"lens:{k}" not in stages:
+            stages[k] = "ok"
+    items = []
+    for k, v in stages.items():
+        ss = stats.get(k) or stats.get(k.split(":", 1)[-1]) or {}
+        bits = []
+        if isinstance(ss, dict):
+            if ss.get("seconds") is not None:
+                bits.append(_fmt_duration(ss["seconds"]) if ss["seconds"] >= 1 else "< 1 с")
+            if ss.get("calls"):
+                bits.append(f'{ss["calls"]} {_plural(int(ss["calls"]), "вызов", "вызова", "вызовов")}')
+            if ss.get("candidates") is not None:
+                bits.append(f'{ss["candidates"]} канд.')
+        extra = f'<small>{e(" · ".join(bits))}</small>' if bits else ""
+        items.append(f'<li class="st st-{e(v)}"><span>{e(STAGE_LABEL.get(k, k))}{extra}</span><b>{e(STAGE_STATE.get(v, v))}</b></li>')
+    st = "".join(items)
     warns = run.get("warnings") or []
     wl = "".join(f"<li>{e(w)}</li>" for w in warns)
     return (f'<div class="pgrid"><div class="tw"><table class="kv">{kv}</table></div><div>'
@@ -934,7 +957,7 @@ def _passport(report: dict) -> str:
             + (f'<h3 class="sub">Предупреждения</h3><ul class="warns">{wl}</ul>' if wl else "")
             + '<h3 class="sub">Как проверить отчёт</h3><p class="lead">Каждая цитата в замечаниях найдена в документе '
               'программой, номер строки посчитан кодом, а не моделью. Повторная сверка: '
-              '<code>python -m bcc_review.v2 verify report.json</code>.</p></div></div>')
+              '<code>python -m bcc_review.v2.verify report.json документ</code>.</p></div></div>')
 
 
 # ─────────────────────────────── сборка ───────────────────────────────
@@ -959,7 +982,7 @@ def render_html(report: dict, view: dict | None = None) -> str:
         ("checks", "Проверки", len(report.get("acceptance_checks") or []) + len(report.get("pair_checks") or []),
          _checks(report, reqs_by_id)),
         ("segment", "Нарезка", len(report.get("requirements") or []), _segmentation(report, findings)),
-        ("rejected", "Отклонённые", len(report.get("rejected") or []), _rejected(report)),
+        ("rejected", "Отклонённые", len(report.get("rejected") or []), _rejected(report, by_id)),
         ("passport", "Паспорт", None, _passport(report)),
     ]
     tabs = [t for t in tabs if t[0] not in ("clarify", "rewrites") or t[3]]

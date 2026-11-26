@@ -161,6 +161,7 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 /* ── итог ─────────────────────────────────────────────────────── */
 .hero { padding: 22px clamp(16px, 3vw, 32px) 18px; }
 .banner { border-radius: var(--r); padding: 10px 14px; margin-bottom: 16px; font-weight: 500; }
+.banner.info { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line-2); }
 .banner.warn { background: var(--major-soft); color: var(--major); border: 1px solid color-mix(in srgb, var(--major) 35%, transparent); }
 .hero-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 18px; }
 .eyebrow { font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; margin-bottom: 8px; }
@@ -406,6 +407,7 @@ table.kv th { width: 210px; font-size: 13px; text-transform: none; letter-spacin
 .stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
 .st { display: flex; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
 .st b { font-size: 12px; }
+.st small { display: block; color: var(--ink-3); font-size: 11.5px; }
 .st-ok b { color: var(--ok); }
 .st-partial b { color: var(--major); }
 .st-failed b { color: var(--crit); }

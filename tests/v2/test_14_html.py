@@ -151,3 +151,17 @@ def test_clarification_and_rewrites_tabs(report, view):
     assert page.count('role="tabpanel"') == 10
     # латинские буквы вариантов, как ждёт --answers (№11)
     assert '<span class="ol">A</span>' in page and '<span class="ol">B</span>' in page
+
+
+def test_stage_stats_duplicate_and_offline(report, view):
+    r = copy.deepcopy(report)
+    r["run"]["stage_stats"] = {"segment": {"calls": 1, "seconds": 48.0}, "analyst": {"calls": 1, "seconds": 71.5, "candidates": 10}}
+    r["rejected"].append({"id": "C-099", "source": "rules:no_ids", "title": "Нет ID", "reason": "Объединён", "duplicate_of": "D-19"})
+    page = H.render_html(r, view)
+    assert "48 с · 1 вызов" in page and "10 канд." in page
+    assert 'data-goto="D-19"' in page.split('id="p-rejected"', 1)[1]
+    r["run"]["provider"] = "offline"
+    r["verdict"].update(development="undetermined", testing="undetermined")
+    r["not_checked"] = ["смысловые противоречия между требованиями"]
+    page = H.render_html(r, view)
+    assert "Проверка без модели" in page and "Не определён" in page and "смысловые противоречия" in page
