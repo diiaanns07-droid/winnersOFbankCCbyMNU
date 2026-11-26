@@ -244,7 +244,9 @@ def test_run_offline_uses_heuristic(official_view):
 
 # ---- фикстуры для линз ---------------------------------------------------------------------------------
 
-CASES = ["official", "official_pdf", "autopay.base", "cardblock.base", "cashback.base", "transfer_limit.base"]
+CASES = ["official", "official_pdf", "autopay.base", "cardblock.base", "cashback.base", "transfer_limit.base",
+         "autopay.drop_promised.no_409_status", "cardblock.two_statuses.reblock_200",
+         "cashback.drop_promised.no_read_method", "transfer_limit.event_conflict.cancel_no_restore"]
 FIELDS = {"id", "source_id", "kind", "section", "summary", "quote", "line_start", "line_end", "page"}
 
 
@@ -322,3 +324,11 @@ def test_empty_document_makes_no_calls():
     llm = _FakeLLM({"requirements": [], "excluded": []})
     out = sg.run(_Ctx(_view(["", "---", "  "]), llm))
     assert out["requirements"] == [] and llm.calls == []
+
+
+def test_mutant_injected_lines_are_requirements():
+    """Внедрённая мутацией строка должна стать отдельным требованием (иначе линзы её не увидят)."""
+    m = json.loads((FIX / "transfer_limit.event_conflict.cancel_no_restore" / "segment.json").read_text("utf-8"))
+    assert any(r["source_id"] == "ЛП-7" for r in m["requirements"])
+    base = json.loads((FIX / "transfer_limit.base" / "segment.json").read_text("utf-8"))
+    assert len(m["requirements"]) == len(base["requirements"]) + 1
