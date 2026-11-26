@@ -340,6 +340,8 @@ HTTP-транспорт SDK (`httpx2.HTTPTransport.handle_request`) через `
 | B a48500d | синтетический | HTTP 2, socket 0, ключ в заголовке из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
 | C 49b1111 | нет | HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
 | C 49b1111 | синтетический | HTTP 2, socket 0, ключ из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
+| D 6b3bfa1 = 2821989 + `git diff 2821989 b504348` + патч asker | нет | HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| D 6b3bfa1 | синтетический | HTTP 2, socket 0, ключ из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
 
 До модели дошёл только этап `inventory` (модуль №04 сделал два запроса, оба успешные). Затем лимит 2
 исчерпан: `individual` и `cross` получили отказ бюджета, его перехватили модули, этапы помечены `failed`;
@@ -359,5 +361,9 @@ bash tests/p12/jury/run_jury_path.sh CANDIDATE_DIR "метка" python3.12
 Попутно: при обычной установке вне checkout `run.agent_commit = null`. `agent_commit()` вызывает
 `git rev-parse` в каталоге `site-packages`, а `release/README.md` требует коммит в паспорте. Для такой
 установки нужен `BCC_AGENT_COMMIT` или запись коммита при сборке (зона Max).
+
+Состояние D — то, что получит Max после применения обоих diff. Полный `pytest tests` на D даёт те же
+12 падений, что и чистый 2821989 (чужие модули: шрифты и PDF №14, №04, №08, №09, №15, №16, `conftest` №11);
+в `tests/p12` 137 пройдено, 4 пропущено. Четвёртый пропуск — сверка diff: патч уже применён.
 
 Живой ответ Gemini не измерен: в сессии нет рабочего ключа, `test_p12_live.py::test_live_one_finding` пропущен.
