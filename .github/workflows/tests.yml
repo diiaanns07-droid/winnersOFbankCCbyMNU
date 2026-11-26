@@ -1,0 +1,71 @@
+name: Тесты
+
+# Тесты ядра v2 и сквозной прогон без сети (провайдеры mock и offline)
+# на трёх ОС и двух версиях Python. Ключи модели не нужны.
+
+# Запуск только на интеграционной и основной ветках, тегах релиза и вручную: репозиторий приватный,
+# минуты Actions общие (macOS считается x10), а веток исполнителей десятки.
+on:
+  push:
+    branches: [main, master, "bcc/v2"]
+    tags: ["v2.*"]
+    paths-ignore: ["docs/**", "presentation/**"]
+  pull_request:
+    branches: [main, master, "bcc/v2"]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: ${{ matrix.os }} · Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12"]
+        include:
+          - os: ubuntu-latest
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Установка (дословно по README)
+        run: python -m pip install -r requirements.txt -e .
+
+      - name: Тесты tests/v2
+        run: python -m pytest tests/v2 -q
+
+      - name: Прогон mock на официальном документе
+        run: python -m bcc_review release/input/requirements.md out/mock/requirements.md --provider mock --no-cache
+
+      - name: verify отчёта mock
+        run: python -m bcc_review verify out/mock/requirements.json release/input/requirements.md
+
+      - name: Прогон без модели на PDF (проверка чтения PDF на этой ОС)
+        run: python -m bcc_review release/input/requirements.pdf out/offline/requirements_pdf.md --provider offline --no-cache
+
+      - name: verify отчёта по PDF
+        run: python -m bcc_review verify out/offline/requirements_pdf.json release/input/requirements.pdf
+
+      - name: Отчёты в артефакты
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-mock-offline
+          path: out/
+          if-no-files-found: ignore
+          retention-days: 7
