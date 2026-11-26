@@ -1,0 +1,51 @@
+{
+ "signals": [
+  {
+   "rule": "promises.read",
+   "kind": "inventory",
+   "line": 36,
+   "quote": "Приложение блокирует карту методом blockCard, разблокирует методом unblockCard и читает статус методом getCardStatus.",
+   "message": "Обещано чтение или показ данных; операции чтения: getCardStatus. Проверьте, что они возвращают всё, что показывается.",
+   "audience": [
+    "architect"
+   ],
+   "id": "S-01",
+   "lines": [
+    36
+   ],
+   "note": "Обещано чтение или показ данных; операции чтения: getCardStatus. Проверьте, что они возвращают всё, что показывается."
+  },
+  {
+   "rule": "api.methods",
+   "kind": "inventory",
+   "line": 52,
+   "quote": "REST type | POST",
+   "message": "Описанные методы API: blockCard (POST, изменение); unblockCard (POST, изменение); getCardStatus (GET, чтение).",
+   "audience": [
+    "architect"
+   ],
+   "id": "S-02",
+   "lines": [
+    52
+   ],
+   "note": "Описанные методы API: blockCard (POST, изменение); unblockCard (POST, изменение); getCardStatus (GET, чтение)."
+  },
+  {
+   "rule": "api.status_inventory",
+   "kind": "inventory",
+   "line": 85,
+   "quote": "200 | Запрос выполнен | Описано в разделе метода; для blockCard и unblockCard те",
+   "message": "Перечень статусов: 200, 400, 401, 404, 409 и 500; упомянуты в тексте: 200.",
+   "audience": [
+    "architect",
+    "qa"
+   ],
+   "id": "S-03",
+   "lines": [
+    85
+   ],
+   "note": "Перечень статусов: 200, 400, 401, 404, 409 и 500; упомянуты в тексте: 200."
+  }
+ ],
+ "candidates": []
+}
