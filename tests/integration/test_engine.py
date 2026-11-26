@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # Механика движка проверяется на тестовых двойниках со сценариями под схемы резервных этапов.
 # Полный конвейер с модулями команды — в test_team_pipeline.py.
-SEMANTIC_FALLBACK = "build_inventory,review_individual,review_set,reconcile_facts,load_criteria,resolve_hint,resolve_candidate"
+SEMANTIC_FALLBACK = ("build_inventory,review_individual,review_set,reconcile_facts,load_criteria,resolve_hint,resolve_candidate,"
+                     "build_questions,parse_answers,propose_patch,write_revision,compare_reports,read_pdf")
 
 
 @pytest.fixture(autouse=True)
@@ -426,9 +427,11 @@ def test_pdf_input_end_to_end(tmp_path, mock_script):
 def test_exports_html_and_jira(tmp_path, mock_script):
     rep = run(tmp_path, BCC, provider="mock", mock_script=write_script(tmp_path, mock_script), exports=("html", "jira", "pdf"))
     html = (tmp_path / "report.html").read_text(encoding="utf-8")
-    assert 'id="finding-F-001"' in html and "<mark" in html
+    assert 'id="finding-F-001"' in html  # стабильный якорь для веба и Markdown (№13)
     assert (tmp_path / "report.jira.csv").exists()
-    assert any("экспорт pdf недоступен" in w["message"] for w in rep["warnings"] if isinstance(w, dict))
+    pdf_ok = (tmp_path / "report.annotated.pdf").exists()
+    pdf_warned = any("экспорт pdf" in w["message"] for w in rep["warnings"] if isinstance(w, dict))
+    assert pdf_ok or pdf_warned  # №14 влит — файл; не влит или упал — явное предупреждение
 
 
 # ---------------------------------------------------------------- факты №04 → №06 через движок

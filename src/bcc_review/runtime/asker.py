@@ -50,8 +50,17 @@ class Asker:
     # ------------------------------------------------------------------ сообщения
     def build_messages(self, stage: str, payload: Mapping[str, Any]) -> tuple[list[dict[str, Any]], str]:
         unknown = set(payload) - {"task", "input", "context"}
-        if unknown:
-            raise AskError(stage, "bad_payload", f"неизвестные ключи payload: {sorted(unknown)}")
+        if "task" not in payload and isinstance(payload.get("instructions"), str):
+            # совместимость стыка: модуль прислал {instructions, document?, ...} вместо {task, input, context};
+            # документ модуль приложил сам — движок его не дублирует
+            self.tracer.emit("payload_adapted", stage=stage, reason="instructions → task")
+            payload = {"task": payload["instructions"],
+                       "input": {k: v for k, v in payload.items() if k != "instructions"},
+                       "context": {"mode": "none" if "document" in payload else "auto"}}
+        elif unknown:
+            self.tracer.emit("payload_adapted", stage=stage, reason="лишние ключи перенесены во input")
+            payload = {"task": payload.get("task"), "context": payload.get("context"),
+                       "input": {"input": payload.get("input"), **{k: payload[k] for k in unknown}}}
         task = payload.get("task")
         if not isinstance(task, str) or not task.strip():
             raise AskError(stage, "bad_payload", "payload.task должен быть непустой строкой")
@@ -78,7 +87,7 @@ class Asker:
     # ------------------------------------------------------------------ вызов
     def __call__(self, stage: str, payload: Mapping[str, Any], schema: Mapping[str, Any]) -> dict:
         messages, policy = self.build_messages(stage, payload)
-        key = self.cache_key(stage, messages, schema, payload["task"])
+        key = self.cache_key(stage, messages, schema, str(payload.get("task") or payload.get("instructions") or ""))
         hit = self.cache.get(key)
         if hit is not None and not validation_errors(hit.get("data"), schema, limit=1):
             self.stats.cache_hit(stage, hit.get("model"))
@@ -135,7 +144,7 @@ class Asker:
                     continue
                 raise AskError(stage, "invalid_output", "; ".join(errs))
             self.cache.note_model(self.provider, self.model, actual)
-            key = self.cache_key(stage, messages, schema, payload["task"])  # с учётом фактической модели
+            key = self.cache_key(stage, messages, schema, str(payload.get("task") or payload.get("instructions") or ""))  # с учётом фактической модели
             self.cache.put(key, {"data": data, "model": actual, "usage": usage, "request_id": res.get("request_id"),
                                  "stage": stage, "provider": self.provider, "requested_model": self.model,
                                  "context_policy": policy})

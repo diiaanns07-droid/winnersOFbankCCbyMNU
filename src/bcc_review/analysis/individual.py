@@ -923,26 +923,39 @@ _ANSWER_FIELDS = ("status", "reason", "quote", "condition", "outcomes", "impact"
 
 
 def _ask_model(reqs: Sequence[_Req], doc: _Doc, crit: Criteria, signals: Mapping[str, list[_Signal]],
-               owner: dict[str, str], ask: Ask, warnings: list[dict]) -> tuple[dict[str, dict[str, dict]], int]:
+               owner: dict[str, str], ask: Ask, warnings: list[dict],
+               failed: dict[str, str]) -> tuple[dict[str, dict[str, dict]], int]:
+    """Пакеты ``individual#N``. Ошибки ask не роняют этап: пункты пакета попадают в ``failed``."""
     size = max(1, int(crit.individual.get("batch_size", 15)))
     schema = response_schema(crit)
     answers: dict[str, dict[str, dict]] = {}
     calls = 0
     by_id = {r.id: r for r in reqs}
-    for i in range(0, len(reqs), size):
+    for n, i in enumerate(range(0, len(reqs), size), 1):
         batch = reqs[i : i + size]
+        stage = f"{STAGE}#{n}"
         payload = _payload_for(batch, doc, crit, signals, owner)
         calls += 1
         try:
-            resp = ask(STAGE, payload, schema)
-        except Exception as exc:  # AskError, BudgetExhausted и прочее: движок уже сделал повторы
-            _warn(warnings, "ask_failed", f"пакет {', '.join(r.id for r in batch)} — {type(exc).__name__}: {_short(str(exc), 200)}")
+            resp = ask(stage, payload, schema)
+        except Exception as exc:  # AskError, BudgetExhausted и прочее: повторы уже сделал движок
+            kind = getattr(exc, "kind", type(exc).__name__)
+            message = getattr(exc, "message", str(exc))
+            for r in batch:
+                failed[r.id] = f"этап {stage}: {kind}: {_short(message, 200)}"[:300]
+            _warn(warnings, "ask_failed", f"{stage} ({', '.join(r.id for r in batch)}) — {kind}: {_short(message, 200)}")
+            if kind == "budget_exhausted":
+                for r in reqs[i + size:]:
+                    failed[r.id] = f"этап {STAGE} не запускался: {_short(message, 200)}"
+                break
             continue
         if isinstance(resp, str):
             try:
                 resp = json.loads(resp)
             except json.JSONDecodeError:
-                _warn(warnings, "bad_response", f"ответ модели не JSON для пакета {batch[0].id}…{batch[-1].id}")
+                for r in batch:
+                    failed[r.id] = f"этап {stage}: ответ модели не JSON"
+                _warn(warnings, "bad_response", f"{stage}: ответ модели не JSON для пакета {batch[0].id}…{batch[-1].id}")
                 continue
         for item in _get(resp, "results", []) or []:
             rid = str(_get(item, "req_id", ""))
@@ -961,7 +974,8 @@ def _ask_model(reqs: Sequence[_Req], doc: _Doc, crit: Criteria, signals: Mapping
                 per[c.code] = {k: _get(chk, k) for k in _ANSWER_FIELDS}
                 per[c.code]["status"] = status
         for r in batch:
-            if r.id not in answers:
+            if r.id not in answers and r.id not in failed:
+                failed[r.id] = f"этап {stage}: модель не вернула результат по требованию"
                 _warn(warnings, "missing_answer", f"{r.id}: модель не вернула оценку; критерии без сигналов правил помечены unknown")
     return answers, calls
 
@@ -1119,7 +1133,7 @@ def _cand_from_signal(req: _Req, s: _Signal, crit: Criteria) -> dict[str, Any]:
         "blocks": list(s.targets),
         "question": s.question,
         "root_cause": s.root_cause,
-        "rule": s.rule,
+        "rule_id": s.rule,
         "severity_rule": s.severity_rule,
         "calibration": notes,
     }
@@ -1160,8 +1174,12 @@ def _cand_from_answer(req: _Req, c: Criterion, ans: Mapping[str, Any], block_id:
     }
 
 
-def _check(req: _Req, code: str, status: str, reason: str, source: str, **extra: Any) -> dict[str, Any]:
-    out = {"req_id": req.id, "criterion": code, "status": status, "reason": _WS.sub(" ", reason).strip(), "source": source}
+def _check(req: _Req, code: str, status: str, reason: str, basis: str, *, answered: bool = False,
+           **extra: Any) -> dict[str, Any]:
+    """``source`` — для движка: llm, если модель оценила пункт; ``basis`` — откуда взят статус."""
+    source = "llm" if answered else "rules"
+    out = {"req_id": req.id, "criterion": code, "status": status, "reason": _WS.sub(" ", reason).strip(),
+           "source": source, "basis": basis}
     for k, v in extra.items():
         if v:
             out[k] = v
@@ -1184,7 +1202,7 @@ def _assemble(reqs: Sequence[_Req], doc: _Doc, crit: Criteria, signals: Mapping[
         for c in crit.for_scope("requirement"):
             own = [s for s in sigs if s.criterion == c.code]
             if excl is not None and not own:
-                checks.append(_check(req, c.code, "na", f"Не оценивается: {excl.reason}", "rules"))
+                checks.append(_check(req, c.code, "na", f"Не оценивается: {excl.reason}", "rules", answered=model is not None))
                 continue
             if not c.applies(req.role):
                 if model and model.get(c.code, {}).get("status") == "issue":
@@ -1192,7 +1210,7 @@ def _assemble(reqs: Sequence[_Req], doc: _Doc, crit: Criteria, signals: Mapping[
                 checks.append(_check(
                     req, c.code, "na",
                     f"«{c.name}» не применяется к пункту с ролью «{role_titles.get(req.role, req.role)}» (criteria.toml, not_for).",
-                    "config"))
+                    "config", answered=model is not None))
                 continue
             checks.append(_decide(req, c, own, model.get(c.code) if model else None, asked, model is not None,
                                   doc, crit, known, acc, warnings))
@@ -1203,6 +1221,10 @@ def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] 
             answered: bool, doc: _Doc, crit: Criteria, known: set[str], acc: _Acc,
             warnings: list[dict]) -> dict[str, Any]:
     code = c.code
+
+    def _check_here(*args: Any, **kw: Any) -> dict[str, Any]:  # source=llm, если модель оценила этот критерий
+        return _check(*args, answered=ans is not None, **kw)
+
     issues = [s for s in own if s.status == "issue"]
     objective = [s for s in issues if s.strength == "objective"]
     unknowns = [s for s in own if s.status == "unknown"]
@@ -1213,11 +1235,11 @@ def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] 
         refs = [acc.add(_cand_from_signal(req, s, crit)) for s in issues]
         worst = min((s.severity or "major" for s in issues), key=crit.rank)
         reason = " ".join(dict.fromkeys(s.reason for s in issues)) + (f" {extra}" if extra else "")
-        return _check(req, code, "issue", reason, "rules", severity=worst, candidate_refs=refs,
+        return _check_here(req, code, "issue", reason, "rules", severity=worst, candidate_refs=refs,
                       question=next((s.question for s in issues if s.question), ""))
 
     if na and not issues:
-        return _check(req, code, "na", na[0].reason, "rules")
+        return _check_here(req, code, "na", na[0].reason, "rules")
 
     if ans is None:
         if issues:
@@ -1226,14 +1248,14 @@ def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] 
         if asked:
             prefix = "Модель не вернула оценку по этому пункту. " if not answered else "Модель не вернула оценку по этому критерию. "
         if unknowns:
-            return _check(req, code, "unknown", prefix + " ".join(s.reason for s in unknowns), "rules",
+            return _check_here(req, code, "unknown", prefix + " ".join(s.reason for s in unknowns), "rules",
                           question=unknowns[0].question)
         if passes and not asked:
-            return _check(req, code, "pass", " ".join(dict.fromkeys(s.reason for s in passes)), "rules")
+            return _check_here(req, code, "pass", " ".join(dict.fromkeys(s.reason for s in passes)), "rules")
         if asked:
             local = (" Локальные правила: " + " ".join(dict.fromkeys(s.reason for s in passes))) if passes else ""
-            return _check(req, code, "unknown", prefix + "Оценка не получена." + local, "rules", question=c.question)
-        return _check(req, code, "unknown",
+            return _check_here(req, code, "unknown", prefix + "Оценка не получена." + local, "rules", question=c.question)
+        return _check_here(req, code, "unknown",
                       f"Без модели не оценивается: локальные правила не дали сигналов по критерию «{c.name}».",
                       "rules", question=c.question)
 
@@ -1247,12 +1269,12 @@ def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] 
             block_id, literal = found
             cand = _cand_from_answer(req, c, ans, block_id, literal, crit, known)
             refs = [acc.add(cand)] + [acc.add(_cand_from_signal(req, s, crit)) for s in issues]
-            return _check(req, code, "issue", reason or cand["title"], "rules+llm" if issues else "llm",
+            return _check_here(req, code, "issue", reason or cand["title"], "rules+llm" if issues else "llm",
                           severity=cand["severity"], candidate_refs=refs, question=cand["question"])
         _warn(warnings, "quote_not_found", f"{req.id}/{code}: цитата модели не найдена в тексте: «{_short(quote, 80)}»")
         if issues:
             return rule_issue("Замечание модели отклонено: её цитата не найдена в тексте пункта.")
-        return _check(
+        return _check_here(
             req, code, "unknown",
             f"Модель сообщила о дефекте без буквальной цитаты из пункта («{_short(quote, 80) or 'цитата не указана'}»); "
             f"замечание не принято, нужна ручная проверка. Довод модели: {_short(reason, 200)}",
@@ -1263,24 +1285,24 @@ def _decide(req: _Req, c: Criterion, own: list[_Signal], ans: Mapping[str, Any] 
             return rule_issue("Модель сочла пункт соответствующим, но значение в тексте буквально отсутствует.")
         if not reason or len(reason) < 20 or _GENERIC_PASS.match(reason):
             if passes:
-                return _check(req, code, "pass", " ".join(s.reason for s in passes), "rules+llm")
+                return _check_here(req, code, "pass", " ".join(s.reason for s in passes), "rules+llm")
             _warn(warnings, "generic_pass", f"{req.id}/{code}: положительная оценка модели без обоснования")
-            return _check(req, code, "unknown", "Модель поставила соответствие без содержательного обоснования; оценка не принята.",
+            return _check_here(req, code, "unknown", "Модель поставила соответствие без содержательного обоснования; оценка не принята.",
                           "llm", question=c.question)
         rejected = [s for s in issues if s.strength == "heuristic"]
         note = (" Сигнал правил отклонён моделью: " + ", ".join(f"«{s.quote}»" for s in rejected) + ".") if rejected else ""
-        return _check(req, code, "pass", reason + note, "rules+llm" if passes else "llm")
+        return _check_here(req, code, "pass", reason + note, "rules+llm" if passes else "llm")
 
     if status == "unknown":
         if issues:
             return rule_issue(f"Модель не смогла оценить пункт: {_short(reason, 160)}" if reason else "")
-        return _check(req, code, "unknown", reason or "Модель не смогла оценить пункт по имеющимся фактам.", "llm",
+        return _check_here(req, code, "unknown", reason or "Модель не смогла оценить пункт по имеющимся фактам.", "llm",
                       question=str(ans.get("question") or c.question))
 
     # status == "na"
     if objective:
         return rule_issue("Модель сочла критерий неприменимым, но значение в тексте буквально отсутствует.")
-    return _check(req, code, "na", reason or "Модель сочла критерий неприменимым к пункту.", "llm")
+    return _check_here(req, code, "na", reason or "Модель сочла критерий неприменимым к пункту.", "llm")
 
 
 def _merge_candidates(cands: list[dict[str, Any]], crit: Criteria) -> tuple[list[dict[str, Any]], dict[str, str]]:
@@ -1370,8 +1392,11 @@ def review_individual(document: Any, requirements: Sequence[Any], ask: Ask | Non
 
     answers: dict[str, dict[str, dict]] | None = None
     calls = 0
+    failed: dict[str, str] = {}
     if ask is not None and reqs:
-        answers, calls = _ask_model(reqs, doc, crit, signals, owner, ask, warnings)
+        answers, calls = _ask_model(reqs, doc, crit, signals, owner, ask, warnings, failed)
+    else:
+        failed = {r.id: "LLM-проверка не выполнялась: работают только локальные правила" for r in reqs}
 
     checks, cands = _assemble(reqs, doc, crit, signals, answers, warnings)
     candidates, refs = _merge_candidates(cands, crit)
@@ -1387,6 +1412,7 @@ def review_individual(document: Any, requirements: Sequence[Any], ask: Ask | Non
         "checks": checks,
         "candidates": candidates,
         "warnings": warnings,
+        "failed": failed,
         "meta": {
             "stage": STAGE,
             "mode": "rules_plus_llm" if ask is not None else "rules_only",

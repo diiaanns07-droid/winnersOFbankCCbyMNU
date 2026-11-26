@@ -1,0 +1,67 @@
+{
+  "case_id": "autopay.event_conflict.insufficient_funds_credit",
+  "family": "autopay",
+  "kind": "mutant",
+  "ops": [
+    "event_conflict"
+  ],
+  "variants": [
+    "insufficient_funds_credit"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "autopay.base",
+  "base_source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+  "source_sha256": "928eb85656f78c887c976e21737f57905673cac57e85424724cbdb932152a11f",
+  "semantic_sha256": "5f71ff962c26670c84fefb4d15b97565d0adbc51415e9211344a447cbc5eefa6",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 30,
+      "after": "* **АП-7.**",
+      "removed": "",
+      "inserted": "* **АП-8.** Если на карте недостаточно средств, банк пополняет номер в кредит и списывает сумму при следующем поступлении на карту.",
+      "mutation_op": "event_conflict",
+      "variant": "insufficient_funds_credit"
+    }
+  ],
+  "expected_effect": [
+    "Нехватка средств по АП-6 отменяет пополнение, по АП-8 приводит к пополнению в кредит."
+  ],
+  "diff": "--- base/source.md\n+++ autopay.event_conflict.insufficient_funds_credit/source.md\n@@ -30,2 +30,3 @@\n * **АП-7.** После отключения автопополнения банк не выполняет пополнения по этой настройке.\n+* **АП-8.** Если на карте недостаточно средств, банк пополняет номер в кредит и списывает сумму при следующем поступлении на карту.\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "autopay.event_conflict.insufficient_funds_credit",
+      "family": "autopay",
+      "source_sha256": "928eb85656f78c887c976e21737f57905673cac57e85424724cbdb932152a11f",
+      "visibility": "public",
+      "label_id": "autopay.event_conflict.insufficient_funds_credit#1",
+      "issue_type": "event_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Если на карте недостаточно средств, пополнение не выполняется, а клиент получает push «Недостаточно средств для автопополнения».",
+          "locator": "md:L29"
+        },
+        {
+          "role": "b",
+          "quote": "Если на карте недостаточно средств, банк пополняет номер в кредит и списывает сумму при следующем поступлении на карту.",
+          "locator": "md:L31"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "Порог 1 000 ₸, на карте 1 500 ₸, сумма 2 000 ₸, оператор сообщает баланс 800 ₸.",
+      "explanation": "Нехватка средств по АП-6 отменяет пополнение, по АП-8 приводит к пополнению в кредит.",
+      "mutation": {
+        "op": "event_conflict",
+        "variant": "insufficient_funds_credit"
+      }
+    }
+  ]
+}

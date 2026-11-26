@@ -1,0 +1,144 @@
+# Таксономия дефектов для счётчика (протокол bcc-eval v1).
+# issue_type в эталоне и предсказаниях берётся из [types].
+# parent: точное совпадение подтипа с родителем засчитывается при --type-match hierarchy
+#         (уровень совпадения "parent" виден в metrics.json).
+# borderline: пограничные синонимы. Автоматически не засчитываются, идут на разбор.
+
+version = "1"
+
+[types.contradiction]
+title = "Противоречие между требованиями"
+criterion = "ISO29148-5.2.6:consistency"
+
+[types.event_conflict]
+title = "Одинаковое событие даёт несовместимые исходы"
+parent = "contradiction"
+criterion = "ISO29148-5.2.6:consistency"
+borderline = ["ambiguity"]
+
+[types.status_conflict]
+title = "Один вход получает два разных статуса или кода ответа"
+parent = "contradiction"
+criterion = "ISO29148-5.2.6:consistency"
+borderline = ["api_contract", "ambiguity"]
+
+[types.unit_mismatch]
+title = "Одна величина описана в разных единицах"
+parent = "contradiction"
+criterion = "ISO29148-5.2.5:unambiguous"
+borderline = ["ambiguity", "terminology"]
+
+[types.boundary_conflict]
+title = "Граница диапазона трактуется в двух местах по-разному"
+parent = "contradiction"
+criterion = "ISO29148-5.2.5:unambiguous"
+borderline = ["ambiguity", "unverifiable"]
+
+[types.missing_element]
+title = "Обещанный элемент отсутствует"
+criterion = "ISO29148-5.2.6:completeness"
+borderline = ["incomplete", "api_contract"]
+
+[types.incomplete]
+title = "Неполное требование"
+criterion = "ISO29148-5.2.5:complete"
+borderline = ["missing_element"]
+
+[types.ambiguity]
+title = "Двусмысленная формулировка"
+criterion = "ISO29148-5.2.5:unambiguous"
+
+[types.unverifiable]
+title = "Непроверяемое требование"
+criterion = "ISO29148-5.2.5:verifiable"
+
+[types.non_singular]
+title = "Несколько обязательств в одном пункте"
+criterion = "ISO29148-5.2.5:singular"
+
+[types.design_constraint]
+title = "Решение реализации вместо требования"
+criterion = "ISO29148-5.2.5:appropriate"
+
+[types.terminology]
+title = "Разные термины для одного понятия"
+criterion = "ISO29148-5.2.5:conforming"
+
+[types.api_contract]
+title = "Дефект контракта API"
+criterion = "ISO29148-5.2.6:consistency"
+
+[types.placeholder]
+title = "Незаполненное поле или заглушка"
+criterion = "IEEE830-4.3.3:complete"
+
+[types.traceability]
+title = "Нет прослеживаемости"
+criterion = "IEEE830-4.3.8:traceable"
+
+[types.infeasible]
+title = "Нереализуемое требование"
+criterion = "ISO29148-5.2.5:feasible"
+
+[types.incorrect]
+title = "Некорректное по предметной области"
+criterion = "ISO29148-5.2.5:correct"
+
+[types.duplicate]
+title = "Дублирующее требование"
+criterion = "ISO29148-5.2.5:necessary"
+
+[types.format]
+title = "Оформление"
+criterion = "ISO29148-5.2.5:conforming"
+
+[types.other]
+title = "Прочее"
+criterion = ""
+
+# Отображение Finding.kind продукта в issue_type счётчика.
+# Ключи сравниваются без учёта регистра. Неизвестный kind получает issue_type "other",
+# попадает в unmapped_kinds в metrics.json и не может стать TP без разбора.
+# Словарь FINDING_KINDS контракта v1 (src/bcc_review/contracts.py): ambiguity, unverifiable, incomplete,
+# conflict, omission, non_singular, design_in_requirement, terminology, traceability, placeholder,
+# infeasible, incorrect, duplicate, format, other. conflict отображается в родителя contradiction:
+# подтипы (event/status/unit/boundary) продукт не различает, совпадение будет уровня parent.
+[product_kind_map]
+contradiction = "contradiction"
+conflict = "contradiction"
+inconsistency = "contradiction"
+event_conflict = "event_conflict"
+scenario_conflict = "event_conflict"
+status_conflict = "status_conflict"
+response_conflict = "status_conflict"
+unit_mismatch = "unit_mismatch"
+unit = "unit_mismatch"
+units = "unit_mismatch"
+boundary = "boundary_conflict"
+boundary_conflict = "boundary_conflict"
+range_conflict = "boundary_conflict"
+missing = "missing_element"
+missing_element = "missing_element"
+omission = "missing_element"
+gap = "missing_element"
+crud_gap = "missing_element"
+incomplete = "incomplete"
+incompleteness = "incomplete"
+ambiguity = "ambiguity"
+ambiguous = "ambiguity"
+vague = "ambiguity"
+unverifiable = "unverifiable"
+not_verifiable = "unverifiable"
+non_singular = "non_singular"
+not_singular = "non_singular"
+compound = "non_singular"
+design = "design_constraint"
+design_constraint = "design_constraint"
+design_in_requirement = "design_constraint"
+implementation_detail = "design_constraint"
+terminology = "terminology"
+term = "terminology"
+api = "api_contract"
+api_contract = "api_contract"
+placeholder = "placeholder"
+template = "placeholder"

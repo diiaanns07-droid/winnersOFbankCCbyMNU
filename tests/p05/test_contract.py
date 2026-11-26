@@ -30,7 +30,11 @@ def test_stitch_with_contract_v1(mode):
     for r in reqs:
         C.validate(r, "Requirement")
     res = review_individual(doc, reqs, ask=FakeAsk(_model) if mode == "rules_plus_llm" else None)
-    assert set(res) == {"checks", "candidates", "warnings", "meta"}
+    assert set(res) == {"checks", "candidates", "warnings", "failed", "meta"}
+    # движок считает требование проверенным моделью, только если все 9 записей пришли с source=llm
+    sources = {c["source"] for c in res["checks"] if c["req_id"] != "R07"}
+    assert sources == ({"rules"} if mode == "rules_only" else {"llm"})
+    assert res["failed"] == ({r["id"]: res["failed"][r["id"]] for r in reqs} if mode == "rules_only" else {})
     for chk in res["checks"]:
         C.validate(chk, "Check")
         assert chk["criterion"] in C.INDIVIDUAL_CRITERIA
