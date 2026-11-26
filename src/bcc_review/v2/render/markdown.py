@@ -1312,8 +1312,8 @@ MAX_LEVEL = 4
 _LIST_KEYS = ("requirements", "excluded", "findings", "rejected", "acceptance_checks", "pair_checks", "trace",
               "glossary", "test_cases", "questions", "checklist", "rewrites")
 _ID_LIST_KEYS = ("requirement_ids", "finding_ids", "candidate_ids", "sources", "rule_requirement_ids", "verified_by",
-                 "implemented_by", "options", "standard_refs", "fix_first", "resolved", "changed", "added",
-                 "models_used", "warnings")
+                 "implemented_by", "options", "standard_refs", "fix_first", "models_used", "warnings",
+                 "new_findings", "unanswered", "decisions", "question_ids", "answer_ids")
 
 
 def _clean_report(report) -> dict:

@@ -112,11 +112,35 @@ def test_rule_verdict(findings, status, expected):
     assert (v["development"], v["testing"]) == expected
 
 
-def test_finalize_keeps_existing_verdict_and_fills_lists():
+def test_finalize_enforces_rule_verdict_and_fills_lists():
     r = {"run": {"status": "complete"}, "findings": [], "requirements": [], "verdict": {"development": "no"}}
     jsonout.finalize(r)
-    assert r["verdict"]["development"] == "no" and r["verdict"]["testing"] == "yes"
+    assert r["verdict"]["development"] == "yes" and r["verdict"]["testing"] == "yes"
+    assert any("пересчитан по правилу" in w for w in r["run"]["warnings"])
     assert r["questions"] == [] and r["schema"] == "bcc-review/2"
+
+
+def test_finalize_answers_mode_keeps_references_valid(sample):
+    """Конвейер в режиме --answers кладёт в findings только оставшиеся дефекты (№11 findings_after)."""
+    r = copy.deepcopy(sample)
+    r["findings_before"] = copy.deepcopy(r["findings"])
+    r["findings"] = [f for f in r["findings"] if f["severity"] != "critical"]
+    r["clarification"] = {"answers": [], "decisions": [], "unanswered": [], "changes": [], "new_findings": [],
+                          "before": {"verdict": {"development": "no", "testing": "no"},
+                                     "findings": {"critical": 5, "major": 20, "minor": 7}},
+                          "after": {"verdict": {"development": "conditional", "testing": "conditional"},
+                                    "findings": {"critical": 0, "major": 20, "minor": 7}},
+                          "resolved": 5, "changed": 0, "open": 0}
+    jsonout.finalize(r)
+    assert r["verdict"]["development"] == "conditional"
+    assert r["verdict"]["summary"].startswith("После ответов владельца разработка — с условиями")
+    assert "D-01" not in r["verdict"]["fix_first"] and r["verdict"]["fix_first"]
+    assert sum(1 for f in r["findings"] if f.get("status_after_answers") == "resolved") == 5
+    from bcc_review.v2 import verify
+    res = verify.verify_report(r, ROOT / "release" / "input" / "requirements.md")
+    assert res["ok"], res["errors"][:3]
+    md = markdown.render(r)
+    assert "[D-01](#d-01)" not in md and "D-01 (снят)" in md
 
 
 # ------------------------------------------------------------------ Markdown
@@ -229,6 +253,7 @@ def test_before_after_block(sample):
     assert jsonout.validate(r) == []
     md = markdown.render(r)
     assert "**До и после ответов владельца** — ответов 1, общих решений 1, без ответа 1" in md
+    assert "Снято 1, уточнено 1, осталось открытыми 0" in md
     assert "**Ответ владельца:** B — Нет" in md and "### Что изменили ответы" in md
     assert "D-01 (снят)" in md
     assert '<a id="d-01">' not in md  # снятый дефект не показывается карточкой
