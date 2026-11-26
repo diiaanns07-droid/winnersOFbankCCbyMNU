@@ -1,0 +1,6 @@
+{
+  "_synthetic": true,
+  "name": "timeout_raise",
+  "raise": "timeout",
+  "_note": "ReadTimeout транспорта."
+}

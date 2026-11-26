@@ -115,7 +115,7 @@ def _source_pos(block: dict[str, Any], offset: int) -> Optional[tuple[int, int]]
             seg = entry
         else:
             break
-    return None if seg is None else (seg[1], seg[2] + offset - seg[0])
+    return None if seg is None or seg[1] == 0 else (seg[1], seg[2] + offset - seg[0])
 
 
 def write_revision(document: dict[str, Any], edits: list[dict[str, Any]], output_md: str | Path, *,

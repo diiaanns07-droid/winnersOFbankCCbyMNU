@@ -8,3 +8,4 @@ tests/**/fixtures/** -text
 *.pdf binary
 *.docx binary
 *.png binary
+release/input/** -text
