@@ -221,6 +221,7 @@ class _FakeLLM:
 
     def ask(self, stage, system, user, schema, **kw):
         self.calls.append((stage, schema))
+        self.kw = kw
         return self.data
 
 
@@ -355,3 +356,39 @@ def test_conflicts_touching_one_multiline_requirement_are_merged():
     assert sorted(e["line"] for e in out["candidates"][0]["evidence"]) == [3, 5, 9, 10]
     out = C.postprocess(answer(pair_checks=[p1, p2]), VIEW, REQS)  # без многострочного блока — два замечания
     assert len(out["candidates"]) == 2
+
+
+class Truncated(Exception):
+    pass
+
+
+class _TruncOnceLLM(_FakeLLM):
+    def ask(self, stage, system, user, schema, **kw):
+        self.calls.append((stage, user))
+        if len(self.calls) == 1:
+            raise Truncated("max_tokens")
+        return self.data
+
+
+def test_run_asks_with_large_output_limit():
+    ctx = _FakeCtx(answer())
+    C.run(ctx)
+    assert ctx.llm.kw["max_output_tokens"] >= 32000
+
+
+def test_run_retries_once_in_short_mode_when_truncated():
+    ctx = _FakeCtx(answer(pair_checks=[pair()]))
+    ctx.llm = _TruncOnceLLM(answer(pair_checks=[pair()]))
+    out = C.run(ctx)
+    assert len(ctx.llm.calls) == 2 and "Краткий режим" in ctx.llm.calls[1][1]
+    assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_run_does_not_swallow_other_errors():
+    class Boom(_FakeLLM):
+        def ask(self, *a, **kw):
+            raise RuntimeError("сеть")
+    ctx = _FakeCtx(answer())
+    ctx.llm = Boom(None)
+    with pytest.raises(RuntimeError):
+        C.run(ctx)

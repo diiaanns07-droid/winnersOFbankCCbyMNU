@@ -21,6 +21,14 @@ from typing import Any, Iterable
 STAGE = "consistency"
 SOURCE = "consistency"
 
+# Ответ этапа ≈ 8–9 тыс. токенов JSON, но модели с рассуждением (haiku через claude -p) тратят ещё
+# 25–40 тыс. на рассуждение: при 16 000 ответ обрезался. Как у судьи — 32 000.
+MAX_OUTPUT_TOKENS = 32000
+# Повтор при обрезке: тот же запрос с просьбой отвечать короче.
+SHORT_MODE = ("\n\n### Краткий режим\nПредыдущий ответ не поместился. Отвечай короче: subjects — до 8, pair_checks — "
+              "до 8 самых рискованных, glossary — до 4, trace — только для функциональных требований с пустой note, "
+              "если всего хватает, candidates — до 5; каждое текстовое поле — одна фраза.")
+
 MAX_PAIRS = 15
 MAX_UNDEFINED_CANDIDATES = 3
 MAX_MODEL_CANDIDATES = 8
@@ -95,7 +103,14 @@ SCHEMA: dict = _obj({
 def run(ctx: Any) -> dict:
     """Этап набора: один вызов модели и разбор ответа кодом (CONTRACT 3)."""
     system, user = ctx.prompt(STAGE)
-    data = ctx.llm.ask(STAGE, system, user, SCHEMA)
+    try:
+        data = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS)
+    except Exception as exc:  # noqa: BLE001 — повторяем только обрезанный ответ
+        if type(exc).__name__ != "Truncated":
+            raise
+        if hasattr(ctx, "warn"):
+            ctx.warn("Проверка набора: ответ модели обрезан, повтор в кратком режиме.")
+        data = ctx.llm.ask(STAGE, system, user + SHORT_MODE, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS)
     return postprocess(data, ctx.view, getattr(ctx, "requirements", None) or [])
 
 
