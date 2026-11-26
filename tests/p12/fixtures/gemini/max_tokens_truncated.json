@@ -1,0 +1,28 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "{\"stage\": \"requirement_check\", \"notes\": null, \"candidates\": [{\"scope\": \"requirement\", \"kind\": \"ambiguity\", \"criterion\": \"И3\", \"severity\": \"major\", \"title\": \"Не определено «быстро» "
+            }
+          ]
+        },
+        "finishReason": "MAX_TOKENS",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 812,
+      "candidatesTokenCount": 64,
+      "totalTokenCount": 2860,
+      "thoughtsTokenCount": 1984
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-trunc-0006"
+  }
+}

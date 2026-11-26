@@ -1,0 +1,1925 @@
+{
+  "schema_version": "1.0",
+  "run": {
+    "run_id": "p17-complete-unnumbered",
+    "parent_run_id": null,
+    "source_sha256": "fe7e7be106913db484c370cf1887407536e3ce90bc231743d27cda23b8829619",
+    "source_name": "booking-unnumbered.md",
+    "agent_version": "0.1.0",
+    "agent_commit": null,
+    "provider": "mock",
+    "model": "mock-1",
+    "requested_model": "mock-1",
+    "models_seen": [
+      "mock-1"
+    ],
+    "mode": "mock",
+    "status": "complete",
+    "status_reasons": [],
+    "started_at": "2026-11-26T10:00:00+05:00",
+    "finished_at": "2026-11-26T10:01:23.500000+05:00",
+    "duration_s": 83.5,
+    "calls": {
+      "physical": 4,
+      "cache_hits": 0,
+      "failed": 0,
+      "retries": 0
+    },
+    "tokens": {
+      "input": 12450,
+      "output": 3210,
+      "cache_read": 0
+    },
+    "budget": {
+      "max_calls": 40,
+      "max_seconds": 1500.0,
+      "max_tokens": null,
+      "exhausted": false,
+      "reason": null
+    },
+    "stages": [
+      {
+        "name": "read",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "inventory",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "individual",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "cross",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      },
+      {
+        "name": "verify_meaning",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "reason": null
+      }
+    ],
+    "incomplete_stages": [],
+    "modules": {},
+    "evidence_audit": {
+      "checked": 10,
+      "confirmed": 9,
+      "ambiguous": 0,
+      "rejected": 1,
+      "note": "Считаются подсказки кандидатов; одна подсказка снятого кандидата не найдена в тексте."
+    },
+    "options": {},
+    "context_policy": "full"
+  },
+  "document": {
+    "id": "fe7e7be106913db484c370cf1887407536e3ce90bc231743d27cda23b8829619",
+    "title": "Бронирование переговорных комнат",
+    "format": "markdown",
+    "source_name": "booking-unnumbered.md",
+    "blocks": [
+      {
+        "id": "b0001",
+        "kind": "heading",
+        "section": [],
+        "text": "Бронирование переговорных комнат",
+        "loc": {
+          "line_start": 1,
+          "line_end": 1,
+          "map": [
+            [
+              0,
+              1,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0002",
+        "kind": "paragraph",
+        "section": [
+          "Бронирование переговорных комнат"
+        ],
+        "text": "Учебный нейтральный документ для проверки экспорта отчёта.",
+        "loc": {
+          "line_start": 3,
+          "line_end": 3,
+          "map": [
+            [
+              0,
+              3,
+              0
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0003",
+        "kind": "heading",
+        "section": [
+          "Бронирование переговорных комнат"
+        ],
+        "text": "Функциональные требования",
+        "loc": {
+          "line_start": 5,
+          "line_end": 5,
+          "map": [
+            [
+              0,
+              5,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0004",
+        "kind": "list_item",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Функциональные требования"
+        ],
+        "text": "Сотрудник бронирует комнату на интервал от 15 до 240 минут включительно, с шагом 15 минут.",
+        "loc": {
+          "line_start": 7,
+          "line_end": 7,
+          "map": [
+            [
+              0,
+              7,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0005",
+        "kind": "list_item",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Функциональные требования"
+        ],
+        "text": "Пересекающиеся брони одной комнаты не допускаются. Бронь 10:00–10:30 не пересекается с бронью, которая начинается в 10:30.",
+        "loc": {
+          "line_start": 8,
+          "line_end": 8,
+          "map": [
+            [
+              0,
+              8,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0006",
+        "kind": "list_item",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Функциональные требования"
+        ],
+        "text": "Автор отменяет бронь только до начала встречи. После отмены комната становится свободной.",
+        "loc": {
+          "line_start": 9,
+          "line_end": 9,
+          "map": [
+            [
+              0,
+              9,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0007",
+        "kind": "list_item",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Функциональные требования"
+        ],
+        "text": "Автор может отменить бронь в любой момент, в том числе после начала встречи.",
+        "loc": {
+          "line_start": 10,
+          "line_end": 10,
+          "map": [
+            [
+              0,
+              10,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0008",
+        "kind": "list_item",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Функциональные требования"
+        ],
+        "text": "Система быстро показывает статус комнаты: «свободно | занято | на обслуживании».",
+        "loc": {
+          "line_start": 11,
+          "line_end": 11,
+          "map": [
+            [
+              0,
+              11,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0009",
+        "kind": "heading",
+        "section": [
+          "Бронирование переговорных комнат"
+        ],
+        "text": "Нефункциональные требования",
+        "loc": {
+          "line_start": 13,
+          "line_end": 13,
+          "map": [
+            [
+              0,
+              13,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0010",
+        "kind": "paragraph",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Нефункциональные требования"
+        ],
+        "text": "Портал должен быть удобным и работать без сбоев.",
+        "loc": {
+          "line_start": 15,
+          "line_end": 15,
+          "map": [
+            [
+              0,
+              15,
+              0
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0011",
+        "kind": "heading",
+        "section": [
+          "Бронирование переговорных комнат"
+        ],
+        "text": "Требования к уведомлениям",
+        "loc": {
+          "line_start": 17,
+          "line_end": 17,
+          "map": [
+            [
+              0,
+              17,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0012",
+        "kind": "paragraph",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Требования к уведомлениям"
+        ],
+        "text": "Сотрудник получает напоминание о встрече:\n1. за 15 минут до начала;\n2. повторно — в момент начала, если бронь не подтверждена.",
+        "loc": {
+          "line_start": 19,
+          "line_end": 21,
+          "map": [
+            [
+              0,
+              19,
+              0
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0013",
+        "kind": "heading",
+        "section": [
+          "Бронирование переговорных комнат"
+        ],
+        "text": "Критерии приемки",
+        "loc": {
+          "line_start": 23,
+          "line_end": 23,
+          "map": [
+            [
+              0,
+              23,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0014",
+        "kind": "table_header",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Критерии приемки"
+        ],
+        "text": "Исходные условия | Действие | Ожидаемый результат",
+        "loc": {
+          "line_start": 25,
+          "line_end": 25,
+          "map": [
+            [
+              0,
+              25,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0015",
+        "kind": "table_row",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Критерии приемки"
+        ],
+        "text": "Комната свободна 10:00–11:00 | Забронировать 10:00–10:30 | Бронь создана",
+        "loc": {
+          "line_start": 27,
+          "line_end": 27,
+          "map": [
+            [
+              0,
+              27,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b0016",
+        "kind": "table_row",
+        "section": [
+          "Бронирование переговорных комнат",
+          "Критерии приемки"
+        ],
+        "text": "Бронь 10:00–10:30 | Забронировать 10:30–11:00 | Бронь создана",
+        "loc": {
+          "line_start": 28,
+          "line_end": 28,
+          "map": [
+            [
+              0,
+              28,
+              2
+            ]
+          ]
+        }
+      }
+    ],
+    "warnings": []
+  },
+  "requirements": [
+    {
+      "id": "R-01",
+      "source_id": null,
+      "text": "Сотрудник бронирует комнату на интервал от 15 до 240 минут включительно, с шагом 15 минут.",
+      "block_ids": [
+        "b0004"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 0,
+          "end": 90,
+          "quote": "Сотрудник бронирует комнату на интервал от 15 до 240 минут включительно, с шагом 15 минут."
+        }
+      ],
+      "hints": [],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-02",
+      "source_id": null,
+      "text": "Пересекающиеся брони одной комнаты не допускаются. Бронь 10:00–10:30 не пересекается с бронью, которая начинается в 10:30.",
+      "block_ids": [
+        "b0005"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0005",
+          "start": 0,
+          "end": 122,
+          "quote": "Пересекающиеся брони одной комнаты не допускаются. Бронь 10:00–10:30 не пересекается с бронью, которая начинается в 10:30."
+        }
+      ],
+      "hints": [],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-03",
+      "source_id": null,
+      "text": "Автор отменяет бронь только до начала встречи. После отмены комната становится свободной.",
+      "block_ids": [
+        "b0006"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0006",
+          "start": 0,
+          "end": 89,
+          "quote": "Автор отменяет бронь только до начала встречи. После отмены комната становится свободной."
+        }
+      ],
+      "hints": [],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-04",
+      "source_id": null,
+      "text": "Автор может отменить бронь в любой момент, в том числе после начала встречи.",
+      "block_ids": [
+        "b0007"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0007",
+          "start": 0,
+          "end": 76,
+          "quote": "Автор может отменить бронь в любой момент, в том числе после начала встречи."
+        }
+      ],
+      "hints": [],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-05",
+      "source_id": null,
+      "text": "Система быстро показывает статус комнаты: «свободно | занято | на обслуживании».",
+      "block_ids": [
+        "b0008"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0008",
+          "start": 0,
+          "end": 80,
+          "quote": "Система быстро показывает статус комнаты: «свободно | занято | на обслуживании»."
+        }
+      ],
+      "hints": [],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-06",
+      "source_id": null,
+      "text": "Портал должен быть удобным и работать без сбоев.",
+      "block_ids": [
+        "b0010"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0010",
+          "start": 0,
+          "end": 48,
+          "quote": "Портал должен быть удобным и работать без сбоев."
+        }
+      ],
+      "hints": [],
+      "kind": "nonfunctional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-07",
+      "source_id": null,
+      "text": "Сотрудник получает напоминание о встрече:\n1. за 15 минут до начала;\n2. повторно — в момент начала, если бронь не подтверждена.",
+      "block_ids": [
+        "b0012"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 0,
+          "end": 126,
+          "quote": "Сотрудник получает напоминание о встрече:\n1. за 15 минут до начала;\n2. повторно — в момент начала, если бронь не подтверждена."
+        }
+      ],
+      "hints": [],
+      "kind": "functional",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-08",
+      "source_id": null,
+      "text": "Комната свободна 10:00–11:00 | Забронировать 10:00–10:30 | Бронь создана",
+      "block_ids": [
+        "b0015"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0015",
+          "start": 0,
+          "end": 72,
+          "quote": "Комната свободна 10:00–11:00 | Забронировать 10:00–10:30 | Бронь создана"
+        }
+      ],
+      "hints": [],
+      "kind": "acceptance",
+      "review_status": "reviewed",
+      "review_reason": null
+    },
+    {
+      "id": "R-09",
+      "source_id": null,
+      "text": "Бронь 10:00–10:30 | Забронировать 10:30–11:00 | Бронь создана",
+      "block_ids": [
+        "b0016"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0016",
+          "start": 0,
+          "end": 61,
+          "quote": "Бронь 10:00–10:30 | Забронировать 10:30–11:00 | Бронь создана"
+        }
+      ],
+      "hints": [],
+      "kind": "acceptance",
+      "review_status": "reviewed",
+      "review_reason": null
+    }
+  ],
+  "checks": [
+    {
+      "req_id": "R-01",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "unambiguous",
+      "status": "issue",
+      "reason": "Шаг 15 минут не уточняет, кратно ли ему начало брони",
+      "finding_ids": [
+        "F-006"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "singular",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "correct",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-01",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "unambiguous",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "singular",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "correct",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-02",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "unambiguous",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "singular",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "correct",
+      "status": "issue",
+      "reason": "Правила отмены брони после начала встречи противоречат друг другу",
+      "finding_ids": [
+        "F-001"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-03",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "unambiguous",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "singular",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "correct",
+      "status": "issue",
+      "reason": "Правила отмены брони после начала встречи противоречат друг другу",
+      "finding_ids": [
+        "F-001"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-04",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "unambiguous",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "singular",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "verifiable",
+      "status": "issue",
+      "reason": "«Быстро» не задаёт измеримого времени показа статуса",
+      "finding_ids": [
+        "F-002"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "correct",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-05",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "unambiguous",
+      "status": "issue",
+      "reason": "«Без сбоев» допускает разные толкования",
+      "finding_ids": [
+        "F-004"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "singular",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "verifiable",
+      "status": "issue",
+      "reason": "Нефункциональное требование не содержит измеримых показателей",
+      "finding_ids": [
+        "F-003"
+      ],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "correct",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-06",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "unambiguous",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "singular",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "correct",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-07",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "unambiguous",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "singular",
+      "status": "na",
+      "reason": "Строка приёмки, а не обязательство.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "correct",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-08",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "appropriate",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "unambiguous",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "complete",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "singular",
+      "status": "na",
+      "reason": "Строка приёмки, а не обязательство.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "feasible",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "correct",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-09",
+      "criterion": "conforming",
+      "status": "pass",
+      "reason": "",
+      "finding_ids": [],
+      "source": "llm"
+    }
+  ],
+  "findings": [
+    {
+      "hints": [
+        {
+          "block_id": "b0006",
+          "quote": "Автор отменяет бронь только до начала встречи."
+        },
+        {
+          "block_id": "b0007",
+          "quote": "Автор может отменить бронь в любой момент, в том числе после начала встречи."
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "Обе цитаты найдены; при одном входе требования дают несовместимые исходы.",
+      "recommendation": "Выбрать одно правило отмены после начала встречи, исправить R-03 или R-04 и добавить критерий приёмки на отмену в 10:10 для встречи с 10:00.",
+      "blocked_decision": "Разрешать ли отмену брони после начала встречи",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": {
+        "input": "Встреча началась в 10:00; в 10:10 автор нажимает «Отменить бронь».",
+        "outcome_a": "Отмена отклонена: встреча уже началась.",
+        "outcome_b": "Отмена выполнена: отмена допустима в любой момент.",
+        "evidence_a": {
+          "block_id": "b0006",
+          "start": 0,
+          "end": 46,
+          "quote": "Автор отменяет бронь только до начала встречи."
+        },
+        "evidence_b": {
+          "block_id": "b0007",
+          "start": 0,
+          "end": 76,
+          "quote": "Автор может отменить бронь в любой момент, в том числе после начала встречи."
+        }
+      },
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": {
+        "object": "отмена брони после начала встречи",
+        "condition": "встреча уже началась",
+        "outcomes": [
+          "отмена запрещена",
+          "отмена разрешена"
+        ]
+      },
+      "source": "llm",
+      "stage": "cross",
+      "notes": [],
+      "id": "F-001",
+      "scope": "set",
+      "kind": "conflict",
+      "criterion": "set_consistent",
+      "severity": "critical",
+      "title": "Правила отмены брони после начала встречи противоречат друг другу",
+      "impact": "Разработчик и тестировщик получат два несовместимых ожидания: поведение кнопки «Отменить» после начала встречи не определено.",
+      "req_ids": [
+        "R-03",
+        "R-04"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0006",
+          "start": 0,
+          "end": 46,
+          "quote": "Автор отменяет бронь только до начала встречи."
+        },
+        {
+          "block_id": "b0007",
+          "start": 0,
+          "end": 76,
+          "quote": "Автор может отменить бронь в любой момент, в том числе после начала встречи."
+        }
+      ]
+    },
+    {
+      "hints": [],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "deterministic",
+      "meaning_reason": "",
+      "recommendation": "Указать предельное время показа статуса (перцентиль и секунды) и точку отсчёта.",
+      "blocked_decision": "",
+      "blocks": [
+        "testing"
+      ],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [
+        "C-014"
+      ],
+      "cause": null,
+      "source": "rules",
+      "stage": "individual",
+      "notes": [],
+      "id": "F-002",
+      "scope": "requirement",
+      "kind": "unverifiable",
+      "criterion": "verifiable",
+      "severity": "major",
+      "title": "«Быстро» не задаёт измеримого времени показа статуса",
+      "impact": "Нельзя написать тест с порогом времени; приёмка зависит от мнения проверяющего.",
+      "req_ids": [
+        "R-05"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0008",
+          "start": 0,
+          "end": 80,
+          "quote": "Система быстро показывает статус комнаты: «свободно | занято | на обслуживании»."
+        }
+      ]
+    },
+    {
+      "hints": [],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "",
+      "recommendation": "Заменить на измеримые показатели: доступность в процентах за месяц, время ответа, сценарии юзабилити-проверки.",
+      "blocked_decision": "",
+      "blocks": [
+        "testing"
+      ],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": {
+        "object": "НФТ портала",
+        "condition": "нет измеримых показателей",
+        "outcomes": []
+      },
+      "source": "llm",
+      "stage": "individual",
+      "notes": [],
+      "id": "F-003",
+      "scope": "requirement",
+      "kind": "unverifiable",
+      "criterion": "verifiable",
+      "severity": "major",
+      "title": "Нефункциональное требование не содержит измеримых показателей",
+      "impact": "Удобство и «без сбоев» нельзя проверить тестом; требования к доступности фактически нет.",
+      "req_ids": [
+        "R-06"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0010",
+          "start": 0,
+          "end": 48,
+          "quote": "Портал должен быть удобным и работать без сбоев."
+        }
+      ]
+    },
+    {
+      "hints": [],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "",
+      "recommendation": "",
+      "blocked_decision": "",
+      "blocks": [],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": {
+        "object": "НФТ портала",
+        "condition": "Нет измеримых  показателей",
+        "outcomes": []
+      },
+      "source": "llm",
+      "stage": "individual",
+      "notes": [],
+      "id": "F-004",
+      "scope": "requirement",
+      "kind": "ambiguity",
+      "criterion": "unambiguous",
+      "severity": "minor",
+      "title": "«Без сбоев» допускает разные толкования",
+      "impact": "Та же первопричина, что у F-003: нет измеримого показателя.",
+      "req_ids": [
+        "R-06"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0010",
+          "start": 29,
+          "end": 47,
+          "quote": "работать без сбоев"
+        }
+      ]
+    },
+    {
+      "hints": [],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "",
+      "recommendation": "Добавить функциональное требование о подтверждении брони: кто, каким действием, до какого момента и что происходит без подтверждения.",
+      "blocked_decision": "Как реализовать подтверждение брони и повторное напоминание",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": null,
+      "inspected_block_ids": [
+        "b0004",
+        "b0005",
+        "b0006",
+        "b0007",
+        "b0008",
+        "b0015",
+        "b0016"
+      ],
+      "merged_from": [],
+      "cause": {
+        "object": "подтверждение брони",
+        "condition": "бронь не подтверждена",
+        "outcomes": []
+      },
+      "source": "llm",
+      "stage": "cross",
+      "notes": [],
+      "id": "F-005",
+      "scope": "set",
+      "kind": "omission",
+      "criterion": "set_complete",
+      "severity": "critical",
+      "title": "Подтверждение брони упомянуто, но нигде не описано",
+      "impact": "Неясно, как и до какого момента подтверждать бронь и что происходит с неподтверждённой бронью; повторное напоминание нельзя реализовать.",
+      "req_ids": [
+        "R-07"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 99,
+          "end": 125,
+          "quote": "если бронь не подтверждена"
+        }
+      ]
+    },
+    {
+      "hints": [],
+      "status": "needs_review",
+      "anchor_status": "supported",
+      "meaning_status": "uncertain",
+      "meaning_reason": "Модель и правила разошлись: неясно, относится ли шаг 15 минут к началу брони или только к длительности.",
+      "recommendation": "",
+      "blocked_decision": "",
+      "blocks": [],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": null,
+      "source": "llm",
+      "stage": "individual",
+      "notes": [],
+      "id": "F-006",
+      "scope": "requirement",
+      "kind": "ambiguity",
+      "criterion": "unambiguous",
+      "severity": "major",
+      "title": "Шаг 15 минут не уточняет, кратно ли ему начало брони",
+      "impact": "Возможны брони, начинающиеся в 10:07.",
+      "req_ids": [
+        "R-01"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 73,
+          "end": 89,
+          "quote": "с шагом 15 минут"
+        }
+      ]
+    },
+    {
+      "hints": [],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "",
+      "recommendation": "Добавить строки приёмки: отмена до и после начала встречи, показ статуса «на обслуживании».",
+      "blocked_decision": "",
+      "blocks": [
+        "testing"
+      ],
+      "witness": null,
+      "inspected_block_ids": [
+        "b0015",
+        "b0016"
+      ],
+      "merged_from": [],
+      "cause": null,
+      "source": "llm",
+      "stage": "cross",
+      "notes": [],
+      "id": "F-007",
+      "scope": "set",
+      "kind": "incomplete",
+      "criterion": "set_validatable",
+      "severity": "minor",
+      "title": "Отмена брони и статус комнаты не покрыты критериями приёмки",
+      "impact": "Тестировщику не на что опереться при приёмке R-03…R-05.",
+      "req_ids": [
+        "R-03",
+        "R-04",
+        "R-05"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0014",
+          "start": 0,
+          "end": 49,
+          "quote": "Исходные условия | Действие | Ожидаемый результат"
+        }
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "FACT-01",
+      "subject": "бронь",
+      "field": "длительность",
+      "value": "15–240",
+      "unit": "мин",
+      "type": "range",
+      "direction": null,
+      "range": {
+        "min": 15,
+        "max": 240,
+        "inclusive": true
+      },
+      "req_ids": [
+        "R-01"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 40,
+          "end": 58,
+          "quote": "от 15 до 240 минут"
+        }
+      ]
+    },
+    {
+      "id": "FACT-02",
+      "subject": "бронь",
+      "field": "шаг",
+      "value": 15,
+      "unit": "мин",
+      "type": "number",
+      "direction": null,
+      "range": null,
+      "req_ids": [
+        "R-01"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 73,
+          "end": 89,
+          "quote": "с шагом 15 минут"
+        }
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "req_id": "R-01",
+      "obligation": "Бронь от 15 до 240 минут с шагом 15 минут",
+      "acceptance_ids": [
+        "R-08"
+      ],
+      "status": "partial",
+      "explanation": "Проверен только интервал 30 минут; границы 15 и 240 минут и шаг не покрыты."
+    },
+    {
+      "req_id": "R-02",
+      "obligation": "Смежные брони не пересекаются",
+      "acceptance_ids": [
+        "R-09"
+      ],
+      "status": "covered",
+      "explanation": "Строка приёмки проверяет смежные брони 10:00–10:30 и 10:30–11:00."
+    },
+    {
+      "req_id": "R-03",
+      "obligation": "Отмена до начала встречи",
+      "acceptance_ids": [],
+      "status": "uncovered",
+      "explanation": "Нет строки приёмки для отмены."
+    },
+    {
+      "req_id": "R-04",
+      "obligation": "Отмена после начала встречи",
+      "acceptance_ids": [],
+      "status": "uncovered",
+      "explanation": "Нет строки приёмки; правило противоречит R-03."
+    },
+    {
+      "req_id": "R-05",
+      "obligation": "Показ статуса «свободно | занято | на обслуживании»",
+      "acceptance_ids": [],
+      "status": "uncovered",
+      "explanation": "Нет времени показа и проверки статуса «на обслуживании»."
+    },
+    {
+      "req_id": "R-06",
+      "obligation": "Удобство и работа без сбоев",
+      "acceptance_ids": [],
+      "status": "unknown",
+      "explanation": "Нет измеримого показателя, покрытие оценить нельзя."
+    },
+    {
+      "req_id": "R-07",
+      "obligation": "Напоминание за 15 минут и повторное",
+      "acceptance_ids": [],
+      "status": "uncovered",
+      "explanation": "Нет строк приёмки для напоминаний."
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-001",
+      "finding_ids": [
+        "F-001"
+      ],
+      "prompt": "Можно ли отменить бронь после начала встречи?",
+      "options": [
+        "Нельзя: действует R-03",
+        "Можно: действует R-04"
+      ],
+      "affected_req_ids": [
+        "R-03",
+        "R-04"
+      ]
+    },
+    {
+      "id": "Q-002",
+      "finding_ids": [
+        "F-005"
+      ],
+      "prompt": "Как и до какого момента сотрудник подтверждает бронь?",
+      "options": [
+        "Кнопкой в напоминании до начала встречи",
+        "Подтверждение не требуется"
+      ],
+      "affected_req_ids": [
+        "R-07"
+      ]
+    }
+  ],
+  "checklist": [
+    {
+      "id": "CL-06",
+      "text": "Требование может быть протестировано",
+      "available": "yes",
+      "checked": "no",
+      "note": "R-05 и НФТ без измеримых порогов.",
+      "finding_ids": [
+        "F-002",
+        "F-003"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CL-08",
+      "text": "Требование не имеет противоречий или явных показателей операционных рисков",
+      "available": "yes",
+      "checked": "no",
+      "note": "Противоречие правил отмены.",
+      "finding_ids": [
+        "F-001"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0006",
+          "start": 0,
+          "end": 46,
+          "quote": "Автор отменяет бронь только до начала встречи."
+        },
+        {
+          "block_id": "b0007",
+          "start": 0,
+          "end": 76,
+          "quote": "Автор может отменить бронь в любой момент, в том числе после начала встречи."
+        }
+      ]
+    },
+    {
+      "id": "CL-14",
+      "text": "Поддерживается версионность документа / зафиксирована",
+      "available": "no",
+      "checked": "unknown",
+      "note": "Версия и дата в документе не указаны.",
+      "finding_ids": [],
+      "evidence": []
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "TC-01",
+      "precondition": "Комната свободна 10:00–11:00",
+      "action": "Забронировать 10:00–10:15",
+      "expected": "Бронь создана",
+      "req_ids": [
+        "R-01"
+      ],
+      "open_question_id": null
+    },
+    {
+      "id": "TC-02",
+      "precondition": "Встреча с 10:00 началась",
+      "action": "В 10:10 автор отменяет бронь",
+      "expected": "Зависит от ответа на Q-001",
+      "req_ids": [
+        "R-03",
+        "R-04"
+      ],
+      "open_question_id": "Q-001"
+    }
+  ],
+  "decisions": [
+    {
+      "question_id": "Q-002",
+      "source_sha256": "fe7e7be106913db484c370cf1887407536e3ce90bc231743d27cda23b8829619",
+      "answer": "Кнопкой «Подтвердить» в напоминании, до начала встречи.",
+      "edits": [],
+      "note": "answers.md, ответ владельца продукта"
+    }
+  ],
+  "diff": null,
+  "verdict": {
+    "development": {
+      "status": "not_ready",
+      "reasons": [
+        "Противоречие в правилах отмены (F-001)",
+        "Подтверждение брони не описано (F-005)"
+      ],
+      "finding_ids": [
+        "F-001",
+        "F-005"
+      ]
+    },
+    "testing": {
+      "status": "not_ready",
+      "reasons": [
+        "Нет измеримых порогов (F-002, F-003)",
+        "Нет критериев приёмки для отмены и статуса (F-007)"
+      ],
+      "finding_ids": [
+        "F-001",
+        "F-003",
+        "F-007"
+      ]
+    },
+    "first_actions": [
+      {
+        "order": 2,
+        "action": "Описать подтверждение брони",
+        "finding_ids": [
+          "F-005"
+        ]
+      },
+      {
+        "order": 1,
+        "action": "Решить вопрос Q-001 и исправить R-03 или R-04",
+        "finding_ids": [
+          "F-001"
+        ]
+      },
+      {
+        "order": 3,
+        "action": "Задать измеримые пороги для статуса и НФТ",
+        "finding_ids": [
+          "F-002",
+          "F-003"
+        ]
+      }
+    ],
+    "basis": "Подтверждённые критичные замечания блокируют разработку и тестирование."
+  },
+  "summary": {
+    "requirements": 9,
+    "reviewed_requirements": 9,
+    "findings": 7,
+    "by_severity": {
+      "critical": 2,
+      "major": 3,
+      "minor": 2
+    },
+    "by_status": {
+      "confirmed": 6,
+      "needs_review": 1
+    },
+    "critical_ids": [
+      "F-001",
+      "F-005"
+    ],
+    "checks": {
+      "pass": 73,
+      "issue": 6,
+      "unknown": 0,
+      "na": 2
+    }
+  },
+  "warnings": [
+    {
+      "code": "no_trace_ids",
+      "message": "Таблица критериев приёмки (строки 25–28) не ссылается на ID требований.",
+      "stage": "inventory",
+      "block_ids": [
+        "b0015",
+        "b0016"
+      ]
+    }
+  ],
+  "excluded": [
+    {
+      "block_ids": [
+        "b0001",
+        "b0003",
+        "b0009",
+        "b0011",
+        "b0013"
+      ],
+      "reason": "Заголовки, не требования"
+    },
+    {
+      "block_ids": [
+        "b0002"
+      ],
+      "reason": "Вводный текст без обязательств"
+    },
+    {
+      "block_ids": [
+        "b0014"
+      ],
+      "reason": "Заголовок таблицы приёмки"
+    }
+  ],
+  "rejected": [
+    {
+      "candidate": {
+        "scope": "requirement",
+        "kind": "conflict",
+        "criterion": "correct",
+        "severity": "major",
+        "title": "Пример 10:00–10:30 противоречит запрету пересечений",
+        "impact": "",
+        "req_ids": [
+          "R-02"
+        ],
+        "hints": [
+          {
+            "block_id": "b0005",
+            "quote": "Бронь 10:00–10:30 не пересекается"
+          }
+        ]
+      },
+      "reason": "Интервалы полуоткрытые: окончание 10:30 и начало 10:30 не пересекаются, противоречия нет.",
+      "stage": "verify_meaning"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "case_id": "cardblock.range_boundary.days_400_at_30",
+  "family": "cardblock",
+  "kind": "mutant",
+  "ops": [
+    "range_boundary"
+  ],
+  "variants": [
+    "days_400_at_30"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cardblock.base",
+  "base_source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+  "source_sha256": "7f6fa16bf2133ce2bfbb7f15ee61a2012efde066f31ca795ae1b9bd6d7f37dbb",
+  "semantic_sha256": "a796535cb6d0002cb7d029dca37c0a3ae54350e18b68e60f3f0463780fd23897",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 86,
+      "removed": "| 400 | Поле days вне диапазона от 1 до 30 |",
+      "inserted": "| 400 | Поле days меньше 1 или не меньше 30 |",
+      "mutation_op": "range_boundary",
+      "variant": "days_400_at_30"
+    }
+  ],
+  "expected_effect": [
+    "Срок 30 суток допустим по БК-2 и получает 400 по таблице статусов."
+  ],
+  "diff": "--- base/source.md\n+++ cardblock.range_boundary.days_400_at_30/source.md\n@@ -85,3 +85,3 @@\n | 200 | Запрос выполнен | Описано в разделе метода; для blockCard и unblockCard тело пустое |\n-| 400 | Поле days вне диапазона от 1 до 30 | `{\"message\":\"Проверьте срок\"}` |\n+| 400 | Поле days меньше 1 или не меньше 30 | `{\"message\":\"Проверьте срок\"}` |\n | 401 | Нет действующей сессии | `{\"message\":\"Требуется вход\"}` |\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.range_boundary.days_400_at_30",
+      "family": "cardblock",
+      "source_sha256": "7f6fa16bf2133ce2bfbb7f15ee61a2012efde066f31ca795ae1b9bd6d7f37dbb",
+      "visibility": "public",
+      "label_id": "cardblock.range_boundary.days_400_at_30#1",
+      "issue_type": "boundary_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "400 | Поле days меньше 1 или не меньше 30",
+          "locator": "md:L86"
+        },
+        {
+          "role": "b",
+          "quote": "Клиент указывает срок блокировки от 1 до 30 суток включительно или выбирает бессрочную блокировку.",
+          "locator": "md:L25"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "blockCard с days=30.",
+      "explanation": "Срок 30 суток допустим по БК-2 и получает 400 по таблице статусов.",
+      "mutation": {
+        "op": "range_boundary",
+        "variant": "days_400_at_30"
+      }
+    }
+  ]
+}

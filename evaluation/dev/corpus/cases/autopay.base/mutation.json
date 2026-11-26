@@ -1,0 +1,32 @@
+{
+  "case_id": "autopay.base",
+  "family": "autopay",
+  "kind": "base",
+  "ops": [],
+  "variants": [],
+  "seeds": [],
+  "generator_version": "1.0.0",
+  "base_case_id": null,
+  "base_source_sha256": null,
+  "source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+  "semantic_sha256": "cdce19dd61a706155793a2b8b365079a836b46c30f929ab7d55e3d74208d1bb0",
+  "transformation": [],
+  "expected_effect": [
+    "Без изменений (чистый контроль)."
+  ],
+  "diff": "",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "label_id": "autopay.base#clean",
+      "case_id": "autopay.base",
+      "family": "autopay",
+      "source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "visibility": "public",
+      "explanation": "Чистая базовая спецификация: любая находка — ложная тревога."
+    }
+  ]
+}
