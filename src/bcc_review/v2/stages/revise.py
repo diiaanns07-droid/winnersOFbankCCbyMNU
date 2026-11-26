@@ -112,6 +112,38 @@ def _fences(lines: list[str]) -> list[bool]:
     return out
 
 
+def _balance_markup(line: str) -> str:
+    """После замены внутри разметки убрать непарные ``**`` и обратные кавычки."""
+    if line.count("**") % 2:
+        line = line.replace("**", "")
+    if line.count("`") % 2:
+        line = line.replace("`", "")
+    return line
+
+
+def _blank(line: str) -> bool:
+    """Строка пуста или осталась одна разметка (``****``, ``* ``, ``|  |``)."""
+    return not re.sub(r"[\s*`_|#>-]", "", line)
+
+
+_LIST = re.compile(r"^(\s*(?:[*+-]|\d+[.)])\s+)")
+
+
+def _shape_insert(new: str, anchor: str) -> str:
+    """Новая строка в стиле соседней: строка таблицы с ``|``, тот же маркер списка."""
+    t = new.strip()
+    if _is_row(anchor):
+        if not _is_row(t) and " | " in t:
+            t = "| " + t.strip("| ") + " |"
+        return t
+    if t.startswith(("|", "#", ">")) or _LIST.match(t):
+        return t
+    m = _LIST.match(anchor)
+    if m and not re.match(r"^\s*\d", m.group(1)):
+        return m.group(1).lstrip() + t
+    return t
+
+
 def _with_mark(text: str, mark: str) -> str:
     if _is_row(text):
         t = text.rstrip()
@@ -167,8 +199,7 @@ def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | No
                     continue
                 was = text[i][a:b]
                 new_line = text[i][:a] + new + text[i][b:]
-                if new_line.count("**") % 2:
-                    new_line = new_line.replace("**", "")
+                new_line = _balance_markup(new_line)
                 delta = len(new) - (b - a)
                 used_spans[i] = [(x if x < a else x + delta, y if y <= a else y + delta) for x, y in used_spans.get(i, [])]
                 used_spans[i].append((a, a + len(new)))
@@ -198,7 +229,7 @@ def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | No
                     while anchor + 1 < n and _is_row(lines[anchor + 1]):
                         anchor += 1
                 for s in new_rows:
-                    inserts.setdefault(anchor, []).append((s, fid))
+                    inserts.setdefault(anchor, []).append((_shape_insert(s, lines[anchor]), fid))
                 rec.update(applied=True, line=anchor + 1, was="")
                 stats["inserted"] += len(new_rows)
             else:
@@ -209,21 +240,47 @@ def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | No
             rec_edits.append(rec)
         out_rewrites.append({**{k: v for k, v in rw.items() if k != "edits"}, "edits": rec_edits})
 
+    deleted = {i for i in changed if _blank(text[i]) and not _blank(lines[i])}
+    # блоки кода, у которых удалено всё содержимое, убираются целиком
+    drop: set[int] = set()
+    i = 0
+    while i < n:
+        if text[i].strip().startswith("```"):
+            j = i + 1
+            while j < n and not text[j].strip().startswith("```"):
+                j += 1
+            body = [k for k in range(i + 1, min(j, n)) if not _blank(lines[k])]
+            if body and all(k in deleted for k in body):
+                drop.update(range(i, min(j, n - 1) + 1))
+            i = j + 1
+        else:
+            i += 1
     out: list[str] = []
     inside = False
     fence_marks: list[str] = []
     for i, s in enumerate(text):
         fids = changed.get(i, [])
         is_fence = s.strip().startswith("```")
-        if is_fence:
+        if i in drop:
+            if i in deleted:
+                fence_marks += [f for f in fids if f not in fence_marks]
+            if is_fence and inside and fence_marks:
+                out.append(f"[удалено: {', '.join(fence_marks)} — пример]")
+                fence_marks = []
+            if is_fence:
+                inside = not inside
+        elif is_fence:
             out.append(s)
             if inside and fence_marks:  # закрывающая граница блока кода — пометка отдельной строкой
                 out.append(f"[изменено: {', '.join(fence_marks)} — пример выше]")
                 fence_marks = []
             inside = not inside
         elif fids and inside:
-            out.append(s)
+            if i not in deleted:
+                out.append(s)
             fence_marks += [f for f in fids if f not in fence_marks]
+        elif i in deleted:
+            out.append(f"[удалено: {', '.join(fids)}]")
         elif fids:
             out.append(_with_mark(s, f"[изменено: {', '.join(fids)}]"))
         else:
