@@ -27,7 +27,7 @@ FOLLOWUP_MARK = "<!-- дозапрос -->"
 
 SINGLE_CALL_MAX_LINES = 300   # документ короче — один вызов
 CHUNK_MAX_LINES = 250         # размер части длинного документа
-MAX_OUTPUT_TOKENS = 16000
+MAX_OUTPUT_TOKENS = 32000      # слабые модели тратят на рассуждения 15–25 тыс. токенов: не обрезать сразу
 FOLLOWUP_MAX_LINES = 120      # дозапрос по непокрытым строкам — не больше стольких строк
 QUOTE_MAX = 150
 
@@ -42,9 +42,9 @@ def _obj(props: dict, required: list | None = None) -> dict:
 
 _S = {"type": "string"}
 _I = {"type": "integer"}
-SCHEMA: dict = _obj({
+SCHEMA: dict = _obj({  # section модель не пишет: раздел строки известен коду из `view`
     "requirements": {"type": "array", "items": _obj({
-        "source_id": _S, "kind": {"type": "string", "enum": KINDS}, "section": _S, "summary": _S, "quote": _S,
+        "source_id": _S, "kind": {"type": "string", "enum": KINDS}, "summary": _S, "quote": _S,
         "line_start": _I, "line_end": _I})},
     "excluded": {"type": "array", "items": _obj({
         "what": _S, "line_start": _I, "line_end": _I, "reason": _S})},
@@ -253,7 +253,10 @@ def normalize_requirement(view: dict, r: dict) -> dict | None:
     section = str(first.get("section") or "") or str(r.get("section") or "")
     pages = [by_n[n].get("page") for n in range(a, b + 1) if n in by_n and by_n[n].get("page") is not None]
     summary = re.sub(r"\s+", " ", str(r.get("summary") or "")).strip() or _short_quote(quote)[:80]
-    return {"id": "", "source_id": re.sub(r"\s+", " ", str(r.get("source_id") or "")).strip(),
+    sid = re.sub(r"\s+", " ", str(r.get("source_id") or "")).strip()
+    if "<" in sid or "уточнить" in sid.lower() or sid in ("—", "-", "нет"):
+        sid = ""  # модель не знала номера и подставила заглушку
+    return {"id": "", "source_id": sid,
             "kind": kind, "section": section, "summary": summary, "quote": quote,
             "line_start": a, "line_end": b, "page": pages[0] if pages else None}
 
@@ -521,7 +524,10 @@ def _system(ctx: Any) -> str:
 def build_user(view: dict, start: int, end: int, task: str, total: int | None = None) -> str:
     head = ""
     if total and (start > 1 or end < total):
-        head = f"Фрагмент документа: строки {start}–{end} из {total}. Разбери только эти строки.\n"
+        by_n = {int(x["n"]): x for x in _lines(view)}
+        sec = str((by_n.get(start) or {}).get("section") or "")
+        where = f" Раздел в начале фрагмента: «{sec}»." if sec else ""
+        head = f"Фрагмент документа: строки {start}–{end} из {total}.{where} Разбери только эти строки.\n"
     return f"<документ>\n{head}{_numbered(view, start, end)}\n</документ>\n\n{task}"
 
 
@@ -540,21 +546,41 @@ def _merge_results(*parts: Any) -> dict:
 def _ask_range(ctx: Any, system: str, task: str, start: int, end: int, total: int) -> dict:
     llm = ctx.llm
     view = ctx.view
-    nums = [int(x["n"]) for x in _lines(view) if start <= int(x["n"]) <= end]
+    blocks = section_blocks(view, start, end)
     split = getattr(llm, "ask_split", None)
-    if callable(split):
+    if callable(split) and blocks:
         def build(items: list) -> tuple[str, str]:
-            return system, build_user(view, min(items), max(items), task, total)
+            return system, build_user(view, items[0][0], items[-1][1], task, total)
         import inspect
         try:
-            inspect.signature(split).bind(STAGE, build, nums, SCHEMA, _merge_results)
-            ok = True
+            inspect.signature(split).bind(STAGE, build, blocks, SCHEMA, _merge_results,
+                                          max_output_tokens=MAX_OUTPUT_TOKENS)
+            kw = {"max_output_tokens": MAX_OUTPUT_TOKENS}
         except (TypeError, ValueError):
-            ok = False  # другая сигнатура ask_split — обычный вызов ниже
-        if ok:
-            return split(STAGE, build, nums, SCHEMA, _merge_results)
+            kw = None
+        if kw is None:
+            try:
+                inspect.signature(split).bind(STAGE, build, blocks, SCHEMA, _merge_results)
+                kw = {}
+            except (TypeError, ValueError):
+                kw = None  # другая сигнатура ask_split — обычный вызов ниже
+        if kw is not None:
+            return split(STAGE, build, blocks, SCHEMA, _merge_results, **kw)
     return llm.ask(STAGE, system, build_user(view, start, end, task, total), SCHEMA,
                    max_output_tokens=MAX_OUTPUT_TOKENS)
+
+
+def section_blocks(view: dict, start: int, end: int) -> list[tuple[int, int]]:
+    """Строки start..end, разбитые на блоки по заголовкам: при делении пополам часть начинается с раздела."""
+    heads = heading_lines(view)
+    nums = [int(x["n"]) for x in _lines(view) if start <= int(x["n"]) <= end]
+    blocks: list[list[int]] = []
+    for n in nums:
+        if not blocks or n in heads:
+            blocks.append([n, n])
+        else:
+            blocks[-1][1] = n
+    return [(a, b) for a, b in blocks]
 
 
 def _followup_text(view: dict, uncovered: list[int]) -> str:

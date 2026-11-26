@@ -31,7 +31,8 @@ def official_view() -> dict:
 
 def test_schema_matches_contract_fields():
     item = sg.SCHEMA["properties"]["requirements"]["items"]
-    assert set(item["required"]) == {"source_id", "kind", "section", "summary", "quote", "line_start", "line_end"}
+    # section модель не пишет: его ставит код по строкам `view`
+    assert set(item["required"]) == {"source_id", "kind", "summary", "quote", "line_start", "line_end"}
     assert set(item["properties"]["kind"]["enum"]) == set(sg.KINDS)
     ex = sg.SCHEMA["properties"]["excluded"]["items"]
     assert set(ex["required"]) == {"what", "line_start", "line_end", "reason"}
@@ -297,26 +298,37 @@ def test_official_md_and_pdf_fixtures_comparable():
 
 
 def test_ask_split_used_and_merge_accepts_both_styles():
-    lines = [f"Пункт {i}: система делает действие {i}." for i in range(1, 11)]
-    v = _view(lines)
+    lines, secs = [], []
+    for part in range(2):
+        lines.append(f"Раздел {part}")
+        secs.append(f"Раздел {part}")
+        for i in range(1, 6):
+            lines.append(f"Пункт {part}.{i}: система делает действие {i}.")
+            secs.append(f"Раздел {part}")
+    v = _view(lines, sections=secs)
 
     class SplitLLM(_FakeLLM):
-        def ask_split(self, stage, build, items, schema, merge):
+        def ask_split(self, stage, build, items, schema, merge, *, max_output_tokens=16000):
+            assert max_output_tokens == sg.MAX_OUTPUT_TOKENS
+            assert items == [(1, 6), (7, 12)]  # блоки по заголовкам — деление по границе раздела
             halves = [items[: len(items) // 2], items[len(items) // 2:]]
             outs = []
             for h in halves:
                 system, user = build(h)
                 self.calls.append(user)
                 nums = [int(m) for m in re.findall(r"^L(\d+)\|", user, re.M)]
-                outs.append({"requirements": [{"source_id": "", "kind": "functional", "section": "", "summary": "п",
-                                               "quote": lines[n - 1], "line_start": n, "line_end": n} for n in nums],
+                assert "Раздел в начале фрагмента" in user
+                outs.append({"requirements": [{"source_id": "", "kind": "functional", "summary": "п",
+                                               "quote": lines[n - 1], "line_start": n, "line_end": n}
+                                              for n in nums if not lines[n - 1].startswith("Раздел")],
                              "excluded": []})
             return merge(outs) if len(outs) != 2 else merge(*outs)
 
     llm = SplitLLM(None)
     out = sg.run(_Ctx(v, llm))
     assert len(llm.calls) == 2
-    assert [r["line_start"] for r in out["requirements"]] == list(range(1, 11))
+    assert [r["line_start"] for r in out["requirements"]] == [2, 3, 4, 5, 6, 8, 9, 10, 11, 12]
+    assert out["requirements"][-1]["section"] == "Раздел 1"
     assert sg._merge_results([{"requirements": [1], "excluded": []}])["requirements"] == [1]
 
 
@@ -362,3 +374,10 @@ def test_offline_heuristic_close_to_model(case, doc):
     b = {r["source_id"] for r in h["requirements"] if r["source_id"]}
     assert a <= b, a - b
     assert sg.uncovered_lines(view, h["requirements"], h["excluded"]) == []
+
+
+def test_placeholder_source_id_cleared(official_view):
+    r = sg.normalize_requirement(official_view, {
+        "source_id": "<уточнить: название раздела>", "kind": "api", "summary": "s",
+        "quote": "REST type | GET", "line_start": 104, "line_end": 104})
+    assert r["source_id"] == ""
