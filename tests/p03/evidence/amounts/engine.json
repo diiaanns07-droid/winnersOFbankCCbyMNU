@@ -1,0 +1,199 @@
+{
+ "input": "amounts_user.docx",
+ "run_status": "partial",
+ "provider": "mock",
+ "modules": {
+  "build_inventory": "team:bcc_review.analysis.inventory:build_inventory",
+  "read_docx": "team:bcc_review.readers.docx:read_docx",
+  "resolve_candidate": "team:bcc_review.analysis.evidence:resolve_candidate",
+  "resolve_hint": "team:bcc_review.analysis.evidence:resolve_hint",
+  "review_set": "fallback:bcc_review.runtime.fallback.llm_stages:review_set",
+  "provider": "runtime.mock:MockAdapter"
+ },
+ "evidence_audit": {
+  "checked": 8,
+  "confirmed": 7,
+  "ambiguous": 0,
+  "rejected": 1
+ },
+ "findings": [
+  {
+   "id": "F-001",
+   "title": "Суммы в единицах «тиын» и «тенге» без правила пересчёта",
+   "evidence": [
+    {
+     "block_id": "b0004",
+     "start": 15,
+     "end": 33,
+     "quote": "в тенге без тиынов"
+    },
+    {
+     "block_id": "b0004",
+     "start": 0,
+     "end": 22,
+     "quote": "Порог хранится в тенге"
+    },
+    {
+     "block_id": "b0003",
+     "start": 42,
+     "end": 60,
+     "quote": "достигают 50 000 ₸"
+    }
+   ]
+  },
+  {
+   "id": "F-002",
+   "title": "Порог по умолчанию повторяет сумму пункта 2",
+   "evidence": [
+    {
+     "block_id": "b0006",
+     "start": 21,
+     "end": 29,
+     "quote": "50 000 ₸"
+    }
+   ]
+  },
+  {
+   "id": "F-003",
+   "title": "Одно понятие названо по-разному: «порог», «лимит»",
+   "evidence": [
+    {
+     "block_id": "b0002",
+     "start": 14,
+     "end": 19,
+     "quote": "порог"
+    },
+    {
+     "block_id": "b0007",
+     "start": 0,
+     "end": 5,
+     "quote": "Лимит"
+    }
+   ]
+  },
+  {
+   "id": "F-004",
+   "title": "Лимит суммы push совпадает с порогом без объяснения",
+   "evidence": [
+    {
+     "block_id": "b0007",
+     "start": 19,
+     "end": 27,
+     "quote": "50 000 ₸"
+    }
+   ]
+  }
+ ],
+ "rejected": [
+  {
+   "title": "Нет правила для суммы ниже 1 000 ₸",
+   "reason": "ни одна цитата не найдена в документе: "
+  },
+  {
+   "title": "Опора, которой нет в документе",
+   "reason": "ни одна цитата не найдена в документе: number_mismatch: похожее место есть, но числа в цитате и в источнике различаются:"
+  }
+ ],
+ "docx_warnings": [],
+ "ranges": [
+  {
+   "comment_id": 8,
+   "author": "BCC Review",
+   "head": "Сводка ревью ТЗ (BCC Review)",
+   "block_id": "b0001",
+   "start": 0,
+   "end": 25,
+   "node": "/w:document/w:body/w:p[1]",
+   "covered": "3. Уведомление о расходах",
+   "existing": false
+  },
+  {
+   "comment_id": 1,
+   "author": "BCC Review",
+   "head": "[F-003] Незначительный · подтверждено",
+   "block_id": "b0002",
+   "start": 14,
+   "end": 19,
+   "node": "/w:document/w:body/w:p[2]",
+   "covered": "порог",
+   "existing": false
+  },
+  {
+   "comment_id": 2,
+   "author": "BCC Review",
+   "head": "[F-001] Существенный · подтверждено",
+   "block_id": "b0003",
+   "start": 42,
+   "end": 60,
+   "node": "/w:document/w:body/w:p[3]",
+   "covered": "достигают 50 000 ₸",
+   "existing": false
+  },
+  {
+   "comment_id": 3,
+   "author": "BCC Review",
+   "head": "[F-001] Существенный · подтверждено",
+   "block_id": "b0004",
+   "start": 0,
+   "end": 22,
+   "node": "/w:document/w:body/w:p[4]",
+   "covered": "Порог хранится в тенге",
+   "existing": false
+  },
+  {
+   "comment_id": 4,
+   "author": "BCC Review",
+   "head": "[F-001] Существенный · подтверждено",
+   "block_id": "b0004",
+   "start": 15,
+   "end": 33,
+   "node": "/w:document/w:body/w:p[4]",
+   "covered": "в тенге без тиынов",
+   "existing": false
+  },
+  {
+   "comment_id": 5,
+   "author": "BCC Review",
+   "head": "[F-002] Существенный · подтверждено",
+   "block_id": "b0006",
+   "start": 21,
+   "end": 29,
+   "node": "/w:document/w:body/w:tbl[1]/w:tr[2]/w:tc[2]",
+   "covered": "50 000 ₸",
+   "existing": false
+  },
+  {
+   "comment_id": 6,
+   "author": "BCC Review",
+   "head": "[F-003] Незначительный · подтверждено",
+   "block_id": "b0007",
+   "start": 0,
+   "end": 5,
+   "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[1]",
+   "covered": "Лимит",
+   "existing": false
+  },
+  {
+   "comment_id": 0,
+   "author": "Аналитик банка",
+   "head": "Пользователь: лимит push совпадает с порогом? Проверить с бизнесом.",
+   "block_id": "b0007",
+   "start": 19,
+   "end": 27,
+   "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[2]",
+   "covered": "50 000 ₸",
+   "existing": true
+  },
+  {
+   "comment_id": 7,
+   "author": "BCC Review",
+   "head": "[F-004] Незначительный · подтверждено",
+   "block_id": "b0007",
+   "start": 19,
+   "end": 27,
+   "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[2]",
+   "covered": "50 000 ₸",
+   "existing": false
+  }
+ ]
+}

@@ -65,6 +65,7 @@ __all__ = [
     "write_docx",
     "default_output_path",
     "verify_annotated",
+    "comment_spans",
     "build_comment_text",
     "DocxReadError",
 ]
@@ -84,6 +85,15 @@ PRECISION_RU = {
     "cell": "ячейка таблицы целиком",
 }
 _PRECISION_RANK = {"exact": 0, "run": 1, "paragraph": 2, "cell": 3}
+SKIP_REASON_RU = {
+    "no_evidence": "у замечания нет текстовой опоры",
+    "quote_not_found": "цитаты нет в тексте блока",
+    "quote_ambiguous": "цитата встречается в блоке несколько раз, координаты её не подтверждают",
+    "block_not_found": "блока нет в документе",
+    "block_text_mismatch": "текст блока в отчёте не совпадает с документом",
+    "quote_is_separator": "цитата состоит только из разделителя",
+}
+_NOT_PUBLISHED = ("status_not_reportable",)
 _ISO = "ISO/IEC/IEEE 29148:2018"
 # Подписи кодов критериев контракта (contracts.INDIVIDUAL_CRITERIA / SET_CRITERIA).
 CRITERIA_RU = {
@@ -145,6 +155,9 @@ class Anchor:
     path: str  # XPath узла в части part
     part: str = MAIN_PART
     note: str | None = None
+    # что комментарий охватывает в сохранённой копии (перечитано из файла после записи):
+    # {"block_id", "start", "end", "text"} в координатах block.text
+    covered: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -163,7 +176,7 @@ class Skipped:
 
 @dataclass
 class AnnotationResult:
-    status: str  # written | source_mismatch | unsupported_input
+    status: str  # written | source_mismatch | unsupported_input | verification_failed
     input_path: str
     output_path: str | None
     source_sha256: str | None
@@ -177,6 +190,38 @@ class AnnotationResult:
     comments_before: int = 0
     comments_after: int = 0
     checks: dict[str, Any] = field(default_factory=dict)
+    findings_total: int = 0  # публикуемые замечания (confirmed / needs_review)
+    evidence_total: int = 0  # их опоры без повторов
+
+    @property
+    def counts(self) -> dict[str, int]:
+        """Счётчик: сколько замечаний и опор отмечено в тексте и сколько пропущено."""
+        return {
+            "findings": self.findings_total,
+            "findings_anchored": len({a.finding_id for a in self.anchors}),
+            "evidence": self.evidence_total,
+            "evidence_anchored": len(self.anchors),
+            "comments_added": len(self.anchors),
+            "skipped": len([s for s in self.skipped if s.reason not in _NOT_PUBLISHED]),
+        }
+
+    def unanchored_ru(self) -> list[str]:
+        """«F-C — у замечания нет текстовой опоры» для замечаний без единого комментария."""
+        anchored = {a.finding_id for a in self.anchors}
+        out, seen = [], set()
+        for s in self.skipped:
+            if s.reason in _NOT_PUBLISHED or s.finding_id in anchored or s.finding_id in seen:
+                continue
+            seen.add(s.finding_id)
+            out.append(f"{s.finding_id} — {SKIP_REASON_RU.get(s.reason, s.reason)}")
+        partial = sorted({s.finding_id for s in self.skipped if s.finding_id in anchored})
+        out += [f"{fid} — отмечена только часть опор" for fid in partial]
+        return out
+
+    def counts_ru(self) -> str:
+        c = self.counts
+        return (f"отмечено {c['findings_anchored']} из {c['findings']} замечаний "
+                f"(опор {c['evidence_anchored']} из {c['evidence']})")
 
     @property
     def complete(self) -> bool:
@@ -187,6 +232,7 @@ class AnnotationResult:
     def to_dict(self) -> dict[str, Any]:
         d = dataclasses.asdict(self)
         d["complete"] = self.complete
+        d["counts"] = self.counts
         return d
 
     def warnings(self) -> list[dict[str, Any]]:
@@ -201,6 +247,11 @@ class AnnotationResult:
             out.append({"code": f"docx_export_{s.reason}", "stage": "export_docx",
                         "message": f"{s.finding_id}: комментарий не поставлен — {s.detail}",
                         "block_ids": [s.block_id] if s.block_id else []})
+        if self.counts["skipped"]:  # общий счётчик пропусков, в том числе замечаний без опоры
+            out.append({"code": "docx_export_unanchored", "stage": "export_docx",
+                        "message": f"В {self.artifact} {self.counts_ru()}; без места в тексте: "
+                                   + "; ".join(self.unanchored_ru()) + ".",
+                        "block_ids": sorted({s.block_id for s in self.skipped if s.block_id})})
         return out
 
     def summary_ru(self) -> str:
@@ -269,7 +320,7 @@ def _question_and_fix(report: dict[str, Any], finding: dict[str, Any]) -> tuple[
             question = _text(q.get("prompt") or q.get("question") or q.get("text"))
             options = [o for o in (q.get("options") or []) if isinstance(o, str) and o.strip()]
             if question and options:
-                question += " Варианты: " + " / ".join(options[:3]) + "."
+                question += " Варианты: " + " / ".join(o.strip().rstrip(".") for o in options[:3]) + "."
             if question:
                 break
     if not question:
@@ -329,6 +380,8 @@ def build_comment_text(
     others = [o for o in other_places if o]
     if others:
         lines.append("Связанное место: " + "; ".join(others))
+    if precision != "exact":
+        lines.append(f"Точные слова: «{_short(quote, 120)}»")
     lines.append(f"Привязка: {PRECISION_RU.get(precision, precision)}" + (f" ({reason})" if reason else ""))
     return "\n".join(lines)
 
@@ -444,11 +497,17 @@ def _boundary(p_el: Any, local: int, side: str) -> tuple[Any | None, str, str | 
 
 @dataclass
 class _Plan:
-    mode: str  # runs | paragraphs
+    mode: str  # runs | paragraphs | point
     precision: str
     reason: str | None
     first: Any
     last: Any
+    # Что диапазон обязан охватить в сохранённой копии (координаты block.text блока block_id):
+    # span -- ровно этот участок; для precision="run" span=None, и участок должен
+    # содержать цитату и лежать внутри bounds.
+    block_id: str = ""
+    span: tuple[int, int] | None = None
+    bounds: tuple[int, int] = (0, 0)
 
 
 def _fallback(spec: BlockSpec, paras: list[ParagraphRef], first_i: int, last_i: int,
@@ -459,7 +518,8 @@ def _fallback(spec: BlockSpec, paras: list[ParagraphRef], first_i: int, last_i: 
         cell = next(iter(cells))
         if [p for p in paras if p.cell == cell] == paras[first_i:last_i + 1]:
             precision = "cell"
-    return _Plan("paragraphs", precision, reason, paras[first_i].el, paras[last_i].el)
+    lo, hi = paras[first_i].start, paras[last_i].end
+    return _Plan("paragraphs", precision, reason, paras[first_i].el, paras[last_i].el, spec.id, (lo, hi), (lo, hi))
 
 
 def _plan(spec: BlockSpec, start: int, end: int) -> _Plan | None:
@@ -467,7 +527,8 @@ def _plan(spec: BlockSpec, start: int, end: int) -> _Plan | None:
         what = "сноска" if spec.loc.get("anchor") == "note" else "текстовое поле"
         reason = f"{what}: Word не ставит комментарий внутрь, привязано к абзацу со знаком"
         hp = spec.host_paragraph
-        return _Plan("paragraphs", "paragraph", reason, hp.el, hp.el)
+        return _Plan("paragraphs", "paragraph", reason, hp.el, hp.el, spec.host.id, (hp.start, hp.end),
+                     (hp.start, hp.end))
     paras = spec.paragraphs
     first_i = next((i for i, p in enumerate(paras) if p.end > start), None)
     last_i = next((i for i in range(len(paras) - 1, -1, -1) if paras[i].start < end), None)
@@ -483,23 +544,105 @@ def _plan(spec: BlockSpec, start: int, end: int) -> _Plan | None:
     if last_r is None:
         return _fallback(spec, paras, first_i, last_i, why_e)
     precision = max(prec_s, prec_e, key=lambda k: _PRECISION_RANK[k])
-    return _Plan("runs", precision, why_s or why_e, first_r, last_r)
+    return _Plan("runs", precision, why_s or why_e, first_r, last_r, spec.id,
+                 (start, end) if precision == "exact" else None, (pf.start, pl.end))
 
 
-def _apply(doc: Any, plan: _Plan, text: str, author: str, initials: str) -> int:
+_MARKER_TAGS = (qn("w:commentRangeStart"), qn("w:commentRangeEnd"), qn("w:commentReference"))
+
+
+def _story_roots(doc: Any) -> list[Any]:
+    """Корни частей, где могут лежать маркеры комментариев: тело, колонтитулы, сноски."""
+    roots = [doc.element]
+    for rel in doc.part.rels.values():
+        if rel.is_external or rel.reltype.rsplit("/", 1)[-1] not in ("header", "footer", "footnotes", "endnotes"):
+            continue
+        root = getattr(rel.target_part, "element", None)
+        if root is None:
+            from lxml import etree
+
+            root = etree.fromstring(rel.target_part.blob)
+        roots.append(root)
+    return roots
+
+
+def _comments_root(doc: Any) -> Any | None:
+    for rel in doc.part.rels.values():
+        if rel.reltype.endswith("/comments") and not rel.is_external:
+            return rel.target_part.element
+    return None
+
+
+def _used_comment_ids(doc: Any) -> set[int]:
+    """Номера, занятые комментариями и маркерами комментариев во всех частях.
+
+    python-docx выдаёт новому комментарию ``max(comments.xml) + 1`` и не видит
+    маркеры без записи в comments.xml. Такой номер нельзя брать: Word связал бы
+    комментарий с чужой парой границ -- например, с копией той же фразы.
+    """
+    used: set[int] = set()
+    for root in _story_roots(doc):
+        for el in root.iter(*_MARKER_TAGS):
+            v = _int_or_none(el.get(qn("w:id")))
+            if v is not None:
+                used.add(v)
+    croot = _comments_root(doc)
+    if croot is not None:
+        used |= {v for v in (_int_or_none(c.get(qn("w:id"))) for c in croot.findall(qn("w:comment"))) if v is not None}
+    return used
+
+
+def _int_or_none(value: str | None) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except ValueError:
+        return None
+
+
+def _free_id(cid: int, reserved: set[int]) -> int:
+    return cid if cid not in reserved else max(reserved | {cid}) + 1
+
+
+def _renumber_comment(doc: Any, old: int, new: int) -> None:
+    croot = _comments_root(doc)
+    mine = [c for c in croot.findall(qn("w:comment")) if c.get(qn("w:id")) == str(old)]
+    assert len(mine) == 1, "новый комментарий должен быть единственным с этим номером в comments.xml"
+    mine[0].set(qn("w:id"), str(new))
+
+
+def _apply(doc: Any, plan: _Plan, text: str, author: str, initials: str, reserved: set[int]) -> int:
+    """Создать комментарий и его границы; номер берётся вне ``reserved`` и туда добавляется."""
     if plan.mode == "runs":
         comment = doc.add_comment([Run(plan.first, doc), Run(plan.last, doc)], text=text,
                                   author=author, initials=initials)
-        return comment.comment_id
+        cid = comment.comment_id
+        new = _free_id(cid, reserved)
+        if new != cid:  # python-docx не знает о чужих маркерах: перенумеровать только свои три
+            start, end = plan.first.getprevious(), plan.last.getnext()
+            ref = end.getnext().find(qn("w:commentReference"))
+            assert start.tag == _MARKER_TAGS[0] and end.tag == _MARKER_TAGS[1] and ref is not None
+            for el in (start, end, ref):
+                el.set(qn("w:id"), str(new))
+            _renumber_comment(doc, cid, new)
+        reserved.add(new)
+        return new
     comment = doc.comments.add_comment(text=text, author=author, initials=initials)
-    cid = comment.comment_id
+    cid = _free_id(comment.comment_id, reserved)
+    if cid != comment.comment_id:
+        _renumber_comment(doc, comment.comment_id, cid)
+    reserved.add(cid)
     start = OxmlElement("w:commentRangeStart", attrs={qn("w:id"): str(cid)})
+    end = OxmlElement("w:commentRangeEnd", attrs={qn("w:id"): str(cid)})
     ppr = plan.first.find(qn("w:pPr"))
     if ppr is not None:
         ppr.addnext(start)
     else:
         plan.first.insert(0, start)
-    plan.last.append(OxmlElement("w:commentRangeEnd", attrs={qn("w:id"): str(cid)}))
+    if plan.mode == "point":  # пустой диапазон в начале абзаца: слова не выделяются
+        start.addnext(end)
+        end.addnext(_reference_run(cid))
+        return cid
+    plan.last.append(end)
     plan.last.append(_reference_run(cid))
     return cid
 
@@ -535,6 +678,55 @@ def _markers(doc: Any) -> dict[int, dict[str, list[int]]]:
     return res
 
 
+def comment_spans(doc: Any, ids: Iterable[int]) -> dict[int, dict[str, Any] | None]:
+    """Что охватывает каждый комментарий в документе, в координатах ``block.text``.
+
+    Позиции маркеров пересчитываются по XML документа (число видимых символов
+    абзаца до маркера по тем же правилам, что у ридера), ID блоков -- по обходу
+    ридера. ``None``, если маркеров не ровно по одному или они не в блоках.
+    """
+    layout = DocxLayout(doc)
+    where: dict[Any, tuple[BlockSpec, ParagraphRef]] = {}
+    for spec in layout.specs:
+        for ref in spec.paragraphs:
+            if ref.el.tag == qn("w:p") and spec.host is None:
+                where[ref.el] = (spec, ref)
+    want = {int(i) for i in ids}
+    found: dict[int, dict[str, list[Any]]] = {i: {"start": [], "end": []} for i in want}
+    for el in doc.element.body.iter(_MARKER_TAGS[0], _MARKER_TAGS[1]):
+        cid = _int_or_none(el.get(qn("w:id")))
+        if cid in found:
+            found[cid]["start" if el.tag == _MARKER_TAGS[0] else "end"].append(el)
+
+    def position(mk: Any) -> tuple[BlockSpec, int] | None:
+        p = mk.getparent()
+        while p is not None and p.tag != qn("w:p"):
+            p = p.getparent()
+        if p not in where:
+            return None
+        spec, ref = where[p]
+        ends = {rs.el: rs.end for rs in ref.scan.runs}
+        pos = 0
+        for el in p.iter():
+            if el is mk:
+                return spec, ref.start + pos
+            if el in ends:
+                pos = max(pos, ends[el])
+        return None
+
+    out: dict[int, dict[str, Any] | None] = {}
+    for cid, m in found.items():
+        if len(m["start"]) != 1 or len(m["end"]) != 1:
+            out[cid] = None
+            continue
+        a, b = position(m["start"][0]), position(m["end"][0])
+        if a is None or b is None or a[0] is not b[0] or a[1] > b[1]:
+            out[cid] = None
+            continue
+        out[cid] = {"block_id": a[0].id, "start": a[1], "end": b[1], "text": a[0].text[a[1]:b[1]]}
+    return out
+
+
 def verify_annotated(input_path: Path | str, output_path: Path | str,
                      new_comment_ids: Iterable[int] | None = None) -> dict[str, Any]:
     """Открыть копию повторно и сверить с исходником, не доверяя процессу записи."""
@@ -563,7 +755,22 @@ def verify_annotated(input_path: Path | str, output_path: Path | str,
     checks["new_ranges_paired"] = paired
     checks["new_comment_ids"] = new_ids
     checks["comments_part"] = "word/comments.xml" in set(zipfile.ZipFile(io.BytesIO(out)).namelist())
+    checks["spans"] = comment_spans(d_out, new_ids)
     return checks
+
+
+_GATING_CHECKS = ("reopened", "text_unchanged", "existing_comments_preserved", "existing_markers_preserved",
+                  "new_ranges_paired", "comments_part", "source_unchanged", "anchors_match_plan")
+
+
+def _span_matches(plan: _Plan, ev_start: int, ev_end: int, span: dict[str, Any] | None) -> bool:
+    if span is None or span["block_id"] != plan.block_id:
+        return False
+    s, e = span["start"], span["end"]
+    if plan.span is not None:
+        return (s, e) == plan.span
+    lo, hi = plan.bounds  # precision="run": содержит цитату и не выходит за абзацы цитаты
+    return lo <= s <= ev_start and ev_end <= e <= hi
 
 
 # ------------------------------------------------------------ точка входа
@@ -637,6 +844,8 @@ def annotate_docx(
     doc = open_docx_bytes(data, input_path.name)
     layout = DocxLayout(doc)
     before = _comment_snapshot(doc)
+    reserved = _used_comment_ids(doc)
+    plans: dict[int, tuple[_Plan, int, int]] = {}
     report_texts = {b.get("id"): b.get("text") for b in document.get("blocks") or [] if isinstance(b, dict)}
     result = AnnotationResult(status="written", input_path=str(input_path), output_path=str(output_path),
                               source_sha256=actual, expected_sha256=expected, message="",
@@ -650,6 +859,7 @@ def annotate_docx(
             result.skipped.append(Skipped(f.get("id"), None, "status_not_reportable",
                                           f"статус «{f.get('status')}» не публикуется в документе"))
             continue
+        result.findings_total += 1
         evs = [e for e in f.get("evidence") or [] if isinstance(e, dict)]
         if not evs:
             result.skipped.append(Skipped(f.get("id"), None, "no_evidence",
@@ -661,6 +871,7 @@ def annotate_docx(
             if key in seen:
                 continue
             seen.add(key)
+            result.evidence_total += 1
             targets.append((order.get(ev.get("block_id"), 10**9), ev.get("start") or 0, fi, f, ev, evs))
     targets.sort(key=lambda t: t[:3])
 
@@ -705,7 +916,8 @@ def annotate_docx(
         question, fix = _question_and_fix(rep, f)
         text = build_comment_text(f, quote=quote, precision=plan.precision, reason=plan.reason,
                                   question=question, fix=fix, other_places=others)
-        cid = _apply(doc, plan, text, author, initials)
+        cid = _apply(doc, plan, text, author, initials, reserved)
+        plans[cid] = (plan, start, end)
         result.anchors.append(Anchor(
             finding_id=fid, block_id=bid, comment_id=cid, precision=plan.precision, start=start, end=end,
             quote=quote, ref=place["ref"], label=place["label"], path=place["path"], part=place["part"],
@@ -713,7 +925,9 @@ def annotate_docx(
         ))
 
     if summary and layout.specs:
-        result.summary_comment_id = _summary_comment(doc, layout.specs[0], rep, findings, result, author, initials)
+        cid, plan = _summary_comment(doc, layout.specs[0], rep, findings, result, author, initials, reserved)
+        result.summary_comment_id = cid
+        plans[cid] = (plan, plan.span[0], plan.span[1])
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -735,30 +949,51 @@ def annotate_docx(
         [result.summary_comment_id] if result.summary_comment_id is not None else [])
     checks = verify_annotated(input_path, output_path, new_ids)
     checks["source_unchanged"] = _sha(input_path.read_bytes()) == actual
+    spans = checks.pop("spans")
+    for a in result.anchors:
+        a.covered = spans.get(a.comment_id)
+    mismatched = [cid for cid, (plan, s, e) in plans.items() if not _span_matches(plan, s, e, spans.get(cid))]
+    checks["anchors_match_plan"] = not mismatched
     result.checks = checks
     result.comments_after = len(before) + len(new_ids)
+    failed = [k for k in _GATING_CHECKS if checks.get(k) is not True]
+    if failed:
+        # не оставлять копию, где комментарий может стоять не на том месте
+        output_path.unlink(missing_ok=True)
+        result.status, result.output_path = "verification_failed", None
+        result.message = ("Аннотированная копия не прошла проверку после записи (" + ", ".join(failed) + ")"
+                          + (f"; диапазоны комментариев {mismatched} не совпали с опорами" if mismatched else "")
+                          + ". Копия удалена, чтобы комментарий не оказался на соседнем месте.")
+        return result
     result.message = result.summary_ru()
     return result
 
 
 def _summary_comment(doc: Any, first: BlockSpec, rep: dict[str, Any], findings: list[dict[str, Any]],
-                     result: AnnotationResult, author: str, initials: str) -> int:
+                     result: AnnotationResult, author: str, initials: str, reserved: set[int]) -> tuple[int, _Plan]:
+    """Общий комментарий со сводкой. На заголовке-первом блоке -- диапазоном по
+    заголовку; иначе -- точкой в начале документа, чтобы не выделять слова
+    требования (первым блоком может оказаться копия фразы из замечания)."""
     findings = [f for f in findings if f.get("status") in REPORTABLE_STATUSES]
     counts = {"critical": 0, "major": 0, "minor": 0}
     for f in findings:
         if f.get("severity") in counts:
             counts[f["severity"]] += 1
-    anchored = {a.finding_id for a in result.anchors}
     lines = ["Сводка ревью ТЗ (BCC Review)"]
     lines += _verdict_lines(rep)
     lines.append(f"Замечаний: {len(findings)} (критичных {counts['critical']}, существенных {counts['major']}, "
-                 f"незначительных {counts['minor']}); отмечено в тексте: {len(anchored)}.")
-    loose = [f.get("id") for f in findings if f.get("id") not in anchored]
+                 f"незначительных {counts['minor']}).")
+    lines.append(result.counts_ru().replace("отмечено", "Отмечено в тексте:", 1) + ".")
+    loose = result.unanchored_ru()
     if loose:
-        lines.append("Без места в тексте (пропуски и замечания к набору): " + ", ".join(str(x) for x in loose[:20]))
+        lines.append("Без места в тексте: " + "; ".join(loose[:20]) + ".")
     lines.append("Подробности, доказательства и вопросы — в отчёте ревью.")
-    plan = _Plan("paragraphs", "paragraph", None, first.paragraphs[0].el, first.paragraphs[-1].el)
-    return _apply(doc, plan, "\n".join(lines), author, initials)
+    p0, pn = first.paragraphs[0], first.paragraphs[-1]
+    if first.kind == "heading":
+        plan = _Plan("paragraphs", "paragraph", None, p0.el, pn.el, first.id, (p0.start, pn.end), (p0.start, pn.end))
+    else:
+        plan = _Plan("point", "paragraph", None, p0.el, p0.el, first.id, (p0.start, p0.start), (p0.start, p0.start))
+    return _apply(doc, plan, "\n".join(lines), author, initials, reserved), plan
 
 
 def write_docx(report: Any, input_path: Path | str, output_path: Path | str, **options: Any) -> Path:
@@ -767,10 +1002,21 @@ def write_docx(report: Any, input_path: Path | str, output_path: Path | str, **o
     Для DOCX другой версии поднимает :class:`SourceMismatchError`, для входа
     не-DOCX -- :class:`UnsupportedSourceError`. У обоих есть ``.result``
     (:class:`AnnotationResult`) с объяснением на русском.
+
+    Если ``report`` -- dict со списком ``warnings``, туда дописываются
+    предупреждения экспорта, включая счётчик ``docx_export_unanchored``
+    («отмечено X из N замечаний (опор Y из M)») при пропусках.
     """
     result = annotate_docx(report, input_path, output_path, **options)
+    if result.status == "written" and isinstance(report, dict) and isinstance(report.get("warnings"), list):
+        # Движок получает от write_docx только путь, а report.json пишет после экспорта
+        # из того же объекта: так счётчик пропусков попадает в отчёт без правок движка.
+        known = {(w.get("code"), w.get("message")) for w in report["warnings"] if isinstance(w, dict)}
+        report["warnings"].extend(w for w in result.warnings() if (w["code"], w["message"]) not in known)
     if result.status == "source_mismatch":
         raise SourceMismatchError(result.message, result)
     if result.status == "unsupported_input":
         raise UnsupportedSourceError(result.message, result)
+    if result.status != "written":
+        raise WordExportError(result.message, result)
     return Path(result.output_path or output_path)

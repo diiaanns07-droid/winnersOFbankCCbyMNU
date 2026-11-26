@@ -132,3 +132,30 @@ def test_libreoffice_reopens_annotated_case_and_shows_comments(tmp_path):
         for fid in ("[K1]", "[K3]", "[C1]"):
             assert fid in text
         assert "BCC Review" in text
+
+
+@pytest.mark.skipif(SOFFICE is None, reason="LibreOffice (soffice) не установлен")
+def test_libreoffice_puts_twin_comment_into_the_cell(tmp_path):
+    """Фраза в абзаце и в ячейке: LibreOffice ставит новый комментарий в ячейку,
+    комментарий автора остаётся в абзаце, сводка -- точкой без выделения."""
+    from lxml import etree
+    from p03_fixtures import TWIN, ref_id, twin_phrase_doc
+
+    for orphan in (False, True):
+        src = twin_phrase_doc(tmp_path / f"twin{int(orphan)}.docx", orphan_markers=orphan)
+        doc = read_docx(src)
+        rep = make_report(doc, [finding("F-201", [evidence(doc, ref_id(doc, "t1.r2"), TWIN)], severity="major")])
+        out = tmp_path / f"twin{int(orphan)}.annotated.docx"
+        annotate_docx(rep, src, out)
+        odt = _soffice(out, tmp_path / f"lo{int(orphan)}", "odt")
+        ns = {"office": "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+              "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0", "dc": "http://purl.org/dc/elements/1.1/"}
+        root = etree.fromstring(zipfile.ZipFile(odt).read("content.xml"))
+        where = {}
+        for ann in root.iter("{%s}annotation" % ns["office"]):
+            body = "".join(t for t in ann.itertext())
+            kind = "F-201" if "[F-201]" in body else ("summary" if "Сводка ревью" in body else "author")
+            where[kind] = "cell" if ann.xpath("ancestor::table:table-cell", namespaces=ns) else "paragraph"
+        assert where == {"F-201": "cell", "author": "paragraph", "summary": "paragraph"}, (orphan, where)
+        ranges = _odt_annotations(odt)
+        assert sorted(ranges.values()) == ["", TWIN, TWIN]  # сводка -- пустой диапазон

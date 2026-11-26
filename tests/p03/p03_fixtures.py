@@ -174,6 +174,148 @@ def rich_doc(path: Path) -> Path:
     return path
 
 
+TWIN = "порог от 1 000 до 1 000 000 ₸"
+TWIN_URL = "https://bank.example/limits"
+
+
+def twin_phrase_doc(path: Path, *, orphan_markers: bool = False, footnote: bool = False,
+                    heading: bool = False) -> Path:
+    """Одна фраза ``TWIN`` в обычном абзаце и в ячейке таблицы.
+
+    * в абзаце на фразе уже стоит комментарий автора;
+    * в ячейке фраза разрезана между жирным run и внешней гиперссылкой, а перед
+      ней стоит удалённый при рецензировании текст «порог от 500 » -- соседняя
+      почти-копия, которой нет в текущей версии;
+    * ``orphan_markers``: вокруг копии в абзаце остались маркеры commentRange
+      с ``w:id`` следующего свободного номера, но без записи в comments.xml
+      (так бывает после удаления комментария внешним инструментом);
+    * ``footnote``: в ячейке после фразы стоит знак сноски с текстом про ту же фразу;
+    * ``heading``: перед абзацем есть заголовок (по умолчанию нет -- первым блоком
+      документа идёт абзац с первой копией фразы).
+    """
+    d = docx.Document()
+    if heading:
+        d.add_heading("Ф-1. Порог уведомления", 1)
+    p = d.add_paragraph("Клиент задаёт ")
+    target = p.add_run(TWIN)
+    p.add_run(" включительно.")
+    d.add_comment(target, text="Автор: границы согласованы с бизнесом.", author="Автор ТЗ", initials="АТ")
+    if orphan_markers:
+        start = parse_xml(f'<w:commentRangeStart {nsdecls("w")} w:id="1"/>')
+        end = parse_xml(f'<w:commentRangeEnd {nsdecls("w")} w:id="1"/>')
+        target._r.addprevious(start)
+        p._p.append(end)
+    table = d.add_table(rows=2, cols=2)
+    table.style = "Table Grid"
+    table.cell(0, 0).text, table.cell(0, 1).text = "Параметр", "Правило"
+    table.cell(1, 0).text = "amount"
+    rid = d.part.relate_to(TWIN_URL, RT.HYPERLINK, is_external=True)
+    cell_p = table.cell(1, 1).paragraphs[0]._p
+    note = '<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="1"/></w:r>' \
+        if footnote else ""
+    for el in list(parse_xml(  # list(): перенос детей при обходе пропускал бы элементы
+        f'<w:p {nsdecls("w", "r")}>'
+        '<w:del w:id="901" w:author="Автор ТЗ" w:date="2026-11-01T10:00:00Z"><w:r>'
+        '<w:delText xml:space="preserve">порог от 500 </w:delText></w:r></w:del>'
+        '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">порог от 1 000</w:t></w:r>'
+        f'<w:hyperlink r:id="{rid}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/>'
+        '</w:rPr><w:t xml:space="preserve"> до 1 000 000 ₸</w:t></w:r></w:hyperlink>'
+        f'{note}<w:r><w:t xml:space="preserve"> включительно.</w:t></w:r></w:p>'
+    )):
+        cell_p.append(el)
+    if footnote:
+        add_footnotes_part(d, {1: f"Сумма {TWIN} указана без учёта комиссий."})
+    d.add_paragraph("Конец раздела.")
+    d.save(path)
+    return path
+
+
+AMOUNT = "50 000 ₸"
+AMOUNTS_HEADING = "3. Уведомление о расходах"
+AMOUNTS_USER_COMMENT = "Пользователь: лимит push совпадает с порогом? Проверить с бизнесом."
+
+
+def amounts_doc(path: Path, *, user_comment: bool = False) -> Path:
+    """Сумма ``AMOUNT`` один раз в основном тексте и дважды в таблице.
+
+    * заголовок «3. Уведомление о расходах» (Heading 1) и автонумерованный список 1–3;
+      сумма стоит в пункте 2;
+    * таблица «Параметр | Значение | Примечание» с шапкой ``tblHeader``: в строке 2
+      сумма разбита на жирный run «50 000» и курсивный run « ₸», в строке 3 -- один run;
+    * ``user_comment``: на сумме в строке 3 уже стоит комментарий пользователя.
+    """
+    d = docx.Document()
+    d.add_heading(AMOUNTS_HEADING, 1)
+    d.add_paragraph("Клиент задаёт порог уведомления в приложении.", style="List Number")
+    p = d.add_paragraph(style="List Number")
+    p.add_run("Push отправляется, когда расходы за месяц достигают ")
+    p.add_run(AMOUNT)
+    p.add_run(".")
+    d.add_paragraph("Порог хранится в тенге без тиынов.", style="List Number")
+    table = d.add_table(rows=3, cols=3)
+    table.style = "Table Grid"
+    for i, h in enumerate(("Параметр", "Значение", "Примечание")):
+        table.cell(0, i).text = h
+    table.rows[0]._tr.get_or_add_trPr().append(parse_xml(f'<w:tblHeader {nsdecls("w")}/>'))
+    table.cell(1, 0).text = "Порог по умолчанию"
+    split = table.cell(1, 1).paragraphs[0]
+    split.add_run("50 000").bold = True
+    split.add_run(" ₸").italic = True
+    table.cell(1, 2).text = "задаётся при выпуске карты"
+    table.cell(2, 0).text = "Лимит суммы push"
+    whole = table.cell(2, 1).paragraphs[0].add_run(AMOUNT)
+    table.cell(2, 2).text = "один push в месяц"
+    d.add_paragraph("Итоговые значения согласует владелец продукта.")
+    if user_comment:
+        d.add_comment(whole, text=AMOUNTS_USER_COMMENT, author="Аналитик банка", initials="АБ")
+    d.save(path)
+    return path
+
+
+def amounts_mock_script(doc: Document) -> dict[str, Any]:
+    """Записанные ответы модели для движка (провайдер mock) по ``amounts_doc``.
+
+    Инвентарь: пункты 1–3 и две строки таблицы; набор: замечание на сумму в строке 2,
+    замечание на ту же сумму в строке 3, пропуск без цитаты и выдуманная цитата
+    «60 000 ₸». Последние два движок отсекает до экспорта (report.rejected).
+    """
+    ref = {b.loc["ref"]: b.id for b in doc.blocks}
+    r2, r3 = ref["t1.r2"], ref["t1.r3"]
+
+    def issue(title, quotes, cause, kind="ambiguity", criterion="unambiguous", severity="major", req=("R-004",)):
+        return {"kind": kind, "criterion": criterion, "severity": severity, "title": title,
+                "impact": "Разработчик и тестировщик поймут сумму по-разному.", "blocked_decision": "Какую сумму проверять",
+                "recommendation": "Сослаться на пункт 2.", "quotes": quotes, "req_ids": list(req),
+                "cause": {"object": cause, "condition": "настройка", "outcomes": ["a", "b"]},
+                "inspected_block_ids": [r2, r3]}
+
+    script = {
+        "inventory": {"items": [
+            {"source_id": "1", "kind": "functional", "text": "Клиент задаёт порог",
+             "evidence": [{"block_id": ref["p2"], "quote": "Клиент задаёт порог уведомления"}]},
+            {"source_id": "2", "kind": "functional", "text": "Push при сумме",
+             "evidence": [{"block_id": ref["p3"], "quote": AMOUNT}]},
+            {"source_id": "3", "kind": "data", "text": "Порог в тенге",
+             "evidence": [{"block_id": ref["p4"], "quote": "Порог хранится в тенге"}]},
+            {"source_id": None, "kind": "contract", "text": "Порог по умолчанию", "evidence": [{"block_id": r2, "quote": AMOUNT}]},
+            {"source_id": None, "kind": "contract", "text": "Лимит суммы push", "evidence": [{"block_id": r3, "quote": AMOUNT}]}],
+            "excluded": [{"category": "structure", "reason": "заголовок и шапка", "block_ids": [ref["p1"], ref["t1.r1"]]},
+                         {"category": "other", "reason": "организационная фраза", "block_ids": [ref["p5"]]}],
+            "facts": [], "done": True},
+        "individual": {"requirements": []},
+        "cross": {"conflicts": [], "coverage": [], "facts": [], "issues": [
+            issue("Порог по умолчанию повторяет сумму пункта 2", [{"block_id": r2, "quote": AMOUNT}], "порог по умолчанию"),
+            issue("Лимит суммы push совпадает с порогом без объяснения", [{"block_id": r3, "quote": AMOUNT}],
+                  "лимит суммы push", kind="duplicate", criterion="necessary", severity="minor", req=("R-005",)),
+            issue("Нет правила для суммы ниже 1 000 ₸", [], "сумма ниже 1 000 ₸", kind="omission",
+                  criterion="set_complete", req=("R-002",)),
+            issue("Опора, которой нет в документе", [{"block_id": r3, "quote": "60 000 ₸"}], "лимит 60 000 ₸",
+                  severity="minor", req=("R-005",))]},
+        "verify_meaning": {"__verdicts__": "confirmed"},
+    }
+    return script
+
+
 # --------------------------------------------------------------- отчёт
 
 
