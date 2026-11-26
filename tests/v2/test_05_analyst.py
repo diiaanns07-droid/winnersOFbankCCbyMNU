@@ -121,64 +121,76 @@ def test_run_wraps_lens_run():
     assert calls == ["analyst"] and len(out["candidates"]) == 1 and out["extra"] == 1
 
 
-class _FakeLLM:
-    def __init__(self):
-        self.calls = []
+def test_lens_run_takes_output_limit_from_module():
+    """Каркас (`stages/lens.run`) берёт MAX_OUTPUT_TOKENS из модуля линзы: haiku укладывается в 1 вызов."""
+    from bcc_review.v2.stages import lens
 
-    def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
-        self.calls.append(("ask", stage, max_output_tokens))
-        return {"candidates": [_cand("a", lines=(1,))]}
+    calls = []
 
-    def ask_split(self, stage, build, items, schema, merge, *, max_output_tokens=16000):
-        self.calls.append(("ask_split", stage, max_output_tokens, list(items)))
-        return {"candidates": [_cand("a", lines=(1,)), _cand("b", lines=(2,))]}
-
-
-class _FakeCtx:
-    def __init__(self, llm):
-        self.llm, self.requirements, self.marker = llm, [{"id": "R-01"}, {"id": "R-02"}], "ctx"
-
-    def prompt(self, name):
-        return "sys", f"user:{name}"
-
-
-def _lens_like(ctx, name):
-    """Как stages/lens.run: ask_split по требованиям с лимитом 16 000."""
-    ids = [r["id"] for r in ctx.requirements]
-    assert ctx.marker == "ctx"  # прочие атрибуты контекста доступны
-    return ctx.llm.ask_split(f"lens_{name}", lambda items: ctx.prompt(f"lens_{name}"), ids, {}, None,
-                             max_output_tokens=16000)
-
-
-def test_run_raises_output_budget_for_lens_calls():
-    mod = _load_stage()
-    llm = _FakeLLM()
-    out = mod.run(_FakeCtx(llm), lens_run=_lens_like)
-    assert llm.calls == [("ask_split", "lens_analyst", mod.MAX_OUTPUT_TOKENS, ["R-01", "R-02"])]
-    assert mod.MAX_OUTPUT_TOKENS >= 32000 and len(out["candidates"]) == 2
-
-
-def test_output_budget_falls_back_to_ask_without_split():
-    mod = _load_stage()
-
-    class OnlyAsk:
-        def __init__(self):
-            self.calls = []
-
-        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
-            self.calls.append(max_output_tokens)
+    class LLM:
+        def ask_split(self, stage, build, items, schema, merge, *, max_output_tokens=16000):
+            calls.append(max_output_tokens)
             return {"candidates": []}
 
-    llm = OnlyAsk()
-    mod.run(_FakeCtx(llm), lens_run=_lens_like)
-    assert llm.calls == [mod.MAX_OUTPUT_TOKENS]
+    class Ctx:
+        llm, requirements, view = LLM(), [{"id": "R-01"}], {"lines": []}
 
+        def prompt(self, name):
+            return "s", "u"
 
-def test_output_budget_keeps_bigger_limit():
+        def warn(self, msg):
+            pass
+
     mod = _load_stage()
-    llm = _FakeLLM()
-    mod._OutputBudget(llm, 1000).ask("s", "a", "b", {}, max_output_tokens=50000)
-    assert llm.calls == [("ask", "s", 50000)]
+    lens.run(Ctx(), "analyst")
+    assert mod.MAX_OUTPUT_TOKENS >= 32000 and calls == [32000]
+
+
+def _view(*lines):
+    return {"lines": [{"n": i, "text": t} for i, t in enumerate(lines, 1)]}
+
+
+def test_maturity_signs():
+    m = _load_stage().maturity
+    raw = m(_view("Цели", "заполняются тестировщиками", "Проверка | Да / Нет", "Prod: —"))
+    assert raw["score"] == 0 and not raw["mature"]
+    clean = m(_view("Версия документа | 1.0 от 01.11.2026", "Термины", "Сутки — по времени UTC+5",
+                    "Клиент задаёт значение от 1 до 10."))
+    assert clean == {"terms": True, "version": True, "timezone": True, "no_placeholders": True, "score": 4,
+                     "mature": True}
+    assert m(None)["score"] == 0 and not m(_view())["mature"]
+
+
+def test_maturity_on_real_documents():
+    from bcc_review.v2 import docview
+    m = _load_stage().maturity
+    assert not m(docview.load(str(ROOT / "release" / "input" / "requirements.md")))["mature"]
+    for base in ("autopay", "cardblock", "cashback", "transfer_limit"):
+        assert m(docview.load(str(CASES / f"{base}.base" / "source.md")))["mature"], base
+
+
+def test_postprocess_mature_keeps_conflicts_and_one_major():
+    pp = _load_stage().postprocess
+    cands = [_cand("пробел 1", "major", "incomplete", lines=(1,)),
+             _cand("пробел 2", "major", "ambiguity", lines=(2,)),
+             _cand("мелочь", "minor", "ambiguity", lines=(3,)),
+             _cand("единицы", "major", "unit_mismatch", lines=(4, 40)),
+             _cand("граница", "critical", "boundary_conflict", lines=(5, 50))]
+    assert [c["title"] for c in pp(cands, mature=True)] == ["граница", "пробел 1", "единицы"]
+    assert len(pp(cands, mature=False)) == 5
+
+
+def test_run_reports_maturity_and_applies_strict_mode():
+    mod = _load_stage()
+
+    class Ctx:
+        view = _view("Версия 2.0", "Термины", "UTC+5")
+
+    def fake_lens(ctx, name):
+        return {"candidates": [_cand("a", "minor", lines=(1,)), _cand("b", "major", lines=(2,))]}
+
+    out = mod.run(Ctx(), lens_run=fake_lens)
+    assert out["document_maturity"]["mature"] and [c["title"] for c in out["candidates"]] == ["b"]
 
 
 @pytest.mark.parametrize("bad", [None, [], [None, "x", 3]])

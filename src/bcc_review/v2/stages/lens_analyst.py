@@ -5,27 +5,63 @@
 
 1. кандидат без единой цитаты отбрасывается;
 2. дубли (тот же тип и тот же набор строк-цитат) схлопываются в первого;
-3. неединичность (`non_singular`) и чистый язык без последствий не бывают выше `minor`;
+3. неединичность (`non_singular`) не бывает выше `minor`;
 4. `critical` без сценария, последствий, с `blocks = none` или с типом, который не означает расхождения
    двух мест документа (`ambiguity`, `incomplete`…), понижается до `major`: critical у этой линзы — только
    когда другое место документа прямо поддерживает иное толкование;
-5. `critical` больше двух — лишние понижаются до `major` (линза смотрит на отдельные формулировки,
-   несовместимые результаты двух мест ловят другие этапы);
-6. сортировка: critical → major → minor, внутри — порядок модели;
-7. не больше 12 кандидатов.
+5. `critical` больше двух — лишние понижаются до `major`;
+6. **зрелый документ** (см. `maturity`) — строгий режим: `minor` отбрасываются, `major` остаются только
+   с типом расхождения двух мест (единицы, границы, события, противоречие) и ещё не больше одного прочего
+   `major`. Так на вычитанных ТЗ линза не засоряет отчёт мелкими пробелами, а на сыром документе работает
+   в полную силу;
+7. сортировка: critical → major → minor, внутри — порядок модели;
+8. не больше 12 кандидатов.
 
-Функция чистая: принимает и возвращает списки dict по схеме кандидата (CONTRACT, раздел 2.3).
+Признаки зрелости считаются кодом по тексту документа, без модели: есть раздел терминов, указана версия,
+явный часовой пояс (UTC/GMT), нет заглушек («заполняются…», «TBD», неотмеченное «Да / Нет», прочерк
+вместо значения). Зрелый — 3 признака из 4.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 MAX_CANDIDATES = 12
-MAX_OUTPUT_TOKENS = 32000  # рассуждение слабой модели + JSON; см. _OutputBudget
+MAX_OUTPUT_TOKENS = 32000  # `lens.run` берёт его из модуля: рассуждение слабой модели + JSON
 MAX_CRITICAL = 2
+MATURE_MIN_SIGNS = 3
+MATURE_MAX_OTHER_MAJOR = 1
 _RANK = {"critical": 0, "major": 1, "minor": 2}
 _MINOR_ONLY_KINDS = {"non_singular"}
-_CRITICAL_KINDS = {"event_conflict", "boundary_conflict", "unit_mismatch", "contradiction", "status_conflict"}
+_CONFLICT_KINDS = {"event_conflict", "boundary_conflict", "unit_mismatch", "contradiction", "status_conflict"}
+_CRITICAL_KINDS = _CONFLICT_KINDS
+
+_TERMS = re.compile(r"^\s*(?:#+\s*)?(?:термин\w*|глоссари\w*|определени[яе](?:\s+термин\w*)?)\s*:?\s*$", re.I)
+_VERSION = re.compile(r"верси[яи]\b[^\n]*\d", re.I)
+_TZ = re.compile(r"\b(?:UTC|GMT)\b", re.I)
+_PLACEHOLDER = re.compile(
+    r"\bTBD\b|\bTODO\b|заполня\w*\s+\w+|не\s+заполнен\w*|Да\s*/\s*Нет|:\s*[—-]\s*(?:\.|$)|\|\s*—\s*(?:\||$)", re.I)
+
+
+def _texts(view: Any) -> list[str]:
+    if isinstance(view, dict):
+        return [str(x.get("text", "")) if isinstance(x, dict) else str(x) for x in view.get("lines") or []]
+    if isinstance(view, str):
+        return view.splitlines()
+    return []
+
+
+def maturity(view: Any) -> dict:
+    """Признаки вычитанного документа по его тексту. `mature` — не меньше `MATURE_MIN_SIGNS` из 4."""
+    lines = _texts(view)
+    signs = {
+        "terms": any(_TERMS.match(t) for t in lines),
+        "version": any(_VERSION.search(t) for t in lines),
+        "timezone": any(_TZ.search(t) for t in lines),
+        "no_placeholders": bool(lines) and not any(_PLACEHOLDER.search(t) for t in lines),
+    }
+    score = sum(signs.values())
+    return {**signs, "score": score, "mature": score >= MATURE_MIN_SIGNS}
 
 
 def _lines(c: dict) -> tuple:
@@ -40,7 +76,7 @@ def _has_evidence(c: dict) -> bool:
     return any(str(ev.get("quote", "")).strip() for ev in c.get("evidence") or [])
 
 
-def postprocess(candidates: list[dict[str, Any]], *, max_candidates: int = MAX_CANDIDATES,
+def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_candidates: int = MAX_CANDIDATES,
                 max_critical: int = MAX_CRITICAL) -> list[dict[str, Any]]:
     """Применить правила линзы к ответу модели. Не меняет входной список."""
     seen: set[tuple] = set()
@@ -71,53 +107,30 @@ def postprocess(candidates: list[dict[str, Any]], *, max_candidates: int = MAX_C
             if critical > max_critical:
                 c["severity"] = "major"
 
+    if mature:
+        strict, other = [], 0
+        for c in kept:
+            if c["severity"] == "minor":
+                continue
+            if c["severity"] == "major" and c.get("kind") not in _CONFLICT_KINDS:
+                other += 1
+                if other > MATURE_MAX_OTHER_MAJOR:
+                    continue
+            strict.append(c)
+        kept = strict
+
     order = sorted(range(len(kept)), key=lambda i: (_RANK[kept[i]["severity"]], i))
     return [kept[i] for i in order][:max_candidates]
 
 
-class _OutputBudget:
-    """Обёртка над ``ctx.llm``: поднимает лимит выходных токенов не ниже ``n``.
-
-    Слабые модели с рассуждением (haiku, Gemini Flash) тратят на этом промпте 20–28 тыс. токенов вывода,
-    из них JSON — около 6 тыс. С общим лимитом 16 000 ответ обрывается. Остальное — как у ``ctx.llm``.
-    """
-
-    def __init__(self, llm, n: int):
-        self._llm, self._n = llm, int(n)
-
-    def ask(self, stage, system, user, schema, *, max_output_tokens: int = 16000, **kw):
-        return self._llm.ask(stage, system, user, schema, max_output_tokens=max(max_output_tokens, self._n), **kw)
-
-    def ask_split(self, stage, build, items, schema, merge, *, max_output_tokens: int = 16000, **kw):
-        n = max(max_output_tokens, self._n)
-        real = getattr(self._llm, "ask_split", None)
-        if real is None:
-            system, user = build(list(items))
-            return self._llm.ask(stage, system, user, schema, max_output_tokens=n)
-        return real(stage, build, items, schema, merge, max_output_tokens=n, **kw)
-
-    def __getattr__(self, name):
-        return getattr(self._llm, name)
-
-
-class _CtxWithLLM:
-    """Контекст этапа с подменённым ``llm``; всё остальное берётся из исходного контекста."""
-
-    def __init__(self, ctx, llm):
-        self._ctx, self.llm = ctx, llm
-
-    def __getattr__(self, name):
-        return getattr(self._ctx, name)
-
-
 def run(ctx, lens_run=None) -> dict:
-    """Запуск линзы с постобработкой. `lens_run(ctx, name)` — общий запуск из `stages/lens.py` (№01)."""
+    """Запуск линзы с постобработкой. `lens_run(ctx, name)` — общий запуск из `stages/lens.py` (№01);
+    он сам берёт `MAX_OUTPUT_TOKENS` из этого модуля."""
     if lens_run is None:
         from . import lens as _lens  # каркас №01
         lens_run = _lens.run
-    llm = getattr(ctx, "llm", None)
-    if llm is not None:
-        ctx = _CtxWithLLM(ctx, _OutputBudget(llm, MAX_OUTPUT_TOKENS))
+    m = maturity(getattr(ctx, "view", None))
     out = dict(lens_run(ctx, "analyst"))
-    out["candidates"] = postprocess(out.get("candidates") or [])
+    out["candidates"] = postprocess(out.get("candidates") or [], mature=m["mature"])
+    out["document_maturity"] = m
     return out
