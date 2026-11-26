@@ -104,7 +104,7 @@ def _print_summary(report: dict, written: dict) -> None:
 
 def _exit_code(report: dict, fail_on: str | None) -> int:
     status = report.get("run", {}).get("status")
-    if status == "failed":
+    if status == "failed" or report.get("run", {}).get("model_error"):
         return 3
     if fail_on == "partial" and status == "partial":
         return 3
@@ -134,6 +134,8 @@ def cmd_review(argv: list[str]) -> int:
     from . import pipeline
     report, written = pipeline.review(a.input, a.output, _opts(a), log=_log(a.quiet))
     _print_summary(report, written)
+    if (report.get("run") or {}).get("model_error"):
+        print("\nМодель не вызывалась, отчёт построен только правилами. " + report["run"]["model_error"], file=sys.stderr)
     return _exit_code(report, a.fail_on)
 
 

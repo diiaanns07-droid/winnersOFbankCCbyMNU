@@ -110,6 +110,7 @@ STAGES = {
 
 def stage_name(key: str) -> str:
     return STAGES.get(stage_key(key), (f"этап `{key}`",))[0]
+PROPOSING = {"rules", "analyst", "qa", "architect", "risk", "consistency"}  # этапы, которые предлагают кандидатов
 STAGE_STATUS = {"ok": "✅ выполнен", "partial": "⚠️ частично", "failed": "⛔ сбой", "skipped": "— пропущен"}
 SOURCES = {"analyst": "аналитик", "qa": "тестировщик", "architect": "архитектор", "risk": "риски",
            "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр"}
@@ -177,9 +178,59 @@ def _lref(m: re.Match) -> str:
     return f"{prep} {word}" if prep else word
 
 
+_CALL = re.compile(r"(?<![\w`])([A-Za-z_][A-Za-z0-9_.]*\([^()`\n]{0,60}\))")
+
+
+_IDREF = re.compile(r"(?<![\w\[#/`-])([DRQ]-\d{2,4})(?![\w-])")
+_KNOWN_IDS: set[str] = set()  # ID дефектов, требований и вопросов текущего отчёта (заполняет render)
+
+
+def _link_ids(text: str) -> str:
+    if not _KNOWN_IDS:
+        return text
+    return _IDREF.sub(lambda m: f"[{m.group(1)}](#{m.group(1).lower()})" if m.group(1) in _KNOWN_IDS else m.group(1),
+                      text)
+
+
+_PATH = re.compile(r"(?<![\w`/.])(/[A-Za-z](?:[\w/{}.-]*[\w/}])?(?:\?[\w=&.%{}-]*[\w=}.])?)")
+_IDENT = re.compile(r"(?<![\w`$./=?&-])("
+                    r"[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+"          # camelCase
+                    r"|[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+"    # snake_case
+                    r"|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+"          # a.b.c
+                    r")(?![\w`(])")
+
+
+def _code_spans(text: str) -> str:
+    """Пути API и идентификаторы — как код; уже оформленный код не трогается."""
+    parts = re.split(r"(`[^`]*`)", text)
+    for i in range(0, len(parts), 2):
+        p = _CALL.sub(r"`\1`", parts[i])
+        sub = re.split(r"(`[^`]*`)", p)
+        for j in range(0, len(sub), 2):
+            sub[j] = _IDENT.sub(r"`\1`", _PATH.sub(r"`\1`", sub[j]))
+        parts[i] = "".join(sub)
+    return "".join(parts)
+
+
 def prose(text) -> str:
-    """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»."""
-    return _LREF.sub(_lref, esc(text))
+    """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»;
+    выражения floor(x/100), пути /a/b?x=1 и идентификаторы monthSpent, limit_kzt, response.result — как код;
+    упоминания D-…, R-…, Q-… — ссылки."""
+    return _link_ids(_code_spans(_LREF.sub(_lref, esc(text))))
+
+
+_SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
+_STAGE_PREFIX = re.compile(r"^\s*([a-z_:]+):\s+")
+
+
+def warn_text(text) -> str:
+    """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», critical → критичный."""
+    s = " ".join(str(text or "").split())
+    m = _STAGE_PREFIX.match(s)
+    if m and stage_key(m.group(1)) in STAGES:
+        s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
+    s = _SEV_WORD.sub(lambda m: SEV_NAME[m.group(1)], s)
+    return prose(s)
 
 
 def cell(text) -> str:
@@ -340,6 +391,7 @@ class _Ctx:
             for fid in q.get("finding_ids", []) or []:
                 self.q_by_finding.setdefault(fid, []).append(q.get("id"))
         self.summary = report.get("summary") or jsonout.compute_summary(report)
+        self.edits = _applied_edits(report)
         self.verdict = report.get("verdict", {}) or {}
         self.offline = self.run.get("provider") == "offline" or (
             not self.run.get("models_used") and self.run.get("provider") not in ("mock",))
@@ -608,6 +660,9 @@ def _passport(c: _Ctx) -> list[str]:
         ["Документ", f"«{cell(doc.get('title') or '—')}»"],
         ["Файл", f"`{doc.get('file') or '—'}` · {fmt} · {size}"],
         ["Хеш файла (`SHA-256`)", f"`{doc.get('sha256') or '—'}`"],
+    ] + ([["Нумерация строк", "строка — фрагмент текста в нумерации агента (сквозная по документу); место на "
+                              "странице находится по номеру страницы и цитате"]]
+         if doc.get("format") in ("pdf", "docx") else []) + [
         ["Дата и время", stamp],
         ["Модель", model.replace("|", "\\|")],
         ["Провайдер", PROVIDERS.get(run.get("provider")) or f"`{run.get('provider') or '—'}`"],
@@ -615,10 +670,12 @@ def _passport(c: _Ctx) -> list[str]:
         ["Обращений к модели", f"{num(calls.get('total', 0))} (из кэша {num(calls.get('cached', 0))}, "
                                f"с ошибкой {num(calls.get('failed', 0))}, делений пакета {num(calls.get('split', 0))})"],
         ["Токены", f"вход {num(tok.get('input', 0))}, выход {num(tok.get('output', 0))}"
-                   + (f" · ≈ ${cost:.2f}" if isinstance(cost, (int, float)) and cost else "")],
+                   + (f" · ≈ {cost:.2f} $".replace(".", ",") if isinstance(cost, (int, float)) and cost else "")],
         ["Длительность", duration(run.get("duration_s"))],
         ["Статус прогона", STATUS.get(run.get("status"), run.get("status") or "—")],
         ["Этапы", cell(stage_txt)],
+        ["Файлы отчёта", "рядом с этим файлом: `.json` — все данные и полные цитаты (по нему работает `verify`), "
+                         "`.html` — интерактивная версия"],
     ]
     cl = c.r.get("clarification") or {}
     if cl:
@@ -626,7 +683,8 @@ def _passport(c: _Ctx) -> list[str]:
                                          f"{len(cl.get('decisions') or [])}, без ответа {len(cl.get('unanswered') or [])}"])
     warns = (run.get("warnings") or []) + (doc.get("warnings") or [])
     if warns:
-        rows.append(["Предупреждения", cell("; ".join(warns[:5]) + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else ""))])
+        rows.append(["Предупреждения", "; ".join(warn_text(w) for w in warns[:5]).replace("|", "\\|")
+                     + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else "")])
     return [h2("s1", "1. Паспорт прогона"), ""] + table(["Поле", "Значение"], rows) + [""]
 
 
@@ -750,6 +808,22 @@ def _per_requirement(c: _Ctx) -> list[str]:
     return out
 
 
+def _applied_edits(report: dict) -> list[tuple[str, dict]]:
+    """Правки режима --revise (№11): [(D-…, {"line", "before", "after", "insert"})], только применённые."""
+    out = []
+    for rw in report.get("rewrites") or []:
+        if not isinstance(rw, dict):
+            continue
+        for e in rw.get("edits") or []:
+            if not isinstance(e, dict) or not e.get("applied") or not isinstance(e.get("line"), int):
+                continue
+            insert = e.get("action") == "insert"
+            out.append((str(rw.get("finding_id") or ""), {
+                "line": e["line"], "insert": insert, "before": "" if insert else str(e.get("was") or e.get("old") or ""),
+                "after": str(e.get("became") if e.get("became") is not None else e.get("new") or "")}))
+    return out
+
+
 def _rewrite_from(f: dict) -> dict | None:
     """Цитата, которую заменяет «стало»: та, где больше общих слов с новой формулировкой."""
     evs = f.get("evidence") or []
@@ -797,8 +871,16 @@ def _card(c: _Ctx, f: dict) -> list[str]:
         fields = [("Проблема", f.get("problem")), ("Сценарий", f.get("scenario")), ("Последствия", f.get("impact")),
                   ("Что исправить", f.get("recommendation"))]
     body = [f"**{name}.** {prose(val)}" for name, val in fields if val]
+    edits = [e for fid, e in c.edits if fid == f.get("id")]
     src = _rewrite_from(f)
-    if src is not None:
+    if edits:
+        for e in edits[:2]:
+            if e["insert"]:
+                body.append(f"**Добавить после строки {e['line']}.** «{prose(e['after'])}»")
+            else:
+                body.append(f"**Было → стало.** Строка {e['line']}: {quote_md(e['before'])} → "
+                            + (f"«{prose(e['after'])}»" if e["after"] else "удалить"))
+    elif src is not None:
         body.append(f"**Было → стало.** {lines_word(src.get('line_start'), src.get('line_end')).capitalize()}: "
                     f"{quote_md(src.get('quote'))} → «{prose(f.get('rewrite'))}»")
     if f.get("question"):
@@ -833,7 +915,7 @@ def _set_check(c: _Ctx) -> list[str]:
                     "undefined": "❔ не определено"}.get(p.get("verdict"), "—")
             rows.append([f"{c.req_label(p.get('a'))} ↔ {c.req_label(p.get('b'))}", cell(p.get("subject")),
                          cell(p.get("scenario")), cell(p.get("outcome_a")), cell(p.get("outcome_b")), mark,
-                         c.f_links(p.get("finding_ids"))])
+                         c.f_links(p.get("finding_ids") or _infer_pair(c, p))])
         out += table(["Пара", "Общий предмет", "Сценарий", "Исход по первому", "Исход по второму", "Итог", "Дефект"],
                      rows) + [""]
     else:
@@ -850,7 +932,8 @@ def _set_check(c: _Ctx) -> list[str]:
                     "undefined": "❔ правила не определяют"}.get(a.get("verdict"), "—")
             rows.append([c.req_label(a.get("row_requirement_id")), cell(a.get("row_facts")),
                          ", ".join(c.req_label(r) for r in a.get("rule_requirement_ids") or []) or "—",
-                         cell(a.get("expected_by_rules")), cell(a.get("stated")), mark, c.f_links(a.get("finding_ids"))])
+                         cell(a.get("expected_by_rules")), cell(a.get("stated")), mark,
+                         c.f_links(a.get("finding_ids") or _infer_acceptance(c, a))])
         out += table(["Критерий", "Исходные данные", "Правила", "Ожидается по правилам", "Указано в критерии",
                       "Итог", "Дефект"], rows) + [""]
     else:
@@ -864,11 +947,55 @@ def _set_check(c: _Ctx) -> list[str]:
         rows = [[cell(g.get("concept")),
                  ", ".join(f"«{cell(t.get('term'))}»" + (f" (строка {t['line']})" if t.get("line") else "")
                            for t in g.get("terms") or []),
-                 cell(g.get("problem")), c.f_links(g.get("finding_ids"))] for g in glossary]
+                 cell(g.get("problem")), c.f_links(g.get("finding_ids") or _infer_glossary(c, g))] for g in glossary]
         out += table(["Понятие", "Как названо в документе", "Проблема", "Дефект"], rows) + [""]
     else:
         out += ["Разночтений терминов не найдено.", ""]
     return out
+
+
+def _ev_lines(f: dict) -> set[int]:
+    out = set()
+    for e in f.get("evidence") or []:
+        a = e.get("line_start")
+        if isinstance(a, int):
+            b = e.get("line_end") if isinstance(e.get("line_end"), int) else a
+            out.update(range(a, b + 1))
+    return out
+
+
+def _infer_pair(c: _Ctx, p: dict) -> list[str]:
+    """Дефект для пары, если судья его не указал: оба требования или обе строки в одном дефекте."""
+    if p.get("verdict") == "compatible":
+        return []
+    a, b = p.get("a"), p.get("b")
+    la, lb = p.get("line_a"), p.get("line_b")
+    hits = []
+    for f in c.findings:
+        reqs = set(f.get("requirement_ids") or [])
+        lines = _ev_lines(f)
+        if (a in reqs and b in reqs) or (isinstance(la, int) and isinstance(lb, int) and la in lines and lb in lines):
+            hits.append(f)
+    hits.sort(key=lambda f: (f.get("kind") not in CONFLICT_KINDS, SEV_ORDER.get(f.get("severity"), 3)))
+    return [f["id"] for f in hits[:2]]
+
+
+def _infer_acceptance(c: _Ctx, a: dict) -> list[str]:
+    if a.get("verdict") == "match":
+        return []
+    row = a.get("row_requirement_id")
+    rules = set(a.get("rule_requirement_ids") or [])
+    hits = [f for f in c.findings if row in (f.get("requirement_ids") or [])
+            and (rules & set(f.get("requirement_ids") or []) or f.get("kind") in CONFLICT_KINDS)]
+    hits.sort(key=lambda f: (f.get("kind") not in CONFLICT_KINDS, SEV_ORDER.get(f.get("severity"), 3)))
+    return [f["id"] for f in hits[:2]]
+
+
+def _infer_glossary(c: _Ctx, g: dict) -> list[str]:
+    lines = {t.get("line") for t in g.get("terms") or [] if isinstance(t.get("line"), int)}
+    hits = [f for f in c.findings if (f.get("kind") == "terminology" or f.get("criterion") == "set_comprehensible")
+            and lines & _ev_lines(f)]
+    return [f["id"] for f in hits[:2]]
 
 
 def _coverage(c: _Ctx) -> list[str]:
@@ -888,6 +1015,13 @@ def _coverage(c: _Ctx) -> list[str]:
     if not trace and not checked:
         return out + ["Трассировка не выполнялась" + (" (режим без модели)." if c.offline else "."), ""]
     covered, rows, bare = 0, [], []
+    # одинаковая заметка у многих непокрытых требований («трассировка не построена») — одной строкой
+    note_count: dict[str, int] = {}
+    for rid in rows_ids:
+        t = trace.get(rid, {})
+        if not (set(t.get("verified_by") or []) | checked.get(rid, set())) and t.get("note"):
+            note_count[t["note"]] = note_count.get(t["note"], 0) + 1
+    grouped: dict[str, list[str]] = {}
     for rid in rows_ids:
         t = trace.get(rid, {})
         by = set(t.get("verified_by") or []) | checked.get(rid, set())
@@ -895,6 +1029,9 @@ def _coverage(c: _Ctx) -> list[str]:
             covered += 1
         elif not t.get("note"):
             bare.append(rid)
+            continue
+        elif note_count.get(t["note"], 0) >= 3:
+            grouped.setdefault(t["note"], []).append(rid)
             continue
         cells = []
         for aid in acc_ids:
@@ -907,8 +1044,11 @@ def _coverage(c: _Ctx) -> list[str]:
         rows.append([c.req_label(rid)] + cells + [cell(t.get("note") or ("нет критерия приёмки" if not by else ""))])
     out += [f"Покрыто приёмкой {covered} из {len(rows_ids)} требований, которые должны проверяться. "
             f"✓ — критерий проверяет требование, ⛔ — критерий противоречит требованию, «·» — не проверяет.", ""]
-    out += table(["Требование"] + [c.req_label(a) for a in acc_ids] + ["Чего не хватает"], rows,
-                 [":---"] + [":---:"] * len(acc_ids) + [":---"])
+    if rows:
+        out += table(["Требование"] + [c.req_label(a) for a in acc_ids] + ["Чего не хватает"], rows,
+                     [":---"] + [":---:"] * len(acc_ids) + [":---"])
+    for note, ids in grouped.items():
+        out += ["", f"Без критерия приёмки — {cell(note)} ({len(ids)}): " + ", ".join(c.req_label(r) for r in ids) + "."]
     if bare:
         out += ["", f"Без критерия приёмки также ({len(bare)}): " + ", ".join(c.req_label(r) for r in bare) + "."]
     return out + [""]
@@ -962,8 +1102,10 @@ def _conclusion(c: _Ctx) -> list[str]:
     if first:
         out += ["**Что исправить в первую очередь**", ""]
         for i, f in enumerate(first, 1):
-            out.append(f"{i}. {c.f_link(f['id'], True)} {prose(f.get('title'))}. Что сделать: "
-                       f"{prose(shorten(f.get('recommendation'), 260))}")
+            rec = shorten(f.get("recommendation"), 260)
+            if len(rec) > 1 and rec[0].isupper() and rec[1].islower():
+                rec = rec[0].lower() + rec[1:]  # после двоеточия — со строчной
+            out.append(f"{i}. {c.f_link(f['id'], True)} {prose(f.get('title'))}. Что сделать: {prose(rec)}")
         out.append("")
     nc = [x for x in c.r.get("not_checked") or [] if isinstance(x, str)]
     if nc:
@@ -1068,28 +1210,41 @@ def _appendix_checklist(c: _Ctx) -> list[str]:
 def _appendix_rewrites(c: _Ctx) -> list[str]:
     out = [h2("pg", "Приложение Г. Было → стало"), ""]
     items = []
+    for fid, e in _applied_edits(c.r):
+        items.append((fid, e["line"], e["line"], e["before"], e["after"], e["insert"]))
     for rw in c.r.get("rewrites") or []:
-        if rw.get("after") or rw.get("rewrite"):
+        if not rw.get("edits") and (rw.get("after") or rw.get("rewrite")):
             items.append((rw.get("finding_id") or ", ".join(rw.get("finding_ids") or []), rw.get("line_start"),
-                          rw.get("line_end"), rw.get("before") or rw.get("quote") or "", rw.get("after") or rw.get("rewrite")))
+                          rw.get("line_end"), rw.get("before") or rw.get("quote") or "",
+                          rw.get("after") or rw.get("rewrite"), False))
+    from_revise = bool(items)
     if not items:
         for f in c.findings:
             if c.level >= 2 and f.get("severity") in ("critical", "major"):
                 continue
             src = _rewrite_from(f)
             if src is not None:
-                items.append((f["id"], src.get("line_start"), src.get("line_end"), src.get("quote"), f.get("rewrite")))
+                items.append((f["id"], src.get("line_start"), src.get("line_end"), src.get("quote"), f.get("rewrite"),
+                              False))
     if not items and c.level >= 2:
         return out + ["Формулировки «было → стало» приведены в карточках раздела 3.2 и в `report.json`.", ""]
     if not items:
         return out + ["Готовых формулировок нет.", ""]
-    out += ["Готовые формулировки для правки ТЗ; «<уточнить: …>» — место, где нужен ответ владельца.", ""]
-    rows = [[c.f_link(fid, True) if fid in c.f_by_id else esc(fid), lines_word(a, b).replace("строки ", "")
-             .replace("строка ", ""), quote_md(before, 120, in_table=True), cell(after)]
-            for fid, a, b, before, after in items]
+    st = c.r.get("revise_stats") or {}
+    if from_revise and st:
+        out += [f"Правки внесены программой в копию документа: заменено фрагментов {num(st.get('replaced', 0))}, "
+                f"добавлено строк {num(st.get('inserted', 0))}, не применено {num(st.get('not_applied', 0))}; "
+                f"«<уточнить: …>» — место, где нужен ответ владельца ({num(st.get('pending', 0))}).", ""]
+    else:
+        out += ["Готовые формулировки для правки ТЗ; «<уточнить: …>» — место, где нужен ответ владельца.", ""]
+    rows = [[c.f_link(fid, True) if fid in c.f_by_id else esc(fid),
+             (f"после {a}" if ins else lines_word(a, b).replace("строки ", "").replace("строка ", "")),
+             "—" if ins else quote_md(before, 120, in_table=True), cell(after) if after else "фрагмент удалён"]
+            for fid, a, b, before, after, ins in items]
     out += table(["Дефект", "Строка", "Было", "Стало"], rows)
     if c.r.get("revised_file"):
-        out += ["", f"Исправленный текст ТЗ целиком: «{esc(c.r['revised_file'])}»."]
+        from pathlib import PurePath
+        out += ["", f"Исправленный текст ТЗ целиком: `{PurePath(str(c.r['revised_file'])).name}` (рядом с отчётом)."]
     return out + [""]
 
 
@@ -1103,12 +1258,17 @@ def _appendix_how(c: _Ctx) -> list[str]:
         for k, v in stages.items():
             name, what = STAGES.get(stage_key(k), (stage_name(k), ""))
             st = stats.get(k) or {}
-            rows.append([name, what, STAGE_STATUS.get(v, v), num(st.get("calls")) if "calls" in st else "—",
+            proposes = stage_key(k) in PROPOSING
+            status = STAGE_STATUS.get(v, v) + (" (из прошлого прогона)" if st.get("reused") else "")
+            calls = num(st.get("calls")) if "calls" in st else "—"
+            if st.get("split"):
+                calls += f" (пакет делился: {num(st['split'])})"
+            rows.append([name, what, status, calls if "calls" in st else "—",
                          duration(st.get("seconds")) if "seconds" in st else "—",
-                         num(st.get("candidates")) if "candidates" in st else "—"])
+                         num(st.get("candidates")) if proposes and "candidates" in st else "—"])
         out += table(["Этап", "Что делает", "Итог", "Вызовов", "Время", "Кандидатов"], rows,
                      [":---", ":---", ":---", ":---:", ":---:", ":---:"]) + [""]
-    proposed = sum(int((stats.get(k) or {}).get("candidates") or 0) for k in stats)
+    proposed = sum(int((stats.get(k) or {}).get("candidates") or 0) for k in stats if stage_key(k) in PROPOSING)
     accepted = sum(len(f.get("candidate_ids") or []) for f in c.r.get("findings") or [])
     rej = c.r.get("rejected") or []
     nfind = len(c.findings)
@@ -1135,7 +1295,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
         out.append("")
     warns = run.get("warnings") or []
     if warns:
-        out += ["**Предупреждения прогона**", ""] + [f"- {esc(w)}" for w in warns[:15]] + [""]
+        out += ["**Предупреждения прогона**", ""] + [f"- {warn_text(w)}" for w in warns[:15]] + [""]
     return out
 
 
@@ -1182,8 +1342,8 @@ MAX_LEVEL = 4
 _LIST_KEYS = ("requirements", "excluded", "findings", "rejected", "acceptance_checks", "pair_checks", "trace",
               "glossary", "test_cases", "questions", "checklist", "rewrites")
 _ID_LIST_KEYS = ("requirement_ids", "finding_ids", "candidate_ids", "sources", "rule_requirement_ids", "verified_by",
-                 "implemented_by", "options", "standard_refs", "fix_first", "resolved", "changed", "added",
-                 "models_used", "warnings")
+                 "implemented_by", "options", "standard_refs", "fix_first", "models_used", "warnings",
+                 "new_findings", "unanswered", "decisions", "question_ids", "answer_ids")
 
 
 def _clean_report(report) -> dict:
@@ -1229,7 +1389,7 @@ def _clean(value, key: str = ""):
                 if isinstance(v, (int, float)) and not isinstance(v, bool):
                     out[k] = str(v)
                 continue
-            if k in ("evidence", "terms", "answers"):
+            if k in ("evidence", "terms", "answers", "edits", "changes"):
                 out[k] = [_clean(x, k) for x in v if isinstance(x, dict)] if isinstance(v, list) else []
             elif k in _ID_LIST_KEYS:
                 out[k] = [str(x) for x in v if isinstance(x, (str, int, float)) and str(x).strip()] \
@@ -1257,6 +1417,10 @@ def _sections():
 
 def _render_level(report: dict, level: int) -> str:
     c = _Ctx(_clean_report(report), level)
+    _KNOWN_IDS.clear()
+    _KNOWN_IDS.update(str(f.get("id")) for f in c.findings)
+    _KNOWN_IDS.update(str(q.get("id")) for q in c.reqs)
+    _KNOWN_IDS.update(str(q.get("id")) for q in c.r.get("questions") or [])
     parts = []
     for title, fn in _sections():
         try:
@@ -1265,7 +1429,11 @@ def _render_level(report: dict, level: int) -> str:
             head = [f"## {title}", ""] if title else []
             parts.append(head + [f"⚠️ Раздел не построен: в данных прогона ошибка ({esc(type(exc).__name__)}: "
                                  f"{esc(shorten(str(exc), 160))}). Полные данные — в `report.json`.", ""])
-    lines = [ln for part in parts for ln in part]
+    lines = []
+    for ln in (ln for part in parts for ln in part):
+        if not ln.strip() and lines and not lines[-1].strip():
+            continue  # не больше одной пустой строки подряд
+        lines.append(ln)
     while lines and not lines[-1].strip():
         lines.pop()
     return "\n".join(lines) + "\n"

@@ -93,6 +93,8 @@ STAGE_LABEL = {
     "lens:risk": "Линза «Риски»", "consistency": "Набор целиком", "quotes": "Сверка цитат", "judge": "Судья",
     "clarify": "Вопросы", "revise": "Исправленное ТЗ", "recheck": "Перепроверка", "report": "Отчёт",
     "analyst": "Линза «Аналитик»", "qa": "Линза «Тестировщик»", "architect": "Линза «Архитектор»", "risk": "Линза «Риски»",
+    "lens_analyst": "Линза «Аналитик»", "lens_qa": "Линза «Тестировщик»", "lens_architect": "Линза «Архитектор»",
+    "lens_risk": "Линза «Риски»", "answers": "Ответы владельца", "offline": "Без модели",
 }
 STAGE_STATE = {"ok": "готово", "partial": "частично", "failed": "ошибка", "skipped": "пропущен"}
 
@@ -499,7 +501,7 @@ def _doc_pane(view: dict | None, findings: list[dict], report: dict) -> str:
             prev_page = page
         text = ln.get("text", "")
         cls = ["ln"]
-        heading = ln.get("heading")
+        heading = ln.get("heading") or (ln.get("level") or 1 if ln.get("kind") == "heading" else 0)
         if not heading and text.strip() and ln.get("section"):
             last = str(ln["section"]).split("›")[-1].strip()
             heading = 1 if last and text.strip() == last else 0
@@ -521,8 +523,12 @@ def _doc_pane(view: dict | None, findings: list[dict], report: dict) -> str:
             attrs += f' data-ex="{e(excl[n])}"'
         body = _marked(text, spans.get(n, []), rank_name)
         tags = "".join(f'<span class="rtag">{e(r)}</span>' for r in req_start.get(n, []))
+        order = sorted(fids, key=lambda x: -SEV_RANK[fsev[x]])  # сначала самые серьёзные
         marks = "".join(f'<a class="fm sev-{fsev[fid]}" href="#{e(fid)}" data-goto="{e(fid)}">{e(fid)}</a>'
-                        for fid in fids)
+                        for fid in order)
+        if len(order) > 3:
+            marks += f'<span class="fmore" title="{e(" ".join(order[3:]))}">+{len(order) - 3}</span>'
+
         out.append(f'<div class="{" ".join(cls)}"{attrs}><span class="no">{n}</span>'
                    f'<span class="tx">{tags}{body or "&#8203;"}</span>'
                    + (f'<span class="fms">{marks}</span>' if marks else "") + "</div>")
@@ -827,8 +833,11 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
     if acc:
         rows = [[_req_link(a.get("row_requirement_id", ""), reqs_by_id), e(a.get("row_facts", "")),
                  " ".join(_req_link(r, reqs_by_id) for r in a.get("rule_requirement_ids") or []),
-                 e(a.get("expected_by_rules", "")), e(a.get("stated", "")),
-                 f'<span class="ans {verdict_cls.get(a.get("verdict"), "a-na")}">{e(verdict_lbl.get(a.get("verdict"), a.get("verdict", "")))}</span>']
+                 e(a.get("expected_by_rules", "")) + (f'<div class="deriv">{e(a["derivation"])}</div>' if a.get("derivation") else ""),
+                 e(a.get("stated", "")),
+                 f'<span class="ans {verdict_cls.get(a.get("verdict"), "a-na")}">{e(verdict_lbl.get(a.get("verdict"), a.get("verdict", "")))}</span>'
+                 + (f'<div class="deriv">{e(a.get("explanation") or a.get("fix"))}</div>'
+                    if a.get("verdict") == "conflict" and (a.get("explanation") or a.get("fix")) else "")]
                 for a in acc]
         parts.append('<h3 class="sub">Исполнение критериев приёмки</h3><p class="lead">Ожидаемый результат выведен '
                      'из правил документа и сравнён с тем, что записано в критерии.</p>'
@@ -930,14 +939,26 @@ def _passport(report: dict) -> str:
         ("SHA-256 документа", f'<code class="hash">{e(doc.get("sha256", "—"))}</code>'),
         ("Схема отчёта", e(report.get("schema", "—"))),
     ]
+    qs = report.get("quote_stats") or {}
+    if qs.get("quotes"):
+        how = ", ".join(f"{lbl} {qs[k]}" for k, lbl in (("exact", "дословно"), ("normalized", "после нормализации"),
+                                                          ("fuzzy", "нечётко"), ("missing", "не найдено")) if qs.get(k))
+        rows.insert(10, ("Сверка цитат кодом", f'{_fmt_int(qs.get("verified", 0))} из {_fmt_int(qs["quotes"])} цитат '
+                                               f'всех кандидатов найдены в документе <span class="muted">({e(how)})</span>'))
+    if qs.get("candidates_in") is not None:
+        rows.insert(11, ("Кандидаты", f'{_fmt_int(qs.get("candidates_in", 0))} от ревьюеров → {_fmt_int(qs.get("candidates_kept", 0))} '
+                                      f'с найденными цитатами → судье; отклонено {_fmt_int(qs.get("candidates_rejected", 0))}'))
     kv = "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in rows)
     stages = dict(run.get("stages") or {})
     stats = run.get("stage_stats") or {}
     for k in stats:
         if k not in stages and f"lens:{k}" not in stages:
             stages[k] = "ok"
+    canon = ["docview", "segment", "rules", "lens_analyst", "lens:analyst", "analyst", "lens_qa", "lens:qa", "qa",
+             "lens_architect", "lens:architect", "architect", "lens_risk", "lens:risk", "risk", "consistency", "quotes",
+             "judge", "clarify", "answers", "recheck", "revise", "report"]
     items = []
-    for k, v in stages.items():
+    for k, v in sorted(stages.items(), key=lambda kv: canon.index(kv[0]) if kv[0] in canon else 99):
         ss = stats.get(k) or stats.get(k.split(":", 1)[-1]) or {}
         bits = []
         if isinstance(ss, dict):
@@ -945,7 +966,7 @@ def _passport(report: dict) -> str:
                 bits.append(_fmt_duration(ss["seconds"]) if ss["seconds"] >= 1 else "< 1 с")
             if ss.get("calls"):
                 bits.append(f'{ss["calls"]} {_plural(int(ss["calls"]), "вызов", "вызова", "вызовов")}')
-            if ss.get("candidates") is not None:
+            if ss.get("candidates"):
                 bits.append(f'{ss["candidates"]} канд.')
         extra = f'<small>{e(" · ".join(bits))}</small>' if bits else ""
         items.append(f'<li class="st st-{e(v)}"><span>{e(STAGE_LABEL.get(k, k))}{extra}</span><b>{e(STAGE_STATE.get(v, v))}</b></li>')

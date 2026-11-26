@@ -45,6 +45,20 @@ def test_verdict_rule():
     assert offline.verdict([one])["development"] == "no"
     assert offline.verdict([one])["testing"] == "undetermined"
     assert offline.verdict([weak, plain])["development"] == "undetermined"
+    crit = {"id": "D-04", "severity": "critical", "blocks": "development", "evidence": [{}]}
+    assert offline.verdict([crit])["development"] == "no"
+
+
+def test_verdict_matches_report_rule():
+    """Офлайн-вердикт №12 совпадает с правилом кода №13 — иначе verify отклонит отчёт."""
+    try:
+        from bcc_review.v2.render import jsonout
+    except Exception:  # noqa: BLE001
+        return
+    for path in (OFFICIAL, CLEAN):
+        r = offline.build(fallback_load(path))
+        rule = jsonout.rule_verdict(r)
+        assert {k: r["verdict"][k] for k in ("development", "testing")} == rule
 
 
 def test_fallback_render_short(tmp_path):

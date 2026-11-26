@@ -18,7 +18,7 @@ from typing import Any, Iterable, Mapping
 
 STAGE = "lens_qa"
 SOURCE = "lens:qa"
-MAX_TEST_CASES = 15
+MAX_TEST_CASES = 12
 MAX_MODEL_CANDIDATES = 12
 UNDEFINED_PREFIX = "Не определено требованиями"
 
@@ -145,18 +145,20 @@ def acceptance_rows(requirements: Iterable[Mapping[str, Any]] | None) -> list[st
 
 
 def resolve_row_id(check: Mapping[str, Any], requirements: Iterable[Mapping[str, Any]] | None) -> str:
-    """ID строки приёмки: как дала модель, если он есть в нарезке; иначе — требование acceptance по номеру строки."""
+    """ID строки приёмки: требование acceptance, в которое попадает номер строки; иначе ID модели, если он есть
+    в нарезке. Номер строки надёжнее: модель путает соседние ID, а без таблицы даёт всем строкам один «ID»."""
     reqs = list(requirements or [])
     rid = _s(check.get("row_requirement_id"))
-    if any(str(r.get("id")) == rid for r in reqs):
-        return rid
     line = _int(check.get("row_line"))
     if line:
         for r in reqs:
-            lo, hi = _int(r.get("line_start")), _int(r.get("line_end")) or _int(r.get("line_start"))
+            lo = _int(r.get("line_start"))
+            hi = _int(r.get("line_end")) or lo
             if r.get("kind") == "acceptance" and lo and lo <= line <= (hi or lo):
                 return str(r["id"])
-    return rid if reqs == [] else ""
+    if any(str(r.get("id")) == rid for r in reqs):
+        return rid
+    return rid if not reqs else ""
 
 
 def missing_rows(checks: list[Mapping[str, Any]], requirements: Iterable[Mapping[str, Any]] | None) -> list[str]:
@@ -260,6 +262,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
             "blocks": "both",
             "source": SOURCE,
             "origin": "acceptance_check",
+            "acceptance_row": c["row_requirement_id"] or f"L{c['row_line']}",
             "derivation": c["derivation"],
         }
     return {
@@ -280,6 +283,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
         "blocks": "testing",
         "source": SOURCE,
         "origin": "acceptance_check",
+        "acceptance_row": c["row_requirement_id"] or f"L{c['row_line']}",
         "derivation": c["derivation"],
     }
 
@@ -406,6 +410,20 @@ def focus_instruction(rows: list[str], rest: int) -> str:
 
 
 BATCH_ROWS = 10
+SHORT_INSTRUCTION = ("\n\n### Дополнительно\nПрошлый ответ не поместился в лимит вывода. Пиши короче: candidates — "
+                     "не больше 4, test_cases — не больше 6, каждое текстовое поле — одно-два предложения.")
+NO_ROWS = " acceptance_checks — пустой список: строки приёмки исполнены отдельным запросом."
+
+
+_TRUNC_TEXT = re.compile(r"output token|max_tokens|max output|обрез|не поместился", re.I)
+
+
+def _is_truncation(exc: BaseException) -> bool:
+    """Обрезка ответа: ``llm.Truncated`` или ошибка провайдера, текст которой говорит о лимите вывода
+    (``claude -p`` сообщает «response exceeded the 16000 output token maximum» как обычную ошибку)."""
+    if type(exc).__name__ == "Truncated" or getattr(exc, "kind", "") == "truncated":
+        return True
+    return bool(_TRUNC_TEXT.search(f"{getattr(exc, 'message', '')} {exc}"))
 
 
 def _ask_rows(ctx: Any, system: str, user: str, rows: list[str], stage: str, warnings: list[str]) -> list:
@@ -422,21 +440,50 @@ def run(ctx: Any) -> dict:
 
     Вызовы: один основной; если строк приёмки больше BATCH_ROWS — по одному на каждые следующие BATCH_ROWS строк
     (ответ не упирается в лимит вывода); затем не больше одного повтора по строкам, которые модель пропустила.
+    Если основной ответ всё же обрезан — строки приёмки запрашиваются пакетами по 5, а кандидаты и тест-кейсы —
+    отдельным коротким запросом; этап получает статус partial.
     """
     system, user = ctx.prompt(STAGE)
     reqs = list(getattr(ctx, "requirements", None) or [])
     rows = acceptance_rows(reqs)
     first, later = rows[:BATCH_ROWS], rows[BATCH_ROWS:]
     warnings: list[str] = []
+    partial = False
     main_user = user + focus_instruction(first, len(later)) if later else user
-    data = dict(ctx.llm.ask(STAGE, system, main_user, SCHEMA) or {})
+    try:
+        data = dict(ctx.llm.ask(STAGE, system, main_user, SCHEMA) or {})
+    except Exception as exc:
+        if not _is_truncation(exc):
+            raise
+        partial = True
+        warnings.append(f"{STAGE}: ответ обрезан по лимиту вывода — строки приёмки и тест-кейсы запрошены раздельно")
+        later = rows  # все строки — пакетами ниже
+        short = SHORT_INSTRUCTION + (NO_ROWS if rows else "")
+        try:
+            data = dict(ctx.llm.ask(f"{STAGE}_short", system, user + short, SCHEMA) or {})
+        except Exception as exc2:
+            if not _is_truncation(exc2):
+                raise
+            data = {}
+            warnings.append(f"{STAGE}: короткий ответ тоже обрезан — кандидаты и тест-кейсы линзы не получены")
+        if rows:
+            data["acceptance_checks"] = []
     checks = [c for c in data.get("acceptance_checks") or [] if isinstance(c, Mapping)]
-    for i in range(0, len(later), BATCH_ROWS):
-        checks += _ask_rows(ctx, system, user, later[i:i + BATCH_ROWS], f"{STAGE}_rows", warnings)
+    step = BATCH_ROWS // 2 if partial else BATCH_ROWS
+    for i in range(0, len(later), step):
+        checks += _ask_rows(ctx, system, user, later[i:i + step], f"{STAGE}_rows", warnings)
     missing = missing_rows([normalize_check(c) for c in checks], reqs)
     if missing:
         checks += _ask_rows(ctx, system, user, missing[:BATCH_ROWS], f"{STAGE}_retry", warnings)
     data["acceptance_checks"] = checks
     out = postprocess(data, reqs)
     out["warnings"] = warnings + out["warnings"]
+    if missing_rows(out["acceptance_checks"], reqs):
+        partial = True
+    warn = getattr(ctx, "warn", None)
+    if callable(warn):
+        for w in out["warnings"]:
+            warn(w)
+    if partial:
+        out["_partial"] = True
     return out
