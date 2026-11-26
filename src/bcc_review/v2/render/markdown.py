@@ -1257,7 +1257,11 @@ def _appendix_how(c: _Ctx) -> list[str]:
             name, what = STAGES.get(stage_key(k), (stage_name(k), ""))
             st = stats.get(k) or {}
             proposes = stage_key(k) in PROPOSING
-            rows.append([name, what, STAGE_STATUS.get(v, v), num(st.get("calls")) if "calls" in st else "—",
+            status = STAGE_STATUS.get(v, v) + (" (из прошлого прогона)" if st.get("reused") else "")
+            calls = num(st.get("calls")) if "calls" in st else "—"
+            if st.get("split"):
+                calls += f" (пакет делился: {num(st['split'])})"
+            rows.append([name, what, status, calls if "calls" in st else "—",
                          duration(st.get("seconds")) if "seconds" in st else "—",
                          num(st.get("candidates")) if proposes and "candidates" in st else "—"])
         out += table(["Этап", "Что делает", "Итог", "Вызовов", "Время", "Кандидатов"], rows,
