@@ -49,7 +49,7 @@ OUT_OF_SCOPE_TOPICS: dict[str, dict[str, Any]] = {
         "hooks": ["аудит", "audit", "журнал", "истори", "логир", "инициатор"],
     },
     "мониторинг и доступность": {
-        "title": r"мониторинг|алерт|оповещени\w+\s+дежурн|SLA|доступност|availability",
+        "title": r"мониторинг|алерт|оповещени\w+\s+дежурн|availability",
         "hooks": ["мониторинг", "алерт", "sla", "доступност"],
     },
     "резервирование и восстановление": {
@@ -86,7 +86,12 @@ def _doc_text(view: Any) -> str:
 
 
 def missing_hook(candidate: dict, doc_text: str) -> str | None:
-    """Тема замечания, которой нет в документе (нет зацепки), или None."""
+    """Тема замечания, которой нет в документе (нет зацепки), или None.
+
+    critical не снимается никогда: это ключевое событие или противоречие, а не «тема вне предмета».
+    """
+    if candidate.get("severity") == "critical":
+        return None
     title = str(candidate.get("title", ""))
     for topic, rx in _TITLE_RES.items():
         if rx.search(title) and not any(h in doc_text for h in OUT_OF_SCOPE_TOPICS[topic]["hooks"]):

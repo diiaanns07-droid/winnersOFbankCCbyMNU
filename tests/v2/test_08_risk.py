@@ -74,6 +74,13 @@ def test_out_of_scope_topics_dropped_without_hook():
     assert len(dropped) == 3 and all(d["reject_reason"] for d in dropped)
 
 
+def test_critical_is_never_dropped_by_topic_filter():
+    doc = "Сервис передаёт уведомление в течение минуты. В расходы входят проведённые покупки."
+    c = _cand("Цель «в момент покупки» несовместима с учётом проведённых покупок и минутным SLA", "critical")
+    kept, dropped = lens_risk.postprocess([c, _cand("Нет мониторинга доступности сервиса")], doc)
+    assert [k["severity"] for k in kept] == ["critical"] and len(dropped) == 1
+
+
 def test_hook_in_document_keeps_topic():
     doc = "Реализация предусматривает схему отката решений. Хранить инициатора изменения."
     kept, _ = lens_risk.postprocess([_cand("Схема отката не описана", "minor", "ops_risk", "risk"),
