@@ -23,10 +23,17 @@ def main():
     for flag in ("product","scorer","inputs","gold","reports","out"):
         ap.add_argument("--"+flag,type=Path,required=True)
     ap.add_argument("--presentation",choices=("primary","order","wording","live"),required=True)
+    ap.add_argument("--input-seal",type=Path,help="Published receipt for another release on this frozen panel")
     ap.add_argument("--mode",choices=("rules_only","rules_plus_llm"),required=True)
     a=ap.parse_args()
     product,scorer,inputs,gold,reports,out=[p.resolve() for p in (a.product,a.scorer,a.inputs,a.gold,a.reports,a.out)]
     seal=read(HERE/(a.presentation+".seal.json"))
+    if a.input_seal:
+        candidate=read(a.input_seal)
+        for key in ("protocol_sha256","presentation","panel_manifest_sha256","panel_gold_sha256","scorer_sha","live_allowed"):
+            if candidate.get(key)!=seal[key]:
+                ap.error("Candidate receipt changes the frozen panel or scoring protocol")
+        seal=candidate
     for worktree,expected in ((product,seal["agent_sha"]),(scorer,seal["scorer_sha"])):
         if git(worktree,"rev-parse","HEAD")!=expected or git(worktree,"status","--porcelain"):
             ap.error("Wrong or dirty checkout: "+str(worktree))
@@ -55,6 +62,7 @@ def main():
             contracts.validate(rep)
             verify,_=call(["-m","bcc_review","verify",report_path,source],env,product,out/(cid+"-verify"))
             valid=(sig==row.get("report_sha256") and ru.get("source_sha256")==rep["document"]["id"]==render["sha256"] and ru.get("agent_commit")==seal["agent_sha"] and ru.get("mode")==a.mode==row["requested_mode"] and ru.get("status") in ("complete","partial") and row.get("exit_code")==0 and (report_path.parent/"report.md").is_file() and ru["calls"]["cache_hits"]==0 and row.get("parameters",{}).get("cache")=="off")
+            valid=valid and verify==0 and not contracts.evidence_errors(rep)
             if a.mode=="rules_only":
                 valid=valid and ru["calls"]["physical"]==0 and ru.get("model") is None
             else:
@@ -87,5 +95,5 @@ def main():
         d=out/st
         rc,_=call(["-m","evaluation.harness","--gold",gold,"--pred",out/"predictions.jsonl","--manifest",manifest,"--render-format","md","--out-dir",d,*flags],env,scorer,out/("score-"+st))
         if rc: raise SystemExit("Scoring failed; see "+str(out))
-    print(a.presentation,a.mode,"verified",sum(x["verify_exit"]==0 for x in log),"of",len(log),"documents")
+    print(a.presentation,a.mode,"verify passed",sum(x["verify_exit"]==0 for x in log),"of",len(log),"eligible for scoring",sum(x["measured"] for x in log))
 if __name__=="__main__":main()

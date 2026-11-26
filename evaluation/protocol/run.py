@@ -88,10 +88,17 @@ def main():
     if (product/".env").exists(): parser.error("Use the clean checkout and pass the live credential through the environment")
     if mode=="rules_plus_llm":
         if not seal.get("live_allowed",True): parser.error("This panel is reserved for offline evaluation")
-        if args.suite!="panel": parser.error("Live measurements use the frozen six-document panel")
+        if args.suite!="panel": parser.error("Live measurements use the frozen provider panel")
         if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")): parser.error("Team Gemini key missing; no measurements taken")
     out.mkdir(parents=True,exist_ok=False)
     env=environment(product,mode)
+    team_adapter=seal.get("provider_adapter")=="team"
+    if team_adapter:
+        env.pop("BCC_FORCE_FALLBACK",None)
+        if mode=="rules_plus_llm":
+            for name in ("GEMINI_THINKING_BUDGET","GEMINI_THINKING_LEVEL","GEMINI_FALLBACK_MODELS"):
+                env.pop(name,None)
+            env.update(GEMINI_TEMPERATURE="0",GEMINI_MAX_OUTPUT_TOKENS="65536")
     sys.path[:0]=[str(product/"src"),str(product)]
     from bcc_review import contracts
     from evaluation.harness.adapter import report_to_rows
@@ -112,7 +119,8 @@ def main():
             folder=out/rel
             folder.mkdir(parents=True)
             source=corpus/r["path"]
-            command=["-m","bcc_review"] if mode=="rules_only" else [str(HERE/"wire_probe.py")]
+            probe=HERE/"policy-variation"/"sdk_wire.py" if team_adapter else HERE/"wire_probe.py"
+            command=["-m","bcc_review"] if mode=="rules_only" else [str(probe)]
             command += [str(source),str(folder/"report.md"),"--no-cache","--max-calls","12","--max-seconds","180","--timeout","30","--max-retries","0"]
             command += ["--offline-lint"] if mode=="rules_only" else ["--provider","gemini","--model","gemini-2.5-flash"]
             wire=folder/"wire.jsonl"
