@@ -1,0 +1,229 @@
+{
+ "source": "tests/p02/fixtures/make_fixtures.py: build_boundaries",
+ "units": "пункты, начало — левый верхний угол неповёрнутой страницы (как у PyMuPDF)",
+ "fonts": {
+  "DejaVuSans-Bold.ttf": {
+   "sha256": "5c1247acef7f2b8522a31742c76d6adcb5569bacc0be7ceaa4dc39dd252ce895",
+   "glyph_ids": {
+    "U+2265": 3312,
+    "U+2264": 3311,
+    "U+003C": 31,
+    "U+003E": 33,
+    "U+20B8": 2958,
+    "U+2A7E": 4487,
+    "U+00A0": 3
+   }
+  },
+  "DejaVuSans.ttf": {
+   "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280",
+   "glyph_ids": {
+    "U+2265": 3312,
+    "U+2264": 3311,
+    "U+003C": 31,
+    "U+003E": 33,
+    "U+20B8": 2958,
+    "U+2A7E": 4487,
+    "U+00A0": 3
+   }
+  }
+ },
+ "threshold": {
+  "text": "1 000",
+  "value": "1000",
+  "unit": "₸",
+  "definition": "Порог проверки — 1 000 ₸ за одну операцию.",
+  "page": 1
+ },
+ "table": {
+  "header": [
+   "№",
+   "Сумма операции, ₸",
+   "Действие"
+  ],
+  "unit_column": 1,
+  "pages": [
+   1,
+   2
+  ],
+  "moved_row": 4,
+  "link": "header_carried"
+ },
+ "conditions": [
+  {
+   "row": 1,
+   "page": 1,
+   "drawn": "≥ 1 000",
+   "codepoints": [
+    "U+2265",
+    "U+00A0",
+    "U+0031",
+    "U+00A0",
+    "U+0030",
+    "U+0030",
+    "U+0030"
+   ],
+   "sign": "≥",
+   "sign_codepoint": "U+2265",
+   "sign_font": "DejaVuSans.ttf",
+   "glyph_id": 3312,
+   "visible": "≥",
+   "value": "1000",
+   "value_text": "1 000",
+   "unit": "₸",
+   "unit_from": "header page 1",
+   "side": "lower",
+   "inclusive": true,
+   "action": "Запросить SMS-код",
+   "cell": [
+    96.0,
+    700.0,
+    260.0,
+    720.0
+   ],
+   "sign_glyphs": [
+    101.0,
+    706.02,
+    109.8,
+    716.52
+   ],
+   "value_glyphs": [
+    113.14,
+    706.02,
+    143.19,
+    716.52
+   ]
+  },
+  {
+   "row": 2,
+   "page": 1,
+   "drawn": "< 1 000",
+   "codepoints": [
+    "U+003C",
+    "U+00A0",
+    "U+0031",
+    "U+00A0",
+    "U+0030",
+    "U+0030",
+    "U+0030"
+   ],
+   "sign": "<",
+   "sign_codepoint": "U+003C",
+   "sign_font": "DejaVuSans.ttf",
+   "glyph_id": 31,
+   "visible": "<",
+   "value": "1000",
+   "value_text": "1 000",
+   "unit": "₸",
+   "unit_from": "header page 1",
+   "side": "upper",
+   "inclusive": false,
+   "action": "Провести без SMS-кода",
+   "cell": [
+    96.0,
+    720.0,
+    260.0,
+    740.0
+   ],
+   "sign_glyphs": [
+    101.0,
+    726.02,
+    109.8,
+    736.52
+   ],
+   "value_glyphs": [
+    113.14,
+    726.02,
+    143.19,
+    736.52
+   ]
+  },
+  {
+   "row": 3,
+   "page": 1,
+   "drawn": "≤ 1 000",
+   "codepoints": [
+    "U+2264",
+    "U+00A0",
+    "U+0031",
+    "U+00A0",
+    "U+0030",
+    "U+0030",
+    "U+0030"
+   ],
+   "sign": "≤",
+   "sign_codepoint": "U+2264",
+   "sign_font": "DejaVuSans.ttf",
+   "glyph_id": 3311,
+   "visible": "≤",
+   "value": "1000",
+   "value_text": "1 000",
+   "unit": "₸",
+   "unit_from": "header page 1",
+   "side": "upper",
+   "inclusive": true,
+   "action": "Не уведомлять мониторинг",
+   "cell": [
+    96.0,
+    740.0,
+    260.0,
+    760.0
+   ],
+   "sign_glyphs": [
+    101.0,
+    746.02,
+    109.8,
+    756.52
+   ],
+   "value_glyphs": [
+    113.14,
+    746.02,
+    143.19,
+    756.52
+   ]
+  },
+  {
+   "row": 4,
+   "page": 2,
+   "drawn": "> 1 000",
+   "codepoints": [
+    "U+003E",
+    "U+00A0",
+    "U+0031",
+    "U+00A0",
+    "U+0030",
+    "U+0030",
+    "U+0030"
+   ],
+   "sign": ">",
+   "sign_codepoint": "U+003E",
+   "sign_font": "DejaVuSans.ttf",
+   "glyph_id": 33,
+   "visible": ">",
+   "value": "1000",
+   "value_text": "1 000",
+   "unit": "₸",
+   "unit_from": "header page 1",
+   "side": "lower",
+   "inclusive": false,
+   "action": "Уведомить мониторинг",
+   "cell": [
+    96.0,
+    60.0,
+    260.0,
+    80.0
+   ],
+   "sign_glyphs": [
+    101.0,
+    66.02,
+    109.8,
+    76.52
+   ],
+   "value_glyphs": [
+    113.14,
+    66.02,
+    143.19,
+    76.52
+   ]
+  }
+ ]
+}

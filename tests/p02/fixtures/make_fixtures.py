@@ -39,7 +39,7 @@ from reportlab.platypus import (
 
 HERE = Path(__file__).resolve().parent
 FONT_DIRS = [Path('/usr/share/fonts/truetype/dejavu'), Path('/usr/share/fonts/dejavu'),
-             Path('/Library/Fonts'), Path('C:/Windows/Fonts')]
+             Path('/usr/share/fonts/truetype/liberation'), Path('/Library/Fonts'), Path('C:/Windows/Fonts')]
 
 # Фразы, на которые опираются тесты (tests/p02/test_pdf_reader.py).
 PHRASE = 'Порог уведомления составляет'
@@ -51,7 +51,8 @@ def _font(name: str) -> str:
     for directory in FONT_DIRS:
         if (directory / name).exists():
             return str(directory / name)
-    sys.exit(f'Нужен шрифт {name} (пакет fonts-dejavu): в нём есть кириллица и знак ₸.')
+    sys.exit(f'Нужен шрифт {name} (пакеты fonts-dejavu, fonts-liberation): DejaVu — кириллица, ₸, ≥ ≤; '
+             'Liberation Sans — шрифт без ⩾ для варианта с неподдерживаемым знаком.')
 
 
 def _styles():
@@ -399,18 +400,196 @@ def build_amounts(path: Path, expected: Path) -> None:
     expected.write_text(json.dumps(truth, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
 
 
+BOUNDARY_GRID = (56.69, 96.0, 260.0, 538.58)
+BOUNDARY_FONTS = ('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
+MISSING_GLYPH_FONT = 'LiberationSans-Regular.ttf'    # в нём нет ⩾ (U+2A7E) и ₸
+NBSP = '\u00a0'
+THRESHOLD = f'1{NBSP}000'
+# Четыре условия одного порога: знак, сторона границы, входит ли сама 1 000 в условие, действие.
+BOUNDARY_ROWS = [
+    ('≥', 'lower', True, 'Запросить SMS-код'),
+    ('<', 'upper', False, 'Провести без SMS-кода'),
+    ('≤', 'upper', True, 'Не уведомлять мониторинг'),
+    ('>', 'lower', False, 'Уведомить мониторинг'),
+]
+UNSUPPORTED_SIGN = '⩾'    # «больше или равно» с наклонной чертой: шрифт строки 1 его не содержит
+
+
+def _register_nbsp_font(name: str, file: str) -> None:
+    """TTF-шрифт reportlab, который сохраняет U+00A0 в текстовом слое.
+
+    reportlab в ``TTFont.splitString`` заменяет NBSP обычным пробелом (``if code==0xa0: code = 32``):
+    в PDF попадает код пробела, и ToUnicode даёт U+0020 — неразрывного пробела в документе уже нет
+    (так было на первой сборке, видно и в pdfminer, и в PyMuPDF). Здесь та же функция без этой строки:
+    NBSP получает свой код подмножества с глифом пробела, ToUnicode отображает его в U+00A0.
+    """
+    import inspect
+    import textwrap
+
+    from reportlab.pdfbase import ttfonts
+    source = textwrap.dedent(inspect.getsource(ttfonts.TTFont.splitString))
+    fold = 'if code==0xa0: code = 32'
+    if source.count(fold) != 1:
+        sys.exit(f'reportlab: в TTFont.splitString не найдена строка «{fold}» — проверьте сохранение NBSP вручную.')
+    namespace: dict = {}
+    code = compile(source.replace(fold, 'pass'), '<reportlab TTFont.splitString без замены NBSP>', 'exec')
+    exec(code, vars(ttfonts), namespace)  # noqa: S102
+    font_class = type('NbspTTFont', (ttfonts.TTFont,), {'splitString': namespace['splitString']})
+    font = font_class(name, _font(file))
+    # registerFont делает новое имя псевдонимом уже зарегистрированного шрифта с тем же начертанием
+    # (_dynFaceNames): после _styles() «DejaVuNbsp» молча стал бы обычным «DejaVu» с заменой NBSP.
+    other = pdfmetrics._dynFaceNames.pop(font.face.name, None)
+    try:
+        pdfmetrics._fonts.pop(name, None)
+        pdfmetrics.registerFont(font)
+    finally:
+        if other is not None:
+            pdfmetrics._dynFaceNames[font.face.name] = other
+    if pdfmetrics.getFont(name) is not font:
+        sys.exit(f'reportlab зарегистрировал вместо {name} другой шрифт: NBSP не сохранится.')
+
+
+def build_boundaries(path: Path, expected: Path, *, unsupported: bool = False) -> None:
+    """Порог 1 000 и четыре границы в разных строках таблицы; единица только в шапке.
+
+    стр. 1  заголовок раздела, абзац «Порог проверки — 1 000 ₸ за одну операцию.», таблица
+            «№ | Сумма операции, ₸ | Действие» (жирная шапка с заливкой) и строки 1–3:
+            «≥ 1 000», «< 1 000», «≤ 1 000»;
+    стр. 2  строка 4 «> 1 000», перенесённая без повтора шапки: единица осталась в шапке на стр. 1.
+    Между знаком и числом и между разрядами — неразрывный пробел U+00A0. Колонтитулы: верхний
+    повторяется, нижний «Стр. N из 2». Шрифт DejaVu Sans: глифы ≥ ≤ < > ₸ и NBSP в нём есть
+    (номера глифов пишутся в эталон; test_boundaries.py проверяет PDF до сравнения с читалкой).
+
+    ``unsupported=True`` — вариант с неподдерживаемым символом: в строке 1 вместо «≥» стоит «⩾»,
+    набранный шрифтом Liberation Sans, где этого глифа нет. reportlab пишет .notdef (код 0,
+    ToUnicode → U+0000): на странице виден пустой прямоугольник, в тексте знака нет.
+
+    Рядом пишется expected (JSON): каждое условие со страницей, строкой, видимым знаком (кодовая точка),
+    значением, единицей шапки, включённостью границы и рамками глифов знака и числа по метрикам шрифта.
+    """
+    import hashlib
+    import json
+
+    from reportlab.pdfbase.ttfonts import TTFontFile
+    from reportlab.pdfgen import canvas as rl_canvas
+    regular, bold, missing = 'DejaVuNbsp', 'DejaVuNbsp-Bold', 'LiberationNbsp'
+    _register_nbsp_font(regular, BOUNDARY_FONTS[0])
+    _register_nbsp_font(bold, BOUNDARY_FONTS[1])
+    faces = {regular: TTFontFile(_font(BOUNDARY_FONTS[0])), bold: TTFontFile(_font(BOUNDARY_FONTS[1]))}
+    if unsupported:
+        _register_nbsp_font(missing, MISSING_GLYPH_FONT)
+        faces[missing] = TTFontFile(_font(MISSING_GLYPH_FONT))
+        if ord(UNSUPPORTED_SIGN) in faces[missing].charToGlyph:
+            sys.exit(f'В {MISSING_GLYPH_FONT} есть глиф {UNSUPPORTED_SIGN}: вариант «неподдерживаемый символ» не получится.')
+    height = A4[1]
+    c = rl_canvas.Canvas(str(path), pagesize=A4, invariant=1)
+    c.setTitle('Фикстура №02: границы порога 1 000 ₸' + (', неподдерживаемый знак' if unsupported else ''))
+    header = ['№', 'Сумма операции, ₸', 'Действие']
+    unit = '₸'
+    conditions: list[dict] = []
+    grid = BOUNDARY_GRID
+    signs = [(UNSUPPORTED_SIGN if unsupported and i == 0 else sign, *rest) for i, (sign, *rest) in enumerate(BOUNDARY_ROWS)]
+
+    def box(x: float, baseline: float, text: str, font: str, size: float) -> list[float]:
+        return [round(v, 2) for v in (x, baseline - pdfmetrics.getAscent(font, size),
+                                      x + pdfmetrics.stringWidth(text, font, size),
+                                      baseline - pdfmetrics.getDescent(font, size))]
+
+    def furniture(page: int) -> None:
+        c.setFont(regular, 8)
+        c.drawString(grid[0], height - 12 * mm, 'Тарифы по картам · пороги проверки операций')
+        c.drawRightString(grid[-1], 10 * mm, f'Стр. {page} из 2')
+
+    def rows(top: float, items: list[tuple[str, list[str]]], page: int) -> float:
+        x0, x1 = grid[0], grid[-1]
+        for i, (style, cells) in enumerate(items):
+            y = top + i * BANK_ROW
+            if style == 'head':
+                c.setFillColor(colors.HexColor('#e0e0e0'))
+                c.rect(x0, height - y - BANK_ROW, x1 - x0, BANK_ROW, stroke=0, fill=1)
+                c.setFillColor(colors.black)
+            font = bold if style == 'head' else regular
+            baseline = y + 14
+            for col, value in enumerate(cells):
+                c.setFont(font, BANK_SIZE)
+                if style == 'data' and col == 1:
+                    continue
+                c.drawString(grid[col] + 5, height - baseline, value)
+            if style != 'data':
+                continue
+            number = int(cells[0])
+            sign, side, inclusive, action = signs[number - 1]
+            sign_font = missing if sign == UNSUPPORTED_SIGN else font
+            tx = grid[1] + 5
+            c.setFont(sign_font, BANK_SIZE)                 # знак — своим шрифтом, число — основным
+            c.drawString(tx, height - baseline, sign)
+            vx = tx + pdfmetrics.stringWidth(sign, sign_font, BANK_SIZE)
+            c.setFont(font, BANK_SIZE)
+            c.drawString(vx, height - baseline, NBSP + THRESHOLD)
+            glyph = faces[sign_font].charToGlyph.get(ord(sign))
+            conditions.append({
+                'row': number, 'page': page, 'drawn': cells[1], 'codepoints': [f'U+{ord(ch):04X}' for ch in cells[1]],
+                'sign': sign, 'sign_codepoint': f'U+{ord(sign):04X}', 'sign_font': Path(_font(
+                    MISSING_GLYPH_FONT if sign_font == missing else BOUNDARY_FONTS[0])).name,
+                'glyph_id': glyph, 'visible': sign if glyph else '.notdef',
+                'value': '1000', 'value_text': THRESHOLD, 'unit': unit, 'unit_from': 'header page 1',
+                'side': side, 'inclusive': inclusive, 'action': action,
+                'cell': [round(v, 2) for v in (grid[1], y, grid[2], y + BANK_ROW)],
+                'sign_glyphs': box(tx, baseline, sign, sign_font, BANK_SIZE),
+                'value_glyphs': box(vx + pdfmetrics.stringWidth(NBSP, font, BANK_SIZE), baseline, THRESHOLD, font,
+                                    BANK_SIZE)})
+        bottom = top + BANK_ROW * len(items)
+        c.setLineWidth(0.6)
+        for i in range(len(items) + 1):
+            c.line(x0, height - (top + i * BANK_ROW), x1, height - (top + i * BANK_ROW))
+        for x in grid:
+            c.line(x, height - top, x, height - bottom)
+        return bottom
+
+    data = [('data', [str(i + 1), f'{sign}{NBSP}{THRESHOLD}', action]) for i, (sign, _, _, action) in enumerate(signs)]
+    furniture(1)
+    c.setFont(bold, 14)
+    c.drawString(grid[0], height - 70, '1. Порог проверки операции')
+    c.setFont(regular, BANK_SIZE)
+    definition = f'Порог проверки — {THRESHOLD}{NBSP}{unit} за одну операцию.'
+    c.drawString(grid[0], height - 100, definition)
+    c.drawString(grid[0], height - 120, 'Последняя строка таблицы перенесена на следующую страницу без повтора шапки.')
+    rows(680, [('head', header)] + data[:3], 1)
+    c.showPage()
+    furniture(2)
+    bottom = rows(60, data[3:], 2)
+    c.setFont(regular, BANK_SIZE)
+    c.drawString(grid[0], height - (bottom + 30), 'Конец таблицы порогов.')
+    c.save()
+    fonts = sorted({BOUNDARY_FONTS[0], BOUNDARY_FONTS[1]} | ({MISSING_GLYPH_FONT} if unsupported else set()))
+    truth = {
+        'source': 'tests/p02/fixtures/make_fixtures.py: build_boundaries' + (' (unsupported=True)' if unsupported else ''),
+        'units': 'пункты, начало — левый верхний угол неповёрнутой страницы (как у PyMuPDF)',
+        'fonts': {name: {'sha256': hashlib.sha256(Path(_font(name)).read_bytes()).hexdigest(),
+                         'glyph_ids': {f'U+{ord(ch):04X}': TTFontFile(_font(name)).charToGlyph.get(ord(ch))
+                                       for ch in '≥≤<>₸⩾' + NBSP}} for name in fonts},
+        'threshold': {'text': THRESHOLD, 'value': '1000', 'unit': unit, 'definition': definition, 'page': 1},
+        'table': {'header': header, 'unit_column': 1, 'pages': [1, 2], 'moved_row': 4, 'link': 'header_carried'},
+        'conditions': conditions,
+    }
+    expected.write_text(json.dumps(truth, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+
+
 def main() -> None:
     rl_config.invariant = 1
     build_sample(HERE / 'p02_sample.pdf')
     build_rotated_text(HERE / 'p02_rotated_text.pdf')
     build_bank_tables(HERE / 'p02_bank_tables.pdf', HERE / 'p02_bank_tables.expected.json')
     build_amounts(HERE / 'p02_amounts.pdf', HERE / 'p02_amounts.expected.json')
+    build_boundaries(HERE / 'p02_boundaries.pdf', HERE / 'p02_boundaries.expected.json')
+    build_boundaries(HERE / 'p02_boundaries_unsupported.pdf', HERE / 'p02_boundaries_unsupported.expected.json',
+                     unsupported=True)
     sys.path.insert(0, str(HERE.parent))
     import p02_builders as builders  # производные PDF: только PyMuPDF
     builders.scan_mixed(HERE / 'p02_scan_mixed.pdf')
     builders.rotated_copy(HERE / 'p02_rotated90.pdf')
-    for name in ('p02_sample.pdf', 'p02_rotated_text.pdf', 'p02_bank_tables.pdf', 'p02_amounts.pdf', 'p02_scan_mixed.pdf',
-                 'p02_rotated90.pdf'):
+    for name in ('p02_sample.pdf', 'p02_rotated_text.pdf', 'p02_bank_tables.pdf', 'p02_amounts.pdf', 'p02_boundaries.pdf',
+                 'p02_boundaries_unsupported.pdf', 'p02_scan_mixed.pdf', 'p02_rotated90.pdf'):
         print('ok', HERE / name)
 
 
