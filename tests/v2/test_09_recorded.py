@@ -47,6 +47,8 @@ def load_view(path: Path) -> dict:
 def run_recorded(doc: Path, fixture_dir: str, model: str) -> dict:
     view = load_view(doc)
     seg = FIX / ("official" if fixture_dir == "09_official" else fixture_dir) / "segment.json"
+    if (FIX / fixture_dir / f"segment.{model}.json").exists():  # ответ получен на другой нарезке
+        seg = FIX / fixture_dir / f"segment.{model}.json"
     reqs = json.loads(seg.read_text(encoding="utf-8"))["requirements"]
     raw = json.loads((FIX / fixture_dir / f"consistency.{model}.json").read_text(encoding="utf-8"))
     return C.postprocess(raw, view, reqs)
@@ -73,7 +75,7 @@ def test_positive_control_one_boundary_conflict_on_one_parameter(model):
     assert len(c["evidence"]) == 2 and all(e["verified"] != "missing" for e in c["evidence"])
 
 
-@pytest.mark.parametrize("model", ["sonnet"])
+@pytest.mark.parametrize("model", ["haiku", "sonnet"])
 def test_negative_control_clean_base_has_no_conflicts(model):
     out = run_recorded(CORPUS / "autopay.base" / "source.md", "09_autopay_base", model)
     assert [p for p in out["pair_checks"] if p["verdict"] == "conflict"] == []
