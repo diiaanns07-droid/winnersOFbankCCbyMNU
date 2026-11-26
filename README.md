@@ -94,9 +94,10 @@ python -m bcc_review release/input/requirements.md reports/my/requirements.md
 python -m bcc_review verify reports/my/requirements.json release/input/requirements.md
 ```
 
-**Без ключа** агент тоже запускается: `--provider offline` проверяет документ только детерминированными правилами
-(без модели, за секунды; вердикт не выше «условно»), `--provider mock` — демонстрационный прогон на записанных
-ответах модели для официального документа.
+**Без ключа** агент тоже запускается: `--provider offline` — предварительная проверка только детерминированными
+правилами (без модели, за секунды: контракт API, единицы измерения, заглушки, размытые слова); отчёт честно
+помечен как проверка без модели, смысл требований и противоречия в нём не оцениваются. `--provider mock` прогоняет
+весь конвейер без сети на записанных ответах модели — для проверки установки и тестов.
 
 ---
 
@@ -152,7 +153,7 @@ python -m bcc_review verify reports/my/requirements.json release/input/requireme
 | `anthropic` | `ANTHROPIC_API_KEY` ([консоль Claude](https://console.anthropic.com/settings/keys)) | `claude-opus-5-5` (`ANTHROPIC_MODEL`) | Claude через API |
 | `openai` | `OPENAI_BASE_URL` и `OPENAI_MODEL` (ключ — по необходимости) | задаётся вами | закрытый контур: Ollama, vLLM, LM Studio; также OpenRouter |
 | `offline` | ничего | без модели | быстрый предварительный просмотр, только правила |
-| `mock` | ничего | записанные ответы | демонстрация и тесты без сети |
+| `mock` | ничего | записанные ответы | проверка установки и тесты без сети |
 
 `auto` выбирает первое доступное: `GEMINI_API_KEY` → `gemini`; `ANTHROPIC_API_KEY` → `anthropic`;
 `OPENAI_BASE_URL` → `openai`; установлен `claude` → `claude_cli`; иначе `offline`.
@@ -179,19 +180,32 @@ python -m bcc_review ТЗ.pdf out/report.md --provider openai
 ```text
 python -m bcc_review ВХОД ОТЧЁТ.md [параметры]
 python -m bcc_review verify ОТЧЁТ.json ВХОД
-python -m bcc_review doctor [--live] [--provider ИМЯ]
+python -m bcc_review doctor [--live] [--provider ИМЯ] [--model ИМЯ]
+python -m bcc_review stage ЭТАП --doc ВХОД --from runs/<id прогона>
 ```
 
 | Параметр | Что делает |
 | :--- | :--- |
 | `--provider ИМЯ` | `auto` (по умолчанию), `gemini`, `claude_cli`, `anthropic`, `openai`, `offline`, `mock` |
 | `--model ИМЯ` | модель провайдера, например `gemini-3.6-flash` или `sonnet` |
-| `--export СПИСОК` | дополнительные форматы через запятую: `html`, `docx`, `pdf`, `jira` |
+| `--fallback-models СПИСОК` | запасные модели через запятую (для Gemini по умолчанию из `GEMINI_FALLBACK_MODELS`) |
+| `--export СПИСОК` | дополнительные форматы через запятую: `jira`, `docx`, `pdf` (HTML пишется всегда) |
+| `--no-html` | не писать HTML-отчёт |
 | `--answers ФАЙЛ` | ответы на вопросы отчёта: пересмотр замечаний и вердикт «до/после» |
 | `--revise` | исправленная редакция ТЗ рядом с отчётом (`ОТЧЁТ.revised.md`) |
-| `--no-cache` | не брать ответы модели из кэша (`.bcc_cache/`), все вызовы — заново |
+| `--passes N` | сколько раз запускать ревьюеров (2 — устойчивее находки, вдвое больше вызовов) |
+| `--lenses СПИСОК` | какие ревьюеры работают: `analyst,qa,architect,risk` |
+| `--no-consistency`, `--no-clarify` | без проверки набора целиком / без вопросов владельцу (быстрее, но беднее отчёт) |
+| `--max-calls N`, `--max-seconds N`, `--timeout N` | бюджет обращений к модели (по умолчанию 16), времени прогона и одного обращения, с |
+| `--no-cache`, `--cache-dir КАТАЛОГ` | не брать ответы модели из кэша `.bcc_cache/` / другой каталог кэша |
+| `--runs-dir КАТАЛОГ`, `--run-id ИМЯ` | где хранить журнал прогона (по умолчанию `runs/`) и как назвать его каталог |
+| `--fail-on blocker\|partial` | ненулевой код выхода, если есть блокер или прогон неполный (для CI) |
+| `-q`, `--quiet` | без хода выполнения в консоли |
 | `--engine v1` | старый движок v1 (для сравнения) |
 | `-h`, `--help` | полный список параметров |
+
+`stage` перезапускает один этап на сохранённых входах прогона — удобно, чтобы отладить промпт, не тратя вызовы
+на весь конвейер.
 
 ## Режим ответов и исправленное ТЗ
 

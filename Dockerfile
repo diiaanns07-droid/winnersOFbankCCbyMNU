@@ -26,6 +26,9 @@ COPY src ./src
 COPY contracts ./contracts
 COPY release/input ./release/input
 COPY examples ./examples
+
+# pymupdf без подсказки про pymupdf_layout в выводе
+ENV PYMUPDF_SUGGEST_LAYOUT_ANALYZER=0
 RUN python -m pip install --no-deps -e .
 
 # В образе нет каталога .git: коммит сборки для паспорта отчёта передаётся при сборке.
