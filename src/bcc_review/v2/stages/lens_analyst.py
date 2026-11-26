@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 MAX_CANDIDATES = 12
+MAX_OUTPUT_TOKENS = 32000  # рассуждение слабой модели + JSON; см. _OutputBudget
 MAX_CRITICAL = 2
 _RANK = {"critical": 0, "major": 1, "minor": 2}
 _MINOR_ONLY_KINDS = {"non_singular"}
@@ -74,11 +75,49 @@ def postprocess(candidates: list[dict[str, Any]], *, max_candidates: int = MAX_C
     return [kept[i] for i in order][:max_candidates]
 
 
+class _OutputBudget:
+    """Обёртка над ``ctx.llm``: поднимает лимит выходных токенов не ниже ``n``.
+
+    Слабые модели с рассуждением (haiku, Gemini Flash) тратят на этом промпте 20–28 тыс. токенов вывода,
+    из них JSON — около 6 тыс. С общим лимитом 16 000 ответ обрывается. Остальное — как у ``ctx.llm``.
+    """
+
+    def __init__(self, llm, n: int):
+        self._llm, self._n = llm, int(n)
+
+    def ask(self, stage, system, user, schema, *, max_output_tokens: int = 16000, **kw):
+        return self._llm.ask(stage, system, user, schema, max_output_tokens=max(max_output_tokens, self._n), **kw)
+
+    def ask_split(self, stage, build, items, schema, merge, *, max_output_tokens: int = 16000, **kw):
+        n = max(max_output_tokens, self._n)
+        real = getattr(self._llm, "ask_split", None)
+        if real is None:
+            system, user = build(list(items))
+            return self._llm.ask(stage, system, user, schema, max_output_tokens=n)
+        return real(stage, build, items, schema, merge, max_output_tokens=n, **kw)
+
+    def __getattr__(self, name):
+        return getattr(self._llm, name)
+
+
+class _CtxWithLLM:
+    """Контекст этапа с подменённым ``llm``; всё остальное берётся из исходного контекста."""
+
+    def __init__(self, ctx, llm):
+        self._ctx, self.llm = ctx, llm
+
+    def __getattr__(self, name):
+        return getattr(self._ctx, name)
+
+
 def run(ctx, lens_run=None) -> dict:
     """Запуск линзы с постобработкой. `lens_run(ctx, name)` — общий запуск из `stages/lens.py` (№01)."""
     if lens_run is None:
         from . import lens as _lens  # каркас №01
         lens_run = _lens.run
+    llm = getattr(ctx, "llm", None)
+    if llm is not None:
+        ctx = _CtxWithLLM(ctx, _OutputBudget(llm, MAX_OUTPUT_TOKENS))
     out = dict(lens_run(ctx, "analyst"))
     out["candidates"] = postprocess(out.get("candidates") or [])
     return out
