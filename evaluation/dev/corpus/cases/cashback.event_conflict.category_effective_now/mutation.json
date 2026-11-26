@@ -1,0 +1,67 @@
+{
+  "case_id": "cashback.event_conflict.category_effective_now",
+  "family": "cashback",
+  "kind": "mutant",
+  "ops": [
+    "event_conflict"
+  ],
+  "variants": [
+    "category_effective_now"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cashback.base",
+  "base_source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+  "source_sha256": "003f217a10c5d80781a88e48adc5cfc0ef3302eef2a35404b3a355af0f4bd043",
+  "semantic_sha256": "ab398f4b9b43399dffce59de391c4afcdd400d1ae30459a04de0a5d7457fbf5f",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 31,
+      "after": "* **КБ-7.**",
+      "removed": "",
+      "inserted": "* **КБ-8.** Выбранная категория применяется к покупкам с момента сохранения.",
+      "mutation_op": "event_conflict",
+      "variant": "category_effective_now"
+    }
+  ],
+  "expected_effect": [
+    "Сохранение категории по КБ-1 действует со следующего месяца, по КБ-8 — сразу."
+  ],
+  "diff": "--- base/source.md\n+++ cashback.event_conflict.category_effective_now/source.md\n@@ -31,2 +31,3 @@\n * **КБ-7.** Приложение показывает выбранную категорию и кэшбэк текущего месяца.\n+* **КБ-8.** Выбранная категория применяется к покупкам с момента сохранения.\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.event_conflict.category_effective_now",
+      "family": "cashback",
+      "source_sha256": "003f217a10c5d80781a88e48adc5cfc0ef3302eef2a35404b3a355af0f4bd043",
+      "visibility": "public",
+      "label_id": "cashback.event_conflict.category_effective_now#1",
+      "issue_type": "event_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Выбор действует с первого дня следующего месяца.",
+          "locator": "md:L25"
+        },
+        {
+          "role": "b",
+          "quote": "Выбранная категория применяется к покупкам с момента сохранения.",
+          "locator": "md:L32"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "Клиент 10 ноября выбрал «Такси» и 11 ноября оплатил такси на 2 000 ₸.",
+      "explanation": "Сохранение категории по КБ-1 действует со следующего месяца, по КБ-8 — сразу.",
+      "mutation": {
+        "op": "event_conflict",
+        "variant": "category_effective_now"
+      }
+    }
+  ]
+}

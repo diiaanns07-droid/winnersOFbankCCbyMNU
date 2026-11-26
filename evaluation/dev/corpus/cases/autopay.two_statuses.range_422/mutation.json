@@ -1,0 +1,67 @@
+{
+  "case_id": "autopay.two_statuses.range_422",
+  "family": "autopay",
+  "kind": "mutant",
+  "ops": [
+    "two_statuses"
+  ],
+  "variants": [
+    "range_422"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "autopay.base",
+  "base_source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+  "source_sha256": "5b79ce91720384120536625f9120d078be028d20dff6aa964ea0d1d35ae6ca47",
+  "semantic_sha256": "cc2fc9fb7f507ceefe2e135b944ab548016ce874ee5ecacdf0384eaf954f6d0e",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 74,
+      "after": "4. Сохранить настройку и вернуть 200.",
+      "removed": "",
+      "inserted": "Если порог или сумма вне диапазона, метод возвращает 422.",
+      "mutation_op": "two_statuses",
+      "variant": "range_422"
+    }
+  ],
+  "expected_effect": [
+    "Порог вне диапазона получает 422 по примечанию и 400 по таблице статусов."
+  ],
+  "diff": "--- base/source.md\n+++ autopay.two_statuses.range_422/source.md\n@@ -75,2 +75,4 @@\n \n+Если порог или сумма вне диапазона, метод возвращает 422.\n+\n ### Метод getAutopay\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "autopay.two_statuses.range_422",
+      "family": "autopay",
+      "source_sha256": "5b79ce91720384120536625f9120d078be028d20dff6aa964ea0d1d35ae6ca47",
+      "visibility": "public",
+      "label_id": "autopay.two_statuses.range_422#1",
+      "issue_type": "status_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Если порог или сумма вне диапазона, метод возвращает 422.",
+          "locator": "md:L76"
+        },
+        {
+          "role": "b",
+          "quote": "400 | Номер не в формате +7XXXXXXXXXX или порог либо сумма вне диапазона",
+          "locator": "md:L101"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "createAutopay с threshold=50.",
+      "explanation": "Порог вне диапазона получает 422 по примечанию и 400 по таблице статусов.",
+      "mutation": {
+        "op": "two_statuses",
+        "variant": "range_422"
+      }
+    }
+  ]
+}

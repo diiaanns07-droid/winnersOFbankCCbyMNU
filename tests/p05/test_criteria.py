@@ -34,6 +34,20 @@ def test_resolve_aliases(key):
     assert load_criteria().get(key).code == "unambiguous"
 
 
+def test_mapping_access_like_engine_fallback():
+    """Резерв движка отдаёт {code: {name, scope, standard, question}}; конфиг №05 читается так же."""
+    from bcc_review.runtime.fallback.criteria import load_criteria as fallback
+
+    crit = load_criteria()
+    fb = fallback()
+    assert list(crit) == list(fb) and len(crit) == len(fb)
+    for code, info in crit.items():
+        assert info["name"] and info["question"] and info["scope"] == fb[code]["scope"]
+        assert "29148" in info["standard"] or "830" in info["standard"]
+        assert "name" in info and code in crit
+    assert crit.get("unknown", None) is None and "unknown" not in crit
+
+
 def test_severity_policy_and_rules():
     crit = load_criteria()
     assert crit.severity_policy["rules_max"] == "major"

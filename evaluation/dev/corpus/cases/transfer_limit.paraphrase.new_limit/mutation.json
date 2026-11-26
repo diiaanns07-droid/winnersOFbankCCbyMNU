@@ -1,0 +1,65 @@
+{
+  "case_id": "transfer_limit.paraphrase.new_limit",
+  "family": "transfer_limit",
+  "kind": "mutant",
+  "ops": [
+    "paraphrase"
+  ],
+  "variants": [
+    "new_limit"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "transfer_limit.base",
+  "base_source_sha256": "f614c16e33c76e795523a58c875a3dbb6078e6710d043725e8fd3b7305ee910a",
+  "source_sha256": "3b2fb6ceaccc947c195fa814a8c7360d72d1687e7ca61f89de89499dfd2f6f8d",
+  "semantic_sha256": "cf5b454ab1a40d01dbb019f8c6e68018eeafabcc557440a1129a37b931e86374",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 28,
+      "removed": "Новый лимит действует начиная со следующего перевода.",
+      "inserted": "Изменённый лимит применяется к каждому переводу после изменения.",
+      "mutation_op": "paraphrase",
+      "variant": "new_limit"
+    }
+  ],
+  "expected_effect": [
+    "Смысл ЛП-5 не меняется. Новых находок быть не должно."
+  ],
+  "diff": "--- base/source.md\n+++ transfer_limit.paraphrase.new_limit/source.md\n@@ -27,3 +27,3 @@\n * **ЛП-4.** Отменённый перевод уменьшает использованную сумму суток, в которые он был выполнен.\n-* **ЛП-5.** Новый лимит действует начиная со следующего перевода.\n+* **ЛП-5.** Изменённый лимит применяется к каждому переводу после изменения.\n * **ЛП-6.** Приложение показывает лимит и остаток лимита на текущие сутки.\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "transfer_limit.paraphrase.new_limit",
+      "family": "transfer_limit",
+      "source_sha256": "3b2fb6ceaccc947c195fa814a8c7360d72d1687e7ca61f89de89499dfd2f6f8d",
+      "visibility": "public",
+      "label_id": "transfer_limit.paraphrase.new_limit#clean",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "explanation": "Смысл ЛП-5 не меняется. Новых находок быть не должно."
+    },
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "transfer_limit.paraphrase.new_limit",
+      "family": "transfer_limit",
+      "source_sha256": "3b2fb6ceaccc947c195fa814a8c7360d72d1687e7ca61f89de89499dfd2f6f8d",
+      "visibility": "public",
+      "label_id": "transfer_limit.paraphrase.new_limit#control",
+      "issue_type": null,
+      "anchors": [
+        {
+          "role": "control",
+          "quote": "Изменённый лимит применяется к каждому переводу после изменения.",
+          "locator": "md:L28"
+        }
+      ],
+      "expected_outcome": "absent",
+      "explanation": "Перефразированное место: находка здесь — ложная тревога."
+    }
+  ]
+}

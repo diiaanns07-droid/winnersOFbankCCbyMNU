@@ -1,0 +1,66 @@
+{
+  "case_id": "transfer_limit.range_boundary.reaching_rejects",
+  "family": "transfer_limit",
+  "kind": "mutant",
+  "ops": [
+    "range_boundary"
+  ],
+  "variants": [
+    "reaching_rejects"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "transfer_limit.base",
+  "base_source_sha256": "f614c16e33c76e795523a58c875a3dbb6078e6710d043725e8fd3b7305ee910a",
+  "source_sha256": "6ae0933005896d03d635178a3a8c50d04d805bc6d363f93295b2812e1bba6de6",
+  "semantic_sha256": "9a45a70334c405e6348cd87e575f3ec24a56eac2dbcc55cd246b4a47b0f57a79",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 26,
+      "removed": "Перевод, после которого использованная сумма превысила бы лимит, отклоняется",
+      "inserted": "Перевод, после которого использованная сумма достигла бы лимита или превысила бы его, отклоняется",
+      "mutation_op": "range_boundary",
+      "variant": "reaching_rejects"
+    }
+  ],
+  "expected_effect": [
+    "Перевод ровно до лимита выполняется по ЛП-2 и отклоняется по ЛП-3."
+  ],
+  "diff": "--- base/source.md\n+++ transfer_limit.range_boundary.reaching_rejects/source.md\n@@ -25,3 +25,3 @@\n * **ЛП-2.** Перевод выполняется, если после него использованная сумма не превысит лимит.\n-* **ЛП-3.** Перевод, после которого использованная сумма превысила бы лимит, отклоняется с сообщением «Превышен суточный лимит».\n+* **ЛП-3.** Перевод, после которого использованная сумма достигла бы лимита или превысила бы его, отклоняется с сообщением «Превышен суточный лимит».\n * **ЛП-4.** Отменённый перевод уменьшает использованную сумму суток, в которые он был выполнен.\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "transfer_limit.range_boundary.reaching_rejects",
+      "family": "transfer_limit",
+      "source_sha256": "6ae0933005896d03d635178a3a8c50d04d805bc6d363f93295b2812e1bba6de6",
+      "visibility": "public",
+      "label_id": "transfer_limit.range_boundary.reaching_rejects#1",
+      "issue_type": "boundary_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Перевод, после которого использованная сумма достигла бы лимита или превысила бы его, отклоняется с сообщением «Превышен суточный лимит».",
+          "locator": "md:L26"
+        },
+        {
+          "role": "b",
+          "quote": "Перевод выполняется, если после него использованная сумма не превысит лимит.",
+          "locator": "md:L25"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "Лимит 100 000 ₸, использовано 60 000 ₸, перевод 40 000 ₸.",
+      "explanation": "Перевод ровно до лимита выполняется по ЛП-2 и отклоняется по ЛП-3.",
+      "mutation": {
+        "op": "range_boundary",
+        "variant": "reaching_rejects"
+      }
+    }
+  ]
+}

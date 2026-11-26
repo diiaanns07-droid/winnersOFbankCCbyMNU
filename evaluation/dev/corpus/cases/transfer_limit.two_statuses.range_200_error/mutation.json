@@ -1,0 +1,67 @@
+{
+  "case_id": "transfer_limit.two_statuses.range_200_error",
+  "family": "transfer_limit",
+  "kind": "mutant",
+  "ops": [
+    "two_statuses"
+  ],
+  "variants": [
+    "range_200_error"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "transfer_limit.base",
+  "base_source_sha256": "f614c16e33c76e795523a58c875a3dbb6078e6710d043725e8fd3b7305ee910a",
+  "source_sha256": "40acde71fe0190c68dc46a928d0000ed463af24eca30ce5c6fe5ebea1bdde20f",
+  "semantic_sha256": "a0b40310d180688ea69b6252194e8d6cd49dab7630c103bb9d6e6126a3818b98",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 77,
+      "after": "| `limit` | integer | Да |",
+      "removed": "",
+      "inserted": "Если лимит вне диапазона, метод возвращает 200 с телом `{\"result\":\"ERROR\"}`.",
+      "mutation_op": "two_statuses",
+      "variant": "range_200_error"
+    }
+  ],
+  "expected_effect": [
+    "Лимит вне диапазона получает 200 по примечанию и 400 по таблице статусов."
+  ],
+  "diff": "--- base/source.md\n+++ transfer_limit.two_statuses.range_200_error/source.md\n@@ -78,2 +78,4 @@\n \n+Если лимит вне диапазона, метод возвращает 200 с телом `{\"result\":\"ERROR\"}`.\n+\n ### Статусы\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "transfer_limit.two_statuses.range_200_error",
+      "family": "transfer_limit",
+      "source_sha256": "40acde71fe0190c68dc46a928d0000ed463af24eca30ce5c6fe5ebea1bdde20f",
+      "visibility": "public",
+      "label_id": "transfer_limit.two_statuses.range_200_error#1",
+      "issue_type": "status_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Если лимит вне диапазона, метод возвращает 200 с телом `{\"result\":\"ERROR\"}`.",
+          "locator": "md:L79"
+        },
+        {
+          "role": "b",
+          "quote": "400 | Лимит вне диапазона от 10 000 до 3 000 000 или не целое число",
+          "locator": "md:L86"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "setTransferLimit с limit=5000.",
+      "explanation": "Лимит вне диапазона получает 200 по примечанию и 400 по таблице статусов.",
+      "mutation": {
+        "op": "two_statuses",
+        "variant": "range_200_error"
+      }
+    }
+  ]
+}

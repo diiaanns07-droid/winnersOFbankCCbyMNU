@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bcc_review/synthetic/stage-candidates-v1",
+  "title": "Синтетическая схема этапа: кандидаты в замечания",
+  "description": "Общая фикстура №11/№12 до публикации contracts/v1.json. Форма Candidate — по контракту v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stage",
+    "candidates",
+    "notes"
+  ],
+  "properties": {
+    "stage": {
+      "const": "requirement_check"
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Пояснение модели или null"
+    }
+  },
+  "$defs": {
+    "hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_id",
+        "quote"
+      ],
+      "properties": {
+        "block_id": {
+          "type": "string",
+          "pattern": "^b[0-9]+$"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Дословная подстрока block.text"
+        },
+        "context": {
+          "type": "string"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "kind",
+        "criterion",
+        "severity",
+        "title",
+        "impact",
+        "req_ids",
+        "hints"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "requirement",
+            "set"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "ambiguity",
+            "unverifiable",
+            "incomplete",
+            "conflict",
+            "omission",
+            "design_leak",
+            "non_singular",
+            "terminology"
+          ]
+        },
+        "criterion": {
+          "type": "string",
+          "pattern": "^(И[1-9]|Н[1-8])$",
+          "description": "Код критерия И1–И9 или Н1–Н8"
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "major",
+            "minor"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "impact": {
+          "type": "string"
+        },
+        "req_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^R-[0-9]{3}$"
+          }
+        },
+        "hints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hint"
+          }
+        },
+        "inspected_block_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
