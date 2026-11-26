@@ -93,6 +93,8 @@ STAGE_LABEL = {
     "lens:risk": "Линза «Риски»", "consistency": "Набор целиком", "quotes": "Сверка цитат", "judge": "Судья",
     "clarify": "Вопросы", "revise": "Исправленное ТЗ", "recheck": "Перепроверка", "report": "Отчёт",
     "analyst": "Линза «Аналитик»", "qa": "Линза «Тестировщик»", "architect": "Линза «Архитектор»", "risk": "Линза «Риски»",
+    "lens_analyst": "Линза «Аналитик»", "lens_qa": "Линза «Тестировщик»", "lens_architect": "Линза «Архитектор»",
+    "lens_risk": "Линза «Риски»", "answers": "Ответы владельца", "offline": "Без модели",
 }
 STAGE_STATE = {"ok": "готово", "partial": "частично", "failed": "ошибка", "skipped": "пропущен"}
 
@@ -940,8 +942,11 @@ def _passport(report: dict) -> str:
     for k in stats:
         if k not in stages and f"lens:{k}" not in stages:
             stages[k] = "ok"
+    canon = ["docview", "segment", "rules", "lens_analyst", "lens:analyst", "analyst", "lens_qa", "lens:qa", "qa",
+             "lens_architect", "lens:architect", "architect", "lens_risk", "lens:risk", "risk", "consistency", "quotes",
+             "judge", "clarify", "answers", "recheck", "revise", "report"]
     items = []
-    for k, v in stages.items():
+    for k, v in sorted(stages.items(), key=lambda kv: canon.index(kv[0]) if kv[0] in canon else 99):
         ss = stats.get(k) or stats.get(k.split(":", 1)[-1]) or {}
         bits = []
         if isinstance(ss, dict):
@@ -949,7 +954,7 @@ def _passport(report: dict) -> str:
                 bits.append(_fmt_duration(ss["seconds"]) if ss["seconds"] >= 1 else "< 1 с")
             if ss.get("calls"):
                 bits.append(f'{ss["calls"]} {_plural(int(ss["calls"]), "вызов", "вызова", "вызовов")}')
-            if ss.get("candidates") is not None:
+            if ss.get("candidates"):
                 bits.append(f'{ss["candidates"]} канд.')
         extra = f'<small>{e(" · ".join(bits))}</small>' if bits else ""
         items.append(f'<li class="st st-{e(v)}"><span>{e(STAGE_LABEL.get(k, k))}{extra}</span><b>{e(STAGE_STATE.get(v, v))}</b></li>')
