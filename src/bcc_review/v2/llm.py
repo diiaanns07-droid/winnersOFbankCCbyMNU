@@ -29,7 +29,8 @@ except Exception:  # pragma: no cover - v1 всегда рядом, но v2 не
 TRANSIENT = {"rate_limit", "overloaded", "server", "timeout", "network"}
 NEXT_MODEL = {"not_found", "overloaded", "quota"}  # после повторов — следующая модель цепочки
 BACKOFF = (2, 4, 8, 16, 32)
-MAX_TIMEOUT_RETRIES = 1  # таймаут claude -p — минуты; повторяем один раз
+MAX_TIMEOUT_RETRIES = 1
+MAX_OUTPUT_CEILING = 32000  # выше лимит ответа не поднимаем: дальше — деление пакета  # таймаут claude -p — минуты; повторяем один раз
 REPAIR_NOTE = ("\n\nПредыдущий ответ не прошёл проверку JSON Schema: {errors}\n"
                "Верни полный ответ заново строго по схеме.")
 
@@ -186,7 +187,8 @@ class LLMClient:
 
     # ------------------------------------------------------------------ публичное
 
-    def ask(self, stage: str, system: str, user: str, schema: dict, *, max_output_tokens: int = 16000) -> dict:
+    def ask(self, stage: str, system: str, user: str, schema: dict, *, max_output_tokens: int = 16000,
+            expand: bool = True) -> dict:
         """Один логический вызов: ответ, прошедший схему. Ошибки — ``LLMError`` / ``Truncated`` / ``BudgetExceeded``."""
         key = self._key(self.model, system, user, schema)
         cached = self._cache_get(key)
@@ -203,7 +205,19 @@ class LLMClient:
         last: LLMError | None = None
         for model in chain:
             try:
-                data, result = self._ask_model(stage, model, system, user, schema, max_output_tokens, handles_retries)
+                try:
+                    data, result = self._ask_model(stage, model, system, user, schema, max_output_tokens,
+                                                   handles_retries)
+                except Truncated:
+                    # этап, который не делит пакет сам, получает одну попытку с удвоенным лимитом ответа
+                    if not expand or max_output_tokens >= MAX_OUTPUT_CEILING:
+                        raise
+                    max_output_tokens = min(max_output_tokens * 2, MAX_OUTPUT_CEILING)
+                    with self._lock:
+                        self.stats["expanded"] = self.stats.get("expanded", 0) + 1
+                    self._emit({"stage": stage, "event": "expand_output", "max_output_tokens": max_output_tokens})
+                    data, result = self._ask_model(stage, model, system, user, schema, max_output_tokens,
+                                                   handles_retries)
             except (Truncated, BudgetExceeded):
                 raise
             except LLMError as exc:
@@ -293,7 +307,8 @@ class LLMClient:
         items = list(items)
         system, user = build(items)
         try:
-            return self.ask(stage, system, user, schema, max_output_tokens=max_output_tokens)
+            return self.ask(stage, system, user, schema, max_output_tokens=max_output_tokens,
+                            expand=len(items) < 2 or _depth >= self.max_split_depth)
         except Truncated:
             if len(items) < 2 or _depth >= self.max_split_depth:
                 raise
