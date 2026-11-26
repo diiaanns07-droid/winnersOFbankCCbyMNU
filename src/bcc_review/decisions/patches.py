@@ -45,7 +45,9 @@ REVISION_SCHEMA = "bcc-review/revision@1"
 _SENTENCE_RE = re.compile(r"[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$")
 
 
-class PatchError(Exception):
+class PatchError(ValueError):
+    """Правка не записана. Наследник ValueError: движок ловит его вместе с ошибками резерва."""
+
     code = "patch_error"
 
     def __init__(self, message: str, **details: Any):
@@ -95,9 +97,12 @@ def edit_state(doc: DocView, e: dict) -> str:
     b = doc.block(e["block_id"])
     if b is None:
         return "precondition_failed"
-    if b.text[e["start"]: e["end"]] == e["old"]:
-        return "ok"
     new = e.get("new", "")
+    if b.text[e["start"]: e["end"]] == e["old"]:
+        k = new.find(e["old"]) if e["old"] else -1
+        if k >= 0 and b.text[e["start"] - k: e["start"] - k + len(new)] == new:
+            return "already_applied"  # «старое» стоит внутри уже вставленного «нового» (дописка)
+        return "ok"
     if new and b.text[e["start"]: e["start"] + len(new)] == new:
         return "already_applied"
     if new and new in b.text and e["old"] not in b.text:
@@ -137,74 +142,207 @@ def _custom_edit(doc: DocView, q: Any, decision: Any) -> dict | None:
     }
 
 
+def resolve_spec(doc: DocView, spec: Any) -> tuple[dict | None, str]:
+    """Правка без координат {block_id?, old, new} -> (Edit, "ok") или (None, причина).
+
+    Координаты считает код: ``old`` должен встретиться ровно один раз — в
+    указанном блоке, иначе во всём документе. Пробелы и переносы внутри
+    фрагмента сравниваются нестрого (экспорт №13 схлопывает их в строке
+    вариантов), но в Edit попадает точный текст блока."""
+    old = str(get(spec, "old") or "")
+    new = get(spec, "new")
+    new = "" if new is None else str(new)
+    if not old.strip():
+        return None, "пустой старый фрагмент"
+    bid = get(spec, "block_id")
+    scopes = [[doc.block(bid)]] if bid and doc.block(bid) else []
+    scopes.append(doc.blocks)
+    for blocks in scopes:
+        hits = [(b, i, i + len(old)) for b in blocks for i in _positions(b.text, old)]
+        if not hits:
+            rx = re.compile(r"\s+".join(re.escape(w) for w in old.split()))
+            hits = [(b, m.start(), m.end()) for b in blocks for m in rx.finditer(b.text)]
+        if hits and new and old in new:  # дописка: «старое» внутри уже вставленного «нового» — правка внесена
+            inside = [h for h in hits if any(p <= h[1] and h[2] <= p + len(new) for p in _positions(h[0].text, new))]
+            if inside and len(inside) == len(hits):
+                return None, "already_applied"
+            hits = [h for h in hits if h not in inside]
+        if len(hits) == 1:
+            b, a, z = hits[0]
+            return {"block_id": b.id, "start": a, "end": z, "old": b.text[a:z], "new": new,
+                    "source_sha256": doc.id}, "ok"
+        if len(hits) > 1:
+            return None, (f"фрагмент «{old}» встречается {len(hits)} раз — укажите блок "
+                          "(«Правка [b0012]: …») или более длинный фрагмент")
+    if new and sum(len(_positions(b.text, new)) for b in doc.blocks) == 1:
+        return None, "already_applied"
+    return None, f"фрагмента «{old}» нет в текущей версии документа"
+
+
+def _positions(text: str, sub: str) -> list[int]:
+    out, i = [], text.find(sub)
+    while sub and i != -1:
+        out.append(i)
+        i = text.find(sub, i + 1)
+    return out
+
+
+def _overlaps(a: dict, b: dict) -> bool:
+    return a["block_id"] == b["block_id"] and a["start"] < b["end"] and b["start"] < a["end"]
+
+
 def propose_patch(document: Any, finding: Any, decision: Any, question: Any = None) -> dict:
-    """Правка по решению владельца. Ничего не пишет на диск."""
+    """Правка по решению владельца. Ничего не пишет на диск.
+
+    Два вызова:
+
+    * ``propose_patch(document, finding, decision, question=q)`` — вариант берётся
+      из вопроса (прежний вызов №08);
+    * ``propose_patch(document, None, decision)`` — вызов движка: правки уже
+      разрешены ``parse_answers`` из файла ответов (строка «Варианты:» №13 и
+      явные «Правка: «…» → «…»»).
+
+    Если ``decision`` — dict (так его передаёт движок), итог записывается в него же:
+    ``edits`` (проверенные), ``patch_state``, ``decision_status``, ``fix_status``,
+    ``note``. Этот dict движок кладёт в Report.decisions."""
     from .answers import Decision  # локально: answers использует этот модуль
+    from .clarify import Question
 
     doc = DocView(document)
     dec = Decision.coerce(decision)
-    qid = dec.question_id
+    q = Question.from_dict(question) if question is not None else None
     out: dict[str, Any] = {
-        "question_id": qid, "finding_ids": [str(x) for x in as_list(get(question, "finding_ids"))]
-        or ([str(get(finding, "id"))] if finding is not None else []),
+        "question_id": dec.question_id,
+        "finding_ids": list(q.finding_ids) if q is not None else
+        ([str(get(finding, "id"))] if finding is not None else []),
         "choice": dec.choice, "state": "open", "edits": [], "warnings": [], "expected_result": None,
     }
-    warn = out["warnings"]
+    _propose(doc, finding, dec, q, out)
+    if out["state"] == "collision" and dec.note:
+        out["reason"] = dec.note  # полная причина с фрагментами — из разбора всех ответов
+    if isinstance(decision, dict):
+        _record(decision, out)
+    return out
 
+
+def _record(d: dict, out: dict) -> None:
+    state = out["state"]
+    d["edits"] = out["edits"]  # те же объекты: write_revision отметит их как внесённые
+    d["patch_state"] = state
+    d["decision_status"] = "needs_clarification" if out.get("needs_clarification") else decision_status(state)
+    d["fix_status"] = "awaiting_revision" if state == "proposed" else "not_applied"
+    reasons = [w for w in out["warnings"] if not w.startswith("[note]")]
+    d["note"] = ("правка передана на запись редакции; закрытие — после повторного анализа"
+                 if state == "proposed" else out.get("reason") or (reasons[0] if reasons else state))
+
+
+def _propose(doc: DocView, finding: Any, dec: Any, q: Any, out: dict) -> None:
+    qid = dec.question_id
+    warn = out["warnings"]
     if dec.choice == "open":
         warn.append(f"[open] {qid}: ответа нет — документ не меняется, вопрос остаётся открытым")
-        return out
+        return
     if not dec.source_sha256 or (doc.id and dec.source_sha256 != doc.id):
         out["state"] = "stale"
         warn.append(
-            f"[stale_source] {qid}: ответ дан для версии {short_sha(dec.source_sha256)}, "
+            f"[stale_source] {qid}: ответ относится к другой редакции ({short_sha(dec.source_sha256)}), "
             f"текущий документ {short_sha(doc.id)}. Правка не применяется; "
             "сформируйте вопросы для текущей версии и перенесите решение."
         )
-        return out
+        return
     if dec.choice == "defer":
         out["state"] = "deferred"
         warn.append(f"[deferred] {qid}: решение отложено — документ не меняется, вопрос остаётся открытым")
-        return out
+        return
+    if dec.choice == "clarify":
+        out["needs_clarification"] = True
+        warn.append(f"[needs_clarification] {qid}: владелец просит уточнения («{dec.answer}») — решения нет, "
+                    "текст не меняется, вопрос остаётся открытым")
+        return
+    if dec.choice == "invalid":
+        out["state"] = "invalid_choice"
+        warn.append(f"[invalid_choice] {qid}: выбрано несколько вариантов ({dec.answer!r}) — оставьте один")
+        return
+    if dec.patch_state == "collision":
+        out["state"] = "collision"
+        # полный текст с фрагментами — в предупреждении разбора и в note решения
+        warn.append(f"[collision] {qid}: решение не применено — его правка пересекается с правкой "
+                    "другого решения; нужен выбор владельца")
+        return
 
     allowed = [doc.full_text(), dec.answer]
-    edits: list[dict] = []
+    owner = [e for e in dec.edits if e.get("origin") == "owner"] + \
+            [s for s in dec.edit_specs if s.get("origin") == "owner"]
+    option: list[dict] = []
     if dec.choice == "custom":
         out["expected_result"] = dec.answer
-        if not dec.wording:
-            out["state"] = "needs_wording"
-            warn.append(f"[needs_wording] {qid}: свой ответ сохранён как решение; для правки текста "
-                        "добавьте строку «Формулировка: …»")
-            return out
-        ce = _custom_edit(doc, question if question is not None else _finding_question(doc, finding), dec)
-        if ce is None:
-            out["state"] = "needs_wording"
-            warn.append(f"[no_target] {qid}: не найден фрагмент для формулировки владельца")
-            return out
-        edits = [ce]
+        if not owner:
+            if not dec.wording:
+                out["state"] = "needs_wording"
+                warn.append(f"[needs_wording] {qid}: свой ответ сохранён как решение; для правки текста "
+                            "добавьте «Правка: «старый фрагмент» → «новый текст»» или «Формулировка: …»")
+                return
+            target_q = q if q is not None else _finding_question(doc, finding)
+            ce = _custom_edit(doc, target_q, dec) if target_q is not None else None
+            if ce is None:
+                out["state"] = "needs_wording"
+                warn.append(f"[no_target] {qid}: «Формулировка:» без цитаты вопроса — укажите "
+                            "«Правка: «старый фрагмент» → «новый текст»»")
+                return
+            option = [ce]
     else:
-        opt = None
-        for o in as_list(get(question, "options")):
-            if str(get(o, "id")) == dec.choice:
-                opt = o
-                break
-        if opt is None:
-            out["state"] = "invalid_choice"
-            warn.append(f"[invalid_choice] {qid}: варианта {dec.choice} нет в вопросе")
-            return out
-        out["expected_result"] = get(opt, "observable_result")
-        edits = [dict(to_plain(e)) for e in as_list(get(opt, "edits"))]
+        if q is not None:
+            opt = q.option(dec.choice)
+            if opt is None:
+                out["state"] = "invalid_choice"
+                warn.append(f"[invalid_choice] {qid}: варианта {dec.choice} нет в вопросе")
+                return
+            out["expected_result"] = opt.observable_result
+            option = [dict(to_plain(e)) for e in opt.edits]
+        else:
+            out["expected_result"] = dec.option_text
+            option = [e for e in dec.edits if e.get("origin") != "owner"] + \
+                     [s for s in dec.edit_specs if s.get("origin") != "owner"]
+            if dec.option_text is None and not owner:
+                out["state"] = "needs_wording"
+                warn.append(f"[no_option_data] {qid}: в файле ответов нет строки «Варианты:» с вариантом "
+                            f"{dec.choice} — правку не из чего построить; добавьте «Правка: «…» → «…»»")
+                return
         if dec.comment:
             warn.append(f"[note] {qid}: комментарий владельца сохранён в решении: «{dec.comment}»")
-        if not edits:
-            out["state"] = "needs_wording"
-            warn.append(f"[needs_wording] {qid}: у варианта {dec.choice} нет проверенной правки текста — "
-                        "решение сохранено, текст не меняется")
-            return out
+
+    resolved: list[dict] = []
+    for raw in owner + option:
+        e = dict(to_plain(raw))
+        if not isinstance(e.get("start"), int) or not isinstance(e.get("end"), int):
+            r, why = resolve_spec(doc, e)
+            if r is None:
+                if why == "already_applied":
+                    out["state"] = "already_applied"
+                    warn.append(f"[already_applied] {qid}: правка уже есть в тексте — повторно не применяется")
+                else:
+                    out["state"] = "precondition_failed"
+                    warn.append(f"[precondition_failed] {qid}: {why}")
+                return
+            r["origin"] = e.get("origin", "option")
+            e = r
+        e = normalize_edit(e)
+        if e.get("origin") != "owner" and any(_overlaps(e, o) for o in resolved if o.get("origin") == "owner"):
+            continue  # своя правка владельца в том же месте важнее правки варианта
+        resolved.append(e)
+    if not resolved:
+        out["state"] = "needs_wording"
+        warn.append(f"[needs_wording] {qid}: у варианта {dec.choice} нет проверенной правки текста — "
+                    "решение сохранено, текст не меняется")
+        return
+    inner = find_collisions(resolved)
+    if inner:
+        out["state"] = "collision"
+        warn.append(f"[collision] {qid}: правки одного решения пересекаются: {describe_collision(inner[0], doc)}")
+        return
 
     states = []
-    for e in edits:
-        e = normalize_edit(e)
+    for e in resolved:
         e.setdefault("source_sha256", doc.id)
         e["question_id"] = qid
         bad = invented_values(e["new"], e["old"], allowed)
@@ -213,24 +351,31 @@ def propose_patch(document: Any, finding: Any, decision: Any, question: Any = No
             out["edits"] = []
             warn.append(f"[invented_value] {qid}: в новой формулировке значения {', '.join(bad)}, "
                         "которых нет ни в документе, ни в ответе владельца — правка не попадает в редакцию")
-            return out
+            return
         st = edit_state(doc, e)
+        if st == "stale":  # правка из вопроса к другой версии: если её «стало» уже на месте — она внесена
+            st = "already_applied" if edit_state(doc, {**e, "source_sha256": None}) == "already_applied" \
+                else "stale_edit"
         states.append(st)
         e["loc"] = format_loc(doc.block(e["block_id"]), e["start"], e["end"])
         out["edits"].append(e)
 
-    if all(s == "ok" for s in states):
+    if all(st == "ok" for st in states):
         out["state"] = "proposed"
-    elif all(s == "already_applied" for s in states):
+    elif all(st == "already_applied" for st in states):
         out["state"] = "already_applied"
         out["edits"] = []
         warn.append(f"[already_applied] {qid}: правка уже есть в тексте — повторно не применяется")
+    elif "stale_edit" in states:
+        out["state"] = "precondition_failed"
+        out["edits"] = []
+        warn.append(f"[precondition_failed] {qid}: правка варианта подготовлена для другой версии документа, "
+                    "а её старого фрагмента в этой версии нет — правка не применяется")
     else:
         out["state"] = "precondition_failed"
         out["edits"] = []
         warn.append(f"[precondition_failed] {qid}: старый фрагмент не совпадает с текстом "
                     f"({', '.join(states)}) — правка не применяется")
-    return out
 
 
 def _finding_question(doc: DocView, finding: Any) -> dict:
@@ -476,21 +621,32 @@ def write_revision(
     output_md: str | Path,
     *,
     source: Any = None,
+    source_path: str | Path | None = None,
     questions: Iterable[Any] | None = None,
     results: dict[str, dict] | None = None,
     decisions: Iterable[Any] | None = None,
 ) -> Path:
     """Записать одобренную редакцию отдельным файлом и манифест рядом.
 
-    * ``source`` — путь или байты исходника. Для Markdown/TXT с совпадающим
-      SHA-256 правки переносятся в исходный текст, остальное сохраняется
-      байт-в-байт. Иначе пишется явная текстовая редакция с заголовками и
-      ссылкой на исходный документ.
+    * ``source`` или ``source_path`` (так вызывает движок) — путь или байты
+      исходника. Для Markdown/TXT с совпадающим SHA-256 правки переносятся в
+      исходный текст, остальные байты (BOM, CRLF, разметка) не меняются. Иначе
+      пишется явная текстовая редакция с заголовками и ссылкой на исходник; если
+      ``output_md`` не .md/.txt (например, .pdf), она пишется рядом с
+      расширением .md — **возвращается фактический путь**.
+    * Каждая записанная правка отмечается в переданном dict: ``status =
+      "applied_not_verified"``, ``revision``, ``revision_sha256``.
     * Исключения: ``StaleSourceError`` (другая версия), ``AlreadyAppliedError``
       (повтор), ``PreconditionError``, ``EditCollisionError`` (перечень пар).
+      При исключении файлы не создаются.
     """
     doc = DocView(document)
-    es = [normalize_edit(e) for e in edits]
+    if source is not None and source_path is not None and Path(str(source)) != Path(str(source_path)):
+        raise PatchError("Переданы разные source и source_path — непонятно, какой исходник править.")
+    if source is None:
+        source = source_path
+    originals = list(edits)
+    es = [normalize_edit(e) for e in originals]
     out_path = Path(output_md)
 
     for e in es:
@@ -542,13 +698,22 @@ def write_revision(
             content = _patch_markdown(doc, text, uniq, warns)
             mode = "markdown_patch"
     applied_q = sorted({e.get("question_id") for e in uniq if e.get("question_id")})
+    bom = b"\xef\xbb\xbf" if mode == "markdown_patch" and data.startswith(b"\xef\xbb\xbf") else b""
     if content is None:
+        if out_path.suffix.lower() not in {".md", ".markdown", ".txt"}:
+            warns.append(f"[revision_suffix] исходник {doc.format or out_path.suffix}: текстовая редакция "
+                         f"записана как {out_path.with_suffix('.md').name}, а не {out_path.name}")
+            out_path = out_path.with_suffix(".md")
         ref = f"`{_rel(src_path, out_path.parent)}`" if src_path else f"«{doc.title}» (SHA-256 `{doc.id}`)"
         content = _render_text_revision(doc, uniq, ref, manifest_path_for(out_path).name, applied_q)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = content.encode("utf-8")
+    payload = bom + content.encode("utf-8")
     out_path.write_bytes(payload)
+    rev_sha = sha256_bytes(payload)
+    for e in originals:  # «внесено, ожидает проверки» — в тех же dict, что лежат в решениях
+        if isinstance(e, dict):
+            e.update(status="applied_not_verified", revision=out_path.name, revision_sha256=rev_sha)
 
     manifest = {
         "schema": REVISION_SCHEMA,
@@ -557,23 +722,33 @@ def write_revision(
                  "подтверждается только повторным анализом этой редакции (тот же SHA-256)."),
         "base": {"sha256": doc.id, "title": doc.title, "format": doc.format,
                  "source": _rel(src_path, out_path.parent)},
-        "revision": {"path": out_path.name, "sha256": sha256_bytes(payload), "mode": mode},
+        "revision": {"path": out_path.name, "sha256": rev_sha, "mode": mode},
         "edits": [{**e, "loc": format_loc(doc.block(e["block_id"]), e["start"], e["end"])} for e in uniq],
         "decisions": [to_plain(d) for d in (decisions or [])],
-        "questions": _question_records(doc, questions or [], results or {}, uniq),
+        "questions": _question_records(doc, questions or [], results or {}, uniq, decisions or []),
         "warnings": warns,
     }
     manifest_path_for(out_path).write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return out_path
 
 
-def _question_records(doc: DocView, questions: Iterable[Any], results: dict, edits: list[dict]) -> list[dict]:
+def _question_records(doc: DocView, questions: Iterable[Any], results: dict, edits: list[dict],
+                      decisions: Iterable[Any] = ()) -> list[dict]:
+    by_q = {str(get(d, "question_id")): d for d in decisions or []}
     recs = []
     for q in questions:
         qid = str(get(q, "id"))
-        r = results.get(qid, {})
+        r = dict(results.get(qid, {}))
         q_edits = [e for e in edits if e.get("question_id") == qid]
+        d = by_q.get(qid)
+        if not r and d is not None:  # вызов движка: results нет, есть решения из parse_answers
+            choice = str(get(d, "choice") or "open")
+            r = {"choice": choice, "state": "proposed" if q_edits else
+                 {"defer": "deferred", "clarify": "open", "invalid": "invalid_choice"}.get(
+                     choice, str(get(d, "patch_state") or "") or ("open" if choice == "open" else "needs_wording"))}
+            if choice == "clarify":
+                r["needs_clarification"] = True
         state = r.get("state", "open")
         recs.append({
             "id": qid,
@@ -582,7 +757,7 @@ def _question_records(doc: DocView, questions: Iterable[Any], results: dict, edi
             "kind": get(q, "kind"),
             "choice": r.get("choice", "open"),
             "patch_state": "applied" if q_edits and state == "proposed" else state,
-            "decision_status": decision_status(state),
+            "decision_status": "needs_clarification" if r.get("needs_clarification") else decision_status(state),
             "expected_result": r.get("expected_result"),
             "quotes": [get(s, "quote") for s in as_list(get(q, "sources"))],
             "new_texts": [e["new"] for e in q_edits if e["new"]],
@@ -628,7 +803,7 @@ def accept_user_revision(base_document: Any, new_path: str | Path, *,
         "warnings": [],
     }
     mp = manifest_path_for(new_path)
-    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return mp
 
 
@@ -712,3 +887,50 @@ def closure_status(manifest: Any, new_document: Any, new_findings: Iterable[Any]
         "analyzed_sha256": nd.id, "verified_on_revision": verified, "questions": rows,
         "warnings": warns,
     }
+
+
+# ---------------------------------------------------------------------------
+# Статус вопросов по паре отчётов (для команды и №15; «исправлено» решает №09)
+# ---------------------------------------------------------------------------
+
+TEXT_STATE_RU = {
+    "applied_not_verified": "внесено в редакцию, ожидает проверки (классификация — №09)",
+    "not_in_revision": "правка есть в решении, но в прочитанной редакции её нет",
+    "unchanged": "текст не менялся",
+}
+
+
+def question_statuses(previous: Any, current: Any) -> list[dict]:
+    """Статус каждого вопроса прошлого отчёта после прогона с ``--answers``.
+
+    ``previous`` — отчёт, по которому отвечали (его вопросы), ``current`` — отчёт
+    прогона с ответами (его решения и прочитанная редакция). Решение без правки
+    (открыт, «нужно уточнить», отложен) текст не меняет."""
+    if isinstance(previous, (str, Path)):
+        previous = json.loads(Path(previous).read_text(encoding="utf-8"))
+    if isinstance(current, (str, Path)):
+        current = json.loads(Path(current).read_text(encoding="utf-8"))
+    decs = {str(get(d, "question_id")): d for d in as_list(get(current, "decisions"))}
+    run = get(current, "run") or {}
+    prev_sha = get(get(previous, "document") or {}, "id")
+    on_revision = bool(prev_sha) and get(run, "revision_of") == prev_sha
+    text = "\n".join(str(get(b, "text")) for b in as_list(get(get(current, "document") or {}, "blocks")))
+    rows = []
+    for q in as_list(get(previous, "questions")):
+        qid = str(get(q, "id"))
+        d = decs.get(qid)
+        side = get(q, "side") or {}
+        row = {"question_id": qid, "side": get(side, "quote"), "answer": None, "decision_status": "open",
+               "text_state": "unchanged"}
+        if d is not None:
+            edits = [e for e in as_list(get(d, "edits")) if get(e, "old") is not None]
+            row["answer"] = get(d, "answer")
+            row["decision_status"] = str(get(d, "decision_status") or get(d, "status") or "accepted")
+            if edits:
+                applied = on_revision and all(str(get(e, "new")) in text for e in edits if get(e, "new")) and not any(
+                    str(get(e, "old")) in text for e in edits if norm_text(str(get(e, "old"))) not in
+                    norm_text(str(get(e, "new") or "")))
+                row["text_state"] = "applied_not_verified" if applied else "not_in_revision"
+        row["text_state_ru"] = TEXT_STATE_RU[row["text_state"]]
+        rows.append(row)
+    return rows

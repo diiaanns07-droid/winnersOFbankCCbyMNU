@@ -1,0 +1,111 @@
+{
+  "schema": "bcc-review/revision@1",
+  "status": "applied_not_verified",
+  "note": "Решения владельца приняты и применены к тексту. Закрытие замечаний подтверждается только повторным анализом этой редакции (тот же SHA-256).",
+  "base": {
+    "sha256": "cbbc38cae3615f5482d87d0d77974c2641856623540e3baa2988ed888cac8e91",
+    "title": "Комиссия за перевод между своими счетами",
+    "format": "markdown",
+    "source": "../tests/p08/fixtures/commission_tz.md"
+  },
+  "revision": {
+    "path": "commission_tz.rev-p08-comm-r2.md",
+    "sha256": "cc57fc9e0d0b8dd25ee88b5af879e5728424ada9b737c8340158aed4d7b4fd8b",
+    "mode": "markdown_patch"
+  },
+  "edits": [
+    {
+      "block_id": "b0005",
+      "start": 37,
+      "end": 78,
+      "old": "взимается комиссия 0,5% от суммы перевода",
+      "new": "комиссия не взимается",
+      "source_sha256": "cbbc38cae3615f5482d87d0d77974c2641856623540e3baa2988ed888cac8e91",
+      "question_id": "Q-02",
+      "loc": "строка 9 · блок b0005 · символы 37–78 · раздел «Комиссия за перевод между своими счетами / Тарифы»"
+    }
+  ],
+  "decisions": [
+    {
+      "question_id": "Q-01",
+      "source_sha256": "cbbc38cae3615f5482d87d0d77974c2641856623540e3baa2988ed888cac8e91",
+      "answer": "нужно уточнить",
+      "edits": [],
+      "note": "",
+      "choice": "clarify",
+      "comment": "нужно уточнить",
+      "wording": "",
+      "status": "open",
+      "decision_status": "needs_clarification",
+      "finding_ids": [
+        "F-001"
+      ]
+    },
+    {
+      "question_id": "Q-02",
+      "source_sha256": "cbbc38cae3615f5482d87d0d77974c2641856623540e3baa2988ed888cac8e91",
+      "answer": "B",
+      "edits": [
+        {
+          "block_id": "b0005",
+          "start": 37,
+          "end": 78,
+          "old": "взимается комиссия 0,5% от суммы перевода",
+          "new": "комиссия не взимается",
+          "source_sha256": "cbbc38cae3615f5482d87d0d77974c2641856623540e3baa2988ed888cac8e91",
+          "origin": "option",
+          "question_id": "Q-02"
+        }
+      ],
+      "note": "",
+      "choice": "B",
+      "comment": "",
+      "wording": "",
+      "status": "accepted",
+      "decision_status": "accepted",
+      "finding_ids": [
+        "F-001"
+      ],
+      "option": "Нет — комиссии нет — Перевод 10 000 ₸: списано 10 000 ₸, комиссия 0 ₸. · Правка [b0005]: «взимается комиссия 0,5% от суммы перевода» → «комиссия не взимается» (Тарифы, строка 9)"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-01",
+      "finding_ids": [
+        "F-001"
+      ],
+      "family": "ambiguity",
+      "kind": "decision",
+      "choice": "clarify",
+      "patch_state": "open",
+      "decision_status": "needs_clarification",
+      "expected_result": null,
+      "quotes": [
+        "Перевод между своими счетами выполняется без комиссии.",
+        "взимается комиссия 0,5% от суммы перевода"
+      ],
+      "new_texts": []
+    },
+    {
+      "id": "Q-02",
+      "finding_ids": [
+        "F-001"
+      ],
+      "family": "ambiguity",
+      "kind": "decision",
+      "choice": "B",
+      "patch_state": "applied",
+      "decision_status": "accepted",
+      "expected_result": null,
+      "quotes": [
+        "взимается комиссия 0,5% от суммы перевода",
+        "Перевод между своими счетами выполняется без комиссии."
+      ],
+      "new_texts": [
+        "комиссия не взимается"
+      ]
+    }
+  ],
+  "warnings": []
+}

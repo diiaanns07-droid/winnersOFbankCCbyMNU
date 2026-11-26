@@ -4,6 +4,7 @@
     python -m bcc_review.decisions questions SOURCE REPORT.json [-o questions.md]
     python -m bcc_review.decisions apply SOURCE REPORT.json ANSWERS.md -o REVISION.md
     python -m bcc_review.decisions close MANIFEST.revision.json NEW_REPORT.json
+    python -m bcc_review.decisions status PREVIOUS.json CURRENT.json   # статус каждого вопроса
 
 REPORT.json — Report v1 (нужны document, findings и, для apply, questions).
 Основной сценарий пользователя — ``python -m bcc_review INPUT OUTPUT.md --answers
@@ -19,7 +20,7 @@ from pathlib import Path
 from ._doc import DocView, load_document, load_markdown, sha256_file, short_sha, to_plain
 from .answers import ANSWERS_MARKER, apply_answers, render_apply_summary_md, write_questions
 from .clarify import Question, build_questions
-from .patches import closure_status
+from .patches import closure_status, question_statuses
 
 DEMO_LABEL = ("> **Демонстрационные ответы команды.** Синтетический пример для проверки модуля "
               "решений; это не решения владельца продукта.")
@@ -56,7 +57,7 @@ def fill_answers(questions_md: str, answers: dict[str, str], label: str | None =
 
 
 def _dump(path: Path, data) -> None:
-    path.write_text(json.dumps(to_plain(data), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(to_plain(data), ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def run_demo(out_dir: Path, write_answers: bool = False) -> dict:
@@ -87,10 +88,10 @@ def run_demo(out_dir: Path, write_answers: bool = False) -> dict:
     for variant, answers in DEMO_ANSWERS.items():
         apath = EXAMPLES_DIR / f"answers_team_{variant}.md"
         if write_answers or not apath.exists():
-            apath.write_text(fill_answers(qpath.read_text(encoding="utf-8"), answers), encoding="utf-8")
+            apath.write_text(fill_answers(qpath.read_text(encoding="utf-8"), answers), encoding="utf-8", newline="\n")
         result = apply_answers(doc, questions, apath, findings=findings,
                                output_md=out_dir / f"revision_{variant}.md", source=before)
-        (out_dir / f"revision_{variant}.apply.md").write_text(render_apply_summary_md(result), encoding="utf-8")
+        (out_dir / f"revision_{variant}.apply.md").write_text(render_apply_summary_md(result), encoding="utf-8", newline="\n")
         row = {"statuses": result["statuses"], "revision": result["revision"], "warnings": result["warnings"]}
         if result["revision"]:
             new_doc = load_markdown(result["revision"])  # повторное чтение реально записанного файла
@@ -134,6 +135,9 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("report")
     a.add_argument("answers")
     a.add_argument("-o", "--output", required=True)
+    st = sub.add_parser("status", help="статус вопросов прошлого отчёта после прогона с --answers")
+    st.add_argument("previous")
+    st.add_argument("current")
     c = sub.add_parser("close", help="статус закрытия по повторному анализу редакции")
     c.add_argument("manifest")
     c.add_argument("new_report")
@@ -167,6 +171,13 @@ def main(argv: list[str] | None = None) -> int:
                             output_md=args.output, source=args.source)
         print(render_apply_summary_md(res))
         return 0 if not res["collisions"] else 2
+    if args.cmd == "status":
+        print("| Вопрос | Сторона | Ответ | Решение | Текст |")
+        print("| :--- | :--- | :--- | :--- | :--- |")
+        for r in question_statuses(args.previous, args.current):
+            print(f"| {r['question_id']} | {r['side'] or '—'} | {r['answer'] or '—'} | {r['decision_status']} | "
+                  f"{r['text_state_ru']} |")
+        return 0
     if args.cmd == "close":
         new = _load_report(args.new_report)
         res = closure_status(args.manifest, new["document"], new.get("findings", []))

@@ -133,3 +133,75 @@ def test_sha_problems_are_reported(questions):
     assert two.source_sha256 is None and any(w.startswith("[sha_conflict]") for w in two.warnings)
     other = parse_answers(f"source_sha256: {'c' * 64}\n## Q-01\nОтвет: A\n", expected_sha="d" * 64)
     assert any(w.startswith("[stale_answers]") for w in other.warnings)
+
+
+# --------------------------------------------------------------------------- форматы №13 и резерва Max
+
+from pathlib import Path  # noqa: E402
+
+from bcc_review.decisions import propose_patch  # noqa: E402
+from bcc_review.decisions.answers import parse_edit_specs  # noqa: E402
+
+FIX = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def transfer():
+    from bcc_review.decisions._doc import load_document
+
+    return load_document(FIX / "transfer_tz.md")
+
+
+def test_parse_13_export_resolves_option_edit(transfer):
+    aset = parse_answers(FIX / "answers13_Q01_A.md", transfer)
+    assert aset.source_sha256 == transfer["id"]
+    (d,) = list(aset)
+    assert (d.question_id, d.choice, d.answer) == ("Q-01", "A", "A")
+    assert d.option_text.startswith("На следующий рабочий день — ")
+    assert [(e["block_id"], e["start"], e["end"], e["old"], e["new"]) for e in d.edits] == [
+        ("b0009", 64, 90, "Перевод исполнен в пятницу", "Перевод исполнен в следующий рабочий день")]
+    assert aset.open_ids == ["Q-02", "Q-03"]
+    (c,) = aset.get("decisions")  # вид для движка: dict Decision v1
+    assert c["question_id"] == "Q-01" and c["edits"][0]["origin"] == "option"
+
+
+def test_13_escaped_heading_lines_are_unescaped(transfer):
+    text = (f"---\nformat: bcc-review-answers/1\nsource_sha256: {transfer['id']}\n---\n\n## Q-01\n\n"
+            "> вопрос\n\n### Ответ\n\n\\# не заголовок, а текст ответа\nвторая строка\n")
+    (d,) = list(parse_answers(text, transfer))
+    assert d.answer == "# не заголовок, а текст ответа\nвторая строка" and d.choice == "custom"
+
+
+def test_fallback_format_with_explicit_edit(transfer):
+    text = (f"source_sha256: {transfer['id']}\n\n## Q-001\nОтвет: перевод исполняется на следующий день\n"
+            "Правка: «Перевод исполнен в пятницу» → «Перевод исполнен в понедельник»\n")
+    aset = parse_answers(text, transfer)
+    (c,) = aset.get("decisions")
+    p = propose_patch(transfer, None, c)            # вызов движка
+    assert p["state"] == "proposed" and c["patch_state"] == "proposed"
+    assert c["edits"] is p["edits"] and c["edits"][0]["origin"] == "owner"
+
+
+def test_letter_without_options_line_explains_what_is_missing(transfer):
+    text = f"source_sha256: {transfer['id']}\n\n## Q-01\nОтвет: A\n"
+    (c,) = parse_answers(text, transfer).get("decisions")
+    p = propose_patch(transfer, None, c)
+    assert p["state"] == "needs_wording" and p["warnings"][0].startswith("[no_option_data]")
+
+
+def test_edit_specs_with_nested_quotes_and_block_hint():
+    specs = parse_edit_specs("A · Правка [b0003]: «выполняется без комиссии» → «выполняется с комиссией по "
+                             "разделу «Тарифы»» · Правка: «x» -> «y»", "option")
+    assert specs == [
+        {"block_id": "b0003", "old": "выполняется без комиссии",
+         "new": "выполняется с комиссией по разделу «Тарифы»", "origin": "option"},
+        {"block_id": None, "old": "x", "new": "y", "origin": "option"},
+    ]
+
+
+def test_ambiguous_fragment_is_rejected_with_reason(transfer):
+    text = (f"source_sha256: {transfer['id']}\n\n## Q-09\nОтвет: свой\n"
+            "Правка: «перевод» → «платёж»\n")
+    (c,) = parse_answers(text, transfer).get("decisions")
+    p = propose_patch(transfer, None, c)
+    assert p["state"] == "precondition_failed" and "встречается" in p["warnings"][0]

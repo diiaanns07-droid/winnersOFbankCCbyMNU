@@ -31,7 +31,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
 from ._doc import (
-    DocView, as_list, format_loc, get, invented_values, norm_text, option_letter, to_plain,
+    DocView, as_list, format_loc, get, invented_values, loc_lines, norm_text, option_letter, quantities,
+    to_plain,
 )
 
 AskFn = Callable[[str, dict, dict], Any]
@@ -86,6 +87,10 @@ CLARIFY_INSTRUCTIONS = """\
    закрывает их все. Группу без влияния на реализацию и приёмку перечисли в
    skipped с причиной.
 10. Пиши по-русски, конкретно, без общих фраз.
+11. Если противоречие между двумя фразами разных разделов, можно задать по вопросу
+   на каждую сторону: target — {block_id, quote} фразы, о которой вопрос; правки
+   вариантов такого вопроса меняют только эту фразу. Для вопроса обо всей группе
+   target = {"block_id": "", "quote": ""}.
 """
 
 BLOCK_LABELS = ("разработку", "тестирование", "приёмку")
@@ -110,6 +115,7 @@ CLARIFY_SCHEMA: dict = _strict({
         "blocks": {"type": "array", "items": {"type": "string", "enum": list(BLOCK_LABELS)}},
         "author_intent_hypothesis": _S,
         "document_answer": _strict({"block_id": _S, "quote": _S}),
+        "target": _strict({"block_id": _S, "quote": _S}),
         "options": {"type": "array", "items": _strict({
             "id": _S,
             "label": _S,
@@ -138,13 +144,19 @@ class Option:
     edits: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     origin: str = "llm"
+    changes: list[dict] = field(default_factory=list)   # какая фраза меняется: раздел, строка, было → стало
+    keeps: dict | None = None                           # фраза цели, которая при этом варианте не меняется
+    acceptance: str = ""                                # влияние на приёмку (строка критерия, совпадает ли)
+    intent: str = ""                                    # keep — фраза цели остаётся; rewrite — её заменит «Формулировка:»
 
     def to_dict(self) -> dict:
         return {
             "id": self.id, "label": self.label, "interpretation": self.interpretation,
             "observable_result": self.observable_result, "consequences": self.consequences,
             "edits": [dict(e) for e in self.edits], "warnings": list(self.warnings),
-            "origin": self.origin,
+            "origin": self.origin, "changes": [dict(c) for c in self.changes],
+            "keeps": dict(self.keeps) if self.keeps else None, "acceptance": self.acceptance,
+            "intent": self.intent,
         }
 
     @classmethod
@@ -157,11 +169,36 @@ class Option:
             edits=[dict(to_plain(e)) for e in as_list(get(d, "edits"))],
             warnings=[str(w) for w in as_list(get(d, "warnings"))],
             origin=str(get(d, "origin") or "llm"),
+            changes=[dict(to_plain(c)) for c in as_list(get(d, "changes"))],
+            keeps=to_plain(get(d, "keeps")), acceptance=str(get(d, "acceptance") or ""),
+            intent=str(get(d, "intent") or ""),
         )
 
 
-@dataclass
-class Question:
+def format_edit(e: Any) -> str:
+    """Правка строкой для Question.options и файла ответов: «Правка [b0006]: «было» → «стало»».
+
+    Строку читает ``answers.parse_answers`` (формат №13 печатает варианты как есть),
+    поэтому выбор буквы варианта в файле ответов сам несёт проверяемую правку."""
+    bid = get(e, "block_id")
+    return f"Правка [{bid}]: «{get(e, 'old')}» → «{get(e, 'new')}»" if bid else \
+        f"Правка: «{get(e, 'old')}» → «{get(e, 'new')}»"
+
+
+_SYNCED = ("id", "finding_ids", "prompt", "options", "affected_req_ids", "owner", "blocks", "situation",
+           "why", "sources", "target", "hypothesis", "document_answer", "kind", "family", "severity",
+           "priority", "rank_reason", "source_sha256", "status", "origin", "blocked_decision", "side",
+           "counterpart_ids")
+
+
+@dataclass(eq=False, repr=False)
+class Question(dict):
+    """Question v1. Это ``dict`` (движок кладёт его в Report.questions как есть,
+    JSON и схема контракта видят обычный объект) с атрибутами №08 поверх.
+
+    Содержимое словаря — :meth:`to_dict`; оно обновляется при присваивании
+    атрибута и при вызове :meth:`sync` (после правки вложенных списков)."""
+
     id: str
     finding_ids: list[str]
     prompt: str
@@ -184,6 +221,25 @@ class Question:
     status: str = "open"
     origin: str = "llm"
     blocked_decision: str = ""
+    side: dict | None = None                       # вопрос об одной стороне противоречия: её фраза
+    counterpart_ids: list[str] = field(default_factory=list)  # вопросы о других сторонах того же противоречия
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_ready", True)
+        self.sync()
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        object.__setattr__(self, name, value)
+        if name in _SYNCED and self.__dict__.get("_ready"):
+            self.sync()
+
+    def sync(self) -> "Question":
+        dict.clear(self)
+        dict.update(self, self._contract())
+        return self
+
+    def __repr__(self) -> str:
+        return f"Question(id={self.id!r}, finding_ids={self.finding_ids!r}, prompt={self.prompt!r})"
 
     def option(self, option_id: str | None) -> Option | None:
         for o in self.options:
@@ -192,12 +248,33 @@ class Question:
         return None
 
     def option_texts(self) -> list[str]:
-        """Варианты строками — так их требует Question.options контракта v1."""
-        return [f"{o.id}. {o.label} — {o.observable_result}" for o in self.options]
+        """Варианты строками — так их требует Question.options контракта v1.
+
+        Каждая проверенная правка варианта дописана как «· Правка [block]: «…» → «…»»:
+        экспорт №13 печатает эти строки в файл ответов, и по букве варианта
+        ``parse_answers`` восстанавливает правку без доступа к отчёту."""
+        out = []
+        for o in self.options:
+            text = f"{o.id}. {o.label} — {o.observable_result}"
+            where = {(c.get("block_id"), c.get("old")): c for c in o.changes}
+            for e in o.edits:
+                if not e.get("invented") and "|" not in f"{e['old']}{e['new']}":
+                    text += " · " + format_edit(e)
+                    c = where.get((e.get("block_id"), e.get("old")))
+                    if c:
+                        text += f" ({c['section']}, строка {c['line']})"
+            if not o.edits and o.keeps:
+                verb = ("меняется по «Формулировка:»" if o.intent == "rewrite" else "текст не меняется")
+                text += f" · {verb}: «{o.keeps['quote']}» ({o.keeps['section']}, строка {o.keeps['line']})"
+            out.append(text)
+        return out
 
     def to_dict(self) -> dict:
         """Question v1 (id, finding_ids, prompt, options: list[str], affected_req_ids)
         плюс поля №08; полные варианты с правками — в ``option_details``."""
+        return self._contract()
+
+    def _contract(self) -> dict:
         return {
             "id": self.id, "finding_ids": list(self.finding_ids), "prompt": self.prompt,
             "options": self.option_texts(),
@@ -212,6 +289,7 @@ class Question:
             "kind": self.kind, "family": self.family, "severity": self.severity,
             "priority": self.priority, "rank_reason": self.rank_reason,
             "source_sha256": self.source_sha256, "status": self.status, "origin": self.origin,
+            "side": dict(self.side) if self.side else None, "counterpart_ids": list(self.counterpart_ids),
         }
 
     @classmethod
@@ -236,6 +314,8 @@ class Question:
             source_sha256=get(d, "source_sha256"), status=str(get(d, "status") or "open"),
             origin=str(get(d, "origin") or "llm"),
             blocked_decision=str(get(d, "blocked_decision") or ""),
+            side=to_plain(get(d, "side")),
+            counterpart_ids=[str(x) for x in as_list(get(d, "counterpart_ids"))],
         )
 
 
@@ -582,6 +662,55 @@ def _conflict_sides(doc: DocView, g: _Group) -> tuple[dict, dict, dict | None] |
     return None
 
 
+def _side_evidence(doc: DocView, g: _Group) -> list[dict]:
+    """Опоры группы в разных разделах без witness — стороны одного противоречия.
+
+    Только для находок о несогласованности (set_consistent, conflict, incorrect): у
+    неоднозначности с опорами в двух местах («нет часового пояса») сторон нет."""
+    if any(f.witness for f in g.findings):
+        return []
+    if not any(f.criterion.lower() == "set_consistent" or f.kind.lower() in ("conflict", "incorrect")
+               for f in g.findings):
+        return []
+    out, seen_sections = [], set()
+    for f in g.findings:
+        for e in f.evidence:
+            b = doc.block(e.get("block_id"))
+            if b is None or not doc.verify_evidence(e) or b.section in seen_sections:
+                continue
+            seen_sections.add(b.section)
+            out.append(e)
+    return out if len(out) >= 2 else []
+
+
+def _resolve_side(doc: DocView, g: _Group, raw: Any) -> dict | None:
+    quote = str(get(raw, "quote") or "").strip()
+    if not quote:
+        return None
+    for f in g.findings:
+        for e in f.evidence:
+            if norm_text(e["quote"]) == norm_text(quote) or (
+                    get(raw, "block_id") == e["block_id"] and quote in e["quote"]):
+                return e
+    return doc.evidence(quote, str(get(raw, "block_id") or "") or None)
+
+
+def _side_rule_options(doc: DocView, side: dict) -> list[Option]:
+    sec, line = _place(doc, side["block_id"])
+    q = side["quote"]
+    return [
+        Option(id="A", label="Оставить эту фразу как есть",
+               interpretation=f"Фраза «{q}» (раздел «{sec}», строка {line}) верна.",
+               observable_result=f"Действует правило «{_short(q, 90)}».",
+               consequences="Противоречие снимается правкой другой стороны.", origin="rule", intent="keep"),
+        Option(id="B", label="Изменить эту фразу",
+               interpretation=f"Фраза «{q}» (раздел «{sec}», строка {line}) неверна.",
+               observable_result=f"Вместо «{_short(q, 90)}» действует правило владельца.",
+               consequences="Новый текст задайте строкой «Формулировка: …» — она заменит именно эту фразу. "
+                            "Без неё решение сохранится, текст не изменится.", origin="rule", intent="rewrite"),
+    ]
+
+
 def _rule_options(doc: DocView, g: _Group) -> list[Option]:
     if g.family == "conflict":
         sides = _conflict_sides(doc, g)
@@ -611,7 +740,7 @@ def _rule_options(doc: DocView, g: _Group) -> list[Option]:
     quote = ev["quote"] if ev else ""
     return [
         Option(
-            id="A", label="Уточнить формулировку",
+            id="A", label="Задать правило своей формулировкой",
             interpretation=f"Владелец задаёт однозначное правило или значение вместо «{_short(quote)}».",
             observable_result="Разработка и тест-кейсы опираются на правило владельца; "
                               "проверка даёт однозначный вердикт.",
@@ -641,11 +770,104 @@ def _distinct(options: list[Option]) -> bool:
     return len(sigs) == len(options) and len(results) == len(options)
 
 
-def _target(sources: list[dict]) -> dict | None:
+def _target(sources: list[dict], g: "_Group | None" = None) -> dict | None:
+    """Цель правки по умолчанию («Формулировка:», правка варианта без указания места) —
+    собственная опора ведущей находки, а не сторона A свидетеля конфликта."""
     if not sources:
         return None
     s = sources[0]
+    if g is not None:
+        lead = max(g.findings, key=lambda f: SEVERITY_WEIGHT.get(f.severity, 0))
+        own = {(e.get("block_id"), e.get("start"), e.get("end")) for e in lead.evidence}
+        s = next((x for x in sources if (x["block_id"], x["start"], x["end"]) in own), s)
     return {k: s[k] for k in ("block_id", "start", "end", "quote")}
+
+
+_ACCEPT_RE = re.compile(r"приёмк|приемк|acceptance", re.I)
+
+
+def _place(doc: DocView, block_id: str) -> tuple[str, int | None]:
+    b = doc.block(block_id)
+    if b is None:
+        return "—", None
+    lines = loc_lines(b.loc)
+    return (b.section[-1] if b.section else doc.title or "—"), (lines[0] if lines else None)
+
+
+def _is_acceptance(doc: DocView, block_id: str) -> bool:
+    b = doc.block(block_id)
+    return b is not None and any(_ACCEPT_RE.search(s) for s in b.section)
+
+
+def _stems(text: str) -> set[str]:
+    return {w[:5] for w in re.findall(r"[а-яёa-z]{5,}", norm_text(text))}
+
+
+def _expected_cell(text: str) -> str:
+    return text.split(" | ")[-1] if " | " in text else text
+
+
+def _describe(doc: DocView, sources: list[dict], target: dict | None, o: Option) -> None:
+    """Для сотрудника: какая фраза меняется при варианте и что это значит для приёмки."""
+    o.changes = []
+    for e in o.edits:
+        sec, line = _place(doc, e["block_id"])
+        o.changes.append({"block_id": e["block_id"], "section": sec, "line": line, "old": e["old"],
+                          "new": e["new"], "acceptance": _is_acceptance(doc, e["block_id"])})
+    o.keeps = None
+    if not o.edits and target:
+        sec, line = _place(doc, target["block_id"])
+        o.keeps = {"block_id": target["block_id"], "section": sec, "line": line, "quote": target["quote"]}
+    if not o.edits and o.intent == "rewrite" and target:
+        rows = [b for b in doc.blocks if b.kind == "table_row" and _is_acceptance(doc, b.id)
+                and len(_stems(target["quote"]) & _stems(b.text)) >= 2]
+        o.acceptance = ("; ".join(f"сверьте критерий приёмки (строка {_place(doc, b.id)[1]}) «{_expected_cell(b.text)}» "
+                                  "с вашей формулировкой" for b in rows[:2])
+                        or "критерия приёмки на это правило нет — тест по вашей формулировке")
+        return
+    ac_changes = [c for c in o.changes if c["acceptance"]]
+    if ac_changes:
+        o.acceptance = "; ".join(f"меняется критерий приёмки (строка {c['line']}): «{c['old']}» → «{c['new']}»"
+                                 for c in ac_changes)
+        return
+    rows = [s for s in sources if _is_acceptance(doc, s["block_id"])]
+    if not rows and target:
+        key = _stems(target["quote"])
+        rows = [{"block_id": b.id, "quote": _expected_cell(b.text)} for b in doc.blocks
+                if b.kind == "table_row" and _is_acceptance(doc, b.id) and len(key & _stems(b.text)) >= 2]
+    has_ac = any(_is_acceptance(doc, b.id) for b in doc.blocks)
+    if not rows:
+        o.acceptance = (f"критерия приёмки на это правило нет — нужен тест: {o.observable_result}" if has_ac
+                        else f"критериев приёмки в документе нет; проверка ожидает: {o.observable_result}")
+        return
+    want = quantities(o.observable_result)
+    parts = []
+    for r in rows[:2]:
+        _, line = _place(doc, r["block_id"])
+        cell = _expected_cell(doc.block(r["block_id"]).text) if doc.block(r["block_id"]) else r["quote"]
+        have = quantities(cell)
+        if want and want <= have:
+            parts.append(f"критерий приёмки (строка {line}) «{cell}» совпадает с результатом варианта — тест не меняется")
+        elif want and have:
+            parts.append(f"критерий приёмки (строка {line}) ожидает «{cell}» — с этим вариантом он расходится, "
+                         "его нужно переписать")
+        else:
+            parts.append(f"сверьте критерий приёмки (строка {line}) «{cell}» с результатом: {o.observable_result}")
+    o.acceptance = "; ".join(parts)
+
+
+def _label_sources(sources: list[dict], target: dict | None, g: "_Group", side: dict | None = None) -> None:
+    own = {(e.get("block_id"), e.get("start"), e.get("end")) for f in g.findings for e in f.evidence}
+    if side is not None:  # вопрос о стороне: остальные опоры группы — другая сторона
+        own = {(side["block_id"], side["start"], side["end"])}
+    for s in sources:
+        key = (s["block_id"], s["start"], s["end"])
+        if target and key == (target["block_id"], target["start"], target["end"]):
+            s["role"] = "target"
+        elif key not in own:
+            s["role"] = "other_side"
+        else:
+            s["role"] = "evidence"
 
 
 def _default_prompt(g: _Group) -> tuple[str, str, str]:
@@ -657,8 +879,12 @@ def _default_prompt(g: _Group) -> tuple[str, str, str]:
     return situation, prompt, why
 
 
-def _assemble(doc: DocView, g: _Group, entry: dict | None, log: list[str]) -> Question:
+def _assemble(doc: DocView, g: _Group, entry: dict | None, log: list[str],
+              side: dict | None = None) -> Question:
     sources = _sources(doc, g)
+    if side is not None:  # своя сторона — первой
+        key = (side["block_id"], side["start"], side["end"])
+        sources.sort(key=lambda x: (x["block_id"], x["start"], x["end"]) != key)
     lead = max(g.findings, key=lambda f: SEVERITY_WEIGHT.get(f.severity, 0))
     owner = owner_role(lead, g.family)
     situation, prompt, why = _default_prompt(g)
@@ -684,6 +910,9 @@ def _assemble(doc: DocView, g: _Group, entry: dict | None, log: list[str]) -> Qu
                 r = resolve_edit(doc, e, log, f"{where}, вариант {oid}")
                 if r is None and get(e, "old") != get(e, "new"):
                     ok = False
+                elif r is not None and side is not None and r["block_id"] != side["block_id"]:
+                    log.append(f"[edit_outside_side] {where}, вариант {oid}: правка «{_short(r['old'])}» вне фразы "
+                               f"вопроса («{_short(side['quote'])}») — отброшена, она относится к другой стороне")
                 elif r is not None:
                     edits.append(r)
             opt = Option(
@@ -724,15 +953,30 @@ def _assemble(doc: DocView, g: _Group, entry: dict | None, log: list[str]) -> Qu
                        "варианты построены по правилам")
             options = []
     if not options:
-        options = _rule_options(doc, g)
+        options = _side_rule_options(doc, side) if side is not None else _rule_options(doc, g)
+    if side is not None:
+        target = {k: side[k] for k in ("block_id", "start", "end", "quote")}
+        if not entry:
+            sec, line = _place(doc, side["block_id"])
+            prompt = f"Фраза «{_short(side['quote'], 90)}» (раздел «{sec}», строка {line}) — оставить или изменить?"
+            others = [x for x in sources if (x["block_id"], x["start"], x["end"]) !=
+                      (side["block_id"], side["start"], side["end"])]
+            if others:
+                situation = (f"{situation} Противоречие: «{_short(side['quote'], 90)}» ↔ "
+                             f"«{_short(others[0]['quote'], 90)}». Этот вопрос — только о первой фразе.")
+    else:
+        target = _target(sources, g)
+    _label_sources(sources, target, g, side)
     for o in options:
         _mark_invented(doc, o)
+        _describe(doc, sources, target, o)
     return Question(
         id="", finding_ids=g.finding_ids, prompt=prompt, options=options,
         affected_req_ids=g.req_ids, owner=owner, blocks=blocks, situation=situation, why=why,
-        sources=sources, target=_target(sources), hypothesis=hypothesis,
+        sources=sources, target=target, hypothesis=hypothesis,
         document_answer=document_answer, kind=kind, family=g.family, severity=g.severity,
         source_sha256=doc.id, origin=origin, blocked_decision=blocked,
+        side=dict(target) if side is not None else None,
     )
 
 
@@ -780,7 +1024,7 @@ def _call(ask: AskFn, doc: DocView, groups: list[_Group], log: list[str]) -> tup
 
     Собственный вопрос группы хранится отдельно от предложения объединить её с
     другими: если объединение не пройдёт проверку, группа получит свой вопрос."""
-    own: dict[str, dict] = {}
+    own: dict[str, list[dict]] = {}
     merged: dict[str, dict] = {}
     skipped: dict[str, str] = {}
     for i in range(0, len(groups), MAX_GROUPS_PER_CALL):
@@ -802,9 +1046,11 @@ def _call(ask: AskFn, doc: DocView, groups: list[_Group], log: list[str]) -> tup
                 continue
             entry = dict(entry)
             entry["group_ids"] = gids
-            target = own if len(gids) == 1 else merged
-            for gid in gids:
-                target.setdefault(gid, entry)
+            if len(gids) == 1:
+                own.setdefault(gids[0], []).append(entry)
+            else:
+                for gid in gids:
+                    merged.setdefault(gid, entry)
     return own, merged, skipped
 
 
@@ -828,6 +1074,8 @@ def _base_priority(q: Question) -> float:
 
 def rank(questions: list[Question], doc: DocView) -> list[Question]:
     def first_pos(q: Question) -> int:
+        if q.side and doc.block(q.side["block_id"]):
+            return doc.block(q.side["block_id"]).index
         idx = [doc.block(s["block_id"]).index for s in q.sources if doc.block(s["block_id"])]
         return min(idx) if idx else 10**9
 
@@ -855,12 +1103,15 @@ def rank(questions: list[Question], doc: DocView) -> list[Question]:
         q.rank_reason = " · ".join(r for r in reason if r)
         ordered.append(q)
         covered |= set(q.affected_req_ids)
-        pool.remove(q)
+        pool = [x for x in pool if x is not q]  # Question — dict: сравнение по идентичности
     for n, q in enumerate(ordered, start=1):
         q.id = f"Q-{n:02d}"
         for o in q.options:
             for e in o.edits:
                 e["question_id"] = q.id
+    for q in ordered:  # вопросы о сторонах одного противоречия ссылаются друг на друга
+        if q.side:
+            q.counterpart_ids = [x.id for x in ordered if x is not q and x.side and x.finding_ids == q.finding_ids]
     return ordered
 
 
@@ -931,14 +1182,32 @@ def build_questions(
                 for o in bad:
                     log.append(f"[merge_rejected] {g.gid}+{o.gid}: нет общего требования или блока — "
                                "вопросы остаются раздельными")
-        if entry is None:
-            entry = own.get(g.gid)
+        entries = [] if entry is not None else own.get(g.gid, [])
+        sided = [(e, _resolve_side(doc, merged, get(e, "target") or {})) for e in entries]
+        sided = [(e, sd) for e, sd in sided if sd is not None]
+        if entry is None and len({sd["block_id"] for _, sd in sided}) >= 2:
+            used.add(g.gid)  # модель задала по вопросу на каждую сторону противоречия
+            seen_blocks: set[str] = set()
+            for e, sd in sided:
+                if sd["block_id"] not in seen_blocks:
+                    seen_blocks.add(sd["block_id"])
+                    questions.append(_assemble(doc, merged, e, log, side=sd))
+            continue
+        if entry is None and entries:
+            entry = entries[0]
         if ask and entry is None and g.gid not in skipped:
             log.append(f"[llm_missing_group] {g.gid}: модель не вернула вопрос — построен по правилам")
         used.add(g.gid)
+        sides = _side_evidence(doc, merged) if entry is None else []
+        if sides:  # без модели: по вопросу на каждую сторону противоречия
+            for sd in sides:
+                questions.append(_assemble(doc, merged, None, log, side=sd))
+            continue
         questions.append(_assemble(doc, merged, entry, log))
 
     ordered = rank(questions, doc)
+    for q in ordered:  # вложенные правки получили question_id — обновить словарь контракта
+        q.sync()
     if limit is not None and len(ordered) > limit:
         rest = ordered[limit:]
         log.append("[queued] ниже порога очереди: " + ", ".join(
