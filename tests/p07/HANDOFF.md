@@ -361,3 +361,112 @@ python -m bcc_review.verification verify release/reports/offline/requirements_pd
    `cells.*` заголовок столбца (`loc.header`) или его номер (`loc.cell`) — verify уже сверяет их с reader.
 3. На `bcc/integration@2821989` в этой среде падают 8 чужих тестов (p04, p08, p09, p11, p14, p15 ×2, p16) — те же
    до и после моих изменений.
+
+## 13. Четвёртый проход: происхождение замечания (`source` / `stage`)
+
+База: `82c0904` (`bcc/p07-evidence`, внутри `bcc/integration@2821989`; `engine.py`, `merge.py`, `facts.py`,
+`cross.py` в обоих коммитах одинаковы). Более свежей публикации p07 нет. Модель не вызывалась: `--offline-lint`
+и тестовый двойник `mock` со сценарием `tests/integration/fixtures/mock_bcc.json`.
+
+**Симптом.** В `release/reports/offline` (сборка 2821989, `run.mode = rules_only`, `calls.physical = 0`,
+`cache_hits = 0`) у 7 замечаний `source = "llm"` и `stage = ""`: `other_topic_cashback` F-010, F-011, F-019;
+`requirements` F-011, F-012; `requirements_pdf` F-010, F-011. Во всех семи исходный кандидат этапа cross
+(`stages/04-cross.json`) несёт `origin = "rules"` (X-03, пропуск метода чтения) или `origin = "facts"` (X-01/X-02,
+сверка фактов) и не несёт ни `source`, ни `stage`.
+
+**Трасса записи «Тип «limit» различается»** (`evaluation/dev/corpus/cases/transfer_limit.base/source.md`,
+`--offline-lint`; поле `limit` — `string` в ответе getTransferLimit и `integer` в запросе setTransferLimit):
+
+| Шаг | Место | Что есть у записи |
+| :--- | :--- | :--- |
+| 1 | `analysis/facts.py:1869` `_types` → `make_candidate(..., origin="facts", cand_kind="type_question")` (`:1889`), сравнение `CMP-007` «undetermined» | `origin = facts`; `source`, `stage` нет |
+| 2 | `analysis/cross.py:1419` `run()` → `self.add(dict(c))`, ref `X-01` | артефакт `04-cross.json`: `origin=facts, source=None, stage=None` |
+| 3 | `engine.py:787` `run_reconcile_facts` → тот же расчёт №06 второй раз, `C-facts-001` | `normalize_candidate` не трогает `source` |
+| 4 | `engine.py:565` `verify_candidates`: `c.get("source") == "rules"` — нет | `meaning_status = unchecked`; `verify_meaning` пропущен (rules_only) |
+| 5 | `runtime/merge.py:113` `_absorb`: `None != None` — ложь | у кластера `C-009 + C-facts-001` `source` так и нет |
+| 6 | `engine.py:655` `"source": c.get("source", "llm"), "stage": c.get("stage", "")` | **`F-008: llm / ""`** |
+
+Паспорт этого прогона: `physical 0`, `cache_hits 0`, этапы `cross` и `facts` — 0 вызовов и 0 попаданий.
+
+**Причина.** Подстановка по умолчанию `"llm"` в `build_findings`. №06 отмечает производителя ключом `origin`
+(`facts`, `rules`, `llm`) и `confirmed_by`; движок их не читает и не записывает этап, вернувший кандидата.
+**Вторая находка** того же места: у смешанного замечания `stage` берётся только у первого кандидата —
+«Чтение настроек обещано, но метод чтения не описан» = правило `C-019` + ответ модели cross `C-028` →
+`mixed / rules`, хотя модель отвечала в этапе cross.
+
+**Три исхода.** Подпись определяется производящим этапом, а не числом физических вызовов: ответ из кэша —
+ответ модели.
+
+| Путь | Происхождение | Кэш (попадания) | Физические вызовы | Подпись на 82c0904 | Подпись с правкой |
+| :--- | :--- | ---: | ---: | :--- | :--- |
+| чистое правило: тип `limit`, transfer_limit.base, офлайн | №06, `origin=facts`, этапы cross и facts | 0 | 0 | `llm / ""` | `rules / cross+facts` |
+| ответ модели из тёплого кэша: конфликт Ф-3 ↔ Ф-4, второй прогон mock | модель, этап cross | 8 (cross 1) | 0 (холодный: 8) | `llm / cross` | `llm / cross` |
+| смешанный вывод: «метод чтения не описан» | правило C-019 + модель cross C-028 | 8 (cross 1) | 0 | `mixed / rules` | `mixed / rules+cross` |
+
+**Правка для Max** — `tests/p07/fixes/engine_provenance.diff`, только `src/bcc_review/engine.py` (+38/−6),
+применяется к `2821989` и к `82c0904` (`git apply --check`):
+
+* `normalize_candidate(c, stage)` записывает этап движка, вернувший кандидата (`rules`, `individual`, `cross`,
+  `facts`), если модуль его не указал;
+* `producers(c, asked)`: отметка модуля `source` (в том числе «llm+rules» №05) либо `origin` + `confirmed_by` №06;
+  `rules`/`facts` → правило, `llm` → модель; без отметки — правило, только если модель в прогоне не опрашивалась
+  (нет `asker`), иначе `unknown`;
+* `build_findings`: подпись по всем кандидатам замечания (`merged_from`): один производитель — он, оба — `mixed`,
+  есть неизвестный — `unknown`; `stage` — производящие этапы через `+`.
+
+Статусы, смысл, объединение и число замечаний не меняются: `verify_candidates` по-прежнему смотрит на исходный
+`source`. Проверено A/B на одном и том же коде с правкой и без: 36 офлайн-отчётов (3 входа релиза + 33 кейса
+`evaluation/dev/corpus`) и 2 прогона mock (холодный, тёплый) совпадают во всём, кроме `findings[].source/stage`,
+`checks[].source` и `rejected[].candidate.stage` (и времени прогона). Изменения подписей: 11 × `llm/∅ → rules/cross+facts`,
+3 × `llm/∅ → rules/cross`, 3 × `rules/rules → rules/rules+individual`, 2 × `mixed/rules → mixed/rules+cross`.
+Подписей `llm` в офлайн-отчётах: 14 до, 0 после.
+
+Совместимость: в контракте `source` и `stage` — свободные строки, новых полей нет. №05 «llm+rules» в Finding
+становится `mixed`. `checks[].source` у проверок, созданных движком по замечанию, следует подписи замечания.
+№09 `_stage_gate` не разбирает `cross+facts`: такое замечание закрывается только при `complete` прогоне — как
+раньше при пустом `stage`; у смешанного раньше стоял «rules», и закрытие проверяло только этап правил, теперь
+строже.
+
+**verify** (`verification.py`, моя зона): новые предупреждения `finding_source_without_model` (подпись `llm`/`mixed`,
+а в прогоне `physical + cache_hits = 0`) и `finding_stage_without_model` (этапы подписи есть в `run.stages`, но ни
+одного ответа модели в них, `cross` учитывает `cross.pairs`); `counts.provenance = {by_source, unlabeled,
+unsupported}`, строка «Подпись замечаний» в тексте. Пустая или `unknown` подпись (старые отчёты) не проверяется.
+Код выхода и `ok` не меняются: отчёты 2821989 проходят verify, семь подписей видны предупреждением.
+
+Регрессии: `tests/p07/test_provenance.py` (19 тестов). Проверки подписи после правки движка отмечены
+`xfail(strict=True)` по признаку поведения `Engine.build_findings` (заглушка движка, кандидат `origin=facts`):
+до правки они обязаны падать, после — проходить; маркер снимать не нужно.
+
+Команды и фактический результат (Python 3.13.18, venv `pip install -e ".[all,dev,eval]"`):
+
+```bash
+python -m pytest tests/p07/test_provenance.py -q -p no:cacheprovider
+```
+Ветка без правки движка: `8 passed, 11 xfailed`.
+
+```bash
+git apply tests/p07/fixes/engine_provenance.diff && python -m pytest tests/p07/test_provenance.py -q -p no:cacheprovider
+```
+С правкой: `19 passed`. Затем `git apply -R tests/p07/fixes/engine_provenance.diff`.
+
+```bash
+python -m pytest tests -q -p no:cacheprovider
+```
+Без правки: `8 failed, 1200 passed, 15 skipped, 11 xfailed`; с правкой: `8 failed, 1211 passed, 15 skipped`.
+Восемь падений одни и те же и чужие (p04, p08, p09, p11, p14, p15 ×2, p16, см. раздел 12); семь из них падают и
+на чистом `82c0904` поодиночке, p11 проходит поодиночке (зависит от порядка).
+
+```bash
+python -m bcc_review verify release/reports/offline/requirements.json release/input/requirements.md
+```
+`verify: OK …`, код 0, среди предупреждений «замечание подписано ответом модели, но в прогоне нет ни одного ответа
+модели …: F-011: source=llm, stage=—; run.calls: physical=0, cache_hits=0» и то же для F-012.
+
+Не исправлено (не моя зона, на статусы и F1 влияет — отдельные задачи):
+
+1. **Max / №06**: кандидаты `origin = facts/rules` идут к критику `verify_meaning` как модельные
+   (`engine.py:579`, `source != "rules"`) и в rules_only остаются `unchecked / needs_review`, хотя вывод
+   детерминированный. Исправление меняет статусы, поэтому в diff не включено.
+2. **№09**: `_stage_gate` сравнивает `stage.split("#")[0]` с именем этапа; составную подпись `a+b` стоит
+   разбирать и требовать завершения всех этапов.
+3. **№06**: `CrossReview.add` пишет в `confirmed_by` `"?"`, если у дубля нет `origin`; такая подпись станет `unknown`.
