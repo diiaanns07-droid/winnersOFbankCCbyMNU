@@ -1,7 +1,8 @@
 # №04 «Нарезка и реестр требований» — передача
 
 Модуль: `src/bcc_review/analysis/inventory.py`, тесты: `tests/p04/`.
-База: `bcc/integration` @ `3e6b569` (контракт v1 @ `431f76d`).
+База: `bcc/integration` @ `091e504` (движок `run_review`; контракт v1 @ `431f76d`). Движок подхватывает
+модуль из слота команды: `run.modules.build_inventory = team:bcc_review.analysis.inventory:build_inventory`.
 
 ```python
 from bcc_review.analysis.inventory import build_inventory
@@ -15,8 +16,8 @@ inv = build_inventory(document, ask=None)   # ask(stage, payload, schema) -> dic
 | `requirements` | атомы: `id` (`R-007` или `R-007.2`), `group` (общий ID исходного пункта), `source_id` (номер из документа или `null`), `source_ref` («Особые правила › 1», «Критерии приемки › строка 2»), `kind`, `text` (пересказ), `block_ids`, `hints`, `evidence`, `section`, `origin` (`rules`, `llm`, `llm_retry`, `rules_fallback`), `review_status: not_reviewed`. Проходит `validate(r, "Requirement")` |
 | `fact_hints` | `subject, field, direction (request/response/business), type, value, unit, range{min,max,min_inclusive,max_inclusive}, condition, required, size, values, db_field, hints, evidence, req_ids, origin`; неизвестное = `null` |
 | `excluded` | группы `{category, reason, block_ids, cross_check, sections}`; форма `Report.excluded` |
-| `unprocessed_block_ids` | явный остаток |
-| `warnings` | `{code, message, stage: "inventory", block_ids}` (контрактный `Warning`) |
+| `unprocessed_block_ids` | явный остаток (предупреждение о нём выдаёт движок, модуль его не дублирует) |
+| `warnings` | `{code, message, stage: "inventory", block_ids}` (контрактный `Warning`); `str(w)` даёт «код: сообщение», как и ждёт `engine.py` |
 | `block_coverage` | судьба каждого блока (`blocks[]`), уровень `complete/partial`, доля учтённых, вызовы, `evidence_audit` в форме `Run.evidence_audit`, объяснение на русском |
 
 Инвариант: каждый блок попадает ровно в одно из трёх: требование, одна группа исключения, остаток.
@@ -65,11 +66,14 @@ python -m pytest tests/contract tests/p04
 | 3. Проверка ответа | `test_p04_model_checks.py` | несуществующий блок или номер, пустая цитата, пропуск, обрезка, сбой, бюджет, дубли, окна с перекрытием |
 | 4. Независимый документ | `test_p04_independent.py` | другая тема и структура (REQ-BK, NFR-таблица, сценарии списком); числа только из входа; нет констант кейса; CLI; плоский PDF |
 | Кейс | `test_p04_case.py` | rules: 49 атомов из 39 пунктов, 4 схемы в остатке; эталон модели: 58 атомов, 1 вызов, покрытие 100% |
-| Стык | `test_p04_contract.py` | `validate` всех типов, `evidence_errors`, формат payload, строгая схема, разметка вне `block.text` |
+| Стык | `test_p04_contract.py` | `validate` всех типов, `evidence_errors`, формат payload, строгая схема, разметка вне `block.text`; движок офлайн (49 требований) и с mock-провайдером через `asker` (1 вызов, 58 атомов, `validate(report)`) |
 
 Эталон модели (`fixtures/case_model_spec.json`) задан цитатами, без ID блоков, поэтому его можно переложить на любой парсер: `BCC_P04_DOCUMENT_JSON=doc.json pytest tests/p04 -k real_parser`.
 
 ## Открыто
+
+* **Max:** `normalize_requirements` в `engine.py` отбрасывает `group`, `source_ref`, `origin`. Для таблицы «ID в отчёте — ID в документе» `source_ref` («Особые правила › 1», «Критерии приемки › строка 2») полезно оставить: `Requirement` допускает дополнительные поля.
+* **Max:** для демо `--provider mock` в `tests/integration/fixtures/mock_bcc.json` нет записи `inventory`. Ответ синтезируется пустым с `done=false`, модуль честно уходит в правила (49 атомов, предупреждения `llm_truncated` и `rules_fallback`). Готовую запись по эталону собирает тест `test_engine_model_branch_with_mock_provider` (`QuoteModel(...).respond(build_payload(doc, attach_text=False)[0])`).
 
 * **Max:** в `bcc/integration` нет `src/bcc_review/analysis/__init__.py`. С `pip install -e` подпакет работает как namespace, а в обычном wheel `packages.find` его потеряет. Файл общий для №04–07, его нужно добавить пустым.
 * **Max и №06:** в `Fact` контракта `subject` и `field` — непустые строки, а в FactHint неизвестное = `null`. Преобразует ли `reconcile_facts`, или контракт допустит `null`?

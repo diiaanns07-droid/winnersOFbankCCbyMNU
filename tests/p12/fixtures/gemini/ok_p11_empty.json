@@ -1,0 +1,28 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "{\"candidates\": []}"
+            }
+          ]
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 1650,
+      "candidatesTokenCount": 402,
+      "thoughtsTokenCount": 512,
+      "totalTokenCount": 2564
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-p11-empty-0016"
+  }
+}

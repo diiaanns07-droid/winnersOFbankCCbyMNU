@@ -124,3 +124,47 @@ def test_real_parser_document_keeps_invariants():
     if doc.get("id") == fixture_document("case_requirements.md")["id"]:
         f1 = [r for r in inv["requirements"] if r["source_id"] == "Ф-1"]
         assert len(f1) == 5, "Ф-1 должен дать пять атомов и на реальном парсере"
+
+
+def test_engine_runs_this_module_and_reads_warnings(tmp_path):
+    """Движок bcc/integration подхватывает №04 из слота команды; str(warning) читается как «код: сообщение»."""
+    engine = pytest.importorskip("bcc_review.engine", reason="движок ещё не влит")
+    src = Path(__file__).resolve().parents[1] / "p04" / "fixtures" / "case_requirements.md"
+    out = tmp_path / "report.md"
+    engine.run_review(src, out, options={"offline_lint": True, "use_cache": False})
+    report = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+    assert report["run"]["modules"]["build_inventory"] == "team:bcc_review.analysis.inventory:build_inventory"
+    assert len(report["requirements"]) == 49
+    inv_warnings = [w for w in report["warnings"] if w.get("stage") == "inventory"]
+    assert not any(w["message"].startswith("{") for w in inv_warnings)
+    assert sum(1 for w in inv_warnings if "b0" in w["message"] and "не попали" in w["message"]) == 1
+    C.validate(report)
+    assert C.evidence_errors(report) == []
+
+
+
+def test_engine_model_branch_with_mock_provider(tmp_path):
+    """Ветка с моделью через движок: payload → asker (схема, контекст) → mock → проверка №04."""
+    engine = pytest.importorskip("bcc_review.engine", reason="движок ещё не влит")
+    from bcc_review.runtime.modules import Modules
+
+    src = Path(__file__).resolve().parent / "fixtures" / "case_requirements.md"
+    doc = Modules().get("read_text").func(src)  # Document читателя движка: его ID блоков
+    entry = QuoteModel(load_spec("case_model_spec.json"), doc).respond(build_payload(doc, attach_text=False)[0])
+    base = Path(__file__).resolve().parents[1] / "integration" / "fixtures" / "mock_bcc.json"
+    script = json.loads(base.read_text(encoding="utf-8")) if base.exists() else {}
+    script["inventory"] = entry
+    script_path = tmp_path / "mock.json"
+    script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+    out = tmp_path / "report.md"
+    engine.run_review(src, out, options={"provider": "mock", "mock_script": str(script_path), "use_cache": False})
+    report = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+    assert report["run"]["modules"]["build_inventory"] == "team:bcc_review.analysis.inventory:build_inventory"
+    stage = next(s for s in report["run"]["stages"] if s["name"] == "inventory")
+    assert stage["status"] == "ok" and stage["calls"] == 1  # короткий вход — один вызов, повтор не нужен
+    assert len(report["requirements"]) == 58
+    f1 = [r for r in report["requirements"] if r["source_id"] == "Ф-1"]
+    assert [r["id"] for r in f1] == ["R-002.1", "R-002.2", "R-002.3", "R-002.4", "R-002.5"]
+    assert not any("не попали" in w["message"] for w in report["warnings"] if w.get("stage") == "inventory")
+    C.validate(report)
+    assert C.evidence_errors(report) == []
