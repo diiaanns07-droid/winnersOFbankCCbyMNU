@@ -1534,7 +1534,8 @@ def _row(
     # --- примечание
     row["presence"] = {"value": pres.value or "unknown", "basis": pres.basis, "evidence": pres.evidence, "negative_evidence": pres.negative, "inspected_block_ids": pres.inspected[:200]}
     row["machine"] = {"value": machine.value or "unknown", "basis": machine.basis, "finding_ids": fids,
-                      "blocking_finding_ids": [f.id for f in mapped if f.status == "confirmed" and f.severity in BLOCKING]}
+                      "blocking_finding_ids": [f.id for f in sorted((x for x in mapped if x.status == "confirmed" and x.severity in BLOCKING),
+                                                                    key=lambda x: _evidence_rank(x, topic))]}
     row["approval"] = approval
     blocking = sorted((f for f in mapped if f.status == "confirmed" and f.severity in BLOCKING),
                       key=lambda f: _evidence_rank(f, topic))

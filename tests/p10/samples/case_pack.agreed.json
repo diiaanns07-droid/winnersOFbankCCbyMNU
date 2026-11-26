@@ -120,9 +120,9 @@
     ],
     "blocking_finding_ids": [
      "F-K4",
+     "F-S7",
      "F-S16b",
-     "F-S17",
-     "F-S7"
+     "F-S17"
     ]
    },
    "approval": null,
