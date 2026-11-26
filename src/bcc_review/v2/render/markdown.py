@@ -114,6 +114,14 @@ STATUS = {"complete": "завершён полностью", "partial": "зав�
 FORMATS = {"md": "Markdown", "txt": "текст", "pdf": "PDF", "docx": "Word (DOCX)", "html": "HTML"}
 CHECK_ANSWER = {"да": "✅ Да", "нет": "❌ Нет", "частично": "⚠️ Частично", "не требуется": "— Не требуется"}
 LETTERS = "абвгдежзик"
+NAV = [("passport", "1. Паспорт"), ("segmentation", "2. Нарезка"), ("per-requirement", "3. Требования"),
+       ("set-check", "4. Набор"), ("summary", "5. Сводка"), ("conclusion", "6. Итог"), ("questions", "А. Вопросы"),
+       ("tests", "Б. Тест-кейсы"), ("checklist", "В. Чек-лист"), ("rewrites", "Г. Было → стало"),
+       ("how", "Д. Как работал агент"), ("method", "Е. Методика")]
+
+
+def h2(anchor_id: str, title: str) -> str:
+    return f"## <a id=\"{anchor_id}\"></a>{title}"
 
 
 # ================================================================== форматирование
@@ -433,16 +441,20 @@ def _brief(c: _Ctx) -> list[str]:
     blockers = [f for f in c.findings if f.get("severity") == "critical" and f.get("blocks") != "none"]
     blockers.sort(key=lambda f: (f.get("priority") or 99, _id_num(f.get("id"))))
     if blockers:
-        out += [f"**Блокеры ({len(blockers)})**", ""]
+        same = len({f.get("blocks") for f in blockers}) == 1
+        out += [f"**Блокеры ({len(blockers)})**" + (f" — блокируют {BLOCKS.get(blockers[0].get('blocks'), '—')}"
+                                                   if same else ""), ""]
         rows = []
         for f in blockers:
             reqs = ", ".join(c.req_label(r) for r in (f.get("requirement_ids") or [])[:3]) or "документ в целом"
             lns = sorted({e.get("line_start") for e in f.get("evidence", []) if e.get("line_start")})
             where = reqs + (f" · {plural(len(lns), 'строка', 'строки', 'строки')} {', '.join(map(str, lns[:4]))}"
                             if lns else "")
-            rows.append([f"🔴 [{f['id']}](#{anchor(f['id'])}) {cell(f.get('title'))}", where,
-                         BLOCKS.get(f.get("blocks"), "—"), cell(first_sentence(f.get("impact") or f.get("problem")))])
-        out += table(["Дефект", "Где", "Блокирует", "Почему"], rows)
+            row = [f"🔴 [{f['id']}](#{anchor(f['id'])}) {cell(f.get('title'))}", where]
+            if not same:
+                row.append(BLOCKS.get(f.get("blocks"), "—"))
+            rows.append(row + [cell(first_sentence(f.get("impact") or f.get("problem"), 170))])
+        out += table(["Дефект", "Где"] + ([] if same else ["Блокирует"]) + ["Почему блокирует"], rows)
         out.append("")
     else:
         out += ["Блокирующих дефектов не найдено.", ""]
@@ -452,6 +464,7 @@ def _brief(c: _Ctx) -> list[str]:
         out += [f"{i}. {c.f_link(f['id'], True)} {esc(f.get('title'))}" for i, f in enumerate(first, 1)]
         out.append("")
     out += _before_after(c)
+    out += ["**Разделы:** " + " · ".join(f"[{name}](#{a})" for a, name in NAV), ""]
     return out
 
 
@@ -539,12 +552,12 @@ def _passport(c: _Ctx) -> list[str]:
     warns = (run.get("warnings") or []) + (doc.get("warnings") or [])
     if warns:
         rows.append(["Предупреждения", cell("; ".join(warns[:5]) + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else ""))])
-    return ["## 1. Паспорт прогона", ""] + table(["Поле", "Значение"], rows) + [""]
+    return [h2("passport", "1. Паспорт прогона"), ""] + table(["Поле", "Значение"], rows) + [""]
 
 
 def _segmentation(c: _Ctx) -> list[str]:
     reqs = c.reqs
-    out = ["## 2. Нарезка требований", "",
+    out = [h2("segmentation", "2. Нарезка требований"), "",
            f"Выделено {len(reqs)} {plural(len(reqs), 'требование', 'требования', 'требований')}. ID R-… присвоены "
            f"агентом в порядке документа; в столбце «ID в документе» — номер или пункт документа, если он есть. "
            f"Дословная цитата каждого требования сохранена в report.json.", ""]
@@ -569,7 +582,7 @@ def _segmentation(c: _Ctx) -> list[str]:
 
 
 def _per_requirement(c: _Ctx) -> list[str]:
-    out = ["## 3. Проверка каждого требования", ""]
+    out = [h2("per-requirement", "3. Проверка каждого требования"), ""]
     by_req: dict[str, list[dict]] = {}
     doc_level = []
     for f in c.findings:
@@ -697,7 +710,7 @@ def _card(c: _Ctx, f: dict) -> list[str]:
 
 
 def _set_check(c: _Ctx) -> list[str]:
-    out = ["## 4. Проверка набора требований", "", "### 4.1. Критерии набора", ""]
+    out = [h2("set-check", "4. Проверка набора требований"), "", "### 4.1. Критерии набора", ""]
     rows = []
     for k in SET_CRITERIA:
         fs = [f for f in c.findings if _set_bucket(f) == k]
@@ -813,7 +826,7 @@ def _summary(c: _Ctx) -> list[str]:
             ["Дефектов всего", f"{total}: " + " · ".join(f"{SEV_ICON[k]} {fs.get(k, 0)}" for k in SEV_ICON)],
             ["Цитат сверено программой", f"{ok} из {qt}"],
             ["Вопросов владельцу", f"{len(qs)}, из них блокирующих {sum(1 for q in qs if q.get('blocking'))}"]]
-    out = ["## 5. Сводка", ""] + table(["Показатель", "Значение"], rows) + [""]
+    out = [h2("summary", "5. Сводка"), ""] + table(["Показатель", "Значение"], rows) + [""]
     out += ["**Критичные дефекты по видам** (п. 6 ТЗ: непроверяемые, противоречивые, неполные)", ""]
     rows = []
     for cat in ("contradictory", "unverifiable", "incomplete", "other"):
@@ -840,7 +853,7 @@ def _summary(c: _Ctx) -> list[str]:
 
 def _conclusion(c: _Ctx) -> list[str]:
     v = c.verdict
-    out = ["## 6. Итог", ""]
+    out = [h2("conclusion", "6. Итог"), ""]
     out += table(["Работа", "Решение"], [["Разработка", f"**{READINESS.get(v.get('development'), '—')}**"],
                                          ["Тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     reason = v.get("summary") or _auto_reason(c)
@@ -870,7 +883,7 @@ def _auto_reason(c: _Ctx) -> str:
 
 def _appendix_questions(c: _Ctx) -> list[str]:
     qs = c.r.get("questions") or []
-    out = ["## Приложение А. Вопросы владельцу", ""]
+    out = [h2("questions", "Приложение А. Вопросы владельцу"), ""]
     if not qs:
         return out + ["Вопросов нет" + (" (режим без модели)." if c.offline else "."), ""]
     blocking = sum(1 for q in qs if q.get("blocking"))
@@ -896,7 +909,7 @@ def _appendix_questions(c: _Ctx) -> list[str]:
 
 def _appendix_tests(c: _Ctx) -> list[str]:
     tc = c.r.get("test_cases") or []
-    out = ["## Приложение Б. Черновик тест-кейсов", ""]
+    out = [h2("tests", "Приложение Б. Черновик тест-кейсов"), ""]
     if not tc:
         return out + ["Тест-кейсы не составлялись" + (" (режим без модели)." if c.offline else "."), ""]
     undefined = sum(1 for t in tc if t.get("expected_defined") is False)
@@ -911,7 +924,7 @@ def _appendix_tests(c: _Ctx) -> list[str]:
 
 def _appendix_checklist(c: _Ctx) -> list[str]:
     cl = c.r.get("checklist") or []
-    out = ["## Приложение В. Чек-лист «Ревью требований», заполненный агентом", ""]
+    out = [h2("checklist", "Приложение В. Чек-лист «Ревью требований», заполненный агентом"), ""]
     if not cl:
         return out + ["Чек-лист не заполнялся" + (" (режим без модели)." if c.offline else "."), ""]
     out += ["Пункты чек-листа банка; ответ агента обоснован дефектами отчёта. Итоговую отметку ставит ответственный.", ""]
@@ -921,7 +934,7 @@ def _appendix_checklist(c: _Ctx) -> list[str]:
 
 
 def _appendix_rewrites(c: _Ctx) -> list[str]:
-    out = ["## Приложение Г. Было → стало", ""]
+    out = [h2("rewrites", "Приложение Г. Было → стало"), ""]
     items = []
     for rw in c.r.get("rewrites") or []:
         if rw.get("after") or rw.get("rewrite"):
@@ -952,7 +965,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
     run = c.run
     stages = run.get("stages") or {}
     stats = run.get("stage_stats") or {}
-    out = ["## Приложение Д. Как работал агент", ""]
+    out = [h2("how", "Приложение Д. Как работал агент"), ""]
     if stages:
         rows = []
         for k, v in stages.items():
@@ -992,7 +1005,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
 
 
 def _appendix_method(c: _Ctx) -> list[str]:
-    out = ["## Приложение Е. Методика", "",
+    out = [h2("method", "Приложение Е. Методика"), "",
            "Статическое ревью текста до разработки: программа не запускается. Документ нумеруется построчно; "
            "проверяющие роли (аналитик, тестировщик, архитектор, риски, набор целиком) предлагают кандидатов с "
            "дословными цитатами; программа находит каждую цитату в документе и сама определяет строку; судья "

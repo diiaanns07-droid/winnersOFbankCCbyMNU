@@ -19,10 +19,10 @@ from bcc_review.v2.render import console, jsonout, markdown  # noqa: E402
 SAMPLE = ROOT / "tests" / "v2" / "fixtures" / "13_report_sample.json"
 
 REQUIRED_HEADINGS = [
-    "## Кратко", "## 1. Паспорт прогона", "## 2. Нарезка требований", "## 3. Проверка каждого требования",
-    "## 4. Проверка набора требований", "## 5. Сводка", "## 6. Итог", "## Приложение А. Вопросы владельцу",
-    "## Приложение Б. Черновик тест-кейсов", "## Приложение В. Чек-лист", "## Приложение Г. Было → стало",
-    "## Приложение Д. Как работал агент", "## Приложение Е. Методика",
+    "## Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
+    "></a>4. Проверка набора требований", "></a>5. Сводка", "></a>6. Итог", "></a>Приложение А. Вопросы владельцу",
+    "></a>Приложение Б. Черновик тест-кейсов", "></a>Приложение В. Чек-лист", "></a>Приложение Г. Было → стало",
+    "></a>Приложение Д. Как работал агент", "></a>Приложение Е. Методика",
 ]
 # латиница, допустимая в шаблонах отчёта (имена стандартов, форматов, провайдеров, команда verify)
 LATIN_OK = {"BCC", "Review", "SHA", "JSON", "json", "API", "ISO", "IEC", "IEEE", "UTC", "python", "bcc_review",
@@ -132,7 +132,7 @@ def test_header_says_generated_and_verified(sample):
 
 def test_first_screen(sample):
     md = markdown.render(sample)
-    brief = md[md.find("## Кратко"):md.find("## 1.")]
+    brief = md[md.find("## Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
     assert brief.count("| 🔴 [D-") == 5  # таблица блокеров
@@ -179,6 +179,7 @@ def test_no_internal_jargon(sample):
 
 def test_templates_are_russian():
     md = markdown.render(minimal()).replace("x.md", "").replace("abcdef1", "")
+    md = re.sub(r'<a id="[\w-]+"></a>|\(#[\w-]+\)', "", md)  # якоря навигации — не текст
     words = set(re.findall(r"[A-Za-z][A-Za-z_]*", md))
     assert words <= LATIN_OK, words - LATIN_OK
 
