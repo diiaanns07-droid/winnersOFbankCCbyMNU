@@ -81,6 +81,7 @@ def test_partial_parse_is_visible(make_server, case_bytes):
 
 
 def test_pdf_with_empty_page_is_partial(make_server):
+    pytest.importorskip("pypdf", reason="dev-движок читает PDF через pypdf")
     client = make_server(CountingEngine())
     pdf = make_pdf(["Requirements F-1 threshold 1000", ""])
     st = client.wait(client.upload("scan.pdf", pdf)["run_id"])

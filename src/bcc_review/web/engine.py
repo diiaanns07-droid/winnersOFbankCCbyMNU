@@ -151,13 +151,15 @@ def _key_present(name: str) -> bool:
     return bool(value) and not any(m in value.lower() for m in _PLACEHOLDER_MARKERS)
 
 
-def preflight(provider: str | None, engine: EngineSpec) -> dict[str, Any]:
+def preflight(provider: str | None, engine: EngineSpec, *, mock_script: str | None = None) -> dict[str, Any]:
     """Предварительная проверка ключа. Фактический режим всё равно берётся из отчёта."""
     if engine.name == "dev":
         return {"provider": "mock", "key_present": True, "key_names": [], "offline": False, "note": "dev-движок: ключ не нужен"}
     if provider == "mock":
-        return {"provider": "mock", "key_present": True, "key_names": [], "offline": False,
-                "note": "mock-провайдер движка: синтетические ответы модели, ключ не нужен"}
+        note = (f"mock-провайдер движка: ответы модели воспроизводятся из записанного сценария {Path(mock_script).name}; "
+                "живая модель не вызывается, ключ не нужен" if mock_script else
+                "mock-провайдер движка без сценария: этапы с моделью получают пустые ответы; живая модель не вызывается")
+        return {"provider": "mock", "key_present": True, "key_names": [], "offline": False, "note": note, "mock_script": mock_script}
     providers = [provider] if provider else list(PROVIDER_KEYS)
     found = []
     for p in providers:

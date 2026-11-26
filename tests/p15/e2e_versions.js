@@ -21,10 +21,11 @@ async function waitFinal(page) {
   await page.waitForSelector('body[data-run-status="complete"], body[data-run-status="partial"], body[data-run-status="failed"]', { timeout: 120000 });
 }
 function runIdOf(url) { return url.split("/runs/")[1].split(/[?#]/)[0]; }
-function fillAnswer(md, qid, answer, edit) {
+function fillAnswer(md, qid, answer, edit, wording) {
   const re = new RegExp("## " + qid.replace(/[-]/g, "\\-") + "\\n[\\s\\S]*?Ответ:[^\\n]*\\n?");
   const sec = md.match(re)[0];
-  const tail = "Ответ: " + answer + "\n" + (edit ? "Правка: «" + edit[0] + "» → «" + edit[1] + "»\n" : "");
+  const tail = "Ответ: " + answer + "\n" + (edit ? "Правка: «" + edit[0] + "» → «" + edit[1] + "»\n" : "")
+    + (wording ? "Формулировка: " + wording + "\n" : "");
   return md.replace(sec, sec.replace(/Ответ:[^\n]*\n?$/, tail));
 }
 async function upload(page, file) {
@@ -95,8 +96,13 @@ async function firstQuestion(page, runId) {
 
       // 2. Свой ответ (questions.md B + правка текста).
       const mdB = await downloadQuestions(page, out.run_b, path.join(outDir, "questions-B.md"));
-      const filledB = fillAnswer(mdB, out.q_b.id, "После смены порога разрешён ещё один push",
-        ["На карту приходится максимум один такой push за календарный месяц.", "На карту приходится не более одного push за календарный месяц, если порог не менялся."]);
+      // Правка в том виде, который применит движок: вопрос №08 с целью — «Формулировка», иначе «было → стало».
+      const repB = await (await page.request.get(base + "/runs/" + out.run_b + "/files/report.json?inline=1")).json();
+      const qB = repB.questions.find((q) => q.id === out.q_b.id) || {};
+      const filledB = qB.target
+        ? fillAnswer(mdB, out.q_b.id, "После смены порога разрешён ещё один push", null, "Если результат 400, 401, 403 или 500 — неуспешный.")
+        : fillAnswer(mdB, out.q_b.id, "После смены порога разрешён ещё один push",
+            ["На карту приходится максимум один такой push за календарный месяц.", "На карту приходится не более одного push за календарный месяц, если порог не менялся."]);
       fs.writeFileSync(path.join(outDir, "answers-B.md"), filledB);
       c0 = await calls(page);
       await page.setInputFiles('input[name="answers_file"]', path.join(outDir, "answers-B.md"));

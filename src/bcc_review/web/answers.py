@@ -45,6 +45,8 @@ ANALYST = "аналитик (веб-форма)"
 
 
 _EDIT_RE = re.compile(r"^\s*(?:Правка|Edit)\s*:\s*«(.+?)»\s*(?:→|->)\s*«(.*?)»\s*$", re.I)
+# «Формулировка: …» — правка в понимании №08: заменяет предложение с целевой цитатой вопроса.
+_WORDING_RE = re.compile(r"^\s*(?:\*\*)?(?:новая\s+формулировка|формулировка)(?:\*\*)?\s*[:：]\s*(.*)$", re.I)
 
 
 @dataclass
@@ -54,6 +56,7 @@ class Answer:
     provenance: str = ANALYST
     question: str = ""
     edits: list[tuple[str, str]] = field(default_factory=list)
+    wording: str = ""
 
 
 @dataclass
@@ -114,7 +117,10 @@ def _answer_lines(a: Answer) -> list[str]:
     # Строки ответа, начинающиеся с # или \, экранируются ведущим \ (как в экспорте №13):
     # иначе «## …» внутри ответа разорвал бы раздел вопроса.
     rest = [("\\" + ln if ln.startswith(("#", "\\")) else ln) for ln in rest]
-    return [f"Ответ: {first}".rstrip(), *rest, *(f"Правка: «{old}» → «{new}»" for old, new in a.edits)]
+    lines = [f"Ответ: {first}".rstrip(), *rest, *(f"Правка: «{old}» → «{new}»" for old, new in a.edits)]
+    if a.wording.strip():
+        lines.append("Формулировка: " + " ".join(a.wording.split()))
+    return lines
 
 
 def compose_answers(answers: list[Answer], *, run_id: str, source_sha256: str) -> str:
@@ -151,11 +157,15 @@ def parse_answers(text: str) -> AnswerSet:
         if not re.fullmatch(r"[\w\-]+", qid):
             continue
         head_question = head.strip()[len(qid):].lstrip(".:) ").strip()  # «## Q-01. вопрос» у №08
-        provenance, question, answer_lines, in_answer, edits = ANALYST, head_question, [], False, []
+        provenance, question, answer_lines, in_answer, edits, wording = ANALYST, head_question, [], False, [], ""
         for line in body.splitlines():
             em = _EDIT_RE.match(line)
             if em:
                 edits.append((em.group(1), em.group(2)))
+                continue
+            wm = _WORDING_RE.match(line)
+            if wm and in_answer:
+                wording = wm.group(1).strip()
                 continue
             if not in_answer:
                 if line.startswith("Источник ответа:"):
@@ -172,8 +182,8 @@ def parse_answers(text: str) -> AnswerSet:
                     break  # заголовок верхнего уровня закрывает ответ
                 answer_lines.append(line[1:] if line.startswith("\\") else line)
         text_ = "\n".join(answer_lines).strip()
-        if text_ or edits:
-            result.answers.append(Answer(qid, text_, provenance, question, edits))
+        if text_ or edits or wording:
+            result.answers.append(Answer(qid, text_, provenance, question, edits, wording))
     return result
 
 
@@ -195,7 +205,7 @@ def load_demo_answers(path: Path | None) -> list[dict[str, Any]]:
             continue
         a = parsed.answers[0]
         keys = [k.strip().lower() for k in head.split(",") if k.strip()]
-        out.append({"keys": keys, "text": a.text, "edits": a.edits, "provenance": a.provenance if a.provenance != ANALYST else f"демонстрационный ответ команды ({path.name})"})
+        out.append({"keys": keys, "text": a.text, "edits": a.edits, "wording": a.wording, "provenance": a.provenance if a.provenance != ANALYST else f"демонстрационный ответ команды ({path.name})"})
     return out
 
 
@@ -328,15 +338,24 @@ def _html13_questions(text: str) -> dict[str, str]:
 
 
 def _split_edits(text: str, *, unescape: bool = False) -> tuple[str, list[tuple[str, str]]]:
-    keep, edits = [], []
+    body, edits, _ = _split_answer(text, unescape=unescape)
+    return body, edits
+
+
+def _split_answer(text: str, *, unescape: bool = False) -> tuple[str, list[tuple[str, str]], str]:
+    """Текст ответа → (ответ, правки «было → стало», «Формулировка» №08)."""
+    keep, edits, wording = [], [], ""
     for line in text.split("\n"):
         m = _EDIT_RE.match(line)
+        w = _WORDING_RE.match(line)
         if m:
             edits.append((m.group(1), m.group(2)))
+        elif w:
+            wording = w.group(1).strip()
         else:
             # №08 (ea5d65d) не снимает экранирование «\#» / «\\» веб-формата и №13 — снимаем здесь.
             keep.append(line[1:] if unescape and line.startswith(("\\#", "\\\\")) else line)
-    return "\n".join(keep).strip(), edits
+    return "\n".join(keep).strip(), edits, wording
 
 
 def read_import(data: bytes, *, filename: str = "answers.md") -> Imported:
@@ -360,8 +379,8 @@ def read_import(data: bytes, *, filename: str = "answers.md") -> Imported:
         questions = _html13_questions(text)
         answers = []
         for qid, raw in parsed.get("answers", {}).items():
-            body, edits = _split_edits(raw)
-            answers.append(Answer(qid, body, prov, questions.get(qid, ""), edits))
+            body, edits, wording = _split_answer(raw)
+            answers.append(Answer(qid, body, prov, questions.get(qid, ""), edits, wording))
         meta = dict(parsed.get("meta", {}))
     else:
         target = os.environ.get(P08_PARSER_ENV) or P08_PARSER_DEFAULT
@@ -376,10 +395,11 @@ def read_import(data: bytes, *, filename: str = "answers.md") -> Imported:
                 for d in aset:
                     qid = str(getattr(d, "question_id", "") or (d.get("question_id") if isinstance(d, dict) else ""))
                     raw = str(getattr(d, "answer", "") or (d.get("answer") if isinstance(d, dict) else "") or "")
-                    body, edits = _split_edits(raw, unescape=True)
+                    body, edits, wording = _split_answer(raw, unescape=True)
+                    wording = wording or str(getattr(d, "wording", "") or (d.get("wording") if isinstance(d, dict) else "") or "")
                     mine = own_by_id.get(qid)
                     prov = mine.provenance if mine and mine.provenance != ANALYST else f"аналитик (файл {filename})"
-                    answers.append(Answer(qid, body, prov, questions.get(qid, ""), edits or (mine.edits if mine else [])))
+                    answers.append(Answer(qid, body, prov, questions.get(qid, ""), edits or (mine.edits if mine else []), wording))
             except Exception as exc:  # №08 не принял файл — встроенный разбор, с пометкой
                 p08 = None
                 warnings.append(f"№08 не разобрал файл ({type(exc).__name__}: {exc}); использован встроенный разбор")
@@ -387,7 +407,7 @@ def read_import(data: bytes, *, filename: str = "answers.md") -> Imported:
             parser = "веб: встроенный разбор (bcc_review.web.answers.parse_answers)"
             for a in own.answers:
                 prov = a.provenance if a.provenance != ANALYST else f"аналитик (файл {filename})"
-                answers.append(Answer(a.qid, a.text, prov, a.question, a.edits))
+                answers.append(Answer(a.qid, a.text, prov, a.question, a.edits, a.wording))
     return Imported(
         format=fmt, parser=parser, declared_sha256=shas[0] if len(shas) == 1 else None, sha_values=shas,
         answers=answers, questions=questions, warnings=warnings,

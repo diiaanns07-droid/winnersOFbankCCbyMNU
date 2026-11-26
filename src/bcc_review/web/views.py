@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
@@ -307,8 +308,6 @@ def verdict_section(view: rv.ReportView, run: dict[str, Any], files: dict[str, s
 
 
 def _link_ids(text: str) -> str:
-    import re
-
     return re.sub(r"\b(F-\d+)\b", lambda m: f'<a href="#{m.group(1)}">{m.group(1)}</a>', e(text))
 
 
@@ -378,6 +377,70 @@ def imports_section(run: dict[str, Any], imports: list[dict[str, Any]], prefix: 
     return f'<details class="card" id="imports"><summary>Импорты файлов ответов ({len(imports)}): оригиналы и итог проверки версии</summary><ul class="files">{"".join(rows)}</ul></details>'
 
 
+_LETTERED = re.compile(r"^[A-FА-Е][.)]\s")
+
+
+def _option_label(oid: str, text: str) -> str:
+    """Вариант №08 уже начинается с буквы («A. …») — без второй нумерации."""
+    return text if _LETTERED.match(text) else f"{oid}. {text}"
+
+
+def _edit_controls(view: rv.ReportView, q: dict[str, Any], qid: str) -> str:
+    """Правка текста, которую движок действительно применит.
+
+    Вопрос №08 несёт ``target``: движок (№08 propose_patch) заменяет предложение с этой цитатой
+    на «Формулировку». Пара «было → стало» №08 не читает, поэтому для таких вопросов форма
+    предлагает именно формулировку и показывает, что будет заменено. Без ``target``
+    (резервный движок, dev-движок) остаётся пара «было → стало».
+    """
+    target = q.get("target") if isinstance(q.get("target"), dict) else None
+    if target and target.get("block_id"):
+        blocks = {str(b.get("id")): b for b in (view.raw.get("document") or {}).get("blocks") or []}
+        b = blocks.get(str(target["block_id"])) or {}
+        text, start, end = str(b.get("text") or ""), target.get("start"), target.get("end")
+        quote = str(target.get("quote") or (text[start:end] if isinstance(start, int) and isinstance(end, int) else ""))
+        if isinstance(start, int) and isinstance(end, int) and text[start:end] == quote:
+            shown = f'{e(text[:start])}<mark>{e(quote)}</mark>{e(text[end:])}'
+        else:
+            shown = f"<mark>{e(quote)}</mark>"
+        where = rv.loc_text(b.get("loc")) or str(target["block_id"])
+        return (
+            f'<details class="edit" id="ed_a_{e(qid)}"><summary>Новая формулировка пункта (новая редакция)</summary>'
+            f'<p class="small">Движок заменит предложение с выделенным фрагментом ({e(where)}):</p>'
+            f'<blockquote class="target small">{shown}</blockquote>'
+            f'<label class="small">Новая формулировка <input type="text" name="w_{e(qid)}" id="w_a_{e(qid)}"></label></details>'
+        )
+    return (
+        f'<details class="edit" id="ed_a_{e(qid)}"><summary>Правка текста ТЗ (новая редакция)</summary>'
+        f'<label class="small">Заменить фрагмент (точно как в документе) <input type="text" name="eo_{e(qid)}" id="eo_a_{e(qid)}"></label>'
+        f'<label class="small">на <input type="text" name="en_{e(qid)}" id="en_a_{e(qid)}"></label></details>'
+    )
+
+
+def changes_section(view: rv.ReportView) -> str:
+    """Изменённые пункты: правки, которые движок внёс в эту редакцию (decisions[].edits), и пункт целиком."""
+    blocks = (view.raw.get("document") or {}).get("blocks") or []
+    rows = []
+    for d in view.decisions:
+        for ed in d.get("edits") or []:
+            new = str(ed.get("new") or "")
+            block = next((b for b in blocks if new and new in str(b.get("text") or "")), None)
+            if block:
+                t = str(block["text"])
+                i = t.find(new)
+                now = f'{e(t[:i])}<mark>{e(new)}</mark>{e(t[i + len(new):])}'
+                where = rv.loc_text(block.get("loc")) + f" · {block.get('id')}"
+            else:
+                now, where = f"<mark>{e(new)}</mark>", "пункт в документе редакции не найден"
+            rows.append(
+                f'<li><b>{e(d.get("question_id"))}</b> · {e(where)}<br><span class="was">было: «{e(ed.get("old"))}»</span><br>'
+                f'<span class="now">стало: «{e(new)}»</span><blockquote class="small">{now}</blockquote></li>'
+            )
+    if not rows:
+        return ""
+    return f'<section class="card" id="changes"><h2>Изменённые пункты ({len(rows)})</h2><ul class="changes">{"".join(rows)}</ul></section>'
+
+
 def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, Any], latest: dict[str, Any] | None, demo_answers: list[dict[str, Any]], manual_import: dict[str, Any] | None = None) -> str:
     if ctx.get("demo"):
         return ""
@@ -403,7 +466,7 @@ def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, A
             opts_html += (
                 f'<label class="opt"><input type="radio" name="d_{e(qid)}" value="{e(oid)}" data-target="a_{e(qid)}" '
                 f'data-text="{e(text)}" data-prov="вариант {e(oid)} из вопроса {e(qid)} (предложение движка, модель {e(view.run.get("model") or "—")})">'
-                f" {e(oid)}. {e(text)}</label>"
+                f" {e(_option_label(oid, text))}</label>"
             )
         demo = match_demo_answer(demo_answers, q)
         demo_html = ""
@@ -411,7 +474,7 @@ def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, A
             d_old, d_new = (demo.get("edits") or [("", "")])[0]
             demo_html = (
                 f'<button type="button" class="button small demo-fill" data-target="a_{e(qid)}" data-text="{e(demo["text"])}" '
-                f'data-edit-old="{e(d_old)}" data-edit-new="{e(d_new)}" '
+                f'data-edit-old="{e(d_old)}" data-edit-new="{e(d_new)}" data-wording="{e(demo.get("wording") or "")}" '
                 f'data-prov="{e(demo["provenance"])}">Подставить демонстрационный ответ</button>'
                 f'<span class="muted small">Источник: {e(demo["provenance"])}</span>'
             )
@@ -422,9 +485,7 @@ def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, A
 <p><b>{e(qid)}.</b> {e(q['text'])} {('<span class="muted">→ ' + refs + '</span>') if refs else ''}</p>
 {prev_html}{f'<div class="options">{opts_html}</div>' if opts_html else ''}
 <textarea name="a_{e(qid)}" id="a_{e(qid)}" rows="2" placeholder="Ответ аналитика"></textarea>
-<details class="edit" id="ed_a_{e(qid)}"><summary>Правка текста ТЗ (новая редакция)</summary>
-<label class="small">Заменить фрагмент (точно как в документе) <input type="text" name="eo_{e(qid)}" id="eo_a_{e(qid)}"></label>
-<label class="small">на <input type="text" name="en_{e(qid)}" id="en_a_{e(qid)}"></label></details>
+{_edit_controls(view, q, qid)}
 <input type="hidden" name="p_{e(qid)}" id="p_a_{e(qid)}" value="{e(ANALYST)}">
 <input type="hidden" name="qt_{e(qid)}" value="{e(q['text'])}">
 <div class="prov" id="prov_a_{e(qid)}"></div>{demo_html}
@@ -542,6 +603,10 @@ def compare_summary(view: rv.ReportView, run: dict[str, Any], parent: dict[str, 
             + (f' · не сопоставлены: <b>{len(diff["unassessed"])}</b>' if diff["unassessed"] else "")
             + "</p>"
         )
+    if view.mode == "mock":
+        dtxt += ('<p class="muted small" id="mock-diff-note">Режим mock: ответы модели взяты из записанного сценария и после правки '
+                 "не меняются, поэтому замечания этапов с моделью повторяются. Изменение текста видно в блоке «Изменённые пункты»; "
+                 "переоценку правки даёт прогон с живой моделью.</p>")
     before = parent_view.counts if parent_view else None
     nums = ""
     if before:
@@ -612,7 +677,7 @@ def passport(run: dict[str, Any]) -> str:
 <dt>Редакция</dt><dd>{e(run.get('revision'))}{(' · родитель <a href="/runs/' + e(run['parent_run_id']) + '"><code>' + e(run['parent_run_id']) + '</code></a>') if run.get('parent_run_id') else ''}{(' · повтор запуска <code>' + e(run['retry_of']) + '</code>') if run.get('retry_of') else ''}</dd>
 <dt>Создан / начат / завершён</dt><dd>{e(fmt_time(run.get('created_at')))} / {e(fmt_time(run.get('started_at')))} / {e(fmt_time(run.get('finished_at')))}</dd>
 <dt>Движок</dt><dd><code>{e((run.get('engine') or {}).get('target'))}</code> {e((run.get('engine') or {}).get('version') or '')}</dd>
-<dt>Параметры run_review</dt><dd><code>{e(", ".join(run.get('engine_options') or []) or run.get('options'))}</code>{(' · не приняты движком: <code>' + e(", ".join(run['engine_options_dropped'])) + '</code>') if run.get('engine_options_dropped') else ''}</dd>
+<dt>Параметры run_review</dt><dd><code>{e(", ".join(run.get('engine_options') or []) or run.get('options'))}</code>{(' · не переданы (нет в RunOptions движка): <code>' + e(", ".join(run['engine_options_dropped'])) + '</code>') if run.get('engine_options_dropped') else ''}</dd>
 <dt>Отчёт</dt><dd>режим {e(rep.get('mode') or '—')} · модель {e(rep.get('model') or '—')} · физических вызовов {e((rep.get('calls') or {}).get('physical', '—') if isinstance(rep.get('calls'), dict) else rep.get('calls', '—'))} · source_sha256 <code>{e(rep.get('source_sha256') or '—')}</code></dd>
 </dl></footer>"""
 
@@ -673,7 +738,14 @@ def run_page(
            if view is not None and (view.raw.get("document") or {}).get("id") not in (None, run["input"]["sha256"]) else "")
         + "</p>"
     )
-    body = demo_banner + lineage_nav(lineage, run["run_id"], prefix) + head
+    not_latest = ""
+    if latest and latest["run_id"] != run["run_id"] and run["status"] in ("complete", "partial", "failed"):
+        not_latest = (
+            f'<p class="notice warn" id="not-latest">Открыта редакция {e(run.get("revision"))}, она не актуальная. '
+            f'Актуальная — редакция {e(latest.get("revision"))}: <a href="{prefix}/runs/{e(latest["run_id"])}">открыть</a>. '
+            f"Статус, вопросы и файлы на этой странице относятся к редакции {e(run.get('revision'))}.</p>"
+        )
+    body = demo_banner + lineage_nav(lineage, run["run_id"], prefix) + not_latest + head
     body += status_section(run, events, eta=eta, queue_pos=queue_pos, elapsed=elapsed, ctx=ctx, report_stages=view.stages if view else None)
     if view is not None:
         files = {}
@@ -683,6 +755,7 @@ def run_page(
         if "report.md" in names:
             files["Markdown"] = f"{prefix}/runs/{run['run_id']}/files/report.md?inline=1"
         body += verdict_section(view, run, files)
+        body += changes_section(view)
         body += compare_summary(view, run, parent, parent_view, prefix)
         body += attention_section(view) if run.get("parent_run_id") else ""
         body += action_section(view, run, ctx=ctx, latest=latest, demo_answers=demo_answers, manual_import=manual_import)

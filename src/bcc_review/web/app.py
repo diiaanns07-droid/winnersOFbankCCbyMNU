@@ -389,8 +389,9 @@ class Handler(BaseHTTPRequestHandler):
                 text = self._decision_text(run_id, qid, fields[f"d_{qid}"]) or ""
             edit_old = (fields.get(f"eo_{qid}") or "").strip()
             edits = [(edit_old, (fields.get(f"en_{qid}") or "").strip())] if edit_old else []
-            if text or edits:
-                answers.append(Answer(qid, text, (fields.get(f"p_{qid}") or ANALYST).strip()[:300], fields.get(f"qt_{qid}", "")[:2000], edits))
+            wording = (fields.get(f"w_{qid}") or "").strip()  # «Формулировка» №08: заменит предложение с целью вопроса
+            if text or edits or wording:
+                answers.append(Answer(qid, text, (fields.get(f"p_{qid}") or ANALYST).strip()[:300], fields.get(f"qt_{qid}", "")[:2000], edits, wording))
         answers_name, answers_file = files.get("answers_file", ("answers.md", b""))
         document = files.get("document")
         if document and not document[1]:

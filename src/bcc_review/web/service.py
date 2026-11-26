@@ -51,7 +51,8 @@ class Service:
 
     # ------------------------------------------------------------------ helpers
     def preflight(self) -> dict[str, Any]:
-        return preflight(self.settings.provider, self.engine)
+        script = str(self.settings.mock_script) if self.settings.mock_script else None
+        return preflight(self.settings.provider, self.engine, mock_script=script)
 
     def _options(self, *, offline: bool) -> dict[str, Any]:
         """Параметры запуска в именах RunOptions (bcc_review.contracts)."""
@@ -185,7 +186,7 @@ class Service:
                 "declared_sha256": imp.declared_sha256, "sha_values": imp.sha_values, "target_sha256": target_sha,
                 "warnings": imp.warnings, "status": "checking",
                 "answers": [{"qid": a.qid, "text": a.text[:2000], "question": imp.questions.get(a.qid, ""),
-                             "provenance": a.provenance, "edits": [list(e) for e in a.edits]} for a in imp.answers],
+                             "provenance": a.provenance, "edits": [list(e) for e in a.edits], "wording": a.wording} for a in imp.answers],
             })
             if not imp.answers:
                 self.store.update_import(parent_id, imp_id, status="rejected", reason="no_answers")
@@ -213,7 +214,7 @@ class Service:
                         "file_sha256": imp.file_sha256, "format": imp.format, "format_label": imp.format_label,
                         "parser": imp.parser, "declared_sha256": imp.declared_sha256}
         else:
-            submitted, origin = [Answer(a.qid, a.text.strip(), a.provenance, a.question, list(a.edits)) for a in form_answers], "form"
+            submitted, origin = [Answer(a.qid, a.text.strip(), a.provenance, a.question, list(a.edits), a.wording.strip()) for a in form_answers], "form"
             asked_about = questions_sha256 or version
             if submitted and asked_about != target_sha:
                 raise StoreError(
@@ -231,7 +232,7 @@ class Service:
                     "source_sha256": target_sha, "import": imp_meta}
         else:
             answers_bytes, meta = None, None
-        canonical = sorted((a.qid, a.text, a.provenance, [list(e) for e in a.edits]) for a in submitted)
+        canonical = sorted((a.qid, a.text, a.provenance, [list(e) for e in a.edits], a.wording) for a in submitted)
 
         # Ключ — от смысла решения (ответы + документ), а не от байтов файла: повторная загрузка
         # того же ответа или повторный клик возвращают уже созданную редакцию.

@@ -76,15 +76,24 @@ def ab(request, make_server, tmp_path):
     return client, engine, a, b
 
 
+WORDING_B = "Если результат 400, 401, 403 или 500 — неуспешный."
+
+
+def _target(client, run_id, qid):
+    report = json.loads(client.app.store.report_json(run_id).read_text(encoding="utf-8"))
+    return next((q.get("target") for q in report["questions"] if q["id"] == qid), None)
+
+
 def _questions(client, run_id):
     report = json.loads(client.app.store.report_json(run_id).read_text(encoding="utf-8"))
     return [(q["id"], q["prompt"]) for q in report["questions"]]
 
 
-def _fill(questions_md: str, qid: str, answer: str, edit: tuple[str, str] | None = None) -> str:
+def _fill(questions_md: str, qid: str, answer: str, edit: tuple[str, str] | None = None, wording: str | None = None) -> str:
     """Аналитик вписывает ответ после «Ответ:» в разделе вопроса (и при желании правку)."""
     section = re.search(rf"## {re.escape(qid)}\n.*?Ответ:[^\n]*\n?", questions_md, re.S).group(0)
-    tail = f"Ответ: {answer}\n" + (f"Правка: «{edit[0]}» → «{edit[1]}»\n" if edit else "")
+    tail = (f"Ответ: {answer}\n" + (f"Правка: «{edit[0]}» → «{edit[1]}»\n" if edit else "")
+            + (f"Формулировка: {wording}\n" if wording else ""))
     return questions_md.replace(section, re.sub(r"Ответ:[^\n]*\n?$", tail, section))
 
 
@@ -122,8 +131,12 @@ def test_answer_from_other_version_starts_nothing(ab):
 def test_own_answer_creates_one_revision_and_repeat_returns_it(ab):
     client, engine, a, b = ab
     qb = _questions(client, b["run_id"])[0][0]
+    # Правка в том виде, который применит движок: у вопроса №08 есть цель — «Формулировка»,
+    # иначе (резервный и dev-движок) — «было → стало».
+    target = _target(client, b["run_id"], qb)
     answers_b = _fill(client.get(f"/runs/{b['run_id']}/questions.md")[2].decode(), qb,
-                      "После смены порога разрешён ещё один push", EDIT_B).encode()
+                      "После смены порога разрешён ещё один push",
+                      None if target else EDIT_B, WORDING_B if target else None).encode()
     calls_before = len(engine.calls)
     code, _, body = client.post_form(f"/runs/{b['run_id']}/revisions", {}, {"answers_file": ("answers.md", answers_b)})
     assert code == 201, body

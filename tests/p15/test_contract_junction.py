@@ -168,32 +168,41 @@ def test_real_engine_full_path_with_mock_provider(make_server, tmp_path):
     page = client.get(f"/runs/{parent['run_id']}")[2].decode()
     # 091e504: конфликт из сценария → «нельзя начинать»; 6be9e97+: модули команды, прогон partial → «не определено».
     assert ("нельзя начинать" in page or "не определено" in page) and "Расхождения с контрактом" not in page
-    assert page.count("<mark>") >= 2 and "Q-001" in page
+    report1 = json.loads(client.app.store.report_json(parent["run_id"]).read_text(encoding="utf-8"))
+    q1 = report1["questions"][0]
+    qid = q1["id"]  # Q-001 у резервного движка, Q-01 у №08
+    assert page.count("<mark>") >= 2 and f"<b>{qid}.</b>" in page
     assert "Подставить демонстрационный ответ" in page and "не решение банка" in page  # ключи «Ф-3, Ф-4»
     assert "объединение замечаний" in page  # этапы из report.run.stages настоящего движка
     names = {a["name"] for a in parent["artifacts"]}
     assert {"report.md", "report.json", "report.html", "trace.jsonl"} <= names
     assert "Служебные файлы движка" in page
 
-    code, _, body = client.post_form(f"/runs/{parent['run_id']}/revisions", {
-        "a_Q-001": "Да, смена порога сбрасывает лимит.", "p_Q-001": "аналитик (веб-форма)",
-        "eo_Q-001": EDIT_OLD, "en_Q-001": EDIT_NEW,
-    })
+    # Правка в форме, которую движок применит: «Формулировка» к цели вопроса №08 или «было → стало».
+    fields = {f"a_{qid}": "Да, смена порога сбрасывает лимит.", f"p_{qid}": "аналитик (веб-форма)"}
+    if q1.get("target"):
+        assert 'name="w_' + qid + '"' in page and "Движок заменит предложение с выделенным фрагментом" in page
+        fields[f"w_{qid}"] = EDIT_NEW
+    else:
+        fields.update({f"eo_{qid}": EDIT_OLD, f"en_{qid}": EDIT_NEW})
+    code, _, body = client.post_form(f"/runs/{parent['run_id']}/revisions", fields)
     assert code == 201, body
     child = client.wait(json.loads(body)["run_id"], timeout=120)
     assert child["status"] in ("complete", "partial"), child["error"]
     report = json.loads(client.app.store.report_json(child["run_id"]).read_text(encoding="utf-8"))
     assert report["run"]["run_id"] == child["run_id"] and report["run"]["parent_run_id"] == parent["run_id"]
-    assert [d["question_id"] for d in report["decisions"]] == ["Q-001"] and len(report["decisions"][0]["edits"]) == 1
+    assert [d["question_id"] for d in report["decisions"]] == [qid] and len(report["decisions"][0]["edits"]) == 1
     stages = {s["name"]: s["status"] for s in report["run"]["stages"]}
     assert stages.get("answers") == "ok", report["run"]["stages"]
-    revision = [a["name"] for a in child["artifacts"] if ".rev-" in a["name"]]
+    revision = [a["name"] for a in child["artifacts"] if ".rev-" in a["name"] and a["name"].endswith(".md")]
     assert revision, "движок записал редакцию B отдельным файлом"
     assert EDIT_NEW in (client.app.store.artifacts_dir(child["run_id"]) / revision[0]).read_text(encoding="utf-8")
     assert report["diff"] is not None
     child_page = client.get(f"/runs/{child['run_id']}")[2].decode()
     assert "Сравнение с редакцией 1" in child_page and "Решения, учтённые движком (1)" in child_page
     assert revision[0] in child_page
+    # Изменённый пункт виден на странице новой редакции: было → стало и пункт целиком.
+    assert 'id="changes"' in child_page and EDIT_NEW in child_page
 
 
 PDF = ROOT / "tests" / "integration" / "fixtures" / "bcc_requirements.pdf"
