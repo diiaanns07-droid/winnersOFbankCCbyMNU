@@ -1,0 +1,12 @@
+{
+  "schema": "bcc-eval-control/1",
+  "control": "hand_2tp",
+  "fixed_before_run": "Ручной ответ выведен до запуска: H1 и H2 найдены точно (F-1, F-2), F-3 — ложная находка, H3 не найден.",
+  "expected": {
+    "base": {"tp": 2, "fp": 1, "fn": 1, "duplicates": 0, "precision": "2/3", "recall": "2/3", "f1": "4/6",
+             "precision_strict": "2/3"},
+    "with_duplicate": {"tp": 2, "fp": 1, "fn": 1, "duplicates": 1, "precision": "2/3", "recall": "2/3",
+                       "precision_strict": "2/4",
+                       "rule": "повтор F-2 — дубль: не TP и не FP основной precision, входит в precision_strict"}
+  }
+}

@@ -18,7 +18,7 @@ from collections import Counter, defaultdict
 from dataclasses import asdict
 from typing import Any
 
-from . import __version__
+from . import POLICY_VERSION, __version__, harness_sha256
 from .matching import CaseResult, match_case, same_finding
 from .normalize import tokens as _tokens
 from .schema import Decision, GoldLabel, Manifest, Prediction, ProtocolError, RunRecord
@@ -32,7 +32,17 @@ ASSUMPTIONS = [
     "Дубли не входят в TP и FP основной precision; precision_strict считает их FP.",
     "Одна находка закрывает не больше одного дефекта эталона (паросочетание один-к-одному).",
     "Пограничные синонимы типов и частичное покрытие опор идут на разбор (pending) и до решения считаются FP.",
+    "Результат не зависит от порядка строк: при равной оценке выбор делается по pred_key и label_id; "
+    "из разных строк run одного представления берётся худший статус.",
 ]
+
+
+_STATUS_RANK = {"failed": 0, "partial": 1, "complete": 2}
+
+
+def _run_sig(r: RunRecord) -> str:
+    d = {k: v for k, v in asdict(r).items() if k not in ("where", "r_case", "r_render", "r_format")}
+    return json.dumps(d, ensure_ascii=False, sort_keys=True, default=str)
 
 
 def prf(tp: int, fp: int, fn: int, dup: int = 0) -> dict[str, Any]:
@@ -51,9 +61,12 @@ class _Resolver:
 
     def __init__(self, gold: list[GoldLabel], manifest: Manifest | None):
         self.manifest = manifest
-        self.gold_by_sha: dict[str, str] = {}
+        by_sha: dict[str, set[str]] = defaultdict(set)
         for lab in gold:
-            self.gold_by_sha.setdefault(lab.source_sha256, lab.case_id)
+            by_sha[lab.source_sha256].add(lab.case_id)
+        # один файл у двух case_id — неоднозначность; выбор не зависит от порядка строк эталона
+        self.ambiguous_sha = sorted(sha for sha, cids in by_sha.items() if len(cids) > 1)
+        self.gold_by_sha: dict[str, str] = {sha: min(cids) for sha, cids in by_sha.items()}
 
     def resolve(self, obj: Prediction | RunRecord) -> tuple[str | None, str | None, str | None]:
         m = self.manifest
@@ -127,6 +140,9 @@ def _run_stats(runs: list[RunRecord]) -> dict[str, Any]:
         "agent_versions": sorted({r.agent_version for r in runs if r.agent_version}),
         "manifest_sha256": sorted({r.manifest_sha256 for r in runs if r.manifest_sha256}),
         "cache": sorted({repr(r.cache) for r in runs}),
+        "transport": sorted({f"mode={r.mode or '—'}, provider={r.provider or '—'}, model={r.model or '—'}" for r in runs}),
+        "implementations": {slot: sorted({r.modules[slot] for r in runs if slot in r.modules})
+                            for slot in sorted({s for r in runs for s in r.modules})},
         "violations": violations,
     }
 
@@ -185,13 +201,25 @@ def score(gold: list[GoldLabel], preds: list[Prediction], runs: list[RunRecord],
     for p in preds:
         if p.r_case in gold_by_case:
             preds_by_render[(p.r_case, p.r_format)].append(p)
-    runs_by_render: dict[tuple[str, str], RunRecord] = {}
+    # несколько строк run на одно представление: одинаковые схлопываются, разные дают худший статус
+    # (failed < partial < complete), затем канонический порядок; от порядка строк выбор не зависит
+    grouped: dict[tuple[str, str], list[RunRecord]] = defaultdict(list)
     for r in runs:
         if r.r_case in gold_by_case:
-            if (r.r_case, r.r_format) in runs_by_render:
-                warnings.append(f"повтор строки run для {r.r_render}: берётся первая")
-                continue
-            runs_by_render[(r.r_case, r.r_format)] = r
+            grouped[(r.r_case, r.r_format)].append(r)
+    runs_by_render: dict[tuple[str, str], RunRecord] = {}
+    run_warnings = []
+    for key, lst in grouped.items():
+        chosen = min(lst, key=lambda r: (_STATUS_RANK.get(r.status, 0), _run_sig(r)))
+        runs_by_render[key] = chosen
+        if len(lst) > 1:
+            kinds = len({_run_sig(r) for r in lst})
+            run_warnings.append(f"повтор одинаковой строки run для {chosen.r_render}: учтена одна" if kinds == 1 else
+                                f"разные строки run для {chosen.r_render} ({kinds} варианта): взят худший статус "
+                                f"{chosen.status}")
+    warnings.extend(sorted(run_warnings))
+    for sha in res.ambiguous_sha:
+        warnings.append(f"один source_sha256 {sha[:12]}… у нескольких case_id: взят {res.gold_by_sha[sha]}")
     have_runs = bool(runs_by_render)
     if not have_runs:
         warnings.append("нет строк record=run: кейс без предсказаний считается прогнанным с нулём находок")
@@ -323,6 +351,8 @@ def score(gold: list[GoldLabel], preds: list[Prediction], runs: list[RunRecord],
     return {
         "schema_version": "bcc-eval-metrics/1",
         "harness_version": __version__,
+        "harness_sha256": harness_sha256(),
+        "policy_version": POLICY_VERSION,
         "policy": {
             "type_match": type_match,
             "render_format": render_format or "primary_render из манифеста",

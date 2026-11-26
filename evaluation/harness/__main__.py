@@ -7,6 +7,7 @@
     adapt-labels  плоские метки (defect_id, type, quote, related_quote, …) → эталон
     run           прогон продукта по манифесту в режиме rules_only | rules_plus_llm
     compare       таблица режимов по нескольким metrics.json
+    selfcheck     контрольная арифметика: ручной ответ против счётчика, перестановки, повтор формата
     fingerprint   хеш-отпечаток закрытого набора (без текста)
     leakcheck     проверка, что закрытые ответы не попали в dev-корпус
 """
@@ -24,7 +25,7 @@ from .schema import (Manifest, ProtocolError, parse_decisions, parse_gold, parse
 from .score import adjudication_sheet, score
 from .taxonomy import Taxonomy
 
-SUBCOMMANDS = ("adapt", "adapt-labels", "run", "compare", "fingerprint", "leakcheck", "score")
+SUBCOMMANDS = ("adapt", "adapt-labels", "run", "compare", "fingerprint", "leakcheck", "score", "selfcheck")
 
 
 def _fmt(v: float | None, num: int, den: int) -> str:
@@ -43,6 +44,9 @@ def summary(m: dict) -> str:
         f"precision_strict={'null' if mi['precision_strict'] is None else round(mi['precision_strict'], 4)}",
         f"чистые документы: {m['clean_controls']['false_alarms']} ложных тревог на "
         f"{m['clean_controls']['cases_with_alarms']}/{m['clean_controls']['cases']} кейсах",
+        f"режим: {m['policy']['mode'] or '—'}; правило типов: {m['policy']['type_match']} "
+        f"(совпадений уровня parent: {mi['tp_parent_level']}); формат: {m['policy']['render_format']}",
+        f"счётчик {m['harness_version']} ({m['policy_version']}), sha256 {m['harness_sha256'][:16]}",
     ]
     for w in m.get("warnings", []):
         lines.append(f"предупреждение: {w}")
@@ -192,16 +196,23 @@ def cmd_leakcheck(argv: list[str]) -> int:
     return 1 if res["leak"] else 0
 
 
+def _selfcheck(argv: list[str]) -> int:
+    from .selfcheck import main as selfcheck_main
+    return selfcheck_main(argv)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["--version"]:
-        print(__version__)
+        from . import POLICY_VERSION, harness_sha256
+        print(f"{__version__} {POLICY_VERSION} {harness_sha256()}")
         return 0
     cmd = argv[0] if argv and argv[0] in SUBCOMMANDS else "score"
     if argv and argv[0] in SUBCOMMANDS:
         argv = argv[1:]
     handlers = {"score": cmd_score, "adapt": cmd_adapt, "adapt-labels": cmd_adapt_labels, "run": cmd_run,
-                "compare": cmd_compare, "fingerprint": cmd_fingerprint, "leakcheck": cmd_leakcheck}
+                "compare": cmd_compare, "fingerprint": cmd_fingerprint, "leakcheck": cmd_leakcheck,
+                "selfcheck": _selfcheck}
     try:
         return handlers[cmd](argv)
     except ProtocolError as exc:

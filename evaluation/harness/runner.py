@@ -47,7 +47,8 @@ def mode_args(mode: str, provider: str | None, cache: str = "off") -> list[str]:
 def child_env(mode: str, cache: str, cache_dir: str | None) -> tuple[dict[str, str], dict]:
     env = dict(os.environ)
     sandbox = {"network_sandbox": False, "removed_env": []}
-    if mode == "rules_only":
+    if mode in ("rules_only", "mock"):
+        # rules_only и mock не должны ходить в сеть: mock — подставной транспорт движка
         removed = sorted(k for k in env if SECRET_ENV.search(k))
         for k in removed:
             env.pop(k)
@@ -55,7 +56,8 @@ def child_env(mode: str, cache: str, cache_dir: str | None) -> tuple[dict[str, s
             env[k] = DEAD_PROXY
         env.pop("NO_PROXY", None)
         env.pop("no_proxy", None)
-        env["BCC_REVIEW_OFFLINE"] = "1"
+        if mode == "rules_only":
+            env["BCC_REVIEW_OFFLINE"] = "1"
         sandbox = {"network_sandbox": True, "removed_env": removed, "proxy": DEAD_PROXY}
     env["BCC_REVIEW_CACHE"] = cache
     if cache_dir:
@@ -125,7 +127,8 @@ def run_manifest(manifest_path: str, mode: str, out_dir: str, taxonomy: Taxonomy
                      "report_path": str(rep_json)})
         if not rep_json.exists():
             rows.append({**base, "status": "failed", "duration_s": round(wall, 3),
-                         "violations": [f"нет {rep_json.name} рядом с OUTPUT.md (exit={rc})"]})
+                         "violations": [f"таймаут счётчика {timeout} с: прогон прерван, отчёт не записан" if rc is None
+                                        else f"нет {rep_json.name} рядом с OUTPUT.md (exit={rc})"]})
             continue
         report = json.loads(rep_json.read_text(encoding="utf-8"))
         got = report_to_rows(report, taxonomy, render_id=r["render_id"], case_id=cid, fmt=want,

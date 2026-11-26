@@ -232,6 +232,8 @@ class RunRecord:
     cache: Any = None
     empty_input_warning: bool | None = None
     violations: list[str] = field(default_factory=list)
+    modules: dict = field(default_factory=dict)
+    status_reasons: list = field(default_factory=list)
     where: str = ""
     r_case: str | None = None
     r_render: str | None = None
@@ -278,6 +280,7 @@ def parse_predictions(rows: list[dict], taxonomy: Taxonomy) -> tuple[list[Predic
                 provider=row.get("provider"), model=row.get("model"), agent_version=row.get("agent_version"),
                 manifest_sha256=row.get("manifest_sha256"), cache=row.get("cache"),
                 empty_input_warning=row.get("empty_input_warning"),
+                modules=dict(row.get("modules") or {}), status_reasons=list(row.get("status_reasons") or []),
                 violations=list(row.get("violations") or []), where=w,
             ))
             continue

@@ -1,0 +1,133 @@
+{
+  "schema": "bcc-eval-open-run/1",
+  "what": "Открытый dev-набор через действующий CLI продукта, rules_only, --no-cache, сеть закрыта песочницей счётчика. Это реальные метрики продукта, не контрольная арифметика.",
+  "command": "python -m evaluation.dev open-run --product-src ../stand/src --out out/open_run",
+  "product": {
+    "bcc/integration": "6be9e973e3fa56b1a5071141588a542adf4b7c51",
+    "overlay": "src/bcc_review/readers/docx.py из bcc/p03-word d2e8f306ce0c436698cba132ef23adb74f4257b7 (№03 ещё не влит в интеграцию)",
+    "agent_commit_in_reports": [
+      "6be9e973e3fa56b1a5071141588a542adf4b7c51-dirty"
+    ]
+  },
+  "corpus_semantic_sha256": "8ddcb3f85b7d6f2d2392dddd5ea4ee1744f1a4fb1e35b7a9e807e44b041f7288",
+  "harness": "0.1.1 bcc-eval-policy/1 e1a4d18b5be80a466f6762e0975d8e96cc9099f82ee56e3731bbecb0ce4bfe1f",
+  "mode": "rules_only",
+  "type_match": "hierarchy",
+  "independent_cases": 31,
+  "cases_labeled": 33,
+  "missing_measurements": [
+    {
+      "case_id": "autopay.event_conflict.insufficient_funds_credit",
+      "format": "md",
+      "reason": "прогон завершился со статусом failed"
+    },
+    {
+      "case_id": "edge.empty",
+      "format": "md",
+      "reason": "прогон завершился со статусом failed"
+    }
+  ],
+  "physical_renders_measured": 32,
+  "per_format": {
+    "docx": {
+      "cases": 1,
+      "tp": 0,
+      "fp": 7,
+      "fn": 2
+    },
+    "md": {
+      "cases": 31,
+      "tp": 0,
+      "fp": 160,
+      "fn": 27
+    }
+  },
+  "micro": {
+    "tp": 0,
+    "fp": 160,
+    "fn": 27,
+    "duplicates": 0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "pending_adjudication": 1,
+    "clean_false_alarms": 40
+  },
+  "clean_controls": {
+    "cases": 8,
+    "cases_with_alarms": 8,
+    "false_alarms": 40
+  },
+  "run_status": {
+    "partial": 31,
+    "failed": 2
+  },
+  "physical_calls": 0,
+  "transport": [
+    "mode=rules_only, provider=none, model=—",
+    "mode=rules_only, provider=—, model=—"
+  ],
+  "implementations": {
+    "build_bank_pack": [
+      "fallback:bcc_review.runtime.fallback.bank:build_bank_pack"
+    ],
+    "build_inventory": [
+      "team:bcc_review.analysis.inventory:build_inventory"
+    ],
+    "build_questions": [
+      "fallback:bcc_review.runtime.fallback.decisions:build_questions"
+    ],
+    "load_criteria": [
+      "team:bcc_review.criteria:load_criteria"
+    ],
+    "read_text": [
+      "team:bcc_review.readers.text:read_text"
+    ],
+    "reconcile_facts": [
+      "team:bcc_review.analysis.facts:reconcile_facts"
+    ],
+    "resolve_candidate": [
+      "team:bcc_review.analysis.evidence:resolve_candidate"
+    ],
+    "resolve_hint": [
+      "team:bcc_review.analysis.evidence:resolve_hint"
+    ],
+    "review_individual": [
+      "team:bcc_review.analysis.individual:review_individual"
+    ],
+    "review_set": [
+      "team:bcc_review.analysis.cross:review_set"
+    ]
+  },
+  "network_sandbox": {
+    "md": true,
+    "docx": true,
+    "incomplete": true
+  },
+  "violations": [
+    {
+      "render_id": "autopay.event_conflict.insufficient_funds_credit@md",
+      "violations": [
+        "таймаут счётчика 0.001 с: прогон прерван, отчёт не записан"
+      ]
+    }
+  ],
+  "results_sha256": "ae71bea74dc0fd43c8bb3649ab6b0c84316f9312c889ea8844814ff45e2f8f31",
+  "fp_by_pred_type": {
+    "ambiguity": 15,
+    "contradiction": 6,
+    "incomplete": 11,
+    "missing_element": 3,
+    "non_singular": 24,
+    "terminology": 23,
+    "traceability": 70,
+    "unverifiable": 8
+  },
+  "observations": [
+    "TP=0: офлайн-правила не находят засеянные противоречия (этапы individual/cross в rules_only не вызываются).",
+    "3 находки kind=omission правильного типа попали на 3 засеянных пропуска метода чтения (cashback и transfer_limit no_read_method, combo transfer_limit), но цитируют фрагменты по 2 токена ('Приложение читает'); политика v1 требует ≥ 3, поэтому это FP.",
+    "6 находок kind=conflict на transfer_limit.*: limit в ответе getTransferLimit string, в теле setTransferLimit integer. Вероятно, реальный непреднамеренный дефект базы корпуса → кандидат new_real_defect на разборе; корпус в этом проходе не менялся.",
+    "edge.empty: движок пишет Report со status=failed ('не выделено ни одного требования'), код выхода 0; по политике v1 это пропуск измерения.",
+    "Все прогоны rules_only движок помечает partial (этапы модели пропущены); по политике v1 partial — измеренный прогон."
+  ]
+}

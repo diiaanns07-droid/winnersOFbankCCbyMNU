@@ -149,3 +149,12 @@ def test_cli_output_distinguishes_policies(tmp_path):
     assert "правило типов: hierarchy" in outs["hierarchy"] and "уровня parent: 1" in outs["hierarchy"]
     assert "правило типов: exact" in outs["exact"] and "уровня parent: 0" in outs["exact"]
     assert "TP=2 " in outs["hierarchy"] and "TP=1 " in outs["exact"]
+
+
+def test_selfcheck_table_has_no_mismatches(tmp_path):
+    r = subprocess.run([sys.executable, "-m", "evaluation.harness", "selfcheck", "--json", str(tmp_path / "s.json")],
+                       cwd=REPO, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout[-2000:] + r.stderr
+    rows = json.loads((tmp_path / "s.json").read_text(encoding="utf-8"))
+    assert rows and all(x["ok"] for x in rows)
+    assert "расхождений: 0" in r.stdout

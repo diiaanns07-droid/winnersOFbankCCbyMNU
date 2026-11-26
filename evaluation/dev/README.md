@@ -58,6 +58,27 @@ python -m evaluation.dev generate --out /tmp/c --seeds 1,2,3 --all-variants
   совпадают (`check --with-binaries`). На другой машине байты PDF могут отличаться из-за версии
   шрифта DejaVu или reportlab. Смысловой хеш от этого не зависит, а закоммиченные файлы — эталон.
 
+## Воспроизводимый прогон через CLI продукта
+
+```bash
+git worktree add --detach ../stand origin/bcc/integration
+git -C ../stand checkout origin/bcc/p03-word -- src/bcc_review/readers/docx.py   # пока №03 не влит
+python -m evaluation.dev open-run --product-src ../stand/src --out out/open_run
+```
+
+Прогон идёт в режиме `rules_only` с `--no-cache`, сеть закрыта песочницей. Состав:
+* MD всех кейсов, кроме `autopay.event_conflict.insufficient_funds_credit`;
+* DOCX кейса `cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict`;
+* отдельный прогон `autopay.event_conflict.insufficient_funds_credit`, прерванный таймаутом счётчика 0.001 с.
+  Он технически не завершён (`failed`) и виден как пропуск измерения.
+
+`summary.json` содержит:
+* число независимых кейсов, пропуски измерения, режим;
+* физические вызовы, транспорт, реализации модулей;
+* `results_sha256` — хеш смысловых итогов без времени и путей.
+
+Зафиксированный результат лежит в `results/`.
+
 ## Изоляция закрытого набора
 
 * В dev-корпусе только `visibility: public`. Тест `test_dev_corpus_has_no_closed_material`
