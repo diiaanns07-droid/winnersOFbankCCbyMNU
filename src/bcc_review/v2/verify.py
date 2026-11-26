@@ -231,7 +231,25 @@ def verify_report(report: dict | str | Path, source: str | Path) -> dict:
             "sha256": sha, "commit": commit}
 
 
+def handles(report_path: str | Path) -> bool:
+    """True, если файл — report.json ядра v2 (для выбора verify v1/v2 в общем CLI)."""
+    try:
+        head = Path(report_path).read_text(encoding="utf-8")[:4000]
+    except (OSError, UnicodeDecodeError):
+        return False
+    return '"schema": "bcc-review/2"' in head or '"schema":"bcc-review/2"' in head
+
+
+def _utf8_console() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_console()
     p = argparse.ArgumentParser(prog="python -m bcc_review verify",
                                 description="Перепроверка report.json без модели: исходник, цитаты, счётчики, "
                                             "вердикт, коммит. Код 0 — всё сходится, 4 — есть расхождения.")
@@ -241,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     try:
         result = verify_report(Path(args.report), Path(args.source))
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, RuntimeError, ImportError) as exc:
         print(f"verify: не удалось прочитать вход: {exc}", file=sys.stderr)
         return EXIT_VERIFY_FAILED
     except (TypeError, AttributeError, KeyError) as exc:

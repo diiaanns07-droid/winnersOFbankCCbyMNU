@@ -114,3 +114,40 @@ def test_garbage_report_is_exit_4(tmp_path, capsys):
     p.write_text(json.dumps({"schema": "bcc-review/2", "findings": [1, 2], "document": [], "run": "x"}),
                  encoding="utf-8")
     assert verify.main([str(p), str(SOURCE)]) == 4
+
+
+def test_handles_detects_v2(tmp_path):
+    assert verify.handles(SAMPLE)
+    p = tmp_path / "v1.json"
+    p.write_text('{"schema_version": "1.0"}', encoding="utf-8")
+    assert not verify.handles(p)
+
+
+def test_pdf_pages_checked_with_docview(tmp_path):
+    """Вход PDF: цитата сверяется по строке DocView, страница — по номеру страницы этой строки."""
+    pytest.importorskip("fitz")
+    docview = pytest.importorskip("bcc_review.v2.docview")
+    from bcc_review.v2.render import jsonout, markdown
+
+    pdf = ROOT / "release" / "input" / "requirements.pdf"
+    view = docview.load(str(pdf))
+    picked = [ln for ln in view["lines"] if ln.get("page") and len(ln.get("text", "").strip()) > 30][5:8]
+    assert picked
+    findings = [{"id": f"D-{i:02d}", "title": "Проверка страницы", "kind": "ambiguity", "criterion": "unambiguous",
+                 "severity": "minor", "requirement_ids": [], "blocks": "none", "problem": "п", "recommendation": "р",
+                 "evidence": [{"quote": ln["text"].strip()[:60], "line_start": ln["n"], "line_end": ln["n"],
+                               "page": ln["page"], "section": ln.get("section", ""), "verified": "exact"}]}
+                for i, ln in enumerate(picked, 1)]
+    import hashlib
+    report = {"schema": "bcc-review/2",
+              "run": {"agent": "BCC Review", "version": "2", "commit": "abcdef1", "started_at": "2026-11-27T03:00:00Z",
+                      "provider": "mock", "status": "complete", "stages": {}},
+              "document": {"title": "т", "file": pdf.name, "format": "pdf", "lines": len(view["lines"]),
+                           "pages": view.get("pages"), "sha256": hashlib.sha256(pdf.read_bytes()).hexdigest()},
+              "requirements": [], "findings": findings, "verdict": {}}
+    jsonout.finalize(report)
+    assert verify.verify_report(report, pdf)["ok"]
+    assert f"стр. {picked[0]['page']}" in markdown.render(report)
+    report["findings"][0]["evidence"][0]["page"] = picked[0]["page"] + 1
+    res = verify.verify_report(report, pdf)
+    assert not res["ok"] and "страница" in res["errors"][0]["message"]
