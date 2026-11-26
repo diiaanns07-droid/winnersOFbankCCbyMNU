@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bcc-review"
+version = "0.1.0"
+description = "Статическое ревью ТЗ до разработки: требования, противоречия, доказательства, готовность (BCC-HUB x MNU FinTech Hackathon)"
+requires-python = ">=3.11"
+license = { text = "Proprietary (team hackathon entry)" }
+dependencies = [
+  "jsonschema>=4.18",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=2.0"]
+pdf = ["pymupdf>=1.24"]
+docx = ["python-docx>=1.1"]
+all = ["anthropic>=2.0", "pymupdf>=1.24", "python-docx>=1.1"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+bcc-review = "bcc_review.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.toml", "*.json", "*.md", "*.txt", "*.css", "*.js", "*.html", "prompts/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
