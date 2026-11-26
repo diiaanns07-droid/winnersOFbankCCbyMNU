@@ -15,7 +15,8 @@
    ё → е; пробел внутри числа («1 000») не учитывается; сравнение без регистра;
 2. вхождение в строках ``line_hint`` ±2, иначе во всём документе — ближайшее к ``line_hint`` / ``near_lines``;
 3. цитата через соседние строки (склейка до 3 непустых строк);
-4. цитата с многоточием внутри — части ищутся по порядку в пределах 3 строк (``normalized``);
+4. цитата с многоточием внутри — части ищутся по порядку в пределах 3 строк (``normalized``), ``text`` — сплошной
+   отрезок документа от первой части до последней;
 5. нечёткое совпадение ≥ 0,92 (difflib) только в пределах ±5 строк от подсказки → ``fuzzy``;
 6. иначе ``None``.
 
@@ -328,7 +329,8 @@ def _match_parts(idx: _Index, parts: list[str], hint: int | None, near: list[int
             pos = a + len(p)
         if ok:
             spans.append((a0, pos))
-            texts[(a0, pos)] = " … ".join(pieces)
+            # в отчёт — сплошной отрезок документа: его подстрокой проверяет verify (№13)
+            texts[(a0, pos)] = idx.original(a0, pos)
     best = _pick(idx, spans, hint, near)
     if not best:
         return None
@@ -417,7 +419,7 @@ def verify_evidence(view: dict, ev: dict, near: Iterable[Any] = ()) -> dict:
     hint = ev.get("line") if ev.get("line") not in (None, "", 0) else ev.get("line_start")
     m = verify_quote(view, quote, hint, near)
     if m:
-        ev["quote"] = m["text"] if m["verified"] != "exact" else str(quote).strip()
+        ev["quote"] = m["text"]  # всегда дословный текст документа (без префиксов и обрамления модели)
         ev["line"] = m["line_start"]
         ev.update({k: m[k] for k in ("line_start", "line_end", "page", "section", "verified")})
     else:

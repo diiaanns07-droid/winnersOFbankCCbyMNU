@@ -142,7 +142,7 @@ def test_glue_across_lines(md):
 def test_ellipsis_inside_quote(md):
     m = Q.verify_quote(md, "Месяц определяется … в Алматы", 38)
     assert m["line_start"] == 38 and m["verified"] == "normalized"
-    assert m["text"] == "Месяц определяется … в Алматы"
+    assert m["text"] == "Месяц определяется по дате совершения покупки в Алматы"   # сплошной отрезок документа
 
 
 def test_fuzzy_only_near_hint(md):
@@ -217,3 +217,23 @@ def test_numbered_prefixes_in_quote(md, pdf):
     assert (m["line_start"], m["line_end"]) == (162, 163)
     m = Q.verify_quote(pdf, "L025| [с.2] Ф-2. Месяц определяется", 25)
     assert m["line_start"] == 25 and m["page"] == 2 and not m["text"].startswith("[")
+
+
+def test_kind_and_level_fields(md, pdf):
+    assert dv.line(md, 8)["kind"] == "heading" and dv.line(md, 8)["level"] == 2
+    assert dv.line(md, 36)["kind"] == "heading" and dv.line(md, 36)["level"] == 4
+    assert dv.line(md, 38)["kind"] == "list_item" and dv.line(md, 38)["level"] == 0
+    assert dv.line(md, 64)["kind"] == "table_row" and dv.line(md, 61)["kind"] == "table_header"
+    assert dv.line(md, 167)["kind"] == "code" and dv.line(md, 2)["kind"] == ""
+    assert dv.line(pdf, 23)["kind"] == "heading" and dv.line(pdf, 25)["kind"] == "list_item"
+
+
+def test_batch_quote_is_document_text(md):
+    """В доказательство пишется дословный текст документа — его подстрокой проверяет verify №13."""
+    cands = [{"id": "C-1", "evidence": [{"quote": "L038| Ф-2. Месяц определяется", "line": 38},
+                                        {"quote": "Месяц определяется … в Алматы", "line": 38},
+                                        {"quote": "«Февральский счётчик вырос»", "line": 64}]}]
+    res = Q.verify_candidates(md, cands)
+    for e in res["candidates"][0]["evidence"]:
+        line_text = " ".join(dv.line(md, n)["text"] for n in range(e["line_start"], e["line_end"] + 1))
+        assert e["quote"] in line_text, e

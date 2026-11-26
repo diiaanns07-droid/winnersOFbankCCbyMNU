@@ -10,6 +10,9 @@
 * PDF/DOCX/HTML — по строке на блок читателя (абзац, пункт, строка таблицы, заголовок); многострочный
   блок даёт несколько строк. Для PDF у каждой строки есть страница.
 
+Сверх контракта у строки есть ``kind`` (вид блока читателя: heading, paragraph, list_item, table_header, table_row,
+code; пусто у пустой строки) и ``level`` (уровень заголовка, у остальных 0) — для нарезки и правил.
+
 ``numbered(view)`` — текст для модели: «L038| …», для PDF «L045| [с.3] …».
 Номер строки, страницу и раздел считает код, а не модель.
 """
@@ -161,6 +164,8 @@ def _text_lines(text: str, doc: dict | None) -> list[dict]:
     texts: list[str | None] = [None] * (n_lines + 1)
     sections: list[str] = [""] * (n_lines + 1)
     block_ids: list[str] = [""] * (n_lines + 1)
+    kinds: list[str] = [""] * (n_lines + 1)
+    levels: list[int] = [0] * (n_lines + 1)
     covered: list[bool] = [False] * (n_lines + 1)
     if doc:
         for b in doc.get("blocks") or []:
@@ -187,6 +192,8 @@ def _text_lines(text: str, doc: dict | None) -> list[dict]:
                 texts[ln_no] = part if texts[ln_no] is None else f"{texts[ln_no]} {part}"
                 sections[ln_no] = sec
                 block_ids[ln_no] = b.get("id", "")
+                kinds[ln_no] = str(b.get("kind") or "")
+                levels[ln_no] = _level(b)
     out: list[dict] = []
     in_fence = False
     cur_section = ""
@@ -206,8 +213,12 @@ def _text_lines(text: str, doc: dict | None) -> list[dict]:
         t = _clean(t)
         if sections[k]:
             cur_section = sections[k]
+        kind = kinds[k] if t else ""
+        if not doc and t:
+            kind = "heading" if _MD_HEADING.match(src) else ("table_row" if " | " in t else "paragraph")
         out.append({"n": k, "text": t, "page": None, "section": sections[k] or cur_section,
-                    "src_line": k, "block_id": block_ids[k]})
+                    "src_line": k, "block_id": block_ids[k], "kind": kind,
+                    "level": levels[k] if kind == "heading" else 0})
     return out
 
 
@@ -253,11 +264,25 @@ def _block_lines(doc: dict) -> list[dict]:
             if b.get("kind") == "list_item" and i == 0:
                 t = _BULLET_GLYPH.sub("", t.lstrip())
             out.append({"n": len(out) + 1, "text": _clean(t), "page": page, "section": sec,
-                        "src_line": None, "block_id": b.get("id", "")})
+                        "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
+                        "level": _level(b) if b.get("kind") == "heading" else 0})
     return out
 
 
 # --------------------------------------------------------------------------- общее
+def _level(b: dict) -> int:
+    if b.get("kind") != "heading":
+        return 0
+    loc = b.get("loc") or {}
+    for key in ("level", "heading_level"):
+        v = loc.get(key)
+        if isinstance(v, int) and v > 0:
+            return v
+        if isinstance(v, str) and v.isdigit():
+            return int(v)
+    return 1
+
+
 def _section(b: dict) -> str:
     sec = [str(s).strip() for s in (b.get("section") or []) if str(s).strip()]
     if b.get("kind") == "heading":
