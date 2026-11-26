@@ -44,15 +44,28 @@ def observe(scenario: str, transport: Any, clock: Any, engine_error: str) -> Non
     OBSERVATIONS.append((scenario, transport.count("GET"), transport.count("POST"), pause, engine_error))
 
 
+#: Исходы одного ответа в report.json (test_response_metadata.py); печатаются в конце прогона.
+OUTCOMES: list[tuple[str, ...]] = []
+
+
+def outcome(*row: Any) -> None:
+    OUTCOMES.append(tuple(str(c) for c in row))
+
+
 def pytest_terminal_summary(terminalreporter: Any) -> None:
-    if not OBSERVATIONS:
-        return
     tr = terminalreporter
-    tr.section("p11: Asker → AnthropicAdapter → ScriptedTransport (httpx2)")
-    tr.write_line("| сценарий | GET | POST | пауза | тип ошибки в движке |")
-    tr.write_line("|---|---|---|---|---|")
-    for row in OBSERVATIONS:
-        tr.write_line("| " + " | ".join(str(c) for c in row) + " |")
+    if OBSERVATIONS:
+        tr.section("p11: Asker → AnthropicAdapter → ScriptedTransport (httpx2)")
+        tr.write_line("| сценарий | GET | POST | пауза | тип ошибки в движке |")
+        tr.write_line("|---|---|---|---|---|")
+        for row in OBSERVATIONS:
+            tr.write_line("| " + " | ".join(str(c) for c in row) + " |")
+    if OUTCOMES:
+        tr.section("p11: один ответ → Engine.run_individual / build_checks / build_run (report.json)")
+        tr.write_line("| исход ответа | POST | GET | фактическая модель | успешная стадия | подпись в отчёте |")
+        tr.write_line("|---|---|---|---|---|---|")
+        for row in OUTCOMES:
+            tr.write_line("| " + " | ".join(row) + " |")
 
 
 def load(name: str) -> Any:

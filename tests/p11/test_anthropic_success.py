@@ -23,7 +23,8 @@ def test_success_returns_contract_fields(make_adapter, messages, schema):
     adapter = make_adapter("success_candidates")
     result = adapter.invoke(model="claude-opus-5-5", messages=messages, schema=schema, timeout_s=30)
 
-    assert set(result) == {"data", "usage", "model", "request_id"}
+    assert set(result) == {"data", "usage", "model", "request_id", "stop_reason"}  # contracts.ProviderAdapter
+    assert result["stop_reason"] == "end_turn"
     assert result["data"] == load("expected_candidates")
     assert result["model"] == "claude-opus-5-5"
     assert result["request_id"] == "req_synth_success_01"
