@@ -22,7 +22,7 @@ on:
         required: false
       export:
         description: "Дополнительные форматы через запятую"
-        default: "html,jira"
+        default: "jira"
         required: false
 
 permissions:

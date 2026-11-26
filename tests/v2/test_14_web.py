@@ -167,3 +167,30 @@ def test_pipeline_command_has_answers(tmp_path):
     cmd = R.PipelineRunner(store, extra_args=["--engine", "v1"]).command(job, tmp_path / "o.md", tmp_path / "runs")
     assert cmd[1:3] == ["-m", "bcc_review"] and "--answers" in cmd and "--revise" in cmd
     assert cmd[cmd.index("--model") + 1] == "sonnet" and cmd[-2:] == ["--engine", "v1"]
+
+
+def test_scan_reads_pipeline_run_dir(tmp_path):
+    """Прогресс по настоящей раскладке pipeline v2: журнал «этап: запуск» и runs/<id>/stages/<этап>.json."""
+    store = R.JobStore(tmp_path)
+    job = store.create("a.md", b"# x\n", "mock", "")
+    job.started = time.time()
+    d = store.dir(job.id)
+    st = d / "runs" / job.id / "stages"
+    st.mkdir(parents=True)
+    log = d / "run.log"
+    log.write_text("Документ: a.md\n  segment: запуск\n  segment: готово за 1 с\n  rules: запуск\n", encoding="utf-8")
+    (st / "segment.json").write_text('{"status": "ok"}', encoding="utf-8")
+    r = R.PipelineRunner(store)
+    r._scan(job, d / "runs", log)
+    assert job.stages["docview"] == "done" and job.stages["segment"] == "done" and job.stages["rules"] == "running"
+    (st / "rules.json").write_text('{"status": "ok"}', encoding="utf-8")
+    (st / "lens_qa.json").write_text('{"status": "failed"}', encoding="utf-8")
+    log.write_text(log.read_text(encoding="utf-8") + "  lens_analyst: запуск\n  lens_qa: запуск\n", encoding="utf-8")
+    r._scan(job, d / "runs", log)
+    assert job.stages["lens_qa"] == "failed" and job.stages["lens_analyst"] == "running"
+    (st / "judge.json").write_text('{"status": "ok"}', encoding="utf-8")
+    r._scan(job, d / "runs", log)
+    assert job.stages["quotes"] == "skipped" and job.stages["judge"] == "done"
+    assert [s["id"] for s in job.public()["stage_list"]].count("recheck") == 0
+    cmd = r.command(job, d / "out" / "report.md", d / "runs")
+    assert cmd[cmd.index("--export") + 1] == "jira,docx,pdf" and cmd[cmd.index("--run-id") + 1] == job.id

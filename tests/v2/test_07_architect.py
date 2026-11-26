@@ -85,7 +85,7 @@ def test_prompt_exists_and_is_russian():
     assert text.startswith("## Задача")
     assert len(re.findall(r"[а-яё]", text, re.I)) > 3000
     for key in ("inventory", "operations", "promises", "codes", "fields", "missing_element", "status_conflict",
-                "unit_mismatch", "api_contract", "До 14 кандидатов"):
+                "unit_mismatch", "api_contract", "До 12 кандидатов"):
         assert key in text, key
 
 
