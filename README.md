@@ -97,7 +97,8 @@ python -m bcc_review verify reports/my/requirements.json release/input/requireme
 **Без ключа** агент тоже запускается: `--provider offline` — предварительная проверка только детерминированными
 правилами (без модели, за секунды: контракт API, единицы измерения, заглушки, размытые слова); отчёт честно
 помечен как проверка без модели, смысл требований и противоречия в нём не оцениваются. `--provider mock` прогоняет
-весь конвейер без сети на записанных ответах модели — для проверки установки и тестов.
+весь конвейер без сети за секунду на записанных ответах живого прогона модели по официальному документу кейса:
+так можно посмотреть настоящий отчёт до того, как появился ключ (на других документах mock даёт пустые ответы).
 
 ---
 
@@ -153,7 +154,7 @@ python -m bcc_review verify reports/my/requirements.json release/input/requireme
 | `anthropic` | `ANTHROPIC_API_KEY` ([консоль Claude](https://console.anthropic.com/settings/keys)) | `claude-opus-5-5` (`ANTHROPIC_MODEL`) | Claude через API |
 | `openai` | `OPENAI_BASE_URL` и `OPENAI_MODEL` (ключ — по необходимости) | задаётся вами | закрытый контур: Ollama, vLLM, LM Studio; также OpenRouter |
 | `offline` | ничего | без модели | быстрый предварительный просмотр, только правила |
-| `mock` | ничего | записанные ответы | проверка установки и тесты без сети |
+| `mock` | ничего | записанные ответы живого прогона | демонстрация на официальном документе и тесты без сети |
 
 `auto` выбирает первое доступное: `GEMINI_API_KEY` → `gemini`; `ANTHROPIC_API_KEY` → `anthropic`;
 `OPENAI_BASE_URL` → `openai`; установлен `claude` → `claude_cli`; иначе `offline`.
