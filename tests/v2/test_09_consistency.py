@@ -315,3 +315,15 @@ def test_conflict_with_goal_or_nonfunctional_is_major():
              b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7)
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
     assert out["candidates"][0]["severity"] == "major"
+
+
+def test_unit_mismatch_conflict_is_major():
+    out = C.postprocess(answer(pair_checks=[pair(kind="unit_mismatch")]), VIEW, REQS)
+    assert out["candidates"][0]["severity"] == "major"
+    assert out["candidates"][0]["kind"] == "unit_mismatch"
+
+
+def test_fallback_fuzzy_quote_near_hint():
+    m = C._fallback_verify(VIEW, "Пополнение через кассы доступно всегда", 4)
+    assert m and m["line_start"] == 4 and m["verified"] == "fuzzy"
+    assert C._fallback_verify(VIEW, "Пополнение через кассы доступно всегда", 10) is None

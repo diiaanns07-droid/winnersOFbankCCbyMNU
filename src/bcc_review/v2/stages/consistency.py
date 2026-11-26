@@ -132,6 +132,11 @@ def _fallback_verify(view: Any, quote: str, line_hint: int | None) -> dict | Non
                 if len(chunk) == k and q in _norm(" ".join(x.get("text", "") for x in chunk)):
                     hits.append((chunk[0]["n"], chunk[-1]["n"]))
                     break
+    verified = "normalized"
+    if not hits and line_hint:
+        best = _fuzzy_line(q, [x for x in lines if abs(x["n"] - line_hint) <= 5])
+        if best is not None:
+            hits, verified = [(best, best)], "fuzzy"
     if not hits:
         return None
     hint = line_hint or hits[0][0]
@@ -139,7 +144,28 @@ def _fallback_verify(view: Any, quote: str, line_hint: int | None) -> dict | Non
     by_n = {x["n"]: x for x in lines}
     first = by_n.get(start, {})
     return {"line_start": start, "line_end": end, "page": first.get("page"),
-            "section": first.get("section", ""), "verified": "normalized", "text": first.get("text", "")}
+            "section": first.get("section", ""), "verified": verified, "text": first.get("text", "")}
+
+
+def _fuzzy_line(q: str, lines: list[dict], threshold: float = 0.92) -> int | None:
+    """Строка, в которой есть фрагмент длины цитаты с похожестью ≥ threshold (CONTRACT §7, п. 4)."""
+    from difflib import SequenceMatcher
+
+    best_n, best_r = None, threshold
+    for x in lines:
+        t = _norm(x.get("text", ""))
+        if not t:
+            continue
+        L = len(q)
+        windows = [t] if len(t) <= L else [t[i:i + L] for i in range(0, len(t) - L + 1)]
+        for w in windows:
+            sm = SequenceMatcher(None, q, w)
+            if sm.quick_ratio() < best_r:
+                continue
+            r = sm.ratio()
+            if r >= best_r:
+                best_n, best_r = x["n"], r
+    return best_n
 
 
 def verify(view: Any, quote: str, line_hint: int | None = None) -> dict | None:
@@ -238,6 +264,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
 # Виды требований, конфликт с которыми не блокирует сам по себе: цель — намерение, а не правило;
 # нефункциональное требование о сроке редко противоречит правилу поведения напрямую.
 SOFT_KINDS = ("goal", "nonfunctional")
+MAJOR_CONFLICT_KINDS = ("unit_mismatch",)
 
 
 def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict | None:
@@ -254,7 +281,8 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         if kind not in CONFLICT_KINDS:
             kind = "contradiction"
         soft = any((known or {}).get(x, {}).get("kind") in SOFT_KINDS for x in (pair["a"], pair["b"]))
-        severity = "critical" if two_places and not soft else "major"
+        # Разные единицы одной величины обычно снимаются правилом пересчёта — major; судья может поднять.
+        severity = "critical" if two_places and not soft and kind not in MAJOR_CONFLICT_KINDS else "major"
     else:  # undefined
         if kind in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
             kind = "ambiguity"
