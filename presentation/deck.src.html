@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STUPITS — ИИ-агент проверки требований</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* Презентация STUPITS (№14). Сцена 1600×900, масштабируется под окно; печать — по слайду на страницу.
+   Стиль продолжает титульный слайд: глубокий космос, золото BCC, мятный свет, пиксельные метки. */
+:root {
+  color-scheme: dark;
+  --bg: #070B16; --bg2: #0D1830; --panel: rgba(18, 28, 52, .72); --panel2: rgba(28, 42, 74, .6);
+  --ink: #F4F6FA; --ink2: #B9C4D8; --ink3: #7F8CA6; --line: rgba(120, 150, 190, .26);
+  --gold: #DEAA6A; --gold2: #F2C98B; --green: #2EAA5A; --mint: #7CFFB2;
+  --crit: #FF6B6B; --major: #FFA94D; --minor: #F2D45C;
+  --sans: "Inter Tight", "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  --pix: "Press Start 2P", var(--mono);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #04060C; color: var(--ink); font-family: var(--sans); overflow: hidden; }
+#vp { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+#stage { position: relative; width: 1600px; height: 900px; flex: none; overflow: hidden; transform-origin: center; background: var(--bg); box-shadow: 0 24px 90px rgba(0, 0, 0, .7); }
+.slide { position: absolute; inset: 0; padding: 64px 96px 70px; display: none; overflow: hidden;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(54, 98, 190, .22), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(46, 170, 90, .10), transparent 60%),
+    linear-gradient(180deg, #070B16 0%, #0A1226 100%); }
+.slide.on { display: block; }
+.slide::before { /* звёзды */
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .55;
+  background-image:
+    radial-gradient(1.5px 1.5px at 7% 12%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 19% 78%, #cfe0ff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 33% 9%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 46% 64%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 61% 18%, #ffe9c7 50%, transparent 51%), radial-gradient(1px 1px at 72% 83%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 88% 31%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 95% 72%, #cfe0ff 50%, transparent 51%),
+    radial-gradient(1px 1px at 54% 92%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 27% 41%, #fff 50%, transparent 51%); }
+.slide > * { position: relative; }
+.kick { font: 12px/1 var(--pix); color: var(--gold); letter-spacing: .06em; display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.kick::before { content: ""; width: 34px; height: 10px; background: linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 12px, var(--gold) 12px 22px, transparent 22px 24px, rgba(222, 170, 106, .35) 24px 34px); }
+h2 { margin: 0 0 18px; font: 800 58px/1.05 var(--sans); letter-spacing: -.025em; max-width: 1300px; }
+h2 em { font-style: normal; color: var(--gold); }
+.lead { font: 400 25px/1.45 var(--sans); color: var(--ink2); max-width: 1180px; margin: 0; }
+.foot { position: absolute; left: 96px; right: 96px; bottom: 26px; display: flex; justify-content: space-between; font: 10px/1 var(--pix); color: var(--ink3); letter-spacing: .05em; }
+.foot b { color: var(--gold); font-weight: 400; }
+.mono { font-family: var(--mono); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; backdrop-filter: blur(6px); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+.tbd { color: #000 !important; background: var(--minor); border-radius: 4px; padding: 0 6px; }
+
+/* 1 — титул */
+#s1 { padding: 0; background: #070B16; }
+#s1 iframe { position: absolute; inset: 0; width: 1600px; height: 900px; border: 0; }
+#s1 img { position: absolute; inset: 0; width: 1600px; height: 900px; display: none; }
+
+/* 2 — боль */
+.pain { display: grid; grid-template-columns: 560px 1fr; gap: 56px; margin-top: 36px; }
+.pain ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+.pain li { font: 500 23px/1.4 var(--sans); color: var(--ink2); padding-left: 34px; position: relative; }
+.pain li::before { content: ""; position: absolute; left: 0; top: 9px; width: 14px; height: 14px; background: var(--crit); box-shadow: 4px 4px 0 rgba(255, 107, 107, .3); }
+.pain li b { color: var(--ink); font-weight: 700; }
+.docbox { padding: 26px 28px; font: 500 19px/1.6 var(--mono); }
+.docbox .ln { display: grid; grid-template-columns: 52px 1fr; gap: 6px; color: var(--ink2); }
+.docbox .ln span:first-child { color: var(--ink3); text-align: right; padding-right: 10px; }
+.docbox mark { background: rgba(255, 107, 107, .22); color: var(--ink); border-bottom: 2px solid var(--crit); border-radius: 3px; }
+.ask { margin-top: 22px; display: flex; gap: 16px; align-items: center; font: 700 26px/1.3 var(--sans); }
+.ask .q { color: var(--gold); }
+.chip2 { font: 600 16px/1 var(--mono); padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); }
+
+/* 3 — решение */
+.flow { display: grid; grid-template-columns: 330px 80px 1fr; align-items: center; gap: 0; margin-top: 40px; }
+.inbox { padding: 30px; text-align: center; }
+.inbox .fmt { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.inbox .big { font: 800 30px/1.2 var(--sans); }
+.inbox .sub { color: var(--ink3); font-size: 18px; margin-top: 8px; }
+.arrow { height: 4px; background: repeating-linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 16px); position: relative; margin: 0 8px; }
+.arrow::after { content: ""; position: absolute; right: -4px; top: -9px; border: 11px solid transparent; border-left: 14px solid var(--gold); }
+.outs { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.out { padding: 22px 24px; }
+.out h3 { margin: 0 0 8px; font: 700 24px/1.2 var(--sans); display: flex; gap: 12px; align-items: center; }
+.out p { margin: 0; color: var(--ink2); font-size: 18.5px; line-height: 1.45; }
+.ico { width: 30px; height: 30px; border-radius: 8px; display: inline-grid; place-items: center; font: 14px/1 var(--pix); color: #0A1226; background: var(--gold); flex: none; }
+.ico.g { background: var(--mint); } .ico.r { background: var(--crit); } .ico.o { background: var(--major); }
+
+/* 4 — демо */
+.shot { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0, 0, 0, .55); background: #0b1020; }
+.shot img { display: block; width: 100%; }
+.demo { display: grid; grid-template-columns: 1fr 380px; gap: 36px; margin-top: 26px; align-items: start; }
+.steps { display: flex; flex-direction: column; gap: 16px; }
+.step { padding: 18px 20px; display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: start; }
+.step .n { font: 16px/44px var(--pix); color: var(--gold); text-align: center; border: 1px solid rgba(222, 170, 106, .5); border-radius: 10px; height: 44px; }
+.step b { display: block; font-size: 20px; margin-bottom: 3px; }
+.step span { color: var(--ink2); font-size: 16.5px; line-height: 1.4; }
+.cmd { margin-top: 6px; font: 600 15px/1.4 var(--mono); color: var(--mint); background: rgba(0, 0, 0, .35); border-radius: 8px; padding: 8px 12px; border: 1px solid var(--line); }
+
+/* 5 — блокеры */
+.blk { display: flex; flex-direction: column; gap: 14px; margin-top: 30px; }
+.bk { display: grid; grid-template-columns: 70px 1fr 220px; gap: 20px; align-items: center; padding: 18px 24px; border-left: 6px solid var(--crit); }
+.bk .id { font: 15px/1 var(--pix); color: var(--crit); }
+.bk .t { font: 700 23px/1.3 var(--sans); }
+.bk .t small { display: block; font: 500 17px/1.4 var(--sans); color: var(--ink2); margin-top: 5px; }
+.bk .where { font: 600 16px/1.4 var(--mono); color: var(--ink3); text-align: right; }
+
+/* 6 — архитектура */
+.pipe { margin-top: 34px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; align-items: stretch; }
+.st { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 8px; position: relative; }
+.st h4 { margin: 0; font: 700 21px/1.2 var(--sans); }
+.st p { margin: 0; font-size: 15.5px; color: var(--ink2); line-height: 1.4; }
+.tag { align-self: flex-start; font: 10px/1 var(--pix); padding: 6px 8px; border-radius: 6px; letter-spacing: .03em; }
+.tag.code { background: rgba(124, 255, 178, .14); color: var(--mint); border: 1px solid rgba(124, 255, 178, .35); }
+.tag.llm { background: rgba(222, 170, 106, .15); color: var(--gold2); border: 1px solid rgba(222, 170, 106, .4); }
+.lenses { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+.lenses span { font: 600 14px/1.2 var(--mono); padding: 7px 8px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); text-align: center; }
+.pipe .st:not(:last-child)::after { content: "→"; position: absolute; right: -17px; top: 40%; color: var(--gold); font: 700 22px/1 var(--sans); }
+.pipe-note { margin-top: 26px; display: flex; gap: 18px; }
+.pipe-note .panel { padding: 16px 20px; font-size: 18px; color: var(--ink2); flex: 1; }
+.pipe-note b { color: var(--ink); }
+
+/* 7 — доказательность */
+.proof { display: grid; grid-template-columns: 1fr 520px; gap: 44px; margin-top: 30px; }
+.rules { display: flex; flex-direction: column; gap: 16px; }
+.rule { padding: 18px 22px; display: grid; grid-template-columns: 40px 1fr; gap: 14px; }
+.rule .n { font: 14px/40px var(--pix); color: var(--mint); text-align: center; border: 1px solid rgba(124, 255, 178, .4); border-radius: 10px; height: 40px; }
+.rule b { display: block; font-size: 21px; margin-bottom: 3px; }
+.rule span { color: var(--ink2); font-size: 17px; line-height: 1.4; }
+.nums { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.num { padding: 18px 20px; }
+.num .v { font: 800 46px/1 var(--sans); color: var(--mint); letter-spacing: -.02em; }
+.num .l { color: var(--ink2); font-size: 16px; margin-top: 6px; line-height: 1.35; }
+
+/* 8 — метрики */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 34px; }
+.kpi { padding: 22px 22px 20px; }
+.kpi .v { font: 800 56px/1 var(--sans); letter-spacing: -.03em; }
+.kpi .v.g { color: var(--mint); } .kpi .v.y { color: var(--gold); }
+.kpi .l { font-size: 17px; color: var(--ink2); margin-top: 10px; line-height: 1.35; }
+.vs { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.vs .panel { padding: 18px 22px; }
+.vs h4 { margin: 0 0 8px; font: 12px/1 var(--pix); color: var(--ink3); letter-spacing: .04em; }
+.vs .panel.new h4 { color: var(--mint); }
+.vs p { margin: 0; font-size: 19px; color: var(--ink2); line-height: 1.45; }
+.vs b { color: var(--ink); }
+.src { margin-top: 14px; font: 500 14px/1.4 var(--mono); color: var(--ink3); }
+
+/* 9 — модели */
+table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 28px; font-size: 19px; }
+.mt th, .mt td { padding: 14px 18px; text-align: left; border-bottom: 1px solid var(--line); }
+.mt th { font: 11px/1 var(--pix); color: var(--ink3); letter-spacing: .04em; }
+.mt td:first-child { font-weight: 700; }
+.mt td.mono { font-size: 17px; }
+.closed { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+.closed .panel { padding: 18px 20px; }
+.closed b { display: block; font-size: 20px; margin-bottom: 4px; }
+.closed span { color: var(--ink2); font-size: 16.5px; line-height: 1.4; }
+
+/* 10 — процесс банка */
+.proc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 32px; }
+.proc .panel { padding: 22px; }
+.proc h3 { margin: 10px 0 6px; font: 700 23px/1.25 var(--sans); }
+.proc p { margin: 0; color: var(--ink2); font-size: 17.5px; line-height: 1.45; }
+
+/* 11 — план */
+.road { margin-top: 44px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+.road::before { content: ""; position: absolute; left: 30px; right: 30px; top: 29px; height: 4px; background: repeating-linear-gradient(90deg, var(--gold) 0 12px, transparent 12px 18px); }
+.ph { padding-right: 26px; }
+.ph .dot { width: 62px; height: 62px; border-radius: 16px; background: var(--bg2); border: 2px solid var(--gold); display: grid; place-items: center; font: 16px/1 var(--pix); color: var(--gold); position: relative; }
+.ph h3 { margin: 22px 0 6px; font: 700 25px/1.2 var(--sans); }
+.ph .when { font: 600 15px/1 var(--mono); color: var(--mint); }
+.ph p { color: var(--ink2); font-size: 17.5px; line-height: 1.45; margin: 10px 0 0; }
+
+/* 12 — команда */
+.team { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 34px; }
+.mem { padding: 22px; }
+.mem .av { width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, var(--gold), #9C6B2E); display: grid; place-items: center; font: 18px/1 var(--pix); color: #0A1226; }
+.mem b { display: block; font-size: 21px; margin-top: 14px; }
+.mem span { color: var(--ink2); font-size: 16px; }
+.final { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+.final .big { font: 800 46px/1.1 var(--sans); letter-spacing: -.02em; }
+.final .big em { font-style: normal; color: var(--gold); }
+.final .repo { font: 600 18px/1.5 var(--mono); color: var(--mint); text-align: right; }
+
+/* навигация */
+#nav { position: fixed; right: 14px; bottom: 12px; display: flex; gap: 6px; z-index: 10; opacity: .25; transition: opacity .2s; }
+#nav:hover { opacity: 1; }
+#nav button { font: 600 13px/1 var(--mono); color: var(--ink); background: rgba(20, 30, 55, .9); border: 1px solid var(--line); border-radius: 8px; height: 30px; min-width: 36px; cursor: pointer; }
+#cnt { font: 600 13px/30px var(--mono); color: var(--ink3); padding: 0 6px; }
+
+@media print {
+  @page { size: 1600px 900px; margin: 0; }
+  html, body { overflow: visible; height: auto; background: var(--bg); }
+  #vp { position: static; display: block; }
+  #stage { transform: none !important; width: auto; height: auto; overflow: visible; box-shadow: none; background: none; }
+  .slide { display: block !important; position: relative; width: 1600px; height: 900px; break-after: page; }
+  #s1 iframe { display: none; }
+  #s1 img { display: block; }
+  #nav { display: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<div id="vp"><div id="stage">
+
+<!-- 1. Титул: живой слайд команды; для PDF/PPTX — его финальный кадр -->
+<section class="slide" id="s1" data-title="Титул">
+  <iframe src="title.html" title="STUPITS — титульный слайд" data-live></iframe>
+  <img src="img/title_final.png" alt="STUPITS: находит дефекты в ТЗ до первой строки кода">
+</section>
+
+<!-- 2. Боль банка -->
+<section class="slide" id="s2" data-title="Боль банка">
+  <div class="kick">02 · БОЛЬ БАНКА</div>
+  <h2>ТЗ уходит в разработку <em>с противоречиями</em></h2>
+  <p class="lead">Ревью требований в банке — ручное, по чек-листу и без ссылок на место в документе. Ошибку находят на тестировании или у клиента, когда исправлять уже дорого.</p>
+  <div class="pain">
+    <ul>
+      <li><b>Две строки — два ответа.</b> Разработчик выбирает трактовку сам, тестировщик не может написать ожидаемый результат.</li>
+      <li><b>Обещано, но не описано.</b> Метода, события или поля нет — команда додумывает контракт.</li>
+      <li><b>Спор при приёмке.</b> Критерий приёмки противоречит правилу из того же документа.</li>
+    </ul>
+    <div>
+      <div class="panel docbox">
+        <div class="ln"><span>39</span><span>Ф-3. … клиент получает push. <mark>На карту приходится максимум один такой push за календарный месяц.</mark></span></div>
+        <div class="ln"><span>40</span><span>Ф-4. При изменении порога накопленная сумма сохраняется. Если она ниже нового порога, <mark>следующее достижение вызывает push независимо от истории</mark> предыдущей настройки.</span></div>
+      </div>
+      <div class="ask"><span class="q">?</span>Порог изменили после push — отправлять второй в этом месяце?</div>
+      <div style="display:flex; gap:10px; margin-top:14px"><span class="chip2">по Ф-3 — нет</span><span class="chip2">по Ф-4 — да</span></div>
+    </div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>02 / 12</span></div>
+</section>
+
+<!-- 3. Решение -->
+<section class="slide" id="s3" data-title="Решение">
+  <div class="kick">03 · РЕШЕНИЕ</div>
+  <h2>Загрузил ТЗ — получил <em>вердикт и доказательства</em></h2>
+  <p class="lead">Агент проводит статическое ревью по ISO/IEC/IEEE 29148 и IEEE 830 и отвечает на главный вопрос: можно ли начинать разработку и тестирование.</p>
+  <div class="flow">
+    <div class="panel inbox"><div class="big">Документ требований</div><div class="sub">как у аналитика, без подготовки</div>
+      <div class="fmt"><span class="chip2">PDF</span><span class="chip2">DOCX</span><span class="chip2">MD</span><span class="chip2">TXT</span><span class="chip2">HTML</span></div></div>
+    <div class="arrow"></div>
+    <div class="outs">
+      <div class="panel out"><h3><span class="ico r">!</span>Вердикт</h3><p>«Разработка: нельзя / с условиями / можно» — по правилу кода, плюс что исправить первым.</p></div>
+      <div class="panel out"><h3><span class="ico">“</span>Дефекты с цитатой</h3><p>Дословная цитата, номер строки и страница, сценарий, последствия и готовая новая формулировка.</p></div>
+      <div class="panel out"><h3><span class="ico o">?</span>Вопросы владельцу</h3><p>С вариантами ответа и адресатом; ответы возвращаются агенту — вердикт «до и после».</p></div>
+      <div class="panel out"><h3><span class="ico g">✓</span>Для процесса банка</h3><p>Заполненный чек-лист ревью, тест-кейсы, задачи Jira, Word с комментариями.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>03 / 12</span></div>
+</section>
+
+<!-- 4. Живое демо -->
+<section class="slide" id="s4" data-title="Демо">
+  <div class="kick">04 · ЖИВОЕ ДЕМО</div>
+  <h2>Клик по дефекту — <em>место в документе</em></h2>
+  <div class="demo">
+    <div class="shot"><img src="img/report_first.png" alt="HTML-отчёт: вердикт, документ с подсветкой, карточки дефектов"></div>
+    <div class="steps">
+      <div class="panel step"><span class="n">1</span><div><b>Загрузить файл</b><span>PDF, Word или Markdown — в браузере или одной командой.</span><div class="cmd">python -m bcc_review.v2.web</div></div></div>
+      <div class="panel step"><span class="n">2</span><div><b>Этапы на экране</b><span>Чтение, нарезка, четыре ревьюера параллельно, судья.</span></div></div>
+      <div class="panel step"><span class="n">3</span><div><b>Отчёт одним файлом</b><span>Работает без сети; скачать MD, JSON, Word, PDF, Jira CSV.</span><div class="cmd">python -m bcc_review ТЗ.pdf отчёт.md</div></div></div>
+    </div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>04 / 12</span></div>
+</section>
+
+<!-- 5. Пять блокеров -->
+<section class="slide" id="s5" data-title="Блокеры">
+  <div class="kick">05 · ОФИЦИАЛЬНЫЙ ДОКУМЕНТ КЕЙСА</div>
+  <h2>{{critical_count}} блокеров, <em>которые агент нашёл сам</em></h2>
+  <div class="blk">{{blockers}}</div>
+  <div class="foot"><span><b>STUPITS</b> · {{report_source}}</span><span>05 / 12</span></div>
+</section>
+
+<!-- 6. Как устроен -->
+<section class="slide" id="s6" data-title="Архитектура">
+  <div class="kick">06 · КАК УСТРОЕН АГЕНТ</div>
+  <h2>Команда ревьюеров, а не <em>один промпт</em></h2>
+  <div class="pipe">
+    <div class="panel st"><span class="tag code">КОД</span><h4>Документ</h4><p>PDF, DOCX, MD, HTML → строки «L038|» со страницей и разделом. Правила — точные сигналы.</p></div>
+    <div class="panel st"><span class="tag llm">LLM ×1</span><h4>Нарезка</h4><p>Требования R-01… с цитатой; чек-листы и шаблоны — исключаются.</p></div>
+    <div class="panel st"><span class="tag llm">LLM ×5 параллельно</span><h4>Ревьюеры</h4><div class="lenses"><span>Аналитик</span><span>Тестировщик</span><span>Архитектор</span><span>Риски</span><span style="grid-column: span 2">Набор целиком</span></div></div>
+    <div class="panel st"><span class="tag llm">LLM ×1</span><h4>Судья</h4><p>Склеивает дубли, отклоняет ложные с причиной, ставит критичность и порядок исправления.</p></div>
+    <div class="panel st"><span class="tag code">КОД</span><h4>Вердикт и отчёты</h4><p>Вердикт — по правилу кода. MD · JSON · HTML · Word · PDF · Jira.</p></div>
+  </div>
+  <div class="pipe-note">
+    <div class="panel"><b>Около 8 вызовов модели</b> на документ вместо оценки «каждое требование × каждый критерий».</div>
+    <div class="panel"><b>Тестировщик исполняет критерии приёмки:</b> выводит ожидаемое из правил и сравнивает с записанным.</div>
+    <div class="panel"><b>Набор целиком:</b> попарная сверка по сценарию «вход → исход A → исход B».</div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>06 / 12</span></div>
+</section>
+
+<!-- 7. Доказательность -->
+<section class="slide" id="s7" data-title="Доказательность">
+  <div class="kick">07 · ДОКАЗАТЕЛЬНОСТЬ</div>
+  <h2>Каждой цитате можно <em>верить</em></h2>
+  <div class="proof">
+    <div class="rules">
+      <div class="panel rule"><span class="n">1</span><div><b>Модель цитирует — код проверяет</b><span>Цитата ищется в документе программой; номер строки и страницу считает код, а не модель.</span></div></div>
+      <div class="panel rule"><span class="n">2</span><div><b>Нет цитаты — нет замечания</b><span>Кандидат с ненайденной цитатой не попадает в отчёт: он уходит в «отклонённые» с причиной.</span></div></div>
+      <div class="panel rule"><span class="n">3</span><div><b>Судья не пишет цитат</b><span>Он только решает: принять, склеить или отклонить. Новых галлюцинаций на этом шаге не появляется.</span></div></div>
+      <div class="nums">
+        <div class="panel num"><div class="v">{{quotes_verified}}</div><div class="l">цитат в отчёте найдены в документе программой</div></div>
+        <div class="panel num"><div class="v">{{rejected}}</div><div class="l">кандидатов судья отклонил с причиной — точность важнее количества</div></div>
+      </div>
+    </div>
+    <div class="shot"><img src="img/report_card.png" alt="Карточка дефекта с подсветкой цитаты в документе"></div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>07 / 12</span></div>
+</section>
+
+<!-- 8. Метрики -->
+<section class="slide" id="s8" data-title="Метрики">
+  <div class="kick">08 · ЗАМЕР НА ЭТАЛОНЕ</div>
+  <h2>Проверили <em>цифрами</em>, а не на глаз</h2>
+  <div class="kpis">
+    <div class="panel kpi"><div class="v g">{{k_found}}</div><div class="l">ключевых блокеров К1–К5 найдено на официальном документе</div></div>
+    <div class="panel kpi"><div class="v y">{{s_found}}</div><div class="l">существенных дефектов С1–С20 из эталона</div></div>
+    <div class="panel kpi"><div class="v g">{{clean_fp}}</div><div class="l">критичных ложных тревог на чистых ТЗ корпуса</div></div>
+    <div class="panel kpi"><div class="v">{{stability}}</div><div class="l">прогона подряд находят все К1–К5</div></div>
+  </div>
+  <div class="vs">
+    <div class="panel"><h4>БЫЛО: v1, ПРАВИЛА + ОЦЕНКА ПО КРИТЕРИЯМ</h4><p><b>0 из 28</b> заложенных дефектов, <b>44 ложные тревоги</b> на 8 чистых ТЗ, отчёт 2 300 строк.</p></div>
+    <div class="panel new"><h4>СТАЛО: v2, РЕВЬЮЕРЫ + СУДЬЯ</h4><p>{{v2_summary}}</p></div>
+  </div>
+  <div class="src">{{metrics_source}}</div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>08 / 12</span></div>
+</section>
+
+<!-- 9. Модели и закрытый контур -->
+<section class="slide" id="s9" data-title="Модели">
+  <div class="kick">09 · МОДЕЛИ И ЗАКРЫТЫЙ КОНТУР</div>
+  <h2>Работает на любой модели — <em>и внутри банка</em></h2>
+  <table class="mt"><thead><tr><th>МОДЕЛЬ</th><th>К1–К5</th><th>С1–С20</th><th>ЗАМЕЧАНИЙ</th><th>ВРЕМЯ</th><th>ВЫЗОВОВ</th></tr></thead>
+  <tbody>{{models_rows}}</tbody></table>
+  <div class="closed">
+    <div class="panel"><b>Один интерфейс провайдера</b><span>Claude, Gemini, OpenAI-совместимые серверы; запасная цепочка моделей при перегрузке.</span></div>
+    <div class="panel"><b>Закрытый контур</b><span>Ollama или vLLM в периметре банка: документ не покидает сеть.</span></div>
+    <div class="panel"><b>Без модели</b><span>Офлайн-режим только на правилах — формальные дефекты за секунды.</span></div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>09 / 12</span></div>
+</section>
+
+<!-- 10. Процесс банка -->
+<section class="slide" id="s10" data-title="Процесс банка">
+  <div class="kick">10 · ВСТРАИВАНИЕ В ПРОЦЕСС</div>
+  <h2>Говорит на языке <em>процесса банка</em></h2>
+  <div class="proc">
+    <div class="panel"><span class="ico g">✓</span><h3>Чек-лист «Ревью требований»</h3><p>Шаблон банка заполнен: «Да / Нет / Частично» с комментарием и ссылками на дефекты.</p></div>
+    <div class="panel"><span class="ico">W</span><h3>Word с комментариями</h3><p>Замечания стоят прямо в документе аналитика — там, где он привык работать.</p></div>
+    <div class="panel"><span class="ico o">J</span><h3>Задачи Jira</h3><p>CSV для импорта: дефект, серьёзность, цитата, рекомендация, приоритет.</p></div>
+    <div class="panel"><span class="ico r">?</span><h3>Вопросы и ответы</h3><p>Владелец отвечает вариантом — агент пересчитывает: вердикт «до» и «после».</p></div>
+    <div class="panel"><span class="ico">✎</span><h3>Исправленное ТЗ</h3><p>Редакция «было → стало» с пометками дефектов и маркерами «уточнить».</p></div>
+    <div class="panel"><span class="ico g">T</span><h3>Тест-кейсы</h3><p>Черновик для пустого раздела «заполняются тестировщиками» — с пробелами приёмки.</p></div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>10 / 12</span></div>
+</section>
+
+<!-- 11. План внедрения -->
+<section class="slide" id="s11" data-title="План">
+  <div class="kick">11 · ПЛАН ВНЕДРЕНИЯ</div>
+  <h2>От хакатона до <em>гейта «можно начинать»</em></h2>
+  <div class="road">
+    <div class="ph"><div class="dot">1</div><h3>Пилот</h3><div class="when">2 недели</div><p>Одна продуктовая команда, реальные ТЗ; аналитик отмечает полезные и ложные замечания.</p></div>
+    <div class="ph"><div class="dot">2</div><h3>Калибровка</h3><div class="when">+2 недели</div><p>Эталон банка из разборов пилота; промпты и шкала серьёзности под внутренние стандарты.</p></div>
+    <div class="ph"><div class="dot">3</div><h3>Закрытый контур</h3><div class="when">+1 месяц</div><p>Модель в периметре (vLLM), журнал прогонов, доступ по ролям, требования ИБ.</p></div>
+    <div class="ph"><div class="dot">4</div><h3>Гейт в процессе</h3><div class="when">далее</div><p>Проверка при переводе задачи в разработку: Jira, Confluence, чек-лист ревью.</p></div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>11 / 12</span></div>
+</section>
+
+<!-- 12. Команда -->
+<section class="slide" id="s12" data-title="Команда">
+  <div class="kick">12 · КОМАНДА</div>
+  <h2>Команда <em>STUPITS</em></h2>
+  <div class="team">{{team}}</div>
+  <div class="final">
+    <div class="big">Находит дефекты в ТЗ<br><em>до первой строки кода</em></div>
+    <div class="repo">github.com/diiaanns07-droid/winnersOFbankCCbyMNU<br>python -m bcc_review ТЗ.pdf отчёт.md</div>
+  </div>
+  <div class="foot"><span><b>STUPITS</b> · BCC-HUB × MNU FinTech Hackathon 2026</span><span>12 / 12</span></div>
+</section>
+
+</div></div>
+<div id="nav"><button type="button" id="prev" aria-label="Назад">←</button><span id="cnt"></span><button type="button" id="next" aria-label="Вперёд">→</button></div>
+<script>
+(function () {
+  var stage = document.getElementById("stage");
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var i = 0;
+  function fit() {
+    var k = Math.min(innerWidth / 1600, innerHeight / 900);
+    stage.style.transform = "scale(" + k + ")";
+  }
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function (s, j) { s.classList.toggle("on", j === i); });
+    document.getElementById("cnt").textContent = (i + 1) + " / " + slides.length;
+    history.replaceState(null, "", "#" + (i + 1));
+    var fr = slides[i].querySelector("iframe[data-live]");
+    if (fr) setTimeout(function () { try { fr.contentWindow.focus(); } catch (_) {} }, 50);
+  }
+  addEventListener("resize", fit);
+  addEventListener("keydown", function (e) {
+    var k = e.key;
+    if (k === "ArrowRight" || k === "PageDown" || k === " ") { e.preventDefault(); show(i + 1); }
+    else if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); show(i - 1); }
+    else if (k === "Home") show(0);
+    else if (k === "End") show(slides.length - 1);
+    else if (k === "f" || k === "а") { (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(function () {}); }
+  });
+  document.getElementById("next").onclick = function () { show(i + 1); };
+  document.getElementById("prev").onclick = function () { show(i - 1); };
+  fit();
+  show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+})();
+</script>
+</body>
+</html>
