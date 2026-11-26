@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "{\"stage\": \"requirement_check\", \"candidates\": [], \"notes\": \"Дефектов не найдено\"}"
+            }
+          ]
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 640,
+      "candidatesTokenCount": 21,
+      "totalTokenCount": 661
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-ok-empty-0002"
+  }
+}
