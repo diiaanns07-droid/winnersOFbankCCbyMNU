@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -27,9 +28,10 @@ LOC_KEYS = ("line", "line_end", "page", "page_end", "path")
 
 
 class Builder:
-    def __init__(self, source: Path) -> None:
+    def __init__(self, source: Path, reader: Callable[[str], dict] | None = None) -> None:
+        """``reader`` — штатный reader (например, №01 через ``normalize_document``); по умолчанию синтетический."""
         self.source = source
-        self.doc = synthetic_reader.read(source)
+        self.doc = (reader or synthetic_reader.read)(str(source))
         self.idx = DocumentIndex(self.doc)
         self.budget = RepairBudget(limit=10)
         self.audit = EvidenceAudit(budget=self.budget)

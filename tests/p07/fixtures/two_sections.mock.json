@@ -1,0 +1,13 @@
+{
+  "individual": {"results": [{"req_id": "R-001.2", "checks": [{
+    "criterion": "unambiguous", "status": "issue",
+    "reason": "Неясно, к чему относится лимит: к одной операции или к сумме за сутки.",
+    "quote": "сумма не превышает 10 000 ₸",
+    "condition": "", "outcomes": [], "impact": "Разработчик и тестировщик по-разному поймут лимит.",
+    "fix": "Указать: лимит на одну операцию или суммарно за сутки.", "question": "",
+    "severity": "major", "kind": "ambiguity", "blocks": "both", "blocked_decision": "",
+    "scenario": "", "root_cause": ""}]}]},
+  "cross.pairs": {"pairs": []},
+  "cross.coverage": {"obligations": [], "links": []},
+  "verify_meaning": {"__verdicts__": "confirmed"}
+}

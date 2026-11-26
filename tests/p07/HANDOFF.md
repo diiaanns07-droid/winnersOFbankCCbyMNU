@@ -93,11 +93,13 @@ from bcc_review.verification import verify_report, render_text, summary_counts, 
 
 1. JSON Schema v1 (`contracts.validation_errors`) → `schema_invalid`.
 2. SHA-256 файла против `run.source_sha256` и `document.id`. При расхождении сверка опор пропускается.
-3. Оригинал читается заново штатным reader. Сравниваются `document.title/format/warnings` и каждый блок
-   (`text`, `section`, `kind`, `loc`).
+3. Оригинал читается заново штатным reader и приводится `contracts.normalize_document` (как в движке).
+   Сравниваются `document.title/format/warnings` и каждый блок (`text`, `section`, `kind`, `loc`).
 4. Каждая Evidence (вне `run`, `diff`, `document`, `rejected`): блок, диапазон, литерал, граница, `section` и
    `loc`/`line`/`col`/`page`/`path`, если они указаны. Правки `decisions[].edits` для текущего SHA: `old`
-   по координатам.
+   по координатам. Опора замечания `scope = requirement` должна лежать внутри опор его требований: если та же
+   цитата стоит внутри требования, а отчёт указывает на другое вхождение, — ошибка `evidence_wrong_occurrence`;
+   если внутри требования такой цитаты нет — предупреждение `evidence_outside_requirement`.
 5. Уникальность ID; ссылки `req_ids`, `req_id`, `affected_req_ids`, `finding_ids`, `critical_ids`, `fact_ids`,
    `question_id`, `open_question_id`, `block_ids`, `inspected_block_ids`, `block_id`.
 6. Замечания `confirmed`: `anchor_status = supported`; конфликт — witness с двумя разными опорами, которые входят
@@ -120,7 +122,8 @@ Reader: аргумент `reader=` → `BCC_REVIEW_READER=module:function` → `
 `reader_unavailable` (код 1); молча проверка не проходит.
 
 Коды выхода по `contracts`: `0` — пройдена, `1` — ошибка выполнения (нет файла или reader), `2` — вызов,
-`4` — расхождение. Оболочка Max: `return verification.main(argv)`; ведущее слово `verify` принимается.
+`4` — расхождение. Результат содержит `implementation = {verify, reader}`: какая функция проверки и какой reader
+реально отработали (для CLI: `bcc_review.cli:cmd_verify.<locals>.<lambda> → bcc_review.readers.text:read_text`).
 
 ## 5. Сравнение с RAG и выбор подхода
 
@@ -164,7 +167,8 @@ pip install -e ".[dev]"
 ```bash
 python -m pytest tests/p07 tests/contract -p no:cacheprovider
 ```
-Результат: `160 passed` на Python 3.13.18 и 3.11.18 (venv: pytest, jsonschema, pdfplumber, python-docx).
+Результат первого прохода: `160 passed`; после второго прохода (раздел 11) — `169 passed` (`tests/p07` — 140),
+на Python 3.13.18 и 3.11.18 (venv: pytest, jsonschema, pdfplumber, python-docx).
 
 ```bash
 ruff check --select E,F,W,B,UP,SIM,I --line-length 120 --target-version py311 src/bcc_review/analysis src/bcc_review/verification.py tests/p07
@@ -224,3 +228,62 @@ BCC_REVIEW_READER=synthetic_reader:read PYTHONPATH=tests/p07 python -m bcc_revie
    стыке перейти со `synthetic_reader.read` на штатный reader (одна строка в `test_verify_report.py`).
 5. **№08, №13, №14, №17**: подпись места — `locate(...)["label"]`; подсветка — `col`/`col_end` (MD) и `rects`
    (PDF); `candidates` не показывать как доказательство; в HTML пересчитать индексы в UTF-16.
+
+## 11. Второй проход: перепроверка реального файла из командной строки
+
+База: `bcc/integration@6be9e97` (влиты №01 reader, движок, CLI и мой `cfebfff`). Тестовая копия — отдельный
+worktree этого коммита и отдельный venv; reader №01 — `bcc_review.readers.text:read_text`, транспорт модели —
+`runtime.mock:MockAdapter`, сеть запрещена.
+
+Пример `tests/p07/fixtures/two_sections.md` (SHA-256 `fdb97025…`): фраза «сумма не превышает 10 000 ₸» дважды в
+блоке `b0003` раздела «Ограничения» (строки 5 и 6) и в `b0005` раздела «Уведомления» (строка 10); перед вторым
+вхождением `𝟙`. `resolve_hint` без контекста — `ambiguous` `[19,46)` и `[70,97)`; с контекстом
+«Для 𝟙-й карты клиента сумма не превышает 10 000 ₸ в сутки.» — `matched` `b0003[70:97)`, строка 6, столбец 22
+(в UTF-16 смещение было бы 71).
+
+Воспроизведение на прежнем коде (`cfebfff`) штатной командой и результат после правки:
+
+| Пара | До | После |
+| :--- | :--- | :--- |
+| правильная | 0, `verify: OK` | 0, `verify: OK` |
+| убрано «не» в цитате | 4, `evidence_quote_mismatch` | то же |
+| 10 000 → 10 001 в цитате | 4, `evidence_quote_mismatch` | то же |
+| чужая редакция («первой» → «второй», фраза на месте) | 4, `source_sha_mismatch`, `document_id_mismatch` | то же |
+| опора замечания R-001.2 переставлена на вхождение строки 5 | **0 — ложное подтверждение** | 4, `evidence_wrong_occurrence` с обоими местами |
+| `python -m bcc_review.verification` на отчёте движка с таблицами | **4 — ложный `document_block_mismatch` (`loc.columns`)** | 0, счётчики равны CLI |
+
+Правки в `verification.py`: проверка вхождения для замечаний уровня требования, `normalize_document` после
+reader, `implementation` в результате. Регрессии: `tests/p07/test_real_reader_cli.py` (9 тестов, на прежнем коде
+падают 3). Ложных срабатываний новой проверки нет: отчёт движка `--offline-lint` по `bcc_requirements.md` —
+290 опор, `ok`, два обоснованных предупреждения `evidence_outside_requirement`; образцы №17 дают те же коды, что и
+до правки.
+
+Команды для Max и №18 (из корня репозитория):
+
+```bash
+python -m bcc_review verify REPORT.json SOURCE.md
+```
+
+```bash
+python -m bcc_review verify REPORT.json SOURCE.md --json
+```
+
+```bash
+python tests/p07/offline_cli.py verify REPORT.json SOURCE.md
+```
+
+Третья команда — тот же CLI с журналом: что загрузил реестр модулей (`[p07-offline] загружено: …`), число
+сетевых соединений и импортированные модули провайдеров.
+
+Найдено на стыке (не в моей зоне):
+
+1. **№05 / Max**: `individual._cand_from_answer` передаёт hint `{block_id, quote}` без `context`, хотя цитата
+   найдена внутри конкретного требования; движок вызывает `resolve_candidate(document, candidate)` без
+   `requirements`. На повторяющейся фразе резолвер честно отвечает `ambiguous`, и верное замечание уходит в
+   `rejected` (прогон `two_sections.md` с `fixtures/two_sections.mock.json`). Ложного подтверждения нет, но теряется
+   находка. Достаточно одного: №05 кладёт в hint `context` = текст требования (резолвер уже его использует), либо
+   Max передаёт `requirements=` и я добавляю выбор вхождения внутри опор требования.
+2. **Max**: `cli.cmd_verify` возвращает 4 на любую ошибку, в том числе `reader_unavailable`, где по контракту
+   нужен 1. Можно вернуть `result.get("exit_code", 4)`.
+3. **№17**: образцы `tests/p17/samples/*/report.json` построены синтетическим документом, а не reader №01, поэтому
+   `verify` по их `source-*.md` справедливо сообщает о расхождении блоков и опор.

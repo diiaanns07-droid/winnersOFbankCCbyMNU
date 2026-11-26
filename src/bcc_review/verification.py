@@ -99,6 +99,8 @@ ERRORS: dict[str, str] = {
     "unknown_section": "раздела с такими заголовками нет в документе",
     "section_mismatch": "раздел не совпадает с разделом блока",
     "evidence_loc_mismatch": "строка/страница/путь опоры не совпадает с вычисленными по reader-координатам",
+    "evidence_wrong_occurrence": "опора указывает на другое вхождение той же цитаты, а не на текст требования",
+    "evidence_outside_requirement": "опора замечания уровня требования лежит вне текста его требования",
     "decision_edit_mismatch": "правка решения не совпадает с текстом текущего источника",
     "unsupported_confirmed_finding": "у замечания со статусом confirmed недостаточно опор",
     "summary_count_mismatch": "счётчик сводки не совпадает с пересчитанным по спискам",
@@ -177,6 +179,20 @@ def _numbers(text: str) -> set[str]:
         token = re.sub(r"[    ]", "", m.group()).replace(",", ".")
         out.add(token.rstrip("0").rstrip(".") if "." in token else token)
     return out
+
+
+def _describe_callable(func: Any) -> str:
+    """``модуль:имя`` функции; для обёртки (lambda движка) — и вложенной функции reader."""
+    name = f"{getattr(func, '__module__', '?')}:{getattr(func, '__qualname__', type(func).__name__)}"
+    inner = []
+    for cell in getattr(func, "__closure__", None) or ():
+        try:
+            value = cell.cell_contents
+        except ValueError:
+            continue
+        if callable(value) and not isinstance(value, type):
+            inner.append(_describe_callable(value))
+    return " → ".join([name, *inner])
 
 
 def find_reader(source_path: str | os.PathLike[str] | None = None) -> Callable[[str], Any] | None:
@@ -286,6 +302,8 @@ class _Verifier:
             "warnings": self.warnings,
             "counts": self.counts,
             "source": self.source,
+            "implementation": {"verify": f"{__name__}:verify_report ({__file__})",
+                               "reader": self.source.get("reader")},
             "report_path": str(self.report_path),
             "source_path": str(self.source_path),
         }
@@ -351,12 +369,16 @@ class _Verifier:
             return False
         try:
             document = reader(str(self.source_path))
+            normalize = getattr(C, "normalize_document", None)  # тот же стык, что у движка; идемпотентно
+            if normalize is not None:
+                document = normalize(document)
         except Exception as exc:  # noqa: BLE001 — reader чужой, причину показываем как есть
             self.errors.append(_err("reader_failed", detail=f"{type(exc).__name__}: {exc}"))
             return False
         if _get(document, "id") not in (None, self.source["sha256"]):
             self.warnings.append(_err("reader_id_differs", detail=str(_get(document, "id"))))
         self.document = document
+        self.source["reader"] = _describe_callable(reader)
         self.index = DocumentIndex(document)
         self.source["format"] = _get(document, "format")
         self.source["blocks"] = len(self.index.order)
@@ -390,8 +412,43 @@ class _Verifier:
                     detail = f"{bid}: нет в источнике" if fresh is None else f"{bid}: {', '.join(differs)}"
                     self.errors.append(_err("document_block_mismatch", f"document.blocks[{i}]", detail))
 
+    def _requirement_spans(self) -> dict[str, tuple[list[str], list[tuple[str, int, int]]]]:
+        """Путь опоры замечания уровня требования → (его req_ids, диапазоны опор этих требований)."""
+        spans: dict[Any, list[tuple[str, int, int]]] = {}
+        for req in _items(self.report, "requirements"):
+            spans[req.get("id")] = [(e["block_id"], e["start"], e["end"]) for e in req.get("evidence") or []
+                                    if _is_evidence(e) and isinstance(e["start"], int) and isinstance(e["end"], int)]
+        out: dict[str, tuple[list[str], list[tuple[str, int, int]]]] = {}
+        for i, finding in enumerate(_items(self.report, "findings")):
+            if finding.get("scope") != "requirement":
+                continue
+            req_ids = [rid for rid in finding.get("req_ids") or [] if spans.get(rid)]
+            ranges = [span for rid in req_ids for span in spans[rid]]
+            for j, _ in enumerate(finding.get("evidence") or [] if ranges else []):
+                out[f"findings[{i}].evidence[{j}]"] = (req_ids, ranges)
+        return out
+
+    def _occurrence_problem(self, path: str, node: Mapping[str, Any],
+                            req_ids: list[str], ranges: list[tuple[str, int, int]]) -> tuple[str, str] | None:
+        """Опора вне текста своего требования: ошибка, если та же цитата есть внутри требования."""
+        assert self.index is not None
+        bid, start, end, quote = node["block_id"], node["start"], node["end"], node["quote"]
+        if any(b == bid and s <= start and end <= e for b, s, e in ranges):
+            return None
+        here = locate(None, node, index=self.index)["label"]
+        for b, s, e in ranges:
+            k = self.index.text(b).find(quote, s, e) if b in self.index.blocks else -1
+            if k != -1:
+                there = locate(None, {"block_id": b, "start": k, "end": k + len(quote)}, index=self.index)["label"]
+                return ("evidence_wrong_occurrence",
+                        f"в отчёте [{start},{end}) {bid}, {here}; у {', '.join(req_ids)} та же цитата "
+                        f"стоит в [{k},{k + len(quote)}) {b}, {there}")
+        self.warnings.append(_err("evidence_outside_requirement", path, f"{here}; требования {', '.join(req_ids)}"))
+        return None
+
     def _check_evidence(self) -> None:
         assert self.index is not None
+        scoped = self._requirement_spans()
         for path, node in _walk_report(self.report):
             if not _is_evidence(node):
                 continue
@@ -409,6 +466,10 @@ class _Verifier:
                 self.counts["rejected"] += 1
                 continue
             problems = self._loc_problems(node)
+            if path in scoped:
+                wrong = self._occurrence_problem(path, node, *scoped[path])
+                if wrong:
+                    problems.append(wrong)
             section = node.get("section")
             if isinstance(section, list) and section != self.index.section(node["block_id"]):
                 problems.append(("section_mismatch", f"{section} ≠ {self.index.section(node['block_id'])}"))
@@ -620,6 +681,9 @@ def render_text(result: Mapping[str, Any]) -> str:
     if src.get("sha256"):
         verdict = "совпадает с отчётом" if src.get("matches") else "НЕ совпадает с отчётом"
         lines.append(f"  SHA-256:  {src['sha256']} — {verdict}")
+    impl = result.get("implementation") or {}
+    lines.append(f"  verify:   {impl.get('verify', '—')}")
+    lines.append(f"  reader:   {impl.get('reader') or 'не вызывался'}")
     lines.append("Опоры (единица учёта — объект Evidence {block_id,start,end,quote} в отчёте; "
                  "каждое вхождение отдельно):")
     tail = f" · пропущено {c['skipped']}" if c.get("skipped") else ""
