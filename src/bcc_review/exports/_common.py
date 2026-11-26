@@ -539,74 +539,155 @@ def severity_rank(finding: Mapping[str, Any]) -> int:
 
 
 def _norm(text: Any) -> str:
-    return " ".join(str(text or "").lower().split())
+    text = " ".join(str(text or "").lower().replace("ё", "е").split())
+    return text.strip(" .,;:!?«»\"'")
 
 
-def root_cause_key(finding: Mapping[str, Any], by_id: Mapping[str, Mapping[str, Any]]) -> str:
-    """Ключ первопричины.
+# Семейства видов дефекта — те же, что в runtime/merge.py движка: противоречие и
+# неточность одного факта — одно семейство, пропуск и неполнота — другое и т. д.
+KIND_FAMILY = {
+    "conflict": "conflict", "incorrect": "conflict", "ambiguity": "ambiguity", "unverifiable": "verifiability",
+    "incomplete": "gap", "omission": "gap", "placeholder": "gap", "terminology": "terminology",
+    "traceability": "traceability", "non_singular": "structure", "duplicate": "structure",
+    "design_in_requirement": "design", "infeasible": "feasibility", "format": "format", "other": "other",
+}
 
-    Порядок: явная ссылка ``duplicate_of`` (цепочки допустимы) или
-    ``root_cause_id`` — расширения сверх v1; затем ``cause`` контракта v1:
-    находки с одинаковыми ``cause.object`` и ``cause.condition`` — одна
-    первопричина; иначе каждая находка самостоятельна. Дубли внутри одной
-    находки движок уже свёл в ``merged_from``.
+LINK_LABEL = {
+    "duplicate_of": "явная ссылка `duplicate_of`",
+    "root_cause_id": "общий `root_cause_id`",
+    "merged_from": "указан в `merged_from`",
+    "cause": "совпали причина и исходы (`cause`)",
+}
+
+
+def cause_signature(finding: Mapping[str, Any]) -> tuple[str, str, str, frozenset[str]] | None:
+    """Доказанная первопричина: семейство вида, объект, условие и непустой набор исходов.
+
+    Без исходов (``cause.outcomes``) совпадение не доказано: одинаковые объект и
+    условие бывают у разных проблем (месяц учёта и правило push при одной и той же
+    проведённой покупке).
     """
-    seen: set[str] = set()
-    cur = finding
-    while True:
-        fid = str(cur.get("id"))
-        if fid in seen:
-            break
-        seen.add(fid)
-        parent = cur.get("duplicate_of")
-        if parent is not None and str(parent) in by_id:
-            cur = by_id[str(parent)]
-            continue
-        break
-    if cur.get("root_cause_id"):
-        return f"rc:{cur['root_cause_id']}"
-    cause = cur.get("cause")
-    if isinstance(cause, Mapping) and _norm(cause.get("object")) and _norm(cause.get("condition")):
-        return f"cause:{_norm(cause.get('object'))}|{_norm(cause.get('condition'))}"
-    return f"id:{cur.get('id')}"
+    cause = finding.get("cause")
+    if not isinstance(cause, Mapping):
+        return None
+    obj, cond = _norm(cause.get("object")), _norm(cause.get("condition"))
+    outcomes = frozenset(o for o in (_norm(x) for x in as_list(cause.get("outcomes"))) if o)
+    if not obj or not cond or not outcomes:
+        return None
+    kind = str(finding.get("kind") or "").lower()
+    return KIND_FAMILY.get(kind, kind), obj, cond, outcomes
+
+
+def root_cause_links(findings: list[Mapping[str, Any]]) -> list[tuple[str, str, str]]:
+    """Связи «одна первопричина» между находками: (id, id, основание).
+
+    Основания — только явные связи или доказанное совпадение:
+    ``duplicate_of`` (ссылка на другую находку), общий ``root_cause_id``,
+    ID другой находки в ``merged_from`` и совпадение :func:`cause_signature`.
+    Совпадение одних ``cause.object`` и ``cause.condition`` связью не является.
+    """
+    ids = [str(f.get("id")) for f in findings]
+    known = set(ids)
+    links: list[tuple[str, str, str]] = []
+    for f in findings:
+        fid = str(f.get("id"))
+        target = f.get("duplicate_of")
+        if target is not None and str(target) in known and str(target) != fid:
+            links.append((fid, str(target), "duplicate_of"))
+        for other in as_list(f.get("merged_from")):
+            if str(other) in known and str(other) != fid:
+                links.append((fid, str(other), "merged_from"))
+    by_root: dict[str, list[str]] = {}
+    by_cause: dict[tuple, list[str]] = {}
+    for f in findings:
+        fid = str(f.get("id"))
+        if f.get("root_cause_id"):
+            by_root.setdefault(str(f["root_cause_id"]), []).append(fid)
+        sig = cause_signature(f)
+        if sig is not None:
+            by_cause.setdefault(sig, []).append(fid)
+    for reason, buckets in (("root_cause_id", by_root), ("cause", by_cause)):
+        for members in buckets.values():
+            links.extend((members[0], other, reason) for other in members[1:])
+    return links
+
+
+def _natural_id(fid: str) -> tuple:
+    return tuple(int(p) if p.isdigit() else p for p in re.split(r"(\d+)", fid))
 
 
 def group_findings(findings: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Объединить находки одной первопричины (см. :func:`root_cause_key`).
+    """Объединить находки одной первопричины по связям :func:`root_cause_links`.
 
-    Основная запись — подтверждённая, среди них самая серьёзная, при
-    равенстве — первая по порядку в Report. Серьёзность группы — серьёзность
-    основной записи.
+    Состав групп не зависит от порядка находок в Report. Основная запись —
+    подтверждённая; среди них та, что не ссылается на другую через
+    ``duplicate_of``, затем самая серьёзная, затем меньший ID. Серьёзность группы —
+    серьёзность основной записи. Для каждой неосновной записи сохраняется
+    основание связи (``group["link_of"][id]``).
     """
     by_id = {str(f.get("id")): f for f in findings}
+    parent = {fid: fid for fid in by_id}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    links = root_cause_links(findings)
+    for a, b, _ in links:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb, key=_natural_id)] = min(ra, rb, key=_natural_id)
+
     groups: dict[str, list[Mapping[str, Any]]] = {}
     order: list[str] = []
     for f in findings:
-        key = root_cause_key(f, by_id)
-        if key not in groups:
-            groups[key] = []
-            order.append(key)
-        groups[key].append(f)
+        root = find(str(f.get("id")))
+        if root not in groups:
+            groups[root] = []
+            order.append(root)
+        groups[root].append(f)
+
     result = []
-    for key in order:
-        members = groups[key]
-        position = {id(m): i for i, m in enumerate(members)}
-        ranked = sorted(
-            members,
-            key=lambda m: (0 if finding_status(m) == "confirmed" else 1, severity_rank(m), position[id(m)]),
-        )
-        primary = ranked[0]
+    for root in order:
+        members = groups[root]
+        member_ids = {str(m.get("id")) for m in members}
+
+        def rank(m: Mapping[str, Any], ids: set[str] = member_ids) -> tuple:
+            is_dup = str(m.get("duplicate_of")) in ids and str(m.get("duplicate_of")) != str(m.get("id"))
+            return (0 if finding_status(m) == "confirmed" else 1, 1 if is_dup else 0, severity_rank(m),
+                    _natural_id(str(m.get("id"))))
+
+        primary = min(members, key=rank)
+        link_of: dict[str, str] = {}
+        for a, b, reason in links:
+            if a in member_ids:
+                for x in (a, b):
+                    link_of.setdefault(x, reason)
+        link_of.pop(str(primary.get("id")), None)
         result.append(
             {
-                "key": key,
+                "key": "group:" + ",".join(sorted(member_ids, key=_natural_id)),
                 "primary": primary,
                 "members": members,
                 "others": [m for m in members if m is not primary],
+                "link_of": link_of,
                 "severity": str(primary.get("severity", "")).lower(),
                 "confirmed": any(finding_status(m) == "confirmed" for m in members),
             }
         )
     return result
+
+
+def merged_candidates(finding: Mapping[str, Any]) -> list[str]:
+    """Кандидаты, поглощённые находкой при подготовке отчёта.
+
+    Движок пишет ``merged_from = [собственный cid, поглощённые…]``, поэтому
+    первый элемент — сама находка, а не слияние.
+    """
+    items = [str(x) for x in as_list(finding.get("merged_from"))]
+    return items[1:]
 
 
 def confirmed_groups(report: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -805,7 +886,7 @@ def summary_numbers(report: Mapping[str, Any]) -> dict[str, Any]:
         "findings_critical": from_json(by_sev_json.get("critical"), sev_count["critical"]),
         "findings_major": from_json(by_sev_json.get("major"), sev_count["major"]),
         "findings_minor": from_json(by_sev_json.get("minor"), sev_count["minor"]),
-        "merged_candidates": sum(len(as_list(f.get("merged_from"))) for f in findings),
+        "merged_candidates": sum(len(merged_candidates(f)) for f in findings),
         "defects_unique": len(groups),
         "defects_critical": grp_sev["critical"],
         "defects_major": grp_sev["major"],

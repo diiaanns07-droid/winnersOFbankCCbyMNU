@@ -13,23 +13,57 @@ NBSP = " "
 SEV_RANK = {"critical": 0, "major": 1, "minor": 2}
 
 
-def _cause_key(f: dict[str, Any]) -> str:
-    cause = f.get("cause") or {}
-    obj = " ".join(str(cause.get("object") or "").lower().split())
-    cond = " ".join(str(cause.get("condition") or "").lower().split())
-    return f"{obj}|{cond}" if obj and cond else f["id"]
+FAMILY = {"conflict": "conflict", "incorrect": "conflict", "incomplete": "gap", "omission": "gap",
+          "placeholder": "gap", "non_singular": "structure", "duplicate": "structure"}
+
+
+def _norm(text: Any) -> str:
+    return " ".join(str(text or "").lower().replace("ё", "е").split()).strip(" .,;:!?«»\"'")
+
+
+def independent_groups(findings: list[dict[str, Any]]) -> list[set[str]]:
+    """Первопричины без кода экспорта: явные связи или совпадение причины вместе с исходами."""
+    ids = [f["id"] for f in findings]
+    group = {i: {i} for i in ids}
+
+    def join(a: str, b: str) -> None:
+        merged = group[a] | group[b]
+        for x in merged:
+            group[x] = merged
+
+    for f in findings:
+        for target in [f.get("duplicate_of"), *(f.get("merged_from") or [])]:
+            if target in group and target != f["id"]:
+                join(f["id"], target)
+    for a in findings:
+        for b in findings:
+            if a["id"] >= b["id"]:
+                continue
+            if a.get("root_cause_id") and a.get("root_cause_id") == b.get("root_cause_id"):
+                join(a["id"], b["id"])
+            ca, cb = a.get("cause") or {}, b.get("cause") or {}
+            oa = {_norm(o) for o in ca.get("outcomes") or [] if _norm(o)}
+            ob = {_norm(o) for o in cb.get("outcomes") or [] if _norm(o)}
+            if (oa and oa == ob and _norm(ca.get("object")) and _norm(ca.get("object")) == _norm(cb.get("object"))
+                    and _norm(ca.get("condition")) and _norm(ca.get("condition")) == _norm(cb.get("condition"))
+                    and FAMILY.get(a["kind"], a["kind"]) == FAMILY.get(b["kind"], b["kind"])):
+                join(a["id"], b["id"])
+    out: list[set[str]] = []
+    for i in ids:
+        if group[i] not in out:
+            out.append(group[i])
+    return out
 
 
 def independent_counts(report: dict[str, Any]) -> dict[str, int]:
     reqs = report["requirements"]
     findings = report["findings"]
     confirmed = [f for f in findings if f["status"] == "confirmed"]
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for f in confirmed:
-        groups.setdefault(_cause_key(f), []).append(f)
+    by_id = {f["id"]: f for f in confirmed}
+    groups = independent_groups(confirmed)
     sev = {"critical": 0, "major": 0, "minor": 0}
-    for members in groups.values():
-        sev[min(members, key=lambda m: SEV_RANK[m["severity"]])["severity"]] += 1
+    for members in groups:
+        sev[min((by_id[m] for m in members), key=lambda m: SEV_RANK[m["severity"]])["severity"]] += 1
     touched = {r for f in confirmed for r in f["req_ids"]}
     reviewed = [r["id"] for r in reqs if r["review_status"] == "reviewed"]
     checks = report["checks"]
@@ -45,7 +79,8 @@ def independent_counts(report: dict[str, Any]) -> dict[str, int]:
         "findings_minor": sum(1 for f in findings if f["severity"] == "minor"),
         "findings_confirmed": len(confirmed),
         "findings_needs_review": sum(1 for f in findings if f["status"] == "needs_review"),
-        "merged_candidates": sum(len(f.get("merged_from") or []) for f in findings),
+        # Движок пишет merged_from = [собственный cid, поглощённые…].
+        "merged_candidates": sum(max(0, len(f.get("merged_from") or []) - 1) for f in findings),
         "defects_unique": len(groups),
         "same_cause_merged": len(confirmed) - len(groups),
         "defects_critical": sev["critical"],

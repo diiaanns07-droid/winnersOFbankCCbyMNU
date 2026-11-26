@@ -22,6 +22,8 @@ HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parents[1] / "src"), str(HERE)]
 
 from p17_fixtures import build_report, neutral_source  # noqa: E402
+from p17_rootcause import SOURCE as ROOTCAUSE_SOURCE  # noqa: E402
+from p17_rootcause import build_rootcause_report  # noqa: E402
 
 from bcc_review.exports._common import summary_numbers  # noqa: E402
 from bcc_review.exports.jira import render_jira_csv  # noqa: E402
@@ -33,6 +35,8 @@ VARIANTS = [
     ("complete-unnumbered", "complete", False, "Полный прогон, документ без нумерации: ID присвоены агентом"),
     ("partial-numbered", "partial", True, "Частичный прогон: R-06 частично, R-07 не проверено; verdict ошибочно «ready»"),
     ("failed-numbered", "failed", True, "Прогон упал после нарезки: проверок и находок нет"),
+    ("rootcause", "rootcause", True,
+     "Две разные проблемы с одинаковыми cause.object и cause.condition: F-1 (+ дубль F-3) и F-2; F-4 на проверке"),
 ]
 
 
@@ -45,11 +49,13 @@ def build_files() -> dict[str, bytes]:
     for numbered in (True, False):
         name = "source-numbered.md" if numbered else "source-unnumbered.md"
         files[name] = neutral_source(numbered).encode("utf-8")
+    files["source-rootcause.md"] = ROOTCAUSE_SOURCE.encode("utf-8")
     manifest = [
         "# Образцы отчётов p17: проверяемый перечень",
         "",
         "Сгенерировано `python tests/p17/p17_make_samples.py`. Синтетический Report контракта v1 (режим mock), "
-        "нейтральный документ «Бронирование переговорных комнат». Не является прогоном модели. "
+        "нейтральный документ «Бронирование переговорных комнат» и выдержка учебного кейса банка для проверки "
+        "группировки (`rootcause`). Не является прогоном модели. "
         "Каждый `report.json` проходит `bcc_review.contracts.validate` и `evidence_errors`.",
         "",
         "Проверка любого образца: `python -m bcc_review.exports.markdown --check <report.md> <report.json>`.",
@@ -59,7 +65,7 @@ def build_files() -> dict[str, bytes]:
         "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
     for key, variant, numbered, title in VARIANTS:
-        report = build_report(variant, numbered)
+        report = build_rootcause_report() if variant == "rootcause" else build_report(variant, numbered)
         report_json = (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         md = render_markdown(report)
         csv_text = render_jira_csv(report)

@@ -39,6 +39,7 @@ from ._common import (
     FINDING,
     FORMAT_LABEL,
     INDIVIDUAL_CODES,
+    LINK_LABEL,
     MEANING_LABEL,
     MODE_LABEL,
     NBSP,
@@ -71,6 +72,7 @@ from ._common import (
     fmt_ratio,
     group_findings,
     kind_name,
+    merged_candidates,
     of_count,
     partial_read_warnings,
     provider_state,
@@ -388,7 +390,7 @@ class _Renderer:
             for i, g in enumerate(crit_groups, 1):
                 extra = ""
                 if g["others"]:
-                    extra = " Та же первопричина: " + ", ".join(self.link_finding(m.get("id")) for m in g["others"]) + "."
+                    extra = " Повтор той же первопричины: " + self.others_text(g, with_status=False) + "."
                 self.emit(f"{i}. {self.one_line(g['primary'])}{extra}")
             self.blank()
         elif not checked_any and not self.findings:
@@ -756,24 +758,37 @@ class _Renderer:
         questions = [q for q in self.questions.values() if fid in {str(x) for x in as_list(q.get("finding_ids"))}]
         if questions:
             self.emit("**Вопрос заказчику:** " + ", ".join(self.link_question(q.get("id")) for q in questions), "")
-        merged = as_list(f.get("merged_from"))
-        if merged:
-            self.emit(f"**Объединено при подготовке:** {esc(', '.join(str(m) for m in merged))}", "")
+        absorbed = merged_candidates(f)
+        if absorbed:
+            self.emit(f"**Объединено при подготовке:** {esc(', '.join(absorbed))}", "")
         group = self.group_of.get(fid)
         if group and len(group["members"]) > 1:
             if group["primary"] is f:
-                others = ", ".join(
-                    f"{self.link_finding(m.get('id'))} ({esc(SEVERITY_LABEL.get(str(m.get('severity')), ''))}, "
-                    f"{esc(STATUS_LABEL.get(finding_status(m), finding_status(m)))})"
-                    for m in group["others"]
-                )
-                self.emit(f"**Та же первопричина:** {others} — в сводке дефектов и Jira учтены как один дефект.", "")
-            else:
                 self.emit(
-                    f"**Та же первопричина, что у {self.link_finding(group['primary'].get('id'))}** — "
+                    f"**Та же первопричина:** {self.others_text(group)} — в сводке дефектов и Jira учтены как один "
+                    "дефект.",
+                    "",
+                )
+            else:
+                reason = LINK_LABEL.get(group["link_of"].get(fid, ""), "связь не указана")
+                self.emit(
+                    f"**Повтор первопричины {self.link_finding(group['primary'].get('id'))}** ({reason}) — "
                     "в сводке дефектов и Jira отдельно не считается.",
                     "",
                 )
+
+    def others_text(self, group: Mapping[str, Any], with_status: bool = True) -> str:
+        """Повторы первопричины со статусом и основанием связи."""
+        parts = []
+        for m in group["others"]:
+            mid = str(m.get("id"))
+            reason = LINK_LABEL.get(group["link_of"].get(mid, ""), "связь не указана")
+            detail = [esc(SEVERITY_LABEL.get(str(m.get("severity")), ""))] if with_status else []
+            if with_status:
+                detail.append(esc(STATUS_LABEL.get(finding_status(m), finding_status(m))))
+            detail.append(reason)
+            parts.append(f"{self.link_finding(mid)} ({', '.join(d for d in detail if d)})")
+        return ", ".join(parts)
 
     def witness_card(self, f: Mapping[str, Any], w: Mapping[str, Any]) -> None:
         reqs = [str(r) for r in as_list(f.get("req_ids"))]
@@ -923,8 +938,8 @@ class _Renderer:
              f"подтверждено {fmt_int(n['findings_confirmed'])}, на проверке человеком {fmt_int(n['findings_needs_review'])}"],
             [SUMMARY_ROWS["unique"], f"{fmt_int(n['defects_unique'])}: {sev_unique}"],
             [SUMMARY_ROWS["merged"],
-             f"кандидатов в `merged_from`: {fmt_int(n['merged_candidates'])}; подтверждённых замечаний "
-             f"с общей первопричиной: {fmt_int(n['same_cause_merged'])}"],
+             f"поглощено кандидатов (`merged_from` без собственного): {fmt_int(n['merged_candidates'])}; "
+             f"повторов первопричины среди подтверждённых: {fmt_int(n['same_cause_merged'])}"],
             [SUMMARY_ROWS["rejected"], fmt_int(n["rejected"])],
             [SUMMARY_ROWS["checks"],
              f"{fmt_int(n['checks_pass'])} выполнено · {fmt_int(n['checks_issue'])} нарушено · "
@@ -951,7 +966,8 @@ class _Renderer:
         note = (
             "Знаменатели: доли требований — от всех выделенных требований; «без замечаний» — от проверенных "
             "полностью; «Замечаний в Report» и «По статусу» — значения `summary`; «Уникальных дефектов» — "
-            "подтверждённые замечания после объединения по первопричине (`cause`); цитаты — от всех опор "
+            "подтверждённые замечания после объединения по явной связи (`duplicate_of`, `root_cause_id`, "
+            "`merged_from`) или по совпадению причины вместе с исходами (`cause`); цитаты — от всех опор "
             "замечаний, сверка `block.text[start:end] == quote` выполнена при экспорте."
         )
         if audit and audit.get("note"):

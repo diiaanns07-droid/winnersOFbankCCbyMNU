@@ -1372,6 +1372,7 @@
       "witness": null,
       "inspected_block_ids": [],
       "merged_from": [
+        "C-002",
         "C-014"
       ],
       "cause": null,
@@ -1475,7 +1476,8 @@
           "end": 47,
           "quote": "работать без сбоев"
         }
-      ]
+      ],
+      "duplicate_of": "F-003"
     },
     {
       "hints": [],

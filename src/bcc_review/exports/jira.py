@@ -8,8 +8,10 @@
 
 Колонки: Summary, Description, Issue Type, Priority, Labels. Одна
 первопричина даёт одну запись: дубли внутри находки движок сводит в
-``merged_from``, а находки с одинаковыми ``cause.object`` и
-``cause.condition`` (контракт v1) сливаются в одну строку. По умолчанию в CSV
+``merged_from``; отдельные находки сливаются в одну строку только по явной
+связи (``duplicate_of``, ``root_cause_id``, ID в ``merged_from``) или при
+совпадении причины вместе с исходами (``cause.object``, ``cause.condition``,
+``cause.outcomes`` и семейство вида). Одинаковых объекта и условия мало. По умолчанию в CSV
 идут только подтверждённые находки (``status: confirmed``); находки «на
 проверке» добавляются флагом ``include_needs_review=True``. Снятые кандидаты
 (``Report.rejected``) не экспортируются.
@@ -38,6 +40,7 @@ from typing import Any
 
 from ._common import (
     BLOCKS_LABEL,
+    LINK_LABEL,
     SEVERITY_LABEL,
     STATUS_LABEL,
     DocIndex,
@@ -50,6 +53,7 @@ from ._common import (
     findings_all,
     group_findings,
     kind_name,
+    merged_candidates,
     requirement_index,
     run_info,
 )
@@ -107,9 +111,13 @@ def _description(group: Mapping[str, Any], data: Mapping[str, Any], idx: DocInde
     lines: list[str] = []
     ids = str(f.get("id"))
     if group["others"]:
-        ids += " (та же первопричина: " + ", ".join(str(m.get("id")) for m in group["others"]) + ")"
+        ids += " (та же первопричина: " + ", ".join(
+            f"{m.get('id')} — {LINK_LABEL.get(group['link_of'].get(str(m.get('id')), ''), 'связь не указана')}"
+            .replace("`", "")
+            for m in group["others"]
+        ) + ")"
     lines.append(f"ID замечания: {ids}")
-    merged = [str(x) for m in group["members"] for x in as_list(m.get("merged_from"))]
+    merged = [x for m in group["members"] for x in merged_candidates(m)]
     if merged:
         lines.append(f"Объединено при подготовке: {', '.join(merged)}")
     req_ids = []

@@ -7,8 +7,8 @@
 проходит.
 
 Варианты:
-* ``complete`` — полный прогон: две находки одной первопричины (общий
-  ``cause``, разные серьёзности), находка с ``merged_from``, критичные
+* ``complete`` — полный прогон: две находки одной первопричины (явная ссылка
+  ``duplicate_of``, разные серьёзности), находка с ``merged_from``, критичные
   противоречие и пропуск, требование без замечаний, снятый кандидат
   в ``rejected`` и находка на проверке;
 * ``partial`` — частичный прогон: R-06 проверено частично, R-07 не проверено,
@@ -285,7 +285,7 @@ def build_report(variant: str = "complete", numbered: bool = True) -> dict[str, 
         req_ids=["R-05"],
         evidence=[doc.ev(11, "Система быстро показывает статус комнаты: «свободно | занято | на обслуживании».")],
         blocks=["testing"],
-        merged_from=["C-014"],
+        merged_from=["C-002", "C-014"],  # как у движка: собственный cid, затем поглощённые
         source="rules",
         meaning_status="deterministic",
     )
@@ -307,6 +307,7 @@ def build_report(variant: str = "complete", numbered: bool = True) -> dict[str, 
         req_ids=["R-06"],
         evidence=[doc.ev(15, "работать без сбоев")],
         cause={"object": "НФТ портала", "condition": "Нет измеримых  показателей", "outcomes": []},
+        duplicate_of="F-003",
     )
     f005 = _finding(
         id="F-005", scope="set", kind="omission", criterion="set_complete", severity="critical",

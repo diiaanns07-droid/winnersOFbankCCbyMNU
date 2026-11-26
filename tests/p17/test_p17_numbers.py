@@ -79,7 +79,7 @@ def test_visible_summary_matches_json(variant, numbered):
 
 def test_duplicate_with_two_severities_counts_once_at_higher_severity():
     md = render_markdown(build_report("complete"))
-    # F-003 (существенное) и F-004 (незначительное) — общий cause: один дефект «существенное».
+    # F-003 (существенное) и F-004 (незначительное, duplicate_of F-003) — один дефект «существенное».
     assert row_numbers(md, "Уникальных подтверждённых дефектов")[:4] == [5, 2, 2, 1]
     # В Report.summary обе записи остаются: 7 замечаний, 3 существенных, 2 незначительных.
     assert row_numbers(md, "Замечаний в Report")[:4] == [7, 2, 3, 2]
