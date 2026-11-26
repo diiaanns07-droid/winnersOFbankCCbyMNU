@@ -159,6 +159,14 @@ MUTANTS = {
     "autopay.drop_promised.no_409_status": ("rules:api.status_409", 73),
     "autopay.two_statuses.range_422": ("rules:api.status_422", 76),
     "autopay.unit_change.limit_per_hour": ("rules:units.period_mix", 28),
+    "autopay.event_conflict.insufficient_funds_credit": ("rules:conflicts.event_condition", 31),
+    "autopay.range_boundary.trigger_at_threshold": ("rules:conflicts.boundary_acceptance", 46),
+    "cardblock.event_conflict.unblock_daily_limit": ("rules:conflicts.event_quantity", 31),
+    "cardblock.range_boundary.days_400_at_30": ("rules:conflicts.boundary_range", 86),
+    "cashback.event_conflict.category_effective_now": ("rules:conflicts.event_effective", 32),
+    "cashback.range_boundary.cap_strict": ("rules:conflicts.boundary_acceptance", 48),
+    "transfer_limit.event_conflict.cancel_no_restore": ("rules:conflicts.event_negation", 30),
+    "transfer_limit.range_boundary.reaching_rejects": ("rules:conflicts.boundary_reach", 26),
     "cardblock.unit_change.blocked_at_utc": ("rules:units.timezone_mix", 79),
     "cashback.drop_promised.no_read_method": ("rules:promises.named_method", 40),
     "cashback.two_statuses.bad_category_200": ("rules:api.success_with_error", 85),
@@ -224,3 +232,37 @@ def test_other_style_document_detected():
 def test_other_style_clean_document():
     out = rules.run(fallback_load(STYLES / "alt_clean.md"))
     assert out["candidates"] == [], [c["title"] for c in out["candidates"]]
+
+
+PAIRS = ROOT / "tests" / "p06" / "fixtures" / "pairs4x2"
+
+
+@pytest.mark.parametrize("name", ["boundary", "unit", "status", "event"])
+def test_compatible_pairs_have_no_conflict(name):
+    """Фикстуры №06 «совместимо»: правила не должны видеть конфликт (разные величины, согласованный пересчёт,
+    строка перечня другого метода)."""
+    path = PAIRS / f"{name}_compatible.md"
+    if not path.exists():
+        pytest.skip("нет фикстуры")
+    out = rules.run(fallback_load(path))
+    assert not [c for c in out["candidates"] if c.get("rule_conflict")], [c["title"] for c in out["candidates"]]
+
+
+@pytest.mark.parametrize("name,src", [("boundary", "rules:conflicts.boundary_range"),
+                                      ("unit", "rules:units.currency_mix"), ("status", "rules:api.status_422")])
+def test_conflict_pairs_detected(name, src):
+    path = PAIRS / f"{name}_conflict.md"
+    if not path.exists():
+        pytest.skip("нет фикстуры")
+    out = rules.run(fallback_load(path))
+    assert any(c["source"] == src or c["source"].startswith(src + ".") for c in out["candidates"])
+
+
+def test_control_case_two_boundaries():
+    case = ROOT / "evaluation" / "dev" / "controls" / "cases"
+    paths = list(case.glob("*/source.md"))
+    if not paths:
+        pytest.skip("нет контрольного кейса")
+    out = rules.run(fallback_load(paths[0]))
+    lines = [{e["line"] for e in c["evidence"]} for c in out["candidates"] if "boundary" in c["source"]]
+    assert {61, 25} in [x & {61, 25} for x in lines] and any({86, 25} <= x for x in lines)

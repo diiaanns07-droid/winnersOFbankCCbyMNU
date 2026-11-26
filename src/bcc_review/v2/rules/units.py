@@ -98,7 +98,7 @@ def rule_currency(doc: Doc, out: dict) -> None:
         if not minors or not (majors or _has_major_values(doc, major)):
             continue
         conv = _conversion(doc, major, minor)
-        if conv is not None:
+        if conv is not None or _implicit_conversion(doc, minors, major):
             continue
         # пара: сначала те же числа в основной единице, затем одна и та же величина, затем любая
         pair = None
@@ -161,6 +161,21 @@ def rule_currency(doc: Doc, out: dict) -> None:
         out["signals"].append(signal("units.currency_mix", a[0], qa,
                                      f"Разные денежные единицы без пересчёта: {quoted(qa)} и {quoted(qb)}.",
                                      ("analyst", "risk", "consistency"), "unit_mismatch"))
+
+
+def _implicit_conversion(doc: Doc, minors: list, major: str) -> bool:
+    """Значения в минорных единицах ровно в 100 раз больше тех же значений в основных — пересчёт согласован."""
+    rx_val = re.compile(rf"\d\s*(?:{major})(?!\w)|{DENOM}(?:{major})(?!\w)", re.I)
+    for a in minors:
+        na = _numbers(a[0].joined)
+        if len(na) < 2:
+            continue
+        for y in doc.lines:
+            if y is a[0] or not y.text or not rx_val.search(y.joined):
+                continue
+            if len({v * 100 for v in _numbers(y.joined)} & na) >= 2:
+                return True
+    return False
 
 
 def _numbers(text: str) -> set[int]:

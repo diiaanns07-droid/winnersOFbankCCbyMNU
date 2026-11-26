@@ -27,7 +27,8 @@ MUTATING_TOKENS = {
     "put", "post", "patch", "close", "lock", "unlock", "revoke", "transfer", "pay", "send",
 }
 READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load", "view", "show", "query",
-               "status", "info", "details", "history"}
+               "status", "info", "details", "history", "calc", "calculate", "compute", "estimate", "preview",
+               "quote", "lookup"}
 # Начало описания метода, означающее изменение состояния.
 MUTATING_DESC = re.compile(
     r"^(сохранени|изменени|удалени|создани|обновлени|замен|установк|установлени|отключени|включени|"
@@ -406,13 +407,19 @@ def _stems(text: str) -> set[str]:
     return {w[:5] for w in words} - STOP_STEMS
 
 
-def _same_case_decl(frag: str, decls: list[Status], code: int) -> Status | None:
-    """Объявленный статус с тем же условием, что у упомянутого кода (≥ 2 общих значимых основы)."""
+def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method | None" = None,
+                    methods: "list[Method] | None" = None) -> Status | None:
+    """Объявленный статус с тем же условием, что у упомянутого кода (≥ 2 общих значимых основы).
+    Строка перечня, отнесённая к другому методу («createX: …»), — не тот же случай."""
     cond = re.sub(CODE, " ", frag)
     st = _stems(cond)
     best, score = None, 1
+    names = {m.name.lower() for m in methods or [] if m.name}
     for d in decls:
         if d.code == code or (d.code // 100) != (code // 100):
+            continue
+        named = {w.lower() for w in re.findall(r"\b[a-z]+[A-Z]\w*\b", d.line.joined)} & names
+        if named and (method is None or (method.name or "").lower() not in named):
             continue
         k = len(st & _stems(re.sub(CODE, " ", d.line.joined)))
         if k > score:
@@ -466,7 +473,8 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
             for line, frag in p["mentions"][:2]:
                 evidence.append(ev(line, frag))
             if not p["foreign"]:
-                same_case = _same_case_decl(p["mentions"][0][1], decls, code)
+                same_case = _same_case_decl(p["mentions"][0][1], decls, code,
+                                            method_of(methods, p["mentions"][0][0].n), methods)
                 parts.append(f"В тексте сказано {quoted(p['mentions'][0][1])}, но кода {code} нет в перечне "
                              f"статусов (описаны {decl_list}).")
                 if same_case is not None:

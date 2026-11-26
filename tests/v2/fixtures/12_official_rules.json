@@ -337,9 +337,7 @@
    "criterion": "correct",
    "severity": "major",
    "requirement_ids": [
-    "R-17",
-    "R-16",
-    "R-19"
+    "R-16"
    ],
    "evidence": [
     {
@@ -371,10 +369,10 @@
    "criterion": "set_consistent",
    "severity": "major",
    "requirement_ids": [
-    "R-31",
-    "R-36",
+    "R-27",
     "R-32",
-    "R-37"
+    "R-28",
+    "R-33"
    ],
    "evidence": [
     {
@@ -410,8 +408,7 @@
    "criterion": "set_consistent",
    "severity": "major",
    "requirement_ids": [
-    "R-34",
-    "R-41"
+    "R-30"
    ],
    "evidence": [
     {
@@ -439,7 +436,7 @@
    "criterion": "unambiguous",
    "severity": "major",
    "requirement_ids": [
-    "R-34"
+    "R-30"
    ],
    "evidence": [
     {
@@ -463,10 +460,8 @@
    "criterion": "set_consistent",
    "severity": "major",
    "requirement_ids": [
-    "R-35",
-    "R-45",
-    "R-46",
-    "R-47"
+    "R-31",
+    "R-40"
    ],
    "evidence": [
     {
@@ -502,8 +497,7 @@
    "criterion": "set_consistent",
    "severity": "major",
    "requirement_ids": [
-    "R-41",
-    "R-40"
+    "R-36"
    ],
    "evidence": [
     {
@@ -535,7 +529,7 @@
    "criterion": "set_consistent",
    "severity": "major",
    "requirement_ids": [
-    "R-47"
+    "R-40"
    ],
    "evidence": [
     {
@@ -659,7 +653,7 @@
    "criterion": "complete",
    "severity": "minor",
    "requirement_ids": [
-    "R-19"
+    "R-16"
    ],
    "evidence": [
     {
@@ -687,7 +681,7 @@
    "criterion": "set_consistent",
    "severity": "minor",
    "requirement_ids": [
-    "R-33"
+    "R-29"
    ],
    "evidence": [
     {
