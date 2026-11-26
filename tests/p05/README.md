@@ -1,8 +1,11 @@
 # №05 — проверка отдельного требования: передача
 
 Ветка: `claude/practical-ride-4z65ch` (назначена платформой вместо `bcc/p05-individual`). В неё влит
-`bcc/integration` @ `091e504` (контракт v1 из `431f76d` и движок). Точка входа совпадает с таблицей в
-`contracts/HANDOFF.md`. Движок сам выбирает модуль №05: `run.modules.review_individual = team:bcc_review.analysis.individual:review_individual`.
+`bcc/integration` @ `6be9e97` (контракт v1 из `431f76d`, движок, модули №01, №04, №06, №07, №11, №17). Точка входа
+совпадает с таблицей в `contracts/HANDOFF.md`. Движок сам выбирает модуль №05: `run.modules.review_individual = team:bcc_review.analysis.individual:review_individual`.
+
+В `bcc/integration @ 6be9e97` влита версия №05 `72c10bd`. Правки `f91f296` (`failed`, `individual#N`, `basis`, `rule_id`)
+и второго прохода (область действия определения) там ещё отсутствуют: их нужно влить из этой ветки.
 
 ## Что входит
 | Файл | Назначение |
@@ -10,9 +13,9 @@
 | `src/bcc_review/criteria.toml` | единый конфиг. Критерии `necessary…conforming` (И1–И9) и `set_complete…traceable` (Н1–Н8) с русскими определениями, источником ISO/IEC/IEEE 29148:2018 или IEEE 830-1998, применимостью (`not_for`), видом находки (`kind`) и связями с 14 пунктами банковского чек-листа. Ещё рубрика critical/major/minor, политика и правила серьёзности, пределы, роли разделов, `kind_alias` для `Requirement.kind`, уровни документа, словарь неоперациональных слов, параметры этапа |
 | `src/bcc_review/criteria.py` | `load_criteria(path=None)`: проверка схемы, отпечаток `tag`/`fingerprint`, `resolve()` (код, `И3`, русское имя), роль и уровень, `rule_severity()`, `cap_for()`, `render_*()` для промптов, `to_dict()` для отчёта |
 | `src/bcc_review/analysis/individual.py` | `review_individual(document, requirements, ask=None, *, criteria=None)`, `build_prompt`, `response_schema`, `prompt_version` |
-| `src/bcc_review/prompts/individual.md` | промпт `individual/1.1.0`: инструкция этапа (`task`), плейсхолдеры `{{…}}` из TOML. Версия = front matter + SHA-256 файла |
+| `src/bcc_review/prompts/individual.md` | промпт `individual/1.2.0`: инструкция этапа (`task`), плейсхолдеры `{{…}}` из TOML, правило 14 об области действия определения. Версия = front matter + SHA-256 файла |
 | `src/bcc_review/prompts/individual.schema.json` | строгая схема ответа: `additionalProperties: false`, полный `required`, без `minLength`/`$ref`. Перечни `criterion` и `kind` подставляются из TOML и `contracts.FINDING_KINDS` |
-| `tests/p05/` | 59 тестов: четыре доказательства, ложные срабатывания, модельный режим, кейс BCC, стык с контрактом и движком, упаковка |
+| `tests/p05/` | 74 теста: четыре доказательства, область действия определения (`test_scope.py`, три ТЗ `fixtures/transfer_*.md`), ложные срабатывания, модельный режим, настоящий Asker с кэшем (`test_asker_cache.py`), кейс BCC, стык с контрактом и движком, упаковка |
 
 Упаковку TOML и промптов уже обеспечивает `pyproject.toml` интеграционной ветки (`"*" = ["*.toml", "*.json", "*.md", …, "prompts/*"]`).
 Тест собирает колесо из копии и читает конфиг из установленного пакета. Из общих файлов ветка добавляет только
@@ -36,11 +39,11 @@
   Дополнительно `blocks` (`development|testing`, как в `Finding`), `question`, `root_cause`, `ref` (`IND-001`…), `calibration` (почему изменилась серьёзность), а у ответа модели `scenario`, у правил `rule_id` (движок переносит его в Finding) и `severity_rule`.
   Одна первопричина — одна кандидатура. Слияние идёт по `root_cause` или по пересечению цитат в блоке.
   `quote` и `context` — буквальные подстроки `block.text`. `block_id = null` бывает только у требования без блоков.
-* `warnings` (`Warning`): `{code: "individual.<…>", message, stage}`. Коды: `missing_answer`, `quote_not_found`, `ask_failed`, `generic_pass`, `bad_check`, `unexpected_req`, `template_rows`, `no_blocks`, `unknown_block`, `na_overridden`.
+* `warnings` (`Warning`): `{code: "individual.<…>", message, stage}`. Коды: `missing_answer`, `quote_not_found`, `ask_failed`, `generic_pass`, `bad_check`, `unexpected_req`, `template_rows`, `no_blocks`, `unknown_block`, `na_overridden`, `out_of_scope_basis`.
 * `meta`: `{stage, mode: rules_only|rules_plus_llm, prompt_version, criteria_version, criteria_fingerprint, criteria_tag, calls, requirements}`.
 * `ask("individual#N", payload, schema)` — имя этапа на каждый пакет, как у резерва (кэш и трасса различают пакеты):
   * `payload = {task, input, context}`;
-  * `input` = `{prompt_version, criteria_tag, criteria_fingerprint, req_ids, requirements:[{req_id, source_id, role, level, section, applicable, not_applicable, block_ids, text, neighbors, rule_signals}]}`;
+  * `input` = `{prompt_version, criteria_tag, criteria_fingerprint, req_ids, requirements:[{req_id, source_id, role, level, section, applicable, not_applicable, block_ids, text, neighbors, definitions:{scope, applicable, other_scope}, rule_signals}]}`;
   * `context = {mode:"auto", block_ids}` — блоки пунктов и их родительских разделов;
   * текст документа прикладывает движок;
   * пакет — `[individual].batch_size = 15`, на кейсе BCC это 2 вызова;
@@ -55,30 +58,67 @@
    * неоперациональные слова ISO 29148 5.2.7. Перед поиском маскируются цитаты, названия кнопок и экранов, примеры и речь клиента; заголовки не проверяются;
    * измеримое ограничение в пункте или соседней строке без своего ID снимает неоднозначность;
    * срок: таймер, граница, точка отсчёта, период. «За 30 дней» — окно данных, а не срок;
-   * диапазон и включённость, в том числе по тем же числам в другом месте документа;
+   * диапазон и включённость, в том числе по тем же числам в области действия пункта (см. ниже);
+   * отсылка к неназванному значению («в установленный срок», «установленный лимит»): проверяемо, только если значение определено в области действия пункта;
    * единичность: от 3 обязательств, только ФТ и НФТ;
    * уровень документа для `appropriate`.
-2. **Модель**: инструкция с таблицей критериев, рубрикой и ролями из TOML, данные пункта (роль, раздел, соседи) и сигналы правил для подтверждения или опровержения.
+2. **Модель**: инструкция с таблицей критериев, рубрикой и ролями из TOML, данные пункта (роль, раздел, соседи, применимые и чужие определения) и сигналы правил для подтверждения или опровержения.
 3. **Слияние**:
    * объективная находка правила (прочерк, заглушка) переживает pass модели, эвристическую модель может отклонить с обоснованием;
    * issue без буквальной цитаты превращается в unknown и `quote_not_found`;
    * общий pass («Соответствует.») становится unknown;
    * если ответа нет, ставится unknown;
-   * числа в правке, которых нет в документе, превращаются в `<уточнить у владельца: …?>` и попадают в вопрос.
+   * числа в правке, которых нет в пункте и его области действия, превращаются в `<уточнить у владельца: …?>` и попадают в вопрос;
+   * pass по `verifiable`, `unambiguous`, `complete`, обоснованный числом из чужой области, не принимается: `out_of_scope_basis`, статус берётся из правил или ставится unknown с вопросом.
 4. **Калибровка**:
    * правила не дают critical (`rules_max = major`);
    * critical от модели требует `blocks`, `scenario`, `impact` и `blocked_decision`, иначе становится major (то же требует движок);
    * `blocks = none` ограничивает серьёзность значением minor;
    * пределы `[[severity.cap]]` действуют и на модель: Prod/Swagger — не выше major.
 
+## Область действия определения (второй проход)
+Число, срок или порог в другом месте документа делает пункт проверяемым, только если определение действует на этот пункт:
+1. **явная ссылка** — ID правила («по правилу ОП-1»), «раздел «…»», «часть X», в самом пункте или во вводном абзаце его части («Дочерний документ части A»);
+2. **тот же раздел** — общий родитель пункта (для `Документ › Часть › Подраздел` — `Документ › Часть`) и тот же предмет;
+3. **общий раздел** — заголовок из `[rules.scope].general` (общие правила, термины и определения, глоссарий) и тот же предмет.
+
+Предмет сравнивается по основам слов, стоп-основы лежат в `[context.scope].stop_stems`. Определение из раздела про другой продукт область не расширяет. Оно попадает в `other_scope`, его называют в основании оценки и в вопросе владельцу, а его число в правке стоит только внутри маркера `<уточнить у владельца: …?>`. Правила области действия используются в отсылках, в заимствовании включённости диапазона и в проверке pass модели.
+
+Три ТЗ про подтверждение перевода, `criteria 1.1.0`, `rules_only`:
+
+| Вход | Критерий | Статус | Основание |
+| :--- | :--- | :--- | :--- |
+| `transfer_linked.md` ПР-1 «…в установленный срок по правилу ОП-1» | verifiable | pass | определение ОП-1 «не позднее 120 секунд с момента отправки кода» [b0003], явная ссылка «ОП-1» |
+| `transfer_other_product.md` ПР-1 «…в установленный срок» | verifiable | issue, major | срок не определён ни в пункте, ни в разделе «Переводы между картами», ссылки нет; «не позднее 300 секунд…» [b0004] есть только в «Кредитные карты › Подтверждение платежа». Вопрос: действует ли срок из КК-1 |
+| `transfer_undefined.md` ПР-1 «…в установленный срок» | verifiable | issue, major | срок не определён ни в пункте, ни в разделе, ни в общих правилах. Вопрос: какой срок и от какого события |
+| ПР-2 «кнопка «Подтвердить быстро»» (во всех трёх) | verifiable | unknown, без замечаний | слово «быстро» стоит внутри названия «Подтвердить быстро» и обязательством не считается |
+
+Заблокированное решение по ПР-1 (ТЗ 2 и 3): «Разработка: какой тайм-аут и от какого события заложить для «Клиент подтверждает перевод»; приёмка: при каком времени тест ожидает успех, а при каком — отказ». `blocks: development, testing`.
+
+Воспроизведение на прежнем коде (`f91f296` + `6be9e97`):
+* правила давали всем трём ТЗ одно и то же: `verifiable → unknown`, «Без модели не оценивается»;
+* при ответе модели «срок задан: не позднее 300 секунд…» для ТЗ 2 старый код принимал `pass` на числе из раздела «Кредитные карты»;
+* «включительно» заимствовалось из диапазона другого продукта.
+
+После правки: `tests/p05/test_scope.py` (13 тестов) зелёный, ошибочный pass модели отклоняется с `out_of_scope_basis`.
+
 ## Команды и результаты (выполнено в этой среде, Linux)
 ```bash
-python3.11 -m venv .venv && .venv/bin/pip install -e ".[dev,pdf]"
-.venv/bin/python -m pytest tests/p05          # 59 passed
-.venv/bin/python -m pytest tests              # 189 passed, 1 skipped, 1 failed — см. «Открытые вопросы», п. 1
-python3 -m pytest tests/p05 tests/contract    # системный 3.13 Debian: 87 passed, 1 skipped (колесо не собирается пропатченным setuptools 68)
-python -m bcc_review tests/integration/fixtures/bcc_requirements.md report.md --offline-lint
+python3.11 -m venv .venv && .venv/bin/pip install -e ".[dev,pdf,anthropic]"
+.venv/bin/python -m pytest tests/p05 -q       # 74 passed
+.venv/bin/python -m pytest tests -q           # 622 passed, 18 skipped, 1 failed: tests/p11/test_anthropic_success.py::test_from_fixture_files_entry_point (падает и на чистой bcc/integration @ 6be9e97, не №05)
+.venv/bin/python -m pytest tests/p05/test_scope.py tests/p05/test_asker_cache.py -q
+python -m bcc_review tests/p05/fixtures/transfer_other_product.md report.md --offline-lint
 ```
+
+Стык в отдельной копии `bcc/integration @ 6be9e97` (worktree, поверх наложены только файлы №05): 622 passed, 18 skipped, тот же 1 failed в p11.
+Сквозной прогон движка на трёх ТЗ (`--offline-lint`). Участвовали модули команды: `read_text` №01, `build_inventory` №04, `load_criteria` и `review_individual` №05, `review_set` №06, `resolve_candidate` №07; плюс правила движка `runtime/fallback/rules.py`. Результат: ТЗ 1 — 0 замечаний; ТЗ 2 и ТЗ 3 — по одному `verifiable major confirmed` (`rule_id: vague.reference`). Кнопка не дала замечаний ни у одного модуля.
+
+Кэш (`test_asker_cache.py`). Участвуют настоящие `runtime.asker.Asker`, `runtime.mock.MockAdapter`, `runtime.core.Cache/Budget/StageStats/Tracer` и `runtime.context.ContextBuilder`; ответ `individual` валиден по схеме №05:
+* вызов 1: `adapter.calls = ['individual#1']`, `physical = 1`, `cache_hits = 0`;
+* вызов 2: `adapter.calls = []`, `physical = 0`, `cache_hits = 1`, checks и candidates совпадают.
+
+То же через `engine.run_review` дважды с одним `cache_dir`: прогон 1 — `physical = 5`; прогон 2 — `physical = 0`, `cache_hits = 5`, этап `individual` в статусе `ok`, `cache_hits = 1`.
 
 Сквозной прогон движка (`--offline-lint`, резервные читатель и нарезка):
 * `run.modules.review_individual = team:…`, `validate(report)` проходит, `evidence_errors(report) == []`;
@@ -125,9 +165,9 @@ python -m bcc_review tests/integration/fixtures/bcc_requirements.md report.md --
 Самый рискованный выбор — словарь размытых слов. На 8 строках наивный поиск по словарю дал 4 ложных срабатывания, контекстные правила — 0 при том же recall (`test_naive_regex_vs_context_aware_rules`).
 
 ## Открытые вопросы к контракту и движку (для Max)
-1. **`tests/integration/fixtures/mock_bcc.json`: `"individual": {"requirements": []}`** — это формат резервного модуля. С модулем №05 ответ не проходит схему (`invalid_output`), не кэшируется, и `test_cache_hit_on_rerun_and_miss_on_model_change` видит 6 повторных вызовов. Исправление — `"individual": {"results": []}` или удалить ключ, тогда mock синтезирует ответ по схеме. Проверено: с этой правкой `tests/integration` даёт 31 passed. Файл в зоне Max, в ветке №05 не менялся.
-2. Слот `rules` (`runtime/fallback/rules.py`) в `091e504` отсутствует, этап `rules` в паспорте помечен failed. Детерминированные правила №05 работают внутри `review_individual(ask=None)` и дают находки и в `--offline-lint`.
-3. `verify_candidates` перезаписывает `notes` кандидата, поэтому `calibration` №05 (почему изменилась серьёзность) до `Finding.notes` не доходит. Стоит дописывать `c.get("calibration", [])` в `notes`.
+1. **Общая mock-фикстура** (`tests/integration/fixtures/mock_bcc.json`, `"individual": {"requirements": []}`). Это по-прежнему формат резервного модуля: для схемы №05 ответ невалиден (`'requirements' was unexpected`). На `6be9e97` она интеграционный тест не ломает, потому что `test_engine.py` включает `BCC_FORCE_FALLBACK`, а `test_team_pipeline.py` работает без сценария. Diff не нужен: одна запись не может быть валидна сразу для двух схем этапа `individual#N`. Путь кэша с модулем команды покрыт `tests/p05/test_asker_cache.py`. Если понадобится сценарий конвейера команды, нужен отдельный файл с ответом `{"results": [...]}`.
+2. `verify_candidates` перезаписывает `notes` кандидата, поэтому `calibration` №05 (почему изменилась серьёзность) до `Finding.notes` не доходит. Стоит дописывать `c.get("calibration", [])` в `notes`.
+3. Кандидат, слитый из находки правила и ответа модели, приходит с `source: llm+rules` и уходит к критику. Без оценки критика (mock) он становится `needs_review`, хотя цитата и правило объективны.
 * `Check.finding_ids`: №05 отдаёт `candidate_refs` (`IND-…`), потому что `Finding.id` назначает движок. Нужна замена при сборке Report.
 * `Candidate.blocks`: в типе `Candidate` поля нет, в `Finding` оно есть. №05 отдаёт его дополнительно (`additionalProperties` разрешает).
 * Читатель №01 снимает `**` и маркеры списка, но формат строки таблицы в контракте не зафиксирован. Правила №05 работают и с ` | `, и с исходным Markdown (проверено тестами в обоих видах).

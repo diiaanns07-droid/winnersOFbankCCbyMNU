@@ -162,16 +162,23 @@ def test_design_decision_depends_on_document_level():
     assert res["candidates"] == []
 
 
-def test_range_inclusivity():
-    doc = doc_from_lines(
+def _range_doc(intro: str | None):
+    lines = [
         "# ТЗ",
-        "## Функциональные требования",
+        "## Часть A",
+        "### Функциональные требования",
         "- **Ф-1.** Клиент задаёт порог от 1 000 до 50 000 ₸.",
         "- **Ф-2.** Клиент задаёт лимит от 100 до 900 ₸ включительно.",
         "## Часть B. REST API",
-        "### Параметры запроса",
-        "| `amount` | integer | 32 bit | Да | 100–900 | Лимит |",
-    )
+    ]
+    if intro:
+        lines.append(intro)
+    lines += ["### Параметры запроса", "| `amount` | integer | 32 bit | Да | 100–900 | Лимит |"]
+    return doc_from_lines(*lines)
+
+
+def test_range_inclusivity():
+    doc = _range_doc("Дочерняя спецификация части A.")  # вводный абзац части B явно ссылается на часть A
     reqs = [requirement(doc, "R1", "Ф-1", "Ф-1"), requirement(doc, "R2", "Ф-2", "Ф-2"), requirement(doc, "R3", "`amount`")]
     res = review_individual(doc, reqs)
     r1 = checks_of(res, "R1")
@@ -182,6 +189,12 @@ def test_range_inclusivity():
     assert r2["status"] == "pass" and "99 / 100 / 900 / 901" in r2["reason"]
     r3 = checks_of(res, "R3")["verifiable"]
     assert r3["status"] == "pass" and "включительно" in r3["reason"]
+
+
+def test_range_inclusivity_needs_link_to_other_part():
+    doc = _range_doc(None)  # без ссылки часть B не наследует определения части A
+    res = review_individual(doc, [requirement(doc, "R3", "`amount`")])
+    assert checks_of(res, "R3")["verifiable"]["status"] != "pass"
 
 
 def test_naive_regex_vs_context_aware_rules():
