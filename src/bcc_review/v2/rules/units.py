@@ -296,7 +296,33 @@ def _clause(text: str, pos: int) -> str:
     return frag if len(frag) <= 200 else text[pos:pos + 120]
 
 
+TIME_OF_DAY = re.compile(r"(?<![\dT:+\-−])([01]?\d|2[0-3]):[0-5]\d(?![:\d])")
+ZONE_AFTER = re.compile(r"^\s*(?:\(?\s*(?:по\s+(?:времени\s+)?[A-ZА-ЯЁ][\w+\-]*|UTC|GMT|[+\-−]\d{1,2}(?::\d{2})?|"
+                        r"местн\w+|московск\w+))", re.I)
+
+
+def rule_time_without_zone(doc: Doc, out: dict) -> None:
+    """В одной строке два момента времени, пояс указан только у одного (сигнал для приёмки и набора)."""
+    for x in doc.lines:
+        if not x.text or x.is_code:
+            continue
+        t = x.joined
+        times = list(TIME_OF_DAY.finditer(t))
+        if len(times) < 2:
+            continue
+        zoned = [bool(ZONE_AFTER.match(t[m.end():m.end() + 25])) for m in times]
+        if any(zoned) and not all(zoned):
+            bare = times[zoned.index(False)].group(0)
+            withz = times[zoned.index(True)]
+            zone = ZONE_AFTER.match(t[withz.end():withz.end() + 25]).group(0).strip()
+            out["signals"].append(signal(
+                "units.time_without_zone", x, t if len(t) <= 200 else t[:200],
+                f"Время {bare} указано без часового пояса, а {withz.group(0)} — {zone}: для дат на границе суток "
+                "и месяца исход зависит от пояса.", ("qa", "consistency"), "unit_mismatch"))
+
+
 def run(doc: Doc, out: dict) -> None:
     rule_currency(doc, out)
     rule_timezone(doc, out)
     rule_period(doc, out)
+    rule_time_without_zone(doc, out)

@@ -15,10 +15,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--segment", help="выход нарезки (segment.json)")
     ap.add_argument("--json", action="store_true", help="вывести JSON целиком")
     ap.add_argument("--signals", action="store_true", help="показать блок сигналов")
+    ap.add_argument("--block", metavar="ЛИНЗА", help="напечатать только блок <сигналы> для линзы "
+                    "(analyst, qa, architect, risk, consistency, all) — для try_prompt --extra")
     a = ap.parse_args(argv)
     view = load(a.file)
     reqs = json.load(open(a.segment, encoding="utf-8")) if a.segment else None
     out = run(view, reqs)
+    if a.block:
+        aud = None if a.block == "all" else a.block
+        print("<сигналы>\n" + format_signals(out["signals"], audience=aud) + "\n</сигналы>")
+        return 0
     if a.json:
         json.dump(out, sys.stdout, ensure_ascii=False, indent=1)
         print()

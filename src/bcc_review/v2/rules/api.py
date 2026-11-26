@@ -258,7 +258,13 @@ def rule_get_mutation(doc: Doc, methods: list[Method], out: dict) -> None:
         out["candidates"].append(c)
         out["signals"].append(signal("api.get_mutation", m.verb_line, evidence[0]["quote"],
                                      f"Метод {m.label or m.verb} изменяет данные ({reason}), но объявлен как {m.verb}.",
-                                     ("architect", "risk"), "api_contract"))
+                                     ("architect",), "api_contract"))
+        src = m.curl_line or m.url_line or m.verb_line
+        out["signals"].append(signal(
+            "api.params_in_url", src, (m.curl_line.joined if m.curl_line else evidence[0]["quote"])[:200],
+            f"Значения изменения ({fmt_list(params[:4]) or 'параметры запроса'}) передаются в строке URL метода "
+            f"{m.verb}: попадают в журналы прокси, веб-сервера и историю браузера; {m.verb} может повторяться "
+            "автоматически.", ("risk",), "security"))
 
 
 def _query_params(doc: Doc, m: Method) -> list[str]:

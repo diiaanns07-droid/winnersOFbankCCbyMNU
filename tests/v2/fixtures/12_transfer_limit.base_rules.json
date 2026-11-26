@@ -1,0 +1,51 @@
+{
+ "signals": [
+  {
+   "rule": "promises.read",
+   "kind": "inventory",
+   "line": 29,
+   "quote": "Приложение показывает лимит и остаток лимита на текущие сутки.",
+   "message": "Обещано чтение или показ данных; операции чтения: getTransferLimit. Проверьте, что они возвращают всё, что показывается.",
+   "audience": [
+    "architect"
+   ],
+   "id": "S-01",
+   "lines": [
+    29
+   ],
+   "note": "Обещано чтение или показ данных; операции чтения: getTransferLimit. Проверьте, что они возвращают всё, что показывается."
+  },
+  {
+   "rule": "api.methods",
+   "kind": "inventory",
+   "line": 51,
+   "quote": "REST type | GET",
+   "message": "Описанные методы API: getTransferLimit (GET, чтение); setTransferLimit (PUT, изменение).",
+   "audience": [
+    "architect"
+   ],
+   "id": "S-02",
+   "lines": [
+    51
+   ],
+   "note": "Описанные методы API: getTransferLimit (GET, чтение); setTransferLimit (PUT, изменение)."
+  },
+  {
+   "rule": "api.status_inventory",
+   "kind": "inventory",
+   "line": 83,
+   "quote": "200 | Запрос выполнен | Описано в разделе метода; для setTransferLimit тело пуст",
+   "message": "Перечень статусов: 200, 400, 401 и 500; упомянуты в тексте: 200.",
+   "audience": [
+    "architect",
+    "qa"
+   ],
+   "id": "S-03",
+   "lines": [
+    83
+   ],
+   "note": "Перечень статусов: 200, 400, 401 и 500; упомянуты в тексте: 200."
+  }
+ ],
+ "candidates": []
+}

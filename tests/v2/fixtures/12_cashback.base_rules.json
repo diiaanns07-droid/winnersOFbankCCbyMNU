@@ -1,0 +1,51 @@
+{
+ "signals": [
+  {
+   "rule": "promises.read",
+   "kind": "inventory",
+   "line": 31,
+   "quote": "Приложение показывает выбранную категорию и кэшбэк текущего месяца.",
+   "message": "Обещано чтение или показ данных; операции чтения: getCashback. Проверьте, что они возвращают всё, что показывается.",
+   "audience": [
+    "architect"
+   ],
+   "id": "S-01",
+   "lines": [
+    31
+   ],
+   "note": "Обещано чтение или показ данных; операции чтения: getCashback. Проверьте, что они возвращают всё, что показывается."
+  },
+  {
+   "rule": "api.methods",
+   "kind": "inventory",
+   "line": 57,
+   "quote": "REST type | GET",
+   "message": "Описанные методы API: getCashback (GET, чтение); saveCategory (POST, изменение).",
+   "audience": [
+    "architect"
+   ],
+   "id": "S-02",
+   "lines": [
+    57
+   ],
+   "note": "Описанные методы API: getCashback (GET, чтение); saveCategory (POST, изменение)."
+  },
+  {
+   "rule": "api.status_inventory",
+   "kind": "inventory",
+   "line": 89,
+   "quote": "200 | Запрос выполнен | Описано в разделе метода",
+   "message": "Перечень статусов: 200, 400, 401, 404 и 500; упомянуты в тексте: 200.",
+   "audience": [
+    "architect",
+    "qa"
+   ],
+   "id": "S-03",
+   "lines": [
+    89
+   ],
+   "note": "Перечень статусов: 200, 400, 401, 404 и 500; упомянуты в тексте: 200."
+  }
+ ],
+ "candidates": []
+}
