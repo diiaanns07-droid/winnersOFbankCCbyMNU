@@ -1,0 +1,371 @@
+"""HTTP-сервер веб-демо v2 на стандартной библиотеке.
+
+Маршруты::
+
+    GET  /                          загрузка файла, выбор провайдера, последние проверки
+    POST /api/jobs                  файл (multipart) + provider + model → 303 /jobs/<id> (JSON при Accept: application/json)
+    GET  /jobs/<id>                 прогресс по этапам, затем отчёт и выгрузки
+    GET  /api/jobs/<id>             состояние задания (для опроса)
+    GET  /jobs/<id>/files/<имя>     скачать файл отчёта (?inline=1 — открыть в браузере)
+    GET  /api/providers             какие провайдеры доступны
+    GET  /healthz                   ok
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shlex
+import sys
+import time
+import webbrowser
+from email import policy
+from email.parser import BytesParser
+from html import escape
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, quote, urlsplit
+
+from .runner import (ALLOWED_EXT, FILES, MAX_UPLOAD, FixtureRunner, Job, JobStore, PipelineRunner, Worker,
+                     check_provider, load_dotenv, provider_status)
+
+ASSETS = Path(__file__).with_name("assets")
+REPO = Path(__file__).resolve().parents[4]
+JOB_PATH = re.compile(r"^/(api/)?jobs/(?P<id>\d{8}-\d{6}-[0-9a-f]{6})(?P<rest>/.*)?$")
+
+VERDICT = {"no": ("Нельзя", "no"), "conditional": ("С условиями", "cond"), "yes": ("Можно", "yes")}
+
+
+def e(v: Any) -> str:
+    return escape("" if v is None else str(v), quote=True)
+
+
+class App:
+    def __init__(self, store: JobStore, worker: Worker, *, default_provider: str = "auto", sample: Path | None = None):
+        self.store = store
+        self.worker = worker
+        self.default_provider = default_provider
+        self.sample = sample if sample and sample.is_file() else None
+
+    def start(self, file_name: str, data: bytes, provider: str, model: str, *, parent: str = "",
+              answers: bytes = b"") -> Job:
+        job = self.store.create(file_name, data, provider, model, parent=parent, answers=answers)
+        self.worker.submit(job)
+        return job
+
+
+# ─────────────────────────────── страницы ───────────────────────────────
+
+def _layout(title: str, body: str, *, sub: str = "") -> str:
+    return f"""<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{e(title)}</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7C55'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/app.css">
+</head><body>
+<header class="top"><a class="brand" href="/"><span class="logo" aria-hidden="true"></span><span><span class="bname">Ревью требований</span>
+<span class="bsub">{e(sub or "ИИ-агент статического ревью ТЗ · BCC-HUB × MNU")}</span></span></a></header>
+{body}
+<script src="/assets/app.js"></script>
+</body></html>"""
+
+
+def index_page(app: App, *, error: str = "", provider: str = "", model: str = "") -> str:
+    provs = provider_status()
+    sel = provider or app.default_provider
+    opts = []
+    for p in provs:
+        mark = "" if p["ok"] else " — недоступен"
+        opts.append(f'<option value="{e(p["id"])}" data-ok="{1 if p["ok"] else 0}" data-note="{e(p["note"])}" '
+                    f'data-models="{e(",".join(p["models"]))}"{" selected" if p["id"] == sel else ""}>'
+                    f'{e(p["label"])}{mark}</option>')
+    sample = ""
+    if app.sample:
+        sample = (f'<button type="submit" class="btn ghost" name="sample" value="1" formnovalidate>'
+                  f'Проверить пример: {e(app.sample.name)}</button>')
+    rows = []
+    for j in app.store.recent():
+        s = j.summary or {}
+        v = VERDICT.get(s.get("development", ""), ("—", "none"))
+        state = {"queued": "в очереди", "running": "идёт анализ", "done": "готово", "failed": "ошибка"}.get(j.state, j.state)
+        counts = (f'<span class="c crit">{s.get("critical", 0)}</span><span class="c major">{s.get("major", 0)}</span>'
+                  f'<span class="c minor">{s.get("minor", 0)}</span>') if j.state == "done" else ""
+        rows.append(f'<tr><td><a href="/jobs/{e(j.id)}">{e(j.file_name)}</a></td>'
+                    f'<td>{e(time.strftime("%d.%m %H:%M", time.localtime(j.created)))}</td>'
+                    f'<td>{e(j.provider)}{(" · " + e(j.model)) if j.model else ""}</td>'
+                    f'<td><span class="st st-{e(j.state)}">{e(state)}</span></td>'
+                    f'<td>{f"<span class=vd-{v[1]}>{e(v[0])}</span>" if j.state == "done" else ""}</td><td>{counts}</td></tr>')
+    recent = (f'<section class="card recent"><h2>Последние проверки</h2><div class="tw"><table><thead><tr><th>Файл</th>'
+              f'<th>Когда</th><th>Провайдер</th><th>Статус</th><th>Разработка</th><th>Замечания</th></tr></thead>'
+              f'<tbody>{"".join(rows)}</tbody></table></div></section>') if rows else ""
+    err = f'<div class="error" role="alert">{e(error)}</div>' if error else ""
+    body = f"""<main class="wrap">
+<section class="intro">
+  <h1>Проверка требований до начала разработки</h1>
+  <p>Загрузите техническое задание — агент найдёт противоречия, пробелы и непроверяемые формулировки.
+  Каждое замечание — с дословной цитатой и номером строки, которые проверены программой.</p>
+</section>
+<form class="card upload" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
+  {err}
+  <label class="drop" id="drop">
+    <input type="file" name="file" id="file" accept=".pdf,.docx,.md,.markdown,.txt,.html,.htm" required>
+    <span class="dicon" aria-hidden="true"></span>
+    <span class="dtitle">Перетащите файл требований сюда или <u>выберите на компьютере</u></span>
+    <span class="dsub">PDF, Word (DOCX), Markdown, TXT, HTML · до 20 МБ</span>
+    <span class="fname" id="fname"></span>
+  </label>
+  <div class="row">
+    <label class="fld">Модель<select name="provider" id="provider">{"".join(opts)}</select></label>
+    <label class="fld narrow">Вариант модели<input name="model" id="model" list="models" value="{e(model)}" placeholder="по умолчанию" autocomplete="off"><datalist id="models"></datalist></label>
+  </div>
+  <p class="pnote" id="pnote"></p>
+  <div class="actions"><button type="submit" class="btn big" id="go">Проверить требования</button>{sample}</div>
+</form>
+{recent}
+<section class="how">
+  <div><b>1. Документ</b><span>Читаем PDF, Word, Markdown; нумеруем строки, нарезаем требования и присваиваем им ID.</span></div>
+  <div><b>2. Четыре ревьюера</b><span>Аналитик, тестировщик, архитектор и риски смотрят параллельно, отдельно — согласованность набора.</span></div>
+  <div><b>3. Судья</b><span>Убирает дубли и ложные срабатывания, ставит критичность и выносит вердикт: можно ли начинать.</span></div>
+</section>
+</main>"""
+    return _layout("Ревью требований", body)
+
+
+def job_page(job: Job) -> str:
+    links = "".join(f'<a class="dl" data-key="{k}" href="/jobs/{e(job.id)}/files/{n}" hidden>{lbl}</a>'
+                    for k, n, lbl, _ in FILES)
+    body = f"""<main class="jobwrap" data-job="{e(job.id)}">
+<section class="card prog" id="prog">
+  <div class="phead">
+    <div class="pinfo"><div class="pfile">{e(job.file_name)}</div>
+    <div class="pmeta">{e(job.provider)}{(" · " + e(job.model)) if job.model else ""} · <span id="elapsed">0 с</span> · <span id="pstate">в очереди</span><span id="vsum"></span></div></div>
+    <div class="dls"><span class="dll" id="dll" hidden>Скачать:</span>{links}
+    <a class="dl" id="newtab" href="/jobs/{e(job.id)}/files/report.html?inline=1" target="_blank" rel="noopener" hidden>Открыть отдельно ↗</a>
+    <form class="answers" id="answers" hidden title="Отметьте варианты во вкладке «Вопросы» отчёта, нажмите «Скачать ответы» и загрузите файл: агент перепроверит замечания и покажет вердикт «до и после» и исправленное ТЗ.">
+      <label class="dl ans">Загрузить ответы ↻<input type="file" name="answers" accept=".md,.txt,.json" hidden></label></form>
+    <a class="btn ghost" href="/">Новая проверка</a></div>
+  </div>
+  {f'<p class="parent">Повторная проверка с ответами владельца к <a href="/jobs/{e(job.parent)}">исходной проверке</a>.</p>' if job.parent else ''}
+  <ol class="stages" id="stages"></ol>
+
+  <div class="error" id="err" hidden></div>
+  <details class="log"><summary>Журнал запуска</summary><pre id="log"></pre></details>
+</section>
+<section class="result" id="result" hidden><iframe id="frame" title="Отчёт ревью"></iframe></section>
+</main>"""
+    return _layout(f"Проверка: {job.file_name}", body, sub=job.file_name)
+
+
+# ─────────────────────────────── обработчик ───────────────────────────────
+
+def _parse_multipart(ctype: str, body: bytes) -> tuple[dict[str, str], dict[str, tuple[str, bytes]]]:
+    msg = BytesParser(policy=policy.HTTP).parsebytes(b"Content-Type: " + ctype.encode("latin-1") + b"\r\n\r\n" + body)
+    fields: dict[str, str] = {}
+    files: dict[str, tuple[str, bytes]] = {}
+    if not msg.is_multipart():
+        return fields, files
+    for part in msg.iter_parts():
+        name = part.get_param("name", header="content-disposition")
+        if not name:
+            continue
+        data = part.get_payload(decode=True) or b""
+        fname = part.get_filename()
+        if fname is not None:
+            files[name] = (fname, data)
+        else:
+            fields[name] = data.decode("utf-8", errors="replace")
+    return fields, files
+
+
+class Handler(BaseHTTPRequestHandler):
+    app: App
+    server_version = "bcc-review-web/2"
+
+    def log_message(self, fmt: str, *args: Any) -> None:  # тише в консоли
+        if "/api/jobs/" in (args[0] if args else ""):
+            return
+        sys.stderr.write("%s %s\n" % (self.log_date_time_string(), fmt % args))
+
+    # ── ответы ──
+    def _send(self, code: int, body: bytes, ctype: str, headers: dict[str, str] | None = None) -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _html(self, code: int, text: str) -> None:
+        self._send(code, text.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _json(self, code: int, obj: Any) -> None:
+        self._send(code, json.dumps(obj, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+
+    def _wants_json(self) -> bool:
+        return "application/json" in (self.headers.get("Accept") or "")
+
+    # ── GET ──
+    def do_HEAD(self) -> None:  # noqa: N802
+        self.do_GET()
+
+    def do_GET(self) -> None:  # noqa: N802
+        url = urlsplit(self.path)
+        path = url.path
+        if path == "/":
+            return self._html(200, index_page(self.app))
+        if path == "/healthz":
+            return self._send(200, b"ok", "text/plain; charset=utf-8")
+        if path == "/api/providers":
+            return self._json(200, provider_status())
+        if path.startswith("/assets/"):
+            name = path.rsplit("/", 1)[-1]
+            p = ASSETS / name
+            if p.is_file() and name in ("app.css", "app.js"):
+                ctype = "text/css; charset=utf-8" if name.endswith(".css") else "text/javascript; charset=utf-8"
+                return self._send(200, p.read_bytes(), ctype)
+            return self._html(404, _layout("Не найдено", '<main class="wrap"><p>Файл не найден.</p></main>'))
+        m = JOB_PATH.match(path)
+        if m:
+            job = self.app.store.get(m.group("id"))
+            if not job:
+                return self._not_found()
+            rest = m.group("rest") or ""
+            if m.group(1):  # /api/jobs/<id>
+                return self._json(200, job.public())
+            if not rest:
+                return self._html(200, job_page(job))
+            if rest.startswith("/files/"):
+                return self._file(job, rest[len("/files/"):], "inline" in parse_qs(url.query))
+        return self._not_found()
+
+    def _not_found(self) -> None:
+        if self._wants_json() or self.path.startswith("/api/"):
+            return self._json(404, {"error": "не найдено"})
+        self._html(404, _layout("Не найдено", '<main class="wrap"><section class="card"><h1>Не найдено</h1>'
+                                '<p><a href="/">Вернуться к загрузке</a></p></section></main>'))
+
+    def _file(self, job: Job, name: str, inline: bool) -> None:
+        known = {n: (lbl, mime) for _, n, lbl, mime in FILES}
+        if name not in known:
+            return self._not_found()
+        p = self.app.store.dir(job.id) / "out" / name
+        if not p.is_file():
+            return self._not_found()
+        stem = Path(job.file_name).stem
+        dl = f"{stem}.{name.split('.', 1)[1]}"
+        disp = "inline" if inline else "attachment"
+        self._send(200, p.read_bytes(), known[name][1],
+                   {"Content-Disposition": f"{disp}; filename=\"report.{name.split('.', 1)[1]}\"; filename*=UTF-8''{quote(dl)}"})
+
+    # ── POST ──
+    def do_POST(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
+        m = JOB_PATH.match(path)
+        if m and m.group(1) and m.group("rest") == "/answers":
+            return self._answers(m.group("id"))
+        if path != "/api/jobs":
+            return self._not_found()
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > MAX_UPLOAD + 64 * 1024:
+            return self._fail(413, "Файл больше 20 МБ.")
+        body = self.rfile.read(length)
+        if len(body) < length:
+            return self._fail(400, "Загрузка оборвалась — отправьте файл ещё раз.")
+        fields, files = _parse_multipart(self.headers.get("Content-Type", ""), body)
+        provider = (fields.get("provider") or self.app.default_provider).strip()
+        model = (fields.get("model") or "").strip()[:80]
+        if fields.get("sample") and self.app.sample:
+            fname, data = self.app.sample.name, self.app.sample.read_bytes()
+        else:
+            fname, data = files.get("file", ("", b""))
+        if not fname or not data:
+            return self._fail(400, "Выберите файл требований.", provider, model)
+        ext = Path(fname).suffix.lower()
+        if ext not in ALLOWED_EXT:
+            return self._fail(400, f"Формат {ext or 'без расширения'} не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML.",
+                              provider, model)
+        problem = check_provider(provider)
+        if problem:
+            return self._fail(400, problem, provider, model)
+        job = self.app.start(fname, data, provider, model)
+        if self._wants_json():
+            return self._json(201, {"id": job.id, "url": f"/jobs/{job.id}"})
+        self._send(303, b"", "text/plain", {"Location": f"/jobs/{job.id}"})
+
+    def _answers(self, parent_id: str) -> None:
+        """Ответы владельца на вопросы отчёта → новый прогон того же документа с --answers --revise."""
+        parent = self.app.store.get(parent_id)
+        if not parent or parent.state != "done":
+            return self._json(404, {"error": "Исходная проверка не найдена или ещё не завершена."})
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > 2 * 1024 * 1024:
+            return self._json(413, {"error": "Файл ответов больше 2 МБ."})
+        fields, files = _parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
+        data = files.get("answers", ("", b""))[1] or (fields.get("answers_text") or "").encode("utf-8")
+        if not data.strip():
+            return self._json(400, {"error": "Загрузите файл ответов (кнопка «Скачать ответы» во вкладке «Вопросы» отчёта)."})
+        problem = check_provider(parent.provider)
+        if problem:
+            return self._json(400, {"error": problem})
+        src = Path(parent.input_path)
+        job = self.app.start(parent.file_name, src.read_bytes(), parent.provider, parent.model,
+                             parent=parent.id, answers=data)
+        self._json(201, {"id": job.id, "url": f"/jobs/{job.id}"})
+
+    def _fail(self, code: int, msg: str, provider: str = "", model: str = "") -> None:
+        if self._wants_json():
+            return self._json(code, {"error": msg})
+        self._html(code, index_page(self.app, error=msg, provider=provider, model=model))
+
+
+def make_server(app: App, host: str = "127.0.0.1", port: int = 8014) -> ThreadingHTTPServer:
+    handler = type("BoundHandler", (Handler,), {"app": app})
+    srv = ThreadingHTTPServer((host, port), handler)
+    srv.daemon_threads = True
+    return srv
+
+
+def build_app(data_dir: Path, *, provider: str = "auto", fixture: Path | None = None, sample: Path | None = None,
+              step_s: float = 0.6, workers: int = 1, extra_args: list[str] | None = None) -> App:
+    store = JobStore(data_dir)
+    runner = FixtureRunner(store, fixture, step_s=step_s) if fixture else PipelineRunner(store, extra_args=extra_args)
+    if sample is None:
+        cand = REPO / "release" / "input" / "requirements.md"
+        sample = cand if cand.is_file() else None
+    return App(store, Worker(store, runner, workers), default_provider=provider, sample=sample)
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.web", description="Веб-демо ревью требований")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8014)
+    ap.add_argument("--provider", default="auto", help="провайдер по умолчанию в форме")
+    ap.add_argument("--data-dir", default=".bcc_web", help="где хранить загрузки и отчёты")
+    ap.add_argument("--sample", help="файл для кнопки «Проверить пример»")
+    ap.add_argument("--fixture", help="показ без модели: этапы по таймеру, отчёт из этого report.json")
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--pipeline-args", default="", help="доп. флаги для python -m bcc_review, например \"--engine v1\"")
+    ap.add_argument("--open", action="store_true", help="открыть браузер")
+    a = ap.parse_args(argv)
+    load_dotenv()
+    app = build_app(Path(a.data_dir), provider=a.provider, fixture=Path(a.fixture) if a.fixture else None,
+                    sample=Path(a.sample) if a.sample else None, workers=a.workers,
+                    extra_args=shlex.split(a.pipeline_args, posix=(os.name != "nt")))
+    srv = make_server(app, a.host, a.port)
+    url = f"http://{a.host}:{srv.server_address[1]}/"
+    print(f"Веб-демо: {url}  (остановить — Ctrl+C)", flush=True)
+    if a.open:
+        webbrowser.open(url)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        srv.server_close()
+    return 0
