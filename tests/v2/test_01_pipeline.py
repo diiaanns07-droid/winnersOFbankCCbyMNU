@@ -93,8 +93,14 @@ def test_ask_split_halves_truncated_batch():
     assert llm.stats["split"] >= 2
 
 
+def test_truncated_retries_with_bigger_limit_then_raises():
+    llm = client([ProviderError("truncated", "x"), {"items": ["ok"]}])
+    assert llm.ask("s", "sys", "u", SCHEMA, max_output_tokens=8000) == {"items": ["ok"]}
+    assert llm.stats["expanded"] == 1
+
+
 def test_truncated_single_item_raises():
-    llm = client([ProviderError("truncated", "x")])
+    llm = client([ProviderError("truncated", "x")] * 3)
     with pytest.raises(Truncated):
         llm.ask_split("s", lambda it: ("sys", "u"), ["one"], SCHEMA, merge_lists)
 
