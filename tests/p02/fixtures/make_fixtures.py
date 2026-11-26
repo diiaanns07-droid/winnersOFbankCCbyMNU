@@ -301,16 +301,115 @@ def build_bank_tables(path: Path, expected: Path) -> None:
     expected.write_text(json.dumps(truth, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
 
 
+AMOUNT_GRID = (56.69, 96.0, 400.0, 538.58)
+AMOUNT = '50 000 ₸'
+
+
+def build_amounts(path: Path, expected: Path) -> None:
+    """Одна сумма «50 000 ₸» в разных местах: строки 1, 3, 8 таблицы, абзац, нижний колонтитул каждой
+    страницы и строка 13 таблицы, перенесённая на стр. 2 (без повтора шапки).
+
+    Рядом пишется expected (JSON): каждое вхождение суммы со страницей, местом (table/paragraph/footer),
+    номером строки таблицы и рамкой глифов по метрикам шрифта — независимо от PyMuPDF.
+    """
+    import json
+
+    from reportlab.pdfgen import canvas as rl_canvas
+    _styles()
+    height = A4[1]
+    c = rl_canvas.Canvas(str(path), pagesize=A4, invariant=1)
+    c.setTitle('Фикстура №02: одна сумма в таблице, абзаце и колонтитуле')
+    found: list[dict] = []
+
+    def glyphs(x: float, baseline: float, text: str, font: str, size: float, start: int = 0) -> list[float]:
+        x0 = x + pdfmetrics.stringWidth(text[:start], font, size)
+        x1 = x0 + pdfmetrics.stringWidth(AMOUNT, font, size)
+        return [round(v, 2) for v in (x0, baseline - pdfmetrics.getAscent(font, size), x1,
+                                      baseline - pdfmetrics.getDescent(font, size))]
+
+    def text(x: float, baseline: float, value: str, font: str = 'DejaVu', size: float = BANK_SIZE, where: str = '',
+             page: int = 0) -> None:
+        c.setFont(font, size)
+        c.drawString(x, height - baseline, value)
+        if AMOUNT in value and where:
+            found.append({'page': page, 'where': where, 'row': None,
+                          'glyphs': glyphs(x, baseline, value, font, size, value.index(AMOUNT))})
+
+    def furniture(page: int) -> None:
+        text(AMOUNT_GRID[0], 12 * mm, 'Выписка по карте *1234 · ноябрь 2026', size=8)
+        text(AMOUNT_GRID[0], height - 10 * mm, f'Порог уведомления {AMOUNT} · стр. {page} из 2', size=8,
+             where='footer', page=page)
+
+    def table(top: float, rows: list[tuple[str, list[str]]], page: int, first_row: int, grid=AMOUNT_GRID,
+              name: str = 'operations') -> float:
+        """Стили строк: head — жирная шапка с заливкой; bold_head — жирная шапка без заливки;
+        kv — жирный ключ и обычное значение; data — обычная строка."""
+        x0, x1 = grid[0], grid[-1]
+        for i, (style, cells) in enumerate(rows):
+            y = top + i * BANK_ROW
+            if style == 'head':
+                c.setFillColor(colors.HexColor('#e0e0e0'))
+                c.rect(x0, height - y - BANK_ROW, x1 - x0, BANK_ROW, stroke=0, fill=1)
+                c.setFillColor(colors.black)
+            for col, value in enumerate(cells):
+                bold = style in ('head', 'bold_head') or (style == 'kv' and col == 0)
+                font = 'DejaVu-Bold' if bold else 'DejaVu'
+                c.setFont(font, BANK_SIZE)
+                c.drawString(grid[col] + 5, height - (y + 14), value)
+                if value == AMOUNT:
+                    found.append({'page': page, 'where': 'table', 'table': name, 'row': first_row + i,
+                                  'cell': [round(v, 2) for v in (grid[col], y, grid[col + 1], y + BANK_ROW)],
+                                  'glyphs': glyphs(grid[col] + 5, y + 14, value, font, BANK_SIZE)})
+        bottom = top + BANK_ROW * len(rows)
+        c.setLineWidth(0.6)
+        for i in range(len(rows) + 1):
+            c.line(x0, height - (top + i * BANK_ROW), x1, height - (top + i * BANK_ROW))
+        for x in grid:
+            c.line(x, height - top, x, height - bottom)
+        return bottom
+
+    operations = ['Покупка в супермаркете', 'Перевод на свой счёт', 'Покупка билетов', 'Оплата связи',
+                  'Покупка в аптеке', 'Снятие наличных', 'Оплата такси', 'Покупка одежды', 'Кафе', 'Возврат покупки',
+                  'Покупка книг', 'Оплата парковки', 'Покупка техники']
+    sums = [AMOUNT, '12 300 ₸', AMOUNT, '4 500 ₸', '2 100 ₸', '20 000 ₸', '3 300 ₸', AMOUNT, '5 600 ₸', '−7 800 ₸',
+            '9 900 ₸', '1 200 ₸', AMOUNT]
+    data = [('data', [str(i + 1), op, amount]) for i, (op, amount) in enumerate(zip(operations, sums))]
+    furniture(1)
+    text(AMOUNT_GRID[0], 70, '1. Операции за ноябрь', font='DejaVu-Bold', size=14)
+    text(AMOUNT_GRID[0], 100, f'Порог уведомления — {AMOUNT} в месяц.', where='paragraph', page=1)
+    text(AMOUNT_GRID[0], 120, 'Последняя строка таблицы перенесена на следующую страницу без повтора шапки.')
+    table(520, [('head', ['№', 'Операция', 'Сумма, ₸'])] + data[:12], 1, 0)
+    c.showPage()
+    furniture(2)
+    bottom = table(60, data[12:], 2, 13)
+    text(AMOUNT_GRID[0], bottom + 30, f'Итог: четыре покупки по {AMOUNT} и девять других операций.',
+         where='paragraph', page=2)
+    # Как в командной PDF-копии: жирный заголовок вплотную над таблицей «Поле | Значение» без заливки,
+    # ключи жирные. PyMuPDF принимает заголовок за внешнюю шапку (header.external = True).
+    text(AMOUNT_GRID[0], 170, '2. Сведения о карте', font='DejaVu-Bold', size=14)
+    table(180, [('bold_head', ['Поле', 'Значение']), ('kv', ['Карта', '*1234']), ('kv', ['Лимит', AMOUNT]),
+                ('kv', ['Валюта', 'KZT'])], 2, 0, grid=(56.69, 226.77, 538.58), name='card')
+    c.save()
+    truth = {'source': 'tests/p02/fixtures/make_fixtures.py: build_amounts', 'amount': AMOUNT,
+             'units': 'пункты, начало — левый верхний угол неповёрнутой страницы (как у PyMuPDF)',
+             'table': {'header': ['№', 'Операция', 'Сумма, ₸'], 'rows': 13, 'pages': [1, 2],
+                       'moved_row': 13, 'link': 'header_carried'},
+             'card_table': {'header': ['Поле', 'Значение'], 'page': 2, 'rows': 3},
+             'occurrences': found}
+    expected.write_text(json.dumps(truth, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+
+
 def main() -> None:
     rl_config.invariant = 1
     build_sample(HERE / 'p02_sample.pdf')
     build_rotated_text(HERE / 'p02_rotated_text.pdf')
     build_bank_tables(HERE / 'p02_bank_tables.pdf', HERE / 'p02_bank_tables.expected.json')
+    build_amounts(HERE / 'p02_amounts.pdf', HERE / 'p02_amounts.expected.json')
     sys.path.insert(0, str(HERE.parent))
     import p02_builders as builders  # производные PDF: только PyMuPDF
     builders.scan_mixed(HERE / 'p02_scan_mixed.pdf')
     builders.rotated_copy(HERE / 'p02_rotated90.pdf')
-    for name in ('p02_sample.pdf', 'p02_rotated_text.pdf', 'p02_bank_tables.pdf', 'p02_scan_mixed.pdf',
+    for name in ('p02_sample.pdf', 'p02_rotated_text.pdf', 'p02_bank_tables.pdf', 'p02_amounts.pdf', 'p02_scan_mixed.pdf',
                  'p02_rotated90.pdf'):
         print('ok', HERE / name)
 

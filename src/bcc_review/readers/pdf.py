@@ -486,7 +486,12 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
     try:
         if rotation:
             page.set_rotation(0)
-        found = page.find_tables().tables
+        found = [(table, [list(row.cells) for row in table.rows], table.col_count, tuple(table.bbox),
+                  bool(getattr(table.header, 'external', False))) for table in page.find_tables().tables]
+        # Сетка из линеек, которую find_tables пропустил (PyMuPDF 2.x не видит таблицу из одной строки,
+        # например последнюю строку, перенесённую на следующую страницу).
+        found += [(None, rows, len(bounds) - 1, bbox, False)
+                  for rows, bounds, bbox in _ruled_grids(page, [item[3] for item in found])]
     except Exception as error:  # noqa: BLE001
         warnings.append(_warn('table_detection_failed', 'warning', page_no,
                               f'Страница {page_no}: таблицы не распознаны ({type(error).__name__}); текст сохранён блоками.'))
@@ -496,12 +501,10 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
             page.set_rotation(rotation)
     chars = [ch for lines in lines_blocks for line in lines for ch in line.chars if ch.c != ' ']
     tables = []
-    for table in found:
-        rows = [list(row.cells) for row in table.rows]
+    for table, rows, col_count, bbox, external in found:
         cells = [(r, c, box) for r, row in enumerate(rows) for c, box in enumerate(row) if box]
-        if table.col_count < 2 or len(cells) < 2:
+        if col_count < 2 or len(cells) < 2:
             continue                                # рамка вокруг абзаца, а не таблица
-        bbox = tuple(table.bbox)
         inside = [ch for ch in chars if _center_in(ch, bbox)]
         if inside and bbox[3] - bbox[1] < 0.8 * max(ch.bbox[3] - ch.bbox[1] for ch in inside):
             continue                                # «таблица» ниже собственного текста: подчёркивание, не сетка
@@ -518,9 +521,9 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
             assigned.setdefault((r, c), []).append(ch)
         bounds = sorted({round(box[0], 1) for _, _, box in cells} | {round(box[2], 1) for _, _, box in cells})
         record = {'bbox': bbox, 'rows': rows, 'assigned': assigned, 'chars': {id(ch) for ch in inside},
-                  'col_count': table.col_count, 'bounds': bounds,
-                  'header_external': bool(getattr(table.header, 'external', False)),
-                  'row_bold': _row_bold(assigned, len(rows))}
+                  'col_count': col_count, 'bounds': bounds, 'header_external': external,
+                  'row_bold': _row_bold(assigned, len(rows)),
+                  'source': 'find_tables' if table is not None else 'ruled_lines'}
         if not upright and inside:
             warnings.append(_warn('table_rotated_text', 'warning', page_no,
                                   f'Страница {page_no}: таблица {_r(bbox)} с текстом поперёк страницы; соответствие строк '
@@ -533,6 +536,85 @@ def _find_tables(page, page_no: int, lines_blocks: list[list[Line]], warnings: l
             continue
         tables.append(record)
     return tables
+
+
+def _ruled_grids(page, known: list[tuple]) -> list[tuple[list[list], list[float], tuple]]:
+    """Таблицы из видимых линеек вне рамок find_tables: (rows, bounds, bbox) в формате find_tables.
+
+    Строка сетки — полоса между двумя горизонталями одной длины, закрытая вертикалями по краям;
+    ячейки делят вертикали, проходящие через всю полосу (объединённая ячейка просто шире). Линейки
+    бывают отрезками («l») и тонкими прямоугольниками («re», так рисует Chromium). Без двух колонок
+    и замкнутых ячеек сетки нет.
+    """
+    horizontal: list[list[float]] = []
+    vertical: list[list[float]] = []
+    for drawing in page.get_drawings():
+        for item in drawing.get('items', ()):
+            if item[0] == 'l':
+                a, b = item[1], item[2]
+                if abs(a.y - b.y) < 0.5:
+                    horizontal.append([min(a.x, b.x), max(a.x, b.x), (a.y + b.y) / 2])
+                elif abs(a.x - b.x) < 0.5:
+                    vertical.append([min(a.y, b.y), max(a.y, b.y), (a.x + b.x) / 2])
+            elif item[0] == 're':
+                r = item[1]
+                if r.height <= 2 < r.width:
+                    horizontal.append([r.x0, r.x1, (r.y0 + r.y1) / 2])
+                elif r.width <= 2 < r.height:
+                    vertical.append([r.y0, r.y1, (r.x0 + r.x1) / 2])
+    horizontal, vertical = _merge_segments(horizontal), _merge_segments(vertical)
+
+    def covers(x: float, top: float, bottom: float) -> bool:
+        return any(abs(v[2] - x) <= 1.5 and v[0] <= top + 1.5 and v[1] >= bottom - 1.5 for v in vertical)
+
+    bands = []
+    lines = sorted(horizontal, key=lambda h: h[2])
+    for i, upper in enumerate(lines):
+        lower = next((h for h in lines[i + 1:] if h[2] - upper[2] > 2 and abs(h[0] - upper[0]) <= 2
+                      and abs(h[1] - upper[1]) <= 2), None)
+        if lower is None:
+            continue
+        x0, x1, top, bottom = max(upper[0], lower[0]), min(upper[1], lower[1]), upper[2], lower[2]
+        if not (covers(x0, top, bottom) and covers(x1, top, bottom)):
+            continue
+        cuts = sorted({round(v[2], 1) for v in vertical
+                       if x0 + 2 < v[2] < x1 - 2 and v[0] <= top + 1.5 and v[1] >= bottom - 1.5})
+        if not cuts:
+            continue                                # одна колонка — рамка, а не таблица
+        box = (x0, top, x1, bottom)
+        if any(_intersection(box, k) > 0.2 * _area(box) for k in known):
+            continue                                # уже таблица find_tables (её рамка бывает обрезана по тексту)
+        bands.append((box, [x0, *cuts, x1]))
+    grids: list[list] = []
+    for box, cuts in bands:                         # смежные полосы с теми же краями — одна сетка
+        last = grids[-1][-1][0] if grids else None
+        if last and abs(last[3] - box[1]) <= 1 and abs(last[0] - box[0]) <= 2 and abs(last[2] - box[2]) <= 2:
+            grids[-1].append((box, cuts))
+        else:
+            grids.append([(box, cuts)])
+    out = []
+    for grid in grids:
+        bounds = sorted({round(x, 1) for _, cuts in grid for x in cuts})
+        rows = []
+        for box, cuts in grid:
+            row: list = [None] * (len(bounds) - 1)
+            for a, b in pairwise(cuts):
+                row[bounds.index(round(a, 1))] = (a, box[1], b, box[3])
+            rows.append(row)
+        out.append((rows, bounds, (grid[0][0][0], grid[0][0][1], grid[-1][0][2], grid[-1][0][3])))
+    return out
+
+
+def _merge_segments(segments: list[list[float]]) -> list[list[float]]:
+    """Отрезки одной прямой (±1 pt), касающиеся друг друга (зазор ≤ 2 pt), — одна линия."""
+    merged: list[list[float]] = []
+    for start, end, level in sorted(segments, key=lambda s: (round(s[2]), s[0])):
+        last = merged[-1] if merged else None
+        if last and abs(last[2] - level) <= 1 and start <= last[1] + 2:
+            last[1] = max(last[1], end)
+        else:
+            merged.append([start, end, level])
+    return merged
 
 
 def _row_bold(assigned: dict[tuple[int, int], list[Char]], count: int) -> list[bool | None]:
@@ -1034,7 +1116,11 @@ def _link_tables(pages: list[dict], warnings: list[dict]) -> None:
 def _start_table(record: dict, table_id: str, page_no: int, warnings: list[dict], *, uncertain: bool) -> None:
     """Новая таблица: шапка со своей страницы (или без шапки, если связка неизвестна)."""
     record['id'], record['part'], record['row_base'], record['link'] = table_id, 1, 0, None
-    if record['header_external'] or uncertain:
+    # PyMuPDF помечает шапку «внешней», если над таблицей жирный заголовок раздела («Общие сведения»).
+    # Если первая строка самой таблицы жирная, а данные — нет, шапка — она.
+    row_bold = record['row_bold']
+    own_header = bool(row_bold) and row_bold[0] is True and any(v is False for v in row_bold[1:])
+    if (record['header_external'] and not own_header) or uncertain:
         record['header_rows'], record['header'], record['header_first'], record['header_source'] = [], None, None, None
     else:
         record['header_rows'] = _header_rows(record)
@@ -1222,6 +1308,8 @@ def _table_rows(unit: Unit, page: dict) -> list[tuple[str, str, dict]]:
         for key in ('link', 'adjacent_to', 'maybe_continues'):
             if record.get(key):
                 loc['table'][key] = record[key]
+        if record.get('source') == 'ruled_lines':
+            loc['table']['source'] = 'ruled_lines'          # сетку нашла читалка по линейкам, не find_tables
         if is_header and record['header_source'] == 'repeated':
             loc['table']['repeated_header'] = True
         out.append(('table_header' if is_header else 'table_row', ''.join(parts), loc))
