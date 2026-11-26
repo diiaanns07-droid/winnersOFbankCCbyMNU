@@ -2198,6 +2198,11 @@ def main(argv: list | None = None) -> int:
     p.add_argument("--view", help="куда записать компактные строки для HTML/веб-демо")
     p.add_argument("--md", help="куда записать раздел отчёта в Markdown")
     args = p.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):  # консоль Windows (cp1251/cp866): вывод всегда UTF-8
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
     try:
         with open(args.previous, encoding="utf-8") as fh:
             previous = json.load(fh)
