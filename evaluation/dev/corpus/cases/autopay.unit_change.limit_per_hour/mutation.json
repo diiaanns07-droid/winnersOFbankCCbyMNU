@@ -1,0 +1,66 @@
+{
+  "case_id": "autopay.unit_change.limit_per_hour",
+  "family": "autopay",
+  "kind": "mutant",
+  "ops": [
+    "unit_change"
+  ],
+  "variants": [
+    "limit_per_hour"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "autopay.base",
+  "base_source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+  "source_sha256": "7aff3a9e5b559ed65f9aad49be933adcb470ec2cfc14330eee050602bc667ec8",
+  "semantic_sha256": "05af0ba420a8c2192850325ffb6d2137c323a546059a6d98bcd85946cd1fb310",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 28,
+      "removed": "За одни сутки выполняется не больше трёх автопополнений одного номера.",
+      "inserted": "За один час выполняется не больше трёх автопополнений одного номера.",
+      "mutation_op": "unit_change",
+      "variant": "limit_per_hour"
+    }
+  ],
+  "expected_effect": [
+    "АП-5 ограничивает пополнения в час, критерий приёмки отказывает после трёх за сутки."
+  ],
+  "diff": "--- base/source.md\n+++ autopay.unit_change.limit_per_hour/source.md\n@@ -27,3 +27,3 @@\n * **АП-4.** Если уведомление о балансе сообщает баланс ниже порога, банк списывает сумму пополнения с карты и пополняет номер.\n-* **АП-5.** За одни сутки выполняется не больше трёх автопополнений одного номера.\n+* **АП-5.** За один час выполняется не больше трёх автопополнений одного номера.\n * **АП-6.** Если на карте недостаточно средств, пополнение не выполняется, а клиент получает push «Недостаточно средств для автопополнения».\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "autopay.unit_change.limit_per_hour",
+      "family": "autopay",
+      "source_sha256": "7aff3a9e5b559ed65f9aad49be933adcb470ec2cfc14330eee050602bc667ec8",
+      "visibility": "public",
+      "label_id": "autopay.unit_change.limit_per_hour#1",
+      "issue_type": "unit_mismatch",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "За один час выполняется не больше трёх автопополнений одного номера.",
+          "locator": "md:L28"
+        },
+        {
+          "role": "b",
+          "quote": "Три пополнения за текущие сутки | Оператор сообщает баланс ниже порога",
+          "locator": "md:L47"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "Три пополнения в 08:00, 12:00 и 16:00, четвёртое уведомление в 20:00.",
+      "explanation": "АП-5 ограничивает пополнения в час, критерий приёмки отказывает после трёх за сутки.",
+      "mutation": {
+        "op": "unit_change",
+        "variant": "limit_per_hour"
+      }
+    }
+  ]
+}

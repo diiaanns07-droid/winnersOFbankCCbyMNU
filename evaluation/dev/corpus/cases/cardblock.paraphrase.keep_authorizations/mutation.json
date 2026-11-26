@@ -1,0 +1,65 @@
+{
+  "case_id": "cardblock.paraphrase.keep_authorizations",
+  "family": "cardblock",
+  "kind": "mutant",
+  "ops": [
+    "paraphrase"
+  ],
+  "variants": [
+    "keep_authorizations"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cardblock.base",
+  "base_source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+  "source_sha256": "b472f2431dd6e0526f72a85e70f21c397b8d462b00119ad7c44ffffb4d87987e",
+  "semantic_sha256": "bfd0a0e9a021041d2e5b25120a3ef65d13d058ceead3a3825d306cc799759922",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 27,
+      "removed": "Блокировка не отменяет авторизации, одобренные до блокировки.",
+      "inserted": "Авторизации, одобренные до блокировки, остаются в силе.",
+      "mutation_op": "paraphrase",
+      "variant": "keep_authorizations"
+    }
+  ],
+  "expected_effect": [
+    "Смысл БК-4 не меняется. Новых находок быть не должно."
+  ],
+  "diff": "--- base/source.md\n+++ cardblock.paraphrase.keep_authorizations/source.md\n@@ -26,3 +26,3 @@\n * **БК-3.** Пока карта в статусе BLOCKED_BY_CLIENT, процессинг отклоняет новые авторизации с причиной «Карта заблокирована клиентом».\n-* **БК-4.** Блокировка не отменяет авторизации, одобренные до блокировки.\n+* **БК-4.** Авторизации, одобренные до блокировки, остаются в силе.\n * **БК-5.** Блокировка вступает в силу не позднее 10 секунд после ответа 200 метода blockCard.\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.paraphrase.keep_authorizations",
+      "family": "cardblock",
+      "source_sha256": "b472f2431dd6e0526f72a85e70f21c397b8d462b00119ad7c44ffffb4d87987e",
+      "visibility": "public",
+      "label_id": "cardblock.paraphrase.keep_authorizations#clean",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "explanation": "Смысл БК-4 не меняется. Новых находок быть не должно."
+    },
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.paraphrase.keep_authorizations",
+      "family": "cardblock",
+      "source_sha256": "b472f2431dd6e0526f72a85e70f21c397b8d462b00119ad7c44ffffb4d87987e",
+      "visibility": "public",
+      "label_id": "cardblock.paraphrase.keep_authorizations#control",
+      "issue_type": null,
+      "anchors": [
+        {
+          "role": "control",
+          "quote": "Авторизации, одобренные до блокировки, остаются в силе.",
+          "locator": "md:L27"
+        }
+      ],
+      "expected_outcome": "absent",
+      "explanation": "Перефразированное место: находка здесь — ложная тревога."
+    }
+  ]
+}

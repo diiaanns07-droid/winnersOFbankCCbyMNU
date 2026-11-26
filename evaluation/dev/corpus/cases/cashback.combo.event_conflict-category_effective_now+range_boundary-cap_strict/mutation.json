@@ -1,0 +1,109 @@
+{
+  "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+  "family": "cashback",
+  "kind": "combo",
+  "ops": [
+    "event_conflict",
+    "range_boundary"
+  ],
+  "variants": [
+    "category_effective_now",
+    "cap_strict"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cashback.base",
+  "base_source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+  "source_sha256": "eb603473958b6a4f880809d14bc614b0512a601ddc67702d5b5f5ca62c5733d6",
+  "semantic_sha256": "0b638476d55860d4d39f044da7cbd067bc2cfc125d9ebf9ce87fe805128b6715",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 31,
+      "after": "* **КБ-7.**",
+      "removed": "",
+      "inserted": "* **КБ-8.** Выбранная категория применяется к покупкам с момента сохранения.",
+      "mutation_op": "event_conflict",
+      "variant": "category_effective_now"
+    },
+    {
+      "op": "replace",
+      "base_line": 28,
+      "removed": "Сумма кэшбэка за месяц не превышает 10 000 ₸.",
+      "inserted": "Сумма кэшбэка за месяц меньше 10 000 ₸.",
+      "mutation_op": "range_boundary",
+      "variant": "cap_strict"
+    }
+  ],
+  "expected_effect": [
+    "Сохранение категории по КБ-1 действует со следующего месяца, по КБ-8 — сразу.",
+    "КБ-4 не допускает ровно 10 000 ₸, критерий приёмки ожидает итог 10 000 ₸."
+  ],
+  "diff": "--- base/source.md\n+++ cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict/source.md\n@@ -27,3 +27,3 @@\n * **КБ-3.** Ставка кэшбэка составляет 5 % от суммы покупки.\n-* **КБ-4.** Сумма кэшбэка за месяц не превышает 10 000 ₸.\n+* **КБ-4.** Сумма кэшбэка за месяц меньше 10 000 ₸.\n * **КБ-5.** Кэшбэк за месяц зачисляется на карту 5-го числа следующего месяца.\n@@ -31,2 +31,3 @@\n * **КБ-7.** Приложение показывает выбранную категорию и кэшбэк текущего месяца.\n+* **КБ-8.** Выбранная категория применяется к покупкам с момента сохранения.\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "family": "cashback",
+      "source_sha256": "eb603473958b6a4f880809d14bc614b0512a601ddc67702d5b5f5ca62c5733d6",
+      "visibility": "public",
+      "label_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict#1",
+      "issue_type": "event_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Выбор действует с первого дня следующего месяца.",
+          "locator": "md:L25"
+        },
+        {
+          "role": "b",
+          "quote": "Выбранная категория применяется к покупкам с момента сохранения.",
+          "locator": "md:L32"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "Клиент 10 ноября выбрал «Такси» и 11 ноября оплатил такси на 2 000 ₸.",
+      "explanation": "Сохранение категории по КБ-1 действует со следующего месяца, по КБ-8 — сразу.",
+      "mutation": {
+        "op": "event_conflict",
+        "variant": "category_effective_now"
+      }
+    },
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "family": "cashback",
+      "source_sha256": "eb603473958b6a4f880809d14bc614b0512a601ddc67702d5b5f5ca62c5733d6",
+      "visibility": "public",
+      "label_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict#2",
+      "issue_type": "boundary_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Сумма кэшбэка за месяц меньше 10 000 ₸.",
+          "locator": "md:L28"
+        },
+        {
+          "role": "b",
+          "quote": "Провести покупку «Такси» на 4 000 ₸ | Кэшбэк месяца 10 000 ₸",
+          "locator": "md:L49"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "Кэшбэк месяца 9 900 ₸, покупка «Такси» на 4 000 ₸.",
+      "explanation": "КБ-4 не допускает ровно 10 000 ₸, критерий приёмки ожидает итог 10 000 ₸.",
+      "mutation": {
+        "op": "range_boundary",
+        "variant": "cap_strict"
+      }
+    }
+  ]
+}

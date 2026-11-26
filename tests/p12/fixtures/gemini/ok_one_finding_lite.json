@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "{\"stage\": \"requirement_check\", \"notes\": null, \"candidates\": [{\"scope\": \"requirement\", \"kind\": \"ambiguity\", \"criterion\": \"И3\", \"severity\": \"major\", \"title\": \"Не определено «быстро» для отправки push\", \"impact\": \"Тестировщик не может проверить срок доставки уведомления.\", \"req_ids\": [\"R-001\"], \"hints\": [{\"block_id\": \"b1\", \"quote\": \"быстро отправлять push\"}]}]}"
+            }
+          ]
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 812,
+      "candidatesTokenCount": 150,
+      "totalTokenCount": 962
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "syn-ok-lite-0003"
+  }
+}

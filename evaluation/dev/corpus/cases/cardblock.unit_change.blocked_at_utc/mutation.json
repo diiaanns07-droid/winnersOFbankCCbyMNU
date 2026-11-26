@@ -1,0 +1,66 @@
+{
+  "case_id": "cardblock.unit_change.blocked_at_utc",
+  "family": "cardblock",
+  "kind": "mutant",
+  "ops": [
+    "unit_change"
+  ],
+  "variants": [
+    "blocked_at_utc"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cardblock.base",
+  "base_source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+  "source_sha256": "249f516a3ef6a4ac96f6a3c1cb71236abbff2913d0d58b40572d07d22f6ee200",
+  "semantic_sha256": "c1787861e68e46a990ec13ddc69989321a45cbd855232faaba72616416cc68f5",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 79,
+      "removed": "Поле `blockedAt` — время блокировки по UTC+5 в формате ISO 8601.",
+      "inserted": "Поле `blockedAt` — время блокировки по UTC в формате ISO 8601.",
+      "mutation_op": "unit_change",
+      "variant": "blocked_at_utc"
+    }
+  ],
+  "expected_effect": [
+    "Время блокировки хранится по UTC+5, а API описывает его по UTC (пример со смещением +05:00)."
+  ],
+  "diff": "--- base/source.md\n+++ cardblock.unit_change.blocked_at_utc/source.md\n@@ -78,3 +78,3 @@\n \n-Ответ 200: `{\"status\":\"BLOCKED_BY_CLIENT\",\"blockedAt\":\"2026-11-01T10:15:00+05:00\",\"days\":30}`. Поле `blockedAt` — время блокировки по UTC+5 в формате ISO 8601.\n+Ответ 200: `{\"status\":\"BLOCKED_BY_CLIENT\",\"blockedAt\":\"2026-11-01T10:15:00+05:00\",\"days\":30}`. Поле `blockedAt` — время блокировки по UTC в формате ISO 8601.\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.unit_change.blocked_at_utc",
+      "family": "cardblock",
+      "source_sha256": "249f516a3ef6a4ac96f6a3c1cb71236abbff2913d0d58b40572d07d22f6ee200",
+      "visibility": "public",
+      "label_id": "cardblock.unit_change.blocked_at_utc#1",
+      "issue_type": "unit_mismatch",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Поле `blockedAt` — время блокировки по UTC в формате ISO 8601.",
+          "locator": "md:L79"
+        },
+        {
+          "role": "b",
+          "quote": "время блокировки по UTC+5 и инициатора изменения",
+          "locator": "md:L33"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.5:unambiguous",
+      "scenario": "Блокировка в 10:15 по Алматы, ответ getCardStatus.",
+      "explanation": "Время блокировки хранится по UTC+5, а API описывает его по UTC (пример со смещением +05:00).",
+      "mutation": {
+        "op": "unit_change",
+        "variant": "blocked_at_utc"
+      }
+    }
+  ]
+}

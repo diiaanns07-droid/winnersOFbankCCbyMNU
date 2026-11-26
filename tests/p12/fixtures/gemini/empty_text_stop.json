@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "   "
+            }
+          ]
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 812,
+      "candidatesTokenCount": 0,
+      "totalTokenCount": 812
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-empty-0009"
+  }
+}

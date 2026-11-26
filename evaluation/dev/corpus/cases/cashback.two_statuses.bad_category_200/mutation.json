@@ -1,0 +1,67 @@
+{
+  "case_id": "cashback.two_statuses.bad_category_200",
+  "family": "cashback",
+  "kind": "mutant",
+  "ops": [
+    "two_statuses"
+  ],
+  "variants": [
+    "bad_category_200"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cashback.base",
+  "base_source_sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f",
+  "source_sha256": "6e283c711b3ffbb4c56abc751c887953384935870c6c3994bd8229350e69f7ca",
+  "semantic_sha256": "be98199820b2f3c8ecf7965a60cb3fd9ef5a576eb4f16ab756710a5d10827f63",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 83,
+      "after": "| `category` | string | Да | CAFE, TAXI или PHARMACY | Код категории |",
+      "removed": "",
+      "inserted": "Если код категории не из списка, метод возвращает 200 и тело `{\"result\":\"ERROR\"}`.",
+      "mutation_op": "two_statuses",
+      "variant": "bad_category_200"
+    }
+  ],
+  "expected_effect": [
+    "Неизвестный код категории получает 200 по описанию метода и 400 по таблице статусов."
+  ],
+  "diff": "--- base/source.md\n+++ cashback.two_statuses.bad_category_200/source.md\n@@ -84,2 +84,4 @@\n \n+Если код категории не из списка, метод возвращает 200 и тело `{\"result\":\"ERROR\"}`.\n+\n ### Статусы\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cashback.two_statuses.bad_category_200",
+      "family": "cashback",
+      "source_sha256": "6e283c711b3ffbb4c56abc751c887953384935870c6c3994bd8229350e69f7ca",
+      "visibility": "public",
+      "label_id": "cashback.two_statuses.bad_category_200#1",
+      "issue_type": "status_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Если код категории не из списка, метод возвращает 200 и тело `{\"result\":\"ERROR\"}`.",
+          "locator": "md:L85"
+        },
+        {
+          "role": "b",
+          "quote": "400 | Код категории не из списка CAFE, TAXI, PHARMACY",
+          "locator": "md:L92"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "POST saveCategory с category=TAXY.",
+      "explanation": "Неизвестный код категории получает 200 по описанию метода и 400 по таблице статусов.",
+      "mutation": {
+        "op": "two_statuses",
+        "variant": "bad_category_200"
+      }
+    }
+  ]
+}

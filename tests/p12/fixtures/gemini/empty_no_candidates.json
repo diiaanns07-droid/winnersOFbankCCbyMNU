@@ -1,0 +1,12 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "usageMetadata": {
+      "promptTokenCount": 812,
+      "totalTokenCount": 812
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "responseId": "syn-empty-0008"
+  }
+}
