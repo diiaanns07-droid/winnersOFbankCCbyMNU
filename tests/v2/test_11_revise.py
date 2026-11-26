@@ -189,3 +189,8 @@ def test_run_modes_answers_and_revise(tmp_path):
     assert q2["options"][0] in ctx.llm.calls[1]["user"], "ответ владельца подставляется в revise"
     assert Path(out["revised_file"]).name == "r.revised.md"
     assert len(out["markdown_sections"]) == 2 and "было → стало" in out["markdown_sections"][1]
+    rw = out["rewrites"]
+    assert rw == [{"finding_id": "D-02", "title": next(f["title"] for f in findings if f["id"] == "D-02"),
+                   "severity": "critical", "summary": "месяц по дате покупки", "action": "replace",
+                   "line_start": 64, "line_end": 64, "before": "Февральский счётчик вырос на 4 000 ₸",
+                   "after": "Январский счётчик вырос на 4 000 ₸", "answer_ids": [q2["id"]]}]

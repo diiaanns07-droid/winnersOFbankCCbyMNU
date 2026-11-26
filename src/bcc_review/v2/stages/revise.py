@@ -374,6 +374,23 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
             "findings": len(targets), "with_rewrite": len(rewrites), "without_rewrite": missing}}
 
 
+def flat_rewrites(result: dict) -> list[dict]:
+    """Применённые правки плоским списком для ``report.json`` и таблицы «было → стало» отчёта (№13):
+    ``{finding_id, title, severity, summary, action, line_start, line_end, before, after, answer_ids}``."""
+    out = []
+    for r in result.get("rewrites") or []:
+        for e in r.get("edits") or []:
+            if not e.get("applied"):
+                continue
+            out.append({"finding_id": r.get("finding_id", ""), "title": r.get("title", ""),
+                        "severity": r.get("severity", ""), "summary": r.get("summary", ""),
+                        "action": e.get("action", ""), "line_start": e.get("line"), "line_end": e.get("line"),
+                        "before": e.get("was", "") if e.get("action") == "replace" else "",
+                        "after": e.get("became", "") or ("фрагмент удалён" if e.get("action") == "replace" else ""),
+                        "answer_ids": list(r.get("answer_ids") or [])})
+    return out
+
+
 def revised_path(report_path: str | Path) -> Path:
     """``reports/requirements.md`` → ``reports/requirements.revised.md``."""
     p = Path(report_path)
@@ -444,7 +461,7 @@ def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = 
     if do_revise:
         r = run(ctx, list(report.get("findings") or []), clar)
         path = write(report_path, r) if report_path else None
-        out.update(rewrites=r.get("rewrites", []), revise_stats=r.get("stats", {}),
+        out.update(rewrites=flat_rewrites(r), revise_stats=r.get("stats", {}),
                    revised_file=str(path) if path else "", revised_markdown=r.get("revised_markdown", ""))
         section = render_markdown(r, path.name if path else "")
         if section:
