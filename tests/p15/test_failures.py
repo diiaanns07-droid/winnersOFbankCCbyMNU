@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 import pytest
 
 from bcc_review.web import devengine
 from bcc_review.web.engine import EngineSpec, resolve_engine
+from bcc_review.web.store import DataDirBusy
 
 from .conftest import CountingEngine, make_pdf
 
@@ -139,13 +141,20 @@ def test_server_restart_during_job_marks_interrupted(make_server, case_bytes, tm
     first = make_server(CountingEngine(hold=hold), data_dir=data)
     rid = first.upload("case_ab.md", case_bytes)["run_id"]
     first.wait(rid, until=lambda s: s["status"] == "running")
-    # Новый процесс сервера над теми же файлами (старый поток ещё висит на hold).
+    # Пока первый процесс жив, второй над тем же каталогом не стартует (иначе он пометил бы
+    # живой прогон прерванным). Перезапуск: первый «процесс» завершился, каталог свободен.
+    with pytest.raises(DataDirBusy):
+        make_server(CountingEngine(), data_dir=data)
+    first.close()
     second = make_server(CountingEngine(), data_dir=data)
     st = second.get_json(f"/api/runs/{rid}")
     assert st["status"] == "failed" and st["error"]["kind"] == "interrupted"
     page = second.get(f"/runs/{rid}")[2].decode()
     assert "веб-сервер перезапустили" in page and "Повторить запуск" in page
+    # Поток прежнего процесса (в жизни его уже нет) не перетирает итог восстановления.
     hold.set()
+    time.sleep(0.5)
+    assert second.get_json(f"/api/runs/{rid}")["status"] == "failed"
 
 
 def test_shared_engine_missing_blocks_new_runs_but_not_pages(make_server, case_bytes):

@@ -13,6 +13,14 @@
 Все записи JSON атомарны (tmp + os.replace); заявки создаются через os.link /
 O_EXCL, поэтому повторный клик не порождает второй платный запуск даже при
 одновременных запросах (см. tests/p15/test_store.py::test_concurrent_claims).
+
+Гарантия «одна отправка формы — один запуск — одна обработка» держится на трёх файлах:
+
+* ``<data>/claims/upload-….json``     — форма (upload_key + SHA-256 файла) → один run_id;
+* ``runs/<id>/claims/exec.json``      — run_id → не больше одного вызова движка (job);
+* ``<data>/server.lock``              — каталог обслуживает один процесс сервера
+  (блокировка ОС: flock / msvcrt). Второй процесс не стартует, поэтому восстановление
+  после перезапуска не может пометить «прерванным» живой прогон чужого процесса.
 """
 
 from __future__ import annotations
@@ -153,6 +161,39 @@ class StoreError(Exception):
         self.extra = extra
 
 
+class DataDirBusy(StoreError):
+    """Каталог данных уже обслуживает другой процесс сервера."""
+
+
+def _try_lock(fh: Any) -> bool | None:
+    """Неблокирующая исключительная блокировка файла.
+
+    True — получена; False — занята другим процессом (или другим открытием в этом же
+    процессе); None — ФС/ОС блокировок не поддерживает (гарантия тогда только в пределах
+    процесса, это пишется в паспорт сервера)."""
+    try:
+        import fcntl  # POSIX
+    except ImportError:
+        fcntl = None  # type: ignore[assignment]
+    if fcntl is not None:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except BlockingIOError:
+            return False
+        except OSError:
+            return None
+    try:
+        import msvcrt  # Windows
+    except ImportError:
+        return None
+    try:
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        return True
+    except OSError:
+        return False
+
+
 @dataclass
 class Claim:
     run_id: str
@@ -167,6 +208,8 @@ class RunStore:
         self._locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
         self._create_guard = threading.Lock()
+        self._owner_fh: Any = None
+        self.owner: dict[str, Any] | None = None
         if not read_only:
             self.runs_dir.mkdir(parents=True, exist_ok=True)
             ignore = self.root / ".gitignore"
@@ -197,6 +240,54 @@ class RunStore:
     def _lock(self, run_id: str) -> threading.Lock:
         with self._locks_guard:
             return self._locks.setdefault(run_id, threading.Lock())
+
+    # ------------------------------------------------------------------ owner
+    def acquire_owner(self, **info: Any) -> dict[str, Any]:
+        """Стать единственным процессом-владельцем каталога данных.
+
+        Блокировка держится открытым файлом ``server.lock`` до выхода процесса (или
+        ``release_owner``); после падения процесса ОС снимает её сама — «зависших»
+        блокировок нет. Кто владеет каталогом, видно в ``server.json``.
+        """
+        if self.read_only:
+            raise StoreError("Хранилище только для чтения", 403)
+        if self._owner_fh is not None:
+            return self.owner or {}
+        fh = open(self.root / "server.lock", "a+b")
+        locked = _try_lock(fh)
+        if locked is False:
+            fh.close()
+            try:
+                holder = read_json(self.root / "server.json", retries=1)
+            except (OSError, json.JSONDecodeError):
+                holder = {}
+            where = f" (pid {holder.get('pid')}, {holder.get('url') or 'адрес неизвестен'}, с {holder.get('started_at')})" if holder else ""
+            raise DataDirBusy(
+                f"Каталог данных {self.root} уже обслуживает другой процесс веб-демо{where}. "
+                "Два сервера над одним каталогом могут дважды обработать один запуск и пометить живой "
+                "прогон прерванным. Остановите первый процесс или укажите другой --data-dir.",
+                409, holder=holder,
+            )
+        owner = {
+            "instance": secrets.token_hex(6),
+            "pid": os.getpid(),
+            "started_at": utcnow(),
+            "lock": "os" if locked else "unavailable",
+            **info,
+        }
+        atomic_write_json(self.root / "server.json", owner)
+        self._owner_fh, self.owner = fh, owner
+        return owner
+
+    def annotate_owner(self, **info: Any) -> None:
+        if self.owner is not None:
+            self.owner.update(info)
+            atomic_write_json(self.root / "server.json", self.owner)
+
+    def release_owner(self) -> None:
+        fh, self._owner_fh = self._owner_fh, None
+        if fh is not None:
+            fh.close()  # закрытие снимает flock/msvcrt-блокировку
 
     # ------------------------------------------------------------------ create
     def _new_run_dir(self) -> tuple[str, Path]:
@@ -315,6 +406,50 @@ class RunStore:
             record.update(fields)
             atomic_write_json(self.run_dir(run_id) / "run.json", record)
             return record
+
+    def update_if(self, run_id: str, check: Callable[[dict[str, Any]], bool], **fields: Any) -> dict[str, Any] | None:
+        """Обновить, только если запись всё ещё в ожидаемом состоянии; иначе None."""
+        if self.read_only:
+            raise StoreError("Хранилище только для чтения", 403)
+        with self._lock(run_id):
+            record = self.load(run_id)
+            if not check(record):
+                return None
+            record.update(fields)
+            atomic_write_json(self.run_dir(run_id) / "run.json", record)
+            return record
+
+    def claim_execution(self, run_id: str, job: dict[str, Any]) -> dict[str, Any] | None:
+        """Заявка «этот run_id обрабатывается движком». None — уже обработан или обрабатывается.
+
+        Файл ``runs/<id>/claims/exec.json`` создаётся атомарно (link/O_EXCL) и не удаляется:
+        повторная постановка того же run_id в очередь, перезапуск сервера или второй поток
+        не вызовут движок второй раз. Новая попытка — это новый запуск (``retry_of``).
+        """
+        path = self.run_dir(run_id) / "claims" / "exec.json"
+        if create_exclusive_json(path, job):
+            return job
+        return None
+
+    def execution(self, run_id: str) -> dict[str, Any] | None:
+        path = self.run_dir(run_id) / "claims" / "exec.json"
+        return read_json(path) if path.is_file() else None
+
+    def retries_of(self, run_id: str) -> list[dict[str, Any]]:
+        """Явные повторы этого запуска (новые run_id с retry_of), старые первыми."""
+        out = [r for r in self.list_runs() if r.get("retry_of") == run_id]
+        out.sort(key=lambda r: r.get("created_at") or "")
+        return out
+
+    def same_content_uploads(self, run: dict[str, Any]) -> list[dict[str, Any]]:
+        """Другие самостоятельные загрузки того же содержимого (не редакции и не повторы)."""
+        sha = (run.get("input") or {}).get("sha256")
+        out = [
+            r for r in self.list_runs()
+            if r["run_id"] != run["run_id"] and r.get("reason") == "upload" and (r.get("input") or {}).get("sha256") == sha
+        ]
+        out.sort(key=lambda r: r.get("created_at") or "")
+        return out
 
     def append_event(self, run_id: str, event: dict[str, Any]) -> None:
         event = {"ts": utcnow(), **event}
@@ -504,7 +639,11 @@ class RunStore:
 
     # ------------------------------------------------------------------ recovery
     def recover_interrupted(self) -> list[str]:
-        """Запуски, оставшиеся в started/running после перезапуска сервера, — failed."""
+        """Запуски, оставшиеся в started/running после перезапуска сервера, — failed.
+
+        Вызывается только владельцем каталога (``acquire_owner``): пока жив прежний процесс,
+        новый не стартует, значит «активный» запуск здесь действительно осиротел.
+        """
         fixed = []
         if self.read_only:
             return fixed
@@ -517,6 +656,7 @@ class RunStore:
                     error={
                         "kind": "interrupted",
                         "message": "Запуск прерван: веб-сервер перезапустили во время выполнения.",
+                        "next_step": "retry",
                     },
                 )
                 fixed.append(rec["run_id"])

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from .engine import load_dotenv, resolve_engine
 from .service import Settings
-from .store import RunStore, StoreError, utcnow
+from .store import DataDirBusy, RunStore, StoreError, utcnow
 
 
 def _serve(argv: list[str]) -> int:
@@ -53,13 +53,19 @@ def _serve(argv: list[str]) -> int:
         mock_script=Path(args.mock_script) if args.mock_script else None,
         cache_dir=Path(args.cache_dir) if args.cache_dir else None,
     )
-    app = create_app(args.data_dir, engine, settings=settings, workers=args.workers, demo_dir=args.demo)
+    try:
+        app = create_app(args.data_dir, engine, settings=settings, workers=args.workers, demo_dir=args.demo)
+    except DataDirBusy as exc:
+        print(f"bcc_review.web: {exc}", file=sys.stderr)
+        return 2
     server = make_server(app, args.host, args.port, verbose=args.verbose)
     url = f"http://{args.host}:{server.server_address[1]}/"
+    app.store.annotate_owner(url=url)  # адрес — в server.json, для сообщения второму процессу
     pf = app.service.preflight()
     print(f"bcc_review.web: {url}")
     print(f"  движок:   {engine.target if engine.available else 'НЕ НАЙДЕН — ' + (engine.error or '')}")
-    print(f"  данные:   {Path(args.data_dir).resolve()}")
+    print(f"  данные:   {Path(args.data_dir).resolve()}"
+          + ("" if app.store.owner.get("lock") == "os" else " (ВНИМАНИЕ: ФС без блокировок — второй сервер над этим каталогом не будет остановлен)"))
     print(f"  ключ:     {pf['note']}" + (f" (из {args.env_file}: {', '.join(loaded)})" if loaded else ""))
     if args.demo:
         print(f"  демо:     {Path(args.demo).resolve()} (только просмотр)")
@@ -71,6 +77,7 @@ def _serve(argv: list[str]) -> int:
         print("остановлено")
     finally:
         server.server_close()
+        app.close()
     return 0
 
 

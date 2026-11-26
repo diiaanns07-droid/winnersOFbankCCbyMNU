@@ -2,8 +2,13 @@
 
 Правила, которые проверяют тесты tests/p15:
 
-* каждая загрузка получает новый run_id, даже при одинаковом имени файла;
-* повторная отправка той же формы (тот же upload_key) возвращает тот же запуск;
+* каждая загрузка получает новый run_id, даже при одинаковом имени и содержимом файла:
+  две разные формы с одним документом — два осознанных анализа (страница показывает соседа);
+* повторная отправка той же формы с тем же файлом (upload_key + SHA-256) возвращает тот же
+  запуск; та же форма с другим файлом — новый запуск;
+* повтор (retry) — отдельный запуск с новым run_id и ``retry_of``; доступен после
+  технической ошибки: ``failed`` или ``partial`` по технической причине (LLM недоступна,
+  ошибки вызовов, бюджет). Исходный запуск сохраняет свой статус и результат;
 * повторное подтверждение тех же ответов к той же редакции не создаёт второго
   платного запуска (атомарная заявка в ``runs/<parent>/claims``);
 * подтверждение к редакции, у которой уже есть более новая, отклоняется
@@ -26,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from .answers import Answer, AnswerSet, Imported, compose_answers, parse_answers, read_import, render_questions, report_version
-from .engine import EngineSpec, Runner, preflight, read_report
+from .engine import EngineSpec, Runner, preflight, read_report, technical_partial_reason
 from .store import Claim, RunStore, StoreError
 
 MAX_UPLOAD = 25 * 1024 * 1024
@@ -95,7 +100,10 @@ class Service:
                 reason="upload",
             )
 
-        claim = self.store.claim(None, f"upload-{upload_key}", create)
+        # Ключ — экземпляр формы и содержимое: повторная отправка той же формы с тем же файлом
+        # (двойной клик, повтор запроса браузером) — тот же запуск; другая форма — новый анализ.
+        content = hashlib.sha256(data).hexdigest()[:16]
+        claim = self.store.claim(None, f"upload-{upload_key}-{content}", create)
         if not claim.duplicate:
             self.runner.submit(claim.run_id)
         return claim
@@ -247,8 +255,11 @@ class Service:
                 if latest and latest["run_id"] != parent_id:
                     if imp_id:
                         self.store.update_import(parent_id, imp_id, status="rejected", reason="stale_parent")
+                    after = (f"для неё уже запущен повтор (запуск {latest['run_id']})" if latest.get("retry_of")
+                             and latest.get("revision") == parent.get("revision")
+                             else f"после неё уже запущена редакция {latest['revision']}")
                     raise StoreError(
-                        f"Редакция {parent['revision']} устарела: после неё уже запущена редакция {latest['revision']}. "
+                        f"Редакция {parent['revision']} устарела: {after}. "
                         "Откройте актуальный результат и отправьте решение к нему.",
                         409,
                         latest_run_id=latest["run_id"],
@@ -278,10 +289,30 @@ class Service:
 
     # ------------------------------------------------------------------ retry
     def retry(self, run_id: str, *, offline: bool) -> Claim:
+        """Явный повтор после технической ошибки: новый run_id с ``retry_of``, исходный не меняется.
+
+        Повторный клик по той же кнопке (тот же запуск, тот же режим) возвращает уже созданный
+        повтор. Если и повтор завершится ошибкой, следующий повтор делается с его страницы.
+        """
         self._require_engine()
         rec = self.store.load(run_id)
-        if rec["status"] != "failed":
-            raise StoreError("Повтор доступен только для запуска со статусом failed", 409, latest_run_id=run_id)
+        if rec["status"] == "partial":
+            reason = technical_partial_reason(rec, read_report(self.store.report_json(run_id))[0])
+            if reason is None:
+                raise StoreError(
+                    "Отчёт неполный не из-за технического сбоя (режим или сам документ): повтор даст тот же результат. "
+                    "Отчёт этого запуска остаётся доступен; исправленный документ отправьте новой редакцией.",
+                    409, latest_run_id=run_id,
+                )
+            if offline or self.preflight()["offline"]:
+                raise StoreError(
+                    "Повтор неполного отчёта имеет смысл только с LLM, а ключ LLM не найден. "
+                    "Отчёт этого запуска остаётся доступен.",
+                    409, latest_run_id=run_id,
+                )
+        elif rec["status"] != "failed":
+            raise StoreError("Повтор доступен после технической ошибки: для запуска со статусом failed "
+                             "или неполного (partial) отчёта из-за сбоя LLM", 409, latest_run_id=run_id)
         data = self.store.input_path(run_id).read_bytes()
         answers = None
         if rec.get("answers"):

@@ -15,6 +15,19 @@
     });
   }
 
+  // «Назад» из страницы запуска может вернуть эту страницу из bfcache «занятой». Форма остаётся
+  // той же (тот же upload_key): тот же файл снова откроет уже созданный запуск, другой — новый.
+  window.addEventListener("pageshow", function (ev) {
+    if (!ev.persisted) return;
+    if (input) {
+      input.disabled = false;
+      input.value = "";
+      var label = document.getElementById("upload-label");
+      if (label) { label.classList.remove("busy"); label.querySelector("span").textContent = "Загрузить ТЗ"; }
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("form.once"), function (form) { delete form.dataset.sent; });
+  });
+
   // Повторный клик по форме не отправляет её второй раз (сервер тоже защищён заявкой).
   Array.prototype.forEach.call(document.querySelectorAll("form.once"), function (form) {
     form.addEventListener("submit", function (ev) {

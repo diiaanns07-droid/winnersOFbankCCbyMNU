@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import email.errors
 import email.parser
 import email.policy
 import json
@@ -32,11 +33,13 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 from . import report_view as rv
 from . import views
 from .answers import ANALYST, Answer, load_demo_answers
-from .engine import EngineSpec, Runner, elapsed_s, read_report, trace_events
+from .engine import EngineSpec, Runner, elapsed_s, read_report, technical_partial_reason, trace_events
 from .service import MAX_UPLOAD, Service, Settings
 from .store import FINAL_STATUSES, RunStore, StoreError
 
 STATIC_DIR = Path(__file__).with_name("static")
+INCOMPLETE_UPLOAD = ("Загрузка оборвалась: сервер получил форму не целиком (страницу обновили или закрыли во время "
+                     "отправки, либо пропала сеть). Анализ не запускался — отправьте файл ещё раз.")
 RUN_PATH = re.compile(r"^/runs/(?P<id>[0-9]{8}-[0-9]{6}-[0-9a-f]{6})(?P<rest>/.*)?$")
 
 
@@ -48,6 +51,11 @@ class App:
     engine: EngineSpec
     demo_store: RunStore | None = None
     demo_answers_path: Path | None = None
+
+    def close(self) -> None:
+        """Отпустить каталог данных (как при выходе процесса). Новых заданий этот экземпляр не берёт."""
+        self.runner.close()
+        self.store.release_owner()
 
     def ctx(self, *, demo: bool = False) -> dict[str, Any]:
         return {
@@ -67,6 +75,9 @@ def create_app(
     demo_dir: Path | str | None = None,
 ) -> App:
     store = RunStore(data_dir)
+    # Один процесс сервера на каталог данных: иначе восстановление ниже пометило бы прерванным
+    # живой прогон соседнего процесса, а повтор через соседа дал бы вторую обработку (DataDirBusy).
+    store.acquire_owner(engine=engine.target)
     store.recover_interrupted()
     runner = Runner(store, engine, workers=workers)
     settings = settings or Settings()
@@ -86,6 +97,10 @@ def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], dic
         if "boundary=" in content_type and len(body) < 512:
             return fields, files  # пустая форма: только закрывающая граница
         raise StoreError("Ожидалась форма multipart/form-data", 400)
+    # Нет закрывающей границы — форма дошла не целиком (обрыв загрузки): из обрезанного
+    # файла запуск не создаём, иначе движок обработал бы часть документа как целый.
+    if any(isinstance(d, email.errors.CloseBoundaryNotFoundDefect) for d in msg.defects):
+        raise StoreError(INCOMPLETE_UPLOAD, 400, reason="incomplete_body")
     for part in msg.iter_parts():
         name = part.get_param("name", header="content-disposition")
         if not name:
@@ -157,7 +172,11 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_UPLOAD + 1024 * 1024:
             raise StoreError("Запрос больше 25 МБ", 413)
-        return self.rfile.read(length) if length else b""
+        body = self.rfile.read(length) if length else b""
+        if len(body) != length:
+            self.close_connection = True
+            raise StoreError(INCOMPLETE_UPLOAD, 400, reason="incomplete_body", received=len(body), expected=length)
+        return body
 
     def same_origin(self) -> bool:
         origin = self.headers.get("Origin")
@@ -178,7 +197,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.page_home()
             if path == "/healthz":
                 return self.json({"ok": True, "engine": self.app.engine.describe(), "engine_available": self.app.engine.available,
-                                  "engine_calls": self.app.runner.engine_calls})
+                                  "engine_calls": self.app.runner.engine_calls,
+                                  "skipped_executions": self.app.runner.skipped_executions,
+                                  "server": self.app.store.owner})
             if path.startswith("/static/"):
                 return self.static(path[len("/static/"):])
             if path.startswith("/api/runs/"):
@@ -274,8 +295,23 @@ class Handler(BaseHTTPRequestHandler):
             duplicate=duplicate,
             manual_import=self._manual_import(store, run_id, import_id),
             imports=store.list_imports(run_id),
+            retry=self._retry_info(store, run),
+            same_content=store.same_content_uploads(run) if run.get("reason") == "upload" else [],
         )
         self.html(page)
+
+    @staticmethod
+    def _retry_info(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
+        """Что известно о повторе: техническая причина partial и уже созданные повторы (новые run_id)."""
+        reason = None
+        if run["status"] == "partial":
+            reason = technical_partial_reason(run, read_report(store.report_json(run["run_id"]))[0])
+        retries = [
+            {"run_id": r["run_id"], "status": r["status"], "offline": bool((r.get("options") or {}).get("offline_lint")),
+             "created_at": r.get("created_at"), "job_id": (r.get("job") or {}).get("job_id")}
+            for r in store.retries_of(run["run_id"])
+        ]
+        return {"partial_reason": reason, "retries": retries}
 
     @staticmethod
     def _manual_import(store: RunStore, run_id: str, import_id: str | None) -> dict[str, Any] | None:
@@ -319,6 +355,12 @@ class Handler(BaseHTTPRequestHandler):
                             for i in store.list_imports(run_id)],
                 "lineage_id": run["lineage_id"],
                 "revision": run["revision"],
+                "reason": run.get("reason"),
+                "retry_of": run.get("retry_of"),
+                "job": run.get("job"),
+                "execution": store.execution(run_id),
+                "retry": self._retry_info(store, run),
+                "same_content_runs": [r["run_id"] for r in store.same_content_uploads(run)] if run.get("reason") == "upload" else [],
                 "latest_run_id": latest["run_id"] if latest else None,
                 "answers": run.get("answers"),
                 "input": run["input"],
