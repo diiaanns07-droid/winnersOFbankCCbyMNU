@@ -84,7 +84,10 @@ def pair_info(item: dict, f: dict) -> dict:
     else:
         status = "none"
     line_score = 2.0 * sum(groups_hit) / max(1, len(groups_hit)) if policy == "all" else (2.0 if lines_any else 0.0)
-    score = line_score + 0.5 * n_kw + (0.3 if kind_ok else 0)
+    title = f.get("_title", "")
+    n_title = sum(1 for r in item["_kw"] if r.search(title)) if title else 0
+    # заголовок говорит, о чём замечание: совпадения в нём весят больше (замечание засчитывается за свою тему)
+    score = line_score + 0.5 * n_kw + 0.3 * n_title + (0.3 if kind_ok else 0)
     return {"status": status, "score": round(score, 3), "groups_hit": groups_hit, "kw_hits": n_kw,
             "kw_total": len(kw_hits), "kind_ok": kind_ok}
 
@@ -135,6 +138,7 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
     for f in findings:
         f["_lines"], qc = finding_lines(f, lines, same_doc)
         f["_text"] = (f["title"] + " " + f["text"]).replace("ё", "е").replace("Ё", "Е")
+        f["_title"] = f["title"].replace("ё", "е").replace("Ё", "Е")
         f["_quotes"] = qc
         quote_checks.extend({"finding": f["id"], **q} for q in qc)
 
@@ -308,6 +312,7 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
     for c in cands:
         c["_lines"], _ = finding_lines(c, lines, same_doc or bool(run_dir))
         c["_text"] = (c["title"] + " " + c["text"]).replace("ё", "е")
+        c["_title"] = c["title"].replace("ё", "е")
     misses = []
     for it in items:
         if it["id"] in assign:
@@ -584,6 +589,36 @@ def astana_now() -> str:
     return datetime.now(timezone(timedelta(hours=5))).strftime("%Y-%m-%d %H:%M")
 
 
+def as_report(data: dict, gold: dict) -> dict:
+    """Выход этапа (`candidates`, например ответ try_prompt.py или runs/<id>/stages/lens_qa.json) → отчёт v2,
+    где каждый кандидат — замечание. Так линзы меряют свой recall по эталону до судьи."""
+    if "findings" in data or "schema_version" in data:
+        return data
+    lists = _find_candidate_lists(data)
+    cands = [c for lst in lists for c in lst if isinstance(c, dict)]
+    fs = []
+    for i, c in enumerate(cands, 1):
+        f = dict(c)
+        f.setdefault("id", f"C-{i:03d}")
+        f["evidence"] = [{**e, "line_start": e.get("line_start", e.get("line")),
+                          "line_end": e.get("line_end", e.get("line"))} for e in c.get("evidence") or []
+                         if isinstance(e, dict)]
+        fs.append(f)
+    return {"schema": "bcc-review/2", "run": {"status": "candidates"}, "findings": fs,
+            "document": {"sha256": gold.get("sha256"), "format": "md"}, "verdict": {}}
+
+
+def render_lens(res: dict, gold: dict, lens: str) -> str:
+    mine = [it for it in gold["items"] if lens in it.get("owners", [])]
+    found = {a["gold"]: a for a in res["assignment"]}
+    L = ["", f"## Этап «{lens}»: пункты эталона, где он владелец", ""]
+    n = sum(1 for it in mine if it["id"] in found)
+    L.append(f"Найдено {n}/{len(mine)}: " + ", ".join(it["id"] for it in mine if it["id"] in found) + ".")
+    L.append("Не найдено: " + (", ".join(f"{it['id']} ({it['title']})" for it in mine if it["id"] not in found)
+                                or "—") + ".")
+    return "\n".join(L) + "\n"
+
+
 def history_row(res: dict, label: str) -> dict:
     rc, p = res["recall"], res["precision"]
     return {"at": astana_now(), "label": label, "version": res["report"]["version"],
@@ -616,12 +651,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--md", help="score.md")
     ap.add_argument("--label", default="")
     ap.add_argument("--history", help="дописать строку в history.jsonl")
+    ap.add_argument("--lens", help="analyst|qa|architect|risk|consistency|rules: сводка по пунктам, где этап — владелец")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
 
     gold = load_gold(a.gold)
     gold["_path"] = a.gold
-    report = load_report(a.report)
+    report = as_report(load_report(a.report), gold)
     md = a.report_md
     if not md:
         for cand in (Path(a.report).with_suffix(".md"), Path(a.report).parent / "report.md"):
@@ -630,6 +666,8 @@ def main(argv: list[str] | None = None) -> int:
                 break
     res = score_report(report, gold, report_md=md, run_dir=a.run_dir, arbiter=a.arbiter, cache_path=Path(a.cache))
     text = render_md(res, a.label)
+    if a.lens:
+        text += render_lens(res, gold, a.lens)
     print(text)
     if a.out:
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)

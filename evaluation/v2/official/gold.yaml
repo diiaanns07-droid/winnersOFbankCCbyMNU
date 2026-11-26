@@ -445,7 +445,7 @@ items:
     keywords:
       min: 1
       groups:
-        - 'прежн\w* состояни|вернуть прежн|enabled ?= ?0|enabled ?равн\w* 0|неверн\w* enabled|некоррект\w* enabled|недопустим\w* enabled|mandatory|обязательн\w* (пол|парамет|amount)|amount.{0,40}обязат|при выключ'
+        - 'прежн\w* состояни|вернуть прежн|enabled ?= ?0|enabled ?равн\w* 0|неверн\w* enabled|некоррект\w* enabled|недопустим\w* enabled|mandatory|обязательн\w* (пол|парамет|amount)|amount.{0,40}(обязат|enabled ?= ?0)|(enabled ?= ?0|выключени\w* уведомлени).{0,60}amount'
     kinds: [ambiguity, incomplete, api_contract, contradiction, missing_element]
     owners: [architect]
     related: [К3, С3]

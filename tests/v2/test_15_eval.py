@@ -158,3 +158,18 @@ def test_corpus_adapter_and_strict_harness(tmp_path):
     assert s["harness"]["tp"] == 1 and s["harness"]["fn"] == 0
     assert s["harness"]["clean_false_alarms"] == 1
     assert s["clean"]["major"] == 1 and s["clean"]["verdict_no"] == 0
+
+
+def test_stage_candidates_as_report():
+    k2, c8 = ITEMS["К2"], ITEMS["С8"]
+    cands = []
+    for it in (k2, c8):
+        f = _finding("x", it)
+        f.pop("id")
+        f["evidence"] = [{"quote": e["quote"], "line": e["line_start"]} for e in f["evidence"]]
+        cands.append(f)
+    rep = score.as_report({"candidates": cands, "pair_checks": []}, GOLD)
+    res = _score(rep)
+    assert res["recall"]["critical"]["found"] == ["К2"]
+    assert "С8" in res["recall"]["major"]["found"]
+    assert "С8" in score.render_lens(res, GOLD, "analyst")
