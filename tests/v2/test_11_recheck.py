@@ -220,3 +220,10 @@ def test_llm_failure_keeps_findings_open(findings, questions):
     clar = out["clarification"]
     assert clar["resolved"] == 0 and clar["after"]["findings"] == clar["before"]["findings"]
     assert clar["after"]["verdict"]["development"] == "no"
+
+
+def test_example_answers_file_parses():
+    p = recheck.load_answers(str(ROOT / "examples" / "v2" / "answers.md"))
+    assert len(p["answers"]) == 10 and all(a["topic_hint"] and a["text"] for a in p["answers"])
+    assert len(p["decisions"]) == 7
+    assert not any("python -m" in a["text"] for a in p["answers"])  # строки-комментарии «>» не читаются
