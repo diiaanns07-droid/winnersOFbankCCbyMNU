@@ -19,6 +19,14 @@
 только из явно заданного списка (``GEMINI_FALLBACK_MODELS``), каждая не более одного
 раза и только если в бюджете осталось ``min_attempt_s``.
 
+Граница бюджета до сетевого вызова: первый физический запрос ``invoke`` учитывает
+вызывающий (``Asker`` делает ``budget.check`` и ``note_call`` перед ``invoke``). Второй и
+следующие запросы внутри того же ``invoke`` (запасная модель) уходят только после
+``call_gate(model_id)`` — необязательного аргумента, через который вызывающий проверяет и
+учитывает каждый дополнительный запрос; исключение из гейта отменяет запрос. Без гейта
+``invoke`` никогда не делает больше одного запроса: запасная модель берётся следующим
+``invoke`` (повтором движка), а в ``detail.fallback_available`` указано, какая.
+
 Ответ принимается только при ``finish_reason == STOP``, непустом тексте, валидном JSON
 и полной валидации по исходной схеме. Других исключений ``invoke`` наружу не выпускает.
 
@@ -46,6 +54,8 @@ __all__ = ["DEFAULT_MODEL", "ErrorKind", "GeminiAdapter", "GeminiError", "Provid
 PROVIDER = "gemini"
 DEFAULT_MODEL = "gemini-2.5-flash"
 DEFAULT_MIN_ATTEMPT_S = 5.0
+# Значение по умолчанию «взять из окружения»: движок создаёт адаптер как ``GeminiAdapter()``.
+_FROM_ENV: Any = object()
 API_HOST = "generativelanguage.googleapis.com"
 KEY_HELP = "Ключ выдаёт Google AI Studio: https://aistudio.google.com/apikey"
 MODELS_HELP = "Список моделей, доступных ключу: python -m bcc_review.providers.gemini models"
@@ -523,35 +533,46 @@ class GeminiAdapter:
     """
 
     name = PROVIDER
+    # Вызывающий может передать в invoke(call_gate=...) разрешение на дополнительные запросы.
+    supports_call_gate = True
 
     def __init__(
         self,
-        api_key: str | None = None,
+        api_key: str | None = _FROM_ENV,
         *,
-        model: str | None = None,
-        fallback_models: Iterable[str] | str | None = None,
-        min_attempt_s: float = DEFAULT_MIN_ATTEMPT_S,
-        temperature: float | None = None,
-        max_output_tokens: int | None = None,
-        thinking_budget: int | None = None,
-        thinking_level: str | None = None,
+        model: str | None = _FROM_ENV,
+        fallback_models: Iterable[str] | str | None = _FROM_ENV,
+        min_attempt_s: float = _FROM_ENV,
+        temperature: float | None = _FROM_ENV,
+        max_output_tokens: int | None = _FROM_ENV,
+        thinking_budget: int | None = _FROM_ENV,
+        thinking_level: str | None = _FROM_ENV,
         fallback_on: Iterable[ErrorKind | str] = FALLBACK_ON,
         http_client: Any = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        self._api_key = api_key
-        self.default_model = (model or "").strip().removeprefix("models/") or DEFAULT_MODEL
-        self.fallback_models = parse_model_list(fallback_models)
-        self.min_attempt_s = float(min_attempt_s)
-        self.temperature = temperature
-        self.max_output_tokens = max_output_tokens
-        self.thinking_budget = thinking_budget
-        self.thinking_level = thinking_level
+        given: dict[str, Any] = {"api_key": api_key, "model": model, "fallback_models": fallback_models,
+                                 "min_attempt_s": min_attempt_s, "temperature": temperature,
+                                 "max_output_tokens": max_output_tokens, "thinking_budget": thinking_budget,
+                                 "thinking_level": thinking_level}
+        if any(v is _FROM_ENV for v in given.values()):
+            env = settings_from_env()
+            given = {k: env[k] if v is _FROM_ENV else v for k, v in given.items()}
+        self._api_key = given["api_key"]
+        self.default_model = (given["model"] or "").strip().removeprefix("models/") or DEFAULT_MODEL
+        self.fallback_models = parse_model_list(given["fallback_models"])
+        self.min_attempt_s = float(DEFAULT_MIN_ATTEMPT_S if given["min_attempt_s"] is None else given["min_attempt_s"])
+        self.temperature = given["temperature"]
+        self.max_output_tokens = given["max_output_tokens"]
+        self.thinking_budget = given["thinking_budget"]
+        self.thinking_level = given["thinking_level"]
         self.fallback_on = frozenset(ErrorKind(k) for k in fallback_on)
         self._http_client = http_client
         self._clock = clock
         self._client: Any = None
         self._sticky: dict[str, GeminiError] = {}
+        # основная модель -> модель, с которой начать следующий invoke (переключение без гейта)
+        self._pending: dict[str, str] = {}
         self._schemas: dict[str, tuple[dict[str, Any], list[dict[str, str]], Any]] = {}
 
     @classmethod
@@ -559,6 +580,12 @@ class GeminiAdapter:
         cfg = settings_from_env(environ)
         cfg.update(overrides)
         return cls(**cfg)
+
+    @property
+    def params(self) -> dict[str, Any]:
+        """Параметры генерации, влияющие на ответ: движок кладёт их в ключ кэша."""
+        return {"temperature": self.temperature, "max_output_tokens": self.max_output_tokens,
+                "thinking_budget": self.thinking_budget, "thinking_level": self.thinking_level}
 
     # -- client ---------------------------------------------------------------
 
@@ -577,8 +604,9 @@ class GeminiAdapter:
         return self._client
 
     def reset_model_state(self) -> None:
-        """Забыть модели, отключённые в этом прогоне (квота, 404)."""
+        """Забыть модели, отключённые в этом прогоне (квота, 404), и отложенные переключения."""
         self._sticky.clear()
+        self._pending.clear()
 
     def close(self) -> None:
         if self._client is not None and hasattr(self._client, "close"):
@@ -701,7 +729,9 @@ class GeminiAdapter:
         timeout_s: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
+        call_gate: Callable[[str], Any] | None = None,
     ) -> dict[str, Any]:
+        """``call_gate(model_id)`` вызывается перед каждым физическим запросом, кроме первого в этом invoke."""
         started = self._clock()
         deadline = started + float(timeout_s)
         chain = self.model_chain(model)
@@ -715,7 +745,12 @@ class GeminiAdapter:
         attempts: list[dict[str, Any]] = []
         calls = 0
         last: GeminiError | None = None
+        resume = self._pending.pop(chain[0], None)
+        skip_before = chain.index(resume) if resume in chain else 0
         for index, current in enumerate(chain):
+            if index < skip_before:
+                attempts.append({"model": current, "skipped": "failed_in_previous_invoke"})
+                continue
             earlier = self._sticky.get(current)
             if earlier is not None:
                 attempts.append({"model": current, "skipped": earlier.kind, "earlier_in_run": True})
@@ -725,15 +760,34 @@ class GeminiAdapter:
                                    detail={**earlier.detail, "remembered": True})
                 continue
             remaining = deadline - self._clock()
-            if index > 0 and remaining < self.min_attempt_s:
-                attempts.append({"model": current, "skipped": "budget", "remaining_s": round(max(remaining, 0.0), 3)})
-                break
+            if calls > 0:  # дополнительный запрос внутри invoke: запасная модель
+                if remaining < self.min_attempt_s:
+                    attempts.append({"model": current, "skipped": "budget",
+                                     "remaining_s": round(max(remaining, 0.0), 3)})
+                    break
+                assert last is not None
+                if call_gate is None:
+                    # вызывающий учитывает один запрос на invoke: запасную модель возьмёт следующий invoke
+                    attempts.append({"model": current, "skipped": "no_call_gate"})
+                    last.detail["fallback_available"] = current
+                    self._pending[chain[0]] = current
+                    break
+                try:
+                    call_gate(current)
+                except Exception as exc:  # noqa: BLE001 - отказ гейта (обычно BudgetExhausted) отменяет запрос
+                    reason = f"{type(exc).__name__}: {exc}"[:200]
+                    attempts.append({"model": current, "skipped": "call_gate", "reason": reason})
+                    last.detail["fallback_blocked"] = reason
+                    self._pending[chain[0]] = current
+                    break
+                remaining = deadline - self._clock()
             if remaining <= 0:
                 last = GeminiError(ErrorKind.TIMEOUT, f"Бюджет вызова Gemini ({timeout_s:g} с) исчерпан до запроса.",
                                    subkind="budget_exhausted_before_call", model=current)
                 break
             call_started = self._clock()
             calls += 1
+            t_s = round(call_started - started, 3)
             try:
                 response = client.models.generate_content(
                     model=current, contents=contents,
@@ -761,11 +815,12 @@ class GeminiAdapter:
                         "fallback_used": current != chain[0],
                         "attempts": attempts,
                         "schema_adjustments": schema_log,
+                        "t_s": t_s,
                         "latency_s": round(self._clock() - call_started, 3),
                     },
                 }
             attempts.append({"model": current, "kind": last.kind, "subkind": last.subkind, "status": last.status,
-                             "retry_after_s": last.retry_after_s,
+                             "retry_after_s": last.retry_after_s, "t_s": t_s,
                              "elapsed_s": round(self._clock() - call_started, 3)})
             if last.kind in STICKY:
                 self._sticky[current] = last
@@ -886,8 +941,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print(adapter.list_models())
             return 0
         genai, _, _ = _sdk()
+        # doctor — сам себе вызывающий: разрешает запасную модель, число запросов берёт из physical_calls
         result = adapter.invoke(model=args.model, messages=DOCTOR_MESSAGES, schema=DOCTOR_SCHEMA,
-                                timeout_s=args.timeout)
+                                timeout_s=args.timeout, call_gate=lambda model_id: None)
         meta = result["meta"]
         _print({"ok": True, "sdk": getattr(genai, "__version__", None),
                 "requested_model": meta["requested_model"], "model": result["model"],

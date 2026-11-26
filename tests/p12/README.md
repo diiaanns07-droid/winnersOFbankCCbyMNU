@@ -2,7 +2,8 @@
 
 Адаптер `src/bcc_review/providers/gemini.py` и его тесты. Документ служит передачей для Max (движок,
 владелец контракта), №11 (адаптер Anthropic) и №18 (холодный прогон). Основа — `bcc/integration`
-3e6b569 (контракт v1 431f76d), влитая в ветку `claude/vigilant-sagan-xjr7yo`.
+2821989 (движок, `runtime.asker`, контракт v1 431f76d), влитая в ветку `claude/vigilant-sagan-xjr7yo`.
+Второй проход (общий бюджет и честное число запросов) — раздел 10.
 
 ## 1. Контракт (как в `bcc_review.contracts.ProviderAdapter`)
 
@@ -69,9 +70,13 @@ result = adapter.invoke(model=None, messages=[...], schema={...}, timeout_s=90) 
    По умолчанию он пуст. Префикс `models/` снимается, дубли и сама основная модель удаляются.
 2. К следующей модели адаптер переходит только при `kind ∈ {not_found, quota, overloaded, server, rate_limit}`
    (настраивается параметром `fallback_on`). При остальных категориях цепочка обрывается сразу.
-3. Каждая модель вызывается не больше одного раза за `invoke`. Резервная модель вызывается только если до
-   конца `timeout_s` осталось не меньше `min_attempt_s` (по умолчанию 5 с, `GEMINI_MIN_ATTEMPT_S`). Иначе в
-   `attempts` пишется `{"skipped": "budget"}`. Тайм-аут HTTP-запроса равен остатку бюджета.
+3. Каждая модель вызывается не больше одного раза за `invoke`. **Второй физический запрос внутри одного
+   `invoke` уходит только после `call_gate(model_id)` вызывающего** (раздел 10). Без гейта `invoke` делает
+   ровно один запрос: в `attempts` пишется `{"skipped": "no_call_gate"}`, в `detail.fallback_available` —
+   запасная модель, и следующий `invoke` (повтор движка) начинается с неё (`"failed_in_previous_invoke"` в
+   `attempts`). Дополнительный запрос делается только если до конца `timeout_s` осталось не меньше
+   `min_attempt_s` (по умолчанию 5 с, `GEMINI_MIN_ATTEMPT_S`), иначе `{"skipped": "budget"}`. Тайм-аут
+   HTTP-запроса равен остатку бюджета.
 4. Модель с `quota` или `not_found` до конца жизни экземпляра адаптера (одного прогона) больше не вызывается:
    в `attempts` пишется `{"skipped": …, "earlier_in_run": true}`, физического вызова нет. Сброс:
    `reset_model_state()`. Временные 429/503 не запоминаются.
@@ -155,8 +160,8 @@ GEMINI_FALLBACK_MODELS=
 | Живой API с фальшивым ключом | **400 INVALID_ARGUMENT, `API_KEY_INVALID`** (фикстура снята) |
 | `doctor` и `models` против живого API с фальшивым ключом | `auth/invalid_key`, `transient=false`, русское сообщение со ссылкой на AI Studio, exit 2, ключ не выводится |
 | `doctor` без ключа | `not_configured/missing_key`, 0 сетевых вызовов, exit 2 |
-| `pytest tests/contract tests/p12` на Python 3.13.18 | 133 passed, 4 skipped (адаптер №11 не влит, 3 живых теста без ключа) |
-| `cold_run.sh` на свежем клоне, Python **3.11.18**, чистый venv, `pip install -e ".[dev]" google-genai==3.6.1` | exit 0: те же 133 passed и 4 skipped; `doctor` из этого venv против живого API даёт `auth/invalid_key`, exit 2 |
+| `pytest tests/contract tests/p12` на Python 3.13.18 (второй проход, с влитым 6be9e97) | 166 passed, 3 skipped (3 живых теста без ключа) |
+| `cold_run.sh` на свежем клоне c7d7f7a, Python **3.11.18**, чистый venv, `pip install -e ".[dev]" google-genai==3.6.1` | exit 0: 164 passed, 5 skipped (ещё 2 пропуска: без пакета `anthropic` тесты с адаптером №11 пропускаются); в первом проходе `doctor` из такого venv против живого API давал `auth/invalid_key`, exit 2 |
 | ruff (E,F,W,B,UP,I), mypy по адаптеру | чисто |
 
 **Не проверено** (нужен ключ команды): успешный `generateContent` с `response_json_schema` на реальной модели,
@@ -211,10 +216,154 @@ P12_LIVE=1 python -m pytest tests/p12/test_p12_live.py -v -s
 
 ## 9. Открытые вопросы к Max
 
-1. В `pyproject.toml` нет extra для Gemini. Предложение: `gemini = ["google-genai==3.6.1"]` и добавить его в `all`.
+0. **Влить эту ветку заново**: в `bcc/integration` 6a6c503 (`ced537d`) лежит первый проход `6f7bfbf`. На нём
+   `GeminiAdapter()` без аргументов (так его создаёт `engine.setup_provider`) не читает `GEMINI_API_KEY`:
+   даже с ключом прогон даёт `not_configured` и уходит в rules_only. Плюс перерасход запросов (раздел 10).
+   **Влить `tests/p12/max_asker_call_gate.diff`** (раздел 10): без него запасная модель недостижима при
+   `quota`/`not_found` и при Retry-After длиннее остатка времени, хотя бюджет и счёт запросов уже честные.
+1. Extra `gemini` в `pyproject.toml` (2821989) — `google-genai>=1.0`. Адаптер опирается на `response_json_schema` и `HttpOptions(httpx_client=…)`, проверен на **3.6.1**; предлагаю `google-genai>=3.6,<4`.
 2. `invalid_output` в контракте не временная, поэтому пустой content (`subkind` `empty_candidates` или
    `empty_text`) движок не повторит. Если повтор нужен, его можно включить по `subkind`, не меняя словарь.
 3. Схема №11 разрешает `null` для списков, контракт — нет (раздел 4).
 
 Проверено: `src/bcc_review/providers/` без `__init__.py` попадает и в обычный `pip install .`
 (у `packages.find` в `pyproject.toml` по умолчанию `namespaces = true`), импорт адаптера работает.
+
+## 10. Общий бюджет и честное число запросов (второй проход)
+
+**Проблема (воспроизведена на `6f7bfbf` с настоящим `runtime.asker.Asker` из 6be9e97 и повторно на
+действующем `bcc/integration` 6a6c503, где лежит этот же адаптер).** `Asker` делает
+`budget.check` и `budget.note_call` один раз перед `invoke`, а `run.calls.physical` складывается из
+`stats.call`, которых тоже одна на `invoke`. Прежний адаптер с запасной моделью делал внутри одного `invoke`
+два `generate_content`: при `max_calls=1` уходило 2 запроса. В сквозном `run_review` при `max_calls=2` уходило
+4 запроса при `run.calls.physical = 2`, а неудачная основная модель не попадала в `models_seen`.
+
+**Минимальная правка адаптера (`gemini.py`).** Публичный `invoke(*, model, messages, schema, timeout_s)` не
+изменился. Добавлены необязательный `call_gate` и признак `GeminiAdapter.supports_call_gate = True`:
+
+* первый физический запрос `invoke` учитывает вызывающий, как и раньше;
+* каждый следующий запрос внутри того же `invoke` уходит только после `call_gate(model_id)`. Исключение из
+  гейта (например, `BudgetExhausted`) отменяет запрос: `{"skipped": "call_gate"}`, `detail.fallback_blocked`,
+  наружу выходит исходная ошибка основной модели;
+* без гейта `invoke` никогда не делает больше одного запроса, а запасную модель берёт следующий `invoke`;
+* в `attempts` у каждой попытки есть `t_s` (смещение от начала `invoke`), у результата — `meta.t_s`;
+* `GeminiAdapter()` без аргументов читает `GEMINI_*` из окружения: движок создаёт адаптер именно так
+  (`engine.setup_provider`: `res.func()`). Прежний адаптер в этом случае остался бы без ключа;
+* `params` (temperature, max_output_tokens, thinking_*) попадают в ключ кэша `Asker`.
+
+**Правка для Max (`tests/p12/max_asker_call_gate.diff`, 33 строки в `runtime/asker.py`).** Заменяемые
+фрагменты лежат в `tests/p12/p12_asker_patch.py`. Тест применяет их к текущему `asker.py` и сверяет с
+закоммиченным diff. `git apply --check` проходит на 6a6c503 (и проходил на 6be9e97). Полный `pytest tests`
+на копии 6a6c503 с diff и этим адаптером даёт те же 17 падений, что и чистый 6a6c503 (шрифты и PDF №14, №02,
+№04, №08, №09, №15, №16, `conftest` №11), и ни одного в `tests/p12`; пройдено 1192 вместо 1161.
+
+* `_call_gate(stage, attempt)`: только для адаптеров с `supports_call_gate` (Mock и Anthropic не затронуты,
+  это проверено тестом). Гейт делает `budget.check` + `budget.note_call` и пишет в трассу `fallback_call`;
+* `_note_inner_attempts`: неудачные запросы внутри `invoke` записываются в `stats.call(ok=False)`, поэтому
+  `run.calls.physical` и `failed` совпадают с транспортом;
+* ошибка с `physical_calls == 0` (модель уже отключена в этом прогоне) не считается вызовом, как и
+  `not_configured`.
+
+**Результат.** Имитируются только HTTP-транспорт SDK (`MockTransport` + фикстуры) и часы. `Asker`, `Budget`,
+`Cache`, `StageStats`, `Tracer`, `ContextBuilder` и SDK google-genai 3.6.1 настоящие. Одна стадия
+`individual`; основная модель `gemini-2.5-flash`, запасная `gemini-2.5-flash-lite`; задержка ответа 1,5 с.
+
+```bash
+python -m tests.p12.p12_budget
+```
+
+| Asker | Случай | Ушло запросов (flash / lite) | Отчёт: calls.physical · model · models_seen | Статус | Причина остановки |
+|---|---|---|---|---|---|
+| HEAD 6a6c503 | лимит 1, flash 503 → lite | 1 / 0 | 1 · flash · [flash] | budget_exhausted | исчерпан лимит вызовов модели (1) |
+| HEAD 6a6c503 | лимит 2, flash 503 → lite | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
+| HEAD 6a6c503 | лимит 2, flash quota → lite | 1 / 0 | 1 · flash · [flash] | ask_error:quota | quota не временная, повтора нет |
+| HEAD 6a6c503 | тёплый кэш после лимита 2 | 0 / 0 | 0 · lite · [lite], cache_hits 1 | ok | — |
+| HEAD 6a6c503 | лимит 2, Retry-After 39 с, остаток 30 с | 1 / 0 | 1 · flash · [flash] | budget_exhausted | пауза Retry-After превышает остаток |
+| + diff Max | лимит 1, flash 503 → lite | 1 / 0 | 1 · flash · [flash] | budget_exhausted | гейт отказал: лимит вызовов (1) |
+| + diff Max | лимит 2, flash 503 → lite | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
+| + diff Max | лимит 2, flash quota → lite | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
+| + diff Max | тёплый кэш после лимита 2 | 0 / 0 | 0 · lite · [lite], cache_hits 1 | ok | — |
+| + diff Max | лимит 2, Retry-After 39 с, остаток 30 с | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
+
+Таймлайн лимита 2 (503 → lite). HEAD: flash в 0,0 с (503), пауза движка 2 с, lite в 3,5 с (200), конец
+этапа 5,0 с. С diff: flash в 0,0 с, гейт, lite в 1,5 с, конец этапа 3,0 с, пауз нет.
+
+Сквозной `run_review` (настоящий движок, `run.modules.provider = team:bcc_review.providers.gemini:GeminiAdapter`,
+пример `contracts/examples/two_linked_requirements.md`): при `max_calls=1` ушёл 1 запрос и
+`run.calls.physical = 1`; при `max_calls=2` ушло 2 запроса, `physical = 2`, `run.model = gemini-2.5-flash-lite`.
+На прежнем адаптере было 2 при `physical 1` и 4 при `physical 2`.
+
+| Тест | Что доказывает |
+| :--- | :--- |
+| `test_p12_asker_budget.py` | лимиты 1 и 2, quota, тёплый кэш, Retry-After больше остатка; оба варианта Asker; таймлайн; diff применяется и совпадает |
+| `test_p12_engine_budget.py` | то же число запросов в `Report.run` сквозного `run_review` |
+| `test_p12_fallback.py::test_without_gate_*`, `::test_gate_*` | протокол гейта на уровне адаптера |
+
+На прежнем адаптере (`gemini.py` из 6f7bfbf в отдельной копии дерева) `test_p12_asker_budget.py` даёт 17 падений
+из 24, а `test_p12_engine_budget.py` — 2 из 2. На действующем 6a6c503 (тот же адаптер) оба файла вместе дают
+19 падений из 27.
+
+## 11. Путь жюри: установленный пакет → `python -m bcc_review` (третий проход)
+
+**Кандидат:** `bcc/integration` **2821989**. В нём `gemini.py` из первого прохода (`6f7bfbf`, влит в
+`ced537d`); из второго прохода не вошло ничего: ни конструктор с чтением окружения, ни `call_gate`. Патча
+`max_asker_call_gate.diff` в `asker.py` нет (0 из 4 замен). Движок создаёт адаптер как `GeminiAdapter()` без
+аргументов, поэтому профиль Gemini из `release/README.md` (`$env:GEMINI_API_KEY` + `--provider gemini`) на
+кандидате при **заданном** ключе уходит в rules_only с причиной «Не задан GEMINI_API_KEY».
+
+Проверялись временные копии (git worktree, локальные коммиты, не публикуются):
+
+* **A** = 2821989 как есть;
+* **B** = A + `gemini.py` и `tests/p12` из 5f6b545 (`a48500d`);
+* **C** = B + `max_asker_call_gate.diff` (`49b1111`).
+
+Каждая копия установлена командой `pip install ".[gemini]"` (не editable) в чистый venv. Пакет импортировался
+из `venv/lib/python3.12/site-packages/bcc_review`; Python 3.12.3 (B повторно на 3.11.18), google-genai 3.6.1
+(подобран по `>=1.0`). Запуск из отдельного каталога с абсолютным путём к
+`contracts/examples/two_linked_requirements.md`:
+
+```bash
+python -m bcc_review INPUT.md OUT.md --provider gemini --max-calls 2 --max-seconds 90 --no-cache
+python -m bcc_review verify OUT.json INPUT.md
+```
+
+В случае с ключом задан синтетический `GEMINI_API_KEY`, только в окружении. Подменён только самый нижний
+HTTP-транспорт SDK (`httpx2.HTTPTransport.handle_request`) через `tests/p12/jury/observer/sitecustomize.py`
+в `PYTHONPATH`, код пакета не меняется. Ответ — конверт фикстуры `ok_empty.json`, в нём объект под
+`responseJsonSchema` этого же запроса. Наблюдатель считает каждое `socket.connect` (положительный контроль: 1).
+
+| Сборка | Ключ из окружения | Транспорт | Физические вызовы | Режим и статус отчёта | verify |
+|---|---|---|---|---|---|
+| A 2821989 | нет | сеть не трогалась: HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| A 2821989 | синтетический | HTTPTransport подменён: **HTTP 0**, socket 0 | **0** | rules_only / partial; «Не задан GEMINI_API_KEY» — ключ не прочитан | OK |
+| B a48500d | нет | HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| B a48500d | синтетический | HTTP 2, socket 0, ключ в заголовке из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
+| C 49b1111 | нет | HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| C 49b1111 | синтетический | HTTP 2, socket 0, ключ из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
+| D 6b3bfa1 = 2821989 + `git diff 2821989 b504348` + патч asker | нет | HTTP 0, socket 0 | 0 | rules_only / partial; «Не задан GEMINI_API_KEY» | OK |
+| D 6b3bfa1 | синтетический | HTTP 2, socket 0, ключ из окружения | 2 (inventory×2) | rules_plus_llm / partial; исчерпан лимит вызовов модели (2) | OK |
+
+До модели дошёл только этап `inventory` (модуль №04 сделал два запроса, оба успешные). Затем лимит 2
+исчерпан: `individual` и `cross` получили отказ бюджета, его перехватили модули, этапы помечены `failed`;
+`bank` размечен по правилам. Итог `partial` при таком бюджете честный. Без ключа пользователь видит
+`Прогон: partial, режим rules_only … модель не вызывалась`, `Вызовы модели: 0 физических`.
+
+Повторить (CANDIDATE_DIR — checkout кандидата, например worktree на `bcc/integration`):
+
+```bash
+bash tests/p12/jury/run_jury_path.sh CANDIDATE_DIR "метка" python3.12
+```
+
+Тест в процессе (`cli.main(argv)` с теми же аргументами, штатные конструктор, провайдер и Asker, подменён
+`HTTPTransport.handle_request`): `tests/p12/test_p12_jury_cli.py`. На B проходит. На `gemini.py` кандидата
+падает с причиной «GeminiAdapter() не отправил ни одного запроса: ключ из окружения не прочитан».
+
+Попутно: при обычной установке вне checkout `run.agent_commit = null`. `agent_commit()` вызывает
+`git rev-parse` в каталоге `site-packages`, а `release/README.md` требует коммит в паспорте. Для такой
+установки нужен `BCC_AGENT_COMMIT` или запись коммита при сборке (зона Max).
+
+Состояние D — то, что получит Max после применения обоих diff. Полный `pytest tests` на D даёт те же
+12 падений, что и чистый 2821989 (чужие модули: шрифты и PDF №14, №04, №08, №09, №15, №16, `conftest` №11);
+в `tests/p12` 137 пройдено, 4 пропущено. Четвёртый пропуск — сверка diff: патч уже применён.
+
+Живой ответ Gemini не измерен: в сессии нет рабочего ключа, `test_p12_live.py::test_live_one_finding` пропущен.

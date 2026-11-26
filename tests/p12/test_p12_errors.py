@@ -5,10 +5,16 @@ from __future__ import annotations
 import sys
 
 import pytest
-from p12_support import MESSAGES, TEST_KEY, httpx_lib, load_fixture
 
 from bcc_review.contracts import PROVIDER_ERROR_KINDS, TRANSIENT_KINDS
-from bcc_review.providers.gemini import ErrorKind, GeminiAdapter, GeminiError, ProviderError
+from bcc_review.providers.gemini import (
+    ErrorKind,
+    GeminiAdapter,
+    GeminiError,
+    ProviderError,
+)
+
+from .p12_support import MESSAGES, TEST_KEY, httpx_lib, load_fixture
 
 K = ErrorKind
 

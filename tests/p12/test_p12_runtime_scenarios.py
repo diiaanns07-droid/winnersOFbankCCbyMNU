@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from p12_runtime import HARD_LOOP_GUARD, Stage, run_stages
-from p12_support import MESSAGES
+from .p12_runtime import HARD_LOOP_GUARD, Stage, run_stages
+from .p12_support import MESSAGES
 
 PRIMARY, LITE = "gemini-2.5-flash", "gemini-2.5-flash-lite"
 STAGE_NAMES = ["segment", "requirements", "set_check", "critic", "verdict"]

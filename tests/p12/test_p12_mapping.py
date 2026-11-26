@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from p12_support import synthetic_schema
 
 from bcc_review.providers.gemini import (
     ErrorKind,
@@ -14,6 +13,8 @@ from bcc_review.providers.gemini import (
     to_gemini_messages,
     to_gemini_schema,
 )
+
+from .p12_support import synthetic_schema
 
 UNSUPPORTED = {"$ref", "$defs", "$schema", "$id", "pattern", "minLength", "maxLength", "uniqueItems",
                "const", "oneOf", "allOf", "not", "if", "then", "else", "patternProperties", "multipleOf"}

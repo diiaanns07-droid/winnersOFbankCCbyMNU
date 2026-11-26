@@ -13,10 +13,11 @@ import json
 from pathlib import Path
 
 import pytest
-from p12_support import FIXTURES, MESSAGES, ROOT, load_fixture, synthetic_schema
 
 from bcc_review import contracts
 from bcc_review.providers import gemini
+
+from .p12_support import FIXTURES, MESSAGES, ROOT, load_fixture, synthetic_schema
 
 P11_SCHEMA = FIXTURES / "shared" / "p11_schema_candidates.json"
 
@@ -116,7 +117,7 @@ def test_p11_adapter_signature_if_present() -> None:
     try:
         module = importlib.import_module("bcc_review.providers.anthropic")
     except ImportError:
-        pytest.skip("адаптер №11 ещё не влит в эту ветку")
+        pytest.skip("адаптер №11 недоступен: не влит или не установлен пакет anthropic")
     theirs = inspect.signature(module.AnthropicAdapter.invoke).parameters
     for name in ("model", "messages", "schema", "timeout_s"):
         assert name in theirs and theirs[name].kind is inspect.Parameter.KEYWORD_ONLY

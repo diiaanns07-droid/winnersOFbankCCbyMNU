@@ -6,9 +6,10 @@ import inspect
 import json
 
 from jsonschema import Draft202012Validator
-from p12_support import MESSAGES, TEST_KEY, load_fixture
 
 from bcc_review.providers.gemini import GeminiAdapter, to_gemini_schema
+
+from .p12_support import MESSAGES, TEST_KEY, load_fixture
 
 CONTRACT_KEYS = {"data", "usage", "model", "request_id"}
 
