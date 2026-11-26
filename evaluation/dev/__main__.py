@@ -21,6 +21,10 @@ def _seeds(s: str) -> list[int]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["composition"]:
+        from .composition import main as composition_main
+        return composition_main(argv[1:])
     ap = argparse.ArgumentParser(prog="python -m evaluation.dev")
     sub = ap.add_subparsers(dest="cmd", required=True)
     g = sub.add_parser("generate", help="сгенерировать корпус")
