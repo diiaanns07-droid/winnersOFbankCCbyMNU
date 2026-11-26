@@ -29,9 +29,20 @@ except Exception:  # pragma: no cover - v1 всегда рядом, но v2 не
 TRANSIENT = {"rate_limit", "overloaded", "server", "timeout", "network"}
 NEXT_MODEL = {"not_found", "overloaded", "quota"}  # после повторов — следующая модель цепочки
 BACKOFF = (2, 4, 8, 16, 32)
-MAX_TIMEOUT_RETRIES = 1  # таймаут claude -p — минуты; повторяем один раз
+MAX_TIMEOUT_RETRIES = 1
+MAX_OUTPUT_CEILING = 32000  # выше лимит ответа не поднимаем: дальше — деление пакета  # таймаут claude -p — минуты; повторяем один раз
 REPAIR_NOTE = ("\n\nПредыдущий ответ не прошёл проверку JSON Schema: {errors}\n"
                "Верни полный ответ заново строго по схеме.")
+
+
+_TRUNC_MARKS = ("output token maximum", "max_tokens", "max output tokens", "maximum output tokens",
+                "response exceeded", "обрезан")
+
+
+def is_truncation(kind: str, message: str) -> bool:
+    """Обрезка по лимиту ответа: вид ``truncated`` или текст ошибки CLI/API («exceeded the 16000 output token maximum»)."""
+    msg = (message or "").lower()
+    return kind == "truncated" or any(m in msg for m in _TRUNC_MARKS)
 
 
 class LLMError(Exception):
@@ -101,6 +112,11 @@ class LLMClient:
         self.stats: dict[str, Any] = {"calls": 0, "cached": 0, "failed": 0, "split": 0, "repaired": 0,
                                       "retries": 0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
                                       "models_used": [], "seconds": 0.0, "by_stage": {}}
+        self.responses: dict[str, list] = {}  # сырые ответы по этапам в порядке вызовов — для mock-фикстур
+
+    def _record(self, stage: str, data: Any) -> None:
+        with self._lock:
+            self.responses.setdefault(stage, []).append(data)
 
     # ------------------------------------------------------------------ служебное
 
@@ -181,7 +197,8 @@ class LLMClient:
 
     # ------------------------------------------------------------------ публичное
 
-    def ask(self, stage: str, system: str, user: str, schema: dict, *, max_output_tokens: int = 16000) -> dict:
+    def ask(self, stage: str, system: str, user: str, schema: dict, *, max_output_tokens: int = 16000,
+            expand: bool = True) -> dict:
         """Один логический вызов: ответ, прошедший схему. Ошибки — ``LLMError`` / ``Truncated`` / ``BudgetExceeded``."""
         key = self._key(self.model, system, user, schema)
         cached = self._cache_get(key)
@@ -190,6 +207,7 @@ class LLMClient:
                 self.stats["cached"] += 1
                 self._stage_stats(stage)["cached"] += 1
             self._emit({"stage": stage, "cached": True, "model": cached.get("model"), "key": key[:16]})
+            self._record(stage, cached["data"])
             return cached["data"]
 
         handles_retries = bool(getattr(self.provider, "handles_retries", False))
@@ -197,7 +215,19 @@ class LLMClient:
         last: LLMError | None = None
         for model in chain:
             try:
-                data, result = self._ask_model(stage, model, system, user, schema, max_output_tokens, handles_retries)
+                try:
+                    data, result = self._ask_model(stage, model, system, user, schema, max_output_tokens,
+                                                   handles_retries)
+                except Truncated:
+                    # этап, который не делит пакет сам, получает одну попытку с удвоенным лимитом ответа
+                    if not expand or max_output_tokens >= MAX_OUTPUT_CEILING:
+                        raise
+                    max_output_tokens = min(max_output_tokens * 2, MAX_OUTPUT_CEILING)
+                    with self._lock:
+                        self.stats["expanded"] = self.stats.get("expanded", 0) + 1
+                    self._emit({"stage": stage, "event": "expand_output", "max_output_tokens": max_output_tokens})
+                    data, result = self._ask_model(stage, model, system, user, schema, max_output_tokens,
+                                                   handles_retries)
             except (Truncated, BudgetExceeded):
                 raise
             except LLMError as exc:
@@ -207,6 +237,7 @@ class LLMClient:
                     continue
                 raise
             self._cache_put(key, {"data": data, "model": result.get("model"), "stage": stage})
+            self._record(stage, data)
             return data
         raise last or LLMError(stage, "unknown", "нет модели для вызова")
 
@@ -228,7 +259,7 @@ class LLMClient:
                 self._account(stage, {"usage": getattr(exc, "usage", None) or {}}, seconds)
                 self._emit({"stage": stage, "model": model, "error": kind, "message": str(msg)[:300],
                             "seconds": round(seconds, 1), "attempt": attempt})
-                if kind == "truncated":
+                if is_truncation(kind, str(msg)):
                     raise Truncated(stage, str(msg)) from None
                 retry = (kind in TRANSIENT and not handles_retries and attempt < self.max_retries
                          and not (kind == "timeout" and timeouts >= MAX_TIMEOUT_RETRIES))
@@ -286,7 +317,8 @@ class LLMClient:
         items = list(items)
         system, user = build(items)
         try:
-            return self.ask(stage, system, user, schema, max_output_tokens=max_output_tokens)
+            return self.ask(stage, system, user, schema, max_output_tokens=max_output_tokens,
+                            expand=len(items) < 2 or _depth >= self.max_split_depth)
         except Truncated:
             if len(items) < 2 or _depth >= self.max_split_depth:
                 raise
