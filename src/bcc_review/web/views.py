@@ -214,7 +214,32 @@ def _stages(events: list[dict[str, Any]], status: str, current: str | None) -> s
     return '<ol class="stages" id="stages">' + "".join(items) + "</ol>"
 
 
-def status_section(run: dict[str, Any], events: list[dict[str, Any]], *, eta: dict[str, Any] | None, queue_pos: int, elapsed: float | None, ctx: dict[str, Any], report_stages: list[dict[str, Any]] | None = None) -> str:
+def _retries_line(retries: list[dict[str, Any]], prefix: str) -> str:
+    if not retries:
+        return ""
+    items = ", ".join(
+        f'<a href="{prefix}/runs/{e(r["run_id"])}"><code>{e(r["run_id"])}</code></a> '
+        f'({"только правила" if r.get("offline") else "с LLM"}) {status_badge(r["status"])}'
+        for r in retries
+    )
+    return (f'<p id="retries"><b>Повтор этого запуска</b> — отдельный запуск со своим run_id: {items}. '
+            "Повторное нажатие той же кнопки открывает этот повтор, второй анализ не запускается; "
+            "если повтор тоже завершится ошибкой, следующий запускается с его страницы.</p>")
+
+
+def _retry_buttons(run: dict[str, Any], buttons: list[tuple[str, bool, bool]], retries: list[dict[str, Any]]) -> list[str]:
+    """Кнопки повтора; для режима, в котором повтор уже создан, — не кнопка, а ссылка (в _retries_line)."""
+    used = {bool(r.get("offline")) for r in retries}
+    return [
+        _post_button(f"/runs/{run['run_id']}/retry", label, {"offline": "1" if offline else "0"}, primary=primary)
+        for label, offline, primary in buttons if offline not in used
+    ]
+
+
+def status_section(run: dict[str, Any], events: list[dict[str, Any]], *, eta: dict[str, Any] | None, queue_pos: int, elapsed: float | None, ctx: dict[str, Any], report_stages: list[dict[str, Any]] | None = None, retry: dict[str, Any] | None = None) -> str:
+    retry = retry or {}
+    retries = retry.get("retries") or []
+    can_start = not ctx.get("demo") and ctx["engine"].available
     status = run["status"]
     lines = [f'<div class="status-line">{status_badge(status)}']
     if status in ("started", "running"):
@@ -235,14 +260,12 @@ def status_section(run: dict[str, Any], events: list[dict[str, Any]], *, eta: di
     if status == "failed":
         err = run.get("error") or {}
         actions = []
-        if not ctx.get("demo") and ctx["engine"].available:
+        if can_start:
             nxt = err.get("next_step")
             if nxt == "offline":
-                actions.append(_post_button(f"/runs/{run['run_id']}/retry", "Проверить только по правилам (без LLM)", {"offline": "1"}, primary=True))
-                actions.append(_post_button(f"/runs/{run['run_id']}/retry", "Повторить с LLM", {"offline": "0"}))
+                actions = _retry_buttons(run, [("Проверить только по правилам (без LLM)", True, True), ("Повторить с LLM", False, False)], retries)
             elif err.get("kind") == "interrupted" or nxt == "retry":
-                actions.append(_post_button(f"/runs/{run['run_id']}/retry", "Повторить запуск", {"offline": "0"}, primary=True))
-                actions.append(_post_button(f"/runs/{run['run_id']}/retry", "Проверить только по правилам", {"offline": "1"}))
+                actions = _retry_buttons(run, [("Повторить запуск", False, True), ("Проверить только по правилам", True, False)], retries)
         hint = {
             "missing_key": "Ключ LLM не найден. Добавьте его в .env и перезапустите сервер или выполните проверку только по правилам.",
             "network": "Провайдер LLM недоступен. Повторите позже или выполните проверку только по правилам.",
@@ -252,7 +275,17 @@ def status_section(run: dict[str, Any], events: list[dict[str, Any]], *, eta: di
         body += (
             f'<div class="notice bad" id="error"><b>Причина:</b> {e(err.get("message"))}'
             f'{" <code>" + e(err.get("type")) + "</code>" if err.get("type") else ""}'
-            f'<br><b>Что можно сделать:</b> {e(hint)}<div class="actions">{"".join(actions)}</div></div>'
+            f'<br><b>Что можно сделать:</b> {e(hint)}<div class="actions">{"".join(actions)}</div>'
+            f'{_retries_line(retries, ctx["prefix"])}</div>'
+        )
+    elif status == "partial" and (retry.get("partial_reason") or retries):
+        actions = _retry_buttons(run, [("Повторить с LLM", False, True)], retries) if can_start and retry.get("partial_reason") else []
+        body += (
+            '<div class="notice warn" id="partial-retry">'
+            + (f'<b>Отчёт неполный из-за технического сбоя:</b> {e(retry.get("partial_reason"))}. ' if retry.get("partial_reason") else "")
+            + "Статус и отчёт этого запуска сохранены и доступны ниже; повтор — отдельный запуск с новым run_id, "
+            "этот запуск он не перезаписывает."
+            f'<div class="actions">{"".join(actions)}</div>{_retries_line(retries, ctx["prefix"])}</div>'
         )
     for w in run.get("warnings") or []:
         body += f'<p class="notice warn">{e(w)}</p>'
@@ -668,13 +701,27 @@ def downloads_section(run: dict[str, Any], artifacts: list[dict[str, Any]], pref
     return f'<section class="card" id="downloads"><h2>Файлы запуска</h2><ul class="files">{"".join(row(a) for a in main)}</ul>{extra}</section>'
 
 
+def _job_line(job: dict[str, Any] | None) -> str:
+    if not job:
+        return '<span class="muted">в очередь не ставился</span>'
+    if job.get("finished_at"):
+        calls = f'вызовов движка: {job.get("engine_calls", 0)}'
+    elif job.get("started_at"):
+        calls = "движок обрабатывает (вызов 1)"
+    else:
+        calls = "в очереди, движок ещё не вызывался"
+    return (f'<code>{e(job.get("job_id"))}</code> · {e(calls)}'
+            f' · процесс сервера pid {e((job.get("server") or {}).get("pid"))}')
+
+
 def passport(run: dict[str, Any]) -> str:
     rep = run.get("report") or {}
     inp = run["input"]
     return f"""<footer class="passport"><h2>Паспорт запуска</h2><dl>
 <dt>run_id</dt><dd><code>{e(run['run_id'])}</code></dd>
 <dt>Файл</dt><dd>{e(inp['original_name'])} → <code>input/{e(inp['file'])}</code>, {e(fmt_size(inp['size']))}, sha256 <code>{e(inp['sha256'])}</code></dd>
-<dt>Редакция</dt><dd>{e(run.get('revision'))}{(' · родитель <a href="/runs/' + e(run['parent_run_id']) + '"><code>' + e(run['parent_run_id']) + '</code></a>') if run.get('parent_run_id') else ''}{(' · повтор запуска <code>' + e(run['retry_of']) + '</code>') if run.get('retry_of') else ''}</dd>
+<dt>Редакция</dt><dd>{e(run.get('revision'))}{(' · родитель <a href="/runs/' + e(run['parent_run_id']) + '"><code>' + e(run['parent_run_id']) + '</code></a>') if run.get('parent_run_id') else ''}{(' · повтор запуска <a href="/runs/' + e(run['retry_of']) + '"><code>' + e(run['retry_of']) + '</code></a>') if run.get('retry_of') else ''}</dd>
+<dt>Задание</dt><dd id="job">{_job_line(run.get('job'))}</dd>
 <dt>Создан / начат / завершён</dt><dd>{e(fmt_time(run.get('created_at')))} / {e(fmt_time(run.get('started_at')))} / {e(fmt_time(run.get('finished_at')))}</dd>
 <dt>Движок</dt><dd><code>{e((run.get('engine') or {}).get('target'))}</code> {e((run.get('engine') or {}).get('version') or '')}</dd>
 <dt>Параметры run_review</dt><dd><code>{e(", ".join(run.get('engine_options') or []) or run.get('options'))}</code>{(' · не переданы (нет в RunOptions движка): <code>' + e(", ".join(run['engine_options_dropped'])) + '</code>') if run.get('engine_options_dropped') else ''}</dd>
@@ -715,6 +762,8 @@ def run_page(
     duplicate: bool = False,
     manual_import: dict[str, Any] | None = None,
     imports: list[dict[str, Any]] | None = None,
+    retry: dict[str, Any] | None = None,
+    same_content: list[dict[str, Any]] | None = None,
 ) -> str:
     prefix = ctx["prefix"]
     demo_banner = ""
@@ -722,6 +771,22 @@ def run_page(
         demo_banner += (
             '<p class="notice info" id="duplicate">Это действие уже было принято раньше: открыт ранее созданный запуск, '
             "второй анализ не запускался.</p>"
+        )
+    if same_content:
+        def links(runs: list[dict[str, Any]]) -> str:
+            return ", ".join(
+                f'<a href="{prefix}/runs/{e(r["run_id"])}"><code>{e(r["run_id"])}</code></a> {status_badge(r["status"])} '
+                f'<span class="muted">{e(fmt_time(r.get("created_at")))}</span>'
+                for r in runs[:5]
+            )
+        mine = run.get("created_at") or ""
+        earlier = [r for r in same_content if (r.get("created_at") or "") < mine]
+        later = [r for r in same_content if (r.get("created_at") or "") >= mine]
+        parts = ([f"раньше: {links(earlier)}"] if earlier else []) + ([f"позже: {links(later)}"] if later else [])
+        demo_banner += (
+            f'<p class="notice info" id="same-content">Этот же файл (SHA-256 <code>{e(short(run["input"]["sha256"]))}</code>) '
+            f"загружали отдельно — {'; '.join(parts)}. Каждая загрузка — самостоятельный анализ со своим run_id и своим вызовом движка"
+            + ("; если эта загрузка случайная, откройте более ранний запуск." if earlier else ".") + "</p>"
         )
     if ctx.get("demo"):
         rep = run.get("report") or {}
@@ -740,13 +805,16 @@ def run_page(
     )
     not_latest = ""
     if latest and latest["run_id"] != run["run_id"] and run["status"] in ("complete", "partial", "failed"):
+        what = (f'повтор этой редакции (запуск <code>{e(latest["run_id"])}</code>, {status_badge(latest["status"])})'
+                if latest.get("retry_of") and latest.get("revision") == run.get("revision")
+                else f'редакция {e(latest.get("revision"))}')
         not_latest = (
             f'<p class="notice warn" id="not-latest">Открыта редакция {e(run.get("revision"))}, она не актуальная. '
-            f'Актуальная — редакция {e(latest.get("revision"))}: <a href="{prefix}/runs/{e(latest["run_id"])}">открыть</a>. '
-            f"Статус, вопросы и файлы на этой странице относятся к редакции {e(run.get('revision'))}.</p>"
+            f'Актуальная — {what}: <a href="{prefix}/runs/{e(latest["run_id"])}">открыть</a>. '
+            f"Статус, вопросы и файлы на этой странице относятся к этому запуску ({e(run['status'])}) и остаются доступны.</p>"
         )
     body = demo_banner + lineage_nav(lineage, run["run_id"], prefix) + not_latest + head
-    body += status_section(run, events, eta=eta, queue_pos=queue_pos, elapsed=elapsed, ctx=ctx, report_stages=view.stages if view else None)
+    body += status_section(run, events, eta=eta, queue_pos=queue_pos, elapsed=elapsed, ctx=ctx, report_stages=view.stages if view else None, retry=retry)
     if view is not None:
         files = {}
         names = {a["name"] for a in artifacts}

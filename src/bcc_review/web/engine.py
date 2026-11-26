@@ -28,6 +28,7 @@ import importlib.util
 import inspect
 import json
 import os
+import secrets
 import statistics
 import threading
 import time
@@ -197,6 +198,28 @@ def classify_error(exc: BaseException) -> dict[str, Any]:
     return {"kind": kind, "type": type(exc).__name__, "message": message[:2000], "next_step": next_step}
 
 
+def technical_partial_reason(run: dict[str, Any], report: dict[str, Any] | None) -> str | None:
+    """Почему отчёт partial из-за технического сбоя (повтор может помочь); None — причина в документе/режиме.
+
+    Нет ключа — не техническая причина: веб сам передал offline_lint, повтор даст то же самое.
+    """
+    if run.get("status") != "partial":
+        return None
+    err = run.get("error") or {}
+    if err:
+        return "движок завершился ошибкой после записи отчёта: " + str(err.get("message") or err.get("kind"))
+    meta = (report or {}).get("run") or {}
+    if meta.get("mode") == "rules_only" and not (run.get("options") or {}).get("offline_lint"):
+        return "LLM была недоступна: выполнены только проверки по правилам"
+    calls = meta.get("calls")
+    if isinstance(calls, dict) and calls.get("failed"):
+        return f"вызовы модели завершились ошибкой: {calls['failed']}"
+    budget = meta.get("budget") or {}
+    if isinstance(budget, dict) and budget.get("exhausted"):
+        return "исчерпан бюджет прогона" + (f": {budget['reason']}" if budget.get("reason") else "")
+    return None
+
+
 def read_report(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     if not path.is_file():
         return None, "report.json не создан"
@@ -210,7 +233,13 @@ def read_report(path: Path) -> tuple[dict[str, Any] | None, str | None]:
 
 
 class Runner:
-    """Очередь запусков. Состояние живёт в файлах, поток только исполняет."""
+    """Очередь запусков. Состояние живёт в файлах, поток только исполняет.
+
+    Один run_id — одно задание (job) — не больше одного вызова ``run_review``:
+    ``submit`` записывает задание в run.json, исполнитель перед вызовом движка берёт
+    заявку ``claims/exec.json`` (атомарно, на диске). Итог пишет только то задание,
+    которое запуск ещё считает своим (статус running и тот же job_id).
+    """
 
     def __init__(self, store: RunStore, engine: EngineSpec, *, workers: int = 1):
         self.store = store
@@ -219,13 +248,39 @@ class Runner:
         self._active: set[str] = set()
         self._guard = threading.Lock()
         self.engine_calls = 0  # сколько раз этот процесс вызвал run_review (для проверки «ноль запусков»)
+        self.skipped_executions = 0  # постановки в очередь, не дошедшие до движка: run_id уже обработан
 
-    def submit(self, run_id: str) -> None:
+    def submit(self, run_id: str) -> str | None:
+        """Поставить запуск в очередь; вернуть job_id (None — этот процесс уже исполняет run_id)."""
         with self._guard:
             if run_id in self._active:
-                return
+                return None
             self._active.add(run_id)
-        self.pool.submit(self._execute, run_id)
+        try:
+            job = self._new_job(run_id)
+        except Exception:
+            with self._guard:
+                self._active.discard(run_id)
+            raise
+        self.pool.submit(self._execute, run_id, job)
+        return job["job_id"]
+
+    def _new_job(self, run_id: str) -> dict[str, Any]:
+        owner = self.store.owner or {}
+        job = {
+            "job_id": "job-" + secrets.token_hex(6),
+            "run_id": run_id,
+            "submitted_at": utcnow(),
+            "server": {"instance": owner.get("instance"), "pid": os.getpid()},
+        }
+        # У запуска одно задание: повторная постановка не перетирает запись исполненного
+        # (её задание до движка не дойдёт — заявка exec.json уже занята).
+        self.store.update_if(run_id, lambda r: not r.get("job"), job=job)
+        return job
+
+    def close(self) -> None:
+        """Не брать новых заданий (уже начатое задание не прерывается — Python этого не умеет)."""
+        self.pool.shutdown(wait=False, cancel_futures=True)
 
     def is_active(self, run_id: str) -> bool:
         with self._guard:
@@ -246,19 +301,30 @@ class Runner:
             return None
         return {"median_s": statistics.median(durations), "samples": len(durations)}
 
-    def _execute(self, run_id: str) -> None:
+    def _execute(self, run_id: str, job: dict[str, Any] | None = None) -> None:
         try:
-            self._execute_inner(run_id)
+            self._execute_inner(run_id, job or self._new_job(run_id))
         finally:
             with self._guard:
                 self._active.discard(run_id)
 
-    def _execute_inner(self, run_id: str) -> None:
+    def _execute_inner(self, run_id: str, job: dict[str, Any]) -> None:
         store = self.store
-        rec = store.load(run_id)
+        job = {**job, "started_at": utcnow()}
+        if store.claim_execution(run_id, job) is None:
+            prev = store.execution(run_id) or {}
+            with self._guard:
+                self.skipped_executions += 1
+            store.append_event(run_id, {"stage": "engine", "state": "skip",
+                                        "detail": f"повторная обработка не выполнена: run_id уже обработан заданием {prev.get('job_id')}"})
+            return
+        rec = store.update_if(run_id, lambda r: r.get("status") == "started",
+                              status="running", started_at=job["started_at"], stage=None, job=job)
+        if rec is None:  # запуск успели закрыть (например, восстановлением) — движок не вызываем
+            store.append_event(run_id, {"stage": "engine", "state": "skip", "detail": "запуск уже не ожидает обработки"})
+            return
         t0 = time.monotonic()
-        store.update(run_id, status="running", started_at=utcnow(), stage=None)
-        store.append_event(run_id, {"stage": "engine", "state": "start", "detail": self.engine.target})
+        store.append_event(run_id, {"stage": "engine", "state": "start", "detail": self.engine.target, "job_id": job["job_id"]})
 
         def progress(stage: str, state: str = "done", detail: str | None = None, **_: Any) -> None:
             try:
@@ -302,6 +368,7 @@ class Runner:
                 raise RuntimeError(self.engine.error or "движок недоступен")
             with self._guard:
                 self.engine_calls += 1
+            job["engine_calls"] = 1
             ret = self.engine.func(str(inp), str(store.report_md(run_id)), options=options)
         except BaseException as exc:  # noqa: BLE001 — SystemExit из CLI-кода тоже ошибка запуска
             error = classify_error(exc)
@@ -341,18 +408,29 @@ class Runner:
                 "document_sha256": (report.get("document") or {}).get("id"),
                 "report_status": run_meta.get("status"),
             }
-        store.append_event(run_id, {"stage": "engine", "state": "fail" if status == "failed" else "done", "detail": status})
-        store.update(
+        finished = utcnow()
+        job = {**job, "finished_at": finished, "engine_calls": job.get("engine_calls", 0)}
+
+        def still_mine(r: dict[str, Any]) -> bool:
+            return r.get("status") == "running" and (r.get("job") or {}).get("job_id") == job["job_id"]
+
+        if still_mine(store.load(run_id)):  # событие — до статуса: страница, увидев итог, уже видит и этап
+            store.append_event(run_id, {"stage": "engine", "state": "fail" if status == "failed" else "done", "detail": status, "job_id": job["job_id"]})
+        written = store.update_if(
             run_id,
+            still_mine,
             status=status,
             stage=None,
-            finished_at=utcnow(),
+            finished_at=finished,
             duration_s=duration,
             error=error,
             warnings=warnings,
             report=summary,
             artifacts=store.list_artifacts(run_id),
+            job=job,
         )
+        if written is None:  # статус уже закрыт (восстановление после перезапуска) — чужой итог не перетираем
+            store.append_event(run_id, {"stage": "engine", "state": "skip", "detail": f"итог задания {job['job_id']} не записан: статус запуска изменён"})
 
 
 def elapsed_s(run: dict[str, Any]) -> float | None:

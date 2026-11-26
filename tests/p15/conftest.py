@@ -132,15 +132,25 @@ def make_server(tmp_path: Path):
             spec = EngineSpec(name, f"tests.p15:{type(fn).__name__}", fn, "test")
         app = create_app(data_dir or tmp_path / "data", spec, settings=settings, workers=workers, demo_dir=demo_dir)
         server, _ = serve_in_thread(app)
-        servers.append(server)
         client = Client(f"http://127.0.0.1:{server.server_address[1]}")
         client.app = app  # type: ignore[attr-defined]
+
+        def close() -> None:  # «процесс сервера завершился»: порт и каталог данных освобождены
+            if (server, app) in servers:
+                servers.remove((server, app))
+                server.shutdown()
+                server.server_close()
+                app.close()
+
+        client.close = close  # type: ignore[attr-defined]
+        servers.append((server, app))
         return client
 
     yield _make
-    for s in servers:
+    for s, app in servers:
         s.shutdown()
         s.server_close()
+        app.close()
 
 
 @pytest.fixture
