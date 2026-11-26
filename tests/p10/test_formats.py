@@ -59,7 +59,7 @@ def test_pdf_pages_without_markdown_and_headings():
     req = {"id": "R-1", "source_id": "Ф-1", "text": "Клиент задаёт лимит от 10 до 500 ₸ включительно, только целое число.",
            "block_ids": ["pg2-1"], "evidence": []}
     pack = build_bank_pack(doc, [req], [], [], None)
-    assert pack["checklist"] == [] and pack["warnings"][0]["code"] in {"bank.criteria_missing", "bank.checklist_absent"}
+    assert pack["checklist"] == [] and "bank.checklist_absent" in {w["code"] for w in pack["warnings"]}
     vals = sorted(t["values"]["input"] for t in pack["test_cases"] if t["kind"] == "boundary")
     assert vals == [9, 10, 10.5, 500, 501]
     t9 = next(t for t in pack["test_cases"] if t["values"].get("input") == 9)

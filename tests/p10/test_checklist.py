@@ -287,3 +287,22 @@ def test_engine_positional_call_and_string_warnings():
     doc = fx.read_real(CUSTOM)
     pack2 = build_bank_pack(doc, [], [], [], broken)
     assert any(str(w).startswith("bank: ") for w in pack2["warnings"])  # движок отметит этап partial
+
+
+def test_team_criteria_toml_checklist_rows_link_criteria():
+    """criteria.toml №05: строка шаблона ↔ CL-запись по match; критерии строки отбирают замечания."""
+    team = pytest.importorskip("bcc_review.criteria")
+    if not getattr(team.load_criteria(), "checklist", None):
+        pytest.skip("в criteria.toml №05 нет [[checklist]]")
+    c = fx.case()
+    pack = build_bank_pack(c["document"], c["requirements"], c["findings"], [], None, questions=fx.questions(), complete=True)
+    rows = pack["checklist"]
+    assert [r["criteria_link"]["checklist_id"] for r in rows] == [f"CL{i:02d}" for i in range(1, 15)]
+    r = {row["position"]: row for row in rows}
+    assert {"F-K1", "F-K2", "F-K3"} <= set(r[8]["machine"]["blocking_finding_ids"])  # correct, set_consistent
+    assert "F-K4" in r[1]["machine"]["blocking_finding_ids"]  # set_complete → покрытие бизнес-требования
+    # ИБ (CL11: complete, feasible): замечания о UI и данных по критерию «complete» к ИБ не относятся,
+    # а GET с параметрами в URL — относится по сути замечания.
+    assert not {"F-S7", "F-S17"} & set(r[11]["finding_ids"]) and "F-S1" in r[11]["finding_ids"]
+    # Артефакт (CL04 UX/UI: set_complete): нужна опора в разделе UI, критерий сам по себе не переносит K4.
+    assert "F-K4" not in r[4]["finding_ids"] and "F-S17" in r[4]["finding_ids"]

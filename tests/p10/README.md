@@ -1,7 +1,7 @@
 # №10. Чек-лист банка и приёмочные сценарии
 
 Код: `src/bcc_review/bank/checklist.py`, `src/bcc_review/bank/acceptance.py`. Тесты: `tests/p10/`.
-База: `bcc/integration` 091e504 (контракт v1 431f76d).
+База: `bcc/integration` 6be9e97 (контракт v1 431f76d; влиты №01, 04–07, 11, 17).
 
 ```python
 from bcc_review.bank import build_bank_pack, collect_questions, render_markdown
@@ -29,6 +29,7 @@ pack = build_bank_pack(document, requirements, findings, decisions, ask,        
 | `approval` | согласование человеком: `requires_confirmation`, `recorded`, `confirmed`, `rejected` или `not_required` |
 | `not_required_basis` | обязательное основание для «Не требуется» |
 | `question` | `Q-CHK-NN` для строки, которая ждёт подтверждения |
+| `criteria_link` | запись `[[checklist]]` из criteria.toml №05 (`CL01…CL14`) и её критерии |
 | `note`, `evidence`, `finding_ids`, `changes`, `source` | обоснование по-русски, опоры, причины изменений и место строки в шаблоне |
 
 * Строка о согласовании («…согласовано с архитекторами») заполняется по отдельности. `available = yes`
@@ -38,9 +39,16 @@ pack = build_bank_pack(document, requirements, findings, decisions, ask,        
   профильному чек-листу. Отрицательный вывод по найденным замечаниям ставится.
 * Без модели (`ask is None`) по умолчанию действует `complete = False`: «Да» по отсутствию замечаний не
   ставится, а «Нет» по найденным замечаниям ставится.
-* Связь «критерий → строка» берётся из `criteria.toml` (поле `bank_topics`, №05). Без него действует
-  встроенная таблица по кодам контракта и пишется предупреждение. Дополнительно строку определяет раздел,
-  где стоит опора замечания.
+* Связь «критерий → строка» берётся из `[[checklist]]` в `criteria.toml` №05 через
+  `bcc_review.criteria.load_criteria()`: регулярное выражение `match` и список `criteria`. Как
+  замечание относится к строке:
+  * строки-свойства (бизнес-покрытие, структура, тестируемость, противоречия, влияние) — по критерию;
+  * строки-артефакты (sequence, UI, данные, архитектура, процесс, интеграция, версия, откат) — только
+    при опоре в разделе своей темы;
+  * строка ИБ — при признаке ИБ в замечании.
+
+  Для другого шаблона без записей №05 темы берутся из `bank_topics` или встроенной таблицы по кодам
+  контракта.
 
 ## Сценарии
 
@@ -60,8 +68,11 @@ pack = build_bank_pack(document, requirements, findings, decisions, ask,        
 * `req_ids`, `obligation` (атомарное предложение или строка таблицы с опорой), `evidence`, `values`;
 * `status`: `draft`, `open` или `agreed`.
 
-Когда правила дают два исхода, сценарий получает статус `open`: в нём есть `open_question_id`,
-`open_question` и `options` с опорой на каждый вариант. Решение владельца (`Decision.answer`: «A»,
+Когда правила дают два исхода, сценарий получает статус `open`: в нём есть `open_question` и `options`
+с опорой на каждый вариант. `open_question_id` модуль ставит, только если вызывающий передал `questions`
+(даже пустой список) и тем самым обязуется добавить `collect_questions(pack)` в `Report.questions`.
+Иначе поле остаётся `null`, а в предупреждения пишется `bank.questions_unlinked`. Так `verify` №07 не
+находит висячих ссылок. Решение владельца (`Decision.answer`: «A»,
 «вариант B», «Б)», подпись варианта) переводит сценарий в `agreed` с конкретным `expected`, `decision_id`
 и записью в `changes`. Один вопрос может закрыть несколько сценариев: например, Q-03 закрывает все три
 недопустимые суммы в API.
@@ -90,8 +101,10 @@ pytest tests
 python -m tests.p10.make_samples
 ```
 
-* `pytest tests/contract tests/p10` — 82 passed.
-* `pytest tests` — 184 passed, 1 skipped; нужны `pymupdf` и `python-docx`.
+* `pytest tests/contract tests/p10` — 84 passed.
+* `pytest tests` — 662 passed, 15 skipped, 1 failed. Нужны `pip install -e ".[all,dev]"`. Падает
+  `tests/p11/test_anthropic_success.py::test_from_fixture_files_entry_point`: он зависит от порядка,
+  в одиночку проходит и так же падает на базе без №10.
 * `python -m tests.p10.make_samples` пересобирает образцы в `tests/p10/samples/` (JSON и Markdown до и
   после решений).
 
@@ -105,24 +118,25 @@ python -m tests.p10.make_samples
 | ложное срабатывание: текст строки шаблона не доказывает наличие раздела | `test_presence_is_not_taken_from_checklist_row_itself` |
 | другой шаблон: одна колонка отметок, «Н/П» с основанием, отметка автора | `test_other_template_rows_marks_and_not_required_basis` |
 | пересчёт после `--answers` и перепроверки с причинами | `test_recheck_after_answers_recalculates_rows_with_reasons`, `test_owner_decision_confirms_approval_with_reason` |
-| сквозной `run_review` (mock и none): движок берёт модуль `team:`, Report валиден, опоры сходятся | `test_engine_end_to_end_uses_bank_module` |
+| сквозной `run_review` (mock и none): движок берёт модуль `team:`, Report валиден, опоры сходятся, `verify` №07 = OK | `test_engine_end_to_end_uses_bank_module` |
+| привязка строк к критериям по `[[checklist]]` №05 без ложных «Нет» у ИБ и UI | `test_team_criteria_toml_checklist_rows_link_criteria` |
 
 ## Передача соседям
 
 * **Max (движок).**
   1. В `run_bank` передавать `coverage=coverage, questions=questions`. При `--compare` или повторе после
      `--answers` передавать ещё `previous=<прежний report>`, а `complete=` — по `run.status`.
-  2. Добавлять `collect_questions(bank)` в `report["questions"]`, иначе вопросы `Q-CHK-NN` и
-     `Q-BANK-xxxxxx` не попадут в answers.md.
+  2. Вместе с `questions=` добавлять `collect_questions(bank)` в `report["questions"]`. Тогда вопросы
+     `Q-CHK-NN` и `Q-BANK-xxxxxx` попадут в answers.md, а `open_question_id` будет заполнен. Сейчас
+     движок их не передаёт, поэтому поле `null`, а решения применяются только к вопросам пакета.
   3. Предупреждения модуля — dict по `Warning`, а `str(w)` возвращает читаемый текст. Префикс «bank:»
      получает только отказ модели, чтобы этап отметился `partial`. Лучше класть dict в отчёт как есть,
      без `str()`.
   4. Предложение схемы пакета для контракта: `tests/p10/bank_schema.json`.
-* **№05.** Поле `bank_topics = [...]` у критерия в `criteria.toml`. Темы перечислены в
-  `bcc_review.bank.checklist.TOPICS`: `business`, `structure`, `sequence`, `ui`, `rollback`,
-  `testability`, `data`, `consistency`, `architecture`, `impact`, `security`, `process`, `integration`,
-  `versioning`. В `FINDING_KINDS` нет вида «ИБ», поэтому строка ИБ сейчас распознаёт такие замечания по
-  `title` или `impact`.
+* **№05.** `[[checklist]]` уже используется. У CL11 (ИБ) критерии `complete` и `feasible` слишком
+  широкие, поэтому модуль требует признак ИБ в `title` или `impact`: вида «ИБ» в `FINDING_KINDS` нет.
+  Для других шаблонов можно задать `bank_topics = [...]`. Темы перечислены в
+  `bcc_review.bank.checklist.TOPICS`.
 * **№06.** Пробел покрытия задаётся одной записью `Coverage` на обязательство со статусом `uncovered` или
   `partial`. Текст пробела — в `obligation`.
 * **№08.** У `Question.finding_ids` должен быть ID конфликта: по нему открытый сценарий принимает ID вашего

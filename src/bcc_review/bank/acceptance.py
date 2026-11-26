@@ -1844,9 +1844,9 @@ def apply_decisions(ctx: Ctx, decisions: Iterable[Any]) -> None:
         tc["notes"].append(f"ожидаемый результат согласован решением владельца по вопросу {qid}")
 
 
-def _gherkin(tc: dict) -> str:
+def _gherkin(tc: dict, qid: str | None = None) -> str:
     if tc["status"] == "open":
-        then = f"Тогда (открыто до решения {tc['open_question_id']}): " + "; ".join(f"{o['id']}) {o['expected']}" for o in tc["options"])
+        then = f"Тогда (открыто до решения {tc['open_question_id'] or qid}): " + "; ".join(f"{o['id']}) {o['expected']}" for o in tc["options"])
     else:
         then = f"Тогда {tc['expected']}"
     return f"Дано {tc['precondition']}\nКогда {tc['action']}\n{then}"
@@ -1866,24 +1866,33 @@ def finalize(ctx: Ctx) -> list[dict]:
     return ctx.tcs
 
 
-def _publish(ctx: Ctx) -> list[dict]:
+def _publish(ctx: Ctx, publish_own: bool = True) -> list[dict]:
+    unlinked = 0
     for tc in ctx.tcs:
         q = ctx.questions.get(tc["_qkey"]) if tc["_qkey"] else None
         if q is not None:
             if tc["status"] == "open":
-                tc["open_question_id"] = q["id"]
+                tc["open_question_id"] = q["id"] if (publish_own or q["existing"]) else None
+                unlinked += tc["open_question_id"] is None
             q["affected_req_ids"] = list(dict.fromkeys(q["affected_req_ids"] + tc["req_ids"]))
             tc["open_question"] = {k: q[k] for k in ("id", "kind", "prompt", "options", "affected_req_ids", "finding_ids", "existing", "key")}
         if tc["status"] == "open":
-            tc["expected"] = f"ОТКРЫТО до решения {tc['open_question_id']}: " + "; ".join(f"{o['id']}) {o['expected']}" for o in tc["options"])
-        tc["gherkin"] = _gherkin(tc)
+            qid = tc["open_question_id"] or (q or {}).get("id")
+            tc["expected"] = f"ОТКРЫТО до решения {qid}: " + "; ".join(f"{o['id']}) {o['expected']}" for o in tc["options"])
+        tc["gherkin"] = _gherkin(tc, (q or {}).get("id"))
         tc.pop("_anchor", None)
         tc.pop("_qkey", None)
+    if unlinked:
+        ctx.warnings.append(W(
+            "bank.questions_unlinked",
+            f"Открытых сценариев без ссылки open_question_id: {unlinked}. Вызывающий не передал questions, поэтому вопросы пакета "
+            "не попадут в Report.questions; они лежат в open_question и в collect_questions().", "info", count=unlinked))
     return ctx.tcs
 
 
 def build_test_cases(doc: Doc, scan: Scan, requirements: list[Any], findings: Iterable[Any], decisions: Iterable[Any],
-                     ask: AskFn | None, *, coverage: list[Any], questions: list[Any], warnings: list[dict]) -> list[dict]:
+                     ask: AskFn | None, *, coverage: list[Any], questions: list[Any], warnings: list[dict],
+                     publish_own_questions: bool = True) -> list[dict]:
     ctx = Ctx(doc, scan, ReqIndex(doc, requirements), warnings)
     findings = as_list(findings)
     extract_rules(ctx)
@@ -1915,4 +1924,4 @@ def build_test_cases(doc: Doc, scan: Scan, requirements: list[Any], findings: It
                 ch["before"] = "открыт: " + "; ".join(f"{o['id']}) {short(o['expected'], 60)}" for o in tc["options"])
     if not ctx.tcs:
         warnings.append(W("bank.no_test_cases", "Из текущего документа не выведено ни одного приёмочного сценария.", "info"))
-    return _publish(ctx)
+    return _publish(ctx, publish_own_questions)

@@ -399,6 +399,20 @@ def _pipe_cells(block: Block, ls: int, le: int) -> list[Cell] | None:
     return cells
 
 
+def _loc_cells(block: Block) -> list[Cell] | None:
+    """Ячейки по ``loc.cells`` загрузчика №01: точные координаты каждой ячейки в block.text."""
+    cells = block.loc.get("cells") if isinstance(block.loc, Mapping) else None
+    if not isinstance(cells, list) or not cells:
+        return None
+    out = []
+    for c in sorted((c for c in cells if isinstance(c, Mapping)), key=lambda c: c.get("index", 0)):
+        s, e = c.get("start"), c.get("end")
+        if not (isinstance(s, int) and isinstance(e, int) and 0 <= s <= e <= len(block.text)):
+            return None
+        out.append(Cell(block, *_trim(block.text, s, e)) if e > s else Cell(block, s, s))
+    return out or None
+
+
 def _sep_cells(block: Block) -> list[Cell] | None:
     """Строка таблицы загрузчика контракта: «a | b | c», пустые ячейки сохраняют место."""
     text = block.text
@@ -491,7 +505,7 @@ def extract_tables(doc: Doc) -> list[Table]:
             last = b
             continue
         lines = _line_spans(b.text)
-        sep = _sep_cells(b) if b.kind in ("table_header", "table_row") else None
+        sep = (_loc_cells(b) or _sep_cells(b)) if b.kind in ("table_header", "table_row") else None
         parsed = [sep] if sep else [c for c in (_pipe_cells(b, s, e) for s, e in lines) if c]
         if not parsed and "row" in b.kind:
             tab = _tab_cells(b)
@@ -701,50 +715,85 @@ _SEVERITY = {
 }
 
 
-def load_criteria(criteria: Any = None, warnings: list | None = None) -> dict[str, set[str]]:
-    """Привязка «критерий → строки чек-листа» из criteria.toml (№05).
+class CriteriaLink(dict):
+    """Привязка критериев к чек-листу: dict «критерий → темы строк» и ``rows`` — строки шаблона №05.
 
-    Ищется поле ``bank_topics`` (также ``bank_rows``/``checklist``) у каждого
-    критерия; имена сравниваются по ключу, ``id``, ``code`` и ``aliases``.
-    Без файла или без привязок используется встроенная таблица и пишется
-    предупреждение.
+    ``rows`` — записи ``[[checklist]]`` из criteria.toml: ``{id, text, match, criteria}``; строка
+    документа связывается с записью по регулярному выражению ``match``.
     """
-    warnings = warnings if warnings is not None else []
-    mapping = {k: set(v) for k, v in BUILTIN_CRITERIA_TOPICS.items()}
-    data: Any = None
+
+    def __init__(self, *args: Any, **kw: Any):
+        super().__init__(*args, **kw)
+        self.rows: list[dict[str, Any]] = []
+        self.source = "builtin"
+
+    def row_spec(self, text: str) -> dict[str, Any] | None:
+        for spec in self.rows:
+            try:
+                if re.search(spec["match"], text, re.I | re.U):
+                    return spec
+            except re.error:
+                continue
+        return None
+
+
+def _criteria_data(criteria: Any, warnings: list) -> tuple[Any, str]:
+    if isinstance(criteria, Mapping):
+        return criteria, "dict"
     if criteria is None:
         try:
             from .. import criteria as team_criteria  # №05: bcc_review.criteria:load_criteria()
 
             loaded = team_criteria.load_criteria()
-            data = loaded if isinstance(loaded, (Mapping, list)) else None
-        except Exception:  # noqa: BLE001 - модуль №05 ещё не влит или вернул неожиданное
-            data = None
-    if isinstance(criteria, Mapping):
-        data = criteria
-    elif data is None:
-        path = Path(criteria) if criteria else Path(__file__).resolve().parents[1] / "criteria.toml"
-        if path.is_file():
-            try:
-                data = tomllib.loads(path.read_text("utf-8"))
-            except (OSError, tomllib.TOMLDecodeError) as exc:
-                warnings.append(W("bank.criteria_unreadable", f"criteria.toml не прочитан: {exc}"))
+            raw = loaded if isinstance(loaded, Mapping) else getattr(loaded, "raw", None)
+            if isinstance(raw, Mapping):
+                return raw, f"bcc_review.criteria ({getattr(loaded, 'tag', '') or getattr(loaded, 'version', '')})".replace(" ()", "")
+        except Exception:  # noqa: BLE001 - модуль №05 не влит или вернул неожиданное: читаем файл
+            pass
+    path = Path(criteria) if criteria else Path(__file__).resolve().parents[1] / "criteria.toml"
+    if path.is_file():
+        try:
+            return tomllib.loads(path.read_text("utf-8")), str(path.name)
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            warnings.append(W("bank.criteria_unreadable", f"criteria.toml не прочитан: {exc}"))
+    return None, ""
+
+
+def load_criteria(criteria: Any = None, warnings: list | None = None) -> CriteriaLink:
+    """Привязка «критерий → строки чек-листа» из criteria.toml (№05).
+
+    Строки шаблона берутся из ``[[checklist]]`` (``match`` и ``criteria``), темы — из поля
+    ``bank_topics`` у критерия (``[criteria.X]`` или ``[[criterion]]``, сравнение по ключу,
+    ``id``, ``code``, ``short`` и ``aliases``). Без файла или без привязок используется
+    встроенная таблица и пишется предупреждение.
+    """
+    warnings = warnings if warnings is not None else []
+    link = CriteriaLink({k: set(v) for k, v in BUILTIN_CRITERIA_TOPICS.items()})
+    data, source = _criteria_data(criteria, warnings)
     if data is None:
         warnings.append(
             W("bank.criteria_missing", "criteria.toml не найден: строки чек-листа связаны с критериями по встроенной таблице.", "info")
         )
-        return mapping
-    entries = data.get("criteria", data) if isinstance(data, Mapping) else data
-    items = entries.items() if isinstance(entries, Mapping) else [(g(e, "id"), e) for e in as_list(entries)]
+        return link
+    link.source = source
+    if isinstance(data, Mapping):
+        entries = data.get("criteria") or data.get("criterion") or {k: v for k, v in data.items() if k != "checklist"}
+    else:
+        entries = data
+    items = entries.items() if isinstance(entries, Mapping) else [(g(e, "code") or g(e, "id"), e) for e in as_list(entries)]
     found = False
+    row_links: dict[str, set[str]] = {}
     for key, entry in items:
         if not isinstance(entry, Mapping):
             continue
         names = {norm(key)} if key else set()
-        names |= {norm(entry[k]) for k in ("id", "code", "key", "name") if entry.get(k)}
+        names |= {norm(entry[k]) for k in ("id", "code", "key", "short") if entry.get(k)}
         names |= {norm(a) for a in as_list(entry.get("aliases"))}
         names.discard("")
-        topics = entry.get("bank_topics") or entry.get("bank_rows") or entry.get("checklist")
+        code = norm(entry.get("code") or key or "")
+        for cl in as_list(entry.get("checklist")):  # №05: критерий → CL-строки шаблона
+            row_links.setdefault(str(cl), set()).add(code)
+        topics = entry.get("bank_topics") or entry.get("bank_rows")
         if topics:
             found = True
             known = {t for t in as_list(topics) if t in TOPIC_BY_ID}
@@ -752,18 +801,24 @@ def load_criteria(criteria: Any = None, warnings: list | None = None) -> dict[st
             if unknown:
                 warnings.append(W("bank.criteria_unknown_topic", f"Неизвестные темы чек-листа в criteria.toml: {', '.join(map(str, unknown))}", topics=unknown))
             for n in names:
-                mapping[n] = set(known)
+                link[n] = set(known)
         else:
             inherited: set[str] = set()
             for n in names:
                 inherited |= BUILTIN_CRITERIA_TOPICS.get(n, set())
             for n in names:
-                mapping.setdefault(n, set()).update(inherited)
-    if not found:
+                link.setdefault(n, set()).update(inherited)
+    rows = data.get("checklist") if isinstance(data, Mapping) else None
+    for spec in as_list(rows):
+        if isinstance(spec, Mapping) and spec.get("match"):
+            crits = {norm(c) for c in as_list(spec.get("criteria"))} | row_links.get(str(spec.get("id")), set())
+            link.rows.append({"id": str(spec.get("id") or ""), "text": str(spec.get("text") or ""), "match": str(spec["match"]),
+                              "criteria": crits})
+    if not found and not link.rows:
         warnings.append(
-            W("bank.criteria_no_bank_topics", "В criteria.toml нет полей bank_topics: использована встроенная привязка критериев к строкам.", "info")
+            W("bank.criteria_no_bank_topics", "В criteria.toml нет ни bank_topics, ни [[checklist]]: использована встроенная привязка критериев к строкам.", "info")
         )
-    return mapping
+    return link
 
 
 # ---------------------------------------------------------------- обзор документа
@@ -1054,10 +1109,18 @@ class NF:
     status: str
     severity: str
     title: str
-    topics: set[str]
+    topics: set[str]  # сигналы и критерии вместе
     blocks: set[str]
     req_ids: set[str]
     raw: Any
+    signals: set[str] = field(default_factory=set)  # вид, текст, раздел опоры
+    crit_topics: set[str] = field(default_factory=set)  # через критерий (bank_topics / встроенная таблица)
+    criteria: set[str] = field(default_factory=set)
+
+
+# Строки-свойства: замечание по критерию строки относится к ней, где бы ни стояла опора.
+# Строки-артефакты (sequence, UI, данные…) требуют опоры в своём разделе; ИБ — явного признака ИБ.
+_PROPERTY_ROWS = {"business", "structure", "testability", "consistency", "impact"}
 
 
 def normalize_findings(doc: Doc, findings: Iterable[Any], crit: Mapping[str, set[str]]) -> list[NF]:
@@ -1067,24 +1130,33 @@ def normalize_findings(doc: Doc, findings: Iterable[Any], crit: Mapping[str, set
         if status not in {"confirmed", "needs_review"}:
             continue
         sev = _SEVERITY.get(norm(g(f, "severity") or "minor"), "minor")
-        topics: set[str] = set()
-        for c in as_list(g(f, "criterion")) + as_list(g(f, "criteria")):
-            topics |= crit.get(norm(c), set())
-        topics |= _KIND_TOPICS.get(norm(g(f, "kind") or ""), set())
+        crits = {norm(c) for c in as_list(g(f, "criterion")) + as_list(g(f, "criteria")) if c}
+        crit_topics: set[str] = set()
+        for c in crits:
+            crit_topics |= crit.get(c, set())
+        signals = set(_KIND_TOPICS.get(norm(g(f, "kind") or ""), set()))
         if _SECURITY_TEXT.search(norm(f"{g(f, 'title') or ''} {g(f, 'impact') or ''}")):
-            topics.add("security")  # в FINDING_KINDS контракта нет вида «ИБ»: распознаём по сути замечания
+            signals.add("security")  # в FINDING_KINDS контракта нет вида «ИБ»: распознаём по сути замечания
         evs = doc.evidence_of(f)
         blocks = {e["block_id"] for e in evs} | {str(b) for b in as_list(g(f, "inspected_block_ids")) if str(b) in doc.by_id}
         for bid in {e["block_id"] for e in evs}:
             b = doc.by_id[bid]
             for t in TOPICS:
-                if t.section_map and t.section and any(re.search(t.section, norm(s)) for s in b.section):
-                    topics.add(t.id)
+                if t.section_map and t.section and any(re.search(t.section, norm(x)) for x in b.section):
+                    signals.add(t.id)
         out.append(
-            NF(str(g(f, "id") or f"F-{i + 1}"), status, sev, str(g(f, "title") or ""), topics, blocks,
-               {str(x) for x in as_list(g(f, "req_ids"))}, f)
+            NF(str(g(f, "id") or f"F-{i + 1}"), status, sev, str(g(f, "title") or ""), signals | crit_topics, blocks,
+               {str(x) for x in as_list(g(f, "req_ids"))}, f, signals, crit_topics, crits)
         )
     return out
+
+
+def _maps(f: NF, topic: Topic, row_crit: set[str] | None) -> bool:
+    if topic.id in f.signals:
+        return True
+    if row_crit is None:
+        return topic.id in f.crit_topics
+    return bool(f.criteria & row_crit) and topic.id in _PROPERTY_ROWS
 
 
 def _machine(topic: Topic, pres: Facet, mapped: list[NF], complete: bool, external: bool) -> tuple[Facet, list[str]]:
@@ -1245,6 +1317,7 @@ def build_checklist(
     ask: AskFn | None,
     warnings: list[dict],
     complete: bool = True,
+    crit: Mapping[str, set[str]] | None = None,
 ) -> list[dict]:
     t = scan.checklist
     if t is None:
@@ -1265,11 +1338,11 @@ def build_checklist(
     rows: list[dict] = []
     pending_llm: list[int] = []
     for pos, r in enumerate(t.body, 1):
-        rows.append(_row(doc, scan, t, roles, headers, allowed_col, pos, r, requirements, findings, decisions, warnings, complete))
+        rows.append(_row(doc, scan, t, roles, headers, allowed_col, pos, r, requirements, findings, decisions, warnings, complete, crit=crit))
         if rows[-1]["topic"] is None:
             pending_llm.append(pos)
     if pending_llm and ask is not None:
-        _llm_rows(doc, scan, rows, pending_llm, ask, warnings, requirements, findings, decisions, t, roles, headers, allowed_col, complete)
+        _llm_rows(doc, scan, rows, pending_llm, ask, warnings, requirements, findings, decisions, t, roles, headers, allowed_col, complete, crit)
     for row in rows:
         if row["topic"] is None and not row["changes"]:
             warnings.append(
@@ -1297,6 +1370,7 @@ def _row(
     col_allowed: Mapping[str, list[str]], pos: int, r: list[Cell], requirements: list[Any],
     findings: list[NF], decisions: Mapping[str, Any], warnings: list[dict], complete: bool,
     topic_override: Topic | None = None, approval_override: bool | None = None, llm: dict | None = None,
+    crit: Mapping[str, set[str]] | None = None,
 ) -> dict:
     text_cell = t.col(r, roles["text"]) or r[0]
     text = text_cell.text.strip()
@@ -1342,6 +1416,7 @@ def _row(
             "cells": raw_cells,
         },
         "method": "rules",
+        "criteria_link": None,
     }
     if topic is None and llm is None:
         row["note"] = "Тема строки не распознана правилами; отметки не проставлены."
@@ -1364,7 +1439,11 @@ def _row(
             pres = na
             row["not_required_basis"] = na.basis
     # --- машинная проверка
-    mapped = [f for f in findings if topic is not None and topic.id in f.topics]
+    spec = crit.row_spec(text) if isinstance(crit, CriteriaLink) else None
+    row_crit = set(spec["criteria"]) if spec else None
+    if spec:
+        row["criteria_link"] = {"checklist_id": spec["id"], "criteria": sorted(spec["criteria"]), "source": crit.source}
+    mapped = [f for f in findings if topic is not None and _maps(f, topic, row_crit)]
     machine, fids = _machine(topic or TOPICS[0], pres, mapped, complete, external)
     row["finding_ids"] = fids
     # --- согласование человеком
@@ -1462,6 +1541,7 @@ def _dedupe_ev(evs: Iterable[dict]) -> list[dict]:
 
 
 _SEM_WORD = {"yes": "да", "no": "нет", "na": "не требуется", "unknown": "не определено", None: "не определено"}
+_QUOTELESS = {t.id for t in TOPICS if t.kind == "property" and t.id != "structure"}  # наличие = есть что проверять
 
 
 def _compose_note(doc: Doc, row: dict, pres: Facet, machine: Facet, approval: dict | None,
@@ -1469,6 +1549,8 @@ def _compose_note(doc: Doc, row: dict, pres: Facet, machine: Facet, approval: di
     parts: list[str] = []
     if pres.value == "na":
         parts.append(f"Не требуется: {pres.basis}")
+    elif row.get("topic") in _QUOTELESS:
+        parts.append(f"Наличие: {_SEM_WORD[pres.value]} — {pres.basis}")
     elif pres.evidence:
         e = pres.evidence[0]
         parts.append(f"Наличие: {_SEM_WORD[pres.value]} — «{short(e['quote'], 110)}» ({doc.label(e)})")
@@ -1528,7 +1610,7 @@ _ROW_TASK = (
 def _llm_rows(doc: Doc, scan: Scan, rows: list[dict], positions: list[int], ask: AskFn, warnings: list[dict],
               requirements: list[Any], findings: list[NF], decisions: Mapping[str, Any], t: Table,
               roles: Mapping[str, int | None], headers: Mapping[str, str | None],
-              col_allowed: Mapping[str, list[str]], complete: bool) -> None:
+              col_allowed: Mapping[str, list[str]], complete: bool, crit: Mapping[str, set[str]] | None = None) -> None:
     payload = {
         "task": _ROW_TASK,
         "input": {
@@ -1565,7 +1647,7 @@ def _llm_rows(doc: Doc, scan: Scan, rows: list[dict], positions: list[int], ask:
         cells = t.body[p - 1]
         new = _row(doc, scan, t, roles, headers, col_allowed, p, cells, requirements, findings, decisions, warnings, complete,
                    topic_override=topic, approval_override=bool(g(item, "requires_approval")) or None,
-                   llm={"presence": pres})
+                   llm={"presence": pres}, crit=crit)
         if topic is None:
             new["topic"] = None
         rows[p - 1] = new
@@ -1582,7 +1664,7 @@ def build_bank_pack(
     ask: AskFn | None = None,
     *,
     coverage: Iterable[Any] = (),
-    questions: Iterable[Any] = (),
+    questions: Iterable[Any] | None = None,
     criteria: Any = None,
     previous: Mapping[str, Any] | None = None,
     complete: bool | None = None,
@@ -1592,7 +1674,10 @@ def build_bank_pack(
     ``document``/``requirements``/``findings`` — объекты контракта v1;
     ``decisions`` — принятые решения №08; ``coverage`` — покрытие №06 с колонкой
     «что не покрыто»; ``questions`` — Report.questions, чтобы открытые
-    сценарии ссылались на уже заданные вопросы; ``previous`` — прежний пакет
+    сценарии ссылались на уже заданные вопросы. Переданный ``questions`` (даже пустой)
+    означает, что вызывающий добавит ``collect_questions(pack)`` в Report.questions; без него
+    ``open_question_id`` ставится только на известные вопросы, иначе ``null`` (вопрос — в
+    ``open_question``), чтобы в отчёте не было висячих ссылок; ``previous`` — прежний пакет
     (после ``--answers`` и перепроверки) для причин изменений; ``complete`` —
     все ли проверки прошли. По умолчанию ``complete = ask is not None``: без модели
     семантические проверки не выполнялись, и положительные машинные отметки не ставятся
@@ -1610,9 +1695,10 @@ def build_bank_pack(
     scan = scan_document(doc)
     nfs = normalize_findings(doc, findings, crit)
     decs = decisions_by_question(decisions)
-    checklist = build_checklist(doc, scan, reqs, nfs, decs, ask, warnings, complete)
+    checklist = build_checklist(doc, scan, reqs, nfs, decs, ask, warnings, complete, crit)
     test_cases = acceptance.build_test_cases(
-        doc, scan, reqs, findings, decisions, ask, coverage=as_list(coverage), questions=as_list(questions), warnings=warnings
+        doc, scan, reqs, findings, decisions, ask, coverage=as_list(coverage), questions=as_list(questions), warnings=warnings,
+        publish_own_questions=questions is not None,
     )
     if previous:
         apply_previous(checklist, test_cases, previous, warnings)
@@ -1735,7 +1821,8 @@ def render_markdown(pack: Mapping[str, Any]) -> str:
             f"Всего {len(tcs)}: открытых до решения — {sum(1 for t in tcs if t['status'] == 'open')}, "
             f"согласованных решением — {sum(1 for t in tcs if t['status'] == 'agreed')}. Черновик для тестировщика.", ""]
     for t in tcs:
-        status = {"open": f"открыт до решения {t['open_question_id']}", "agreed": f"согласован решением {t['decision_id']}", "draft": "черновик"}[t["status"]]
+        qid = t["open_question_id"] or (t.get("open_question") or {}).get("id")
+        status = {"open": f"открыт до решения {qid}", "agreed": f"согласован решением {t['decision_id']}", "draft": "черновик"}[t["status"]]
         reqs = ", ".join(t["source_ids"]) or "без требования"
         out.append(f"**{t['id']}. {t['title']}** · {reqs} · {status}")
         out.append("")

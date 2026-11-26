@@ -297,3 +297,16 @@ def test_owner_answer_forms_select_option(answer, chosen):
     ac2 = next(t for t in pack["test_cases"] if t["key"] == "acceptance:1:2")
     assert ac2["status"] == "agreed" and [o["id"] for o in ac2["options"] if o.get("chosen")] == [chosen]
     assert sum(1 for ch in ac2["changes"] if ch["field"] == "expected") == 1
+
+
+def test_own_questions_not_linked_without_questions_argument():
+    """Движок без questions: открытые сценарии без висячих ссылок, вопросы доступны через collect_questions."""
+    c = fx.case()
+    pack = build_bank_pack(c["document"], c["requirements"], c["findings"], [], None, criteria=fx.CRITERIA)
+    opened = [t for t in pack["test_cases"] if t["status"] == "open"]
+    assert opened and all(t["open_question_id"] is None for t in opened)
+    assert all(t["expected"].startswith("ОТКРЫТО до решения Q-BANK-") for t in opened)
+    assert {t["open_question"]["id"] for t in opened} <= {q["id"] for q in collect_questions(pack)}
+    assert "bank.questions_unlinked" in {w["code"] for w in pack["warnings"]}
+    linked = build_bank_pack(c["document"], c["requirements"], c["findings"], [], None, questions=[], criteria=fx.CRITERIA)
+    assert all(t["open_question_id"] for t in linked["test_cases"] if t["status"] == "open")

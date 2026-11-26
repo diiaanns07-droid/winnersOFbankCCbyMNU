@@ -76,5 +76,11 @@ def test_engine_end_to_end_uses_bank_module(tmp_path, engine_env, provider):
     assert on_disk["checklist"] == rows
     bank_stage = next(s for s in rep["run"]["stages"] if s["name"] == "bank")
     assert bank_stage["status"] in ("ok", "partial")
+    # №07: перепроверка отчёта без модели — ссылки open_question_id/req_ids/finding_ids не висят
+    from bcc_review.cli import main as cli_main
+
+    assert cli_main(["verify", str(tmp_path / "report.json"), str(fx.CASE_MD)]) == C.EXIT_OK
+    opened = [t for t in rep["test_cases"] if t.get("status") == "open"]
+    assert opened and all(t["open_question_id"] is None and t["open_question"]["id"] for t in opened)
     bank_warn = [w for w in rep["warnings"] if isinstance(w, dict) and w.get("stage") == "bank"]
     assert all(not str(w.get("message", "")).startswith("{") for w in bank_warn)  # читаемые сообщения, не repr словаря

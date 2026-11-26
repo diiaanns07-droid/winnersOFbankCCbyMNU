@@ -39,7 +39,12 @@ def read_real(text: str) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "requirements.md"
         path.write_bytes(text.encode("utf-8"))
-        return read(path)
+        doc = read(path)
+    try:  # как движок: Document на стыке нормализуется в dict контракта
+        from bcc_review.contracts import normalize_document
+    except ImportError:
+        return doc
+    return normalize_document(doc)
 
 
 def load_markdown(text: str | bytes, *, title: str | None = None, table_mode: str = "rows") -> dict:
