@@ -221,6 +221,7 @@ class _FakeLLM:
 
     def ask(self, stage, system, user, schema, **kw):
         self.calls.append((stage, schema))
+        self.kw = kw
         return self.data
 
 
@@ -355,3 +356,54 @@ def test_conflicts_touching_one_multiline_requirement_are_merged():
     assert sorted(e["line"] for e in out["candidates"][0]["evidence"]) == [3, 5, 9, 10]
     out = C.postprocess(answer(pair_checks=[p1, p2]), VIEW, REQS)  # без многострочного блока — два замечания
     assert len(out["candidates"]) == 2
+
+
+class Truncated(Exception):
+    pass
+
+
+class _TruncOnceLLM(_FakeLLM):
+    def ask(self, stage, system, user, schema, **kw):
+        self.calls.append((stage, user))
+        if len(self.calls) == 1:
+            raise Truncated("max_tokens")
+        return self.data
+
+
+def test_run_asks_with_large_output_limit():
+    ctx = _FakeCtx(answer())
+    C.run(ctx)
+    assert ctx.llm.kw["max_output_tokens"] >= 32000
+
+
+def test_run_retries_once_in_short_mode_when_truncated():
+    ctx = _FakeCtx(answer(pair_checks=[pair()]))
+    ctx.llm = _TruncOnceLLM(answer(pair_checks=[pair()]))
+    out = C.run(ctx)
+    assert len(ctx.llm.calls) == 2 and "Краткий режим" in ctx.llm.calls[1][1]
+    assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_run_does_not_swallow_other_errors():
+    class Boom(_FakeLLM):
+        def ask(self, *a, **kw):
+            raise RuntimeError("сеть")
+    ctx = _FakeCtx(answer())
+    ctx.llm = Boom(None)
+    with pytest.raises(RuntimeError):
+        C.run(ctx)
+
+
+def test_link_findings_maps_pairs_and_glossary_to_final_defects():
+    g = {"concept": "распорядитель", "terms": [{"term": "Клиент", "line": 10}, {"term": "держатель счёта", "line": 10}],
+         "problem": "", "severity": "major"}
+    p2 = pair(b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7, title="второй")
+    out = C.postprocess(answer(pair_checks=[pair(), p2], glossary=[g]), VIEW, REQS)
+    assert [p["id"] for p in out["pair_checks"]] == ["P-01", "P-02"]
+    assert out["glossary"][0]["id"] == "G-01"
+    cands = [dict(c, id=f"C-{i:03d}") for i, c in enumerate(out["candidates"], 1)]  # как в pipeline._collect
+    assert cands[0]["pair_ids"] == ["P-01", "P-02"]  # склеенный конфликт
+    findings = [{"id": "D-01", "candidate_ids": ["C-001"]}, {"id": "D-02", "candidate_ids": ["C-002"]}]
+    C.link_findings(out["pair_checks"], out["glossary"], cands, findings)
+    assert out["pair_checks"][0]["finding_ids"] == ["D-01"] and out["pair_checks"][1]["finding_ids"] == ["D-01"]
+    assert out["glossary"][0]["finding_ids"] == ["D-02"]
