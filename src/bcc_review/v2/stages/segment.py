@@ -375,6 +375,51 @@ def fill_gaps(view: dict, requirements: list[dict], excluded: list[dict], uncove
     return merge_items(requirements + new_r, excluded + new_e)
 
 
+def _is_row(text: str) -> bool:
+    t = text.strip()
+    return " | " in t or (t.startswith("|") and t.endswith("|"))
+
+
+def table_header_lines(view: dict) -> set[int]:
+    """Шапки таблиц: строка таблицы, перед которой нет строки таблицы, а следом (через пустые) — есть."""
+    lines = _lines(view)
+    out: set[int] = set()
+    prev_row = False
+    for i, ln in enumerate(lines):
+        t = _text(ln)
+        if not t.strip():
+            continue  # разделитель шапки в view — пустая строка: состояние не меняем
+        row = _is_row(t)
+        if row and not prev_row:
+            nxt = next((_text(x) for x in lines[i + 1:] if _text(x).strip()), "")
+            if _is_row(nxt):
+                out.add(int(ln["n"]))
+        prev_row = row
+    return out
+
+
+def auto_exclude(view: dict, uncovered: list[int]) -> tuple[list[dict], list[int]]:
+    """Очевидные непокрытые строки код исключает сам (шапки таблиц, JSON и код), чтобы не тратить дозапрос.
+
+    Возвращает (новые исключения, оставшиеся непокрытые строки).
+    """
+    if not uncovered:
+        return [], []
+    headers = table_header_lines(view)
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    excl, rest = [], []
+    for n in uncovered:
+        t = _text(by_n[n])
+        if n in headers:
+            excl.append({"what": "Шапка таблицы", "line_start": n, "line_end": n, "reason": "Строка-шапка таблицы"})
+        elif re.match(r"^\s*[\[{]", t) and re.search(r"[\]}]\s*[,.]?\s*$", t):
+            excl.append({"what": "Пример данных", "line_start": n, "line_end": n,
+                         "reason": "Пример тела запроса или ответа (JSON)"})
+        else:
+            rest.append(n)
+    return excl, rest
+
+
 # ---------------------------------------------------------------------------------------------------------
 # Деление длинного документа
 
@@ -567,6 +612,7 @@ _NUM_RE = re.compile(r"^(?P<n>\d{1,2})[.)]\s+")
 _STATUS_RE = re.compile(r"^(?P<code>[1-5]\d\d)\b")
 _SKIP_SECTIONS = ("общие сведения", "ревью требований", "чек-лист", "согласующ", "лист согласования",
                   "история изменений", "история версий")
+_GLOSSARY = {"термины", "глоссарий", "определения", "термины и определения", "словарь терминов"}
 _PLACEHOLDER = re.compile(r"^(не используется|не используются|не применяется|tbd|заполняются? .*)\.?$", re.I)
 
 
@@ -576,6 +622,7 @@ def heuristic_segment(view: dict) -> dict:
     lines = _lines(view)
     reqs, excl = [], []
     prev_table_row = False
+    row_no = 0
     for i, ln in enumerate(lines):
         n, t = int(ln["n"]), _text(ln).strip()
         if n in headings:
@@ -598,18 +645,31 @@ def heuristic_segment(view: dict) -> dict:
         if is_row and not prev_table_row:
             excl.append({"what": "Шапка таблицы", "line_start": n, "line_end": n, "reason": "Строка-шапка таблицы"})
             prev_table_row = True
+            row_no = 0
             continue
         prev_table_row = is_row
+        row_no = row_no + 1 if is_row else 0
         if _PLACEHOLDER.match(t):
             excl.append({"what": "Заглушка", "line_start": n, "line_end": n, "reason": "Пустой раздел или «не используется»"})
             continue
         if _CODEISH.match(t):
             excl.append({"what": "Пример", "line_start": n, "line_end": n, "reason": "Пример данных или кода"})
             continue
+        if re.fullmatch(r"(или|либо|or)\.?", t, re.I):
+            excl.append({"what": "Связка между примерами", "line_start": n, "line_end": n, "reason": "Служебная строка"})
+            continue
+        if re.fullmatch(r"[1-5]\d\d\.?", t) and reqs and t[:3] in reqs[-1]["quote"] and n - reqs[-1]["line_end"] <= 2:
+            reqs[-1]["line_end"] = n  # голый код ответа под строкой, где он уже назван
+            if not reqs[-1]["source_id"]:
+                reqs[-1]["source_id"], reqs[-1]["kind"] = f"Статус {t[:3]}", "api"
+            continue
         tail = _section_tail(ln)
         clean = re.sub(r"^\s*[-*•]\s+", "", t)
         sid, kind = "", _guess_kind(low_sec, clean, is_row)
-        if (m := _ID_RE.match(clean)):
+        if tail.lower() in _GLOSSARY and re.search(r"\s[—–-]\s", clean) and not is_row:
+            term = re.split(r"\s[—–-]\s", clean, maxsplit=1)[0].strip()
+            sid, kind = (f"{tail}: {term}", "other") if len(term) <= 60 else ("", "other")
+        elif (m := _ID_RE.match(clean)):
             sid = m.group("id")
         elif (m := _STATUS_RE.match(clean)):
             sid, kind = f"Статус {m.group('code')}", "api"
@@ -617,14 +677,49 @@ def heuristic_segment(view: dict) -> dict:
             sid = f"{tail}, п. {m.group('n')}" if tail else f"п. {m.group('n')}"
         elif is_row:
             first_cell = clean.strip("| ").split(" | ")[0].strip()
-            sid = f"{tail}: {first_cell}" if tail and len(first_cell) <= 40 else ""
+            if re.fullmatch(r"[\w.{}/\[\]-]{1,40}", first_cell):
+                sid = f"{tail}: {first_cell}" if tail else first_cell  # имя параметра
+            else:
+                sid = f"{tail}, строка {row_no}" if tail else f"строка {row_no}"
         r = normalize_requirement(view, {"source_id": sid, "kind": kind, "section": section,
                                          "summary": _short_quote(clean)[:90], "quote": _short_quote(clean),
                                          "line_start": n, "line_end": n})
         if r:
             reqs.append(r)
+    reqs = _collapse_key_value_tables(view, reqs)
     reqs, excl = merge_items(reqs, excl)
     return {"requirements": assign_ids(reqs), "excluded": excl}
+
+
+_KV_HEADER = re.compile(r"^(поле|параметр|атрибут|field|name|key)\s*\|\s*(значение|value|описание)$", re.I)
+
+
+def _collapse_key_value_tables(view: dict, reqs: list[dict]) -> list[dict]:
+    """Таблица «поле | значение» (паспорт метода) — одно требование на таблицу, как в промпте."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    headers = [n for n in sorted(table_header_lines(view)) if _KV_HEADER.match(_text(by_n[n]).strip().strip("|").strip())]
+    if not headers:
+        return reqs
+    out = list(reqs)
+    for h in headers:
+        end = h
+        for n in range(h + 1, max(by_n) + 1):
+            tx = _text(by_n[n])
+            if not tx.strip():
+                continue
+            if not _is_row(tx):
+                break
+            end = n
+        inside = [r for r in out if h < r["line_start"] <= end]
+        if len(inside) < 2:
+            continue
+        first = inside[0]
+        merged = {**first, "line_end": max(r["line_end"] for r in inside),
+                  "source_id": _section_tail(by_n[h]) or first["source_id"], "kind": "api",
+                  "summary": "Общие параметры: " + ", ".join(
+                      r["quote"].split(" | ")[0] for r in inside[:5])[:90]}
+        out = [r for r in out if r not in inside] + [merged]
+    return sorted(out, key=lambda r: (r["line_start"], r["line_end"]))
 
 
 def _guess_kind(section: str, text: str, is_row: bool) -> str:
@@ -671,6 +766,9 @@ def segment_from_response(view: dict, raw: dict,
     reqs, excl = finalize(view, raw, headings)
     uncovered = uncovered_lines(view, reqs, excl, headings)
     first_uncovered = list(uncovered)
+    auto_excl, uncovered = auto_exclude(view, uncovered)
+    if auto_excl:
+        reqs, excl = merge_items(reqs, excl + auto_excl)
     followup_calls = 0
     if uncovered and followup is not None:
         followup_calls = 1
@@ -691,7 +789,7 @@ def segment_from_response(view: dict, raw: dict,
     assign_ids(reqs)
     return {"requirements": reqs, "excluded": excl,
             "coverage": {"lines": len(_lines(view)), "uncovered_after_model": first_uncovered,
-                         "followup_calls": followup_calls, "auto_added": auto,
+                         "auto_excluded": len(auto_excl), "followup_calls": followup_calls, "auto_added": auto,
                          "uncovered": uncovered_lines(view, reqs, excl, headings)}}
 
 

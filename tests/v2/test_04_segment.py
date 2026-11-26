@@ -332,3 +332,33 @@ def test_mutant_injected_lines_are_requirements():
     assert any(r["source_id"] == "ЛП-7" for r in m["requirements"])
     base = json.loads((FIX / "transfer_limit.base" / "segment.json").read_text("utf-8"))
     assert len(m["requirements"]) == len(base["requirements"]) + 1
+
+
+def test_table_headers_and_json_excluded_without_followup(official_view):
+    raw = _official_raw()
+    # модель «забыла» шапки таблиц и JSON-пример: дозапрос не нужен, код исключит сам
+    raw["excluded"] = [e for e in raw["excluded"] if e["line_start"] not in (140, 153, 61)]
+    raw["excluded"] = [e for e in raw["excluded"] if not (e["line_start"] <= 197 <= e["line_end"])]
+    calls = []
+    out = sg.segment_from_response(official_view, raw, lambda u, d: calls.append(u) or {})
+    assert calls == []
+    assert out["coverage"]["auto_excluded"] >= 3 and out["coverage"]["uncovered"] == []
+    assert {140, 153, 61} <= sg.table_header_lines(official_view)
+    assert 142 not in sg.table_header_lines(official_view)
+
+
+@pytest.mark.parametrize("case,doc", [
+    ("official", "release/input/requirements.md"),
+    ("autopay.base", "evaluation/dev/corpus/cases/autopay.base/source.md"),
+    ("cashback.base", "evaluation/dev/corpus/cases/cashback.base/source.md"),
+])
+def test_offline_heuristic_close_to_model(case, doc):
+    """Без модели нарезка близка к модельной: тот же набор исходных ID, разница в числе ≤ 3."""
+    view = sg.load_view(str(ROOT / doc))
+    h = sg.heuristic_segment(view)
+    fx = json.loads((FIX / case / "segment.json").read_text("utf-8"))["requirements"]
+    assert abs(len(h["requirements"]) - len(fx)) <= 3
+    a = {r["source_id"] for r in fx if r["source_id"]}
+    b = {r["source_id"] for r in h["requirements"] if r["source_id"]}
+    assert a <= b, a - b
+    assert sg.uncovered_lines(view, h["requirements"], h["excluded"]) == []
