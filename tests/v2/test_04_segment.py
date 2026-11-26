@@ -381,3 +381,56 @@ def test_placeholder_source_id_cleared(official_view):
         "source_id": "<уточнить: название раздела>", "kind": "api", "summary": "s",
         "quote": "REST type | GET", "line_start": 104, "line_end": 104})
     assert r["source_id"] == ""
+
+
+# ---- документы другой структуры (04_structures) ---------------------------------------------------------
+
+STRUCT = FIX / "04_structures"
+NESTED_IDS = {f"ФТ-{x}" for x in ["2.1.1", "2.1.2", "2.1.3", "2.2.1", "2.2.2", "2.2.3", "2.2.3.1", "2.2.3.2",
+                                  "2.2.4", "2.3.1", "2.3.2", "2.4.1"]} | {"НФТ-3.1", "НФТ-3.2", "НФТ-3.3"}
+
+
+@pytest.mark.parametrize("name", ["nested_ids.md", "unnumbered.md", "long.md", "official.docx"])
+def test_structures_offline_cover_every_line(name):
+    view = sg.load_view(str(STRUCT / name))
+    h = sg.heuristic_segment(view)
+    assert h["requirements"]
+    assert sg.uncovered_lines(view, h["requirements"], h["excluded"]) == []
+
+
+def test_nested_ids_kept_verbatim_offline():
+    view = sg.load_view(str(STRUCT / "nested_ids.md"))
+    sids = {r["source_id"] for r in sg.heuristic_segment(view)["requirements"]}
+    assert NESTED_IDS <= sids
+
+
+def test_long_document_chunks_and_ids():
+    view = sg.load_view(str(STRUCT / "long.md"))
+    assert len(view["lines"]) >= 600
+    chunks = sg.plan_chunks(view)
+    assert len(chunks) >= 3 and all(b - a + 1 <= sg.CHUNK_MAX_LINES for a, b in chunks)
+    h = sg.heuristic_segment(view)
+    ids = {r["source_id"] for r in h["requirements"] if r["source_id"].startswith("КИБ-")}
+    assert ids == {f"КИБ-{k}.{j}" for k in range(1, 13) for j in range(1, 8)}
+    assert len(h["requirements"]) == 242
+
+
+@pytest.mark.xfail(strict=False, reason="DOCX: читатель не отдаёт номер пункта нумерованного списка (просьба к №03 "
+                                        "в status/04.md); с моделью список совпадает с MD")
+def test_official_docx_matches_md_offline():
+    md = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
+    dx = sg.heuristic_segment(sg.load_view(str(STRUCT / "official.docx")))["requirements"]
+    assert [r["source_id"] for r in md] == [r["source_id"] for r in dx]
+
+
+def test_official_pdf_matches_md_offline():
+    md = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
+    pdf = sg.heuristic_segment(sg.load_view(str(ROOT / "release" / "input" / "requirements.pdf")))["requirements"]
+    assert [r["source_id"] for r in md] == [r["source_id"] for r in pdf]
+
+
+def test_caption_line_auto_excluded():
+    view = sg.load_view(str(STRUCT / "unnumbered.md"))
+    n = next(x["n"] for x in view["lines"] if x["text"].strip() == "Ответ метода списка устройств:")
+    excl, rest = sg.auto_exclude(view, [n])
+    assert rest == [] and excl[0]["what"].startswith("Подпись")

@@ -393,12 +393,31 @@ def table_header_lines(view: dict) -> set[int]:
         if not t.strip():
             continue  # разделитель шапки в view — пустая строка: состояние не меняем
         row = _is_row(t)
-        if row and not prev_row:
+        if ln.get("kind") == "table_header":
+            out.add(int(ln["n"]))  # docview №03 сам знает шапку таблицы
+        elif row and not prev_row:
             nxt = next((_text(x) for x in lines[i + 1:] if _text(x).strip()), "")
             if _is_row(nxt):
                 out.add(int(ln["n"]))
         prev_row = row
     return out
+
+
+def _is_caption(view: dict, n: int) -> bool:
+    """Короткая строка с двоеточием в конце, за которой идёт таблица, список или пример."""
+    lines = _lines(view)
+    idx = next((i for i, x in enumerate(lines) if int(x["n"]) == n), None)
+    if idx is None:
+        return False
+    t = _text(lines[idx]).strip()
+    if not t.endswith(":") or len(t) > 80 or _is_row(t):
+        return False
+    nxt = next((x for x in lines[idx + 1:] if _text(x).strip()), None)
+    if nxt is None:
+        return False
+    nt = _text(nxt)
+    return (_is_row(nt) or nxt.get("kind") in ("list_item", "table_header", "table_row", "code")
+            or bool(re.match(r"^\s*[\[{]", nt)))
 
 
 def auto_exclude(view: dict, uncovered: list[int]) -> tuple[list[dict], list[int]]:
@@ -415,6 +434,9 @@ def auto_exclude(view: dict, uncovered: list[int]) -> tuple[list[dict], list[int
         t = _text(by_n[n])
         if n in headers:
             excl.append({"what": "Шапка таблицы", "line_start": n, "line_end": n, "reason": "Строка-шапка таблицы"})
+        elif _is_caption(view, n):
+            excl.append({"what": "Подпись к таблице или списку", "line_start": n, "line_end": n,
+                         "reason": "Подводка к следующей таблице или списку, своего обязательства нет"})
         elif re.match(r"^\s*[\[{]", t) and re.search(r"[\]}]\s*[,.]?\s*$", t):
             excl.append({"what": "Пример данных", "line_start": n, "line_end": n,
                          "reason": "Пример тела запроса или ответа (JSON)"})
@@ -651,6 +673,12 @@ def heuristic_segment(view: dict) -> dict:
     row_no = 0
     for i, ln in enumerate(lines):
         n, t = int(ln["n"]), _text(ln).strip()
+        if (n in headings and re.fullmatch(r"[1-5]\d\d\.?", t) and reqs and t[:3] in reqs[-1]["quote"]
+                and n - reqs[-1]["line_end"] <= 2):
+            reqs[-1]["line_end"] = n  # голый код ответа, который читатель PDF принял за заголовок
+            if not reqs[-1]["source_id"]:
+                reqs[-1]["source_id"], reqs[-1]["kind"] = f"Статус {t[:3]}", "api"
+            continue
         if n in headings:
             prev_table_row = False
             continue
@@ -862,14 +890,67 @@ def run(ctx: Any) -> dict:
     return out
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Отладка без каркаса: `python -m bcc_review.v2.stages.segment ДОК ОТВЕТ.json [ВЫХОД.json]`.
+def run_live(doc: str, *, provider: str = "claude_cli", model: str | None = None, cache: bool = False,
+             max_calls: int = 6) -> dict:
+    """Этап segment на любом файле через настоящий `LLMClient` каркаса (без остальных этапов)."""
+    import time
+    from bcc_review.v2.context import Context
+    from bcc_review.v2.pipeline import DEFAULTS, make_llm
+    opts = {**DEFAULTS, "provider": provider, "model": model, "cache": cache, "max_calls": max_calls}
+    view = load_view(doc)
+    llm, pname = make_llm(opts, None, doc)
+    ctx = Context(view=view, llm=llm, options={**opts, "input": doc})
+    t0 = time.monotonic()
+    out = run(ctx)
+    stats = getattr(llm, "stats", {}) if llm is not None else {}
+    out["run"] = {"provider": pname, "model": model, "seconds": round(time.monotonic() - t0, 1),
+                  "calls": stats.get("calls"), "split": stats.get("split"), "failed": stats.get("failed"),
+                  "tokens_out": stats.get("tokens_out"), "warnings": list(ctx.warnings)}
+    return out
 
-    Берёт сырой ответ модели (например, из `try_prompt.py --schema segment --out`) и прогоняет кодовую часть
-    этапа: нормализация, покрытие, ID. Строки документа — через `docview.load`, иначе как в `try_prompt`.
+
+def _print_summary(out: dict) -> None:
+    import sys
+    cov = out.get("coverage") or {}
+    run_info = out.get("run") or {}
+    head = (f"требований {len(out['requirements'])}, исключено {len(out['excluded'])}, "
+            f"непокрыто после модели {len(cov.get('uncovered_after_model') or [])}, "
+            f"дозапросов {cov.get('followup_calls', 0)}, добавлено кодом {cov.get('auto_added', 0)}")
+    if run_info:
+        head += (f"; {run_info.get('provider')}/{run_info.get('model')}: вызовов {run_info.get('calls')}, "
+                 f"делений {run_info.get('split')}, {run_info.get('seconds')} с")
+    print(head, file=sys.stderr)
+    for w in run_info.get("warnings") or []:
+        print(f"  ! {w}", file=sys.stderr)
+    for n in cov.get("uncovered_after_model") or []:
+        print(f"  непокрыта L{n}", file=sys.stderr)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Отладка этапа segment.
+
+    `python -m bcc_review.v2.stages.segment --run ДОК [--provider claude_cli] [--model haiku] [--out OUT.json]`
+        — нарезка любого файла (MD/TXT/PDF/DOCX/HTML) живой моделью через `LLMClient` каркаса;
+    `python -m bcc_review.v2.stages.segment ДОК ОТВЕТ.json [ВЫХОД.json]`
+        — кодовая часть этапа (нормализация, покрытие, ID) на сохранённом ответе модели.
     """
+    import argparse
     import sys
     args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "--run":
+        ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.stages.segment --run")
+        ap.add_argument("doc")
+        ap.add_argument("--provider", default="claude_cli")
+        ap.add_argument("--model", default=None)
+        ap.add_argument("--out", default=None)
+        ap.add_argument("--cache", action="store_true", help="брать ответы из кэша .bcc_cache/v2")
+        a = ap.parse_args(args[1:])
+        out = run_live(a.doc, provider=a.provider, model=a.model, cache=a.cache)
+        if a.out:
+            Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        _print_summary(out)
+        return 0
     if len(args) < 2:
         print(main.__doc__)
         return 2
@@ -880,12 +961,7 @@ def main(argv: list[str] | None = None) -> int:
                       ensure_ascii=False, indent=2)
     if len(args) > 2:
         Path(args[2]).write_text(text + "\n", encoding="utf-8")
-    cov = out["coverage"]
-    print(f"требований {len(out['requirements'])}, исключено {len(out['excluded'])}, "
-          f"непокрыто после модели {len(cov['uncovered_after_model'])}, добавлено кодом {cov['auto_added']}",
-          file=sys.stderr)
-    for n in cov["uncovered_after_model"]:
-        print(f"  непокрыта L{n}", file=sys.stderr)
+    _print_summary(out)
     return 0
 
 
