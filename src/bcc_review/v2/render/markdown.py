@@ -548,7 +548,7 @@ def _brief(c: _Ctx) -> list[str]:
             rows.append(row + [pcell(first_sentence(f.get("impact") or f.get("problem"), 170))])
         out += table(["Дефект", "Где"] + ([] if same else ["Блокирует"]) + ["Почему блокирует"], rows)
         out.append("")
-    elif c.run.get("status") != "failed":
+    elif c.run.get("status") != "failed" and "блокирующ" not in str(v.get("summary") or "").lower():
         out += ["Блокирующих дефектов не найдено.", ""]
     first = _fix_first(c)
     if first:
@@ -628,7 +628,9 @@ def _clarification_details(c: _Ctx) -> list[str]:
 def _passport(c: _Ctx) -> list[str]:
     run, doc = c.run, c.doc
     st, fn = when(run.get("started_at")), when(run.get("finished_at"))
-    if st and fn:
+    if st and fn and f"{st:%d.%m.%Y %H:%M}" == f"{fn:%d.%m.%Y %H:%M}":
+        stamp = f"{st:%d.%m.%Y %H:%M} (UTC+5)"
+    elif st and fn:
         stamp = f"{st:%d.%m.%Y %H:%M}–{fn:%H:%M} (UTC+5)" if st.date() == fn.date() else \
             f"{st:%d.%m.%Y %H:%M} – {fn:%d.%m.%Y %H:%M} (UTC+5)"
     elif st:
