@@ -233,7 +233,8 @@ _EOL = re.compile(r"\r\n|\r|\n")
 
 
 def decode_source(data: bytes) -> Source:
-    """Декодирует байты: BOM → UTF-8 → cp1251 → UTF-8 с заменой (с предупреждением)."""
+    """Декодирует байты: BOM → UTF-8 → UTF-8 с заменой, если битых мест не больше
+    ``max(8, размер / 50)`` (``decode_error``) → cp1251 (``encoding_fallback``) → UTF-8 с заменой."""
     for bom, enc in _BOMS:
         if data.startswith(bom):
             body = data[len(bom):]
@@ -250,6 +251,14 @@ def decode_source(data: bytes) -> Source:
         return Source(data.decode("utf-8"), "utf-8", 0, True)
     except UnicodeDecodeError as exc:
         bad = exc.start
+    lossy = data.decode("utf-8", errors="replace")
+    broken = lossy.count("\ufffd")
+    if broken <= max(8, len(data) // 50):  # UTF-8 с единичными битыми байтами — не другая кодировка
+        note = (
+            f"байт {bad}: недопустимая последовательность UTF-8 (битых мест: {broken}), заменена на U+FFFD; "
+            "byte_start/byte_end не выдаются"
+        )
+        return Source(lossy, "utf-8", 0, False, (("decode_error", note),))
     try:
         note = f"файл не в UTF-8 (байт {bad}); прочитан как cp1251"
         return Source(data.decode("cp1251"), "cp1251", 0, True, (("encoding_fallback", note),))
