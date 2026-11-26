@@ -115,7 +115,14 @@ h2 em { font-style: normal; color: var(--gold); }
 .lenses { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
 .lenses span { font: 600 14px/1.2 var(--mono); padding: 7px 8px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); text-align: center; }
 .pipe .st:not(:last-child)::after { content: "→"; position: absolute; right: -17px; top: 40%; color: var(--gold); font: 700 22px/1 var(--sans); }
-.pipe-note { margin-top: 26px; display: flex; gap: 18px; }
+.exec { margin-top: 26px; padding: 18px 24px 20px; }
+.exh { font: 11px/1 var(--pix); color: var(--gold); letter-spacing: .04em; margin-bottom: 14px; }
+.exrow { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 0.8fr; align-items: center; gap: 6px; }
+.exrow span { display: block; font-size: 14.5px; color: var(--ink3); margin-bottom: 4px; }
+.exrow b { font: 600 19px/1.35 var(--mono); color: var(--ink); }
+.exa { font: 700 28px/1 var(--sans); color: var(--gold); text-align: center; }
+.exv b { color: var(--crit); font-family: var(--sans); font-weight: 800; font-size: 21px; }
+.pipe-note { margin-top: 18px; display: flex; gap: 18px; }
 .pipe-note .panel { padding: 16px 20px; font-size: 18px; color: var(--ink2); flex: 1; }
 .pipe-note b { color: var(--ink); }
 
@@ -157,10 +164,11 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
 .closed span { color: var(--ink2); font-size: 16.5px; line-height: 1.4; }
 
 /* 10 — процесс банка */
-.proc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 32px; }
-.proc .panel { padding: 22px; }
-.proc h3 { margin: 10px 0 6px; font: 700 23px/1.25 var(--sans); }
-.proc p { margin: 0; color: var(--ink2); font-size: 17.5px; line-height: 1.45; }
+.procwrap { display: grid; grid-template-columns: 1fr 620px; gap: 30px; margin-top: 30px; align-items: start; }
+.proc { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.proc .panel { padding: 16px 18px; }
+.proc h3 { margin: 8px 0 4px; font: 700 20px/1.25 var(--sans); }
+.proc p { margin: 0; color: var(--ink2); font-size: 15.5px; line-height: 1.4; }
 
 /* 11 — план */
 .road { margin-top: 44px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
@@ -170,6 +178,11 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
 .ph h3 { margin: 22px 0 6px; font: 700 25px/1.2 var(--sans); }
 .ph .when { font: 600 15px/1 var(--mono); color: var(--mint); }
 .ph p { color: var(--ink2); font-size: 17.5px; line-height: 1.45; margin: 10px 0 0; }
+
+.need { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.need .panel { padding: 20px 24px; }
+.need h4 { margin: 0 0 10px; font: 11px/1 var(--pix); color: var(--gold); letter-spacing: .04em; }
+.need p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--ink2); }
 
 /* 12 — команда */
 .team { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 34px; }
@@ -286,10 +299,22 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
     <div class="panel st"><span class="tag llm">LLM ×1</span><h4>Судья</h4><p>Склеивает дубли, отклоняет ложные с причиной, ставит критичность и порядок исправления.</p></div>
     <div class="panel st"><span class="tag code">КОД</span><h4>Вердикт и отчёты</h4><p>Вердикт — по правилу кода. MD · JSON · HTML · Word · PDF · Jira.</p></div>
   </div>
+  <div class="exec panel">
+    <div class="exh">ТЕСТИРОВЩИК ИСПОЛНЯЕТ КРИТЕРИЙ ПРИЁМКИ</div>
+    <div class="exrow">
+      <div><span>Условия из критерия</span><b>покупка 31.01 в 23:58,<br>проведена 01.02 в 00:03</b></div>
+      <div class="exa">→</div>
+      <div><span>Ожидаемое по правилу Ф-2</span><b>месяц — по дате совершения:<br>растёт январь</b></div>
+      <div class="exa">≠</div>
+      <div><span>Записано в критерии</span><b>«февральский счётчик<br>вырос на 4 000 ₸»</b></div>
+      <div class="exa">→</div>
+      <div class="exv"><span>Вывод</span><b>противоречие,<br>критичный дефект</b></div>
+    </div>
+  </div>
   <div class="pipe-note">
     <div class="panel"><b>Около 8 вызовов модели</b> на документ вместо оценки «каждое требование × каждый критерий».</div>
-    <div class="panel"><b>Тестировщик исполняет критерии приёмки:</b> выводит ожидаемое из правил и сравнивает с записанным.</div>
     <div class="panel"><b>Набор целиком:</b> попарная сверка по сценарию «вход → исход A → исход B».</div>
+    <div class="panel"><b>Судья</b> видит всех кандидатов сразу и ставит одну шкалу серьёзности.</div>
   </div>
   <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>06 / 12</span></div>
 </section>
@@ -349,14 +374,14 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
 <section class="slide" id="s10" data-title="Процесс банка">
   <div class="kick">10 · ВСТРАИВАНИЕ В ПРОЦЕСС</div>
   <h2>Говорит на языке <em>процесса банка</em></h2>
-  <div class="proc">
+  <div class="procwrap"><div class="proc">
     <div class="panel"><span class="ico g">✓</span><h3>Чек-лист «Ревью требований»</h3><p>Шаблон банка заполнен: «Да / Нет / Частично» с комментарием и ссылками на дефекты.</p></div>
     <div class="panel"><span class="ico">W</span><h3>Word с комментариями</h3><p>Замечания стоят прямо в документе аналитика — там, где он привык работать.</p></div>
     <div class="panel"><span class="ico o">J</span><h3>Задачи Jira</h3><p>CSV для импорта: дефект, серьёзность, цитата, рекомендация, приоритет.</p></div>
     <div class="panel"><span class="ico r">?</span><h3>Вопросы и ответы</h3><p>Владелец отвечает вариантом — агент пересчитывает: вердикт «до» и «после».</p></div>
     <div class="panel"><span class="ico">✎</span><h3>Исправленное ТЗ</h3><p>Редакция «было → стало» с пометками дефектов и маркерами «уточнить».</p></div>
     <div class="panel"><span class="ico g">T</span><h3>Тест-кейсы</h3><p>Черновик для пустого раздела «заполняются тестировщиками» — с пробелами приёмки.</p></div>
-  </div>
+  </div><div class="shot"><img src="img/report_checklist.png" alt="Заполненный чек-лист ревью требований банка в отчёте"></div></div>
   <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>10 / 12</span></div>
 </section>
 
@@ -369,6 +394,10 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
     <div class="ph"><div class="dot">2</div><h3>Калибровка</h3><div class="when">+2 недели</div><p>Эталон банка из разборов пилота; промпты и шкала серьёзности под внутренние стандарты.</p></div>
     <div class="ph"><div class="dot">3</div><h3>Закрытый контур</h3><div class="when">+1 месяц</div><p>Модель в периметре (vLLM), журнал прогонов, доступ по ролям, требования ИБ.</p></div>
     <div class="ph"><div class="dot">4</div><h3>Гейт в процессе</h3><div class="when">далее</div><p>Проверка при переводе задачи в разработку: Jira, Confluence, чек-лист ревью.</p></div>
+  </div>
+  <div class="need">
+    <div class="panel"><h4>ЧТО НУЖНО ОТ БАНКА</h4><p>20–30 реальных ТЗ с разборами ревьюеров · стенд с моделью в контуре · доступ к Jira и Confluence для пилотной команды</p></div>
+    <div class="panel"><h4>КАК ИЗМЕРИМ ПИЛОТ</h4><p>Доля замечаний, принятых аналитиком · ложные тревоги на согласованных ТЗ · дефекты требований, дошедшие до тестирования</p></div>
   </div>
   <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>11 / 12</span></div>
 </section>

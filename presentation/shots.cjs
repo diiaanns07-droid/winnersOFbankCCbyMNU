@@ -24,6 +24,22 @@ const path = require("path");
     await p.waitForTimeout(1200);
     await p.screenshot({ path: out("report_card.png") });
   }
+  for (const [tab, name] of [["checklist", "report_checklist.png"], ["questions", "report_questions.png"]]) {
+    await p.evaluate((t) => { history.replaceState(null, "", "#" + t); document.getElementById("t-" + t).click(); window.scrollTo(0, 0); }, tab);
+    await p.waitForTimeout(300);
+    const y = await p.evaluate(() => document.querySelector(".tabs").getBoundingClientRect().top + window.scrollY - 60);
+    await p.evaluate((yy) => window.scrollTo(0, yy), y);
+    await p.waitForTimeout(200);
+    // крупно: только таблица чек-листа / первые карточки вопросов
+    const sel = tab === "checklist" ? "#p-checklist .tw" : "#p-questions .qlist";
+    const el = await p.$(sel);
+    if (el) {
+      await el.evaluate((n) => { n.style.maxHeight = "640px"; n.style.overflow = "hidden"; n.style.maxWidth = "1100px"; });
+      await el.screenshot({ path: out(name) });
+    } else {
+      await p.screenshot({ path: out(name) });
+    }
+  }
   const d = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: "dark" });
   const pd = await d.newPage();
   await pd.goto("file://" + path.resolve(report));
