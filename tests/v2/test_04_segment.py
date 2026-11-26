@@ -316,3 +316,9 @@ def test_ask_split_used_and_merge_accepts_both_styles():
     assert len(llm.calls) == 2
     assert [r["line_start"] for r in out["requirements"]] == list(range(1, 11))
     assert sg._merge_results([{"requirements": [1], "excluded": []}])["requirements"] == [1]
+
+
+def test_empty_document_makes_no_calls():
+    llm = _FakeLLM({"requirements": [], "excluded": []})
+    out = sg.run(_Ctx(_view(["", "---", "  "]), llm))
+    assert out["requirements"] == [] and llm.calls == []

@@ -699,8 +699,9 @@ def run(ctx: Any) -> dict:
     """Этап segment: `ctx.view` → `{"requirements", "excluded", "coverage"}`."""
     view = ctx.view
     lines = _lines(view)
-    if not lines:
-        return {"requirements": [], "excluded": [], "coverage": {"lines": 0, "uncovered": []}}
+    if not any(not is_trivial(_text(x)) for x in lines):
+        return {"requirements": [], "excluded": [], "coverage": {"lines": len(lines), "uncovered": [],
+                                                                "mode": "empty"}}
     if not _llm_available(ctx):
         out = heuristic_segment(view)
         out["coverage"] = {"lines": len(lines), "mode": "heuristic",
