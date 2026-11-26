@@ -196,7 +196,7 @@ def test_minimal_offline_report_has_all_sections():
     for h in REQUIRED_HEADINGS:
         assert h in md, h
     assert "Режим без модели" in md and "Дефектов не найдено" in md
-    assert "✅ можно начинать" in md
+    assert "❔ не определено" in md and "✅ можно начинать" not in md
 
 
 def test_partial_and_failed_status_banners():
@@ -210,16 +210,48 @@ def test_partial_and_failed_status_banners():
 
 def test_before_after_block(sample):
     r = copy.deepcopy(sample)
-    r["findings"][0]["status"] = "resolved"
-    r["recheck"] = {"answers": [{"question_id": "Q-01", "answer": "Да"}],
-                    "before": {"verdict": {"development": "no", "testing": "no"},
-                               "findings": {"critical": 5, "major": 20, "minor": 7}},
-                    "resolved": ["D-01"], "changed": [], "added": []}
+    r["findings"][0]["status_after_answers"] = "resolved"
+    r["findings"][1]["status_after_answers"] = "changed"
+    r["clarification"] = {
+        "answers": [{"question_id": "Q-01", "topic": "лимит", "question": "?", "choice": "B", "answer": "Нет",
+                     "finding_ids": ["D-01"]}],
+        "decisions": ["Событие — авторизация"], "unanswered": ["Q-02"],
+        "changes": [{"finding_id": "D-01", "title": "Ф-3 и Ф-4", "severity_before": "critical", "status": "resolved",
+                     "severity_after": None, "reason": "лимит действует всегда", "question_ids": ["Q-01"]},
+                    {"finding_id": "D-02", "title": "Событие", "severity_before": "critical", "status": "changed",
+                     "severity_after": "major", "reason": "уточнено", "question_ids": []}],
+        "new_findings": [], "before": {"verdict": {"development": "no", "testing": "no"},
+                                       "findings": {"critical": 5, "major": 20, "minor": 7}},
+        "after": {"verdict": {"development": "no", "testing": "no"}, "findings": {"critical": 4, "major": 20, "minor": 7}},
+        "resolved": 1, "changed": 1, "open": 0}
+    del r["summary"]
     jsonout.finalize(r)
+    assert jsonout.validate(r) == []
     md = markdown.render(r)
-    assert "**До и после ответов владельца** (ответов: 1)" in md
-    assert "Снято ответами: D-01 (снят)" in md
+    assert "**До и после ответов владельца** — ответов 1, общих решений 1, без ответа 1" in md
+    assert "**Ответ владельца:** B — Нет" in md and "### Что изменили ответы" in md
+    assert "D-01 (снят)" in md
     assert '<a id="d-01">' not in md  # снятый дефект не показывается карточкой
+    assert "· уточнён после ответов" in md
+    assert r["summary"]["findings"]["critical"] == 4
+
+
+def test_offline_report_of_rules():
+    r = minimal()
+    r["title"] = "Предварительная проверка без модели"
+    r["signals"] = [{"kind": "vague", "line": 2, "quote": "быстро", "message": "размытое слово"},
+                    {"kind": "inventory", "line": 1, "quote": "x", "message": "служебное"}]
+    r["not_checked"] = ["противоречия по смыслу"]
+    r["verdict"] = {"development": "undetermined", "testing": "undetermined", "summary": "Смысл не проверялся."}
+    assert jsonout.validate(r) == []
+    md = markdown.render(r)
+    assert md.startswith("# Предварительная проверка без модели: «Пустое ТЗ»")
+    assert "3.4. Подсказки для ручной проверки" in md and "«быстро» — размытое слово" in md and "служебное" not in md
+    assert "**Что не проверялось в этом прогоне**" in md and "❔ не определено" in md
+    assert jsonout.rule_verdict(r) == {"development": "undetermined", "testing": "undetermined"}
+    r["findings"] = [{"id": "D-01", "severity": "major", "rule_conflict": True, "blocks": "testing",
+                      "evidence": [{"quote": "a"}, {"quote": "b"}]}]
+    assert jsonout.rule_verdict(r) == {"development": "undetermined", "testing": "no"}
 
 
 def test_markdown_escapes_document_markup():

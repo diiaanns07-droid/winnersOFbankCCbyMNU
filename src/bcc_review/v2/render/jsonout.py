@@ -67,9 +67,13 @@ def validate(report: dict) -> list[str]:
 
 # ---------------------------------------------------------------- счётчики
 
+def is_resolved(f: dict) -> bool:
+    return f.get("status") == "resolved" or f.get("status_after_answers") == "resolved"
+
+
 def open_findings(report: dict) -> list[dict]:
-    """Действующие дефекты: снятые ответами владельца (status=resolved) не считаются."""
-    return [f for f in report.get("findings", []) if f.get("status", "open") != "resolved"]
+    """Действующие дефекты: снятые ответами владельца (resolved) не считаются."""
+    return [f for f in report.get("findings", []) or [] if isinstance(f, dict) and not is_resolved(f)]
 
 
 def count_quotes(findings: Iterable[dict]) -> tuple[int, int]:
@@ -103,12 +107,22 @@ def compute_summary(report: dict) -> dict:
 
 
 def rule_verdict(report: dict) -> dict:
-    """Вердикт по правилу кода (CONTRACT.md, раздел 5): {"development", "testing"}."""
-    status = report.get("run", {}).get("status", "complete")
+    """Вердикт по правилу кода (CONTRACT.md, раздел 5): {"development", "testing"}.
+
+    Прогон без модели (provider = offline, №12): «нельзя» только при блокирующем критичном дефекте или
+    противоречии двух мест, найденном правилом (rule_conflict); иначе «не определено» — смысл не проверялся."""
+    run = report.get("run", {}) or {}
+    status = run.get("status", "complete")
     if status == "failed":
         return {"development": "none", "testing": "none"}
     findings = open_findings(report)
     out = {}
+    if run.get("provider") == "offline":
+        for target, blockers in (("development", {"development", "both"}), ("testing", {"testing", "both"})):
+            hit = any((f.get("severity") == "critical" or (f.get("rule_conflict") and len(f.get("evidence") or []) >= 2))
+                      and f.get("blocks") in blockers for f in findings)
+            out[target] = "no" if hit else "undetermined"
+        return out
     for target, blockers in (("development", {"development", "both"}), ("testing", {"testing", "both"})):
         crit = any(f.get("severity") == "critical" and f.get("blocks") in blockers for f in findings)
         majors = sum(1 for f in findings if f.get("severity") == "major" and f.get("blocks") in blockers)

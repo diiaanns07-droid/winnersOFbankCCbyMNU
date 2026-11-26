@@ -27,9 +27,10 @@ SEV_PLURAL = {"critical": ("критичный", "критичных", "крит
               "minor": ("незначительный", "незначительных", "незначительных")}
 
 READINESS = {"no": "⛔ нельзя начинать", "conditional": "⚠️ можно с условиями", "yes": "✅ можно начинать",
-             "none": "— вердикт не вынесен"}
+             "undetermined": "❔ не определено", "none": "— вердикт не вынесен"}
 BLOCKS = {"development": "разработку", "testing": "тестирование", "both": "разработку и тестирование",
           "none": "не блокирует"}
+BLOCKING = {"development", "testing", "both"}
 
 # Критерии и стандарты — CONTRACT.md, раздел 4. (название, ссылка, короткая метка столбца матрицы)
 CRITERIA: dict[str, tuple[str, str, str]] = {
@@ -100,8 +101,15 @@ STAGES = {
     "clarify": ("Вопросы", "вопросы владельцу с вариантами ответа"),
     "recheck": ("Пересмотр по ответам", "снимает и уточняет дефекты по ответам владельца"),
     "revise": ("Исправленное ТЗ", "формулировки «было → стало»"),
-    "render": ("Запись отчёта", "Markdown, JSON и другие форматы"),
+    "render": ("Запись отчёта", "отчёт в Markdown, JSON и других форматах"),
+    "lenses": ("Проверка ролями", "аналитик, тестировщик, архитектор, риски"),
+    "export": ("Экспорт", "DOCX, PDF, задачи Jira"),
+    "html": ("HTML-отчёт", "интерактивная страница отчёта"),
 }
+
+
+def stage_name(key: str) -> str:
+    return STAGES.get(stage_key(key), (f"этап `{key}`",))[0]
 STAGE_STATUS = {"ok": "✅ выполнен", "partial": "⚠️ частично", "failed": "⛔ сбой", "skipped": "— пропущен"}
 SOURCES = {"analyst": "аналитик", "qa": "тестировщик", "architect": "архитектор", "risk": "риски",
            "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр"}
@@ -113,7 +121,7 @@ PROVIDERS = {
 STATUS = {"complete": "завершён полностью", "partial": "завершён частично", "failed": "завершён со сбоем"}
 FORMATS = {"md": "«Markdown»", "txt": "текст", "pdf": "PDF", "docx": "DOCX", "html": "HTML"}
 CHECK_ANSWER = {"да": "✅ Да", "нет": "❌ Нет", "частично": "⚠️ Частично", "не требуется": "— Не требуется"}
-LETTERS = "абвгдежзик"
+LETTERS = "ABCDEFGHIJ"  # как в файле ответов --answers (№11 clarify.option_label); кириллицу ответы тоже принимают
 # якоря разделов — короткие коды, чтобы в тексте отчёта не было английских слов
 NAV = [("s1", "1. Паспорт"), ("s2", "2. Нарезка"), ("s3", "3. Требования"), ("s4", "4. Набор"), ("s5", "5. Сводка"),
        ("s6", "6. Итог"), ("pa", "А. Вопросы"), ("pb", "Б. Тест-кейсы"), ("pv", "В. Чек-лист"),
@@ -294,8 +302,8 @@ class _Ctx:
         self.reqs = report.get("requirements", []) or []
         self.req_by_id = {q.get("id"): q for q in self.reqs}
         all_f = report.get("findings", []) or []
-        self.resolved = [f for f in all_f if f.get("status") == "resolved"]
-        self.findings = sorted((f for f in all_f if f.get("status") != "resolved"),
+        self.resolved = [f for f in all_f if jsonout.is_resolved(f)]
+        self.findings = sorted((f for f in all_f if not jsonout.is_resolved(f)),
                                key=lambda f: (SEV_ORDER.get(f.get("severity"), 3), _id_num(f.get("id"))))
         self.f_by_id = {f.get("id"): f for f in all_f}
         self.q_by_finding: dict[str, list[str]] = {}
@@ -320,7 +328,7 @@ class _Ctx:
         if not f:
             return esc(fid)
         icon = SEV_ICON.get(f.get("severity"), "") + " " if with_icon else ""
-        if f.get("status") == "resolved":
+        if jsonout.is_resolved(f):
             return f"{icon}{fid} (снят)"
         return f"{icon}[{fid}](#{anchor(fid)})"
 
@@ -379,8 +387,9 @@ def _counts_line(c: _Ctx) -> str:
     s = c.summary
     fs = s.get("findings", {})
     total = sum(fs.get(k, 0) for k in SEV_ICON)
-    parts = [f"**{s.get('requirements', len(c.reqs))}** "
-             f"{plural(s.get('requirements', 0), 'требование', 'требования', 'требований')}",
+    nreq = s.get("requirements", len(c.reqs)) or 0
+    parts = ([f"**{nreq}** {plural(nreq, 'требование', 'требования', 'требований')}"] if nreq or not c.offline
+             else ["Требования без модели не выделялись"]) + [
              f"**{total}** {plural(total, 'дефект', 'дефекта', 'дефектов')}: "
              + " · ".join(f"{SEV_ICON[k]} **{fs.get(k, 0)}** {plural(fs.get(k, 0), *SEV_PLURAL[k])}"
                           for k in ("critical", "major", "minor"))]
@@ -410,13 +419,14 @@ def _header(c: _Ctx) -> list[str]:
         quotes = f"программой сверено {ok} из {total} цитат с исходником {src}, несверенные помечены ⚠️"
     else:
         quotes = f"исходник {src}, цитат в дефектах нет"
-    out = [f"# Ревью требований: «{esc(title)}»", "",
+    head = esc(c.r.get("title")) if isinstance(c.r.get("title"), str) and c.r.get("title") else "Ревью требований"
+    out = [f"# {head}: «{esc(title)}»", "",
            f"> Сформирован агентом «{esc(run.get('agent') or 'BCC Review')}» {esc(run.get('version') or '')} "
            f"(коммит {commit}{dirty}) без ручных правок; {quotes}. Проверка повторяется командой "
            f"`python -m bcc_review verify отчёт.json исходник`."]
     status = run.get("status")
     if status == "partial":
-        bad = [STAGES.get(stage_key(k), (k,))[0] for k, v in (run.get("stages") or {}).items()
+        bad = [stage_name(k) for k, v in (run.get("stages") or {}).items()
                if v in ("partial", "failed")]
         out += [">", f"> ⚠️ Прогон завершён частично"
                 + (f": не полностью выполнены этапы {', '.join(bad)}" if bad else "")
@@ -439,7 +449,8 @@ def _brief(c: _Ctx) -> list[str]:
     out += ["", _counts_line(c), ""]
     if v.get("summary"):
         out += [esc(v["summary"]), ""]
-    blockers = [f for f in c.findings if f.get("severity") == "critical" and f.get("blocks") != "none"]
+    blockers = [f for f in c.findings if f.get("blocks") in BLOCKING and (
+        f.get("severity") == "critical" or (c.offline and f.get("rule_conflict")))]
     blockers.sort(key=lambda f: (f.get("priority") or 99, _id_num(f.get("id"))))
     if blockers:
         same = len({f.get("blocks") for f in blockers}) == 1
@@ -451,7 +462,7 @@ def _brief(c: _Ctx) -> list[str]:
             lns = sorted({e.get("line_start") for e in f.get("evidence", []) if e.get("line_start")})
             where = reqs + (f" · {plural(len(lns), 'строка', 'строки', 'строки')} {', '.join(map(str, lns[:4]))}"
                             if lns else "")
-            row = [f"🔴 [{f['id']}](#{anchor(f['id'])}) {cell(f.get('title'))}", where]
+            row = [f"{SEV_ICON.get(f.get('severity'), '')} [{f['id']}](#{anchor(f['id'])}) {cell(f.get('title'))}", where]
             if not same:
                 row.append(BLOCKS.get(f.get("blocks"), "—"))
             rows.append(row + [cell(first_sentence(f.get("impact") or f.get("problem"), 170))])
@@ -475,33 +486,63 @@ def _fix_first(c: _Ctx) -> list[dict]:
         ids = [f["id"] for f in sorted((f for f in c.findings if f.get("priority")), key=lambda f: f["priority"])]
     if not ids:
         ids = [f["id"] for f in c.findings if f.get("severity") == "critical"][:7]
-    return [c.f_by_id[i] for i in ids if i in c.f_by_id and c.f_by_id[i].get("status") != "resolved"][:7]
+    return [c.f_by_id[i] for i in ids if i in c.f_by_id and not jsonout.is_resolved(c.f_by_id[i])][:7]
+
+
+CHANGE_STATUS = {"resolved": "✅ снят", "changed": "✏️ уточнён", "open": "⏳ открыт", "new": "🆕 новый"}
 
 
 def _before_after(c: _Ctx) -> list[str]:
-    rc = c.r.get("recheck") or {}
-    if not rc:
+    """Блок «до/после» на первом экране (режим --answers, №11: report["clarification"])."""
+    cl = c.r.get("clarification") or {}
+    if not cl:
         return []
-    before = rc.get("before") or {}
+    before, after = cl.get("before") or {}, cl.get("after") or {}
     bv, bf = before.get("verdict") or {}, before.get("findings") or {}
-    nf = c.summary.get("findings", {})
-    answers = rc.get("answers") or []
-    out = [f"**До и после ответов владельца** (ответов: {len(answers)})", ""]
-    rows = [["Разработка", READINESS.get(bv.get("development"), "—"), READINESS.get(c.verdict.get("development"), "—")],
-            ["Тестирование", READINESS.get(bv.get("testing"), "—"), READINESS.get(c.verdict.get("testing"), "—")]]
+    av = after.get("verdict") or c.verdict
+    af = after.get("findings") or c.summary.get("findings", {})
+    answers = cl.get("answers") or []
+    decisions = cl.get("decisions") or []
+    out = [f"**До и после ответов владельца** — ответов {len(answers)}, общих решений {len(decisions)}, "
+           f"без ответа {len(cl.get('unanswered') or [])}", ""]
+    rows = [["Разработка", READINESS.get(bv.get("development"), "—"), READINESS.get(av.get("development"), "—")],
+            ["Тестирование", READINESS.get(bv.get("testing"), "—"), READINESS.get(av.get("testing"), "—")]]
     for k in ("critical", "major", "minor"):
         rows.append([f"{SEV_ICON[k]} {SEV_PLURAL[k][2].capitalize()}", num(bf.get(k)) if k in bf else "—",
-                     num(nf.get(k, 0))])
-    out += table(["", "До", "После"], rows, [":---", ":---:", ":---:"])
-    bits = []
-    for key, label in (("resolved", "снято ответами"), ("changed", "уточнено"), ("added", "новые")):
-        ids = rc.get(key) or []
-        if ids:
-            bits.append(f"{label}: {c.f_links(ids)}")
-    if bits:
-        text = "; ".join(bits)
-        out += ["", text[0].upper() + text[1:] + "."]
-    return out + [""]
+                     num(af.get(k)) if k in af else "—"])
+    out += table(["", "До ответов", "После ответов"], rows, [":---", ":---:", ":---:"])
+    out += ["", f"Снято {num(cl.get('resolved', 0))}, уточнено {num(cl.get('changed', 0))}, осталось открытыми "
+                f"{num(cl.get('open', 0))}, новых конфликтов из-за ответов {len(cl.get('new_findings') or [])}"
+                + (f": {c.f_links(cl['new_findings'])}" if cl.get("new_findings") else "")
+                + ". Подробно — [приложение А](#pa).", ""]
+    return out
+
+
+def _clarification_details(c: _Ctx) -> list[str]:
+    cl = c.r.get("clarification") or {}
+    if not cl:
+        return []
+    out = ["### Что изменили ответы", ""]
+    changes = [x for x in cl.get("changes") or [] if isinstance(x, dict)]
+    if changes:
+        rows = []
+        for x in changes:
+            fid = x.get("finding_id") or ""
+            before = SEV_ICON.get(x.get("severity_before"), "—")
+            after = SEV_ICON.get(x.get("severity_after"), "—") if x.get("status") != "resolved" else "—"
+            title = x.get("title_after") or x.get("title") or ""
+            rows.append([c.f_link(fid) + " " + cell(title), before, CHANGE_STATUS.get(x.get("status"), "—"), after,
+                         cell(x.get("reason")), ", ".join(f"[{q}](#{anchor(q)})" for q in x.get("question_ids") or [])
+                         or "общее решение"])
+        out += table(["Дефект", "Было", "Итог", "Стало", "Почему", "Ответ"], rows,
+                      [":---", ":---:", ":---", ":---:", ":---", ":---"]) + [""]
+    else:
+        out += ["Ответы не изменили ни одного дефекта.", ""]
+    if cl.get("decisions"):
+        out += ["**Общие решения владельца:** " + "; ".join(esc(d) for d in cl["decisions"]) + ".", ""]
+    if cl.get("unanswered"):
+        out += ["**Без ответа:** " + ", ".join(f"[{q}](#{anchor(q)})" for q in cl["unanswered"]) + ".", ""]
+    return out
 
 
 def _passport(c: _Ctx) -> list[str]:
@@ -524,7 +565,7 @@ def _passport(c: _Ctx) -> list[str]:
     if doc.get("pages"):
         size += f", {doc['pages']} {plural(int(doc['pages']), 'страница', 'страницы', 'страниц')}"
     stages = run.get("stages") or {}
-    bad = [f"{STAGES.get(stage_key(k), (k,))[0]} — {STAGE_STATUS.get(v, v).split(' ', 1)[-1]}"
+    bad = [f"{stage_name(k)} — {STAGE_STATUS.get(v, v).split(' ', 1)[-1]}"
            for k, v in stages.items() if v != "ok"]
     if not stages:
         stage_txt = "—"
@@ -564,7 +605,9 @@ def _segmentation(c: _Ctx) -> list[str]:
            f"агентом в порядке документа; в столбце «ID в документе» — номер или пункт документа, если он есть. "
            f"Дословная цитата каждого требования сохранена в `report.json`.", ""]
     if not reqs:
-        return out + ["Требования не выделены: этап нарезки не дал результата (приложение Д).", ""]
+        why = ("нарезка выполняется моделью, в режиме без модели её нет; замечания правил привязаны к строкам "
+               "документа" if c.offline else "этап нарезки не дал результата (приложение Д)")
+        return out[:2] + [f"Требования не выделены: {why}.", ""]
     rows = []
     for q in reqs:
         rows.append([f"<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}", cell(q.get("source_id") or "—"),
@@ -661,6 +704,17 @@ def _per_requirement(c: _Ctx) -> list[str]:
         out.append("")
     else:
         out += ["Незначительных дефектов нет.", ""]
+    sig = [g for g in c.r.get("signals") or [] if isinstance(g, dict) and g.get("kind") != "inventory"
+           and g.get("quote")]
+    if sig and c.offline:
+        limit = 20 if c.level < 2 else 10
+        out += ["### 3.4. Подсказки для ручной проверки", "",
+                "Места, на которые указали правила; это не дефекты, их стоит перечитать.", ""]
+        out += [f"- строка {g.get('line') or g.get('line_start') or '—'}: {quote_md(g.get('quote'), 100)} — "
+                f"{esc(g.get('message') or g.get('note') or '')}" for g in sig[:limit]]
+        if len(sig) > limit:
+            out.append(f"- и ещё {len(sig) - limit} — в `report.json`, поле `signals`.")
+        out.append("")
     return out
 
 
@@ -675,7 +729,8 @@ def _rewrite_from(f: dict) -> dict | None:
 
 def _card(c: _Ctx, f: dict) -> list[str]:
     sev = f.get("severity")
-    badge = {"changed": " · уточнён после ответов", "new": " · новый после ответов"}.get(f.get("status"), "")
+    badge = {"changed": " · уточнён после ответов", "new": " · новый после ответов"}.get(
+        f.get("status_after_answers") or f.get("status"), "")
     out = [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(sev, '')} {f['id']}. {esc(f.get('title'))}", ""]
     meta = []
     reqs = [c.req_label(r) for r in f.get("requirement_ids") or []]
@@ -867,8 +922,15 @@ def _conclusion(c: _Ctx) -> list[str]:
             out.append(f"{i}. {c.f_link(f['id'], True)} {esc(f.get('title'))}. Что сделать: "
                        f"{esc(shorten(f.get('recommendation'), 260))}")
         out.append("")
-    out += ["Вердикт считает программа: критичный дефект, блокирующий направление, — «нельзя начинать»; иначе "
-            "три и более существенных — «с условиями»; иначе «можно». Подробнее — приложение Е.", ""]
+    nc = [x for x in c.r.get("not_checked") or [] if isinstance(x, str)]
+    if nc:
+        out += ["**Что не проверялось в этом прогоне**", ""] + [f"- {esc(x)}" for x in nc] + [""]
+    if c.offline:
+        out += ["Без модели программа выносит «нельзя» только при противоречии двух мест документа, найденном "
+                "правилом; иначе вердикт «не определено» — для полного ревью нужен прогон с моделью.", ""]
+    else:
+        out += ["Вердикт считает программа: критичный дефект, блокирующий направление, — «нельзя начинать»; иначе "
+                "три и более существенных — «с условиями»; иначе «можно». Подробнее — приложение Е.", ""]
     return out
 
 
@@ -889,23 +951,36 @@ def _appendix_questions(c: _Ctx) -> list[str]:
     if not qs:
         return out + ["Вопросов нет" + (" (режим без модели)." if c.offline else "."), ""]
     blocking = sum(1 for q in qs if q.get("blocking"))
+    cl = c.r.get("clarification") or {}
+    answered = {a.get("question_id"): a for a in cl.get("answers") or [] if isinstance(a, dict)}
     out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}, блокирующих — {blocking}. "
-            f"Ответ выбирается из вариантов или пишется свой.", ""]
+            f"Ответ — буква варианта или свой текст, по строке на вопрос (`Q-01: B`); повторный прогон с ответами: "
+            f"`python -m bcc_review ВХОД ОТЧЁТ.md --answers ответы.md`.", ""]
     for q in sorted(qs, key=lambda q: (not q.get("blocking"), _id_num(q.get("id")))):
-        head = [f"**<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}**",
+        head = [f"**<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}**"
+                + (f" {esc(q['topic'])}" if q.get("topic") else ""),
                 "⛔ блокирует" if q.get("blocking") else "не блокирует"]
         if q.get("to"):
             head.append(f"кому: {esc(q['to'])}")
         if q.get("finding_ids"):
             head.append(f"к {c.f_links(q['finding_ids'])}")
         lines = [" · ".join(head), esc(q.get("question"))]
+        evs = [e for e in q.get("evidence") or [] if isinstance(e, dict) and e.get("quote")]
+        if evs:
+            lines.append("Где: " + "; ".join(f"{lines_word(e.get('line_start'), e.get('line_end'))} "
+                                             f"{quote_md(e.get('quote'), 90)}" for e in evs[:3]))
         opts = q.get("options") or []
         if opts:
-            lines.append("Варианты: " + "; ".join(f"{LETTERS[i] if i < len(LETTERS) else i + 1}) {esc(o)}"
+            lines.append("Варианты: " + "; ".join(f"**{LETTERS[i] if i < len(LETTERS) else i + 1}** {esc(o)}"
                                                   for i, o in enumerate(opts)))
         if q.get("why"):
             lines.append(f"Зачем: {esc(q['why'])}")
+        a = answered.get(q.get("id"))
+        if a:
+            choice = f"{a['choice']} — " if a.get("choice") else ""
+            lines.append(f"**Ответ владельца:** {esc(choice + str(a.get('answer') or ''))}")
         out += [ln + "  " if i < len(lines) - 1 else ln for i, ln in enumerate(lines)] + [""]
+    out += _clarification_details(c)
     return out
 
 
@@ -929,7 +1004,10 @@ def _appendix_checklist(c: _Ctx) -> list[str]:
     out = [h2("pv", "Приложение В. Чек-лист «Ревью требований», заполненный агентом"), ""]
     if not cl:
         return out + ["Чек-лист не заполнялся" + (" (режим без модели)." if c.offline else "."), ""]
-    out += ["Пункты чек-листа банка; ответ агента обоснован дефектами отчёта. Итоговую отметку ставит ответственный.", ""]
+    src = c.r.get("checklist_source") or c.run.get("checklist_source")
+    origin = {"document": "Пункты — из таблицы «Ревью требований» самого документа",
+              "bank": "Пункты — 14 вопросов чек-листа «Ревью требований» банка"}.get(src, "Пункты чек-листа банка")
+    out += [f"{origin}; ответ агента обоснован дефектами отчёта. Итоговую отметку ставит ответственный.", ""]
     rows = [[cell(i.get("item")), CHECK_ANSWER.get(str(i.get("answer", "")).strip().lower(), cell(i.get("answer"))),
              cell(i.get("comment")), c.f_links(i.get("finding_ids"))] for i in cl]
     return out + table(["Пункт", "Ответ агента", "Комментарий", "Дефекты"], rows) + [""]
@@ -971,7 +1049,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
     if stages:
         rows = []
         for k, v in stages.items():
-            name, what = STAGES.get(stage_key(k), (k, ""))
+            name, what = STAGES.get(stage_key(k), (stage_name(k), ""))
             st = stats.get(k) or {}
             rows.append([name, what, STAGE_STATUS.get(v, v), num(st.get("calls")) if "calls" in st else "—",
                          duration(st.get("seconds")) if "seconds" in st else "—",
@@ -994,8 +1072,9 @@ def _appendix_how(c: _Ctx) -> list[str]:
             reason = esc(r.get("reason"))
             if r.get("duplicate_of"):
                 reason += f" → {c.f_link(r['duplicate_of'])}"
+            line = r.get("line") if isinstance(r.get("line"), int) and r.get("line") else None
             rows.append([esc(r.get("id") or r.get("candidate_id") or "—"), esc(source_name(r.get("source"))),
-                         cell(r.get("title")), reason.replace("|", "\\|")])
+                         cell(r.get("title")) + (f" (строка {line})" if line else ""), reason.replace("|", "\\|")])
         out += table(["Кандидат", "Источник", "Что предлагалось", "Почему отклонён"], rows)
         if len(rej) > limit:
             out += ["", f"Ещё {len(rej) - limit} — в `report.json`, поле `rejected`."]
@@ -1060,12 +1139,15 @@ def _clean_report(report) -> dict:
     for k, v in report.items():
         if k in _LIST_KEYS:
             out[k] = [_clean(x) for x in v if isinstance(x, dict)] if isinstance(v, list) else []
-        elif k in ("run", "document", "verdict", "summary", "recheck"):
+        elif k in ("run", "document", "verdict", "summary", "recheck", "clarification"):
             out[k] = _clean(v) if isinstance(v, dict) else {}
         else:
             out[k] = v
-    for k in ("run", "document", "verdict", "summary", "recheck"):
+    for k in ("run", "document", "verdict", "summary", "recheck", "clarification"):
         out.setdefault(k, {})
+    for k in ("signals", "not_checked"):
+        v = out.get(k)
+        out[k] = [x for x in v if isinstance(x, (dict, str))] if isinstance(v, list) else []
     for key, prefix in (("findings", "D"), ("requirements", "R"), ("questions", "Q"), ("test_cases", "T")):
         for i, item in enumerate(out.get(key, []), 1):
             if not item.get("id"):
@@ -1081,7 +1163,8 @@ _STR_KEYS = {"id", "title", "kind", "criterion", "severity", "blocks", "status",
              "why", "given", "when", "then", "gap", "agent", "version", "commit", "provider", "model_requested",
              "file", "format", "sha256", "subject", "outcome_a", "outcome_b", "row_facts", "expected_by_rules",
              "stated", "requirement_id", "row_requirement_id", "a", "b", "note", "development", "testing",
-             "started_at", "finished_at", "question_id", "before", "after"}
+             "started_at", "finished_at", "question_id", "status_after_answers", "choice", "message",
+             "severity_before", "severity_after", "title_after", "finding_id"}
 
 
 def _clean(value, key: str = ""):
