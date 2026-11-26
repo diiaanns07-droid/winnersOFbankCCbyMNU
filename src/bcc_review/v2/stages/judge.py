@@ -787,9 +787,25 @@ def _sev_sub(m: re.Match) -> str:
     return f"{many} дефекты"
 
 
+# Частые латинские термины в текстах линз → по-русски (идентификаторы документа не трогаем).
+_TERMS_RU = [
+    (re.compile(r"\b(?:защит\w* от )CSRF\b"), "защитой от подделки межсайтовых запросов"),
+    (re.compile(r"\bCSRF\b"), "подделка межсайтовых запросов"),
+    (re.compile(r"\bв USD\b"), "в долларах США"),
+    (re.compile(r"\bUSD\b"), "доллары США"),
+    (re.compile(r"\bв EUR\b"), "в евро"),
+    (re.compile(r"\bfeature[- ]flag\w*", re.I), "флаг включения функции"),
+]
+
+
 def _ru_levels(text: str) -> str:
-    """Страховка «только русский»: латинские названия уровней в тексте для читателя → русские."""
-    return _SEV_WORD_RE.sub(_sev_sub, text) if text else text
+    """Страховка «только русский»: латинские названия уровней и частые термины в тексте → русские."""
+    if not text:
+        return text
+    text = _SEV_WORD_RE.sub(_sev_sub, text)
+    for rx, ru in _TERMS_RU:
+        text = rx.sub(ru, text)
+    return text
 
 
 def _replace_keys(text: str, key_map: dict[str, str]) -> str:
