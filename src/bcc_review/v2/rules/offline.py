@@ -6,7 +6,8 @@
 
 Что в отчёте: только кандидаты и сигналы правил. Вердикт:
 * «не определено» (`undetermined`) — по умолчанию: смысл требований без модели не проверялся;
-* «нельзя» (`no`) — только если правило нашло конфликт двух цитат об одном предмете;
+* «нельзя» (`no`) — только если правило нашло конфликт двух цитат об одном предмете или критичный дефект
+  (обещанная, но не описанная операция) — так же считает `render.jsonout.rule_verdict` №13;
 * «можно начинать» (`yes`) — никогда.
 """
 from __future__ import annotations
@@ -94,14 +95,20 @@ def _finding(i: int, c: dict) -> dict:
 
 
 def verdict(findings: list[dict]) -> dict:
-    conflicts = [f for f in findings if f.get("rule_conflict") and len(f.get("evidence") or []) >= 2]
+    """Офлайн-вердикт; совпадает с `render.jsonout.rule_verdict` для provider = offline (иначе `verify` упадёт):
+    «нельзя» — при противоречии двух цитат об одном предмете или критичном дефекте правила (обещанная, но не
+    описанная операция); иначе «не определено»."""
+    conflicts = [f for f in findings if (f.get("rule_conflict") and len(f.get("evidence") or []) >= 2)
+                 or f.get("severity") == "critical"]
     dev = [f for f in conflicts if f.get("blocks") in ("development", "both")]
     test = [f for f in conflicts if f.get("blocks") in ("testing", "both")]
     base = ("Модель не вызывалась: проверены только формальные признаки — контракт API, единицы измерения, "
             "заглушки и шаблон, язык требований. Смысл требований без модели не проверялся")
     if dev or test:
         ids = ", ".join(f["id"] for f in (dev or test)[:5])
-        summary = (f"Правила нашли противоречие двух мест документа об одном предмете ({ids}): "
+        what = ("противоречие двух мест документа об одном предмете" if any(f.get("rule_conflict") for f in (dev or test))
+                else "обещанную, но не описанную операцию")
+        summary = (f"Правила нашли {what} ({ids}): "
                    f"{'разработку' if dev else ''}{' и ' if dev and test else ''}{'тестирование' if test else ''} "
                    f"начинать нельзя, пока оно не исправлено. {base}, поэтому остальное не оценено.")
     else:

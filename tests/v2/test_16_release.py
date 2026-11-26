@@ -233,10 +233,30 @@ def test_report_workflow_uses_secret_and_uploads_artifacts():
 def test_dockerfile_runs_the_agent():
     text = _read(ROOT / "Dockerfile")
     assert "requirements.txt" in text
-    assert 'ENTRYPOINT ["python", "-m", "bcc_review"]' in text
-    ignore = _read(ROOT / ".dockerignore")
-    for entry in (".env", ".git", ".bcc_cache", "runs"):
-        assert entry in ignore.splitlines(), entry
+    assert "exec python -m bcc_review" in text and "ENTRYPOINT" in text
+    assert "AGENT_COMMIT" in text  # коммит в паспорте и без .git в образе
+    ignore = _read(ROOT / ".dockerignore").splitlines()
+    for entry in (".env", ".git/*", ".bcc_cache", "runs"):
+        assert entry in ignore, entry
+    assert not any(ln.startswith("!") and ".git/" not in ln for ln in ignore), "исключения .dockerignore только для .git"
+
+
+def test_git_commit_script_resolves_head(tmp_path):
+    import importlib.util as iu
+    spec = iu.spec_from_file_location("git_commit", ROOT / "scripts" / "git_commit.py")
+    mod = iu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    sha = "0123456789abcdef0123456789abcdef01234567"
+    (tmp_path / "HEAD").write_text(sha + "\n", encoding="utf-8")
+    assert mod.resolve(tmp_path) == sha
+    (tmp_path / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (tmp_path / "packed-refs").write_text(f"# pack-refs\n{sha} refs/heads/main\n", encoding="utf-8")
+    assert mod.resolve(tmp_path) == sha
+    (tmp_path / "refs" / "heads").mkdir(parents=True)
+    other = "f" * 40
+    (tmp_path / "refs" / "heads" / "main").write_text(other, encoding="utf-8")
+    assert mod.resolve(tmp_path) == other
+    assert mod.resolve(tmp_path / "нет") == ""
 
 
 # --------------------------------------------------------------------------- секреты в репозитории

@@ -369,10 +369,15 @@ def _representative(group: list[str], by_id: dict[str, dict]) -> str:
 # --- подача кандидатов в промпт ---------------------------------------------------------------
 
 
+_ORIGIN_RU = {"acceptance_check": "исполнение строки приёмки", "pair_check": "попарная сверка по сценарию",
+              "glossary": "глоссарий"}
+
+
 def _render_full(c: dict) -> str:
     lines = _lines_of(c)
+    origin = _ORIGIN_RU.get(_s(c.get("origin")), "")
     head = " · ".join(x for x in [
-        c["id"], _s(c.get("source")) or "?", _s(c.get("severity")) or "?",
+        c["id"], _s(c.get("source")) or "?", origin, _s(c.get("severity")) or "?",
         f"{_s(c.get('kind'))}/{_s(c.get('criterion'))}",
         ", ".join(c.get("requirement_ids") or []) or "без требований",
         ("строки " + ", ".join(str(n) for n in lines)) if lines else "строки ?",
@@ -551,9 +556,13 @@ def _ask(ctx: Any, system: str, user: str, schema: dict) -> dict:
     if llm is None:
         raise RuntimeError("модель недоступна")
     try:
-        return llm.ask(STAGE, system, user, schema, max_output_tokens=MAX_OUTPUT_TOKENS)
+        data = llm.ask(STAGE, system, user, schema, max_output_tokens=MAX_OUTPUT_TOKENS)
     except TypeError:
-        return llm.ask(STAGE, system, user, schema)
+        data = llm.ask(STAGE, system, user, schema)
+    missing = [k for k in schema.get("required") or [] if not isinstance(data, dict) or k not in data]
+    if missing:  # ответ не по схеме этапа — это сбой вызова, а не пустой реестр
+        raise ValueError(f"ответ модели без полей {', '.join(missing)}")
+    return data
 
 
 def _call_judge(ctx: Any, cands: list[dict], clusters: list[list[str]], checklist: str,
@@ -783,9 +792,25 @@ def _sev_sub(m: re.Match) -> str:
     return f"{many} дефекты"
 
 
+# Частые латинские термины в текстах линз → по-русски (идентификаторы документа не трогаем).
+_TERMS_RU = [
+    (re.compile(r"\b(?:защит\w* от )CSRF\b"), "защитой от подделки межсайтовых запросов"),
+    (re.compile(r"\bCSRF\b"), "подделка межсайтовых запросов"),
+    (re.compile(r"\bв USD\b"), "в долларах США"),
+    (re.compile(r"\bUSD\b"), "доллары США"),
+    (re.compile(r"\bв EUR\b"), "в евро"),
+    (re.compile(r"\bfeature[- ]flag\w*", re.I), "флаг включения функции"),
+]
+
+
 def _ru_levels(text: str) -> str:
-    """Страховка «только русский»: латинские названия уровней в тексте для читателя → русские."""
-    return _SEV_WORD_RE.sub(_sev_sub, text) if text else text
+    """Страховка «только русский»: латинские названия уровней и частые термины в тексте → русские."""
+    if not text:
+        return text
+    text = _SEV_WORD_RE.sub(_sev_sub, text)
+    for rx, ru in _TERMS_RU:
+        text = rx.sub(ru, text)
+    return text
 
 
 def _replace_keys(text: str, key_map: dict[str, str]) -> str:
@@ -1089,11 +1114,12 @@ def _render_check(f: dict, members: list[dict]) -> str:
 
 
 def _check_severity(ctx: Any, response: dict, by_id: dict[str, dict], warnings: list[str]) -> dict:
-    """Второй короткий вызов: перепроверка critical и major по шкале; уровень можно только понизить."""
+    """Второй короткий вызов: перепроверка critical по шкале; уровень можно только понизить.
+    Major не перепроверяется: на живых прогонах проверка снимала верные major (расхождение терминов, связей)."""
     response = {**response, "findings": [dict(f) for f in response.get("findings") or []]}  # ответ модели не меняем
     todo = []
     for f in response["findings"]:
-        if _s(f.get("severity")) not in {"critical", "major"}:
+        if _s(f.get("severity")) != "critical":
             continue
         members = [by_id[c] for c in (_s(x) for x in f.get("candidate_ids") or []) if c in by_id]
         if members:
@@ -1276,6 +1302,8 @@ def run(ctx: Any, candidates: list[dict]) -> dict:
     try:
         parts = _call_judge(ctx, good, clusters, check_block, warnings)
         response = _merge_responses(parts)
+        if not (response.get("findings") or response.get("rejected")):
+            raise ValueError("пустой ответ: ни один кандидат не распределён")
     except Exception as exc:  # noqa: BLE001 — запасной реестр лучше, чем пустой отчёт
         _warn(ctx, warnings, f"судья недоступен ({type(exc).__name__}: {_cut(str(exc), 160)}); "
                              "реестр собран кодом из кластеров без отсева ложных")

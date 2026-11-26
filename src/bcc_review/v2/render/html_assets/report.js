@@ -75,6 +75,7 @@
   function clearSel() {
     $$(".ln.sel, .ln.rqsel, mark.q.on").forEach(function (x) { x.classList.remove("sel", "rqsel", "on"); });
     $$(".card.active").forEach(function (x) { x.classList.remove("active"); });
+    if (doc) doc.classList.remove("focus");
   }
 
   function selectFinding(id, opts) {
@@ -84,6 +85,7 @@
     showTab("findings");
     clearSel();
     card.classList.add("active");
+    if (doc) doc.classList.add("focus");
     if (card.hidden) { resetFilters(); }
     var lines = (card.dataset.lines || "").split(" ").filter(Boolean);
     if (doc) {
@@ -254,6 +256,7 @@
   /* ── клавиатура: ↑/↓ или j/k по карточкам ── */
   document.addEventListener("keydown", function (ev) {
     if (ev.target.closest("input, textarea, select") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key === "Escape") { clearSel(); history.replaceState(null, "", location.pathname); return; }
     var d = (ev.key === "ArrowDown" || ev.key === "j") ? 1 : (ev.key === "ArrowUp" || ev.key === "k") ? -1 : 0;
     if (!d || $("#p-findings").hidden || ev.target.closest(".doc")) return;
     var vis = $$(".card", cardsBox).filter(function (c) { return !c.hidden; });

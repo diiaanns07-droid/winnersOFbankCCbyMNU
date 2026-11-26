@@ -204,6 +204,11 @@ def calibrate(candidate: dict) -> dict:
     return c
 
 
+def _drop(c: dict, reason: str) -> dict:
+    """Снятый кандидат с причиной: `reason` читает конвейер (в `rejected` отчёта), `reject_reason` — тесты."""
+    return {**c, "reason": reason, "reject_reason": reason}
+
+
 def _title_key(c: dict) -> str:
     return re.sub(r"[^\w]+", " ", str(c.get("title", "")).lower()).strip()
 
@@ -228,7 +233,7 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
         if known is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in known]
         if not c.get("evidence"):
-            dropped.append({**c, "reject_reason": "нет цитаты-зацепки"})
+            dropped.append(_drop(c, "нет цитаты-зацепки"))
             continue
         ev_lines = _evidence_lines(c)
         if defined and ev_lines and (all(n in defined for n in ev_lines)
@@ -239,11 +244,11 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
             c["severity"] = "minor"
         topic = missing_hook(c, doc) if doc else None
         if topic:
-            dropped.append({**c, "reject_reason": f"тема «{topic}» в документе не затрагивается"})
+            dropped.append(_drop(c, f"тема «{topic}» в документе не затрагивается"))
             continue
         key = _title_key(c)
         if key in seen:
-            dropped.append({**c, "reject_reason": "дубль заголовка"})
+            dropped.append(_drop(c, "дубль заголовка"))
             continue
         seen.add(key)
         kept.append(c)
@@ -255,7 +260,7 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
                 c["severity"] = "major"
     kept.sort(key=lambda c: SEVERITY_ORDER.get(c.get("severity"), 3))
     for c in kept[MAX_CANDIDATES:]:
-        dropped.append({**c, "reject_reason": f"сверх лимита линзы ({MAX_CANDIDATES})"})
+        dropped.append(_drop(c, f"сверх лимита линзы ({MAX_CANDIDATES})"))
     return kept[:MAX_CANDIDATES], dropped
 
 
