@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,17 @@ SCHEMA: dict = {
                 }}},
         }}}},
 }
+
+
+CHECK_STAGE = "revise_check"
+_EDIT_ITEMS = SCHEMA["properties"]["rewrites"]["items"]["properties"]["edits"]
+CHECK_SCHEMA: dict = {
+    "type": "object", "additionalProperties": False, "required": ["fixes"],
+    "properties": {"fixes": {"type": "array", "maxItems": 12, "items": {
+        "type": "object", "additionalProperties": False, "required": ["finding_id", "problem", "edits"],
+        "properties": {"finding_id": {"type": "string"}, "problem": {"type": "string"}, "edits": _EDIT_ITEMS}}}},
+}
+_MARK = re.compile(r"\s*\[(изменено|добавлено|удалено): ([^\]]*)\]")
 
 
 # --------------------------------------------------------------------------- исходный текст
@@ -146,7 +158,79 @@ def _shape_insert(new: str, anchor: str) -> str:
     return t
 
 
+_SEP_CELL = re.compile(r"^\s*:?-{3,}:?\s*$")
+
+
+def _is_sep(row: str) -> bool:
+    cells = [c for c in row.strip().strip("|").split("|")]
+    return bool(cells) and all(_SEP_CELL.match(c) for c in cells)
+
+
+def _is_json(line: str) -> bool:
+    t = line.strip()
+    if not (t[:1] in "{[" and t[-1:] in "}]"):
+        return False
+    try:
+        json.loads(t)
+        return True
+    except ValueError:
+        return False
+
+
+def _shape_block(rows: list[str], anchor: str) -> list[tuple[str, str]]:
+    """Вставляемые строки → разметка документа: строки с « | » — таблица (с разделителем, если она новая),
+    строки-JSON — блок кода, остальное — в стиле соседней строки. Возвращает ``[(строка, вид)]``,
+    вид: ``mark`` — с пометкой, ``raw`` — как есть (разделитель таблицы, граница блока кода), ``note`` — пометка."""
+    out: list[tuple[str, str]] = []
+    i = 0
+    in_table = _is_row(anchor)
+    while i < len(rows):
+        t = rows[i].strip()
+        if _is_json(t):
+            j = i
+            while j < len(rows) and _is_json(rows[j]):
+                j += 1
+            out += [("```json", "raw")] + [(r.strip(), "raw") for r in rows[i:j]] + [("```", "raw"), ("", "note")]
+            i = j
+            continue
+        if " | " in t or _is_row(t):
+            j = i
+            while j < len(rows) and (" | " in rows[j] or _is_row(rows[j].strip())):
+                j += 1
+            block = ["| " + r.strip().strip("|").strip() + " |" for r in rows[i:j]]
+            if in_table or j - i == 1 and _is_row(anchor):
+                out += [(b, "raw" if _is_sep(b) else "mark") for b in block]
+            elif j - i >= 2:
+                ncols = block[0].count("|") - 1
+                if not _is_sep(block[1]):
+                    block.insert(1, "| " + " | ".join([":---"] * ncols) + " |")
+                if out and out[-1][0].strip():
+                    out.append(("", "raw"))  # таблице нужна пустая строка перед ней
+                out += [(b, "raw" if _is_sep(b) else "mark") for b in block]
+            else:
+                out.append((t, "mark"))
+            i = j
+            continue
+        out.append((_shape_insert(t, anchor), "mark"))
+        i += 1
+    return out
+
+
 def _with_mark(text: str, mark: str) -> str:
+    m_new = _MARK.match(" " + mark)
+    found = list(_MARK.finditer(text))
+    if found and m_new:  # строка уже помечена (второй проход): добавленную строку не помечаем повторно
+        kinds = {f.group(1) for f in found}
+        if "добавлено" in kinds or m_new.group(1) in kinds:
+            f = next((f for f in found if f.group(1) == m_new.group(1)), None)
+            if f is None:
+                return text
+            ids = [x.strip() for x in f.group(2).split(",")]
+            extra = [x.strip() for x in m_new.group(2).split(",") if x.strip() not in ids]
+            if not extra:
+                return text
+            merged = f" [{f.group(1)}: {', '.join(ids + extra)}]"
+            return text[:f.start()] + merged + text[f.end():]
     if _is_row(text):
         t = text.rstrip()
         return t[:-1].rstrip() + f" {mark} |"
@@ -230,8 +314,8 @@ def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | No
                     anchor += 1  # строки таблицы после заголовка раздела — в конец таблицы
                     while anchor + 1 < n and _is_row(lines[anchor + 1]):
                         anchor += 1
-                for s in new_rows:
-                    inserts.setdefault(anchor, []).append((_shape_insert(s, lines[anchor]), fid))
+                for text_, kind in _shape_block(new_rows, lines[anchor]):
+                    inserts.setdefault(anchor, []).append((text_, fid, kind))
                 rec.update(applied=True, line=anchor + 1, was="")
                 stats["inserted"] += len(new_rows)
             else:
@@ -287,8 +371,13 @@ def apply_edits(lines: list[str], rewrites: list[dict], warnings: list[str] | No
             out.append(_with_mark(s, f"[изменено: {', '.join(fids)}]"))
         else:
             out.append(s)
-        for row, fid in inserts.get(i, []):
-            out.append(_with_mark(row, f"[добавлено: {fid}]"))
+        for row, fid, kind in inserts.get(i, []):
+            if kind == "mark":
+                out.append(_with_mark(row, f"[добавлено: {fid}]"))
+            elif kind == "note":
+                out.append(f"[добавлено: {fid} — пример выше]")
+            else:
+                out.append(row)
     return {"markdown": "\n".join(out) + "\n", "rewrites": out_rewrites, "stats": stats}
 
 
@@ -329,15 +418,19 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
         return {"rewrites": [], "revised_markdown": "", "stats": {"replaced": 0, "inserted": 0, "not_applied": 0,
                                                                   "pending": 0}}
     ans_text, by_finding = _answers_block(answers)
-    block = _cl.format_findings(targets)
-    system, user = ctx.prompt(STAGE, findings=block, answers=ans_text)
-    if block[:200] not in user:
-        extra = f"<дефекты>\n{block}\n</дефекты>\n\n<ответы>\n{ans_text}\n</ответы>"
-        idx = user.find("Задание: исправленная редакция")
-        user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+
+    def build(items: list) -> tuple[str, str]:
+        block = _cl.format_findings(items)
+        system, user = ctx.prompt(STAGE, findings=block, answers=ans_text)
+        if block[:200] not in user:
+            extra = f"<дефекты>\n{block}\n</дефекты>\n\n<ответы>\n{ans_text}\n</ответы>"
+            idx = user.find("Задание: исправленная редакция")
+            user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+        return system, user
+
     warnings: list[str] = []
     try:
-        raw = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=16000) or {}
+        raw = _cl.ask_items(ctx, STAGE, targets, build, SCHEMA, max_output_tokens=16000)
     except Exception as exc:  # noqa: BLE001
         _cl._warn(ctx, f"revise: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); редакция не построена")
         return {"rewrites": [], "revised_markdown": "", "stats": {}, "status": "failed"}
@@ -354,6 +447,13 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     order = {f["id"]: i for i, f in enumerate(targets)}
     rewrites.sort(key=lambda r: order.get(r["finding_id"], 999))
     applied = apply_edits(lines, rewrites, warnings)
+    opts = getattr(ctx, "options", None) or {}
+    check = {"fixes": [], "stats": {}}
+    if isinstance(opts, dict) and opts.get("revise_check", True) and applied["stats"].get("replaced", 0) + \
+            applied["stats"].get("inserted", 0):
+        check = _check_pass(ctx, applied, warnings)
+        if check.get("markdown"):
+            applied["markdown"] = check["markdown"]
     for r in applied["rewrites"]:
         r["pending"] = sum(len(_PENDING.findall(e.get("became", ""))) for e in r["edits"])
     body = applied["markdown"].splitlines()
@@ -366,8 +466,85 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     for w in warnings:
         _cl._warn(ctx, w)
     missing = [f["id"] for f in targets if f["id"] not in {r["finding_id"] for r in rewrites}]
-    return {"rewrites": applied["rewrites"], "revised_markdown": md, "stats": {**applied["stats"],
-            "findings": len(targets), "with_rewrite": len(rewrites), "without_rewrite": missing}}
+    return {"rewrites": applied["rewrites"], "revised_markdown": md, "check_fixes": check.get("fixes", []),
+            "stats": {**applied["stats"], "findings": len(targets), "with_rewrite": len(rewrites),
+                      "without_rewrite": missing, "check_fixes": len(check.get("fixes", [])),
+                      "check_edits": check.get("stats", {}).get("replaced", 0) + check.get("stats", {}).get("inserted", 0)}}
+
+
+def _changed_lines(md_lines: list[str]) -> list[str]:
+    rows = []
+    for i, s in enumerate(md_lines, 1):
+        for m in _MARK.finditer(s):
+            rows.append(f"L{i:03d} | {m.group(1)}: {m.group(2)}")
+    return rows
+
+
+def _number_markdown(ctx: Any, md: str) -> str:
+    """Нумерованный текст редакции так же, как модель видит исходный документ."""
+    try:
+        from bcc_review.v2 import docview  # type: ignore
+        view = docview.from_text(md, file="revised.md", fmt="md")
+        return docview.numbered(view)
+    except Exception:  # noqa: BLE001 — запасная нумерация без разметки
+        out = []
+        for i, s in enumerate(md.splitlines(), 1):
+            t = re.sub(r"\*\*|__|`", "", s).rstrip()
+            out.append(f"L{i:03d}| {t}")
+        return "\n".join(out)
+
+
+def _check_pass(ctx: Any, applied: dict, warnings: list[str]) -> dict:
+    """Второй проход: противоречия, которые внесли сами правки, и их исправление (1 вызов модели)."""
+    md = applied["markdown"]
+    md_lines = md.splitlines()
+    changes = _changed_lines(md_lines)
+    if not changes:
+        return {"fixes": []}
+    by_fid = {r["finding_id"]: r for r in applied["rewrites"]}
+    summary = "\n".join(f"{fid}: {r.get('title', '')} — {r.get('summary', '')}" for fid, r in by_fid.items())
+    block = "\n".join(changes) + "\n\nДефекты:\n" + summary
+    try:
+        from bcc_review.v2 import prompts as _p  # type: ignore
+        own, task = _p.task(CHECK_STAGE, changes=block)
+        system = own or _p.system()
+    except Exception:  # noqa: BLE001
+        system, user0 = ctx.prompt(CHECK_STAGE, changes=block)
+        task = user0[user0.find("<правки>"):] if "<правки>" in user0 else user0
+    user = f"<документ>\n{_number_markdown(ctx, md)}\n</документ>\n\n{task}"
+    try:
+        raw = ctx.llm.ask(CHECK_STAGE, system, user, CHECK_SCHEMA, max_output_tokens=12000) or {}
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"revise: самопроверка редакции не выполнена ({type(exc).__name__}: {str(exc)[:160]})")
+        return {"fixes": []}
+    fixes = [f for f in raw.get("fixes") or [] if f.get("edits")]
+    for f in fixes:
+        if f.get("finding_id") not in by_fid:
+            f["finding_id"] = next(iter(by_fid), "D-00")
+    if not fixes:
+        return {"fixes": [], "stats": {}}
+    res = apply_edits(md_lines, [{"finding_id": f["finding_id"], "summary": f.get("problem", ""),
+                                  "edits": f["edits"]} for f in fixes], warnings)
+    out_fixes = [{"finding_id": r["finding_id"], "problem": r.get("summary", ""), "edits": r["edits"]}
+                 for r in res["rewrites"]]
+    return {"fixes": out_fixes, "stats": res["stats"], "markdown": res["markdown"]}
+
+
+def flat_rewrites(result: dict) -> list[dict]:
+    """Применённые правки плоским списком для ``report.json`` и таблицы «было → стало» отчёта (№13):
+    ``{finding_id, title, severity, summary, action, line_start, line_end, before, after, answer_ids}``."""
+    out = []
+    for r in result.get("rewrites") or []:
+        for e in r.get("edits") or []:
+            if not e.get("applied"):
+                continue
+            out.append({"finding_id": r.get("finding_id", ""), "title": r.get("title", ""),
+                        "severity": r.get("severity", ""), "summary": r.get("summary", ""),
+                        "action": e.get("action", ""), "line_start": e.get("line"), "line_end": e.get("line"),
+                        "before": e.get("was", "") if e.get("action") == "replace" else "",
+                        "after": e.get("became", "") or ("фрагмент удалён" if e.get("action") == "replace" else ""),
+                        "answer_ids": list(r.get("answer_ids") or [])})
+    return out
 
 
 def revised_path(report_path: str | Path) -> Path:
@@ -440,7 +617,7 @@ def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = 
     if do_revise:
         r = run(ctx, list(report.get("findings") or []), clar)
         path = write(report_path, r) if report_path else None
-        out.update(rewrites=r.get("rewrites", []), revise_stats=r.get("stats", {}),
+        out.update(rewrites=flat_rewrites(r), revise_stats=r.get("stats", {}),
                    revised_file=str(path) if path else "", revised_markdown=r.get("revised_markdown", ""))
         section = render_markdown(r, path.name if path else "")
         if section:
