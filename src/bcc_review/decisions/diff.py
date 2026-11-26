@@ -65,6 +65,7 @@ FIND_CONFIDENT = 0.62  # уверенная пара замечаний
 FIND_CANDIDATE = 0.45  # кандидат для ручной проверки
 FUZZY_ANCHOR = 0.60  # нечёткое перемещение опоры
 SCENARIO_MATCH = 0.80  # сценарий перепроверки совпадает с witness.input
+TIE_EPS = 0.02  # кандидаты с разницей оценок меньше порога равноправны
 
 # Check.status по контракту v1: pass | issue | unknown | na. Прочие значения — для совместимости.
 _POSITIVE = {"pass", "passed", "ok", "consistent"}
@@ -280,6 +281,17 @@ class _Edition:
             for w in raw_warnings
             if isinstance(w, dict) and w.get("code") in _PARTIAL_READ
         ]
+        # неполное чтение с указанием места (Warning.block_ids) задевает только эти блоки;
+        # без указания места неизвестно, что потеряно, — задето всё
+        self.partial_read_blocks: set = set()
+        self.partial_read_global: list = []
+        for w in raw_warnings:
+            if isinstance(w, dict) and w.get("code") in _PARTIAL_READ:
+                ids = [b for b in _as_list(w.get("block_ids")) if b]
+                if ids:
+                    self.partial_read_blocks.update(ids)
+                else:
+                    self.partial_read_global.append(str(w.get("message") or w.get("code")))
         self.digest = _report_digest(report)
 
     # --- опоры ---------------------------------------------------------
@@ -783,6 +795,9 @@ class _Finding:
                 if item not in self.anchor_src:
                     self.anchor_src.append(item)
         self.inspected = [b for b in _as_list(raw.get("inspected_block_ids"))]
+        self.key = self.id  # у части сгруппированной находки: «F-001@R-002»
+        self.part: str | None = None  # пункт прошлой редакции, к которому относится часть
+        self.whole_req_ids: list = list(self.req_ids)
         self.is_conflict = self.witness is not None or self.kind in _CONFLICT_KINDS
         self.is_omission = bool(self.inspected) or self.kind in _OMISSION_KINDS
         self.pos = self._pos()
@@ -798,6 +813,35 @@ class _Finding:
 
     def sev_rank(self) -> int:
         return SEVERITY_RANK.get(self.severity, 3)
+
+
+def _split_by_source(fo: _Finding, prev: _Edition, cur: _Edition, links: dict) -> list:
+    """Части находки одного пункта, сгруппированной по нескольким пунктам (правила объединяют одинаковый
+    дефект похожих формулировок). Делится, только если судьбы источников в новой редакции расходятся:
+    один пункт правили, а другой нет. Иначе находка сравнивается целиком, как раньше."""
+    if fo.is_conflict or fo.is_omission or fo.kind == "duplicate" or fo.criterion.startswith("set_"):
+        return [fo]
+    if len(fo.req_ids) < 2:
+        return [fo]
+    parts = []
+    for r in fo.req_ids:
+        blocks = set(prev.req_blocks(r))
+        ev = [e for e in _as_list(fo.raw.get("evidence")) if isinstance(e, dict) and e.get("block_id") in blocks]
+        if not ev:
+            return [fo]  # опору части не отделить — делить нельзя
+        hints = [h for h in _as_list(fo.raw.get("hints")) if isinstance(h, dict) and h.get("block_id") in blocks]
+        part = _Finding(prev, dict(fo.raw, req_ids=[r], evidence=ev, hints=hints))
+        part.key, part.part, part.whole_req_ids = f"{fo.id}@{r}", r, list(fo.req_ids)
+        parts.append(part)
+
+    def unchanged(part: _Finding) -> bool:
+        lk = links.get(part.part) or {}
+        if lk.get("relation") != "same" or "reworded" in lk.get("changes", []):
+            return False
+        own = [b for n in lk["new_ids"] for b in cur.req_blocks(n)]
+        return all((a := cur.locate(q, own, only=True)) is not None and a["match"] != "fuzzy" for q in part.quotes)
+
+    return parts if len({unchanged(p) for p in parts}) > 1 else [fo]
 
 
 def _overlap(a: set, b: set) -> float:
@@ -922,9 +966,9 @@ def _match_findings(prev: _Edition, cur: _Edition, olds: list, news: list, links
         m: set = set()
         for rid in fo.req_ids:
             m.update(links.get(rid, {}).get("new_ids", []))
-        mapped[fo.id] = m
+        mapped[fo.key] = m
         prefer = [b for nid in sorted(m, key=_natural) for b in cur.req_blocks(nid)]
-        source_blocks[fo.id] = set(prefer)
+        source_blocks[fo.key] = set(prefer)
         found: list = []
         for q, old_bid in fo.anchor_src:
             # источник опоры: пункты прошлой редакции, которым принадлежал её блок, и их пары в новой
@@ -934,17 +978,17 @@ def _match_findings(prev: _Edition, cur: _Edition, olds: list, news: list, links
             if own:
                 a = cur.locate(q, own, only=True)
                 if a is not None and a["match"] != "fuzzy":
-                    present.setdefault(fo.id, []).append(q)
+                    present.setdefault(fo.key, []).append(q)
             elif src_old or m:
                 a = cur.locate(q, prefer, only=True) if prefer else None  # пункт исчез — опоры нет
                 if a is not None and a["match"] != "fuzzy":
-                    present.setdefault(fo.id, []).append(q)
+                    present.setdefault(fo.key, []).append(q)
             else:
                 a = cur.locate(q, prefer)
                 if a is not None and a["match"] != "fuzzy":
                     hits = sum(1 for b in cur.blocks if _norm(q) in cur.block_norm[b["id"]][0])
                     a["ambiguous"] = hits > 1  # одинаковый текст в нескольких местах: место не доказано
-                    present.setdefault(fo.id, []).append(q)
+                    present.setdefault(fo.key, []).append(q)
             if a is None or any(
                 b["block_id"] == a["block_id"]
                 and a["start"] < b["end"]
@@ -954,24 +998,36 @@ def _match_findings(prev: _Edition, cur: _Edition, olds: list, news: list, links
             ):
                 continue  # та же точка новой редакции уже найдена (например, нечёткий двойник дубля)
             found.append(a)
-        anchors[fo.id] = found
+        anchors[fo.key] = found
 
     scores: dict[tuple[int, int], tuple[float, dict]] = {}
     lookalikes: dict[int, list] = {}  # похожие по названию находки из другого источника — для объяснения
     for i, fo in enumerate(olds):
         for j, fn in enumerate(news):
-            s, d = _finding_score(fo, fn, mapped[fo.id], anchors[fo.id], cur, source_blocks[fo.id])
+            s, d = _finding_score(fo, fn, mapped[fo.key], anchors[fo.key], cur, source_blocks[fo.key])
             if s >= FIND_CANDIDATE:
                 scores[(i, j)] = (s, d)
             elif fo.kind == fn.kind and text_similarity(fo.title, fn.title) >= 0.8:
                 lookalikes.setdefault(i, []).append((j, d.get("source") or d.get("capped") or "место другое"))
 
+    # честная неопределённость: источник прежней находки не определён, а два новых кандидата равноправны —
+    # выбирать по порядку нельзя (иначе «сохранилось» или «исправлено» зависит от того, кто первый в списке)
+    ties: dict[int, list[int]] = {}
+    for i, fo in enumerate(olds):
+        opts = sorted(
+            ((s, j) for (a, j), (s, _) in scores.items() if a == i and s >= FIND_CONFIDENT), key=lambda x: (-x[0], x[1])
+        )
+        if len(opts) >= 2 and not mapped[fo.key] and opts[0][0] - opts[1][0] < TIE_EPS:
+            ties[i] = [j for s, j in opts if opts[0][0] - s < TIE_EPS]
+
     def best_new(i: int) -> int | None:
+        if i in ties:
+            return None
         opts = [(s, -j) for (a, j), (s, _) in scores.items() if a == i and s >= FIND_CONFIDENT]
         return -max(opts)[1] if opts else None
 
     def best_old(j: int) -> int | None:
-        opts = [(s, -i) for (i, b), (s, _) in scores.items() if b == j and s >= FIND_CONFIDENT]
+        opts = [(s, -i) for (i, b), (s, _) in scores.items() if b == j and s >= FIND_CONFIDENT and i not in ties]
         return -max(opts)[1] if opts else None
 
     group_of_old: dict[int, int] = {}
@@ -1004,9 +1060,18 @@ def _match_findings(prev: _Edition, cur: _Edition, olds: list, news: list, links
         weak[i].sort(key=lambda x: (-x[0], x[1]))
     for g in groups:
         g["scores"] = {
-            f"{olds[i].id}->{news[j].id}": scores[(i, j)] for i in g["old"] for j in g["new"] if (i, j) in scores
+            f"{olds[i].key}->{news[j].id}": scores[(i, j)] for i in g["old"] for j in g["new"] if (i, j) in scores
         }
-    return groups, {"weak": weak, "mapped": mapped, "anchors": anchors, "lookalikes": lookalikes, "present": present}
+    return groups, {
+        "weak": weak,
+        "mapped": mapped,
+        "anchors": anchors,
+        "lookalikes": lookalikes,
+        "present": present,
+        "source_blocks": source_blocks,
+        "ties": ties,
+        "scores": scores,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1057,6 +1122,8 @@ def _affected(prev: _Edition, fo: _Finding) -> list[tuple[str, str]]:
     for c in prev.checks:
         if fo.id in _as_list(c.get("finding_ids")) and _check_status(c) == "negative":
             pairs += [(rid, _family(c.get("criterion"))) for rid in sorted(_check_reqs(c), key=_natural)]
+    if fo.part is not None:
+        pairs = [p for p in pairs if p[0] == fo.part]
     if not pairs:
         pairs = [(rid, _family(fo.criterion)) for rid in fo.req_ids]
     return sorted(set(pairs), key=lambda p: (prev.req_pos(p[0]), _natural(p[0]), p[1]))
@@ -1496,9 +1563,16 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
 
     links = _align_requirements(prev, cur, ask, warnings)
     # порядок по месту в документе и id: результат не зависит от порядка списков во входе
-    olds = sorted((_Finding(prev, f) for f in prev.findings), key=lambda f: (f.pos, _natural(f.id)))
+    olds = sorted(
+        (part for f in prev.findings for part in _split_by_source(_Finding(prev, f), prev, cur, links)),
+        key=lambda f: (f.pos, _natural(f.id), _natural(f.part or "")),
+    )
     news = sorted((_Finding(cur, f) for f in cur.findings), key=lambda f: (f.pos, _natural(f.id)))
+    seen_warn: set = set()
     for f in olds + news:
+        if (f.ed.label, f.id) in seen_warn:
+            continue
+        seen_warn.add((f.ed.label, f.id))
         bad = [e for e in f.evidence if not e["verified"]]
         if bad:
             warnings.append(
@@ -1541,8 +1615,8 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
         entry = {
             "status": status,
             "status_ru": STATUS_RU[status],
-            "old_ids": [f.id for f in fo_list],
-            "new_ids": [f.id for f in fn_list],
+            "old_ids": list(dict.fromkeys(f.id for f in fo_list)),
+            "new_ids": list(dict.fromkeys(f.id for f in fn_list)),
             "reason": "",
             "reason_code": "",
             "kind": lead.raw.get("kind"),
@@ -1568,7 +1642,16 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
             "identity": {"old": _identity(prev, fo_list), "new": _identity(cur, fn_list)},
             "_rel": rl,
         }
+        part = _part_of(prev, fo_list)
+        if part:
+            entry["part"] = part
         return entry
+
+    def with_part(e: dict, text: str) -> str:
+        if not e.get("part"):
+            return text
+        p = e["part"]
+        return f"Часть прежнего {p['of']} в {', '.join(p['labels'])}: {text[0].lower()}{text[1:]}"
 
     # --- найденные пары: сохранилось ---------------------------------
     for g in groups:
@@ -1577,8 +1660,8 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
         e = base_entry("persisting", fo_list, fn_list)
         first = next(iter(g["scores"].values()), (0.0, {}))[1]
         parts = ["Та же первопричина найдена в новом отчёте: " + _identity_text(prev, cur, e["_rel"], fo_list, first)]
-        if len(fo_list) > 1:
-            parts.append(f"в новой редакции объединены {len(fo_list)} прежних замечания")
+        if len(e["old_ids"]) > 1:
+            parts.append(f"в новой редакции объединены {len(e['old_ids'])} прежних замечания")
         if len(fn_list) > 1:
             parts.append(f"первопричина разделена на {len(fn_list)} замечания")
         if e["severity_change"]:
@@ -1590,18 +1673,51 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
             parts.append("тип дефекта переименован: " + ", ".join(sorted({f.raw.get("kind") or "—" for f in fn_list})))
         if same_source and e["decision_refs"]:
             parts.append("ответ по --answers получен, но формулировка в документе прежняя")
-        e["reason"] = "; ".join(parts) + "."
+        e["reason"] = with_part(e, "; ".join(parts) + ".")
         e["reason_code"] = "same_root_cause" + ("_severity_changed" if e["severity_change"] else "")
         e["match"] = {k: {"score": round(v[0], 3), **v[1]} for k, v in g["scores"].items()}
         result["persisting"].append(e)
 
     # --- старые без пары: закрыто или нужно подтверждение ------------
     possible_old: dict[int, list] = {}
+    tie_taken: set = set()
     for i, fo in enumerate(olds):
         if i in used_old:
             continue
         rl = rel_links_for([fo])
         e = base_entry("unassessed", [fo], [])
+        if i in aux["ties"]:
+            tied = [j for j in aux["ties"][i] if j not in used_new and j not in tie_taken]
+            tie_taken.update(tied)
+            e.update(reason_code="ambiguous_match", new_ids=[news[j].id for j in tied])
+            e["new_evidence"] = [x for j in tied for x in news[j].evidence]
+            e["new_status"] = [news[j].status for j in tied]
+            e["candidates"] = [
+                {
+                    "new_id": news[j].id,
+                    "score": round(aux["scores"][(i, j)][0], 3),
+                    "match": aux["scores"][(i, j)][1],
+                    "new_title": news[j].title,
+                    "new_severity": news[j].severity,
+                    "new_source": [cur.req_label(r) for r in news[j].req_ids],
+                }
+                for j in tied
+            ]
+            e["reason"] = with_part(
+                e,
+                (
+                    "Два равноправных кандидата в новом отчёте: "
+                    + "; ".join(
+                        f"{c['new_id']} ({', '.join(c['new_source']) or 'без пунктов'}, {c['score']:.2f})"
+                        for c in e["candidates"]
+                    )
+                    + ". Источник прежнего замечания в новой редакции не определён однозначно, поэтому выбрать одного "
+                    "по порядку нельзя: дефект мог сохраниться в любом из этих мест."
+                ),
+            )
+            e["recheck"] = _recheck_request(fo, cur, rl, aux, "ambiguous_match")
+            result["unassessed"].append(e)
+            continue
         code, why, proof = _classify_closure(fo, prev, cur, rl, aux, same_source, e["decision_refs"])
         weak = [w for w in aux["weak"].get(i, []) if w[1] not in used_new]
         for s, j, _d in weak:
@@ -1617,11 +1733,13 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
             e.update(status="resolved", status_ru=STATUS_RU["resolved"], reason_code="text_changed_rechecked")
             e["proof"] = proof
             e["new_evidence"] = _resolution_evidence(cur, rl, proof)
-            e["reason"] = why + (" " + _identity_text(prev, cur, rl, [fo], {}, resolved=True) if rl else "") + look
+            e["reason"] = with_part(
+                e, why + (" " + _identity_text(prev, cur, rl, [fo], {}, resolved=True) if rl else "") + look
+            )
         else:
             e["reason_code"] = code
-            e["reason"] = why + look
-            e["new_evidence"] = list(aux["anchors"].get(fo.id, []))
+            e["reason"] = with_part(e, why + look)
+            e["new_evidence"] = list(aux["anchors"].get(fo.key, []))
             if weak:
                 e["candidates"] = [
                     {
@@ -1645,7 +1763,7 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
 
     # --- новые без пары --------------------------------------------
     for j, fn in enumerate(news):
-        if j in used_new:
+        if j in used_new or j in tie_taken:
             continue
         e = base_entry("introduced", [], [fn])
         located_old = [prev.locate(q) for q in fn.quotes]
@@ -1663,14 +1781,19 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
             e["reason"] = "Новая первопричина: опора находится в тексте, которого не было в прошлой редакции."
             e["reason_code"] = "new_root_cause"
         if j in possible_old:
-            links_back = sorted(possible_old[j], key=lambda x: (-x[0], x[1].pos, _natural(x[1].id)))
+            best: dict = {}
+            for s_, fo_ in possible_old[j]:
+                if fo_.id not in best or s_ > best[fo_.id][0]:
+                    best[fo_.id] = (s_, fo_)
+            links_back = sorted(best.values(), key=lambda x: (-x[0], x[1].pos, _natural(x[1].id)))
             e["possible_old"] = [{"old_id": fo.id, "score": round(s, 3)} for s, fo in links_back]
             e["reason"] += (
                 " Возможно, это продолжение прежнего замечания "
                 + ", ".join(f"{fo.id} ({s:.2f})" for s, fo in links_back)
                 + ": сверьте вручную."
             )
-        if prev.status != "complete":
+        stage = str(fn.raw.get("stage") or "").split("#")[0]
+        if prev.status != "complete" and not (stage and _stage_done(prev, stage)):
             e["reason"] += " Прошлый прогон был неполным, поэтому новизна условна."
         result["introduced"].append(e)
 
@@ -1710,6 +1833,28 @@ def _impacted(cur: _Edition, links: dict) -> list[str]:
     mapped = {n for lk in links.values() for n in lk["new_ids"]}
     touched |= {r["id"] for r in cur.reqs if r["id"] not in mapped}
     return sorted(touched, key=lambda r: (cur.req_pos(r), _natural(r)))
+
+
+def _part_of(prev: _Edition, fo_list: list) -> dict | None:
+    """Описание части, если запись относится не ко всем пунктам прежней находки."""
+    parts = [f for f in fo_list if f.part is not None]
+    if not parts or len({f.id for f in fo_list}) != 1:
+        return None
+    covered = sorted({f.part for f in parts}, key=lambda r: (prev.req_pos(r), _natural(r)))
+    whole = parts[0].whole_req_ids
+    if set(covered) >= set(whole):
+        return None
+    return {
+        "of": parts[0].id,
+        "req_ids": covered,
+        "labels": [prev.req_label(r) for r in covered],
+        "whole_req_ids": list(whole),
+    }
+
+
+def _stage_done(ed: _Edition, stage: str) -> bool:
+    runs = [st for st in ed.stages if str(st.get("name") or "").split("#")[0] == stage]
+    return bool(runs) and stage not in ed.incomplete_stages and all(st.get("status") in ("ok", "cached") for st in runs)
 
 
 def _identity(ed: _Edition, fs: list) -> dict:
@@ -1786,7 +1931,7 @@ def _classify_closure(
     label = ", ".join(prev.req_label(r) for r in fo.req_ids) or "набор"
     dec_ids = ", ".join(str(d["id"]) for d in decisions)
     blockers: list[tuple[str, str]] = []
-    covered, why_not = _stage_gate(fo, cur)
+    covered, why_not = _stage_gate(fo, cur, aux["source_blocks"].get(fo.key))
     if not covered:
         blockers.append(("run_incomplete", why_not))
     if same_source:
@@ -1811,7 +1956,7 @@ def _classify_closure(
             blockers.append(("obligation_missing", lk["detail"]))
         elif lk["relation"] == "ambiguous":
             blockers.append(("alignment_ambiguous", lk["detail"] + " Нужна ручная сверка кандидатов."))
-    anchors = aux["anchors"].get(fo.id, [])
+    anchors = aux["anchors"].get(fo.key, [])
     if not rl and fo.quotes and not anchors and not fo.is_omission:
         blockers.append(
             (
@@ -1823,7 +1968,7 @@ def _classify_closure(
         return blockers[0][0], " ".join(dict.fromkeys(msg for _c, msg in blockers)), None
 
     # опора сохранилась, если цитата дословно есть в своём источнике (а не где-то в документе)
-    quotes_present = list(dict.fromkeys(aux["present"].get(fo.id, [])))
+    quotes_present = list(dict.fromkeys(aux["present"].get(fo.key, [])))
     all_quotes = list(dict.fromkeys(q for q, _b in fo.anchor_src)) or fo.quotes
     reworded = any("reworded" in lk["changes"] or lk["relation"] in ("split", "merge") for lk in rl)
     changed = reworded or len(quotes_present) < len(all_quotes)
@@ -1886,13 +2031,25 @@ def _classify_closure(
     return "resolved", text, proof
 
 
-def _stage_gate(fo: _Finding, cur: _Edition) -> tuple[bool, str]:
-    """Охват перепроверки: этап, который нашёл замечание, во втором прогоне завершён."""
-    if cur.partial_read:
+def _stage_gate(fo: _Finding, cur: _Edition, source_blocks: set | None = None) -> tuple[bool, str]:
+    """Охват перепроверки: документ прочитан там, где лежит источник, и этап, нашедший замечание, завершён."""
+    if cur.partial_read_global:
         return False, (
-            "Новая редакция прочитана не полностью (" + "; ".join(_short(w, 120) for w in cur.partial_read) + "): "
-            "отсутствие замечания не доказывает исправления."
+            "Новая редакция прочитана не полностью ("
+            + "; ".join(_short(w, 120) for w in cur.partial_read_global)
+            + "): отсутствие замечания не доказывает исправления."
         )
+    if cur.partial_read_blocks:
+        src = set(source_blocks or ())
+        whole_set = fo.scope == "set" or fo.is_conflict or fo.is_omission or not src
+        hit = sorted(cur.partial_read_blocks & src, key=lambda b: cur.block_order.get(b, 10**9))
+        if whole_set or hit:
+            where = ", ".join(hit) if hit else ", ".join(sorted(cur.partial_read_blocks))
+            why = "задет источник замечания" if hit else "замечание касается всего набора требований"
+            return False, (
+                f"Новая редакция прочитана не полностью (блоки {where}; {why}): отсутствие замечания не доказывает "
+                "исправления."
+            )
     run_reasons = _short("; ".join(map(str, _as_list(cur.run.get("status_reasons")))) or "причина не указана", 300)
     run_msg = (
         f"Второй прогон завершился со статусом «{cur.status}» ({run_reasons}): отсутствие замечания не доказывает "
@@ -1958,7 +2115,7 @@ def _resolution_evidence(cur: _Edition, rl: list, proof: dict | None) -> list:
 def _recheck_request(fo: _Finding, cur: _Edition, rl: list, aux: dict, code: str) -> dict:
     new_reqs = sorted({n for lk in rl for n in lk["new_ids"]}, key=_natural)
     blocks = sorted(
-        {b for n in new_reqs for b in cur.req_blocks(n)} | {a["block_id"] for a in aux["anchors"].get(fo.id, [])},
+        {b for n in new_reqs for b in cur.req_blocks(n)} | {a["block_id"] for a in aux["anchors"].get(fo.key, [])},
         key=lambda b: cur.block_order.get(b, 10**9),
     )
     req = {
@@ -2120,7 +2277,10 @@ def to_view(diff: dict) -> dict:
     """Плоские строки для №13/№15: прежние замечания отдельно от новых."""
 
     def row(e: dict) -> dict:
-        return {"id": e["id"], "status": e["status"], "old_ids": e["old_ids"], "new_ids": e["new_ids"], **e["view"]}
+        out = {"id": e["id"], "status": e["status"], "old_ids": e["old_ids"], "new_ids": e["new_ids"], **e["view"]}
+        if e.get("part"):  # запись относится к части сгруппированной находки (одному из пунктов)
+            out["part"] = e["part"]["labels"]
+        return out
 
     previous = [row(e) for key in ("resolved", "persisting", "unassessed") for e in diff[key]]
     previous.sort(
@@ -2163,7 +2323,10 @@ def render_markdown(diff: dict) -> str:
         return _short(str(x), limit).replace("|", "\\|") if x else "—"
 
     for r in v["previous_findings"]:
-        ids = f"{', '.join(map(str, r['old_ids'])) or '—'} → {', '.join(map(str, r['new_ids'])) or '—'}"
+        old = ", ".join(map(str, r["old_ids"])) or "—"
+        if r.get("part"):
+            old += f" [{', '.join(r['part'])}]"
+        ids = f"{old} → {', '.join(map(str, r['new_ids'])) or '—'}"
         lines.append(
             f"| {r['status_ru']} | {ids} | {cell(r['entity'])} | {cell(r['old_quote'])} | "
             f"{cell(r['new_quote'])} | {cell(r['reason'], 600)} |"
