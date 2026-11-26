@@ -21,8 +21,8 @@ def test_ten_logical_calls_are_ten_physical(make_adapter, messages, schema):
         except ProviderError as err:
             outcomes.append(err.kind)
 
-    assert outcomes == ["rate_limited", "overloaded", "server_error", "timeout", "network",
-                        "ok", "ok", "incomplete", "schema_violation", "ok"]
+    assert outcomes == ["rate_limit", "overloaded", "server", "timeout", "network",
+                        "ok", "ok", "truncated", "invalid_output", "ok"]
     assert adapter.physical_calls == 10
     messages_events = [e for e in events if e["endpoint"] == "messages"]
     assert len(messages_events) == 10

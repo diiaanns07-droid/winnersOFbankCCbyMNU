@@ -6,8 +6,9 @@
         -> {"data": <объект по схеме>, "usage": {...}, "model": <фактическая модель>,
             "request_id": <request-id ответа>}
 
-Любая ошибка интеграции поднимается как ``ProviderError(kind, retry_after_s=None)``
-из общей библиотеки. Внешний бюджет повторов и кэш принадлежат Max, поэтому
+Любая ошибка интеграции поднимается как общий ``bcc_review.contracts.ProviderError``
+(kind из ``PROVIDER_ERROR_KINDS``; message, retry_after_s, status, request_id, usage,
+model — именованно). Внешний бюджет повторов и кэш принадлежат Max, поэтому
 собственные повторы SDK выключены (``max_retries=0``): один ``invoke`` даёт ровно
 один физический POST /v1/messages. Каждый физический HTTP-запрос (включая
 повторы, если их всё же включить) считается через event hook httpx2 и
@@ -29,7 +30,6 @@ from __future__ import annotations
 import copy
 import datetime as _dt
 import email.utils
-import importlib
 import json
 import logging
 import os
@@ -43,6 +43,8 @@ from typing import Any, Callable, Iterable, Iterator, Mapping, MutableMapping, S
 import anthropic
 import httpx2
 import jsonschema
+
+from bcc_review.contracts import PROVIDER_ERROR_KINDS, ProviderError
 
 log = logging.getLogger(__name__)
 
@@ -69,69 +71,34 @@ ENV_VARS: dict[str, str] = {
 }
 
 
-# --------------------------------------------------------------------------- #
-# ProviderError: общий контракт Max. До публикации bootstrap — совместимая копия.
-# --------------------------------------------------------------------------- #
-
-_SHARED_ERROR_MODULES = ("bcc_review.providers.base", "bcc_review.errors")
-
-
-def _load_shared_provider_error() -> tuple[type[Exception] | None, str | None]:
-    for name in _SHARED_ERROR_MODULES:
-        try:
-            module = importlib.import_module(name)
-        except ImportError:
-            continue
-        cls = getattr(module, "ProviderError", None)
-        if isinstance(cls, type) and issubclass(cls, Exception):
-            return cls, name
-    return None, None
-
-
-class _BootstrapProviderError(Exception):
-    """Временная копия контракта ``ProviderError(kind, retry_after_s=None)``.
-
-    Используется, только пока общая библиотека Max не опубликована. Стыковой
-    тест ``tests/p11/test_joint_contract.py`` проверяет, что после публикации
-    адаптер берёт общий класс.
-    """
-
-    def __init__(self, kind: str, retry_after_s: float | None = None) -> None:
-        super().__init__(kind, retry_after_s)
-        self.kind = kind
-        self.retry_after_s = retry_after_s
-
-    def __str__(self) -> str:
-        detail = getattr(self, "detail", None)
-        return f"{self.kind}: {detail}" if detail else str(self.kind)
-
-
-_shared_cls, _shared_module = _load_shared_provider_error()
-ProviderError: type[Exception] = _shared_cls or _BootstrapProviderError
-PROVIDER_ERROR_SOURCE: str = _shared_module or "bootstrap-fallback"
+#: Откуда взят класс ошибки (паспорт прогона): общий контракт движка, без локальной копии.
+PROVIDER_ERROR_SOURCE: str = ProviderError.__module__
 
 
 # --------------------------------------------------------------------------- #
 # Категории ошибок
 # --------------------------------------------------------------------------- #
 
+# Значения — строго словарь контракта v1 (``PROVIDER_ERROR_KINDS``): по ним Asker решает о повторе.
+KIND_NOT_CONFIGURED = "not_configured"
 KIND_AUTH = "auth"
-KIND_QUOTA = "quota_exhausted"
-KIND_RATE_LIMIT = "rate_limited"
+KIND_QUOTA = "quota"
+KIND_RATE_LIMIT = "rate_limit"
 KIND_OVERLOADED = "overloaded"
 KIND_TIMEOUT = "timeout"
-KIND_INCOMPLETE = "incomplete"
-KIND_SCHEMA = "schema_violation"
+KIND_INCOMPLETE = "truncated"
+KIND_SCHEMA = "invalid_output"
 KIND_REFUSAL = "refusal"
-KIND_BAD_REQUEST = "invalid_request"
-KIND_MODEL_NOT_FOUND = "model_not_found"
-KIND_SERVER = "server_error"
+KIND_BAD_REQUEST = "bad_request"
+KIND_MODEL_NOT_FOUND = "not_found"
+KIND_SERVER = "server"
 KIND_NETWORK = "network"
 KIND_UNKNOWN = "unknown"
 
 #: kind -> (можно ли повторить тот же запрос, описание для отчёта и журнала)
 ERROR_KINDS: dict[str, tuple[bool, str]] = {
-    KIND_AUTH: (False, "отказ авторизации или доступа (401/403, ключ не задан)"),
+    KIND_NOT_CONFIGURED: (False, "ключ не задан: запрос не отправлялся"),
+    KIND_AUTH: (False, "отказ авторизации или доступа (401/403)"),
     KIND_QUOTA: (False, "исчерпана квота или кредит (402, 429 со spend-limit)"),
     KIND_RATE_LIMIT: (True, "временный лимит запросов (429), ждать retry_after_s"),
     KIND_OVERLOADED: (True, "перегрузка API (529 overloaded_error)"),
@@ -145,6 +112,7 @@ ERROR_KINDS: dict[str, tuple[bool, str]] = {
     KIND_NETWORK: (True, "сетевая ошибка до получения ответа"),
     KIND_UNKNOWN: (False, "не удалось однозначно классифицировать"),
 }
+assert set(ERROR_KINDS) <= set(PROVIDER_ERROR_KINDS), "словарь kind разошёлся с контрактом"
 
 _QUOTA_ERROR_CODES = frozenset(
     {
@@ -156,36 +124,37 @@ _QUOTA_ERROR_CODES = frozenset(
 )
 
 
-def _make_error(kind: str, retry_after_s: float | None = None, **attrs: Any) -> Exception:
-    """Создать ProviderError по контракту и добавить диагностические атрибуты.
+def _make_error(kind: str, retry_after_s: float | None = None, **attrs: Any) -> ProviderError:
+    """Создать общий ProviderError и добавить диагностические атрибуты адаптера.
 
-    Конструктор вызывается строго с ``(kind, retry_after_s)``, остальные поля
-    ставятся атрибутами, чтобы не зависеть от сигнатуры общего класса.
+    Поля контракта передаются конструктору именованно: ``message`` — текст ``detail``
+    (уже без секретов), ``status`` — HTTP-статус, ``usage`` — всегда dict.
     """
-    err = ProviderError(kind, retry_after_s)
-    defaults: dict[str, Any] = {
+    retryable, description = ERROR_KINDS.get(kind, (False, ""))
+    extra: dict[str, Any] = {
         "provider": PROVIDER,
         "subkind": None,
-        "detail": ERROR_KINDS.get(kind, (False, ""))[1],
+        "detail": description,
         "http_status": None,
         "error_type": None,
         "error_code": None,
-        "request_id": None,
         "requested_model": None,
-        "model": None,
-        "usage": None,
-        "retryable": ERROR_KINDS.get(kind, (False, ""))[0],
+        "retryable": retryable,
         "ambiguous": False,
         "alternatives": (),
     }
-    defaults.update(attrs)
-    for key, value in defaults.items():
-        if key in ("kind", "retry_after_s"):
-            continue
-        try:
-            setattr(err, key, value)
-        except AttributeError:  # общий класс со __slots__: оставляем только контракт
-            pass
+    extra.update(attrs)
+    err = ProviderError(
+        kind,
+        extra["detail"] or kind,
+        retry_after_s=retry_after_s,
+        status=extra["http_status"],
+        request_id=extra.pop("request_id", None),
+        usage=extra.pop("usage", None),
+        model=extra.pop("model", None),
+    )
+    for key, value in extra.items():
+        setattr(err, key, value)
     return err
 
 
@@ -539,7 +508,7 @@ class AnthropicAdapter:
             if (env.get("ANTHROPIC_AUTH_TOKEN") or "").strip():
                 hint = " ANTHROPIC_AUTH_TOKEN (подписка/OAuth) намеренно не используется."
             raise _make_error(
-                KIND_AUTH,
+                KIND_NOT_CONFIGURED,
                 subkind="missing_key",
                 retryable=False,
                 detail="Не задан ANTHROPIC_API_KEY: живой вызов Claude API невозможен." + hint,
@@ -1058,7 +1027,7 @@ class AnthropicAdapter:
                     KIND_RATE_LIMIT, None, subkind="no_retry_after", ambiguous=True,
                     alternatives=(KIND_QUOTA,),
                     detail=detail("429 без Retry-After и без error_code: временный лимит или исчерпание "
-                                  "квоты не различимы; классифицировано как rate_limited, ambiguous."),
+                                  "квоты не различимы; классифицировано как rate_limit, ambiguous."),
                     **base,
                 )
             return _make_error(KIND_RATE_LIMIT, retry_after, subkind=code or "rate_limit",

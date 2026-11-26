@@ -56,5 +56,5 @@ def test_invalid_stage_schema_is_rejected_before_call(make_adapter, messages):
     adapter = make_adapter("success_candidates")
     with pytest.raises(ProviderError) as info:
         adapter.invoke(model="claude-opus-5-5", messages=messages, schema={"type": "nonsense"}, timeout_s=5)
-    assert info.value.kind == "invalid_request" and info.value.subkind == "invalid_schema"
+    assert info.value.kind == "bad_request" and info.value.subkind == "invalid_schema"
     assert adapter.passport()["physical_calls"] == {"messages": 0, "models": 0, "other": 0}
