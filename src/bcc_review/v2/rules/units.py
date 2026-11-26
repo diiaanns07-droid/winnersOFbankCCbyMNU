@@ -12,12 +12,13 @@ import re
 
 from ._text import Doc, Line, candidate, ev, quoted, signal
 
+# Формы: именительный мн. ч., предложный мн. ч., родительный мн. ч.
 CURRENCIES = [
-    # (major-шаблон, minor-шаблон, название основной, название минорной, множитель)
-    (r"тенге|₸|kzt", r"тиын\w*", "тенге", "тиыны", 100),
-    (r"рубл\w*|₽|rub", r"копе\w*", "рубли", "копейки", 100),
-    (r"доллар\w*|usd|\$", r"цент\w*", "доллары", "центы", 100),
-    (r"евро|eur|€", r"(?:евро)?цент\w*", "евро", "центы", 100),
+    # (major-шаблон, minor-шаблон, формы основной, формы минорной)
+    (r"тенге|₸|kzt", r"тиын\w*", ("тенге", "тенге", "тенге"), ("тиыны", "тиынах", "тиынов")),
+    (r"рубл\w*|₽|rub", r"копе\w*", ("рубли", "рублях", "рублей"), ("копейки", "копейках", "копеек")),
+    (r"доллар\w*|usd|\$", r"цент\w*", ("доллары", "долларах", "долларов"), ("центы", "центах", "центов")),
+    (r"евро|eur|€", r"(?:евро)?цент\w*", ("евро", "евро", "евро"), ("центы", "центах", "центов")),
 ]
 DENOM = r"(?:\bв|\bчисл\w*|\bцел\w+\s+числ\w*|\bсумм\w*\s+в)\s+"
 SUBJECT_STOP = re.compile(r"[,;:(]|\s(?:и|или|а также)\s")
@@ -54,7 +55,7 @@ def _conversion(doc: Doc, major: str, minor: str) -> Line | None:
 
 
 def rule_currency(doc: Doc, out: dict) -> None:
-    for major, minor, major_ru, minor_ru, _mult in CURRENCIES:
+    for major, minor, MJ, MN in CURRENCIES:
         rx_minor = re.compile(rf"{DENOM}(?:{minor})", re.I)
         rx_major = re.compile(rf"{DENOM}(?:{major})(?![\w])", re.I)
         minors: list[tuple[Line, str, str]] = []
@@ -76,14 +77,14 @@ def rule_currency(doc: Doc, out: dict) -> None:
                     frag = x.joined
                 out["candidates"].append(candidate(
                     "units.minor_fraction",
-                    title=f"Величина в минорных единицах ({minor_ru}) описана с дробной частью",
+                    title=f"Величина в минорных единицах ({MN[0]}) описана с дробной частью",
                     kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
                     evidence=[ev(x, frag)],
-                    problem=(f"{quoted(frag)}: {minor_ru} — наименьшая единица валюты, дробной части у неё нет. "
-                             f"Похоже, имелись в виду {major_ru}; значение примера и правила расходятся в 100 раз."),
-                    scenario=f"В ответе приходит «100.00»: по описанию это 100 {minor_ru}, по смыслу — 100 {major_ru}.",
+                    problem=(f"{quoted(frag)}: {MN[0]} — наименьшая единица валюты, дробной части у неё нет. "
+                             f"Похоже, имелись в виду {MJ[0]}; значение примера и правила расходятся в 100 раз."),
+                    scenario=f"В ответе приходит «100.00»: по описанию это 100 {MN[2]}, по смыслу — 100 {MJ[2]}.",
                     impact="Клиент покажет сумму в 100 раз меньше или больше; тест не определит правильное значение.",
-                    recommendation=f"Указать одну единицу: целое число {minor_ru} либо {major_ru} с двумя знаками.",
+                    recommendation=f"Указать одну единицу: целое число {MN[2]} либо сумму в {MJ[1]} с двумя знаками.",
                     conflict=False,
                 ))
                 break
@@ -122,14 +123,14 @@ def rule_currency(doc: Doc, out: dict) -> None:
             kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
             evidence=[ev(a[0], qa), ev(b[0], qb)],
             problem=(f"В документе {subj} заданы в разных единицах: {quoted(qa)} и {quoted(qb)}. "
-                     f"Правила пересчёта {minor_ru} в {major_ru} и округления нет."),
-            scenario=(f"Значение 1 000 в {major_ru} сравнивается с накопленными 100 000 в {minor_ru}: без пересчёта "
+                     f"Правила пересчёта {MN[2]} в {MJ[0]} и округления нет."),
+            scenario=(f"Значение 1 000 в {MJ[1]} сравнивается с накопленными 100 000 в {MN[1]}: без пересчёта "
                       f"сравнение ложно срабатывает или не срабатывает, а при пересчёте неясно, как округлять "
-                      f"остаток в {minor_ru}."),
+                      f"остаток в {MN[1]}."),
             impact="Неверный расчёт и сравнение сумм; разные реализации в сервисах; тесты не определят ожидаемое.",
             recommendation=(f"Хранить и сравнивать суммы в одной единице или явно задать правило: "
-                            f"1 {major_ru} = 100 {minor_ru}, сравнение после пересчёта, округление <уточнить>."),
-            rewrite=f"Все суммы хранятся в {minor_ru}; 1 {major_ru} = 100 {minor_ru}; округление: <уточнить: правило>.",
+                            f"1 {MJ[0]} = 100 {MN[2]}, сравнение после пересчёта, округление <уточнить>."),
+            rewrite=f"Все суммы хранятся в {MN[1]}; 1 {MJ[0]} = 100 {MN[2]}; округление: <уточнить: правило>.",
             conflict=same,
         ))
         out["signals"].append(signal("units.currency_mix", a[0], qa,

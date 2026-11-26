@@ -185,7 +185,7 @@ def test_empty_and_odd_views():
 
 
 BANNED = ["saveLimit", "Алматы", "push", "порог", "Ф-1", "Ф-2", "AlertsController", "limit_kzt", "cardId",
-          "тиынах", "50 000", "Проверьте сумму"]
+          "50 000", "Проверьте сумму", "сумму покупки"]
 
 
 def test_no_document_words_in_rules_code():

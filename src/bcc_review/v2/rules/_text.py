@@ -230,4 +230,5 @@ def fmt_list(items: list[str], conj: str = "и") -> str:
 
 
 def quoted(s: str) -> str:
-    return f"«{s}»"
+    """Цитата внутри прозы: «…» без завершающей точки (точку ставит предложение)."""
+    return f"«{s.rstrip().rstrip('.')}»"
