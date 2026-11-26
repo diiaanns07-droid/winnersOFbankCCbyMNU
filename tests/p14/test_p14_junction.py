@@ -62,12 +62,19 @@ def test_engine_exports_annotated_pdf(tmp_path, name):
     for p in m["placements"]:
         assert p["status"] == "highlight", p
         if name.endswith(".pdf"):
-            assert p["method"] == "fragment_bbox"
+            assert p["method"].startswith("fragment_")
             b = blocks[p["block_id"]]
             assert p["page"] == b["loc"]["page"]
-            frags = [pymupdf.Rect(fr["rect"]) + (-2, -2, 2, 2) for fr in b["loc"]["fragments"]]
+            # выделение лежит в объединении fragments, которые пересекают цитату: у резервного
+            # ридера fragment — строка, у ридера №02 — слово (полоса по строке шире одного слова)
+            hit = [pymupdf.Rect(fr["rect"]) for fr in b["loc"]["fragments"]
+                   if fr["start"] < p["end"] and fr["end"] > p["start"]]
+            assert hit, p
+            area = hit[0]
+            for r in hit[1:]:
+                area |= r
             for q in p["rects"]:
-                assert any(fr.contains(pymupdf.Rect(q)) for fr in frags), (p["finding_id"], q)
+                assert (area + (-2, -2, 2, 2)).contains(pymupdf.Rect(q)), (p["finding_id"], q, list(area))
         else:
             assert p["method"] == "loc_map"
 

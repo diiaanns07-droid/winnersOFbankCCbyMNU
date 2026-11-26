@@ -21,9 +21,12 @@
      размещается.
   2. SHA-256 входного файла должен совпасть с ``report.document.id`` и
      ``run.source_sha256``.
-  3. PDF: каждый fragment блока (``loc.fragments``: start, end, page, bbox) сужает поиск до
-     своей страницы и своего прямоугольника. Символы внутри прямоугольника выравниваются с
-     ``block.text[start:end]``, и смещения цитаты переходят в прямоугольники символов.
+  3. PDF: каждый fragment блока (``loc.fragments``: start, end, rect, а у наклонного текста
+     №02 ещё ``quad``) сужает поиск до своей страницы и своей рамки. Если есть ``quad``, область
+     поиска — четырёхугольник, а не осевая рамка. Символы области выравниваются с
+     ``block.text[start:end]``. Знаки всех fragments цитаты собираются по строкам: горизонтальная
+     строка даёт объединённый прямоугольник, наклонная — четырёхугольник от первого до последнего
+     знака (``recover_char_quad``). Соседняя строка внутри осевой рамки не закрашивается.
      Похожая фраза в другом месте документа не используется никогда.
   4. Markdown: если у блока есть ``loc.map`` контракта, позиция в block.text переводится в
      (строку, колонку) исходника, и берётся знак, который наша вёрстка поставила для этой
@@ -165,7 +168,8 @@ class Placement:
     end: int | None = None
     quote: str | None = None
     page: int | None = None  # 1-based, страница выходного PDF
-    rects: list[list[float]] = field(default_factory=list)  # неповёрнутые координаты
+    rects: list[list[float]] = field(default_factory=list)  # неповёрнутые координаты (охватывающие)
+    quads: list[list[list[float]]] = field(default_factory=list)  # [ul, ur, ll, lr] каждого выделения
     reason: str | None = None
     source_ref: str | None = None
     annot_names: list[str] = field(default_factory=list)
@@ -399,14 +403,16 @@ def _block_lines(block: dict[str, Any]) -> tuple[int, int] | None:
     loc = block.get("loc")
     a = b = None
     if isinstance(loc, dict):
+        # контрактные line_start/line_end важнее; у №01 рядом лежит lines = [[строка, col0, col1], ...]
+        a = _int(loc.get("line_start", loc.get("start_line", loc.get("line"))))
+        b = _int(loc.get("line_end", loc.get("end_line", a)))
         lines = loc.get("lines")
-        if isinstance(lines, (list, tuple)) and lines:
-            a, b = _int(lines[0]), _int(lines[-1])
-        elif isinstance(lines, str):
+        if a is None and isinstance(lines, (list, tuple)) and lines:
+            first, last = lines[0], lines[-1]
+            a = _int(first[0] if isinstance(first, (list, tuple)) and first else first)
+            b = _int(last[0] if isinstance(last, (list, tuple)) and last else last)
+        elif a is None and isinstance(lines, str):
             return _parse_line_range(lines)
-        else:
-            a = _int(loc.get("line_start", loc.get("start_line", loc.get("line"))))
-            b = _int(loc.get("line_end", loc.get("end_line", a)))
     elif isinstance(loc, str):
         return _parse_line_range(loc)
     elif _int(loc) is not None:
@@ -448,6 +454,17 @@ class _Frag:
     bbox: tuple[float, float, float, float] | None
     space: str
     sha256: str | None
+    quad: tuple[tuple[float, float], ...] | None = None  # ul, ur, ll, lr — наклонный текст №02
+
+
+def _parse_quad(q: Any) -> tuple[tuple[float, float], ...] | None:
+    """quad fragment: ``[[x,y]×4]`` (ul, ur, ll, lr, как у №02) или 8 чисел подряд."""
+    if not isinstance(q, (list, tuple)):
+        return None
+    flat = [v for p in q for v in p] if q and isinstance(q[0], (list, tuple)) else list(q)
+    if len(flat) != 8 or not all(isinstance(v, (int, float)) for v in flat):
+        return None
+    return tuple((float(flat[i]), float(flat[i + 1])) for i in range(0, 8, 2))
 
 
 def _fragments(block: dict[str, Any]) -> list[_Frag]:
@@ -468,6 +485,7 @@ def _fragments(block: dict[str, Any]) -> list[_Frag]:
         bbox = None
         if isinstance(bb, (list, tuple)) and len(bb) == 4 and all(isinstance(v, (int, float)) for v in bb):
             bbox = tuple(float(v) for v in bb)  # type: ignore[assignment]
+        quad = _parse_quad(f.get("quad"))
         out.append(
             _Frag(
                 start=st if st is not None else 0,
@@ -476,6 +494,7 @@ def _fragments(block: dict[str, Any]) -> list[_Frag]:
                 bbox=bbox,
                 space=str(f.get("space") or f.get("coords") or loc.get("space") or "pymupdf").lower(),
                 sha256=f.get("source_sha256") or f.get("sha256"),
+                quad=quad,
             )
         )
     if not out:
@@ -669,6 +688,59 @@ class _Ch:
     rect: pymupdf.Rect
     key: tuple[int, int, int]
     eol: bool
+    quad: pymupdf.Quad | None = None  # точная форма знака (наклонная строка — не прямоугольник)
+
+
+def _char_quad(line: dict[str, Any], span: dict[str, Any], ch: dict[str, Any]) -> pymupdf.Quad:
+    try:
+        return pymupdf.recover_char_quad(line["dir"], span, ch)
+    except Exception:  # noqa: BLE001 — без метрик шрифта остаётся рамка знака
+        return pymupdf.Rect(ch["bbox"]).quad
+
+
+def _in_quad(pt: pymupdf.Point, q: pymupdf.Quad, tol: float = 1.5) -> bool:
+    """Точка внутри выпуклого четырёхугольника ul→ur→lr→ll с допуском tol (pt)."""
+    ring = [q.ul, q.ur, q.lr, q.ll]
+    area = sum(a.x * b.y - b.x * a.y for a, b in zip(ring, ring[1:] + ring[:1]))
+    sign = 1.0 if area >= 0 else -1.0
+    for a, b in zip(ring, ring[1:] + ring[:1]):
+        edge = abs(b - a)
+        if edge == 0:
+            continue
+        cross = (b.x - a.x) * (pt.y - a.y) - (b.y - a.y) * (pt.x - a.x)
+        if sign * cross / edge < -tol:
+            return False
+    return True
+
+
+def _line_quads(items: Iterable[_Ch]) -> list[pymupdf.Quad]:
+    """Знаки цитаты → одна фигура на строку. Горизонтальная строка — объединение рамок знаков
+    (как раньше). Наклонная — четырёхугольник от первого до последнего знака по направлению строки,
+    поэтому соседняя строка внутри осевого прямоугольника не попадает под выделение."""
+    groups: list[list[_Ch]] = []
+    for c in items:
+        if groups and groups[-1][0].key == c.key:
+            groups[-1].append(c)
+        else:
+            groups.append([c])
+    out: list[pymupdf.Quad] = []
+    for g in groups:
+        while g and g[0].c.isspace():
+            g = g[1:]
+        while g and g[-1].c.isspace():
+            g = g[:-1]
+        if not g:
+            continue
+        first, last = g[0].quad or g[0].rect.quad, g[-1].quad or g[-1].rect.quad
+        base = first.ur - first.ul
+        if abs(base.y) <= 0.02 * abs(base.x) + 1e-6:
+            u = pymupdf.Rect(g[0].rect)
+            for c in g[1:]:
+                u |= c.rect
+            out.append(u.quad)
+        else:
+            out.append(pymupdf.Quad(first.ul, last.ur, first.ll, last.lr))
+    return out
 
 
 class _PdfLocator:
@@ -693,7 +765,8 @@ class _PdfLocator:
                     continue
                 for li, line in enumerate(b.get("lines", [])):
                     lc = [
-                        _Ch(ch["c"], pymupdf.Rect(ch["bbox"]), (pno, b.get("number", 0), li), False)
+                        _Ch(ch["c"], pymupdf.Rect(ch["bbox"]), (pno, b.get("number", 0), li), False,
+                            _char_quad(line, span, ch))
                         for span in line.get("spans", [])
                         for ch in span.get("chars", [])
                     ]
@@ -723,6 +796,18 @@ class _PdfLocator:
             return r * ~_unrot_to_pdf(page, self._p2pdf)
         raise ValueError(f"неизвестное пространство координат fragment: {space}")
 
+    def to_unrot_quad(self, pno: int, quad: tuple[tuple[float, float], ...], space: str) -> pymupdf.Quad:
+        page = self.doc[pno]
+        if space in ("pymupdf", "mupdf", "unrotated", "fitz"):
+            m = pymupdf.Identity
+        elif space in ("display", "rotated", "viewer"):
+            m = page.derotation_matrix
+        elif space in ("pdf", "user", "pdf_user"):
+            m = ~_unrot_to_pdf(page, self._p2pdf)
+        else:
+            raise ValueError(f"неизвестное пространство координат fragment: {space}")
+        return pymupdf.Quad(*(pymupdf.Point(p) * m for p in quad))
+
     def describe(self, loc: _Loc, block: dict[str, Any]) -> str:
         return f"исходный PDF, стр. {loc.page + 1}" if loc.page is not None else "исходный PDF"
 
@@ -733,6 +818,8 @@ class _PdfLocator:
         if not frags:
             return [_Loc(None, [], "none", "у блока нет страницы и fragments (loc)")]
         locs: list[_Loc] = []
+        picked: dict[int, dict[int, _Ch]] = defaultdict(dict)  # страница → {номер знака: знак}
+        methods: dict[int, set[str]] = defaultdict(set)
         covered = False
         for f in frags:
             lo, hi = max(s, f.start), min(e, f.end)
@@ -747,49 +834,46 @@ class _PdfLocator:
                 locs.append(_Loc(None, [], "fragment", f"страница {bad or '?'} вне документа ({n} стр.)"))
                 continue
             pnos = [p - 1 for p in f.pages]
-            if f.bbox is not None:
+            if f.quad is not None:
+                # наклонный текст: только знаки внутри четырёхугольника fragment, а не его осевой рамки
+                qd = self.to_unrot_quad(pnos[0], f.quad, f.space)
+                clip = qd.rect
+                pool = [(i, c) for i, c in enumerate(self.chars(pnos[0])) if _in_quad((c.rect.tl + c.rect.br) / 2, qd)]
+                method = "fragment_quad"
+            elif f.bbox is not None:
                 clip = self.to_unrot(pnos[0], f.bbox, f.space)
                 grow = clip + (-2.0, -2.0, 2.0, 2.0)
-                cand = [c for c in self.chars(pnos[0]) if grow.contains((c.rect.tl + c.rect.br) / 2)]
+                pool = [(i, c) for i, c in enumerate(self.chars(pnos[0])) if grow.contains((c.rect.tl + c.rect.br) / 2)]
                 method = "fragment_bbox"
+            else:
+                pool = [(i + 100000 * k, c) for k, p in enumerate(pnos) for i, c in enumerate(self.chars(p))]
+                method = "page_text"
+            cand = [c for _, c in pool]
+            score = None
+            if method != "page_text":
 
                 def score(i0: int, i1: int, cand: list[_Ch] = cand, clip: pymupdf.Rect = clip) -> float:
                     return sum((c.rect & clip).get_area() for c in cand[i0 : i1 + 1])
 
-            else:
-                cand = [c for p in pnos for c in self.chars(p)]
-                method = "page_text"
-                score = None  # type: ignore[assignment]
             span, reason = _align(
                 text[f.start : f.end], lo - f.start, hi - f.start, [c.c for c in cand], [c.eol for c in cand], score
             )
             if span is None:
                 why = self.empty_reason(pnos[0]) or reason
+                if method == "page_text":
+                    why = "нет координат слов от ридера (у блока только loc.page); " + why
                 locs.append(_Loc(pnos[0], [], method, why))
                 continue
-            chosen = cand[span[0] : span[1] + 1]
-            by_page: dict[int, list[_Ch]] = defaultdict(list)
-            for c in chosen:
-                by_page[c.key[0]].append(c)
-            for pno in sorted(by_page):
-                rects = _line_rects((c.c, c.rect, c.key) for c in by_page[pno])
-                if rects:
-                    locs.append(_Loc(pno, rects, method))
+            for idx, c in pool[span[0] : span[1] + 1]:
+                picked[c.key[0]][idx] = c
+                methods[c.key[0]].add(method)
         if not covered:
             return [_Loc(None, [], "fragment", "диапазон цитаты не покрыт fragments блока")]
-        return _merge_locs(locs)
-
-
-def _merge_locs(locs: list[_Loc]) -> list[_Loc]:
-    """Соседние куски одной цитаты на одной странице → одна аннотация с несколькими quads."""
-    out: list[_Loc] = []
-    for lc in locs:
-        prev = out[-1] if out else None
-        if prev and lc.rects and prev.rects and prev.page == lc.page and prev.method == lc.method:
-            prev.rects.extend(lc.rects)
-        else:
-            out.append(_Loc(lc.page, list(lc.rects), lc.method, lc.reason))
-    return out
+        found = [
+            _Loc(pno, _line_quads(c for _, c in sorted(picked[pno].items())), "+".join(sorted(methods[pno])))
+            for pno in sorted(picked)
+        ]
+        return [lc for lc in found if lc.rects] + locs
 
 
 def _unrot_to_pdf(page: pymupdf.Page, cache: dict[int, pymupdf.Matrix] | None = None) -> pymupdf.Matrix:
@@ -907,7 +991,16 @@ class _Annotator:
                     return r, lines
         lines = [" · ".join(lines)]
         w, h = self._label_size(lines)
-        x = min(max(2.0, anchor.x0), dw - w - 2.0)
+        # компактная подпись в одну строку: ближайший свободный промежуток над или под выделением
+        xs = [min(max(2.0, anchor.x0), dw - w - 2.0), min(max(2.0, anchor.x1 - w), dw - w - 2.0)]
+        for dy in [k * 2.0 for k in range(40)]:
+            for y in (anchor.y0 - h - 0.8 - dy, anchor.y1 + 0.8 + dy):
+                for x in xs:
+                    r = pymupdf.Rect(x, y, x + w, y + h)
+                    if free(r):
+                        occupied.append(r)
+                        return r, lines
+        x = xs[0]
         r = pymupdf.Rect(x, max(1.0, anchor.y0 - h - 0.8), x + w, max(1.0, anchor.y0 - h - 0.8) + h)
         self.overlaps_text += 1
         occupied.append(r)
@@ -921,12 +1014,13 @@ class _Annotator:
         self, pno: int, rects: list[pymupdf.Rect], sev: str, title: str, subject: str, content: str, name: str
     ) -> int:
         page = self.doc[pno]
-        a = page.add_highlight_annot(quads=[r.quad for r in rects])
+        quads = [q if isinstance(q, pymupdf.Quad) else pymupdf.Rect(q).quad for q in rects]
+        a = page.add_highlight_annot(quads=quads)
         a.set_colors(stroke=SEVERITY[sev]["highlight"])
         a.set_info(title=title, subject=subject, content=content)
         a.set_flags(pymupdf.PDF_ANNOT_IS_PRINT)
         a.update()
-        disp = rects[0] * page.rotation_matrix
+        disp = quads[0].rect * page.rotation_matrix
         dw = page.rect.width
         pw, ph = 230.0, 150.0
         px = min(max(2.0, disp.x1 + 8), dw - pw - 2)
@@ -1186,6 +1280,17 @@ def _place_all(
             if lc.page is not None and (an.fid, an.role) not in first_loc:
                 first_loc[(an.fid, an.role)] = (lc, an)
 
+    # Одна видимая подпись на замечание и страницу: у F-014 восемь опор подряд, и восемь подписей
+    # выталкивали подписи соседних замечаний далеко от их выделений. Каждое выделение по-прежнему
+    # несёт свою полную заметку «часть k из n». Стороны противоречия подписываются отдельно.
+    grouped: dict[tuple[str, int], list[int]] = defaultdict(list)
+    for an, locs, _ in located:
+        if an.role == "evidence":
+            for lc in locs:
+                if lc.page is not None and lc.rects:
+                    grouped[(an.fid, lc.page)].append(an.part)
+    labelled: set[tuple[str, int]] = set()
+
     placements: list[Placement] = []
     label_rects: dict[tuple[str, str], tuple[int, pymupdf.Rect]] = {}
     for an, locs, base in located:
@@ -1229,10 +1334,12 @@ def _place_all(
                 continue
             if lc.rects:
                 pl.status = "highlight"
-                pl.rects = [list(map(float, r)) for r in lc.rects]
-                ann.highlight(lc.page, lc.rects, sev, title, subject, content, tag)
+                shapes = [q if isinstance(q, pymupdf.Quad) else pymupdf.Rect(q).quad for q in lc.rects]
+                pl.rects = [list(map(float, q.rect)) for q in shapes]
+                pl.quads = [[[round(p.x, 3), round(p.y, 3)] for p in (q.ul, q.ur, q.ll, q.lr)] for q in shapes]
+                ann.highlight(lc.page, shapes, sev, title, subject, content, tag)
                 pl.annot_names.append(NM_PREFIX + tag)
-                anchor = lc.rects[0] * ann.doc[lc.page].rotation_matrix
+                anchor = shapes[0].rect * ann.doc[lc.page].rotation_matrix
             else:
                 pl.status = "note"
                 pl.reason = lc.reason
@@ -1240,9 +1347,18 @@ def _place_all(
                 anchor = ann.note(lc.page, sev, title, subject + " · без координат", note_content, tag + ":note")
                 pl.annot_names.append(NM_PREFIX + tag + ":note")
                 extra.append("без координат")
+            group = sorted(set(grouped.get((an.fid, lc.page), []))) if pl.status == "highlight" else []
+            if len(group) > 1:
+                if (an.fid, lc.page) in labelled:
+                    placements.append(pl)  # подпись уже стоит у первой части на этой странице
+                    continue
+                labelled.add((an.fid, lc.page))
+                extra = [f"части {_ranges(group)} из {an.parts}"] + (["на проверке"] if review else [])
             lines = [an.fid + (f" · {extra[0]}" if extra and an.role in ("a", "b") else ""), SEVERITY[sev]["word"]]
             rest = extra[1:] if an.role in ("a", "b") else extra
-            if rest:
+            if len(group) > 1:
+                lines += rest
+            elif rest:
                 lines.append(" · ".join(rest))
             label_text = f"{an.fid} · {SEVERITY[sev]['mark']} {SEVERITY[sev]['word']}" + (
                 f" · {' · '.join(extra)}" if extra else ""
@@ -1259,6 +1375,17 @@ def _place_all(
             ann.link(pno, rect, bp, br)
             ann.link(bp, br, pno, rect)
     return placements
+
+
+def _ranges(nums: list[int]) -> str:
+    """[1, 2, 3, 5] → «1–3, 5»."""
+    out: list[tuple[int, int]] = []
+    for n in nums:
+        if out and out[-1][1] == n - 1:
+            out[-1] = (out[-1][0], n)
+        else:
+            out.append((n, n))
+    return ", ".join(f"{a}–{b}" if b > a else str(a) for a, b in out)
 
 
 def _summary_text(
@@ -1689,6 +1816,7 @@ class _MdRenderer:
         x0 = self.X0 if x is None else x
         lead = size * lead_k
         vls = self.wrap(spans, self.X1 - x0, size)
+        page_of_label = -1
         for k, vl in enumerate(vls):
             self.ensure(lead)
             baseline = self.y + size * 1.02
@@ -1697,8 +1825,10 @@ class _MdRenderer:
             self.draw_line(vl, x0, baseline, size, color, ln_hint=ln)
             if bar:
                 self.ops[self.pno].append(("line", (self.X0 + 2, self.y), (self.X0 + 2, self.y + lead), (0.7, 0.72, 0.8), 1.6))
-            if k == 0:
-                self.gutter(ln, baseline)
+            if k == 0 or page_of_label != self.pno:
+                # продолжение строки после разрыва страницы помечается «(ln)», как повтор шапки
+                self.gutter(ln, baseline, repeated=k > 0)
+                page_of_label = self.pno
             self.y += lead
 
     # -- блоки Markdown
@@ -1818,13 +1948,15 @@ class _MdRenderer:
         self.y += 2
         for ln, text in body:
             spans = [_S(" " if c == "\t" else c, ln, k, "codeblock") for k, c in enumerate(text)]
+            page_of_label = -1
             for k, vl in enumerate(self.wrap(spans, self.X1 - self.X0 - 8, size, keep_space=True)):
                 self.ensure(lead)
                 self.ops[self.pno].append(("rect", pymupdf.Rect(self.X0, self.y, self.X1, self.y + lead), (0.95, 0.95, 0.97), None, 0))
                 baseline = self.y + size * 1.02
                 self.draw_line(vl, self.X0 + 4, baseline, size, ln_hint=ln)
-                if k == 0:
-                    self.gutter(ln, baseline)
+                if k == 0 or page_of_label != self.pno:
+                    self.gutter(ln, baseline, repeated=k > 0)
+                    page_of_label = self.pno
                 self.y += lead
         self.y += 3
 
@@ -1895,6 +2027,8 @@ class _MdRenderer:
                     )
             if start == 0 or repeated:
                 self.gutter(ln, first_base, repeated=repeated)
+            else:  # кусок строки таблицы, перенесённый на новую страницу
+                self.gutter(ln, first_base, repeated=True)
             self.y = y0 + h
 
         def new_page_with_header() -> None:
@@ -2257,6 +2391,8 @@ def read_annotations(pdf_path: str | os.PathLike[str]) -> list[dict[str, Any]]:
                     rec["quads"] = [
                         [round(c, 2) for c in pymupdf.Quad(v[i : i + 4]).rect] for i in range(0, len(v) - 3, 4)
                     ]
+                    # вершины как есть (ul, ur, ll, lr): у наклонного текста это не прямоугольник
+                    rec["quad_points"] = [[[round(c, 3) for c in pt] for pt in v[i : i + 4]] for i in range(0, len(v) - 3, 4)]
                     rec["color"] = list(a.colors.get("stroke") or [])
                     rec["has_popup"] = bool(a.has_popup)
                 out.append(rec)
@@ -2340,8 +2476,12 @@ def verify_export(
                 missing.append(nm)
                 continue
             if p.get("status") == "highlight" and nm.count(":") == 4:
-                got = a.get("quads") or []
-                want = p.get("rects") or []
+                # вершины Highlight против записанных четырёхугольников (или рамок у старых манифестов)
+                if p.get("quads"):
+                    got = [[c for pt in q for c in pt] for q in a.get("quad_points") or []]
+                    want = [[c for pt in q for c in pt] for q in p["quads"]]
+                else:
+                    got, want = a.get("quads") or [], p.get("rects") or []
                 if len(got) != len(want) or any(
                     max(abs(x - y) for x, y in zip(g, w)) > 1.0 for g, w in zip(got, want)
                 ):
