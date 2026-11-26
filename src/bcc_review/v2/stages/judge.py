@@ -551,9 +551,13 @@ def _ask(ctx: Any, system: str, user: str, schema: dict) -> dict:
     if llm is None:
         raise RuntimeError("модель недоступна")
     try:
-        return llm.ask(STAGE, system, user, schema, max_output_tokens=MAX_OUTPUT_TOKENS)
+        data = llm.ask(STAGE, system, user, schema, max_output_tokens=MAX_OUTPUT_TOKENS)
     except TypeError:
-        return llm.ask(STAGE, system, user, schema)
+        data = llm.ask(STAGE, system, user, schema)
+    missing = [k for k in schema.get("required") or [] if not isinstance(data, dict) or k not in data]
+    if missing:  # ответ не по схеме этапа — это сбой вызова, а не пустой реестр
+        raise ValueError(f"ответ модели без полей {', '.join(missing)}")
+    return data
 
 
 def _call_judge(ctx: Any, cands: list[dict], clusters: list[list[str]], checklist: str,
@@ -1276,6 +1280,8 @@ def run(ctx: Any, candidates: list[dict]) -> dict:
     try:
         parts = _call_judge(ctx, good, clusters, check_block, warnings)
         response = _merge_responses(parts)
+        if not (response.get("findings") or response.get("rejected")):
+            raise ValueError("пустой ответ: ни один кандидат не распределён")
     except Exception as exc:  # noqa: BLE001 — запасной реестр лучше, чем пустой отчёт
         _warn(ctx, warnings, f"судья недоступен ({type(exc).__name__}: {_cut(str(exc), 160)}); "
                              "реестр собран кодом из кластеров без отсева ложных")

@@ -547,3 +547,12 @@ def test_plan_b_candidates_from_v1_report():
     res = judge.run(Ctx(FakeLLM(response([finding("F01", ["C-001"], kind="contradiction")])), view=view,
                         requirements=[]), cs)
     assert res["findings"][0]["evidence"][0]["line_start"] == 39
+
+
+def test_empty_model_answer_falls_back_to_code_registry():
+    cs = [cand("C-001", 38, "Месяц определяется"), cand("C-002", 46, "в течение минуты", kind="unverifiable")]
+    empty = {"findings": [], "rejected": [], "checklist": [], "verdict_summary": ""}
+    res = judge.run(Ctx(FakeLLM(empty)), cs)
+    all_placed(res, ["C-001", "C-002"])
+    assert len(res["findings"]) == 2 and not res["rejected"]
+    assert any("судья недоступен" in w for w in res["warnings"])
