@@ -1,6 +1,6 @@
 --- a/src/bcc_review/runtime/asker.py
 +++ b/src/bcc_review/runtime/asker.py
-@@ -75,6 +75,32 @@
+@@ -84,6 +84,32 @@
              params=self.params,
          )
  
@@ -33,7 +33,7 @@
      # ------------------------------------------------------------------ вызов
      def __call__(self, stage: str, payload: Mapping[str, Any], schema: Mapping[str, Any]) -> dict:
          messages, policy = self.build_messages(stage, payload)
-@@ -94,14 +120,17 @@
+@@ -103,14 +129,17 @@
              self.budget.note_call()
              t0 = time.monotonic()
              is_retry = attempt > 0
@@ -54,7 +54,7 @@
                  self.budget.note_tokens(sum(int(v or 0) for k, v in err.usage.items() if k in ("input_tokens", "output_tokens")))
                  self.stats.call(stage, ok=False, usage=err.usage, model=err.model, retry=is_retry)
                  self.tracer.emit("call_error", stage=stage, kind=err.kind, retry_after_s=err.retry_after_s,
-@@ -119,6 +148,7 @@
+@@ -128,6 +157,7 @@
                      continue
                  raise AskError(stage, err.kind, err.message) from err
              usage = dict(res.get("usage") or {})

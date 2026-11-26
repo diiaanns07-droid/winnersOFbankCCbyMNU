@@ -2,7 +2,7 @@
 
 Адаптер `src/bcc_review/providers/gemini.py` и его тесты. Документ служит передачей для Max (движок,
 владелец контракта), №11 (адаптер Anthropic) и №18 (холодный прогон). Основа — `bcc/integration`
-6be9e97 (движок, `runtime.asker`, контракт v1 431f76d), влитая в ветку `claude/vigilant-sagan-xjr7yo`.
+6a6c503 (движок, `runtime.asker`, контракт v1 431f76d), влитая в ветку `claude/vigilant-sagan-xjr7yo`.
 Второй проход (общий бюджет и честное число запросов) — раздел 10.
 
 ## 1. Контракт (как в `bcc_review.contracts.ProviderAdapter`)
@@ -216,7 +216,10 @@ P12_LIVE=1 python -m pytest tests/p12/test_p12_live.py -v -s
 
 ## 9. Открытые вопросы к Max
 
-0. **Влить `tests/p12/max_asker_call_gate.diff`** (раздел 10): без него запасная модель недостижима при
+0. **Влить эту ветку заново**: в `bcc/integration` 6a6c503 (`ced537d`) лежит первый проход `6f7bfbf`. На нём
+   `GeminiAdapter()` без аргументов (так его создаёт `engine.setup_provider`) не читает `GEMINI_API_KEY`:
+   даже с ключом прогон даёт `not_configured` и уходит в rules_only. Плюс перерасход запросов (раздел 10).
+   **Влить `tests/p12/max_asker_call_gate.diff`** (раздел 10): без него запасная модель недостижима при
    `quota`/`not_found` и при Retry-After длиннее остатка времени, хотя бюджет и счёт запросов уже честные.
 1. В `pyproject.toml` нет extra для Gemini. Предложение: `gemini = ["google-genai==3.6.1"]` и добавить его в `all`.
 2. `invalid_output` в контракте не временная, поэтому пустой content (`subkind` `empty_candidates` или
@@ -228,7 +231,8 @@ P12_LIVE=1 python -m pytest tests/p12/test_p12_live.py -v -s
 
 ## 10. Общий бюджет и честное число запросов (второй проход)
 
-**Проблема (воспроизведена на `6f7bfbf` с настоящим `runtime.asker.Asker` из 6be9e97).** `Asker` делает
+**Проблема (воспроизведена на `6f7bfbf` с настоящим `runtime.asker.Asker` из 6be9e97 и повторно на
+действующем `bcc/integration` 6a6c503, где лежит этот же адаптер).** `Asker` делает
 `budget.check` и `budget.note_call` один раз перед `invoke`, а `run.calls.physical` складывается из
 `stats.call`, которых тоже одна на `invoke`. Прежний адаптер с запасной моделью делал внутри одного `invoke`
 два `generate_content`: при `max_calls=1` уходило 2 запроса. В сквозном `run_review` при `max_calls=2` уходило
@@ -249,7 +253,9 @@ P12_LIVE=1 python -m pytest tests/p12/test_p12_live.py -v -s
 
 **Правка для Max (`tests/p12/max_asker_call_gate.diff`, 33 строки в `runtime/asker.py`).** Заменяемые
 фрагменты лежат в `tests/p12/p12_asker_patch.py`. Тест применяет их к текущему `asker.py` и сверяет с
-закоммиченным diff; `git apply --check` на 6be9e97 проходит.
+закоммиченным diff. `git apply --check` проходит на 6a6c503 (и проходил на 6be9e97). Полный `pytest tests`
+на копии 6a6c503 с diff и этим адаптером даёт те же 17 падений, что и чистый 6a6c503 (шрифты и PDF №14, №02,
+№04, №08, №09, №15, №16, `conftest` №11), и ни одного в `tests/p12`; пройдено 1192 вместо 1161.
 
 * `_call_gate(stage, attempt)`: только для адаптеров с `supports_call_gate` (Mock и Anthropic не затронуты,
   это проверено тестом). Гейт делает `budget.check` + `budget.note_call` и пишет в трассу `fallback_call`;
@@ -268,11 +274,11 @@ python -m tests.p12.p12_budget
 
 | Asker | Случай | Ушло запросов (flash / lite) | Отчёт: calls.physical · model · models_seen | Статус | Причина остановки |
 |---|---|---|---|---|---|
-| HEAD 6be9e97 | лимит 1, flash 503 → lite | 1 / 0 | 1 · flash · [flash] | budget_exhausted | исчерпан лимит вызовов модели (1) |
-| HEAD 6be9e97 | лимит 2, flash 503 → lite | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
-| HEAD 6be9e97 | лимит 2, flash quota → lite | 1 / 0 | 1 · flash · [flash] | ask_error:quota | quota не временная, повтора нет |
-| HEAD 6be9e97 | тёплый кэш после лимита 2 | 0 / 0 | 0 · lite · [lite], cache_hits 1 | ok | — |
-| HEAD 6be9e97 | лимит 2, Retry-After 39 с, остаток 30 с | 1 / 0 | 1 · flash · [flash] | budget_exhausted | пауза Retry-After превышает остаток |
+| HEAD 6a6c503 | лимит 1, flash 503 → lite | 1 / 0 | 1 · flash · [flash] | budget_exhausted | исчерпан лимит вызовов модели (1) |
+| HEAD 6a6c503 | лимит 2, flash 503 → lite | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
+| HEAD 6a6c503 | лимит 2, flash quota → lite | 1 / 0 | 1 · flash · [flash] | ask_error:quota | quota не временная, повтора нет |
+| HEAD 6a6c503 | тёплый кэш после лимита 2 | 0 / 0 | 0 · lite · [lite], cache_hits 1 | ok | — |
+| HEAD 6a6c503 | лимит 2, Retry-After 39 с, остаток 30 с | 1 / 0 | 1 · flash · [flash] | budget_exhausted | пауза Retry-After превышает остаток |
 | + diff Max | лимит 1, flash 503 → lite | 1 / 0 | 1 · flash · [flash] | budget_exhausted | гейт отказал: лимит вызовов (1) |
 | + diff Max | лимит 2, flash 503 → lite | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
 | + diff Max | лимит 2, flash quota → lite | 1 / 1 | 2 · lite · [flash, lite] | ok | — |
@@ -294,4 +300,5 @@ python -m tests.p12.p12_budget
 | `test_p12_fallback.py::test_without_gate_*`, `::test_gate_*` | протокол гейта на уровне адаптера |
 
 На прежнем адаптере (`gemini.py` из 6f7bfbf в отдельной копии дерева) `test_p12_asker_budget.py` даёт 17 падений
-из 24, а `test_p12_engine_budget.py` — 2 из 2.
+из 24, а `test_p12_engine_budget.py` — 2 из 2. На действующем 6a6c503 (тот же адаптер) оба файла вместе дают
+19 падений из 27.
