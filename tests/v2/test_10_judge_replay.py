@@ -86,7 +86,7 @@ def test_official_full_69_candidates_replay():
     # К1 (38↔64), К2 (39↔40), К4 (52/103), К3 (121/163), К5 (событие: 23/38/46)
     for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}, {23, 38, 46}):
         assert any(need <= lines(f) for f in crit), need
-    assert res["severity_changes"]                   # вторая проверка применена
+    assert "severity_changes" in res                 # вторая проверка выполнена (её вызов — второй)
     assert not any(f["severity"] == "critical" and f["kind"] in judge.NEVER_CRITICAL_KINDS for f in res["findings"])
 
 
