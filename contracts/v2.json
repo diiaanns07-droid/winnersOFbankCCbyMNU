@@ -1,0 +1,1075 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/contracts/v2.json",
+  "title": "BCC Review — итог прогона v2 (report.json)",
+  "description": "Схема файла report.json ядра v2 (CONTRACT.md, раздел 2.6). Владелец — №13. Лишние поля разрешены: этапы могут добавлять свои данные, отчёт их не теряет.",
+  "type": "object",
+  "required": [
+    "schema",
+    "run",
+    "document",
+    "requirements",
+    "findings",
+    "verdict",
+    "summary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bcc-review/2"
+    },
+    "run": {
+      "$ref": "#/$defs/run"
+    },
+    "document": {
+      "$ref": "#/$defs/document"
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/requirement"
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/excluded"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rejected"
+      }
+    },
+    "acceptance_checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/acceptance_check"
+      }
+    },
+    "pair_checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pair_check"
+      }
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/trace"
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/glossary"
+      }
+    },
+    "test_cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/test_case"
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/question"
+      }
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/checklist_item"
+      }
+    },
+    "verdict": {
+      "$ref": "#/$defs/verdict"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "rewrites": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "revised_file": {
+      "type": "string"
+    },
+    "clarification": {
+      "$ref": "#/$defs/clarification"
+    },
+    "title": {
+      "type": "string",
+      "description": "Заголовок отчёта, если не «Ревью требований» (офлайн-режим №12)"
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "not_checked": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "checklist_source": {
+      "enum": [
+        "document",
+        "bank"
+      ]
+    }
+  },
+  "$defs": {
+    "line_no": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "page": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "id_list": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "severity": {
+      "enum": [
+        "critical",
+        "major",
+        "minor"
+      ]
+    },
+    "blocks": {
+      "enum": [
+        "development",
+        "testing",
+        "both",
+        "none"
+      ]
+    },
+    "readiness": {
+      "enum": [
+        "no",
+        "conditional",
+        "yes",
+        "undetermined",
+        "none"
+      ],
+      "description": "undetermined — прогон без модели (№12): смысл требований не проверялся; none — прогон со сбоем"
+    },
+    "stage_status": {
+      "enum": [
+        "ok",
+        "partial",
+        "failed",
+        "skipped"
+      ]
+    },
+    "verified": {
+      "enum": [
+        "exact",
+        "normalized",
+        "fuzzy",
+        "missing"
+      ]
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "agent",
+        "version",
+        "commit",
+        "started_at",
+        "provider",
+        "status",
+        "stages"
+      ],
+      "properties": {
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string",
+          "minLength": 10
+        },
+        "finished_at": {
+          "type": "string"
+        },
+        "duration_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model_requested": {
+          "type": "string"
+        },
+        "models_used": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "calls": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cached": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "split": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "tokens": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "failed"
+          ]
+        },
+        "stages": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/stage_status"
+          }
+        },
+        "stage_stats": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "calls": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "seconds": {
+                "type": "number",
+                "minimum": 0
+              },
+              "candidates": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "model": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "options": {
+          "type": "object"
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "required": [
+        "title",
+        "file",
+        "format",
+        "sha256",
+        "lines"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "format": {
+          "enum": [
+            "md",
+            "txt",
+            "pdf",
+            "docx",
+            "html"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pages": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "summary",
+        "line_start",
+        "line_end"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^R-\\d{2,}$"
+        },
+        "source_id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "functional",
+            "nonfunctional",
+            "data",
+            "integration",
+            "ui",
+            "process",
+            "architecture",
+            "api",
+            "acceptance",
+            "constraint",
+            "goal",
+            "other"
+          ]
+        },
+        "section": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "quote": {
+          "type": "string"
+        },
+        "line_start": {
+          "$ref": "#/$defs/line_no"
+        },
+        "line_end": {
+          "$ref": "#/$defs/line_no"
+        },
+        "page": {
+          "$ref": "#/$defs/page"
+        }
+      }
+    },
+    "excluded": {
+      "type": "object",
+      "required": [
+        "what",
+        "line_start",
+        "reason"
+      ],
+      "properties": {
+        "what": {
+          "type": "string"
+        },
+        "line_start": {
+          "$ref": "#/$defs/line_no"
+        },
+        "line_end": {
+          "$ref": "#/$defs/line_no"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "quote",
+        "line_start",
+        "verified"
+      ],
+      "properties": {
+        "quote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_start": {
+          "$ref": "#/$defs/line_no"
+        },
+        "line_end": {
+          "$ref": "#/$defs/line_no"
+        },
+        "page": {
+          "$ref": "#/$defs/page"
+        },
+        "section": {
+          "type": "string"
+        },
+        "verified": {
+          "$ref": "#/$defs/verified"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "criterion",
+        "severity",
+        "requirement_ids",
+        "evidence",
+        "problem",
+        "recommendation",
+        "blocks"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^D-\\d{2,}$"
+        },
+        "candidate_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string"
+        },
+        "criterion": {
+          "type": "string"
+        },
+        "standard_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "requirement_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "problem": {
+          "type": "string"
+        },
+        "scenario": {
+          "type": "string"
+        },
+        "impact": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        },
+        "rewrite": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "blocks": {
+          "$ref": "#/$defs/blocks"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "enum": [
+            "open",
+            "resolved",
+            "changed",
+            "new"
+          ]
+        },
+        "status_note": {
+          "type": "string"
+        },
+        "status_after_answers": {
+          "enum": [
+            "open",
+            "resolved",
+            "changed",
+            "new"
+          ]
+        },
+        "rule_conflict": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "severity": {
+                "const": "critical"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "blocks": {
+                "enum": [
+                  "development",
+                  "testing",
+                  "both"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "rejected": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "duplicate_of": {
+          "type": "string"
+        }
+      }
+    },
+    "acceptance_check": {
+      "type": "object",
+      "required": [
+        "row_requirement_id",
+        "verdict"
+      ],
+      "properties": {
+        "row_requirement_id": {
+          "type": "string"
+        },
+        "row_facts": {
+          "type": "string"
+        },
+        "rule_requirement_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "expected_by_rules": {
+          "type": "string"
+        },
+        "stated": {
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "match",
+            "conflict",
+            "undefined"
+          ]
+        },
+        "finding_ids": {
+          "$ref": "#/$defs/id_list"
+        }
+      }
+    },
+    "pair_check": {
+      "type": "object",
+      "required": [
+        "a",
+        "b",
+        "verdict"
+      ],
+      "properties": {
+        "a": {
+          "type": "string"
+        },
+        "b": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "same_subject": {
+          "type": "boolean"
+        },
+        "quote_a": {
+          "type": "string"
+        },
+        "line_a": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "quote_b": {
+          "type": "string"
+        },
+        "line_b": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "scenario": {
+          "type": "string"
+        },
+        "outcome_a": {
+          "type": "string"
+        },
+        "outcome_b": {
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "conflict",
+            "compatible",
+            "undefined"
+          ]
+        },
+        "finding_ids": {
+          "$ref": "#/$defs/id_list"
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "required": [
+        "requirement_id"
+      ],
+      "properties": {
+        "requirement_id": {
+          "type": "string"
+        },
+        "verified_by": {
+          "$ref": "#/$defs/id_list"
+        },
+        "implemented_by": {
+          "$ref": "#/$defs/id_list"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "glossary": {
+      "type": "object",
+      "required": [
+        "concept",
+        "terms"
+      ],
+      "properties": {
+        "concept": {
+          "type": "string"
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "term"
+            ],
+            "properties": {
+              "term": {
+                "type": "string"
+              },
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "problem": {
+          "type": "string"
+        },
+        "finding_ids": {
+          "$ref": "#/$defs/id_list"
+        }
+      }
+    },
+    "test_case": {
+      "type": "object",
+      "required": [
+        "id",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "requirement_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "title": {
+          "type": "string"
+        },
+        "given": {
+          "type": "string"
+        },
+        "when": {
+          "type": "string"
+        },
+        "then": {
+          "type": "string"
+        },
+        "gap": {
+          "type": "string"
+        },
+        "expected_defined": {
+          "type": "boolean"
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": [
+        "id",
+        "question"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "finding_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "to": {
+          "type": "string"
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "why": {
+          "type": "string"
+        },
+        "topic": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "checklist_item": {
+      "type": "object",
+      "required": [
+        "item",
+        "answer"
+      ],
+      "properties": {
+        "item": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "finding_ids": {
+          "$ref": "#/$defs/id_list"
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "required": [
+        "development",
+        "testing"
+      ],
+      "properties": {
+        "development": {
+          "$ref": "#/$defs/readiness"
+        },
+        "testing": {
+          "$ref": "#/$defs/readiness"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "fix_first": {
+          "$ref": "#/$defs/id_list"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "requirements",
+        "findings",
+        "requirements_without_findings",
+        "quotes_verified"
+      ],
+      "properties": {
+        "requirements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "findings": {
+          "type": "object",
+          "required": [
+            "critical",
+            "major",
+            "minor"
+          ],
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "major": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minor": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "requirements_without_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quotes_verified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quotes_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "questions": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "clarification": {
+      "type": "object",
+      "description": "Режим --answers (№11, recheck.apply_answers): ответы владельца и состояние до и после.",
+      "properties": {
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question_id": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
+              "question": {
+                "type": "string"
+              },
+              "choice": {
+                "type": "string"
+              },
+              "answer": {
+                "type": "string"
+              },
+              "finding_ids": {
+                "$ref": "#/$defs/id_list"
+              }
+            }
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unanswered": {
+          "$ref": "#/$defs/id_list"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "finding_id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "severity_before": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "resolved",
+                  "changed",
+                  "open"
+                ]
+              },
+              "severity_after": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "question_ids": {
+                "$ref": "#/$defs/id_list"
+              },
+              "title_after": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "new_findings": {
+          "$ref": "#/$defs/id_list"
+        },
+        "before": {
+          "type": "object"
+        },
+        "after": {
+          "type": "object"
+        },
+        "resolved": {
+          "type": "integer"
+        },
+        "changed": {
+          "type": "integer"
+        },
+        "open": {
+          "type": "integer"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
