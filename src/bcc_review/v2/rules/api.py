@@ -80,6 +80,11 @@ TYPE_COLS = ("format", "формат", "type", "тип")
 IDENT = re.compile(r"^[A-Za-z_][\w.\[\]]*$")
 
 
+def _slug(s: str) -> str:
+    """Короткий идентификатор предмета для `source` (разные методы — разные кластеры у судьи)."""
+    return re.sub(r"[^A-Za-z0-9]+", "_", s).strip("_")[:40] or "x"
+
+
 def split_camel(name: str) -> list[str]:
     parts = re.split(r"[_\-./]+", name)
     out: list[str] = []
@@ -247,8 +252,9 @@ def rule_get_mutation(doc: Doc, methods: list[Method], out: dict) -> None:
         leak = (f"параметры {fmt_list(params[:4])} передаются в строке URL и оседают в журналах прокси и "
                 f"веб-сервера" if params else "параметры передаются в строке URL и оседают в журналах прокси и "
                 "веб-сервера")
+        rid = "api.get_mutation" + (f".{_slug(m.label)}" if m.label else "")
         c = candidate(
-            "api.get_mutation",
+            rid,
             title=f"Метод {m.label + ' ' if m.label else ''}изменяет данные, но объявлен как {m.verb}",
             kind="api_contract", criterion="correct", severity="major", blocks="development",
             evidence=evidence,
@@ -265,7 +271,7 @@ def rule_get_mutation(doc: Doc, methods: list[Method], out: dict) -> None:
             rewrite="REST type: <уточнить: PUT или POST>. Параметры передаются в теле запроса (application/json).",
         )
         out["candidates"].append(c)
-        out["signals"].append(signal("api.get_mutation", m.verb_line, evidence[0]["quote"],
+        out["signals"].append(signal(rid, m.verb_line, evidence[0]["quote"],
                                      f"Метод {m.label or m.verb} изменяет данные ({reason}), но объявлен как {m.verb}.",
                                      ("architect",), "api_contract"))
         src = m.curl_line or m.url_line or m.verb_line
@@ -620,8 +626,9 @@ def rule_field_types(doc: Doc, methods: list[Method], out: dict) -> None:
             evidence += [q1, q2]
             desc.append(f"{nm}: в запросе {r1.cells[ti1]}, в ответе {r2.cells[ti2]}")
         label = f" метода {m.label}" if m and m.label else ""
+        rid = "api.field_types" + (f".{_slug(m.label)}" if m and m.label else "")
         out["candidates"].append(candidate(
-            "api.field_types",
+            rid,
             title=f"Тип {'поля' if len(names) == 1 else 'полей'} {fmt_list(names)} в запросе и ответе{label} различается",
             kind="api_contract", criterion="set_consistent", severity="major", blocks="development",
             evidence=evidence,
@@ -635,7 +642,7 @@ def rule_field_types(doc: Doc, methods: list[Method], out: dict) -> None:
             rewrite="; ".join(f"{nm} | <уточнить: один тип для запроса и ответа>" for nm in names),
             conflict=True,
         ))
-        out["signals"].append(signal("api.field_types", bad[0][1][1], evidence[0]["quote"],
+        out["signals"].append(signal(rid, bad[0][1][1], evidence[0]["quote"],
                                      "Разные типы одного поля в запросе и ответе: " + "; ".join(desc) + ".",
                                      ("architect",), "api_contract"))
 

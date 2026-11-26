@@ -69,7 +69,7 @@
    "note": "Время 23:58 указано без часового пояса, а 00:03 — по Алматы: для дат на границе суток и месяца исход зависит от пояса."
   },
   {
-   "rule": "api.get_mutation",
+   "rule": "api.get_mutation.saveLimit",
    "kind": "api_contract",
    "line": 104,
    "quote": "REST type | GET",
@@ -116,7 +116,7 @@
    "note": "Значения изменения (cardId, amount и enabled) передаются в строке URL метода GET: попадают в журналы прокси, веб-сервера и историю браузера; GET может повторяться автоматически."
   },
   {
-   "rule": "api.field_types",
+   "rule": "api.field_types.saveLimit",
    "kind": "api_contract",
    "line": 143,
    "quote": "amount | integer",
@@ -312,7 +312,7 @@
    "rewrite": "REST type: <уточнить: PUT или POST>. Параметры передаются в теле запроса (application/json).",
    "question": "",
    "blocks": "development",
-   "source": "rules:api.get_mutation",
+   "source": "rules:api.get_mutation.saveLimit",
    "rule_conflict": false
   },
   {
@@ -351,7 +351,7 @@
    "rewrite": "amount | <уточнить: один тип для запроса и ответа>; enabled | <уточнить: один тип для запроса и ответа>",
    "question": "",
    "blocks": "development",
-   "source": "rules:api.field_types",
+   "source": "rules:api.field_types.saveLimit",
    "rule_conflict": true
   },
   {

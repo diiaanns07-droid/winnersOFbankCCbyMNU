@@ -60,7 +60,7 @@ def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
         described = fmt_list([m.label or m.verb for m in methods])
         is_read = split_camel(name)[0] in READ_TOKENS
         out["candidates"].append(candidate(
-            "promises.named_method",
+            f"promises.named_method.{name}",
             title=f"Метод {name} упомянут, но не описан в спецификации API",
             kind="missing_element", criterion="set_complete", severity="critical", blocks="development",
             evidence=evidence,
@@ -72,7 +72,7 @@ def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
             recommendation=f"Добавить описание метода {name} (тип запроса, адрес, параметры, ответ, статусы) или убрать ссылку.",
             question=f"Нужен ли метод {name} в этой поставке, и если да — кто опишет его контракт?",
         ))
-        out["signals"].append(signal("promises.named_method", first, frag,
+        out["signals"].append(signal(f"promises.named_method.{name}", first, frag,
                                      f"Метод {name} упомянут, но не описан: есть только {described}.",
                                      ("architect", "qa"), "missing_element"))
         reported.add(name)

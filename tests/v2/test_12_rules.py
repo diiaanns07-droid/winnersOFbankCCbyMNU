@@ -50,7 +50,15 @@ def official() -> dict:
 
 
 def _sources(out: dict) -> set[str]:
-    return {c["source"] for c in out["candidates"]}
+    """Правила без уточнения предмета: «rules:api.get_mutation.saveLimit» → «rules:api.get_mutation»."""
+    res = set()
+    for c in out["candidates"]:
+        src = c["source"]
+        for base in ("rules:api.get_mutation", "rules:api.field_types", "rules:promises.named_method"):
+            if src.startswith(base + "."):
+                src = base
+        res.add(src)
+    return res
 
 
 def test_official_expected_detectors(official):
@@ -66,6 +74,8 @@ def test_official_expected_detectors(official):
 
 def test_official_key_evidence(official):
     by = {c["source"]: c for c in official["candidates"]}
+    by.update({b: c for c in official["candidates"] for b in ("rules:api.get_mutation", "rules:api.field_types")
+               if c["source"].startswith(b + ".")})
     lines = lambda s: {e["line"] for e in by[s]["evidence"]}  # noqa: E731
     assert {104, 108} <= lines("rules:api.get_mutation")           # GET + путь изменения
     assert {147, 148} <= lines("rules:api.content_type_without_body")
@@ -120,7 +130,7 @@ def test_raw_and_clean_views_agree():
 def test_requirements_mapping():
     seg = json.loads(SEGMENT.read_text(encoding="utf-8"))
     out = rules.run(fallback_load(OFFICIAL), seg)
-    by = {c["source"]: c for c in out["candidates"]}
+    by = {c["source"].split(".saveLimit")[0]: c for c in out["candidates"]}
     assert by["rules:api.get_mutation"]["requirement_ids"], "требования по строкам цитат"
     assert all(r.startswith("R-") for c in out["candidates"] for r in c["requirement_ids"])
     # со списком требований тоже работает
@@ -165,7 +175,7 @@ def test_mutants_detected(case_id):
         pytest.skip("нет мутанта в корпусе")
     src, line = MUTANTS[case_id]
     out = rules.run(fallback_load(path))
-    hit = [c for c in out["candidates"] if c["source"] == src]
+    hit = [c for c in out["candidates"] if c["source"] == src or c["source"].startswith(src + ".")]
     assert hit, [c["source"] for c in out["candidates"]]
     assert line in {e["line"] for e in hit[0]["evidence"]}
 
