@@ -292,11 +292,18 @@
     if (c && state.sel === fid) revealCard(c);
     var target = btn && doc.contains(btn) && !btn.closest('[hidden]') ? btn : c ? toggleOf(c) : null;
     if (target) {
-      if (!c || !c.contains(target)) target.scrollIntoView({ block: 'center' });
+      // Карточка бывает выше экрана (конфликт с двумя сторонами на 390 px): после возврата
+      // кнопка цитаты, с которой ушли к документу, должна быть видна, а не только верх карточки.
+      ensureVisible(target);
       target.focus({ preventScroll: true });
     }
     if (state.sel) setHash(D.findings[state.sel].anchor, { kind: 'finding', fid: state.sel }, false);
     say(state.sel ? 'Возврат к замечанию ' + state.sel + '. Выбор сохранён.' : 'Возврат.');
+  }
+  function ensureVisible(el) {
+    var box = !isNarrow() && fScroll ? fScroll.getBoundingClientRect() : { top: isNarrow() ? 52 : 0, bottom: window.innerHeight };
+    var r = el.getBoundingClientRect();
+    if (r.top < box.top || r.bottom > box.bottom) el.scrollIntoView({ block: 'center' });
   }
   function goBack() {
     if (history.state && history.state.kind === 'quote') {
@@ -573,22 +580,36 @@
     ansStatus.textContent = msg;
     ansStatus.classList.toggle('warn', !!warn);
   }
+  /* Q-ID живёт только в своём прогоне: в другом отчёте того же документа Q-01 может
+     означать другой вопрос. Поэтому запись черновика хранится по отпечатку вопроса
+     (data-qfp: текст вопроса + опоры его замечаний), а Q-ID — лишь подпись. Записи к
+     вопросам, которых нет в этом отчёте, не подставляются и не затираются. */
+  var qByFp = {};
+  A.questions.forEach(function (q) { qByFp[q.fp] = q; });
+  var orphansBox = $('#ans-orphans'), orphansList = $('#ans-orphans-list');
   function collect() {
     var out = {};
     areas.forEach(function (ta) { if (ta.value.trim()) out[ta.getAttribute('data-qid')] = ta.value; });
     return out;
   }
-  function loadDraft() {
+  function readJSON(key) {
     if (!store || !D.doc.id) return null;
     try {
-      var raw = store.getItem(A.storageKey);
-      if (!raw) return null;
-      var d = JSON.parse(raw);
-      if (!d || d.format !== A.draftFormat || d.document_sha256 !== D.doc.id || typeof d.answers !== 'object') return null;
-      return d;
+      var raw = store.getItem(key);
+      return raw ? JSON.parse(raw) : null;
     } catch (err) {
       return null;
     }
+  }
+  function loadDraft() {
+    var d = readJSON(A.storageKey);
+    if (!d || d.format !== A.draftFormat || d.document_sha256 !== D.doc.id || !d.entries || typeof d.entries !== 'object') return null;
+    return d;
+  }
+  function loadLegacy() {
+    var d = readJSON(A.legacyKey);
+    if (!d || d.format !== A.legacyFormat || d.document_sha256 !== D.doc.id || !d.answers || typeof d.answers !== 'object') return null;
+    return d;
   }
   var saveTimer = 0;
   function saveDraft() {
@@ -597,19 +618,21 @@
       return;
     }
     try {
-      var answers = collect();
-      if (Object.keys(answers).length) {
-        store.setItem(A.storageKey, JSON.stringify({
-          format: A.draftFormat,
-          document_sha256: D.doc.id,
-          saved_at: new Date().toISOString(),
-          answers: answers
-        }));
-        setAnsStatus('Черновик сохранён в этом браузере (' + new Date().toLocaleTimeString('ru-RU') + '). Документ и вердикт не изменены.');
-      } else {
-        store.removeItem(A.storageKey);
-        setAnsStatus('Черновик пуст.');
-      }
+      // Перечитываем запись: черновики других прогонов этого документа сохраняются как есть.
+      var obj = loadDraft() || { format: A.draftFormat, document_sha256: D.doc.id, entries: {} };
+      var now = new Date().toISOString();
+      areas.forEach(function (ta) {
+        var fp = ta.getAttribute('data-qfp');
+        if (ta.value.trim()) {
+          obj.entries[fp] = { qid: ta.getAttribute('data-qid'), prompt: (qByFp[fp] || {}).prompt || '', answer: ta.value, saved_at: now, run_id: A.runId };
+        } else {
+          delete obj.entries[fp];
+        }
+      });
+      obj.saved_at = now;
+      if (Object.keys(obj.entries).length) store.setItem(A.storageKey, JSON.stringify(obj));
+      else store.removeItem(A.storageKey);
+      setAnsStatus('Черновик сохранён в этом браузере (' + new Date().toLocaleTimeString('ru-RU') + ') по тексту вопроса. Документ и вердикт не изменены.');
     } catch (err) {
       setAnsStatus('Не удалось сохранить черновик (' + (err && err.name) + '). Выгрузите ответы в Markdown.', true);
     }
@@ -618,17 +641,125 @@
     var art = ta.closest('.qa');
     if (art) art.classList.toggle('has-draft', !!ta.value.trim());
   }
-  if (areas.length) {
-    var d = loadDraft();
-    if (d) {
-      areas.forEach(function (ta) {
-        var v = d.answers[ta.getAttribute('data-qid')];
-        if (typeof v === 'string') { ta.value = v; markDraft(ta); }
+  function el(tag, cls, text) {
+    var e = doc.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function insertInto(qid, text) {
+    var ta = $('textarea.ans[data-qid="' + qid + '"]');
+    if (!ta) return;
+    ta.value = ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' + text : text;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.focus();
+  }
+  function removeStored(item) {
+    try {
+      if (item.legacy) {
+        var lg = loadLegacy();
+        if (lg) {
+          delete lg.answers[item.qid];
+          if (Object.keys(lg.answers).length) store.setItem(A.legacyKey, JSON.stringify(lg));
+          else store.removeItem(A.legacyKey);
+        }
+      } else {
+        var d = loadDraft();
+        if (d) {
+          delete d.entries[item.fp];
+          if (Object.keys(d.entries).length) store.setItem(A.storageKey, JSON.stringify(d));
+          else store.removeItem(A.storageKey);
+        }
+      }
+    } catch (err) { /* хранилище недоступно */ }
+  }
+  function renderOrphans(items) {
+    if (!orphansBox || !orphansList) return;
+    orphansList.textContent = '';
+    items.forEach(function (item, i) {
+      var li = el('li', 'orphan' + (item.legacy ? ' orphan-legacy' : ''));
+      li.setAttribute('data-orphan-qid', item.qid);
+      li.setAttribute('data-orphan-kind', item.legacy ? 'legacy' : 'other-question');
+      li.appendChild(el('p', null, (item.legacy
+        ? 'Старый формат черновика (только Q-ID) · ' + item.qid + ' · сохранён ' + (item.saved_at || '—')
+        : item.qid + ' прогона ' + (item.run_id || '—') + ' · сохранён ' + (item.saved_at || '—'))));
+      li.appendChild(el('p', 'small', item.legacy
+        ? 'Вопрос неизвестен: старый формат хранил только номер, а в этом отчёте ' + item.qid + ' может означать другое. Ответ не подставлен.'
+        : 'Вопрос: «' + (item.prompt || '—') + '». В этом отчёте такого вопроса нет.'));
+      var id = 'orph-' + i;
+      var lab = el('label', 'small', 'Текст сохранённого ответа');
+      lab.setAttribute('for', id);
+      var ta = el('textarea', 'orphan-text');
+      ta.id = id;
+      ta.readOnly = true;
+      ta.rows = 2;
+      ta.value = item.answer;
+      var sel = el('select');
+      sel.setAttribute('aria-label', 'Вопрос этого отчёта для переноса ответа ' + item.qid);
+      A.questions.forEach(function (q) { var o = el('option', null, q.id + ' — ' + q.prompt.slice(0, 70)); o.value = q.id; sel.appendChild(o); });
+      var put = el('button', 'btn', 'Перенести в черновик');
+      put.type = 'button';
+      put.addEventListener('click', function () { insertInto(sel.value, item.answer); });
+      var del = el('button', 'btn', 'Удалить сохранённый ответ');
+      del.type = 'button';
+      del.addEventListener('click', function () {
+        removeStored(item);
+        li.remove();
+        if (!orphansList.children.length) orphansBox.hidden = true;
+        setAnsStatus('Сохранённый ответ ' + item.qid + ' удалён из браузера.');
       });
-      setAnsStatus('Восстановлен черновик от ' + d.saved_at + ' для этой версии документа. Он хранится только в браузере и в отчёте не учтён.');
-    } else if (!store) {
-      setAnsStatus('Локальное хранилище недоступно (приватный режим или запрет сайта). Ответы можно ввести и выгрузить в Markdown, но после закрытия вкладки они пропадут.', true);
+      var row = el('div', 'btns');
+      row.appendChild(sel);
+      row.appendChild(put);
+      row.appendChild(del);
+      li.appendChild(lab);
+      li.appendChild(ta);
+      li.appendChild(row);
+      orphansList.appendChild(li);
+    });
+    orphansBox.hidden = items.length === 0;
+  }
+  if (areas.length) {
+    var draft = loadDraft();
+    var legacy = loadLegacy();
+    var restored = 0, moved = [], orphans = [];
+    if (draft) {
+      areas.forEach(function (ta) {
+        var e = draft.entries[ta.getAttribute('data-qfp')];
+        if (e && typeof e.answer === 'string') {
+          ta.value = e.answer;
+          markDraft(ta);
+          restored++;
+          if (e.qid && e.qid !== ta.getAttribute('data-qid')) moved.push(e.qid + ' → ' + ta.getAttribute('data-qid'));
+        }
+      });
+      Object.keys(draft.entries).forEach(function (fp) {
+        var e = draft.entries[fp];
+        if (!qByFp[fp] && e && typeof e.answer === 'string' && e.answer.trim()) {
+          orphans.push({ fp: fp, qid: e.qid, prompt: e.prompt, answer: e.answer, saved_at: e.saved_at, run_id: e.run_id });
+        }
+      });
     }
+    if (legacy) {
+      Object.keys(legacy.answers).forEach(function (qid) {
+        var v = legacy.answers[qid];
+        if (typeof v === 'string' && v.trim()) orphans.push({ legacy: true, qid: qid, answer: v, saved_at: legacy.saved_at });
+      });
+    }
+    renderOrphans(orphans);
+    var msg = [];
+    var warn = false;
+    if (restored) msg.push('Восстановлено черновиков для этой версии документа: ' + restored + ' (сопоставлены по тексту вопроса, в отчёте не учтены).');
+    if (moved.length) msg.push('Номер вопроса изменился: ' + moved.join(', ') + '.');
+    var nOther = orphans.filter(function (o) { return !o.legacy; }).length;
+    var nLegacy = orphans.length - nOther;
+    if (nOther) { msg.push('Черновиков к вопросам, которых нет в этом отчёте: ' + nOther + ' — они не подставлены, см. список ниже.'); warn = true; }
+    if (nLegacy) { msg.push('Найден черновик старого формата, где ответ привязан только к номеру вопроса (ответов: ' + nLegacy + '). Он не подставлен: под тем же номером теперь может быть другой вопрос.'); warn = true; }
+    if (!store) {
+      msg.push('Локальное хранилище недоступно (приватный режим или запрет сайта). Ответы можно ввести и выгрузить в Markdown, но после закрытия вкладки они пропадут.');
+      warn = true;
+    }
+    if (msg.length) setAnsStatus(msg.join(' '), warn);
     areas.forEach(function (ta) {
       ta.addEventListener('input', function () {
         markDraft(ta);
@@ -637,22 +768,22 @@
       });
     });
   }
-  function answerLines(ans) {
-    ans = ans.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^\n+|\n+$/g, '');
-    if (!ans.trim()) return [];
-    return ans.split('\n').map(function (l) {
-      var c = l.charAt(0);
-      return c === '#' || c === '\\' ? '\\' + l : l;
-    }).concat(['']);
+  /* Формат совпадает с answers_markdown() в html.py: карточка у каждого вопроса, «Ответ: …» одной строкой. */
+  function oneLine(s) {
+    return String(s || '').split(/\r\n|\r|\n/).map(function (x) { return x.replace(/^[ \t]+|[ \t]+$/g, ''); })
+      .filter(function (x) { return x; }).join(' ');
   }
   function buildMarkdown(exportedAt) {
     var answers = collect();
-    var lines = [];
+    var lines = [], missing = [], blocks = [];
     A.header.forEach(function (h) { lines.push(h === null ? 'exported_at: ' + exportedAt : h); });
     A.questions.forEach(function (q) {
-      lines.push.apply(lines, q.head);
-      lines.push.apply(lines, answerLines(answers[q.id] || q.reportAnswer || ''));
+      var one = oneLine(answers[q.id] || '') || oneLine(q.reportAnswer || '');
+      blocks.push(q.head.concat([one ? 'Ответ: ' + one : 'Ответ:', '']));
+      if (!one) missing.push(q.id);
     });
+    if (missing.length) lines.push('Без ответа: ' + missing.join(', '), '');
+    blocks.forEach(function (b) { lines.push.apply(lines, b); });
     return lines.join('\n').replace(/\n+$/, '') + '\n';
   }
   function fileName() { return 'answers-' + (D.doc.id || 'document').slice(0, 12) + '.md'; }
@@ -696,10 +827,10 @@
   });
   var clr = $('#ans-clear');
   if (clr) clr.addEventListener('click', function () {
-    if (!window.confirm('Удалить черновик ответов для этого документа?')) return;
+    if (!window.confirm('Удалить черновики ответов на вопросы этого отчёта? Сохранённые ответы к другим вопросам останутся.')) return;
     areas.forEach(function (ta) { ta.value = ''; markDraft(ta); });
-    try { if (store) store.removeItem(A.storageKey); } catch (err) { /* нет хранилища */ }
-    setAnsStatus('Черновик удалён.');
+    saveDraft();
+    setAnsStatus('Черновики ответов на вопросы этого отчёта удалены.');
   });
 
   /* ---------------------------------------------------------- старт */

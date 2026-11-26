@@ -46,7 +46,7 @@ class Collector(HTMLParser):
             self.texts[self.block] = ""
         if "data-text" in a:
             self.in_text = True
-        if self.in_text and tag == "span" and "data-ev" in a:
+        if self.in_text and tag in ("span", "mark") and "data-ev" in a:
             self.cur_ev = a["data-ev"].split()
             s, e = map(int, a["data-cp"].split(":"))
             for ev in self.cur_ev:
@@ -54,7 +54,7 @@ class Collector(HTMLParser):
                 self.ev_block[ev].add(self.block)
 
     def handle_endtag(self, tag):
-        if tag == "span":
+        if tag in ("span", "mark"):
             self.cur_ev = None
         if tag == "div" and self.in_text:
             self.in_text = False
@@ -187,7 +187,7 @@ def test_overlapping_ranges_share_segment(report):
     owners = {ev_id: set(ev["f"]) for ev_id, ev in vm["ev"].items()}
     shared = [
         ids
-        for ids in (seg.split() for seg in re.findall(r'<span class="hl[^"]*" data-ev="([^"]+)"', text))
+        for ids in (seg.split() for seg in re.findall(r'<(?:span|mark) class="hl[^"]*" data-ev="([^"]+)"', text))
         if {"F-002", "F-008"} <= set().union(*(owners[e] for e in ids))
     ]
     assert shared, "нет общего сегмента F-002 и F-008"
@@ -290,7 +290,7 @@ def test_verdict_and_first_actions_on_top(report):
     assert "Что сделать первым" in top
     actions = re.findall(r"<li>([^<]+) <span class=\"refs\">", top)
     assert actions[0].startswith("Решить, допускается ли второй push"), "первые действия упорядочены по order"
-    assert "Учтено ответов на вопросы" in top
+    assert "Ответов из --answers: 1; привязано к вопросам этого прогона: <a href=\"#questions\">1</a>." in top
     assert "блокируют тестирование" in top
 
 
@@ -349,18 +349,45 @@ def test_decisions_shown_as_answered_and_stale_flagged(report):
     assert "Открытые вопросы (5 из 5)" in stale
 
 
-def test_answers_markdown_roundtrip(report):
+def test_answers_markdown_format_and_reference_parser(report):
     tricky = "# не заголовок\n\\обратный слэш\n### Ответ\n\n🔔 emoji\nпоследняя"
     md = H.answers_markdown(report, {"Q-01": tricky, "Q-03": "Клиринг", "Q-04": "   "}, exported_at="2026-11-26T00:00:00Z")
     parsed = H.parse_answers_markdown(md)
-    assert parsed["meta"]["format"] == H.ANSWERS_FORMAT
+    assert parsed["meta"]["format"] == H.ANSWERS_FORMAT == "bcc-review-answers/2"
     assert parsed["meta"]["source_sha256"] == report["document"]["id"]
-    assert parsed["answers"]["Q-01"] == tricky
+    assert parsed["meta"]["report_run_id"] == report["run"]["run_id"]
+    # Ответ — одна строка «Ответ: …»: так его читает опубликованный parse_answers.
+    assert parsed["answers"]["Q-01"] == "# не заголовок \\обратный слэш ### Ответ 🔔 emoji последняя"
+    assert "Ответ: # не заголовок" in md
     assert parsed["answers"]["Q-03"] == "Клиринг"
-    assert "Q-04" not in parsed["answers"]  # пустой ответ не выдаётся за ответ
     assert parsed["answers"]["Q-05"].startswith("400 Bad Request")  # ответ, учтённый прогоном
+    # Карточка у каждого вопроса (формат №08); у открытых поле «Ответ:» пустое.
+    assert sorted(parsed["answers"]) == ["Q-01", "Q-03", "Q-05"]
+    assert parsed["unanswered"] == ["Q-02", "Q-04"]
     assert md.count("\n## Q-") == len(report["questions"])
+    assert md.count("\nОтвет:\n") == 2
+    for i, q in enumerate(report["questions"]):
+        if q["id"] in parsed["answers"]:
+            assert parsed["fingerprints"][q["id"]] == H.question_fingerprint(report, q)
     assert "Варианты: Да, после изменения порога | Нет, не более одного push в месяц" in md
+
+
+def test_reference_parser_reads_format_1():
+    old = "---\nformat: bcc-review-answers/1\nsource_sha256: abc\n---\n\n## Q-01\n\n> вопрос\n\n### Ответ\n\n\\# строка\nвторая\n"
+    parsed = H.parse_answers_markdown(old)
+    assert parsed["answers"] == {"Q-01": "# строка\nвторая"}
+
+
+def test_decision_bound_to_other_question_is_not_shown_as_answer(report):
+    q5 = next(q for q in report["questions"] if q["id"] == "Q-05")
+    report["decisions"][0]["question_fingerprint"] = H.question_fingerprint(report, q5)
+    ok = section(H.render_html(report), "questions")
+    assert "отпечаток вопроса совпал" in ok and "Открытые вопросы (4 из 5)" in ok
+    report["decisions"][0]["question_fingerprint"] = "0" * 64
+    other = section(H.render_html(report), "questions")
+    assert "относится к другому вопросу" in other and "Открытые вопросы (5 из 5)" in other
+    del report["decisions"][0]["question_fingerprint"]
+    assert "сверена только по Q-ID" in section(H.render_html(report), "questions")
 
 
 def test_view_model_answers_header_matches_python(report):
@@ -368,6 +395,8 @@ def test_view_model_answers_header_matches_python(report):
     header = [("exported_at: X" if h is None else h) for h in vm["answers"]["header"]]
     assert H.answers_markdown(report, {}, exported_at="X").startswith("\n".join(header))
     assert vm["answers"]["storageKey"] == H.answers_storage_key(report["document"]["id"])
+    assert vm["answers"]["legacyKey"] == H.legacy_answers_storage_key(report["document"]["id"])
+    assert [q["fp"] for q in vm["answers"]["questions"]] == [H.question_fingerprint(report, q) for q in report["questions"]]
 
 
 def test_input_types_dataclass_path_pydantic(tmp_path, report):
@@ -406,3 +435,28 @@ def test_all_variants_render(any_variant, tmp_path):
     c = parse(out.read_text(encoding="utf-8"))
     for b in rep["document"]["blocks"]:
         assert c.texts[b["id"]] == b["text"]
+
+
+def test_decisions_without_question_in_this_run_are_visible(report):
+    """Движок заново строит вопросы: Decision с Q-ID прошлого прогона не должен пропасть из HTML."""
+    for i, q in enumerate(report["questions"]):
+        q["id"] = f"Q-{i + 1:03d}"  # нумерация нового прогона
+    report["decisions"] = [
+        {"question_id": "Q-01", "source_sha256": report["document"]["id"], "answer": "Да: повторный push разрешён.", "edits": []},
+    ]
+    text = H.render_html(report)
+    qs = section(text, "questions")
+    assert "Ответы из --answers без вопроса в этом прогоне" in qs and "Да: повторный push разрешён." in qs
+    assert "в этом прогоне нет вопроса Q-01" in qs
+    top = text[text.index('id="summary"') : text.index('id="workspace"')]
+    assert "привязано к вопросам этого прогона: <a href=\"#questions\">0</a>" in top and "без вопроса: 1" in top
+    assert "Ответ учтён при этом прогоне" not in qs
+    report["questions"] = []
+    assert "Да: повторный push разрешён." in section(H.render_html(report), "questions")
+
+
+def test_finding_evidence_is_semantic_mark(report):
+    """Опора замечания — <mark> (ожидание интеграционного теста движка), опора требования без замечаний — <span>."""
+    text = H.render_html(report)
+    assert '<mark class="hl" data-ev=' in text and '<span class="hl hl-q" data-ev=' in text
+    assert 'id="finding-F-001"' in text

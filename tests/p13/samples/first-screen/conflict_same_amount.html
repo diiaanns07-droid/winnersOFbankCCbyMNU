@@ -1,0 +1,1326 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'sha256-lvdOKwg4WaTPtRYsZu4GZPqmr+tnYbFpvuV8MOit8bo='; script-src 'sha256-LidFKidxVHdqozC4gVXv88o/Bb7BSHCb0kLmcwt2k5Y='; base-uri 'none'; form-action 'none'">
+<meta name="generator" content="bcc_review.exports.html/1.0">
+<meta name="bcc-review:generator-sha256" content="680498b8d2cd426174beaa2ac5a6aa4f3c06318ca6fe81906346846df90b82e2">
+<meta name="bcc-review:document-sha256" content="7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830">
+<meta name="bcc-review:schema-version" content="1.0">
+<meta name="bcc-review:run-id" content="20261126T173939Z-7d7a40a0-3f0f">
+<title>Ревью ТЗ — Месячный порог расходов (пример для HTML №13)</title>
+<style>:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --text: #1b1f24;
+  --muted: #5b6470;
+  --border: #d7dce2;
+  --accent: #0b5cad;
+  --accent-bg: #e6f0fa;
+  --focus: #1a73e8;
+  --crit: #b3261e;
+  --crit-bg: #fde7e5;
+  --crit-hl: rgba(214, 48, 39, 0.16);
+  --major: #a14b00;
+  --major-bg: #fff0e0;
+  --major-hl: rgba(232, 120, 0, 0.17);
+  --minor: #3d5a80;
+  --minor-bg: #e8eef6;
+  --minor-hl: rgba(61, 90, 128, 0.13);
+  --ok: #17663a;
+  --ok-bg: #e3f4ea;
+  --warn: #8a5a00;
+  --warn-bg: #fff6dc;
+  --sel: rgba(11, 92, 173, 0.22);
+  --side-a: #6b3fa0;
+  --side-b: #00796b;
+  --bar-h: 52px;
+  --radius: 8px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --surface: #181c21;
+    --surface-2: #20252c;
+    --text: #e6e9ed;
+    --muted: #9aa4b0;
+    --border: #333a43;
+    --accent: #7db4f0;
+    --accent-bg: #1b2b3e;
+    --focus: #8ab4f8;
+    --crit: #ff8a80;
+    --crit-bg: #3b1d1b;
+    --crit-hl: rgba(255, 110, 100, 0.22);
+    --major: #ffb870;
+    --major-bg: #3a2814;
+    --major-hl: rgba(255, 170, 80, 0.2);
+    --minor: #a9c1e0;
+    --minor-bg: #1f2a38;
+    --minor-hl: rgba(150, 180, 220, 0.16);
+    --ok: #7fd6a0;
+    --ok-bg: #16301f;
+    --warn: #f0c060;
+    --warn-bg: #352a10;
+    --sel: rgba(125, 180, 240, 0.28);
+    --side-a: #c7a4f0;
+    --side-b: #6fd6c6;
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-padding-top: calc(var(--bar-h) + 8px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--sans);
+  -webkit-text-size-adjust: 100%;
+  overflow-wrap: break-word;
+}
+a { color: var(--accent); }
+a:hover { text-decoration-thickness: 2px; }
+code { font-family: var(--mono); font-size: 0.92em; }
+h2 { font-size: 1.25rem; margin: 0 0 0.75rem; }
+h3 { font-size: 1.02rem; margin: 1rem 0 0.5rem; }
+h4 { font-size: 0.82rem; margin: 0 0 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+h5 { font-size: 0.9rem; margin: 0 0 0.25rem; }
+p { margin: 0.25rem 0 0.5rem; }
+.small { font-size: 0.86rem; }
+.muted { color: var(--muted); }
+.pre { white-space: pre-wrap; }
+.sr-only {
+  position: absolute !important; left: 0; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.skip { position: absolute; left: -999px; top: 4px; z-index: 50; background: var(--surface); padding: 6px 10px; }
+.skip:focus { left: 8px; }
+
+.btn {
+  font: inherit; font-size: 0.88rem; line-height: 1.2;
+  padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-pri { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+
+/* ---------------------------------------------------------------- шапка */
+.bar {
+  position: sticky; top: 0; z-index: 20; min-height: var(--bar-h);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.bar-in {
+  display: flex; align-items: center; gap: 12px; padding: 8px 16px; min-width: 0;
+  max-width: 1800px; margin: 0 auto;
+}
+.bar-title { min-width: 0; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kicker { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-right: 6px; }
+.doc-title { font-weight: 650; }
+.run-chip { font-size: 0.8rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+.run-complete { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.run-partial, .run-unknown { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+.run-failed { color: var(--crit); background: var(--crit-bg); border-color: transparent; }
+.bar nav { min-width: 0; flex: 0 1 auto; overflow-x: auto; }
+.bar nav ul { display: flex; gap: 2px; list-style: none; margin: 0; padding: 0; white-space: nowrap; }
+.bar nav a { display: inline-block; padding: 4px 8px; border-radius: 6px; text-decoration: none; font-size: 0.88rem; }
+.bar nav a:hover { background: var(--surface-2); }
+.cnt {
+  display: inline-block; min-width: 1.4em; padding: 0 5px; border-radius: 999px; text-align: center;
+  font-size: 0.78rem; background: var(--surface-2); color: var(--muted); font-weight: 600;
+}
+
+main { max-width: 1800px; margin: 0 auto; padding: 0 16px 48px; }
+
+/* ---------------------------------------------------------------- итог */
+.summary { padding: 16px 0 8px; }
+.banner { border-radius: var(--radius); padding: 10px 14px; margin: 0 0 12px; border: 1px solid transparent; }
+.banner ul { margin: 6px 0 0; padding-left: 20px; }
+.banner-run { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
+.banner-info { background: var(--accent-bg); }
+.verdict { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.tile, .actions { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
+.tile h3, .actions h3 { margin: 0 0 4px; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.tile-v { font-size: 1.2rem; font-weight: 700; margin: 0 0 4px; }
+.glyph {
+  display: inline-flex; align-items: center; justify-content: center; width: 1.5em; height: 1.5em;
+  border-radius: 50%; font-size: 0.9em; margin-right: 4px; border: 2px solid currentColor;
+}
+.tile-no { border-left: 6px solid var(--crit); }
+.tile-no .tile-v { color: var(--crit); }
+.tile-ok { border-left: 6px solid var(--ok); }
+.tile-ok .tile-v { color: var(--ok); }
+.tile-cond, .tile-unk { border-left: 6px dashed var(--warn); }
+.tile-cond .tile-v, .tile-unk .tile-v { color: var(--warn); }
+.prelim { display: inline-block; font-size: 0.78rem; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); margin-bottom: 4px; }
+.actions ol, .actions ul { margin: 4px 0 0; padding-left: 22px; }
+.actions li { margin: 3px 0; }
+.verdict-sum { margin-top: 10px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 12px 0 0; }
+.stats li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; }
+.stats a { display: inline-block; padding: 4px 12px; color: var(--text); text-decoration: none; }
+.stats li:not(:has(a)) { padding: 4px 12px; }
+.stats b { font-size: 1.05rem; }
+.stats .sev-critical { border-color: var(--crit); }
+.stats .sev-major { border-color: var(--major); }
+
+/* ---------------------------------------------------------------- серьёзность */
+.sev {
+  display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+  font-size: 0.78rem; font-weight: 700; padding: 1px 7px; border-radius: 4px; border: 1px solid currentColor;
+}
+.sev.sev-critical { color: var(--crit); background: var(--crit-bg); }
+.sev.sev-major { color: var(--major); background: var(--major-bg); border-style: dashed; }
+.sev.sev-minor { color: var(--minor); background: var(--minor-bg); border-style: dotted; }
+.st { font-size: 0.78rem; padding: 1px 6px; border-radius: 4px; background: var(--surface-2); }
+.st-needs_review { background: var(--warn-bg); color: var(--warn); }
+.st-needs_review::before { content: "? "; font-weight: 700; }
+.st-confirmed::before { content: "✓ "; }
+.warn { color: var(--warn); }
+.ref { white-space: nowrap; font-weight: 600; }
+.ref-f.sev-critical::before { content: "▲ "; color: var(--crit); }
+.ref-f.sev-major::before { content: "◆ "; color: var(--major); }
+.ref-f.sev-minor::before { content: "● "; color: var(--minor); }
+.ref-x { color: var(--muted); font-weight: 400; }
+.refs { display: inline; }
+
+/* ---------------------------------------------------------------- рабочая область */
+.ws {
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px;
+  height: calc(100vh - var(--bar-h)); height: calc(100dvh - var(--bar-h));
+  min-height: 480px; padding: 12px 0; scroll-margin-top: var(--bar-h);
+}
+.ws-switch { display: none; }
+.pane {
+  min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.pane-head { padding: 10px 14px 8px; border-bottom: 1px solid var(--border); }
+.pane-head h2 { margin: 0 0 2px; font-size: 1.05rem; }
+.doc-scroll, .f-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.doc-scroll { padding: 8px 14px 40vh; }
+.f-scroll { padding: 8px 10px 30vh; }
+.doc-scroll:focus { outline: none; }
+
+/* ---------------------------------------------------------------- блоки документа */
+.blk { position: relative; padding: 6px 8px 8px; margin: 2px -8px; border-radius: 6px; scroll-margin: 30vh 0; }
+.blk.has-on { background: var(--surface-2); }
+.blk:target, .blk.pulse { box-shadow: inset 3px 0 0 var(--accent); }
+.blk-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 0.74rem; color: var(--muted); margin-bottom: 1px; }
+.blk-id { font-family: var(--mono); color: var(--muted); text-decoration: none; }
+.blk-id:hover { color: var(--accent); text-decoration: underline; }
+.loc { white-space: nowrap; }
+.blk-flag { color: var(--warn); }
+.blk-f {
+  font: inherit; font-size: 0.74rem; padding: 0 6px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--accent);
+}
+.pdf-link { white-space: nowrap; }
+.blk-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.blk-heading .blk-text { font-weight: 700; font-size: 1.12rem; }
+.blk-heading.lvl-1 .blk-text { font-size: 1.3rem; }
+.blk-heading.lvl-3 .blk-text, .blk-heading.lvl-4 .blk-text { font-size: 1.02rem; }
+.blk-table_header, .blk-table_row { margin-top: 0; margin-bottom: 0; padding-top: 2px; padding-bottom: 2px; }
+.blk-table_header .blk-text { font-weight: 700; }
+.blk-table_header .blk-text, .blk-table_row .blk-text, .blk-code .blk-text {
+  font-family: var(--mono); font-size: 0.84rem; line-height: 1.45; white-space: pre; overflow-wrap: normal;
+  overflow-x: auto; background: var(--surface-2); padding: 6px 8px; border-radius: 4px; max-width: 100%;
+}
+.page-mark { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.75rem; margin: 14px 0 4px; }
+.page-mark::before, .page-mark::after { content: ""; flex: 1; border-top: 1px dashed var(--border); }
+.sec-mark { font-size: 0.75rem; color: var(--muted); margin: 10px 0 0; text-transform: none; }
+
+/* подсветка: фон по серьёзности, линия разной формы — не только цвет */
+mark.hl { background: transparent; color: inherit; }
+.hl { border-radius: 2px; text-decoration-line: underline; text-underline-offset: 3px; text-decoration-skip-ink: none; cursor: pointer; }
+.hl[data-sev="critical"] { background: var(--crit-hl); text-decoration-style: solid; text-decoration-thickness: 2px; text-decoration-color: var(--crit); }
+.hl[data-sev="major"] { background: var(--major-hl); text-decoration-style: dashed; text-decoration-thickness: 2px; text-decoration-color: var(--major); }
+.hl[data-sev="minor"] { background: var(--minor-hl); text-decoration-style: dotted; text-decoration-thickness: 2px; text-decoration-color: var(--minor); }
+.hl[data-n="2"] { box-shadow: inset 0 -0.55em 0 rgba(127, 127, 127, 0.12); }
+.hl[data-n="3"], .hl[data-n="4"], .hl[data-n="5"] { box-shadow: inset 0 -0.8em 0 rgba(127, 127, 127, 0.18); }
+.hl.hl-q { background: none; text-decoration: none; cursor: auto; }
+.hl.off { background: none; text-decoration-color: var(--border); }
+/* выбранная опора: сплошная полоса подчёркивания не рвётся на стыках сегментов (опоры фактов режут цитату) */
+.hl.on { background: var(--sel); outline: none; text-decoration-line: underline; text-decoration-style: solid;
+  text-decoration-thickness: 3px; text-decoration-color: var(--accent); text-underline-offset: 4px; }
+.hl.on.side-a { text-decoration-color: var(--side-a); }
+.hl.on.side-b { text-decoration-color: var(--side-b); text-decoration-style: dashed; }
+.hl.ev-first[data-side-label]::before {
+  content: attr(data-side-label); display: inline-block; font: 700 0.7rem/1.3 var(--sans);
+  padding: 0 4px; margin-right: 2px; border-radius: 3px; vertical-align: 0.15em; color: var(--surface);
+}
+.hl.side-a.ev-first::before { background: var(--side-a); }
+.hl.side-b.ev-first::before { background: var(--side-b); }
+.hl:focus { outline: 3px solid var(--focus); }
+.pulse { animation: pulse 1.2s ease-out 1; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 6px var(--sel); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+
+/* возврат к замечанию и выбор фрагмента */
+.ret, .chooser {
+  position: sticky; z-index: 5; margin: 0; padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+  background: var(--accent-bg); border-bottom: 1px solid var(--border);
+}
+.ret[hidden], .chooser[hidden] { display: none; }
+.ret { top: 0; }
+.ret-label { flex: 1 1 220px; font-size: 0.86rem; min-width: 0; }
+.chooser { top: 0; flex-direction: column; align-items: stretch; }
+.chooser-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chooser h3 { margin: 0; font-size: 0.92rem; }
+.chooser ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.chooser-item { width: 100%; text-align: left; }
+
+/* ---------------------------------------------------------------- фильтры */
+.filters fieldset { border: 0; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.f-sev { display: flex; flex-wrap: wrap; gap: 6px; }
+.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 0.84rem; padding: 2px 8px 2px 4px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
+.chk.sev-critical span[aria-hidden] { color: var(--crit); }
+.chk.sev-major span[aria-hidden] { color: var(--major); }
+.chk.sev-minor span[aria-hidden] { color: var(--minor); }
+.f-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: end; }
+.f-row label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--muted); gap: 2px; min-width: 0; }
+.f-row select, .f-row input {
+  font: inherit; font-size: 0.86rem; padding: 4px 6px; border-radius: 6px; max-width: 100%;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.f-q { flex: 1 1 140px; }
+.f-q input { width: 100%; }
+.f-count { font-size: 0.82rem; color: var(--muted); margin: 0 4px 6px; }
+
+/* ---------------------------------------------------------------- карточки замечаний */
+.f-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.f-list > li, .qa-list > li { min-width: 0; }
+.fc { border: 1px solid var(--border); border-left-width: 5px; border-radius: var(--radius); background: var(--surface); scroll-margin-top: 12px; }
+.fc.sev-critical { border-left-color: var(--crit); }
+.fc.sev-major { border-left-color: var(--major); border-left-style: dashed; }
+.fc.sev-minor { border-left-color: var(--minor); border-left-style: dotted; }
+.fc.is-sel { box-shadow: 0 0 0 2px var(--accent); }
+.fc-h { margin: 0; font-size: 0.95rem; }
+.fc-toggle {
+  display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0;
+  padding: 8px 10px 2px; cursor: pointer; border-radius: var(--radius) var(--radius) 0 0;
+}
+.fc-toggle::after { content: "▸"; float: right; color: var(--muted); margin-left: 6px; }
+.fc-toggle[aria-expanded="true"]::after { content: "▾"; }
+.fc-id { font-family: var(--mono); font-size: 0.84rem; color: var(--muted); }
+.fc-title { font-weight: 650; }
+.fc-meta { font-size: 0.8rem; color: var(--muted); padding: 0 10px 8px; margin: 0; }
+.fc-body { padding: 0 10px 10px; display: grid; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+.fd p { margin: 0 0 4px; }
+.fd ul { margin: 0 0 4px; padding-left: 20px; }
+.rewrite { background: var(--ok-bg); border-radius: 4px; padding: 4px 8px; }
+
+.witness { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface-2); }
+.w-in { margin-bottom: 8px; }
+.w-sides { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.w-side { background: var(--surface); border-radius: 6px; padding: 6px 8px; border-top: 3px solid var(--side-a); min-width: 0; }
+.w-b { border-top: 3px dashed var(--side-b); }
+.side-tag { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0 5px; border-radius: 3px; color: var(--surface); }
+.w-a .side-tag { background: var(--side-a); }
+.w-b .side-tag { background: var(--side-b); }
+
+.q-item { display: block; margin: 4px 0; }
+.q-btn {
+  font: inherit; text-align: left; cursor: pointer; padding: 3px 8px; border-radius: 6px; max-width: 100%;
+  border: 1px solid var(--accent); background: var(--accent-bg); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.q-btn:hover { background: var(--sel); }
+.q-btn::after { content: " ↗"; color: var(--accent); }
+.q-btn[data-side="a"] { border-color: var(--side-a); }
+.q-btn[data-side="b"] { border-color: var(--side-b); border-style: dashed; }
+q { quotes: "«" "»"; }
+.q-src { display: block; font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
+.q-bad q, .q-hint q { color: var(--muted); }
+.ev-list { margin-top: 4px; }
+
+.empty { padding: 18px 12px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius); }
+.empty-warn { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
+
+/* ---------------------------------------------------------------- разделы */
+.sec { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; scroll-margin-top: calc(var(--bar-h) + 8px); }
+.tbl-wrap { position: relative; overflow-x: auto; max-width: 100%; border: 1px solid var(--border); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+thead th { background: var(--surface-2); font-size: 0.8rem; color: var(--muted); position: sticky; top: 0; }
+tbody tr:target { background: var(--accent-bg); }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 6px 16px; margin: 0 0 10px; }
+.kv div { min-width: 0; }
+.kv dt { font-size: 0.78rem; color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.qa-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.qa { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; scroll-margin-top: calc(var(--bar-h) + 8px); }
+.qa:target { box-shadow: 0 0 0 2px var(--accent); }
+.qa h3 { margin: 0 0 4px; font-size: 0.98rem; }
+.q-id { font-family: var(--mono); color: var(--muted); margin-right: 4px; }
+.qa.has-draft { border-left: 4px solid var(--accent); }
+.ans-l { display: block; font-size: 0.86rem; margin: 6px 0 2px; }
+textarea {
+  width: 100%; font: inherit; font-size: 0.9rem; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); resize: vertical;
+}
+#ans-md { font-family: var(--mono); font-size: 0.8rem; }
+.ans-done { background: var(--ok-bg); border-radius: 4px; padding: 4px 8px; margin: 4px 0; }
+.dst { white-space: nowrap; font-weight: 600; }
+.dst-resolved { color: var(--ok); }
+.dst-changed { color: var(--warn); }
+.dst-persisting { color: var(--crit); }
+details summary { cursor: pointer; }
+.checks { margin-top: 10px; }
+
+/* ---------------------------------------------------------------- адаптивность */
+
+@media (max-width: 999px) {
+  .bar-in { flex-wrap: wrap; gap: 4px 10px; padding: 6px 12px; }
+  .bar-title { flex-basis: calc(100% - 140px); }
+  .bar nav { flex-basis: 100%; }
+  .ws { display: block; height: auto; min-height: 0; padding: 8px 0; }
+  .js .ws-switch {
+    display: flex; gap: 6px; position: sticky; top: 0; z-index: 6;
+    background: var(--bg); padding: 6px 0;
+  }
+  .js .ws-switch .btn { flex: 1; }
+  .js .ws-switch .btn[aria-pressed="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+  .pane { overflow: visible; margin-bottom: 12px; }
+  .doc-scroll, .f-scroll { overflow: visible; padding-bottom: 16px; }
+  .js .ws[data-view="findings"] .pane-doc { display: none; }
+  .js .ws[data-view="doc"] .pane-findings { display: none; }
+  .bar { position: static; }
+  html { scroll-padding-top: 56px; }
+  .ret, .chooser { top: 46px; border-radius: 6px; }
+  .fc, .sec, .qa { scroll-margin-top: 56px; }
+  .blk { scroll-margin: 40vh 0; }
+}
+@media (max-width: 640px) {
+  body { font-size: 15px; }
+  main { padding: 0 10px 32px; }
+  .verdict { gap: 8px; }
+  .tile { padding: 8px 10px; }
+  .tile-v { font-size: 1rem; }
+  .tile h3 { font-size: 0.78rem; }
+  .summary h2 { font-size: 1.1rem; margin-bottom: 8px; }
+  .w-sides { grid-template-columns: minmax(0, 1fr); }
+  .f-row label { flex: 1 1 45%; }
+  .f-row select { width: 100%; }
+  .sec { padding: 12px; }
+}
+
+@media print {
+  .bar { position: static; }
+  .ws { display: block; height: auto; }
+  .pane { overflow: visible; border: 0; }
+  .doc-scroll, .f-scroll { overflow: visible; padding: 0; }
+  .filters, .ws-switch, .ret, .chooser, .ans-tools .btns, .blk-f { display: none !important; }
+  .fc-body[hidden] { display: grid !important; }
+  .js .ws .pane-doc, .js .ws .pane-findings { display: flex !important; }
+}
+.q-line { display: inline; }
+.q-ctx { color: var(--muted); font-size: 0.88rem; white-space: pre-wrap; }
+.blk-ex .blk-text { color: var(--muted); }
+.blocks-tag { font-size: 0.76rem; font-weight: 600; padding: 0 6px; border-radius: 4px; color: var(--crit); border: 1px solid currentColor; white-space: nowrap; }
+.blocked { background: var(--crit-bg); border-radius: 4px; padding: 4px 8px; }
+.opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; }
+.opt { font-size: 0.82rem; padding: 3px 8px; }
+.ans-stale { background: var(--warn-bg); }
+.edits { margin: 2px 0 0; padding-left: 20px; font-size: 0.86rem; }
+del { color: var(--crit); }
+ins { color: var(--ok); text-decoration: none; }
+.val-yes, .val-pass, .val-covered, .val-ok, .val-cached, .val-reviewed { color: var(--ok); }
+.val-no, .val-issue, .val-conflict, .val-failed { color: var(--crit); font-weight: 600; }
+.val-partial, .val-unknown, .val-uncovered, .val-not_reviewed { color: var(--warn); }
+.dst-unassessed { color: var(--warn); }
+.banner-warn { background: var(--warn-bg); border-color: var(--warn); }
+.banner-warn h3 { margin: 0 0 4px; font-size: 0.95rem; color: var(--warn); }
+.orphans { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 8px; }
+.orphan { background: var(--surface); color: var(--text); border: 1px dashed var(--warn); border-radius: 6px; padding: 6px 10px; min-width: 0; }
+.orphan p { margin: 0 0 4px; }
+.orphan .btns { align-items: center; }
+.orphan select { font: inherit; font-size: 0.86rem; max-width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+
+/* первый экран: статус прогона и обоснование вывода */
+.banner-run { margin: 12px 0 0; }
+.banner-run p { margin: 0 0 4px; }
+.run-code { font-size: 0.82rem; padding: 0 5px; border-radius: 4px; border: 1px solid currentColor; white-space: nowrap; }
+.run-reason { color: var(--text); }
+.run-more summary, .tile-more summary { font-size: 0.84rem; color: var(--accent); }
+.run-more ul, .tile-more ul { margin: 4px 0 0; padding-left: 20px; font-size: 0.86rem; }
+.tile-r { margin: 4px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tile-more { margin-top: 4px; }
+.actions { margin-top: 12px; }
+@media print { .tile-r { display: block; -webkit-line-clamp: unset; } details { display: block; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#workspace">Перейти к ревью</a><header class="bar"><div class="bar-in"><div class="bar-title"><span class="kicker">Ревью ТЗ</span> <span class="doc-title">Месячный порог расходов (пример для HTML №13)</span></div><span class="run-chip run-complete">Прогон завершён</span><nav aria-label="Разделы отчёта"><ul><li><a href="#summary">Итог</a></li><li><a href="#workspace">Ревью</a></li><li><a href="#requirements">Требования</a></li><li><a href="#questions">Вопросы <span class="cnt">2</span></a></li><li><a href="#checklist">Чек-лист</a></li><li><a href="#coverage">Покрытие</a></li><li><a href="#test-cases">Тест-кейсы</a></li><li><a href="#run">Паспорт</a></li></ul></nav></div></header><main><section id="summary" class="summary" aria-labelledby="summary-h"><h2 id="summary-h">Итог ревью</h2><div class="verdict"><div class="tile tile-no" id="verdict-development" role="group" aria-labelledby="verdict-development-h"><h3 id="verdict-development-h">Разработка</h3><p class="tile-v"><span aria-hidden="true" class="glyph">✕</span> Нельзя начинать</p><p class=small>Блокируют: <span class="refs"><a class="ref ref-f sev-critical" href="#finding-F-001"><span class="sr-only">Критичное: </span>F-001</a></span></p><p class="tile-r">F-001: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу</p></div><div class="tile tile-no" id="verdict-testing" role="group" aria-labelledby="verdict-testing-h"><h3 id="verdict-testing-h">Тестирование</h3><p class="tile-v"><span aria-hidden="true" class="glyph">✕</span> Нельзя начинать</p><p class=small>Блокируют: <span class="refs"><a class="ref ref-f sev-critical" href="#finding-F-001"><span class="sr-only">Критичное: </span>F-001</a></span></p><p class="tile-r">F-001: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу</p></div></div><div class="actions" id="first-actions"><h3>Что сделать первым</h3><ol><li>Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу — Выбрать одно правило («достигают» или «превышают») и привести к нему Ф-2, критерий приёмки №1 и требование к тестированию №1. <span class="refs"><a class="ref ref-f sev-critical" href="#finding-F-001"><span class="sr-only">Критичное: </span>F-001</a></span></li></ol></div><p class=verdict-sum>Готовность считается отдельно для разработки и тестирования: блокирует только подтверждённое критичное замечание с указанным бизнес-последствием и блокируемым решением; неполный прогон даёт «не определено», а не «можно начинать».</p><ul class="stats" aria-label="Сводка"><li><a href="#requirements"><b></b> 0 из 6 требований проверено</a></li><li><a href="#workspace"><b>2</b> замечаний</a></li><li class="sev-critical"><a href="#workspace" data-filter-sev="critical"><b>1</b> <span aria-hidden="true">▲</span> критичные</a></li><li class="sev-major"><a href="#workspace" data-filter-sev="major"><b>0</b> <span aria-hidden="true">◆</span> существенные</a></li><li class="sev-minor"><a href="#workspace" data-filter-sev="minor"><b>1</b> <span aria-hidden="true">●</span> незначительные</a></li><li><a href="#workspace" data-filter-blocks="development"><b>1</b> блокируют разработку</a></li><li><a href="#workspace" data-filter-blocks="testing"><b>1</b> блокируют тестирование</a></li><li><a href="#workspace" data-filter-status="needs_review"><b>0</b> требуют проверки</a></li><li><a href="#questions"><b>2</b> открытых вопросов</a></li></ul></section><section id="workspace" class="ws" aria-label="Ревью: документ и замечания" data-view="findings"><div class="ws-switch" role="group" aria-label="Показать панель"><button type="button" class="btn" data-view="findings" aria-pressed="true">Замечания</button><button type="button" class="btn" data-view="doc" aria-pressed="false">Документ</button></div><section class="pane pane-doc" id="doc-pane" aria-labelledby="doc-h" data-pane="doc"><div class="pane-head"><h2 id="doc-h">Исходный документ</h2><p class="small muted">Месячный порог расходов (пример для HTML №13) · формат markdown · блоков 11 · Оригинальный файл не приложен к этому отчёту. Страницы и строки указаны у каждого блока.</p></div><div class="ret" id="ret" hidden><span id="ret-label" class="ret-label"></span><button type="button" class="btn" id="ret-prev">← Предыдущая цитата</button><button type="button" class="btn" id="ret-next">Следующая цитата →</button><button type="button" class="btn btn-pri" id="ret-back">Вернуться к замечанию</button></div><div class="chooser" id="chooser" role="dialog" aria-modal="false" aria-labelledby="chooser-h" hidden><div class="chooser-head"><h3 id="chooser-h">Замечания к фрагменту</h3><button type="button" class="btn" id="chooser-close">Закрыть</button></div><ul id="chooser-list"></ul></div><div class="doc-scroll" id="doc-scroll" tabindex="-1"><div class="blk blk-heading lvl-1 blk-ex" id="block-b0001" data-block="b0001"><div class="blk-meta"><a class="blk-id" href="#block-b0001" title="Ссылка на блок">b0001</a><span class=loc>строка 1</span><span class="blk-flag" title="Заголовок раздела: задаёт путь section для вложенных блоков.">исключён из проверки: Заголовок раздела: задаёт путь section для вложенных блоков.</span></div><div class="blk-text" data-text>Месячный порог расходов (пример для HTML №13)</div></div><div class="blk blk-heading lvl-2 blk-ex" id="block-b0002" data-block="b0002"><div class="blk-meta"><a class="blk-id" href="#block-b0002" title="Ссылка на блок">b0002</a><span class=loc>строка 3</span><span class="blk-flag" title="Заголовок раздела: задаёт путь section для вложенных блоков.">исключён из проверки: Заголовок раздела: задаёт путь section для вложенных блоков.</span></div><div class="blk-text" data-text>Функциональные требования</div></div><div class="blk blk-list_item" id="block-b0003" data-block="b0003"><div class="blk-meta"><a class="blk-id" href="#block-b0003" title="Ссылка на блок">b0003</a><span class=loc>строка 5</span></div><div class="blk-text" data-text>Ф-1. <span class="hl hl-q" data-ev="ev-4" data-cp="5:25" data-n="0">Клиент задаёт порог </span><span class="hl hl-q" data-ev="ev-4 ev-10" data-cp="25:48" data-n="0">от 1 000 до 1 000 000 ₸</span><span class="hl hl-q" data-ev="ev-4" data-cp="48:49" data-n="0">.</span> <span class="hl hl-q" data-ev="ev-5" data-cp="50:97" data-n="0">Например, расходы 50 000 ₸ при пороге 50 000 ₸.</span></div></div><div class="blk blk-list_item" id="block-b0004" data-block="b0004"><div class="blk-meta"><a class="blk-id" href="#block-b0004" title="Ссылка на блок">b0004</a><span class=loc>строка 6</span><button type="button" class="blk-f" data-fids="F-002" aria-label="Блок b0004: 1 замечание">1 замечание</button></div><div class="blk-text" data-text>Ф-2. <span class="hl hl-q" data-ev="ev-6" data-cp="5:38" data-n="0">Push отправляется, когда расходы </span><mark class="hl" data-ev="ev-3 ev-6" data-cp="38:58" data-n="1" data-sev="minor">за календарный месяц</mark><span class="hl hl-q" data-ev="ev-6" data-cp="58:94" data-n="0"> достигают порога или превышают его.</span></div></div><div class="blk blk-heading lvl-2 blk-ex" id="block-b0005" data-block="b0005"><div class="blk-meta"><a class="blk-id" href="#block-b0005" title="Ссылка на блок">b0005</a><span class=loc>строка 8</span><span class="blk-flag" title="Заголовок раздела: задаёт путь section для вложенных блоков.">исключён из проверки: Заголовок раздела: задаёт путь section для вложенных блоков.</span></div><div class="blk-text" data-text>Критерии приёмки</div></div><div class="blk blk-table_header blk-ex" id="block-b0006" data-block="b0006"><div class="blk-meta"><a class="blk-id" href="#block-b0006" title="Ссылка на блок">b0006</a><span class=loc>строки 10–11</span><span class="blk-flag" title="Шапка таблицы «Критерии приёмки»: названия колонок.">исключён из проверки: Шапка таблицы «Критерии приёмки»: названия колонок.</span></div><div class="blk-text" data-text>№ | Исходные условия | Ожидаемый результат</div></div><div class="blk blk-table_row" id="block-b0007" data-block="b0007"><div class="blk-meta"><a class="blk-id" href="#block-b0007" title="Ссылка на блок">b0007</a><span class=loc>строка 12</span><button type="button" class="blk-f" data-fids="F-001" aria-label="Блок b0007: 1 замечание">1 замечание</button></div><div class="blk-text" data-text><span class="hl hl-q" data-ev="ev-7" data-cp="0:4" data-n="0">1 | </span><mark class="hl" data-ev="ev-1 ev-7" data-cp="4:10" data-n="1" data-sev="critical">Порог </mark><mark class="hl" data-ev="ev-1 ev-7 ev-11" data-cp="10:18" data-n="1" data-sev="critical">50 000 ₸</mark><mark class="hl" data-ev="ev-1 ev-7" data-cp="18:28" data-n="1" data-sev="critical">, расходы </mark><mark class="hl" data-ev="ev-1 ev-7 ev-12" data-cp="28:36" data-n="1" data-sev="critical">50 000 ₸</mark><mark class="hl" data-ev="ev-1 ev-7" data-cp="36:62" data-n="1" data-sev="critical"> | Push отправлен один раз</mark></div></div><div class="blk blk-table_row" id="block-b0008" data-block="b0008"><div class="blk-meta"><a class="blk-id" href="#block-b0008" title="Ссылка на блок">b0008</a><span class=loc>строка 13</span></div><div class="blk-text" data-text><span class="hl hl-q" data-ev="ev-8" data-cp="0:10" data-n="0">2 | Порог </span><span class="hl hl-q" data-ev="ev-8 ev-13" data-cp="10:18" data-n="0">50 000 ₸</span><span class="hl hl-q" data-ev="ev-8" data-cp="18:28" data-n="0">, расходы </span><span class="hl hl-q" data-ev="ev-8 ev-14" data-cp="28:36" data-n="0">49 999 ₸</span><span class="hl hl-q" data-ev="ev-8" data-cp="36:56" data-n="0"> | Push не отправлен</span></div></div><div class="blk blk-heading lvl-2 blk-ex" id="block-b0009" data-block="b0009"><div class="blk-meta"><a class="blk-id" href="#block-b0009" title="Ссылка на блок">b0009</a><span class=loc>строка 15</span><span class="blk-flag" title="Заголовок раздела: задаёт путь section для вложенных блоков.">исключён из проверки: Заголовок раздела: задаёт путь section для вложенных блоков.</span></div><div class="blk-text" data-text>Требования к тестированию</div></div><div class="blk blk-table_header blk-ex" id="block-b0010" data-block="b0010"><div class="blk-meta"><a class="blk-id" href="#block-b0010" title="Ссылка на блок">b0010</a><span class=loc>строки 17–18</span><span class="blk-flag" title="Шапка таблицы «Требования к тестированию»: названия колонок.">исключён из проверки: Шапка таблицы «Требования к тестированию»: названия колонок.</span></div><div class="blk-text" data-text>№ | Исходные условия | Ожидаемый результат</div></div><div class="blk blk-table_row" id="block-b0011" data-block="b0011"><div class="blk-meta"><a class="blk-id" href="#block-b0011" title="Ссылка на блок">b0011</a><span class=loc>строка 19</span><button type="button" class="blk-f" data-fids="F-001" aria-label="Блок b0011: 1 замечание">1 замечание</button></div><div class="blk-text" data-text><span class="hl hl-q" data-ev="ev-9" data-cp="0:4" data-n="0">1 | </span><mark class="hl" data-ev="ev-2 ev-9" data-cp="4:56" data-n="1" data-sev="critical">Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен</mark><span class="hl hl-q" data-ev="ev-9" data-cp="56:100" data-n="0">: уведомление только после превышения порога</span></div></div></div></section><section class="pane pane-findings" id="findings-pane" aria-labelledby="fp-h" data-pane="findings"><div class="pane-head"><h2 id="fp-h">Замечания <span class="cnt">2</span></h2><form class="filters" id="filters" aria-label="Фильтры замечаний"><fieldset><legend class="sr-only">Фильтры</legend><div class="f-sev" role="group" aria-label="Серьёзность"><label class="chk sev-critical"><input type="checkbox" name="sev" value="critical" checked> <span aria-hidden="true">▲</span> Критичные <span class="cnt">1</span></label><label class="chk sev-major"><input type="checkbox" name="sev" value="major" checked> <span aria-hidden="true">◆</span> Существенные <span class="cnt">0</span></label><label class="chk sev-minor"><input type="checkbox" name="sev" value="minor" checked> <span aria-hidden="true">●</span> Незначительные <span class="cnt">1</span></label></div><div class="f-row"><label>Критерий <select name="crit"><option value="">Все критерии</option><option value="unambiguous">Однозначность</option><option value="set_consistent">Согласованность</option></select></label><label>Статус <select name="status"><option value="">Все</option><option value="confirmed">Подтверждено</option><option value="needs_review">Требует проверки</option></select></label><label>Блокирует <select name="blocks"><option value="">Неважно</option><option value="development">разработку</option><option value="testing">тестирование</option></select></label><label class="f-q">Поиск <input type="search" name="q" autocomplete="off" placeholder="ID, текст, цитата"></label><button type="reset" class="btn">Сбросить</button></div></fieldset></form></div><div class="f-scroll" id="f-scroll"><p class="f-count" id="f-count" role="status">Показано 2 из 2</p><ol class="f-list" id="f-list"><li><article class="fc sev-critical" id="finding-F-001" data-fid="F-001" data-sev="critical" data-crit="set_consistent" data-status="confirmed" data-kind="conflict" data-blocks="development testing" data-search="f-001 критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу тестировщик и разработчик получат противоположные ожидания для одной и той же суммы: один из тестов упадёт на любой реализации. отправлять ли push, когда расходы за месяц ровно равны порогу порог 50 000 ₸, расходы 50 000 ₸ | push отправлен один раз порог 50 000 ₸, расходы 50 000 ₸ | push не отправлен"><h3 class="fc-h"><button type="button" class="fc-toggle" aria-expanded="true" aria-controls="fd-F-001"><span class="sev sev-critical"><span aria-hidden="true">▲</span> Критичное</span> <span class="fc-id">F-001</span> <span class="fc-title">Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу</span></button></h3><p class="fc-meta"><span class="st st-confirmed">Подтверждено</span> <span class="blocks-tag"><span aria-hidden="true">⊘</span> блокирует разработку</span> <span class="blocks-tag"><span aria-hidden="true">⊘</span> блокирует тестирование</span>  Противоречие · Согласованность · Набор требований · <span class=fc-loc>b0007 · строка 12; b0011 · строка 19</span> </p><div class="fc-body" id="fd-F-001"><div class="witness"><h4>Конфликт: один вход, два несовместимых исхода</h4><p class="w-in"><b>Вход.</b> Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸</p><div class="w-sides"><div class="w-side w-a"><h5><span class="side-tag" aria-hidden="true">A</span> Исход A</h5><p>Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»)</p><span class="q-item"><span class="q-line"><span class="q-ctx">1 | </span><button type="button" class="q-btn" data-ev="ev-1" data-side="a"><span class="sr-only">Показать в документе цитату стороны A </span><q>Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз</q></button></span><span class="q-src">b0007 · Месячный порог расходов (пример для HTML №13) › Критерии приёмки · строка 12</span></span></div><div class="w-side w-b"><h5><span class="side-tag" aria-hidden="true">B</span> Исход B</h5><p>Push не отправлен: уведомление только после превышения порога (требование к тестированию №1)</p><span class="q-item"><span class="q-line"><span class="q-ctx">1 | </span><button type="button" class="q-btn" data-ev="ev-2" data-side="b"><span class="sr-only">Показать в документе цитату стороны B </span><q>Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен</q></button><span class="q-ctx">: уведомление только после превышения порога</span></span><span class="q-src">b0011 · Месячный порог расходов (пример для HTML №13) › Требования к тестированию · строка 19</span></span></div></div></div><div class="fd"><h4>Основание</h4><p><b>push при расходах, равных порогу</b> — условие: расходы за месяц = порог = 50 000 ₸</p><ul><li>отправить</li><li>не отправлять</li></ul><p class="small muted">Критерий «Согласованность»; опора подтверждена; смысл подтверждён.</p><p class="small">mock: сценарий критика</p></div><div class="fd"><h4>Последствие</h4><p>Тестировщик и разработчик получат противоположные ожидания для одной и той же суммы: один из тестов упадёт на любой реализации.</p><p class="blocked"><b>Блокирует решение:</b> Отправлять ли push, когда расходы за месяц ровно равны порогу</p></div><div class="fd"><h4>Уточняющий вопрос</h4><p>Как трактовать: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу? <a class="ref" href="#question-Q-01">Ответить на Q-01</a></p></div><div class="fd"><h4>Как исправить</h4><p>Выбрать одно правило («достигают» или «превышают») и привести к нему Ф-2, критерий приёмки №1 и требование к тестированию №1.</p></div><p class="small muted">Требования: <span class="refs"><a class="ref" href="#req-R-003">R-003</a> <a class="ref" href="#req-R-005">R-005</a></span><br>Объединено из: C-002<br>Источник находки: llm / cross</p></div></article></li><li><article class="fc sev-minor" id="finding-F-002" data-fid="F-002" data-sev="minor" data-crit="unambiguous" data-status="confirmed" data-kind="ambiguity" data-blocks="" data-search="f-002 время и границы периода без явного часового пояса: «за календарный месяц» граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.  за календарный месяц"><h3 class="fc-h"><button type="button" class="fc-toggle" aria-expanded="true" aria-controls="fd-F-002"><span class="sev sev-minor"><span aria-hidden="true">●</span> Незначительное</span> <span class="fc-id">F-002</span> <span class="fc-title">Время и границы периода без явного часового пояса: «за календарный месяц»</span></button></h3><p class="fc-meta"><span class="st st-confirmed">Подтверждено</span>  Неоднозначность · Однозначность · Требование · <span class=fc-loc>b0004 · строка 6</span> </p><div class="fc-body" id="fd-F-002"><div class="fd"><h4>Основание</h4><p><b>часовой пояс времени и границ периода</b> — условие: пояс не указан или задан городом</p><p class="small muted">Критерий «Однозначность»; опора подтверждена; правило без LLM.</p><p class="small">детерминированное правило: вывод следует из найденного текста</p></div><div class="fd"><h4>Последствие</h4><p>Граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.</p></div><div class="fd"><h4>Источник</h4><span class="q-item"><span class="q-line"><span class="q-ctx">Ф-2. Push отправляется, когда расходы </span><button type="button" class="q-btn" data-ev="ev-3"><span class="sr-only">Показать в документе цитату </span><q>за календарный месяц</q></button><span class="q-ctx"> достигают порога или превышают его.</span></span><span class="q-src">b0004 · Месячный порог расходов (пример для HTML №13) › Функциональные требования · строка 6</span></span></div><div class="fd"><h4>Уточняющий вопрос</h4><p>Как трактовать: Время и границы периода без явного часового пояса: «за календарный месяц»? <a class="ref" href="#question-Q-02">Ответить на Q-02</a></p></div><div class="fd"><h4>Как исправить</h4><p>Для каждого времени и границы периода указать смещение и IANA-зону (&lt;уточнить: UTC+hh:mm, Region/City&gt;) вместо названия города или умолчания; определить, по какой отметке времени события считается период.</p></div><p class="small muted">Требования: <span class="refs"><a class="ref" href="#req-R-002">R-002</a></span><br>Объединено из: C-001<br>Источник находки: rules / rules</p></div></article></li></ol><div class="empty" id="f-empty" hidden><p>Нет замечаний, подходящих под фильтры.</p><button type="button" class="btn" id="f-reset">Сбросить фильтры</button></div></div></section></section><section id="requirements" class="sec" aria-labelledby="requirements-h"><h2 id="requirements-h">Требования (6)</h2><div class="tbl-wrap" role="region" aria-label="Требования" tabindex="0"><table><caption class="sr-only">Нарезка требований</caption><thead><tr><th scope="col">ID</th><th scope="col">ID в документе</th><th scope="col">Формулировка</th><th scope="col">Проверка</th><th scope="col">Блоки</th><th scope="col">Замечания</th></tr></thead><tbody><tr id="req-R-001.1"><th scope="row">R-001.1</th><td>Ф-1</td><td><span class="pre">Клиент задаёт порог от 1 000 до 1 000 000 ₸.</span><div class=ev-list><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-4"><span class="sr-only">Показать в документе цитату </span><q>Клиент задаёт порог от 1 000 до 1 000 000 ₸.</q></button></span><span class="q-src">b0003 · Месячный порог расходов (пример для HTML №13) › Функциональные требования · строка 5</span></span></div></td><td><span class="val val-partial">◐ частично</span><br><span class="small muted">модель проверила 1 из 9 критериев</span></td><td><span class="refs"><a class="ref ref-b" href="#block-b0003">b0003</a></span></td><td>—</td></tr><tr id="req-R-001.2"><th scope="row">R-001.2</th><td>Ф-1</td><td><span class="pre">Например, расходы 50 000 ₸ при пороге 50 000 ₸.</span><div class=ev-list><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-5"><span class="sr-only">Показать в документе цитату </span><q>Например, расходы 50 000 ₸ при пороге 50 000 ₸.</q></button></span><span class="q-src">b0003 · Месячный порог расходов (пример для HTML №13) › Функциональные требования · строка 5</span></span></div></td><td><span class="val val-partial">◐ частично</span><br><span class="small muted">модель проверила 1 из 9 критериев</span></td><td><span class="refs"><a class="ref ref-b" href="#block-b0003">b0003</a></span></td><td>—</td></tr><tr id="req-R-002"><th scope="row">R-002</th><td>Ф-2</td><td><span class="pre">Push отправляется, когда расходы за календарный месяц достигают порога или превышают его.</span><div class=ev-list><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-6"><span class="sr-only">Показать в документе цитату </span><q>Push отправляется, когда расходы за календарный месяц достигают порога или превышают его.</q></button></span><span class="q-src">b0004 · Месячный порог расходов (пример для HTML №13) › Функциональные требования · строка 6</span></span></div></td><td><span class="val val-partial">◐ частично</span><br><span class="small muted">модель проверила 1 из 9 критериев</span></td><td><span class="refs"><a class="ref ref-b" href="#block-b0004">b0004</a></span></td><td><span class="refs"><a class="ref ref-f sev-minor" href="#finding-F-002"><span class="sr-only">Незначительное: </span>F-002</a></span></td></tr><tr id="req-R-003"><th scope="row">R-003</th><td>1</td><td><span class="pre">Исходные условия: Порог 50 000 ₸, расходы 50 000 ₸; Ожидаемый результат: Push отправлен один раз</span><div class=ev-list><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-7"><span class="sr-only">Показать в документе цитату </span><q>1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз</q></button></span><span class="q-src">b0007 · Месячный порог расходов (пример для HTML №13) › Критерии приёмки · строка 12</span></span></div></td><td><span class="val val-partial">◐ частично</span><br><span class="small muted">модель проверила 1 из 9 критериев</span></td><td><span class="refs"><a class="ref ref-b" href="#block-b0007">b0007</a></span></td><td><span class="refs"><a class="ref ref-f sev-critical" href="#finding-F-001"><span class="sr-only">Критичное: </span>F-001</a></span></td></tr><tr id="req-R-004"><th scope="row">R-004</th><td>2</td><td><span class="pre">Исходные условия: Порог 50 000 ₸, расходы 49 999 ₸; Ожидаемый результат: Push не отправлен</span><div class=ev-list><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-8"><span class="sr-only">Показать в документе цитату </span><q>2 | Порог 50 000 ₸, расходы 49 999 ₸ | Push не отправлен</q></button></span><span class="q-src">b0008 · Месячный порог расходов (пример для HTML №13) › Критерии приёмки · строка 13</span></span></div></td><td><span class="val val-partial">◐ частично</span><br><span class="small muted">модель проверила 1 из 9 критериев</span></td><td><span class="refs"><a class="ref ref-b" href="#block-b0008">b0008</a></span></td><td>—</td></tr><tr id="req-R-005"><th scope="row">R-005</th><td>1</td><td><span class="pre">Исходные условия: Порог 50 000 ₸, расходы 50 000 ₸; Ожидаемый результат: Push не отправлен: уведомление только после превышения порога</span><div class=ev-list><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-9"><span class="sr-only">Показать в документе цитату </span><q>1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен: уведомление только после превышения порога</q></button></span><span class="q-src">b0011 · Месячный порог расходов (пример для HTML №13) › Требования к тестированию · строка 19</span></span></div></td><td><span class="val val-partial">◐ частично</span><br><span class="small muted">модель проверила 1 из 9 критериев</span></td><td><span class="refs"><a class="ref ref-b" href="#block-b0011">b0011</a></span></td><td><span class="refs"><a class="ref ref-f sev-critical" href="#finding-F-001"><span class="sr-only">Критичное: </span>F-001</a></span></td></tr></tbody></table></div></section><section id="questions" class="sec" aria-labelledby="questions-h"><h2 id="questions-h">Открытые вопросы (2 из 2)</h2><div class="ans-tools" id="ans-tools"><p class="banner banner-info" id="ans-note" role="note">Черновики ответов не меняют исходный документ, вердикт и статусы замечаний. Черновик привязан к тексту вопроса, а не к его номеру: в другом прогоне Q-01 может означать другой вопрос. Чтобы учесть ответы, выгрузите их в Markdown и запустите проверку заново с <code>--answers</code>. Документ: <code title="7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830">sha256 7d7a40a02f3e…</code></p><div class="banner banner-warn" id="ans-orphans" role="region" aria-labelledby="ans-orphans-h" hidden><h3 id="ans-orphans-h">Черновики к вопросам, которых нет в этом отчёте</h3><p class="small">Эти ответы сохранены в браузере для других вопросов этого документа и сюда не подставлены. Если ответ подходит к вопросу этого прогона, перенесите его вручную.</p><ul id="ans-orphans-list" class="orphans"></ul></div><p class="small" id="ans-status" role="status"></p><div class="btns"><button type="button" class="btn btn-pri" id="ans-export">Выгрузить ответы (.md)</button><button type="button" class="btn" id="ans-copy">Скопировать Markdown</button><button type="button" class="btn" id="ans-clear">Очистить черновик</button></div><details id="ans-md-box"><summary>Показать Markdown для ручного копирования</summary><label class="sr-only" for="ans-md">Markdown ответов</label><textarea id="ans-md" readonly rows="10">
+</textarea></details></div><ol class="qa-list"><li><article class="qa" id="question-Q-01" data-qid="Q-01"><h3><span class="q-id">Q-01</span> <span class="pre">Как трактовать: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу?</span></h3><p class="small">Замечания: <span class="refs"><a class="ref ref-f sev-critical" href="#finding-F-001"><span class="sr-only">Критичное: </span>F-001</a></span> · Требования: <span class="refs"><a class="ref" href="#req-R-003">R-003</a> <a class="ref" href="#req-R-005">R-005</a></span></p><div class="opts" role="group" aria-label="Варианты ответа на Q-01"><span class="small muted">Варианты:</span> <button type="button" class="btn opt" data-qid="Q-01" data-opt="A. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»).">A. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»).</button><button type="button" class="btn opt" data-qid="Q-01" data-opt="B. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push не отправлен: уведомление только после превышения порога (требование к тестированию №1).">B. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push не отправлен: уведомление только после превышения порога (требование к тестированию №1).</button></div><label class="ans-l" for="ans-Q-01">Черновик ответа на Q-01 <span class="small muted">(хранится только в этом браузере, документ не меняет)</span></label><textarea id="ans-Q-01" class="ans" data-qid="Q-01" data-qfp="7326ad403386c123d0faa78036e6d77b6d372c2eb6cacb21a6f60558718a9f60" rows="3">
+</textarea></article></li><li><article class="qa" id="question-Q-02" data-qid="Q-02"><h3><span class="q-id">Q-02</span> <span class="pre">Как трактовать: Время и границы периода без явного часового пояса: «за календарный месяц»?</span></h3><p class="small">Замечания: <span class="refs"><a class="ref ref-f sev-minor" href="#finding-F-002"><span class="sr-only">Незначительное: </span>F-002</a></span> · Требования: <span class="refs"><a class="ref" href="#req-R-002">R-002</a></span></p><div class="opts" role="group" aria-label="Варианты ответа на Q-02"><span class="small muted">Варианты:</span> <button type="button" class="btn opt" data-qid="Q-02" data-opt="A. Уточнить формулировку — Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт.">A. Уточнить формулировку — Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт.</button><button type="button" class="btn opt" data-qid="Q-02" data-opt="B. Оставить как есть, риск принят — Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта.">B. Оставить как есть, риск принят — Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта.</button></div><label class="ans-l" for="ans-Q-02">Черновик ответа на Q-02 <span class="small muted">(хранится только в этом браузере, документ не меняет)</span></label><textarea id="ans-Q-02" class="ans" data-qid="Q-02" data-qfp="3fdebd099ae0141262359edf8c0d09d2c9e4c70bc300aee451e46f795a04b34d" rows="3">
+</textarea></article></li></ol></section><section id="checklist" class="sec" aria-labelledby="checklist-h"><h2 id="checklist-h">Чек-лист ревью требований</h2><p class=muted>Чек-лист не заполнен в этом прогоне.</p></section><section id="coverage" class="sec" aria-labelledby="coverage-h"><h2 id="coverage-h">Покрытие проверки</h2><details class="checks"><summary>Выполненные проверки (54: ? не определено — 47, ✓ норма — 6, ✕ замечание — 1)</summary><div class="tbl-wrap" role="region" aria-label="Проверки требований по критериям" tabindex="0"><table><caption class="sr-only">Проверки требований по критериям</caption><thead><tr><th scope="col">Требование</th><th scope="col">Критерий</th><th scope="col">Статус</th><th scope="col">Обоснование</th><th scope="col">Замечания</th><th scope="col">Источник</th></tr></thead><tbody><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Необходимость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Уместность уровня</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Однозначность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Полнота</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Единичность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Реализуемость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Проверяемость</td><td><span class="val val-pass">✓ норма</span></td><td><span class="pre">Границы порога заданы числами.</span></td><td>—</td><td><span class="pre">llm</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Корректность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.1">R-001.1</a></td><td>Соответствие шаблону</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Необходимость</td><td><span class="val val-pass">✓ норма</span></td><td><span class="pre">Пример поясняет Ф-1.</span></td><td>—</td><td><span class="pre">llm</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Уместность уровня</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Однозначность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Полнота</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Единичность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Реализуемость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Проверяемость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Корректность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-001.2">R-001.2</a></td><td>Соответствие шаблону</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Необходимость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Уместность уровня</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Однозначность</td><td><span class="val val-issue">✕ замечание</span></td><td><span class="pre">Время и границы периода без явного часового пояса: «за календарный месяц»</span></td><td><span class="refs"><a class="ref ref-f sev-minor" href="#finding-F-002"><span class="sr-only">Незначительное: </span>F-002</a></span></td><td><span class="pre">rules</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Полнота</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Единичность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Реализуемость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Проверяемость</td><td><span class="val val-pass">✓ норма</span></td><td><span class="pre">Исход наблюдаем: push отправлен или нет.</span></td><td>—</td><td><span class="pre">llm</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Корректность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-002">R-002</a></td><td>Соответствие шаблону</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Необходимость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Уместность уровня</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Однозначность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Полнота</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Единичность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Реализуемость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Проверяемость</td><td><span class="val val-pass">✓ норма</span></td><td><span class="pre">Ожидаемый результат наблюдаем.</span></td><td>—</td><td><span class="pre">llm</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Корректность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-003">R-003</a></td><td>Соответствие шаблону</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Необходимость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Уместность уровня</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Однозначность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Полнота</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Единичность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Реализуемость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Проверяемость</td><td><span class="val val-pass">✓ норма</span></td><td><span class="pre">Ожидаемый результат наблюдаем.</span></td><td>—</td><td><span class="pre">llm</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Корректность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-004">R-004</a></td><td>Соответствие шаблону</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Необходимость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Уместность уровня</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Однозначность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Полнота</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Единичность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Реализуемость</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Проверяемость</td><td><span class="val val-pass">✓ норма</span></td><td><span class="pre">Ожидаемый результат наблюдаем.</span></td><td>—</td><td><span class="pre">llm</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Корректность</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr><tr><td><a class="ref" href="#req-R-005">R-005</a></td><td>Соответствие шаблону</td><td><span class="val val-unknown">? не определено</span></td><td><span class="pre">не проверено: модель проверила 1 из 9 критериев</span></td><td>—</td><td><span class="pre">engine</span></td></tr></tbody></table></div></details></section><section id="diff" class="sec" aria-labelledby="diff-h"><h2 id="diff-h">Сравнение версий</h2><p class=muted>Сравнение с предыдущим отчётом не запускалось (--compare).</p></section><section id="test-cases" class="sec" aria-labelledby="test-cases-h"><h2 id="test-cases-h">Черновик тест-кейсов</h2><p class=muted>Тест-кейсы не сформированы.</p></section><section id="facts" class="sec" aria-labelledby="facts-h"><h2 id="facts-h">Факты документа (5)</h2><div class="tbl-wrap" role="region" aria-label="Факты документа" tabindex="0"><table><caption class="sr-only">Факты документа</caption><thead><tr><th scope="col">ID</th><th scope="col">Объект</th><th scope="col">Поле</th><th scope="col">Значение</th><th scope="col">Единица</th><th scope="col">Тип</th><th scope="col">Направление</th><th scope="col">Диапазон</th><th scope="col">Требования</th><th scope="col">Опора</th></tr></thead><tbody><tr><td><span class="pre">FX-001</span></td><td><span class="pre">Клиент</span></td><td><span class="pre">порог</span></td><td>—</td><td><span class="pre">KZT</span></td><td>—</td><td>—</td><td>min: <span class="pre">1000</span>; max: <span class="pre">1000000</span>; min_inclusive: —; max_inclusive: —; min_minor: 100000; max_minor: 100000000</td><td>—</td><td><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-10"><span class="sr-only">Показать в документе цитату </span><q>от 1 000 до 1 000 000 ₸</q></button></span><span class="q-src">b0003 · Месячный порог расходов (пример для HTML №13) › Функциональные требования · строка 5</span></span></td></tr><tr><td><span class="pre">FX-002</span></td><td><span class="pre">Критерии приёмки</span></td><td><span class="pre">Порог</span></td><td><span class="pre">50000</span></td><td><span class="pre">KZT</span></td><td><span class="pre">money</span></td><td>—</td><td>—</td><td>—</td><td><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-11"><span class="sr-only">Показать в документе цитату </span><q>50 000 ₸</q></button></span><span class="q-src">b0007 · Месячный порог расходов (пример для HTML №13) › Критерии приёмки · строка 12</span></span></td></tr><tr><td><span class="pre">FX-003</span></td><td><span class="pre">Критерии приёмки</span></td><td><span class="pre">расходы</span></td><td><span class="pre">50000</span></td><td><span class="pre">KZT</span></td><td><span class="pre">money</span></td><td>—</td><td>—</td><td>—</td><td><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-12"><span class="sr-only">Показать в документе цитату </span><q>50 000 ₸</q></button></span><span class="q-src">b0007 · Месячный порог расходов (пример для HTML №13) › Критерии приёмки · строка 12</span></span></td></tr><tr><td><span class="pre">FX-004</span></td><td><span class="pre">Критерии приёмки</span></td><td><span class="pre">Порог</span></td><td><span class="pre">50000</span></td><td><span class="pre">KZT</span></td><td><span class="pre">money</span></td><td>—</td><td>—</td><td>—</td><td><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-13"><span class="sr-only">Показать в документе цитату </span><q>50 000 ₸</q></button></span><span class="q-src">b0008 · Месячный порог расходов (пример для HTML №13) › Критерии приёмки · строка 13</span></span></td></tr><tr><td><span class="pre">FX-005</span></td><td><span class="pre">Критерии приёмки</span></td><td><span class="pre">расходы</span></td><td><span class="pre">49999</span></td><td><span class="pre">KZT</span></td><td><span class="pre">money</span></td><td>—</td><td>—</td><td>—</td><td><span class="q-item"><span class="q-line"><button type="button" class="q-btn" data-ev="ev-14"><span class="sr-only">Показать в документе цитату </span><q>49 999 ₸</q></button></span><span class="q-src">b0008 · Месячный порог расходов (пример для HTML №13) › Критерии приёмки · строка 13</span></span></td></tr></tbody></table></div></section><section id="run" class="sec" aria-labelledby="run-h"><h2 id="run-h">Паспорт прогона</h2><dl class="kv"><div><dt>Документ</dt><dd><span class="pre">Месячный порог расходов (пример для HTML №13)</span></dd></div><div><dt>Формат</dt><dd><span class="pre">markdown</span></dd></div><div><dt>Файл</dt><dd><span class="pre">conflict_same_amount.md</span></dd></div><div><dt>SHA-256 документа</dt><dd><span class="pre">7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830</span></dd></div><div><dt>SHA-256 источника прогона</dt><dd><span class="pre">7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830</span></dd></div><div><dt>Блоков</dt><dd><span class="pre">11</span></dd></div><div><dt>ID прогона</dt><dd><span class="pre">20261126T173939Z-7d7a40a0-3f0f</span></dd></div><div><dt>Версия агента</dt><dd><span class="pre">0.1.0</span></dd></div><div><dt>Коммит агента</dt><dd><span class="pre">88d322fc29058f97005f389863c7215524df359c-dirty</span></dd></div><div><dt>Провайдер</dt><dd><span class="pre">mock</span></dd></div><div><dt>Модель (фактическая)</dt><dd><span class="pre">mock-1</span></dd></div><div><dt>Модель (запрошенная)</dt><dd><span class="pre">mock-1</span></dd></div><div><dt>Модели в ответах</dt><dd><span class="pre">mock-1</span></dd></div><div><dt>Режим</dt><dd><span class="pre">Подставная модель (mock)</span></dd></div><div><dt>Начало</dt><dd><span class="pre">2026-11-26T17:39:39Z</span></dd></div><div><dt>Окончание</dt><dd><span class="pre">2026-11-26T17:39:39Z</span></dd></div><div><dt>Длительность, с</dt><dd><span class="pre">0.164</span></dd></div><div><dt>Вызовы модели</dt><dd><span class="pre">физических 7, из кэша 0, повторов 0, ошибок 0</span></dd></div><div><dt>Токены</dt><dd><span class="pre">вход 10236, выход 595</span></dd></div><div><dt>Бюджет</dt><dd><span class="pre">вызовов ≤ 40, секунд ≤ 1500.0</span></dd></div><div><dt>Контекст</dt><dd><span class="pre">full</span></dd></div><div><dt>Статус</dt><dd><span class="pre">Прогон завершён</span></dd></div><div><dt>Схема отчёта</dt><dd><span class="pre">1.0</span></dd></div></dl><h3>Этапы</h3><div class="tbl-wrap" role="region" aria-label="Этапы прогона" tabindex="0"><table><caption class="sr-only">Этапы прогона</caption><thead><tr><th scope="col">Этап</th><th scope="col">Статус</th><th scope="col">Вызовы</th><th scope="col">Из кэша</th><th scope="col">Повторы</th><th scope="col">Модель</th><th scope="col">Время, с</th><th scope="col">Обоснование</th><th scope="col">Реализация</th></tr></thead><tbody><tr><td><span class="pre">read</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>0</td><td>0</td><td>0</td><td>—</td><td>0.051</td><td>—</td><td><span class="pre">team:bcc_review.readers.text:read_text</span></td></tr><tr><td><span class="pre">inventory</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>2</td><td>0</td><td>0</td><td><span class="pre">mock-1</span></td><td>0.018</td><td>—</td><td><span class="pre">team:bcc_review.analysis.inventory:build_inventory</span></td></tr><tr><td><span class="pre">rules</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>0</td><td>0</td><td>0</td><td>—</td><td>0.017</td><td>—</td><td><span class="pre">fallback:bcc_review.runtime.fallback.rules:lint</span></td></tr><tr><td><span class="pre">individual</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>1</td><td>0</td><td>0</td><td><span class="pre">mock-1</span></td><td>0.001</td><td>—</td><td><span class="pre">fallback:bcc_review.runtime.fallback.llm_stages:review_individual</span></td></tr><tr><td><span class="pre">cross</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>1</td><td>0</td><td>0</td><td><span class="pre">mock-1</span></td><td>0.001</td><td>—</td><td><span class="pre">fallback:bcc_review.runtime.fallback.llm_stages:review_set</span></td></tr><tr><td><span class="pre">evidence</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>0</td><td>0</td><td>0</td><td>—</td><td>0.004</td><td>—</td><td><span class="pre">team:bcc_review.analysis.evidence:resolve_candidate</span></td></tr><tr><td><span class="pre">verify_meaning</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>1</td><td>0</td><td>0</td><td><span class="pre">mock-1</span></td><td>0.0</td><td>—</td><td>—</td></tr><tr><td><span class="pre">merge</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>0</td><td>0</td><td>0</td><td>—</td><td>0.0</td><td><span class="pre">кандидатов 2 → замечаний 2</span></td><td>—</td></tr><tr><td><span class="pre">facts</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>0</td><td>0</td><td>0</td><td>—</td><td>0.003</td><td><span class="pre">фактов: 5</span></td><td><span class="pre">team:bcc_review.analysis.facts:reconcile_facts</span></td></tr><tr><td><span class="pre">clarify</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>1</td><td>0</td><td>0</td><td><span class="pre">mock-1</span></td><td>0.0</td><td>—</td><td>—</td></tr><tr><td><span class="pre">questions</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>0</td><td>0</td><td>0</td><td>—</td><td>0.01</td><td>—</td><td><span class="pre">team:bcc_review.decisions.clarify:build_questions</span></td></tr><tr><td><span class="pre">bank</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>1</td><td>0</td><td>0</td><td><span class="pre">mock-1</span></td><td>0.001</td><td>—</td><td><span class="pre">fallback:bcc_review.runtime.fallback.bank:build_bank_pack</span></td></tr><tr><td><span class="pre">verdict</span></td><td><span class="val val-ok">✓ выполнен</span></td><td>0</td><td>0</td><td>0</td><td>—</td><td>0.0</td><td>—</td><td>—</td></tr></tbody></table></div><h3>Модули</h3><dl class="kv"><div><dt>build_bank_pack</dt><dd>fallback:bcc_review.runtime.fallback.bank:build_bank_pack</dd></div><div><dt>build_inventory</dt><dd>team:bcc_review.analysis.inventory:build_inventory</dd></div><div><dt>build_questions</dt><dd>team:bcc_review.decisions.clarify:build_questions</dd></div><div><dt>load_criteria</dt><dd>team:bcc_review.criteria:load_criteria</dd></div><div><dt>read_text</dt><dd>team:bcc_review.readers.text:read_text</dd></div><div><dt>reconcile_facts</dt><dd>team:bcc_review.analysis.facts:reconcile_facts</dd></div><div><dt>resolve_candidate</dt><dd>team:bcc_review.analysis.evidence:resolve_candidate</dd></div><div><dt>resolve_hint</dt><dd>team:bcc_review.analysis.evidence:resolve_hint</dd></div><div><dt>review_individual</dt><dd>fallback:bcc_review.runtime.fallback.llm_stages:review_individual</dd></div><div><dt>review_set</dt><dd>fallback:bcc_review.runtime.fallback.llm_stages:review_set</dd></div><div><dt>provider</dt><dd>runtime.mock:MockAdapter</dd></div></dl><h3>Аудит опор (из прогона)</h3><dl class="kv"><div><dt>Проверено</dt><dd>5</dd></div><div><dt>Подтверждено</dt><dd>5</dd></div><div><dt>Неоднозначно</dt><dd>0</dd></div><div><dt>Отклонено</dt><dd>0</dd></div><div><dt>Учёт</dt><dd>Учтена каждая подсказка-цитата кандидатов (включая опоры witness): confirmed — найдена в тексте блока, ambiguous — в нескольких блоках, rejected — не найдена. Смысл проверяется отдельно (meaning_status).</dd></div></dl><h3>Проверка опор при сборке HTML</h3><p>Опор: 14; совпали с текстом блока: 14; не подтверждены и не подсвечены: 0.</p><p id="dom-check" role="status" class="small">Проверка подсветки в браузере не выполнялась (нужен JavaScript).</p><details><summary>Исключено из проверки (3)</summary><ul><li><span class="refs"><a class="ref ref-b" href="#block-b0001">b0001</a> <a class="ref ref-b" href="#block-b0002">b0002</a> <a class="ref ref-b" href="#block-b0005">b0005</a> <a class="ref ref-b" href="#block-b0009">b0009</a></span> — Заголовок раздела: задаёт путь section для вложенных блоков.</li><li><span class="refs"><a class="ref ref-b" href="#block-b0006">b0006</a></span> — Шапка таблицы «Критерии приёмки»: названия колонок.</li><li><span class="refs"><a class="ref ref-b" href="#block-b0010">b0010</a></span> — Шапка таблицы «Требования к тестированию»: названия колонок.</li></ul></details><h3>Предупреждения</h3><ul><li>{&#x27;code&#x27;: &#x27;llm_truncated&#x27;, &#x27;message&#x27;: &#x27;ответ по окну 1/1 (full) обрезан или без done=true; принято 0 пунктов, непокрытые блоки уйдут в повтор&#x27;, &#x27;stage&#x27;: &#x27;inventory&#x27;, &#x27;block_ids&#x27;: [&#x27;b0003&#x27;, &#x27;b0004&#x27;, &#x27;b0007&#x27;, &#x27;b0008&#x27;, &#x27;b0011&#x27;]} (inventory, inventory)</li><li>{&#x27;code&#x27;: &#x27;llm_truncated&#x27;, &#x27;message&#x27;: &#x27;ответ по окну 1/1 (retry) обрезан или без done=true; принято 0 пунктов, непокрытые блоки уйдут в повтор&#x27;, &#x27;stage&#x27;: &#x27;inventory&#x27;, &#x27;block_ids&#x27;: [&#x27;b0003&#x27;, &#x27;b0004&#x27;, &#x27;b0007&#x27;, &#x27;b0008&#x27;, &#x27;b0011&#x27;]} (inventory, inventory)</li><li>{&#x27;code&#x27;: &#x27;rules_fallback&#x27;, &#x27;message&#x27;: &#x27;модель не учла блоки b0003, b0004, b0007, b0008, b0011; применена нарезка по правилам&#x27;, &#x27;stage&#x27;: &#x27;inventory&#x27;, &#x27;block_ids&#x27;: [&#x27;b0003&#x27;, &#x27;b0004&#x27;, &#x27;b0007&#x27;, &#x27;b0008&#x27;, &#x27;b0011&#x27;]} (inventory, inventory)</li></ul><p class="small muted">Файл собран bcc_review.exports.html/1.0. Открывается без сети и сервера. Правки документа выполняет живое приложение.</p></section></main><div id="live" class="sr-only" aria-live="polite"></div>
+<script type="application/json" id="bcc-data">{"v":1,"generator":"bcc_review.exports.html/1.0","doc":{"id":"7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830","title":"Месячный порог расходов (пример для HTML №13)"},"run":{"status":"complete"},"findings":{"F-001":{"sev":"critical","title":"Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу","a":["ev-1"],"b":["ev-2"],"ev":[],"blocks":["b0007","b0011"],"anchor":"finding-F-001"},"F-002":{"sev":"minor","title":"Время и границы периода без явного часового пояса: «за календарный месяц»","a":[],"b":[],"ev":["ev-3"],"blocks":["b0004"],"anchor":"finding-F-002"}},"ev":{"ev-1":{"b":"b0007","s":4,"e":62,"q":"Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз","ok":true,"f":["F-001"],"anchor":"block-b0007","place":"строка 12"},"ev-2":{"b":"b0011","s":4,"e":56,"q":"Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен","ok":true,"f":["F-001"],"anchor":"block-b0011","place":"строка 19"},"ev-3":{"b":"b0004","s":38,"e":58,"q":"за календарный месяц","ok":true,"f":["F-002"],"anchor":"block-b0004","place":"строка 6"},"ev-4":{"b":"b0003","s":5,"e":49,"q":"Клиент задаёт порог от 1 000 до 1 000 000 ₸.","ok":true,"f":[],"anchor":"block-b0003","place":"строка 5"},"ev-5":{"b":"b0003","s":50,"e":97,"q":"Например, расходы 50 000 ₸ при пороге 50 000 ₸.","ok":true,"f":[],"anchor":"block-b0003","place":"строка 5"},"ev-6":{"b":"b0004","s":5,"e":94,"q":"Push отправляется, когда расходы за календарный месяц достигают порога или превышают его.","ok":true,"f":[],"anchor":"block-b0004","place":"строка 6"},"ev-7":{"b":"b0007","s":0,"e":62,"q":"1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз","ok":true,"f":[],"anchor":"block-b0007","place":"строка 12"},"ev-8":{"b":"b0008","s":0,"e":56,"q":"2 | Порог 50 000 ₸, расходы 49 999 ₸ | Push не отправлен","ok":true,"f":[],"anchor":"block-b0008","place":"строка 13"},"ev-9":{"b":"b0011","s":0,"e":100,"q":"1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен: уведомление только после превышения порога","ok":true,"f":[],"anchor":"block-b0011","place":"строка 19"},"ev-10":{"b":"b0003","s":25,"e":48,"q":"от 1 000 до 1 000 000 ₸","ok":true,"f":[],"anchor":"block-b0003","place":"строка 5"},"ev-11":{"b":"b0007","s":10,"e":18,"q":"50 000 ₸","ok":true,"f":[],"anchor":"block-b0007","place":"строка 12"},"ev-12":{"b":"b0007","s":28,"e":36,"q":"50 000 ₸","ok":true,"f":[],"anchor":"block-b0007","place":"строка 12"},"ev-13":{"b":"b0008","s":10,"e":18,"q":"50 000 ₸","ok":true,"f":[],"anchor":"block-b0008","place":"строка 13"},"ev-14":{"b":"b0008","s":28,"e":36,"q":"49 999 ₸","ok":true,"f":[],"anchor":"block-b0008","place":"строка 13"}},"answers":{"format":"bcc-review-answers/2","draftFormat":"bcc-review-answers-draft/2","legacyFormat":"bcc-review-answers-draft/1","storageKey":"bcc-review/answers/v2/7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830","legacyKey":"bcc-review/answers/v1/7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830","runId":"20261126T173939Z-7d7a40a0-3f0f","header":["---","format: bcc-review-answers/2","source_sha256: 7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830","document_title: Месячный порог расходов (пример для HTML №13)","report_run_id: 20261126T173939Z-7d7a40a0-3f0f","report_agent_version: 0.1.0",null,"---","","# Ответы на уточняющие вопросы","","\u003e Черновик ответов аналитика к отчёту ревью. Исходный документ этим файлом не изменён.","\u003e Ответ — одна строка «Ответ: …» под своим «## Q-ID». Q-ID действует только в прогоне report_run_id;","\u003e «Отпечаток вопроса» связывает ответ с текстом вопроса и его опорами в документе.","\u003e Учесть ответы: python -m bcc_review INPUT OUTPUT.md --answers answers.md",""],"questions":[{"id":"Q-01","fp":"7326ad403386c123d0faa78036e6d77b6d372c2eb6cacb21a6f60558718a9f60","prompt":"Как трактовать: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу?","head":["## Q-01","","\u003e Как трактовать: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу?","","Варианты: A. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»). | B. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push не отправлен: уведомление только после превышения порога (требование к тестированию №1).","Замечания: F-001","Отпечаток вопроса: 7326ad403386c123d0faa78036e6d77b6d372c2eb6cacb21a6f60558718a9f60",""],"reportAnswer":""},{"id":"Q-02","fp":"3fdebd099ae0141262359edf8c0d09d2c9e4c70bc300aee451e46f795a04b34d","prompt":"Как трактовать: Время и границы периода без явного часового пояса: «за календарный месяц»?","head":["## Q-02","","\u003e Как трактовать: Время и границы периода без явного часового пояса: «за календарный месяц»?","","Варианты: A. Уточнить формулировку — Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт. | B. Оставить как есть, риск принят — Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта.","Замечания: F-002","Отпечаток вопроса: 3fdebd099ae0141262359edf8c0d09d2c9e4c70bc300aee451e46f795a04b34d",""],"reportAnswer":""}]}}</script>
+<script>/* bcc_review: автономный HTML-отчёт. Без зависимостей и сетевых запросов. */
+(function () {
+  'use strict';
+  var D;
+  try {
+    D = JSON.parse(document.getElementById('bcc-data').textContent);
+  } catch (err) {
+    return;
+  }
+  var doc = document;
+  doc.documentElement.classList.add('js');
+
+  function $(sel, root) { return (root || doc).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || doc).querySelectorAll(sel)); }
+
+  var live = $('#live');
+  var liveTimer = 0;
+  function say(msg) {
+    if (!live) return;
+    clearTimeout(liveTimer);
+    live.textContent = '';
+    liveTimer = setTimeout(function () { live.textContent = msg; }, 40);
+  }
+
+  /* Кодовые точки Unicode → индекс UTF-16. Нужен живому приложению (№15),
+     если оно строит подсветку само. Отчёт режет текст заранее в Python. */
+  function cpToUtf16(text, cp) {
+    var u = 0, i = 0;
+    for (var it = text[Symbol.iterator](), step = it.next(); !step.done; step = it.next()) {
+      if (i === cp) return u;
+      u += step.value.length;
+      i++;
+    }
+    return u;
+  }
+
+  var ws = $('#workspace');
+  var bar = $('.bar');
+  var docScroll = $('#doc-scroll');
+  var fScroll = $('#f-scroll');
+  var docPane = $('#doc-pane');
+  var mq = window.matchMedia ? window.matchMedia('(max-width: 999px)') : { matches: false };
+  function isNarrow() { return !!mq.matches; }
+
+  /* ---------------------------------------------------------- индекс сегментов */
+  var segs = {};
+  $$('.hl', docScroll).forEach(function (el) {
+    el.getAttribute('data-ev').split(' ').forEach(function (id) {
+      (segs[id] = segs[id] || []).push(el);
+    });
+  });
+
+  function fidsOfSeg(el) {
+    var out = [];
+    el.getAttribute('data-ev').split(' ').forEach(function (id) {
+      var ev = D.ev[id];
+      if (ev) ev.f.forEach(function (f) { if (out.indexOf(f) < 0) out.push(f); });
+    });
+    return out;
+  }
+
+  /* Самопроверка: склеенный текст сегментов опоры равен цитате из JSON,
+     а срез textContent блока по кодовым точкам даёт ту же цитату. */
+  function domCheck() {
+    var total = 0, ok = 0, bad = [];
+    Object.keys(D.ev).forEach(function (id) {
+      var ev = D.ev[id];
+      if (!ev.ok) return;
+      total++;
+      var list = segs[id] || [];
+      var text = '', pos = ev.s, contiguous = true, sameBlock = list.length > 0;
+      list.forEach(function (el) {
+        var cp = el.getAttribute('data-cp').split(':');
+        if (+cp[0] !== pos) contiguous = false;
+        pos = +cp[1];
+        text += el.textContent;
+        var blk = el.closest('[data-block]');
+        if (!blk || blk.getAttribute('data-block') !== ev.b) sameBlock = false;
+      });
+      var bt = list.length ? list[0].closest('[data-text]').textContent : '';
+      var bySlice = Array.from(bt).slice(ev.s, ev.e).join('');
+      if (text === ev.q && bySlice === ev.q && contiguous && pos === ev.e && sameBlock) ok++;
+      else bad.push(id);
+    });
+    return { total: total, ok: ok, bad: bad };
+  }
+  var check = domCheck();
+  var checkEl = $('#dom-check');
+  if (checkEl) {
+    checkEl.textContent = check.bad.length
+      ? 'Проверка подсветки в браузере: расхождения у ' + check.bad.length + ' из ' + check.total + ' опор (' + check.bad.join(', ') + ').'
+      : 'Проверка подсветки в браузере: все ' + check.total + ' подсвеченные цитаты совпадают с JSON по кодовым точкам Unicode.';
+    if (check.bad.length) checkEl.classList.add('warn');
+  }
+
+  /* ---------------------------------------------------------- карточки */
+  var cards = {};
+  $$('.fc').forEach(function (c) {
+    cards[c.getAttribute('data-fid')] = c;
+    collapse(c);
+  });
+  function toggleOf(c) { return $('.fc-toggle', c); }
+  function collapse(c) {
+    if (!c) return;
+    toggleOf(c).setAttribute('aria-expanded', 'false');
+    $('.fc-body', c).hidden = true;
+    c.classList.remove('is-sel');
+  }
+  function expand(c) {
+    toggleOf(c).setAttribute('aria-expanded', 'true');
+    $('.fc-body', c).hidden = false;
+    c.classList.add('is-sel');
+  }
+
+  var state = { sel: null, ret: null, retList: [], retIdx: 0, retFid: null };
+  var marked = [];
+  var lastHash = location.hash;
+  var pendingReturn = false;
+
+  function clearMarks() {
+    marked.forEach(function (el) {
+      el.classList.remove('on', 'side-a', 'side-b', 'ev-first', 'pulse');
+      el.removeAttribute('data-side-label');
+      el.removeAttribute('tabindex');
+    });
+    marked = [];
+    $$('.blk.has-on', docScroll).forEach(function (b) { b.classList.remove('has-on'); });
+  }
+  function markEvs(groups) {
+    clearMarks();
+    groups.forEach(function (g) {
+      g.ids.forEach(function (id) {
+        (segs[id] || []).forEach(function (el, i) {
+          el.classList.add('on');
+          if (g.side) el.classList.add('side-' + g.side);
+          if (i === 0) {
+            el.classList.add('ev-first');
+            if (g.side) el.setAttribute('data-side-label', g.side.toUpperCase());
+          }
+          marked.push(el);
+          var b = el.closest('.blk');
+          if (b) b.classList.add('has-on');
+        });
+      });
+    });
+  }
+  function orderedEvs(fid) {
+    var f = D.findings[fid];
+    return f ? f.a.concat(f.b, f.ev) : [];
+  }
+  function firstOkEv(fid) {
+    var list = orderedEvs(fid);
+    for (var i = 0; i < list.length; i++) if (D.ev[list[i]] && D.ev[list[i]].ok) return list[i];
+    return null;
+  }
+
+  function setHash(anchor, st, push) {
+    var url = anchor ? '#' + anchor : location.pathname + location.search;
+    try {
+      if (push) history.pushState(st, '', url);
+      else history.replaceState(st, '', url);
+    } catch (err) { /* file:// в отдельных браузерах */ }
+    lastHash = location.hash;
+  }
+
+  function reveal(el, container) {
+    if (!el) return;
+    if (!isNarrow() && container && container.scrollHeight > container.clientHeight + 1) {
+      var cr = container.getBoundingClientRect();
+      var er = el.getBoundingClientRect();
+      container.scrollTop += (er.top - cr.top) - Math.max(24, container.clientHeight / 3);
+    } else {
+      el.scrollIntoView({ block: 'center' });
+    }
+  }
+  function revealCard(c) {
+    if (!c) return;
+    if (!isNarrow() && fScroll && fScroll.scrollHeight > fScroll.clientHeight + 1) {
+      var cr = fScroll.getBoundingClientRect();
+      var er = c.getBoundingClientRect();
+      if (er.top < cr.top || er.top > cr.bottom - 80) fScroll.scrollTop += er.top - cr.top - 8;
+    } else {
+      c.scrollIntoView({ block: 'start' });
+    }
+  }
+  function ensureWorkspace() {
+    if (isNarrow() || !ws) return;
+    var barH = bar ? bar.offsetHeight : 0;
+    var top = ws.getBoundingClientRect().top;
+    if (Math.abs(top - barH) > 1) window.scrollTo(0, window.pageYOffset + top - barH);
+  }
+  function flash(el) {
+    el.classList.remove('pulse');
+    void el.offsetWidth;
+    el.classList.add('pulse');
+  }
+
+  function select(fid, opt) {
+    opt = opt || {};
+    var c = cards[fid];
+    if (!c) return false;
+    if (state.sel && state.sel !== fid) {
+      collapse(cards[state.sel]);
+      hideRet();
+    }
+    if (c.parentNode.hidden) resetFilters();
+    state.sel = fid;
+    expand(c);
+    var f = D.findings[fid];
+    markEvs([{ ids: f.a, side: 'a' }, { ids: f.b, side: 'b' }, { ids: f.ev, side: '' }]);
+    if (opt.hash !== false) setHash(f.anchor, { kind: 'finding', fid: fid }, !!opt.push);
+    var first = firstOkEv(fid);
+    if (opt.scrollDoc !== false && first && !isNarrow()) reveal(segs[first][0], docScroll);
+    if (opt.scrollCard) revealCard(c);
+    if (opt.focusCard) toggleOf(c).focus({ preventScroll: true });
+    var n = orderedEvs(fid).filter(function (id) { return D.ev[id] && D.ev[id].ok; }).length;
+    say('Выбрано замечание ' + fid + ': ' + f.title + '. Подсвечено цитат: ' + n + '.');
+    return true;
+  }
+  function deselect() {
+    if (!state.sel) return;
+    collapse(cards[state.sel]);
+    clearMarks();
+    hideRet();
+    say('Замечание ' + state.sel + ' свёрнуто.');
+    state.sel = null;
+    setHash('', null, false);
+  }
+
+  /* ---------------------------------------------------------- переход к цитате */
+  var ret = $('#ret'), retLabel = $('#ret-label');
+  var retPrev = $('#ret-prev'), retNext = $('#ret-next'), retBack = $('#ret-back');
+
+  function sideOf(fid, evId) {
+    var f = D.findings[fid];
+    if (!f) return '';
+    if (f.a.indexOf(evId) >= 0) return 'A';
+    if (f.b.indexOf(evId) >= 0) return 'B';
+    return '';
+  }
+  function showRet(fid, evId) {
+    var ev = D.ev[evId];
+    var side = fid ? sideOf(fid, evId) : '';
+    var loc = ev.place ? ' · ' + ev.place : '';
+    var pos = state.retList.length > 1 ? ' (' + (state.retIdx + 1) + ' из ' + state.retList.length + ')' : '';
+    retLabel.textContent = 'Цитата' + (side ? ' ' + side : '') + (fid ? ' · ' + fid : '') + ' · блок ' + ev.b + loc + pos;
+    retPrev.hidden = retNext.hidden = state.retList.length < 2;
+    retPrev.disabled = state.retIdx <= 0;
+    retNext.disabled = state.retIdx >= state.retList.length - 1;
+    retBack.textContent = fid ? 'Вернуться к замечанию ' + fid : 'Вернуться';
+    ret.hidden = false;
+  }
+  function hideRet() {
+    if (ret) ret.hidden = true;
+    state.ret = null;
+    state.retFid = null;
+  }
+
+  function jump(evId, fromBtn) {
+    var ev = D.ev[evId];
+    if (!ev) return;
+    var card = fromBtn ? fromBtn.closest('.fc') : null;
+    var fid = card ? card.getAttribute('data-fid') : null;
+    if (fid && state.sel !== fid) select(fid, { scrollDoc: false });
+    if (!fid) markEvs([{ ids: [evId], side: '' }]);
+    setView('doc');
+    ensureWorkspace();
+    var list = segs[evId];
+    var target = list && list.length ? list[0] : doc.getElementById(ev.anchor);
+    if (!target) return;
+    target.setAttribute('tabindex', '-1');
+    reveal(target, docScroll);
+    (list || [target]).forEach(flash);
+    target.focus({ preventScroll: true });
+    state.ret = fromBtn || null;
+    state.retFid = fid;
+    var okList = fid ? orderedEvs(fid).filter(function (id) { return D.ev[id] && D.ev[id].ok; }) : [evId];
+    state.retList = okList.length ? okList : [evId];
+    state.retIdx = Math.max(0, state.retList.indexOf(evId));
+    showRet(fid, evId);
+    var cur = history.state;
+    setHash(ev.anchor, { kind: 'quote', fid: fid, ev: evId }, !(cur && cur.kind === 'quote'));
+    say('Показана цитата' + (fid ? ' ' + (sideOf(fid, evId) || '') + ' замечания ' + fid : '') + ' в блоке ' + ev.b + '. Escape — вернуться.');
+  }
+
+  function finishReturn() {
+    var btn = state.ret;
+    var fid = state.retFid || state.sel;
+    hideRet();
+    setView('findings');
+    var c = fid ? cards[fid] : null;
+    if (c && state.sel === fid) revealCard(c);
+    var target = btn && doc.contains(btn) && !btn.closest('[hidden]') ? btn : c ? toggleOf(c) : null;
+    if (target) {
+      // Карточка бывает выше экрана (конфликт с двумя сторонами на 390 px): после возврата
+      // кнопка цитаты, с которой ушли к документу, должна быть видна, а не только верх карточки.
+      ensureVisible(target);
+      target.focus({ preventScroll: true });
+    }
+    if (state.sel) setHash(D.findings[state.sel].anchor, { kind: 'finding', fid: state.sel }, false);
+    say(state.sel ? 'Возврат к замечанию ' + state.sel + '. Выбор сохранён.' : 'Возврат.');
+  }
+  function ensureVisible(el) {
+    var box = !isNarrow() && fScroll ? fScroll.getBoundingClientRect() : { top: isNarrow() ? 52 : 0, bottom: window.innerHeight };
+    var r = el.getBoundingClientRect();
+    if (r.top < box.top || r.bottom > box.bottom) el.scrollIntoView({ block: 'center' });
+  }
+  function goBack() {
+    if (history.state && history.state.kind === 'quote') {
+      pendingReturn = true;
+      history.back();
+      // Если браузер не вернулся (нет записи), завершаем возврат сами.
+      setTimeout(function () { if (pendingReturn) { pendingReturn = false; finishReturn(); } }, 300);
+    } else {
+      finishReturn();
+    }
+  }
+  function stepRet(delta) {
+    var i = state.retIdx + delta;
+    if (i < 0 || i >= state.retList.length) return;
+    var id = state.retList[i];
+    var c = state.retFid ? cards[state.retFid] : null;
+    var btn = c ? $('.q-btn[data-ev="' + id + '"]', c) : state.ret;
+    jump(id, btn || state.ret);
+  }
+  if (retBack) retBack.addEventListener('click', goBack);
+  if (retPrev) retPrev.addEventListener('click', function () { stepRet(-1); });
+  if (retNext) retNext.addEventListener('click', function () { stepRet(1); });
+
+  /* ---------------------------------------------------------- выбор фрагмента в документе */
+  var chooser = $('#chooser'), chooserList = $('#chooser-list');
+  var chooserReturn = null;
+  function visibleFid(fid) { return cards[fid] && !cards[fid].parentNode.hidden; }
+  function openChooser(fids, from) {
+    chooserList.textContent = '';
+    fids.forEach(function (fid) {
+      var f = D.findings[fid];
+      var li = doc.createElement('li');
+      var b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'btn chooser-item sev-' + f.sev;
+      b.setAttribute('data-fid', fid);
+      var badge = $('.sev', cards[fid]);
+      b.textContent = (badge ? badge.textContent.trim() + ' · ' : '') + fid + ' · ' + f.title;
+      li.appendChild(b);
+      chooserList.appendChild(li);
+    });
+    chooser.hidden = false;
+    chooserReturn = from;
+    var first = $('button', chooserList);
+    if (first) first.focus();
+  }
+  function closeChooser(restore) {
+    if (!chooser || chooser.hidden) return;
+    chooser.hidden = true;
+    if (restore && chooserReturn && chooserReturn.focus) chooserReturn.focus();
+    chooserReturn = null;
+  }
+  function pickFromDoc(fid) {
+    closeChooser(false);
+    select(fid, { scrollDoc: false });
+    setView('findings');
+    revealCard(cards[fid]);
+    toggleOf(cards[fid]).focus({ preventScroll: true });
+  }
+  if (chooser) {
+    $('#chooser-close').addEventListener('click', function () { closeChooser(true); });
+    chooserList.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-fid]');
+      if (b) pickFromDoc(b.getAttribute('data-fid'));
+    });
+  }
+  if (docScroll) docScroll.addEventListener('click', function (e) {
+    var blkBtn = e.target.closest('.blk-f');
+    if (blkBtn) {
+      var fl = blkBtn.getAttribute('data-fids').split(' ').filter(visibleFid);
+      if (fl.length === 1) pickFromDoc(fl[0]);
+      else if (fl.length) openChooser(fl, blkBtn);
+      else say('Замечания этого блока скрыты фильтрами.');
+      return;
+    }
+    if (e.target.closest('a,button')) return;
+    var seg = e.target.closest('.hl');
+    if (!seg) return;
+    var sel = window.getSelection ? String(window.getSelection()) : '';
+    if (sel.length) return;
+    var fids = fidsOfSeg(seg).filter(visibleFid);
+    if (fids.length === 1) pickFromDoc(fids[0]);
+    else if (fids.length > 1) openChooser(fids, seg);
+  });
+
+  /* ---------------------------------------------------------- клики в карточках */
+  doc.addEventListener('click', function (e) {
+    var t = e.target;
+    var toggle = t.closest('.fc-toggle');
+    if (toggle) {
+      var fid = toggle.closest('.fc').getAttribute('data-fid');
+      if (state.sel === fid) deselect();
+      else select(fid, {});
+      return;
+    }
+    var q = t.closest('.q-btn');
+    if (q) {
+      jump(q.getAttribute('data-ev'), q);
+      return;
+    }
+    var sw = t.closest('.ws-switch [data-view]');
+    if (sw) {
+      setView(sw.getAttribute('data-view'));
+      return;
+    }
+    var opt = t.closest('.opt[data-qid]');
+    if (opt) {
+      var ta = $('textarea.ans[data-qid="' + opt.getAttribute('data-qid') + '"]');
+      if (ta) {
+        var v = opt.getAttribute('data-opt');
+        ta.value = ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' + v : v;
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.focus();
+      }
+      return;
+    }
+    var fl = t.closest('[data-filter-sev],[data-filter-status],[data-filter-blocks]');
+    if (fl && form) {
+      resetFilters();
+      var sev = fl.getAttribute('data-filter-sev');
+      var st = fl.getAttribute('data-filter-status');
+      var fb = fl.getAttribute('data-filter-blocks');
+      if (sev) $$('input[name=sev]', form).forEach(function (i) { i.checked = i.value === sev; });
+      if (st) form.elements.status.value = st;
+      if (fb) form.elements.blocks.value = fb;
+      applyFilters();
+      setView('findings');
+    }
+    var a = t.closest('a[href^="#"]');
+    if (a) {
+      var h = a.getAttribute('href');
+      if (/^#(finding|block)-/.test(h) && doc.getElementById(h.slice(1))) {
+        e.preventDefault();
+        setHash(h.slice(1), { kind: h.indexOf('#finding-') === 0 ? 'finding' : 'block' }, true);
+        route(h);
+      }
+    }
+  });
+
+  /* ---------------------------------------------------------- клавиатура */
+  doc.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (e.key === 'Escape') {
+      if (chooser && !chooser.hidden) { closeChooser(true); e.preventDefault(); return; }
+      if (state.ret || (ret && !ret.hidden)) {
+        if (docPane.contains(t) || t === doc.body || t === doc.documentElement) { goBack(); e.preventDefault(); }
+      }
+      return;
+    }
+    if (t.classList && t.classList.contains('fc-toggle')) {
+      var keys = { ArrowDown: 1, ArrowUp: -1, Home: 'first', End: 'last' };
+      if (!(e.key in keys)) return;
+      var list = $$('.fc-toggle').filter(function (b) { return !b.closest('li').hidden; });
+      var i = list.indexOf(t);
+      var k = keys[e.key];
+      var n = k === 'first' ? 0 : k === 'last' ? list.length - 1 : i + k;
+      if (list[n]) { list[n].focus(); e.preventDefault(); }
+    }
+  });
+
+  /* ---------------------------------------------------------- фильтры */
+  var form = $('#filters');
+  var countEl = $('#f-count'), emptyEl = $('#f-empty');
+  function applyFilters() {
+    if (!form || !countEl) return;
+    var sev = $$('input[name=sev]:checked', form).map(function (i) { return i.value; });
+    var crit = form.elements.crit.value, st = form.elements.status.value, blk = form.elements.blocks.value;
+    var q = form.elements.q.value.trim().toLowerCase();
+    var shown = 0, total = 0, vis = {};
+    Object.keys(cards).forEach(function (fid) {
+      var c = cards[fid];
+      total++;
+      var ok = sev.indexOf(c.getAttribute('data-sev')) >= 0 &&
+        (!crit || c.getAttribute('data-crit') === crit) &&
+        (!st || c.getAttribute('data-status') === st) &&
+        (!blk || (' ' + c.getAttribute('data-blocks') + ' ').indexOf(' ' + blk + ' ') >= 0) &&
+        (!q || c.getAttribute('data-search').indexOf(q) >= 0);
+      c.parentNode.hidden = !ok;
+      if (ok) { shown++; vis[fid] = 1; }
+    });
+    var hiddenSel = state.sel && !vis[state.sel] ? ' Выбранное ' + state.sel + ' скрыто фильтром.' : '';
+    countEl.textContent = 'Показано ' + shown + ' из ' + total + '.' + hiddenSel;
+    emptyEl.hidden = shown !== 0;
+    $$('.hl', docScroll).forEach(function (el) {
+      var f = fidsOfSeg(el);
+      el.classList.toggle('off', f.length > 0 && !f.some(function (x) { return vis[x]; }));
+    });
+  }
+  function resetFilters() {
+    if (!form) return;
+    form.reset();
+    $$('input[name=sev]', form).forEach(function (i) { i.checked = true; });
+    applyFilters();
+  }
+  if (form) {
+    form.addEventListener('input', applyFilters);
+    form.addEventListener('change', applyFilters);
+    form.addEventListener('reset', function () { setTimeout(applyFilters, 0); });
+    form.addEventListener('submit', function (e) { e.preventDefault(); });
+    var fr = $('#f-reset');
+    if (fr) fr.addEventListener('click', function () { resetFilters(); var first = $('.fc-toggle'); if (first) first.focus(); });
+  }
+
+  /* ---------------------------------------------------------- панели на узком экране */
+  function setView(v) {
+    if (!ws) return;
+    ws.setAttribute('data-view', v);
+    $$('.ws-switch [data-view]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-view') === v ? 'true' : 'false');
+    });
+  }
+
+  /* ---------------------------------------------------------- якоря */
+  function route(hash) {
+    var id = '';
+    try { id = decodeURIComponent((hash || '').replace(/^#/, '')); } catch (err) { id = (hash || '').slice(1); }
+    if (!id) return false;
+    var el = doc.getElementById(id);
+    if (!el) return false;
+    if (el.classList.contains('fc')) {
+      var fid = el.getAttribute('data-fid');
+      ensureWorkspace();
+      setView('findings');
+      select(fid, { hash: false, scrollCard: true });
+      lastHash = location.hash;
+      return true;
+    }
+    if (el.classList.contains('blk')) {
+      setView('doc');
+      ensureWorkspace();
+      el.setAttribute('tabindex', '-1');
+      reveal(el, docScroll);
+      flash(el);
+      el.focus({ preventScroll: true });
+      lastHash = location.hash;
+      return true;
+    }
+    return false;
+  }
+  /* При переходе по истории браузер после popstate прокручивает к якорю и
+     выполняет шаги фокусировки, сбрасывая фокус на body. Поэтому возврат
+     завершается следующей задачей, уже после навигации к фрагменту. */
+  window.addEventListener('popstate', function () {
+    var returning = pendingReturn || !!state.ret;
+    pendingReturn = false;
+    lastHash = location.hash;
+    setTimeout(function () {
+      if (returning) finishReturn();
+      else route(location.hash);
+      lastHash = location.hash;
+    }, 0);
+  });
+  window.addEventListener('hashchange', function () {
+    if (location.hash === lastHash) return;
+    lastHash = location.hash;
+    route(location.hash);
+  });
+
+  /* ---------------------------------------------------------- черновик ответов */
+  var A = D.answers;
+  var ansStatus = $('#ans-status');
+  var areas = $$('textarea.ans');
+  var mdBox = $('#ans-md');
+  var store = null;
+  try {
+    store = window.localStorage;
+    store.setItem('bcc-review/probe', '1');
+    store.removeItem('bcc-review/probe');
+  } catch (err) {
+    store = null;
+  }
+  function setAnsStatus(msg, warn) {
+    if (!ansStatus) return;
+    ansStatus.textContent = msg;
+    ansStatus.classList.toggle('warn', !!warn);
+  }
+  /* Q-ID живёт только в своём прогоне: в другом отчёте того же документа Q-01 может
+     означать другой вопрос. Поэтому запись черновика хранится по отпечатку вопроса
+     (data-qfp: текст вопроса + опоры его замечаний), а Q-ID — лишь подпись. Записи к
+     вопросам, которых нет в этом отчёте, не подставляются и не затираются. */
+  var qByFp = {};
+  A.questions.forEach(function (q) { qByFp[q.fp] = q; });
+  var orphansBox = $('#ans-orphans'), orphansList = $('#ans-orphans-list');
+  function collect() {
+    var out = {};
+    areas.forEach(function (ta) { if (ta.value.trim()) out[ta.getAttribute('data-qid')] = ta.value; });
+    return out;
+  }
+  function readJSON(key) {
+    if (!store || !D.doc.id) return null;
+    try {
+      var raw = store.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      return null;
+    }
+  }
+  function loadDraft() {
+    var d = readJSON(A.storageKey);
+    if (!d || d.format !== A.draftFormat || d.document_sha256 !== D.doc.id || !d.entries || typeof d.entries !== 'object') return null;
+    return d;
+  }
+  function loadLegacy() {
+    var d = readJSON(A.legacyKey);
+    if (!d || d.format !== A.legacyFormat || d.document_sha256 !== D.doc.id || !d.answers || typeof d.answers !== 'object') return null;
+    return d;
+  }
+  var saveTimer = 0;
+  function saveDraft() {
+    if (!store) {
+      setAnsStatus('Локальное хранилище недоступно: черновик живёт только в этой вкладке. Выгрузите ответы в Markdown перед закрытием.', true);
+      return;
+    }
+    try {
+      // Перечитываем запись: черновики других прогонов этого документа сохраняются как есть.
+      var obj = loadDraft() || { format: A.draftFormat, document_sha256: D.doc.id, entries: {} };
+      var now = new Date().toISOString();
+      areas.forEach(function (ta) {
+        var fp = ta.getAttribute('data-qfp');
+        if (ta.value.trim()) {
+          obj.entries[fp] = { qid: ta.getAttribute('data-qid'), prompt: (qByFp[fp] || {}).prompt || '', answer: ta.value, saved_at: now, run_id: A.runId };
+        } else {
+          delete obj.entries[fp];
+        }
+      });
+      obj.saved_at = now;
+      if (Object.keys(obj.entries).length) store.setItem(A.storageKey, JSON.stringify(obj));
+      else store.removeItem(A.storageKey);
+      setAnsStatus('Черновик сохранён в этом браузере (' + new Date().toLocaleTimeString('ru-RU') + ') по тексту вопроса. Документ и вердикт не изменены.');
+    } catch (err) {
+      setAnsStatus('Не удалось сохранить черновик (' + (err && err.name) + '). Выгрузите ответы в Markdown.', true);
+    }
+  }
+  function markDraft(ta) {
+    var art = ta.closest('.qa');
+    if (art) art.classList.toggle('has-draft', !!ta.value.trim());
+  }
+  function el(tag, cls, text) {
+    var e = doc.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function insertInto(qid, text) {
+    var ta = $('textarea.ans[data-qid="' + qid + '"]');
+    if (!ta) return;
+    ta.value = ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' + text : text;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.focus();
+  }
+  function removeStored(item) {
+    try {
+      if (item.legacy) {
+        var lg = loadLegacy();
+        if (lg) {
+          delete lg.answers[item.qid];
+          if (Object.keys(lg.answers).length) store.setItem(A.legacyKey, JSON.stringify(lg));
+          else store.removeItem(A.legacyKey);
+        }
+      } else {
+        var d = loadDraft();
+        if (d) {
+          delete d.entries[item.fp];
+          if (Object.keys(d.entries).length) store.setItem(A.storageKey, JSON.stringify(d));
+          else store.removeItem(A.storageKey);
+        }
+      }
+    } catch (err) { /* хранилище недоступно */ }
+  }
+  function renderOrphans(items) {
+    if (!orphansBox || !orphansList) return;
+    orphansList.textContent = '';
+    items.forEach(function (item, i) {
+      var li = el('li', 'orphan' + (item.legacy ? ' orphan-legacy' : ''));
+      li.setAttribute('data-orphan-qid', item.qid);
+      li.setAttribute('data-orphan-kind', item.legacy ? 'legacy' : 'other-question');
+      li.appendChild(el('p', null, (item.legacy
+        ? 'Старый формат черновика (только Q-ID) · ' + item.qid + ' · сохранён ' + (item.saved_at || '—')
+        : item.qid + ' прогона ' + (item.run_id || '—') + ' · сохранён ' + (item.saved_at || '—'))));
+      li.appendChild(el('p', 'small', item.legacy
+        ? 'Вопрос неизвестен: старый формат хранил только номер, а в этом отчёте ' + item.qid + ' может означать другое. Ответ не подставлен.'
+        : 'Вопрос: «' + (item.prompt || '—') + '». В этом отчёте такого вопроса нет.'));
+      var id = 'orph-' + i;
+      var lab = el('label', 'small', 'Текст сохранённого ответа');
+      lab.setAttribute('for', id);
+      var ta = el('textarea', 'orphan-text');
+      ta.id = id;
+      ta.readOnly = true;
+      ta.rows = 2;
+      ta.value = item.answer;
+      var sel = el('select');
+      sel.setAttribute('aria-label', 'Вопрос этого отчёта для переноса ответа ' + item.qid);
+      A.questions.forEach(function (q) { var o = el('option', null, q.id + ' — ' + q.prompt.slice(0, 70)); o.value = q.id; sel.appendChild(o); });
+      var put = el('button', 'btn', 'Перенести в черновик');
+      put.type = 'button';
+      put.addEventListener('click', function () { insertInto(sel.value, item.answer); });
+      var del = el('button', 'btn', 'Удалить сохранённый ответ');
+      del.type = 'button';
+      del.addEventListener('click', function () {
+        removeStored(item);
+        li.remove();
+        if (!orphansList.children.length) orphansBox.hidden = true;
+        setAnsStatus('Сохранённый ответ ' + item.qid + ' удалён из браузера.');
+      });
+      var row = el('div', 'btns');
+      row.appendChild(sel);
+      row.appendChild(put);
+      row.appendChild(del);
+      li.appendChild(lab);
+      li.appendChild(ta);
+      li.appendChild(row);
+      orphansList.appendChild(li);
+    });
+    orphansBox.hidden = items.length === 0;
+  }
+  if (areas.length) {
+    var draft = loadDraft();
+    var legacy = loadLegacy();
+    var restored = 0, moved = [], orphans = [];
+    if (draft) {
+      areas.forEach(function (ta) {
+        var e = draft.entries[ta.getAttribute('data-qfp')];
+        if (e && typeof e.answer === 'string') {
+          ta.value = e.answer;
+          markDraft(ta);
+          restored++;
+          if (e.qid && e.qid !== ta.getAttribute('data-qid')) moved.push(e.qid + ' → ' + ta.getAttribute('data-qid'));
+        }
+      });
+      Object.keys(draft.entries).forEach(function (fp) {
+        var e = draft.entries[fp];
+        if (!qByFp[fp] && e && typeof e.answer === 'string' && e.answer.trim()) {
+          orphans.push({ fp: fp, qid: e.qid, prompt: e.prompt, answer: e.answer, saved_at: e.saved_at, run_id: e.run_id });
+        }
+      });
+    }
+    if (legacy) {
+      Object.keys(legacy.answers).forEach(function (qid) {
+        var v = legacy.answers[qid];
+        if (typeof v === 'string' && v.trim()) orphans.push({ legacy: true, qid: qid, answer: v, saved_at: legacy.saved_at });
+      });
+    }
+    renderOrphans(orphans);
+    var msg = [];
+    var warn = false;
+    if (restored) msg.push('Восстановлено черновиков для этой версии документа: ' + restored + ' (сопоставлены по тексту вопроса, в отчёте не учтены).');
+    if (moved.length) msg.push('Номер вопроса изменился: ' + moved.join(', ') + '.');
+    var nOther = orphans.filter(function (o) { return !o.legacy; }).length;
+    var nLegacy = orphans.length - nOther;
+    if (nOther) { msg.push('Черновиков к вопросам, которых нет в этом отчёте: ' + nOther + ' — они не подставлены, см. список ниже.'); warn = true; }
+    if (nLegacy) { msg.push('Найден черновик старого формата, где ответ привязан только к номеру вопроса (ответов: ' + nLegacy + '). Он не подставлен: под тем же номером теперь может быть другой вопрос.'); warn = true; }
+    if (!store) {
+      msg.push('Локальное хранилище недоступно (приватный режим или запрет сайта). Ответы можно ввести и выгрузить в Markdown, но после закрытия вкладки они пропадут.');
+      warn = true;
+    }
+    if (msg.length) setAnsStatus(msg.join(' '), warn);
+    areas.forEach(function (ta) {
+      ta.addEventListener('input', function () {
+        markDraft(ta);
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveDraft, 300);
+      });
+    });
+  }
+  /* Формат совпадает с answers_markdown() в html.py: карточка у каждого вопроса, «Ответ: …» одной строкой. */
+  function oneLine(s) {
+    return String(s || '').split(/\r\n|\r|\n/).map(function (x) { return x.replace(/^[ \t]+|[ \t]+$/g, ''); })
+      .filter(function (x) { return x; }).join(' ');
+  }
+  function buildMarkdown(exportedAt) {
+    var answers = collect();
+    var lines = [], missing = [], blocks = [];
+    A.header.forEach(function (h) { lines.push(h === null ? 'exported_at: ' + exportedAt : h); });
+    A.questions.forEach(function (q) {
+      var one = oneLine(answers[q.id] || '') || oneLine(q.reportAnswer || '');
+      blocks.push(q.head.concat([one ? 'Ответ: ' + one : 'Ответ:', '']));
+      if (!one) missing.push(q.id);
+    });
+    if (missing.length) lines.push('Без ответа: ' + missing.join(', '), '');
+    blocks.forEach(function (b) { lines.push.apply(lines, b); });
+    return lines.join('\n').replace(/\n+$/, '') + '\n';
+  }
+  function fileName() { return 'answers-' + (D.doc.id || 'document').slice(0, 12) + '.md'; }
+  var exp = $('#ans-export');
+  if (exp) exp.addEventListener('click', function () {
+    var md = buildMarkdown(new Date().toISOString());
+    if (mdBox) mdBox.value = md;
+    try {
+      var url = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
+      var a = doc.createElement('a');
+      a.href = url;
+      a.download = fileName();
+      a.hidden = true;
+      doc.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+      setAnsStatus('Сформирован файл ' + a.download + '. Передайте его в повторную проверку через --answers.');
+    } catch (err) {
+      var box = $('#ans-md-box');
+      if (box) box.open = true;
+      setAnsStatus('Скачивание недоступно: скопируйте Markdown из поля ниже.', true);
+    }
+  });
+  var cp = $('#ans-copy');
+  if (cp) cp.addEventListener('click', function () {
+    var md = buildMarkdown(new Date().toISOString());
+    if (mdBox) mdBox.value = md;
+    function fallback() {
+      var box = $('#ans-md-box');
+      if (box) box.open = true;
+      if (mdBox) { mdBox.focus(); mdBox.select(); }
+      var ok = false;
+      try { ok = doc.execCommand('copy'); } catch (err) { ok = false; }
+      setAnsStatus(ok ? 'Markdown скопирован.' : 'Выделите текст в поле ниже и скопируйте вручную.', !ok);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(md).then(function () { setAnsStatus('Markdown скопирован в буфер обмена.'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+  var clr = $('#ans-clear');
+  if (clr) clr.addEventListener('click', function () {
+    if (!window.confirm('Удалить черновики ответов на вопросы этого отчёта? Сохранённые ответы к другим вопросам останутся.')) return;
+    areas.forEach(function (ta) { ta.value = ''; markDraft(ta); });
+    saveDraft();
+    setAnsStatus('Черновики ответов на вопросы этого отчёта удалены.');
+  });
+
+  /* ---------------------------------------------------------- старт */
+  if (location.hash) {
+    var h0 = location.hash;
+    route(h0);
+    if (history.state === null && state.sel) setHash(D.findings[state.sel].anchor, { kind: 'finding', fid: state.sel }, false);
+  }
+
+  window.bccReview = {
+    version: D.generator,
+    domCheck: check,
+    cpToUtf16: cpToUtf16,
+    select: function (fid) { return select(fid, {}); },
+    state: function () {
+      return {
+        selected: state.sel,
+        view: ws ? ws.getAttribute('data-view') : null,
+        returnPending: !!state.ret,
+        hash: location.hash,
+        storage: !!store
+      };
+    }
+  };
+})();
+</script>
+</body>
+</html>

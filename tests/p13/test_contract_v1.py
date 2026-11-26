@@ -72,10 +72,16 @@ def test_contract_example_renders():
 
 def test_real_reports_if_present(tmp_path):
     """Реальные report.json прогонов (Max, №18), если они лежат в checkout, собираются без ошибок."""
-    candidates = sorted(ROOT.glob("reports/**/*.json")) + sorted(ROOT.glob("runs/**/report.json"))
+    candidates = (sorted(ROOT.glob("release/reports/**/*.json")) + sorted(ROOT.glob("reports/**/*.json"))
+                  + sorted(ROOT.glob("runs/**/report.json")))
+    candidates = [p for p in candidates if ".artifacts" not in p.parts[-2] and "stages" not in p.parts]
     reports = [p for p in candidates if '"schema_version"' in p.read_text(encoding="utf-8", errors="ignore")[:4000]]
     if not reports:
         pytest.skip("реальных report.json в checkout нет")
-    for path in reports[:3]:
-        out = H.write_html(path, tmp_path / (path.stem + ".html"))
-        assert out.stat().st_size > 0
+    for path in reports[:6]:
+        rep = json.loads(path.read_text(encoding="utf-8"))
+        text = H.write_html(path, tmp_path / (path.stem + ".html")).read_text(encoding="utf-8")
+        c = parse(text)
+        assert all(c.texts[b["id"]] == b["text"] for b in rep["document"]["blocks"]), path
+        vm = view_model(text)
+        assert all(c.ev_text[k] == ev["q"] for k, ev in vm["ev"].items() if ev["ok"]), path

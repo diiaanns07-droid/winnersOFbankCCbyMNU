@@ -85,4 +85,4 @@ def test_exported_answers_match_python_format(browser_run):
     expected = H.answers_markdown(reports["synthetic"], typed, exported_at=parsed["meta"]["exported_at"])
     assert exported == expected
     assert parsed["meta"]["source_sha256"] == reports["synthetic"]["document"]["id"]
-    assert parsed["answers"]["Q-01"] == typed["Q-01"]
+    assert parsed["answers"]["Q-01"] == H.answer_one_line(typed["Q-01"])

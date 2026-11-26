@@ -367,7 +367,7 @@ const segText = (page, evId) => page.evaluate((id) => Array.from(document.queryS
     await o.page.fill('textarea[data-qid="Q-01"]', answer1);
     await o.page.fill('textarea[data-qid="Q-03"]', 'Клиринг');
     await o.page.waitForFunction(() => /сохранён/.test(document.getElementById('ans-status').textContent));
-    const key = 'bcc-review/answers/v1/' + syn.document.id;
+    const key = 'bcc-review/answers/v2/' + syn.document.id;
     const stored = await o.page.evaluate((k) => localStorage.getItem(k), key);
     await o.page.reload();
     const restored = await o.page.evaluate(() => ({
@@ -385,9 +385,10 @@ const segText = (page, evId) => page.evaluate((id) => Array.from(document.queryS
     await other.goto(url('partial'));
     const otherQ1 = await other.evaluate(() => document.querySelector('textarea[data-qid="Q-03"]').value);
     await ctx.close();
-    assert(stored && JSON.parse(stored).answers['Q-01'] === answer1, 'в хранилище: ' + stored);
+    const entries = stored ? Object.values(JSON.parse(stored).entries) : [];
+    assert(entries.some((e) => e.qid === 'Q-01' && e.answer === answer1 && e.prompt), 'в хранилище: ' + stored);
     assert(restored.q1 === answer1, 'не восстановлено');
-    assert(/не учтён/.test(restored.status) && /не меняют исходный документ/.test(restored.note), 'нет пометки черновика');
+    assert(/в отчёте не учт/.test(restored.status) && /не меняют исходный документ/.test(restored.note), 'нет пометки черновика');
     assert(restored.verdict === '✕ Нельзя начинать / ✕ Нельзя начинать' && /Подтверждено/.test(restored.f1), 'черновик изменил вердикт/статус: ' + JSON.stringify(restored));
     assert(otherQ1 === '', 'черновик просочился в документ с другим хешем');
     fs.writeFileSync(path.join(work, 'answers-typed.json'), JSON.stringify({ 'Q-01': answer1, 'Q-03': 'Клиринг', file }));

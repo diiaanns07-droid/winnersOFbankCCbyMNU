@@ -602,6 +602,52 @@ def build_long_report(n_copies: int = 8) -> dict[str, Any]:
     return _resummarize(rep)
 
 
+Q_MONTH = {
+    "id": "Q-01", "finding_ids": ["F-002"],
+    "prompt": "К какому месяцу относится покупка 31.01 23:58, проведённая 01.02 00:03: к месяцу совершения или к месяцу проведения?",
+    "options": ["К январю (дата совершения)", "К февралю (дата проведения)"], "affected_req_ids": ["R-02"],
+}
+Q_EVENT = {
+    "id": "Q-02", "finding_ids": ["F-008"],
+    "prompt": "Какое событие процессинга считается «проведённой покупкой»: авторизация или клиринг?",
+    "options": ["Авторизация", "Клиринг"], "affected_req_ids": ["R-02", "R-05"],
+}
+Q_PUSH = {
+    "id": "Q-01", "finding_ids": ["F-001"],
+    "prompt": "Нужен ли повторный push в месяце после изменения порога, если push в этом месяце уже был?",
+    "options": ["Да, после изменения порога", "Нет, не более одного push в месяц"], "affected_req_ids": ["R-03", "R-04"],
+}
+Q_READ = {
+    "id": "Q-02", "finding_ids": ["F-011"],
+    "prompt": "Каким методом приложение читает порог и сумму за месяц?",
+    "options": [], "affected_req_ids": ["R-07"],
+}
+
+
+def build_answers_reports() -> dict[str, dict[str, Any]]:
+    """Три прогона одного документа (один SHA) с разными вопросами под одинаковыми Q-ID.
+
+    * ``r1``: Q-01 — месяц учёта покупки, Q-02 — событие «проведённой покупки»;
+    * ``r2``: Q-01 — повторный push (другой смысл под тем же ID), Q-02 — тот же вопрос
+      о событии с той же привязкой (F-008 и его опоры);
+    * ``r3``: тот же вопрос о событии перенумерован в Q-03, Q-02 — новый вопрос.
+    """
+    base = build_report(table_rows=20)
+    base["decisions"] = []
+    out = {}
+    for name, run_id, questions in (
+        ("r1", "p13-answers-run-1", [Q_MONTH, Q_EVENT]),
+        ("r2", "p13-answers-run-2", [Q_PUSH, Q_EVENT]),
+        ("r3", "p13-answers-run-3", [Q_PUSH, Q_READ, {**Q_EVENT, "id": "Q-03"}]),
+    ):
+        rep = json.loads(json.dumps(base))
+        rep["run"]["run_id"] = run_id
+        rep["questions"] = json.loads(json.dumps(questions))
+        rep["test_cases"] = [t for t in rep["test_cases"] if t["open_question_id"] is None]
+        out[name] = rep
+    return out
+
+
 VARIANTS = {
     "synthetic": build_report,
     "empty": build_empty_report,

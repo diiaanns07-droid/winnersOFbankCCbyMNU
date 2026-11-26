@@ -43,16 +43,20 @@ __all__ = [
     "answers_storage_key",
     "block_anchor",
     "finding_anchor",
+    "answer_one_line",
+    "legacy_answers_storage_key",
     "parse_answers_markdown",
     "question_anchor",
+    "question_fingerprint",
     "render_html",
     "requirement_anchor",
     "write_html",
 ]
 
 GENERATOR = "bcc_review.exports.html/1.0"
-ANSWERS_FORMAT = "bcc-review-answers/1"
-DRAFT_FORMAT = "bcc-review-answers-draft/1"
+ANSWERS_FORMAT = "bcc-review-answers/2"
+DRAFT_FORMAT = "bcc-review-answers-draft/2"
+LEGACY_DRAFT_FORMAT = "bcc-review-answers-draft/1"
 ASSETS_DIR = Path(__file__).with_name("html_assets")
 
 # --------------------------------------------------------------------------- #
@@ -92,7 +96,12 @@ def requirement_anchor(req_id: Any) -> str:
 
 
 def answers_storage_key(document_sha256: str) -> str:
-    """Ключ localStorage для черновика ответов конкретной версии документа."""
+    """Ключ localStorage черновика ответов версии документа. Внутри записи лежат по отпечатку вопроса."""
+    return f"bcc-review/answers/v2/{document_sha256}"
+
+
+def legacy_answers_storage_key(document_sha256: str) -> str:
+    """Ключ черновика старого формата (только Q-ID). Читается для явного показа, не пишется."""
     return f"bcc-review/answers/v1/{document_sha256}"
 
 
@@ -498,7 +507,9 @@ def _segments(text: str, evs: list[_Ev], sev_of: Mapping[str, str]) -> str:
             attrs.append(f'data-sev="{SEVERITY_ORDER[min(ranks)]}"')
         if not fids:
             cls += " hl-q"
-        out.append(f'<span class="{cls}" {" ".join(attrs)}>{piece}</span>')
+        # Опора замечания — семантическая подсветка <mark>; опоры требований и фактов без замечаний — <span>.
+        tag = "mark" if fids else "span"
+        out.append(f'<{tag} class="{cls}" {" ".join(attrs)}>{piece}</{tag}>')
     return "".join(out)
 
 
@@ -623,18 +634,69 @@ def _decisions_by_question(report: Mapping[str, Any]) -> dict[str, list[dict[str
     return out
 
 
-def _report_answer(report: Mapping[str, Any], qid: str) -> str:
-    """Ответ, учтённый прогоном (Decision) для текущей версии документа."""
-    doc_id = str((report.get("document") or {}).get("id") or "")
+def _doc_sha(report: Mapping[str, Any]) -> str:
+    return str((report.get("document") or {}).get("id") or (report.get("run") or {}).get("source_sha256") or "")
+
+
+def _finding_anchors(report: Mapping[str, Any], finding_ids: Iterable[str]) -> list[str]:
+    by_id = {str(f.get("id")): f for f in _dicts(report.get("findings"))}
+    anchors: set[str] = set()
+    for fid in finding_ids:
+        f = by_id.get(str(fid))
+        if f is None:
+            continue
+        evs = list(_dicts(f.get("evidence")))
+        w = f.get("witness")
+        if isinstance(w, Mapping):
+            for side in ("evidence_a", "evidence_b"):
+                evs += _dicts(w.get(side))
+        for ev in evs:
+            anchors.add(f"{ev.get('block_id')}:{ev.get('start')}:{ev.get('end')}:{ev.get('quote')}")
+    return sorted(anchors)
+
+
+def question_fingerprint(report: Any, question: Mapping[str, Any]) -> str:
+    """Отпечаток вопроса: SHA-256 от документа, текста вопроса и опор его замечаний.
+
+    Q-ID и ID замечаний нумеруются заново в каждом прогоне, поэтому в отпечаток не входят.
+    Тот же вопрос с той же привязкой к тексту документа даёт тот же отпечаток в любом
+    прогоне; другой текст вопроса или другие опоры дают другой.
+    """
+    rep = report if isinstance(report, Mapping) else _to_plain(report)
+    payload = {
+        "v": 1,
+        "document": _doc_sha(rep),
+        "prompt": _one_line(_question_text(question)),
+        "anchors": _finding_anchors(rep, _question_findings(question)),
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _decision_state(report: Mapping[str, Any], d: Mapping[str, Any], fp: str) -> str:
+    """``ok`` | ``qid_only`` | ``other_question`` | ``other_version`` для Decision под Q-ID вопроса."""
+    doc_id, src = _doc_sha(report), str(d.get("source_sha256") or "")
+    if src and doc_id and src != doc_id:
+        return "other_version"
+    dfp = d.get("question_fingerprint")
+    if not dfp:
+        return "qid_only"
+    return "ok" if str(dfp) == fp else "other_question"
+
+
+def _report_answer(report: Mapping[str, Any], qid: str, fp: str) -> str:
+    """Ответ, учтённый прогоном (Decision), если он относится к этому вопросу этой версии документа."""
     for d in _decisions_by_question(report).get(qid, []):
-        src = str(d.get("source_sha256") or "")
-        if isinstance(d.get("answer"), str) and d["answer"] and (not src or not doc_id or src == doc_id):
-            return d["answer"]
+        answer = d.get("answer")
+        if isinstance(answer, str) and answer.strip() and _decision_state(report, d, fp) in ("ok", "qid_only"):
+            return answer
     return ""
 
 
-def _doc_sha(report: Mapping[str, Any]) -> str:
-    return str((report.get("document") or {}).get("id") or (report.get("run") or {}).get("source_sha256") or "")
+def answer_one_line(answer: str) -> str:
+    """Ответ одной строкой: опубликованный ``parse_answers`` читает «Ответ: …» до конца строки."""
+    parts = re.split(r"\r\n|\r|\n", answer or "")
+    return " ".join(x.strip(" \t") for x in parts if x.strip(" \t"))
 
 
 def _answers_header(report: Mapping[str, Any]) -> list[str | None]:
@@ -654,12 +716,14 @@ def _answers_header(report: Mapping[str, Any]) -> list[str | None]:
         "# Ответы на уточняющие вопросы",
         "",
         "> Черновик ответов аналитика к отчёту ревью. Исходный документ этим файлом не изменён.",
+        "> Ответ — одна строка «Ответ: …» под своим «## Q-ID». Q-ID действует только в прогоне report_run_id;",
+        "> «Отпечаток вопроса» связывает ответ с текстом вопроса и его опорами в документе.",
         "> Учесть ответы: python -m bcc_review INPUT OUTPUT.md --answers answers.md",
         "",
     ]
 
 
-def _answers_question_head(q: Mapping[str, Any], index: int) -> list[str]:
+def _answers_question_head(q: Mapping[str, Any], index: int, fp: str) -> list[str]:
     lines = [f"## {_question_id(q, index)}", ""]
     text = _question_text(q).replace("\r\n", "\n").replace("\r", "\n")
     for line in text.split("\n"):
@@ -667,43 +731,46 @@ def _answers_question_head(q: Mapping[str, Any], index: int) -> list[str]:
     lines.append("")
     options = [str(o) for o in _as_list(q.get("options")) if o not in (None, "")]
     if options:
-        lines += ["Варианты: " + " | ".join(_one_line(o) for o in options), ""]
+        lines.append("Варианты: " + " | ".join(_one_line(o) for o in options))
     fids = _question_findings(q)
     if fids:
-        lines += ["Замечания: " + ", ".join(fids), ""]
-    lines += ["### Ответ", ""]
+        lines.append("Замечания: " + ", ".join(fids))
+    lines += [f"Отпечаток вопроса: {fp}", ""]
     return lines
 
 
-def _answer_lines(answer: str) -> list[str]:
-    ans = answer.replace("\r\n", "\n").replace("\r", "\n").strip("\n")
-    if not ans.strip():
-        return []
-    return [("\\" + ln if ln.startswith(("#", "\\")) else ln) for ln in ans.split("\n")] + [""]
-
-
 def answers_markdown(report: Any, answers: Mapping[str, str], *, exported_at: str) -> str:
-    """Markdown-файл ответов для ``--answers``. JS в HTML строит тот же текст.
+    """Файл ответов для ``--answers``: JS в HTML строит тот же текст байт в байт.
 
-    Пустой черновик заменяется ответом, уже учтённым прогоном (Decision), чтобы
-    повторный запуск с этим файлом его не потерял.
+    ``answers`` — черновики по Q-ID ЭТОГО отчёта. Карточка «## Q-ID» есть у каждого вопроса,
+    последнее поле — «Ответ: …» одной строкой; у открытого вопроса поле пустое (так его читает
+    №08: вопрос остаётся открытым, Decision не создаётся). Пустой черновик заменяется ответом,
+    уже учтённым прогоном для этого же вопроса.
     """
     rep = report if isinstance(report, dict) else _to_plain(report)
     lines: list[str] = []
     for item in _answers_header(rep):
         lines.append(f"exported_at: {exported_at}" if item is None else item)
+    chosen = []
     for i, q in enumerate(_dicts(rep.get("questions"))):
         qid = _question_id(q, i)
-        lines += _answers_question_head(q, i)
-        draft = answers.get(qid) or ""
-        lines += _answer_lines(draft if draft.strip() else _report_answer(rep, qid))
+        fp = question_fingerprint(rep, q)
+        one = answer_one_line(answers.get(qid) or "") or answer_one_line(_report_answer(rep, qid, fp))
+        chosen.append((i, q, qid, fp, one))
+    missing = [qid for _, _, qid, _, one in chosen if not one]
+    if missing:
+        lines += ["Без ответа: " + ", ".join(missing), ""]
+    for i, q, _qid, fp, one in chosen:
+        lines += _answers_question_head(q, i, fp) + [f"Ответ: {one}" if one else "Ответ:", ""]
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
 def parse_answers_markdown(text: str) -> dict[str, Any]:
-    """Эталонный разбор файла ответов: ``{"meta": {...}, "answers": {Q-ID: текст}}``.
+    """Эталонный разбор файла ответов (форматы 2 и 1).
 
-    Из результата №08 получает ``Decision = {question_id, source_sha256 = meta["source_sha256"], answer}``.
+    Возвращает ``{"meta", "answers": {Q-ID: ответ}, "fingerprints": {Q-ID: отпечаток}, "unanswered": [...]}``.
+    Decision для №08: ``{question_id, source_sha256 = meta["source_sha256"], answer,
+    question_fingerprint}``.
     """
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     meta: dict[str, str] = {}
@@ -717,28 +784,35 @@ def parse_answers_markdown(text: str) -> dict[str, Any]:
             i += 1
         i += 1
     answers: dict[str, str] = {}
+    fingerprints: dict[str, str] = {}
+    unanswered: list[str] = []
     current: str | None = None
-    buf: list[str] | None = None
+    buf: list[str] | None = None  # формат 1: блок после «### Ответ»
 
     def flush() -> None:
         if current is not None and buf is not None:
-            while buf and not buf[0].strip():
-                buf.pop(0)
-            while buf and not buf[-1].strip():
-                buf.pop()
-            if buf:
-                answers[current] = "\n".join(buf)
+            body = "\n".join(buf).strip("\n")
+            if body.strip():
+                answers[current] = body
 
     for line in lines[i:]:
         if line.startswith("## "):
             flush()
             current, buf = line[3:].strip().split(" ")[0], None
+        elif current is None and line.startswith("Без ответа:"):
+            unanswered += [x.strip() for x in line.split(":", 1)[1].split(",") if x.strip()]
+        elif current is not None and buf is None and line.startswith("Отпечаток вопроса:"):
+            fingerprints[current] = line.split(":", 1)[1].strip()
+        elif current is not None and buf is None and line.startswith("Ответ:"):
+            value = line.split(":", 1)[1].strip()
+            if value:
+                answers[current] = value
         elif current is not None and buf is None and line.strip() == "### Ответ":
             buf = []
         elif buf is not None:
             buf.append(line[1:] if line.startswith("\\") else line)
     flush()
-    return {"meta": meta, "answers": answers}
+    return {"meta": meta, "answers": answers, "fingerprints": fingerprints, "unanswered": unanswered}
 
 
 # --------------------------------------------------------------------------- #
@@ -761,6 +835,22 @@ class _Renderer:
         self.requirements = _dicts(self.r.get("requirements"))
         self.questions = _dicts(self.r.get("questions"))
         self.decisions = _decisions_by_question(self.r)
+        self.qfp = {_question_id(q, i): question_fingerprint(self.r, q) for i, q in enumerate(self.questions)}
+        # Decision привязан, только если его Q-ID есть в этом прогоне и отпечаток не противоречит.
+        self.dec_attached: list[dict[str, Any]] = []
+        self.dec_unattached: list[tuple[dict[str, Any], str]] = []
+        for d in _dicts(self.r.get("decisions")):
+            qid = str(d.get("question_id"))
+            if qid not in self.qfp:
+                self.dec_unattached.append((d, f"в этом прогоне нет вопроса {qid}: Q-ID относится к прогону, где был задан вопрос"))
+                continue
+            state = _decision_state(self.r, d, self.qfp[qid])
+            if state in ("ok", "qid_only"):
+                self.dec_attached.append(d)
+            elif state == "other_question":
+                self.dec_unattached.append((d, f"отпечаток вопроса не совпал с {qid} этого прогона"))
+            else:
+                self.dec_unattached.append((d, "ответ дан к другой версии документа"))
         self.crit_labels = _criteria_labels(self.r)
         self.render_warnings: list[str] = []
         if replaced[0]:
@@ -1014,28 +1104,58 @@ class _Renderer:
             "</div></header>"
         )
 
+    _STAGE_REASON = re.compile(r"^([A-Za-z_][\w#.\-]*):\s+(.+)$", re.S)
+
+    def run_reason_groups(self) -> list[tuple[str, list[str]]]:
+        """``status_reasons`` вида «этап: причина», сгруппированные по тексту причины (крупные группы первыми)."""
+        groups: dict[str, list[str]] = {}
+        for raw in _as_list(self.run.get("status_reasons")):
+            text = " ".join(str(raw).split())
+            m = self._STAGE_REASON.match(text)
+            stage, reason = (m.group(1), m.group(2)) if m else ("", text)
+            stages = groups.setdefault(reason, [])
+            if stage and stage not in stages:
+                stages.append(stage)
+        return sorted(groups.items(), key=lambda kv: -len(kv[1]))
+
     def run_banner(self) -> str:
-        status = self.run.get("status")
+        """Статус прогона для первого экрана: код статуса, главная причина, остальное — в <details>."""
+        status = str(self.run.get("status") or "")
         if status == "complete":
             return ""
-        notes = [str(x) for x in _as_list(self.run.get("status_reasons"))]
-        stages = _as_list(self.run.get("incomplete_stages"))
-        if stages:
-            notes.append("Не выполнены этапы: " + ", ".join(str(s) for s in stages))
-        notes += self.warnings_all()
-        tail = "".join(f"<li>{_e(n)}</li>" for n in notes[:8])
-        if status == "failed":
-            head = "Прогон завершился ошибкой. Отчёт содержит только то, что успели проверить."
-        elif status == "partial":
-            head = "Прогон неполный. Часть проверок не выполнена, поэтому отсутствие замечания не доказывает отсутствие дефекта."
+        head = {"partial": "Прогон неполный", "failed": "Прогон завершился ошибкой"}.get(status, "Статус прогона не указан")
+        tail = {
+            "partial": "Часть проверок не выполнена: отсутствие замечания не доказывает отсутствие дефекта.",
+            "failed": "Отчёт содержит только то, что успели проверить.",
+        }.get(status, "Отчёт нельзя считать полным.")
+        groups = self.run_reason_groups()
+        stages = [str(x) for x in _as_list(self.run.get("incomplete_stages"))]
+        if groups:
+            reason, st = groups[0]
+            primary = reason.rstrip(".") + (f" — этапы: {', '.join(st)}" if st else "")
+            more = len(groups) - 1
         else:
-            head = "Статус прогона не указан. Отчёт нельзя считать полным."
+            primary = ("не выполнены этапы: " + ", ".join(stages)) if stages else "причина в отчёте не указана"
+            more = 0
+        notes = [str(x) for x in _as_list(self.run.get("status_reasons"))]
+        if stages:
+            notes.append("Не выполнены этапы: " + ", ".join(stages))
+        notes += self.warnings_all()
+        details = (
+            f'<details class="run-more"><summary>Все причины и предупреждения ({len(notes)})</summary>'
+            "<ul>" + "".join(f"<li>{_e(n)}</li>" for n in notes) + "</ul></details>"
+            if notes
+            else ""
+        )
         return (
-            f'<div class="banner banner-run" role="note"><strong><span aria-hidden="true">⚠</span> {head}</strong>'
-            f'{f"<ul>{tail}</ul>" if tail else ""}</div>'
+            '<div class="banner banner-run" id="run-state" role="note" aria-labelledby="run-state-h">'
+            f'<p class="run-head" id="run-state-h"><strong><span aria-hidden="true">⚠</span> {head}</strong> '
+            f'<code class="run-code">status: {_e(status or "—")}</code></p>'
+            f'<p class="run-reason"><b>Причина:</b> {_e(primary)}{f"; ещё причин: {more}" if more else ""}.</p>'
+            f'<p class="small run-tail">{tail}</p>{details}</div>'
         )
 
-    def verdict_tile(self, title: str, data: Any) -> str:
+    def verdict_tile(self, title: str, data: Any, key: str) -> str:
         if isinstance(data, bool):
             data = {"status": "ready" if data else "not_ready"}
         if isinstance(data, str):
@@ -1045,21 +1165,32 @@ class _Renderer:
         if not status and isinstance(data.get("ready"), bool):
             status = "ready" if data["ready"] else "not_ready"
         cls, glyph, label = READINESS.get(status, ("unk", "?", "Решение не сформировано"))
-        reasons = [str(r) for r in _as_list(_first(data, "reasons", "reason", default=[])) if r]
+        reasons = [" ".join(str(r).split()) for r in _as_list(_first(data, "reasons", "reason", default=[])) if r]
         blockers = _as_list(_first(data, "finding_ids", "blocking_finding_ids", default=[]))
+        run_reasons = [" ".join(str(x).split()) for x in _as_list(self.run.get("status_reasons")) if x]
+
+        def repeats_run_status(r: str) -> bool:
+            return r.startswith(("Прогон partial", "Прогон failed", "Прогон неполный")) or any(x in r for x in run_reasons)
+
+        own = [r for r in reasons if not repeats_run_status(r)]
+        shown = own[0] if own else (reasons[0] if reasons else "")
+        rest = [r for r in reasons if r != shown]
         prelim = ""
         if self.run.get("status") != "complete":
             prelim = '<span class="prelim">предварительно: прогон неполный</span>'
-        reasons_html = ""
-        if len(reasons) == 1:
-            reasons_html = f"<p>{_e(reasons[0])}</p>"
-        elif reasons:
-            reasons_html = "<ul>" + "".join(f"<li>{_e(r)}</li>" for r in reasons) + "</ul>"
+        reasons_html = f'<p class="tile-r">{_e(shown)}</p>' if shown else ""
+        if rest:
+            reasons_html += (
+                f'<details class="tile-more"><summary>Всё обоснование ({len(reasons)})</summary><ul>'
+                + "".join(f"<li>{_e(r)}</li>" for r in reasons)
+                + "</ul></details>"
+            )
         return (
-            f'<div class="tile tile-{cls}"><h3>{_e(title)}</h3>'
+            f'<div class="tile tile-{cls}" id="verdict-{key}" role="group" aria-labelledby="verdict-{key}-h">'
+            f'<h3 id="verdict-{key}-h">{_e(title)}</h3>'
             f'<p class="tile-v"><span aria-hidden="true" class="glyph">{glyph}</span> {_e(label)}</p>{prelim}'
-            f"{reasons_html}"
-            f'{f"<p class=small>Блокируют: {self.links(blockers)}</p>" if blockers else ""}</div>'
+            f'{f"<p class=small>Блокируют: {self.links(blockers)}</p>" if blockers else ""}'
+            f"{reasons_html}</div>"
         )
 
     def summary(self) -> str:
@@ -1069,7 +1200,7 @@ class _Renderer:
         for f in self.findings:
             counts[self.sev_of[f["id"]]] += 1
         review = sum(1 for f in self.findings if f.get("status") == "needs_review")
-        open_q = sum(1 for i, q in enumerate(self.questions) if not _report_answer(self.r, _question_id(q, i)))
+        open_q = sum(1 for qid, fp in self.qfp.items() if not _report_answer(self.r, qid, fp))
         n_req = len(self.requirements)
         reviewed = s.get("reviewed_requirements")
         req_label = f"{reviewed} из {n_req} требований проверено" if _is_int(reviewed) and reviewed != n_req else "требований"
@@ -1099,21 +1230,30 @@ class _Renderer:
         for a in _as_list(_first(v, "first_actions", default=[])):
             if isinstance(a, str):
                 act_items.append(f"<li>{_e(a)}</li>")
-        answered = sum(len(x) for x in self.decisions.values())
-        dec_html = (
-            f'<p class="small">Учтено ответов на вопросы: <a href="#questions">{answered}</a>.</p>' if answered else ""
-        )
+        dec_html = ""
+        if self.dec_attached or self.dec_unattached:
+            dec_html = (
+                f'<p class="small">Ответов из --answers: {len(self.dec_attached) + len(self.dec_unattached)}; '
+                f'привязано к вопросам этого прогона: <a href="#questions">{len(self.dec_attached)}</a>'
+                + (
+                    f'; <a class="warn" href="#ans-unattached">без вопроса: {len(self.dec_unattached)}</a>'
+                    if self.dec_unattached
+                    else ""
+                )
+                + ".</p>"
+            )
         basis = _first(v, "basis", "summary", default="")
         return (
             '<section id="summary" class="summary" aria-labelledby="summary-h">'
             '<h2 id="summary-h">Итог ревью</h2>'
-            f"{self.run_banner()}"
             '<div class="verdict">'
-            f'{self.verdict_tile("Разработка", _first(v, "development", "dev"))}'
-            f'{self.verdict_tile("Тестирование", _first(v, "testing", "test"))}'
-            '<div class="actions"><h3>Что сделать первым</h3>'
+            f'{self.verdict_tile("Разработка", _first(v, "development", "dev"), "development")}'
+            f'{self.verdict_tile("Тестирование", _first(v, "testing", "test"), "testing")}'
+            "</div>"
+            f"{self.run_banner()}"
+            '<div class="actions" id="first-actions"><h3>Что сделать первым</h3>'
             f'{"<ol>" + "".join(act_items) + "</ol>" if act_items else "<p class=muted>Первые действия в отчёте не указаны.</p>"}'
-            f"{dec_html}</div></div>"
+            f"{dec_html}</div>"
             f'{f"<p class=verdict-sum>{_e(basis)}</p>" if basis else ""}'
             f'<ul class="stats" aria-label="Сводка">{stat_html}</ul>'
             "</section>"
@@ -1438,15 +1578,20 @@ class _Renderer:
         )
         return self.section("requirements", f"Требования ({len(self.requirements)})", table, empty="")
 
-    def decision_html(self, d: Mapping[str, Any]) -> str:
+    def decision_html(self, d: Mapping[str, Any], fp: str) -> str:
         src = str(d.get("source_sha256") or "")
-        stale = bool(src and self.doc_id and src != self.doc_id)
-        head = (
-            '<span class="warn small"><span aria-hidden="true">⚠</span> Ответ дан к другой версии документа '
-            f"(sha256 {_e(src[:12])}…): в этом прогоне он не учтён.</span>"
-            if stale
-            else '<span class="small"><span aria-hidden="true">✓</span> Ответ учтён при этом прогоне (файл --answers):</span>'
-        )
+        state = _decision_state(self.r, d, fp)
+        stale = state in ("other_version", "other_question")
+        head = {
+            "other_version": '<span class="warn small"><span aria-hidden="true">⚠</span> Ответ дан к другой версии документа '
+            f"(sha256 {_e(src[:12])}…): в этом прогоне он не учтён.</span>",
+            "other_question": '<span class="warn small"><span aria-hidden="true">⚠</span> Ответ из файла относится к другому '
+            "вопросу с тем же Q-ID (отпечаток вопроса не совпал): к этому вопросу не применён.</span>",
+            "ok": '<span class="small"><span aria-hidden="true">✓</span> Ответ учтён при этом прогоне (файл --answers), '
+            "отпечаток вопроса совпал:</span>",
+            "qid_only": '<span class="small"><span aria-hidden="true">✓</span> Ответ учтён при этом прогоне (файл --answers). '
+            "Связь с вопросом сверена только по Q-ID: убедитесь, что ответ относится к этому вопросу.</span>",
+        }[state]
         edits = []
         for ed in _dicts(d.get("edits")):
             b = str(ed.get("block_id") or "")
@@ -1465,14 +1610,33 @@ class _Renderer:
             f'<p class="pre">{_e(d.get("answer") or "")}</p>{note}{edits_html}</div>'
         )
 
+    def unattached_html(self) -> str:
+        if not self.dec_unattached:
+            return ""
+        rows = "".join(
+            f"<li><b>{_e(d.get('question_id'))}</b> — {_e(reason)}."
+            f'<p class="pre">{_e(d.get("answer") or "")}</p>'
+            f'<p class="small muted">source_sha256 {_e(str(d.get("source_sha256") or "—")[:12])}…'
+            f'{"; правок: " + str(len(_dicts(d.get("edits")))) if _dicts(d.get("edits")) else ""}</p></li>'
+            for d, reason in self.dec_unattached
+        )
+        return (
+            '<div class="banner banner-warn" id="ans-unattached" role="region" aria-labelledby="ans-unattached-h">'
+            '<h3 id="ans-unattached-h">Ответы из --answers без вопроса в этом прогоне</h3>'
+            '<p class="small">Прогон учёл файл ответов, но заново построил вопросы, и эти ответы не относятся ни к одному '
+            "из них. Ни к какому вопросу ниже они не приписаны; проверьте, учтено ли решение в тексте документа.</p>"
+            f'<ul class="orphans">{rows}</ul></div>'
+        )
+
     def questions_section(self) -> str:
         if not self.questions:
-            return self.section("questions", "Открытые вопросы", "", empty="Уточняющих вопросов нет.")
+            return self.section("questions", "Открытые вопросы", self.unattached_html(), empty="Уточняющих вопросов нет.")
         items = []
         for i, q in enumerate(self.questions):
             qid = _question_id(q, i)
             slug = anchor_slug(qid)
-            done_html = "".join(self.decision_html(d) for d in self.decisions.get(qid, []))
+            fp = self.qfp[qid]
+            done_html = "".join(self.decision_html(d, fp) for d in self.decisions.get(qid, []))
             options = [str(o) for o in _as_list(q.get("options")) if o not in (None, "")]
             opt_html = ""
             if options:
@@ -1495,14 +1659,20 @@ class _Renderer:
                 f"{done_html}{opt_html}"
                 f'<label class="ans-l" for="ans-{slug}">Черновик ответа на {_e(qid)} '
                 '<span class="small muted">(хранится только в этом браузере, документ не меняет)</span></label>'
-                f'<textarea id="ans-{slug}" class="ans" data-qid="{_e(qid)}" rows="3">\n</textarea>'
+                f'<textarea id="ans-{slug}" class="ans" data-qid="{_e(qid)}" data-qfp="{fp}" rows="3">\n</textarea>'
                 "</article></li>"
             )
         tools = (
             '<div class="ans-tools" id="ans-tools">'
             '<p class="banner banner-info" id="ans-note" role="note">Черновики ответов не меняют исходный документ, '
-            "вердикт и статусы замечаний. Чтобы учесть ответы, выгрузите их в Markdown и запустите проверку "
+            "вердикт и статусы замечаний. Черновик привязан к тексту вопроса, а не к его номеру: в другом прогоне "
+            "Q-01 может означать другой вопрос. Чтобы учесть ответы, выгрузите их в Markdown и запустите проверку "
             f'заново с <code>--answers</code>. Документ: <code title="{_e(self.doc_id)}">sha256 {_e(self.doc_id[:12])}…</code></p>'
+            '<div class="banner banner-warn" id="ans-orphans" role="region" aria-labelledby="ans-orphans-h" hidden>'
+            '<h3 id="ans-orphans-h">Черновики к вопросам, которых нет в этом отчёте</h3>'
+            '<p class="small">Эти ответы сохранены в браузере для других вопросов этого документа и сюда не подставлены. '
+            "Если ответ подходит к вопросу этого прогона, перенесите его вручную.</p>"
+            '<ul id="ans-orphans-list" class="orphans"></ul></div>'
             '<p class="small" id="ans-status" role="status"></p>'
             '<div class="btns"><button type="button" class="btn btn-pri" id="ans-export">Выгрузить ответы (.md)</button>'
             '<button type="button" class="btn" id="ans-copy">Скопировать Markdown</button>'
@@ -1511,11 +1681,11 @@ class _Renderer:
             '<label class="sr-only" for="ans-md">Markdown ответов</label>'
             '<textarea id="ans-md" readonly rows="10">\n</textarea></details></div>'
         )
-        open_q = sum(1 for i, q in enumerate(self.questions) if not _report_answer(self.r, _question_id(q, i)))
+        open_q = sum(1 for qid, fp in self.qfp.items() if not _report_answer(self.r, qid, fp))
         return self.section(
             "questions",
             f"Открытые вопросы ({open_q} из {len(self.questions)})",
-            tools + f'<ol class="qa-list">{"".join(items)}</ol>',
+            self.unattached_html() + tools + f'<ol class="qa-list">{"".join(items)}</ol>',
             empty="",
         )
 
@@ -1776,13 +1946,18 @@ class _Renderer:
             "answers": {
                 "format": ANSWERS_FORMAT,
                 "draftFormat": DRAFT_FORMAT,
+                "legacyFormat": LEGACY_DRAFT_FORMAT,
                 "storageKey": answers_storage_key(self.doc_id),
+                "legacyKey": legacy_answers_storage_key(self.doc_id),
+                "runId": str(self.run.get("run_id") or ""),
                 "header": _answers_header(self.r),
                 "questions": [
                     {
                         "id": _question_id(q, i),
-                        "head": _answers_question_head(q, i),
-                        "reportAnswer": _report_answer(self.r, _question_id(q, i)),
+                        "fp": self.qfp[_question_id(q, i)],
+                        "prompt": _one_line(_question_text(q)),
+                        "head": _answers_question_head(q, i, self.qfp[_question_id(q, i)]),
+                        "reportAnswer": _report_answer(self.r, _question_id(q, i), self.qfp[_question_id(q, i)]),
                     }
                     for i, q in enumerate(self.questions)
                 ],
@@ -1813,6 +1988,7 @@ class _Renderer:
             '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f'<meta http-equiv="Content-Security-Policy" content="{csp}">\n'
             f'<meta name="generator" content="{GENERATOR}">\n'
+            f'<meta name="bcc-review:generator-sha256" content="{generator_fingerprint()}">\n'
             f'<meta name="bcc-review:document-sha256" content="{_e(self.doc_id)}">\n'
             f'<meta name="bcc-review:schema-version" content="{_e(self.r.get("schema_version") or "")}">\n'
             f'<meta name="bcc-review:run-id" content="{_e(self.run.get("run_id") or "")}">\n'
@@ -1821,6 +1997,14 @@ class _Renderer:
             f'<script type="application/json" id="bcc-data">{data}</script>\n'
             f"<script>{js}</script>\n</body>\n</html>\n"
         )
+
+
+def generator_fingerprint() -> str:
+    """SHA-256 кода генератора (html.py и html_assets): одинаков у всех HTML одной версии генератора."""
+    h = hashlib.sha256()
+    for path in (Path(__file__), ASSETS_DIR / "report.css", ASSETS_DIR / "report.js"):
+        h.update(path.read_bytes())
+    return h.hexdigest()
 
 
 def _plural(n: int, one: str, few: str, many: str) -> str:
