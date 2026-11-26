@@ -21,23 +21,29 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-STAGES: list[tuple[str, str]] = [
+STAGES: list[tuple[str, str]] = [  # имена — как у файлов runs/<id>/stages/<этап>.json pipeline v2
     ("docview", "Чтение документа"),
-    ("rules", "Правила"),
     ("segment", "Нарезка требований"),
-    ("lens:analyst", "Аналитик"),
-    ("lens:qa", "Тестировщик"),
-    ("lens:architect", "Архитектор"),
-    ("lens:risk", "Риски"),
+    ("rules", "Правила"),
+    ("lens_analyst", "Аналитик"),
+    ("lens_qa", "Тестировщик"),
+    ("lens_architect", "Архитектор"),
+    ("lens_risk", "Риски"),
     ("consistency", "Набор целиком"),
+    ("quotes", "Сверка цитат кодом"),
     ("judge", "Судья"),
     ("clarify", "Вопросы владельцу"),
+    ("recheck", "Пересмотр по ответам"),
+    ("revise", "Исправленное ТЗ"),
     ("report", "Отчёт"),
 ]
-PARALLEL = {"lens:analyst", "lens:qa", "lens:architect", "lens:risk", "consistency"}
-STAGE_ALIASES = {"lens_analyst": "lens:analyst", "lens_qa": "lens:qa", "lens_architect": "lens:architect",
-                 "lens_risk": "lens:risk", "analyst": "lens:analyst", "qa": "lens:qa", "architect": "lens:architect",
-                 "risk": "lens:risk", "render": "report", "verdict": "report", "quotes": "judge"}
+PARALLEL = {"lens_analyst", "lens_qa", "lens_architect", "lens_risk", "consistency"}
+ANSWER_STAGES = {"recheck", "revise"}  # показываются только при --answers
+STAGE_ALIASES = {"lens:analyst": "lens_analyst", "lens:qa": "lens_qa", "lens:architect": "lens_architect",
+                 "lens:risk": "lens_risk", "analyst": "lens_analyst", "qa": "lens_qa", "architect": "lens_architect",
+                 "risk": "lens_risk", "render": "report", "verdict": "report", "answers": "recheck"}
+STATE_OF = {"ok": "done", "partial": "done", "failed": "failed", "skipped": "skipped"}
+_LOG_STAGE = re.compile(r"^\s+([a-z_:]+): (запуск|готово|СБОЙ|взят)")
 
 ALLOWED_EXT = {".pdf", ".docx", ".md", ".markdown", ".txt", ".html", ".htm"}
 MAX_UPLOAD = 20 * 1024 * 1024
@@ -49,6 +55,9 @@ FILES = [  # (ключ, имя файла в out/, подпись, mime)
     ("docx", "report.docx", "Word", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     ("pdf", "report.pdf", "PDF", "application/pdf"),
     ("csv", "report.jira.csv", "Jira CSV", "text/csv; charset=utf-8"),
+    ("docx_annotated", "report.annotated.docx", "Word с комментариями",
+     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("pdf_annotated", "report.annotated.pdf", "PDF с выделениями", "application/pdf"),
     ("revised", "report.revised.md", "Исправленное ТЗ", "text/markdown; charset=utf-8"),
 ]
 
@@ -147,7 +156,8 @@ class Job:
         d["log"] = self.log[-40:]
         d["elapsed"] = round((self.finished or time.time()) - (self.started or self.created), 1)
         d["stage_list"] = [{"id": k, "label": lbl, "state": self.stages.get(k, "pending"),
-                            "parallel": k in PARALLEL} for k, lbl in STAGES]
+                            "parallel": k in PARALLEL} for k, lbl in STAGES
+                           if k not in ANSWER_STAGES or self.answers_path]
         return d
 
 
@@ -239,7 +249,7 @@ class PipelineRunner:
             cmd += ["--model", job.model]
         if job.answers_path:
             cmd += ["--answers", job.answers_path, "--revise"]
-        cmd += ["--export", "html,json,docx,pdf,jira", "--runs-dir", str(runs_dir)]
+        cmd += ["--export", "jira,docx,pdf", "--runs-dir", str(runs_dir), "--run-id", job.id]
         return cmd + self.extra_args
 
     def run(self, job: Job, progress: Callable[[Job], None]) -> None:
@@ -279,40 +289,47 @@ class PipelineRunner:
         progress(job)
 
     def _scan(self, job: Job, runs: Path, log_path: Path) -> None:
-        done = set()
-        for p in runs.glob("*/stages/*.json"):
-            st = _norm_stage(p.stem)
-            if st:
-                done.add(st)
-        for p in runs.glob("*/trace.jsonl"):
-            try:
-                for line in p.read_text(encoding="utf-8", errors="replace").splitlines()[-400:]:
-                    ev = json.loads(line)
-                    st = _norm_stage(str(ev.get("stage", "")))
-                    if not st:
-                        continue
-                    if ev.get("event") in ("stage_end", "end", "done") or ev.get("status") in ("ok", "partial"):
-                        done.add(st)
-                    elif job.stages.get(st) == "pending":
-                        job.stages[st] = "running"
-            except Exception:  # noqa: BLE001
-                continue
-        for st in done:
-            if job.stages.get(st) != "done":
-                job.stages[st] = "done"
-                job.stage_times[st] = round(time.time() - (job.started or time.time()), 1)
-        # следующий не начатый этап считаем идущим (линзы идут параллельно)
-        order = [k for k, _ in STAGES]
-        pending = [k for k in order if job.stages[k] == "pending"]
-        if pending and not any(v == "running" for v in job.stages.values()):
-            nxt = pending[0]
-            group = [k for k in pending if k in PARALLEL] if nxt in PARALLEL else [nxt]
-            for k in group:
-                job.stages[k] = "running"
+        now = round(time.time() - (job.started or time.time()), 1)
+        order = [k for k, _ in STAGES if k not in ANSWER_STAGES or job.answers_path]
+
+        def mark(st: str, state: str) -> None:
+            if st in job.stages and job.stages[st] != state and job.stages[st] not in ("failed",):
+                job.stages[st] = state
+                if state in ("done", "failed"):
+                    job.stage_times[st] = now
+
         try:
-            job.log = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+            log = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
-            pass
+            log = []
+        job.log = log[-40:]
+        if any(line.startswith("Документ:") for line in log) or any(runs.glob("*/stages/*.json")):
+            mark("docview", "done")
+        for line in log:  # «  lens_qa: запуск» → идёт
+            m = _LOG_STAGE.match(line)
+            st = _norm_stage(m.group(1)) if m else None
+            if st and m.group(2) == "запуск" and job.stages.get(st) == "pending":
+                mark(st, "running")
+        for p in runs.glob("*/stages/*.json"):  # файл этапа — этап завершён, статус внутри
+            st = _norm_stage(p.stem)
+            if not st:
+                continue
+            try:
+                status = json.loads(p.read_text(encoding="utf-8")).get("status", "ok")
+            except Exception:  # noqa: BLE001 — файл ещё пишется
+                continue
+            mark(st, STATE_OF.get(status, "done"))
+        # этапы идут по порядку: всё до последнего завершённого последовательного этапа уже пройдено
+        last = max((i for i, k in enumerate(order) if job.stages.get(k) in ("done", "failed", "skipped")
+                    and k not in PARALLEL), default=-1)
+        for k in order[:last]:
+            if job.stages.get(k) in ("pending", "running"):
+                mark(k, "skipped" if job.stages[k] == "pending" else "done")
+        if not any(v == "running" for v in job.stages.values()):
+            nxt = next((k for k in order if job.stages.get(k) == "pending"), None)
+            if nxt:
+                for k in ([x for x in order if x in PARALLEL and job.stages[x] == "pending"] if nxt in PARALLEL else [nxt]):
+                    mark(k, "running")
 
     @staticmethod
     def _find_report_json(d: Path) -> Path | None:
@@ -370,7 +387,7 @@ class FixtureRunner(PipelineRunner):
     def run(self, job: Job, progress: Callable[[Job], None]) -> None:
         out = self.store.dir(job.id) / "out"
         out.mkdir(exist_ok=True)
-        order = [k for k, _ in STAGES]
+        order = [k for k, _ in STAGES if k not in ANSWER_STAGES or job.answers_path]
         i = 0
         while i < len(order):
             k = order[i]
