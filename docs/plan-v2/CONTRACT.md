@@ -274,3 +274,54 @@ recheck.run(ctx, findings, answers) -> {"findings": [...с status resolved|open|
   `transfer_limit.base`) и 4 мутанта по выбору №15.
 * Mock-провайдер отвечает файлами `<этап>.json` из каталога фикстуры; неизвестный этап → валидный пустой ответ.
 * Тест анти-подгонки (№15): в `src/bcc_review/v2/prompts/*.md` нет слов официального документа.
+
+## 9. Решения №01 (каркас `0dd6619`, 27.11 02:45)
+
+Ответы на просьбы из статусов веток. Всё ниже — часть контракта.
+
+**Файлы.** `tests/v2/conftest.py` (путь к `src/` для тестов и их подпроцессов) — №01. `prompts/judge_check.md` — №10.
+`examples/v2/*` — №11. `tests/v2/fixtures/official/<этап>.json` (ответы mock) — №01, кроме `segment.json` (№04).
+
+**Имена этапов** (ключ `stage` в `llm.ask`, файл `runs/<id>/stages/<этап>.json`, файл ответа mock `<этап>.json`):
+`segment, rules, lens_analyst, lens_qa, lens_architect, lens_risk, consistency, quotes, judge, clarify`, в режимах
+`--answers/--revise` — `recheck, revise`. Промпт этапа — `prompts/<этап>.md` (у линз `lens_<имя>.md`).
+
+**Context** (`v2/context.py`): `ctx.view`, `ctx.llm`, `ctx.options` (dict: все опции CLI + `input` — путь входного файла),
+`ctx.requirements`, `ctx.excluded`, `ctx.signals`, `ctx.run_dir`, `ctx.warnings` (list), `ctx.warn(msg)`,
+`ctx.prompt(name, **vars) -> (system, user)`. Если в `prompts/<name>.md` есть разделы `## system` / `## user`,
+первый заменяет общий системный промпт. В `user` блок `<требования>` и `<сигналы>` (только линзам и набору,
+`rules.format_signals(audience=…)`) не ставятся для `segment`.
+
+**LLMClient** (`v2/llm.py`): `ask(stage, system, user, schema, *, max_output_tokens=16000)`;
+`ask_split(stage, build, items, schema, merge, *, max_output_tokens=16000)`, `merge` получает **список** ответов частей.
+Ошибки: `LLMError(stage, kind, message)`, подклассы `Truncated` (обрезка — сигнал делить) и `BudgetExceeded`.
+Провайдеру передаётся именованный `stage=…` (провайдеры принимают `**_`). Повторы: временные ошибки 2, 4, 8, 16,
+32 с (`Retry-After` важнее), таймаут — один повтор; при `handles_retries = True` повторов поверх нет. Цепочка
+`--fallback-models` — при `not_found/overloaded/quota`. Бюджет `--max-calls` (16) и `--max-seconds` (1500) общий.
+
+**Линзы.** Конвейер зовёт `stages/lens_<имя>.run(ctx)`, если модуль и функция есть, иначе `lens.run(ctx, имя)`.
+`lens.run` берёт схему `SCHEMA` из `stages/lens_<имя>.py`, если она есть, иначе общую схему кандидатов; при обрезке
+делит таблицу требований пополам (документ остаётся целиком). `source = lens:<имя>` и `id = C-NNN` ставит код.
+Дополнительные ключи выхода линзы сохраняются в файле этапа; в отчёт идут `acceptance_checks`, `test_cases`
+(qa), `pair_checks`, `trace`, `glossary` (consistency); `dropped` (risk) → `rejected` с `reason_code = lens_dropped`.
+
+**Mock** (`providers/mock.py`): каталог `--mock-dir`, по умолчанию `tests/v2/fixtures/<имя папки входа>` или
+`tests/v2/fixtures/official`. Для k-го вызова этапа S: `S.k.json` → `S.json` (список — k-й элемент; файл этапа
+`runs/…/stages/S.json` тоже подходит — берётся `output`) → валидный пустой ответ. Лишние поля убираются по схеме
+запроса, недостающие обязательные дописываются пустыми; не прошёл схему — пустой ответ.
+
+**Вердикт** считает `pipeline.verdict_rule` по разделу 5; `verdict.summary ← judge.verdict_summary`,
+`verdict.fix_first ← judge.fix_first` (иначе по `priority`). Для `provider = offline` допустим вердикт
+`undetermined` (без модели «можно» не бывает, №12), его считает `jsonout.rule_verdict`.
+
+**Поля сверх раздела 2** (необязательные, рендер их понимает): строка DocView — `kind`, `level`, `heading`;
+`acceptance_checks[]` — `row_quote, row_line, assumptions, rule_evidence, derivation, stated_line, conflict_kind,
+explanation, fix`; кандидат — `origin` (`acceptance_check|pair_check|glossary|model`), `pass` (при `--passes 2`);
+вопрос — `topic`, `evidence[]`; отчёт — `checklist_source`, `signals`, `quote_stats`, `clarification`,
+`findings_before`, `rewrites`, `revised_file`, `run.stage_stats{этап: {calls, seconds, candidates, reused?, split?}}`,
+`rejected[] = {candidate_id, title, source, reason_code, reason, line, severity, kind, problem, evidence}`.
+
+**CLI.** `python -m bcc_review ВХОД ОТЧЁТ.md` → v2, `--engine v1` → старый движок; `verify` выбирает версию по
+`schema` отчёта; `doctor` → `providers/doctor.main`; `stage` — см. `docs/plan-v2/INTEGRATION.md`. `.env` читается из
+текущего каталога (`utf-8-sig`, окружение важнее). HTML пишется рядом с .md всегда (`--no-html` — нет).
+Коммит для паспорта — `git rev-parse`, без `.git` — `BCC_AGENT_COMMIT`.
