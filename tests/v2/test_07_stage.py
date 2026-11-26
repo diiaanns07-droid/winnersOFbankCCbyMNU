@@ -129,3 +129,34 @@ def test_fallback_stops_when_first_part_overflows_too(ctx):
     with pytest.raises(RuntimeError):
         lens.run_named(local, "architect")
     assert _AlwaysOverflow.calls == 2  # исходный запрос + первая часть, вторую не тратим
+
+
+def test_whole_document_single_call_without_split(ctx):
+    answer = json.loads((MOCK / "lens_architect.json").read_text(encoding="utf-8"))
+
+    class _Spy:
+        asks, splits = 0, 0
+
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            type(self).asks += 1
+            assert "Ограничение этого запроса" not in user
+            return answer
+
+        def ask_split(self, *a, **k):  # pragma: no cover - не должен вызываться
+            type(self).splits += 1
+            raise AssertionError("линза не делит пакет требований")
+
+    local = Context(view=ctx.view, llm=_Spy(), requirements=ctx.requirements, signals=ctx.signals)
+    out = lens.run_named(local, "architect")
+    assert (_Spy.asks, _Spy.splits) == (1, 0)
+    assert out["candidates"]
+
+
+def test_output_limit_by_provider(ctx):
+    class _L:
+        def __init__(self, name):
+            self.provider_name = name
+
+    for name, want in (("claude_cli", 32000), ("gemini", 32000), ("anthropic", 32000), ("openai", 16000), ("", 16000)):
+        local = Context(view=ctx.view, llm=_L(name), requirements=ctx.requirements)
+        assert lens_architect.output_limit(local) == want, name
