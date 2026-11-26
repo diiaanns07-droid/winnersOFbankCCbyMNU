@@ -1,0 +1,273 @@
+"""Линза «Риски» (№08): карточный процессинг, ИБ и эксплуатация.
+
+Сам вызов модели делает общий запуск линзы (`stages/lens.py`, №01) с промптом `prompts/lens_risk.md`.
+Здесь — детерминированная постобработка ответа модели, которая не зависит от провайдера:
+
+* калибровка серьёзности по шкале контракта (раздел 5): риск ИБ и эксплуатационный риск — не выше major;
+  critical без сценария, последствий или с `blocks = none` — major;
+* страховка от «фантазий»: замечание о теме, которой документ не касается ни словом (PCI DSS, шифрование,
+  аудит, мониторинг, откат, антифрод…), снимается — у такой темы нет текстовой зацепки;
+* замечание, все цитаты которого — определения из раздела терминов (или первая цитата-зацепка у
+  «неоднозначности/неполноты»), — не выше minor;
+* major о дублях, гонках и сбоях смежных систем — minor, если документ этих тем не касается;
+  major-риск ИБ без опоры на описанный интерфейс (адрес, GET, чужой объект, владение, номер карты,
+  журналы, хранение) — minor;
+* не больше двух critical (остальные — major), дубли по заголовку, не более 12 замечаний,
+  порядок: critical → major → minor.
+
+Снятые замечания возвращаются отдельно с причиной, чтобы судья и отчёт могли их показать.
+"""
+from __future__ import annotations
+
+import re
+from typing import Any, Iterable
+
+NAME = "risk"
+MAX_CANDIDATES = 12
+# Виды «не определено / неполно»: если их зацепка — определение термина, это тонкость, а не дефект.
+VAGUE_KINDS = ("ambiguity", "incomplete", "missing_element", "other")
+MAX_CRITICAL = 2  # ключевое событие и одно противоречие; остальное у линзы — major
+SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2}
+
+# Темы, которые линза поднимает только при текстовой зацепке. Ключ — тема (для причины отказа);
+# `title` — признак темы в заголовке замечания; `hooks` — основы слов, наличие любой из которых
+# в документе считается зацепкой.
+OUT_OF_SCOPE_TOPICS: dict[str, dict[str, Any]] = {
+    "соответствие стандартам и регуляторике": {
+        "title": r"PCI|GDPR|ISO\s*27|ГОСТ|регулятор|закон|персональн\w*\s+данн|ПДн",
+        "hooks": ["pci", "gdpr", "27001", "гост", "регулятор", "закон", "персональн", "пдн"],
+    },
+    "шифрование": {
+        "title": r"шифр|TLS|HTTPS",
+        "hooks": ["шифр", "tls", "https", "сертификат"],
+    },
+    "многофакторная аутентификация": {
+        "title": r"двухфактор|многофактор|2FA|MFA|OTP|одноразов\w+\s+код",
+        "hooks": ["двухфактор", "многофактор", "2fa", "mfa", "otp", "одноразов", "код подтвержд"],
+    },
+    "ограничение частоты запросов": {
+        "title": r"rate.?limit|частот\w*\s+запрос|троттл|throttl|brute|брутфорс|DoS",
+        "hooks": ["rate", "частот", "запросов в секунду", "троттл", "throttl", "rps"],
+    },
+    "антифрод": {
+        "title": r"антифрод|фрод|fraud|мошенн",
+        "hooks": ["фрод", "fraud", "мошенн"],
+    },
+    "аудит и журналирование": {
+        "title": r"аудит|журнал\w*\s+(изменени|действи|операци|аудит)|audit",
+        "hooks": ["аудит", "audit", "журнал", "истори", "логир", "инициатор"],
+    },
+    "мониторинг и доступность": {
+        "title": r"мониторинг|алерт|оповещени\w+\s+дежурн|availability",
+        "hooks": ["мониторинг", "алерт", "sla", "доступност"],
+    },
+    "резервирование и восстановление": {
+        "title": r"резервн\w*\s+коп|бэкап|backup|катастроф|disaster|восстановлени\w+\s+после",
+        "hooks": ["резерв", "бэкап", "backup", "катастроф", "восстановлен"],
+    },
+    "нагрузка и производительность": {
+        "title": r"нагрузк|производительн|RPS|пиков",
+        "hooks": ["нагрузк", "производительн", "rps", "запросов в секунду"],
+    },
+    "откат и выключение функции": {
+        "title": r"схем\w*\s+откат|откат\w*\s+(решени|функц|релиз|выпуск|изменени)|rollback|feature.?flag"
+                 r"|флаг\w*\s+(включ|выключ|функц)|выключени\w+\s+функц|скрыти\w+\s+функц",
+        "hooks": ["откат", "rollback", "флаг", "скрыти"],
+    },
+}
+
+_TITLE_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in OUT_OF_SCOPE_TOPICS.items()}
+
+# Эксплуатационные темы, по которым major ставится, только если документ сам их касается (заявляет
+# устойчивость к повторам, говорит о параллельных событиях или сбоях). Иначе это вопрос — minor.
+MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
+    "повторы и дубли событий": {
+        "title": r"дедуплик|дубл|повторн\w*\s+(доставк|событи|уведомлени|обработк|запрос|вызов)|идемпотент|двойн",
+        "hooks": ["повтор", "дубл", "идемпотент", "исходный итог", "однократн"],
+    },
+    "гонки параллельных событий": {
+        "title": r"гонк|конкурентн|атомарн|(параллельн|одновременн)\w*\s+(\w+\s+)?(событ|запрос|операц|покуп"
+                 r"|перевод|уведомлен|обработ|вызов|списан|пополнен|начислен)",
+        "hooks": ["параллельн", "одновременн", "конкурентн", "гонк", "атомарн"],
+    },
+    "сбои смежных систем": {
+        "title": r"сбо[йяеию]|таймаут|недоступн|(ответ|код|статус|HTTP)\w*\s+5\d\d\b|не\s+прош\w*|не\s+выполн\w*"
+                 r"|не\s+подтвержд\w*",
+        "hooks": ["сбо", "таймаут", "недоступност", "не отвечает"],
+    },
+}
+_MAJOR_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in MAJOR_NEEDS_HOOK.items()}
+
+
+# Риск ИБ уровня major — только конкретный риск описанного интерфейса (данные в адресе, GET, ответ на чужой
+# объект, проверка владения, номер карты и персональные данные в уведомлениях, журналах, хранилище).
+# Прочие «риски ИБ» (подлинность входящих событий, общие угрозы) без такой опоры — вопрос, minor.
+SECURITY_MAJOR_RE = re.compile(
+    r"строк\w*\s+запрос|query|адрес|url|\bget\b|40[34]|чуж|владе|принадлеж|сесси|роль|роли|держател"
+    r"|номер\w*\s+карт|цифр|маск|персональн|журнал|лог[аиоу]|перебор|раскры", re.I)
+
+
+def major_without_hook(candidate: dict, doc_text: str) -> str | None:
+    """Тема эксплуатационного major, которой документ не касается (тогда это minor), или None."""
+    if candidate.get("severity") != "major":
+        return None
+    title = str(candidate.get("title", ""))
+    if candidate.get("kind") == "security" and not SECURITY_MAJOR_RE.search(title):
+        return "риск ИБ без опоры на описанный интерфейс"
+    matched = [topic for topic, rx in _MAJOR_RES.items() if rx.search(title)]
+    hooked = [t for t in matched if any(h in doc_text for h in MAJOR_NEEDS_HOOK[t]["hooks"])]
+    return matched[0] if matched and not hooked else None
+
+
+_TERMS_RE = re.compile(r"термин|глоссари|определени|понятия", re.I)
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.*)")
+
+
+def _lines(view: Any) -> list[dict]:
+    """Строки документа как [{"n", "text", "section"}]: из DocView, списка строк или текста Markdown."""
+    if view is None:
+        return []
+    if isinstance(view, str):
+        out, path = [], []
+        for n, text in enumerate(view.splitlines(), 1):
+            m = _HEADING_RE.match(text)
+            if m:
+                level = len(text.strip()) - len(text.strip().lstrip("#"))
+                path = path[: level - 1] + [m.group(1).strip()]
+            out.append({"n": n, "text": text, "section": " › ".join(path)})
+        return out
+    lines = view.get("lines") if isinstance(view, dict) else getattr(view, "lines", None)
+    if lines is None:
+        lines = view
+    out = []
+    for i, line in enumerate(lines or [], 1):
+        if isinstance(line, dict):
+            out.append({"n": line.get("n", i), "text": str(line.get("text", "")),
+                        "section": str(line.get("section") or "")})
+        else:
+            out.append({"n": i, "text": str(line), "section": ""})
+    return out
+
+
+def _doc_text(view: Any) -> str:
+    """Текст документа в нижнем регистре."""
+    return "\n".join(x["text"] for x in _lines(view)).lower()
+
+
+def terms_lines(view: Any) -> set[int]:
+    """Номера строк раздела терминов (глоссария, определений): там понятия уже определены."""
+    out = set()
+    for x in _lines(view):
+        last = x["section"].split("›")[-1] if x["section"] else ""
+        if last and _TERMS_RE.search(last):
+            out.add(int(x["n"]))
+    return out
+
+
+def _evidence_lines(c: dict) -> list[int]:
+    out = []
+    for ev in c.get("evidence") or []:
+        n = ev.get("line_start") or ev.get("line") if isinstance(ev, dict) else None
+        if isinstance(n, int):
+            out.append(n)
+    return out
+
+
+def missing_hook(candidate: dict, doc_text: str) -> str | None:
+    """Тема замечания, которой нет в документе (нет зацепки), или None.
+
+    critical не снимается никогда: это ключевое событие или противоречие, а не «тема вне предмета».
+    """
+    if candidate.get("severity") == "critical":
+        return None
+    title = str(candidate.get("title", ""))
+    for topic, rx in _TITLE_RES.items():
+        if rx.search(title) and not any(h in doc_text for h in OUT_OF_SCOPE_TOPICS[topic]["hooks"]):
+            return topic
+    return None
+
+
+def calibrate(candidate: dict) -> dict:
+    """Приводит серьёзность к шкале контракта; возвращает копию кандидата."""
+    c = dict(candidate)
+    sev = c.get("severity")
+    if sev not in SEVERITY_ORDER:
+        c["severity"] = sev = "major"
+    if sev == "critical":
+        is_risk_only = c.get("kind") in ("security", "ops_risk") and c.get("criterion") == "risk"
+        weak = not str(c.get("scenario", "")).strip() or not str(c.get("impact", "")).strip() \
+            or c.get("blocks") in (None, "", "none")
+        if is_risk_only or weak:
+            c["severity"] = "major"
+    if c["severity"] in ("critical", "major") and c.get("blocks") in (None, ""):
+        c["blocks"] = "development"
+    return c
+
+
+def _title_key(c: dict) -> str:
+    return re.sub(r"[^\w]+", " ", str(c.get("title", "")).lower()).strip()
+
+
+def postprocess(candidates: Iterable[dict], view: Any = None,
+                known_ids: Iterable[str] | None = None) -> tuple[list[dict], list[dict]]:
+    """Калибровка, отсев тем без зацепки, дубли, лимит и порядок.
+
+    `known_ids` — ID требований из нарезки: чужие ID (номера пунктов документа) из `requirement_ids` убираются.
+    Возвращает (оставленные, снятые); у снятых есть поле `reject_reason`.
+    """
+    known = set(known_ids) if known_ids is not None else None
+    doc = _doc_text(view)
+    defined = terms_lines(view)
+    kept: list[dict] = []
+    dropped: list[dict] = []
+    seen: set[str] = set()
+    for raw in candidates or []:
+        if not isinstance(raw, dict):
+            continue
+        c = calibrate(raw)
+        if known is not None:
+            c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in known]
+        if not c.get("evidence"):
+            dropped.append({**c, "reject_reason": "нет цитаты-зацепки"})
+            continue
+        ev_lines = _evidence_lines(c)
+        if defined and ev_lines and (all(n in defined for n in ev_lines)
+                                     or (ev_lines[0] in defined and c.get("kind") in VAGUE_KINDS)):
+            # зацепка — определение из раздела терминов: тонкость определения, не выше minor
+            c["severity"] = "minor"
+        if doc and major_without_hook(c, doc):
+            c["severity"] = "minor"
+        topic = missing_hook(c, doc) if doc else None
+        if topic:
+            dropped.append({**c, "reject_reason": f"тема «{topic}» в документе не затрагивается"})
+            continue
+        key = _title_key(c)
+        if key in seen:
+            dropped.append({**c, "reject_reason": "дубль заголовка"})
+            continue
+        seen.add(key)
+        kept.append(c)
+    n_critical = 0
+    for c in kept:  # порядок модели: самые серьёзные первыми
+        if c["severity"] == "critical":
+            n_critical += 1
+            if n_critical > MAX_CRITICAL:
+                c["severity"] = "major"
+    kept.sort(key=lambda c: SEVERITY_ORDER.get(c.get("severity"), 3))
+    for c in kept[MAX_CANDIDATES:]:
+        dropped.append({**c, "reject_reason": f"сверх лимита линзы ({MAX_CANDIDATES})"})
+    return kept[:MAX_CANDIDATES], dropped
+
+
+def run(ctx: Any) -> dict:
+    """Запуск линзы через общий `lens.run` и постобработка ответа."""
+    from . import lens  # общий запуск линзы (№01)
+
+    out = dict(lens.run(ctx, NAME))
+    reqs = getattr(ctx, "requirements", None)
+    known = [r.get("id") for r in reqs if isinstance(r, dict) and r.get("id")] if reqs else None
+    kept, dropped = postprocess(out.get("candidates", []), getattr(ctx, "view", None), known)
+    out["candidates"] = kept
+    if dropped:
+        out["dropped"] = dropped
+    return out
