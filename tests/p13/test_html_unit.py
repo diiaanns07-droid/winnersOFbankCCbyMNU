@@ -361,10 +361,11 @@ def test_answers_markdown_format_and_reference_parser(report):
     assert "Ответ: # не заголовок" in md
     assert parsed["answers"]["Q-03"] == "Клиринг"
     assert parsed["answers"]["Q-05"].startswith("400 Bad Request")  # ответ, учтённый прогоном
-    # Разделы «## Q-ID» только у вопросов с ответом; остальные перечислены отдельно.
+    # Карточка у каждого вопроса (формат №08); у открытых поле «Ответ:» пустое.
     assert sorted(parsed["answers"]) == ["Q-01", "Q-03", "Q-05"]
     assert parsed["unanswered"] == ["Q-02", "Q-04"]
-    assert md.count("\n## Q-") == 3
+    assert md.count("\n## Q-") == len(report["questions"])
+    assert md.count("\nОтвет:\n") == 2
     for i, q in enumerate(report["questions"]):
         if q["id"] in parsed["answers"]:
             assert parsed["fingerprints"][q["id"]] == H.question_fingerprint(report, q)

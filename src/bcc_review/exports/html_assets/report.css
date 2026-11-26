@@ -134,7 +134,7 @@ main { max-width: 1800px; margin: 0 auto; padding: 0 16px 48px; }
 .banner ul { margin: 6px 0 0; padding-left: 20px; }
 .banner-run { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
 .banner-info { background: var(--accent-bg); }
-.verdict { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
+.verdict { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .tile, .actions { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
 .tile h3, .actions h3 { margin: 0 0 4px; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .tile-v { font-size: 1.2rem; font-weight: 700; margin: 0 0 4px; }
@@ -236,9 +236,11 @@ mark.hl { background: transparent; color: inherit; }
 .hl[data-n="3"], .hl[data-n="4"], .hl[data-n="5"] { box-shadow: inset 0 -0.8em 0 rgba(127, 127, 127, 0.18); }
 .hl.hl-q { background: none; text-decoration: none; cursor: auto; }
 .hl.off { background: none; text-decoration-color: var(--border); }
-.hl.on { background: var(--sel); outline: 2px solid var(--accent); outline-offset: 0; text-decoration-line: none; }
-.hl.on.side-a { outline-color: var(--side-a); }
-.hl.on.side-b { outline-color: var(--side-b); outline-style: dashed; }
+/* выбранная опора: сплошная полоса подчёркивания не рвётся на стыках сегментов (опоры фактов режут цитату) */
+.hl.on { background: var(--sel); outline: none; text-decoration-line: underline; text-decoration-style: solid;
+  text-decoration-thickness: 3px; text-decoration-color: var(--accent); text-underline-offset: 4px; }
+.hl.on.side-a { text-decoration-color: var(--side-a); }
+.hl.on.side-b { text-decoration-color: var(--side-b); text-decoration-style: dashed; }
 .hl.ev-first[data-side-label]::before {
   content: attr(data-side-label); display: inline-block; font: 700 0.7rem/1.3 var(--sans);
   padding: 0 4px; margin-right: 2px; border-radius: 3px; vertical-align: 0.15em; color: var(--surface);
@@ -362,10 +364,7 @@ details summary { cursor: pointer; }
 .checks { margin-top: 10px; }
 
 /* ---------------------------------------------------------------- адаптивность */
-@media (max-width: 1280px) {
-  .verdict { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .actions { grid-column: 1 / -1; }
-}
+
 @media (max-width: 999px) {
   .bar-in { flex-wrap: wrap; gap: 4px 10px; padding: 6px 12px; }
   .bar-title { flex-basis: calc(100% - 140px); }
@@ -390,7 +389,11 @@ details summary { cursor: pointer; }
 @media (max-width: 640px) {
   body { font-size: 15px; }
   main { padding: 0 10px 32px; }
-  .verdict { grid-template-columns: minmax(0, 1fr); }
+  .verdict { gap: 8px; }
+  .tile { padding: 8px 10px; }
+  .tile-v { font-size: 1rem; }
+  .tile h3 { font-size: 0.78rem; }
+  .summary h2 { font-size: 1.1rem; margin-bottom: 8px; }
   .w-sides { grid-template-columns: minmax(0, 1fr); }
   .f-row label { flex: 1 1 45%; }
   .f-row select { width: 100%; }
@@ -428,3 +431,15 @@ ins { color: var(--ok); text-decoration: none; }
 .orphan p { margin: 0 0 4px; }
 .orphan .btns { align-items: center; }
 .orphan select { font: inherit; font-size: 0.86rem; max-width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+
+/* первый экран: статус прогона и обоснование вывода */
+.banner-run { margin: 12px 0 0; }
+.banner-run p { margin: 0 0 4px; }
+.run-code { font-size: 0.82rem; padding: 0 5px; border-radius: 4px; border: 1px solid currentColor; white-space: nowrap; }
+.run-reason { color: var(--text); }
+.run-more summary, .tile-more summary { font-size: 0.84rem; color: var(--accent); }
+.run-more ul, .tile-more ul { margin: 4px 0 0; padding-left: 20px; font-size: 0.86rem; }
+.tile-r { margin: 4px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tile-more { margin-top: 4px; }
+.actions { margin-top: 12px; }
+@media print { .tile-r { display: block; -webkit-line-clamp: unset; } details { display: block; } }

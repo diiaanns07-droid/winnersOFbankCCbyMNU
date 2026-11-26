@@ -2,7 +2,7 @@
  {
   "name": "offline: файл открывается без сети, без ошибок JS и CSP",
   "ok": true,
-  "details": "requests=0; default-src 'none'; img-src data:; style-src 'sha256-GcF5QQU…"
+  "details": "requests=0; default-src 'none'; img-src data:; style-src 'sha256-lvdOKwg…"
  },
  {
   "name": "текст блоков в DOM равен block.text из JSON (кириллица, emoji, HTML-подобный текст, CRLF, таблица)",
@@ -52,7 +52,7 @@
  {
   "name": "длинный документ на ноутбуке: загрузка, глубокая ссылка #finding-…, без горизонтальной прокрутки",
   "ok": true,
-  "details": "блоков 3432, замечаний 112, загрузка 515 мс, опор проверено 192"
+  "details": "блоков 3432, замечаний 112, загрузка 469 мс, опор проверено 192"
  },
  {
   "name": "глубокая ссылка #block-…: документ прокручен к блоку",

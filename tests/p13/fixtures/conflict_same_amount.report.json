@@ -1,0 +1,2128 @@
+{
+  "schema_version": "1.0",
+  "run": {
+    "run_id": "20261126T173939Z-7d7a40a0-3f0f",
+    "parent_run_id": null,
+    "source_sha256": "7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830",
+    "source_name": "conflict_same_amount.md",
+    "agent_version": "0.1.0",
+    "agent_commit": "88d322fc29058f97005f389863c7215524df359c-dirty",
+    "provider": "mock",
+    "model": "mock-1",
+    "requested_model": "mock-1",
+    "models_seen": [
+      "mock-1"
+    ],
+    "mode": "mock",
+    "status": "complete",
+    "status_reasons": [],
+    "started_at": "2026-11-26T17:39:39Z",
+    "finished_at": "2026-11-26T17:39:39Z",
+    "duration_s": 0.164,
+    "calls": {
+      "physical": 7,
+      "cache_hits": 0,
+      "failed": 0,
+      "retries": 0
+    },
+    "tokens": {
+      "input": 10236,
+      "output": 595,
+      "cache_read": 0
+    },
+    "budget": {
+      "max_calls": 40,
+      "max_seconds": 1500.0,
+      "max_tokens": null,
+      "exhausted": false,
+      "reason": null
+    },
+    "stages": [
+      {
+        "name": "read",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.051,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.readers.text:read_text"
+      },
+      {
+        "name": "inventory",
+        "status": "ok",
+        "calls": 2,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.018,
+        "input_tokens": 3732,
+        "output_tokens": 28,
+        "implementation": "team:bcc_review.analysis.inventory:build_inventory"
+      },
+      {
+        "name": "rules",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.017,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "fallback:bcc_review.runtime.fallback.rules:lint"
+      },
+      {
+        "name": "individual",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.001,
+        "input_tokens": 1416,
+        "output_tokens": 212,
+        "implementation": "fallback:bcc_review.runtime.fallback.llm_stages:review_individual"
+      },
+      {
+        "name": "cross",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.001,
+        "input_tokens": 1562,
+        "output_tokens": 311,
+        "implementation": "fallback:bcc_review.runtime.fallback.llm_stages:review_set"
+      },
+      {
+        "name": "evidence",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.004,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.analysis.evidence:resolve_candidate"
+      },
+      {
+        "name": "verify_meaning",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.0,
+        "input_tokens": 852,
+        "output_tokens": 29
+      },
+      {
+        "name": "merge",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": "кандидатов 2 → замечаний 2",
+        "duration_s": 0.0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "name": "facts",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": "фактов: 5",
+        "duration_s": 0.003,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.analysis.facts:reconcile_facts"
+      },
+      {
+        "name": "clarify",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.0,
+        "input_tokens": 1571,
+        "output_tokens": 8
+      },
+      {
+        "name": "questions",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.01,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.decisions.clarify:build_questions"
+      },
+      {
+        "name": "bank",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.001,
+        "input_tokens": 1103,
+        "output_tokens": 7,
+        "implementation": "fallback:bcc_review.runtime.fallback.bank:build_bank_pack"
+      },
+      {
+        "name": "verdict",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    ],
+    "incomplete_stages": [],
+    "modules": {
+      "build_bank_pack": "fallback:bcc_review.runtime.fallback.bank:build_bank_pack",
+      "build_inventory": "team:bcc_review.analysis.inventory:build_inventory",
+      "build_questions": "team:bcc_review.decisions.clarify:build_questions",
+      "load_criteria": "team:bcc_review.criteria:load_criteria",
+      "read_text": "team:bcc_review.readers.text:read_text",
+      "reconcile_facts": "team:bcc_review.analysis.facts:reconcile_facts",
+      "resolve_candidate": "team:bcc_review.analysis.evidence:resolve_candidate",
+      "resolve_hint": "team:bcc_review.analysis.evidence:resolve_hint",
+      "review_individual": "fallback:bcc_review.runtime.fallback.llm_stages:review_individual",
+      "review_set": "fallback:bcc_review.runtime.fallback.llm_stages:review_set",
+      "provider": "runtime.mock:MockAdapter"
+    },
+    "evidence_audit": {
+      "checked": 5,
+      "confirmed": 5,
+      "ambiguous": 0,
+      "rejected": 0,
+      "note": "Учтена каждая подсказка-цитата кандидатов (включая опоры witness): confirmed — найдена в тексте блока, ambiguous — в нескольких блоках, rejected — не найдена. Смысл проверяется отдельно (meaning_status)."
+    },
+    "options": {
+      "provider": "mock",
+      "model": null,
+      "offline_lint": false,
+      "answers_path": null,
+      "compare_path": null,
+      "exports": [],
+      "cache_dir": null,
+      "use_cache": false,
+      "max_calls": 40,
+      "max_seconds": 1500.0,
+      "max_tokens": null,
+      "max_retries": 3,
+      "timeout_s": 300.0,
+      "trace": true,
+      "fail_on": null,
+      "allow_partial_ready": false,
+      "full_context_chars": 120000,
+      "run_id": null,
+      "parent_run_id": null,
+      "artifacts_dir": null
+    },
+    "context_policy": "full"
+  },
+  "document": {
+    "id": "7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830",
+    "title": "Месячный порог расходов (пример для HTML №13)",
+    "format": "markdown",
+    "source_name": "conflict_same_amount.md",
+    "blocks": [
+      {
+        "id": "b0001",
+        "kind": "heading",
+        "section": [],
+        "text": "Месячный порог расходов (пример для HTML №13)",
+        "loc": {
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 79,
+          "level": 1,
+          "style": "atx",
+          "empty": false,
+          "section_end": 19,
+          "lines": [
+            [
+              1,
+              0,
+              45
+            ]
+          ],
+          "map": [
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              45,
+              1,
+              2,
+              47,
+              "v"
+            ]
+          ],
+          "section_ids": []
+        }
+      },
+      {
+        "id": "b0002",
+        "kind": "heading",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)"
+        ],
+        "text": "Функциональные требования",
+        "loc": {
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 81,
+          "byte_end": 133,
+          "level": 2,
+          "style": "atx",
+          "empty": false,
+          "section_end": 7,
+          "lines": [
+            [
+              3,
+              0,
+              25
+            ]
+          ],
+          "map": [
+            [
+              0,
+              3,
+              3
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              25,
+              3,
+              3,
+              28,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001"
+          ]
+        }
+      },
+      {
+        "id": "b0003",
+        "kind": "list_item",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)",
+          "Функциональные требования"
+        ],
+        "text": "Ф-1. Клиент задаёт порог от 1 000 до 1 000 000 ₸. Например, расходы 50 000 ₸ при пороге 50 000 ₸.",
+        "loc": {
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 135,
+          "byte_end": 286,
+          "list": {
+            "id": 1,
+            "ordered": false,
+            "marker": "*",
+            "number": null,
+            "depth": 0,
+            "item": 1
+          },
+          "lines": [
+            [
+              5,
+              0,
+              97
+            ]
+          ],
+          "map": [
+            [
+              0,
+              5,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              97,
+              5,
+              2,
+              99,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0002"
+          ]
+        }
+      },
+      {
+        "id": "b0004",
+        "kind": "list_item",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)",
+          "Функциональные требования"
+        ],
+        "text": "Ф-2. Push отправляется, когда расходы за календарный месяц достигают порога или превышают его.",
+        "loc": {
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 287,
+          "byte_end": 456,
+          "list": {
+            "id": 1,
+            "ordered": false,
+            "marker": "*",
+            "number": null,
+            "depth": 0,
+            "item": 2
+          },
+          "lines": [
+            [
+              6,
+              0,
+              94
+            ]
+          ],
+          "map": [
+            [
+              0,
+              6,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              94,
+              6,
+              2,
+              96,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0002"
+          ]
+        }
+      },
+      {
+        "id": "b0005",
+        "kind": "heading",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)"
+        ],
+        "text": "Критерии приёмки",
+        "loc": {
+          "line_start": 8,
+          "line_end": 8,
+          "byte_start": 458,
+          "byte_end": 492,
+          "level": 2,
+          "style": "atx",
+          "empty": false,
+          "section_end": 14,
+          "lines": [
+            [
+              8,
+              0,
+              16
+            ]
+          ],
+          "map": [
+            [
+              0,
+              8,
+              3
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              16,
+              8,
+              3,
+              19,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001"
+          ]
+        }
+      },
+      {
+        "id": "b0006",
+        "kind": "table_header",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)",
+          "Критерии приёмки"
+        ],
+        "text": "№ | Исходные условия | Ожидаемый результат",
+        "loc": {
+          "line_start": 10,
+          "line_end": 11,
+          "byte_start": 494,
+          "byte_end": 598,
+          "table": {
+            "index": 1,
+            "columns": [
+              "№",
+              "Исходные условия",
+              "Ожидаемый результат"
+            ],
+            "align": [
+              "left",
+              "left",
+              "left"
+            ],
+            "delimiter_line": 11,
+            "line_end": 13,
+            "rows": 2
+          },
+          "cells": [
+            {
+              "index": 0,
+              "column": "№",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "index": 1,
+              "column": "Исходные условия",
+              "start": 4,
+              "end": 20
+            },
+            {
+              "index": 2,
+              "column": "Ожидаемый результат",
+              "start": 23,
+              "end": 42
+            }
+          ],
+          "lines": [
+            [
+              10,
+              0,
+              42
+            ]
+          ],
+          "map": [
+            [
+              0,
+              10,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              42,
+              10,
+              2,
+              44,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0005"
+          ],
+          "columns": [
+            "№",
+            "Исходные условия",
+            "Ожидаемый результат"
+          ]
+        }
+      },
+      {
+        "id": "b0007",
+        "kind": "table_row",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)",
+          "Критерии приёмки"
+        ],
+        "text": "1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз",
+        "loc": {
+          "line_start": 12,
+          "line_end": 12,
+          "byte_start": 599,
+          "byte_end": 697,
+          "table": {
+            "index": 1,
+            "header_id": "b0006",
+            "columns": [
+              "№",
+              "Исходные условия",
+              "Ожидаемый результат"
+            ]
+          },
+          "row": 1,
+          "cells": [
+            {
+              "index": 0,
+              "column": "№",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "index": 1,
+              "column": "Исходные условия",
+              "start": 4,
+              "end": 36
+            },
+            {
+              "index": 2,
+              "column": "Ожидаемый результат",
+              "start": 39,
+              "end": 62
+            }
+          ],
+          "empty": false,
+          "lines": [
+            [
+              12,
+              0,
+              62
+            ]
+          ],
+          "map": [
+            [
+              0,
+              12,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              62,
+              12,
+              2,
+              64,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0005"
+          ],
+          "columns": [
+            "№",
+            "Исходные условия",
+            "Ожидаемый результат"
+          ]
+        }
+      },
+      {
+        "id": "b0008",
+        "kind": "table_row",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)",
+          "Критерии приёмки"
+        ],
+        "text": "2 | Порог 50 000 ₸, расходы 49 999 ₸ | Push не отправлен",
+        "loc": {
+          "line_start": 13,
+          "line_end": 13,
+          "byte_start": 698,
+          "byte_end": 785,
+          "table": {
+            "index": 1,
+            "header_id": "b0006",
+            "columns": [
+              "№",
+              "Исходные условия",
+              "Ожидаемый результат"
+            ]
+          },
+          "row": 2,
+          "cells": [
+            {
+              "index": 0,
+              "column": "№",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "index": 1,
+              "column": "Исходные условия",
+              "start": 4,
+              "end": 36
+            },
+            {
+              "index": 2,
+              "column": "Ожидаемый результат",
+              "start": 39,
+              "end": 56
+            }
+          ],
+          "empty": false,
+          "lines": [
+            [
+              13,
+              0,
+              56
+            ]
+          ],
+          "map": [
+            [
+              0,
+              13,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              56,
+              13,
+              2,
+              58,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0005"
+          ],
+          "columns": [
+            "№",
+            "Исходные условия",
+            "Ожидаемый результат"
+          ]
+        }
+      },
+      {
+        "id": "b0009",
+        "kind": "heading",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)"
+        ],
+        "text": "Требования к тестированию",
+        "loc": {
+          "line_start": 15,
+          "line_end": 15,
+          "byte_start": 787,
+          "byte_end": 838,
+          "level": 2,
+          "style": "atx",
+          "empty": false,
+          "section_end": 19,
+          "lines": [
+            [
+              15,
+              0,
+              25
+            ]
+          ],
+          "map": [
+            [
+              0,
+              15,
+              3
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              25,
+              15,
+              3,
+              28,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001"
+          ]
+        }
+      },
+      {
+        "id": "b0010",
+        "kind": "table_header",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)",
+          "Требования к тестированию"
+        ],
+        "text": "№ | Исходные условия | Ожидаемый результат",
+        "loc": {
+          "line_start": 17,
+          "line_end": 18,
+          "byte_start": 840,
+          "byte_end": 944,
+          "table": {
+            "index": 2,
+            "columns": [
+              "№",
+              "Исходные условия",
+              "Ожидаемый результат"
+            ],
+            "align": [
+              "left",
+              "left",
+              "left"
+            ],
+            "delimiter_line": 18,
+            "line_end": 19,
+            "rows": 1
+          },
+          "cells": [
+            {
+              "index": 0,
+              "column": "№",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "index": 1,
+              "column": "Исходные условия",
+              "start": 4,
+              "end": 20
+            },
+            {
+              "index": 2,
+              "column": "Ожидаемый результат",
+              "start": 23,
+              "end": 42
+            }
+          ],
+          "lines": [
+            [
+              17,
+              0,
+              42
+            ]
+          ],
+          "map": [
+            [
+              0,
+              17,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              42,
+              17,
+              2,
+              44,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0009"
+          ],
+          "columns": [
+            "№",
+            "Исходные условия",
+            "Ожидаемый результат"
+          ]
+        }
+      },
+      {
+        "id": "b0011",
+        "kind": "table_row",
+        "section": [
+          "Месячный порог расходов (пример для HTML №13)",
+          "Требования к тестированию"
+        ],
+        "text": "1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен: уведомление только после превышения порога",
+        "loc": {
+          "line_start": 19,
+          "line_end": 19,
+          "byte_start": 945,
+          "byte_end": 1114,
+          "table": {
+            "index": 2,
+            "header_id": "b0010",
+            "columns": [
+              "№",
+              "Исходные условия",
+              "Ожидаемый результат"
+            ]
+          },
+          "row": 1,
+          "cells": [
+            {
+              "index": 0,
+              "column": "№",
+              "start": 0,
+              "end": 1
+            },
+            {
+              "index": 1,
+              "column": "Исходные условия",
+              "start": 4,
+              "end": 36
+            },
+            {
+              "index": 2,
+              "column": "Ожидаемый результат",
+              "start": 39,
+              "end": 100
+            }
+          ],
+          "empty": false,
+          "lines": [
+            [
+              19,
+              0,
+              100
+            ]
+          ],
+          "map": [
+            [
+              0,
+              19,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              100,
+              19,
+              2,
+              102,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0009"
+          ],
+          "columns": [
+            "№",
+            "Исходные условия",
+            "Ожидаемый результат"
+          ]
+        }
+      }
+    ],
+    "warnings": []
+  },
+  "requirements": [
+    {
+      "id": "R-001.1",
+      "source_id": "Ф-1",
+      "text": "Клиент задаёт порог от 1 000 до 1 000 000 ₸.",
+      "block_ids": [
+        "b0003"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0003",
+          "start": 5,
+          "end": 49,
+          "quote": "Клиент задаёт порог от 1 000 до 1 000 000 ₸."
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0003",
+          "quote": "Клиент задаёт порог от 1 000 до 1 000 000 ₸."
+        }
+      ],
+      "kind": "functional",
+      "section": [
+        "Месячный порог расходов (пример для HTML №13)",
+        "Функциональные требования"
+      ],
+      "review_status": "partial",
+      "review_reason": "модель проверила 1 из 9 критериев"
+    },
+    {
+      "id": "R-001.2",
+      "source_id": "Ф-1",
+      "text": "Например, расходы 50 000 ₸ при пороге 50 000 ₸.",
+      "block_ids": [
+        "b0003"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0003",
+          "start": 50,
+          "end": 97,
+          "quote": "Например, расходы 50 000 ₸ при пороге 50 000 ₸."
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0003",
+          "quote": "Например, расходы 50 000 ₸ при пороге 50 000 ₸."
+        }
+      ],
+      "kind": "functional",
+      "section": [
+        "Месячный порог расходов (пример для HTML №13)",
+        "Функциональные требования"
+      ],
+      "review_status": "partial",
+      "review_reason": "модель проверила 1 из 9 критериев"
+    },
+    {
+      "id": "R-002",
+      "source_id": "Ф-2",
+      "text": "Push отправляется, когда расходы за календарный месяц достигают порога или превышают его.",
+      "block_ids": [
+        "b0004"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 5,
+          "end": 94,
+          "quote": "Push отправляется, когда расходы за календарный месяц достигают порога или превышают его."
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0004",
+          "quote": "Push отправляется, когда расходы за календарный месяц достигают порога или превышают его."
+        }
+      ],
+      "kind": "functional",
+      "section": [
+        "Месячный порог расходов (пример для HTML №13)",
+        "Функциональные требования"
+      ],
+      "review_status": "partial",
+      "review_reason": "модель проверила 1 из 9 критериев"
+    },
+    {
+      "id": "R-003",
+      "source_id": "1",
+      "text": "Исходные условия: Порог 50 000 ₸, расходы 50 000 ₸; Ожидаемый результат: Push отправлен один раз",
+      "block_ids": [
+        "b0007"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0007",
+          "start": 0,
+          "end": 62,
+          "quote": "1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз"
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0007",
+          "quote": "1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз"
+        }
+      ],
+      "kind": "acceptance",
+      "section": [
+        "Месячный порог расходов (пример для HTML №13)",
+        "Критерии приёмки"
+      ],
+      "review_status": "partial",
+      "review_reason": "модель проверила 1 из 9 критериев"
+    },
+    {
+      "id": "R-004",
+      "source_id": "2",
+      "text": "Исходные условия: Порог 50 000 ₸, расходы 49 999 ₸; Ожидаемый результат: Push не отправлен",
+      "block_ids": [
+        "b0008"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0008",
+          "start": 0,
+          "end": 56,
+          "quote": "2 | Порог 50 000 ₸, расходы 49 999 ₸ | Push не отправлен"
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0008",
+          "quote": "2 | Порог 50 000 ₸, расходы 49 999 ₸ | Push не отправлен"
+        }
+      ],
+      "kind": "acceptance",
+      "section": [
+        "Месячный порог расходов (пример для HTML №13)",
+        "Критерии приёмки"
+      ],
+      "review_status": "partial",
+      "review_reason": "модель проверила 1 из 9 критериев"
+    },
+    {
+      "id": "R-005",
+      "source_id": "1",
+      "text": "Исходные условия: Порог 50 000 ₸, расходы 50 000 ₸; Ожидаемый результат: Push не отправлен: уведомление только после превышения порога",
+      "block_ids": [
+        "b0011"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0011",
+          "start": 0,
+          "end": 100,
+          "quote": "1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен: уведомление только после превышения порога"
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0011",
+          "quote": "1 | Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен: уведомление только после превышения порога"
+        }
+      ],
+      "kind": "acceptance",
+      "section": [
+        "Месячный порог расходов (пример для HTML №13)",
+        "Требования к тестированию"
+      ],
+      "review_status": "partial",
+      "review_reason": "модель проверила 1 из 9 критериев"
+    }
+  ],
+  "checks": [
+    {
+      "req_id": "R-001.1",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "Границы порога заданы числами.",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.1",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "necessary",
+      "status": "pass",
+      "reason": "Пример поясняет Ф-1.",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-001.2",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "unambiguous",
+      "status": "issue",
+      "reason": "Время и границы периода без явного часового пояса: «за календарный месяц»",
+      "finding_ids": [
+        "F-002"
+      ],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "Исход наблюдаем: push отправлен или нет.",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "Ожидаемый результат наблюдаем.",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "Ожидаемый результат наблюдаем.",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-004",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "verifiable",
+      "status": "pass",
+      "reason": "Ожидаемый результат наблюдаем.",
+      "finding_ids": [],
+      "source": "llm"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    },
+    {
+      "req_id": "R-005",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "не проверено: модель проверила 1 из 9 критериев",
+      "finding_ids": [],
+      "source": "engine"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-001",
+      "scope": "set",
+      "kind": "conflict",
+      "criterion": "set_consistent",
+      "severity": "critical",
+      "title": "Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу",
+      "impact": "Тестировщик и разработчик получат противоположные ожидания для одной и той же суммы: один из тестов упадёт на любой реализации.",
+      "req_ids": [
+        "R-003",
+        "R-005"
+      ],
+      "hints": [
+        {
+          "block_id": "b0007",
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз"
+        },
+        {
+          "block_id": "b0011",
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0007",
+          "start": 4,
+          "end": 62,
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз"
+        },
+        {
+          "block_id": "b0011",
+          "start": 4,
+          "end": 56,
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "mock: сценарий критика",
+      "recommendation": "Выбрать одно правило («достигают» или «превышают») и привести к нему Ф-2, критерий приёмки №1 и требование к тестированию №1.",
+      "blocked_decision": "Отправлять ли push, когда расходы за месяц ровно равны порогу",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": {
+        "input": "Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸",
+        "outcome_a": "Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»)",
+        "outcome_b": "Push не отправлен: уведомление только после превышения порога (требование к тестированию №1)",
+        "evidence_a": {
+          "block_id": "b0007",
+          "start": 4,
+          "end": 62,
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз"
+        },
+        "evidence_b": {
+          "block_id": "b0011",
+          "start": 4,
+          "end": 56,
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен"
+        }
+      },
+      "inspected_block_ids": [],
+      "merged_from": [
+        "C-002"
+      ],
+      "cause": {
+        "object": "push при расходах, равных порогу",
+        "condition": "расходы за месяц = порог = 50 000 ₸",
+        "outcomes": [
+          "отправить",
+          "не отправлять"
+        ]
+      },
+      "source": "llm",
+      "stage": "cross",
+      "notes": []
+    },
+    {
+      "id": "F-002",
+      "scope": "requirement",
+      "kind": "ambiguity",
+      "criterion": "unambiguous",
+      "severity": "minor",
+      "title": "Время и границы периода без явного часового пояса: «за календарный месяц»",
+      "impact": "Граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.",
+      "req_ids": [
+        "R-002"
+      ],
+      "hints": [
+        {
+          "block_id": "b0004",
+          "quote": "за календарный месяц"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 38,
+          "end": 58,
+          "quote": "за календарный месяц"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "deterministic",
+      "meaning_reason": "детерминированное правило: вывод следует из найденного текста",
+      "recommendation": "Для каждого времени и границы периода указать смещение и IANA-зону (<уточнить: UTC+hh:mm, Region/City>) вместо названия города или умолчания; определить, по какой отметке времени события считается период.",
+      "blocked_decision": "",
+      "blocks": [],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [
+        "C-001"
+      ],
+      "cause": {
+        "object": "часовой пояс времени и границ периода",
+        "condition": "пояс не указан или задан городом",
+        "outcomes": []
+      },
+      "source": "rules",
+      "stage": "rules",
+      "notes": [],
+      "rule_id": "RULE-TZ"
+    }
+  ],
+  "facts": [
+    {
+      "id": "FX-001",
+      "subject": "Клиент",
+      "field": "порог",
+      "scope": "Функциональные требования",
+      "direction": null,
+      "type": null,
+      "value": null,
+      "range": {
+        "min": "1000",
+        "max": "1000000",
+        "min_inclusive": null,
+        "max_inclusive": null,
+        "min_minor": 100000,
+        "max_minor": 100000000
+      },
+      "unit": "KZT",
+      "condition": null,
+      "binding": null,
+      "aliases": [],
+      "source": "text",
+      "role": "business_rules",
+      "cells": {
+        "range": {
+          "block_id": "b0003",
+          "start": 25,
+          "end": 48,
+          "quote": "от 1 000 до 1 000 000 ₸"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0003",
+          "start": 25,
+          "end": 48,
+          "quote": "от 1 000 до 1 000 000 ₸"
+        }
+      ],
+      "req_ids": []
+    },
+    {
+      "id": "FX-002",
+      "subject": "Критерии приёмки",
+      "field": "Порог",
+      "scope": "Критерии приёмки",
+      "direction": null,
+      "type": "money",
+      "value": "50000",
+      "range": null,
+      "unit": "KZT",
+      "condition": null,
+      "binding": null,
+      "aliases": [],
+      "source": "acceptance",
+      "role": "acceptance",
+      "value_minor": 5000000,
+      "cells": {
+        "value": {
+          "block_id": "b0007",
+          "start": 10,
+          "end": 18,
+          "quote": "50 000 ₸"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0007",
+          "start": 10,
+          "end": 18,
+          "quote": "50 000 ₸"
+        }
+      ],
+      "req_ids": []
+    },
+    {
+      "id": "FX-003",
+      "subject": "Критерии приёмки",
+      "field": "расходы",
+      "scope": "Критерии приёмки",
+      "direction": null,
+      "type": "money",
+      "value": "50000",
+      "range": null,
+      "unit": "KZT",
+      "condition": null,
+      "binding": null,
+      "aliases": [],
+      "source": "acceptance",
+      "role": "acceptance",
+      "value_minor": 5000000,
+      "cells": {
+        "value": {
+          "block_id": "b0007",
+          "start": 28,
+          "end": 36,
+          "quote": "50 000 ₸"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0007",
+          "start": 28,
+          "end": 36,
+          "quote": "50 000 ₸"
+        }
+      ],
+      "req_ids": []
+    },
+    {
+      "id": "FX-004",
+      "subject": "Критерии приёмки",
+      "field": "Порог",
+      "scope": "Критерии приёмки",
+      "direction": null,
+      "type": "money",
+      "value": "50000",
+      "range": null,
+      "unit": "KZT",
+      "condition": null,
+      "binding": null,
+      "aliases": [],
+      "source": "acceptance",
+      "role": "acceptance",
+      "value_minor": 5000000,
+      "cells": {
+        "value": {
+          "block_id": "b0008",
+          "start": 10,
+          "end": 18,
+          "quote": "50 000 ₸"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0008",
+          "start": 10,
+          "end": 18,
+          "quote": "50 000 ₸"
+        }
+      ],
+      "req_ids": []
+    },
+    {
+      "id": "FX-005",
+      "subject": "Критерии приёмки",
+      "field": "расходы",
+      "scope": "Критерии приёмки",
+      "direction": null,
+      "type": "money",
+      "value": "49999",
+      "range": null,
+      "unit": "KZT",
+      "condition": null,
+      "binding": null,
+      "aliases": [],
+      "source": "acceptance",
+      "role": "acceptance",
+      "value_minor": 4999900,
+      "cells": {
+        "value": {
+          "block_id": "b0008",
+          "start": 28,
+          "end": 36,
+          "quote": "49 999 ₸"
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0008",
+          "start": 28,
+          "end": 36,
+          "quote": "49 999 ₸"
+        }
+      ],
+      "req_ids": []
+    }
+  ],
+  "coverage": [],
+  "questions": [
+    {
+      "id": "Q-01",
+      "finding_ids": [
+        "F-001"
+      ],
+      "prompt": "Как трактовать: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу?",
+      "options": [
+        "A. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»).",
+        "B. Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен» — Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push не отправлен: уведомление только после превышения порога (требование к тестированию №1)."
+      ],
+      "affected_req_ids": [
+        "R-003",
+        "R-005"
+      ],
+      "option_details": [
+        {
+          "id": "A",
+          "label": "Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз»",
+          "interpretation": "Действует фрагмент (строка 12 · блок b0007 · символы 4–62 · раздел «Месячный порог расходов (пример для HTML №13) / Критерии приёмки»): «Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз».",
+          "observable_result": "Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»).",
+          "consequences": "Фрагмент (строка 19 · блок b0011 · символы 4–56 · раздел «Месячный порог расходов (пример для HTML №13) / Требования к тестированию») «Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен» противоречит выбору и должен быть удалён или переписан; тест-кейс сценария ожидает: Push отправлен один раз (критерий приёмки №1, как в Ф-2: «достигают порога»).",
+          "edits": [],
+          "warnings": [],
+          "origin": "rule"
+        },
+        {
+          "id": "B",
+          "label": "Верно «Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен»",
+          "interpretation": "Действует фрагмент (строка 19 · блок b0011 · символы 4–56 · раздел «Месячный порог расходов (пример для HTML №13) / Требования к тестированию»): «Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен».",
+          "observable_result": "Порог 50 000 ₸, расходы за месяц ровно 50 000 ₸: Push не отправлен: уведомление только после превышения порога (требование к тестированию №1).",
+          "consequences": "Фрагмент (строка 12 · блок b0007 · символы 4–62 · раздел «Месячный порог расходов (пример для HTML №13) / Критерии приёмки») «Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз» противоречит выбору и должен быть удалён или переписан; тест-кейс сценария ожидает: Push не отправлен: уведомление только после превышения порога (требование к тестированию №1).",
+          "edits": [],
+          "warnings": [],
+          "origin": "rule"
+        }
+      ],
+      "owner": "PO",
+      "blocked_decision": "Отправлять ли push, когда расходы за месяц ровно равны порогу",
+      "blocks": [
+        "разработку",
+        "тестирование"
+      ],
+      "situation": "Тестировщик и разработчик получат противоположные ожидания для одной и той же суммы: один из тестов упадёт на любой реализации.",
+      "why": "Тестировщик и разработчик получат противоположные ожидания для одной и той же суммы: один из тестов упадёт на любой реализации.",
+      "sources": [
+        {
+          "block_id": "b0007",
+          "start": 4,
+          "end": 62,
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз",
+          "loc": "строка 12 · блок b0007 · символы 4–62 · раздел «Месячный порог расходов (пример для HTML №13) / Критерии приёмки»",
+          "finding_id": "F-001"
+        },
+        {
+          "block_id": "b0011",
+          "start": 4,
+          "end": 56,
+          "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push не отправлен",
+          "loc": "строка 19 · блок b0011 · символы 4–56 · раздел «Месячный порог расходов (пример для HTML №13) / Требования к тестированию»",
+          "finding_id": "F-001"
+        }
+      ],
+      "target": {
+        "block_id": "b0007",
+        "start": 4,
+        "end": 62,
+        "quote": "Порог 50 000 ₸, расходы 50 000 ₸ | Push отправлен один раз"
+      },
+      "hypothesis": null,
+      "document_answer": null,
+      "kind": "decision",
+      "family": "conflict",
+      "severity": "critical",
+      "priority": 138.0,
+      "rank_reason": "critical · противоречие · блокирует разработку и тестирование · требований 2 · замечаний 1 · бизнес-развилка",
+      "source_sha256": "7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830",
+      "status": "open",
+      "origin": "rule"
+    },
+    {
+      "id": "Q-02",
+      "finding_ids": [
+        "F-002"
+      ],
+      "prompt": "Как трактовать: Время и границы периода без явного часового пояса: «за календарный месяц»?",
+      "options": [
+        "A. Уточнить формулировку — Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт.",
+        "B. Оставить как есть, риск принят — Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта."
+      ],
+      "affected_req_ids": [
+        "R-002"
+      ],
+      "option_details": [
+        {
+          "id": "A",
+          "label": "Уточнить формулировку",
+          "interpretation": "Владелец задаёт однозначное правило или значение вместо «за календарный месяц».",
+          "observable_result": "Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт.",
+          "consequences": "Нужна формулировка: ответьте своим текстом со строкой «Формулировка: …». Без неё решение сохранится, но текст не изменится.",
+          "edits": [],
+          "warnings": [],
+          "origin": "rule"
+        },
+        {
+          "id": "B",
+          "label": "Оставить как есть, риск принят",
+          "interpretation": "Фрагмент «за календарный месяц» не меняется, трактовку выбирает разработка.",
+          "observable_result": "Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта.",
+          "consequences": "Риск фиксируется в отчёте как принятый владельцем.",
+          "edits": [],
+          "warnings": [],
+          "origin": "rule"
+        }
+      ],
+      "owner": "PO",
+      "blocked_decision": "",
+      "blocks": [
+        "разработку",
+        "тестирование"
+      ],
+      "situation": "Граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.",
+      "why": "Граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.",
+      "sources": [
+        {
+          "block_id": "b0004",
+          "start": 38,
+          "end": 58,
+          "quote": "за календарный месяц",
+          "loc": "строка 6 · блок b0004 · символы 38–58 · раздел «Месячный порог расходов (пример для HTML №13) / Функциональные требования»",
+          "finding_id": "F-002"
+        }
+      ],
+      "target": {
+        "block_id": "b0004",
+        "start": 38,
+        "end": 58,
+        "quote": "за календарный месяц"
+      },
+      "hypothesis": null,
+      "document_answer": null,
+      "kind": "decision",
+      "family": "ambiguity",
+      "severity": "minor",
+      "priority": 39.0,
+      "rank_reason": "minor · неоднозначность · блокирует разработку и тестирование · требований 1 · замечаний 1 · бизнес-развилка",
+      "source_sha256": "7d7a40a02f3e406a56d1cf16678ce3e4791b271998742fb306d8039d7aa39830",
+      "status": "open",
+      "origin": "rule"
+    }
+  ],
+  "checklist": [],
+  "test_cases": [],
+  "decisions": [],
+  "diff": null,
+  "verdict": {
+    "development": {
+      "status": "not_ready",
+      "reasons": [
+        "F-001: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу"
+      ],
+      "finding_ids": [
+        "F-001"
+      ]
+    },
+    "testing": {
+      "status": "not_ready",
+      "reasons": [
+        "F-001: Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу"
+      ],
+      "finding_ids": [
+        "F-001"
+      ]
+    },
+    "first_actions": [
+      {
+        "order": 1,
+        "action": "Критерий приёмки №1 и требование к тестированию №1 дают разный исход при расходах, равных порогу — Выбрать одно правило («достигают» или «превышают») и привести к нему Ф-2, критерий приёмки №1 и требование к тестированию №1.",
+        "finding_ids": [
+          "F-001"
+        ]
+      }
+    ],
+    "basis": "Готовность считается отдельно для разработки и тестирования: блокирует только подтверждённое критичное замечание с указанным бизнес-последствием и блокируемым решением; неполный прогон даёт «не определено», а не «можно начинать»."
+  },
+  "summary": {
+    "requirements": 6,
+    "reviewed_requirements": 0,
+    "findings": 2,
+    "by_severity": {
+      "critical": 1,
+      "major": 0,
+      "minor": 1
+    },
+    "by_status": {
+      "confirmed": 2,
+      "needs_review": 0
+    },
+    "critical_ids": [
+      "F-001"
+    ],
+    "checks": {
+      "pass": 6,
+      "issue": 1,
+      "unknown": 47,
+      "na": 0
+    }
+  },
+  "warnings": [
+    {
+      "code": "inventory",
+      "message": "{'code': 'llm_truncated', 'message': 'ответ по окну 1/1 (full) обрезан или без done=true; принято 0 пунктов, непокрытые блоки уйдут в повтор', 'stage': 'inventory', 'block_ids': ['b0003', 'b0004', 'b0007', 'b0008', 'b0011']}",
+      "stage": "inventory"
+    },
+    {
+      "code": "inventory",
+      "message": "{'code': 'llm_truncated', 'message': 'ответ по окну 1/1 (retry) обрезан или без done=true; принято 0 пунктов, непокрытые блоки уйдут в повтор', 'stage': 'inventory', 'block_ids': ['b0003', 'b0004', 'b0007', 'b0008', 'b0011']}",
+      "stage": "inventory"
+    },
+    {
+      "code": "inventory",
+      "message": "{'code': 'rules_fallback', 'message': 'модель не учла блоки b0003, b0004, b0007, b0008, b0011; применена нарезка по правилам', 'stage': 'inventory', 'block_ids': ['b0003', 'b0004', 'b0007', 'b0008', 'b0011']}",
+      "stage": "inventory"
+    }
+  ],
+  "excluded": [
+    {
+      "category": "structure",
+      "reason": "Заголовок раздела: задаёт путь section для вложенных блоков.",
+      "block_ids": [
+        "b0001",
+        "b0002",
+        "b0005",
+        "b0009"
+      ],
+      "cross_check": false,
+      "sections": [
+        "",
+        "Месячный порог расходов (пример для HTML №13)"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Критерии приёмки»: названия колонок.",
+      "block_ids": [
+        "b0006"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Месячный порог расходов (пример для HTML №13) › Критерии приёмки"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Требования к тестированию»: названия колонок.",
+      "block_ids": [
+        "b0010"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Месячный порог расходов (пример для HTML №13) › Требования к тестированию"
+      ]
+    }
+  ],
+  "rejected": []
+}

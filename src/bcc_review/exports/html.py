@@ -742,9 +742,10 @@ def _answers_question_head(q: Mapping[str, Any], index: int, fp: str) -> list[st
 def answers_markdown(report: Any, answers: Mapping[str, str], *, exported_at: str) -> str:
     """Файл ответов для ``--answers``: JS в HTML строит тот же текст байт в байт.
 
-    ``answers`` — черновики по Q-ID ЭТОГО отчёта. Разделы «## Q-ID» пишутся только для
-    вопросов с ответом (иначе парсер создаст пустые Decision), прочие перечислены в строке
-    «Без ответа». Пустой черновик заменяется ответом, уже учтённым прогоном для этого же вопроса.
+    ``answers`` — черновики по Q-ID ЭТОГО отчёта. Карточка «## Q-ID» есть у каждого вопроса,
+    последнее поле — «Ответ: …» одной строкой; у открытого вопроса поле пустое (так его читает
+    №08: вопрос остаётся открытым, Decision не создаётся). Пустой черновик заменяется ответом,
+    уже учтённым прогоном для этого же вопроса.
     """
     rep = report if isinstance(report, dict) else _to_plain(report)
     lines: list[str] = []
@@ -760,8 +761,7 @@ def answers_markdown(report: Any, answers: Mapping[str, str], *, exported_at: st
     if missing:
         lines += ["Без ответа: " + ", ".join(missing), ""]
     for i, q, _qid, fp, one in chosen:
-        if one:
-            lines += _answers_question_head(q, i, fp) + [f"Ответ: {one}", ""]
+        lines += _answers_question_head(q, i, fp) + [f"Ответ: {one}" if one else "Ответ:", ""]
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
@@ -1104,28 +1104,58 @@ class _Renderer:
             "</div></header>"
         )
 
+    _STAGE_REASON = re.compile(r"^([A-Za-z_][\w#.\-]*):\s+(.+)$", re.S)
+
+    def run_reason_groups(self) -> list[tuple[str, list[str]]]:
+        """``status_reasons`` вида «этап: причина», сгруппированные по тексту причины (крупные группы первыми)."""
+        groups: dict[str, list[str]] = {}
+        for raw in _as_list(self.run.get("status_reasons")):
+            text = " ".join(str(raw).split())
+            m = self._STAGE_REASON.match(text)
+            stage, reason = (m.group(1), m.group(2)) if m else ("", text)
+            stages = groups.setdefault(reason, [])
+            if stage and stage not in stages:
+                stages.append(stage)
+        return sorted(groups.items(), key=lambda kv: -len(kv[1]))
+
     def run_banner(self) -> str:
-        status = self.run.get("status")
+        """Статус прогона для первого экрана: код статуса, главная причина, остальное — в <details>."""
+        status = str(self.run.get("status") or "")
         if status == "complete":
             return ""
-        notes = [str(x) for x in _as_list(self.run.get("status_reasons"))]
-        stages = _as_list(self.run.get("incomplete_stages"))
-        if stages:
-            notes.append("Не выполнены этапы: " + ", ".join(str(s) for s in stages))
-        notes += self.warnings_all()
-        tail = "".join(f"<li>{_e(n)}</li>" for n in notes[:8])
-        if status == "failed":
-            head = "Прогон завершился ошибкой. Отчёт содержит только то, что успели проверить."
-        elif status == "partial":
-            head = "Прогон неполный. Часть проверок не выполнена, поэтому отсутствие замечания не доказывает отсутствие дефекта."
+        head = {"partial": "Прогон неполный", "failed": "Прогон завершился ошибкой"}.get(status, "Статус прогона не указан")
+        tail = {
+            "partial": "Часть проверок не выполнена: отсутствие замечания не доказывает отсутствие дефекта.",
+            "failed": "Отчёт содержит только то, что успели проверить.",
+        }.get(status, "Отчёт нельзя считать полным.")
+        groups = self.run_reason_groups()
+        stages = [str(x) for x in _as_list(self.run.get("incomplete_stages"))]
+        if groups:
+            reason, st = groups[0]
+            primary = reason.rstrip(".") + (f" — этапы: {', '.join(st)}" if st else "")
+            more = len(groups) - 1
         else:
-            head = "Статус прогона не указан. Отчёт нельзя считать полным."
+            primary = ("не выполнены этапы: " + ", ".join(stages)) if stages else "причина в отчёте не указана"
+            more = 0
+        notes = [str(x) for x in _as_list(self.run.get("status_reasons"))]
+        if stages:
+            notes.append("Не выполнены этапы: " + ", ".join(stages))
+        notes += self.warnings_all()
+        details = (
+            f'<details class="run-more"><summary>Все причины и предупреждения ({len(notes)})</summary>'
+            "<ul>" + "".join(f"<li>{_e(n)}</li>" for n in notes) + "</ul></details>"
+            if notes
+            else ""
+        )
         return (
-            f'<div class="banner banner-run" role="note"><strong><span aria-hidden="true">⚠</span> {head}</strong>'
-            f'{f"<ul>{tail}</ul>" if tail else ""}</div>'
+            '<div class="banner banner-run" id="run-state" role="note" aria-labelledby="run-state-h">'
+            f'<p class="run-head" id="run-state-h"><strong><span aria-hidden="true">⚠</span> {head}</strong> '
+            f'<code class="run-code">status: {_e(status or "—")}</code></p>'
+            f'<p class="run-reason"><b>Причина:</b> {_e(primary)}{f"; ещё причин: {more}" if more else ""}.</p>'
+            f'<p class="small run-tail">{tail}</p>{details}</div>'
         )
 
-    def verdict_tile(self, title: str, data: Any) -> str:
+    def verdict_tile(self, title: str, data: Any, key: str) -> str:
         if isinstance(data, bool):
             data = {"status": "ready" if data else "not_ready"}
         if isinstance(data, str):
@@ -1135,21 +1165,32 @@ class _Renderer:
         if not status and isinstance(data.get("ready"), bool):
             status = "ready" if data["ready"] else "not_ready"
         cls, glyph, label = READINESS.get(status, ("unk", "?", "Решение не сформировано"))
-        reasons = [str(r) for r in _as_list(_first(data, "reasons", "reason", default=[])) if r]
+        reasons = [" ".join(str(r).split()) for r in _as_list(_first(data, "reasons", "reason", default=[])) if r]
         blockers = _as_list(_first(data, "finding_ids", "blocking_finding_ids", default=[]))
+        run_reasons = [" ".join(str(x).split()) for x in _as_list(self.run.get("status_reasons")) if x]
+
+        def repeats_run_status(r: str) -> bool:
+            return r.startswith(("Прогон partial", "Прогон failed", "Прогон неполный")) or any(x in r for x in run_reasons)
+
+        own = [r for r in reasons if not repeats_run_status(r)]
+        shown = own[0] if own else (reasons[0] if reasons else "")
+        rest = [r for r in reasons if r != shown]
         prelim = ""
         if self.run.get("status") != "complete":
             prelim = '<span class="prelim">предварительно: прогон неполный</span>'
-        reasons_html = ""
-        if len(reasons) == 1:
-            reasons_html = f"<p>{_e(reasons[0])}</p>"
-        elif reasons:
-            reasons_html = "<ul>" + "".join(f"<li>{_e(r)}</li>" for r in reasons) + "</ul>"
+        reasons_html = f'<p class="tile-r">{_e(shown)}</p>' if shown else ""
+        if rest:
+            reasons_html += (
+                f'<details class="tile-more"><summary>Всё обоснование ({len(reasons)})</summary><ul>'
+                + "".join(f"<li>{_e(r)}</li>" for r in reasons)
+                + "</ul></details>"
+            )
         return (
-            f'<div class="tile tile-{cls}"><h3>{_e(title)}</h3>'
+            f'<div class="tile tile-{cls}" id="verdict-{key}" role="group" aria-labelledby="verdict-{key}-h">'
+            f'<h3 id="verdict-{key}-h">{_e(title)}</h3>'
             f'<p class="tile-v"><span aria-hidden="true" class="glyph">{glyph}</span> {_e(label)}</p>{prelim}'
-            f"{reasons_html}"
-            f'{f"<p class=small>Блокируют: {self.links(blockers)}</p>" if blockers else ""}</div>'
+            f'{f"<p class=small>Блокируют: {self.links(blockers)}</p>" if blockers else ""}'
+            f"{reasons_html}</div>"
         )
 
     def summary(self) -> str:
@@ -1205,13 +1246,14 @@ class _Renderer:
         return (
             '<section id="summary" class="summary" aria-labelledby="summary-h">'
             '<h2 id="summary-h">Итог ревью</h2>'
-            f"{self.run_banner()}"
             '<div class="verdict">'
-            f'{self.verdict_tile("Разработка", _first(v, "development", "dev"))}'
-            f'{self.verdict_tile("Тестирование", _first(v, "testing", "test"))}'
-            '<div class="actions"><h3>Что сделать первым</h3>'
+            f'{self.verdict_tile("Разработка", _first(v, "development", "dev"), "development")}'
+            f'{self.verdict_tile("Тестирование", _first(v, "testing", "test"), "testing")}'
+            "</div>"
+            f"{self.run_banner()}"
+            '<div class="actions" id="first-actions"><h3>Что сделать первым</h3>'
             f'{"<ol>" + "".join(act_items) + "</ol>" if act_items else "<p class=muted>Первые действия в отчёте не указаны.</p>"}'
-            f"{dec_html}</div></div>"
+            f"{dec_html}</div>"
             f'{f"<p class=verdict-sum>{_e(basis)}</p>" if basis else ""}'
             f'<ul class="stats" aria-label="Сводка">{stat_html}</ul>'
             "</section>"
@@ -1946,6 +1988,7 @@ class _Renderer:
             '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f'<meta http-equiv="Content-Security-Policy" content="{csp}">\n'
             f'<meta name="generator" content="{GENERATOR}">\n'
+            f'<meta name="bcc-review:generator-sha256" content="{generator_fingerprint()}">\n'
             f'<meta name="bcc-review:document-sha256" content="{_e(self.doc_id)}">\n'
             f'<meta name="bcc-review:schema-version" content="{_e(self.r.get("schema_version") or "")}">\n'
             f'<meta name="bcc-review:run-id" content="{_e(self.run.get("run_id") or "")}">\n'
@@ -1954,6 +1997,14 @@ class _Renderer:
             f'<script type="application/json" id="bcc-data">{data}</script>\n'
             f"<script>{js}</script>\n</body>\n</html>\n"
         )
+
+
+def generator_fingerprint() -> str:
+    """SHA-256 кода генератора (html.py и html_assets): одинаков у всех HTML одной версии генератора."""
+    h = hashlib.sha256()
+    for path in (Path(__file__), ASSETS_DIR / "report.css", ASSETS_DIR / "report.js"):
+        h.update(path.read_bytes())
+    return h.hexdigest()
 
 
 def _plural(n: int, one: str, few: str, many: str) -> str:

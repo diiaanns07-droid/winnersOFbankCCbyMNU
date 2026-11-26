@@ -47,6 +47,14 @@ def run_scenario(work: Path, src: Path = SRC) -> tuple[dict[str, Any], dict[str,
     return reports, json.loads((work / "answers-scenario.json").read_text(encoding="utf-8"))
 
 
+def as_plain(obj):
+    try:
+        from bcc_review.contracts import as_plain as plain
+    except ImportError:
+        return obj
+    return plain(obj)
+
+
 def published_parse_answers():
     """Опубликованный слот parse_answers движка, если он есть в этой копии."""
     try:
@@ -208,11 +216,17 @@ def test_exports_read_by_published_parse_answers(scenario):
     report = {"implementation": slot.label}
     for key, (step, typed) in _expected_exports(rs, ans).items():
         exp = obs[step]["export"] if key == "nostore" else obs[step][key]
-        out = slot.func(exp["file"], doc)
-        out = {"decisions": out, "warnings": []} if isinstance(out, list) else out
-        assert out["warnings"] == [], out["warnings"]
-        pairs = {d["question_id"]: d["answer"] for d in out["decisions"]}
+        # Как движок (engine.apply_answers): вопросы прогона, ожидаемый SHA, результат → dict.
+        try:
+            raw = slot.func(exp["file"], doc, questions=rs["r2"]["questions"], expected_sha=doc["id"])
+        except TypeError:  # резервный parse_answers(path, document)
+            raw = slot.func(exp["file"], doc)
+        warnings = list(getattr(raw, "warnings", None) or (raw.get("warnings", []) if isinstance(raw, dict) else []))
+        items = raw.get("decisions", []) if isinstance(raw, dict) else list(raw)
+        decisions = [as_plain(d) for d in items]
+        assert warnings == [], warnings
+        pairs = {d["question_id"]: d["answer"] for d in decisions if (d.get("answer") or "").strip()}
         assert pairs == {q: H.answer_one_line(a) for q, a in typed.items()}, key
-        assert {d["source_sha256"] for d in out["decisions"]} <= {doc["id"]}
-        report[key] = out["decisions"]
+        assert {d["source_sha256"] for d in decisions} <= {doc["id"]}
+        report[key] = decisions
     (work / "published-parse.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")

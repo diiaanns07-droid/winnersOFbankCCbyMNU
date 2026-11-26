@@ -203,3 +203,25 @@ exported_at: 2026-11-26T12:00:00.000Z
 ```bash
 python tests/p13/answers_binding_report.py /tmp/p13-answers --src <src реализации> --parser-src <src копии bcc/integration>
 ```
+
+## Первый экран аналитика
+
+Одна команда собирает два локальных HTML одной версией генератора (`<meta name="bcc-review:generator-sha256">`
+одинаков у обоих):
+
+```bash
+python tests/p13/first_screen.py out/first-screen
+```
+
+| Файл | Вход | Что проверяется |
+| :--- | :--- | :--- |
+| `requirements_pdf.html` | `release/reports/offline/requirements_pdf.json` (офлайн-прогон релиза, `run.status = partial`) | на первом экране при 390 и 1280 px, с JavaScript и без: оба вывода о готовности (`#verdict-development`, `#verdict-testing`), плашка `#run-state` с `status: partial` и главной причиной; все причины и предупреждения — в `<details>` |
+| `conflict_same_amount.html` | `tests/p13/fixtures/conflict_same_amount.report.json` — записанный прогон движка: вход `conflict_same_amount.md`, ответ модели `conflict_same_amount.mock.json` | критичный конфликт `#finding-F-001`: переход к цитате A (`#block-b0007`) и B (`#block-b0011`) и возврат к той же карточке мышью и с клавиатуры при 390 и 1280 px; обе цитаты начинаются с «Порог 50 000 ₸, расходы 50 000 ₸», первое вхождение этого текста — в `b0007`, сумма «50 000 ₸» впервые в `b0003`; без JavaScript видны вердикт и обе цитаты |
+
+`--record` заново записывает `conflict_same_amount.report.json`:
+`BCC_FORCE_FALLBACK=review_individual,review_set python -m bcc_review … --provider mock --mock-script …`.
+Этапы `individual` и `cross` отвечают записанным JSON, а чтение (№01), инвентарь (№04), привязка цитат
+(№07), вопросы (№08), вердикт и проверка — модули команды. `python -m bcc_review verify` по записи — OK.
+
+Браузерная проверка: `tests/p13/browser/first_screen.cjs` (12 проверок, результат — `first-screen-results.json`),
+pytest: `tests/p13/test_first_screen.py`.

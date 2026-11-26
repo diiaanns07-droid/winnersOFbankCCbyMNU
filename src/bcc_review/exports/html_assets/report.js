@@ -292,11 +292,18 @@
     if (c && state.sel === fid) revealCard(c);
     var target = btn && doc.contains(btn) && !btn.closest('[hidden]') ? btn : c ? toggleOf(c) : null;
     if (target) {
-      if (!c || !c.contains(target)) target.scrollIntoView({ block: 'center' });
+      // Карточка бывает выше экрана (конфликт с двумя сторонами на 390 px): после возврата
+      // кнопка цитаты, с которой ушли к документу, должна быть видна, а не только верх карточки.
+      ensureVisible(target);
       target.focus({ preventScroll: true });
     }
     if (state.sel) setHash(D.findings[state.sel].anchor, { kind: 'finding', fid: state.sel }, false);
     say(state.sel ? 'Возврат к замечанию ' + state.sel + '. Выбор сохранён.' : 'Возврат.');
+  }
+  function ensureVisible(el) {
+    var box = !isNarrow() && fScroll ? fScroll.getBoundingClientRect() : { top: isNarrow() ? 52 : 0, bottom: window.innerHeight };
+    var r = el.getBoundingClientRect();
+    if (r.top < box.top || r.bottom > box.bottom) el.scrollIntoView({ block: 'center' });
   }
   function goBack() {
     if (history.state && history.state.kind === 'quote') {
@@ -761,7 +768,7 @@
       });
     });
   }
-  /* Формат совпадает с answers_markdown() в html.py: «Ответ: …» одной строкой, только вопросы с ответом. */
+  /* Формат совпадает с answers_markdown() в html.py: карточка у каждого вопроса, «Ответ: …» одной строкой. */
   function oneLine(s) {
     return String(s || '').split(/\r\n|\r|\n/).map(function (x) { return x.replace(/^[ \t]+|[ \t]+$/g, ''); })
       .filter(function (x) { return x; }).join(' ');
@@ -772,8 +779,8 @@
     A.header.forEach(function (h) { lines.push(h === null ? 'exported_at: ' + exportedAt : h); });
     A.questions.forEach(function (q) {
       var one = oneLine(answers[q.id] || '') || oneLine(q.reportAnswer || '');
-      if (one) blocks.push(q.head.concat(['Ответ: ' + one, '']));
-      else missing.push(q.id);
+      blocks.push(q.head.concat([one ? 'Ответ: ' + one : 'Ответ:', '']));
+      if (!one) missing.push(q.id);
     });
     if (missing.length) lines.push('Без ответа: ' + missing.join(', '), '');
     blocks.forEach(function (b) { lines.push.apply(lines, b); });
