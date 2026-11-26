@@ -639,6 +639,9 @@ def _passport(c: _Ctx) -> list[str]:
         ["Документ", f"«{cell(doc.get('title') or '—')}»"],
         ["Файл", f"`{doc.get('file') or '—'}` · {fmt} · {size}"],
         ["Хеш файла (`SHA-256`)", f"`{doc.get('sha256') or '—'}`"],
+    ] + ([["Нумерация строк", "строка — фрагмент текста в нумерации агента (сквозная по документу); место на "
+                              "странице находится по номеру страницы и цитате"]]
+         if doc.get("format") in ("pdf", "docx") else []) + [
         ["Дата и время", stamp],
         ["Модель", model.replace("|", "\\|")],
         ["Провайдер", PROVIDERS.get(run.get("provider")) or f"`{run.get('provider') or '—'}`"],
