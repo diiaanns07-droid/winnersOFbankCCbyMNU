@@ -38,8 +38,10 @@ loc.fragments[]   {start, end, rect:[x0,y0,x1,y1], line, dir?, quad?, hyphen?}
                   страницы PyMuPDF (начало — левый верхний угол CropBox, y вниз); line — визуальная строка
 loc.bbox          охват всех фрагментов
 loc.rotation      /Rotate страницы, если не 0
-loc.table         у table_header/table_row: {id, part, row, header_row, header[], header_source,
-                  header_restored, cells:[{col, colspan, start, end, rect}], repeated_header?}
+loc.table         у table_header/table_row: {id, part, row, header_row, header[], columns[]?, header_source,
+                  header_restored, cells:[{col, colspan, start, end, rect}], repeated_header?,
+                  link?, adjacent_to?, maybe_continues?}; columns = header, движок кладёт его в loc.columns
+                  (cells[].rect — рамка find_tables, внешний край бывает обрезан по тексту; подсветка — по fragments)
 loc.level         уровень заголовка; loc.ocr — текст из OCR; loc.furniture — колонтитул (kind "other")
 loc.continues / loc.continued_from — абзац продолжается в следующем блоке (колонка или страница)
 ```
@@ -95,12 +97,14 @@ MediaBox, читатель видит обычную книжную страни
 
 ```text
 {reader, engine, pages, content_pages, completeness: 0..1, pages_status: {"2": "scan", ...},
- pages_unread, pages_ocr, pages_blank, tables: [{id, pages, parts, header_restored}], method}
+ pages_unread, pages_ocr, pages_blank, tables: [{id, pages, parts, header_restored, links?, adjacent_to?,
+ maybe_continues?}], method}
 ```
 
 `completeness` — среднее по непустым страницам. Текстовая страница даёт 1, скан, нечитаемый шрифт и текст
 кривыми — 0. У смешанной страницы это площадь текста / (площадь текста + площадь изображений без текста).
-Предупреждения: `{code, message, stage: "read_pdf", severity, page}` плюс поля по смыслу.
+Предупреждения: `{code, message, stage: "read_pdf", severity, page?}` плюс поля по смыслу; `page` (целое ≥ 1, как
+требует контракт с 6be9e97) есть только у предупреждений конкретной страницы.
 
 | Ситуация | code (контракт) | Чем кончается |
 | :--- | :--- | :--- |
@@ -109,11 +113,11 @@ MediaBox, читатель видит обычную книжную страни
 | шрифт без ToUnicode | `decode_error` (error) | «каша» не попадает в блоки |
 | отдельные глифы без кодировки (например, ₸) | `decode_error` (warning) | текст с `�` и номер страницы |
 | картинка без текста ≥ 15% площади | `partial_read` с номером страницы | оценка полноты страницы |
-| итог при полноте < 1 | `partial_read`, `page: null`, `pages`, `completeness` | прогон `partial`, готовность не `ready` |
+| итог при полноте < 1 | `partial_read` без `page`, с `pages` и `completeness` | прогон `partial`, готовность не `ready` |
 | полностью скан или пустой PDF | то же, блоков 0, полнота 0 | `Document`, а не исключение |
 | OCR применён | `page_ocr` (warning) | `loc.ocr = true`, сверка цитат |
 | не PDF / повреждён / пароль | исключение `PdfReadError(code)` | `diagnostic` готов к показу |
-| прочее | `page_blank`, `pdf_encrypted_owner`, `pdf_repaired`, `page_text_over_image`, `table_unreliable`, `table_rotated_text`, `layout_grid_unreliable`, `table_continuation_unmatched`, `table_header_unmapped` | не меняет полноту |
+| прочее | `empty_page`, `pdf_encrypted_owner`, `pdf_repaired`, `page_text_over_image`, `table_unreliable`, `table_rotated_text`, `layout_grid_unreliable`, `table_continuation_unmatched`, `table_continuation_uncertain`, `table_header_unmapped` | не меняет полноту |
 
 `diagnose_pdf(path)` никогда не бросает исключений. Он возвращает
 `{ok, code: complete|partial|no_text|not_pdf|damaged|encrypted, message, pages, extraction, warnings}`.
@@ -134,12 +138,35 @@ OCR не требует.
 со строкой и колонкой принимается, только если каждый символ однозначно попал в одну ячейку и не пересекает её линию.
 Иначе сохраняются исходные блоки и выдаётся `table_unreliable`. Выровненный текст без линеек остаётся блоками в
 построчном порядке с `layout_grid_unreliable`. Объединённые ячейки шапки разворачиваются в имена колонок:
-`["Сценарий", "Сумма, ₸ / до", "Сумма, ₸ / после"]`. **Многостраничные таблицы**: продолжение узнаётся по тем же
-внутренним границам колонок (±3 pt). Повторённая шапка помечается `repeated_header`. Без повтора шапка берётся с
-прошлой части (`header_source: "page 4"`). Нумерация `row` сквозная. Восстановлено ли соответствие, видно по
-`header_restored` у каждой строки и `extraction.tables[].header_restored`. На фикстуре и кейсе все многостраничные
-таблицы восстановлены: T2 (стр. 3–4, повтор), T3 (стр. 4–5, без повтора), чек-лист кейса (стр. 3–4), таблица ответа
-(стр. 5–6).
+`["Сценарий", "Сумма, ₸ / до", "Сумма, ₸ / после"]`.
+
+**Многостраничные таблицы.** Кандидат в продолжение — таблица первой на странице, если прошлая страница кончается
+таблицей с тем же числом колонок и теми же внутренними границами (±3 pt). Одной сетки мало: две разные таблицы бывают
+одной ширины. Поэтому решает видимое оформление первой строки и шапки прошлой части (`_continuation`):
+
+| Первая строка на новой странице | `link` | Итог |
+| :--- | :--- | :--- |
+| повторяет шапку прошлой части | `repeated_header` | тот же `id`, `part + 1`, `repeated_header`, нумерация `row` сквозная |
+| жирная (как шапка), текст другой | `new_header` | новая таблица со своей шапкой, `adjacent_to` — соседняя |
+| обычная, а шапка прошлой части выделена | `header_carried` | тот же `id`, шапка с прошлой части (`header_source: "page N"`) |
+| оформлением не различить (шапка не выделена) | `uncertain` | новая таблица без `header`/`columns`, `maybe_continues`, предупреждение `table_continuation_uncertain` с `pages`; значения, страница и координаты сохраняются |
+
+Восстановлено ли соответствие, видно по `header_restored` у каждой строки и в `extraction.tables[]`. На фикстуре и
+кейсе все настоящие продолжения восстановлены: T2 (стр. 3–4, повтор), T3 (стр. 4–5, без повтора), чек-лист кейса
+(стр. 3–4), таблица ответа (стр. 5–6).
+
+`p02_bank_tables.pdf` (генератор `make_fixtures.py`, эталон `p02_bank_tables.expected.json`) проверяет риск склейки:
+
+| Случай | Код 288d727 | Сейчас |
+| :--- | :--- | :--- |
+| стр. 1–2: «Операция \| Сумма, ₸» → «Код HTTP \| Причина» | одна T1; шапка «Код HTTP \| Причина» стала строкой 11, «409» — строка 13 T1 в колонке «Операция», «Повтор события» — в «Сумма, ₸» | T1 стр. 1; **T2** стр. 2, шапка `Код HTTP, Причина`, `link: new_header`; «409» — строка 2 T2 |
+| стр. 3–4: продолжение под повторённой шапкой | T2, верно | T3 части 1–2, `repeated_header`, строки 1–13 |
+| стр. 5–6: продолжение без повтора шапки | T3, верно | T4 части 1–2, `header_carried` (`page 5`), строки 11–13 на стр. 6 |
+| стр. 7–8: шапка без выделения, первая строка тоже | T4 тихо склеена, шапка «Параметр \| Значение» приписана | T5 и **T6** (`uncertain`, `maybe_continues: T5`), без имён колонок, предупреждение на стр. 8 |
+
+Для №14: строка 409 — блок **`b0019`**, стр. 2, текст `409 | Повтор события`; цифры — диапазон **`[0, 3)`**
+(`locate_span(block, 0, 3)` → `[[61.69, 106.02, 81.72, 116.52]]`, эталон генератора `[61.69, 106.02, 81.73, 116.52]`),
+причина — `[6, 20)`.
 
 ## Порядок чтения
 
@@ -154,10 +181,12 @@ OCR не требует.
 
 | Команда | Результат |
 | :--- | :--- |
-| `python -m pytest tests/contract tests/p02 -q` (PyMuPDF 2.2, tessdata rus+eng) | 66 passed, 1 skipped (стык №07 без модуля) |
-| то же с `TESSDATA_PREFIX=/nonexistent` (OCR недоступен) | 65 passed, 2 skipped |
-| то же на PyMuPDF 1.26.5 (`pip install --target … pymupdf==1.26.5 --no-deps`) | 66 passed, 1 skipped |
-| `tests/p02/test_joint_p07.py` с `src` ветки `bcc/p07-evidence@cfebfff` | 2 passed |
+| `python -m pytest tests/p02 -q` (PyMuPDF 2.2, tessdata rus+eng), эта ветка | 42 passed, 3 skipped (стыки ждут модулей интеграции) |
+| `tests/contract tests/p02` на PyMuPDF 1.26.5 | 71 passed, 3 skipped |
+| `tests/p02` в копии `bcc/integration@6a6c503` с этим `pdf.py` (движок, №07, №14 настоящие) | 46 passed |
+| весь набор интеграции без `tests/p11`, `tests/p12` (нет SDK): до правки / с правкой | 15 / 10 failed; минус 5 падений `tests/p02` (контракт `Warning.page`), новых падений нет |
+| `python -m bcc_review p02_bank_tables.pdf … --offline-lint` и `--provider mock` в той же копии | `read: ok`, `run.modules.read_pdf = team:bcc_review.readers.pdf:read_pdf`; `b0019.loc.columns = [Код HTTP, Причина]` |
+| `tests/p02/test_joint_p07.py` с `src` ветки `bcc/p07-evidence@cfebfff` (первый проход) | 2 passed |
 | `ruff check src/bcc_review/readers/pdf.py tests/p02` | чисто |
 
 Проверенные случаи:
@@ -184,6 +213,7 @@ OCR не требует.
 | `p02_sample.pdf` | 5 стр.: заголовки, ₸, перенос, таблица, две колонки, таблицы на 2 страницы с повтором шапки и без, колонтитулы | `make_fixtures.py` (reportlab, invariant) |
 | `p02_rotated_text.pdf` | /Rotate 90, текст поперёк MediaBox, две колонки | `make_fixtures.py` |
 | `p02_rotated90.pdf`, `p02_scan_mixed.pdf` | повёрнутая стр. 1; текст / скан / пустая / картинка без текста / текст | `p02_builders.py` (PyMuPDF) |
+| `p02_bank_tables.pdf` + `.expected.json` | 8 стр.: соседние таблицы в одной сетке — разные, продолжение с повтором шапки, без повтора, неоднозначный стык; эталон связок и областей ячеек (409 и др.) | `make_fixtures.py` (reportlab canvas) |
 | `case_requirements_chromium.pdf`, `chromium_layouts.pdf` | кейс BCC-HUB `docs/requirements.md@928c1aa` из Chromium; CSS-колонки, сетка без линеек, объединённые ячейки | `make_chromium.py` (markdown + Node playwright) |
 
 Остальные граничные PDF (шифрование, ToUnicode, кривые, пустой, логотип) `p02_builders.py` собирает в `tmp_path` во время теста.
@@ -200,6 +230,10 @@ OCR не требует.
   `quads` есть только у наклонного текста.
 * **№18**: `diagnose_pdf` / `python -m bcc_review.readers.pdf FILE --diagnose` выдают сообщение на русском
   и коды выхода 0 / 5 (partial) / 1 (нет текста или файл не открыть).
-* Известные ограничения: заголовок, стоящий прямо под одной колонкой, не отличить от продолжения колонки, если он
+* **Max (второй проход)**: в `bcc/integration@6a6c503` влит `pdf.py` из 288d727 — у него склейка разных таблиц
+  одной сетки и `Warning.page = null`, из-за которого там падают 5 тестов `tests/p02`. Нужно перелить эту ветку.
+  `extraction.tables[].links/maybe_continues` и предупреждение `table_continuation_uncertain` можно показывать в отчёте.
+* Известные ограничения: неоднозначный стык (шапка не выделена ни жирным, ни повтором) не склеивается и не получает
+  имён колонок — это сознательная осторожность; заливка шапки как признак пока не используется. Заголовок, стоящий прямо под одной колонкой, не отличить от продолжения колонки, если он
   не крупнее текста. Таблица без линеек остаётся блоками. Повёрнутый текст внутри таблицы не превращается в ячейки
   (`table_rotated_text`).

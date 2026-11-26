@@ -70,7 +70,7 @@ def _annotate_and_reopen(src: Path, page_no: int, rects, out: Path) -> list[list
 
 
 def _codes(doc: dict) -> set[tuple[str, int | None]]:
-    return {(w['code'], w['page']) for w in doc['warnings']}
+    return {(w['code'], w.get('page')) for w in doc['warnings']}
 
 
 def _partial(doc: dict) -> bool:
@@ -228,8 +228,8 @@ def test_multipage_tables_repeated_and_restored_header(sample_doc):
     assert all(t['header'] == ['Код', 'Лимит', 'Валюта'] and t['header_source'] == 'page 4' and t['header_restored']
                for t in tail)
     summary = {t['id']: t for t in sample_doc['extraction']['tables']}
-    assert summary['T2'] == {'id': 'T2', 'pages': [3, 4], 'parts': 2, 'header_restored': True}
-    assert summary['T3'] == {'id': 'T3', 'pages': [4, 5], 'parts': 2, 'header_restored': True}
+    assert summary['T2'] == {'id': 'T2', 'pages': [3, 4], 'parts': 2, 'header_restored': True, 'links': ['repeated_header']}
+    assert summary['T3'] == {'id': 'T3', 'pages': [4, 5], 'parts': 2, 'header_restored': True, 'links': ['header_carried']}
 
 
 def test_merged_header_cells_flattened():
@@ -265,8 +265,8 @@ def test_scan_page_reports_page_number_and_completeness(tmp_path):
     path = builders.scan_mixed(tmp_path / 'mixed.pdf')
     doc = read_pdf(path, ocr='off')
     validate(doc, 'Document')
-    assert {('ocr_required', 2), ('page_blank', 3), ('partial_read', 4), ('partial_read', None)} <= _codes(doc)
-    summary = next(w for w in doc['warnings'] if w['code'] == 'partial_read' and w['page'] is None)
+    assert {('ocr_required', 2), ('empty_page', 3), ('partial_read', 4), ('partial_read', None)} <= _codes(doc)
+    summary = next(w for w in doc['warnings'] if w['code'] == 'partial_read' and 'page' not in w)
     assert summary['severity'] == 'error' and summary['pages'] == [2, 4] and summary['completeness'] < 1
     ext = doc['extraction']
     assert ext['completeness'] < 1 and ext['pages_unread'] == [2, 4]
@@ -289,7 +289,7 @@ def test_document_without_text_layer_has_no_blocks_and_partial_codes(tmp_path):
 
 
 @pytest.mark.parametrize('builder, code, page_status', [
-    (builders.blank_only, 'page_blank', 'blank'),
+    (builders.blank_only, 'empty_page', 'blank'),
     (builders.vector_page, 'unreadable_page', 'vector'),
 ])
 def test_empty_extraction_is_never_a_clean_document(tmp_path, builder, code, page_status):
