@@ -259,7 +259,7 @@ def test_prompt_is_russian():
                "terms", "problem", "severity", "major", "minor", "none", "trace", "functional", "nonfunctional",
                "data", "integration", "constraint", "requirement_id", "verified_by", "implemented_by", "note",
                "candidates", "missing_element", "set_consistent", "set_feasible", "set_complete", "modifiable",
-               "duplicate", "ranked", "traceable", "traceability", "critical", "requirement_ids", "blocks", "false"}
+               "duplicate", "ranked", "traceable", "traceability", "critical", "requirement_ids", "blocks", "false", "HTTP"}
     stray = {w for w in words if w.lower() not in allowed and w not in allowed}
     assert not stray, stray
 
@@ -268,3 +268,50 @@ def test_prompt_is_russian():
 def test_trace_kinds_are_contract_kinds(kind):
     assert kind in {"functional", "nonfunctional", "data", "integration", "ui", "process", "architecture", "api",
                     "acceptance", "constraint", "goal", "other"}
+
+
+def test_conflicts_sharing_a_line_are_merged_into_one():
+    p1 = pair()
+    p2 = pair(b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7, title="второй")
+    out = C.postprocess(answer(pair_checks=[p1, p2]), VIEW, REQS)
+    [c] = out["candidates"]
+    assert [e["line"] for e in c["evidence"]] == [3, 4, 7]
+    assert c["requirement_ids"] == ["R-02", "R-03", "R-06"]
+    assert "второй" in c["problem"]
+    assert len(out["pair_checks"]) == 2
+
+
+def test_conflicts_of_different_kind_are_not_merged():
+    p2 = pair(b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7,
+              kind="unit_mismatch")
+    out = C.postprocess(answer(pair_checks=[pair(), p2]), VIEW, REQS)
+    assert len(out["candidates"]) == 2
+
+
+def test_minor_glossary_entries_become_one_candidate():
+    g1 = {"concept": "вклад", "terms": [{"term": "Вклад", "line": 3}, {"term": "вклада", "line": 5}],
+          "problem": "", "severity": "minor"}
+    g2 = {"concept": "доход", "terms": [{"term": "доход по вкладу", "line": 2}, {"term": "Доход начисляется", "line": 7}],
+          "problem": "", "severity": "minor"}
+    out = C.postprocess(answer(glossary=[g1, g2]), VIEW, REQS)
+    terms = [c for c in out["candidates"] if c["kind"] == "terminology"]
+    assert len(terms) == 1 and terms[0]["severity"] == "minor"
+    assert "«вклад»" in terms[0]["title"] and "«доход»" in terms[0]["title"]
+
+
+def test_term_in_other_case_is_found_and_quoted_as_in_document():
+    g = {"concept": "распорядитель", "terms": [{"term": "клиент", "line": 10},
+                                               {"term": "держатель счёт", "line": 10}],
+         "problem": "", "severity": "major"}
+    hit = C.find_term(VIEW, "держатели счёта", 9)
+    assert hit == ("держатель счёта", 10)
+    out = C.postprocess(answer(glossary=[g]), VIEW, REQS)
+    assert out["glossary"][0]["terms"][1]["term"] == "держатель счёта"
+    assert out["candidates"][0]["evidence"][1]["quote"] == "держатель счёта"
+
+
+def test_conflict_with_goal_or_nonfunctional_is_major():
+    p = pair(a="R-01", quote_a="клиент видит доход по вкладу сразу после пополнения", line_a=2,
+             b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7)
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["candidates"][0]["severity"] == "major"

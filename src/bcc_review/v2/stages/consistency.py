@@ -22,7 +22,7 @@ STAGE = "consistency"
 SOURCE = "consistency"
 
 MAX_PAIRS = 15
-MAX_UNDEFINED_CANDIDATES = 4
+MAX_UNDEFINED_CANDIDATES = 3
 MAX_MODEL_CANDIDATES = 10
 MAX_GLOSSARY = 8
 
@@ -235,7 +235,12 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     return pair
 
 
-def pair_to_candidate(pair: dict) -> dict | None:
+# Виды требований, конфликт с которыми не блокирует сам по себе: цель — намерение, а не правило;
+# нефункциональное требование о сроке редко противоречит правилу поведения напрямую.
+SOFT_KINDS = ("goal", "nonfunctional")
+
+
+def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict | None:
     """conflict → critical с двумя цитатами в разных местах; undefined → major."""
     if not pair["same_subject"] or pair["verdict"] == "compatible":
         return None
@@ -248,7 +253,8 @@ def pair_to_candidate(pair: dict) -> dict | None:
     if pair["verdict"] == "conflict":
         if kind not in CONFLICT_KINDS:
             kind = "contradiction"
-        severity = "critical" if two_places else "major"
+        soft = any((known or {}).get(x, {}).get("kind") in SOFT_KINDS for x in (pair["a"], pair["b"]))
+        severity = "critical" if two_places and not soft else "major"
     else:  # undefined
         if kind in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
             kind = "ambiguity"
@@ -283,6 +289,41 @@ def pair_to_candidate(pair: dict) -> dict | None:
     }
 
 
+_WORD = re.compile(r"[\wё]+", re.I)
+
+
+def _stem(w: str) -> str:
+    w = w.lower().replace("ё", "е")
+    return w if len(w) <= 4 else w[:max(4, len(w) - 2)]
+
+
+def _same_stem(tok: str, word: str) -> bool:
+    if tok.startswith(word):
+        return True
+    return word.startswith(tok) and len(tok) >= max(3, len(word) - 2)
+
+
+def find_term(view: Any, term: str, line_hint: int | None, radius: int = 2) -> tuple[str, int] | None:
+    """Термин в другом падеже или числе («владелец карты» в строке «сессия владельца карты»):
+    ищем подряд идущие слова строки с теми же основами рядом с подсказкой и возвращаем
+    дословный фрагмент строки, чтобы цитата прошла общую сверку."""
+    words = [_stem(w) for w in _WORD.findall(term)]
+    if not words:
+        return None
+    lines = _lines(view)
+    if line_hint:
+        cand = sorted((x for x in lines if abs(x["n"] - line_hint) <= radius), key=lambda x: abs(x["n"] - line_hint))
+    else:
+        cand = lines
+    for x in cand:
+        text = str(x.get("text", ""))
+        toks = [(m.start(), m.end(), _stem(m.group())) for m in _WORD.finditer(text)]
+        for i in range(len(toks) - len(words) + 1):
+            if all(_same_stem(toks[i + k][2], words[k]) for k in range(len(words))):
+                return text[toks[i][0]:toks[i + len(words) - 1][1]], x["n"]
+    return None
+
+
 def normalize_glossary(g: dict, view: Any) -> dict | None:
     terms = []
     seen: set[str] = set()
@@ -292,10 +333,25 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
             continue
         seen.add(_norm(term))
         line = _int(t.get("line")) or 0
-        m = verify(view, term, line or None)
-        if m:
-            line = m.get("line_start") or line
-        terms.append({"term": term, "line": line, "verified": (m or {}).get("verified", "missing")})
+        verified = "missing"
+        # Сначала целыми словами рядом с подсказкой (термин мог стоять в другом падеже),
+        # затем обычная сверка цитаты по всему документу, затем словами по всему документу.
+        hit = find_term(view, term, line or None) if line else None
+        if hit:
+            term, line, verified = hit[0], hit[1], "normalized"
+        else:
+            m = verify(view, term, line or None)
+            if m:
+                line, verified = m.get("line_start") or line, m.get("verified", "exact")
+            else:
+                hit = find_term(view, term, None)
+                if hit:
+                    term, line, verified = hit[0], hit[1], "normalized"
+        if verified != "missing" and _norm(term) != _norm(_s(t.get("term"))):
+            if _norm(term) in seen:
+                continue
+            seen.add(_norm(term))
+        terms.append({"term": term, "line": line, "verified": verified})
     if len(terms) < 2:
         return None
     sev = g.get("severity") if g.get("severity") in GLOSSARY_SEVERITIES else "minor"
@@ -326,6 +382,57 @@ def glossary_to_candidate(g: dict) -> dict | None:
         "rewrite": "", "question": "", "blocks": "development" if severity == "major" else "none",
         "source": SOURCE, "origin": "glossary",
     }
+
+
+def minor_glossary_candidate(entries: list[dict]) -> dict | None:
+    """Все синонимы без влияния на реализацию — одно замечание minor на документ."""
+    found = [(g, [t for t in g["terms"] if t["verified"] != "missing"]) for g in entries if g["severity"] == "minor"]
+    found = [(g, ts) for g, ts in found if len(ts) >= 2]
+    if not found:
+        return None
+    evidence, parts = [], []
+    for g, ts in found:
+        parts.append(f"{g['concept']}: " + ", ".join(f"«{t['term']}» (L{t['line']:03d})" for t in ts[:4]))
+        for t in ts[:2]:
+            if len(evidence) < 6:
+                evidence.append({"quote": t["term"], "line": t["line"], "verified": t["verified"]})
+    concepts = ", ".join(f"«{g['concept']}»" for g, _ in found[:3])
+    return {
+        "title": f"Терминология не едина, глоссария нет: {concepts}" + (" и др." if len(found) > 3 else ""),
+        "kind": "terminology", "criterion": "conforming", "severity": "minor", "requirement_ids": [],
+        "evidence": evidence,
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. " + "; ".join(parts) + ".",
+        "scenario": "", "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно "
+                                  "название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого "
+                          "понятия.",
+        "rewrite": "", "question": "", "blocks": "none", "source": SOURCE, "origin": "glossary",
+    }
+
+
+def merge_conflicts(cands: list[dict]) -> list[dict]:
+    """Конфликты одного вида, у которых общая строка (одно правило против нескольких мест), — одно замечание."""
+    out: list[dict] = []
+    for c in cands:
+        host = None
+        if c["kind"] in CONFLICT_KINDS:
+            for o in out:
+                if o["kind"] == c["kind"] and o["severity"] == c["severity"] and any(
+                        _overlap(e1, e2) for e1 in o["evidence"] for e2 in c["evidence"] if _found(e1) and _found(e2)):
+                    host = o
+                    break
+        if host is None:
+            out.append(c)
+            continue
+        for e in c["evidence"]:
+            if not any(_overlap(e, h) and _norm(e["quote"]) == _norm(h["quote"]) for h in host["evidence"]):
+                host["evidence"].append(e)
+        for rid in c["requirement_ids"]:
+            if rid not in host["requirement_ids"]:
+                host["requirement_ids"].append(rid)
+        host["problem"] += f" Также: {c['title']}."
+        host.setdefault("merged_titles", []).append(c["title"])
+    return out
 
 
 def _requirement_ids_for_lines(ev_list: list[dict], requirements: list[dict]) -> list[str]:
@@ -428,7 +535,7 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     pair_cands: list[dict] = []
     undefined = 0
     for p in pairs:
-        c = pair_to_candidate(p)
+        c = pair_to_candidate(p, known)
         if not c:
             continue
         if p["verdict"] == "undefined":
@@ -436,13 +543,18 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
             if undefined > MAX_UNDEFINED_CANDIDATES:
                 continue
         pair_cands.append(c)
+    pair_cands = merge_conflicts(pair_cands)
     candidates.extend(pair_cands)
 
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]
     for g in glossary:
-        c = glossary_to_candidate(g)
-        if c:
-            candidates.append(c)
+        if g["severity"] == "major":
+            c = glossary_to_candidate(g)
+            if c:
+                candidates.append(c)
+    c = minor_glossary_candidate(glossary)
+    if c:
+        candidates.append(c)
 
     for raw in (data.get("candidates") or [])[:MAX_MODEL_CANDIDATES]:
         c = normalize_candidate(raw, view, known, requirements)
