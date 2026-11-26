@@ -73,9 +73,13 @@ def _opts(a: argparse.Namespace) -> dict:
 
 
 def _log(quiet: bool):
+    import threading
+    lock = threading.Lock()
+
     def log(msg: str) -> None:
         if not quiet:
-            print(msg, file=sys.stderr, flush=True)
+            with lock:
+                print(msg, file=sys.stderr, flush=True)
     return log
 
 
