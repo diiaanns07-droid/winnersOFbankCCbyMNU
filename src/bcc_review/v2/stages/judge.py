@@ -369,10 +369,15 @@ def _representative(group: list[str], by_id: dict[str, dict]) -> str:
 # --- подача кандидатов в промпт ---------------------------------------------------------------
 
 
+_ORIGIN_RU = {"acceptance_check": "исполнение строки приёмки", "pair_check": "попарная сверка по сценарию",
+              "glossary": "глоссарий"}
+
+
 def _render_full(c: dict) -> str:
     lines = _lines_of(c)
+    origin = _ORIGIN_RU.get(_s(c.get("origin")), "")
     head = " · ".join(x for x in [
-        c["id"], _s(c.get("source")) or "?", _s(c.get("severity")) or "?",
+        c["id"], _s(c.get("source")) or "?", origin, _s(c.get("severity")) or "?",
         f"{_s(c.get('kind'))}/{_s(c.get('criterion'))}",
         ", ".join(c.get("requirement_ids") or []) or "без требований",
         ("строки " + ", ".join(str(n) for n in lines)) if lines else "строки ?",
