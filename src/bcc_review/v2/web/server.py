@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shlex
 import sys
 import time
 import webbrowser
@@ -47,8 +49,9 @@ class App:
         self.default_provider = default_provider
         self.sample = sample if sample and sample.is_file() else None
 
-    def start(self, file_name: str, data: bytes, provider: str, model: str) -> Job:
-        job = self.store.create(file_name, data, provider, model)
+    def start(self, file_name: str, data: bytes, provider: str, model: str, *, parent: str = "",
+              answers: bytes = b"") -> Job:
+        job = self.store.create(file_name, data, provider, model, parent=parent, answers=answers)
         self.worker.submit(job)
         return job
 
@@ -140,9 +143,13 @@ def job_page(job: Job) -> str:
     <div class="pmeta">{e(job.provider)}{(" · " + e(job.model)) if job.model else ""} · <span id="elapsed">0 с</span> · <span id="pstate">в очереди</span><span id="vsum"></span></div></div>
     <div class="dls"><span class="dll" id="dll" hidden>Скачать:</span>{links}
     <a class="dl" id="newtab" href="/jobs/{e(job.id)}/files/report.html?inline=1" target="_blank" rel="noopener" hidden>Открыть отдельно ↗</a>
+    <form class="answers" id="answers" hidden title="Отметьте варианты во вкладке «Вопросы» отчёта, нажмите «Скачать ответы» и загрузите файл: агент перепроверит замечания и покажет вердикт «до и после» и исправленное ТЗ.">
+      <label class="dl ans">Загрузить ответы ↻<input type="file" name="answers" accept=".md,.txt,.json" hidden></label></form>
     <a class="btn ghost" href="/">Новая проверка</a></div>
   </div>
+  {f'<p class="parent">Повторная проверка с ответами владельца к <a href="/jobs/{e(job.parent)}">исходной проверке</a>.</p>' if job.parent else ''}
   <ol class="stages" id="stages"></ol>
+
   <div class="error" id="err" hidden></div>
   <details class="log"><summary>Журнал запуска</summary><pre id="log"></pre></details>
 </section>
@@ -258,7 +265,11 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── POST ──
     def do_POST(self) -> None:  # noqa: N802
-        if urlsplit(self.path).path != "/api/jobs":
+        path = urlsplit(self.path).path
+        m = JOB_PATH.match(path)
+        if m and m.group(1) and m.group("rest") == "/answers":
+            return self._answers(m.group("id"))
+        if path != "/api/jobs":
             return self._not_found()
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_UPLOAD + 64 * 1024:
@@ -286,6 +297,26 @@ class Handler(BaseHTTPRequestHandler):
         if self._wants_json():
             return self._json(201, {"id": job.id, "url": f"/jobs/{job.id}"})
         self._send(303, b"", "text/plain", {"Location": f"/jobs/{job.id}"})
+
+    def _answers(self, parent_id: str) -> None:
+        """Ответы владельца на вопросы отчёта → новый прогон того же документа с --answers --revise."""
+        parent = self.app.store.get(parent_id)
+        if not parent or parent.state != "done":
+            return self._json(404, {"error": "Исходная проверка не найдена или ещё не завершена."})
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > 2 * 1024 * 1024:
+            return self._json(413, {"error": "Файл ответов больше 2 МБ."})
+        fields, files = _parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
+        data = files.get("answers", ("", b""))[1] or (fields.get("answers_text") or "").encode("utf-8")
+        if not data.strip():
+            return self._json(400, {"error": "Загрузите файл ответов (кнопка «Скачать ответы» во вкладке «Вопросы» отчёта)."})
+        problem = check_provider(parent.provider)
+        if problem:
+            return self._json(400, {"error": problem})
+        src = Path(parent.input_path)
+        job = self.app.start(parent.file_name, src.read_bytes(), parent.provider, parent.model,
+                             parent=parent.id, answers=data)
+        self._json(201, {"id": job.id, "url": f"/jobs/{job.id}"})
 
     def _fail(self, code: int, msg: str, provider: str = "", model: str = "") -> None:
         if self._wants_json():
@@ -319,11 +350,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--sample", help="файл для кнопки «Проверить пример»")
     ap.add_argument("--fixture", help="показ без модели: этапы по таймеру, отчёт из этого report.json")
     ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--pipeline-args", default="", help="доп. флаги для python -m bcc_review, например \"--engine v1\"")
     ap.add_argument("--open", action="store_true", help="открыть браузер")
     a = ap.parse_args(argv)
     load_dotenv()
     app = build_app(Path(a.data_dir), provider=a.provider, fixture=Path(a.fixture) if a.fixture else None,
-                    sample=Path(a.sample) if a.sample else None, workers=a.workers)
+                    sample=Path(a.sample) if a.sample else None, workers=a.workers,
+                    extra_args=shlex.split(a.pipeline_args, posix=(os.name != "nt")))
     srv = make_server(app, a.host, a.port)
     url = f"http://{a.host}:{srv.server_address[1]}/"
     print(f"Веб-демо: {url}  (остановить — Ctrl+C)", flush=True)

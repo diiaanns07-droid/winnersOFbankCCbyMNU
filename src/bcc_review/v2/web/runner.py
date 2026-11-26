@@ -49,6 +49,7 @@ FILES = [  # (ключ, имя файла в out/, подпись, mime)
     ("docx", "report.docx", "Word", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     ("pdf", "report.pdf", "PDF", "application/pdf"),
     ("csv", "report.jira.csv", "Jira CSV", "text/csv; charset=utf-8"),
+    ("revised", "report.revised.md", "Исправленное ТЗ", "text/markdown; charset=utf-8"),
 ]
 
 
@@ -136,10 +137,13 @@ class Job:
     files: dict[str, str] = field(default_factory=dict)
     log: list[str] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
+    parent: str = ""                    # задание, на вопросы которого отвечали
+    answers_path: str = ""              # файл ответов владельца (--answers)
 
     def public(self) -> dict[str, Any]:
         d = asdict(self)
         d.pop("input_path", None)
+        d["answers_path"] = bool(self.answers_path)
         d["log"] = self.log[-40:]
         d["elapsed"] = round((self.finished or time.time()) - (self.started or self.created), 1)
         d["stage_list"] = [{"id": k, "label": lbl, "state": self.stages.get(k, "pending"),
@@ -171,14 +175,20 @@ class JobStore:
     def dir(self, job_id: str) -> Path:
         return self.root / "jobs" / job_id
 
-    def create(self, file_name: str, data: bytes, provider: str, model: str) -> Job:
+    def create(self, file_name: str, data: bytes, provider: str, model: str, *, parent: str = "",
+               answers: bytes = b"") -> Job:
         jid = time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3)
         d = self.dir(jid)
         (d / "input").mkdir(parents=True)
         safe = safe_filename(file_name)
         inp = d / "input" / safe
         inp.write_bytes(data)
-        job = Job(id=jid, file_name=safe, input_path=str(inp), provider=provider, model=model, created=time.time())
+        job = Job(id=jid, file_name=safe, input_path=str(inp), provider=provider, model=model, created=time.time(),
+                  parent=parent)
+        if answers:
+            ap = d / "input" / "answers.md"
+            ap.write_bytes(answers)
+            job.answers_path = str(ap)
         with self.lock:
             self.jobs[jid] = job
         self.save(job)
@@ -227,6 +237,8 @@ class PipelineRunner:
         cmd = [sys.executable, "-m", "bcc_review", job.input_path, str(out_md), "--provider", job.provider]
         if job.model:
             cmd += ["--model", job.model]
+        if job.answers_path:
+            cmd += ["--answers", job.answers_path, "--revise"]
         cmd += ["--export", "html,json,docx,pdf,jira", "--runs-dir", str(runs_dir)]
         return cmd + self.extra_args
 

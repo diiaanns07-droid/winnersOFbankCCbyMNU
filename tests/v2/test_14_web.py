@@ -135,3 +135,35 @@ def test_provider_status_has_mock_and_auto(monkeypatch):
     ids = {p["id"]: p for p in R.provider_status()}
     assert ids["mock"]["ok"] and ids["auto"]["ok"] and not ids["gemini"]["ok"]
     assert R.check_provider("mock") == ""
+
+
+def test_answers_rerun(srv):
+    code, j = _post(srv, {"provider": "mock"}, ("tz.md", DOC.read_bytes()))
+    assert _wait(srv, j["id"])["state"] == "done"
+    body, ctype = _multipart({}, None)
+    b = ctype.split("boundary=")[1]
+    body = (f'--{b}\r\nContent-Disposition: form-data; name="answers"; filename="a.md"\r\n\r\n'
+            "Q-01 [лимит]: A\r\n"
+            f"--{b}--\r\n").encode()
+    req = urllib.request.Request(f"{srv}/api/jobs/{j['id']}/answers", data=body, method="POST",
+                                 headers={"Content-Type": ctype, "Accept": "application/json"})
+    with urllib.request.urlopen(req) as r:
+        child = json.loads(r.read())
+    st = _wait(srv, child["id"])
+    assert st["parent"] == j["id"] and st["answers_path"] is True and st["state"] == "done"
+    # пустые ответы — понятная ошибка
+    req = urllib.request.Request(f"{srv}/api/jobs/{j['id']}/answers", data=f"--{b}--\r\n".encode(), method="POST",
+                                 headers={"Content-Type": ctype, "Accept": "application/json"})
+    try:
+        urllib.request.urlopen(req)
+        raise AssertionError("ожидалась ошибка")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 400 and "Скачать ответы" in json.loads(exc.read())["error"]
+
+
+def test_pipeline_command_has_answers(tmp_path):
+    store = R.JobStore(tmp_path)
+    job = store.create("a.md", b"# x\n", "claude_cli", "sonnet", answers=b"Q-01: A\n")
+    cmd = R.PipelineRunner(store, extra_args=["--engine", "v1"]).command(job, tmp_path / "o.md", tmp_path / "runs")
+    assert cmd[1:3] == ["-m", "bcc_review"] and "--answers" in cmd and "--revise" in cmd
+    assert cmd[cmd.index("--model") + 1] == "sonnet" and cmd[-2:] == ["--engine", "v1"]

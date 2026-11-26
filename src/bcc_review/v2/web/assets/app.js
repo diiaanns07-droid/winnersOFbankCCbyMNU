@@ -95,6 +95,24 @@
     var err = $("#err");
     if (j.state === "failed") { err.hidden = false; err.textContent = j.error || "Анализ завершился с ошибкой."; }
     if (j.state === "done") {
+      var af = $("#answers");
+      if (af && af.hidden && !j.answers_path) {
+        af.hidden = false;
+        var inp = af.querySelector("input[type=file]");
+        inp.addEventListener("change", function () {
+          if (!inp.files.length) return;
+          var lbl = af.querySelector("label");
+          lbl.firstChild.textContent = "Пересчитываем… ";
+          fetch("/api/jobs/" + id + "/answers", { method: "POST", body: new FormData(af), headers: { Accept: "application/json" } })
+            .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, x: x }; }); })
+            .then(function (res) { if (res.ok) location.href = res.x.url; else throw new Error(res.x.error); })
+            .catch(function (err) {
+              lbl.firstChild.textContent = "Загрузить ответы ↻";
+              inp.value = "";
+              var e2 = $("#err"); e2.hidden = false; e2.textContent = err.message;
+            });
+        });
+      }
       $("#prog").classList.add("compact");
       $("#result").hidden = false;
       document.querySelectorAll(".dl[data-key]").forEach(function (a) { a.hidden = !(a.dataset.key in j.files); });
