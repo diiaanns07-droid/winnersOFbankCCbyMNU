@@ -6,7 +6,7 @@
  "expected_sha256": "4b87ae996cc2e2082682f4b7bf87ceee2b99c9cc8d72965c19f0d23009347660",
  "message": "В копию report.annotated.docx добавлено комментариев: 5 (точная, по цитате: 5), плюс общий комментарий со сводкой.",
  "artifact": "report.annotated.docx",
- "output_sha256": "74c8d3950987db69c741823272cfbed53d64db93e39b95aca22d32c0befa79cc",
+ "output_sha256": "cd7aeca2dbc913165efb011e22105072060ebf8d7d0955fadce3dbf5c19bf224",
  "anchors": [
   {
    "finding_id": "K1",
@@ -20,7 +20,13 @@
    "label": "Абзац 16 (пункт списка)",
    "path": "/w:document/w:body/w:p[16]",
    "part": "word/document.xml",
-   "note": null
+   "note": null,
+   "covered": {
+    "block_id": "b0024",
+    "start": 0,
+    "end": 50,
+    "text": "Ф-2. Месяц определяется по дате совершения покупки"
+   }
   },
   {
    "finding_id": "K1",
@@ -34,7 +40,13 @@
    "label": "Таблица 2, строка 3, столбец 3 «Ожидаемый результат»",
    "path": "/w:document/w:body/w:tbl[2]/w:tr[3]/w:tc[3]",
    "part": "word/document.xml",
-   "note": null
+   "note": null,
+   "covered": {
+    "block_id": "b0041",
+    "start": 78,
+    "end": 114,
+    "text": "Февральский счётчик вырос на 4 000 ₸"
+   }
   },
   {
    "finding_id": "C1",
@@ -48,7 +60,13 @@
    "label": "Таблица 5, строка 3, столбец 2 «Значение»",
    "path": "/w:document/w:body/w:tbl[5]/w:tr[3]/w:tc[2]",
    "part": "word/document.xml",
-   "note": null
+   "note": null,
+   "covered": {
+    "block_id": "b0067",
+    "start": 12,
+    "end": 15,
+    "text": "GET"
+   }
   },
   {
    "finding_id": "K3",
@@ -62,7 +80,13 @@
    "label": "Абзац 60 (заголовок)",
    "path": "/w:document/w:body/w:p[60]",
    "part": "word/document.xml",
-   "note": null
+   "note": null,
+   "covered": {
+    "block_id": "b0110",
+    "start": 0,
+    "end": 25,
+    "text": "200. Successful — Created"
+   }
   },
   {
    "finding_id": "K3",
@@ -76,7 +100,13 @@
    "label": "Абзац 63",
    "path": "/w:document/w:body/w:p[63]",
    "part": "word/document.xml",
-   "note": null
+   "note": null,
+   "covered": {
+    "block_id": "b0113",
+    "start": 1,
+    "end": 17,
+    "text": "\"result\":\"ERROR\""
+   }
   }
  ],
  "skipped": [],
@@ -98,7 +128,8 @@
    5
   ],
   "comments_part": true,
-  "source_unchanged": true
+  "source_unchanged": true,
+  "anchors_match_plan": true
  },
  "complete": true
 }

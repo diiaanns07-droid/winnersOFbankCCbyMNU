@@ -5,6 +5,49 @@
 Пустые `readers/__init__.py` и `exports/__init__.py` нужны как пакеты: при слиянии с
 №01/№02/№13/№14/№17 одинаковые пустые файлы конфликта не дают.
 
+## Второй проход: комментарий на точном вхождении (после `d2e8f30`)
+
+Вход: фраза «порог от 1 000 до 1 000 000 ₸» в обычном абзаце (на ней комментарий
+автора) и в ячейке, где она разрезана между жирным run и внешней гиперссылкой, а перед
+ней удалённое при рецензировании «порог от 500 » (`p03_fixtures.twin_phrase_doc`).
+Воспроизведено на `d2e8f30`:
+
+1. сводный комментарий по умолчанию выделял весь первый блок — абзац с копией фразы;
+2. маркеры `commentRange` без записи в `comments.xml` (`orphan_markers=True`):
+   python-docx выдаёт номер `max(comments.xml)+1` и не видит маркеры — две пары границ
+   на один `w:id`, а экспорт отвечал `written / exact`, хотя его же проверка
+   `new_ranges_paired` была `False`.
+
+Правка (`exports/word.py`):
+
+* номер комментария выбирается вне номеров маркеров всех частей (тело, колонтитулы,
+  сноски); при совпадении свои три маркера перенумеровываются;
+* сводка: на заголовке, если он первый блок, иначе точкой (пустой диапазон) в начале;
+* после записи диапазон каждого комментария перечитывается из копии
+  (`comment_spans`) и сверяется с планом; `Anchor.covered = {block_id, start, end, text}` —
+  фактически охваченные слова. При расхождении копия удаляется, статус
+  `verification_failed`, `write_docx` поднимает `WordExportError` (движок пишет
+  предупреждение `export`);
+* при приблизительной привязке в комментарии добавлена строка «Точные слова: «…»».
+
+Тесты: `test_p03_exact_copy.py` (независимая проверка по OOXML: `p03_ooxml.py` без кода
+экспортёра), `test_p03_case.py::test_libreoffice_puts_twin_comment_into_the_cell`,
+`test_p03_stitch.py` (движок + mock, пропускается до слияния с интеграцией).
+Новые тесты на прежнем коде: 5 failed, 3 passed; на текущем — все зелёные.
+Деталь, не изменённая намеренно: `w:commentReference` после последнего run гиперссылки
+python-docx ставит внутрь `w:hyperlink`; адрес (`r:id` → Target) и текст ссылки не меняются.
+
+**Max — зависимость.** `Document.add_comment` есть только с python-docx 1.2.0; в
+`pyproject.toml` интеграции стоит `>=1.1`. Проверено в venv с 1.1.2: `read_docx` работает,
+`write_docx` отказывает `WordExportError` и копию не создаёт. Строка изменения:
+
+```diff
+-docx = ["python-docx>=1.1"]
+-all = ["anthropic>=2.0", "pymupdf>=1.24", "python-docx>=1.1"]
++docx = ["python-docx>=1.2"]
++all = ["anthropic>=2.0", "pymupdf>=1.24", "python-docx>=1.2"]
+```
+
 ## Точки входа (как в таблице HANDOFF Max)
 
 ```python
@@ -123,7 +166,7 @@ ID замечания в панели примечаний.
 
 ```bash
 python -m pip install -e ".[dev]" "python-docx>=1.2"
-python -m pytest tests/contract tests/p03          # 54 passed (Python 3.13.18 и 3.11.18)
+python -m pytest tests/contract tests/p03 -o addopts=""   # 62 passed, 1 skipped (стык без движка); 3.13 и 3.11
 python tests/p03/evidence/make_evidence.py         # пересобрать доказательства
 python tests/p03/fixtures/build_case_docx.py requirements.md tests/p03/fixtures/case_requirements.docx
 ```
