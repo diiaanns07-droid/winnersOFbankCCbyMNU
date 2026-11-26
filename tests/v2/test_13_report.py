@@ -313,6 +313,8 @@ def test_render_never_crashes_on_broken_data(sample):
 
 def test_line_refs_from_model_text_become_russian():
     assert markdown.prose("см. L038 и L39–L40") == "см. строка 38 и строки 39–40"
+    assert markdown.prose("по L151 и в L38-L40, из L7–L9; Сервер по L121") == \
+        "по строке 151 и в строках 38–40, из строк 7–9; Сервер по строке 121"
     assert markdown.cell("a | L7") == "a \\| строка 7"
     assert markdown.source_name("lens:что-то") == "проверка ролью"
     assert markdown.source_name("rules:units") == "правило «units»"

@@ -161,11 +161,20 @@ def esc(text) -> str:
     return _HTML_START.sub(r"\\<", s)
 
 
-_LREF = re.compile(r"\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,7})\s+)?\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+# падеж слова «строка» после предлога: (одна строка, диапазон)
+_LCASE = {**dict.fromkeys(("по", "к", "ко"), ("строке", "строкам")),
+          **dict.fromkeys(("в", "во", "на", "о", "об", "при"), ("строке", "строках")),
+          **dict.fromkeys(("из", "до", "от", "у", "для", "около", "после", "с", "со", "без", "кроме", "вместо",
+                           "возле", "вне", "против", "среди", "из-за"), ("строки", "строк")),
+          **dict.fromkeys(("между", "над", "под", "перед", "за"), ("строкой", "строками"))}
 
 
 def _lref(m: re.Match) -> str:
-    return f"строки {m.group(1)}–{m.group(2)}" if m.group(2) else f"строка {m.group(1)}"
+    prep = m.group(1) or ""
+    one, many = _LCASE.get(prep.lower(), ("строка", "строки"))
+    word = f"{many} {m.group(2)}–{m.group(3)}" if m.group(3) else f"{one} {m.group(2)}"
+    return f"{prep} {word}" if prep else word
 
 
 def prose(text) -> str:
