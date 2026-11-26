@@ -89,7 +89,7 @@ def finding(key, ids, *, severity="major", kind="ambiguity", criterion="unambigu
     return {"key": key, "candidate_ids": list(ids), "base": ids[0], "title": title or f"Дефект {key}",
             "kind": kind, "criterion": criterion, "requirement_ids": list(reqs), "problem": f"Суть {key}.",
             "scenario": scenario, "impact": impact, "severity_basis": "", "severity": severity,
-            "blocks": blocks, "priority": priority, "recommendation": "", "rewrite": "", "question": ""}
+            "blocks": blocks, "priority": priority, "recommendation": ""}
 
 
 def response(findings, rejected=(), checklist=None, summary="Разработку начинать нельзя: F01."):
@@ -292,7 +292,7 @@ def test_no_quote_candidates_rejected_before_model():
 
 def test_critical_cap_and_priorities():
     cs = [cand(f"C-{i:03d}", 30 + i * 3, f"q{i}", kind="contradiction", criterion="set_consistent",
-               reqs=(f"R-{i:02d}",)) for i in range(1, 11)]
+               reqs=(f"R-{i:02d}",), extra=[(100 + i, f"p{i}")]) for i in range(1, 11)]
     view = {"lines": [{"n": 30 + i * 3, "text": f"q{i}"} for i in range(1, 11)]}
     fs = [finding(f"F{i:02d}", [f"C-{i:03d}"], severity="critical", kind="contradiction",
                   criterion="set_consistent", priority=i if i <= 3 else 0, scenario="Вход: два исхода.",
@@ -304,6 +304,15 @@ def test_critical_cap_and_priorities():
     prios = sorted(f["priority"] for f in res["findings"] if f["priority"])
     assert prios == list(range(1, 8))
     assert any("понижены до major" in w for w in res["warnings"])
+
+
+def test_conflict_with_single_place_is_not_critical():
+    cs = [cand("C-001", 39, "максимум один такой push", kind="contradiction", criterion="set_consistent")]
+    f = finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
+                scenario="Вход: два исхода.", impact="Две реализации.", priority=1)
+    res = judge.run(Ctx(FakeLLM(response([f]))), cs)
+    assert res["findings"][0]["severity"] == "major"
+    assert any("только одного места" in w for w in res["warnings"])
 
 
 def test_truncation_splits_batch():

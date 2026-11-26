@@ -81,12 +81,15 @@ NEVER_CRITICAL_KINDS = {"placeholder", "terminology", "traceability", "duplicate
 NEVER_CRITICAL_CRITERIA = {"conforming", "language", "ranked", "modifiable", "traceable", "necessary",
                            "singular", "risk", "set_comprehensible"}
 
+# Противоречие (critical по пункту «а» шкалы) доказывается цитатами двух разных мест.
+CONFLICT_KINDS = {"event_conflict", "status_conflict", "boundary_conflict", "contradiction", "unit_mismatch"}
+
 MAX_CRITICAL = 7
 MAX_PRIORITY = 7
 MAX_EVIDENCE = 5
 COMPACT_THRESHOLD = 60       # больше кандидатов — компактная подача кластеров
 MAX_SPLIT_DEPTH = 2          # пакет делится не более чем на 4 части
-MAX_OUTPUT_TOKENS = 16000
+MAX_OUTPUT_TOKENS = 32000
 CHECK_ANSWERS = ["Да", "Нет", "Частично", "Не требуется"]
 
 # Стандартный чек-лист ревью требований банка (шаблон банка; хранится в коде, не в промпте).
@@ -171,8 +174,6 @@ def response_schema() -> dict:
         "blocks": {"type": "string", "enum": BLOCKS},
         "priority": {"type": "integer"},
         "recommendation": _S,
-        "rewrite": _S,
-        "question": _S,
     })
     rejected = _obj({
         "candidate_id": _S,
@@ -660,6 +661,8 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str]) -> N
             why = "нет сценария или последствий"
         elif f["blocks"] == "none":
             why = "дефект ничего не блокирует"
+        elif f["kind"] in CONFLICT_KINDS and len({e["line_start"] for e in f["evidence"]}) < 2:
+            why = "противоречие подтверждено цитатой только одного места"
         if why:
             f["severity"] = "major"
             _warn(ctx, warnings, f"судья: {f['title'][:60]!r} понижен до major ({why})")
@@ -701,6 +704,9 @@ def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
 
 def _assign_priorities(findings: list[dict]) -> None:
     """priority 1…7 без повторов: сначала то, что указал судья, затем недостающие critical."""
+    for f in findings:  # minor ничего не блокирует — в «исправить первым» не идёт
+        if f["severity"] == "minor":
+            f["priority"] = 0
     chosen = [f for f in findings if f["priority"] > 0]
     chosen.sort(key=lambda f: (f["priority"], SEV_RANK[f["severity"]], f["_first_line"]))
     crit_missing = [f for f in findings if f["severity"] == "critical" and f["priority"] <= 0]
@@ -985,7 +991,7 @@ def _repair_missing(ctx: Any, missing: list[dict], response: dict, warnings: lis
                   "criterion": _s(c.get("criterion")), "requirement_ids": list(c.get("requirement_ids") or []),
                   "problem": "", "scenario": "", "impact": "", "severity_basis": "", "severity": sev,
                   "blocks": _s(c.get("blocks")) or "none", "priority": 0,
-                  "recommendation": "", "rewrite": "", "question": ""}
+                  "recommendation": ""}
             resp["findings"].append(nf)
             keys[nf["key"]] = nf
     return resp
@@ -1006,7 +1012,7 @@ def code_only_response(candidates: list[dict], clusters: list[list[str]]) -> dic
                          "requirement_ids": list(rep.get("requirement_ids") or []),
                          "problem": "", "scenario": "", "impact": "", "severity_basis": "",
                          "severity": _s(rep.get("severity")), "blocks": _s(rep.get("blocks")) or "none",
-                         "priority": 0, "recommendation": "", "rewrite": "", "question": ""})
+                         "priority": 0, "recommendation": ""})
     return {"findings": findings, "rejected": [], "checklist": [], "verdict_summary": "", "_fallback": True}
 
 
