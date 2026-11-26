@@ -6,12 +6,20 @@
 from __future__ import annotations
 
 from . import jsonout
-from .markdown import BLOCKS, PROVIDERS, STATUS, duration, plural, shorten
+from .markdown import BLOCKS, PROVIDERS, STATUS, _clean_report, duration, plural, shorten
 
 READY = {"no": "нельзя", "conditional": "с условиями", "yes": "можно", "none": "не вынесен"}
 
 
 def summary(report: dict, *, md_path: str | None = None, json_path: str | None = None, width: int = 100) -> str:
+    try:
+        return _summary(_clean_report(report), md_path, json_path, width)
+    except Exception as exc:  # noqa: BLE001 — сводка в терминал не должна ронять прогон
+        paths = " и ".join(p for p in (md_path, json_path) if p)
+        return f"BCC Review: сводка не построена ({type(exc).__name__}); отчёт: {paths or '—'}"
+
+
+def _summary(report: dict, md_path, json_path, width: int) -> str:
     run = report.get("run", {}) or {}
     doc = report.get("document", {}) or {}
     s = report.get("summary") or jsonout.compute_summary(report)

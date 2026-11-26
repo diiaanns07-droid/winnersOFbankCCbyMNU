@@ -335,7 +335,7 @@ def _id_num(id_) -> int:
 
 
 def _worst(findings) -> str | None:
-    sevs = sorted((f.get("severity") for f in findings), key=lambda s: SEV_ORDER.get(s, 3))
+    sevs = sorted((f.get("severity") for f in findings if f.get("severity") in SEV_ORDER), key=SEV_ORDER.get)
     return sevs[0] if sevs else None
 
 
@@ -1044,11 +1044,88 @@ MAX_LINES = 900
 MAX_LEVEL = 3
 
 
+_LIST_KEYS = ("requirements", "excluded", "findings", "rejected", "acceptance_checks", "pair_checks", "trace",
+              "glossary", "test_cases", "questions", "checklist", "rewrites")
+_ID_LIST_KEYS = ("requirement_ids", "finding_ids", "candidate_ids", "sources", "rule_requirement_ids", "verified_by",
+                 "implemented_by", "options", "standard_refs", "fix_first", "resolved", "changed", "added",
+                 "models_used", "warnings")
+
+
+def _clean_report(report) -> dict:
+    """Копия отчёта, в которой у каждого поля ожидаемый тип: рендер не падает на неполных данных этапов."""
+    report = report if isinstance(report, dict) else {}
+    out = {}
+    for k, v in report.items():
+        if k in _LIST_KEYS:
+            out[k] = [_clean(x) for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+        elif k in ("run", "document", "verdict", "summary", "recheck"):
+            out[k] = _clean(v) if isinstance(v, dict) else {}
+        else:
+            out[k] = v
+    for k in ("run", "document", "verdict", "summary", "recheck"):
+        out.setdefault(k, {})
+    for key, prefix in (("findings", "D"), ("requirements", "R"), ("questions", "Q"), ("test_cases", "T")):
+        for i, item in enumerate(out.get(key, []), 1):
+            if not item.get("id"):
+                item["id"] = f"{prefix}-{i:02d}"
+    if not isinstance(out["summary"].get("findings"), dict):
+        out["summary"] = {}
+    return out
+
+
+_STR_KEYS = {"id", "title", "kind", "criterion", "severity", "blocks", "status", "problem", "scenario", "impact",
+             "recommendation", "rewrite", "question", "quote", "section", "verified", "source_id", "reason", "source",
+             "candidate_id", "duplicate_of", "what", "item", "answer", "comment", "concept", "term", "problem", "to",
+             "why", "given", "when", "then", "gap", "agent", "version", "commit", "provider", "model_requested",
+             "file", "format", "sha256", "subject", "outcome_a", "outcome_b", "row_facts", "expected_by_rules",
+             "stated", "requirement_id", "row_requirement_id", "a", "b", "note", "development", "testing",
+             "started_at", "finished_at", "question_id", "before", "after"}
+
+
+def _clean(value, key: str = ""):
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            if k in _STR_KEYS and not isinstance(v, str):
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    out[k] = str(v)
+                continue
+            if k in ("evidence", "terms", "answers"):
+                out[k] = [_clean(x, k) for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+            elif k in _ID_LIST_KEYS:
+                out[k] = [str(x) for x in v if isinstance(x, (str, int, float)) and str(x).strip()] \
+                    if isinstance(v, list) else ([str(v)] if isinstance(v, str) and v.strip() else [])
+            elif v is None and k not in ("page", "pages", "cost_usd", "line", "line_a", "line_b"):
+                continue
+            else:
+                out[k] = _clean(v, k)
+        return out
+    if isinstance(value, list):
+        return [_clean(x) for x in value]
+    return value
+
+
+def _sections():
+    return [(None, _header), (None, _brief), ("1. Паспорт прогона", _passport),
+            ("2. Нарезка требований", _segmentation), ("3. Проверка каждого требования", _per_requirement),
+            ("4. Проверка набора требований", _set_check), ("5. Сводка", _summary), ("6. Итог", _conclusion),
+            ("Приложение А. Вопросы владельцу", _appendix_questions),
+            ("Приложение Б. Черновик тест-кейсов", _appendix_tests),
+            ("Приложение В. Чек-лист «Ревью требований», заполненный агентом", _appendix_checklist),
+            ("Приложение Г. Было → стало", _appendix_rewrites), ("Приложение Д. Как работал агент", _appendix_how),
+            ("Приложение Е. Методика", _appendix_method)]
+
+
 def _render_level(report: dict, level: int) -> str:
-    c = _Ctx(report, level)
-    parts = [_header(c), _brief(c), _passport(c), _segmentation(c), _per_requirement(c), _set_check(c),
-             _summary(c), _conclusion(c), _appendix_questions(c), _appendix_tests(c), _appendix_checklist(c),
-             _appendix_rewrites(c), _appendix_how(c), _appendix_method(c)]
+    c = _Ctx(_clean_report(report), level)
+    parts = []
+    for title, fn in _sections():
+        try:
+            parts.append(fn(c))
+        except Exception as exc:  # noqa: BLE001 — один сломанный раздел не должен лишить аналитика отчёта
+            head = [f"## {title}", ""] if title else []
+            parts.append(head + [f"⚠️ Раздел не построен: в данных прогона ошибка ({esc(type(exc).__name__)}: "
+                                 f"{esc(shorten(str(exc), 160))}). Полные данные — в report.json.", ""])
     lines = [ln for part in parts for ln in part]
     while lines and not lines[-1].strip():
         lines.pop()

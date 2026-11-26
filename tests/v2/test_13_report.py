@@ -243,3 +243,30 @@ def test_console_summary(sample):
     text = console.summary(sample, md_path="reports/x.md", json_path="reports/x.json")
     assert "Разработка: нельзя" in text and "D-01" in text and "reports/x.md" in text
     assert len(text.split("\n")) <= 8
+
+
+def _mutations(report: dict):
+    for key in list(report):
+        for bad in (None, [], {}, "строка", 7):
+            r = copy.deepcopy(report)
+            r[key] = bad
+            yield f"{key}={bad!r}", r
+    for field in ("evidence", "requirement_ids", "severity", "title", "blocks", "id", "criterion", "kind"):
+        for bad in (None, "x", [None, 3], {}):
+            r = copy.deepcopy(report)
+            for f in r["findings"]:
+                f[field] = bad
+            yield f"findings.{field}={bad!r}", r
+    r = copy.deepcopy(report)
+    for f in r["findings"]:
+        for ev in f["evidence"]:
+            ev.pop("line_start")
+            ev["section"] = None
+    yield "evidence без строк", r
+
+
+def test_render_never_crashes_on_broken_data(sample):
+    for name, r in _mutations(sample):
+        md = markdown.render(r)
+        assert "## Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
+        assert "BCC Review" in console.summary(r), name
