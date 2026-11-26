@@ -6,7 +6,9 @@
 1. кандидат без единой цитаты отбрасывается;
 2. дубли (тот же тип и тот же набор строк-цитат) схлопываются в первого;
 3. неединичность (`non_singular`) и чистый язык без последствий не бывают выше `minor`;
-4. `critical` без сценария, последствий или с `blocks = none` понижается до `major`;
+4. `critical` без сценария, последствий, с `blocks = none` или с типом, который не означает расхождения
+   двух мест документа (`ambiguity`, `incomplete`…), понижается до `major`: critical у этой линзы — только
+   когда другое место документа прямо поддерживает иное толкование;
 5. `critical` больше двух — лишние понижаются до `major` (линза смотрит на отдельные формулировки,
    несовместимые результаты двух мест ловят другие этапы);
 6. сортировка: critical → major → minor, внутри — порядок модели;
@@ -22,6 +24,7 @@ MAX_CANDIDATES = 12
 MAX_CRITICAL = 2
 _RANK = {"critical": 0, "major": 1, "minor": 2}
 _MINOR_ONLY_KINDS = {"non_singular"}
+_CRITICAL_KINDS = {"event_conflict", "boundary_conflict", "unit_mismatch", "contradiction", "status_conflict"}
 
 
 def _lines(c: dict) -> tuple:
@@ -52,7 +55,8 @@ def postprocess(candidates: list[dict[str, Any]], *, max_candidates: int = MAX_C
         sev = c.get("severity") if c.get("severity") in _RANK else "major"
         if c.get("kind") in _MINOR_ONLY_KINDS:
             sev = "minor"
-        if sev == "critical" and (not str(c.get("scenario", "")).strip()
+        if sev == "critical" and (c.get("kind") not in _CRITICAL_KINDS
+                                  or not str(c.get("scenario", "")).strip()
                                   or not str(c.get("impact", "")).strip()
                                   or c.get("blocks", "none") == "none"):
             sev = "major"
