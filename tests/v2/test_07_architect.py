@@ -85,7 +85,7 @@ def test_prompt_exists_and_is_russian():
     assert text.startswith("## Задача")
     assert len(re.findall(r"[а-яё]", text, re.I)) > 3000
     for key in ("inventory", "operations", "promises", "codes", "fields", "missing_element", "status_conflict",
-                "unit_mismatch", "api_contract", "До 12 кандидатов"):
+                "unit_mismatch", "api_contract", "До 14 кандидатов"):
         assert key in text, key
 
 
@@ -136,7 +136,7 @@ def test_critical_without_scenario_or_blocks_is_downgraded():
 
 def test_order_dedupe_limit_and_evidence_filter():
     cands = [_cand(severity="minor", evidence=[{"quote": "m", "line": 50}])]
-    cands += [_cand(evidence=[{"quote": f"q{i}", "line": i}]) for i in range(1, 15)]
+    cands += [_cand(evidence=[{"quote": f"q{i}", "line": i}]) for i in range(1, 17)]
     cands += [_cand(evidence=[{"quote": "dup", "line": 3}])]          # дубль по виду и строкам
     cands += [_cand(evidence=[])]                                      # без цитаты
     cands += [_cand(severity="critical", evidence=[{"quote": "k", "line": 99}])]
@@ -170,7 +170,7 @@ def test_unfulfilled_promises():
 
 # --- записанные живые ответы на официальном документе ---------------------------------------------
 
-@pytest.fixture(scope="module", params=["architect_sonnet.json", "architect_haiku.json", "architect_opus.json"])
+@pytest.fixture(scope="module", params=["official_architect_sonnet.json", "official_architect_haiku.json", "official_architect_opus.json"])
 def recorded(request):
     return json.loads((FIX / request.param).read_text(encoding="utf-8"))
 

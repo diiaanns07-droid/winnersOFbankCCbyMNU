@@ -19,7 +19,7 @@ from typing import Any
 NAME = "architect"
 PROMPT = "lens_architect"
 SOURCE = "lens:architect"
-MAX_CANDIDATES = 12
+MAX_CANDIDATES = 14
 
 KINDS = ["event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
          "missing_element", "incomplete", "ambiguity", "unverifiable", "non_singular", "design_constraint",
