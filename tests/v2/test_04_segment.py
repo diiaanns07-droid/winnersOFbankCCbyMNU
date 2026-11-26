@@ -292,3 +292,27 @@ def test_official_md_and_pdf_fixtures_comparable():
     a = {r["source_id"] for r in md if r["source_id"]}
     b = {r["source_id"] for r in pdf if r["source_id"]}
     assert len(a ^ b) <= 2, a ^ b
+
+
+def test_ask_split_used_and_merge_accepts_both_styles():
+    lines = [f"Пункт {i}: система делает действие {i}." for i in range(1, 11)]
+    v = _view(lines)
+
+    class SplitLLM(_FakeLLM):
+        def ask_split(self, stage, build, items, schema, merge):
+            halves = [items[: len(items) // 2], items[len(items) // 2:]]
+            outs = []
+            for h in halves:
+                system, user = build(h)
+                self.calls.append(user)
+                nums = [int(m) for m in re.findall(r"^L(\d+)\|", user, re.M)]
+                outs.append({"requirements": [{"source_id": "", "kind": "functional", "section": "", "summary": "п",
+                                               "quote": lines[n - 1], "line_start": n, "line_end": n} for n in nums],
+                             "excluded": []})
+            return merge(outs) if len(outs) != 2 else merge(*outs)
+
+    llm = SplitLLM(None)
+    out = sg.run(_Ctx(v, llm))
+    assert len(llm.calls) == 2
+    assert [r["line_start"] for r in out["requirements"]] == list(range(1, 11))
+    assert sg._merge_results([{"requirements": [1], "excluded": []}])["requirements"] == [1]

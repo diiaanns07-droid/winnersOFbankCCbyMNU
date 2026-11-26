@@ -480,7 +480,9 @@ def build_user(view: dict, start: int, end: int, task: str, total: int | None = 
     return f"<документ>\n{head}{_numbered(view, start, end)}\n</документ>\n\n{task}"
 
 
-def _merge_results(results: list[dict]) -> dict:
+def _merge_results(*parts: Any) -> dict:
+    """Склейка ответов частей: принимает список ответов или ответы отдельными аргументами."""
+    results = parts[0] if len(parts) == 1 and isinstance(parts[0], (list, tuple)) else parts
     out = {"requirements": [], "excluded": []}
     for r in results:
         if not isinstance(r, dict):
@@ -498,10 +500,14 @@ def _ask_range(ctx: Any, system: str, task: str, start: int, end: int, total: in
     if callable(split):
         def build(items: list) -> tuple[str, str]:
             return system, build_user(view, min(items), max(items), task, total)
+        import inspect
         try:
+            inspect.signature(split).bind(STAGE, build, nums, SCHEMA, _merge_results)
+            ok = True
+        except (TypeError, ValueError):
+            ok = False  # другая сигнатура ask_split — обычный вызов ниже
+        if ok:
             return split(STAGE, build, nums, SCHEMA, _merge_results)
-        except TypeError:
-            pass  # другая сигнатура ask_split — обычный вызов ниже
     return llm.ask(STAGE, system, build_user(view, start, end, task, total), SCHEMA,
                    max_output_tokens=MAX_OUTPUT_TOKENS)
 
