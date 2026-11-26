@@ -312,7 +312,73 @@ def _link_ids(text: str) -> str:
     return re.sub(r"\b(F-\d+)\b", lambda m: f'<a href="#{m.group(1)}">{m.group(1)}</a>', e(text))
 
 
-def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, Any], latest: dict[str, Any] | None, demo_answers: list[dict[str, Any]], run_answers: dict[str, Any] | None = None) -> str:
+IMPORT_STATUS = {
+    "accepted": ("принят → новая редакция", "ok"),
+    "duplicate": ("повтор → та же редакция", "info"),
+    "rejected": ("отклонён", "bad"),
+    "checking": ("проверяется", "neutral"),
+}
+IMPORT_REASON = {
+    "stale_answers": "ответы к другой версии документа",
+    "no_sha": "в файле нет source_sha256",
+    "sha_conflict": "в файле несколько разных source_sha256",
+    "no_answers": "нет заполненных ответов",
+    "stale_parent": "редакция устарела",
+}
+
+
+def short(sha: str | None) -> str:
+    return (sha or "—")[:12] + ("…" if sha else "")
+
+
+def manual_import_panel(rec: dict[str, Any], view: rv.ReportView) -> str:
+    """Файл без версии: ответы не применены; аналитик сверяет вопрос и переносит ответ сам."""
+    current = {q["id"]: q["text"] for q in view.questions}
+    rows = []
+    for a in rec.get("answers") or []:
+        qid = a["qid"]
+        here = current.get(qid)
+        file_q = a.get("question") or "— (в файле текста вопроса нет)"
+        if here is not None:
+            btn = (
+                f'<button type="button" class="button small demo-fill" data-target="a_{e(qid)}" data-text="{e(a["text"])}" '
+                f'data-prov="{e("перенесено аналитиком вручную из файла без версии " + rec["original_name"] + " (" + rec["import_id"] + ")")}">'
+                f"Перенести в ответ на {e(qid)}</button>"
+            )
+            here_html = f"<br><b>Здесь {e(qid)}:</b> {e(here)}"
+        else:
+            btn, here_html = '<span class="muted small">вопроса с таким номером в этой версии нет</span>', ""
+        rows.append(
+            f'<li><b>{e(qid)}</b> · <b>в файле:</b> {e(file_q)}{here_html}<br><b>Ответ из файла:</b> '
+            f'<span class="file-answer">{e(a["text"])}</span><br>{btn}</li>'
+        )
+    return (
+        f'<div class="notice warn" id="manual-import"><b>Файл {e(rec["original_name"])} без версии документа — не применён.</b> '
+        "Сверьте вопрос в файле с вопросом этой версии и перенесите ответ вручную, если смысл совпадает. "
+        f'Перенесённый ответ будет подписан как ручной перенос из {e(rec["import_id"])}.'
+        f'<ul class="manual-list">{"".join(rows) or "<li>Ответов в файле нет.</li>"}</ul></div>'
+    )
+
+
+def imports_section(run: dict[str, Any], imports: list[dict[str, Any]], prefix: str) -> str:
+    if not imports:
+        return ""
+    rows = []
+    for r in imports:
+        label, tone = IMPORT_STATUS.get(r.get("status"), (r.get("status"), "neutral"))
+        why = IMPORT_REASON.get(r.get("reason"), r.get("reason") or "")
+        child = f' · <a href="{prefix}/runs/{e(r["child_run_id"])}">{e(r["child_run_id"])}</a>' if r.get("child_run_id") else ""
+        rows.append(
+            f'<li id="{e(r["import_id"])}"><span class="badge {tone}">{e(label)}</span> {e(why)}{child} · '
+            f'<a href="{prefix}/runs/{e(run["run_id"])}/imports/{e(r["import_id"])}.md" download>{e(r.get("original_name"))}</a> '
+            f'<span class="muted small">{e(r.get("format_label") or r.get("format"))} · разбор: {e(r.get("parser"))} · '
+            f'заявлено {e(short(r.get("declared_sha256")))} · сверено с {e(short(r.get("target_sha256")))} · '
+            f'sha256 файла {e(short(r.get("file_sha256")))} · {e(fmt_time(r.get("created_at")))}</span></li>'
+        )
+    return f'<details class="card" id="imports"><summary>Импорты файлов ответов ({len(imports)}): оригиналы и итог проверки версии</summary><ul class="files">{"".join(rows)}</ul></details>'
+
+
+def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, Any], latest: dict[str, Any] | None, demo_answers: list[dict[str, Any]], manual_import: dict[str, Any] | None = None) -> str:
     if ctx.get("demo"):
         return ""
     rid = run["run_id"]
@@ -325,6 +391,7 @@ def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, A
         )
     if not ctx["engine"].available:
         return ""
+    version = str((view.raw.get("document") or {}).get("id") or view.run.get("source_sha256") or "")
     qs = view.questions
     items = []
     for q in qs:
@@ -348,21 +415,13 @@ def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, A
                 f'data-prov="{e(demo["provenance"])}">Подставить демонстрационный ответ</button>'
                 f'<span class="muted small">Источник: {e(demo["provenance"])}</span>'
             )
-        carried = (run_answers or {}).get(qid)
         dec = q.get("decision") or {}
-        prev = carried.text if carried else dec.get("answer")
-        prev_prov = f" · происхождение: {e(carried.provenance)}" if carried else ""
-        prev_html = (
-            f'<p class="carried">Действующий ответ (перенесётся в следующую редакцию): {e(prev)}<span class="muted small">{prev_prov}</span></p>'
-            if prev
-            else ""
-        )
-        placeholder = "Новый ответ (пусто — оставить действующий)" if prev else "Ответ аналитика"
+        prev_html = f'<p class="carried">Ответ, учтённый в этой версии: {e(dec.get("answer"))}</p>' if dec.get("answer") else ""
         items.append(
             f"""<div class="question" id="q-{e(qid)}">
 <p><b>{e(qid)}.</b> {e(q['text'])} {('<span class="muted">→ ' + refs + '</span>') if refs else ''}</p>
 {prev_html}{f'<div class="options">{opts_html}</div>' if opts_html else ''}
-<textarea name="a_{e(qid)}" id="a_{e(qid)}" rows="2" placeholder="{e(placeholder)}"></textarea>
+<textarea name="a_{e(qid)}" id="a_{e(qid)}" rows="2" placeholder="Ответ аналитика"></textarea>
 <details class="edit" id="ed_a_{e(qid)}"><summary>Правка текста ТЗ (новая редакция)</summary>
 <label class="small">Заменить фрагмент (точно как в документе) <input type="text" name="eo_{e(qid)}" id="eo_a_{e(qid)}"></label>
 <label class="small">на <input type="text" name="en_{e(qid)}" id="en_a_{e(qid)}"></label></details>
@@ -372,37 +431,57 @@ def action_section(view: rv.ReportView, run: dict[str, Any], *, ctx: dict[str, A
 </div>"""
         )
     qhtml = "".join(items) if items else '<p class="muted">Открытых уточняющих вопросов нет. Можно загрузить исправленную редакцию документа.</p>'
-    asked = {str(q["id"]) for q in qs}
-    carried_items = []
-    for qid, a in (run_answers or {}).items():
-        if qid in asked:
-            continue
-        carried_items.append(
-            f"""<details class="question carried-q" id="q-{e(qid)}"><summary><b>{e(qid)}.</b> {e(a.question or "")}
-<span class="carried">{e(a.text)}</span> <span class="muted small">· {e(a.provenance)}{(" · правок текста: " + str(len(a.edits))) if a.edits else ""}</span></summary>
-<textarea name="a_{e(qid)}" id="a_{e(qid)}" rows="2" placeholder="Новый ответ (пусто — оставить действующий)"></textarea>
-<input type="hidden" name="p_{e(qid)}" id="p_a_{e(qid)}" value="{e(ANALYST)}">
-<input type="hidden" name="qt_{e(qid)}" value="{e(a.question or "")}">
-<div class="prov" id="prov_a_{e(qid)}"></div></details>"""
-        )
-    if carried_items:
-        qhtml += (
-            f'<h3 id="carried">Действующие ответы ({len(carried_items)}) — перенесутся в следующую редакцию</h3>'
-            + "".join(carried_items)
-        )
+    manual = manual_import_panel(manual_import, view) if manual_import else ""
     return f"""<section class="card" id="action"><h2>Действие аналитика</h2>
+<p class="version" id="version">Вопросы и ответы относятся к версии документа <code title="{e(version)}">{e(short(version))}</code>.
+Файл ответов другой версии не применяется: номер вопроса однозначен только внутри своей версии.</p>
+{manual}
 <form method="post" action="/runs/{e(rid)}/revisions" enctype="multipart/form-data" id="confirm-form" class="once">
-{'<p class="muted small">Ответы прошлых редакций переносятся автоматически; новый ответ на тот же вопрос заменяет прежний.</p>' if run_answers else ''}
+<input type="hidden" name="questions_sha256" value="{e(version)}">
 {qhtml}
 <div class="files-row">
   <a class="button small" href="/runs/{e(rid)}/questions.md">Скачать questions.md</a>
-  <label class="small">или загрузить заполненный answers.md <input type="file" name="answers_file" accept=".md,.txt"></label>
-  <label class="small">и/или исправленную редакцию документа <input type="file" name="document" accept=".pdf,.md,.markdown,.txt,.docx,.html,.htm"></label>
+  <label class="small">или загрузить заполненный answers.md (веб-формат, экспорт HTML №13, файл №08) <input type="file" name="answers_file" accept=".md,.txt"></label>
+  <label class="small">или исправленную редакцию документа <input type="file" name="document" accept=".pdf,.md,.markdown,.txt,.docx,.html,.htm"></label>
 </div>
 <p class="muted small">Ответ без правки текста фиксирует решение, но документ остаётся прежним: замечание закроется только после правки или загрузки исправленной редакции.</p>
 <button class="button primary" type="submit" id="confirm">Подтвердить новую редакцию и перепроверить</button>
 <p class="muted small">Повторное нажатие не запускает второй анализ: вы попадёте в уже созданный запуск.</p>
 </form></section>"""
+
+
+def import_rejected_page(ctx: dict[str, Any], parent: dict[str, Any], info: dict[str, Any], message: str) -> str:
+    """Отклонённый импорт: причина, обе версии, тот же номер вопроса с разным смыслом, куда идти."""
+    clash = "".join(
+        f'<li><b>{e(c["qid"])}</b> в файле: «{e(c["in_file"] or "текста вопроса в файле нет")}»<br>'
+        f'<b>{e(c["qid"])}</b> здесь: «{e(c["here"])}»</li>'
+        for c in info.get("question_clash") or []
+    )
+    runs = "".join(
+        f'<li><a class="button small" href="/runs/{e(r["run_id"])}#action">Открыть вопросы той версии: {e(r["original_name"])}, '
+        f'редакция {e(r["revision"])} ({e(r["run_id"])})</a></li>'
+        for r in info.get("matching_runs") or []
+    )
+    if not runs and info.get("reason") == "stale_answers":
+        runs = "<li class=muted>Запусков с версией из файла в этом хранилище нет.</li>"
+    manual = ""
+    if info.get("reason") == "no_sha":
+        manual = f'<a class="button primary" href="{e(info["manual_url"])}">Сверить вопросы и перенести ответы вручную</a> '
+    body = f"""<section class="card" id="import-rejected"><h1>Ответы не применены</h1>
+<p class="notice bad">{e(message)}</p>
+<dl class="kv">
+<dt>Файл</dt><dd>{e(info.get("format_label") or info.get("format"))} · разбор: {e(info.get("parser"))} · <a href="/runs/{e(parent["run_id"])}/imports/{e(info["import_id"])}.md" download>оригинал ({e(info["import_id"])})</a></dd>
+<dt>Заявленная версия</dt><dd><code>{e(info.get("declared_sha256") or ", ".join(info.get("sha_values") or []) or "не указана")}</code></dd>
+<dt>Документ новой редакции</dt><dd>{e(parent["input"]["original_name"])}, редакция {e(parent.get("revision"))} · <code>{e(info.get("target_sha256"))}</code></dd>
+<dt>Новых запусков</dt><dd id="no-runs">0 — анализ не запускался</dd>
+</dl>
+{f'<h2>Один номер — разные вопросы</h2><ul class="clash">{clash}</ul>' if clash else ''}
+<h2>Что можно сделать</h2>
+<ul class="next">{runs}
+<li><a class="button small" href="{e(info["questions_url"])}">Скачать questions.md этой версии</a></li>
+<li>{manual}<a class="button small" href="/runs/{e(parent["run_id"])}#action">Вернуться к редакции {e(parent.get("revision"))}</a></li></ul>
+</section>"""
+    return layout("Ответы не применены", body, ctx=ctx)
 
 
 def findings_section(view: rv.ReportView) -> str:
@@ -471,8 +550,19 @@ def compare_summary(view: rv.ReportView, run: dict[str, Any], parent: dict[str, 
     ans_txt = ""
     if ans:
         prov = "; ".join(f"{k}: {v}" for k, v in (ans.get("provenance") or {}).items())
-        carried = f", перенесено из прошлых редакций: {ans.get('carried')}" if ans.get("carried") else ""
-        ans_txt = f'<p class="provenance">Ответы этой редакции: {e(ans.get("count"))}{e(carried)} ({e(prov)}) · <a href="{prefix}/runs/{e(run["run_id"])}/input/answers.md">answers.md</a></p>'
+        imp = ans.get("import") or {}
+        imp_txt = ""
+        if imp:
+            imp_txt = (
+                f'<br>Импорт: {e(imp.get("original_name"))} · {e(imp.get("format_label") or imp.get("format"))} · разбор: {e(imp.get("parser"))} · '
+                f'заявленная версия <code>{e(short(imp.get("declared_sha256")))}</code> совпала с документом · '
+                f'<a href="{prefix}/runs/{e(imp.get("parent_run_id"))}/imports/{e(imp.get("import_id"))}.md">оригинал</a> · '
+                f'<a href="{prefix}/runs/{e(run["run_id"])}/input/answers_uploaded.md">копия во входе редакции</a>'
+            )
+        ans_txt = (
+            f'<p class="provenance" id="answers-provenance">Ответы этой редакции: {e(ans.get("count"))} ({e(prov)}) · '
+            f'версия <code>{e(short(ans.get("source_sha256")))}</code> · <a href="{prefix}/runs/{e(run["run_id"])}/input/answers.md">собранный answers.md</a>{imp_txt}</p>'
+        )
     if view.decisions:
         lis = "".join(
             f"<li><b>{e(d.get('question_id'))}</b>: {e(d.get('answer'))}"
@@ -558,7 +648,8 @@ def run_page(
     elapsed: float | None,
     demo_answers: list[dict[str, Any]],
     duplicate: bool = False,
-    run_answers: dict[str, Any] | None = None,
+    manual_import: dict[str, Any] | None = None,
+    imports: list[dict[str, Any]] | None = None,
 ) -> str:
     prefix = ctx["prefix"]
     demo_banner = ""
@@ -574,6 +665,14 @@ def run_page(
             f'модель <code>{e(rep.get("model") or "—")}</code>, режим {e(rep.get("mode") or "—")}. Это не живой анализ — новый запуск отсюда не выполняется.</div>'
         )
     head = f'<h1>{e(run["input"]["original_name"])} <span class="muted">· редакция {e(run.get("revision"))}</span></h1>'
+    derived = run["input"].get("derived_from") or {}
+    head += (
+        f'<p class="muted small" id="input-version">Вход редакции: SHA-256 <code title="{e(run["input"]["sha256"])}">{e(short(run["input"]["sha256"]))}</code>'
+        + (f' — файл редакции движка {e(derived.get("artifact"))} из <a href="{prefix}/runs/{e(derived.get("run_id"))}">{e(derived.get("run_id"))}</a>' if derived else "")
+        + (f' · документ отчёта <code title="{e(view.raw["document"].get("id"))}">{e(short(view.raw["document"].get("id")))}</code>'
+           if view is not None and (view.raw.get("document") or {}).get("id") not in (None, run["input"]["sha256"]) else "")
+        + "</p>"
+    )
     body = demo_banner + lineage_nav(lineage, run["run_id"], prefix) + head
     body += status_section(run, events, eta=eta, queue_pos=queue_pos, elapsed=elapsed, ctx=ctx, report_stages=view.stages if view else None)
     if view is not None:
@@ -586,7 +685,8 @@ def run_page(
         body += verdict_section(view, run, files)
         body += compare_summary(view, run, parent, parent_view, prefix)
         body += attention_section(view) if run.get("parent_run_id") else ""
-        body += action_section(view, run, ctx=ctx, latest=latest, demo_answers=demo_answers, run_answers=run_answers)
+        body += action_section(view, run, ctx=ctx, latest=latest, demo_answers=demo_answers, manual_import=manual_import)
+        body += imports_section(run, imports or [], prefix)
         body += downloads_section(run, artifacts, prefix)
         body += findings_section(view)
         if view.contract_notes:

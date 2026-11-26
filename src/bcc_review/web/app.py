@@ -142,6 +142,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.wants_json():
             self.json({"error": str(exc), **exc.extra}, exc.http_status)
             return
+        if exc.extra.get("import_id") and exc.extra.get("reason") in ("stale_answers", "no_sha", "sha_conflict"):
+            parent = self.app.store.load(exc.extra["parent_run_id"])
+            self.html(views.import_rejected_page(self.app.ctx(demo=demo), parent, exc.extra, str(exc)), exc.http_status)
+            return
         links = [("К списку запусков", "/")]
         latest = exc.extra.get("latest_run_id")
         if latest:
@@ -173,7 +177,8 @@ class Handler(BaseHTTPRequestHandler):
             if path in ("/", "/index.html"):
                 return self.page_home()
             if path == "/healthz":
-                return self.json({"ok": True, "engine": self.app.engine.describe(), "engine_available": self.app.engine.available})
+                return self.json({"ok": True, "engine": self.app.engine.describe(), "engine_available": self.app.engine.available,
+                                  "engine_calls": self.app.runner.engine_calls})
             if path.startswith("/static/"):
                 return self.static(path[len("/static/"):])
             if path.startswith("/api/runs/"):
@@ -189,7 +194,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise StoreError("Страница не найдена", 404)
             run_id, rest = m.group("id"), m.group("rest") or ""
             if rest in ("", "/"):
-                return self.page_run(store, run_id, demo=demo, duplicate="dup" in query)
+                return self.page_run(store, run_id, demo=demo, duplicate="dup" in query, import_id=(query.get("import") or [None])[0])
             if rest == "/compare":
                 return self.page_compare(store, run_id, demo=demo)
             if rest == "/questions.md":
@@ -201,6 +206,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not rec.get("answers"):
                     raise StoreError("Эта редакция запущена без answers.md", 404)
                 return self.send_file(store.input_dir(run_id) / "answers.md", attachment="inline" not in query)
+            if rest.startswith("/imports/") and rest.endswith(".md"):
+                imp_id = rest[len("/imports/"):-3]
+                rec = store.load_import(run_id, imp_id)
+                path = store.import_original(run_id, imp_id)
+                return self.send_file(path, attachment=True, name=f"{imp_id}-{rec.get('original_name') or 'answers.md'}")
             if rest.startswith("/files/"):
                 name = rest[len("/files/"):]
                 return self.send_file(store.artifact_path(run_id, name), attachment="inline" not in query)
@@ -240,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
         """Этапы от колбэка progress (если движок его принял) и из JSONL-трассы движка."""
         return store.events(run_id) + trace_events(store.artifacts_dir(run_id))
 
-    def page_run(self, store: RunStore, run_id: str, *, demo: bool, duplicate: bool = False) -> None:
+    def page_run(self, store: RunStore, run_id: str, *, demo: bool, duplicate: bool = False, import_id: str | None = None) -> None:
         run = store.load(run_id)
         view, problem = self._view(store, run_id, run.get("parent_run_id")) if run["status"] in FINAL_STATUSES else (None, None)
         parent = store.load(run["parent_run_id"]) if run.get("parent_run_id") and store.exists(run["parent_run_id"]) else None
@@ -262,9 +272,21 @@ class Handler(BaseHTTPRequestHandler):
             elapsed=elapsed_s(run),
             demo_answers=demo_answers,
             duplicate=duplicate,
-            run_answers=self.app.service.run_answers(run_id, store=store),
+            manual_import=self._manual_import(store, run_id, import_id),
+            imports=store.list_imports(run_id),
         )
         self.html(page)
+
+    @staticmethod
+    def _manual_import(store: RunStore, run_id: str, import_id: str | None) -> dict[str, Any] | None:
+        """Ручной перенос предлагается только для файла без версии (не для чужой версии)."""
+        if not import_id:
+            return None
+        try:
+            rec = store.load_import(run_id, import_id)
+        except StoreError:
+            return None
+        return rec if rec.get("status") == "rejected" and rec.get("reason") == "no_sha" else None
 
     def page_compare(self, store: RunStore, run_id: str, *, demo: bool) -> None:
         run = store.load(run_id)
@@ -292,6 +314,9 @@ class Handler(BaseHTTPRequestHandler):
                 "report": run.get("report"),
                 "artifacts": store.list_artifacts(run_id),
                 "parent_run_id": run.get("parent_run_id"),
+                "children": [c["run_id"] for c in store.children(run_id)],
+                "imports": [{k: i.get(k) for k in ("import_id", "status", "reason", "format", "parser", "declared_sha256", "target_sha256", "child_run_id")}
+                            for i in store.list_imports(run_id)],
                 "lineage_id": run["lineage_id"],
                 "revision": run["revision"],
                 "latest_run_id": latest["run_id"] if latest else None,
@@ -309,17 +334,19 @@ class Handler(BaseHTTPRequestHandler):
         ctype = "text/css; charset=utf-8" if name.endswith(".css") else "text/javascript; charset=utf-8"
         self._send(200, data, ctype, {"Cache-Control": "no-cache"})
 
-    def send_file(self, path: Path, *, attachment: bool) -> None:
+    def send_file(self, path: Path, *, attachment: bool, name: str | None = None) -> None:
         data = path.read_bytes()
-        ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        name = name or path.name
+        ctype = mimetypes.guess_type(name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/json",):
             ctype += "; charset=utf-8"
-        if path.suffix == ".md":
+        if name.endswith(".md"):
             ctype = "text/plain; charset=utf-8" if not attachment else "text/markdown; charset=utf-8"
-        headers = {"Content-Disposition": ("attachment" if attachment else "inline") + f"; filename*=UTF-8''{quote(path.name)}"}
+        headers = {"Content-Disposition": ("attachment" if attachment else "inline") + f"; filename*=UTF-8''{quote(name)}"}
         if path.suffix in (".html", ".htm"):
-            # Отчёт №13 открывается в песочнице: его скрипты не видят API демо.
-            headers["Content-Security-Policy"] = "sandbox allow-scripts allow-popups; default-src 'self' 'unsafe-inline' data:"
+            # Отчёт №13 открывается в песочнице: его скрипты не видят API демо. allow-downloads —
+            # чтобы работала выгрузка черновика ответов (Blob → answers-….md) из самого отчёта.
+            headers["Content-Security-Policy"] = "sandbox allow-scripts allow-popups allow-downloads; default-src 'self' 'unsafe-inline' data: blob:"
         self._send(200, data, ctype, headers)
 
     # ---------------------------------------------------------------- actions
@@ -364,11 +391,14 @@ class Handler(BaseHTTPRequestHandler):
             edits = [(edit_old, (fields.get(f"en_{qid}") or "").strip())] if edit_old else []
             if text or edits:
                 answers.append(Answer(qid, text, (fields.get(f"p_{qid}") or ANALYST).strip()[:300], fields.get(f"qt_{qid}", "")[:2000], edits))
-        answers_file = files.get("answers_file", (None, b""))[1] or None
+        answers_name, answers_file = files.get("answers_file", ("answers.md", b""))
         document = files.get("document")
         if document and not document[1]:
             document = None
-        claim = self.app.service.confirm_revision(run_id, form_answers=answers, answers_file=answers_file, document=document)
+        claim = self.app.service.confirm_revision(
+            run_id, form_answers=answers, answers_file=answers_file or None, answers_name=answers_name or "answers.md",
+            document=document, questions_sha256=(fields.get("questions_sha256") or "").strip() or None,
+        )
         self._created(claim, "Это подтверждение уже принято")
 
     def _decision_text(self, run_id: str, qid: str, option_id: str) -> str | None:

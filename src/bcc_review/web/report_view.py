@@ -264,7 +264,10 @@ def build(report: dict[str, Any], previous: dict[str, Any] | None = None) -> Rep
     findings.sort(key=lambda fv: (SEVERITY.get(fv.severity, ("", 9))[1], fv.status != "confirmed", fv.id))
 
     decisions = [d for d in _as_list(report.get("decisions")) if isinstance(d, dict)]
-    by_q = {str(d.get("question_id")): d for d in decisions}
+    version = str(doc.get("id") or run.get("source_sha256") or "")
+    # Номер вопроса однозначен только внутри версии документа: решение относится к вопросу
+    # этого отчёта, лишь если оно дано к этой же версии (как в HTML №13).
+    by_q = {str(d.get("question_id")): d for d in decisions if str(d.get("source_sha256") or "") == version}
     questions = []
     for q in _as_list(report.get("questions")):
         if not isinstance(q, dict) or not q.get("id"):
@@ -340,9 +343,8 @@ def attention_items(view: ReportView) -> list[dict[str, str]]:
     for fv in view.findings:
         if fv.status == "needs_review":
             items.append({"kind": "review", "text": f"{fv.id}: опора не подтверждена, проверьте вручную", "severity": fv.severity})
-    answered = {str(d.get("question_id")) for d in view.decisions}
     for q in view.questions:
-        if q["id"] not in answered:
+        if not q.get("decision"):
             items.append({"kind": "question", "text": f"{q['id']}: {q['text']}", "severity": ""})
     if view.incomplete:
         reasons = [*map(str, view.run.get("status_reasons") or [])]

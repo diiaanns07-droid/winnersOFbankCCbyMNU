@@ -183,7 +183,7 @@ def test_demo_mode_is_separate_and_labelled(make_server, case_bytes, tmp_path):
     data = tmp_path / "live"
     live = make_server(CountingEngine(), data_dir=data)
     parent = live.wait(live.upload("case_ab.md", case_bytes)["run_id"])
-    code, _, body = live.post_form(f"/runs/{parent['run_id']}/revisions", {"a_Q-f3f4": "Приоритет Ф-4"})
+    code, _, body = live.post_form(f"/runs/{parent['run_id']}/revisions", {"a_Q-01": "Приоритет Ф-4"})
     child = live.wait(json.loads(body)["run_id"])
     bundle = tmp_path / "bundle"
     assert main(["pack", child["run_id"], "--data-dir", str(data), "--out", str(bundle)]) == 0
@@ -199,7 +199,7 @@ def test_demo_mode_is_separate_and_labelled(make_server, case_bytes, tmp_path):
     assert 'id="confirm-form"' not in page
     assert viewer.get(f"/demo/runs/{child['run_id']}/compare")[0] == 200
     assert viewer.get(f"/demo/runs/{child['run_id']}/files/report.md")[0] == 200
-    code, _, _ = viewer.post_form(f"/demo/runs/{child['run_id']}/revisions", {"a_Q-f3f4": "x"})
+    code, _, _ = viewer.post_form(f"/demo/runs/{child['run_id']}/revisions", {"a_Q-01": "x"})
     assert code == 404
     assert len(viewer.app.runner.store.list_runs()) == 0
 

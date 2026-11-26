@@ -216,6 +216,7 @@ class Runner:
         self.pool = ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="bcc-run")
         self._active: set[str] = set()
         self._guard = threading.Lock()
+        self.engine_calls = 0  # сколько раз этот процесс вызвал run_review (для проверки «ноль запусков»)
 
     def submit(self, run_id: str) -> None:
         with self._guard:
@@ -297,6 +298,8 @@ class Runner:
         try:
             if self.engine.func is None:
                 raise RuntimeError(self.engine.error or "движок недоступен")
+            with self._guard:
+                self.engine_calls += 1
             ret = self.engine.func(str(inp), str(store.report_md(run_id)), options=options)
         except BaseException as exc:  # noqa: BLE001 — SystemExit из CLI-кода тоже ошибка запуска
             error = classify_error(exc)
@@ -333,6 +336,7 @@ class Runner:
                 "calls": run_meta.get("calls"),
                 "agent_version": run_meta.get("agent_version"),
                 "source_sha256": run_meta.get("source_sha256"),
+                "document_sha256": (report.get("document") or {}).get("id"),
                 "report_status": run_meta.get("status"),
             }
         store.append_event(run_id, {"stage": "engine", "state": "fail" if status == "failed" else "done", "detail": status})

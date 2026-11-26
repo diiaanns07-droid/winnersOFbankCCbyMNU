@@ -85,7 +85,17 @@ python -m bcc_review.web --demo demo_bundle
 python -m bcc_review.web --engine dev --demo-answers tests/p15/fixtures/demo_answers.md
 ```
 
-## 5. Автоматическая репетиция (без ключа)
+## 5. Ответ к чужой версии (проверка перед показом)
+
+```bash
+python tests/p15/versions_demo.py --out out/p15-versions
+```
+
+Ожидается `summary.json`: `foreign` — `children_b: 0, engine_calls: 0`; `own` —
+`children_b: 1, engine_calls: 1`, свой `child_document_sha256`; `repeat` — та же редакция,
+`engine_calls: 0`; `html13` — экспорт из HTML №13 принят. Скриншоты — в каталоге `--out`.
+
+## 6. Автоматическая репетиция (без ключа)
 
 ```bash
 P15_SHOTS=out/p15 python -m pytest tests/p15/test_browser.py

@@ -230,16 +230,47 @@ _SEMANTIC = [
 ]
 
 
-def _parse_answers(text: str) -> dict[str, tuple[str, str]]:
-    """Тот же формат, что пишет веб-слой (bcc_review.web.answers): qid → (ответ, происхождение)."""
+def question_keys(blocks: list[dict]) -> list[str]:
+    """Порядок вопросов документа: Q-01 — первый найденный, как нумерует настоящий движок.
+
+    Номер зависит от документа: в другой версии Q-01 может означать другое."""
+    return [sem["key"] for sem in _SEMANTIC if _find_all(blocks, sem["quotes"]) is not None]
+
+
+def _apply_answers(path: Path, data: bytes, opts: dict, out: Path) -> tuple[Path, bytes, dict, list, dict | None]:
+    """Как движок Max: ответы к другой версии не применяются; правки пишут редакцию отдельным файлом."""
     from .answers import parse_answers
 
-    return {a.qid: (a.text, a.provenance) for a in parse_answers(text).answers}
+    if not opts.get("answers_path"):
+        return path, data, {}, [], None
+    parsed = parse_answers(Path(opts["answers_path"]).read_text(encoding="utf-8"))
+    source_sha = hashlib.sha256(data).hexdigest()
+    declared = parsed.meta.get("source_sha256")
+    if declared and declared != source_sha:
+        warn = {"code": "stale_answers", "message": f"ответы к версии {declared[:12]}…, документ {source_sha[:12]}…: не применены"}
+        return path, data, {}, [warn], {"name": "answers", "status": "partial", "reason": warn["message"]}
+    answers = {a.qid: (a.text, a.provenance) for a in parsed.answers}
+    text = data.decode("utf-8", errors="replace")
+    applied = 0
+    for a in parsed.answers:
+        for old, new in a.edits:
+            if old and old in text:
+                text = text.replace(old, new, 1)
+                applied += 1
+    if not applied:
+        return path, data, answers, [], {"name": "answers", "status": "ok" if answers else "partial", "reason": "правок текста нет: проверяется исходная редакция"}
+    rev = out.parent / f"{path.stem}.rev-{str(opts.get('run_id') or 'dev')[:16]}{path.suffix}"
+    rev.write_bytes(text.encode("utf-8"))
+    return rev, rev.read_bytes(), answers, [], {"name": "answers", "status": "ok", "reason": f"применено правок: {applied}; редакция: {rev.name}"}
 
 
 # --------------------------------------------------------------------------- Report
-def _build_report(path: Path, data: bytes, opts: dict, progress: Callable, scenario: str, delay: float) -> dict:
+def _build_report(path: Path, data: bytes, opts: dict, progress: Callable, scenario: str, delay: float, *,
+                  source_sha: str | None = None, answers: dict | None = None, answer_stage: dict | None = None,
+                  answer_warnings: list | None = None, answered_keys: dict | None = None) -> dict:
     stages: list[dict] = []
+    if answer_stage:
+        stages.append({**answer_stage, "calls": 0, "cache_hits": 0, "duration_s": 0.0, "implementation": "web.devengine"})
     t_run = time.monotonic()
 
     def stage(name: str):
@@ -258,6 +289,7 @@ def _build_report(path: Path, data: bytes, opts: dict, progress: Callable, scena
     started = _now()
     offline = bool(opts.get("offline_lint"))
     warnings: list[Any] = [{"code": "dev_mock", "message": "Отчёт создан подставным dev-движком веб-слоя (mock), а не общим движком bcc_review."}]
+    warnings += answer_warnings or []
 
     done = stage("read")
     doc = parse_document(path, data)
@@ -302,7 +334,8 @@ def _build_report(path: Path, data: bytes, opts: dict, progress: Callable, scena
                                  "kind": "functional" if m else "other", "section": b["section"], "review_status": "reviewed", "review_reason": None})
     done(detail=f"требований: {len(requirements)}")
 
-    answers = _parse_answers(Path(opts["answers_path"]).read_text(encoding="utf-8")) if opts.get("answers_path") else {}
+    answers = answers or {}
+    source_sha = source_sha or hashlib.sha256(data).hexdigest()
 
     questions: list[dict] = []
     decisions: list[dict] = []
@@ -310,13 +343,14 @@ def _build_report(path: Path, data: bytes, opts: dict, progress: Callable, scena
     if mode == "mock":
         for sem in _SEMANTIC:
             ev = _find_all(blocks, sem["quotes"])
-            if ev is None:
+            if ev is None and sem["key"] not in (answered_keys or {}):
                 continue
-            qid = f"Q-{sem['key']}"
-            if qid in answers:
+            if sem["key"] in (answered_keys or {}):
+                qid = answered_keys[sem["key"]]
                 text, prov = answers[qid]
-                decisions.append({"question_id": qid, "source_sha256": doc["id"], "answer": text, "edits": [], "note": f"происхождение: {prov}"})
+                decisions.append({"question_id": qid, "source_sha256": source_sha, "answer": text, "edits": [], "note": f"происхождение: {prov}"})
                 continue  # в mock-логике ответ аналитика снимает замечание
+            qid = f"Q-{len(questions) + 1:02d}"
             f = {**{k: sem[k] for k in ("key", "kind", "criterion", "severity", "title", "impact", "recommendation")},
                  "scope": "set", "source": "mock-llm", "stage": "cross", "evidence": ev, "meaning_status": "confirmed"}
             if sem.get("blocked_decision"):
@@ -424,7 +458,7 @@ def _build_report(path: Path, data: bytes, opts: dict, progress: Callable, scena
         "run": {
             "run_id": opts.get("run_id") or "dev-" + hashlib.sha1(started.encode()).hexdigest()[:8],
             "parent_run_id": opts.get("parent_run_id"),
-            "source_sha256": doc["id"], "source_name": path.name,
+            "source_sha256": source_sha, "source_name": path.name,
             "agent_version": AGENT_VERSION, "agent_commit": None,
             "provider": "mock", "model": "dev-mock", "requested_model": None, "models_seen": [],
             "mode": mode, "status": status, "status_reasons": status_reasons,
@@ -506,7 +540,13 @@ def run_review(input_path: str | os.PathLike, report_md: str | os.PathLike, *, o
     opts.pop("tmp_dir", None)
     if scenario == "slow":
         delay = max(delay, 1.5)
-    report = _build_report(path, path.read_bytes(), opts, progress, scenario, delay)
+    original = path.read_bytes()
+    reviewed, data, answers, answer_warnings, answer_stage = _apply_answers(path, original, opts, out)
+    # Номера вопросов в answers.md — это нумерация проверенной версии (вход), а не редакции после правок.
+    keys = question_keys(parse_document(path, original)["blocks"]) if answers else []
+    answered_keys = {keys[int(q[2:]) - 1]: q for q in answers if re.fullmatch(r"Q-\d+", q) and 0 < int(q[2:]) <= len(keys)}
+    report = _build_report(reviewed, data, opts, progress, scenario, delay, source_sha=hashlib.sha256(original).hexdigest(),
+                           answers=answers, answer_stage=answer_stage, answer_warnings=answer_warnings, answered_keys=answered_keys)
     progress("render", "start")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(_render_md(report), encoding="utf-8")

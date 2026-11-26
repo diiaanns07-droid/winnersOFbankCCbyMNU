@@ -166,7 +166,8 @@ def test_real_engine_full_path_with_mock_provider(make_server, tmp_path):
     assert parent["status"] in ("complete", "partial"), parent["error"]
     assert parent["report"]["mode"] == "mock" and parent["report"]["provider"] == "mock"
     page = client.get(f"/runs/{parent['run_id']}")[2].decode()
-    assert "нельзя начинать" in page and "Расхождения с контрактом" not in page
+    # 091e504: конфликт из сценария → «нельзя начинать»; 6be9e97+: модули команды, прогон partial → «не определено».
+    assert ("нельзя начинать" in page or "не определено" in page) and "Расхождения с контрактом" not in page
     assert page.count("<mark>") >= 2 and "Q-001" in page
     assert "Подставить демонстрационный ответ" in page and "не решение банка" in page  # ключи «Ф-3, Ф-4»
     assert "объединение замечаний" in page  # этапы из report.run.stages настоящего движка

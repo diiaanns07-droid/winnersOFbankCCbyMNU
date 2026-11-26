@@ -88,7 +88,7 @@ def test_resubmitting_same_upload_form_is_not_a_second_run(make_server, case_byt
     assert "уже было принято" in client.get(hdr["Location"])[2].decode()
 
 
-def _answer_fields(qid="Q-f3f4", text="Приоритет Ф-4: смена порога открывает право на новый push."):
+def _answer_fields(qid="Q-01", text="Приоритет Ф-4: смена порога открывает право на новый push."):
     return {f"a_{qid}": text, f"p_{qid}": "аналитик (веб-форма)", f"qt_{qid}": "вопрос"}
 
 
@@ -107,7 +107,7 @@ def test_answer_confirm_creates_child_revision_with_diff(make_server, case_bytes
     call = engine.calls[-1]
     assert _tail(call["options"]["compare_path"], f"{parent['run_id']}/artifacts/report.json")
     answers = parse_answers(open(call["options"]["answers_path"], encoding="utf-8").read())
-    assert answers.by_id()["Q-f3f4"].provenance == "аналитик (веб-форма)"
+    assert answers.by_id()["Q-01"].provenance == "аналитик (веб-форма)"
     assert child["answers"]["provenance"] == {"аналитик (веб-форма)": 1}
 
     page = client.get(f"/runs/{child_id}")[2].decode()
@@ -122,7 +122,7 @@ def test_answer_confirm_creates_child_revision_with_diff(make_server, case_bytes
         assert code == 200 and hdr["Content-Disposition"].startswith("inline") and data
     # answers.md, с которым запущена редакция, доступен для скачивания.
     code, _, data = client.get(f"/runs/{child_id}/input/answers.md")
-    assert code == 200 and "Q-f3f4" in data.decode()
+    assert code == 200 and "Q-01" in data.decode()
 
 
 def test_double_confirm_does_not_start_second_paid_run(make_server, case_bytes):
@@ -170,13 +170,13 @@ def test_questions_md_roundtrip_via_answers_file(make_server, case_bytes):
     code, hdr, data = client.get(f"/runs/{parent['run_id']}/questions.md")
     assert code == 200 and hdr["Content-Disposition"].startswith("attachment")
     text = data.decode()
-    assert "## Q-f3f4" in text and "## Q-api200" in text
+    assert "## Q-01" in text and "## Q-03" in text
     # questions.md реально лежит среди артефактов (сформирован веб-слоем из report.json).
     names = {a["name"]: a["origin"] for a in client.get_json(f"/api/runs/{parent['run_id']}")["artifacts"]}
     assert names.get("web/questions.md") == "web"
 
-    # Аналитик вписывает ответ в раздел Q-api200 и меняет строку происхождения.
-    section = re.search(r"## Q-api200\n.*?Ответ:\n", text, re.S).group(0)
+    # Аналитик вписывает ответ в раздел Q-03 и меняет строку происхождения.
+    section = re.search(r"## Q-03\n.*?Ответ:\n", text, re.S).group(0)
     filled_section = section.replace("Источник ответа: аналитик (веб-форма)", "Источник ответа: аналитик (файл answers.md)") + "400 Bad Request, пример 200 с ERROR удалить.\n"
     filled = text.replace(section, filled_section)
     assert filled != text
@@ -191,7 +191,7 @@ def test_questions_md_roundtrip_via_answers_file(make_server, case_bytes):
 def test_empty_answers_rejected(make_server, case_bytes):
     client = make_server()
     parent = _complete(client, case_bytes)
-    code, _, body = client.post_form(f"/runs/{parent['run_id']}/revisions", {"a_Q-f3f4": "  "})
+    code, _, body = client.post_form(f"/runs/{parent['run_id']}/revisions", {"a_Q-01": "  "})
     assert code == 400 and "ответ" in json.loads(body)["error"]
     code, _, body = client.post_form(f"/runs/{parent['run_id']}/revisions", {}, {"answers_file": ("answers.md", b"## Q-1\n\xd0\x9e\xd1\x82\xd0\xb2\xd0\xb5\xd1\x82:\n\n")})
     assert code == 400
@@ -210,17 +210,17 @@ def test_decision_option_and_demo_answer_provenance(make_server, case_bytes, tmp
     page = client.get(f"/runs/{parent['run_id']}")[2].decode()
     assert "Подставить демонстрационный ответ" in page
     assert "не решение банка" in page
-    assert 'name="d_Q-ac2" value="1"' in page
+    assert 'name="d_Q-02" value="1"' in page
     # Выбран вариант решения без своего текста — в answers.md попадает текст варианта и его происхождение.
     code, _, body = client.post_form(
         f"/runs/{parent['run_id']}/revisions",
-        {"a_Q-ac2": "", "d_Q-ac2": "1", "p_Q-ac2": "вариант 1 из вопроса Q-ac2 (предложение движка, модель dev-mock)"},
+        {"a_Q-02": "", "d_Q-02": "1", "p_Q-02": "вариант 1 из вопроса Q-02 (предложение движка, модель dev-mock)"},
     )
     assert code == 201, body
     child = client.wait(json.loads(body)["run_id"])
     text = open(client.app.store.input_dir(child["run_id"]) / "answers.md", encoding="utf-8").read()
     assert "По дате совершения в Asia/Almaty" in text
-    assert "Источник ответа: вариант 1 из вопроса Q-ac2" in text
+    assert "Источник ответа: вариант 1 из вопроса Q-02" in text
 
 
 def test_revised_document_upload_becomes_new_revision(make_server, case_bytes):
@@ -235,26 +235,11 @@ def test_revised_document_upload_becomes_new_revision(make_server, case_bytes):
     assert "f3f4" in _diff_keys(client.app.store, child["run_id"])
 
 
-def test_answers_accumulate_across_revisions(make_server, case_bytes):
+def test_no_new_answers_means_no_new_run(make_server, case_bytes):
     engine = CountingEngine()
     client = make_server(engine)
     r1 = _complete(client, case_bytes)
-    r2 = client.wait(json.loads(client.post_form(f"/runs/{r1['run_id']}/revisions", _answer_fields())[2])["run_id"])
-    # Повтор тех же ответов без нового документа — анализ не нужен, платного запуска нет.
     calls = len(engine.calls)
-    code, _, body = client.post_form(f"/runs/{r2['run_id']}/revisions", {})
+    code, _, body = client.post_form(f"/runs/{r1['run_id']}/revisions", {})
     assert code == 400 and "повторный анализ не нужен" in json.loads(body)["error"]
-    assert len(engine.calls) == calls
-    page = client.get(f"/runs/{r2['run_id']}")[2].decode()
-    assert "Действующие ответы (1) — перенесутся в следующую редакцию" in page
-    # questions.md второй редакции уже содержит действующий ответ.
-    q = client.get(f"/runs/{r2['run_id']}/questions.md")[2].decode()
-    assert "смена порога открывает право" in q
-
-    code, _, body = client.post_form(f"/runs/{r2['run_id']}/revisions", _answer_fields("Q-api200", "400 Bad Request"))
-    r3 = client.wait(json.loads(body)["run_id"])
-    assert r3["revision"] == 3 and r3["answers"]["count"] == 2 and r3["answers"]["carried"] == 1
-    answers = parse_answers(open(engine.calls[-1]["options"]["answers_path"], encoding="utf-8").read()).by_id()
-    assert set(answers) == {"Q-f3f4", "Q-api200"}
-    assert _diff_keys(client.app.store, r3["run_id"]) == ["api200"]
-    assert _diff_keys(client.app.store, r3["run_id"], "introduced") == []  # замечание по Ф-3/Ф-4 не вернулось
+    assert len(engine.calls) == calls and client.app.store.children(r1["run_id"]) == []
