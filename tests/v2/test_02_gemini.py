@@ -32,8 +32,10 @@ class Script:
         self.calls = []
         self.thinking = {}
 
-    def factory(self, model, thinking):
+    def factory(self, model, thinking, schema_mode="native"):
         script = self
+        self.modes = getattr(self, "modes", [])
+        self.modes.append((model, schema_mode))
 
         class Adapter:
             def invoke(self, *, model, messages, schema, timeout_s, max_output_tokens=None):
@@ -207,3 +209,16 @@ def test_thinking_for():
     assert thinking_for("gemini-3.8-flash", "off", None) == {}
     assert thinking_for("gemini-3.8-flash", None, "2048") == {"thinking_budget": 2048}
     assert thinking_for("gemma-3", None, None) == {}
+
+
+def test_schema_rejected_retries_same_model_with_schema_as_text():
+    p, s, sleeps = make({"gemini-3.8-flash": [err("bad_request", 400, message="Gemini отклонил запрос (400): "
+                                                  "The specified schema produces a constraint that has too many states"),
+                                              ok("gemini-3.8-flash")]})
+    r = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert s.calls == ["gemini-3.8-flash"] * 2 and sleeps == []
+    assert ("gemini-3.8-flash", "text") in s.modes
+    assert r["meta"]["schema_mode"] == "text"
+    assert '"required": ["answer"]' in s.last_messages[0]["content"]      # схема текстом в system
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert s.modes.count(("gemini-3.8-flash", "text")) == 1               # режим запомнен, адаптер переиспользуется

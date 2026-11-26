@@ -47,15 +47,15 @@ def response(text, finish="STOP", model_version="gemini-3.8-flash-002"):
 
 def sdk_provider(plan):
     """GeminiProvider поверх настоящего адаптера v1, у которого подменён только клиент SDK."""
-    from bcc_review.providers.gemini import GeminiAdapter
     fakes = {}
     sleeps = []
 
-    def factory(model, thinking):
-        adapter = GeminiAdapter(api_key="k", model=model, fallback_models=[], min_attempt_s=1.0, temperature=None,
-                                max_output_tokens=32000, thinking_budget=thinking.get("thinking_budget"),
-                                thinking_level=thinking.get("thinking_level"))
-        fakes[model] = FakeModels(plan.get(model, [response(json.dumps({"answer": "ок"}), model_version=model)]))
+    holder = {}
+
+    def factory(model, thinking, schema_mode="native"):
+        adapter = holder["p"]._v1_adapter(model, thinking, schema_mode)
+        if model not in fakes:
+            fakes[model] = FakeModels(plan.get(model, [response(json.dumps({"answer": "ок"}), model_version=model)]))
 
         class Client:
             models = fakes[model]
@@ -63,7 +63,8 @@ def sdk_provider(plan):
         adapter._client = Client()
         return adapter
 
-    return GeminiProvider(api_key="k", env={}, adapter_factory=factory, sleep=sleeps.append), fakes, sleeps
+    holder["p"] = GeminiProvider(api_key="k", env={}, adapter_factory=factory, sleep=sleeps.append)
+    return holder["p"], fakes, sleeps
 
 
 def test_sdk_503_then_404_then_success_on_third_model():
@@ -115,3 +116,16 @@ def test_sdk_max_tokens_is_truncated_and_bad_json_invalid():
     with pytest.raises(ProviderError) as e2:
         p2.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
     assert e2.value.kind == "invalid_output"
+
+
+def test_sdk_schema_rejected_then_text_mode_without_response_schema():
+    plan = {"gemini-3.8-flash": [api_error(400, "INVALID_ARGUMENT", "The specified schema produces a constraint that "
+                                           "has too many states for serving."),
+                                 response(json.dumps({"answer": "да"}))]}
+    p, fakes, sleeps = sdk_provider(plan)
+    r = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert r["data"] == {"answer": "да"} and r["meta"]["schema_mode"] == "text"
+    first, second = fakes["gemini-3.8-flash"].calls
+    assert first[1].response_json_schema is not None
+    assert second[1].response_json_schema is None and second[1].response_mime_type == "application/json"
+    assert "JSON Schema" in second[1].system_instruction

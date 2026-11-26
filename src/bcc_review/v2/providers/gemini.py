@@ -114,6 +114,19 @@ def thinking_for(model: str, level: str | None, budget: str | None) -> dict[str,
     return {}
 
 
+def _with_schema_text(messages: list[dict[str, Any]], schema: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Схема ответа текстом в системном сообщении (режим без response_json_schema)."""
+    import json
+    hint = ("Ответ — только один JSON-объект строго по этой JSON Schema, без пояснений и без markdown:\n"
+            + json.dumps(schema, ensure_ascii=False))
+    out = [dict(m) for m in messages]
+    for m in out:
+        if m.get("role") == "system":
+            m["content"] = f"{m.get('content') or ''}\n\n{hint}"
+            return out
+    return [{"role": "system", "content": hint}, *out]
+
+
 def _int(value: Any) -> int:
     try:
         return int(value or 0)
@@ -133,8 +146,10 @@ def _describe(kind: str, status: Any) -> str:
 class GeminiProvider:
     """Gemini с цепочкой моделей. ``adapter_factory(model, thinking)`` и ``sleep`` подменяются в тестах.
 
-    ``adapter_factory`` возвращает объект с методом ``invoke(model=, messages=, schema=, timeout_s=,
-    max_output_tokens=)`` в формате адаптера v1 (успех — dict, ошибка — ``ProviderError``).
+    ``adapter_factory(model, thinking, schema_mode="native"|"text")`` возвращает объект с методом
+    ``invoke(model=, messages=, schema=, timeout_s=, max_output_tokens=)`` в формате адаптера v1
+    (успех — dict, ошибка — ``ProviderError``). ``schema_mode="text"`` — запрос без ``response_json_schema``
+    (только JSON), схема передаётся текстом в системном промпте, ответ проверяется локально по полной схеме.
     """
 
     name = PROVIDER
@@ -167,25 +182,34 @@ class GeminiProvider:
         self._adapters: dict[tuple[str, tuple], Any] = {}
         self._dead: dict[str, ProviderError] = {}       # модели, отключённые до конца прогона (404, квота)
         self._no_thinking: set[str] = set()              # модели, отвергшие настройку рассуждений
+        self._text_schema: set[str] = set()              # модели, отвергшие схему ответа (слишком сложная)
 
     # ------------------------------------------------------------------ adapters
 
-    def _v1_adapter(self, model: str, thinking: dict[str, Any]) -> Any:
+    def _v1_adapter(self, model: str, thinking: dict[str, Any], schema_mode: str = "native") -> Any:
         if not self._api_key:
             raise ProviderError("not_configured", f"Не задан GEMINI_API_KEY. {KEY_HELP}", model=model)
         from bcc_review.providers.gemini import GeminiAdapter
-        return GeminiAdapter(api_key=self._api_key, model=model, fallback_models=[], min_attempt_s=1.0,
-                             temperature=self.temperature, max_output_tokens=self.max_output_tokens,
-                             thinking_budget=thinking.get("thinking_budget"),
-                             thinking_level=thinking.get("thinking_level"))
+        cls = GeminiAdapter
+        if schema_mode == "text":
+            class TextSchemaAdapter(GeminiAdapter):
+                def _schema_bundle(self, schema: Mapping[str, Any]) -> Any:
+                    wire, log, validator = super()._schema_bundle(schema)
+                    return None, [*log, {"path": "/", "keyword": "*", "action": "schema sent as text"}], validator
+            cls = TextSchemaAdapter
+        return cls(api_key=self._api_key, model=model, fallback_models=[], min_attempt_s=1.0,
+                   temperature=self.temperature, max_output_tokens=self.max_output_tokens,
+                   thinking_budget=thinking.get("thinking_budget"), thinking_level=thinking.get("thinking_level"))
 
-    def _adapter(self, model: str) -> tuple[Any, dict[str, Any]]:
+    def _adapter(self, model: str) -> tuple[Any, dict[str, Any], str]:
         thinking = {} if model in self._no_thinking else thinking_for(model, self.thinking_level, self.thinking_budget)
-        key = (model, tuple(sorted(thinking.items())))
+        mode = "text" if model in self._text_schema else "native"
+        key = (model, tuple(sorted(thinking.items())), mode)
         with self._lock:
             if key not in self._adapters:
-                self._adapters[key] = self._factory(model, thinking)
-            return self._adapters[key], thinking
+                self._adapters[key] = (self._factory(model, thinking, schema_mode=mode) if mode == "text"
+                                       else self._factory(model, thinking))
+            return self._adapters[key], thinking, mode
 
     def model_chain(self, model: str | None = None) -> list[str]:
         return _models([(model or "").strip() or self.default_model, *self.fallback_models])
@@ -222,13 +246,14 @@ class GeminiProvider:
                     raise self._final(last or ProviderError("timeout", f"Бюджет времени вызова Gemini ({total:.0f} с) "
                                                                        "исчерпан.", model=current), chain, attempts)
                 try:
-                    adapter, thinking = self._adapter(current)
+                    adapter, thinking, mode = self._adapter(current)
                 except ProviderError as exc:
                     raise self._final(exc, chain, attempts) from None
                 started = self._clock()
+                sent = _with_schema_text(clean, schema) if mode == "text" else clean
                 try:
                     with self._gate:
-                        result = adapter.invoke(model=current, messages=clean, schema=schema,
+                        result = adapter.invoke(model=current, messages=sent, schema=schema,
                                                 timeout_s=min(per_call, remaining), max_output_tokens=max_tokens)
                 except ProviderError as exc:
                     last = exc
@@ -259,11 +284,17 @@ class GeminiProvider:
                             network += 1
                             continue
                         raise self._final(exc, chain, attempts) from None
-                    if kind == "bad_request" and thinking and "think" in (exc.message or "").lower():
+                    low = (exc.message or "").lower()
+                    if kind == "bad_request" and thinking and "think" in low:
                         self._no_thinking.add(current)
                         continue
+                    if kind == "bad_request" and mode == "native" and ("schema" in low or "too many states" in low):
+                        self._text_schema.add(current)
+                        continue
                     raise self._final(exc, chain, attempts) from None
-                return self._normalize(result, chain, current, attempts, thinking)
+                out = self._normalize(result, chain, current, attempts, thinking)
+                out["meta"]["schema_mode"] = mode
+                return out
         assert last is not None
         raise self._final(last, chain, attempts, exhausted=True)
 
@@ -310,7 +341,7 @@ class GeminiProvider:
 
     def list_models(self) -> list[dict[str, Any]]:
         """Модели ключа с generateContent (``models.list``)."""
-        adapter, _ = self._adapter(self.default_model)
+        adapter, _, _ = self._adapter(self.default_model)
         if not hasattr(adapter, "list_models"):
             return []
         return adapter.list_models()
