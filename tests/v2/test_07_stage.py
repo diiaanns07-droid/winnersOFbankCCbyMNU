@@ -113,3 +113,19 @@ def test_other_errors_are_not_swallowed(ctx):
     local = Context(view=ctx.view, llm=_Broken(), requirements=ctx.requirements, signals=ctx.signals)
     with pytest.raises(LLMError):
         lens.run_named(local, "architect")
+
+
+def test_fallback_stops_when_first_part_overflows_too(ctx):
+    from bcc_review.v2.llm import LLMError
+
+    class _AlwaysOverflow:
+        calls = 0
+
+        def ask(self, stage, *a, **k):
+            type(self).calls += 1
+            raise LLMError(stage, "unknown", "response exceeded the 16000 output token maximum")
+
+    local = Context(view=ctx.view, llm=_AlwaysOverflow(), requirements=ctx.requirements, signals=ctx.signals)
+    with pytest.raises(RuntimeError):
+        lens.run_named(local, "architect")
+    assert _AlwaysOverflow.calls == 2  # исходный запрос + первая часть, вторую не тратим

@@ -148,6 +148,8 @@ def _run_parts(ctx: Any) -> dict:
                                      schema, max_output_tokens=lens.MAX_OUTPUT_TOKENS))
         except Exception as exc:  # noqa: BLE001 — одна часть не должна ронять другую
             failed.append(f"{ids[0]}…{ids[-1]}: {exc}")
+            if not parts and _is_output_limit(exc):
+                break  # и половина не уместилась: дело в рассуждении модели, вторая часть не поможет
     if not parts:
         raise RuntimeError("Линза «Архитектор»: обе части не выполнены — " + "; ".join(failed))
     if failed and hasattr(ctx, "warn"):
