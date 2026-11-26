@@ -27,7 +27,8 @@ except Exception:  # pragma: no cover - v1 всегда рядом, но v2 не
             self.retry_after_s = kw.get("retry_after_s")
 
 TRANSIENT = {"rate_limit", "overloaded", "server", "timeout", "network"}
-NEXT_MODEL = {"not_found", "overloaded", "quota"}  # после повторов — следующая модель цепочки
+NEXT_MODEL = {"not_found", "overloaded", "quota"}
+FATAL = {"auth", "not_configured", "quota"}  # после такой ошибки модель в этом прогоне больше не зовём  # после повторов — следующая модель цепочки
 BACKOFF = (2, 4, 8, 16, 32)
 MAX_TIMEOUT_RETRIES = 1
 MAX_OUTPUT_CEILING = 32000  # выше лимит ответа не поднимаем: дальше — деление пакета  # таймаут claude -p — минуты; повторяем один раз
@@ -112,6 +113,7 @@ class LLMClient:
         self.stats: dict[str, Any] = {"calls": 0, "cached": 0, "failed": 0, "split": 0, "repaired": 0,
                                       "retries": 0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
                                       "models_used": [], "seconds": 0.0, "by_stage": {}}
+        self.fatal: LLMError | None = None  # первая фатальная ошибка провайдера (ключ, настройка, квота)
         self.responses: dict[str, list] = {}  # сырые ответы по этапам в порядке вызовов — для mock-фикстур
 
     def _record(self, stage: str, data: Any) -> None:
@@ -210,6 +212,8 @@ class LLMClient:
             self._record(stage, cached["data"])
             return cached["data"]
 
+        if self.fatal is not None:
+            raise LLMError(stage, self.fatal.kind, "модель недоступна в этом прогоне: " + self.fatal.message)
         handles_retries = bool(getattr(self.provider, "handles_retries", False))
         chain = [self.model] + ([] if handles_retries else self.fallback_models)
         last: LLMError | None = None
@@ -235,6 +239,10 @@ class LLMClient:
                 if exc.kind in NEXT_MODEL and model != chain[-1]:
                     self._emit({"stage": stage, "event": "fallback_model", "from": model, "kind": exc.kind})
                     continue
+                if exc.kind in FATAL:
+                    with self._lock:
+                        if self.fatal is None:
+                            self.fatal = exc
                 raise
             self._cache_put(key, {"data": data, "model": result.get("model"), "stage": stage})
             self._record(stage, data)
@@ -317,8 +325,8 @@ class LLMClient:
         items = list(items)
         system, user = build(items)
         try:
-            return self.ask(stage, system, user, schema, max_output_tokens=max_output_tokens,
-                            expand=len(items) < 2 or _depth >= self.max_split_depth)
+            # сначала одна попытка с удвоенным лимитом (у моделей с рассуждением деление не помогает), потом деление
+            return self.ask(stage, system, user, schema, max_output_tokens=max_output_tokens, expand=_depth == 0)
         except Truncated:
             if len(items) < 2 or _depth >= self.max_split_depth:
                 raise
