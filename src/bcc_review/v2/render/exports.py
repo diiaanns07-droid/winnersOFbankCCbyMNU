@@ -328,7 +328,8 @@ def to_v1_report(report: dict, view: dict, input_path: Path, doc1: dict | None =
         fix = str(f.get("recommendation") or "").strip()
         if f.get("rewrite"):
             fix = (fix + "\n" if fix else "") + "Формулировка: " + str(f["rewrite"]).strip()
-        findings.append({"id": f.get("id"), "status": "confirmed", "severity": f.get("severity"), "title": title,
+        # status None: в v2 все дефекты прошли судью, пометка «подтверждено» в комментарии лишняя
+        findings.append({"id": f.get("id"), "status": None, "severity": f.get("severity"), "title": title,
                          "criterion": criterion_label(f.get("criterion")) if f.get("criterion") else None,
                          "kind": f.get("kind"), "impact": impact, "question": f.get("question") or None,
                          "recommendation": fix or None, "req_ids": list(f.get("requirement_ids") or []),
@@ -625,6 +626,7 @@ def annotate_pdf(report: dict, view: dict, input_path: Path, output_path: Path) 
                 continue
             a = page.add_highlight_annot(quads=quads)
             a.set_colors(stroke=color)
+            a.set_opacity(0.45)  # полупрозрачно: текст под выделением читается, наложения не чернеют
             a.set_info(title=AUTHOR, subject=f"{fid} · {SEVERITY_RU.get(str(f.get('severity')), '')}", content=note)
             a.set_name(f"bcc-{fid}-{places}")
             a.update()
@@ -673,6 +675,7 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
 
     for vi, variant in enumerate(_search_variants(quote)):
         found: list = []
+        prev_x = None
         for piece in variant:
             hits = page.search_for(piece, quads=True)
             if not hits and len(piece) > 60:
@@ -684,7 +687,13 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
             if vi == 0 and ins:
                 hits = ins  # цитата целиком: все части переноса внутри блока
             elif ins:
-                hits = ins[:1]  # часть цитаты (ячейка, фрагмент): одно вхождение внутри блока
+                # часть цитаты (ячейка, фрагмент): одно вхождение внутри блока, ячейки — слева направо;
+                # перенос внутри ячейки даёт несколько четырёхугольников — берём их все
+                cand = [h for h in ins if prev_x is None or h.rect.x0 >= prev_x - 1] or ins
+                first = cand[0]
+                hits = [first] + [h for h in cand[1:] if abs(h.rect.x0 - first.rect.x0) < 4
+                                  and 0 < h.rect.y0 - first.rect.y0 <= 2.6 * max(first.rect.height, 1)]
+                prev_x = first.rect.x1
             elif area is not None:
                 hits = sorted(hits, key=lambda h: abs(h.rect.y0 - area.y0))[:1]
             else:

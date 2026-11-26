@@ -200,3 +200,25 @@ def test_export_never_raises(tmp_path):
     assert res[0]["status"] == "written"
     assert res[1]["status"] == "failed" and res[2]["status"] == "skipped"
     assert E.plural(1, "а", "б", "в") == "а" and E.plural(3, "а", "б", "в") == "б" and E.plural(11, "а", "б", "в") == "в"
+
+
+SAMPLES = ROOT / "tests/v2/fixtures/03_export_samples"
+
+
+@needs_docx
+@needs_pdf
+def test_demo_samples_open():
+    """Образцы для демо (make_samples.py) открываются и содержат комментарии, выделения и задачи."""
+    import docx
+    import pymupdf
+    d = docx.Document(str(SAMPLES / "official.annotated.docx"))
+    comments = list(d.comments)
+    assert len(comments) >= 30 and any(c.text.startswith("Сводка ревью ТЗ") for c in comments)
+    assert all("подтверждено" not in c.text.splitlines()[0] for c in comments)
+    with pymupdf.open(str(SAMPLES / "official.annotated.pdf")) as p:
+        hl = [a for pg in p for a in pg.annots() if a.type[0] == pymupdf.PDF_ANNOT_HIGHLIGHT]
+        assert len(hl) >= 30 and all(a.info["content"].startswith("[D-") for a in hl)
+        assert all(abs(a.opacity - 0.45) < 0.01 for a in hl)
+    rows = list(csv.DictReader((SAMPLES / "official.jira.csv").open(encoding="utf-8-sig", newline="")))
+    assert len(rows) >= 20 and rows[0]["Priority"] == "Highest"
+    assert len(list((SAMPLES / "png").glob("*.png"))) >= 3
