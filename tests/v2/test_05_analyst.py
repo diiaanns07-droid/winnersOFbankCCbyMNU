@@ -113,3 +113,49 @@ def test_run_wraps_lens_run():
 @pytest.mark.parametrize("bad", [None, [], [None, "x", 3]])
 def test_postprocess_tolerates_garbage(bad):
     assert _load_stage().postprocess(bad) == []
+
+
+# --- реальный ответ модели (haiku, промпт v1) на официальном документе ---
+
+FIXTURE = ROOT / "tests" / "v2" / "fixtures" / "05_analyst" / "official.haiku.v1.json"
+DOC = ROOT / "release" / "input" / "requirements.md"
+KEYS = {"title", "kind", "criterion", "severity", "requirement_ids", "evidence", "problem", "scenario",
+        "impact", "recommendation", "rewrite", "question", "blocks"}
+
+
+def _norm(s: str) -> str:
+    s = re.sub(r"[«»“”„\"']", '"', s)
+    s = re.sub(r"[—–‑−]", "-", s)
+    s = re.sub(r"\*\*|__|`", "", s)
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def test_fixture_answer_matches_candidate_schema():
+    import json
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    assert data["candidates"]
+    for c in data["candidates"]:
+        assert set(c) == KEYS
+        assert c["severity"] in {"critical", "major", "minor"}
+        assert c["blocks"] in {"development", "testing", "both", "none"}
+        assert c["evidence"] and all({"quote", "line"} <= set(e) for e in c["evidence"])
+
+
+def test_fixture_quotes_are_found_near_given_line():
+    import json
+    lines = DOC.read_text(encoding="utf-8").splitlines()
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    for c in data["candidates"]:
+        for e in c["evidence"]:
+            q = _norm(e["quote"])
+            near = range(max(0, e["line"] - 3), min(len(lines), e["line"] + 2))
+            assert any(q in _norm(lines[i]) for i in near), (c["title"], e)
+
+
+def test_fixture_postprocess_respects_lens_rules():
+    import json
+    pp = _load_stage().postprocess
+    out = pp(json.loads(FIXTURE.read_text(encoding="utf-8"))["candidates"])
+    assert 1 <= len(out) <= 12
+    assert sum(c["severity"] == "critical" for c in out) <= 2
+    assert all(c["severity"] == "minor" for c in out if c["kind"] == "non_singular")
