@@ -1,0 +1,136 @@
+{
+  "schema": "bcc-review/revision@1",
+  "status": "applied_not_verified",
+  "note": "Решения владельца приняты и применены к тексту. Закрытие замечаний подтверждается только повторным анализом этой редакции (тот же SHA-256).",
+  "base": {
+    "sha256": "46fde4aff10838531a3691774da7426e83ea501264a5c432492fa25f5397e7e0",
+    "title": "Досрочное погашение потребительского кредита",
+    "format": "markdown",
+    "source": "synthetic_loan_tz.md"
+  },
+  "revision": {
+    "path": "revision_B.md",
+    "sha256": "f0fc66cda6be6e943efe078eb26513a8efa9022c9d9a7489c5a432759f307ddf",
+    "mode": "markdown_patch"
+  },
+  "edits": [
+    {
+      "block_id": "b0011",
+      "start": 6,
+      "end": 51,
+      "old": "Комиссия за досрочное погашение не взимается.",
+      "new": "Комиссия за досрочное погашение взимается по разделу «Тарифы».",
+      "source_sha256": "46fde4aff10838531a3691774da7426e83ea501264a5c432492fa25f5397e7e0",
+      "question_id": "Q-01",
+      "loc": "строка 19 · блок b0011 · символы 6–51 · раздел «Досрочное погашение потребительского кредита / Функциональные требования»"
+    },
+    {
+      "block_id": "b0019",
+      "start": 93,
+      "end": 105,
+      "old": "комиссия 0 ₸",
+      "new": "комиссия 1% от суммы досрочного погашения",
+      "source_sha256": "46fde4aff10838531a3691774da7426e83ea501264a5c432492fa25f5397e7e0",
+      "question_id": "Q-01",
+      "loc": "строка 32 · блок b0019 · символы 93–105 · раздел «Досрочное погашение потребительского кредита / Критерии приёмки»"
+    }
+  ],
+  "decisions": [
+    {
+      "question_id": "Q-01",
+      "source_sha256": "46fde4aff10838531a3691774da7426e83ea501264a5c432492fa25f5397e7e0",
+      "answer": "B",
+      "edits": [],
+      "note": "",
+      "choice": "B",
+      "comment": "",
+      "wording": "",
+      "status": "accepted"
+    },
+    {
+      "question_id": "Q-03",
+      "source_sha256": "46fde4aff10838531a3691774da7426e83ea501264a5c432492fa25f5397e7e0",
+      "answer": "B",
+      "edits": [],
+      "note": "",
+      "choice": "B",
+      "comment": "",
+      "wording": "",
+      "status": "accepted"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-01",
+      "finding_ids": [
+        "F-01",
+        "F-02"
+      ],
+      "family": "conflict",
+      "kind": "decision",
+      "choice": "B",
+      "patch_state": "applied",
+      "decision_status": "accepted",
+      "expected_result": "Та же заявка: списано 200 000 ₸ и комиссия 1% от суммы досрочного погашения.",
+      "quotes": [
+        "Комиссия за досрочное погашение не взимается.",
+        "взимается комиссия 1% от суммы досрочного погашения",
+        "комиссия 0 ₸"
+      ],
+      "new_texts": [
+        "Комиссия за досрочное погашение взимается по разделу «Тарифы».",
+        "комиссия 1% от суммы досрочного погашения"
+      ]
+    },
+    {
+      "id": "Q-02",
+      "finding_ids": [
+        "F-03"
+      ],
+      "family": "conflict",
+      "kind": "decision",
+      "choice": "open",
+      "patch_state": "open",
+      "decision_status": "open",
+      "expected_result": null,
+      "quotes": [
+        "платёж списывается в следующий рабочий день",
+        "Платёж списан 14 марта, в пятницу"
+      ],
+      "new_texts": []
+    },
+    {
+      "id": "Q-03",
+      "finding_ids": [
+        "F-05"
+      ],
+      "family": "gap",
+      "kind": "decision",
+      "choice": "B",
+      "patch_state": "needs_wording",
+      "decision_status": "accepted_needs_wording",
+      "expected_result": "Заявка ниже минимальной суммы отклоняется с сообщением.",
+      "quotes": [
+        "полное или частичное досрочное погашение"
+      ],
+      "new_texts": []
+    },
+    {
+      "id": "Q-04",
+      "finding_ids": [
+        "F-04"
+      ],
+      "family": "ambiguity",
+      "kind": "align_to_source",
+      "choice": "open",
+      "patch_state": "open",
+      "decision_status": "open",
+      "expected_result": null,
+      "quotes": [
+        "ближайший банковский день"
+      ],
+      "new_texts": []
+    }
+  ],
+  "warnings": []
+}

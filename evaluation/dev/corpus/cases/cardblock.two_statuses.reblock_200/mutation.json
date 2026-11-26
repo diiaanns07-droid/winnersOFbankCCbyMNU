@@ -1,0 +1,67 @@
+{
+  "case_id": "cardblock.two_statuses.reblock_200",
+  "family": "cardblock",
+  "kind": "mutant",
+  "ops": [
+    "two_statuses"
+  ],
+  "variants": [
+    "reblock_200"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "cardblock.base",
+  "base_source_sha256": "6b53778a368d3751eec83706570a6583619adee21d33738ba90ef0605e6b1c63",
+  "source_sha256": "12fca05e9ee1c234a9610d068ac47fe2096513525558bc63d4b57aa51d306fbb",
+  "semantic_sha256": "34e8463e2131901aa5028df327308e9238dc6ac8c5c16aa357dea4f790c8a5cf",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 90,
+      "after": "| 500 | Внутренняя ошибка сервиса |",
+      "removed": "",
+      "inserted": "Повторная блокировка карты в статусе BLOCKED_BY_CLIENT возвращает 200 без изменений.",
+      "mutation_op": "two_statuses",
+      "variant": "reblock_200"
+    }
+  ],
+  "expected_effect": [
+    "Повторная блокировка получает 200 по примечанию и 409 по таблице статусов."
+  ],
+  "diff": "--- base/source.md\n+++ cardblock.two_statuses.reblock_200/source.md\n@@ -90 +90,3 @@\n | 500 | Внутренняя ошибка сервиса | `{\"message\":\"Ошибка сервиса\"}` |\n+\n+Повторная блокировка карты в статусе BLOCKED_BY_CLIENT возвращает 200 без изменений.\n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "cardblock.two_statuses.reblock_200",
+      "family": "cardblock",
+      "source_sha256": "12fca05e9ee1c234a9610d068ac47fe2096513525558bc63d4b57aa51d306fbb",
+      "visibility": "public",
+      "label_id": "cardblock.two_statuses.reblock_200#1",
+      "issue_type": "status_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Повторная блокировка карты в статусе BLOCKED_BY_CLIENT возвращает 200 без изменений.",
+          "locator": "md:L92"
+        },
+        {
+          "role": "b",
+          "quote": "409 | Статус карты не позволяет операцию: блокировка не из ACTIVE или разблокировка не из BLOCKED_BY_CLIENT",
+          "locator": "md:L89"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "major",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "blockCard для карты, уже заблокированной клиентом.",
+      "explanation": "Повторная блокировка получает 200 по примечанию и 409 по таблице статусов.",
+      "mutation": {
+        "op": "two_statuses",
+        "variant": "reblock_200"
+      }
+    }
+  ]
+}

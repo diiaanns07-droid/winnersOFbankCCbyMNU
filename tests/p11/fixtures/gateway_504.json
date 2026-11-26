@@ -1,0 +1,20 @@
+{
+  "_synthetic": true,
+  "_note": "Тайм-аут шлюза.",
+  "name": "gateway_504",
+  "response": {
+    "status": 504,
+    "headers": {
+      "request-id": "req_synth_504",
+      "content-type": "application/json"
+    },
+    "body": {
+      "type": "error",
+      "error": {
+        "type": "timeout_error",
+        "message": "Gateway timeout"
+      },
+      "request_id": "req_synth_504"
+    }
+  }
+}

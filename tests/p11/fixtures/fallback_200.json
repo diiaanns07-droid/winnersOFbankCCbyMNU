@@ -1,0 +1,61 @@
+{
+  "_synthetic": true,
+  "_note": "Серверный fallback: ответил другой модельный снимок; фактическая модель в поле model.",
+  "name": "fallback_200",
+  "response": {
+    "status": 200,
+    "headers": {
+      "request-id": "req_synth_fallback",
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "msg_synth_01",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-opus-4-8",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "text",
+          "text": "{\"candidates\":[{\"scope\":\"set\",\"kind\":\"conflict\",\"criterion\":\"ISO29148-5.2.6-consistency\",\"severity\":\"critical\",\"title\":\"Ф-3 и Ф-4 дают разный исход для второго push в месяце\",\"impact\":\"Разработчик и тестировщик выберут разные правила отправки\",\"req_ids\":[\"R-003\",\"R-004\"],\"hints\":[{\"block_id\":\"blk-039\",\"quote\":\"максимум один push за календарный месяц\"},{\"block_id\":\"blk-040\",\"quote\":\"вызывает push независимо от истории\"}],\"inspected_block_ids\":null},{\"scope\":\"requirement\",\"kind\":\"ambiguity\",\"criterion\":\"ISO29148-5.2.5-unambiguous\",\"severity\":\"major\",\"title\":\"Не указан часовой пояс календарного месяца\",\"impact\":\"Покупки на стыке месяцев попадут в разные периоды\",\"req_ids\":[\"R-002\"],\"hints\":[{\"block_id\":\"blk-038\",\"quote\":\"по дате совершения покупки\"}],\"inspected_block_ids\":null}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 5210,
+        "output_tokens": 600,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "type": "message",
+            "input_tokens": 5210,
+            "output_tokens": 3,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          },
+          {
+            "type": "fallback_message",
+            "model": "claude-opus-4-8",
+            "input_tokens": 5210,
+            "output_tokens": 597,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        ]
+      }
+    }
+  }
+}

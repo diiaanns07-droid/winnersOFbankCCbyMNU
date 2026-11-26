@@ -62,6 +62,8 @@ SET_CRITERIA = ("set_complete", "set_consistent", "set_feasible", "set_comprehen
                 "ranked", "modifiable", "traceable")
 # Коды предупреждений документа, означающие неполное чтение (готовность не может быть положительной).
 PARTIAL_READ_CODES = ("partial_read", "unreadable_page", "decode_error", "ocr_required", "truncated_input")
+# Информационные предупреждения чтения: на полноту прогона не влияют.
+INFO_WARNING_CODES = ("encoding_guess", "empty_page", "images_not_read", "pdf_repaired")
 
 # Коды выхода CLI (согласуются с №18).
 EXIT_OK = 0
@@ -296,10 +298,14 @@ DEFS: dict[str, Any] = {
                                 "rect": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
                                 "quad": {"type": "array"}}, ["start", "end", "rect"])),
         "part": _STR, "path": _STR, "runs": {"type": "array"},
+        "level": {"type": "integer", "minimum": 1}, "columns": _STRS, "empty": {"type": "boolean"},
+        "bbox": {"type": "array", "items": {"type": "number"}}, "table": {},
+        "row": {"type": "integer"}, "furniture": {"type": "boolean"}, "lang": _NSTR,
     }),
     "Block": _obj({"id": _STR, "kind": _enum(BLOCK_KINDS), "section": _STRS, "text": _STR, "loc": _ref("Loc")},
                   ["id", "kind", "section", "text", "loc"]),
-    "Warning": {"anyOf": [_STR, _obj({"code": _STR, "message": _STR, "stage": _STR, "block_ids": _STRS},
+    "Warning": {"anyOf": [_STR, _obj({"code": _STR, "message": _STR, "stage": _STR, "block_ids": _STRS,
+                                      "page": {"type": ["integer", "null"], "minimum": 1}},
                                      ["code", "message"])]},
     "Document": _obj({
         "id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -461,6 +467,43 @@ REPORT_SCHEMA: dict[str, Any] = {
 }
 
 
+def as_plain(obj: Any) -> Any:
+    """Объект модуля → JSON-совместимые dict/list контракта (рекурсивно): ``to_dict()``, dataclass, кортежи."""
+    if hasattr(obj, "to_dict") and callable(obj.to_dict):
+        return as_plain(obj.to_dict())
+    if hasattr(obj, "__dataclass_fields__") and not isinstance(obj, type):
+        return as_plain(asdict(obj))
+    if isinstance(obj, Mapping):
+        return {str(k): as_plain(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set, frozenset)):
+        return [as_plain(v) for v in obj]
+    if isinstance(obj, Path):
+        return str(obj)
+    return obj
+
+
+def normalize_document(doc: dict[str, Any]) -> dict[str, Any]:
+    """Привести Document читателя к единой форме стыка (движок вызывает после чтения):
+
+    * ``section`` — полный путь заголовков от корня (если читатель дал ``loc.section_ids``);
+    * ``loc.columns`` — заголовки столбцов для строк таблиц (если они лежат в ``loc.table.columns``).
+    """
+    doc = as_plain(doc)
+    blocks = doc.get("blocks", [])
+    heads = {b["id"]: b["text"] for b in blocks if b.get("kind") == "heading"}
+    for b in blocks:
+        loc = b.setdefault("loc", {})
+        ids = loc.get("section_ids")
+        if isinstance(ids, list) and ids and all(i in heads for i in ids):
+            path = [heads[i] for i in ids]
+            if not b.get("section") or b["section"] == path[-len(b["section"]):]:
+                b["section"] = path
+        tbl = loc.get("table")
+        if b.get("kind") in ("table_header", "table_row") and "columns" not in loc and isinstance(tbl, dict)                 and isinstance(tbl.get("columns"), list):
+            loc["columns"] = list(tbl["columns"])
+    return doc
+
+
 def subschema(name: str) -> dict[str, Any]:
     """Схема одного типа (``Document``, ``Candidate``…) с общими ``$defs`` — для проверки на стыках."""
     if name not in DEFS:
@@ -503,7 +546,10 @@ def evidence_errors(report: Mapping[str, Any]) -> list[str]:
     if len(blocks) != len(report.get("document", {}).get("blocks", [])):
         errs.append("document.blocks: повторяющиеся id блоков")
 
-    def check_ev(where: str, ev: Mapping[str, Any]) -> None:
+    def check_ev(where: str, ev: Any) -> None:
+        if not isinstance(ev, Mapping) or not {"block_id", "start", "end", "quote"} <= set(ev):
+            errs.append(f"{where}: опора не в формате Evidence")
+            return
         b = blocks.get(ev.get("block_id"))
         if b is None:
             errs.append(f"{where}: блок {ev.get('block_id')!r} отсутствует")

@@ -1,0 +1,209 @@
+{
+  "note": "Повторный анализ подставной перепроверкой _demo.recheck по файлу редакции.",
+  "findings_after": [
+    {
+      "id": "N-02",
+      "scope": "set",
+      "kind": "conflict",
+      "criterion": "set_consistent",
+      "severity": "critical",
+      "title": "Перенос платежа с выходного определён по-разному",
+      "impact": "Дата списания неясна.",
+      "blocked_decision": "",
+      "req_ids": [],
+      "hints": [
+        {
+          "block_id": "b0012",
+          "quote": "платёж списывается в следующий рабочий день"
+        },
+        {
+          "block_id": "b0020",
+          "quote": "Платёж списан 14 марта, в пятницу"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0012",
+          "start": 59,
+          "end": 102,
+          "quote": "платёж списывается в следующий рабочий день"
+        },
+        {
+          "block_id": "b0020",
+          "start": 60,
+          "end": 93,
+          "quote": "Платёж списан 14 марта, в пятницу"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "recommendation": "",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": {
+        "input": "дата платежа в субботу",
+        "outcome_a": "позже",
+        "outcome_b": "раньше",
+        "evidence_a": {
+          "block_id": "b0012",
+          "start": 59,
+          "end": 102,
+          "quote": "платёж списывается в следующий рабочий день"
+        },
+        "evidence_b": {
+          "block_id": "b0020",
+          "start": 60,
+          "end": 93,
+          "quote": "Платёж списан 14 марта, в пятницу"
+        }
+      },
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": null,
+      "source": "synthetic",
+      "stage": "individual",
+      "notes": []
+    },
+    {
+      "id": "N-03",
+      "scope": "requirement",
+      "kind": "ambiguity",
+      "criterion": "unambiguous",
+      "severity": "major",
+      "title": "«Банковский день» не определён",
+      "impact": "Дата исполнения неясна.",
+      "blocked_decision": "",
+      "req_ids": [],
+      "hints": [
+        {
+          "block_id": "b0014",
+          "quote": "ближайший банковский день"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0014",
+          "start": 39,
+          "end": 64,
+          "quote": "ближайший банковский день"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "recommendation": "",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": null,
+      "source": "synthetic",
+      "stage": "individual",
+      "notes": []
+    },
+    {
+      "id": "N-04",
+      "scope": "requirement",
+      "kind": "omission",
+      "criterion": "complete",
+      "severity": "major",
+      "title": "Не задана минимальная сумма частичного погашения",
+      "impact": "Нет границ для тестов.",
+      "blocked_decision": "",
+      "req_ids": [],
+      "hints": [
+        {
+          "block_id": "b0010",
+          "quote": "полное или частичное досрочное погашение"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0010",
+          "start": 31,
+          "end": 71,
+          "quote": "полное или частичное досрочное погашение"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "recommendation": "",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [],
+      "cause": null,
+      "source": "synthetic",
+      "stage": "individual",
+      "notes": []
+    }
+  ],
+  "base_sha256": "46fde4aff10838531a3691774da7426e83ea501264a5c432492fa25f5397e7e0",
+  "revision_sha256": "f0fc66cda6be6e943efe078eb26513a8efa9022c9d9a7489c5a432759f307ddf",
+  "analyzed_sha256": "f0fc66cda6be6e943efe078eb26513a8efa9022c9d9a7489c5a432759f307ddf",
+  "verified_on_revision": true,
+  "questions": [
+    {
+      "question_id": "Q-01",
+      "finding_ids": [
+        "F-01",
+        "F-02"
+      ],
+      "decision_status": "accepted",
+      "choice": "B",
+      "fix_status": "closed_after_reanalysis",
+      "fix_label": "закрыто: повторный анализ редакции замечания не нашёл",
+      "matched_finding_ids": []
+    },
+    {
+      "question_id": "Q-02",
+      "finding_ids": [
+        "F-03"
+      ],
+      "decision_status": "open",
+      "choice": "open",
+      "fix_status": "open_still_present",
+      "fix_label": "решения нет; текст не менялся — замечание сохраняется",
+      "matched_finding_ids": [
+        "N-02"
+      ]
+    },
+    {
+      "question_id": "Q-03",
+      "finding_ids": [
+        "F-05"
+      ],
+      "decision_status": "accepted_needs_wording",
+      "choice": "B",
+      "fix_status": "open_still_present",
+      "fix_label": "решение принято без формулировки; текст не менялся — замечание сохраняется",
+      "matched_finding_ids": [
+        "N-04"
+      ]
+    },
+    {
+      "question_id": "Q-04",
+      "finding_ids": [
+        "F-04"
+      ],
+      "decision_status": "open",
+      "choice": "open",
+      "fix_status": "open_still_present",
+      "fix_label": "решения нет; текст не менялся — замечание сохраняется",
+      "matched_finding_ids": [
+        "N-03"
+      ]
+    }
+  ],
+  "warnings": []
+}
