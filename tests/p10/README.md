@@ -1,7 +1,7 @@
 # №10. Чек-лист банка и приёмочные сценарии
 
 Код: `src/bcc_review/bank/checklist.py`, `src/bcc_review/bank/acceptance.py`. Тесты: `tests/p10/`.
-База: `bcc/integration` 6be9e97 (контракт v1 431f76d; влиты №01, 04–07, 11, 17).
+База: `bcc/integration` 6a6c503 (контракт v1 431f76d; влиты №01–09, 11–17).
 
 ```python
 from bcc_review.bank import build_bank_pack, collect_questions, render_markdown
@@ -129,9 +129,9 @@ python -m tests.p10.make_samples
   2. Вместе с `questions=` добавлять `collect_questions(bank)` в `report["questions"]`. Тогда вопросы
      `Q-CHK-NN` и `Q-BANK-xxxxxx` попадут в answers.md, а `open_question_id` будет заполнен. Сейчас
      движок их не передаёт, поэтому поле `null`, а решения применяются только к вопросам пакета.
-  3. Предупреждения модуля — dict по `Warning`, а `str(w)` возвращает читаемый текст. Префикс «bank:»
-     получает только отказ модели, чтобы этап отметился `partial`. Лучше класть dict в отчёт как есть,
-     без `str()`.
+  3. Предупреждения модуля — строки контракта `Warning` (класс `BankWarning(str)`), поэтому они
+     переживают `as_plain` и `str(w)`. Код доступен как `w.code`, данные — через `w.as_dict()`.
+     Префикс «bank:» получает только отказ модели, чтобы этап отметился `partial`.
   4. Предложение схемы пакета для контракта: `tests/p10/bank_schema.json`.
 * **№05.** `[[checklist]]` уже используется. У CL11 (ИБ) критерии `complete` и `feasible` слишком
   широкие, поэтому модуль требует признак ИБ в `title` или `impact`: вида «ИБ» в `FINDING_KINDS` нет.

@@ -596,27 +596,28 @@
       }
     },
     "Warning": {
-      "type": "object",
-      "required": [
-        "code",
-        "level",
-        "message"
-      ],
-      "properties": {
-        "code": {
+      "description": "Строка контракта Warning (русское сообщение); код — в BankWarning.code. Отказ модели начинается с «bank: ».",
+      "anyOf": [
+        {
           "type": "string",
-          "pattern": "^bank\\."
+          "minLength": 1
         },
-        "level": {
-          "enum": [
-            "info",
-            "warning"
-          ]
-        },
-        "message": {
-          "type": "string"
+        {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
         }
-      }
+      ]
     },
     "Token": {
       "type": [

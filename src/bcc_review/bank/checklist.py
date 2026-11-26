@@ -46,25 +46,45 @@ def as_list(value: Any) -> list:
     return [value]
 
 
-class BankWarning(dict):
-    """Предупреждение пакета: dict по контракту Warning, а ``str()`` — русское сообщение.
+class BankWarning(str):
+    """Предупреждение пакета: строка контракта Warning (русское сообщение) с кодом и данными.
 
-    Движок пишет ``str(w)`` в Report.warnings и помечает этап ``bank`` частичным, если в строке
-    есть «bank:»; поэтому префикс получают только отказы модели.
+    Движок нормализует выход модуля ``contracts.as_plain`` и пишет ``str(w)`` в Report.warnings;
+    строка переживает обе операции. Префикс «bank:» получают только отказы модели — по нему
+    движок помечает этап ``bank`` частичным. Код и данные доступны как ``w.code``, ``w["code"]``,
+    ``w.get("level")``.
     """
 
     DEGRADING = frozenset({"bank.llm_failed"})
+    code: str
+    level: str
+    data: dict[str, Any]
 
-    def __str__(self) -> str:
-        prefix = "bank: " if self.get("code") in self.DEGRADING else ""
-        return f"{prefix}{self.get('message', '')}"
+    def __new__(cls, code: str, message: str, level: str = "warning", **data: Any) -> "BankWarning":
+        text = f"bank: {message}" if code in cls.DEGRADING else message
+        obj = super().__new__(cls, text)
+        obj.code, obj.level, obj.data = code, level, {k: v for k, v in data.items() if v is not None}
+        return obj
+
+    @property
+    def message(self) -> str:
+        return str.__str__(self)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"code": self.code, "level": self.level, "message": self.message, "stage": "bank", **self.data}
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.as_dict().get(key, default)
+
+    def __getitem__(self, key):  # type: ignore[override]
+        if isinstance(key, str):
+            return self.as_dict()[key]
+        return str.__getitem__(self, key)
 
 
 def W(code: str, message: str, level: str = "warning", **extra: Any) -> BankWarning:
     """Предупреждение пакета: код, уровень, русское сообщение и данные."""
-    item = BankWarning(code=code, level=level, message=message, stage="bank")
-    item.update({k: v for k, v in extra.items() if v is not None})
-    return item
+    return BankWarning(code, message, level, **extra)
 
 
 # ---------------------------------------------------------------- нормализация текста

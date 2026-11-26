@@ -279,7 +279,13 @@ def test_engine_positional_call_and_string_warnings():
     pack = build_bank_pack(c["document"], c["requirements"], c["findings"], fx.decisions(c["document"]), None)
     assert len(pack["checklist"]) == 14 and pack["test_cases"]
     for w in pack["warnings"]:
-        assert not str(w).startswith("{") and "bank:" not in str(w)  # без модели этап не «деградировал»
+        assert isinstance(w, str) and not str(w).startswith("{") and "bank:" not in str(w)  # без модели этап не «деградировал»
+        assert w.code.startswith("bank.") and w["code"] == w.code
+    from bcc_review.contracts import as_plain  # движок нормализует выход модуля
+
+    plain = as_plain(pack)
+    assert [str(w) for w in plain["warnings"]] == [str(w) for w in pack["warnings"]]
+    assert all(not str(w).startswith("{") for w in plain["warnings"])
 
     def broken(stage, payload, schema):
         raise RuntimeError("503")
