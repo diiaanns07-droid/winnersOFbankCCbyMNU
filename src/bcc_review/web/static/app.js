@@ -47,6 +47,12 @@
         if (eo && en) { eo.value = btn.dataset.editOld; en.value = btn.dataset.editNew || ""; }
         if (box) box.open = true;
       }
+      var w = document.getElementById("w_" + btn.dataset.target);
+      if (w && btn.dataset.wording) {
+        w.value = btn.dataset.wording;
+        var wbox = document.getElementById("ed_" + btn.dataset.target);
+        if (wbox) wbox.open = true;
+      }
     });
   });
   Array.prototype.forEach.call(document.querySelectorAll(".options input[type=radio]"), function (r) {

@@ -69,3 +69,29 @@ def test_analyst_path_in_browser(make_server, tmp_path):
     # Скачанный в браузере файл совпадает с файлом, который записал движок.
     assert Path(result["downloaded"]).read_bytes() == store.report_md(result["child"]).read_bytes()
     assert len(result["log"]) >= 20
+
+
+def test_foreign_answer_import_in_browser(make_server, tmp_path):
+    """A/B в Chromium: чужой ответ — 0 запусков, свой — одна редакция, повтор — та же редакция."""
+    env = _node_env()
+    if env is None:
+        pytest.skip("нет node + playwright")
+    from .conftest import FIXTURES
+
+    client = make_server(CountingEngine(delay=0.05))
+    out = Path(os.environ.get("P15_SHOTS") or tmp_path / "shots") / "versions"
+    out.mkdir(parents=True, exist_ok=True)
+    results = {}
+    for phase, doc in (("a", "A"), ("b", "B")):
+        proc = subprocess.run(
+            ["node", str(HERE / "e2e_versions.js"), phase, client.base, str(FIXTURES / "versions" / doc / "tz.md"), str(out)],
+            env=env, capture_output=True, text=True, timeout=240,
+        )
+        results[phase] = json.loads((proc.stdout.strip().splitlines() or ["{}"])[-1])
+        assert proc.returncode == 0, results[phase].get("error") or proc.stderr
+    b = results["b"]
+    assert b["foreign"] == {**b["foreign"], "children_b": 0, "engine_calls": 0}
+    assert b["foreign"]["import"]["status"] == "rejected" and b["foreign"]["import"]["reason"] == "stale_answers"
+    assert b["own"]["children_b"] == 1 and b["own"]["engine_calls"] == 1
+    assert b["repeat"] == {"landed_on": b["child"], "children_b": 1, "engine_calls": 0}
+    assert client.app.runner.engine_calls == 3  # A, B и одна новая редакция

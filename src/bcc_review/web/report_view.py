@@ -15,7 +15,7 @@ FINDING_STATUS = {"confirmed": "подтверждено", "needs_review": "тр
 MODE = {
     "rules_plus_llm": "правила + LLM",
     "rules_only": "только правила (без LLM)",
-    "mock": "mock: синтетические ответы модели",
+    "mock": "mock: ответы модели из сценария, живая модель не вызывалась",
 }
 CRITERIA = {
     "necessary": "необходимость", "appropriate": "уместность", "unambiguous": "однозначность",
@@ -47,7 +47,8 @@ STAGES = {
     "cross": "проверка набора", "set_checks": "проверка набора", "set": "проверка набора", "facts": "сверка фактов",
     "evidence": "сверка опор", "verify": "сверка опор", "verify_meaning": "проверка смысла", "merge": "объединение замечаний",
     "questions": "уточняющие вопросы",
-    "decisions": "вопросы и решения", "clarify": "уточняющие вопросы", "answers": "учёт ответов",
+    "decisions": "вопросы и решения", "clarify": "формулировка вопросов", "answers": "учёт ответов",
+    "cross.pairs": "противоречия пар требований", "cross.coverage": "покрытие приёмкой",
     "bank": "чек-лист банка", "verdict": "вердикт",
     "diff": "сравнение редакций", "compare": "сравнение редакций",
     "render": "запись отчёта", "markdown": "запись отчёта", "export": "экспорт", "html": "экспорт HTML",
@@ -264,7 +265,10 @@ def build(report: dict[str, Any], previous: dict[str, Any] | None = None) -> Rep
     findings.sort(key=lambda fv: (SEVERITY.get(fv.severity, ("", 9))[1], fv.status != "confirmed", fv.id))
 
     decisions = [d for d in _as_list(report.get("decisions")) if isinstance(d, dict)]
-    by_q = {str(d.get("question_id")): d for d in decisions}
+    version = str(doc.get("id") or run.get("source_sha256") or "")
+    # Номер вопроса однозначен только внутри версии документа: решение относится к вопросу
+    # этого отчёта, лишь если оно дано к этой же версии (как в HTML №13).
+    by_q = {str(d.get("question_id")): d for d in decisions if str(d.get("source_sha256") or "") == version}
     questions = []
     for q in _as_list(report.get("questions")):
         if not isinstance(q, dict) or not q.get("id"):
@@ -340,9 +344,8 @@ def attention_items(view: ReportView) -> list[dict[str, str]]:
     for fv in view.findings:
         if fv.status == "needs_review":
             items.append({"kind": "review", "text": f"{fv.id}: опора не подтверждена, проверьте вручную", "severity": fv.severity})
-    answered = {str(d.get("question_id")) for d in view.decisions}
     for q in view.questions:
-        if q["id"] not in answered:
+        if not q.get("decision"):
             items.append({"kind": "question", "text": f"{q['id']}: {q['text']}", "severity": ""})
     if view.incomplete:
         reasons = [*map(str, view.run.get("status_reasons") or [])]

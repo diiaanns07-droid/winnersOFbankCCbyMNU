@@ -75,3 +75,5 @@ ol.stages li.partial{background:var(--warn-bg);color:var(--warn)}
 .verdict.insufficient .vv{color:var(--warn)}
 details.edit{margin:6px 0;font-size:14px}details.edit label{display:block;margin:4px 0}details.edit input[type=text]{width:100%;font:inherit;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
 .service-files{margin-top:8px;font-size:14px}
+.version{font-size:13.5px;color:var(--muted)}.manual-list{margin:6px 0 0;padding-left:18px}.manual-list li{margin:6px 0}.file-answer{white-space:pre-wrap}dl.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px}dl.kv dd{margin:0;overflow-wrap:anywhere}ul.clash li,ul.next li{margin:6px 0}ul.next{list-style:none;padding:0}@media (max-width:640px){dl.kv{grid-template-columns:1fr}}
+blockquote.target{background:var(--bg);border-radius:6px;padding:6px 8px;margin:4px 0}ul.changes{padding-left:18px}ul.changes li{margin:8px 0}.was{color:var(--muted);text-decoration:line-through}.now{color:var(--ok);font-weight:600}

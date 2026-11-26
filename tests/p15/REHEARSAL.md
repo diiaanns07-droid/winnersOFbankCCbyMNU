@@ -3,6 +3,36 @@
 Цель — за 3 минуты показать жюри путь аналитика на настоящем движке и уметь переключиться
 на сохранённый прогон, если сеть или ключ подведут.
 
+## Демо пути аналитика: команда и последовательность (проверено на bcc/integration 2821989)
+
+Вход — публичный кейс `release/input/requirements.md` (= `tests/p15/fixtures/case_ab.md`, SHA-256
+`e7dae55e…`). Ответы модели воспроизводятся из записанного сценария
+`tests/p15/fixtures/mock_case_recorded.json` (ответы транспорта №06, `tests/p15/record_mock_case.py`);
+живая модель не вызывается, ключ не нужен. Режим показан в шапке и в вердикте.
+
+```bash
+python -m bcc_review.web --provider mock --mock-script tests/p15/fixtures/mock_case_recorded.json --export html,pdf --demo-answers tests/p15/fixtures/demo_answers.md
+```
+
+1. <http://127.0.0.1:8015/> → «Загрузить ТЗ» → `release/input/requirements.md`. Видны этапы движка;
+   обновите страницу (F5) посреди прогона — статус и пройденные этапы сохраняются.
+2. После `готово частично partial` (в сценарии нет ответов этапа `individual`, это честно указано)
+   откройте вопрос **Q-01** → ссылка **F-002**: две цитаты, строка 38 (Ф-2) и строка 64 (критерий №2).
+3. У Q-01 нажмите «Подставить демонстрационный ответ»: заполнятся ответ и «Новая формулировка»;
+   над полем видно предложение, которое движок заменит. → «Подтвердить новую редакцию и перепроверить».
+4. Редакция 2: блок «Изменённые пункты» — было «В расходы входят проведённые покупки.» → стало
+   «…; месяц покупки определяется по дате её совершения (Asia/Almaty, UTC+5).», пункт Ф-2 целиком.
+5. «Файлы запуска»: `report.md`, `report.html` (№13), `report.annotated.pdf` (№14), файл редакции
+   `case_ab.rev-….md` — его SHA-256 равен версии документа редакции 2.
+6. Откройте прежнюю ссылку на редакцию 1: сверху пометка «не актуальная» и ссылка на редакцию 2;
+   статус, вопросы и `questions.md` — версии 1.
+
+Автоматически, с кадрами и видео:
+
+```bash
+python tests/p15/demo_run.py --out out/p15-demo
+```
+
 ## 0. Подготовка (накануне)
 
 ```bash
@@ -85,7 +115,17 @@ python -m bcc_review.web --demo demo_bundle
 python -m bcc_review.web --engine dev --demo-answers tests/p15/fixtures/demo_answers.md
 ```
 
-## 5. Автоматическая репетиция (без ключа)
+## 5. Ответ к чужой версии (проверка перед показом)
+
+```bash
+python tests/p15/versions_demo.py --out out/p15-versions
+```
+
+Ожидается `summary.json`: `foreign` — `children_b: 0, engine_calls: 0`; `own` —
+`children_b: 1, engine_calls: 1`, свой `child_document_sha256`; `repeat` — та же редакция,
+`engine_calls: 0`; `html13` — экспорт из HTML №13 принят. Скриншоты — в каталоге `--out`.
+
+## 6. Автоматическая репетиция (без ключа)
 
 ```bash
 P15_SHOTS=out/p15 python -m pytest tests/p15/test_browser.py

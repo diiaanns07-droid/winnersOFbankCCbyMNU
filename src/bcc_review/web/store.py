@@ -225,6 +225,7 @@ class RunStore:
         reason: str = "upload",
         retry_of: str | None = None,
         extra_inputs: dict[str, bytes] | None = None,
+        derived_from: dict[str, Any] | None = None,
     ) -> str:
         if self.read_only:
             raise StoreError("Сохранённый прогон открыт только для просмотра", 403)
@@ -273,6 +274,7 @@ class RunStore:
                 "file": safe,
                 "sha256": sha256_bytes(data),
                 "size": len(data),
+                "derived_from": derived_from,
             },
             "answers": (
                 {"file": answers_name, "sha256": sha256_bytes(answers), **(answers_meta or {})}
@@ -433,6 +435,72 @@ class RunStore:
             raise
         create_exclusive_json(path, {"run_id": run_id, "ts": utcnow()})
         return Claim(run_id, False)
+
+    # ------------------------------------------------------------------ imports
+    IMPORT_ID_RE = re.compile(r"^imp-\d{8}-\d{6}-[0-9a-f]{6}$")
+
+    def record_import(self, run_id: str, data: bytes, meta: dict[str, Any]) -> str:
+        """Сохранить загруженный файл ответов как есть (байт в байт) и запись о нём.
+
+        Запись ведётся до проверки версии: и отклонённый, и принятый импорт остаются
+        различимыми — исходные байты, заявленная версия, разборщик, итог.
+        """
+        if self.read_only:
+            raise StoreError("Сохранённый прогон открыт только для просмотра", 403)
+        base = self.run_dir(run_id) / "imports"
+        base.mkdir(exist_ok=True)
+        for _ in range(50):
+            imp_id = "imp-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3)
+            if create_exclusive_json(base / f"{imp_id}.json", {"import_id": imp_id, "run_id": run_id, "created_at": utcnow(), **meta}):
+                atomic_write_bytes(base / f"{imp_id}.orig", data)
+                return imp_id
+        raise StoreError("Не удалось сохранить импорт", 500)  # pragma: no cover
+
+    def update_import(self, run_id: str, imp_id: str, **fields: Any) -> dict[str, Any]:
+        path = self.import_record_path(run_id, imp_id)
+        with self._lock(run_id):
+            rec = read_json(path)
+            rec.update(fields)
+            atomic_write_json(path, rec)
+            return rec
+
+    def import_record_path(self, run_id: str, imp_id: str) -> Path:
+        if not self.IMPORT_ID_RE.match(imp_id or ""):
+            raise StoreError("Некорректный идентификатор импорта", 404)
+        path = self.run_dir(run_id) / "imports" / f"{imp_id}.json"
+        if not path.is_file():
+            raise StoreError("Импорт не найден", 404)
+        return path
+
+    def load_import(self, run_id: str, imp_id: str) -> dict[str, Any]:
+        return read_json(self.import_record_path(run_id, imp_id))
+
+    def import_original(self, run_id: str, imp_id: str) -> Path:
+        self.import_record_path(run_id, imp_id)
+        return self.run_dir(run_id) / "imports" / f"{imp_id}.orig"
+
+    def list_imports(self, run_id: str) -> list[dict[str, Any]]:
+        base = self.run_dir(run_id) / "imports"
+        if not base.is_dir():
+            return []
+        out = [read_json(p) for p in base.glob("imp-*.json")]
+        out.sort(key=lambda r: r.get("created_at") or "")
+        return out
+
+    def runs_with_version(self, sha256: str) -> list[dict[str, Any]]:
+        """Запуски, чей документ (вход или документ отчёта) имеет этот SHA-256 — там лежат «свои» вопросы."""
+        out = []
+        for rec in self.list_runs():
+            doc_id = None
+            rj = self.report_json(rec["run_id"])
+            if rj.is_file():
+                try:
+                    doc_id = (read_json(rj).get("document") or {}).get("id")
+                except (OSError, json.JSONDecodeError):
+                    doc_id = None
+            if sha256 in (rec["input"].get("sha256"), doc_id):
+                out.append(rec)
+        return out
 
     # ------------------------------------------------------------------ recovery
     def recover_interrupted(self) -> list[str]:

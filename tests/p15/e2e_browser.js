@@ -45,11 +45,11 @@ async function waitFinal(page, status) {
     await f1.scrollIntoViewIfNeeded();
     await f1.screenshot({ path: path.join(outDir, "03-fragments.png") });
     // 4. Ответ: демонстрационный (с подписью происхождения) + вариант решения движка.
-    await page.click('#q-Q-f3f4 .demo-fill');
-    const prov = await page.locator("#prov_a_Q-f3f4").innerText();
+    await page.click('#q-Q-01 .demo-fill');
+    const prov = await page.locator("#prov_a_Q-01").innerText();
     check(prov.includes("демонстрационный ответ команды"), "подпись происхождения демо-ответа видна");
-    await page.check('input[name="d_Q-api200"][value="1"]');
-    check((await page.inputValue("#a_Q-api200")).startsWith("400 Bad Request"), "вариант решения подставил текст");
+    await page.check('input[name="d_Q-03"][value="1"]');
+    check((await page.inputValue("#a_Q-03")).startsWith("400 Bad Request"), "вариант решения подставил текст");
     await page.locator("#action").screenshot({ path: path.join(outDir, "04-answer.png") });
     // 5. Подтверждение двойным кликом.
     await Promise.all([page.waitForURL((u) => !u.toString().includes(result.parent)), page.dblclick("#confirm")]);
@@ -60,7 +60,7 @@ async function waitFinal(page, status) {
     const cmp = await page.locator("#compare-summary").innerText();
     check(/Устранено: 2/.test(cmp), "в сравнении устранено 2 замечания");
     const att = await page.locator("#attention").innerText();
-    check(att.includes("Q-ac2"), "в «что ещё требует внимания» остался открытый вопрос Q-ac2");
+    check(att.includes("Q-02"), "в «что ещё требует внимания» остался открытый вопрос Q-02");
     const answersProv = await page.locator("#compare-summary .provenance").innerText();
     check(answersProv.includes("демонстрационный ответ команды") && answersProv.includes("вариант 1"), "происхождение ответов редакции показано");
     await shot("05-revision");
@@ -86,7 +86,7 @@ async function waitFinal(page, status) {
     const [qdl] = await Promise.all([page.waitForEvent("download"), page.click("text=Скачать questions.md")]);
     const qsaved = path.join(outDir, "questions.md");
     await qdl.saveAs(qsaved);
-    check(fs.readFileSync(qsaved, "utf8").includes("## Q-ac2"), "questions.md скачан и содержит открытый вопрос");
+    check(fs.readFileSync(qsaved, "utf8").includes("## Q-02"), "questions.md скачан и содержит открытый вопрос");
     // 8. Старая редакция: решения туда не принимаются.
     await page.goto(`${base}/runs/${result.parent}`);
     check((await page.locator("#stale").count()) === 1, "старая редакция предупреждает об актуальной");

@@ -7,7 +7,13 @@
 * повторное подтверждение тех же ответов к той же редакции не создаёт второго
   платного запуска (атомарная заявка в ``runs/<parent>/claims``);
 * подтверждение к редакции, у которой уже есть более новая, отклоняется
-  с 409 и ссылкой на актуальный результат.
+  с 409 и ссылкой на актуальный результат;
+* файл ответов применяется только к той версии документа, к вопросам которой он дан:
+  заявленный ``source_sha256`` сверяется с SHA-256 документа новой редакции до
+  объединения ответов и до создания дочернего запуска. Чужая версия, конфликт или
+  отсутствие версии — 409, ноль новых запусков, импорт сохранён как отклонённый;
+* ответы не переносятся между версиями по номеру вопроса: следующая редакция
+  проверяет документ, о котором были вопросы (вход или файл редакции движка).
 """
 
 from __future__ import annotations
@@ -19,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .answers import Answer, AnswerSet, compose_answers, parse_answers, render_questions
+from .answers import Answer, AnswerSet, Imported, compose_answers, parse_answers, read_import, render_questions, report_version
 from .engine import EngineSpec, Runner, preflight, read_report
 from .store import Claim, RunStore, StoreError
 
@@ -45,7 +51,8 @@ class Service:
 
     # ------------------------------------------------------------------ helpers
     def preflight(self) -> dict[str, Any]:
-        return preflight(self.settings.provider, self.engine)
+        script = str(self.settings.mock_script) if self.settings.mock_script else None
+        return preflight(self.settings.provider, self.engine, mock_script=script)
 
     def _options(self, *, offline: bool) -> dict[str, Any]:
         """Параметры запуска в именах RunOptions (bcc_review.contracts)."""
@@ -97,13 +104,53 @@ class Service:
     def latest_of(self, run: dict[str, Any]) -> dict[str, Any] | None:
         return self.store.latest_in_lineage(run["lineage_id"])
 
+    def version_document(self, parent: dict[str, Any], report: dict[str, Any]) -> tuple[str, bytes, dict[str, Any] | None]:
+        """Документ, о котором заданы вопросы редакции: её вход или файл редакции B из артефактов.
+
+        Так веб повторяет CLI: следующий круг проверяет редакцию, которую записал движок,
+        а ответы относятся к её SHA-256 (``report.document.id``)."""
+        version = report_version(report)
+        parent_id = parent["run_id"]
+        if not version or version == parent["input"]["sha256"]:
+            return parent["input"]["original_name"], self.store.input_path(parent_id).read_bytes(), None
+        for a in self.store.list_artifacts(parent_id):
+            if a["sha256"] == version:
+                path = self.store.artifact_path(parent_id, a["name"])
+                return parent["input"]["original_name"], path.read_bytes(), {"run_id": parent_id, "artifact": a["name"]}
+        raise StoreError(
+            f"Документ, о котором заданы вопросы этой редакции (SHA-256 {version[:12]}…), не найден среди файлов запуска. "
+            "Ответы не к чему применить: повторите запуск.",
+            409, reason="version_document_missing", target_sha256=version, latest_run_id=parent_id,
+        )
+
+    def _reject_import(self, parent_id: str, imp_id: str, imp: Imported, reason: str, message: str, target_sha: str,
+                       current_questions: dict[str, str]) -> StoreError:
+        matching = [
+            {"run_id": r["run_id"], "original_name": r["input"]["original_name"], "revision": r.get("revision"),
+             "created_at": r.get("created_at"), "status": r.get("status")}
+            for r in (self.store.runs_with_version(imp.declared_sha256) if imp.declared_sha256 else [])
+        ]
+        self.store.update_import(parent_id, imp_id, status="rejected", reason=reason, message=message, matching_runs=matching)
+        clash = [
+            {"qid": qid, "in_file": imp.questions.get(qid, ""), "here": current_questions[qid]}
+            for qid in [a.qid for a in imp.answers] if qid in current_questions
+        ]
+        return StoreError(
+            message, 409, reason=reason, import_id=imp_id, parent_run_id=parent_id,
+            declared_sha256=imp.declared_sha256, sha_values=imp.sha_values, target_sha256=target_sha,
+            matching_runs=matching, question_clash=clash, format=imp.format, format_label=imp.format_label, parser=imp.parser,
+            questions_url=f"/runs/{parent_id}/questions.md", manual_url=f"/runs/{parent_id}?import={imp_id}#manual-import",
+        )
+
     def confirm_revision(
         self,
         parent_id: str,
         *,
         form_answers: list[Answer],
         answers_file: bytes | None = None,
+        answers_name: str = "answers.md",
         document: tuple[str, bytes] | None = None,
+        questions_sha256: str | None = None,
     ) -> Claim:
         self._require_engine()
         parent = self.store.load(parent_id)
@@ -117,50 +164,80 @@ class Service:
         if report is None:
             raise StoreError(f"Отчёт редакции недоступен: {problem}", 409, latest_run_id=parent_id)
 
+        version = report_version(report)
+        derived = None
         if document is not None:
             doc_name, doc_bytes = document
         else:
-            doc_name = parent["input"]["original_name"]
-            doc_bytes = self.store.input_path(parent_id).read_bytes()
-        # Ответы относятся к документу, который проверит дочерний запуск (движок сверяет source_sha256).
-        source_sha = hashlib.sha256(doc_bytes).hexdigest()
-        carried = self.run_answers(parent_id)
-        extra: dict[str, bytes] = {}
-        if answers_file is not None:
-            parsed = parse_answers(answers_file.decode("utf-8", errors="replace"))
-            if not parsed.answers:
-                raise StoreError("В загруженном answers.md не найдено ни одного ответа (строки после «Ответ:» пустые)", 400)
-            submitted, origin = parsed.answers, "upload"
-            extra["answers_uploaded.md"] = answers_file  # исходный файл аналитика — для прослеживаемости
-        else:
-            submitted, origin = [Answer(a.qid, a.text.strip(), a.provenance, a.question, list(a.edits)) for a in form_answers], "form"
+            doc_name, doc_bytes, derived = self.version_document(parent, report)
+        # Документ, к которому реально применяется решение: его проверит дочерний запуск.
+        target_sha = hashlib.sha256(doc_bytes).hexdigest()
+        current_questions = {str(q.get("id")): str(q.get("prompt") or q.get("text") or "") for q in report.get("questions") or []}
 
-        # Ответы накапливаются по цепочке редакций: новый ответ на тот же вопрос заменяет прежний.
-        merged: dict[str, Answer] = dict(carried)
-        for a in submitted:
-            merged[a.qid] = a
-        if document is None and [(q, a.text, a.edits) for q, a in sorted(merged.items())] == [(q, a.text, a.edits) for q, a in sorted(carried.items())]:
-            raise StoreError(
-                "Нет новых ответов и нет исправленной редакции: повторный анализ не нужен. Заполните хотя бы один ответ.",
-                400,
-            )
-        if merged:
-            answers_bytes = compose_answers(list(merged.values()), run_id=parent_id, source_sha256=source_sha).encode("utf-8")
-            meta = {
-                "origin": origin,
-                "count": len(merged),
-                "new": len(submitted),
-                "carried": len([q for q in carried if q not in {a.qid for a in submitted}]),
-                "provenance": AnswerSet(list(merged.values())).provenance_summary(),
-            }
+        # ---- сверка версии: до объединения ответов и до создания дочернего запуска
+        extra: dict[str, bytes] = {}
+        imp_meta = None
+        imp_id = None
+        if answers_file is not None:
+            imp = read_import(answers_file, filename=answers_name)
+            imp_id = self.store.record_import(parent_id, answers_file, {
+                "original_name": answers_name, "file_sha256": imp.file_sha256, "size": len(answers_file),
+                "format": imp.format, "format_label": imp.format_label, "parser": imp.parser,
+                "declared_sha256": imp.declared_sha256, "sha_values": imp.sha_values, "target_sha256": target_sha,
+                "warnings": imp.warnings, "status": "checking",
+                "answers": [{"qid": a.qid, "text": a.text[:2000], "question": imp.questions.get(a.qid, ""),
+                             "provenance": a.provenance, "edits": [list(e) for e in a.edits], "wording": a.wording} for a in imp.answers],
+            })
+            if not imp.answers:
+                self.store.update_import(parent_id, imp_id, status="rejected", reason="no_answers")
+                raise StoreError("В загруженном файле не найдено ни одного заполненного ответа", 400, import_id=imp_id)
+            if imp.sha_conflict:
+                raise self._reject_import(parent_id, imp_id, imp, "sha_conflict",
+                    "В файле ответов несколько разных source_sha256: нельзя понять, к какой версии документа он относится. "
+                    "Ответы не применены, новый анализ не запускался.", target_sha, current_questions)
+            if imp.declared_sha256 is None:
+                raise self._reject_import(parent_id, imp_id, imp, "no_sha",
+                    "В файле ответов нет source_sha256: версия, к которой даны ответы, не указана. Автоматически такой файл "
+                    "не применяется — номера вопросов в разных версиях означают разное. Перенесите нужные ответы вручную, "
+                    "сверив вопросы, или скачайте questions.md этой версии. Новый анализ не запускался.",
+                    target_sha, current_questions)
+            if imp.declared_sha256 != target_sha:
+                where = "новую загруженную редакцию" if document is not None else f"«{doc_name}», редакция {parent.get('revision')}"
+                raise self._reject_import(parent_id, imp_id, imp, "stale_answers",
+                    f"Файл ответов относится к другой версии документа (SHA-256 {imp.declared_sha256[:12]}…), а решение "
+                    f"применяется к {where} (SHA-256 {target_sha[:12]}…). Один и тот же номер вопроса в разных версиях "
+                    "может означать разное. Ответы не применены, новый анализ не запускался.",
+                    target_sha, current_questions)
+            submitted, origin = imp.answers, "upload"
+            extra["answers_uploaded.md"] = answers_file  # оригинал аналитика рядом с собранным answers.md
+            imp_meta = {"import_id": imp_id, "parent_run_id": parent_id, "original_name": answers_name,
+                        "file_sha256": imp.file_sha256, "format": imp.format, "format_label": imp.format_label,
+                        "parser": imp.parser, "declared_sha256": imp.declared_sha256}
+        else:
+            submitted, origin = [Answer(a.qid, a.text.strip(), a.provenance, a.question, list(a.edits), a.wording.strip()) for a in form_answers], "form"
+            asked_about = questions_sha256 or version
+            if submitted and asked_about != target_sha:
+                raise StoreError(
+                    f"Ответы в форме даны к вопросам версии {asked_about[:12]}…, а проверяться будет новая редакция документа "
+                    f"({target_sha[:12]}…). Отправьте новую редакцию без ответов: движок задаст вопросы к ней заново.",
+                    409, reason="form_other_version", declared_sha256=asked_about, target_sha256=target_sha,
+                    latest_run_id=parent_id,
+                )
+        if not submitted and document is None:
+            raise StoreError("Нет ни ответа, ни новой редакции документа: повторный анализ не нужен. Заполните хотя бы один ответ.", 400)
+
+        if submitted:
+            answers_bytes = compose_answers(submitted, run_id=parent_id, source_sha256=target_sha).encode("utf-8")
+            meta = {"origin": origin, "count": len(submitted), "provenance": AnswerSet(submitted).provenance_summary(),
+                    "source_sha256": target_sha, "import": imp_meta}
         else:
             answers_bytes, meta = None, None
-        canonical = sorted((a.qid, a.text, a.provenance, [list(e) for e in a.edits]) for a in merged.values())
+        canonical = sorted((a.qid, a.text, a.provenance, [list(e) for e in a.edits], a.wording) for a in submitted)
 
-        # Ключ — от смысла решения (ответы + документ), а не от байтов answers.md:
-        # в собранном файле есть метка времени, и повторный клик дал бы новый ключ.
+        # Ключ — от смысла решения (ответы + документ), а не от байтов файла: повторная загрузка
+        # того же ответа или повторный клик возвращают уже созданную редакцию.
         content_key = hashlib.sha256(
-            json.dumps([parent_id, hashlib.sha256(doc_bytes).hexdigest(), canonical], ensure_ascii=False).encode("utf-8")
+            json.dumps([parent_id, target_sha, canonical], ensure_ascii=False).encode("utf-8")
         ).hexdigest()[:40]
 
         with self._lineage_guard:
@@ -168,6 +245,8 @@ class Service:
             if not existing.is_file():
                 latest = self.latest_of(parent)
                 if latest and latest["run_id"] != parent_id:
+                    if imp_id:
+                        self.store.update_import(parent_id, imp_id, status="rejected", reason="stale_parent")
                     raise StoreError(
                         f"Редакция {parent['revision']} устарела: после неё уже запущена редакция {latest['revision']}. "
                         "Откройте актуальный результат и отправьте решение к нему.",
@@ -187,9 +266,12 @@ class Service:
                     answers_meta=meta,
                     reason="revision",
                     extra_inputs=extra,
+                    derived_from=derived,
                 )
 
             claim = self.store.claim(parent_id, f"rev-{content_key}", create)
+        if imp_id:
+            self.store.update_import(parent_id, imp_id, status="duplicate" if claim.duplicate else "accepted", child_run_id=claim.run_id)
         if not claim.duplicate:
             self.runner.submit(claim.run_id)
         return claim
@@ -235,14 +317,14 @@ class Service:
         target = self.store.artifacts_dir(run_id) / "web" / "questions.md"
         if not target.is_file() and not self.store.read_only:
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(render_questions(report, run_id, self.run_answers(run_id)), encoding="utf-8")
+            target.write_text(render_questions(report, run_id), encoding="utf-8")
             self.store.update(run_id, artifacts=self.store.list_artifacts(run_id))
         if not target.is_file():
             raise StoreError("questions.md не сохранён в этом прогоне", 404)
         return target
 
     def run_answers(self, run_id: str, *, store: RunStore | None = None) -> dict[str, Answer]:
-        """Ответы, с которыми запущена редакция (накопленные по цепочке)."""
+        """Ответы, с которыми запущена эта редакция (answers.md во входе запуска)."""
         store = store or self.store
         rec = store.load(run_id)
         if not rec.get("answers"):

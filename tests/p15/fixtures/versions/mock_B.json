@@ -1,0 +1,58 @@
+{
+ "questions": {
+  "questions": [
+   {
+    "finding_ids": [
+     "F-001"
+    ],
+    "prompt": "Отправляется ли повторный push в том же месяце после смены порога (Ф-1 и Ф-2)?",
+    "options": [
+     "Да, после смены порога разрешён ещё один push",
+     "Нет, не более одного push в месяц"
+    ],
+    "affected_req_ids": []
+   }
+  ]
+ },
+ "clarify": {
+  "questions": [
+   {
+    "group_ids": [
+     "G1"
+    ],
+    "owner": "PO",
+    "situation": "Отправляется ли повторный push в том же месяце после смены порога (Ф-1 и Ф-2)?",
+    "prompt": "Отправляется ли повторный push в том же месяце после смены порога (Ф-1 и Ф-2)?",
+    "why": "Ответ определяет поведение системы.",
+    "blocks": [
+     "разработку",
+     "тестирование"
+    ],
+    "author_intent_hypothesis": "",
+    "document_answer": {
+     "block_id": "",
+     "quote": ""
+    },
+    "options": [
+     {
+      "id": "A",
+      "label": "Да, после смены порога разрешён ещё один push",
+      "interpretation": "Да, после смены порога разрешён ещё один push",
+      "observable_result": "Да, после смены порога разрешён ещё один push",
+      "consequences": "",
+      "edits": []
+     },
+     {
+      "id": "B",
+      "label": "Нет, не более одного push в месяц",
+      "interpretation": "Нет, не более одного push в месяц",
+      "observable_result": "Нет, не более одного push в месяц",
+      "consequences": "",
+      "edits": []
+     }
+    ]
+   }
+  ],
+  "skipped": []
+ }
+}

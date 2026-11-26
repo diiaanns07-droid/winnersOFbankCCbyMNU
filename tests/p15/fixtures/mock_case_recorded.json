@@ -1,0 +1,190 @@
+{
+ "_source": "ответы транспорта №06 (tests/p06/demo_case.py) на requirements.md; не живая модель",
+ "cross.pairs": [
+  {
+   "pairs": [
+    {
+     "verdict": "conflict",
+     "title": "Неверная сумма описана двумя исходами: 400 и 200 с ERROR",
+     "a": {
+      "condition": "при отклонении суммы — результат ERROR (пример под 200)",
+      "expected": "HTTP 200, result=ERROR",
+      "constraints": [
+       {
+        "var": "amount",
+        "op": "outside",
+        "value": "range:FX-015"
+       }
+      ]
+     },
+     "b": {
+      "condition": "параметры запроса заполнены неверно",
+      "expected": "HTTP 400",
+      "constraints": [
+       {
+        "var": "amount",
+        "op": "outside",
+        "value": "range:FX-015"
+       }
+      ]
+     },
+     "witness": {
+      "input": [
+       {
+        "var": "amount",
+        "value": "999",
+        "source": "illustrative",
+        "why": "на 1 ₸ ниже нижней границы 1 000 из Logic"
+       }
+      ],
+      "outcome_a": "HTTP 200 с {\"result\":\"ERROR\"}",
+      "outcome_b": "HTTP 400 «Некорректный запрос»",
+      "outcome_target": "код HTTP-ответа",
+      "outcome_a_value": "200",
+      "outcome_b_value": "400",
+      "evidence_a": {
+       "block_id": "b0114",
+       "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+      },
+      "evidence_b": {
+       "block_id": "b0110",
+       "quote": "Ответ в случае, если параметры запроса заполнены неверно."
+      }
+     },
+     "pair_id": "P-001"
+    },
+    {
+     "verdict": "conflict",
+     "title": "Ф-3 и Ф-4 дают разный ответ о втором push в месяце",
+     "impact": "После смены порога реализация не знает, отправлять ли второй push в том же месяце.",
+     "a": {
+      "object": "push о достижении порога",
+      "owner": "карта",
+      "condition": "push в этом месяце уже был",
+      "moment": "календарный месяц",
+      "expected": "второй push не отправляется",
+      "quote": "На карту приходится максимум один такой push за календарный месяц.",
+      "constraints": [
+       {
+        "var": "push в текущем месяце уже отправлен",
+        "op": "eq",
+        "value": "да"
+       }
+      ]
+     },
+     "b": {
+      "object": "push о достижении порога",
+      "owner": "карта",
+      "condition": "порог изменён, сумма ниже нового",
+      "moment": "следующее достижение",
+      "expected": "push отправляется",
+      "quote": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки.",
+      "constraints": [
+       {
+        "var": "порог изменён",
+        "op": "eq",
+        "value": "да"
+       },
+       {
+        "var": "накопленная сумма после смены",
+        "op": "lt",
+        "value": "$новый порог"
+       }
+      ]
+     },
+     "witness": {
+      "input": [
+       {
+        "var": "push в текущем месяце уже отправлен",
+        "value": "да",
+        "source": "illustrative",
+        "why": "10 января расходы достигли порога 50 000 ₸"
+       },
+       {
+        "var": "порог изменён",
+        "value": "да",
+        "source": "illustrative",
+        "why": "15 января порог 60 000 ₸"
+       },
+       {
+        "var": "накопленная сумма после смены",
+        "value": "50 000 ₸",
+        "source": "illustrative"
+       },
+       {
+        "var": "новый порог",
+        "value": "60 000 ₸",
+        "source": "illustrative"
+       }
+      ],
+      "outcome_a": "второй push в январе не отправляется",
+      "outcome_b": "push отправляется",
+      "outcome_target": "push при достижении 60 000 ₸ 20 января",
+      "outcome_a_value": "нет",
+      "outcome_b_value": "да",
+      "evidence_a": {
+       "block_id": "b0025",
+       "quote": "максимум один такой push за календарный месяц"
+      },
+      "evidence_b": {
+       "block_id": "b0026",
+       "quote": "следующее достижение вызывает push независимо от истории предыдущей настройки"
+      }
+     },
+     "pair_id": "P-012"
+    }
+   ]
+  },
+  {
+   "pairs": []
+  }
+ ],
+ "cross.coverage": {
+  "obligations": [
+   {
+    "obligation_id": "Ф-3#1",
+    "branches": [
+     "сумма становится равной порогу",
+     "сумма становится выше порога",
+     "сумма остаётся ниже порога"
+    ]
+   },
+   {
+    "obligation_id": "Ф-2#1",
+    "branches": [
+     "перевод не учитывается",
+     "снятие наличных не учитывается"
+    ]
+   }
+  ],
+  "links": [
+   {
+    "obligation_id": "Ф-3#1",
+    "acceptance_id": "R-009",
+    "relation": "checks_branch",
+    "branches_checked": [
+     "сумма становится равной порогу"
+    ],
+    "explanation": "48 500 + 1 500 = 50 000 ₸ — проверен только переход ровно на порог."
+   },
+   {
+    "obligation_id": "Ф-2#1",
+    "acceptance_id": "R-011",
+    "relation": "checks_branch",
+    "branches_checked": [
+     "перевод не учитывается"
+    ],
+    "explanation": "Проверен перевод; снятие наличных не проверено."
+   },
+   {
+    "obligation_id": "Ф-2#1",
+    "acceptance_id": "R-010",
+    "relation": "contradicts",
+    "explanation": "По Ф-2 покупка 31.01 относится к январю, приёмка ожидает февраль."
+   }
+  ]
+ },
+ "verify_meaning": {
+  "__verdicts__": "confirmed"
+ }
+}
