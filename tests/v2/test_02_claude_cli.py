@@ -257,3 +257,12 @@ def test_cli_output_token_maximum_text_is_truncated():
         provider(FakeRunner(json.dumps(out), returncode=1)).invoke(model="haiku", messages=MESSAGES, schema=SCHEMA,
                                                                     timeout_s=30)
     assert e.value.kind == "truncated" and not e.value.transient
+
+
+def test_five_hour_limit_is_quota_with_reset_time():
+    out = error_out(429, "rate_limit_error", "You've hit your 5-hour limit · resets 9am (Asia/Almaty)")
+    with pytest.raises(ProviderError) as e:
+        provider(FakeRunner(json.dumps(out), returncode=1)).invoke(model="opus", messages=MESSAGES, schema=SCHEMA,
+                                                                    timeout_s=30)
+    assert e.value.kind == "quota" and not e.value.transient
+    assert "Сброс лимита: 9am (Asia/Almaty)" in e.value.message

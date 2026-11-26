@@ -146,16 +146,18 @@ def classify_cli_result(out: Mapping[str, Any] | None, *, returncode: int, stder
     if ("output token maximum" in low or "exceeded the" in low and "output token" in low
             or "max output tokens" in low or out.get("stop_reason") == "max_tokens"):
         return err("truncated", "Ответ модели обрезан по лимиту выходных токенов (claude -p).")
-    if ("usage limit" in low or "hit your limit" in low or "limit reached" in low or "out of extra usage" in low
-            or "credit balance is too low" in low):
+    if ("usage limit" in low or re.search(r"hit your [\w\- ]*limit", low) or "limit reached" in low
+            or "out of extra usage" in low or "credit balance is too low" in low):
         retry = None
         m = _RESET_RE.search(result)
         if m:
             ts = int(m.group(1))
             ts = ts / 1000 if ts > 10**11 else ts
             retry = max(0.0, ts - time.time())
-        return err("quota", "Исчерпан лимит подписки Claude Code. Дождитесь сброса лимита или выберите другого "
-                            "провайдера (--provider gemini с GEMINI_API_KEY).", retry)
+        reset = re.search(r"resets? (?:at )?([^\]\n·|]{1,40})", result, flags=re.IGNORECASE)
+        when = f" Сброс лимита: {reset.group(1).strip()}." if reset else ""
+        return err("quota", f"Исчерпан лимит подписки Claude Code.{when} До сброса выберите другую модель "
+                            "(--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY).", retry)
     if status == 401 or status == 403 or etype in ("authentication_error", "permission_error") or any(
             s in low for s in ("invalid api key", "please run /login", "not logged in", "oauth token", "/login")):
         return err("auth", "Claude Code не авторизован. Выполните «claude» в терминале и войдите в аккаунт "
