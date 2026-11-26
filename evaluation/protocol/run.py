@@ -57,14 +57,17 @@ def main():
     parser.add_argument("--product", type=Path, required=True)
     inputs=parser.add_mutually_exclusive_group(required=True)
     inputs.add_argument("--vault", type=Path, help="Custodian directory with sealed reference")
-    inputs.add_argument("--input-pack", type=Path, help="Six input documents and public-hash manifest, without labels")
+    inputs.add_argument("--input-pack", type=Path, help="Input documents and a sealed manifest, without labels")
+    parser.add_argument("--input-seal", type=Path, help="Published receipt for a separate input-only panel")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--mode", choices=["rules_only","rules_plus_llm"],required=True)
     parser.add_argument("--suite", choices=["all","panel"],required=True)
     args=parser.parse_args()
     product, out = args.product.resolve(), args.out.resolve()
     mode=args.mode
-    seal=read(HERE/"seal.json")
+    if args.input_seal and not args.input_pack:
+        parser.error("--input-seal requires --input-pack")
+    seal=read(args.input_seal or HERE/"seal.json")
     if args.input_pack:
         corpus=args.input_pack.resolve()
         if args.suite!="panel" or digest(corpus/"panel.manifest.json")!=seal["panel_manifest_sha256"]:
@@ -84,6 +87,7 @@ def main():
         parser.error("Run requires a clean checkout of the exact product SHA in seal.json")
     if (product/".env").exists(): parser.error("Use the clean checkout and pass the live credential through the environment")
     if mode=="rules_plus_llm":
+        if not seal.get("live_allowed",True): parser.error("This panel is reserved for offline evaluation")
         if args.suite!="panel": parser.error("Live measurements use the frozen six-document panel")
         if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")): parser.error("Team Gemini key missing; no measurements taken")
     out.mkdir(parents=True,exist_ok=False)
