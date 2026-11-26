@@ -127,6 +127,8 @@ def test_ops_major_without_hook_is_minor():
                                      _cand("Параллельные покупки у границы лимита", "major", "ops_risk", "risk"),
                                      _cand("Сбой зачисления: итог не описан", "major", "ops_risk", "risk")], doc)
     assert {c["severity"] for c in kept} == {"minor"}
+    kept, _ = lens_risk.postprocess([_cand("Возврат при лимите 10 000 ₸ и пороге 500 ₸ даёт неопределённый итог")], doc)
+    assert kept[0]["severity"] == "major", "сумма 500 ₸ — не код ответа 5xx"
     doc2 = "Повторная доставка одного события сохраняет исходный итог."
     kept, _ = lens_risk.postprocess([_cand("Нет ключа дедупликации событий", "major", "ops_risk", "risk")], doc2)
     assert kept[0]["severity"] == "major"
