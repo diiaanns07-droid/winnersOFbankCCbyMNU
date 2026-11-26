@@ -37,9 +37,10 @@ class _Seg:
         self._expect = (line, col + len(chunk))
 
     def add_synthetic(self, chunk: str) -> None:
-        """Разделитель, которого нет в исходнике (перевод строки, « | »): отдельный отрезок без сдвига."""
+        """Разделитель, которого нет в исходнике (перевод строки, « | »): отрезок ``[start, 0, 0]`` — без позиции."""
         if not chunk:
             return
+        self.map.append([len(self.text), 0, 0])
         self.text += chunk
         self._expect = None
 
@@ -292,6 +293,6 @@ def source_position(block: dict[str, Any], offset: int) -> tuple[int, int] | Non
             seg = entry
         else:
             break
-    if seg is None:
+    if seg is None or seg[1] == 0:
         return None
     return seg[1], seg[2] + (offset - seg[0])
