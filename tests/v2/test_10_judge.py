@@ -520,3 +520,14 @@ def test_missing_element_critical_needs_two_reviewers():
     # мало источников в прогоне (например, повторная проверка №11) — правило не действует
     res2 = judge.run(Ctx(FakeLLM(response([fs[1]]))), [cs[2]])
     assert res2["findings"][0]["severity"] == "critical"
+
+
+def test_user_texts_have_no_latin_severity_words():
+    cs = [cand("C-001", 38, "Месяц определяется")]
+    f = finding("F01", ["C-001"], title="Один major-дефект в F01")
+    chk = [{"n": 1, "answer": "Нет", "comment": "Есть critical и minor-замечания.", "finding_keys": ["F01"]}]
+    res = judge.run(Ctx(FakeLLM(response([f], checklist=chk, summary="Critical-дефектов нет, но major-дефектов три."))), cs)
+    texts = [res["verdict_summary"], res["checklist"][0]["comment"], res["findings"][0]["title"]]
+    for t in texts:
+        assert not re.search(r"\b(critical|major|minor)\b", t, re.I), t
+    assert res["verdict_summary"].startswith("критичных дефектов нет")

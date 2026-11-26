@@ -761,6 +761,33 @@ def _assign_priorities(findings: list[dict]) -> None:
         f["priority"] = i
 
 
+_SEV_ADJ = {"critical": ("критичный", "критичные", "критичных"),
+            "major": ("существенный", "существенные", "существенных"),
+            "minor": ("незначительный", "незначительные", "незначительных")}
+_SEV_WORD_RE = re.compile(r"\b(critical|major|minor)(?:[- ](дефект|замечание|дефекты|замечания|дефектов|замечаний)\b)?",
+                          re.I)
+
+
+def _sev_sub(m: re.Match) -> str:
+    one, many, gen = _SEV_ADJ[m.group(1).lower()]
+    noun = (m.group(2) or "").lower()
+    if noun in ("дефект", "замечание"):
+        return f"{one if noun == 'дефект' else one[:-2] + 'ое'} {noun}"
+    if noun in ("дефекты", "замечания"):
+        return f"{many} {noun}"
+    if noun in ("дефектов", "замечаний"):
+        return f"{gen} {noun}"
+    prev = m.string[max(0, m.start() - 12):m.start()].lower()
+    if re.search(r"(\d|нет|пять|шесть|семь|восемь|много|несколько|два|три|четыре)\s*$", prev):
+        return f"{gen} дефектов" if not re.search(r"(два|три|четыре|\b[234])\s*$", prev) else f"{gen} дефекта"
+    return f"{many} дефекты"
+
+
+def _ru_levels(text: str) -> str:
+    """Страховка «только русский»: латинские названия уровней в тексте для читателя → русские."""
+    return _SEV_WORD_RE.sub(_sev_sub, text) if text else text
+
+
 def _replace_keys(text: str, key_map: dict[str, str]) -> str:
     if not text or not key_map:
         return text
@@ -919,20 +946,20 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         final_check.append({
             "item": text,
             "answer": _s(ch.get("answer")),
-            "comment": _words_cut(_replace_keys(_s(ch.get("comment")), key_map), 30),
+            "comment": _words_cut(_ru_levels(_replace_keys(_s(ch.get("comment")), key_map)), 30),
             "finding_ids": list(dict.fromkeys(fids)),
         })
     if missed_items:
         _warn(ctx, warnings, f"судья не заполнил {missed_items} пункт(ов) чек-листа; заполнены кодом")
 
-    summary = _replace_keys(_s(response.get("verdict_summary")), key_map)
+    summary = _ru_levels(_replace_keys(_s(response.get("verdict_summary")), key_map))
     if not summary:
         summary = fallback_summary(clean)
 
     # 7. ссылки на ключи в текстах дефектов → D-xx
     for f in clean:
-        for field in ("problem", "scenario", "impact", "recommendation", "question"):
-            f[field] = _replace_keys(f[field], {k: v for k, v in key_map.items() if not k.startswith("C-")})
+        for field in ("title", "problem", "scenario", "impact", "recommendation", "question"):
+            f[field] = _ru_levels(_replace_keys(f[field], {k: v for k, v in key_map.items() if not k.startswith("C-")}))
 
     fix_first = [f["id"] for f in sorted((f for f in clean if f["priority"] > 0), key=lambda f: f["priority"])]
     changes = [{"id": key_map[k], **v} for k, v in (response.get("_checks") or {}).items() if k in key_map]
