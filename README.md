@@ -307,7 +307,9 @@ docker run --rm --env-file .env -v "$(pwd)/reports:/app/reports" bcc-review rele
 ```
 
 В PowerShell вместо `$(pwd)` пишите `${PWD}`. Свой документ положите в `reports/` и передайте путь
-`reports/<файл>`.
+`reports/<файл>`; отчёт появится там же. Коммит агента для паспорта образ берёт из `.git` при сборке.
+В контейнере работают `gemini`, `anthropic`, `openai` и `offline`; `claude_cli` — нет (в образе нет авторизованного
+Claude Code). Ollama на той же машине: `OPENAI_BASE_URL=http://host.docker.internal:11434/v1`.
 
 ## Ограничения
 
