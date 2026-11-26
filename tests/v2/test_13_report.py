@@ -391,3 +391,13 @@ def test_candidate_count_excludes_non_proposing_stages(sample):
     r["run"]["stage_stats"]["quotes"]["candidates"] = 45
     md = markdown.render(r)
     assert "Кандидатов в дефекты: 45." in md
+
+
+def test_identifiers_in_model_text_become_code():
+    assert markdown.prose("Клиент читает response.result и поле monthSpent") == \
+        "Клиент читает `response.result` и поле `monthSpent`"
+    assert markdown.prose("Добавить GET /alerts/limit?cardId=... с ответом") == \
+        "Добавить GET `/alerts/limit?cardId=...` с ответом"
+    assert markdown.prose("поле limit_kzt и `уже код` и 1.5 и т.е.") == "поле `limit_kzt` и `уже код` и 1.5 и т.е."
+    assert markdown.prose("путь /alerts/saveLimit. Дальше") == "путь `/alerts/saveLimit`. Дальше"
+    assert markdown.prose("сумма 50 000 ₸, Ф-2, push, API") == "сумма 50 000 ₸, Ф-2, push, API"

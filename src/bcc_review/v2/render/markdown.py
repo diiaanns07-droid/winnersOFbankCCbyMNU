@@ -192,10 +192,31 @@ def _link_ids(text: str) -> str:
                       text)
 
 
+_PATH = re.compile(r"(?<![\w`/.])(/[A-Za-z](?:[\w/{}.-]*[\w/}])?(?:\?[\w=&.%{}-]*[\w=}.])?)")
+_IDENT = re.compile(r"(?<![\w`$./=?&-])("
+                    r"[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+"          # camelCase
+                    r"|[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+"    # snake_case
+                    r"|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+"          # a.b.c
+                    r")(?![\w`(])")
+
+
+def _code_spans(text: str) -> str:
+    """Пути API и идентификаторы — как код; уже оформленный код не трогается."""
+    parts = re.split(r"(`[^`]*`)", text)
+    for i in range(0, len(parts), 2):
+        p = _CALL.sub(r"`\1`", parts[i])
+        sub = re.split(r"(`[^`]*`)", p)
+        for j in range(0, len(sub), 2):
+            sub[j] = _IDENT.sub(r"`\1`", _PATH.sub(r"`\1`", sub[j]))
+        parts[i] = "".join(sub)
+    return "".join(parts)
+
+
 def prose(text) -> str:
     """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»;
-    выражения вида floor(x/100) — как код; упоминания D-…, R-…, Q-… — ссылки."""
-    return _link_ids(_CALL.sub(r"`\1`", _LREF.sub(_lref, esc(text))))
+    выражения floor(x/100), пути /a/b?x=1 и идентификаторы monthSpent, limit_kzt, response.result — как код;
+    упоминания D-…, R-…, Q-… — ссылки."""
+    return _link_ids(_code_spans(_LREF.sub(_lref, esc(text))))
 
 
 _SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
