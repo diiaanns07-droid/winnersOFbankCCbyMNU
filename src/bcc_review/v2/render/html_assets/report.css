@@ -466,8 +466,11 @@ table.kv th { width: 210px; font-size: 13px; text-transform: none; letter-spacin
   .panel { display: block !important; margin-top: 14px; }
   .panel > .ph { display: block; font-size: 15pt; margin: 6px 0 10px; padding-bottom: 4px; border-bottom: 2px solid var(--ink); break-after: avoid; }
   #p-questions, #p-checklist, #p-passport { break-before: page; }
-  .split { display: block; }
-  .card, .qcard, .vcard, .fixfirst, tr { break-inside: avoid; }
+  .split, .flist, .cards, .evs, .meta, .ch, .cf { display: block; }
+  .meta .chip, .ch > *, .cf .fl { display: inline-block; margin: 0 6px 3px 0; }
+  .ev { display: flex; }
+  .card, .qcard, .vcard, .fixfirst, tr, .foot { break-inside: avoid; }
+  .foot { padding: 10px 0 0; }
   .card { cursor: default; margin-bottom: 8px; }
   .card.active { box-shadow: none; }
   .more summary { display: none; }
