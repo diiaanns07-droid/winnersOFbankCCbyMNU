@@ -115,12 +115,22 @@ def test_postprocess_tolerates_garbage(bad):
     assert _load_stage().postprocess(bad) == []
 
 
-# --- реальный ответ модели (haiku, промпт v1) на официальном документе ---
+# --- реальные ответы модели (сохранены из прогонов try_prompt.py) ---
 
-FIXTURE = ROOT / "tests" / "v2" / "fixtures" / "05_analyst" / "official.haiku.v1.json"
-DOC = ROOT / "release" / "input" / "requirements.md"
+FIX_DIR = ROOT / "tests" / "v2" / "fixtures" / "05_analyst"
+CASES = ROOT / "evaluation" / "dev" / "corpus" / "cases"
 KEYS = {"title", "kind", "criterion", "severity", "requirement_ids", "evidence", "problem", "scenario",
         "impact", "recommendation", "rewrite", "question", "blocks"}
+
+
+def _doc_for(fixture: Path) -> Path:
+    case = fixture.name.split(".sonnet.")[0].split(".haiku.")[0]
+    if case == "official":
+        return ROOT / "release" / "input" / "requirements.md"
+    return CASES / case / "source.md"
+
+
+FIXTURES = sorted(FIX_DIR.glob("*.json"))
 
 
 def _norm(s: str) -> str:
@@ -130,9 +140,14 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
-def test_fixture_answer_matches_candidate_schema():
+def _answer(fx: Path) -> dict:
     import json
-    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    return json.loads(fx.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("fx", FIXTURES, ids=lambda p: p.name)
+def test_fixture_answer_matches_candidate_schema(fx):
+    data = _answer(fx)
     assert data["candidates"]
     for c in data["candidates"]:
         assert set(c) == KEYS
@@ -141,21 +156,26 @@ def test_fixture_answer_matches_candidate_schema():
         assert c["evidence"] and all({"quote", "line"} <= set(e) for e in c["evidence"])
 
 
-def test_fixture_quotes_are_found_near_given_line():
-    import json
-    lines = DOC.read_text(encoding="utf-8").splitlines()
-    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    for c in data["candidates"]:
+@pytest.mark.parametrize("fx", FIXTURES, ids=lambda p: p.name)
+def test_fixture_quotes_are_found_near_given_line(fx):
+    lines = _doc_for(fx).read_text(encoding="utf-8").splitlines()
+    for c in _answer(fx)["candidates"]:
         for e in c["evidence"]:
             q = _norm(e["quote"])
             near = range(max(0, e["line"] - 3), min(len(lines), e["line"] + 2))
             assert any(q in _norm(lines[i]) for i in near), (c["title"], e)
 
 
-def test_fixture_postprocess_respects_lens_rules():
-    import json
-    pp = _load_stage().postprocess
-    out = pp(json.loads(FIXTURE.read_text(encoding="utf-8"))["candidates"])
+@pytest.mark.parametrize("fx", FIXTURES, ids=lambda p: p.name)
+def test_fixture_postprocess_respects_lens_rules(fx):
+    out = _load_stage().postprocess(_answer(fx)["candidates"])
     assert 1 <= len(out) <= 12
     assert sum(c["severity"] == "critical" for c in out) <= 2
     assert all(c["severity"] == "minor" for c in out if c["kind"] == "non_singular")
+
+
+def test_clean_base_answer_has_no_critical():
+    for fx in FIXTURES:
+        if ".base." in fx.name:
+            out = _load_stage().postprocess(_answer(fx)["candidates"])
+            assert not [c for c in out if c["severity"] == "critical"], fx.name
