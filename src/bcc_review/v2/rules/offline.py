@@ -111,6 +111,22 @@ def verdict(findings: list[dict]) -> dict:
             "summary": summary, "fix_first": [f["id"] for f in (dev or test)[:3]]}
 
 
+def _git_state() -> tuple[str, bool]:
+    """Коммит агента и признак незакоммиченных правок (для паспорта); без git — пусто."""
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[4]
+    try:
+        commit = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True,
+                                timeout=5).stdout.strip()
+        dirty = bool(subprocess.run(["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+                                    capture_output=True, text=True, timeout=5).stdout.strip())
+        return commit, dirty
+    except Exception:  # noqa: BLE001
+        return "", False
+
+
 def build(view: dict, requirements: Any = None, *, started_at: str | None = None,
           rules_out: dict | None = None) -> dict:
     """Отчёт по форме report.json для прогона без модели."""
@@ -127,10 +143,12 @@ def build(view: dict, requirements: Any = None, *, started_at: str | None = None
     quotes_total = sum(len(f["evidence"]) for f in findings)
     with_findings = {r for f in findings for r in f["requirement_ids"]}
     finished = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+    commit, dirty = _git_state()
     return {
         "schema": "bcc-review/2",
         "title": TITLE,
-        "run": {"agent": "bcc_review", "version": "2", "provider": "offline", "model_requested": "",
+        "run": {"agent": "bcc_review", "version": "2", "commit": commit, "dirty": dirty,
+                "provider": "offline", "model_requested": "",
                 "models_used": [], "calls": {"total": 0, "cached": 0, "failed": 0, "split": 0},
                 "tokens": {"input": 0, "output": 0}, "cost_usd": 0.0, "status": "complete",
                 "started_at": started, "finished_at": finished, "duration_s": round(time.monotonic() - t0, 2),
