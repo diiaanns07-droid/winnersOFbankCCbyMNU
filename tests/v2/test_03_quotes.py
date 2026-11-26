@@ -207,3 +207,13 @@ def test_official_segment_fixture_quotes_resolve(md):
             found += 1
             assert r["line_start"] - 2 <= m["line_start"] <= r["line_end"] + 2, (r["id"], m)
     assert found == len(reqs)
+
+
+def test_numbered_prefixes_in_quote(md, pdf):
+    """Модель иногда копирует цитату вместе с префиксом нумерованного вида: «L038| …», «[с.2] …»."""
+    m = Q.verify_quote(md, "L038| Ф-2. Месяц определяется по дате совершения покупки", 38)
+    assert m["line_start"] == 38 and m["text"] == "Ф-2. Месяц определяется по дате совершения покупки"
+    m = Q.verify_quote(md, "Ответ в случае успешного выполнения метода.\nL163| 400. Ответ в случае", 162)
+    assert (m["line_start"], m["line_end"]) == (162, 163)
+    m = Q.verify_quote(pdf, "L025| [с.2] Ф-2. Месяц определяется", 25)
+    assert m["line_start"] == 25 and m["page"] == 2 and not m["text"].startswith("[")

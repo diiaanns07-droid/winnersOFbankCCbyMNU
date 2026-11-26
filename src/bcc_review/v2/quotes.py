@@ -100,9 +100,13 @@ def _norm_map(s: str) -> tuple[str, list[int]]:
     return "".join(out_c), out_i
 
 
+_LINE_PREFIX = re.compile(r"(?:(?<=\s)|^)L\d{1,5}\s?\|\s?|\[с\.\s?\d{1,4}\]\s?", re.IGNORECASE)
+
+
 def _clean_quote(q: str) -> str:
-    """Нормализованная цитата без обрамления: ведущие маркеры, кавычки и точки по краям не нужны для поиска."""
-    t = normalize(q)
+    """Нормализованная цитата без обрамления: ведущие маркеры, кавычки и точки по краям не нужны для поиска.
+    Префиксы нумерованного вида «L038| » и «[с.2] », скопированные моделью вместе с текстом, снимаются."""
+    t = normalize(_LINE_PREFIX.sub(" ", q))
     t = _LEAD.sub("", t)
     return t.strip(_EDGE + "…").strip()
 
@@ -268,7 +272,8 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
     """Найти цитату в документе. Возвращает Match или None (см. описание модуля)."""
     if not isinstance(quote, str):
         return None
-    raw = quote.strip()
+    raw = _LINE_PREFIX.sub(" ", quote).strip() if _LINE_PREFIX.search(quote) else quote.strip()
+    raw = re.sub(r"\s{2,}", " ", raw) if raw != quote.strip() else raw
     needle = _clean_quote(raw)
     if len(needle) < MIN_QUOTE:
         return None
@@ -490,3 +495,52 @@ def verify_requirements(view: dict, requirements: Iterable[dict]) -> dict:
         if not r.get("section"):
             r["section"] = m["section"]
     return {"requirements": reqs, "missing": missing}
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``python -m bcc_review.v2.quotes ФАЙЛ "цитата" [--line N] [--near A-B]`` или ``--candidates out.json``."""
+    import argparse
+    import json
+    import sys
+
+    from . import docview
+
+    ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.quotes", description="Сверка цитат с документом")
+    ap.add_argument("file")
+    ap.add_argument("quote", nargs="?", default="")
+    ap.add_argument("--line", type=int, default=None)
+    ap.add_argument("--near", default="", help="строки требования, например 38-40")
+    ap.add_argument("--candidates", help="JSON с полем candidates (ответ линзы) — сверить все цитаты")
+    ap.add_argument("--requirements", help="segment.json — строки требований как подсказки")
+    a = ap.parse_args(argv)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+    view = docview.load(a.file)
+    if a.candidates:
+        data = json.loads(open(a.candidates, encoding="utf-8").read())
+        reqs = None
+        if a.requirements:
+            reqs = json.loads(open(a.requirements, encoding="utf-8").read()).get("requirements")
+        cands = data.get("candidates", data if isinstance(data, list) else [])
+        hints = [[(e.get("line"), e.get("quote")) for e in c.get("evidence") or []] for c in cands]
+        res = verify_candidates(view, cands, reqs, keep_missing_evidence=True)
+        for c, hs in zip(res["candidates"] + res["rejected"], hints):
+            for e in c.get("evidence") or []:
+                mark = e["verified"] if e["verified"] != "missing" else "НЕТ"
+                print(f"{c.get('id') or '—':<6} L{e.get('line_start')}–{e.get('line_end')} {mark:<10} "
+                      f"«{str(e.get('quote'))[:90]}»")
+        print(json.dumps(res["stats"], ensure_ascii=False))
+        return 0
+    near = []
+    if a.near:
+        x, _, y = a.near.partition("-")
+        near = [(int(x), int(y or x))]
+    m = verify_quote(view, a.quote, a.line, near)
+    print(json.dumps(m, ensure_ascii=False, indent=1) if m else "цитата не найдена")
+    return 0 if m else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

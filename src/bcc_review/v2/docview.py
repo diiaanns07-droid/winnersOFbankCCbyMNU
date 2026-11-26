@@ -345,3 +345,36 @@ def summary(view: dict) -> dict[str, Any]:
     """Паспорт документа для report.json: {title, file, format, sha256, lines, pages}."""
     return {"title": view.get("title", ""), "file": view.get("file", ""), "format": view.get("format", ""),
             "sha256": view.get("sha256", ""), "lines": len(view.get("lines") or []), "pages": view.get("pages")}
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``python -m bcc_review.v2.docview ФАЙЛ [--from N] [--to M] [--json]`` — показать нумерованный вид."""
+    import argparse
+    import json
+    import sys
+
+    ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.docview", description="Документ с номерами строк")
+    ap.add_argument("file")
+    ap.add_argument("--from", dest="start", type=int, default=1)
+    ap.add_argument("--to", dest="end", type=int, default=None)
+    ap.add_argument("--json", action="store_true", help="DocView целиком в JSON")
+    a = ap.parse_args(argv)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+    view = load(a.file)
+    if a.json:
+        print(json.dumps(view, ensure_ascii=False, indent=1))
+        return 0
+    s = summary(view)
+    print(f"# {s['title']} · {s['file']} · {s['format']} · строк {s['lines']}"
+          + (f" · страниц {s['pages']}" if s["pages"] else "") + f" · sha256 {s['sha256'][:12]}")
+    for w in view["warnings"]:
+        print(f"# предупреждение: {w}")
+    print(numbered(view, a.start, a.end))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
