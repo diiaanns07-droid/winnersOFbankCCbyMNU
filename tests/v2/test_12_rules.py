@@ -147,6 +147,7 @@ def test_clean_documents_at_most_one(case_id):
 MUTANTS = {
     "autopay.drop_promised.no_409_status": ("rules:api.status_409", 73),
     "autopay.two_statuses.range_422": ("rules:api.status_422", 76),
+    "autopay.unit_change.limit_per_hour": ("rules:units.period_mix", 28),
     "cardblock.unit_change.blocked_at_utc": ("rules:units.timezone_mix", 79),
     "cashback.drop_promised.no_read_method": ("rules:promises.named_method", 40),
     "cashback.two_statuses.bad_category_200": ("rules:api.success_with_error", 85),

@@ -104,7 +104,7 @@ class Method:
 
     @property
     def label(self) -> str:
-        return self.name or self.url or self.verb
+        return self.name or self.url
 
     def mutating_reason(self) -> tuple[str, Line | None] | None:
         if self.name:
@@ -240,7 +240,7 @@ def rule_get_mutation(doc: Doc, methods: list[Method], out: dict) -> None:
                 "веб-сервера")
         c = candidate(
             "api.get_mutation",
-            title=f"Метод {m.label} изменяет данные, но объявлен как {m.verb}",
+            title=f"Метод {m.label + ' ' if m.label else ''}изменяет данные, но объявлен как {m.verb}",
             kind="api_contract", criterion="correct", severity="major", blocks="development",
             evidence=evidence,
             problem=(f"По документу метод изменяет состояние ({reason}), а тип запроса — {m.verb}. "
@@ -257,7 +257,7 @@ def rule_get_mutation(doc: Doc, methods: list[Method], out: dict) -> None:
         )
         out["candidates"].append(c)
         out["signals"].append(signal("api.get_mutation", m.verb_line, evidence[0]["quote"],
-                                     f"Метод {m.label} изменяет данные ({reason}), но объявлен как {m.verb}.",
+                                     f"Метод {m.label or m.verb} изменяет данные ({reason}), но объявлен как {m.verb}.",
                                      ("architect", "risk"), "api_contract"))
 
 
@@ -292,7 +292,7 @@ def rule_content_type_without_body(doc: Doc, methods: list[Method], out: dict) -
         ct_frag = ct.joined[ct_m.start():ct_m.end()] if ct_m else ct.joined
         nb_m = NO_BODY.search(nb.joined)
         nb_frag = nb.joined if len(nb.joined) <= 80 else nb.joined[nb_m.start():nb_m.end()]
-        label = f" метода {m.label}" if m else ""
+        label = f" метода {m.label}" if m and m.label else ""
         out["candidates"].append(candidate(
             "api.content_type_without_body",
             title=f"Для запроса{label} указан Content-Type, хотя тело запроса не используется",
@@ -604,7 +604,7 @@ def rule_field_types(doc: Doc, methods: list[Method], out: dict) -> None:
             q2 = cell_quote(r2, ni2, ti2) if ti2 == ni2 + 1 else ev(r2, r2.cells[ti2])
             evidence += [q1, q2]
             desc.append(f"{nm}: в запросе {r1.cells[ti1]}, в ответе {r2.cells[ti2]}")
-        label = f" метода {m.label}" if m else ""
+        label = f" метода {m.label}" if m and m.label else ""
         out["candidates"].append(candidate(
             "api.field_types",
             title=f"Тип {'поля' if len(names) == 1 else 'полей'} {fmt_list(names)} в запросе и ответе{label} различается",
@@ -631,7 +631,7 @@ def rule_inventory(doc: Doc, methods: list[Method], out: dict) -> None:
     parts = []
     for m in methods:
         kind = "чтение" if m.is_read() else "изменение"
-        parts.append(f"{m.label} ({m.verb}, {kind})")
+        parts.append(f"{m.label or 'без имени'} ({m.verb}, {kind})")
     out["signals"].append(signal("api.methods", methods[0].verb_line, methods[0].verb_line.joined[:80],
                                  "Описанные методы API: " + "; ".join(parts) + ".", ("architect",), "inventory"))
 

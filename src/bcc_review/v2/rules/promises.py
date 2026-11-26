@@ -57,7 +57,7 @@ def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
         first = lines[0]
         frag = _sentence(first.joined, name)
         evidence = [ev(first, frag)] + [ev(y, _sentence(y.joined, name)) for y in lines[1:2]]
-        described = fmt_list([m.label for m in methods])
+        described = fmt_list([m.label or m.verb for m in methods])
         is_read = split_camel(name)[0] in READ_TOKENS
         out["candidates"].append(candidate(
             "promises.named_method",
@@ -104,7 +104,7 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
         return
     if reads:
         # обещание есть и чтение есть — линзе архитектора полезно знать, что именно читается
-        names = fmt_list([m.label for m in reads])
+        names = fmt_list([m.label or m.verb for m in reads])
         out["signals"].append(signal("promises.read", promises[0][0], promises[0][1],
                                      f"Обещано чтение или показ данных; операции чтения: {names}. "
                                      "Проверьте, что они возвращают всё, что показывается.",
@@ -112,7 +112,7 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
         return
     if any(split_camel(n)[0] in READ_TOKENS for n in named):
         return  # уже есть кандидат «метод чтения упомянут, но не описан»
-    described = fmt_list([f"{m.label} ({m.verb})" for m in methods])
+    described = fmt_list([f"{m.label} ({m.verb})" if m.label else m.verb for m in methods])
     evidence = [ev(p[0], p[1]) for p in promises[:3]]
     mut = [m for m in methods if m.mutating_reason()]
     if mut and mut[0].desc_line is not None and all(e["line"] != mut[0].desc_line.n for e in evidence):

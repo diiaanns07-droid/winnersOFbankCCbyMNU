@@ -5,7 +5,8 @@
     block = rules.format_signals(out["signals"], audience="architect")   # текст блока <сигналы>
 
 * Кандидат — схема CONTRACT 2.3, `source` = `rules:<правило>`. Цитаты — подстроки строк документа.
-* Сигнал — подсказка линзе: `{"id": "S-01", "rule", "kind", "line", "quote", "message", "audience"}`,
+* Сигнал — подсказка линзе: `{"id": "S-01", "rule", "kind", "line", "lines", "quote", "message", "note",
+  "audience"}` (`lines` — все строки доказательств правила, `note` = `message`),
   `audience` ⊂ {analyst, qa, architect, risk, consistency}.
 * Правила не знают слов конкретного документа: словари общие для банковских ТЗ.
 """
@@ -79,8 +80,14 @@ def run(view: dict, requirements: Any = None) -> dict:
             continue
         seen.add(key)
         uniq.append(s)
+    ev_lines = {}
+    for c in cands:
+        ev_lines.setdefault(c["source"].split(":", 1)[1], sorted({e["line"] for e in c["evidence"]}))
     for i, s in enumerate(uniq, 1):
         s["id"] = f"S-{i:02d}"
+        # вид, удобный линзам (№07): все строки доказательств и пояснение
+        s["lines"] = ev_lines.get(s["rule"]) or [s["line"]]
+        s["note"] = s["message"]
     res = {"signals": uniq, "candidates": cands}
     if out.get("warnings"):
         res["warnings"] = out["warnings"]

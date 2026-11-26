@@ -183,19 +183,102 @@ def rule_timezone(doc: Doc, out: dict) -> None:
                                  ("consistency", "risk"), "unit_mismatch"))
 
 
-PERIOD = re.compile(r"\b(?:за|в)\s+(?:один\s+|одн[иу]\s+|текущ\w+\s+|календарн\w+\s+)?"
-                    r"(час|сутки|день|недел\w|месяц|минут\w)\b", re.I)
+PERIOD = re.compile(r"\b(?:за|в)\s+(?:один\s+|одн[иу]\s+|текущ\w+\s+|календарн\w+\s+|последн\w+\s+)?"
+                    r"(час|сутки|суток|день|дня|недел\w|месяц\w*|минут\w)\b", re.I)
 LIMIT = re.compile(r"не\s+больше|не\s+более|максимум|не\s+чаще|не\s+свыше|лимит\w*|ограничен\w*", re.I)
+LIMIT_COUNT = re.compile(r"(?:не\s+больше|не\s+более|максимум|не\s+чаще|не\s+свыше)\s+(\d+|[а-яё]+)\s+"
+                         r"((?:[а-яё]+\s+){0,1}[а-яё]+)", re.I)
+NUM_WORDS = {
+    1: ("один", "одна", "одно", "одного", "одной", "одни", "одних"), 2: ("два", "две", "двух"),
+    3: ("три", "трёх", "трех"), 4: ("четыре", "четырёх", "четырех"), 5: ("пять", "пяти"),
+    6: ("шесть", "шести"), 7: ("семь", "семи"), 8: ("восемь", "восьми"), 9: ("девять", "девяти"),
+    10: ("десять", "десяти"),
+}
+WORD_NUM = {w: n for n, ws in NUM_WORDS.items() for w in ws}
+PERIOD_RU = {"час": "час", "сутк": "сутки", "суто": "сутки", "день": "сутки", "дня": "сутки",
+             "неде": "неделя", "меся": "месяц", "мину": "минута"}
+
+
+def _period(word: str) -> str:
+    w = word.lower()
+    for k, v in PERIOD_RU.items():
+        if w.startswith(k):
+            return v
+    return w
+
+
+def _num(tok: str) -> int | None:
+    t = tok.lower()
+    if t.isdigit():
+        return int(t)
+    return WORD_NUM.get(t)
+
+
+def _lcs(a: str, b: str) -> int:
+    a, b = a.lower(), b.lower()
+    best = 0
+    prev = [0] * (len(b) + 1)
+    for i in range(1, len(a) + 1):
+        cur = [0] * (len(b) + 1)
+        for j in range(1, len(b) + 1):
+            if a[i - 1] == b[j - 1]:
+                cur[j] = prev[j - 1] + 1
+                best = max(best, cur[j])
+        prev = cur
+    return best
 
 
 def rule_period(doc: Doc, out: dict) -> None:
+    """Один и тот же лимит (число + предмет) за разные периоды: «за час» в правиле, «за сутки» в приёмке."""
+    lines = [x for x in doc.lines if x.text and not x.is_code]
+    for x in lines:
+        t = x.joined
+        pm = PERIOD.search(t)
+        if not pm:
+            continue
+        for m in LIMIT_COUNT.finditer(t):
+            n = _num(m.group(1))
+            if n is None:
+                continue
+            noun = max(m.group(2).split(), key=len)
+            if len(noun) < 6:
+                continue
+            per = _period(pm.group(1))
+            for y in lines:
+                if y is x:
+                    continue
+                u = y.joined
+                for nm in re.finditer(r"(\d+|[А-Яа-яЁё]+)\s+([А-Яа-яЁё]{6,})", u):
+                    if _num(nm.group(1)) != n or _lcs(nm.group(2), noun) < 6:
+                        continue
+                    qm = PERIOD.search(u, nm.end())
+                    if not qm or qm.start() - nm.end() > 30 or _period(qm.group(1)) == per:
+                        continue
+                    qa = _clause(t, m.start())
+                    qb = u[nm.start():qm.end()].strip()
+                    out["candidates"].append(candidate(
+                        "units.period_mix",
+                        title=(f"Один лимит задан за разные периоды: {quoted(pm.group(0))} и "
+                               f"{quoted(qm.group(0))}"),
+                        kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
+                        evidence=[ev(x, qa), ev(y, qb)],
+                        problem=(f"Ограничение {quoted(qa)} считается {pm.group(0)}, а в другом месте то же число "
+                                 f"{quoted(qb)} отнесено к периоду {quoted(qm.group(0))}. Период подсчёта не определён."),
+                        scenario=(f"Лимит исчерпан в одном периоде {quoted(pm.group(0))}, следующее событие приходит "
+                                  f"в том же периоде {quoted(qm.group(0))}, но в новом {quoted(pm.group(0))}: по одному "
+                                  "месту документа оно допустимо, по другому — нет."),
+                        impact="Реализация и тесты выберут разные периоды; лимит будет либо слишком мягким, либо жёстким.",
+                        recommendation="Задать один период подсчёта лимита и использовать его в правиле и в критериях приёмки.",
+                        rewrite=f"Не больше {n} <уточнить: что> за <уточнить: час или сутки>.",
+                        conflict=True,
+                    ))
+                    return
     found: dict[str, tuple[Line, str]] = {}
-    for x in doc.lines:
-        if not x.text or x.is_code or not LIMIT.search(x.joined):
+    for x in lines:
+        if not LIMIT.search(x.joined):
             continue
         for m in PERIOD.finditer(x.joined):
-            unit = m.group(1).lower()[:4]
-            found.setdefault(unit, (x, m.group(0)))
+            found.setdefault(_period(m.group(1)), (x, m.group(0)))
     units = sorted(found)
     if len(units) >= 2:
         x, q = found[units[0]]
@@ -204,6 +287,13 @@ def rule_period(doc: Doc, out: dict) -> None:
                                      + ", ".join(quoted(found[u][1]) for u in units)
                                      + ". Проверьте, что один лимит везде считается за один период.",
                                      ("consistency", "qa"), "unit_mismatch"))
+
+
+def _clause(text: str, pos: int) -> str:
+    s0 = max(text.rfind(".", 0, pos) + 1, text.rfind("|", 0, pos) + 1, 0)
+    e = text.find(".", pos)
+    frag = text[s0:e + 1 if e != -1 else len(text)].strip()
+    return frag if len(frag) <= 200 else text[pos:pos + 120]
 
 
 def run(doc: Doc, out: dict) -> None:

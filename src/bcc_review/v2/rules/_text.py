@@ -45,7 +45,7 @@ def split_cells(t: str) -> list[str] | None:
         s = s[1:]
     if s.endswith("|"):
         s = s[:-1]
-    parts = [c.strip() for c in s.split("|")]
+    parts = [c.strip().replace("\x00", "\\|") for c in s.replace("\\|", "\x00").split("|")]
     if len(parts) < 2:
         return None
     return parts
