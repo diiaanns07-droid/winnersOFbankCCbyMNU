@@ -971,6 +971,33 @@ class _Inventory:
                     bucket.append(b.id)
         return owners
 
+    def _own_labels(self, b: _Block) -> set[str]:
+        """Собственные номера блока: номер сегмента или строки таблицы, номер списка из loc, номер пункта-продолжения."""
+        own = {_norm_label(lab) for _, _, lab in self.labels.get(b.id, [])}
+        if b.marker:
+            own.add(_norm_label(b.marker))
+        if b.id in self.parent_label:
+            own.add(_norm_label(self.parent_label[b.id][0]))
+        return own
+
+    def _is_reference(self, sid: Any, b: _Block) -> bool:
+        """Номер упомянут в тексте блока, у которого есть свой, другой номер: это ссылка, а не номер пункта.
+
+        Так «АК-4 | ДК-3: …» остаётся критерием АК-4 со ссылкой на ДК-3, а не пунктом «ДК-3». В строке
+        таблицы номер задаёт колонка ID; в прозе номер в начале предложения с «.» или «:» после него —
+        номер слитого в ту же строку пункта («… без комиссии. У-2. За рубежом …»), а не ссылка.
+        """
+        s = _norm_label(sid)
+        own = self._own_labels(b)
+        if not s or not own or s in own:
+            return False
+        text = _norm_label_text(b.text)
+        hits = list(re.finditer(rf"(?<![\w]){re.escape(s)}(?![\w])", text))
+        if not hits or b.id in self.row_of:
+            return bool(hits)
+        return not any(re.search(r"(?:^|[.;!?]\s)$", text[:m.start()]) and re.match(r"[.:](?:\s|$)", text[m.end():])
+                       for m in hits)
+
     def _pick_by_wording(self, candidates: list[str], item_text: str) -> str | None:
         """Из нескольких блоков с одной цитатой — тот, что лучше всех совпадает с формулировкой пункта."""
         words = {w for w in re.findall(r"\w+", _kw(item_text)) if len(w) >= 3 or w.isdigit()}
@@ -1452,8 +1479,9 @@ class _Inventory:
                 hl = self.heading_label(hb.section)
                 if hl and _norm_label(hl) == s:
                     return hl, "heading"
-                if not s.isdigit() and s and re.search(rf"(?<![\w]){re.escape(s)}(?![\w])", _norm_label_text(hb.text)):
-                    return str(sid).strip(), "text"
+                if (not s.isdigit() and s and not self._is_reference(sid, hb)
+                        and re.search(rf"(?<![\w]){re.escape(s)}(?![\w])", _norm_label_text(hb.text))):
+                    return str(sid).strip(), "text"  # номер виден в тексте и не является ссылкой на другой пункт
             self.stats.source_ids_cleared += 1
         # номер из ярлыка сегмента, в котором лежит первая опора, иначе из ближайшего заголовка
         filled: tuple[str | None, str | None] = (None, None)
@@ -1470,7 +1498,11 @@ class _Inventory:
                 filled = (self.heading_label(b.section), "heading")
         if filled[0] is not None:
             self.stats.source_ids_filled += 1
-        if given is not None:
+        if given is not None and self._is_reference(given, b):
+            self._warn("source_id_reference",
+                       f"«{given}» в {b.id} — ссылка из текста на другой пункт, а не номер этого пункта; "
+                       + (f"взят собственный номер «{filled[0]}»" if filled[0] else "оставлен null"), [b.id])
+        elif given is not None:
             self._warn("source_id_cleared",
                        f"номер «{given}» не найден в опорах ({anchor.block_id}); "
                        + (f"взят номер из текста «{filled[0]}»" if filled[0] else "оставлен null"),
@@ -1499,6 +1531,10 @@ class _Inventory:
             hints: list[_Hint] = []
             given = _none_if_empty(it.get("source_id"))
             owners = self.owners.get(_norm_label(given), []) if given is not None else []
+            claimed = next((self.by_id[str(ev.get("block_id"))] for ev in (evs if isinstance(evs, list) else [])
+                            if isinstance(ev, Mapping) and str(ev.get("block_id")) in self.by_id), None)
+            if owners and claimed is not None and self._is_reference(given, claimed):
+                owners = []  # ссылка из текста на другой пункт: опору не переносим в его блок и пункт не отклоняем
             item_text = str(it.get("text") or "")
             for ev in evs if isinstance(evs, list) else []:
                 h = self._resolve_hint(ev, window, forbidden, owners=owners if not hints else None, item_text=item_text)
