@@ -420,3 +420,10 @@ ins { color: var(--ok); text-decoration: none; }
 .val-no, .val-issue, .val-conflict, .val-failed { color: var(--crit); font-weight: 600; }
 .val-partial, .val-unknown, .val-uncovered, .val-not_reviewed { color: var(--warn); }
 .dst-unassessed { color: var(--warn); }
+.banner-warn { background: var(--warn-bg); border-color: var(--warn); }
+.banner-warn h3 { margin: 0 0 4px; font-size: 0.95rem; color: var(--warn); }
+.orphans { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 8px; }
+.orphan { background: var(--surface); color: var(--text); border: 1px dashed var(--warn); border-radius: 6px; padding: 6px 10px; min-width: 0; }
+.orphan p { margin: 0 0 4px; }
+.orphan .btns { align-items: center; }
+.orphan select { font: inherit; font-size: 0.86rem; max-width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }

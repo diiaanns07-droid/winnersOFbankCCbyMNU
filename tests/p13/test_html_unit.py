@@ -349,18 +349,44 @@ def test_decisions_shown_as_answered_and_stale_flagged(report):
     assert "Открытые вопросы (5 из 5)" in stale
 
 
-def test_answers_markdown_roundtrip(report):
+def test_answers_markdown_format_and_reference_parser(report):
     tricky = "# не заголовок\n\\обратный слэш\n### Ответ\n\n🔔 emoji\nпоследняя"
     md = H.answers_markdown(report, {"Q-01": tricky, "Q-03": "Клиринг", "Q-04": "   "}, exported_at="2026-11-26T00:00:00Z")
     parsed = H.parse_answers_markdown(md)
-    assert parsed["meta"]["format"] == H.ANSWERS_FORMAT
+    assert parsed["meta"]["format"] == H.ANSWERS_FORMAT == "bcc-review-answers/2"
     assert parsed["meta"]["source_sha256"] == report["document"]["id"]
-    assert parsed["answers"]["Q-01"] == tricky
+    assert parsed["meta"]["report_run_id"] == report["run"]["run_id"]
+    # Ответ — одна строка «Ответ: …»: так его читает опубликованный parse_answers.
+    assert parsed["answers"]["Q-01"] == "# не заголовок \\обратный слэш ### Ответ 🔔 emoji последняя"
+    assert "Ответ: # не заголовок" in md
     assert parsed["answers"]["Q-03"] == "Клиринг"
-    assert "Q-04" not in parsed["answers"]  # пустой ответ не выдаётся за ответ
     assert parsed["answers"]["Q-05"].startswith("400 Bad Request")  # ответ, учтённый прогоном
-    assert md.count("\n## Q-") == len(report["questions"])
+    # Разделы «## Q-ID» только у вопросов с ответом; остальные перечислены отдельно.
+    assert sorted(parsed["answers"]) == ["Q-01", "Q-03", "Q-05"]
+    assert parsed["unanswered"] == ["Q-02", "Q-04"]
+    assert md.count("\n## Q-") == 3
+    for i, q in enumerate(report["questions"]):
+        if q["id"] in parsed["answers"]:
+            assert parsed["fingerprints"][q["id"]] == H.question_fingerprint(report, q)
     assert "Варианты: Да, после изменения порога | Нет, не более одного push в месяц" in md
+
+
+def test_reference_parser_reads_format_1():
+    old = "---\nformat: bcc-review-answers/1\nsource_sha256: abc\n---\n\n## Q-01\n\n> вопрос\n\n### Ответ\n\n\\# строка\nвторая\n"
+    parsed = H.parse_answers_markdown(old)
+    assert parsed["answers"] == {"Q-01": "# строка\nвторая"}
+
+
+def test_decision_bound_to_other_question_is_not_shown_as_answer(report):
+    q5 = next(q for q in report["questions"] if q["id"] == "Q-05")
+    report["decisions"][0]["question_fingerprint"] = H.question_fingerprint(report, q5)
+    ok = section(H.render_html(report), "questions")
+    assert "отпечаток вопроса совпал" in ok and "Открытые вопросы (4 из 5)" in ok
+    report["decisions"][0]["question_fingerprint"] = "0" * 64
+    other = section(H.render_html(report), "questions")
+    assert "относится к другому вопросу" in other and "Открытые вопросы (5 из 5)" in other
+    del report["decisions"][0]["question_fingerprint"]
+    assert "сверена только по Q-ID" in section(H.render_html(report), "questions")
 
 
 def test_view_model_answers_header_matches_python(report):
@@ -368,6 +394,8 @@ def test_view_model_answers_header_matches_python(report):
     header = [("exported_at: X" if h is None else h) for h in vm["answers"]["header"]]
     assert H.answers_markdown(report, {}, exported_at="X").startswith("\n".join(header))
     assert vm["answers"]["storageKey"] == H.answers_storage_key(report["document"]["id"])
+    assert vm["answers"]["legacyKey"] == H.legacy_answers_storage_key(report["document"]["id"])
+    assert [q["fp"] for q in vm["answers"]["questions"]] == [H.question_fingerprint(report, q) for q in report["questions"]]
 
 
 def test_input_types_dataclass_path_pydantic(tmp_path, report):
