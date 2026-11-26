@@ -1,0 +1,32 @@
+{
+  "case_id": "edge.empty",
+  "family": "edge",
+  "kind": "edge",
+  "ops": [],
+  "variants": [],
+  "seeds": [],
+  "generator_version": "1.0.0",
+  "base_case_id": null,
+  "base_source_sha256": null,
+  "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "semantic_sha256": "458cb950fcd5b74e379b7563950d0cf971b2d886678c7d6bdfe90c4ef25133b2",
+  "transformation": [],
+  "expected_effect": [
+    "Пустой документ."
+  ],
+  "diff": "",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "label_id": "edge.empty#clean",
+      "case_id": "edge.empty",
+      "family": "edge",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "visibility": "public",
+      "explanation": "Пустой файл (0 байт): находок с опорами быть не может, ожидается предупреждение."
+    }
+  ]
+}

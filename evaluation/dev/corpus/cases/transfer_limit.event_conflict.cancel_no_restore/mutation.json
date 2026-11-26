@@ -1,0 +1,67 @@
+{
+  "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+  "family": "transfer_limit",
+  "kind": "mutant",
+  "ops": [
+    "event_conflict"
+  ],
+  "variants": [
+    "cancel_no_restore"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "transfer_limit.base",
+  "base_source_sha256": "f614c16e33c76e795523a58c875a3dbb6078e6710d043725e8fd3b7305ee910a",
+  "source_sha256": "7366bf4b0486c35dbccad3516d1424912373e02d5b54ae52b94ddcdd30382d80",
+  "semantic_sha256": "9103b56c2ecbce0a6f763616cbb1d3c95f08bdaec15773045a4ef2ebafedb924",
+  "transformation": [
+    {
+      "op": "insert_after",
+      "base_line": 29,
+      "after": "* **ЛП-6.**",
+      "removed": "",
+      "inserted": "* **ЛП-7.** Отменённый перевод не уменьшает использованную сумму.",
+      "mutation_op": "event_conflict",
+      "variant": "cancel_no_restore"
+    }
+  ],
+  "expected_effect": [
+    "Отмена перевода по ЛП-4 уменьшает использованную сумму, по ЛП-7 не уменьшает."
+  ],
+  "diff": "--- base/source.md\n+++ transfer_limit.event_conflict.cancel_no_restore/source.md\n@@ -29,2 +29,3 @@\n * **ЛП-6.** Приложение показывает лимит и остаток лимита на текущие сутки.\n+* **ЛП-7.** Отменённый перевод не уменьшает использованную сумму.\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+      "family": "transfer_limit",
+      "source_sha256": "7366bf4b0486c35dbccad3516d1424912373e02d5b54ae52b94ddcdd30382d80",
+      "visibility": "public",
+      "label_id": "transfer_limit.event_conflict.cancel_no_restore#1",
+      "issue_type": "event_conflict",
+      "anchors": [
+        {
+          "role": "a",
+          "quote": "Отменённый перевод уменьшает использованную сумму суток, в которые он был выполнен.",
+          "locator": "md:L27"
+        },
+        {
+          "role": "b",
+          "quote": "Отменённый перевод не уменьшает использованную сумму.",
+          "locator": "md:L30"
+        }
+      ],
+      "anchor_policy": "all",
+      "expected_outcome": "present",
+      "severity": "critical",
+      "criterion": "ISO29148-5.2.6:consistency",
+      "scenario": "Лимит 100 000 ₸, переведено 100 000 ₸, один перевод на 20 000 ₸ отменён, новый перевод 10 000 ₸.",
+      "explanation": "Отмена перевода по ЛП-4 уменьшает использованную сумму, по ЛП-7 не уменьшает.",
+      "mutation": {
+        "op": "event_conflict",
+        "variant": "cancel_no_restore"
+      }
+    }
+  ]
+}

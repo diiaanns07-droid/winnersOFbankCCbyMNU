@@ -1,0 +1,65 @@
+{
+  "case_id": "autopay.paraphrase.nfr",
+  "family": "autopay",
+  "kind": "mutant",
+  "ops": [
+    "paraphrase"
+  ],
+  "variants": [
+    "nfr"
+  ],
+  "seeds": [
+    1
+  ],
+  "generator_version": "1.0.0",
+  "base_case_id": "autopay.base",
+  "base_source_sha256": "1c8b13dcbfb0bf305d49b63f6de835461d19a7bc72696838466db767bf4a2a31",
+  "source_sha256": "18733f6011a1d52c16e089476db431502116c9eaad2ae3d38032c9629a302a0b",
+  "semantic_sha256": "7f92ef55b31c16955f14a0f34ada95ae3e1cc51671dfe145a209de871ebd989c",
+  "transformation": [
+    {
+      "op": "replace",
+      "base_line": 33,
+      "removed": "Пополнение выполняется не позднее 5 минут после получения уведомления о балансе для 99 % уведомлений.",
+      "inserted": "Для 99 % уведомлений о балансе пополнение выполняется в течение 5 минут после получения уведомления.",
+      "mutation_op": "paraphrase",
+      "variant": "nfr"
+    }
+  ],
+  "expected_effect": [
+    "Смысл НФ-1 не меняется. Новых находок быть не должно."
+  ],
+  "diff": "--- base/source.md\n+++ autopay.paraphrase.nfr/source.md\n@@ -32,3 +32,3 @@\n ### Нефункциональные требования\n-* **НФ-1.** Пополнение выполняется не позднее 5 минут после получения уведомления о балансе для 99 % уведомлений.\n+* **НФ-1.** Для 99 % уведомлений о балансе пополнение выполняется в течение 5 минут после получения уведомления.\n \n",
+  "labels": [
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "autopay.paraphrase.nfr",
+      "family": "autopay",
+      "source_sha256": "18733f6011a1d52c16e089476db431502116c9eaad2ae3d38032c9629a302a0b",
+      "visibility": "public",
+      "label_id": "autopay.paraphrase.nfr#clean",
+      "issue_type": null,
+      "anchors": [],
+      "expected_outcome": "clean",
+      "explanation": "Смысл НФ-1 не меняется. Новых находок быть не должно."
+    },
+    {
+      "schema": "bcc-eval-label/1",
+      "case_id": "autopay.paraphrase.nfr",
+      "family": "autopay",
+      "source_sha256": "18733f6011a1d52c16e089476db431502116c9eaad2ae3d38032c9629a302a0b",
+      "visibility": "public",
+      "label_id": "autopay.paraphrase.nfr#control",
+      "issue_type": null,
+      "anchors": [
+        {
+          "role": "control",
+          "quote": "Для 99 % уведомлений о балансе пополнение выполняется в течение 5 минут после получения уведомления.",
+          "locator": "md:L33"
+        }
+      ],
+      "expected_outcome": "absent",
+      "explanation": "Перефразированное место: находка здесь — ложная тревога."
+    }
+  ]
+}
