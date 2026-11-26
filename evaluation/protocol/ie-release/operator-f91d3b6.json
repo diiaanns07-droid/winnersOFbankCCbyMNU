@@ -1,0 +1,12 @@
+{
+  "protocol": "IE-operator-2",
+  "corpus_version": "IE-corpus-1",
+  "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "provider_adapter": "fallback",
+  "live_allowed": true,
+  "documents": 6,
+  "reference_manifest_sha256": "ef3e588cba1734ac2165b721fe222474e44a26bcdc8e3e0636cbe1a903c1c5c4",
+  "panel_manifest_sha256": "c78ecd0670f8bb0d57fec1cf3fa048ccdd17369f895556ccfe314ac4d50fdb38",
+  "panel_gold_sha256": "a70027b941f6f76fec2f6ded9fa5c20612757b1ee05a009889da1a1d09dee5a5",
+  "operator_archive_sha256": "4861cab8901de6cb54a0fdd8c7dbcd0c55dac95cd49651df2d6d7ad9e6b74b04"
+}

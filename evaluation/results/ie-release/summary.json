@@ -1,0 +1,589 @@
+{
+  "corpus": "IE-corpus-1",
+  "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+  "previous_agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "scorer_sha": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+  "mode": "rules_only",
+  "actual_model": null,
+  "physical_calls": 0,
+  "independent_annotation": "AI",
+  "human_reviews": 0,
+  "families": 4,
+  "metrics": {
+    "main": {
+      "usable": {
+        "n": 14,
+        "d": 24,
+        "value": 0.5833333333333334
+      },
+      "scores": {
+        "1.0": {
+          "confirmed": {
+            "tp": 0,
+            "fp": 20,
+            "fn": 14,
+            "duplicates": 0,
+            "precision": {
+              "n": 0,
+              "d": 20,
+              "value": 0.0
+            },
+            "recall": {
+              "n": 0,
+              "d": 14,
+              "value": 0.0
+            },
+            "strict_precision": 0.0,
+            "actual_from_planned": {
+              "n": 0,
+              "d": 24,
+              "value": 0.0
+            },
+            "labels_unmeasured": 10,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 2,
+              "unmeasured": 4,
+              "planned": 6
+            },
+            "clean": {
+              "measured": 5,
+              "planned": 8,
+              "documents_with_alarms": 5,
+              "alarms": 9
+            },
+            "document_accuracy": {
+              "n": 9,
+              "d": 14,
+              "value": 0.6428571428571429
+            },
+            "document_confusion": {
+              "tp": 9,
+              "fp": 5,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          },
+          "all": {
+            "tp": 0,
+            "fp": 21,
+            "fn": 14,
+            "duplicates": 0,
+            "precision": {
+              "n": 0,
+              "d": 21,
+              "value": 0.0
+            },
+            "recall": {
+              "n": 0,
+              "d": 14,
+              "value": 0.0
+            },
+            "strict_precision": 0.0,
+            "actual_from_planned": {
+              "n": 0,
+              "d": 24,
+              "value": 0.0
+            },
+            "labels_unmeasured": 10,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 2,
+              "unmeasured": 4,
+              "planned": 6
+            },
+            "clean": {
+              "measured": 5,
+              "planned": 8,
+              "documents_with_alarms": 5,
+              "alarms": 10
+            },
+            "document_accuracy": {
+              "n": 9,
+              "d": 14,
+              "value": 0.6428571428571429
+            },
+            "document_confusion": {
+              "tp": 9,
+              "fp": 5,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          }
+        },
+        "1.1": {
+          "confirmed": {
+            "tp": 8,
+            "fp": 12,
+            "fn": 14,
+            "duplicates": 0,
+            "precision": {
+              "n": 8,
+              "d": 20,
+              "value": 0.4
+            },
+            "recall": {
+              "n": 8,
+              "d": 22,
+              "value": 0.36363636363636365
+            },
+            "strict_precision": 0.4,
+            "actual_from_planned": {
+              "n": 8,
+              "d": 42,
+              "value": 0.19047619047619047
+            },
+            "labels_unmeasured": 20,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 2,
+              "unmeasured": 4,
+              "planned": 6
+            },
+            "clean": {
+              "measured": 2,
+              "planned": 2,
+              "documents_with_alarms": 2,
+              "alarms": 2
+            },
+            "document_accuracy": {
+              "n": 12,
+              "d": 14,
+              "value": 0.8571428571428571
+            },
+            "document_confusion": {
+              "tp": 12,
+              "fp": 2,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          },
+          "all": {
+            "tp": 8,
+            "fp": 13,
+            "fn": 14,
+            "duplicates": 0,
+            "precision": {
+              "n": 8,
+              "d": 21,
+              "value": 0.38095238095238093
+            },
+            "recall": {
+              "n": 8,
+              "d": 22,
+              "value": 0.36363636363636365
+            },
+            "strict_precision": 0.38095238095238093,
+            "actual_from_planned": {
+              "n": 8,
+              "d": 42,
+              "value": 0.19047619047619047
+            },
+            "labels_unmeasured": 20,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 2,
+              "unmeasured": 4,
+              "planned": 6
+            },
+            "clean": {
+              "measured": 2,
+              "planned": 2,
+              "documents_with_alarms": 2,
+              "alarms": 2
+            },
+            "document_accuracy": {
+              "n": 12,
+              "d": 14,
+              "value": 0.8571428571428571
+            },
+            "document_confusion": {
+              "tp": 12,
+              "fp": 2,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          }
+        }
+      },
+      "total_agent_seconds": 16.903,
+      "median_agent_seconds": 0.682
+    },
+    "panel": {
+      "usable": {
+        "n": 2,
+        "d": 6,
+        "value": 0.3333333333333333
+      },
+      "scores": {
+        "1.0": {
+          "confirmed": {
+            "tp": 0,
+            "fp": 2,
+            "fn": 2,
+            "duplicates": 0,
+            "precision": {
+              "n": 0,
+              "d": 2,
+              "value": 0.0
+            },
+            "recall": {
+              "n": 0,
+              "d": 2,
+              "value": 0.0
+            },
+            "strict_precision": 0.0,
+            "actual_from_planned": {
+              "n": 0,
+              "d": 6,
+              "value": 0.0
+            },
+            "labels_unmeasured": 4,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 1,
+              "unmeasured": 1,
+              "planned": 2
+            },
+            "clean": {
+              "measured": 0,
+              "planned": 2,
+              "documents_with_alarms": 0,
+              "alarms": 0
+            },
+            "document_accuracy": {
+              "n": 2,
+              "d": 2,
+              "value": 1.0
+            },
+            "document_confusion": {
+              "tp": 2,
+              "fp": 0,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          },
+          "all": {
+            "tp": 0,
+            "fp": 2,
+            "fn": 2,
+            "duplicates": 0,
+            "precision": {
+              "n": 0,
+              "d": 2,
+              "value": 0.0
+            },
+            "recall": {
+              "n": 0,
+              "d": 2,
+              "value": 0.0
+            },
+            "strict_precision": 0.0,
+            "actual_from_planned": {
+              "n": 0,
+              "d": 6,
+              "value": 0.0
+            },
+            "labels_unmeasured": 4,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 1,
+              "unmeasured": 1,
+              "planned": 2
+            },
+            "clean": {
+              "measured": 0,
+              "planned": 2,
+              "documents_with_alarms": 0,
+              "alarms": 0
+            },
+            "document_accuracy": {
+              "n": 2,
+              "d": 2,
+              "value": 1.0
+            },
+            "document_confusion": {
+              "tp": 2,
+              "fp": 0,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          }
+        },
+        "1.1": {
+          "confirmed": {
+            "tp": 1,
+            "fp": 1,
+            "fn": 2,
+            "duplicates": 0,
+            "precision": {
+              "n": 1,
+              "d": 2,
+              "value": 0.5
+            },
+            "recall": {
+              "n": 1,
+              "d": 3,
+              "value": 0.3333333333333333
+            },
+            "strict_precision": 0.5,
+            "actual_from_planned": {
+              "n": 1,
+              "d": 11,
+              "value": 0.09090909090909091
+            },
+            "labels_unmeasured": 8,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 1,
+              "unmeasured": 1,
+              "planned": 2
+            },
+            "clean": {
+              "measured": 0,
+              "planned": 0,
+              "documents_with_alarms": 0,
+              "alarms": 0
+            },
+            "document_accuracy": {
+              "n": 2,
+              "d": 2,
+              "value": 1.0
+            },
+            "document_confusion": {
+              "tp": 2,
+              "fp": 0,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          },
+          "all": {
+            "tp": 1,
+            "fp": 1,
+            "fn": 2,
+            "duplicates": 0,
+            "precision": {
+              "n": 1,
+              "d": 2,
+              "value": 0.5
+            },
+            "recall": {
+              "n": 1,
+              "d": 3,
+              "value": 0.3333333333333333
+            },
+            "strict_precision": 0.5,
+            "actual_from_planned": {
+              "n": 1,
+              "d": 11,
+              "value": 0.09090909090909091
+            },
+            "labels_unmeasured": 8,
+            "critical": {
+              "found": 0,
+              "missed_on_measured": 1,
+              "unmeasured": 1,
+              "planned": 2
+            },
+            "clean": {
+              "measured": 0,
+              "planned": 0,
+              "documents_with_alarms": 0,
+              "alarms": 0
+            },
+            "document_accuracy": {
+              "n": 2,
+              "d": 2,
+              "value": 1.0
+            },
+            "document_confusion": {
+              "tp": 2,
+              "fp": 0,
+              "tn": 0,
+              "fn": 0
+            },
+            "harness_version": "0.1.2"
+          }
+        }
+      },
+      "total_agent_seconds": 4.046,
+      "median_agent_seconds": 0.675
+    }
+  },
+  "physical_files": {
+    "usable": {
+      "n": 17,
+      "d": 31,
+      "value": 0.5483870967741935
+    },
+    "full_semantic": {
+      "n": 0,
+      "d": 31,
+      "value": 0.0
+    },
+    "verify_rejected": 12,
+    "reported_failed": 2
+  },
+  "audits": {
+    "same_finding_content": {
+      "n": 64,
+      "d": 64,
+      "value": 1.0
+    },
+    "included_findings": 21,
+    "all_literal_positions": {
+      "n": 64,
+      "d": 64,
+      "value": 1.0
+    },
+    "literal_citations": {
+      "n": 121,
+      "d": 121,
+      "value": 1.0
+    },
+    "main_verify_issues": {
+      "evidence_wrong_occurrence": 10
+    }
+  },
+  "paired_verification": [
+    {
+      "generator": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "verifier": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "pass_count": 24,
+      "denominator": 24,
+      "rejected_count": 0
+    },
+    {
+      "generator": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "verifier": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "pass_count": 14,
+      "denominator": 24,
+      "rejected_count": 10
+    },
+    {
+      "generator": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "verifier": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "pass_count": 24,
+      "denominator": 24,
+      "rejected_count": 0
+    },
+    {
+      "generator": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "verifier": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "pass_count": 14,
+      "denominator": 24,
+      "rejected_count": 10
+    }
+  ],
+  "questions": {
+    "examined_panel_documents": 2,
+    "planned_documents": 6,
+    "cards_all_raw_reports": 16,
+    "cards_on_valid_reports": 0,
+    "quality_on_valid_cards": null
+  },
+  "revision_coverage": {
+    "n": 2,
+    "d": 6,
+    "value": 0.3333333333333333
+  },
+  "owner_decisions": {
+    "hidden": {
+      "variants": 2,
+      "same_revision_bytes_as_prior": 2,
+      "application_reports_verified": 0,
+      "independent_reruns_verified": 0,
+      "application_reports_with_dangling_reference": 1
+    },
+    "public": {
+      "variants": 2,
+      "same_revision_bytes_as_prior": 2,
+      "application_reports_verified": 0,
+      "independent_reruns_verified": 2,
+      "application_reports_with_dangling_reference": 2
+    }
+  },
+  "gemini": {
+    "planned": 6,
+    "executed": 0,
+    "actual_model": null,
+    "precision": null,
+    "recall": null,
+    "accuracy": null
+  },
+  "neutral_handoff_checks": [
+    {
+      "sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "raw_returns": 6,
+      "usable": 6,
+      "same_case_outcomes_as_canonical": true
+    },
+    {
+      "sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "raw_returns": 6,
+      "usable": 2,
+      "same_case_outcomes_as_canonical": true
+    }
+  ],
+  "open_example": {
+    "release": [
+      {
+        "input": "occurrence",
+        "source_sha256": "f8b027e9bc19f0e849a05b7e20f47c8c9e0d2c3f33e9f370e314127ea0117840",
+        "report_sha256": "9a31dcc436880c87aca9837a799dcaf57b10c61e95343277080e83cd933ee245",
+        "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+        "rules": [
+          "RULE-TZ"
+        ],
+        "run_status": "partial",
+        "verify_exit": 4,
+        "usable": false
+      },
+      {
+        "input": "control",
+        "source_sha256": "747129361ace7624e74f1f8e7c59b0b2043b0738e66f7efb1b6f36194a5d3d1d",
+        "report_sha256": "2b30ab70497140934e40f56b4db578536baef487de6c81794bba0b18069410a3",
+        "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+        "rules": [
+          "RULE-TZ"
+        ],
+        "run_status": "partial",
+        "verify_exit": 0,
+        "usable": true
+      }
+    ],
+    "old": [
+      {
+        "input": "occurrence",
+        "source_sha256": "f8b027e9bc19f0e849a05b7e20f47c8c9e0d2c3f33e9f370e314127ea0117840",
+        "report_sha256": "de8c2b9c46970662751ded03f1239b22eb7e5fcfbaa52b2c9030bb33f36dcb34",
+        "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+        "rules": [
+          "RULE-TZ"
+        ],
+        "run_status": "partial",
+        "verify_exit": 0,
+        "usable": true
+      },
+      {
+        "input": "control",
+        "source_sha256": "747129361ace7624e74f1f8e7c59b0b2043b0738e66f7efb1b6f36194a5d3d1d",
+        "report_sha256": "779a4c97b2438289009177a2e31f34a05b311d4e6af9f289c46d20a3ebf459ef",
+        "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+        "rules": [
+          "RULE-TZ"
+        ],
+        "run_status": "partial",
+        "verify_exit": 0,
+        "usable": true
+      }
+    ]
+  }
+}

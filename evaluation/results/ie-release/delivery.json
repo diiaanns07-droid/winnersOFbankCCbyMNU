@@ -1,0 +1,21 @@
+{
+  "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+  "corpus_index_sha256": "e6e1a6dd221376fa68baf7e8b078163f606e7d2504b7c2181aa3920e41d10b5d",
+  "custodian": {
+    "file": "IE-release-custodian.zip",
+    "sha256": "3ff1401984c8b6451f9fe2d2b2546d684bd21d060933fe89de3b37b8023d85d5",
+    "members": 1189,
+    "bytes": 2488240
+  },
+  "six_inputs_for_operator": {
+    "file": "IE-six-inputs-v2.zip",
+    "sha256": "4861cab8901de6cb54a0fdd8c7dbcd0c55dac95cd49651df2d6d7ad9e6b74b04",
+    "members": 7,
+    "bytes": 7094
+  },
+  "local_cli_renders": 31,
+  "cross_verifications": 48,
+  "decision_variants": 4,
+  "revision_transitions": 6,
+  "live_model_runs": 0
+}

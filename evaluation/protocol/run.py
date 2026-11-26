@@ -149,7 +149,7 @@ def main():
             identity=run.get("source_sha256")==digest(source) and run.get("agent_commit")==seal["agent_sha"]
             tech=rc==0 and verify_rc==0 and bool(rep) and (folder/"report.md").is_file() and identity and actual_ok and not errors and run.get("status") in ("complete","partial")
             actual_model=(", ".join(models) or None)
-            record={"case_id":cid,"render_id":r["render_id"],"format":fmt,"family":case["family"],"stratum":case["stratum"],"corpus_version":seal["corpus_version"],
+            record={"case_id":cid,"render_id":r["render_id"],"format":fmt,"family":case.get("family"),"stratum":case.get("stratum"),"corpus_version":seal["corpus_version"],
                     "agent_sha":seal["agent_sha"],"source_sha256":r["sha256"],"requested_mode":mode,"actual_mode":run.get("mode"),"actual_model":actual_model,
                     "report_model":run.get("model"),"parameters":parameters,"status":run.get("status"),"technical_success":bool(tech),
                     "semantic_complete":bool(tech and run["status"]=="complete" and not run.get("incomplete_stages")),"exit_code":rc,"verify_exit":verify_rc,

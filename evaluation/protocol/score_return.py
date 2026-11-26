@@ -2,25 +2,49 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import sys
 from run import HERE, call, digest, environment, git, jsonl, lines, read, write
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for arg in ("product","vault","returned","out"): ap.add_argument("--"+arg,type=Path,required=True)
+    ap.add_argument("--operator-seal",type=Path,help="Published receipt for an anonymized six-input package")
+    ap.add_argument("--operator-manifest",type=Path,help="Input-only manifest from that package")
     ap.add_argument("--mode",choices=("rules_only","rules_plus_llm"),required=True)
     a=ap.parse_args()
     product,vault,returned,out=map(Path.resolve,(a.product,a.vault,a.returned,a.out))
-    seal=read(HERE/"seal.json"); corpus=vault/"corpus"; mode=a.mode
+    if bool(a.operator_seal)!=bool(a.operator_manifest):
+        ap.error("--operator-seal and --operator-manifest must be supplied together")
+    reference=read(HERE/"seal.json")
+    seal=read(a.operator_seal) if a.operator_seal else reference
+    corpus=vault/"corpus"; mode=a.mode
     if git(product,"rev-parse","HEAD")!=seal["agent_sha"] or git(product,"status","--porcelain"):
         ap.error("Exact clean product checkout required")
     manifest=corpus/"panel.manifest.json"; gold=corpus/"panel.labels.jsonl"
-    if digest(manifest)!=seal["panel_manifest_sha256"] or digest(gold)!=seal["panel_gold_sha256"]:
+    if digest(manifest)!=reference["panel_manifest_sha256"] or digest(gold)!=reference["panel_gold_sha256"]:
         ap.error("Reference or manifest digest mismatch")
-    expected=seal["comparison_panel"]
+    cases=read(manifest)["cases"]
+    expected={c["case_id"] for c in cases}
+    operator_ids={cid:cid for cid in expected}
+    if a.operator_manifest:
+        if (seal.get("reference_manifest_sha256")!=digest(manifest) or seal.get("panel_gold_sha256")!=digest(gold)
+                or digest(a.operator_manifest)!=seal.get("panel_manifest_sha256")):
+            ap.error("Operator package differs from the published panel commitments")
+        original={next(r["sha256"] for r in c["renders"] if r["format"]=="md"):c["case_id"] for c in cases}
+        operator_ids={}
+        for c in read(a.operator_manifest)["cases"]:
+            alias=c["case_id"]
+            rs=c["renders"]
+            if (not re.fullmatch(r"[A-Za-z0-9_-]+",alias) or len(rs)!=1 or rs[0]["format"]!="md"
+                    or rs[0]["sha256"] not in original or original[rs[0]["sha256"]] in operator_ids):
+                ap.error("Invalid panel alias or input SHA")
+            operator_ids[original[rs[0]["sha256"]]]=alias
+        if set(operator_ids)!=expected or len(set(operator_ids.values()))!=len(expected):
+            ap.error("The mapped panel is incomplete or contains duplicate aliases")
     records=lines(returned/"measurements.jsonl")
     by_id={row["case_id"]:row for row in records}
-    if len(records)!=len(by_id) or set(by_id)-set(expected): ap.error("Unexpected or duplicate primary case")
+    if len(records)!=len(by_id) or set(by_id)-set(operator_ids.values()): ap.error("Unexpected or duplicate primary case")
     out.mkdir(parents=True,exist_ok=False)
     env=environment(product,"rules_only")
     sys.path[:0]=[str(product/"src"),str(product)]
@@ -29,20 +53,21 @@ def main():
     from evaluation.harness.taxonomy import Taxonomy
     tax=Taxonomy.load(product/"evaluation/harness/taxonomy.toml")
     rows=[]; checks=[]
-    for c in read(manifest)["cases"]:
+    for c in cases:
         cid=c["case_id"]; r=next(x for x in c["renders"] if x["format"]=="md")
         source=corpus/r["path"]
         if digest(source)!=r["sha256"]: ap.error("Changed input "+cid)
-        row=by_id.get(cid,{})
+        alias=operator_ids[cid]
+        row=by_id.get(alias,{})
         valid=False; why=[]; models=[]; converted=[]; rc=None
-        ref=returned/"reports"/(cid+"-md")/"report.json"
+        ref=returned/"reports"/(alias+"-md")/"report.json"
         if row and ref.exists():
             report=read(ref); run=report["run"]
             rc,_=call(["-m","bcc_review","verify",ref,source],env,product,out/(cid+"-verify"))
             try: contracts.validate(report)
             except Exception as exc: why.append(str(exc))
             why.extend(contracts.evidence_errors(report))
-            if not (digest(ref)==row.get("report_sha256") and run["source_sha256"]==r["sha256"] and run["agent_commit"]==seal["agent_sha"] and run["mode"]==mode and row.get("requested_mode")==mode and row.get("format")=="md"):
+            if not (digest(ref)==row.get("report_sha256") and run["source_sha256"]==r["sha256"]==row.get("source_sha256") and run["agent_commit"]==seal["agent_sha"]==row.get("agent_sha") and run["mode"]==mode and row.get("requested_mode")==mode and row.get("format")=="md"):
                 why.append("identity/mode mismatch")
             if row.get("parameters",{}).get("cache")!="off" or run["calls"].get("cache_hits")!=0:
                 why.append("cache mismatch")
@@ -64,7 +89,7 @@ def main():
         for pred in converted:
             pred.update(ident)
             if pred["record"]=="run":pred.update(cache={"policy":"off"},manifest_sha256=digest(manifest))
-        rows.extend(converted);checks.append({**ident,"requested_mode":mode,"valid":valid,"verify_exit":rc,"reasons":why})
+        rows.extend(converted);checks.append({**ident,"operator_case_id":alias,"requested_mode":mode,"valid":valid,"verify_exit":rc,"reasons":why})
     jsonl(out/"predictions.jsonl",rows);jsonl(out/"independent-check.jsonl",checks)
     for name,flags in (("all",[]),("confirmed",["--status","confirmed"])):
         code,_=call(["-m","evaluation.harness","--gold",gold,"--manifest",manifest,"--pred",out/"predictions.jsonl","--out",out/(name+".json"),"--adjudication-out",out/(name+"-review.jsonl"),"--render-format","md",*flags],env,product,out/("score-"+name))
