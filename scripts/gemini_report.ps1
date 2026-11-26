@@ -34,7 +34,7 @@ Write-Host "== проверка настройки"
 
 $report = Join-Path $OutDir "$Name.md"
 $json = Join-Path $OutDir "$Name.json"
-$runArgs = @($Doc, $report, "--provider", "gemini", "--no-cache", "--export", "html,jira")
+$runArgs = @($Doc, $report, "--provider", "gemini", "--no-cache", "--export", "jira")
 if ($Model) { $runArgs += @("--model", $Model) }
 
 Write-Host "== прогон: $Doc -> $report"
