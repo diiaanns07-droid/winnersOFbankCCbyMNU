@@ -343,6 +343,17 @@ def test_cp1251_txt_is_decoded_with_warning(tmp_path):
                              "message": "файл не в UTF-8 (байт 0); прочитан как cp1251"}]
 
 
+def test_utf8_with_a_few_broken_bytes_stays_utf8_and_is_a_partial_read():
+    """HANDOFF: UTF-8 с единичным битым байтом не перечитывается целиком как cp1251."""
+    good = NOTES.read_bytes()
+    k = good.index("сотрудник".encode())
+    doc = parse_bytes(good[:k] + b"\xff" + good[k:], "txt", "notes.txt")
+    assert codes(doc) == ["decode_error"]
+    assert doc.blocks[1].text.startswith("Сервис хранит заявки \ufffdсотрудников")
+    assert [b.loc["line_start"] for b in doc.blocks] == [1, 3, 6, 8]  # номера строк не сдвинулись
+    assert doc.blocks[1].loc["byte_start"] is None
+
+
 def test_undecodable_bytes_are_a_partial_read():
     doc = parse_bytes(b"\xef\xbb\xbf\xd0\x9f\xff\xfe text\n", "txt")
     assert codes(doc) == ["decode_error"]

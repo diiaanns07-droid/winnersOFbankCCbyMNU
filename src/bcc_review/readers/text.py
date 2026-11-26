@@ -28,7 +28,9 @@
 * ``"\\n"`` стоит между физическими строками одного блока (абзац, пункт списка, код, цитата);
 * ``" | "`` стоит между ячейками строки таблицы. Если в источнике между ячейками ровно ``" | "``
   (канонический GFM), разделитель считается дословной копией;
-* ``<br>`` даёт ``"\\n"``, HTML-сущность даёт её символ.
+* ``<br>`` даёт ``"\\n"``, HTML-сущность даёт её символ;
+* ссылка на сноску ``[^1]`` даёт ``[1]`` (снят только ``^``, если в документе есть определение
+  ``[^1]:``), определение ``[^1]: текст`` даёт ``[1]: текст``.
 
 Содержимое fenced-блоков и ``код`` в обратных кавычках копируется дословно: не исполняется и не
 разбирается, ``|`` и ``#`` внутри него не создают таблиц и заголовков.
@@ -72,6 +74,10 @@
     ``empty_section``).
 ``paragraph``
     ``parent`` = ID пункта списка, если абзац продолжает пункт после пустой строки.
+вложенные блоки
+    ``table_header``, каждая ``table_row``, fenced-``code``, ``quote`` и ``other`` (HTML-комментарий)
+    с отступом пункта получают ``parent`` = ID пункта; список после такого блока продолжается.
+    Так таблица приёмки под «1. Комиссия» остаётся связанной со своим правилом.
 ``list_item``
     ``list = {id, ordered, marker, number, depth, item}``. ``id`` — номер списка в документе,
     ``item`` — номер пункта в списке с 1, ``depth`` — вложенность с 0. У пункта чек-листа
@@ -92,7 +98,9 @@
 ``other``
     ``subtype`` ``html_comment`` или ``front_matter``, текст дословный.
 
-Если блок содержит ссылки, добавляется ``links = [{start, end, url}]``.
+Если блок содержит ссылки, добавляется ``links = [{start, end, url}]``. Ссылки на сноски —
+``footnotes = [{label, start, end, definition}]`` (``definition`` — ID абзаца-определения или ``null``);
+у абзаца-определения ``footnote = {label, refs}``.
 
 В TXT заголовков нет (``section == []``). Абзацы разделены пустой строкой. Строка с маркером
 ``-``, ``*``, ``•``, ``–``, ``—``, ``1.``, ``1)`` начинает ``list_item``, следующие непустые
@@ -225,7 +233,8 @@ _EOL = re.compile(r"\r\n|\r|\n")
 
 
 def decode_source(data: bytes) -> Source:
-    """Декодирует байты: BOM → UTF-8 → cp1251 → UTF-8 с заменой (с предупреждением)."""
+    """Декодирует байты: BOM → UTF-8 → UTF-8 с заменой, если битых мест не больше
+    ``max(8, размер / 50)`` (``decode_error``) → cp1251 (``encoding_fallback``) → UTF-8 с заменой."""
     for bom, enc in _BOMS:
         if data.startswith(bom):
             body = data[len(bom):]
@@ -242,6 +251,14 @@ def decode_source(data: bytes) -> Source:
         return Source(data.decode("utf-8"), "utf-8", 0, True)
     except UnicodeDecodeError as exc:
         bad = exc.start
+    lossy = data.decode("utf-8", errors="replace")
+    broken = lossy.count("\ufffd")
+    if broken <= max(8, len(data) // 50):  # UTF-8 с единичными битыми байтами — не другая кодировка
+        note = (
+            f"байт {bad}: недопустимая последовательность UTF-8 (битых мест: {broken}), заменена на U+FFFD; "
+            "byte_start/byte_end не выдаются"
+        )
+        return Source(lossy, "utf-8", 0, False, (("decode_error", note),))
     try:
         note = f"файл не в UTF-8 (байт {bad}); прочитан как cp1251"
         return Source(data.decode("cp1251"), "cp1251", 0, True, (("encoding_fallback", note),))
@@ -353,6 +370,8 @@ _AUTOLINK = re.compile(
     r"(?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?)*)>"
 )
 _BR = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_FOOTNOTE_REF = re.compile(r"\[\^([^\]\s]+)\]")
+_FOOTNOTE_DEF = re.compile(r"^[ \t]{0,3}\[\^([^\]\s]+)\]:")
 _ENTITY = re.compile(r"&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});")
 
 
@@ -364,11 +383,13 @@ def _punct(ch: str) -> bool:
     return unicodedata.category(ch)[0] in "PS"
 
 
-def _inline(raw: _Buf) -> tuple[_Buf, list[int], list[list[Any]]]:
+def _inline(raw: _Buf, notes: frozenset[str] = frozenset()) -> tuple[_Buf, list[int], list[list[Any]]]:
     """Снимает инлайн-разметку CommonMark/GFM (упрощённо, без потери символов текста).
 
     Возвращает видимый текст, ``before`` (длина видимого текста до сырого индекса i; длина n + 1)
-    и ссылки ``[[t0, t1, url], ...]``.
+    и ссылки ``[[t0, t1, url], ...]``; ссылка на сноску — ``[t0, t1, None, метка]``.
+    ``notes`` — метки определённых сносок (casefold): ``[^1]`` даёт видимое ``[1]``, снимается только
+    ``^``, остальные символы — дословные копии исходника.
     """
     ch, orig = raw.chars, raw.orig
     n = len(ch)
@@ -432,6 +453,15 @@ def _inline(raw: _Buf) -> tuple[_Buf, list[int], list[list[Any]]]:
             i += 1
             continue
         c = ch[i]
+        if c == "[" and notes and i + 1 < n and ch[i + 1] == "^":
+            m = _FOOTNOTE_REF.match(s, i)
+            if m and m.group(1).casefold() in notes and free(i, m.end()) and same_line(i, m.end()):
+                drop[i + 1] = True
+                for t in range(i, m.end()):
+                    lit[t] = True
+                links.append((i, m.end(), None, m.group(1)))
+                i = m.end()
+                continue
         if c == "[":
             close = _close_bracket(ch, lit, drop, i)
             if close is not None and close + 1 < n and not lit[close + 1]:
@@ -548,7 +578,7 @@ def _inline(raw: _Buf) -> tuple[_Buf, list[int], list[list[Any]]]:
             out.orig.append(orig[i])
         i += 1
     before[n] = len(out)
-    return out, before, [[before[a], before[b], url] for a, b, url in links]
+    return out, before, [[before[e[0]], before[e[1]], *e[2:]] for e in links]
 
 
 def _close_bracket(ch: list[str], lit: list[bool], drop: list[bool], i: int) -> int | None:
@@ -579,7 +609,8 @@ class _Pending:
     links: list[list[Any]]
 
 
-def _flow(parts: list[tuple[Line, int, int]], *, inline: bool) -> tuple[_Buf, list[list[int]], list]:
+def _flow(parts: list[tuple[Line, int, int]], *, inline: bool,
+          notes: frozenset[str] = frozenset()) -> tuple[_Buf, list[list[int]], list]:
     """Склеивает части строк через синтетический "\\n" и (для Markdown) снимает инлайн-разметку."""
     raw = _Buf()
     ranges: list[tuple[int, int, int]] = []
@@ -591,7 +622,7 @@ def _flow(parts: list[tuple[Line, int, int]], *, inline: bool) -> tuple[_Buf, li
             raw.syn("\n", ln.no, c1, len(ln.text), _J)
     if not inline:
         return raw, [[no, a, b] for no, a, b in ranges], []
-    vis, before, links = _inline(raw)
+    vis, before, links = _inline(raw, notes)
     return vis, [[no, before[a], before[b]] for no, a, b in ranges], links
 
 
@@ -676,6 +707,26 @@ _CHOICE_WORD = r"(?:да|нет|не требуется|не применимо|
 _CHOICE = re.compile(rf"^{_CHOICE_WORD}(?:\s*/\s*{_CHOICE_WORD})+$", re.IGNORECASE)
 
 
+def _footnote_labels(lines: list[Line]) -> frozenset[str]:
+    """Метки определений ``[^метка]:`` вне fenced-блоков (casefold, как метки GFM)."""
+    labels: set[str] = set()
+    fence: str | None = None
+    for ln in lines:
+        if fence is not None:
+            mc = _FENCE_CLOSE.match(ln.text)
+            if mc and mc["fence"][0] == fence[0] and len(mc["fence"]) >= len(fence):
+                fence = None
+            continue
+        mo = _FENCE_OPEN.match(ln.text)
+        if mo and not (mo["fence"][0] == "`" and "`" in mo["info"]):
+            fence = mo["fence"]
+            continue
+        m = _FOOTNOTE_DEF.match(ln.text)
+        if m:
+            labels.add(m.group(1).casefold())
+    return frozenset(labels)
+
+
 class _Markdown:
     def __init__(self, lines: list[Line], warnings: list[tuple[str, str, int | None]]) -> None:
         self.lines = lines
@@ -687,6 +738,7 @@ class _Markdown:
         self.list_count = 0
         self.table_count = 0
         self.structural: set[int] = set()
+        self.notes = _footnote_labels(lines)
 
     # -- управление открытым абзацем и списками
 
@@ -717,6 +769,12 @@ class _Markdown:
         while self.lists and ind < self.lists[-1]["content"]:
             self.lists.pop()
 
+    def _nest(self, first: int) -> None:
+        """Блоки ``out[first:]`` лежат внутри открытого пункта списка: ``loc.parent`` = его строка."""
+        if self.lists:
+            for p in self.out[first:]:
+                p.loc["parent"] = self.lists[-1]["last"]  # ID подставит _finish
+
     def _part(self, ln: Line, c0: int | None = None) -> tuple[Line, int, int]:
         s = ln.text
         a = _lstrip_at(s, 0 if c0 is None else c0)
@@ -732,7 +790,7 @@ class _Markdown:
             tail = len(ln.text[c0:c1]) - len(ln.text[c0:c1].rstrip("\\"))
             if tail % 2 == 1:
                 parts[k] = (ln, c0, c1 - 1)
-        buf, lines, links = _flow(parts, inline=True)
+        buf, lines, links = _flow(parts, inline=True, notes=self.notes)
         end = parts[-1][0].no if parts else par["start"]
         self.out.append(_Pending(par["kind"], par["start"], end, buf, lines, par["loc"], links))
 
@@ -749,7 +807,7 @@ class _Markdown:
         if plain and not blank and rel <= 3 and _SETEXT.match(s):
             self.par = None
             level = 1 if s.strip()[0] == "=" else 2
-            buf, lines, links = _flow(par["parts"], inline=True)
+            buf, lines, links = _flow(par["parts"], inline=True, notes=self.notes)
             loc = {"level": level, "style": "setext", "empty": False, "section_end": 0}
             self.out.append(_Pending("heading", par["start"], ln.no, buf, lines, loc, links))
             return i + 1
@@ -768,17 +826,26 @@ class _Markdown:
         if m and rel <= 3 and not (m["fence"][0] == "`" and "`" in m["info"]):
             self._flush()
             self._pop(ind)
-            return self._fence(i, m)
+            first = len(self.out)
+            nxt = self._fence(i, m)
+            self._nest(first)
+            return nxt
         if rel <= 3 and "|" in s:
             head = self._table_head(i)
             if head is not None:
                 self._flush()
-                self.lists.clear()
-                return self._table(i, *head)
+                self._pop(ind)  # таблица с отступом пункта остаётся в пункте, список не рвётся
+                first = len(self.out)
+                nxt = self._table(i, *head)
+                self._nest(first)
+                return nxt
         if rel <= 3 and _HTML_COMMENT.match(s):
             self._flush()
             self._pop(ind)
-            return self._comment(i)
+            first = len(self.out)
+            nxt = self._comment(i)
+            self._nest(first)
+            return nxt
         m = _QUOTE.match(s)
         if m and rel <= 3:
             c0 = _lstrip_at(s, m.end())
@@ -788,7 +855,8 @@ class _Markdown:
             self._flush()
             self._pop(ind)
             if c0 < len(s):
-                self.par = {"kind": "quote", "start": ln.no, "parts": [self._part(ln, c0)], "loc": {}}
+                qloc = {"parent": self.lists[-1]["last"]} if self.lists else {}
+                self.par = {"kind": "quote", "start": ln.no, "parts": [self._part(ln, c0)], "loc": qloc}
             else:
                 self.structural.add(ln.no)  # пустая строка цитаты разделяет абзацы
             return i + 1
@@ -807,6 +875,9 @@ class _Markdown:
         loc: dict[str, Any] = {}
         if self.lists:
             loc["parent"] = self.lists[-1]["last"]  # строка пункта; ID подставит _finish
+        m = _FOOTNOTE_DEF.match(s)
+        if m and m.group(1).casefold() in self.notes:
+            loc["footnote"] = m.group(1)  # определение сноски; ссылки подставит _finish
         self.par = {"kind": "paragraph", "start": ln.no, "parts": [self._part(ln)], "loc": loc}
         return i + 1
 
@@ -843,7 +914,7 @@ class _Markdown:
             mm = _ATX_CLOSE.search(content)
             if mm:
                 c1 = c0 + mm.start()
-        buf, lines, links = _flow([(ln, c0, c1)], inline=True)
+        buf, lines, links = _flow([(ln, c0, c1)], inline=True, notes=self.notes)
         loc = {"level": len(m.group(1)), "style": "atx", "empty": False, "section_end": 0}
         self.out.append(_Pending("heading", ln.no, ln.no, buf, lines, loc, links))
 
@@ -940,10 +1011,10 @@ class _Markdown:
         for idx, (c0, c1) in enumerate(cells):
             if idx:
                 _joiner(buf, " | ", ln, prev_end, c0)
-            vis, _, lk = _inline(_Buf().src(ln.no, c0, ln.text[c0:c1]))
+            vis, _, lk = _inline(_Buf().src(ln.no, c0, ln.text[c0:c1]), self.notes)
             start = len(buf)
             buf.extend(vis)
-            links.extend([a + start, b + start, url] for a, b, url in lk)
+            links.extend([e[0] + start, e[1] + start, *e[2:]] for e in lk)
             column = columns[idx] if idx < len(columns) else None
             locs.append({"index": idx, "column": column, "start": start, "end": len(buf)})
             prev_end = c1
@@ -1140,8 +1211,13 @@ def _finish(pendings: list[_Pending], lines: list[Line], structural: set[int],
             loc["parent"] = by_line[loc["parent"]]
         if "table" in loc and "header_id" in loc["table"]:
             loc["table"] = dict(loc["table"], header_id=by_line[loc["table"]["header_id"]])
-        if p.links:
-            loc["links"] = [{"start": a, "end": b, "url": url} for a, b, url in p.links]
+        links = [e for e in p.links if e[2] is not None]
+        if links:
+            loc["links"] = [{"start": a, "end": b, "url": url} for a, b, url in links]
+        refs = [e for e in p.links if e[2] is None and not ("footnote" in p.loc and e[0] == 0)]
+        if refs:
+            loc["footnotes"] = [{"label": lab, "start": a, "end": b, "definition": None}
+                                for a, b, _url, lab in refs]
         spans = _segments(p.buf)
         loc["lines"] = p.lines
         loc["map"] = [[t0, line, c0] for t0, _t1, line, c0, _c1, _kind in spans]
@@ -1150,6 +1226,20 @@ def _finish(pendings: list[_Pending], lines: list[Line], structural: set[int],
         blocks.append(Block(bid, p.kind, [h[1] for h in stack], text, loc))
         if p.kind == "heading":
             stack.append((p.loc["level"], text, bid))
+
+    defs: dict[str, Block] = {}
+    for b in blocks:
+        if "footnote" in b.loc:
+            label = b.loc["footnote"]
+            b.loc["footnote"] = {"label": label, "refs": []}
+            defs.setdefault(label.casefold(), b)
+    for b in blocks:
+        for ref in b.loc.get("footnotes", []):
+            target = defs.get(ref["label"].casefold())
+            if target is not None:
+                ref["definition"] = target.id
+                if b.id not in target.loc["footnote"]["refs"]:
+                    target.loc["footnote"]["refs"].append(b.id)
 
     last_line = lines[-1].no if lines else 0
     for idx, b in enumerate(blocks):
@@ -1426,6 +1516,7 @@ def table_records(document: Document) -> list[dict[str, Any]]:
             "table": b.loc["table"]["index"],
             "header_id": b.loc["table"]["header_id"],
             "row": b.loc["row"],
+            "parent": b.loc.get("parent"),
             "line": b.loc["line_start"],
             "section": list(b.section),
             "direction": _direction(b.section),

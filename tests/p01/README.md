@@ -39,7 +39,9 @@ PYTHONPATH=src python -m bcc_review.readers.text tests/p01/fixtures/spec_ab.md >
 * `"\n"` между физическими строками одного блока (абзац, пункт списка, код, цитата);
 * `" | "` между ячейками строки таблицы. В каноническом GFM (`| a | b |`) он совпадает с исходником,
   и вся строка таблицы становится одним дословным отрезком;
-* `<br>` превращается в `"\n"`, `&amp;` — в `&`.
+* `<br>` превращается в `"\n"`, `&amp;` — в `&`;
+* сноска `[^1]` превращается в `[1]` (снят только `^`, остальные символы — дословные копии файла),
+  определение `[^1]: текст` — в `[1]: текст`.
 
 Снимаются `#`, маркеры списков и `[ ]`, `**`, `*`, `_`, `~~`, обратные кавычки кода, `\`-экранирование,
 крайние `|` и хвостовые пробелы жёсткого переноса. Тело fenced-блока и `кода` копируется дословно,
@@ -65,8 +67,10 @@ PYTHONPATH=src python -m bcc_review.readers.text tests/p01/fixtures/spec_ab.md >
 | `table_row` | `table = {index, header_id, columns}`, `row` (с 1), `cells = [{index, column, start, end}]`, `empty`, `template_choices` (ячейки вида «Да / Нет / Не требуется») |
 | `code` | `fence = {marker, info, open_line, close_line, closed}` или `null` (отступ), `language` |
 | `paragraph` | `parent` — ID пункта списка, если абзац его продолжает |
+| вложенные блоки | `parent` — ID пункта списка у таблицы (`table_header` и каждой `table_row`), fenced-кода, цитаты и HTML-комментария, если блок начинается с отступом пункта; список после такого блока продолжается |
 | `other` | `subtype`: `html_comment`, `front_matter` |
 | ссылки | `links = [{start, end, url}]` |
+| сноски | у ссылки `footnotes = [{label, start, end, definition}]`, у абзаца-определения `footnote = {label, refs}` |
 
 ### Восстановить строку и текст цитаты (для №07)
 
@@ -80,15 +84,62 @@ for line, c0, c1 in span_to_source(block, ev["start"], ev["end"]):
     print(line, lines[line - 1][c0:c1])  # внутри одной строки без снятой разметки == quote
 ```
 
+Пример со вложенной таблицей (`fixtures/nested_tables.md`, строка 23, часть B, пункт «1. Комиссия»):
+
+```python
+from bcc_review.analysis.evidence import locate, resolve_hint  # №07
+from bcc_review.readers.text import read_text, span_to_source
+
+doc = read_text("tests/p01/fixtures/nested_tables.md")
+row = next(b for b in doc.blocks if b.loc["line_start"] == 23)
+row.text   # 'Перевод на карту | 💳 не более 10 000 ₸ | карта | счёт'
+row.loc["map"]  # [[0, 23, 5], [21, 23, 28], [38, 23, 47], [47, 23, 57]]
+q = "💳 не более 10 000 ₸ | карта | счёт"
+s = row.text.index(q)                      # 19
+span_to_source(row, s, s + len(q))         # [(23, 24, 63)]
+# сырая строка 23 [24:63] == '💳 **не более 10 000 ₸** | карта \\| счёт'
+
+ev = resolve_hint(doc.to_dict(), {"block_id": row.id, "quote": q})["evidence"]
+locate(doc.to_dict(), ev)                  # line 23, col 24, col_end 63, раздел «Часть B. Кредитные карты»
+```
+
+Формула `locate` по `loc.map` и `span_to_source` по `loc.spans` дают один и тот же диапазон: якорь
+`[21, 23, 28]` перешагивает `**`, якорь `[38, 23, 47]` перешагивает `**`, `[47, 23, 57]` — `\`.
+Без `block_id` фраза «не более 10 000 ₸ в сутки» неоднозначна (строки 9 и 22, обе под «1. Комиссия»):
+№07 возвращает `ambiguous`, с `block_id` — нужное место.
+
 `to_source`, `span_to_source`, `from_source` работают и по блоку, у которого есть только контрактный
 `loc.map` (без `spans`). `verify_document(document, data)` перепроверяет SHA, карту и байтовые смещения
 без модели; её можно вызвать из `verify REPORT.json SOURCE`. `block_at_line(document, n)` находит блок,
 содержащий строку `n`; это помогает, когда модель ссылается на номер строки.
 
+### Сквозной сценарий: ТЗ о лимите в LF и CRLF+BOM
+
+`fixtures/limit_spec.lf.md` (683 байта, LF) и `fixtures/limit_spec.crlf_bom.md` (702 байта,
+BOM + CRLF) — один текст: пункт «1. Лимит переводов в сутки[^1]», под ним таблица, где `50 000 ₸`
+стоит в строках 9 и 10, пункт 2, абзац с двумя `50 000 ₸` (строка 14), определение сноски (строка 16).
+
+```bash
+python tests/p01/p01_limit_scenario.py
+python -m bcc_review tests/p01/fixtures/limit_spec.crlf_bom.md out/limit.md --offline-lint --no-cache
+python -m bcc_review verify out/limit.json tests/p01/fixtures/limit_spec.crlf_bom.md
+```
+
+| Фрагмент | block_id | Строка | Столбцы строки | `block.text` |
+| :--- | :--- | ---: | :--- | :--- |
+| `50 000 ₸` во 2-й строке таблицы | `b0006` | 10 | `[21:29]` | `[16:24]` |
+| `лимит 50 000 ₸ общий для всех каналов` в сноске | `b0009` | 16 | `[41:78]` | `[40:77]` (снят `^`) |
+| второе `50 000 ₸` в обычном тексте | `b0008` | 14 | `[52:60]` | `[52:60]` |
+
+Номера строк, столбцы и ID одинаковы в обоих вариантах, различается только `Document.id` (SHA-256 байтов).
+**Остаточная неоднозначность для №07 — строка 14**: `50 000 ₸` дважды в одном блоке `b0008`, поэтому
+`{block_id, quote}` даёт `ambiguous`; нужен контекст (`before: "лимит "`) или цитата длиннее числа.
+
 ### Строки таблиц как факты (для №04 и №06)
 
 `table_records(document)` выдаёт по записи на `table_row`: `block_id`, `header_id`, `row`, `line`,
-`section`, `direction` (`request`/`response`/`None` по ближайшему заголовку: «запрос», «Query»,
+`section`, `parent` (пункт списка, под которым лежит таблица, или `None`), `direction`
+(`request`/`response`/`None` по ближайшему заголовку: «запрос», «Query»,
 «Request body» → `request`; «Ответ» → `response`), `key` (первая ячейка) и `cells`. В каждой ячейке
 есть `column`, `value`, смещения, `line`, `col_start`, `col_end` и `numbers`. Числа ищутся только внутри
 своей ячейки, разделитель тысяч — пробел, NBSP или узкий NBSP, перенос строки им не считается.
@@ -113,6 +164,16 @@ for line, c0, c1 in span_to_source(block, ev["start"], ev["end"]):
 | Каждый дословный символ ↔ символ источника (туда и обратно) | `test_every_visible_character_maps_back_to_its_source_character` |
 | Ложные срабатывания: `#хештег`, `2 * 3`, `snake_case`, `2024.` внутри абзаца, `\|` без разделителя | `test_setext_thematic_break_and_false_positives`, `test_inline_*` |
 | Стык с контрактом: `validate(…, "Document")`, совпадение с `minimal_report.json`, `evidence_errors` | `test_p01_contract_junction.py` |
+| Таблица под «1. Комиссия» в двух разделах: раздел, строка, ячейка, `parent`, `map` по символам файла | `test_rows_under_numbered_rule_keep_section_line_cells_and_parent` |
+| Одинаковая фраза «не более 10 000 ₸» в ячейках обоих разделов: отдельные записи | `test_same_phrase_in_two_sections_gives_two_distinct_records` |
+| Цитата из части B с эмодзи, `**` и `\|`: точные символы и байты сырого файла на LF и BOM+CRLF | `test_quote_in_second_section_restores_exact_raw_chars_and_bytes` |
+| Тот же рисунок таблицы в fenced-коде остаётся кодом | `test_table_drawing_inside_fenced_code_stays_code` |
+| Список продолжается после вложенной таблицы; таблица без отступа пункта завершает список | `test_list_continues_after_nested_table`, `test_table_outdented_from_item_is_top_level_and_ends_the_list` |
+| Варианты вложения: без пустой строки, отступ 4 у «10.», вложенный пункт, табуляция | `test_nested_table_variants_attach_to_their_item` |
+| ID прежних фикстур совпадают с reader `d9742fb` | `test_ids_of_unchanged_fixtures_match_previous_reader` (`fixtures/ids_d9742fb.json`) |
+| Стык с опубликованным №07: `resolve_hint` + `locate` на вложенной таблице (пропуск, если №07 нет в checkout) | `test_p01_p07_junction.py` |
+| ТЗ о лимите: таблица под пунктом с одним числом в двух строках, сноска, повтор числа в тексте; LF и CRLF+BOM дают одни block_id, строки и столбцы, обратное чтение по строке и по байтам | `test_p01_limit_footnote.py`; сквозной вывод — `python tests/p01/p01_limit_scenario.py` |
+| Остаточная неоднозначность: «50 000 ₸» дважды в строке 14 одного блока — №07 без контекста `ambiguous`, с `before` — строка 14, `[52:60]` | `test_p07_residual_ambiguity_same_number_twice_in_one_line` |
 
 Сверх тестов прогнан фаззинг: 8000 случайных документов (md и txt; LF, CRLF и CR; BOM) без падений,
 без потерянных строк и с полным покрытием `spans`, плюс 1200 документов через `contracts.validate`.
@@ -136,8 +197,11 @@ for line, c0, c1 in span_to_source(block, ev["start"], ev["end"]):
 ## Ограничения (упрощённый CommonMark)
 
 * Внутри цитат `>` списки и заголовки не разбираются, содержимое идёт текстом блока `quote`.
-* Таблицы внутри пунктов списка не распознаются, строка остаётся текстом пункта.
-* Reference-ссылки `[text][ref]` и сноски остаются буквальным текстом.
+* Таблица внутри пункта распознаётся, если её отступ не больше отступа текста пункта + 3; при большем
+  отступе (код с отступом по CommonMark) её строки остаются текстом абзаца с `parent`.
+* Reference-ссылки `[text][ref]` остаются буквальным текстом. Сноска без определения `[^x]` тоже
+  остаётся как есть (так её показывает и GFM). Абзацы продолжения сноски с отступом не связываются
+  с определением.
 * В TXT нет заголовков: `section == []`, заголовок документа — первая строка.
 * «Часть A» и «Часть B» в официальном файле набраны латиницей. Если модель вернёт кириллическую «А»,
   №07 стоит сравнивать цитаты с учётом похожих символов.
