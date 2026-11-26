@@ -19,7 +19,7 @@ from bcc_review.v2.render import console, jsonout, markdown  # noqa: E402
 SAMPLE = ROOT / "tests" / "v2" / "fixtures" / "13_report_sample.json"
 
 REQUIRED_HEADINGS = [
-    "## Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
+    "></a>Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
     "></a>4. Проверка набора требований", "></a>5. Сводка", "></a>6. Итог", "></a>Приложение А. Вопросы владельцу",
     "></a>Приложение Б. Черновик тест-кейсов", "></a>Приложение В. Чек-лист", "></a>Приложение Г. Было → стало",
     "></a>Приложение Д. Как работал агент", "></a>Приложение Е. Методика",
@@ -160,7 +160,7 @@ def test_header_says_generated_and_verified(sample):
 
 def test_first_screen(sample):
     md = markdown.render(sample)
-    brief = md[md.find("## Кратко"):md.find("></a>1. Паспорт")]
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
     assert brief.count("| 🔴 [D-") == 5  # таблица блокеров
@@ -170,7 +170,7 @@ def test_first_screen(sample):
 
 def test_every_link_has_anchor(sample):
     md = markdown.render(sample)
-    links = set(re.findall(r"\]\(#([\w-]+)\)", md))
+    links = set(re.findall(r"\]\(#([\w-]+)(?: \"[^\"]*\")?\)", md))
     anchors = set(re.findall(r'<a id="([\w-]+)"></a>', md))
     assert links and links <= anchors, links - anchors
 
@@ -196,7 +196,7 @@ def test_card_quotes_are_short_and_located(sample):
 
 def test_ids_of_document_shown_next_to_report_ids(sample):
     md = markdown.render(sample)
-    assert "[R-07 / Ф-3](#r-07)" in md and "[R-30](#r-30)" in md  # «Query-параметры: cardId» — не ID
+    assert "[R-07 / Ф-3](#r-07 " in md and "[R-30](#r-30 " in md  # «Query-параметры: cardId» — не ID
 
 
 def test_no_internal_jargon(sample):
@@ -261,6 +261,7 @@ def test_before_after_block(sample):
     assert "D-01 (снят)" in md
     assert '<a id="d-01">' not in md  # снятый дефект не показывается карточкой
     assert "· уточнён после ответов" in md
+    assert "**Сняты ответами блокеры (1):**" in md and "D-01 (снят) Ф-3 и Ф-4 — [Q-01](#q-01): лимит действует всегда" in md
     assert r["summary"]["findings"]["critical"] == 4
 
 
@@ -335,7 +336,7 @@ def _mutations(report: dict):
 def test_render_never_crashes_on_broken_data(sample):
     for name, r in _mutations(sample):
         md = markdown.render(r)
-        assert "## Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
+        assert "></a>Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
         assert "BCC Review" in console.summary(r), name
 
 

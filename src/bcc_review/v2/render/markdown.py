@@ -54,6 +54,29 @@ CRITERIA: dict[str, tuple[str, str, str]] = {
     "traceable": ("Прослеживаемость", "IEEE 830-1998 п. 4.3.8", "Нб"),
     "risk": ("ИБ и операционные риски", "чек-лист «Ревью требований» банка", "Рс"),
 }
+# своими словами: какой вопрос агент задаёт требованию или набору
+CRITERION_WHAT = {
+    "necessary": "без требования продукт неполон; это не дубль другого пункта",
+    "appropriate": "сказано, что должна делать система, без лишнего решения реализации",
+    "unambiguous": "одно толкование: определены термины, единицы, границы, часовые пояса, события",
+    "complete": "есть условие, действие, ограничения, реакция на ошибки и граничные случаи",
+    "singular": "одно обязательство в одном пункте",
+    "feasible": "реализуемо при описанной архитектуре, данных и интеграциях",
+    "verifiable": "выполнение можно доказать тестом, анализом или осмотром: есть измеримый результат",
+    "correct": "соответствует предметной области и не противоречит критериям приёмки",
+    "conforming": "оформлено по шаблону банка: идентификатор, модальность, заполненные поля",
+    "language": "нет размытых слов, лазеек «по возможности» и открытых перечней «и т. д.»",
+    "set_complete": "набор покрывает цель: обещанные операции описаны, обязательные разделы заполнены",
+    "set_consistent": "ни одна пара требований, критериев приёмки или частей документа не даёт разный исход "
+                      "для одного входа",
+    "set_feasible": "весь набор вместе реализуем в заданных ограничениях",
+    "set_comprehensible": "из набора ясно, что ожидается; одно понятие — один термин",
+    "set_validatable": "можно показать, что набор достигает бизнес-цели: есть критерии приёмки",
+    "ranked": "у требований указаны важность и стабильность",
+    "modifiable": "правило записано в одном месте, документ версионируется",
+    "traceable": "у требований есть идентификаторы и связи с источником и приёмкой",
+    "risk": "нет рисков ИБ и эксплуатации: утечки данных, небезопасные методы, нет отката",
+}
 INDIVIDUAL = ["necessary", "appropriate", "unambiguous", "complete", "singular", "feasible", "verifiable",
               "correct", "conforming", "language"]
 SET_CRITERIA = ["set_consistent", "set_complete", "set_feasible", "set_comprehensible", "set_validatable",
@@ -410,7 +433,17 @@ class _Ctx:
         label = rid
         if sid and _DOC_ID.fullmatch(sid):
             label = f"{rid} / {sid}"
-        return f"[{label}](#{anchor(rid)})" if link and q else label
+        if not (link and q):
+            return label
+        tip = shorten(q.get("summary") or "", 120).replace('"', "'").replace("\\", "/")
+        tip = re.sub(r"[\[\]()<>`*|]", "", tip)
+        return f'[{label}](#{anchor(rid)} "{tip}")' if tip else f"[{label}](#{anchor(rid)})"
+
+    def req_named(self, rid: str) -> str:
+        """Ссылка на требование с кратким названием: «R-07 / Ф-3 (Push при переходе порога…)»."""
+        q = self.req_by_id.get(rid, {})
+        summ = shorten(q.get("summary") or "", 48)
+        return self.req_label(rid) + (f" ({cell(summ)})" if summ else "")
 
     def f_link(self, fid: str, with_icon: bool = False) -> str:
         f = self.f_by_id.get(fid)
@@ -509,10 +542,24 @@ def _header(c: _Ctx) -> list[str]:
     else:
         quotes = f"исходник {src}, цитат в дефектах нет"
     head = esc(c.r.get("title")) if isinstance(c.r.get("title"), str) and c.r.get("title") else "Ревью требований"
+    models = ", ".join(f"`{m}`" for m in run.get("models_used") or [])
+    calls = (run.get("calls") or {}).get("total")
+    how = []
+    if models:
+        how.append(f"модель {models}")
+    elif c.offline:
+        how.append("без модели")
+    if run.get("duration_s") is not None:
+        how.append(duration(run.get("duration_s")))
+    if calls:
+        how.append(f"{num(calls)} {plural(int(calls), 'вызов', 'вызова', 'вызовов')}")
+    st = when(run.get("started_at"))
+    if st:
+        how.append(f"{st:%d.%m.%Y %H:%M} (UTC+5)")
     out = [f"# {head}: «{esc(title)}»", "",
            f"> Сформирован агентом «{esc(run.get('agent') or 'BCC Review')}» {esc(run.get('version') or '')} "
-           f"(коммит {commit}{dirty}) без ручных правок; {quotes}. Проверка повторяется командой "
-           f"`python -m bcc_review verify отчёт.json исходник`."]
+           f"(коммит {commit}{dirty}) без ручных правок" + (f": {', '.join(how)}" if how else "") + f"; {quotes}. "
+           f"Проверка повторяется командой `python -m bcc_review verify отчёт.json исходник`."]
     status = run.get("status")
     if status == "partial":
         bad = [stage_name(k) for k, v in (run.get("stages") or {}).items()
@@ -526,17 +573,19 @@ def _header(c: _Ctx) -> list[str]:
         out += [">", "> Режим без модели: работали только детерминированные правила. Поиск противоречий, "
                      "проверка критериев приёмки и вопросы владельцу требуют модели (инструкция «README», раздел о "
                      "ключе)."]
+    out += ["", "**Содержание:** [Кратко](#s0) · " + " · ".join(f"[{name}](#{a})" for a, name in NAV)]
     return out + [""]
 
 
 def _brief(c: _Ctx) -> list[str]:
     v = c.verdict
-    out = ["## Кратко", ""]
+    out = [h2("s0", "Кратко"), ""]
     out += table(["Разработка", "Тестирование"],
                  [[f"**{READINESS.get(v.get('development'), '—')}**", f"**{READINESS.get(v.get('testing'), '—')}**"]],
                  [":---:", ":---:"])
     out += ["", _counts_line(c), ""]
     out += [prose(v.get("summary") or _auto_reason(c)), ""]
+    out += _before_after(c)
     blockers = [f for f in c.findings if f.get("blocks") in BLOCKING and (
         f.get("severity") == "critical" or (c.offline and f.get("rule_conflict")))]
     blockers.sort(key=lambda f: (f.get("priority") or 99, _id_num(f.get("id"))))
@@ -563,9 +612,36 @@ def _brief(c: _Ctx) -> list[str]:
         out += ["**Исправить первым**", ""]
         out += [f"{i}. {c.f_link(f['id'], True)} {esc(f.get('title'))}" for i, f in enumerate(first, 1)]
         out.append("")
-    out += _before_after(c)
-    out += ["**Разделы:** " + " · ".join(f"[{name}](#{a})" for a, name in NAV), ""]
+    out += _how_obtained(c)
     return out
+
+
+def _how_obtained(c: _Ctx) -> list[str]:
+    """Строка доверия: откуда взялись дефекты и почему им можно верить."""
+    if c.run.get("status") == "failed":
+        return []
+    stats = c.run.get("stage_stats") or {}
+    roles = [STAGES[stage_key(k)][0].lower() for k in (c.run.get("stages") or {})
+             if stage_key(k) in PROPOSING and stage_key(k) != "rules" and c.run["stages"][k] in ("ok", "partial")]
+    accepted = sum(len(f.get("candidate_ids") or []) for f in c.r.get("findings") or [])
+    rej = c.r.get("rejected") or []
+    total = accepted + len(rej)
+    ok, qt = c.summary.get("quotes_verified", 0), c.summary.get("quotes_total", c.summary.get("quotes_verified", 0))
+    parts = []
+    if roles or "rules" in {stage_key(k) for k in stats}:
+        who = (f"роли ({', '.join(roles)})" if roles else "") + (" и правила без модели" if any(
+            stage_key(k) == "rules" for k in c.run.get("stages") or {}) else "")
+        parts.append(f"{who.strip().capitalize()} предложили {num(total)} "
+                     f"{plural(total, 'кандидата', 'кандидатов', 'кандидатов')} в дефекты" if total else
+                     f"{who.strip().capitalize()} проверили документ")
+    if total:
+        parts.append(f"судья объединил дубли и оставил {len(c.findings)} "
+                     f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')}, отклонил {len(rej)}")
+    if qt:
+        parts.append(f"каждая цитата найдена в документе программой ({ok} из {qt}), номер строки посчитан кодом")
+    if not parts:
+        return []
+    return [f"*Как получено:* {'; '.join(parts)}. Вердикт считает программа по правилу из приложения Е.", ""]
 
 
 def _fix_first(c: _Ctx) -> list[dict]:
@@ -599,6 +675,16 @@ def _before_after(c: _Ctx) -> list[str]:
         rows.append([f"{SEV_ICON[k]} {SEV_PLURAL[k][2].capitalize()}", num(bf.get(k)) if k in bf else "—",
                      num(af.get(k)) if k in af else "—"])
     out += table(["", "До ответов", "После ответов"], rows, [":---", ":---:", ":---:"])
+    gone = [x for x in cl.get("changes") or [] if isinstance(x, dict) and x.get("status") == "resolved"
+            and x.get("severity_before") == "critical"]
+    if gone:
+        out += ["", f"**Сняты ответами блокеры ({len(gone)}):**", ""]
+        for x in gone[:7]:
+            reason = str(x.get("reason") or "")
+            qids = [q for q in x.get("question_ids") or [] if q not in reason]
+            qs = ", ".join(qids) + ": " if qids else ("" if re.search(r"\bQ-\d", reason) else "общее решение: ")
+            out.append(f"- 🔴 {c.f_link(x.get('finding_id', ''))} {prose(x.get('title') or '')} — "
+                       f"{prose(qs + shorten(reason, 170))}")
     out += ["", f"Снято {num(cl.get('resolved', 0))}, уточнено {num(cl.get('changed', 0))}, осталось открытыми "
                 f"{num(cl.get('open', 0))}, новых конфликтов из-за ответов {len(cl.get('new_findings') or [])}"
                 + (f": {c.f_links(cl['new_findings'])}" if cl.get("new_findings") else "")
@@ -853,7 +939,8 @@ def _card(c: _Ctx, f: dict) -> list[str]:
         f.get("status_after_answers") or f.get("status"), "")
     out = [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(sev, '')} {f['id']}. {prose(f.get('title'))}", ""]
     meta = []
-    reqs = [c.req_label(r) for r in f.get("requirement_ids") or []]
+    rids = list(f.get("requirement_ids") or [])
+    reqs = [c.req_named(r) if len(rids) <= 3 else c.req_label(r) for r in rids]
     meta.append("**Требования:** " + (", ".join(reqs) if reqs else "документ в целом"))
     meta.append(f"**Критерий:** {esc(_criterion_name(f.get('criterion')))} ({esc(_criterion_ref(f))})")
     meta.append(f"**Вид:** {esc(KIND_NAME.get(f.get('kind'), f.get('kind') or '—'))}")
@@ -1327,8 +1414,8 @@ def _appendix_method(c: _Ctx) -> list[str]:
                 + ". Плюс ИБ и операционные риски по чек-листу банка.", ""]
     else:
         rows = [[CRITERIA[k][0], CRITERIA[k][1], "требование" if k in INDIVIDUAL else
-                 ("набор" if k in SET_CRITERIA else "риски")] for k in CRITERIA]
-        out += table(["Критерий", "Стандарт", "Уровень"], rows) + [""]
+                 ("набор" if k in SET_CRITERIA else "риски"), CRITERION_WHAT.get(k, "")] for k in CRITERIA]
+        out += table(["Критерий", "Стандарт", "Уровень", "Что проверяется"], rows) + [""]
     out += ["**Шкала серьёзности**", "",
             "- 🔴 **Критичный** — два места документа дают несовместимый результат для одного входа; ключевое "
             "правило нельзя однозначно реализовать или проверить; нет информации, без которой основную функцию не "
