@@ -1,0 +1,492 @@
+"""Сверка цитат с документом (владелец №03, CONTRACT.md, раздел 7).
+
+Модель пишет цитату и номер строки; код ищет цитату в DocView и сам ставит строку, страницу и раздел.
+Так в отчёт попадает только текст, который действительно есть в документе, на своём месте.
+
+``verify_quote(view, quote, line_hint=None, near_lines=())`` → ``Match | None``::
+
+    {"line_start": 38, "line_end": 38, "page": None, "section": "…", "verified": "exact|normalized|fuzzy",
+     "text": "дословный текст документа"}
+
+Порядок поиска:
+
+1. нормализация обеих сторон: NFKC; кавычки «»“”„"' → "; тире —–‑ → -; неразрывные и тонкие пробелы →
+   пробел; пробелы схлопываются; ``**``, обратные кавычки, ведущие ``* ``, ``#``, ``|`` снимаются;
+   ё → е; пробел внутри числа («1 000») не учитывается; сравнение без регистра;
+2. вхождение в строках ``line_hint`` ±2, иначе во всём документе — ближайшее к ``line_hint`` / ``near_lines``;
+3. цитата через соседние строки (склейка до 3 непустых строк);
+4. цитата с многоточием внутри — части ищутся по порядку в пределах 3 строк (``normalized``);
+5. нечёткое совпадение ≥ 0,92 (difflib) только в пределах ±5 строк от подсказки → ``fuzzy``;
+6. иначе ``None``.
+
+``verify_candidates(view, candidates, requirements)`` — пакетная сверка кандидатов: проставляет
+``evidence[i].verified`` и точные ``line_start/line_end/page/section``, кандидатов без единой найденной
+цитаты переносит в ``rejected`` с причиной «цитата не найдена».
+"""
+
+from __future__ import annotations
+
+import bisect
+import re
+import unicodedata
+from difflib import SequenceMatcher
+from typing import Any, Iterable
+
+FUZZY_MIN = 0.92
+FUZZY_RADIUS = 5
+HINT_RADIUS = 2
+MAX_GLUE = 3
+MIN_QUOTE = 3          # короче (после нормализации) — не цитата
+MIN_FUZZY_QUOTE = 12   # нечёткий поиск только для достаточно длинных цитат
+REASON_MISSING = "цитата не найдена"
+
+_QUOTES = set("«»“”„‟\"'‘’‚‛`´ʹʺ〝〞＂")
+_DASHES = set("—–‑‒―−⁃﹘﹣－")
+_ZERO = set("\u200b\u200c\u200d\u2060\ufeff\u00ad")
+_ELLIPSIS = re.compile(r"\.{3,}")
+_LEAD = re.compile(r"^(?:\s|[#*•|>]|-(?=\s))+")
+_LEAD_NUM = re.compile(r"^\d{1,3}[.)]\s+")
+_EDGE = " \"'.,;!?|*"
+
+
+# --------------------------------------------------------------------------- нормализация с картой позиций
+def normalize(s: str) -> str:
+    """Нормализованная строка для сравнения (без регистра)."""
+    return _norm_map(s)[0]
+
+
+def _norm_map(s: str) -> tuple[str, list[int]]:
+    """Нормализовать строку и вернуть карту: позиция нормализованного символа → позиция в исходной строке."""
+    chars: list[str] = []
+    idx: list[int] = []
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i]
+        # снять **, __ и обратные кавычки (разметка Markdown)
+        if c == "`" or (c in "*_" and i + 1 < n and s[i + 1] == c):
+            i += 2 if c != "`" else 1
+            continue
+        for ch in unicodedata.normalize("NFKC", c):
+            if ch in _ZERO:
+                continue
+            if ch in _QUOTES:
+                ch = '"'
+            elif ch in _DASHES:
+                ch = "-"
+            elif ch.isspace():
+                ch = " "
+            for low in ch.lower():
+                if low == "ё":
+                    low = "е"
+                chars.append(low)
+                idx.append(i)
+        i += 1
+    # схлопнуть пробелы; убрать пробел внутри числа «1 000» → «1000»
+    out_c: list[str] = []
+    out_i: list[int] = []
+    m = len(chars)
+    for k, ch in enumerate(chars):
+        if ch == " ":
+            if not out_c or out_c[-1] == " ":
+                continue
+            if (out_c[-1].isdigit() and k + 3 < m + 1 and "".join(chars[k + 1:k + 4]).isdigit()
+                    and (k + 4 >= m or not chars[k + 4].isdigit())):
+                continue
+        out_c.append(ch)
+        out_i.append(idx[k])
+    while out_c and out_c[-1] == " ":
+        out_c.pop()
+        out_i.pop()
+    return "".join(out_c), out_i
+
+
+def _clean_quote(q: str) -> str:
+    """Нормализованная цитата без обрамления: ведущие маркеры, кавычки и точки по краям не нужны для поиска."""
+    t = normalize(q)
+    t = _LEAD.sub("", t)
+    return t.strip(_EDGE + "…").strip()
+
+
+# --------------------------------------------------------------------------- индекс документа
+class _Index:
+    """Нормализованный текст всех непустых строк через пробел и границы строк в нём."""
+
+    def __init__(self, view: dict):
+        self.view = view
+        self.lines = view.get("lines") or []
+        parts: list[str] = []
+        self.starts: list[int] = []   # начало строки в self.full
+        self.ends: list[int] = []
+        self.nos: list[int] = []      # номер строки view
+        self.maps: list[list[int]] = []
+        pos = 0
+        for ln in self.lines:
+            norm, mp = _norm_map(ln.get("text") or "")
+            if not norm.strip():
+                continue
+            if parts:
+                parts.append(" ")
+                pos += 1
+            self.starts.append(pos)
+            parts.append(norm)
+            pos += len(norm)
+            self.ends.append(pos)
+            self.nos.append(ln["n"])
+            self.maps.append(mp)
+        self.full = "".join(parts)
+        self.by_no = {no: k for k, no in enumerate(self.nos)}
+
+    def slot(self, pos: int) -> int:
+        """Индекс непустой строки, которой принадлежит позиция в self.full (разделитель — к предыдущей)."""
+        return max(0, bisect.bisect_right(self.starts, pos) - 1)
+
+    def occurrences(self, needle: str) -> list[tuple[int, int]]:
+        out = []
+        start = 0
+        while True:
+            a = self.full.find(needle, start)
+            if a < 0:
+                return out
+            out.append((a, a + len(needle)))
+            start = a + 1
+
+    def span_lines(self, a: int, b: int) -> tuple[int, int]:
+        return self.slot(a), self.slot(max(a, b - 1))
+
+    def original(self, a: int, b: int) -> str:
+        """Исходный текст документа, соответствующий отрезку [a, b) нормализованного текста."""
+        s1, s2 = self.span_lines(a, b)
+        pieces = []
+        for k in range(s1, s2 + 1):
+            text = self.lines_text(k)
+            mp = self.maps[k]
+            lo = max(a, self.starts[k]) - self.starts[k]
+            hi = min(b, self.ends[k]) - self.starts[k]
+            if hi <= lo or not mp:
+                continue
+            o1 = mp[lo]
+            o2 = mp[hi - 1] + 1
+            # дотянуть до конца составного символа (например, «**» после текста не нужен — карта его пропускает)
+            pieces.append(text[o1:o2].strip())
+        return " ".join(p for p in pieces if p)
+
+    def lines_text(self, k: int) -> str:
+        return self.line_of_slot(k).get("text") or ""
+
+    def line_of_slot(self, k: int) -> dict:
+        no = self.nos[k]
+        if 1 <= no <= len(self.lines) and self.lines[no - 1]["n"] == no:
+            return self.lines[no - 1]
+        return next(ln for ln in self.lines if ln["n"] == no)
+
+
+_CACHE: dict[int, tuple[Any, _Index]] = {}
+
+
+def _index(view: dict) -> _Index:
+    key = id(view)
+    hit = _CACHE.get(key)
+    lines = view.get("lines")
+    if hit and hit[0] is lines and hit[1].view is view and len(hit[1].lines) == len(lines or []):
+        return hit[1]
+    idx = _Index(view)
+    if len(_CACHE) > 16:
+        _CACHE.clear()
+    _CACHE[key] = (lines, idx)
+    return idx
+
+
+# --------------------------------------------------------------------------- выбор вхождения
+def _anchors(line_hint: Any, near_lines: Iterable[Any]) -> tuple[int | None, list[int]]:
+    hint = _as_int(line_hint)
+    near: list[int] = []
+    for x in near_lines or ():
+        if isinstance(x, (list, tuple)) and x:
+            a, b = _as_int(x[0]), _as_int(x[-1])
+            if a is not None and b is not None:
+                near.extend(range(min(a, b), max(a, b) + 1))
+        else:
+            v = _as_int(x)
+            if v is not None:
+                near.append(v)
+    return hint, near
+
+
+def _as_int(x: Any) -> int | None:
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, int):
+        return x if x > 0 else None
+    if isinstance(x, float) and x > 0:
+        return int(x)
+    if isinstance(x, str):
+        m = re.search(r"\d+", x)
+        return int(m.group()) if m else None
+    return None
+
+
+def _dist(ls: int, le: int, points: list[int]) -> int:
+    best = 10 ** 9
+    for p in points:
+        d = 0 if ls <= p <= le else min(abs(ls - p), abs(le - p))
+        if d < best:
+            best = d
+    return best
+
+
+def _pick(idx: _Index, spans: list[tuple[int, int]], hint: int | None, near: list[int]):
+    """Выбрать вхождение: сначала в окне подсказки ±2, потом ближайшее; одна строка лучше склейки."""
+    best = None
+    points = ([hint] if hint else []) + near
+    for a, b in spans:
+        s1, s2 = idx.span_lines(a, b)
+        if s2 - s1 + 1 > MAX_GLUE:
+            continue
+        ls, le = idx.nos[s1], idx.nos[s2]
+        multi = le > ls
+        in_win = hint is not None and ls <= hint + HINT_RADIUS and le >= hint - HINT_RADIUS
+        tier = (0 if in_win else 2) + (1 if multi else 0)
+        d = _dist(ls, le, points) if points else 0
+        dh = _dist(ls, le, [hint]) if hint else 0
+        # вхождение по границам слов лучше куска слова («Prod» не должен найтись в «Product»)
+        cut = int((a > 0 and idx.full[a - 1].isalnum() and idx.full[a].isalnum())
+                  or (b < len(idx.full) and idx.full[b].isalnum() and idx.full[b - 1].isalnum()))
+        key = (tier, cut, d, dh, ls)
+        if best is None or key < best[0]:
+            best = (key, a, b, ls, le)
+    return best
+
+
+def _match(idx: _Index, a: int, b: int, ls: int, le: int, verified: str, text: str | None = None) -> dict:
+    first = idx.line_of_slot(idx.by_no[ls])
+    return {"line_start": ls, "line_end": le, "page": first.get("page"), "section": first.get("section", ""),
+            "verified": verified, "text": text if text is not None else idx.original(a, b)}
+
+
+# --------------------------------------------------------------------------- основная функция
+def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iterable[Any] = ()) -> dict | None:
+    """Найти цитату в документе. Возвращает Match или None (см. описание модуля)."""
+    if not isinstance(quote, str):
+        return None
+    raw = quote.strip()
+    needle = _clean_quote(raw)
+    if len(needle) < MIN_QUOTE:
+        return None
+    idx = _index(view)
+    if not idx.full:
+        return None
+    hint, near = _anchors(line_hint, near_lines)
+
+    # 1–3: точное (после нормализации) вхождение, в том числе через соседние строки;
+    # если не нашлось — та же цитата без ведущего номера пункта («5. …»: в DOCX нумерация не в тексте)
+    best = _pick(idx, idx.occurrences(needle), hint, near)
+    if not best and _LEAD_NUM.match(needle) and len(_LEAD_NUM.sub("", needle)) >= MIN_QUOTE:
+        needle = _LEAD_NUM.sub("", needle)
+        best = _pick(idx, idx.occurrences(needle), hint, near)
+    if best:
+        _, a, b, ls, le = best
+        text = idx.original(a, b)
+        joined = " ".join(idx.line_of_slot(k).get("text", "") for k in range(idx.by_no[ls], idx.by_no[le] + 1))
+        verified = "exact" if raw and (raw in joined or raw.strip("«»\"' ") in joined) else "normalized"
+        return _match(idx, a, b, ls, le, verified, text)
+
+    # 4: многоточие внутри цитаты — части по порядку в пределах 3 строк
+    parts = [p.strip(_EDGE + "…") for p in _ELLIPSIS.split(needle)]
+    parts = [p for p in parts if len(p) >= MIN_QUOTE]
+    if len(parts) >= 2:
+        m = _match_parts(idx, parts, hint, near)
+        if m:
+            return m
+
+    # 5: нечёткое совпадение только рядом с подсказкой
+    points = ([hint] if hint else []) + near
+    if points and len(needle) >= MIN_FUZZY_QUOTE:
+        m = _fuzzy(idx, needle, hint, points)
+        if m:
+            return m
+    return None
+
+
+def _match_parts(idx: _Index, parts: list[str], hint: int | None, near: list[int]) -> dict | None:
+    spans = []
+    texts: dict[tuple[int, int], str] = {}
+    for a0, b0 in idx.occurrences(parts[0]):
+        s0 = idx.slot(a0)
+        limit = idx.ends[min(len(idx.ends) - 1, s0 + MAX_GLUE - 1)]
+        pos, pieces, ok = b0, [idx.original(a0, b0)], True
+        for p in parts[1:]:
+            a = idx.full.find(p, pos)
+            if a < 0 or a + len(p) > limit:
+                ok = False
+                break
+            pieces.append(idx.original(a, a + len(p)))
+            pos = a + len(p)
+        if ok:
+            spans.append((a0, pos))
+            texts[(a0, pos)] = " … ".join(pieces)
+    best = _pick(idx, spans, hint, near)
+    if not best:
+        return None
+    _, a, b, ls, le = best
+    return _match(idx, a, b, ls, le, "normalized", texts[(a, b)])
+
+
+def _partial(needle: str, hay: str) -> tuple[float, int, int]:
+    """Лучшее совпадение needle с отрезком hay: (оценка 0..1, начало, конец)."""
+    if not hay:
+        return 0.0, 0, 0
+    if len(hay) <= len(needle):
+        return SequenceMatcher(None, needle, hay, autojunk=False).ratio(), 0, len(hay)
+    sm = SequenceMatcher(None, needle, hay, autojunk=False)
+    best = (0.0, 0, 0)
+    seen = set()
+    for blk in sm.get_matching_blocks():
+        if blk.size == 0:
+            continue
+        start = max(0, blk.b - blk.a)
+        end = min(len(hay), start + len(needle))
+        start = max(0, end - len(needle))
+        if start in seen:
+            continue
+        seen.add(start)
+        r = SequenceMatcher(None, needle, hay[start:end], autojunk=False).ratio()
+        if r > best[0]:
+            best = (r, start, end)
+    return best
+
+
+def _fuzzy(idx: _Index, needle: str, hint: int | None, points: list[int]) -> dict | None:
+    cand_slots = sorted({k for k, no in enumerate(idx.nos)
+                         if any(abs(no - p) <= FUZZY_RADIUS for p in points)})
+    best = None
+    for k in cand_slots:
+        for width in range(1, MAX_GLUE + 1):
+            k2 = k + width - 1
+            if k2 >= len(idx.nos):
+                break
+            lo, hi = idx.starts[k], idx.ends[k2]
+            hay = idx.full[lo:hi]
+            r, s, e = _partial(needle, hay)
+            if r < FUZZY_MIN:
+                continue
+            a, b = _widen(idx.full, lo + s, lo + e, lo, hi)
+            s1, s2 = idx.span_lines(a, b)
+            ls, le = idx.nos[s1], idx.nos[s2]
+            d = _dist(ls, le, points)
+            key = (-round(r, 4), le - ls, d, ls)
+            if best is None or key < best[0]:
+                best = (key, a, b, ls, le)
+    if not best:
+        return None
+    _, a, b, ls, le = best
+    return _match(idx, a, b, ls, le, "fuzzy")
+
+
+def _widen(full: str, a: int, b: int, lo: int, hi: int) -> tuple[int, int]:
+    """Расширить отрезок до границ слов, не выходя за [lo, hi)."""
+    while a > lo and full[a - 1] != " ":
+        a -= 1
+    while b < hi and full[b] != " " and full[b - 1] != " ":
+        b += 1
+    while a < b and full[a] == " ":
+        a += 1
+    while b > a and full[b - 1] == " ":
+        b -= 1
+    return a, b
+
+
+# --------------------------------------------------------------------------- пакетная сверка
+def requirement_lines(requirements: Iterable[dict] | None) -> dict[str, tuple[int, int]]:
+    out: dict[str, tuple[int, int]] = {}
+    for r in requirements or []:
+        rid = str(r.get("id") or "")
+        a, b = _as_int(r.get("line_start")), _as_int(r.get("line_end"))
+        if rid and a:
+            out[rid] = (a, b or a)
+    return out
+
+
+def verify_evidence(view: dict, ev: dict, near: Iterable[Any] = ()) -> dict:
+    """Сверить одно доказательство (in place) и вернуть его: verified, line_start/line_end/page/section, quote."""
+    quote = ev.get("quote")
+    hint = ev.get("line") if ev.get("line") not in (None, "", 0) else ev.get("line_start")
+    m = verify_quote(view, quote, hint, near)
+    if m:
+        ev["quote"] = m["text"] if m["verified"] != "exact" else str(quote).strip()
+        ev["line"] = m["line_start"]
+        ev.update({k: m[k] for k in ("line_start", "line_end", "page", "section", "verified")})
+    else:
+        h = _as_int(hint) or 0
+        ev.update({"verified": "missing", "line_start": h, "line_end": h, "page": None, "section": ""})
+    return ev
+
+
+def verify_candidates(view: dict, candidates: Iterable[dict], requirements: Iterable[dict] | None = None,
+                      *, keep_missing_evidence: bool = False) -> dict:
+    """Сверить цитаты всех кандидатов.
+
+    Возвращает ``{"candidates": [...], "rejected": [...], "stats": {...}}``. У оставленных кандидатов
+    доказательства с ``verified=missing`` убираются (если не ``keep_missing_evidence``), а на уровне
+    кандидата ставятся ``line_start/line_end/page/section`` первого найденного доказательства.
+    Кандидат без единой найденной цитаты попадает в ``rejected`` с ``reason = "цитата не найдена"``.
+    """
+    req_lines = requirement_lines(requirements)
+    kept: list[dict] = []
+    rejected: list[dict] = []
+    stats = {"quotes": 0, "verified": 0, "exact": 0, "normalized": 0, "fuzzy": 0, "missing": 0,
+             "candidates_in": 0, "candidates_kept": 0, "candidates_rejected": 0}
+    for cand in candidates or []:
+        stats["candidates_in"] += 1
+        near = [req_lines[r] for r in cand.get("requirement_ids") or [] if r in req_lines]
+        evidence = [e for e in (cand.get("evidence") or []) if isinstance(e, dict)]
+        seen: set[tuple] = set()
+        checked: list[dict] = []
+        for ev in evidence:
+            verify_evidence(view, ev, near)
+            stats["quotes"] += 1
+            stats[ev["verified"]] += 1
+            if ev["verified"] != "missing":
+                stats["verified"] += 1
+            key = (ev.get("line_start"), ev.get("line_end"), normalize(str(ev.get("quote") or "")))
+            if ev["verified"] != "missing" and key in seen:
+                continue
+            seen.add(key)
+            checked.append(ev)
+        found = [e for e in checked if e["verified"] != "missing"]
+        if not found:
+            cand["evidence"] = checked
+            cand["reason"] = REASON_MISSING
+            rejected.append(cand)
+            stats["candidates_rejected"] += 1
+            continue
+        cand["evidence"] = checked if keep_missing_evidence else found
+        first = found[0]
+        cand.update({k: first[k] for k in ("line_start", "line_end", "page", "section")})
+        kept.append(cand)
+        stats["candidates_kept"] += 1
+    stats["share_verified"] = round(stats["verified"] / stats["quotes"], 4) if stats["quotes"] else 1.0
+    return {"candidates": kept, "rejected": rejected, "stats": stats}
+
+
+def verify_requirements(view: dict, requirements: Iterable[dict]) -> dict:
+    """Уточнить строки требований по их цитатам (выход segment): line_start/line_end/page, раздел — если пуст.
+
+    Возвращает ``{"requirements": [...], "missing": [ID…]}``; требования без найденной цитаты остаются как есть.
+    """
+    reqs = list(requirements or [])
+    missing = []
+    for r in reqs:
+        m = verify_quote(view, r.get("quote"), r.get("line_start"), [(r.get("line_start"), r.get("line_end"))]
+                         if r.get("line_start") else ())
+        if not m:
+            missing.append(r.get("id", ""))
+            continue
+        ls, le = m["line_start"], m["line_end"]
+        old_s, old_e = _as_int(r.get("line_start")), _as_int(r.get("line_end"))
+        # цитата — часть требования: строки требования расширяем, но не сужаем без причины
+        if old_s and old_e and old_s <= ls and le <= old_e and old_e - old_s <= 6:
+            ls, le = old_s, old_e
+        r["line_start"], r["line_end"], r["page"] = ls, le, m["page"]
+        if not r.get("section"):
+            r["section"] = m["section"]
+    return {"requirements": reqs, "missing": missing}
