@@ -160,8 +160,29 @@ class Option:
         )
 
 
-@dataclass
-class Question:
+def format_edit(e: Any) -> str:
+    """Правка строкой для Question.options и файла ответов: «Правка [b0006]: «было» → «стало»».
+
+    Строку читает ``answers.parse_answers`` (формат №13 печатает варианты как есть),
+    поэтому выбор буквы варианта в файле ответов сам несёт проверяемую правку."""
+    bid = get(e, "block_id")
+    return f"Правка [{bid}]: «{get(e, 'old')}» → «{get(e, 'new')}»" if bid else \
+        f"Правка: «{get(e, 'old')}» → «{get(e, 'new')}»"
+
+
+_SYNCED = ("id", "finding_ids", "prompt", "options", "affected_req_ids", "owner", "blocks", "situation",
+           "why", "sources", "target", "hypothesis", "document_answer", "kind", "family", "severity",
+           "priority", "rank_reason", "source_sha256", "status", "origin", "blocked_decision")
+
+
+@dataclass(eq=False, repr=False)
+class Question(dict):
+    """Question v1. Это ``dict`` (движок кладёт его в Report.questions как есть,
+    JSON и схема контракта видят обычный объект) с атрибутами №08 поверх.
+
+    Содержимое словаря — :meth:`to_dict`; оно обновляется при присваивании
+    атрибута и при вызове :meth:`sync` (после правки вложенных списков)."""
+
     id: str
     finding_ids: list[str]
     prompt: str
@@ -185,6 +206,23 @@ class Question:
     origin: str = "llm"
     blocked_decision: str = ""
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_ready", True)
+        self.sync()
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        object.__setattr__(self, name, value)
+        if name in _SYNCED and self.__dict__.get("_ready"):
+            self.sync()
+
+    def sync(self) -> "Question":
+        dict.clear(self)
+        dict.update(self, self._contract())
+        return self
+
+    def __repr__(self) -> str:
+        return f"Question(id={self.id!r}, finding_ids={self.finding_ids!r}, prompt={self.prompt!r})"
+
     def option(self, option_id: str | None) -> Option | None:
         for o in self.options:
             if o.id == option_id:
@@ -192,12 +230,26 @@ class Question:
         return None
 
     def option_texts(self) -> list[str]:
-        """Варианты строками — так их требует Question.options контракта v1."""
-        return [f"{o.id}. {o.label} — {o.observable_result}" for o in self.options]
+        """Варианты строками — так их требует Question.options контракта v1.
+
+        Каждая проверенная правка варианта дописана как «· Правка [block]: «…» → «…»»:
+        экспорт №13 печатает эти строки в файл ответов, и по букве варианта
+        ``parse_answers`` восстанавливает правку без доступа к отчёту."""
+        out = []
+        for o in self.options:
+            text = f"{o.id}. {o.label} — {o.observable_result}"
+            for e in o.edits:
+                if not e.get("invented") and "|" not in f"{e['old']}{e['new']}":
+                    text += " · " + format_edit(e)
+            out.append(text)
+        return out
 
     def to_dict(self) -> dict:
         """Question v1 (id, finding_ids, prompt, options: list[str], affected_req_ids)
         плюс поля №08; полные варианты с правками — в ``option_details``."""
+        return self._contract()
+
+    def _contract(self) -> dict:
         return {
             "id": self.id, "finding_ids": list(self.finding_ids), "prompt": self.prompt,
             "options": self.option_texts(),
@@ -855,7 +907,7 @@ def rank(questions: list[Question], doc: DocView) -> list[Question]:
         q.rank_reason = " · ".join(r for r in reason if r)
         ordered.append(q)
         covered |= set(q.affected_req_ids)
-        pool.remove(q)
+        pool = [x for x in pool if x is not q]  # Question — dict: сравнение по идентичности
     for n, q in enumerate(ordered, start=1):
         q.id = f"Q-{n:02d}"
         for o in q.options:
@@ -939,6 +991,8 @@ def build_questions(
         questions.append(_assemble(doc, merged, entry, log))
 
     ordered = rank(questions, doc)
+    for q in ordered:  # вложенные правки получили question_id — обновить словарь контракта
+        q.sync()
     if limit is not None and len(ordered) > limit:
         rest = ordered[limit:]
         log.append("[queued] ниже порога очереди: " + ", ".join(

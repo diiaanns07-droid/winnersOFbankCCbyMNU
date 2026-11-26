@@ -441,7 +441,12 @@ def load_document(path: str | Path) -> Any:
             fn = getattr(mod, fn_name)
         except (ImportError, AttributeError):
             continue
-        return fn(path)
+        doc = fn(path)
+        try:  # как движок: читатель может вернуть dataclass — приводим к Document v1 (dict)
+            from bcc_review.contracts import normalize_document
+        except ImportError:
+            return doc
+        return normalize_document(doc)
     if path.suffix.lower() in {".md", ".markdown", ".txt"}:
         return load_markdown(path)
     raise RuntimeError(

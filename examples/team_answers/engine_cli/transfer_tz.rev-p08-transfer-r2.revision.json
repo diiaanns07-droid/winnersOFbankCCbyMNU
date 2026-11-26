@@ -1,0 +1,32 @@
+{
+  "schema": "bcc-review/revision@1",
+  "status": "applied_not_verified",
+  "note": "Решения владельца приняты и применены к тексту. Закрытие замечаний подтверждается только повторным анализом этой редакции (тот же SHA-256).",
+  "base": {
+    "sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+    "title": "Перевод между своими счетами",
+    "format": "markdown",
+    "source": "../tests/p08/fixtures/transfer_tz.md"
+  },
+  "revision": {
+    "path": "transfer_tz.rev-p08-transfer-r2.md",
+    "sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+    "mode": "markdown_patch"
+  },
+  "edits": [
+    {
+      "block_id": "b0009",
+      "start": 64,
+      "end": 90,
+      "old": "Перевод исполнен в пятницу",
+      "new": "Перевод исполнен в следующий рабочий день",
+      "source_sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+      "origin": "option",
+      "question_id": "Q-01",
+      "loc": "строка 16 · блок b0009 · символы 64–90 · раздел «Перевод между своими счетами / Критерии приёмки»"
+    }
+  ],
+  "decisions": [],
+  "questions": [],
+  "warnings": []
+}

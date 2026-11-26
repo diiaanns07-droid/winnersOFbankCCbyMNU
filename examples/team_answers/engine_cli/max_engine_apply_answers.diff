@@ -1,0 +1,27 @@
+diff --git a/src/bcc_review/engine.py b/src/bcc_review/engine.py
+index 98e0d98..7be7d6f 100644
+--- a/src/bcc_review/engine.py
++++ b/src/bcc_review/engine.py
+@@ -388,9 +388,19 @@ class Engine:
+         rev_path = self.out_md.parent / f"{self.input_path.stem}.rev-{self.run_id[:16]}{self.input_path.suffix}"
+         writer = self.mods.get("write_revision")
+         try:
+-            writer.func(document, edits, rev_path, source_path=self.input_path)
+-        except TypeError:
+-            writer.func(document, edits, rev_path)
++            try:
++                written = writer.func(document, edits, rev_path, source_path=self.input_path)
++            except TypeError:
++                written = writer.func(document, edits, rev_path)
++        except ValueError as exc:  # правка не легла на исходник: прогон продолжается на исходной редакции
++            self.warn("answers", f"редакция не записана: {exc}", "answers")
++            self.mark("answers", "partial", "редакция не записана: проверяется исходная редакция",
++                      implementation=writer.label, t=t)
++            return document
++        rev_path = Path(written) if written else rev_path  # писатель выбирает расширение (PDF/DOCX → .md)
++        for d in self.decisions:  # внесено в редакцию; закрытие — после повторного анализа (--compare)
++            if isinstance(d, dict) and d.get("edits") and d.get("patch_state", "proposed") == "proposed":
++                d.update(patch_state="applied", fix_status="applied_not_verified", revision=rev_path.name)
+         self.revision_of = document["id"]
+         self.reviewed_path = rev_path
+         revised = self.read(rev_path)

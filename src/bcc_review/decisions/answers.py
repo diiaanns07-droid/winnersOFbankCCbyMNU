@@ -1,6 +1,19 @@
 """Файл вопросов, разбор ответов владельца и применение решений (№08).
 
-Формат файла (его же экспортирует HTML №13; читает один и тот же код)::
+``parse_answers`` читает три формата одним кодом:
+
+1. файл вопросов №08 (``Ответ:`` — последнее поле карточки, ниже);
+2. экспорт HTML №13 ``format: bcc-review-answers/1``: фронтматтер с
+   ``source_sha256``, ``## Q-01``, строка ``Варианты: A. … | B. …``, заголовок
+   ``### Ответ`` и текст ответа (строки, начинавшиеся с решётки или обратной косой черты,
+   экранированы обратной косой чертой);
+3. резервный формат движка: ``Ответ: …`` и строки ``Правка: «старое» → «новое»``.
+
+Правки берутся без доступа к отчёту: выбранная буква → строка ``Варианты:``
+(``Question.options`` несут «· Правка [b0012]: «…» → «…»»), плюс явные строки
+``Правка:`` в ответе. Координаты считает код по текущему документу.
+
+Формат файла №08::
 
     <!-- bcc-review:answers v1 -->
     source_sha256: <64 hex SHA-256 исходного документа>
@@ -61,6 +74,54 @@ _CYR_BARE = re.compile(r"^\s*([АБВСЕабвсе])(?:\s*$|\s*[.):;,]\s*|\s+[�
 _MULTI = re.compile(
     r"^(?:(?:и|или|or|and)\s+)?(?:вариант\s+)?(?:[A-F](?=$|[\s.):;,])|[АБВСЕ](?=$|[.):;,]))")
 _EMPTYISH = re.compile(r"^[\s\-—–.?…_*]*$")
+_ANS_HEADING = re.compile(r"^[ \t]*#{3,4}[ \t]*Ответ[ \t]*:?[ \t]*$", re.M)
+_OPTIONS_LINE = re.compile(r"^[ \t]*Варианты[ \t]*:[ \t]*(.+)$", re.M)
+_OPTION_SPLIT = re.compile(r"\s+\|\s+(?=[A-F][.)]\s)")
+_EDIT_HEAD = re.compile(r"(?:Правка|Edit)(?:[ \t]*\[([^\]\s]+)\])?[ \t]*:[ \t]*(?=«)", re.I)
+_ARROW = re.compile(r"\s*(?:→|->)\s*(?=«)")
+
+
+def _balanced(text: str, i: int) -> tuple[str, int] | None:
+    """Содержимое «…» с учётом вложенных кавычек, начиная с text[i] == '«'."""
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == "«":
+            depth += 1
+        elif text[j] == "»":
+            depth -= 1
+            if depth == 0:
+                return text[i + 1: j], j + 1
+    return None
+
+
+def parse_edit_specs(text: str, origin: str = "owner") -> list[dict]:
+    """«Правка [b0012]: «старое» → «новое»» -> [{block_id|None, old, new, origin}]."""
+    out = []
+    for m in _EDIT_HEAD.finditer(text or ""):
+        a = _balanced(text, m.end())
+        if a is None:
+            continue
+        arrow = _ARROW.match(text, a[1])
+        if not arrow:
+            continue
+        b = _balanced(text, arrow.end())
+        if b is None:
+            continue
+        out.append({"block_id": m.group(1), "old": a[0], "new": b[0], "origin": origin})
+    return out
+
+
+def _options_from_section(body: str) -> dict[str, str]:
+    """Строка «Варианты: A. … | B. …» (№13 и карточка №08) -> {буква: текст}."""
+    m = _OPTIONS_LINE.search(body)
+    if not m:
+        return {}
+    out: dict[str, str] = {}
+    for part in _OPTION_SPLIT.split(m.group(1).strip()):
+        om = re.match(r"^([A-F])[.)]\s*(.*)$", part.strip(), re.S)
+        if om and om.group(1) not in out:
+            out[om.group(1)] = om.group(2).strip()
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +171,9 @@ class Decision:
     wording: str = ""
     edits: list[dict] = field(default_factory=list)
     note: str = ""
+    edit_specs: list[dict] = field(default_factory=list)   # правки без координат (не найдены при разборе)
+    option_text: str | None = None                         # текст выбранного варианта из «Варианты:»
+    patch_state: str = ""                                  # "collision" / "stale" — решено при разборе
 
     @classmethod
     def from_answer(cls, question_id: str, source_sha256: str | None, answer: str) -> "Decision":
@@ -123,7 +187,15 @@ class Decision:
         answer = get(obj, "answer")
         if answer is None and get(obj, "choice"):
             answer = str(get(obj, "choice"))
-        return cls.from_answer(str(get(obj, "question_id")), get(obj, "source_sha256"), str(answer or ""))
+        d = cls.from_answer(str(get(obj, "question_id")), get(obj, "source_sha256"), str(answer or ""))
+        d.edits = [dict(e) for e in (get(obj, "edits") or [])]
+        d.edit_specs = [dict(e) for e in (get(obj, "edit_specs") or [])]
+        d.option_text = get(obj, "option")
+        d.patch_state = str(get(obj, "patch_state") or "")
+        d.note = str(get(obj, "note") or "")
+        if not d.edits and not d.edit_specs and answer:  # dict из резервного формата: правки в тексте ответа
+            d.edit_specs = parse_edit_specs(str(answer))
+        return d
 
     @property
     def status(self) -> str:
@@ -131,12 +203,19 @@ class Decision:
 
     def to_dict(self) -> dict:
         """Decision v1 (question_id, source_sha256, answer, edits, note) и поля №08."""
-        return {
+        d = {
             "question_id": self.question_id, "source_sha256": self.source_sha256,
             "answer": self.answer, "edits": [dict(e) for e in self.edits], "note": self.note,
             "choice": self.choice, "comment": self.comment, "wording": self.wording,
             "status": self.status,
         }
+        if self.edit_specs:
+            d["edit_specs"] = [dict(e) for e in self.edit_specs]
+        if self.option_text is not None:
+            d["option"] = self.option_text
+        if self.patch_state:
+            d["patch_state"] = self.patch_state
+        return d
 
 
 @dataclass
@@ -148,6 +227,7 @@ class AnswerSet:
     duplicate_ids: list[str] = field(default_factory=list)
     seen_ids: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    _contract: list[dict] | None = field(default=None, repr=False, compare=False)
 
     # Ведёт себя как list[Decision] (точка входа №08 в contracts/HANDOFF.md):
     # итерация, len и индекс — по заполненным решениям; метаданные разбора — в полях.
@@ -158,7 +238,22 @@ class AnswerSet:
         return len(self.decisions)
 
     def __getitem__(self, i):
+        if isinstance(i, str):
+            return self.get(i)
         return self.decisions[i]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Вид для движка (``engine.apply_answers``): ``decisions`` — список dict Decision v1
+        к текущей версии (каждый dict передаётся в propose_patch и попадает в Report),
+        ``warnings`` — пояснения разбора."""
+        if key == "decisions":
+            if self._contract is None:
+                self._contract = [d.to_dict() for d in self.decisions
+                                  if d.source_sha256 and d.patch_state != "stale"]
+            return self._contract
+        if key == "warnings":
+            return self.warnings
+        return default
 
     def decision(self, question_id: str) -> Decision | None:
         for d in self.decisions:
@@ -228,24 +323,33 @@ def parse_answers(
         warns.append("[sha_conflict] в файле несколько разных source_sha256 — решения не привязаны к версии")
     else:
         warns.append("[no_sha] в файле нет source_sha256 — решения не привязаны к версии")
-    if sha and expected_sha and sha != expected_sha:
-        warns.append(f"[stale_answers] ответы к версии {short_sha(sha)}, текущий документ "
-                     f"{short_sha(expected_sha)} — правки не применяются")
+    stale = bool(sha and expected_sha and sha != expected_sha)
+    if stale:
+        warns.append(f"[stale_answers] ответы относятся к другой редакции (source_sha256 {short_sha(sha)}…, "
+                     f"документ {short_sha(expected_sha)}…): правки не применены")
 
     known = {str(get(q, "id")) for q in questions} if questions is not None else None
     raw: dict[str, list[str]] = {}
+    options: dict[str, dict[str, str]] = {}
     order: list[str] = []
     for i, h in enumerate(heads):
         qid = h.group(1)
         body = text[h.end(): heads[i + 1].start() if i + 1 < len(heads) else len(text)]
+        hm = _ANS_HEADING.search(body)   # №13: «### Ответ», ответ — строки ниже
         m = _ANS.search(body)
-        if not m:
-            warns.append(f"[no_answer_field] {qid}: нет поля «Ответ:» — вопрос считается открытым")
-            ans = ""
-        else:
+        if hm and (not m or hm.start() <= m.start()):
+            lines = body[hm.end():].split("\n")
+            ans = _clean_answer("\n".join(ln[1:] if ln.startswith("\\") else ln for ln in lines))
+            card = body[: hm.start()]
+        elif m:
             ans = _clean_answer(m.group(1) + body[m.end():])
+            card = body[: m.start()]
+        else:
+            warns.append(f"[no_answer_field] {qid}: нет поля «Ответ:» — вопрос считается открытым")
+            ans, card = "", body
         if qid not in raw:
             order.append(qid)
+            options[qid] = _options_from_section(card)
         raw.setdefault(qid, []).append(ans)
 
     aset = AnswerSet(source_sha256=sha, seen_ids=list(order), warnings=warns)
@@ -269,12 +373,53 @@ def parse_answers(
         if not filled:
             aset.open_ids.append(qid)
             continue
-        aset.decisions.append(Decision.from_answer(qid, sha, filled[0]))
+        dec = Decision.from_answer(qid, sha, filled[0])
+        dec.edit_specs = parse_edit_specs(dec.answer, "owner")
+        if dec.choice in options.get(qid, {}):
+            dec.option_text = options[qid][dec.choice]
+            dec.edit_specs += parse_edit_specs(dec.option_text, "option")
+        if stale:
+            dec.patch_state = "stale"
+        aset.decisions.append(dec)
     if known is not None:
         for qid in sorted(known - set(order)):
             aset.open_ids.append(qid)
             warns.append(f"[missing_card] {qid}: карточки нет в файле ответов — вопрос открыт")
+    if document is not None and not stale:
+        _resolve_and_check(DocView(document), aset)
     return aset
+
+
+def _resolve_and_check(doc: DocView, aset: AnswerSet) -> None:
+    """Координаты правок по текущему документу и коллизии между решениями.
+
+    Только здесь видны все ответы сразу: движок вызывает propose_patch по одному
+    решению, поэтому пересечение правок двух решений отклоняется на разборе —
+    оба решения получают ``patch_state = "collision"`` и причину с фрагментами."""
+    from .patches import describe_collision, find_collisions, resolve_spec
+
+    active = [d for d in aset.decisions if d.choice not in ("open", "defer", "invalid") and d.source_sha256]
+    for d in active:
+        kept = []
+        for spec in d.edit_specs:
+            e, why = resolve_spec(doc, spec)
+            if e is None:
+                kept.append(spec)  # propose_patch даст явную причину
+                continue
+            e.update(origin=spec.get("origin", "owner"), question_id=d.question_id)
+            d.edits.append(e)
+        d.edit_specs = kept
+    tagged = [e for d in active for e in d.edits]
+    for c in find_collisions(tagged):
+        a, b = c["a"].get("question_id"), c["b"].get("question_id")
+        if a == b:
+            continue  # внутри одного решения: своя правка владельца важнее варианта (propose_patch)
+        msg = "[collision] " + describe_collision(c, doc)
+        if msg not in aset.warnings:
+            aset.warnings.append(msg)
+        for d in active:
+            if d.question_id in (a, b):
+                d.patch_state, d.note = "collision", msg
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +473,9 @@ def render_card(q: Any, doc: DocView | None = None) -> str:
         "«Формулировка: …» — она заменит предложение с цитатой (для пропуска — добавится после "
         "него). Без формулировки решение сохранится, текст не изменится.",
         "- **Отложить.** Напишите «отложить»: документ останется как есть, вопрос — открытым.",
+        "",
+        # машинная строка вариантов — та же, что печатает экспорт №13; по ней разбор находит правку
+        "Варианты: " + " | ".join(" ".join(t.split()) for t in q.option_texts()),
         "", "Ответ:", "",
     ]
     return "\n".join(out)

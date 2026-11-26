@@ -1,0 +1,1735 @@
+{
+  "schema_version": "1.0",
+  "run": {
+    "run_id": "p08-transfer-r2",
+    "parent_run_id": null,
+    "source_sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+    "source_name": "transfer_tz.rev-p08-transfer-r2.md",
+    "agent_version": "0.1.0",
+    "agent_commit": "b34e66d1ccaacd3bf000fc7e38cfcdfd6673eb51-dirty",
+    "provider": "mock",
+    "model": "mock-1",
+    "requested_model": "mock-1",
+    "models_seen": [
+      "mock-1"
+    ],
+    "mode": "mock",
+    "status": "partial",
+    "status_reasons": [
+      "individual: модуль не получил ни одного успешного ответа модели (ошибки перехвачены модулем)"
+    ],
+    "started_at": "2026-11-26T17:08:04Z",
+    "finished_at": "2026-11-26T17:08:04Z",
+    "duration_s": 0.168,
+    "calls": {
+      "physical": 8,
+      "cache_hits": 0,
+      "failed": 2,
+      "retries": 1
+    },
+    "tokens": {
+      "input": 15681,
+      "output": 580,
+      "cache_read": 0
+    },
+    "budget": {
+      "max_calls": 40,
+      "max_seconds": 1500.0,
+      "max_tokens": null,
+      "exhausted": false,
+      "reason": null
+    },
+    "stages": [
+      {
+        "name": "read",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.051,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.readers.text:read_text"
+      },
+      {
+        "name": "answers",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": "применено правок: 1; исходный файл не изменён, редакция: transfer_tz.rev-p08-transfer-r2.md",
+        "duration_s": 0.011,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.decisions.patches:write_revision"
+      },
+      {
+        "name": "inventory",
+        "status": "ok",
+        "calls": 2,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.015,
+        "input_tokens": 3384,
+        "output_tokens": 28,
+        "implementation": "team:bcc_review.analysis.inventory:build_inventory"
+      },
+      {
+        "name": "rules",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.015,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "fallback:bcc_review.runtime.fallback.rules:lint"
+      },
+      {
+        "name": "individual",
+        "status": "failed",
+        "calls": 2,
+        "cache_hits": 0,
+        "retries": 1,
+        "model": "mock-1",
+        "reason": "модуль не получил ни одного успешного ответа модели (ошибки перехвачены модулем)",
+        "duration_s": 0.007,
+        "input_tokens": 7992,
+        "output_tokens": 10,
+        "implementation": "team:bcc_review.analysis.individual:review_individual"
+      },
+      {
+        "name": "cross",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.001,
+        "input_tokens": 1115,
+        "output_tokens": 213,
+        "implementation": "fallback:bcc_review.runtime.fallback.llm_stages:review_set"
+      },
+      {
+        "name": "evidence",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.004,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.analysis.evidence:resolve_candidate"
+      },
+      {
+        "name": "verify_meaning",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.0,
+        "input_tokens": 760,
+        "output_tokens": 29
+      },
+      {
+        "name": "merge",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": "кандидатов 3 → замечаний 3",
+        "duration_s": 0.0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "name": "clarify",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.0,
+        "input_tokens": 1462,
+        "output_tokens": 293
+      },
+      {
+        "name": "questions",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.001,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "team:bcc_review.decisions.clarify:build_questions"
+      },
+      {
+        "name": "bank",
+        "status": "ok",
+        "calls": 1,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": "mock-1",
+        "reason": null,
+        "duration_s": 0.001,
+        "input_tokens": 968,
+        "output_tokens": 7,
+        "implementation": "fallback:bcc_review.runtime.fallback.bank:build_bank_pack"
+      },
+      {
+        "name": "compare",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.008,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "implementation": "fallback:bcc_review.runtime.fallback.diff:compare_reports"
+      },
+      {
+        "name": "verdict",
+        "status": "ok",
+        "calls": 0,
+        "cache_hits": 0,
+        "retries": 0,
+        "model": null,
+        "reason": null,
+        "duration_s": 0.0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    ],
+    "incomplete_stages": [
+      "individual"
+    ],
+    "modules": {
+      "build_bank_pack": "fallback:bcc_review.runtime.fallback.bank:build_bank_pack",
+      "build_inventory": "team:bcc_review.analysis.inventory:build_inventory",
+      "build_questions": "team:bcc_review.decisions.clarify:build_questions",
+      "compare_reports": "fallback:bcc_review.runtime.fallback.diff:compare_reports",
+      "load_criteria": "team:bcc_review.criteria:load_criteria",
+      "parse_answers": "team:bcc_review.decisions.answers:parse_answers",
+      "propose_patch": "team:bcc_review.decisions.patches:propose_patch",
+      "read_text": "team:bcc_review.readers.text:read_text",
+      "reconcile_facts": "team:bcc_review.analysis.facts:reconcile_facts",
+      "resolve_candidate": "team:bcc_review.analysis.evidence:resolve_candidate",
+      "resolve_hint": "team:bcc_review.analysis.evidence:resolve_hint",
+      "review_individual": "team:bcc_review.analysis.individual:review_individual",
+      "review_set": "fallback:bcc_review.runtime.fallback.llm_stages:review_set",
+      "write_revision": "team:bcc_review.decisions.patches:write_revision",
+      "provider": "runtime.mock:MockAdapter"
+    },
+    "evidence_audit": {
+      "checked": 8,
+      "confirmed": 8,
+      "ambiguous": 0,
+      "rejected": 0,
+      "note": "Учтена каждая подсказка-цитата кандидатов (включая опоры witness): confirmed — найдена в тексте блока, ambiguous — в нескольких блоках, rejected — не найдена. Смысл проверяется отдельно (meaning_status)."
+    },
+    "options": {
+      "provider": "mock",
+      "model": null,
+      "offline_lint": false,
+      "answers_path": "tests/p08/fixtures/answers13_Q01_A.md",
+      "compare_path": "out/r1.json",
+      "exports": [],
+      "cache_dir": null,
+      "use_cache": false,
+      "max_calls": 40,
+      "max_seconds": 1500.0,
+      "max_tokens": null,
+      "max_retries": 3,
+      "timeout_s": 300.0,
+      "trace": true,
+      "fail_on": null,
+      "allow_partial_ready": false,
+      "full_context_chars": 120000,
+      "run_id": "p08-transfer-r2",
+      "parent_run_id": null,
+      "artifacts_dir": null
+    },
+    "context_policy": "full",
+    "revision_of": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+    "original_source_name": "transfer_tz.md"
+  },
+  "document": {
+    "id": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+    "title": "Перевод между своими счетами",
+    "format": "markdown",
+    "source_name": "transfer_tz.rev-p08-transfer-r2.md",
+    "blocks": [
+      {
+        "id": "b0001",
+        "kind": "heading",
+        "section": [],
+        "text": "Перевод между своими счетами",
+        "loc": {
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 55,
+          "level": 1,
+          "style": "atx",
+          "empty": false,
+          "section_end": 16,
+          "lines": [
+            [
+              1,
+              0,
+              28
+            ]
+          ],
+          "map": [
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              28,
+              1,
+              2,
+              30,
+              "v"
+            ]
+          ],
+          "section_ids": []
+        }
+      },
+      {
+        "id": "b0002",
+        "kind": "heading",
+        "section": [
+          "Перевод между своими счетами"
+        ],
+        "text": "Функциональные требования",
+        "loc": {
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 57,
+          "byte_end": 109,
+          "level": 2,
+          "style": "atx",
+          "empty": false,
+          "section_end": 7,
+          "lines": [
+            [
+              3,
+              0,
+              25
+            ]
+          ],
+          "map": [
+            [
+              0,
+              3,
+              3
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              25,
+              3,
+              3,
+              28,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001"
+          ]
+        }
+      },
+      {
+        "id": "b0003",
+        "kind": "list_item",
+        "section": [
+          "Перевод между своими счетами",
+          "Функциональные требования"
+        ],
+        "text": "ПС-1. Перевод между своими счетами выполняется без комиссии.",
+        "loc": {
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 111,
+          "byte_end": 226,
+          "list": {
+            "id": 1,
+            "ordered": false,
+            "marker": "*",
+            "number": null,
+            "depth": 0,
+            "item": 1
+          },
+          "lines": [
+            [
+              5,
+              0,
+              60
+            ]
+          ],
+          "map": [
+            [
+              0,
+              5,
+              4
+            ],
+            [
+              5,
+              5,
+              11
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              5,
+              5,
+              4,
+              9,
+              "v"
+            ],
+            [
+              5,
+              60,
+              5,
+              11,
+              66,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0002"
+          ]
+        }
+      },
+      {
+        "id": "b0004",
+        "kind": "list_item",
+        "section": [
+          "Перевод между своими счетами",
+          "Функциональные требования"
+        ],
+        "text": "ПС-2. Перевод, созданный после 18:00, исполняется на следующий рабочий день.",
+        "loc": {
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 227,
+          "byte_end": 365,
+          "list": {
+            "id": 1,
+            "ordered": false,
+            "marker": "*",
+            "number": null,
+            "depth": 0,
+            "item": 2
+          },
+          "lines": [
+            [
+              6,
+              0,
+              76
+            ]
+          ],
+          "map": [
+            [
+              0,
+              6,
+              4
+            ],
+            [
+              5,
+              6,
+              11
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              5,
+              6,
+              4,
+              9,
+              "v"
+            ],
+            [
+              5,
+              76,
+              6,
+              11,
+              82,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0002"
+          ]
+        }
+      },
+      {
+        "id": "b0005",
+        "kind": "heading",
+        "section": [
+          "Перевод между своими счетами"
+        ],
+        "text": "Тарифы",
+        "loc": {
+          "line_start": 8,
+          "line_end": 8,
+          "byte_start": 367,
+          "byte_end": 382,
+          "level": 2,
+          "style": "atx",
+          "empty": false,
+          "section_end": 11,
+          "lines": [
+            [
+              8,
+              0,
+              6
+            ]
+          ],
+          "map": [
+            [
+              0,
+              8,
+              3
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              6,
+              8,
+              3,
+              9,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001"
+          ]
+        }
+      },
+      {
+        "id": "b0006",
+        "kind": "paragraph",
+        "section": [
+          "Перевод между своими счетами",
+          "Тарифы"
+        ],
+        "text": "За перевод между своими счетами взимается комиссия 0,5% от суммы перевода.",
+        "loc": {
+          "line_start": 10,
+          "line_end": 10,
+          "byte_start": 384,
+          "byte_end": 517,
+          "lines": [
+            [
+              10,
+              0,
+              74
+            ]
+          ],
+          "map": [
+            [
+              0,
+              10,
+              0
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              74,
+              10,
+              0,
+              74,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0005"
+          ]
+        }
+      },
+      {
+        "id": "b0007",
+        "kind": "heading",
+        "section": [
+          "Перевод между своими счетами"
+        ],
+        "text": "Критерии приёмки",
+        "loc": {
+          "line_start": 12,
+          "line_end": 12,
+          "byte_start": 519,
+          "byte_end": 553,
+          "level": 2,
+          "style": "atx",
+          "empty": false,
+          "section_end": 16,
+          "lines": [
+            [
+              12,
+              0,
+              16
+            ]
+          ],
+          "map": [
+            [
+              0,
+              12,
+              3
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              16,
+              12,
+              3,
+              19,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001"
+          ]
+        }
+      },
+      {
+        "id": "b0008",
+        "kind": "table_header",
+        "section": [
+          "Перевод между своими счетами",
+          "Критерии приёмки"
+        ],
+        "text": "Исходные условия | Действие | Ожидаемый результат",
+        "loc": {
+          "line_start": 14,
+          "line_end": 15,
+          "byte_start": 555,
+          "byte_end": 672,
+          "table": {
+            "index": 1,
+            "columns": [
+              "Исходные условия",
+              "Действие",
+              "Ожидаемый результат"
+            ],
+            "align": [
+              "left",
+              "left",
+              "left"
+            ],
+            "delimiter_line": 15,
+            "line_end": 16,
+            "rows": 1
+          },
+          "cells": [
+            {
+              "index": 0,
+              "column": "Исходные условия",
+              "start": 0,
+              "end": 16
+            },
+            {
+              "index": 1,
+              "column": "Действие",
+              "start": 19,
+              "end": 27
+            },
+            {
+              "index": 2,
+              "column": "Ожидаемый результат",
+              "start": 30,
+              "end": 49
+            }
+          ],
+          "lines": [
+            [
+              14,
+              0,
+              49
+            ]
+          ],
+          "map": [
+            [
+              0,
+              14,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              49,
+              14,
+              2,
+              51,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0007"
+          ],
+          "columns": [
+            "Исходные условия",
+            "Действие",
+            "Ожидаемый результат"
+          ]
+        }
+      },
+      {
+        "id": "b0009",
+        "kind": "table_row",
+        "section": [
+          "Перевод между своими счетами",
+          "Критерии приёмки"
+        ],
+        "text": "Перевод 10 000 ₸ создан в 19:00 в пятницу | Исполнить перевод | Перевод исполнен в следующий рабочий день",
+        "loc": {
+          "line_start": 16,
+          "line_end": 16,
+          "byte_start": 673,
+          "byte_end": 858,
+          "table": {
+            "index": 1,
+            "header_id": "b0008",
+            "columns": [
+              "Исходные условия",
+              "Действие",
+              "Ожидаемый результат"
+            ]
+          },
+          "row": 1,
+          "cells": [
+            {
+              "index": 0,
+              "column": "Исходные условия",
+              "start": 0,
+              "end": 41
+            },
+            {
+              "index": 1,
+              "column": "Действие",
+              "start": 44,
+              "end": 61
+            },
+            {
+              "index": 2,
+              "column": "Ожидаемый результат",
+              "start": 64,
+              "end": 105
+            }
+          ],
+          "empty": false,
+          "lines": [
+            [
+              16,
+              0,
+              105
+            ]
+          ],
+          "map": [
+            [
+              0,
+              16,
+              2
+            ]
+          ],
+          "spans": [
+            [
+              0,
+              105,
+              16,
+              2,
+              107,
+              "v"
+            ]
+          ],
+          "section_ids": [
+            "b0001",
+            "b0007"
+          ],
+          "columns": [
+            "Исходные условия",
+            "Действие",
+            "Ожидаемый результат"
+          ]
+        }
+      }
+    ],
+    "warnings": []
+  },
+  "requirements": [
+    {
+      "id": "R-001",
+      "source_id": "ПС-1",
+      "text": "Перевод между своими счетами выполняется без комиссии.",
+      "block_ids": [
+        "b0003"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0003",
+          "start": 6,
+          "end": 60,
+          "quote": "Перевод между своими счетами выполняется без комиссии."
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0003",
+          "quote": "Перевод между своими счетами выполняется без комиссии."
+        }
+      ],
+      "kind": "functional",
+      "section": [
+        "Перевод между своими счетами",
+        "Функциональные требования"
+      ],
+      "review_status": "partial",
+      "review_reason": "только детерминированные правила; LLM-проверка не выполнена: модель не вернула результат"
+    },
+    {
+      "id": "R-002",
+      "source_id": "ПС-2",
+      "text": "Перевод, созданный после 18:00, исполняется на следующий рабочий день.",
+      "block_ids": [
+        "b0004"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 6,
+          "end": 76,
+          "quote": "Перевод, созданный после 18:00, исполняется на следующий рабочий день."
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0004",
+          "quote": "Перевод, созданный после 18:00, исполняется на следующий рабочий день."
+        }
+      ],
+      "kind": "functional",
+      "section": [
+        "Перевод между своими счетами",
+        "Функциональные требования"
+      ],
+      "review_status": "partial",
+      "review_reason": "только детерминированные правила; LLM-проверка не выполнена: модель не вернула результат"
+    },
+    {
+      "id": "R-003",
+      "source_id": null,
+      "text": "Исходные условия: Перевод 10 000 ₸ создан в 19:00 в пятницу; Действие: Исполнить перевод; Ожидаемый результат: Перевод исполнен в следующий рабочий день",
+      "block_ids": [
+        "b0009"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0009",
+          "start": 0,
+          "end": 105,
+          "quote": "Перевод 10 000 ₸ создан в 19:00 в пятницу | Исполнить перевод | Перевод исполнен в следующий рабочий день"
+        }
+      ],
+      "hints": [
+        {
+          "block_id": "b0009",
+          "quote": "Перевод 10 000 ₸ создан в 19:00 в пятницу | Исполнить перевод | Перевод исполнен в следующий рабочий день"
+        }
+      ],
+      "kind": "acceptance",
+      "section": [
+        "Перевод между своими счетами",
+        "Критерии приёмки"
+      ],
+      "review_status": "partial",
+      "review_reason": "модель проверила 2 из 9 критериев"
+    }
+  ],
+  "checks": [
+    {
+      "req_id": "R-001",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-001",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "unambiguous",
+      "status": "issue",
+      "reason": "Время и границы периода без явного часового пояса: «после 18:00», «в 19:00»",
+      "finding_ids": [
+        "F-002"
+      ],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-002",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "appropriate",
+      "status": "na",
+      "reason": "«Уместность уровня» не применяется к пункту с ролью «Критерии приёмки» (criteria.toml, not_for).",
+      "finding_ids": [],
+      "source": "config"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "unambiguous",
+      "status": "issue",
+      "reason": "Время и границы периода без явного часового пояса: «после 18:00», «в 19:00»",
+      "finding_ids": [
+        "F-002"
+      ],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "feasible",
+      "status": "na",
+      "reason": "«Реализуемость» не применяется к пункту с ролью «Критерии приёмки» (criteria.toml, not_for).",
+      "finding_ids": [],
+      "source": "config"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-003",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "Модель не вернула оценку по этому пункту. Оценка не получена.",
+      "finding_ids": [],
+      "source": "rules"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-001",
+      "scope": "set",
+      "kind": "conflict",
+      "criterion": "set_consistent",
+      "severity": "critical",
+      "title": "ПС-1 обещает перевод без комиссии, раздел «Тарифы» берёт 0,5%",
+      "impact": "Клиент увидит списание комиссии, которую требование запрещает.",
+      "req_ids": [
+        "R-001"
+      ],
+      "hints": [
+        {
+          "block_id": "b0003",
+          "quote": "Перевод между своими счетами выполняется без комиссии."
+        },
+        {
+          "block_id": "b0006",
+          "quote": "взимается комиссия 0,5% от суммы перевода"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0003",
+          "start": 6,
+          "end": 60,
+          "quote": "Перевод между своими счетами выполняется без комиссии."
+        },
+        {
+          "block_id": "b0006",
+          "start": 32,
+          "end": 73,
+          "quote": "взимается комиссия 0,5% от суммы перевода"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "confirmed",
+      "meaning_reason": "mock: сценарий критика",
+      "recommendation": "Выбрать одно правило комиссии.",
+      "blocked_decision": "Сумма списания при переводе между своими счетами",
+      "blocks": [
+        "development",
+        "testing"
+      ],
+      "witness": {
+        "input": "Перевод 10 000 ₸ между своими счетами",
+        "outcome_a": "комиссия 0 ₸ по ПС-1",
+        "outcome_b": "комиссия 0,5% по разделу «Тарифы»",
+        "evidence_a": {
+          "block_id": "b0003",
+          "start": 6,
+          "end": 60,
+          "quote": "Перевод между своими счетами выполняется без комиссии."
+        },
+        "evidence_b": {
+          "block_id": "b0006",
+          "start": 32,
+          "end": 73,
+          "quote": "взимается комиссия 0,5% от суммы перевода"
+        }
+      },
+      "inspected_block_ids": [],
+      "merged_from": [
+        "C-003"
+      ],
+      "cause": {
+        "object": "комиссия за перевод",
+        "condition": "перевод между своими счетами",
+        "outcomes": [
+          "0 ₸",
+          "0,5%"
+        ]
+      },
+      "source": "llm",
+      "stage": "cross",
+      "notes": []
+    },
+    {
+      "id": "F-002",
+      "scope": "set",
+      "kind": "ambiguity",
+      "criterion": "unambiguous",
+      "severity": "minor",
+      "title": "Время и границы периода без явного часового пояса: «после 18:00», «в 19:00»",
+      "impact": "Граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.",
+      "req_ids": [
+        "R-002",
+        "R-003"
+      ],
+      "hints": [
+        {
+          "block_id": "b0004",
+          "quote": "после 18:00"
+        },
+        {
+          "block_id": "b0009",
+          "quote": "в 19:00"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0004",
+          "start": 25,
+          "end": 36,
+          "quote": "после 18:00"
+        },
+        {
+          "block_id": "b0009",
+          "start": 24,
+          "end": 31,
+          "quote": "в 19:00"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "deterministic",
+      "meaning_reason": "детерминированное правило: вывод следует из найденного текста",
+      "recommendation": "Для каждого времени и границы периода указать смещение и IANA-зону (<уточнить: UTC+hh:mm, Region/City>) вместо названия города или умолчания; определить, по какой отметке времени события считается период.",
+      "blocked_decision": "",
+      "blocks": [],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [
+        "C-001"
+      ],
+      "cause": {
+        "object": "часовой пояс времени и границ периода",
+        "condition": "пояс не указан или задан городом",
+        "outcomes": []
+      },
+      "source": "rules",
+      "stage": "rules",
+      "notes": [],
+      "rule_id": "RULE-TZ"
+    },
+    {
+      "id": "F-003",
+      "scope": "requirement",
+      "kind": "traceability",
+      "criterion": "traceable",
+      "severity": "minor",
+      "title": "Критерии приёмки в разделе «Критерии приёмки» не ссылаются на ID требований (1)",
+      "impact": "Нельзя проверить покрытие: неизвестно, какое требование подтверждает каждый критерий и какие требования остались без приёмки.",
+      "req_ids": [
+        "R-003"
+      ],
+      "hints": [
+        {
+          "block_id": "b0008",
+          "quote": "Исходные условия | Действие | Ожидаемый результат"
+        },
+        {
+          "block_id": "b0009",
+          "quote": "Перевод 10 000 ₸ создан в 19:00 в пятницу"
+        }
+      ],
+      "evidence": [
+        {
+          "block_id": "b0008",
+          "start": 0,
+          "end": 49,
+          "quote": "Исходные условия | Действие | Ожидаемый результат"
+        },
+        {
+          "block_id": "b0009",
+          "start": 0,
+          "end": 41,
+          "quote": "Перевод 10 000 ₸ создан в 19:00 в пятницу"
+        }
+      ],
+      "status": "confirmed",
+      "anchor_status": "supported",
+      "meaning_status": "deterministic",
+      "meaning_reason": "детерминированное правило: вывод следует из найденного текста",
+      "recommendation": "Добавить в каждый критерий ссылку на проверяемые требования (колонка «Требование»: <уточнить: ID>) и убедиться, что каждое требование покрыто хотя бы одним критерием.",
+      "blocked_decision": "",
+      "blocks": [],
+      "witness": null,
+      "inspected_block_ids": [],
+      "merged_from": [
+        "C-002"
+      ],
+      "cause": {
+        "object": "критерии приёмки (Критерии приёмки)",
+        "condition": "нет ссылок на ID требований",
+        "outcomes": []
+      },
+      "source": "rules",
+      "stage": "rules",
+      "notes": [],
+      "rule_id": "RULE-ACCEPTANCE-TRACE"
+    }
+  ],
+  "facts": [],
+  "coverage": [],
+  "questions": [
+    {
+      "id": "Q-01",
+      "finding_ids": [
+        "F-001"
+      ],
+      "prompt": "Берётся ли комиссия за перевод между своими счетами?",
+      "options": [
+        "A. Комиссии нет — Перевод 10 000 ₸: списано 10 000 ₸, комиссия 0 ₸. · Правка [b0006]: «За перевод между своими счетами взимается комиссия 0,5% от суммы перевода.» → «За перевод между своими счетами комиссия не взимается.»",
+        "B. Комиссия 0,5% — Перевод 10 000 ₸: списано 10 000 ₸ и комиссия 0,5% от суммы перевода. · Правка [b0003]: «выполняется без комиссии» → «выполняется с комиссией по разделу «Тарифы»»"
+      ],
+      "affected_req_ids": [
+        "R-001"
+      ],
+      "option_details": [
+        {
+          "id": "A",
+          "label": "Комиссии нет",
+          "interpretation": "Действует ПС-1, тариф устарел.",
+          "observable_result": "Перевод 10 000 ₸: списано 10 000 ₸, комиссия 0 ₸.",
+          "consequences": "Тариф удаляется из расчёта.",
+          "edits": [
+            {
+              "block_id": "b0006",
+              "start": 0,
+              "end": 74,
+              "old": "За перевод между своими счетами взимается комиссия 0,5% от суммы перевода.",
+              "new": "За перевод между своими счетами комиссия не взимается.",
+              "source_sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+              "question_id": "Q-01"
+            }
+          ],
+          "warnings": [],
+          "origin": "llm"
+        },
+        {
+          "id": "B",
+          "label": "Комиссия 0,5%",
+          "interpretation": "Действует раздел «Тарифы».",
+          "observable_result": "Перевод 10 000 ₸: списано 10 000 ₸ и комиссия 0,5% от суммы перевода.",
+          "consequences": "ПС-1 переписывается.",
+          "edits": [
+            {
+              "block_id": "b0003",
+              "start": 35,
+              "end": 59,
+              "old": "выполняется без комиссии",
+              "new": "выполняется с комиссией по разделу «Тарифы»",
+              "source_sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+              "question_id": "Q-01"
+            }
+          ],
+          "warnings": [],
+          "origin": "llm"
+        }
+      ],
+      "owner": "PO",
+      "blocked_decision": "Сумма списания при переводе между своими счетами",
+      "blocks": [
+        "разработку",
+        "тестирование"
+      ],
+      "situation": "ПС-1 обещает перевод без комиссии, а раздел «Тарифы» берёт 0,5% от суммы.",
+      "why": "От ответа зависит сумма списания и текст подтверждения перевода.",
+      "sources": [
+        {
+          "block_id": "b0003",
+          "start": 6,
+          "end": 60,
+          "quote": "Перевод между своими счетами выполняется без комиссии.",
+          "loc": "строка 5 · блок b0003 · символы 6–60 · раздел «Перевод между своими счетами / Функциональные требования»",
+          "finding_id": "F-001"
+        },
+        {
+          "block_id": "b0006",
+          "start": 32,
+          "end": 73,
+          "quote": "взимается комиссия 0,5% от суммы перевода",
+          "loc": "строка 10 · блок b0006 · символы 32–73 · раздел «Перевод между своими счетами / Тарифы»",
+          "finding_id": "F-001"
+        }
+      ],
+      "target": {
+        "block_id": "b0003",
+        "start": 6,
+        "end": 60,
+        "quote": "Перевод между своими счетами выполняется без комиссии."
+      },
+      "hypothesis": null,
+      "document_answer": null,
+      "kind": "decision",
+      "family": "conflict",
+      "severity": "critical",
+      "priority": 134.0,
+      "rank_reason": "critical · противоречие · блокирует разработку и тестирование · требований 1 · замечаний 1 · бизнес-развилка",
+      "source_sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+      "status": "open",
+      "origin": "llm"
+    },
+    {
+      "id": "Q-02",
+      "finding_ids": [
+        "F-002"
+      ],
+      "prompt": "Как трактовать: Время и границы периода без явного часового пояса: «после 18:00», «в 19:00»?",
+      "options": [
+        "A. Уточнить формулировку — Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт.",
+        "B. Оставить как есть, риск принят — Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта."
+      ],
+      "affected_req_ids": [
+        "R-002",
+        "R-003"
+      ],
+      "option_details": [
+        {
+          "id": "A",
+          "label": "Уточнить формулировку",
+          "interpretation": "Владелец задаёт однозначное правило или значение вместо «после 18:00».",
+          "observable_result": "Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт.",
+          "consequences": "Нужна формулировка: ответьте своим текстом со строкой «Формулировка: …». Без неё решение сохранится, но текст не изменится.",
+          "edits": [],
+          "warnings": [],
+          "origin": "rule"
+        },
+        {
+          "id": "B",
+          "label": "Оставить как есть, риск принят",
+          "interpretation": "Фрагмент «после 18:00» не меняется, трактовку выбирает разработка.",
+          "observable_result": "Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта.",
+          "consequences": "Риск фиксируется в отчёте как принятый владельцем.",
+          "edits": [],
+          "warnings": [],
+          "origin": "rule"
+        }
+      ],
+      "owner": "PO",
+      "blocked_decision": "",
+      "blocks": [
+        "разработку",
+        "тестирование"
+      ],
+      "situation": "Граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.",
+      "why": "Граница суток или месяца зависит от пояса: операции около полуночи попадут в разные периоды у разных сервисов, а тест на стыке периодов нельзя однозначно оценить.",
+      "sources": [
+        {
+          "block_id": "b0004",
+          "start": 25,
+          "end": 36,
+          "quote": "после 18:00",
+          "loc": "строка 6 · блок b0004 · символы 25–36 · раздел «Перевод между своими счетами / Функциональные требования»",
+          "finding_id": "F-002"
+        },
+        {
+          "block_id": "b0009",
+          "start": 24,
+          "end": 31,
+          "quote": "в 19:00",
+          "loc": "строка 16 · блок b0009 · символы 24–31 · раздел «Перевод между своими счетами / Критерии приёмки»",
+          "finding_id": "F-002"
+        }
+      ],
+      "target": {
+        "block_id": "b0004",
+        "start": 25,
+        "end": 36,
+        "quote": "после 18:00"
+      },
+      "hypothesis": null,
+      "document_answer": null,
+      "kind": "decision",
+      "family": "ambiguity",
+      "severity": "minor",
+      "priority": 43.0,
+      "rank_reason": "minor · неоднозначность · блокирует разработку и тестирование · требований 2 · замечаний 1 · бизнес-развилка",
+      "source_sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+      "status": "open",
+      "origin": "rule"
+    }
+  ],
+  "checklist": [],
+  "test_cases": [],
+  "decisions": [
+    {
+      "question_id": "Q-01",
+      "source_sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+      "answer": "A",
+      "edits": [
+        {
+          "block_id": "b0009",
+          "start": 64,
+          "end": 90,
+          "old": "Перевод исполнен в пятницу",
+          "new": "Перевод исполнен в следующий рабочий день",
+          "source_sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+          "origin": "option",
+          "question_id": "Q-01",
+          "loc": "строка 16 · блок b0009 · символы 64–90 · раздел «Перевод между своими счетами / Критерии приёмки»",
+          "status": "applied_not_verified",
+          "revision": "transfer_tz.rev-p08-transfer-r2.md",
+          "revision_sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839"
+        }
+      ],
+      "note": "правка передана на запись редакции; закрытие — после повторного анализа",
+      "choice": "A",
+      "comment": "",
+      "wording": "",
+      "status": "accepted",
+      "option": "На следующий рабочий день — Перевод в 19:00 в пятницу исполнен в следующий рабочий день. · Правка [b0009]: «Перевод исполнен в пятницу» → «Перевод исполнен в следующий рабочий день»",
+      "patch_state": "proposed",
+      "decision_status": "accepted",
+      "fix_status": "awaiting_revision"
+    }
+  ],
+  "diff": {
+    "previous": {
+      "source_sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+      "run_id": "p08-transfer-r1"
+    },
+    "current": {
+      "source_sha256": "a09da5508614c94a366e37bfc2b72831801b4dbab417153b62ccd9cd2706a839",
+      "run_id": "p08-transfer-r2"
+    },
+    "resolved": [
+      {
+        "old_ids": [
+          "F-002"
+        ],
+        "new_ids": [],
+        "reason": "текст опоры изменён в новой редакции, дефект не найден повторно",
+        "evidence": [
+          {
+            "block_id": "b0009",
+            "start": 0,
+            "end": 105,
+            "quote": "Перевод 10 000 ₸ создан в 19:00 в пятницу | Исполнить перевод | Перевод исполнен в следующий рабочий день"
+          }
+        ]
+      }
+    ],
+    "persisting": [
+      {
+        "old_ids": [
+          "F-001"
+        ],
+        "new_ids": [
+          "F-001"
+        ],
+        "reason": "замечание найдено в обеих редакциях по тексту опор",
+        "evidence": [
+          {
+            "block_id": "b0003",
+            "start": 6,
+            "end": 60,
+            "quote": "Перевод между своими счетами выполняется без комиссии."
+          },
+          {
+            "block_id": "b0006",
+            "start": 32,
+            "end": 73,
+            "quote": "взимается комиссия 0,5% от суммы перевода"
+          }
+        ]
+      },
+      {
+        "old_ids": [
+          "F-003"
+        ],
+        "new_ids": [
+          "F-002"
+        ],
+        "reason": "замечание найдено в обеих редакциях по тексту опор",
+        "evidence": [
+          {
+            "block_id": "b0004",
+            "start": 25,
+            "end": 36,
+            "quote": "после 18:00"
+          },
+          {
+            "block_id": "b0009",
+            "start": 24,
+            "end": 31,
+            "quote": "в 19:00"
+          }
+        ]
+      },
+      {
+        "old_ids": [
+          "F-004"
+        ],
+        "new_ids": [
+          "F-003"
+        ],
+        "reason": "замечание найдено в обеих редакциях по тексту опор",
+        "evidence": [
+          {
+            "block_id": "b0008",
+            "start": 0,
+            "end": 49,
+            "quote": "Исходные условия | Действие | Ожидаемый результат"
+          },
+          {
+            "block_id": "b0009",
+            "start": 0,
+            "end": 41,
+            "quote": "Перевод 10 000 ₸ создан в 19:00 в пятницу"
+          }
+        ]
+      }
+    ],
+    "introduced": [],
+    "unassessed": [],
+    "impacted_req_ids": [
+      "R-003"
+    ],
+    "warnings": []
+  },
+  "verdict": {
+    "development": {
+      "status": "not_ready",
+      "reasons": [
+        "F-001: ПС-1 обещает перевод без комиссии, раздел «Тарифы» берёт 0,5%",
+        "Прогон неполный: возможны и другие блокирующие дефекты."
+      ],
+      "finding_ids": [
+        "F-001"
+      ]
+    },
+    "testing": {
+      "status": "not_ready",
+      "reasons": [
+        "F-001: ПС-1 обещает перевод без комиссии, раздел «Тарифы» берёт 0,5%",
+        "Прогон неполный: возможны и другие блокирующие дефекты."
+      ],
+      "finding_ids": [
+        "F-001"
+      ]
+    },
+    "first_actions": [
+      {
+        "order": 1,
+        "action": "ПС-1 обещает перевод без комиссии, раздел «Тарифы» берёт 0,5% — Выбрать одно правило комиссии.",
+        "finding_ids": [
+          "F-001"
+        ]
+      },
+      {
+        "order": 2,
+        "finding_ids": [],
+        "action": "Повторить прогон с доступной моделью для этапов: individual"
+      }
+    ],
+    "basis": "Готовность считается отдельно для разработки и тестирования: блокирует только подтверждённое критичное замечание с указанным бизнес-последствием и блокируемым решением; неполный прогон даёт «не определено», а не «можно начинать»."
+  },
+  "summary": {
+    "requirements": 3,
+    "reviewed_requirements": 0,
+    "findings": 3,
+    "by_severity": {
+      "critical": 1,
+      "major": 0,
+      "minor": 2
+    },
+    "by_status": {
+      "confirmed": 3,
+      "needs_review": 0
+    },
+    "critical_ids": [
+      "F-001"
+    ],
+    "checks": {
+      "pass": 0,
+      "issue": 2,
+      "unknown": 23,
+      "na": 2
+    }
+  },
+  "warnings": [
+    {
+      "code": "inventory",
+      "message": "{'code': 'llm_truncated', 'message': 'ответ по окну 1/1 (full) обрезан или без done=true; принято 0 пунктов, непокрытые блоки уйдут в повтор', 'stage': 'inventory', 'block_ids': ['b0003', 'b0004', 'b0006', 'b0009']}",
+      "stage": "inventory"
+    },
+    {
+      "code": "inventory",
+      "message": "{'code': 'llm_truncated', 'message': 'ответ по окну 1/1 (retry) обрезан или без done=true; принято 0 пунктов, непокрытые блоки уйдут в повтор', 'stage': 'inventory', 'block_ids': ['b0003', 'b0004', 'b0006', 'b0009']}",
+      "stage": "inventory"
+    },
+    {
+      "code": "inventory",
+      "message": "{'code': 'rules_fallback', 'message': 'модель не учла блоки b0003, b0004, b0009; применена нарезка по правилам', 'stage': 'inventory', 'block_ids': ['b0003', 'b0004', 'b0009']}",
+      "stage": "inventory"
+    },
+    {
+      "code": "inventory",
+      "message": "{'code': 'unprocessed_blocks', 'message': 'не обработано 1 блок: b0006', 'stage': 'inventory', 'block_ids': ['b0006']}",
+      "stage": "inventory"
+    },
+    {
+      "code": "unprocessed_blocks",
+      "message": "блоки не попали ни в требования, ни в исключения: b0006",
+      "stage": "inventory"
+    }
+  ],
+  "excluded": [
+    {
+      "category": "structure",
+      "reason": "Заголовок раздела: задаёт путь section для вложенных блоков.",
+      "block_ids": [
+        "b0001",
+        "b0002",
+        "b0005",
+        "b0007"
+      ],
+      "cross_check": false,
+      "sections": [
+        "",
+        "Перевод между своими счетами"
+      ]
+    },
+    {
+      "category": "structure",
+      "reason": "Шапка таблицы «Критерии приёмки»: названия колонок.",
+      "block_ids": [
+        "b0008"
+      ],
+      "cross_check": false,
+      "sections": [
+        "Перевод между своими счетами › Критерии приёмки"
+      ]
+    }
+  ],
+  "rejected": []
+}
