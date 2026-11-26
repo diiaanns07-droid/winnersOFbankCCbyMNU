@@ -719,18 +719,28 @@ def _clarification_details(c: _Ctx) -> list[str]:
     return out
 
 
+# ------------------------------------------------------------------ общие подписи MD и HTML (№14 может импортировать)
+TERM = {"finding": "дефект", "findings": "дефекты", "requirement": "требование", "question": "вопрос владельцу"}
+READINESS_PLAIN = {"no": "нельзя начинать", "conditional": "можно с условиями", "yes": "можно начинать",
+                   "undetermined": "не определено", "none": "вердикт не вынесен"}
+
+
+def run_stamp(run: dict) -> str:
+    """Время прогона одинаково в MD и HTML: «27.11.2026 02:50–02:54 (UTC+5)»."""
+    st, fn = when((run or {}).get("started_at")), when((run or {}).get("finished_at"))
+    if st and fn and f"{st:%d.%m.%Y %H:%M}" == f"{fn:%d.%m.%Y %H:%M}":
+        return f"{st:%d.%m.%Y %H:%M} (UTC+5)"
+    if st and fn:
+        return (f"{st:%d.%m.%Y %H:%M}–{fn:%H:%M} (UTC+5)" if st.date() == fn.date()
+                else f"{st:%d.%m.%Y %H:%M} – {fn:%d.%m.%Y %H:%M} (UTC+5)")
+    if st or fn:
+        return f"{(st or fn):%d.%m.%Y %H:%M} (UTC+5)"
+    return "—"
+
+
 def _passport(c: _Ctx) -> list[str]:
     run, doc = c.run, c.doc
-    st, fn = when(run.get("started_at")), when(run.get("finished_at"))
-    if st and fn and f"{st:%d.%m.%Y %H:%M}" == f"{fn:%d.%m.%Y %H:%M}":
-        stamp = f"{st:%d.%m.%Y %H:%M} (UTC+5)"
-    elif st and fn:
-        stamp = f"{st:%d.%m.%Y %H:%M}–{fn:%H:%M} (UTC+5)" if st.date() == fn.date() else \
-            f"{st:%d.%m.%Y %H:%M} – {fn:%d.%m.%Y %H:%M} (UTC+5)"
-    elif st:
-        stamp = f"{st:%d.%m.%Y %H:%M} (UTC+5)"
-    else:
-        stamp = "—"
+    stamp = run_stamp(run)
     models = ", ".join(f"`{m}`" for m in run.get("models_used") or []) or ("не использовалась" if c.offline else "—")
     asked = run.get("model_requested")
     model = models + (f" (запрошена: `{asked}`)" if asked and asked not in (run.get("models_used") or []) else "")
