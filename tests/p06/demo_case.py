@@ -1,10 +1,10 @@
-"""Сквозной прогон №06 на Markdown-файле: JSON-результат и таблица покрытия с доказательствами.
+"""Сквозной прогон №06: штатный читатель и нарезка движка → review_set → JSON и таблица покрытия.
 
-    python tests/p06/demo_case.py tests/p06/fixtures/case_ab.md OUT_DIR [--scripted]
+    python tests/p06/demo_case.py INPUT.md|INPUT.pdf OUT_DIR [--scripted]
 
 Без флага — только правила (rules_only). С --scripted подключается подставной транспорт из тестов
-(сценарии К2/К3), чтобы показать путь проверки witness; это НЕ ответ реальной модели.
-Реальный прогон с LLM делает движок Max: review_set(document, requirements, ask).
+(сценарии К2/К3 и покрытия), чтобы показать путь проверки witness; это НЕ ответ реальной модели.
+Реальный прогон с LLM делает движок: python -m bcc_review INPUT OUTPUT.md --provider anthropic|gemini.
 """
 
 from __future__ import annotations
@@ -16,8 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parents[1] / "src"), str(HERE)]
 
-from conftest import ScriptedAsk, block_with, requirements_from  # noqa: E402
-from p06_mdloader import load_markdown  # noqa: E402
+from conftest import ScriptedAsk, block_with  # noqa: E402
 
 from bcc_review.analysis.cross import review_set  # noqa: E402
 from bcc_review.analysis.facts import reconcile_facts  # noqa: E402
@@ -62,6 +61,8 @@ def _scripted(doc: dict) -> ScriptedAsk:
 def _loc(doc: dict, bid: str) -> str:
     b = next((x for x in doc["blocks"] if x["id"] == bid), None)
     loc = (b or {}).get("loc") or {}
+    if loc.get("page"):
+        return f"стр. {loc['page']}"
     if "line_start" in loc:
         a, z = loc["line_start"], loc.get("line_end", loc["line_start"])
         return f"строка {a}" if a == z else f"строки {a}–{z}"
@@ -89,23 +90,23 @@ def render(doc: dict, res: dict) -> str:
                    f"{', '.join(c['acceptance_ids']) or '—'} | **{c['status']}** | {_q(c['explanation'], 160)} |")
     out += ["", "## Кандидаты", ""]
     for c in res["candidates"]:
-        out += [f"### {c['ref']} · {c['kind']} · {c['severity']} — {c['title']}", "",
+        out += [f"### {c['ref']} · {c['subkind']} ({c['kind']}, {c['criterion']}) · {c['severity']} — {c['title']}", "",
                 f"Требования: {', '.join(c['req_ids']) or '—'}; приёмка: {', '.join(c.get('acceptance_ids', [])) or '—'}. {c['impact']}", ""]
         w = c.get("witness")
         if w:
             out += ["| Сторона | Опора | Исход |", "| :--- | :--- | :--- |",
                     f"| A | «{_q(w['evidence_a']['quote'])}» ({_loc(doc, w['evidence_a']['block_id'])}) | {_q(w['outcome_a'])} |",
                     f"| B | «{_q(w['evidence_b']['quote'])}» ({_loc(doc, w['evidence_b']['block_id'])}) | {_q(w['outcome_b'])} |", "",
-                    f"Вход: {w['input']['description']}.", ""]
-            for x in w["input"].get("document_data", []):
+                    f"Вход: {w['input']}", ""]
+            for x in w["input_detail"].get("document_data", []):
                 out.append(f"* данные документа — {x['name']}: «{x['value']}» ({_loc(doc, x['evidence']['block_id'])})")
-            for x in w["input"].get("illustrative", []):
+            for x in w["input_detail"].get("illustrative", []):
                 out.append(f"* иллюстративно — {x['name']}: {x['value']} ({x.get('why', '')})")
             out.append(f"* проверки: {c.get('checks')}")
             out.append("")
         if c.get("question"):
             out += [f"Вопрос для №08: {c['question']}", ""]
-        if c["kind"] == "missing_contract":
+        if c["subkind"] == "missing_contract":
             out += [f"Обещание: «{_q(c['promise']['quote'], 140)}» ({_loc(doc, c['promise']['block_id'])}).",
                     f"Просмотрено: {c['inspected_scope']['span']}, блоков {len(c['inspected_block_ids'])}.",
                     f"Искали: {'; '.join(c['searched_for'])}. Найдено: {'; '.join(c['found'])}.", ""]
@@ -118,13 +119,15 @@ def render(doc: dict, res: dict) -> str:
         r = f["range"]
         val = (f"{r['min']}–{r['max']}" + (" вкл." if r.get("min_inclusive") else "")) if r else (f["value"] if f["value"] is not None else "")
         out.append(f"| {f['id']} | {_q(f['field'] or '', 30)} | {f['direction'] or '—'} | {f['type'] or '—'} | {_q(val, 30)} | "
-                   f"{f['unit'] or '—'} | {_q(f['condition'] or '—', 40)} | {_loc(doc, f['evidence']['block_id'])} |")
+                   f"{f['unit'] or '—'} | {_q(f['condition'] or '—', 40)} | {_loc(doc, f['evidence'][0]['block_id'])} |")
     out += ["", "## Сравнения фактов", ""]
     for c in res["comparisons"]:
         out.append(f"* `{c['id']}` {c['aspect']} → **{c['verdict']}**: {_q(c['explanation'], 220)}")
     a = res["evidence_audit"]
     out += ["", f"Опоры: проверено {a['checked']}, подтверждено {a['confirmed']}, перенесено {a['relocated']}, "
                 f"неоднозначно {a['ambiguous']}, отклонено {a['rejected']}.", ""]
+    if s.get("excluded"):
+        out += ["## Вне знаменателя покрытия", ""] + [f"* {e['req_id']} ({e['label']}): {e['reason']}" for e in s["excluded"]] + [""]
     if res["warnings"]:
         out += ["## Предупреждения", ""] + [f"* {w}" for w in res["warnings"]] + [""]
     return "\n".join(out)
@@ -136,16 +139,20 @@ def main(argv: list[str]) -> int:
         return 2
     src, out_dir = Path(argv[1]), Path(argv[2])
     out_dir.mkdir(parents=True, exist_ok=True)
-    doc = load_markdown(src)
+    from bcc_review.runtime.modules import Modules
+
+    m = Modules()
+    doc = m.get("read_pdf" if src.suffix.lower() == ".pdf" else "read_text").func(str(src))
+    inv = m.get("build_inventory").func(doc)
     ask = _scripted(doc) if "--scripted" in argv else None
-    res = review_set(doc, requirements_from(doc), ask)
-    stem = src.stem + ("-scripted" if ask else "-rules")
+    res = review_set(doc, inv["requirements"], ask, fact_hints=inv["fact_hints"])
+    stem = src.stem + ("-pdf" if src.suffix.lower() == ".pdf" else "") + ("-scripted" if ask else "-rules")
     (out_dir / f"{stem}.json").write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
     (out_dir / f"{stem}.md").write_text(render(doc, res), encoding="utf-8")
     s = res["coverage_summary"]
     kinds: dict[str, int] = {}
     for c in res["candidates"]:
-        kinds[c["kind"]] = kinds.get(c["kind"], 0) + 1
+        kinds[c["subkind"]] = kinds.get(c["subkind"], 0) + 1
     print(f"{stem}: candidates={kinds} coverage={s['covered']}/{s['denominator']} covered, "
           f"{s['conflict']} conflict, {s['partial']} partial, {s['uncovered']} uncovered, {s['unknown']} unknown; "
           f"llm_calls={res['stats']['llm_calls']} → {out_dir / (stem + '.md')}")

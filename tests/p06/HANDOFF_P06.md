@@ -1,146 +1,170 @@
 # №06 · Межраздельные противоречия и покрытие приёмкой — передача
 
 Файлы направления: `src/bcc_review/analysis/cross.py`, `src/bcc_review/analysis/facts.py`,
-`src/bcc_review/prompts/cross.{pairs.md,coverage.md,schema.json}`, `tests/p06/`.
-Других файлов модуль не создаёт. `__init__.py` нет: пакет работает как namespace (PEP 420),
-поэтому после bootstrap Max достаточно его собственных `__init__.py`.
+`src/bcc_review/prompts/cross.{pairs.md,coverage.md,schema.json}`, `tests/p06/`. Чужие файлы не менялись.
+Ветка влита поверх `bcc/integration` @ `091e504`; контракт v1 — `431f76d`. Стык проверен:
+* выход модуля проходит `contracts.validate` (Candidate, Fact, Coverage, EvidenceAudit);
+* кандидаты принимает `resolve_candidate` №07/резерва;
+* `run_review` подключает модуль как `team:bcc_review.analysis.cross:review_set`, отчёт проходит
+  `validate(report)` и `evidence_errors(report) == []`.
 
-База — `claude/nice-edison-gpkcfl` @ `76ab976`. `bcc/integration` и `contracts/HANDOFF.md` на момент работы
-не были опубликованы, поэтому типы приняты по контракту v1 «утиным» способом: dict или объект с атрибутами.
-Стыковой тест с реальным загрузчиком и `ask` Max ещё не прогнан (см. «Открытые зависимости»).
-
-## Протокол
+## Протокол (как вызывает движок)
 
 ```python
-from bcc_review.analysis.cross import review_set
-from bcc_review.analysis.facts import reconcile_facts
-
 review_set(document, requirements, ask=None, *, fact_hints=None, resolve=None, max_pairs=60, pairs_per_call=30)
-# -> {facts, coverage, candidates, warnings,                  # контракт
-#     coverage_summary, comparisons, evidence_audit, stats, acceptance}   # пояснения для отчёта
+# -> {facts, coverage, candidates, warnings,                                  # контракт
+#     coverage_summary, comparisons, evidence_audit, stats, acceptance}       # пояснения для отчёта
 reconcile_facts(document, fact_hints=None, *, resolve=None)
 # -> {facts, candidates, comparisons, endpoints, warnings, evidence_audit}
 ```
 
-* `ask(stage, payload, schema) -> dict`. Стадии: `cross.pairs` (пакеты по 30 пар) и `cross.coverage` (1 вызов).
-  На кейсе A+B получается 3 вызова. В `payload["instructions"]` лежит текст промпта из `prompts/cross.<stage>.md`,
-  схема ответа берётся из `prompts/cross.schema.json[stage]`: подмножество JSON Schema без `$ref`.
-  Если `ask` бросает исключение или возвращает не объект, детерминированный результат сохраняется,
-  в `warnings` попадает причина, а `stats.status = "partial"`.
-* `resolve(document, hint) -> Evidence | None` — точка подключения №07. Если резолвер передан, решение
-  за ним. Иначе работает локальный резолвер с тем же инвариантом `block.text[start:end] == quote`:
-  точное совпадение, затем нормализация пробелов, ё и Markdown, затем перенос в единственный другой блок.
-* `fact_hints` (№04) — список или `{"facts": [...]}` элементов
-  `{field, subject?, direction?, type?, value?, range?, unit?, condition?, hint: {block_id, quote}}`.
-  Подсказка заполняет пустые слоты факта из таблицы. Если она расходится с разбором, разбор остаётся,
-  а в `warnings` пишется предупреждение. Подсказка без найденной цитаты отклоняется.
+* **ask.** Два подэтапа, `cross#pairs` (пакеты по 30 пар) и `cross#coverage` (1 вызов). `StageStats` сводит
+  их в этап `cross` паспорта. Payload — `{task, input, context:{mode:"auto", block_ids}}`, текст документа
+  прикладывает движок. Схемы ответов лежат в `prompts/cross.schema.json`: строгие (`additionalProperties:false`,
+  полный `required`, без `$ref`), отсутствующее значение — `""` или `[]`.
+* **Ошибки модели.** Если не удался ни один вызов и пришёл `AskError`/`BudgetExhausted`, модуль поднимает его.
+  Движок отмечает `cross: failed` и перезапускает модуль с `ask=None`, результат правил сохраняется.
+  Если не удалась часть вызовов, модуль возвращает частичный результат: `stats.status="partial"`,
+  `stats.llm_failed` и причины в `warnings`. **Max:** сейчас движок в этом случае ставит этапу `ok`.
+  Предлагаю читать `out["stats"]["status"]`.
+* **Цитаты.** Проверяет №07: `bcc_review.analysis.evidence:resolve_hint`, иначе резерв движка. Параметр
+  `resolve` не нужен. Ответ `{status, evidence}` учитывается в `evidence_audit`
+  (`checked`, `confirmed`, `ambiguous`, `rejected`, `relocated`, `note`). При `missing` и указанном блоке
+  выполняется повтор с `relocate=True`. Локальный резолвер — запасной, с тем же инвариантом.
+* **fact_hints (№04).** Список или `{"facts": [...]}` элементов
+  `{field, subject?, direction?, type?, value?, range?, unit?, condition?, hint:{block_id, quote}}`.
+  Подсказка заполняет пустые слоты факта из таблиц. Если она расходится с разбором, пишется предупреждение,
+  разбор остаётся.
 
-### Кандидаты
+### Кандидаты (Candidate v1 + поля №06)
 
-Базовые поля по контракту: `scope, kind, criterion, severity, title, impact, req_ids, hints`. Дополнительно:
+| subkind | kind / criterion | когда | ключевые поля |
+| :--- | :--- | :--- | :--- |
+| `conflict` | conflict / set_consistent | один вход удовлетворяет обоим предусловиям, исходы несовместимы, обе опоры найдены | `witness` = WitnessDraft (`input` — строка, `outcome_a/b`, `hint_a/b`) + `evidence_a/b`, `input_detail{description, document_data[{name,value,evidence}], illustrative[{name,value,why}]}`, `outcome_*_value`; `cause`, `checks`, `slots`, `acceptance_ids` |
+| `missing_contract` | omission / set_complete | обещана операция через API, а метода нет | `inspected_block_ids`, `inspected_scope{sections, span}`, `searched_for`, `found`, `promise` |
+| `question` | ambiguity / set_consistent | общий вход не построен — для №08 | `question`, `condition_a/b`, `reason`, `needs` |
 
-| kind | когда | доп. поля |
-| :--- | :--- | :--- |
-| `conflict` | один вход удовлетворяет обоим предусловиям, исходы несовместимы, обе опоры найдены | `witness = {input:{description, document_data[{name,value,evidence}], illustrative[{name,value,why}]}, outcome_a, outcome_b, outcome_a_value?, outcome_b_value?, evidence_a, evidence_b}`, `checks` (что проверила программа: evidence, preconditions, outcomes), `slots` (объект, владелец, условие, момент, единицы, ожидаемое), `acceptance_ids`, `origin` (rules/facts/llm) |
-| `missing_contract` | обещана операция через API, а метода нет | `promise`, `inspected_block_ids`, `inspected_scope {sections, span}`, `searched_for`, `found` |
-| `question` | общий вход не построен (→ №08) | `question`, `condition_a`, `condition_b`, `reason`, `needs` |
+У каждого кандидата есть `impact`, `blocked_decision`, `recommendation`, `source` (rules|llm), `stage:"cross"`
+и `origin`. `criteria.toml`: значения по умолчанию можно переопределить секциями `[cross.<subkind>]`
+с ключами `criterion` и `severity`.
 
-`criterion` и `severity` берутся из `src/bcc_review/criteria.toml`, секции `[cross.<kind>]` или `[kinds.<kind>]`
-с ключами `criterion` и `severity`. Пока файла нет, действуют значения по умолчанию:
-conflict — consistency/critical, missing_contract — completeness/critical, question — consistency/major,
-вопрос о типе — minor.
+### Факты и покрытие
 
-### Покрытие
-
-Каждое обязательство — одно предложение требования:
-`{req_id, obligation_id, obligation, acceptance_ids, status, explanation, hints, branches, branches_checked, links}`.
-
-* `covered` — модель указала проверку всех ветвей, и связанная приёмка сама не участвует в противоречии.
-* `partial` — проверена часть ветвей, либо есть только лексическая связь (режим без модели),
-  либо модель заявила противоречие без подтверждённого входа.
-* `conflict` — подтверждённый witness связывает эту строку приёмки с этим предложением.
-* `uncovered` — связей нет, а все страницы извлечены.
-* `unknown` — связей нет, но часть страниц пропущена (по `document.warnings` или по разрыву в `loc.page`).
-
-`coverage_summary` сохраняет знаменатель и отдельно считает `linked`: наличие ссылки не даёт covered.
+* `Fact` = `{id, subject, field, scope, direction, type, value, range, unit, condition, evidence:[Evidence], req_ids}`
+  + `binding`, `aliases`, `cells` (опора каждого слота), `value_minor` / `range.*_minor` (тиыны, int).
+* `Coverage` = `{req_id, obligation_id, obligation, acceptance_ids, status, explanation, hints, evidence, branches,
+  branches_checked, links}`.
+  * Обязательство — предложение требования из разделов правил, интеграции, данных, НФТ, UI и логики метода.
+  * Строки контракта API, примеры JSON, паспортные таблицы и схемы в знаменатель не входят:
+    `coverage_summary.excluded` с причиной.
+  * В нарезке Max строки приёмки — тоже требования (`R-14…`), их id попадают в `acceptance_ids` и в `req_ids` конфликта.
+  * `covered` — модель подтвердила все ветви, и строка приёмки сама не в противоречии.
+  * `partial` — проверена часть ветвей или есть только лексическая связь (без модели).
+  * `conflict` — подтверждённый witness.
+  * `uncovered` — связей нет, документ прочитан полностью.
+  * `unknown` — связей нет, но в `document.warnings` есть код из `PARTIAL_READ_CODES` или в `loc.page` разрыв.
 
 ## Команды и результаты (выполнено в этой среде)
 
 ```bash
-python3 -m pytest tests/p06 -q -p no:cacheprovider        # Python 3.13.18: 38 passed
+python3 -m pytest tests/p06 tests/contract -p no:cacheprovider
+```
+Python 3.13.18: **76 passed, 1 skipped**. Пропущен паритет MD/PDF: в системном Python нет PyMuPDF.
+
+```bash
+uv venv --python /usr/bin/python3.11 .venv
 ```
 
 ```bash
-uv venv --python /usr/bin/python3.11 .venv311 && VIRTUAL_ENV=.venv311 uv pip install pytest jsonschema
-.venv311/bin/python -m pytest tests/p06 -q -p no:cacheprovider   # Python 3.11.18: 38 passed
+VIRTUAL_ENV=.venv uv pip install -e ".[dev]" "pymupdf>=1.24"
 ```
 
 ```bash
-ruff check --select E9,F --target-version py311 src/bcc_review/analysis tests/p06   # чисто
+.venv/bin/python -m pytest -p no:cacheprovider
 ```
+Python 3.11.18, весь репозиторий: **13 failed, 166 passed, 1 skipped**. Все 13 — тесты Max, см. ниже.
 
 ```bash
-python3 tests/p06/demo_case.py tests/p06/fixtures/case_ab.md OUT            # только правила
-python3 tests/p06/demo_case.py tests/p06/fixtures/case_ab.md OUT --scripted # подставной транспорт, не реальная модель
+git apply tests/p06/patches/integration-pin-fallback.patch && .venv/bin/python -m pytest -p no:cacheprovider
 ```
+С патчем для Max: **179 passed, 1 skipped**.
 
-Вывод демо (по одной строке на прогон):
+```bash
+ruff check --select E9,F --target-version py311 src/bcc_review/analysis tests/p06
+```
+Замечаний нет.
+
+```bash
+.venv/bin/python tests/p06/demo_case.py tests/p06/fixtures/case_ab.md OUT
+```
+Сквозной прогон: читатель и нарезка движка → `review_set` → JSON + Markdown. Флаг `--scripted`
+подключает подставной транспорт; это не ответ модели.
 
 ```text
-case_ab-rules:    conflict=1 missing_contract=1 question=1; coverage 0/10 covered, 1 conflict, 6 partial, 3 uncovered; llm_calls=0
-case_ab-scripted: conflict=3 missing_contract=1;            coverage 0/10 covered, 1 conflict, 2 partial, 7 uncovered; llm_calls=3
-cashback_boundary-rules: conflict=1; coverage 0/3, 2 conflict, 1 partial
-payment_states-rules:    кандидатов нет; coverage 0/4, 2 partial, 2 uncovered
-transfers_pairs-rules:   conflict=1 (только разные границы); coverage 0/2 (нет приёмки)
+case_ab-rules:              question=1 conflict=1 missing_contract=1; coverage 0/25 covered, 1 conflict, 9 partial, 15 uncovered
+bcc_requirements-pdf-rules: question=1 conflict=1 missing_contract=1; coverage 0/25 covered, 1 conflict, 9 partial, 15 uncovered
+case_ab-scripted:           conflict=3 missing_contract=1;            coverage 0/25 covered, 1 conflict, 2 partial, 22 uncovered; llm_calls=3
 ```
+Образцы таблицы покрытия с доказательствами лежат в `tests/p06/sample/case_ab-rules.md` и `case_ab-scripted.md`.
 
-## Проверенные случаи (tests/p06)
+## ⚠️ Для Max: 13 интеграционных тестов привязаны к резерву слота
 
-1. **Граница расчётного периода, независимый сюжет** (`test_p06_period_boundary.py`, кешбэк 1 % → 2 %).
-   Покупка совершена 30 июня в 23:55 и проведена 1 июля в 00:05. Цитаты «…1 %…» (КБ-1) и «…2 % — 200 ₸» (приёмка)
-   дают разные исходы одного события. Моменты времени взяты из документа, пояс UTC+5 помечен как
-   иллюстративное допущение. Строка с покупкой 1 июля совместима. Вариант с двумя правилами привязки
-   к разным событиям тоже даёт конфликт.
-2. **Негативный контроль** (`test_p06_negative_control.py`): условия «подтверждённый» и «отменённый» платёж.
-   Без модели конфликта нет. Если «наивная» модель заявит конфликт, проверка ограничений отклонит его
-   как непересекающийся. Без ограничений такой ответ становится максимум вопросом.
-3. **Два обязательства в Л-1** (`test_p06_coverage.py`): одно covered, другое conflict, итог covered 1/3.
-   Witness вычислен программой: 45 000 + 10 000 > 50 000. Без модели covered не выставляется.
-   При пропущенной странице 3 (PDF) статус Л-2 — unknown, а положительные выводы сохраняются.
-4. **Три пары** (`test_p06_three_pairs.py`). Только разные границы (100–500 000 и 100–300 000) дают конфликт
-   с минимальным примером 300 001 ₸. Пары 1 ₸ = 100 тиын и integer→string с оговорённым представлением
-   совместимы. 200-ERROR рядом с 401 «не передан токен» не даёт ни конфликта, ни вопроса.
-   Расхождение типов без оговорки уходит вопросом с серьёзностью minor.
-5. **Кейс A+B** (`test_p06_case_ab.py`, строки и целая таблица дают одинаковый результат):
-   * К1 — witness на данных строки 64.
-   * К4 — обещание в строке 52, просмотрены строки 95–197, найден только `GET /alerts/saveLimit — сохранение`.
-   * 200-ERROR/400 — вопрос. Со сценарием модели (подставной транспорт) К2 (Ф-3↔Ф-4) и К3
-     (`amount=999 outside range:FX-…`) подтверждаются программой, вопрос снимается.
-   * Выдуманная цитата отклоняется и учитывается в `evidence_audit`.
-   * Сбой провайдера даёт статус partial, а результаты правил сохраняются.
-6. **Ложные срабатывания** (`test_p06_false_positives.py`):
-   * «получает push через сервис» не считается обещанием API;
-   * неоднозначная метка времени не даёт конфликта (тест падает на прежней логике выбора метки);
-   * таблица приёмки, пришедшая одним требованием, получает уникальные id;
-   * результат сериализуется в JSON и имеет форму контракта на всех фикстурах.
+`tests/integration` передаёт mock-провайдеру сценарий `mock_bcc.json["cross"]` в схеме **резервной**
+реализации (`conflicts/issues/coverage/facts`). Mock ищет ответ по полному имени, затем по базовому, поэтому
+отдаёт этот ответ и на `cross#pairs`. Ответ не проходит схему №06, движок перезапускает модуль без модели,
+и ожидаемых LLM-находок («Ф-4», «метод чтения»…) нет.
+
+Причина подтверждена: если убрать `analysis/cross.py`, падает только PDF-тест, и то лишь без PyMuPDF.
+Свои тесты движка я не трогал. Патч `tests/p06/patches/integration-pin-fallback.patch` (3 строки в
+`tests/integration/conftest.py`) закрепляет резерв слота `review_set` для mock-сценариев. Поведение №06
+через движок покрывает `tests/p06/test_p06_integration.py`: офлайн, mock с K2, отказ модели, паритет MD/PDF.
+Вторая возможность — добавить в `mock_bcc.json` ключи `cross#pairs` и `cross#coverage`; пример сборки есть
+в `_k2_script`. **Без одного из двух вариантов влитие №06 в `bcc/integration` сделает эти 13 тестов красными.**
+
+## Проверенные случаи (tests/p06, 48 тестов)
+
+1. **Граница периода, независимый сюжет** (кешбэк 1 % → 2 %).
+   Покупка 30.06 в 23:55, проведение 01.07 в 00:05. Цитаты «…1 %…» и «…2 % — 200 ₸» дают разные исходы одного
+   события; пояс UTC+5 помечен как иллюстративное допущение. Покупка 1 июля совместима. Два правила привязки
+   к разным событиям тоже дают конфликт.
+2. **Негативный контроль** (подтверждённый и отменённый платёж).
+   Без модели конфликта нет. Если «наивная» модель заявит конфликт, его отклоняют непересекающиеся
+   ограничения; без ограничений такой ответ становится максимум вопросом.
+3. **Покрытие.** Л-1 — одно обязательство covered, второе conflict, итог covered 1/3. Без модели covered
+   не выставляется. При пропущенной стр. 3 — unknown, а положительные выводы сохраняются.
+4. **Три пары.** Конфликт дают только разные границы, минимальный пример 300 001 ₸.
+   Совместимы: 1 ₸ = 100 тиын; integer→string с оговорённым представлением; 200-ERROR рядом с 401
+   «не передан токен». Тип без оговорки уходит вопросом minor.
+5. **Кейс A+B** (три загрузчика дают одинаковый результат):
+   * К1 — witness на строке 64; К4 — обещание в строке 52, охват строк 95–197, найден только
+     `GET /alerts/saveLimit — сохранение`; 200-ERROR/400 — вопрос.
+   * С подставной моделью К2 и К3 (`amount=999 outside range:FX-…`) подтверждаются программой.
+   * Выдуманная цитата отклоняется; сбой провайдера даёт partial.
+6. **Стык.**
+   * `validate` по контракту; `resolve_candidate` №07 → `supported`;
+   * `run_review` офлайн и через mock (К2 доходит до `findings` с witness);
+   * если модель не ответила ни разу, этап `cross` = failed, прогон partial, правила сохранены;
+   * `AskError` поднимается, только если не удался ни один вызов;
+   * **паритет Markdown/PDF**.
+7. **Ложные срабатывания.**
+   * «push через сервис» не считается обещанием API;
+   * неоднозначная метка времени не даёт конфликта (тест падает на прежней логике);
+   * мягкие переносы PDF не режут обязательства (до исправления PDF давал 37 обязательств вместо 25);
+   * одна таблица приёмки получает уникальные id.
 
 ## Кому что
 
-* **Max:** вызывать `review_set(doc, requirements, ask, fact_hints=inv04, resolve=evidence07)`.
-  `facts` → `Report.facts`; `coverage` и `coverage_summary` → `Report.coverage`;
-  `evidence_audit` можно сложить с аудитом №07; `stats.mode` и `stats.llm_calls` → `run`.
-  Кандидаты с `witness` уже содержат Evidence с обеих сторон.
-* **№10:** `coverage` + `coverage_summary.by_requirement` (знаменатель, linked ≠ covered).
-* **№07:** пары опор — `witness.evidence_a/evidence_b`, `hints`, `input.document_data[].evidence`.
-  Ожидаемая сигнатура резолвера — `resolve(document, hint) -> Evidence | None`.
-* **№08:** кандидаты `kind="question"` с полями `question`, `condition_a`, `condition_b`, `reason`.
-* **№04:** формат `fact_hints` описан выше. Полезнее всего единицы и включённость границ, которые не читаются из таблицы.
+* **Max.** Применить патч или ключи сценария (см. выше); читать `stats.status` у `cross`. `facts` → `Report.facts`,
+  `coverage` → `Report.coverage`, `coverage_summary` (знаменатель, `linked`, `excluded`) — в раздел покрытия.
+* **№10.** `coverage` + `coverage_summary.by_requirement`; `linked` ≠ `covered`.
+* **№07.** Опоры witness — `hint_a/hint_b` и `evidence_a/b`, плюс `input_detail.document_data[].evidence`.
+  Модуль вызывает `resolve_hint(document, hint, index=…)`, а при `missing` повторяет с `relocate=True`.
+* **№08.** Кандидаты `subkind="question"` (`kind="ambiguity"`) с полями `question`, `condition_a/b`, `reason`.
+* **№04.** Формат `fact_hints` описан выше. Полезнее всего единицы и включённость границ, которых нет в таблице.
 
 ## Открытые зависимости
 
-* Bootstrap `bcc/integration`: сверить Document и Requirement с `contracts/v1.json`, прогнать стыковой тест
-  с реальным загрузчиком MD/PDF/DOCX (формат `loc` и разбивку таблиц на блоки модуль поддерживает в трёх
-  вариантах: целая таблица, строка, ячейка с `loc.row/col`).
-* Реальный прогон `ask` на Gemini или Anthropic ключом команды (Max и №18). Здесь проверены только
-  подставной транспорт и схемы через `jsonschema.validate`.
-* `criteria.toml`: согласовать коды критериев (`consistency` и `completeness` → коды Max).
+* Реальный прогон `ask` на Gemini или Anthropic ключом команды (Max, №18). Здесь проверены только mock движка,
+  подставной транспорт и строгие схемы через `jsonschema`.
+* Решение Max по 13 тестам `tests/integration`: патч или ключи сценария.
+* Коды критериев (`set_consistent`, `set_complete`) — сверить с `criteria.toml` №05, когда он появится.

@@ -69,8 +69,8 @@ def test_one_checked_one_contradicted_is_not_full_coverage(load):
     assert len(conf) == 1 and conf[0]["checks"]["preconditions"] == "program"
     w = conf[0]["witness"]
     assert evidence_ok(doc, w["evidence_a"]) and evidence_ok(doc, w["evidence_b"])
-    assert [x["name"] for x in w["input"]["document_data"]] == ["суточный лимит", "снято ранее"]
-    assert [x["name"] for x in w["input"]["illustrative"]] == ["снято за сутки с учётом операции"]
+    assert [x["name"] for x in w["input_detail"]["document_data"]] == ["суточный лимит", "снято ранее"]
+    assert [x["name"] for x in w["input_detail"]["illustrative"]] == ["снято за сутки с учётом операции"]
     # Л-2 ни одна строка не проверяет — uncovered (все страницы на месте)
     assert cov["Л-2#1"]["status"] == "uncovered"
 

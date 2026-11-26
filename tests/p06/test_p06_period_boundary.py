@@ -29,11 +29,11 @@ def test_boundary_event_gives_two_real_quotes_with_different_outcomes(load):
     assert w["evidence_b"]["block_id"] == acc_block["id"] and "2 %" in w["evidence_b"]["quote"]
 
     # один конкретный вход: оба момента из документа, пояс — явная иллюстративная оговорка
-    data = {x["value"]: x for x in w["input"]["document_data"]}
+    data = {x["value"]: x for x in w["input_detail"]["document_data"]}
     assert {"30 июня в 23:55", "1 июля в 00:05"} <= set(data)
-    assert all(evidence_ok(doc, x["evidence"]) for x in w["input"]["document_data"])
-    assert [x["name"] for x in w["input"]["illustrative"]] == ["пояс времени момента"]
-    assert "UTC+5" in w["input"]["illustrative"][0]["value"]
+    assert all(evidence_ok(doc, x["evidence"]) for x in w["input_detail"]["document_data"])
+    assert [x["name"] for x in w["input_detail"]["illustrative"]] == ["пояс времени момента"]
+    assert "UTC+5" in w["input_detail"]["illustrative"][0]["value"]
 
     # несовместимые исходы, вычисленные программой
     assert (w["outcome_a_value"], w["outcome_b_value"]) == ("1 %", "2 %")
@@ -73,4 +73,4 @@ def test_two_anchor_rules_with_different_events_conflict(load):
     w = conflicts[0]["witness"]
     assert w["outcome_a_value"] != w["outcome_b_value"]
     assert evidence_ok(doc, w["evidence_a"]) and evidence_ok(doc, w["evidence_b"])
-    assert w["input"]["document_data"] == [] and len(w["input"]["illustrative"]) == 2
+    assert w["input_detail"]["document_data"] == [] and len(w["input_detail"]["illustrative"]) == 2

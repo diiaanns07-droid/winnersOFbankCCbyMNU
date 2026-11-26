@@ -1,0 +1,14 @@
+diff --git a/tests/integration/conftest.py b/tests/integration/conftest.py
+index ec95bde..5e77796 100644
+--- a/tests/integration/conftest.py
++++ b/tests/integration/conftest.py
+@@ -20,6 +20,9 @@ def _no_sleep_no_env(monkeypatch):
+                 "GEMINI_MODEL", "BCC_FORCE_FALLBACK"):
+         monkeypatch.delenv(var, raising=False)
+     monkeypatch.setattr(engine, "load_dotenv", lambda *a, **k: None)
++    # Сценарий mock_bcc.json["cross"] написан под резервную реализацию проверки набора.
++    # Модуль №06 (bcc_review.analysis.cross) проверяется своими стыковыми тестами tests/p06.
++    monkeypatch.setenv("BCC_FORCE_FALLBACK", "review_set")
+     return sleeps
+ 
+ 
