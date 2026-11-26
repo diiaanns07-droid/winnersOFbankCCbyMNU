@@ -1950,7 +1950,7 @@ class _Inventory:
                          "модель не вызывалась, атомарность — до предложения.")
         else:
             parts.append(
-                f"Модель вызвана {_times_word(calls['used'])} при бюджете {calls['budget']} (окон {calls['windows']}, "
+                f"Обращений к ask: {calls['used']} при пределе модуля {calls['budget']} (окон {calls['windows']}, "
                 f"повторов {calls['retry_calls']}, сбоев {calls['failed']}, обрезанных ответов {calls['truncated']}); "
                 f"цитат проверено {st.hints_checked}: дословно {st.hints_exact}, исправлено {st.hints_repaired}, "
                 f"отклонено {st.hints_rejected}; пунктов отброшено {st.items_rejected}.")

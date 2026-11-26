@@ -1,7 +1,7 @@
 # №04 «Нарезка и реестр требований» — передача
 
 Модуль: `src/bcc_review/analysis/inventory.py`, тесты: `tests/p04/`.
-База: `bcc/integration` @ `6be9e97` (движок, №01, №05–07, №11, №17; контракт v1 @ `431f76d`). Движок подхватывает
+База: `bcc/integration` @ `6a6c503` (движок и модули №01–03, 05–09, 11–17; контракт v1 @ `431f76d`). Движок подхватывает
 модуль из слота команды: `run.modules.build_inventory = team:bcc_review.analysis.inventory:build_inventory`.
 
 ```python
@@ -100,8 +100,8 @@ python -m pytest tests/contract tests/p04
 * **Max:** `normalize_requirements` в `engine.py` отбрасывает `group`, `source_ref`, `origin`. Для таблицы «ID в отчёте — ID в документе» `source_ref` («Особые правила › 1», «Критерии приемки › строка 2») полезно оставить: `Requirement` допускает дополнительные поля.
 * **Max:** для демо `--provider mock` в `tests/integration/fixtures/mock_bcc.json` нет записи `inventory`. Ответ синтезируется пустым с `done=false`, модуль честно уходит в правила (49 атомов, предупреждения `llm_truncated` и `rules_fallback`). Готовую запись по эталону собирает тест `test_engine_model_branch_with_mock_provider` (`QuoteModel(...).respond(build_payload(doc, attach_text=False)[0])`).
 
-* **Max:** в `bcc/integration` влит первый коммит №04 (`6b9f04a`), а `067f965` и второй проход — нет: без них `str()` предупреждений №04 в отчёте выглядит как `{'code': …}`, остаток дублируется, номер исключения теряется.
-* **Max:** полный `pytest tests` на `6be9e97` падает в `tests/p11/test_anthropic_success.py::test_from_fixture_files_entry_point`: `from conftest import FIXTURES` получает модуль `conftest` из `tests/p17` (без `--ignore=tests/p17` воспроизводится и на чистой ветке). Это не №04.
+* **Max:** в `bcc/integration` влит `067f965`, второй проход (`6df40f6` и далее) — ещё нет: без него номер строки-исключения теряется, а номера списков №01 не доходят до `source_id`.
+* **Max:** полный `pytest tests` на чистом `6a6c503` даёт 13 падений, с этой веткой — 12 (исправлен стыковой тест №04 на объекте `Document` от №01). Остальные — `p02` (5), `p08`, `p09`, `p11`, `p14`, `p15` (2), `p16`. С резервной нарезкой (`BCC_FORCE_FALLBACK=build_inventory`) движковые падают так же, значит, не из-за №04. `p11::test_from_fixture_files_entry_point` ломает `from conftest import FIXTURES`: модуль `conftest` подменяет `tests/p17/conftest.py`.
 * **Max:** при усечении и исчерпанном бюджете этап `inventory` помечается `failed`, хотя модуль вернул требования откатом на правила (`rules_fallback`).
 * **Max и №06:** в `Fact` контракта `subject` и `field` — непустые строки, а в FactHint неизвестное = `null`. Преобразует ли `reconcile_facts`, или контракт допустит `null`?
 * **Max:** выход называется `block_coverage`, чтобы не путаться с `Report.coverage` (покрытие приёмкой). `review_status = not_reviewed` ставится до №05.
