@@ -1,0 +1,700 @@
+{
+  "label": "v2 офлайн-правила (09f0dfb)",
+  "at": "2026-11-27 02:50",
+  "harness": {
+    "tp": 12,
+    "fp": 3,
+    "fn": 16,
+    "duplicates": 0,
+    "precision": 0.8,
+    "recall": 0.42857142857142855,
+    "f1": 0.5581395348837209,
+    "precision_strict": 0.8,
+    "support": 28,
+    "predicted": 15,
+    "clean_false_alarms": 0,
+    "fp_background": 0,
+    "tp_parent_level": 0,
+    "pending_adjudication": 2
+  },
+  "per_issue_type": {
+    "boundary_conflict": {
+      "tp": 0,
+      "fn": 5,
+      "fp": 0,
+      "recall": 0.0
+    },
+    "event_conflict": {
+      "tp": 0,
+      "fn": 5,
+      "fp": 0,
+      "recall": 0.0
+    },
+    "missing_element": {
+      "tp": 5,
+      "fn": 1,
+      "fp": 1,
+      "recall": 0.8333333333333334
+    },
+    "status_conflict": {
+      "tp": 3,
+      "fn": 3,
+      "fp": 0,
+      "recall": 0.5
+    },
+    "unit_mismatch": {
+      "tp": 4,
+      "fn": 2,
+      "fp": 2,
+      "recall": 0.6666666666666666
+    }
+  },
+  "missing_measurements": 0,
+  "not_run": 0,
+  "cases": 33,
+  "failed": 0,
+  "clean": {
+    "n": 8,
+    "measured": 8,
+    "findings": 0,
+    "critical": 0,
+    "major": 0,
+    "docs_with_critical": 0,
+    "docs_over_1_major": 0,
+    "verdict_no": 0
+  },
+  "time": {
+    "total_s": 3.2,
+    "calls": 0,
+    "cost_usd": 0
+  },
+  "per_case": [
+    {
+      "case_id": "autopay.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "findings": 2,
+      "by_severity": {
+        "critical": 0,
+        "major": 2,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "autopay.drop_promised.no_409_status",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "autopay.event_conflict.insufficient_funds_credit",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "autopay.paraphrase.nfr",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "autopay.range_boundary.trigger_at_threshold",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "autopay.two_statuses.range_422",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "autopay.unit_change.limit_per_hour",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.drop_promised.no_last_digits",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.event_conflict.unblock_daily_limit",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.paraphrase.keep_authorizations",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.range_boundary.days_400_at_30",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.two_statuses.reblock_200",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cardblock.unit_change.blocked_at_utc",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.drop_promised.no_read_method",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 1,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.event_conflict.category_effective_now",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.paraphrase.rate",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.range_boundary.cap_strict",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.two_statuses.bad_category_200",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.unit_change.accrued_in_tiyn",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "edge.empty",
+      "expected": "clean",
+      "kind": "edge",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.0,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "findings": 2,
+      "by_severity": {
+        "critical": 1,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.drop_promised.no_read_method",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 1,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.paraphrase.new_limit",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.range_boundary.reaching_rejects",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.two_statuses.range_200_error",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "findings": 1,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    }
+  ]
+}
