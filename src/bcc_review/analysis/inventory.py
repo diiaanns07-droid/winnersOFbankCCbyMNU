@@ -717,6 +717,7 @@ class _Inventory:
         self.header_block: dict[str, str] = {}
         self._group_tables()
         self._collect_labels()
+        self.parent_label = self._continuations()
         self.fates: dict[str, _Fate] = {}
         self._rule_fates()
 
@@ -747,6 +748,9 @@ class _Inventory:
                 sec = [sec]
             loc = _get(raw, "loc") or {}
             marker = _get(raw, "marker") or _get(raw, "number") or _get(loc, "marker") or _get(loc, "number")
+            lst = _get(loc, "list")
+            if marker in (None, "") and lst is not None and _get(lst, "ordered") and _get(lst, "number") is not None:
+                marker = str(_get(lst, "number"))  # №01 выносит «1.» из текста в loc.list
             blocks.append(
                 _Block(
                     idx=len(blocks),
@@ -895,11 +899,18 @@ class _Inventory:
                     return t
         return None
 
+    def segments_of(self, b: _Block) -> list[_Segment]:
+        """Сегменты блока; номер списка из loc (``marker``) достаётся первому сегменту без своего номера."""
+        segs = _segments(b.text)
+        if b.marker and segs and segs[0].label is None:
+            segs[0] = _Segment(b.marker, segs[0].start, segs[0].end)
+        return segs
+
     def _collect_labels(self) -> None:
         for b in self.blocks:
             if self.is_heading(b) or b.id in self.row_of:
                 continue
-            for seg in _segments(b.text):
+            for seg in self.segments_of(b):
                 if seg.label:
                     self.labels.setdefault(b.id, []).append((seg.start, seg.end, seg.label))
         for t in self.tables:
@@ -916,6 +927,24 @@ class _Inventory:
                 if lab:
                     for c in r.cells:
                         self.labels.setdefault(c.block_id, []).append((c.start, c.end, lab))
+
+    def _continuations(self) -> dict[str, tuple[str, str]]:
+        """Блок без номера сразу за пронумерованным абзацем того же раздела — продолжение этого пункта.
+
+        Только прямое соседство (без цепочек): так «следующей строкой» уточнение или исключение остаётся
+        при своём пункте, даже если стык окон прошёл между ними, а заключительный абзац раздела
+        не прилипает к последнему пункту. Код, таблицы и заголовки не наследуют номер.
+        """
+        out: dict[str, tuple[str, str]] = {}
+        for prev, b in zip(self.blocks, self.blocks[1:]):
+            if b.section != prev.section or b.id in self.labels or not b.text.strip():
+                continue
+            if any(self.is_heading(x) or self.is_code(x) or x.id in self.row_of for x in (prev, b)):
+                continue
+            labels = self.labels.get(prev.id)
+            if labels:
+                out[b.id] = (labels[-1][2], prev.id)
+        return out
 
     @staticmethod
     def _col(header: list[str], pat: re.Pattern[str]) -> int | None:
@@ -984,9 +1013,14 @@ class _Inventory:
             )
         if _CONNECTOR_RE.match(_clean(text)):
             return self._excl("fragment", f"Раздел «{name}»: служебная связка «{_clean(text)}».")
-        segs = _segments(text)
+        segs = self.segments_of(b)
         labeled = any(s.label for s in segs)
         modal = bool(_MODAL_RE.search(text))
+        parent = self.parent_label.get(b.id)
+        if parent and not labeled and self.fates.get(parent[1]) and self.fates[parent[1]].atoms:
+            atoms = self._prose_atoms(b, segs, role, inherited=parent[0])
+            if atoms:
+                return _Fate(atoms=atoms, facts=self._text_facts_for(atoms))
         if labeled or role in _REQ_ROLES or modal:
             if not labeled and role != "acceptance" and not modal and self.has_children(b.section):
                 return self._excl("preamble", f"Раздел «{name}»: вводный текст перед подразделами.")
@@ -999,7 +1033,8 @@ class _Inventory:
         return _Fate(unprocessed=f"Раздел «{name}»: нет номера, модальности и признаков раздела требований; "
                                  "решение за семантическим этапом.")
 
-    def _prose_atoms(self, b: _Block, segs: list[_Segment], role: str | None) -> list[_Atom]:
+    def _prose_atoms(self, b: _Block, segs: list[_Segment], role: str | None,
+                     inherited: str | None = None) -> list[_Atom]:
         kind = self.kind_for(b.section)
         no_split = role == "acceptance"
         heading = self._section_name(b.section)
@@ -1013,7 +1048,10 @@ class _Inventory:
                     continue
                 if len(cleaned.split()) < 4 and not seg.label:
                     cleaned = f"{_clean(heading)}: {cleaned}"
-                sid, src = (seg.label, "label") if seg.label else ((head_label, "heading") if head_label else (None, None))
+                if seg.label or inherited:
+                    sid, src = seg.label or inherited, "label"
+                else:
+                    sid, src = (head_label, "heading") if head_label else (None, None)
                 atoms.append(_Atom(kind, cleaned, sid, [self._hint(b.id, a, z)], "rules", src))
         return atoms
 
@@ -1336,6 +1374,9 @@ class _Inventory:
                         return lab, "label"
                 if hb.marker and _norm_label(hb.marker) == s:
                     return hb.marker, "label"
+                parent = self.parent_label.get(hb.id)
+                if parent and _norm_label(parent[0]) == s:
+                    return parent[0], "label"  # продолжение пункта: номер стоит в предыдущем блоке
                 hl = self.heading_label(hb.section)
                 if hl and _norm_label(hl) == s:
                     return hl, "heading"
@@ -1351,6 +1392,8 @@ class _Inventory:
         else:
             if b.marker:
                 filled = (b.marker, "label")
+            elif b.id in self.parent_label:
+                filled = (self.parent_label[b.id][0], "label")
             elif self.heading_label(b.section):
                 filled = (self.heading_label(b.section), "heading")
         if filled[0] is not None:
@@ -1630,8 +1673,9 @@ class _Inventory:
                 calls["retry_calls"] += 1
                 call(core, ctx, i, len(rplan), "retry", "llm_retry")
         elif pending and retry:
-            self._warn("llm_budget", f"повтор не выполнен — бюджет вызовов исчерпан ({calls['used']} из {budget})",
-                       [b.id for b in pending])
+            why = ("движок сообщил BudgetExhausted" if stop["budget"]
+                   else f"бюджет модуля исчерпан ({calls['used']} из {budget})")
+            self._warn("llm_budget", f"повтор не выполнен — {why}", [b.id for b in pending])
         atoms = self._link_windows(atoms)
         missed = [b.id for b in process if b.id not in covered]
         unproc: dict[str, str] = {}

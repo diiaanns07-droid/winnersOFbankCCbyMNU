@@ -330,3 +330,126 @@ def assert_contract(doc: dict[str, Any], inv: dict[str, Any]) -> None:
     report["requirements"] = inv["requirements"]
     if report["document"]:
         assert C.evidence_errors(report) == []
+
+
+# --------------------------------------------------------------------------- транспорт движка
+_CTX_LINE = re.compile(r"^\[(b\d{4,})\] ?(.*)$")
+_K_LABEL = re.compile(r"^(?P<label>[А-ЯЁA-Z]{1,4}-\d+)\.\s+(?P<body>.+)$")
+_EXCEPTION = re.compile(r"^Исключение:\s+(?P<body>.+)$")
+
+
+def _undecorate(rendered: str) -> str:
+    """Текст блока из рендера ``runtime.context.render_block`` (снимает «• », «## », «| … |»)."""
+    s = rendered
+    s = re.sub(r"^\(заголовок таблицы\) ", "", s)
+    if s.startswith("• "):
+        return s[2:]
+    if re.match(r"^#{1,6} ", s):
+        return s.split(" ", 1)[1]
+    if s.startswith("| ") and s.endswith(" |"):
+        return s[2:-2]
+    return s
+
+
+def visible_blocks(messages: list[dict[str, Any]]) -> dict[str, str]:
+    """Блоки, которые модель действительно видит в контексте сообщений Asker: ``{id: текст}``."""
+    seen: dict[str, list[str]] = {}
+    cur = None
+    for msg in messages:
+        if msg["role"] != "user" or "ВХОДНЫЕ ДАННЫЕ (JSON):" in msg["content"]:
+            continue
+        for line in msg["content"].split("\n"):
+            m = _CTX_LINE.match(line)
+            if m:
+                cur = m.group(1)
+                seen[cur] = [m.group(2)]
+            elif cur is not None and line and not line.startswith(("ФРАГМЕНТЫ", "ДОКУМЕНТ", "ИНДЕКС")):
+                seen[cur].append(line)
+    return {bid: _undecorate("\n".join(lines)) for bid, lines in seen.items()}
+
+
+class WindowContentAdapter:
+    """Детерминированный «провайдер» за ``runtime.asker.Asker``.
+
+    Отвечает только по тому, что Asker реально передал: тексты — из контекста сообщений
+    (``[b0004] …``), список окна и разделы — из ``input.blocks``. Правила ответа:
+    «К-1. …» → обязательство с номером; «Исключение: …» → обязательство с номером ближайшего
+    видимого в окне пункта того же раздела (иначе null); «→» → design; «Документ …» → preamble.
+    Порядок выдачи меняется от вызова к вызову. ``faults = {номер_вызова: "truncated"}`` имитирует
+    ``ProviderError("truncated")`` адаптера (stop_reason=max_tokens по HANDOFF).
+    """
+
+    name = "mock"
+    params = {"mock": True, "p04": "window-content"}
+
+    def __init__(self, *, overeager: bool = False, faults: dict[int, str] | None = None):
+        self.overeager = overeager
+        self.faults = dict(faults or {})
+        self.calls: list[dict[str, Any]] = []
+
+    def invoke(self, *, model: str, messages: list[dict[str, Any]], schema: Any, timeout_s: float) -> dict[str, Any]:
+        from bcc_review.contracts import ProviderError
+
+        n = len(self.calls)
+        body = messages[-1]["content"]
+        inp = json.loads(body.split("ВХОДНЫЕ ДАННЫЕ (JSON):\n", 1)[1])
+        texts = visible_blocks(messages)
+        self.calls.append({"input": inp, "visible": sorted(texts), "context_lines": len(texts)})
+        if self.faults.get(n) == "truncated":
+            raise ProviderError("truncated", "mock: ответ обрезан по max_tokens", model=model)
+        listed = inp["blocks"]
+        answer_for = [b for b in listed if b["process"] or self.overeager]
+        items, excluded = [], []
+        for b in answer_for:
+            text = texts.get(b["id"], b.get("text") or "")
+            if not text:
+                continue  # блока нет в переданном контексте — модель о нём не знает
+            m, e = _K_LABEL.match(text), _EXCEPTION.match(text)
+            if m:
+                items.append({"source_id": m["label"], "kind": "functional",
+                              "text": f"Правило {m['label']}: {m['body'].rstrip('.')}",
+                              "evidence": [{"block_id": b["id"], "quote": m["body"]}]})
+            elif e:
+                parent = None
+                for prev in listed[: listed.index(b)][::-1]:
+                    pm = _K_LABEL.match(texts.get(prev["id"], ""))
+                    if prev["section"] == b["section"] and pm:
+                        parent = pm["label"]
+                        break
+                items.append({"source_id": parent, "kind": "functional",
+                              "text": f"Исключение из правила: {e['body'].rstrip('.')}",
+                              "evidence": [{"block_id": b["id"], "quote": e["body"]}]})
+            elif "→" in text:
+                excluded.append({"category": "design", "reason": "Схема без самостоятельного обязательства",
+                                 "block_ids": [b["id"]]})
+            elif text.startswith("Документ "):
+                excluded.append({"category": "preamble", "reason": "Вводный текст", "block_ids": [b["id"]]})
+            else:
+                items.append({"source_id": None, "kind": "functional", "text": text,
+                              "evidence": [{"block_id": b["id"], "quote": text}]})
+        items = items[::-1] if n % 2 == 0 else items[1:] + items[:1]  # порядок выдачи меняется
+        data = {"items": items, "excluded": excluded[::-1], "facts": [], "done": True}
+        return {"data": data, "usage": {"input_tokens": len(body) // 4, "output_tokens": 0}, "model": "p04-window-content",
+                "request_id": f"p04-{n + 1}", "stop_reason": "end_turn"}
+
+
+def engine_ask(document: dict[str, Any], adapter: Any, *, max_calls: int = 40):
+    """``ask`` из опубликованного рантайма движка: ContextBuilder → Asker → adapter, общий Budget."""
+    from bcc_review.runtime.asker import Asker
+    from bcc_review.runtime.context import ContextBuilder
+    from bcc_review.runtime.core import Budget, Cache, StageStats, Tracer
+
+    budget = Budget(max_calls, 600.0)
+    asker = Asker(adapter=adapter, provider="mock", model="p04-window-content", budget=budget,
+                  cache=Cache(None, enabled=False), stats=StageStats(), tracer=Tracer(None, "p04"),
+                  context=ContextBuilder(document), max_retries=0, sleep=lambda s: None)
+    return asker, budget
+
+
+def published_document(path: Path | str) -> tuple[dict[str, Any], str]:
+    """Document опубликованного читателя через слот движка (№01 или резерв) и normalize_document."""
+    from bcc_review import contracts as C
+    from bcc_review.runtime.modules import Modules
+
+    reader = Modules().get("read_text")
+    return C.normalize_document(reader.func(Path(path))), reader.label
