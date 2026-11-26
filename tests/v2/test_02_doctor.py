@@ -144,3 +144,10 @@ def test_doctor_main_parses_args(monkeypatch, tmp_path, capsys):
     code = doctor.main(["--provider", "offline"])
     out = capsys.readouterr().out
     assert code == 1 and "Диагностика bcc_review" in out
+
+
+def test_is_fatal():
+    from bcc_review.v2.providers.doctor import is_fatal
+    assert is_fatal(ProviderError("auth", "x")) and is_fatal(ProviderError("quota", "x"))
+    assert is_fatal(ProviderError("not_configured", "x"))
+    assert not is_fatal(ProviderError("overloaded", "x")) and not is_fatal(ValueError("x"))

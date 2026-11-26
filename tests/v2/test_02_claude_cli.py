@@ -235,3 +235,16 @@ def test_recorded_real_404_unknown_model():
             model="nonexistent-model-xyz", messages=MESSAGES, schema=SCHEMA, timeout_s=30)
     assert e.value.kind == "not_found" and e.value.status == 404
     assert "opus, sonnet или haiku" in e.value.message
+
+
+def test_stage_limit_never_lowers_cli_output_limit():
+    runner = FakeRunner(json.dumps(OK_OUT))
+    provider(runner).invoke(model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=8000)
+    assert runner.calls[0][1]["env"]["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "64000"
+    runner2 = FakeRunner(json.dumps(OK_OUT))
+    provider(runner2).invoke(model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=90000)
+    assert runner2.calls[0][1]["env"]["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "90000"
+    runner3 = FakeRunner(json.dumps(OK_OUT))
+    ClaudeCLIProvider(binary=["claude"], runner=runner3, env={"CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"}).invoke(
+        model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=8000)
+    assert runner3.calls[0][1]["env"]["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "64000"

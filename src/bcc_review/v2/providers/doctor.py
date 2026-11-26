@@ -28,7 +28,8 @@ from typing import Any, Callable, Mapping, Sequence
 
 from bcc_review.contracts import ProviderError
 
-__all__ = ["PROVIDER_NAMES", "explain", "load_dotenv", "main", "make_provider", "resolve_auto", "run_doctor"]
+__all__ = ["FATAL_KINDS", "PROVIDER_NAMES", "explain", "is_fatal", "load_dotenv", "main", "make_provider",
+           "resolve_auto", "run_doctor"]
 
 PROVIDER_NAMES = ("auto", "claude_cli", "gemini", "anthropic", "openai", "mock", "offline")
 ALIASES = {"claude": "claude_cli", "claude-cli": "claude_cli", "cli": "claude_cli", "google": "gemini",
@@ -164,6 +165,15 @@ _GENERIC: dict[str, str] = {
     "invalid_output": "Модель вернула ответ не по схеме. Повторите или выберите модель сильнее.",
     "unknown": "Неожиданная ошибка провайдера. " + DOCTOR_HINT,
 }
+
+
+#: Ошибки, после которых звать модель в этом прогоне бессмысленно: следующие этапы получат то же самое.
+FATAL_KINDS = frozenset({"auth", "not_configured", "quota"})
+
+
+def is_fatal(exc: BaseException) -> bool:
+    """True — модель недоступна до конца прогона (ключ, настройка, квота): остальные этапы — без модели."""
+    return isinstance(exc, ProviderError) and exc.kind in FATAL_KINDS or getattr(exc, "kind", None) in FATAL_KINDS
 
 
 def explain(exc: BaseException, provider: str | None = None) -> str:

@@ -44,6 +44,7 @@ __all__ = ["ClaudeCLIProvider", "classify_cli_result", "find_cli", "parse_cli_ou
 PROVIDER = "claude_cli"
 DEFAULT_MODEL = "opus"
 DEFAULT_TIMEOUT_FLOOR_S = 600.0
+MIN_OUTPUT_TOKENS = 64000  # рассуждения входят в лимит: haiku на линзе — 31 тыс. ток., из них 22 тыс. рассуждения
 EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 INSTALL_HELP = ("Установите Claude Code (https://claude.com/claude-code): «npm install -g @anthropic-ai/claude-code», "
                 "затем один раз выполните «claude» и войдите в аккаунт.")
@@ -307,8 +308,9 @@ class ClaudeCLIProvider:
         timeout = max(float(timeout_s or 0), self.timeout_floor_s)
 
         child_env = dict(self._env)
-        if max_output_tokens:
-            child_env.setdefault("CLAUDE_CODE_MAX_OUTPUT_TOKENS", str(int(max_output_tokens)))
+        # Лимит этапа не опускает лимит CLI: обрезка дороже лишних токенов (рассуждения тоже в лимите).
+        if not (child_env.get("CLAUDE_CODE_MAX_OUTPUT_TOKENS") or "").strip():
+            child_env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(max(int(max_output_tokens or 0), MIN_OUTPUT_TOKENS))
         tmp_path = None
         if system:
             fd, tmp_path = tempfile.mkstemp(prefix="bcc_sys_", suffix=".md")

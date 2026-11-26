@@ -230,7 +230,8 @@ class GeminiProvider:
         deadline = self._clock() + total
         attempts: list[dict[str, Any]] = []
         last: ProviderError | None = None
-        max_tokens = int(max_output_tokens or self.max_output_tokens)
+        # лимит этапа — не ниже лимита провайдера: у Gemini рассуждения расходуют тот же лимит
+        max_tokens = max(int(max_output_tokens or 0), self.max_output_tokens)
         clean = [{"role": m.get("role"), "content": m.get("content")} for m in messages]
 
         for current in chain:
