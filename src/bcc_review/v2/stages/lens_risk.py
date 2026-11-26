@@ -208,11 +208,14 @@ def _title_key(c: dict) -> str:
     return re.sub(r"[^\w]+", " ", str(c.get("title", "")).lower()).strip()
 
 
-def postprocess(candidates: Iterable[dict], view: Any = None) -> tuple[list[dict], list[dict]]:
+def postprocess(candidates: Iterable[dict], view: Any = None,
+                known_ids: Iterable[str] | None = None) -> tuple[list[dict], list[dict]]:
     """Калибровка, отсев тем без зацепки, дубли, лимит и порядок.
 
+    `known_ids` — ID требований из нарезки: чужие ID (номера пунктов документа) из `requirement_ids` убираются.
     Возвращает (оставленные, снятые); у снятых есть поле `reject_reason`.
     """
+    known = set(known_ids) if known_ids is not None else None
     doc = _doc_text(view)
     defined = terms_lines(view)
     kept: list[dict] = []
@@ -222,6 +225,8 @@ def postprocess(candidates: Iterable[dict], view: Any = None) -> tuple[list[dict
         if not isinstance(raw, dict):
             continue
         c = calibrate(raw)
+        if known is not None:
+            c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in known]
         if not c.get("evidence"):
             dropped.append({**c, "reject_reason": "нет цитаты-зацепки"})
             continue
@@ -259,7 +264,9 @@ def run(ctx: Any) -> dict:
     from . import lens  # общий запуск линзы (№01)
 
     out = dict(lens.run(ctx, NAME))
-    kept, dropped = postprocess(out.get("candidates", []), getattr(ctx, "view", None))
+    reqs = getattr(ctx, "requirements", None)
+    known = [r.get("id") for r in reqs if isinstance(r, dict) and r.get("id")] if reqs else None
+    kept, dropped = postprocess(out.get("candidates", []), getattr(ctx, "view", None), known)
     out["candidates"] = kept
     if dropped:
         out["dropped"] = dropped

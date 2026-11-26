@@ -171,6 +171,13 @@ def test_candidate_without_evidence_dropped():
     assert not kept and dropped[0]["reject_reason"] == "нет цитаты-зацепки"
 
 
+def test_unknown_requirement_ids_removed():
+    kept, _ = lens_risk.postprocess([_cand("Риск", requirement_ids=["R-01", "Ф-9", "R-77"])], "текст", ["R-01", "R-02"])
+    assert kept[0]["requirement_ids"] == ["R-01"]
+    kept, _ = lens_risk.postprocess([_cand("Риск", requirement_ids=["ЛП-4"])], "текст")
+    assert kept[0]["requirement_ids"] == ["ЛП-4"], "без нарезки ID не трогаем"
+
+
 def test_doc_text_accepts_docview():
     view = {"lines": [{"n": 1, "text": "Схема ОТКАТА"}]}
     assert "отката" in lens_risk._doc_text(view)
@@ -198,3 +205,28 @@ def test_saved_live_answers_on_clean_bases(path):
     sev = [c["severity"] for c in kept]
     limit = 2 if "sonnet" in path.stem else 4
     assert sev.count("critical") == 0 and sev.count("major") <= limit, sev
+
+
+def test_run_uses_common_lens_and_postprocess(monkeypatch):
+    """run(ctx): общий запуск линзы (подменён) → постобработка; снятые — в `dropped`."""
+    import types
+
+    calls = []
+    fake = types.ModuleType("bcc_review.v2.stages.lens")
+
+    def fake_run(ctx, name):
+        calls.append(name)
+        return {"candidates": [_cand("Ключевое событие не определено", "critical", requirement_ids=["R-01", "Ф-9"]),
+                               _cand("Нет требований PCI DSS")]}
+
+    fake.run = fake_run
+    monkeypatch.setitem(sys.modules, "bcc_review.v2.stages.lens", fake)
+    import bcc_review.v2.stages as stages_pkg
+    monkeypatch.setattr(stages_pkg, "lens", fake, raising=False)
+    ctx = types.SimpleNamespace(view={"lines": [{"n": 1, "text": "Клиент задаёт лимит.", "section": ""}]},
+                                requirements=[{"id": "R-01"}])
+    out = lens_risk.run(ctx)
+    assert calls == ["risk"]
+    assert [c["title"] for c in out["candidates"]] == ["Ключевое событие не определено"]
+    assert out["candidates"][0]["requirement_ids"] == ["R-01"]
+    assert out["dropped"][0]["reject_reason"].startswith("тема")
