@@ -1,9 +1,8 @@
 # №11 → Max, №12, №18, №07: передача адаптера Claude API
 
 Область №11: `src/bcc_review/providers/anthropic.py` и `tests/p11/`. Остальные файлы не менялись.
-Bootstrap Max (`bcc/integration`, `contracts/HANDOFF.md`) на момент работы в репозитории не опубликован:
-на удалённой стороне была только ветка `claude/nice-edison-gpkcfl` на `76ab976`. Поэтому адаптер собран по
-контракту v1 из брифа на синтетических фикстурах, а стыковой тест ждёт SHA bootstrap.
+Адаптер сверен с контрактом движка на срезе `bcc/integration` `2821989` (`contracts.py`, `runtime/asker.py`):
+ошибки — общий `bcc_review.contracts.ProviderError` со словарём `PROVIDER_ERROR_KINDS`.
 
 ## 1. Интерфейс
 
@@ -33,28 +32,31 @@ res == {"data": <dict по схеме>, "usage": {...}, "model": "<фактич�
 
 ## 2. Таблица категорий ошибок (`ProviderError.kind`)
 
-Конструктор вызывается строго как `ProviderError(kind, retry_after_s)`, остальное ставится атрибутами:
-`subkind, detail (рус., без секретов), http_status, error_type, error_code, request_id, requested_model,
-model, usage, retryable, ambiguous, alternatives, provider="anthropic"`.
+Класс — общий `bcc_review.contracts.ProviderError` (его ловит `Asker`), `kind` — строго из
+`PROVIDER_ERROR_KINDS`. Конструктор: `ProviderError(kind, message, retry_after_s=, status=, request_id=,
+usage=, model=)`; `message` = `detail` (рус., без секретов), `status` = HTTP-статус, `usage` — всегда dict.
+Повтор решает движок по `err.transient` (`TRANSIENT_KINDS`). Атрибутами добавлены: `subkind, detail,
+http_status, error_type, error_code, requested_model, retryable, ambiguous, alternatives, provider="anthropic"`.
 
 | kind | Условие (HTTP / SDK / stop_reason) | subkind (примеры) | retryable | retry_after_s | Что делать Max |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| `auth` | 401, 403, `organization_on_hold`, нет `ANTHROPIC_API_KEY` | `authentication`, `permission`, `missing_key` | нет | — | стоп этапа, run `failed` или `rules_only` с пометкой |
-| `quota_exhausted` | 402 `billing_error`; 429 с `enforced/contract/linked_*_spend_limit*` | `billing`, `enforced_spend_limit_reached` | нет | обычно — | стоп, повтор бессмыслен |
-| `rate_limited` | 429 с Retry-After / `retry-after-ms`, `ramp_limit_exceeded` | `rate_limit`, `ramp_limit_exceeded` | да | секунды | ждать и повторить из общего бюджета |
-| `rate_limited` + `ambiguous=True` | 429 без Retry-After и без `error_code` | `no_retry_after`, `alternatives=("quota_exhausted",)` | да | `None` | один повтор с backoff, затем считать квотой |
+| `not_configured` | нет `ANTHROPIC_API_KEY` (в конструкторе, до любого запроса) | `missing_key` | нет | — | `Engine.setup_provider` ставит `unavailable`, 0 HTTP-запросов |
+| `auth` | 401, 403, `organization_on_hold` | `authentication`, `permission` | нет | — | стоп этапа, run `failed` или `rules_only` с пометкой |
+| `quota` | 402 `billing_error`; 429 с `enforced/contract/linked_*_spend_limit*` | `billing`, `enforced_spend_limit_reached` | нет | обычно — | стоп, повтор бессмыслен |
+| `rate_limit` | 429 с Retry-After / `retry-after-ms`, `ramp_limit_exceeded` | `rate_limit`, `ramp_limit_exceeded` | да | секунды | ждать и повторить из общего бюджета |
+| `rate_limit` + `ambiguous=True` | 429 без Retry-After и без `error_code` | `no_retry_after`, `alternatives=("quota",)` | да | `None` | один повтор с backoff, затем считать квотой |
 | `overloaded` | 529 / `overloaded_error` | `overloaded` | да | если есть | backoff |
 | `timeout` | истёк `timeout_s` у клиента; 408/504 / `timeout_error` | `client_timeout`, `server_timeout` | да | если есть | повтор или увеличить `timeout_s` |
-| `incomplete` | HTTP 200, `stop_reason` ∈ max_tokens, model_context_window_exceeded, pause_turn, tool_use, compaction | имя stop_reason | нет | — | данные не приняты; поднять `ANTHROPIC_MAX_TOKENS` или разбить этап |
-| `schema_violation` | HTTP 200, пустой текст, не JSON, JSON не по схеме | `empty_output`, `invalid_json`, `schema_mismatch` | да | — | один повтор из бюджета; `detail` содержит пути ошибок |
+| `truncated` | HTTP 200, `stop_reason` ∈ max_tokens, model_context_window_exceeded, pause_turn, tool_use, compaction | имя stop_reason | нет | — | данные не приняты; поднять `ANTHROPIC_MAX_TOKENS` или разбить этап |
+| `invalid_output` | HTTP 200, пустой текст, не JSON, JSON не по схеме | `empty_output`, `invalid_json`, `schema_mismatch` | да (атрибут) | — | движок **не** повторяет: `invalid_output` нет в `TRANSIENT_KINDS`; `detail` содержит пути ошибок |
 | `refusal` | HTTP 200, `stop_reason=refusal` (и fallback не спас) | категория: `cyber`, `bio`, … | нет | — | этап `failed`, без «пустого успеха» |
-| `invalid_request` | 400/413/422; локально: prefill, пустые messages, плохая схема | `context_overflow`, `schema_too_complex`, `beta_not_enabled`, `prefill`, `invalid_schema` | нет | — | ошибка конфигурации; при `beta_not_enabled` выставить `ANTHROPIC_FALLBACKS=off` |
-| `model_not_found` | 404 на GET /v1/models/{id} или `model: …` | `model` | нет | — | неверный `ANTHROPIC_MODEL`; ни одного токена не потрачено |
-| `server_error` | 500, 502, 503 | `api_error`, `http_503` | да | если есть | backoff |
+| `bad_request` | 400/413/422; локально: prefill, пустые messages, плохая схема | `context_overflow`, `schema_too_complex`, `beta_not_enabled`, `prefill`, `invalid_schema` | нет | — | ошибка конфигурации; при `beta_not_enabled` выставить `ANTHROPIC_FALLBACKS=off` |
+| `not_found` | 404 на GET /v1/models/{id} или `model: …` | `model` | нет | — | неверный `ANTHROPIC_MODEL`; ни одного токена не потрачено |
+| `server` | 500, 502, 503 | `api_error`, `http_503` | да | если есть | backoff |
 | `network` | ошибка соединения до ответа | `ConnectError`, … | да | — | backoff |
 | `unknown` | 409, неизвестный stop_reason, нераспознанный конверт ответа | `conflict`, `unexpected_stop_reason`, `invalid_envelope` | 409 — да, иначе нет | если есть | лог и стоп |
 
-При ошибках `incomplete`, `schema_violation` и `refusal` токены уже потрачены. Поэтому `err.usage`,
+При ошибках `truncated`, `invalid_output` и `refusal` токены уже потрачены. Поэтому `err.usage`,
 `err.model` и `err.request_id` заполнены, а потраченное входит в `passport().usage_total`.
 
 ## 3. Счётчик и таймер (согласовать с Max)
@@ -146,8 +148,13 @@ BCC_P11_LIVE=1 python -m pytest tests/p11/test_live_smoke.py -s
 
 Успех: данные, модель, request_id, cache read/write, `physical_calls=1`. Повторный прогон без ключа.
 Форма запроса: нет sampling-параметров, wire-схема, effort, cache_control, fallbacks, beta-заголовок.
-429 с Retry-After → `rate_limited`, 7 с. 429 без Retry-After → `rate_limited`, `ambiguous`. 401 → `auth`.
-HTTP 200 + `max_tokens` → `incomplete` с usage. Валидный JSON неверной схемы → `schema_violation`.
+429 с Retry-After → `rate_limit`, 7 с. 429 без Retry-After → `rate_limit`, `ambiguous`. 401 → `auth`.
+HTTP 200 + `max_tokens` → `truncated` с usage. Валидный JSON неверной схемы → `invalid_output`.
+Нет ключа → `not_configured`, ноль запросов.
+
+Стык с движком (`tests/p11/test_asker_path.py`): `Asker` → `AnthropicAdapter` → `ScriptedTransport`
+(httpx2, синтетические ответы), заданные часы, реальный этап `individual#1` и его `response_schema()`.
+Таблица «сценарий / GET / POST / пауза / тип ошибки» печатается в конце прогона pytest.
 Также `minLength`, который API не проверяет, невалидный JSON, refusal, 529, 500, 504, 402, spend-cap 429,
 сложная схема 400, тайм-аут клиента, ConnectError, неизвестная модель (0 вызовов messages), prefill
 (0 вызовов), fallback на другую модель, нормализация регистра enum, стоимость только при явном тарифе,
@@ -164,10 +171,9 @@ HTTP 200 + `max_tokens` → `incomplete` с usage. Валидный JSON нев�
 
 ## 8. Открытые зависимости
 
-1. **Max:** где лежит общий `ProviderError`. Адаптер ищет `bcc_review.providers.base`, затем `bcc_review.errors`,
-   иначе берёт совместимую копию (`PROVIDER_ERROR_SOURCE == "bootstrap-fallback"`). Предлагаю
-   `bcc_review.providers.base`. После публикации SHA запустить `python -m pytest tests/p11/test_joint_contract.py`
-   и, если имя модуля другое, поменять `_SHARED_ERROR_MODULES`.
+1. **Закрыто:** общий `ProviderError` — `bcc_review.contracts` (срез `2821989`). Адаптер импортирует его
+   напрямую, локальной копии и поиска по `bcc_review.providers.base` / `bcc_review.errors` больше нет;
+   `PROVIDER_ERROR_SOURCE == "bcc_review.contracts"`.
 2. **Max:** `contracts/v1.json`. Пока его нет, стыковой тест схемы пропускается.
 3. **Max и №18:** живой демо-вызов с ключом команды не выполнялся: ключа в этой среде нет, отдельный
    интеграционный запуск не выделен. Результат подписать полями `res["model"]` и `passport()`.

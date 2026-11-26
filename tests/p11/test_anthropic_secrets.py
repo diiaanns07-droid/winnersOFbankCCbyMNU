@@ -55,7 +55,7 @@ def test_no_key_in_errors_journal_or_logs(messages, schema, caplog):
     assert "TESTSECRET" not in blob
     assert "ECHOEDSECRET" not in blob  # ключ, который «сервер» вернул эхом в сообщении
     assert "Bearer sk-" not in blob
-    assert [e.kind for e in errors] == ["auth", "network", "rate_limited"]
+    assert [e.kind for e in errors] == ["auth", "network", "rate_limit"]
     assert adapter.passport()["credential"] == "argument"
     assert adapter.passport()["run_mode"] == "rules_plus_llm"
 

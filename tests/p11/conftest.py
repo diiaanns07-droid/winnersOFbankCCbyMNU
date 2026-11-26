@@ -35,6 +35,26 @@ def _no_real_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
+#: Наблюдения стыка Asker → адаптер → транспорт (test_asker_path.py); печатаются в конце прогона.
+OBSERVATIONS: list[tuple[str, int, int, str, str]] = []
+
+
+def observe(scenario: str, transport: Any, clock: Any, engine_error: str) -> None:
+    pause = " + ".join(f"{s:g} с" for s in clock.sleeps) or "0"
+    OBSERVATIONS.append((scenario, transport.count("GET"), transport.count("POST"), pause, engine_error))
+
+
+def pytest_terminal_summary(terminalreporter: Any) -> None:
+    if not OBSERVATIONS:
+        return
+    tr = terminalreporter
+    tr.section("p11: Asker → AnthropicAdapter → ScriptedTransport (httpx2)")
+    tr.write_line("| сценарий | GET | POST | пауза | тип ошибки в движке |")
+    tr.write_line("|---|---|---|---|---|")
+    for row in OBSERVATIONS:
+        tr.write_line("| " + " | ".join(str(c) for c in row) + " |")
+
+
 def load(name: str) -> Any:
     return json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
 
