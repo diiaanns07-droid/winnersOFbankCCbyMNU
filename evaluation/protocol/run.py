@@ -96,6 +96,8 @@ def main():
     if team_adapter:
         env.pop("BCC_FORCE_FALLBACK",None)
         if mode=="rules_plus_llm":
+            if not env.get("GEMINI_API_KEY") and env.get("GOOGLE_API_KEY"):
+                env["GEMINI_API_KEY"]=env["GOOGLE_API_KEY"]
             for name in ("GEMINI_THINKING_BUDGET","GEMINI_THINKING_LEVEL","GEMINI_FALLBACK_MODELS"):
                 env.pop(name,None)
             env.update(GEMINI_TEMPERATURE="0",GEMINI_MAX_OUTPUT_TOKENS="65536")

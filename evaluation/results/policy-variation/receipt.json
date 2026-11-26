@@ -1,0 +1,22 @@
+{
+  "corpus": "PV-1",
+  "sealed_index_sha256": "d5620312e810fcd8c3c5118165618b4a728e76bd367f7d57c736aaf8c5e296fa",
+  "researched_remote_heads": 34,
+  "branch_snapshot_utc": "2026-11-26T18:55:47.271746+00:00",
+  "release_handoff": "08d3af55446ef37d8d61d077848e63c292a47207",
+  "raw_closed_reports_in_branch_snapshot": 0,
+  "custodian": {
+    "name": "PV1-custodian.zip",
+    "sha256": "a5cc005e0d90a82471c2b8cd8ef113221ae65a946689508d26024fa47f8b2586",
+    "members": 1890
+  },
+  "operator": {
+    "name": "PV1-eight-inputs.zip",
+    "sha256": "339b5f8dc3c43c5a2dce18ec57b7d9d83ab3076df3c112afe7ae5fbee1f8ca5e",
+    "documents": 8,
+    "manifest": 1
+  },
+  "verified_offline_reports": 96,
+  "extra_replay": 1,
+  "paid_runs": 0
+}
