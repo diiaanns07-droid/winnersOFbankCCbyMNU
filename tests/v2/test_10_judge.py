@@ -476,3 +476,26 @@ def test_severity_check_failure_keeps_judge_levels():
     res = judge.run(Ctx(FakeLLM(response(fs), RuntimeError("503")), options={}), cs)
     assert res["findings"][0]["severity"] == "critical"
     assert any("вторая проверка" in w for w in res["warnings"])
+
+
+def test_repeated_keys_are_not_glued():
+    cs = [cand("C-001", 38, "Месяц определяется"), cand("C-002", 46, "в течение минуты", kind="unverifiable")]
+    res = judge.run(Ctx(FakeLLM(response([finding("F01", ["C-001"]), finding("F01", ["C-002"])]))), cs)
+    assert len(res["findings"]) == 2
+    all_placed(res, ["C-001", "C-002"])
+
+
+def test_split_parts_keep_key_references():
+    cs = [cand(f"C-{i:03d}", 20 + i * 4, f"q{i}", kind=["ambiguity", "incomplete"][i % 2],
+               reqs=(f"R-{i:02d}",)) for i in range(1, 7)]
+    view = {"lines": [{"n": 20 + i * 4, "text": f"q{i}"} for i in range(1, 7)]}
+
+    def answer(user, schema):
+        ids = sorted(set(re.findall(r"^(C-\d{3}) ·", user, re.M)))
+        return response([finding("F01", ids)], summary="Главное — F01.",
+                        checklist=[{"n": 1, "answer": "Нет", "comment": "См. F01.", "finding_keys": ["F01"]}])
+
+    res = judge.run(Ctx(FakeLLM(Truncated("max_tokens"), answer, answer), view=view, requirements=[]), cs)
+    assert "F01" not in res["verdict_summary"] and "D-0" in res["verdict_summary"]
+    assert "F01" not in res["checklist"][0]["comment"]
+    assert len(res["checklist"][0]["finding_ids"]) == 2

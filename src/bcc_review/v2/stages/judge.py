@@ -606,7 +606,8 @@ def _merge_responses(parts: list[dict]) -> dict:
         rejected += list(resp.get("rejected") or [])
         for ch in resp.get("checklist") or []:
             n = ch.get("n")
-            ch = {**ch, "finding_keys": [remap.get(k, k) for k in ch.get("finding_keys") or []]}
+            ch = {**ch, "finding_keys": [remap.get(k, k) for k in ch.get("finding_keys") or []],
+                  "comment": _replace_keys(_s(ch.get("comment")), remap)}
             prev = checks.get(n)
             if prev is None:
                 checks[n] = ch
@@ -615,7 +616,7 @@ def _merge_responses(parts: list[dict]) -> dict:
                 checks[n] = {**worse, "finding_keys": list(dict.fromkeys(
                     (prev.get("finding_keys") or []) + (ch.get("finding_keys") or [])))}
         if _s(resp.get("verdict_summary")):
-            summaries.append(_s(resp["verdict_summary"]))
+            summaries.append(_replace_keys(_s(resp["verdict_summary"]), remap))
     return {"findings": findings, "rejected": rejected, "checklist": list(checks.values()),
             "verdict_summary": summaries[0] if summaries else "", "_parts": len(parts)}
 
@@ -734,7 +735,8 @@ def _assign_priorities(findings: list[dict]) -> None:
     order.sort(key=lambda f: (0 if f["severity"] == "critical" else 1,
                               f["priority"] if f["priority"] > 0 else 99, f["_first_line"]))
     top = [f for f in order if f["severity"] == "critical"][:MAX_PRIORITY]
-    rest = [f for f in chosen if f not in top]
+    top_ids = {id(f) for f in top}
+    rest = [f for f in chosen if id(f) not in top_ids]
     rest.sort(key=lambda f: (f["priority"], SEV_RANK[f["severity"]], f["_first_line"]))
     top += rest[: MAX_PRIORITY - len(top)]
     # итоговый порядок: как поставил судья, critical без номера — после своих
@@ -769,8 +771,12 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
 
     # 1. дефекты судьи: только известные кандидаты, каждый не более одного раза
     drafts: list[dict] = []
+    used_keys: set[str] = set()
     for i, f in enumerate(response.get("findings") or [], 1):
         key = _s(f.get("key")) or f"F{i:02d}"
+        if key in used_keys:  # повтор ключа у слабой модели — дефекты не склеиваем
+            key = f"{key}#{i}"
+        used_keys.add(key)
         ids = []
         for cid in f.get("candidate_ids") or []:
             cid = _s(cid)
