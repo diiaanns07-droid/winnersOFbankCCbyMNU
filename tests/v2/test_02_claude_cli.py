@@ -248,3 +248,12 @@ def test_stage_limit_never_lowers_cli_output_limit():
     ClaudeCLIProvider(binary=["claude"], runner=runner3, env={"CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"}).invoke(
         model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=8000)
     assert runner3.calls[0][1]["env"]["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "64000"
+
+
+def test_cli_output_token_maximum_text_is_truncated():
+    out = error_out(None, "", "API Error: Claude's response exceeded the 16000 output token maximum. To configure "
+                              "this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.")
+    with pytest.raises(ProviderError) as e:
+        provider(FakeRunner(json.dumps(out), returncode=1)).invoke(model="haiku", messages=MESSAGES, schema=SCHEMA,
+                                                                    timeout_s=30)
+    assert e.value.kind == "truncated" and not e.value.transient

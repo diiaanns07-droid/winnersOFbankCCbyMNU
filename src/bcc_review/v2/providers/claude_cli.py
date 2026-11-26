@@ -44,6 +44,7 @@ __all__ = ["ClaudeCLIProvider", "classify_cli_result", "find_cli", "parse_cli_ou
 PROVIDER = "claude_cli"
 DEFAULT_MODEL = "opus"
 DEFAULT_TIMEOUT_FLOOR_S = 600.0
+_CLI_LIMIT_VAR = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"   # переменная самого claude -p: лимит ответа
 MIN_OUTPUT_TOKENS = 64000  # рассуждения входят в лимит: haiku на линзе — 31 тыс. ток., из них 22 тыс. рассуждения
 EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 INSTALL_HELP = ("Установите Claude Code (https://claude.com/claude-code): «npm install -g @anthropic-ai/claude-code», "
@@ -142,6 +143,9 @@ def classify_cli_result(out: Mapping[str, Any] | None, *, returncode: int, stder
         return ProviderError(kind, f"{message} [claude -p, модель {model}: {tail}]" if tail else message,
                              retry_after_s=retry_after, status=status, request_id=out.get("session_id"), model=model)
 
+    if ("output token maximum" in low or "exceeded the" in low and "output token" in low
+            or "max output tokens" in low or out.get("stop_reason") == "max_tokens"):
+        return err("truncated", "Ответ модели обрезан по лимиту выходных токенов (claude -p).")
     if ("usage limit" in low or "hit your limit" in low or "limit reached" in low or "out of extra usage" in low
             or "credit balance is too low" in low):
         retry = None
@@ -309,8 +313,9 @@ class ClaudeCLIProvider:
 
         child_env = dict(self._env)
         # Лимит этапа не опускает лимит CLI: обрезка дороже лишних токенов (рассуждения тоже в лимите).
-        if not (child_env.get("CLAUDE_CODE_MAX_OUTPUT_TOKENS") or "").strip():
-            child_env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(max(int(max_output_tokens or 0), MIN_OUTPUT_TOKENS))
+        # Переменная самого Claude Code CLI: наш код её не читает, только задаёт, если пользователь не задал сам.
+        if _CLI_LIMIT_VAR not in child_env or not str(child_env[_CLI_LIMIT_VAR]).strip():
+            child_env[_CLI_LIMIT_VAR] = str(max(int(max_output_tokens or 0), MIN_OUTPUT_TOKENS))
         tmp_path = None
         if system:
             fd, tmp_path = tempfile.mkstemp(prefix="bcc_sys_", suffix=".md")
