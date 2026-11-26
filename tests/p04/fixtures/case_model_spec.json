@@ -1,0 +1,98 @@
+{
+  "_about": "Детерминированный эталонный ответ модели для кейса BCC-HUB (docs/requirements.md @928c1aa). Пункты заданы цитатами: block_id подставляет QuoteModel по тексту текущего окна, поэтому эталон переносим на любой парсер. Это фикстура проверки кода, а не измерение качества модели.",
+  "items": [
+    {"kind": "ui", "source_id": null, "text": "Экран уведомления открывается по пути Карты → Расходы → Уведомления", "quotes": ["Карты → Расходы → Уведомления"]},
+    {"kind": "ui", "source_id": null, "text": "На экране показаны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»", "quotes": ["На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»"]},
+    {"kind": "ui", "source_id": null, "text": "При ошибке ввода сообщение показывается под полем порога", "quotes": ["При ошибке ввода сообщение появляется под полем"]},
+
+    {"kind": "functional", "source_id": "Ф-1", "text": "Порог задаёт держатель активной карты в валюте KZT", "quotes": ["Держатель активной карты KZT задаёт"]},
+    {"kind": "functional", "source_id": "Ф-1", "text": "Порог — целое число тенге", "quotes": ["целый порог"]},
+    {"kind": "functional", "source_id": "Ф-1", "text": "Нижняя граница порога — 1 000 ₸ включительно", "quotes": ["от 1 000", "включительно"]},
+    {"kind": "functional", "source_id": "Ф-1", "text": "Верхняя граница порога — 1 000 000 ₸ включительно", "quotes": ["до 1 000 000 ₸ включительно"]},
+    {"kind": "functional", "source_id": "Ф-1", "text": "По умолчанию уведомление выключено", "quotes": ["По умолчанию уведомление выключено"]},
+
+    {"kind": "functional", "source_id": "Ф-2", "text": "Месяц расходов определяется по дате совершения покупки по времени Алматы", "quotes": ["Месяц определяется по дате совершения покупки в Алматы"]},
+    {"kind": "functional", "source_id": "Ф-2", "text": "В расходы входят только проведённые покупки", "quotes": ["В расходы входят проведённые покупки"]},
+    {"kind": "functional", "source_id": "Ф-2", "text": "Возврат уменьшает расходы месяца исходной покупки", "quotes": ["Возврат уменьшает расходы месяца исходной покупки"]},
+    {"kind": "functional", "source_id": "Ф-2", "text": "Переводы и снятие наличных не входят в расходы", "quotes": ["Переводы и снятие наличных исключаются"]},
+
+    {"kind": "functional", "source_id": "Ф-3", "text": "Push отправляется при переходе расходов от суммы ниже порога к сумме не ниже порога", "quotes": ["Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше, клиент получает push"]},
+    {"kind": "functional", "source_id": "Ф-3", "text": "По карте не более одного такого push за календарный месяц", "quotes": ["На карту приходится максимум один такой push за календарный месяц"]},
+
+    {"kind": "functional", "source_id": "Ф-4", "text": "При изменении порога накопленная сумма сохраняется", "quotes": ["При изменении порога накопленная сумма сохраняется"]},
+    {"kind": "functional", "source_id": "Ф-4", "text": "Если накопленная сумма ниже нового порога, следующее достижение вызывает push независимо от истории", "quotes": ["Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки"]},
+
+    {"kind": "integration", "source_id": null, "text": "Процессинг передаёт в сервис расходов событие о проведённой покупке", "quotes": ["Процессинг → сервис расходов: проведена покупка"]},
+    {"kind": "integration", "source_id": null, "text": "Сервис расходов получает порог карты из сервиса настроек", "quotes": ["Сервис расходов → настройки: получить порог карты"]},
+    {"kind": "integration", "source_id": null, "text": "При достижении порога сервис расходов передаёт в сервис push последние четыре цифры карты и сумму", "quotes": ["Сервис расходов → push: передать последние четыре цифры карты и сумму при достижении порога"]},
+
+    {"kind": "nonfunctional", "source_id": null, "text": "Push передаётся на отправку не позже чем через минуту после получения события", "quotes": ["Сервис передаёт push на отправку в течение минуты после получения события"]},
+    {"kind": "data", "source_id": null, "text": "Хранятся идентификатор карты, месяц, идентификатор операции, сумма покупки в тиынах, признак отправки и порог в тенге", "quotes": ["Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге"]},
+    {"kind": "integration", "source_id": null, "text": "Приложение читает и сохраняет настройки через REST API дочернего документа", "quotes": ["Приложение читает и сохраняет настройки через дочерний документ"]},
+    {"kind": "integration", "source_id": null, "text": "Повторная доставка того же события процессинга не меняет итог", "quotes": ["Повторная доставка одного события процессинга сохраняет исходный итог"]},
+
+    {"kind": "acceptance", "source_id": null, "text": "Дано расходы 48 500 ₸ и порог 50 000 ₸; покупка 1 500 ₸ даёт итог 50 000 ₸ и один push", "quotes": ["Расходы 48 500 ₸, порог 50 000 ₸", "Итог 50 000 ₸ и один push"]},
+    {"kind": "acceptance", "source_id": null, "text": "Покупка 31 января в 23:58 на 4 000 ₸, проведённая 1 февраля в 00:03, увеличивает февральский счётчик", "quotes": ["Покупка 31 января в 23:58 на 4 000 ₸", "Февральский счётчик вырос на 4 000 ₸"]},
+    {"kind": "acceptance", "source_id": null, "text": "Перевод 500 ₸ при расходах 19 900 ₸ не меняет счётчик", "quotes": ["Расходы 19 900 ₸, порог 20 000 ₸", "Счётчик показывает 19 900 ₸"]},
+
+    {"kind": "contract", "source_id": null, "text": "Метод вызывается HTTP-методом GET", "quotes": ["**REST type** | GET"]},
+    {"kind": "contract", "source_id": null, "text": "Авторизация — Bearer по сессии владельца карты", "quotes": ["Bearer, сессия владельца карты"]},
+    {"kind": "contract", "source_id": null, "text": "Адрес метода в Dev — /alerts/saveLimit", "quotes": ["Dev: `/alerts/saveLimit`"]},
+
+    {"kind": "contract", "source_id": "1", "text": "Метод проверяет пользовательскую сессию", "quotes": ["Проверить пользовательскую сессию"]},
+    {"kind": "contract", "source_id": "2", "text": "Метод проверяет принадлежность карты клиенту", "quotes": ["Проверить принадлежность карты клиенту"]},
+    {"kind": "contract", "source_id": "3", "text": "Метод проверяет сумму", "quotes": ["Проверить сумму и переключатель"]},
+    {"kind": "contract", "source_id": "3", "text": "Метод проверяет переключатель", "quotes": ["Проверить сумму и переключатель"]},
+    {"kind": "contract", "source_id": "4", "text": "Метод заменяет действующую настройку", "quotes": ["Заменить настройку"]},
+    {"kind": "contract", "source_id": "4", "text": "Метод возвращает результат сохранения", "quotes": ["вернуть результат сохранения"]},
+    {"kind": "contract", "source_id": "5", "text": "При отклонении суммы метод возвращает прежнее состояние", "quotes": ["При отклонении суммы вернуть прежнее состояние"]},
+    {"kind": "contract", "source_id": "5", "text": "При отклонении суммы метод возвращает результат ERROR", "quotes": ["результат ERROR"]},
+
+    {"kind": "contract", "source_id": "1", "text": "Порог — целое число тенге", "quotes": ["Целое число тенге"]},
+    {"kind": "contract", "source_id": "1", "text": "Обе границы порога включены", "quotes": ["обе границы включены"]},
+    {"kind": "contract", "source_id": "2", "text": "Повторное сохранение заменяет действующую настройку", "quotes": ["Повторное сохранение заменяет действующую настройку"]},
+    {"kind": "contract", "source_id": "3", "text": "Изменение порога сохраняет накопленные расходы", "quotes": ["Изменение порога сохраняет накопленные расходы"]},
+
+    {"kind": "contract", "source_id": null, "text": "Query-параметр cardId: строка 1–64, обязательный, карта клиента", "quotes": ["`cardId` | string | 1–64 | Да | Карта клиента"]},
+    {"kind": "contract", "source_id": null, "text": "Query-параметр amount: integer 32 bit, обязательный, 1 000–1 000 000 тенге", "quotes": ["`amount` | integer | 32 bit | Да | 1 000–1  000 000"]},
+    {"kind": "contract", "source_id": null, "text": "Query-параметр enabled: integer, обязательный, 0 или 1", "quotes": ["`enabled` | integer | 1 знак | Да | 0 или 1"]},
+    {"kind": "contract", "source_id": null, "text": "Content-Type запроса — application/json", "quotes": ["**Content-Type:** `application/json`"]},
+    {"kind": "contract", "source_id": null, "text": "Тело запроса не используется", "quotes": ["Тело не используется."]},
+    {"kind": "contract", "source_id": null, "text": "Коды 200 и 201 означают успех", "quotes": ["Если результат 200 или 201 — успешный"]},
+    {"kind": "contract", "source_id": null, "text": "Коды 400, 401 и далее означают неуспех", "quotes": ["Если результат 400, 401 и далее — неуспешный"]},
+
+    {"kind": "contract", "source_id": null, "text": "Поле ответа result: строка OK / ERROR — исход сохранения", "quotes": ["`result` | string | OK / ERROR"]},
+    {"kind": "contract", "source_id": null, "text": "Поле ответа amount: строка, порог в тенге, при успехе", "quotes": ["`amount` | string | При успехе"]},
+    {"kind": "contract", "source_id": null, "text": "Поле ответа enabled: строка «0» или «1»", "quotes": ["`enabled` | string | «0» или «1»"]},
+    {"kind": "contract", "source_id": null, "text": "Поле ответа message: строка с описанием ошибки", "quotes": ["`message` | string | При ошибке"]},
+
+    {"kind": "contract", "source_id": "200", "text": "Код 200 — успешное выполнение метода", "quotes": ["Ответ в случае успешного выполнения метода"]},
+    {"kind": "contract", "source_id": "400", "text": "Код 400 — параметры запроса заполнены неверно", "quotes": ["Ответ в случае, если параметры запроса заполнены неверно"]},
+    {"kind": "contract", "source_id": "401", "text": "Код 401 — запрос без необходимой авторизации", "quotes": ["Ответ в случае, если запрос выполнен без необходимой авторизации"]},
+    {"kind": "contract", "source_id": "403", "text": "Код 403 — доступ к ресурсу запрещён", "quotes": ["Ответ в случае, если на указанный ресурс доступ запрещен"]},
+    {"kind": "contract", "source_id": "500", "text": "Код 500 — внутренняя ошибка сервера", "quotes": ["Ответ в случае, если произошла внутренняя ошибка сервера"]},
+    {"kind": "contract", "source_id": "403", "text": "Для чужой и для отсутствующей карты возвращается 404", "quotes": ["Для чужой карты возвращается 404, как и для отсутствующей карты"]}
+  ],
+  "excluded": [
+    {"category": "preamble", "reason": "Вводный текст комплекта и дочернего документа без обязательства", "contains": ["Комплект из двух исходных документов", "Дочерний документ части A"]},
+    {"category": "metadata", "reason": "Паспорт задачи и описательные атрибуты метода", "contains": ["Наименование задачи", "**Продукт** |", "Бизнес-процесс", "Business owner", "Тип работы", "Влияние на ИС", "Задача в JIRA", "**Description** |", "**Controller** |", "**URL type** |", "**Gitlab project** |", "**Framework** |", "**Author** |", "**Developer** |"]},
+    {"category": "metadata", "reason": "Path-параметров нет: описание отсутствия, а не обязательство", "equals": ["Не используются."]},
+    {"category": "goal", "reason": "Цель функционала: опора для трассировки", "contains": ["Дать клиенту возможность"]},
+    {"category": "design", "reason": "Описание архитектуры и схем без самостоятельного обязательства", "contains": ["Мобильное приложение → сервис настроек", "Проведение покупки → пересчёт расходов", "Приложение → AlertsController"]},
+    {"category": "placeholder", "reason": "Раздел или значение не заполнены", "contains": ["заполняются тестировщиками", "**Swagger** |"]},
+    {"category": "example", "reason": "Примеры вызова и тел ответов для сверки с контрактом", "contains": ["**CURL** |", "{\"result\":\"OK\"", "{\"result\":\"ERROR\"", "Некорректный запрос", "Требуется вход", "Карта не найдена", "Ошибка сервиса"]},
+    {"category": "fragment", "reason": "Связка между двумя примерами ответа 200", "equals": ["или"]}
+  ],
+  "facts": [
+    {"subject": "порог", "field": "порог", "direction": "business", "type": "integer", "value": null, "unit": "тенге", "range": {"min": 1000, "max": 1000000, "min_inclusive": true, "max_inclusive": true}, "condition": null, "quotes": ["целый порог от 1 000 до 1 000 000 ₸ включительно"]},
+    {"subject": "уведомление", "field": "состояние", "direction": "business", "type": null, "value": "выключено", "unit": null, "range": null, "condition": "по умолчанию", "quotes": ["По умолчанию уведомление выключено"]},
+    {"subject": "push", "field": "время передачи на отправку", "direction": "business", "type": "duration", "value": 1, "unit": "минута", "range": {"min": null, "max": 1, "min_inclusive": null, "max_inclusive": null}, "condition": "после получения события", "quotes": ["в течение минуты после получения события"]},
+    {"subject": "покупка", "field": "сумма покупки", "direction": "business", "type": null, "value": null, "unit": "тиын", "range": null, "condition": null, "quotes": ["сумму покупки в тиынах"]},
+    {"subject": "настройка", "field": "порог", "direction": "business", "type": null, "value": null, "unit": "тенге", "range": null, "condition": null, "quotes": ["порог в тенге"]},
+    {"subject": "saveLimit", "field": "amount", "direction": "request", "type": "integer", "value": null, "unit": "тенге", "range": {"min": 1000, "max": 1000000, "min_inclusive": null, "max_inclusive": null}, "condition": null, "quotes": ["`amount` | integer | 32 bit | Да | 1 000–1 000 000"]},
+    {"subject": "saveLimit", "field": "enabled", "direction": "request", "type": "integer", "value": null, "unit": null, "range": null, "condition": null, "values": ["0", "1"], "quotes": ["`enabled` | integer | 1 знак | Да | 0 или 1"]},
+    {"subject": "saveLimit", "field": "amount", "direction": "response", "type": "string", "value": null, "unit": "тенге", "range": null, "condition": "При успехе", "quotes": ["`amount` | string | При успехе"]},
+    {"subject": "saveLimit", "field": "enabled", "direction": "response", "type": "string", "value": null, "unit": null, "range": null, "condition": null, "values": ["0", "1"], "quotes": ["`enabled` | string | «0» или «1»"]},
+    {"subject": "порог", "field": "порог", "direction": null, "type": "integer", "value": "", "unit": "тенге", "range": {"min": null, "max": null, "min_inclusive": true, "max_inclusive": true}, "condition": "", "quotes": ["Целое число тенге, обе границы включены"]}
+  ]
+}

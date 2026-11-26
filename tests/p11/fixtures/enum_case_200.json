@@ -1,0 +1,44 @@
+{
+  "_synthetic": true,
+  "_note": "Регистр enum не гарантирован документацией: Critical/Set вместо critical/set.",
+  "name": "enum_case_200",
+  "response": {
+    "status": 200,
+    "headers": {
+      "request-id": "req_synth_enum_case",
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "msg_synth_01",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-opus-5-5",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "text",
+          "text": "{\"candidates\":[{\"scope\":\"Set\",\"kind\":\"conflict\",\"criterion\":\"ISO29148-5.2.6-consistency\",\"severity\":\"Critical\",\"title\":\"Ф-3 и Ф-4 дают разный исход для второго push в месяце\",\"impact\":\"Разработчик и тестировщик выберут разные правила отправки\",\"req_ids\":[\"R-003\",\"R-004\"],\"hints\":[{\"block_id\":\"blk-039\",\"quote\":\"максимум один push за календарный месяц\"},{\"block_id\":\"blk-040\",\"quote\":\"вызывает push независимо от истории\"}],\"inspected_block_ids\":null}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 1200,
+        "output_tokens": 340,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global"
+      }
+    }
+  }
+}
