@@ -1,0 +1,38 @@
+{
+  "$comment": "Ответ этапа individual (№05). Перечень кодов criterion подставляется из criteria.toml при сборке запроса.",
+  "type": "object",
+  "required": ["results"],
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["req_id", "checks"],
+        "properties": {
+          "req_id": {"type": "string"},
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["criterion", "status", "reason"],
+              "properties": {
+                "criterion": {"type": "string"},
+                "status": {"type": "string", "enum": ["pass", "issue", "unknown", "na"]},
+                "reason": {"type": "string"},
+                "quote": {"type": "string"},
+                "condition": {"type": "string"},
+                "impact": {"type": "string"},
+                "fix": {"type": "string"},
+                "question": {"type": "string"},
+                "severity": {"type": "string", "enum": ["critical", "major", "minor"]},
+                "blocks": {"type": "string", "enum": ["implement", "verify", "both", "none"]},
+                "scenario": {"type": "string"},
+                "root_cause": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

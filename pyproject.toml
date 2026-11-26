@@ -1,0 +1,26 @@
+# Временный файл ветки №05: bootstrap bcc/integration ещё не опубликован.
+# При слиянии берётся pyproject.toml интеграционной ветки; перенести в него нужно только
+# блок [tool.setuptools.package-data], иначе criteria.toml и промпты не попадут в установленный пакет.
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bcc-review"
+version = "0.1.0"
+description = "Статическое ревью требований до разработки (BCC-HUB × MNU FinTech Hackathon)"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+bcc_review = ["criteria.toml", "prompts/*.md", "prompts/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
