@@ -102,9 +102,9 @@ python -m tests.p10.make_samples
 ```
 
 * `pytest tests/contract tests/p10` — 84 passed.
-* `pytest tests` — 662 passed, 15 skipped, 1 failed. Нужны `pip install -e ".[all,dev]"`. Падает
-  `tests/p11/test_anthropic_success.py::test_from_fixture_files_entry_point`: он зависит от порядка,
-  в одиночку проходит и так же падает на базе без №10.
+* `pytest tests` на 6a6c503 — 1221 passed, 14 skipped, 13 failed. Нужны `pip install -e ".[all,dev]"`.
+  Все 13 падений есть и на чистой 6a6c503 без №10: №02 (5), №04, №08, №09, №11, №14, №15 (2), №16. Это
+  окружение и чужие стыки; новых падений №10 не добавляет.
 * `python -m tests.p10.make_samples` пересобирает образцы в `tests/p10/samples/` (JSON и Markdown до и
   после решений).
 
