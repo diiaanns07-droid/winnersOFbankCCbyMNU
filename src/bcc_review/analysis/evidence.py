@@ -69,6 +69,7 @@ __all__ = [
     "describe",
     "locate",
     "normalize",
+    "table_cell",
     "resolve_candidate",
     "resolve_hint",
 ]
@@ -940,6 +941,31 @@ def _map_position(entries: list[tuple[int, int, int]], text: str, pos: int) -> t
     return line + text.count("\n", text_start, pos), pos - newline - 1
 
 
+def table_cell(block: Any, start: int, end: int) -> dict | None:
+    """Ячейка таблицы, целиком содержащая ``[start, end)`` текста блока, по reader-координатам.
+
+    Понимает обе формы стыка: №02 PDF — ``loc.table = {id, row, header, cells: [{col, start, end}]}``,
+    №01 Markdown — ``loc.cells = [{index, column, start, end}]``, ``loc.row``, ``loc.table.index``.
+    Возвращает ``{table, row, cell, header, start, end, text}`` (``cell`` с нуля) или ``None``.
+    """
+    loc = _get(block, "loc") or {}
+    table = loc.get("table") if isinstance(loc.get("table"), Mapping) else {}
+    cells = [c for c in table.get("cells") or loc.get("cells") or [] if isinstance(c, Mapping)]
+    headers = table.get("header") or table.get("columns") or loc.get("columns") or []
+    text = str(_get(block, "text") or "")
+    for k, cell in enumerate(cells):
+        cs, ce = cell.get("start"), cell.get("end")
+        if not (isinstance(cs, int) and isinstance(ce, int) and cs <= start and end <= ce):
+            continue
+        col = cell.get("col", cell.get("index", k))
+        header = cell.get("column")
+        if header is None and isinstance(col, int) and 0 <= col < len(headers):
+            header = headers[col]
+        return {"table": table.get("id", table.get("index")), "row": table.get("row", loc.get("row")),
+                "cell": col, "header": header, "start": cs, "end": ce, "text": text[cs:ce]}
+    return None
+
+
 def locate(document: Any, evidence: Mapping[str, Any], *, index: DocumentIndex | None = None) -> dict:
     """Строка/страница/путь для опоры, вычисленные из ``block.loc`` и смещений.
 
@@ -993,6 +1019,9 @@ def locate(document: Any, evidence: Mapping[str, Any], *, index: DocumentIndex |
     for key in ("part", "path"):
         if loc.get(key):
             out[key] = loc[key]
+    cell = table_cell(block, start, end)
+    if cell:
+        out.update({key: cell[key] for key in ("table", "row", "cell", "header")})
     parts = []
     if "page" in out:
         parts.append(f"стр. {out['page']}" if out["page"] == out["page_end"]
@@ -1002,6 +1031,10 @@ def locate(document: Any, evidence: Mapping[str, Any], *, index: DocumentIndex |
                      else f"строки {out['line']}–{out['line_end']}")
     if "path" in out:
         parts.append(f"абзац {out['path']}")
+    if "cell" in out:
+        column = f"столбец {out['cell'] + 1}" if isinstance(out["cell"], int) else "столбец ?"
+        parts.append(f"таблица {out['table']}, строка {out['row']}, {column}"
+                     + (f" «{out['header']}»" if out["header"] else ""))
     if out["section"]:
         parts.append(f"раздел «{out['section'][-1]}»")
     out["label"] = ", ".join(parts) or f"блок {bid}"
