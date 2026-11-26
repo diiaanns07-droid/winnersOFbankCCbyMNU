@@ -159,3 +159,12 @@ def test_corpus_formats_without_loss(case):
         ids = set(re.findall(r"\b[А-ЯA-Z]{1,4}-\d+\b", " ".join(ln["text"] for ln in md["lines"])))
         assert ids and all(i in text for i in ids)
         assert "Часть A" in text and "Часть B" in text
+
+
+@pytest.mark.parametrize("ext", ["md", "pdf", "docx"])
+def test_empty_document_warns_once(ext):
+    p = CORPUS / f"edge.empty/source.{ext}"
+    if ext == "pdf" and not (_has("pymupdf") or _has("fitz")) or ext == "docx" and not _has("docx"):
+        pytest.skip("нет читателя")
+    v = dv.load(p)
+    assert dv.nonempty(v) == [] and len(v["warnings"]) == 1

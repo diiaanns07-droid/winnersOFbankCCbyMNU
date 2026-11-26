@@ -76,7 +76,7 @@ def load(path: str | Path) -> dict:
         ext = (doc or {}).get("extraction") or {}
         pages = ext.get("pages") or max((ln["page"] or 0 for ln in lines), default=0) or None
     warnings += _doc_warnings(doc)
-    if not any(ln["text"].strip() for ln in lines):
+    if not any(ln["text"].strip() for ln in lines) and not warnings:
         warnings.append("В документе нет текста: проверять нечего.")
     return {"title": title, "file": p.name, "format": fmt, "sha256": sha, "lines": lines,
             "pages": pages, "warnings": _dedup(warnings)}
