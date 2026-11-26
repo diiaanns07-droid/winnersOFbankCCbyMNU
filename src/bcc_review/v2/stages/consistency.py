@@ -23,7 +23,7 @@ SOURCE = "consistency"
 
 MAX_PAIRS = 15
 MAX_UNDEFINED_CANDIDATES = 3
-MAX_MODEL_CANDIDATES = 10
+MAX_MODEL_CANDIDATES = 8
 MAX_GLOSSARY = 8
 
 # Требования, для которых строится трассировка (CONTRACT 2.2, поле kind).
