@@ -1,0 +1,466 @@
+{
+ "columns_expected": [
+  "Правило",
+  "Лимит за сутки / Сумма, ₸",
+  "Лимит за сутки / Операций",
+  "Условие"
+ ],
+ "versions": {
+  "limits": {
+   "command": "python -m bcc_review tests/p03/evidence/merged_header/limits.docx <tmp>/limits/report.md --provider mock --mock-script tests/p03/evidence/merged_header/limits.mock.json --export docx --no-cache --cache-dir <tmp>/cache",
+   "env": "BCC_FORCE_FALLBACK=review_individual,review_set, без ключей провайдеров",
+   "stdout_tail": [
+    "Незавершённые этапы: individual",
+    "Требований: 4; замечаний: 3 (0 критичных, 1 существенных, 2 незначительных); подтверждено 3, на проверку 0",
+    "Разработка: не определено; тестирование: не определено"
+   ],
+   "run": {
+    "mode": "mock",
+    "status": "partial",
+    "provider": "mock",
+    "model": "mock-1"
+   },
+   "modules": {
+    "build_inventory": "team:bcc_review.analysis.inventory:build_inventory",
+    "read_docx": "team:bcc_review.readers.docx:read_docx",
+    "resolve_hint": "team:bcc_review.analysis.evidence:resolve_hint",
+    "review_set": "fallback:bcc_review.runtime.fallback.llm_stages:review_set",
+    "provider": "runtime.mock:MockAdapter"
+   },
+   "all_cells_match": true,
+   "cells": [
+    {
+     "cell": "t1.r3.c4",
+     "expected": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "actual_input": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "actual_report_json": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "actual_reopened_copy": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "comment": {
+      "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[4]",
+      "covered": "кроме возвратов",
+      "head": "[F-001] Существенный · подтверждено"
+     }
+    }
+   ],
+   "findings": [
+    {
+     "id": "F-001",
+     "severity": "major",
+     "status": "confirmed",
+     "title": "Л-1: «кроме возвратов» не говорит, восстанавливает ли возврат дневной лимит",
+     "evidence": [
+      {
+       "block_id": "b0005",
+       "start": 54,
+       "end": 69,
+       "quote": "кроме возвратов"
+      }
+     ]
+    },
+    {
+     "id": "F-002",
+     "severity": "minor",
+     "status": "confirmed",
+     "title": "4 объединяет 2 независимых правила в одном пункте",
+     "evidence": [
+      {
+       "block_id": "b0002",
+       "start": 0,
+       "end": 39,
+       "quote": "Лимиты действуют на одну карту клиента."
+      },
+      {
+       "block_id": "b0002",
+       "start": 40,
+       "end": 86,
+       "quote": "Счётчики обнуляются в 00:00 по времени Алматы."
+      }
+     ]
+    },
+    {
+     "id": "F-003",
+     "severity": "minor",
+     "status": "confirmed",
+     "title": "Время и границы периода без явного часового пояса: «00:00 по времени Алматы»",
+     "evidence": [
+      {
+       "block_id": "b0002",
+       "start": 62,
+       "end": 85,
+       "quote": "00:00 по времени Алматы"
+      }
+     ]
+    }
+   ],
+   "comment_ranges": [
+    {
+     "comment_id": 4,
+     "node": "/w:document/w:body/w:p[1]",
+     "covered": "4. Лимиты операций по карте",
+     "head": "Сводка ревью ТЗ (BCC Review)"
+    },
+    {
+     "comment_id": 0,
+     "node": "/w:document/w:body/w:p[2]",
+     "covered": "Лимиты действуют на одну карту клиента.",
+     "head": "[F-002] Незначительный · подтверждено"
+    },
+    {
+     "comment_id": 1,
+     "node": "/w:document/w:body/w:p[2]",
+     "covered": "Счётчики обнуляются в 00:00 по времени Алматы.",
+     "head": "[F-002] Незначительный · подтверждено"
+    },
+    {
+     "comment_id": 2,
+     "node": "/w:document/w:body/w:p[2]",
+     "covered": "00:00 по времени Алматы",
+     "head": "[F-003] Незначительный · подтверждено"
+    },
+    {
+     "comment_id": 3,
+     "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[4]",
+     "covered": "кроме возвратов",
+     "head": "[F-001] Существенный · подтверждено"
+    }
+   ],
+   "reread": {
+    "blocks_same": true,
+    "cell_map_same": true,
+    "columns": [
+     "Правило",
+     "Лимит за сутки / Сумма, ₸",
+     "Лимит за сутки / Операций",
+     "Условие"
+    ],
+    "header_rows": 2,
+    "merges_input": {
+     "tr1_tc2_gridSpan": "2",
+     "tc1_vMerge": [
+      "restart",
+      "continue"
+     ]
+    },
+    "merges_copy": {
+     "tr1_tc2_gridSpan": "2",
+     "tc1_vMerge": [
+      "restart",
+      "continue"
+     ]
+    },
+    "comments_added": 5,
+    "markers_paired": true,
+    "source_sha256_unchanged": true
+   }
+  },
+  "limits_month": {
+   "command": "python -m bcc_review tests/p03/evidence/merged_header/limits_month.docx <tmp>/limits_month/report.md --provider mock --mock-script tests/p03/evidence/merged_header/limits_month.mock.json --export docx --no-cache --cache-dir <tmp>/cache --compare <tmp>/limits/report.json",
+   "env": "BCC_FORCE_FALLBACK=review_individual,review_set, без ключей провайдеров",
+   "stdout_tail": [
+    "Незавершённые этапы: individual",
+    "Требований: 4; замечаний: 4 (1 критичных, 1 существенных, 2 незначительных); подтверждено 4, на проверку 0",
+    "Разработка: нельзя начинать; тестирование: нельзя начинать"
+   ],
+   "run": {
+    "mode": "mock",
+    "status": "partial",
+    "provider": "mock",
+    "model": "mock-1"
+   },
+   "modules": {
+    "build_inventory": "team:bcc_review.analysis.inventory:build_inventory",
+    "read_docx": "team:bcc_review.readers.docx:read_docx",
+    "resolve_hint": "team:bcc_review.analysis.evidence:resolve_hint",
+    "review_set": "fallback:bcc_review.runtime.fallback.llm_stages:review_set",
+    "provider": "runtime.mock:MockAdapter"
+   },
+   "all_cells_match": true,
+   "cells": [
+    {
+     "cell": "t1.r3.c4",
+     "expected": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "actual_input": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "actual_report_json": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "actual_reopened_copy": {
+      "column_header": "Условие",
+      "header_refs": [
+       "t1.r1.c4"
+      ],
+      "text": "кроме возвратов"
+     },
+     "comment": {
+      "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[4]",
+      "covered": "кроме возвратов",
+      "head": "[F-002] Существенный · подтверждено"
+     }
+    },
+    {
+     "cell": "t1.r4.c2",
+     "expected": {
+      "column_header": "Лимит за сутки / Сумма, ₸",
+      "header_refs": [
+       "t1.r1.c2",
+       "t1.r2.c2"
+      ],
+      "text": "300 000 за месяц"
+     },
+     "actual_input": {
+      "column_header": "Лимит за сутки / Сумма, ₸",
+      "header_refs": [
+       "t1.r1.c2",
+       "t1.r2.c2"
+      ],
+      "text": "300 000 за месяц"
+     },
+     "actual_report_json": {
+      "column_header": "Лимит за сутки / Сумма, ₸",
+      "header_refs": [
+       "t1.r1.c2",
+       "t1.r2.c2"
+      ],
+      "text": "300 000 за месяц"
+     },
+     "actual_reopened_copy": {
+      "column_header": "Лимит за сутки / Сумма, ₸",
+      "header_refs": [
+       "t1.r1.c2",
+       "t1.r2.c2"
+      ],
+      "text": "300 000 за месяц"
+     },
+     "comment": {
+      "node": "/w:document/w:body/w:tbl[1]/w:tr[4]/w:tc[2]",
+      "covered": "за месяц",
+      "head": "[F-001] Критичный · подтверждено"
+     }
+    }
+   ],
+   "findings": [
+    {
+     "id": "F-001",
+     "severity": "critical",
+     "status": "confirmed",
+     "title": "Л-2: лимит «за месяц» в ячейке противоречит шапке «Лимит за сутки»",
+     "evidence": [
+      {
+       "block_id": "b0003",
+       "start": 16,
+       "end": 24,
+       "quote": "за сутки"
+      },
+      {
+       "block_id": "b0006",
+       "start": 35,
+       "end": 43,
+       "quote": "за месяц"
+      }
+     ]
+    },
+    {
+     "id": "F-002",
+     "severity": "major",
+     "status": "confirmed",
+     "title": "Л-1: «кроме возвратов» не говорит, восстанавливает ли возврат дневной лимит",
+     "evidence": [
+      {
+       "block_id": "b0005",
+       "start": 54,
+       "end": 69,
+       "quote": "кроме возвратов"
+      }
+     ]
+    },
+    {
+     "id": "F-003",
+     "severity": "minor",
+     "status": "confirmed",
+     "title": "4 объединяет 2 независимых правила в одном пункте",
+     "evidence": [
+      {
+       "block_id": "b0002",
+       "start": 0,
+       "end": 39,
+       "quote": "Лимиты действуют на одну карту клиента."
+      },
+      {
+       "block_id": "b0002",
+       "start": 40,
+       "end": 86,
+       "quote": "Счётчики обнуляются в 00:00 по времени Алматы."
+      }
+     ]
+    },
+    {
+     "id": "F-004",
+     "severity": "minor",
+     "status": "confirmed",
+     "title": "Время и границы периода без явного часового пояса: «00:00 по времени Алматы»",
+     "evidence": [
+      {
+       "block_id": "b0002",
+       "start": 62,
+       "end": 85,
+       "quote": "00:00 по времени Алматы"
+      }
+     ]
+    }
+   ],
+   "comment_ranges": [
+    {
+     "comment_id": 6,
+     "node": "/w:document/w:body/w:p[1]",
+     "covered": "4. Лимиты операций по карте",
+     "head": "Сводка ревью ТЗ (BCC Review)"
+    },
+    {
+     "comment_id": 0,
+     "node": "/w:document/w:body/w:p[2]",
+     "covered": "Лимиты действуют на одну карту клиента.",
+     "head": "[F-003] Незначительный · подтверждено"
+    },
+    {
+     "comment_id": 1,
+     "node": "/w:document/w:body/w:p[2]",
+     "covered": "Счётчики обнуляются в 00:00 по времени Алматы.",
+     "head": "[F-003] Незначительный · подтверждено"
+    },
+    {
+     "comment_id": 2,
+     "node": "/w:document/w:body/w:p[2]",
+     "covered": "00:00 по времени Алматы",
+     "head": "[F-004] Незначительный · подтверждено"
+    },
+    {
+     "comment_id": 3,
+     "node": "/w:document/w:body/w:tbl[1]/w:tr[1]/w:tc[2]",
+     "covered": "за сутки",
+     "head": "[F-001] Критичный · подтверждено"
+    },
+    {
+     "comment_id": 4,
+     "node": "/w:document/w:body/w:tbl[1]/w:tr[3]/w:tc[4]",
+     "covered": "кроме возвратов",
+     "head": "[F-002] Существенный · подтверждено"
+    },
+    {
+     "comment_id": 5,
+     "node": "/w:document/w:body/w:tbl[1]/w:tr[4]/w:tc[2]",
+     "covered": "за месяц",
+     "head": "[F-001] Критичный · подтверждено"
+    }
+   ],
+   "reread": {
+    "blocks_same": true,
+    "cell_map_same": true,
+    "columns": [
+     "Правило",
+     "Лимит за сутки / Сумма, ₸",
+     "Лимит за сутки / Операций",
+     "Условие"
+    ],
+    "header_rows": 2,
+    "merges_input": {
+     "tr1_tc2_gridSpan": "2",
+     "tc1_vMerge": [
+      "restart",
+      "continue"
+     ]
+    },
+    "merges_copy": {
+     "tr1_tc2_gridSpan": "2",
+     "tc1_vMerge": [
+      "restart",
+      "continue"
+     ]
+    },
+    "comments_added": 7,
+    "markers_paired": true,
+    "source_sha256_unchanged": true
+   },
+   "changed_cell_comment": "[F-001] Критичный · подтверждено\nЛ-2: лимит «за месяц» в ячейке противоречит шапке «Лимит за сутки»\nКритерий: Согласованность набора (ISO/IEC/IEEE 29148:2018, 5.2.6)\nПоследствие: Покупки в интернете отклонят на второй день или пропустят сверх лимита.\nБлокирует решение: Период счётчика лимита Л-2\nСценарий: покупки в интернете по 300 000 ₸ 1 и 2 числа → по одному месту: 2 числа покупка проходит (лимит за сутки); по другому: 2 числа покупка отклонена (лимит за месяц исчерпан)\nВопрос автору: Как трактовать: Л-2: лимит «за месяц» в ячейке противоречит шапке «Лимит за сутки»? Варианты: A. Верно «за сутки» — покупки в интернете по 300 000 ₸ 1 и 2 числа: 2 числа покупка проходит (лимит за сутки) / B. Верно «за месяц» — покупки в интернете по 300 000 ₸ 1 и 2 числа: 2 числа покупка отклонена (лимит за месяц исчерпан).\nИсправление: Указать период Л-2 в шапке или вынести Л-2 в отдельную таблицу «Лимит за месяц».\nТребования: R-003\nМесто: Таблица 1, строка 4, столбец 2 «Лимит за сутки / Сумма, ₸»; строка «Л-2. Покупки в интернете»\nСвязанное место: Таблица 1, строка 1, столбцы 2–3\nПривязка: точная, по цитате",
+   "compare": {
+    "introduced": [
+     {
+      "old_ids": [],
+      "new_ids": [
+       "F-001"
+      ],
+      "title": "Л-2: лимит «за месяц» в ячейке противоречит шапке «Лимит за сутки»"
+     }
+    ],
+    "resolved": [],
+    "persisting": [
+     {
+      "old_ids": [
+       "F-001"
+      ],
+      "new_ids": [
+       "F-002"
+      ],
+      "title": "Л-1: «кроме возвратов» не говорит, восстанавливает ли возврат дневной лимит"
+     },
+     {
+      "old_ids": [
+       "F-002"
+      ],
+      "new_ids": [
+       "F-003"
+      ],
+      "title": "4 объединяет 2 независимых правила в одном пункте"
+     },
+     {
+      "old_ids": [
+       "F-003"
+      ],
+      "new_ids": [
+       "F-004"
+      ],
+      "title": "Время и границы периода без явного часового пояса: «00:00 по времени Алматы»"
+     }
+    ]
+   }
+  }
+ }
+}

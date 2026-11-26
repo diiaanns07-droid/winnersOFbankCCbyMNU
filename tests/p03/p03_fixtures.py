@@ -316,6 +316,115 @@ def amounts_mock_script(doc: Document) -> dict[str, Any]:
     return script
 
 
+# ------------------------------- объединённая шапка: единица «за сутки» на два столбца
+
+LIMITS_HEADING = "4. Лимиты операций по карте"
+DAILY = "за сутки"
+MONTHLY = "за месяц"
+EXCEPTION = "кроме возвратов"
+LIMIT_SUM = "300 000"
+LIMIT_ROWS = (("Л-1. Переводы на карты других банков", LIMIT_SUM, "10", EXCEPTION),
+              ("Л-2. Покупки в интернете", LIMIT_SUM, "12", "включая возвраты"))
+LIMITS_COLUMNS = ["Правило", "Лимит за сутки / Сумма, ₸", "Лимит за сутки / Операций", "Условие"]
+
+
+def limits_doc(path: Path, *, monthly: bool = False, repeat_header: bool = False) -> Path:
+    """Таблица лимитов с шапкой в две строки (как её делают в Word объединением ячеек).
+
+    * строка 1: «Правило» и «Условие» объединены по вертикали со строкой 2 (``vMerge``),
+      «Лимит за сутки» -- одна ячейка на 2 столбца (``gridSpan=2``): единица «за сутки»
+      есть только здесь;
+    * строка 2: подписи столбцов группы «Сумма, ₸» | «Операций»;
+    * Л-1 и Л-2 -- похожие значения (одна сумма 300 000, 10 и 12 операций) и разные
+      условия: «кроме возвратов» -- в одной ячейке Л-1, у Л-2 «включая возвраты»;
+    * ``monthly``: редакция -- в ячейке суммы Л-2 «300 000 за месяц»; больше ничего
+      не меняется (единица одного правила);
+    * ``repeat_header``: обе строки шапки помечены «Повторять как заголовок» (``tblHeader``);
+      по умолчанию пометки нет, шапку узнают по объединению.
+    """
+    d = docx.Document()
+    d.add_heading(LIMITS_HEADING, 1)
+    d.add_paragraph("Лимиты действуют на одну карту клиента. Счётчики обнуляются в 00:00 по времени Алматы.")
+    table = d.add_table(rows=4, cols=4)
+    table.style = "Table Grid"
+    head = [(table.cell(0, 0).merge(table.cell(1, 0)), "Правило"),
+            (table.cell(0, 1).merge(table.cell(0, 2)), "Лимит " + DAILY),
+            (table.cell(0, 3).merge(table.cell(1, 3)), "Условие"),
+            (table.cell(1, 1), "Сумма, ₸"), (table.cell(1, 2), "Операций")]
+    for cell, text in head:
+        cell.paragraphs[0].add_run(text).bold = True
+    for i, row in enumerate(LIMIT_ROWS, start=2):
+        for j, value in enumerate(row):
+            if monthly and i == 3 and j == 1:
+                value = f"{value} {MONTHLY}"
+            table.cell(i, j).text = value
+    if repeat_header:
+        for tr in table.rows[:2]:
+            tr._tr.get_or_add_trPr().append(parse_xml(f'<w:tblHeader {nsdecls("w")}/>'))
+    d.add_paragraph("Превышение лимита отклоняет операцию с кодом LIMIT_EXCEEDED.")
+    d.save(path)
+    return path
+
+
+LIMITS_CONFLICT = "Л-2: лимит «за месяц» в ячейке противоречит шапке «Лимит за сутки»"
+LIMITS_EXCEPTION = "Л-1: «кроме возвратов» не говорит, восстанавливает ли возврат дневной лимит"
+
+
+def limits_mock_script(doc: Document) -> dict[str, Any]:
+    """Записанные ответы модели (провайдер mock) для ``limits_doc``: запись на каждую версию.
+
+    * в обеих версиях -- замечание на исключение «кроме возвратов» в ячейке Л-1
+      (строка 3, столбец «Условие»);
+    * только в редакции (в ячейке Л-2 есть «за месяц») -- фиксированное замечание-
+      противоречие: «за сутки» в объединённой шапке и «за месяц» в изменённой ячейке.
+      Модель не называет противоречие, которого в документе нет, поэтому в записи для
+      чистого документа его нет.
+    """
+    ref = {b.loc["ref"]: b.id for b in doc.blocks}
+    h1, h2, r3, r4 = ref["t1.r1"], ref["t1.r2"], ref["t1.r3"], ref["t1.r4"]
+    revision = MONTHLY in doc.block(r4).text
+    script = {
+        "inventory": {"items": [
+            {"source_id": None, "kind": "functional", "text": "Лимиты действуют на карту и обнуляются в 00:00",
+             "evidence": [{"block_id": ref["p2"], "quote": "Счётчики обнуляются в 00:00 по времени Алматы"}]},
+            {"source_id": "Л-1", "kind": "functional", "text": "Переводы на карты других банков: лимит в сутки",
+             "evidence": [{"block_id": r3, "quote": LIMIT_ROWS[0][0]}]},
+            {"source_id": "Л-2", "kind": "functional", "text": "Покупки в интернете: лимит",
+             "evidence": [{"block_id": r4, "quote": LIMIT_ROWS[1][0]}]},
+            {"source_id": None, "kind": "functional", "text": "Превышение лимита отклоняет операцию",
+             "evidence": [{"block_id": ref["p3"], "quote": "Превышение лимита отклоняет операцию"}]}],
+            "excluded": [{"category": "structure", "reason": "заголовок и шапка таблицы",
+                          "block_ids": [ref["p1"], h1, h2]}],
+            "facts": [], "done": True},
+        "individual": {"requirements": []},
+        "cross": {
+            "conflicts": [{
+                "title": LIMITS_CONFLICT, "severity": "critical", "criterion": "set_consistent",
+                "impact": "Покупки в интернете отклонят на второй день или пропустят сверх лимита.",
+                "blocked_decision": "Период счётчика лимита Л-2", "recommendation":
+                    "Указать период Л-2 в шапке или вынести Л-2 в отдельную таблицу «Лимит за месяц».",
+                "req_ids": ["R-003"], "input": "покупки в интернете по 300 000 ₸ 1 и 2 числа",
+                "outcome_a": "2 числа покупка проходит (лимит за сутки)",
+                "outcome_b": "2 числа покупка отклонена (лимит за месяц исчерпан)",
+                "quote_a": {"block_id": h1, "quote": DAILY}, "quote_b": {"block_id": r4, "quote": MONTHLY},
+                "cause": {"object": "период лимита Л-2", "condition": "шапка и ячейка",
+                          "outcomes": ["сутки", "месяц"]}}],
+            "issues": [{
+                "kind": "ambiguity", "criterion": "unambiguous", "severity": "major", "title": LIMITS_EXCEPTION,
+                "impact": "Тестировщик и разработчик по-разному посчитают остаток лимита после возврата.",
+                "blocked_decision": "Уменьшает ли возврат использованный лимит Л-1",
+                "recommendation": "Написать: «возврат не уменьшает использованный лимит» или обратное.",
+                "quotes": [{"block_id": r3, "quote": EXCEPTION}], "req_ids": ["R-002"],
+                "cause": {"object": "исключение Л-1", "condition": "возврат", "outcomes": ["учитывается", "нет"]},
+                "inspected_block_ids": [r3, r4]}],
+            "coverage": [], "facts": []},
+        "verify_meaning": {"__verdicts__": "confirmed"},
+    }
+    if not revision:
+        script["cross"]["conflicts"] = []
+    return script
+
+
 # --------------------------------------------------------------- отчёт
 
 

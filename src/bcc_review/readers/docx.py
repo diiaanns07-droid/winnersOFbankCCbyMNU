@@ -42,13 +42,23 @@ Unicode с 0, правая граница не входит)::
                 "fmt": ["b"], "field": true, "atomic": true, "math": true}],
       "cells": [{"ref": "t2.r3.c3", "col": 3, "col_span": 1, "row_span": 1, "vmerge": null,
                  "merged_into": null, "path": ".../w:tr[3]/w:tc[3]", "start": 40, "end": 75,
-                 "column_header": "Ожидаемый результат", "label": "Таблица 2, строка 3, столбец 3 «…»"}],
+                 "column_header": "Ожидаемый результат", "label": "Таблица 2, строка 3, столбец 3 «…»",
+                 "column_path": ["Ожидаемый результат"], "header_refs": ["t2.r1.c3"]}],
       "table": {"ref": "t2", "row": 3, "rows": 4, "cols": 3, "header_row": false,
-                "header_row_source": "tblHeader" | "first_row" | null,
+                "header_row_source": "tblHeader" | "first_row" | "merged_cells" | null,
+                "header_rows": 1,
                 "columns": ["Исходные условия", "Действие", "Ожидаемый результат"],
                 "nesting": 1, "parent_ref": null} | null,
       "host": {"block_id": "b0012", "ref": "p12", "path": "..."} | null   # для note/textbox
     }
+
+Шапка таблицы -- строки ``tblHeader``; без них первая строка, а если в ней есть
+заголовок группы на несколько столбцов и ячейка, объединённая по вертикали со
+строками ниже, -- и эти строки (``header_row_source = "merged_cells"``). Заголовок
+столбца собирается из всех строк шапки сверху вниз через ``" / "``:
+``"Лимит за сутки / Сумма, ₸"``; ``column_path`` -- те же части списком,
+``header_refs`` -- ячейки шапки, из которых они взяты (связь шапка → строка → ячейка).
+Ячейка на несколько столбцов подписана «столбцы 2–3».
 
 :func:`locate` переводит ``(block, start, end)`` в самый узкий узел (ячейку или
 абзац) с ``ref``, ``path`` и подписью на русском -- для отчётов и веба.
@@ -71,6 +81,7 @@ __all__ = [
     "READER_VERSION",
     "MAIN_PART",
     "ROW_SEPARATOR",
+    "COLUMN_PATH_SEPARATOR",
     "Block",
     "Document",
     "DocxReadError",
@@ -82,6 +93,8 @@ __all__ = [
 READER_VERSION = "docx-reader/1"
 MAIN_PART = "word/document.xml"
 ROW_SEPARATOR = " | "
+# Заголовок столбца из нескольких строк шапки: «Лимит за сутки / Сумма, ₸».
+COLUMN_PATH_SEPARATOR = " / "
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -660,6 +673,35 @@ def _loc_paragraphs_and_runs(refs: list[ParagraphRef]) -> tuple[list[dict[str, A
     return paragraphs, runs
 
 
+def _merged_header_depth(rows: list[dict[str, Any]]) -> int:
+    """Сколько строк сверху занимает шапка без ``tblHeader`` (не меньше 1).
+
+    Шапка в несколько строк узнаётся по объединению: в первой строке есть
+    заголовок группы на несколько столбцов (``gridSpan``, без ``vMerge``) и ячейка,
+    объединённая по вертикали (``vMerge restart``) со строками ниже. Тогда строки
+    до конца этого объединения -- тоже шапка: в них подписи столбцов группы
+    («Лимит за сутки» → «Сумма, ₸» | «Операций»). Хотя бы одна строка остаётся
+    строкой данных. Шапка из двух строк без объединения по вертикали неотличима
+    от строки данных -- для неё нужна явная пометка ``tblHeader`` в Word.
+    """
+    if len(rows) < 2:
+        return 1
+    first = rows[0]["cells"]
+    if not any(c["span"] > 1 and c["vmerge"] is None for c in first):
+        return 1
+    depth = 1
+    for c in first:
+        if c["vmerge"] != "restart":
+            continue
+        span = 1
+        for nxt in rows[1:]:
+            if not any(x["col"] == c["col"] and x["vmerge"] == "continue" for x in nxt["cells"]):
+                break
+            span += 1
+        depth = max(depth, span)
+    return depth if depth < len(rows) else 1
+
+
 class DocxLayout:
     """Обход документа python-docx: блоки, их ``loc`` и предупреждения.
 
@@ -907,24 +949,45 @@ class DocxLayout:
         n_rows = len(rows)
         n_cols = max([grid_cols] + [c["col"] + c["span"] - 1 for r in rows for c in r["cells"]] or [0])
         explicit = [i for i, r in enumerate(rows) if r["header"]]
-        head_idx = explicit[-1] if explicit else (0 if n_rows > 1 else -1)
+        # Строки шапки (индексы с 0): явные tblHeader; без них -- первая строка и строки
+        # под объединённым заголовком группы (см. _merged_header_depth).
+        if explicit:
+            head_rows = explicit
+        else:
+            head_rows = list(range(_merged_header_depth(rows))) if n_rows > 1 else []
 
         def plain(tc: Any, tc_path: str) -> str:
             return " ".join(scan_paragraph(p).text.strip()
                             for name, p, _ in _iter_content(tc, tc_path, frozenset({"p"})) if name == "p").strip()
 
-        columns: list[str] = [""] * n_cols
-        if rows and head_idx >= 0:
-            for c in rows[head_idx]["cells"]:
+        # Заголовок столбца сетки -- тексты ячеек шапки сверху вниз: объединённая по
+        # горизонтали ячейка («Лимит за сутки» на 2 столбца) входит в каждый свой столбец,
+        # продолжение вертикального объединения берёт текст начала. Так единица из
+        # объединённого заголовка доходит до ячейки данных: «Лимит за сутки / Сумма, ₸».
+        col_path: list[list[str]] = [[] for _ in range(n_cols)]
+        col_refs: list[list[str]] = [[] for _ in range(n_cols)]
+        for hi in head_rows:
+            for c in rows[hi]["cells"]:
+                if c["vmerge"] == "continue":
+                    continue
                 t = _truncate(plain(c["tc"], c["path"]), 120)
+                if not t:
+                    continue
                 for g in range(c["col"], min(c["col"] + c["span"], n_cols + 1)):
-                    columns[g - 1] = t
+                    col_refs[g - 1].append(f"{table_ref}.r{hi + 1}.c{c['col']}")
+                    if not col_path[g - 1] or col_path[g - 1][-1] != t:
+                        col_path[g - 1].append(t)
+        columns = [COLUMN_PATH_SEPARATOR.join(p) for p in col_path]
 
         restart_at: dict[int, str] = {}  # столбец сетки -> ref ячейки, начавшей вертикальное объединение
         for ri, row in enumerate(rows, start=1):
-            first_row = ri == 1 and not explicit and n_rows > 1  # шапка по умолчанию -- первая строка
-            is_header = bool(row["header"]) or first_row
-            header_source = "tblHeader" if row["header"] else ("first_row" if first_row else None)
+            is_header = (ri - 1) in head_rows
+            if row["header"]:
+                header_source = "tblHeader"
+            elif is_header:
+                header_source = "first_row" if ri == 1 else "merged_cells"
+            else:
+                header_source = None
             row_ref = f"{table_ref}.r{ri}"
             row_label = f"{label}, строка {ri}"
             refs: list[ParagraphRef] = []
@@ -946,8 +1009,11 @@ class DocxLayout:
                         row_span += 1
                 elif cell["vmerge"] is None:
                     restart_at.pop(cell["col"], None)
-                header_text = columns[cell["col"] - 1] if not is_header and cell["col"] <= n_cols else ""
-                cell_label = f"{label}, строка {ri}, столбец {cell['col']}"
+                in_grid = not is_header and cell["col"] <= n_cols
+                header_text = columns[cell["col"] - 1] if in_grid else ""
+                last_col = cell["col"] + cell["span"] - 1
+                cell_label = (f"{label}, строка {ri}, столбец {cell['col']}" if cell["span"] == 1
+                              else f"{label}, строка {ri}, столбцы {cell['col']}–{last_col}")
                 if header_text:
                     cell_label += f" «{_truncate(header_text, 40)}»"
                 start = pos
@@ -980,14 +1046,17 @@ class DocxLayout:
                     "merged_into": restart_at.get(cell["col"]) if cell["vmerge"] == "continue" else None,
                     "path": cell["path"], "start": start, "end": pos,
                     "column_header": header_text or None, "label": cell_label,
+                    # связь «шапка → ячейка»: части заголовка и ячейки шапки, из которых он собран
+                    "column_path": list(col_path[cell["col"] - 1]) if in_grid else [],
+                    "header_refs": list(col_refs[cell["col"] - 1]) if in_grid else [],
                 })
             text = ROW_SEPARATOR.join(texts)
             if refs:
                 loc = self._base_loc("row", row_ref, row["path"], row_label)
                 loc.update(page_hint=row_page if self._track_pages else None, cells=cells_loc, table={
                     "ref": table_ref, "row": ri, "rows": n_rows, "cols": n_cols, "header_row": is_header,
-                    "header_row_source": header_source, "columns": columns, "nesting": nesting,
-                    "parent_ref": parent_ref,
+                    "header_row_source": header_source, "header_rows": len(head_rows), "columns": columns,
+                    "nesting": nesting, "parent_ref": parent_ref,
                 })
                 spec = self._new_spec("table_header" if is_header else "table_row", text, loc, refs)
                 self._attachments(spec)
