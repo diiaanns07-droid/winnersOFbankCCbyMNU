@@ -290,3 +290,70 @@ def test_no_secrets_in_tracked_files():
                 if not FAKE_MARKERS.search(m.group(0)):
                     found.append(f"{rel}: {label}")
     assert not found, found
+
+
+# --------------------------------------------------------------------------- скрипты для жюри и оператора
+
+SCRIPTS = ROOT / "scripts"
+
+
+def test_powershell_scripts_have_utf8_bom():
+    """Windows PowerShell 5.1 читает .ps1 без BOM в кодировке ANSI: байты «Д» (D0 94) становятся кавычкой «”»."""
+    ps1 = sorted(SCRIPTS.glob("*.ps1"))
+    assert {p.name for p in ps1} >= {"run_official.ps1", "jury_check.ps1", "_env.ps1"}
+    for path in ps1:
+        assert path.read_bytes().startswith(b"\xef\xbb\xbf"), f"{path.name}: нужен UTF-8 с BOM"
+
+
+def test_shell_scripts_parse_and_are_executable():
+    import os
+    import shutil
+
+    bash = shutil.which("bash")
+    for name in ("run_official.sh", "jury_check.sh", "final_reports.sh", "check_clean_install.sh"):
+        path = SCRIPTS / name
+        assert path.read_bytes().startswith(b"#!/usr/bin/env bash"), name
+        assert b"\r\n" not in path.read_bytes(), f"{name}: окончания строк CRLF"
+        if os.name != "nt":
+            assert os.access(path, os.X_OK), f"{name}: нет права на запуск (chmod +x)"
+        if bash and os.name != "nt":
+            r = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True, timeout=30)
+            assert r.returncode == 0, r.stderr
+    assert b"\r\n" not in (SCRIPTS / "_env.sh").read_bytes()
+
+
+def _summary_report(tmp_path: Path, status: str, *, verified: int = 10, seconds: float = 120.0) -> Path:
+    import json
+
+    rep = {"run": {"status": status, "provider": "gemini", "models_used": ["gemini-3.8-flash"],
+                   "calls": {"total": 9, "cached": 0, "failed": 0, "split": 0}, "duration_s": seconds,
+                   "tokens": {"input": 1000, "output": 500}, "warnings": []},
+           "summary": {"requirements": 40, "findings": {"critical": 4, "major": 10, "minor": 8},
+                       "quotes_verified": verified, "quotes_total": 10},
+           "verdict": {"development": "no", "testing": "no"}}
+    path = tmp_path / f"r_{status}.json"
+    path.write_text(json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def _run_summary(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(SCRIPTS / "run_summary.py"), *args], capture_output=True,
+                          text=True, encoding="utf-8", errors="replace", timeout=60)
+
+
+def test_run_summary_gates(tmp_path):
+    ok = _summary_report(tmp_path, "complete")
+    r = _run_summary(str(ok), "--check", "--max-minutes", "6", "--max-calls", "12", "--verify-code", "0")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "gemini-3.8-flash" in r.stdout and "Все проверки пройдены" in r.stdout
+
+    partial = _summary_report(tmp_path, "partial")
+    r = _run_summary(str(partial), "--check")
+    assert r.returncode == 1 and "статус прогона" in r.stdout.split("Не пройдено:", 1)[1]
+
+    slow = _summary_report(tmp_path, "complete", seconds=500)
+    assert _run_summary(str(slow), "--check", "--max-minutes", "6").returncode == 1
+    assert _run_summary(str(ok), "--check", "--verify-code", "4").returncode == 1
+    # без --check сводка только печатается
+    assert _run_summary(str(partial)).returncode == 0
+    assert _run_summary(str(tmp_path / "нет.json")).returncode == 1
