@@ -7,7 +7,11 @@
   critical без сценария, последствий или с `blocks = none` — major;
 * страховка от «фантазий»: замечание о теме, которой документ не касается ни словом (PCI DSS, шифрование,
   аудит, мониторинг, откат, антифрод…), снимается — у такой темы нет текстовой зацепки;
-* дубли по заголовку, не более 12 замечаний, порядок: critical → major → minor.
+* замечание, все цитаты которого — определения из раздела терминов (или первая цитата-зацепка у
+  «неоднозначности/неполноты»), — не выше minor;
+* major о дублях, гонках и сбоях смежных систем — minor, если документ этих тем не касается;
+* не больше двух critical (остальные — major), дубли по заголовку, не более 12 замечаний,
+  порядок: critical → major → minor.
 
 Снятые замечания возвращаются отдельно с причиной, чтобы судья и отчёт могли их показать.
 """
@@ -18,6 +22,9 @@ from typing import Any, Iterable
 
 NAME = "risk"
 MAX_CANDIDATES = 12
+# Виды «не определено / неполно»: если их зацепка — определение термина, это тонкость, а не дефект.
+VAGUE_KINDS = ("ambiguity", "incomplete", "missing_element", "other")
+MAX_CRITICAL = 2  # ключевое событие и одно противоречие; остальное у линзы — major
 SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2}
 
 # Темы, которые линза поднимает только при текстовой зацепке. Ключ — тема (для причины отказа);
@@ -61,28 +68,96 @@ OUT_OF_SCOPE_TOPICS: dict[str, dict[str, Any]] = {
         "hooks": ["нагрузк", "производительн", "rps", "запросов в секунду"],
     },
     "откат и выключение функции": {
-        "title": r"откат|rollback|feature.?flag|флаг\w*\s+(включ|выключ|функц)|выключени\w+\s+функц|скрыти\w+\s+функц",
+        "title": r"схем\w*\s+откат|откат\w*\s+(решени|функц|релиз|выпуск|изменени)|rollback|feature.?flag"
+                 r"|флаг\w*\s+(включ|выключ|функц)|выключени\w+\s+функц|скрыти\w+\s+функц",
         "hooks": ["откат", "rollback", "флаг", "скрыти"],
     },
 }
 
 _TITLE_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in OUT_OF_SCOPE_TOPICS.items()}
 
+# Эксплуатационные темы, по которым major ставится, только если документ сам их касается (заявляет
+# устойчивость к повторам, говорит о параллельных событиях или сбоях). Иначе это вопрос — minor.
+MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
+    "повторы и дубли событий": {
+        "title": r"дедуплик|дубл|повторн\w*\s+(доставк|событи|уведомлени|обработк|запрос|вызов)|идемпотент|двойн",
+        "hooks": ["повтор", "дубл", "идемпотент", "исходный итог", "однократн"],
+    },
+    "гонки параллельных событий": {
+        "title": r"гонк|параллельн|одновременн|конкурентн|атомарн",
+        "hooks": ["параллельн", "одновременн", "конкурентн", "гонк", "атомарн"],
+    },
+    "сбои смежных систем": {
+        "title": r"сбо[йяеию]|таймаут|недоступн|ответ\w*\s+5\d\d|\b5\d\d\b|не\s+прош\w*|не\s+выполн\w*",
+        "hooks": ["сбо", "таймаут", "недоступност", "не отвечает"],
+    },
+}
+_MAJOR_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in MAJOR_NEEDS_HOOK.items()}
+
+
+def major_without_hook(candidate: dict, doc_text: str) -> str | None:
+    """Тема эксплуатационного major, которой документ не касается (тогда это minor), или None."""
+    if candidate.get("severity") != "major":
+        return None
+    title = str(candidate.get("title", ""))
+    for topic, rx in _MAJOR_RES.items():
+        if rx.search(title) and not any(h in doc_text for h in MAJOR_NEEDS_HOOK[topic]["hooks"]):
+            return topic
+    return None
+
+
+_TERMS_RE = re.compile(r"термин|глоссари|определени|понятия", re.I)
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.*)")
+
+
+def _lines(view: Any) -> list[dict]:
+    """Строки документа как [{"n", "text", "section"}]: из DocView, списка строк или текста Markdown."""
+    if view is None:
+        return []
+    if isinstance(view, str):
+        out, path = [], []
+        for n, text in enumerate(view.splitlines(), 1):
+            m = _HEADING_RE.match(text)
+            if m:
+                level = len(text.strip()) - len(text.strip().lstrip("#"))
+                path = path[: level - 1] + [m.group(1).strip()]
+            out.append({"n": n, "text": text, "section": " › ".join(path)})
+        return out
+    lines = view.get("lines") if isinstance(view, dict) else getattr(view, "lines", None)
+    if lines is None:
+        lines = view
+    out = []
+    for i, line in enumerate(lines or [], 1):
+        if isinstance(line, dict):
+            out.append({"n": line.get("n", i), "text": str(line.get("text", "")),
+                        "section": str(line.get("section") or "")})
+        else:
+            out.append({"n": i, "text": str(line), "section": ""})
+    return out
+
 
 def _doc_text(view: Any) -> str:
-    """Текст документа в нижнем регистре: из DocView (`lines`), списка строк или строки."""
-    if view is None:
-        return ""
-    if isinstance(view, str):
-        return view.lower()
-    if isinstance(view, dict):
-        lines = view.get("lines") or []
-    else:
-        lines = getattr(view, "lines", None) or view
-    parts = []
-    for line in lines:
-        parts.append(str(line.get("text", "")) if isinstance(line, dict) else str(line))
-    return "\n".join(parts).lower()
+    """Текст документа в нижнем регистре."""
+    return "\n".join(x["text"] for x in _lines(view)).lower()
+
+
+def terms_lines(view: Any) -> set[int]:
+    """Номера строк раздела терминов (глоссария, определений): там понятия уже определены."""
+    out = set()
+    for x in _lines(view):
+        last = x["section"].split("›")[-1] if x["section"] else ""
+        if last and _TERMS_RE.search(last):
+            out.add(int(x["n"]))
+    return out
+
+
+def _evidence_lines(c: dict) -> list[int]:
+    out = []
+    for ev in c.get("evidence") or []:
+        n = ev.get("line_start") or ev.get("line") if isinstance(ev, dict) else None
+        if isinstance(n, int):
+            out.append(n)
+    return out
 
 
 def missing_hook(candidate: dict, doc_text: str) -> str | None:
@@ -126,6 +201,7 @@ def postprocess(candidates: Iterable[dict], view: Any = None) -> tuple[list[dict
     Возвращает (оставленные, снятые); у снятых есть поле `reject_reason`.
     """
     doc = _doc_text(view)
+    defined = terms_lines(view)
     kept: list[dict] = []
     dropped: list[dict] = []
     seen: set[str] = set()
@@ -136,6 +212,13 @@ def postprocess(candidates: Iterable[dict], view: Any = None) -> tuple[list[dict
         if not c.get("evidence"):
             dropped.append({**c, "reject_reason": "нет цитаты-зацепки"})
             continue
+        ev_lines = _evidence_lines(c)
+        if defined and ev_lines and (all(n in defined for n in ev_lines)
+                                     or (ev_lines[0] in defined and c.get("kind") in VAGUE_KINDS)):
+            # зацепка — определение из раздела терминов: тонкость определения, не выше minor
+            c["severity"] = "minor"
+        if doc and major_without_hook(c, doc):
+            c["severity"] = "minor"
         topic = missing_hook(c, doc) if doc else None
         if topic:
             dropped.append({**c, "reject_reason": f"тема «{topic}» в документе не затрагивается"})
@@ -146,6 +229,12 @@ def postprocess(candidates: Iterable[dict], view: Any = None) -> tuple[list[dict
             continue
         seen.add(key)
         kept.append(c)
+    n_critical = 0
+    for c in kept:  # порядок модели: самые серьёзные первыми
+        if c["severity"] == "critical":
+            n_critical += 1
+            if n_critical > MAX_CRITICAL:
+                c["severity"] = "major"
     kept.sort(key=lambda c: SEVERITY_ORDER.get(c.get("severity"), 3))
     for c in kept[MAX_CANDIDATES:]:
         dropped.append({**c, "reject_reason": f"сверх лимита линзы ({MAX_CANDIDATES})"})

@@ -99,6 +99,52 @@ def test_postprocess_sorts_dedups_and_caps():
     assert "дубль заголовка" in reasons and any("сверх лимита" in r for r in reasons)
 
 
+def test_terms_section_caps_severity_to_minor():
+    doc = "# Документ\n\n### Термины\n* **Месяц** — календарный месяц по UTC+5.\n\n### Требования\n* Правило.\n"
+    assert lens_risk.terms_lines(doc) == {3, 4, 5}
+    c_terms = _cand("Месяц не привязан к дате операции", "critical", evidence=[{"quote": "Месяц", "line": 4}])
+    c_mixed = _cand("Правило против определения", "critical", "contradiction", "set_consistent",
+                    evidence=[{"quote": "Месяц", "line": 4}, {"quote": "Правило", "line": 7}])
+    kept, _ = lens_risk.postprocess([c_terms, c_mixed], doc)
+    sev = {c["title"]: c["severity"] for c in kept}
+    assert sev == {"Месяц не привязан к дате операции": "minor", "Правило против определения": "critical"}
+    c_vague = _cand("Месяц: дата авторизации или проведения", "major",
+                    evidence=[{"quote": "Месяц", "line": 4}, {"quote": "Правило", "line": 7}])
+    kept, _ = lens_risk.postprocess([c_vague], doc)
+    assert kept[0]["severity"] == "minor"
+
+
+def test_terms_lines_from_docview_sections():
+    view = {"lines": [{"n": 1, "text": "Термины", "section": "Часть A › Термины"},
+                      {"n": 2, "text": "Сутки — с 00:00", "section": "Часть A › Термины"},
+                      {"n": 3, "text": "ЛП-1", "section": "Часть A › Функциональные требования"}]}
+    assert lens_risk.terms_lines(view) == {1, 2}
+
+
+def test_ops_major_without_hook_is_minor():
+    doc = "Клиент задаёт лимит. Сервис начисляет кэшбэк."
+    kept, _ = lens_risk.postprocess([_cand("Нет ключа дедупликации событий", "major", "ops_risk", "risk"),
+                                     _cand("Параллельные покупки у границы лимита", "major", "ops_risk", "risk"),
+                                     _cand("Сбой зачисления: итог не описан", "major", "ops_risk", "risk")], doc)
+    assert {c["severity"] for c in kept} == {"minor"}
+    doc2 = "Повторная доставка одного события сохраняет исходный итог."
+    kept, _ = lens_risk.postprocess([_cand("Нет ключа дедупликации событий", "major", "ops_risk", "risk")], doc2)
+    assert kept[0]["severity"] == "major"
+
+
+def test_refund_rollback_wording_not_dropped():
+    kept, _ = lens_risk.postprocess([_cand("Списание без отката денег, если пополнение не прошло")], "текст")
+    assert len(kept) == 1 and kept[0]["severity"] == "minor"
+    doc = "Операция недоступна"  # «недоступна» в тексте ответа — не зацепка для темы сбоев
+    kept, _ = lens_risk.postprocess([_cand("При ответе 500 неизвестно, применена ли блокировка")], doc)
+    assert kept[0]["severity"] == "minor"
+
+
+def test_critical_cap():
+    kept, _ = lens_risk.postprocess([_cand(f"Событие {i}", "critical") for i in range(4)], "текст")
+    assert [c["severity"] for c in kept] == ["critical", "critical", "major", "major"]
+
+
 def test_candidate_without_evidence_dropped():
     kept, dropped = lens_risk.postprocess([_cand("Без цитаты", evidence=[])], "текст")
     assert not kept and dropped[0]["reject_reason"] == "нет цитаты-зацепки"
@@ -119,3 +165,13 @@ def test_saved_live_answers_keep_key_event(path):
     k5 = [c for c in kept if c["severity"] == "critical"
           and re.search(r"проведен|проведён|клиринг|авторизац|событи", c["title"] + c["problem"], re.I)]
     assert k5, "ключевое событие процессинга не найдено как critical"
+
+
+@pytest.mark.parametrize("path", sorted(FIXTURES.glob("clean_*.json")), ids=lambda p: p.stem)
+def test_saved_live_answers_on_clean_bases(path):
+    """Сохранённые живые ответы на чистых базах корпуса: 0 critical и не больше 3 major после постобработки."""
+    case = path.stem.removeprefix("clean_").rsplit("_", 2)[0]
+    doc = (ROOT / "evaluation" / "dev" / "corpus" / "cases" / f"{case}.base" / "source.md").read_text(encoding="utf-8")
+    kept, _ = lens_risk.postprocess(json.loads(path.read_text(encoding="utf-8"))["candidates"], doc)
+    sev = [c["severity"] for c in kept]
+    assert sev.count("critical") == 0 and sev.count("major") <= 3, sev
