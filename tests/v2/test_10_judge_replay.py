@@ -96,3 +96,18 @@ def test_clean_base_full_replay():
     all_placed(res, [c["id"] for c in cands])
     assert not [f for f in res["findings"] if f["severity"] == "critical"]
     assert judge.compute_verdict(res["findings"])["development"] != "no"
+
+
+def test_planted_false_candidates_are_rejected():
+    """69 реальных + 4 подмешанных ложных кандидата (C-070…C-073): все ложные — в rejected с причиной."""
+    cands, res, _ = replay("official.fakes", ROOT / "release/input/requirements.md",
+                           ROOT / "tests/v2/fixtures/official/segment.json")
+    all_placed(res, [c["id"] for c in cands])
+    rej = {r["candidate_id"]: r for r in res["rejected"]}
+    assert set(rej) == {"C-070", "C-071", "C-072", "C-073"}
+    assert rej["C-070"]["reason_code"] == "exact_sense"
+    assert rej["C-071"]["reason_code"] == "misread"
+    assert all(r["reason"] and r["evidence"] and r["problem"] for r in rej.values())
+    crit = [f for f in res["findings"] if f["severity"] == "critical"]
+    for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}):
+        assert any(need <= lines(f) for f in crit), need
