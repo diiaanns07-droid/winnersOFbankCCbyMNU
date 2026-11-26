@@ -97,9 +97,12 @@ def edit_state(doc: DocView, e: dict) -> str:
     b = doc.block(e["block_id"])
     if b is None:
         return "precondition_failed"
-    if b.text[e["start"]: e["end"]] == e["old"]:
-        return "ok"
     new = e.get("new", "")
+    if b.text[e["start"]: e["end"]] == e["old"]:
+        k = new.find(e["old"]) if e["old"] else -1
+        if k >= 0 and b.text[e["start"] - k: e["start"] - k + len(new)] == new:
+            return "already_applied"  # «старое» стоит внутри уже вставленного «нового» (дописка)
+        return "ok"
     if new and b.text[e["start"]: e["start"] + len(new)] == new:
         return "already_applied"
     if new and new in b.text and e["old"] not in b.text:
@@ -159,6 +162,11 @@ def resolve_spec(doc: DocView, spec: Any) -> tuple[dict | None, str]:
         if not hits:
             rx = re.compile(r"\s+".join(re.escape(w) for w in old.split()))
             hits = [(b, m.start(), m.end()) for b in blocks for m in rx.finditer(b.text)]
+        if hits and new and old in new:  # дописка: «старое» внутри уже вставленного «нового» — правка внесена
+            inside = [h for h in hits if any(p <= h[1] and h[2] <= p + len(new) for p in _positions(h[0].text, new))]
+            if inside and len(inside) == len(hits):
+                return None, "already_applied"
+            hits = [h for h in hits if h not in inside]
         if len(hits) == 1:
             b, a, z = hits[0]
             return {"block_id": b.id, "start": a, "end": z, "old": b.text[a:z], "new": new,
@@ -221,7 +229,7 @@ def _record(d: dict, out: dict) -> None:
     state = out["state"]
     d["edits"] = out["edits"]  # те же объекты: write_revision отметит их как внесённые
     d["patch_state"] = state
-    d["decision_status"] = decision_status(state)
+    d["decision_status"] = "needs_clarification" if out.get("needs_clarification") else decision_status(state)
     d["fix_status"] = "awaiting_revision" if state == "proposed" else "not_applied"
     reasons = [w for w in out["warnings"] if not w.startswith("[note]")]
     d["note"] = ("правка передана на запись редакции; закрытие — после повторного анализа"
@@ -245,6 +253,11 @@ def _propose(doc: DocView, finding: Any, dec: Any, q: Any, out: dict) -> None:
     if dec.choice == "defer":
         out["state"] = "deferred"
         warn.append(f"[deferred] {qid}: решение отложено — документ не меняется, вопрос остаётся открытым")
+        return
+    if dec.choice == "clarify":
+        out["needs_clarification"] = True
+        warn.append(f"[needs_clarification] {qid}: владелец просит уточнения («{dec.answer}») — решения нет, "
+                    "текст не меняется, вопрос остаётся открытым")
         return
     if dec.choice == "invalid":
         out["state"] = "invalid_choice"
@@ -339,7 +352,11 @@ def _propose(doc: DocView, finding: Any, dec: Any, q: Any, out: dict) -> None:
             warn.append(f"[invented_value] {qid}: в новой формулировке значения {', '.join(bad)}, "
                         "которых нет ни в документе, ни в ответе владельца — правка не попадает в редакцию")
             return
-        states.append(edit_state(doc, e))
+        st = edit_state(doc, e)
+        if st == "stale":  # правка из вопроса к другой версии: если её «стало» уже на месте — она внесена
+            st = "already_applied" if edit_state(doc, {**e, "source_sha256": None}) == "already_applied" \
+                else "stale_edit"
+        states.append(st)
         e["loc"] = format_loc(doc.block(e["block_id"]), e["start"], e["end"])
         out["edits"].append(e)
 
@@ -349,6 +366,11 @@ def _propose(doc: DocView, finding: Any, dec: Any, q: Any, out: dict) -> None:
         out["state"] = "already_applied"
         out["edits"] = []
         warn.append(f"[already_applied] {qid}: правка уже есть в тексте — повторно не применяется")
+    elif "stale_edit" in states:
+        out["state"] = "precondition_failed"
+        out["edits"] = []
+        warn.append(f"[precondition_failed] {qid}: правка варианта подготовлена для другой версии документа, "
+                    "а её старого фрагмента в этой версии нет — правка не применяется")
     else:
         out["state"] = "precondition_failed"
         out["edits"] = []
@@ -703,20 +725,30 @@ def write_revision(
         "revision": {"path": out_path.name, "sha256": rev_sha, "mode": mode},
         "edits": [{**e, "loc": format_loc(doc.block(e["block_id"]), e["start"], e["end"])} for e in uniq],
         "decisions": [to_plain(d) for d in (decisions or [])],
-        "questions": _question_records(doc, questions or [], results or {}, uniq),
+        "questions": _question_records(doc, questions or [], results or {}, uniq, decisions or []),
         "warnings": warns,
     }
     manifest_path_for(out_path).write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return out_path
 
 
-def _question_records(doc: DocView, questions: Iterable[Any], results: dict, edits: list[dict]) -> list[dict]:
+def _question_records(doc: DocView, questions: Iterable[Any], results: dict, edits: list[dict],
+                      decisions: Iterable[Any] = ()) -> list[dict]:
+    by_q = {str(get(d, "question_id")): d for d in decisions or []}
     recs = []
     for q in questions:
         qid = str(get(q, "id"))
-        r = results.get(qid, {})
+        r = dict(results.get(qid, {}))
         q_edits = [e for e in edits if e.get("question_id") == qid]
+        d = by_q.get(qid)
+        if not r and d is not None:  # вызов движка: results нет, есть решения из parse_answers
+            choice = str(get(d, "choice") or "open")
+            r = {"choice": choice, "state": "proposed" if q_edits else
+                 {"defer": "deferred", "clarify": "open", "invalid": "invalid_choice"}.get(
+                     choice, str(get(d, "patch_state") or "") or ("open" if choice == "open" else "needs_wording"))}
+            if choice == "clarify":
+                r["needs_clarification"] = True
         state = r.get("state", "open")
         recs.append({
             "id": qid,
@@ -725,7 +757,7 @@ def _question_records(doc: DocView, questions: Iterable[Any], results: dict, edi
             "kind": get(q, "kind"),
             "choice": r.get("choice", "open"),
             "patch_state": "applied" if q_edits and state == "proposed" else state,
-            "decision_status": decision_status(state),
+            "decision_status": "needs_clarification" if r.get("needs_clarification") else decision_status(state),
             "expected_result": r.get("expected_result"),
             "quotes": [get(s, "quote") for s in as_list(get(q, "sources"))],
             "new_texts": [e["new"] for e in q_edits if e["new"]],
@@ -771,7 +803,7 @@ def accept_user_revision(base_document: Any, new_path: str | Path, *,
         "warnings": [],
     }
     mp = manifest_path_for(new_path)
-    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return mp
 
 
@@ -855,3 +887,50 @@ def closure_status(manifest: Any, new_document: Any, new_findings: Iterable[Any]
         "analyzed_sha256": nd.id, "verified_on_revision": verified, "questions": rows,
         "warnings": warns,
     }
+
+
+# ---------------------------------------------------------------------------
+# Статус вопросов по паре отчётов (для команды и №15; «исправлено» решает №09)
+# ---------------------------------------------------------------------------
+
+TEXT_STATE_RU = {
+    "applied_not_verified": "внесено в редакцию, ожидает проверки (классификация — №09)",
+    "not_in_revision": "правка есть в решении, но в прочитанной редакции её нет",
+    "unchanged": "текст не менялся",
+}
+
+
+def question_statuses(previous: Any, current: Any) -> list[dict]:
+    """Статус каждого вопроса прошлого отчёта после прогона с ``--answers``.
+
+    ``previous`` — отчёт, по которому отвечали (его вопросы), ``current`` — отчёт
+    прогона с ответами (его решения и прочитанная редакция). Решение без правки
+    (открыт, «нужно уточнить», отложен) текст не меняет."""
+    if isinstance(previous, (str, Path)):
+        previous = json.loads(Path(previous).read_text(encoding="utf-8"))
+    if isinstance(current, (str, Path)):
+        current = json.loads(Path(current).read_text(encoding="utf-8"))
+    decs = {str(get(d, "question_id")): d for d in as_list(get(current, "decisions"))}
+    run = get(current, "run") or {}
+    prev_sha = get(get(previous, "document") or {}, "id")
+    on_revision = bool(prev_sha) and get(run, "revision_of") == prev_sha
+    text = "\n".join(str(get(b, "text")) for b in as_list(get(get(current, "document") or {}, "blocks")))
+    rows = []
+    for q in as_list(get(previous, "questions")):
+        qid = str(get(q, "id"))
+        d = decs.get(qid)
+        side = get(q, "side") or {}
+        row = {"question_id": qid, "side": get(side, "quote"), "answer": None, "decision_status": "open",
+               "text_state": "unchanged"}
+        if d is not None:
+            edits = [e for e in as_list(get(d, "edits")) if get(e, "old") is not None]
+            row["answer"] = get(d, "answer")
+            row["decision_status"] = str(get(d, "decision_status") or get(d, "status") or "accepted")
+            if edits:
+                applied = on_revision and all(str(get(e, "new")) in text for e in edits if get(e, "new")) and not any(
+                    str(get(e, "old")) in text for e in edits if norm_text(str(get(e, "old"))) not in
+                    norm_text(str(get(e, "new") or "")))
+                row["text_state"] = "applied_not_verified" if applied else "not_in_revision"
+        row["text_state_ru"] = TEXT_STATE_RU[row["text_state"]]
+        rows.append(row)
+    return rows

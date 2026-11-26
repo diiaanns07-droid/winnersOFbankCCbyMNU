@@ -284,6 +284,7 @@ def scripted_answer(doc: DocView, stage: str, payload: dict, schema: dict) -> di
         entry = {k: v for k, v in spec.items() if k not in ("options", "document_answer")}
         entry["group_ids"] = [g["group_id"]]
         entry.setdefault("author_intent_hypothesis", "")
+        entry.setdefault("target", {"block_id": "", "quote": ""})
         q = spec.get("document_answer", {}).get("quote", "")
         entry["document_answer"] = {"block_id": _block_for(doc, q) if q else "", "quote": q}
         entry["options"] = []

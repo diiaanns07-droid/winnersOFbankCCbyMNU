@@ -41,11 +41,13 @@ diff -r /tmp/p08_demo examples/team_answers/generated && echo "совпадае�
 python -m pytest tests/contract tests/p08
 ```
 
-Ожидаемо: `diff` пустой; `tests/contract` — 29 passed, `tests/p08` — 99 passed.
+Ожидаемо: `diff` пустой; `tests/contract` — 29 passed, `tests/p08` — 113 passed.
 
 Штатный путь через движок (`python -m bcc_review … --answers`, экспорт №13,
 другой SHA, коллизия) с парой входов и выходов для №09 и №18 описан в
-[`engine_cli/README.md`](engine_cli/README.md).
+[`engine_cli/README.md`](engine_cli/README.md). Два вопроса к разным сторонам одного
+противоречия, ответ на один, «нужно уточнить» и повторный импорт — в
+[`two_sided/README.md`](two_sided/README.md).
 
 Результат `demo`:
 
@@ -91,6 +93,9 @@ source_sha256: <64 hex — SHA-256 исходного документа>
   «С» читаются по начертанию, «Б» — как B. Кириллическая буква без точки или
   тире после неё («В течение…») считается своим ответом.
 * `отложить` — решение отложено, документ не меняется.
+* «нужно уточнить» (и «надо уточнить», «требует уточнения», «не знаю») — решения нет:
+  вопрос остаётся открытым, `decision_status: needs_clarification`, текст ответа сохраняется в
+  `Report.decisions`, правок нет.
 * Другой текст — свой ответ. Без строки `Правка: «…» → «…»` или `Формулировка:`
   решение сохраняется, но текст документа не меняется. `Формулировка:` требует
   цитату вопроса, поэтому в файле №13 надёжнее писать `Правка:`.
@@ -106,15 +111,30 @@ source_sha256: <64 hex — SHA-256 исходного документа>
 
 | Поле | Значения | Кто ставит |
 | :--- | :--- | :--- |
-| `decision_status` — факт решения | `open`, `deferred`, `accepted`, `accepted_needs_wording`, `stale`, `collision`, `blocked`, `invalid` | `apply_answers` по answers.md |
+| `decision_status` — факт решения | `open`, `needs_clarification` («нужно уточнить» — вопрос открыт), `deferred`, `accepted`, `accepted_needs_wording`, `stale`, `collision`, `blocked`, `invalid` | `parse_answers` (в `Decision.to_dict()`), `apply_answers` |
 | `patch_state` — текст | `applied`, `proposed`, `needs_wording`, `already_applied`, `precondition_failed`, `stale`, `collision`, `open`, `deferred` | `propose_patch` / `write_revision` |
-| `fix_status` — закрытие | штатный путь движка: `awaiting_revision` у решения и `status: applied_not_verified` у каждой записанной правки; `applied_not_verified` → после повторного анализа `closed_after_reanalysis` / `still_present`; для текста без изменений: `open_still_present` / `absent_without_decision`; при анализе не той версии: `applied_unverified` | `closure_status(manifest, new_doc, new_findings)` |
+| `fix_status` — закрытие | штатный путь движка @2821989: статус «внесено, ожидает проверки» — в манифесте `*.revision.json` (`status: applied_not_verified`, у вопроса `patch_state: applied`); `python -m bcc_review.decisions status PREV.json CUR.json` показывает его по вопросам; `applied_not_verified` → после повторного анализа `closed_after_reanalysis` / `still_present`; для текста без изменений: `open_still_present` / `absent_without_decision`; при анализе не той версии: `applied_unverified` | `closure_status(manifest, new_doc, new_findings)` |
 
 Закрытие требует, чтобы SHA-256 перечитанного документа совпадал с
 `revision.sha256` в манифесте. Иначе ставится `[not_reanalyzed]` и статус
 «закрыто» не присваивается.
 
-## Стык с движком (Max, `bcc/integration` @ `6be9e97`, `engine.apply_answers`)
+## Стык с движком (Max, `bcc/integration` @ `2821989`, `engine.apply_answers`)
+
+Движок вызывает `parse_answers(path, document, questions=, expected_sha=)`,
+`propose_patch(document, finding, decision, question=)` (вопрос и находка — из
+`--compare`) и `write_revision(document, edits, output, source=, questions=,
+decisions=)`. Решение в `Report.decisions` — это `Decision.to_dict()` на момент
+разбора: `decision_status`, `finding_ids`, `choice` и правки (у правок только поля
+контракта). Пустой `questions` (без `--compare`) значит «данных о вопросах нет»: ответы
+не отбрасываются как неизвестные. Итерация `AnswerSet` отдаёт только решения к текущей
+версии.
+
+Вопросы к разным сторонам одного противоречия. Если модель на этапе `clarify`
+возвращает несколько вопросов на группу с `target`, или без модели находка о
+несогласованности (`set_consistent`, `conflict`, `incorrect`, без witness) опирается на
+фразы разных разделов, строится по вопросу на каждую фразу. У такого вопроса есть
+`side`, `counterpart_ids`, своя цель правки, и он меняет только свою фразу.
 
 * Точки входа: `bcc_review.decisions.clarify:build_questions`,
   `bcc_review.decisions.patches:propose_patch/write_revision`,

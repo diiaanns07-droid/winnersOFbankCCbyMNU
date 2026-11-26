@@ -110,13 +110,17 @@ def test_cli_answers_changes_only_the_agreed_phrase(case):
     assert answers_stage(rep)["status"] == "ok"
     for slot in ("parse_answers", "propose_patch", "write_revision"):
         assert run["modules"][slot].startswith("team:bcc_review.decisions."), slot
-    # решение внесено и ждёт проверки повторным анализом
+    # решение в отчёте; «внесено, ожидает проверки» — в манифесте редакции (движок @2821989 снимает
+    # решение до propose_patch и оставляет у правок только поля контракта)
     (d,) = rep["decisions"]
     assert d["question_id"] == "Q-01" and d["answer"] == "A" and d["source_sha256"] == ORIGINAL_SHA
-    assert d["patch_state"] == "proposed" and d["fix_status"] == "awaiting_revision"
+    assert d["decision_status"] == "accepted"
     (e,) = d["edits"]
     assert (e["block_id"], e["start"], e["end"], e["old"]) == ("b0009", 64, 90, "Перевод исполнен в пятницу")
-    assert e["status"] == "applied_not_verified" and e["revision_sha256"] == sha(rev)
+    m = json.loads((case / "transfer_tz.rev-p08-transfer-r2.revision.json").read_text(encoding="utf-8"))
+    assert m["status"] == "applied_not_verified" and m["revision"]["sha256"] == sha(rev)
+    assert [(x["block_id"], x["question_id"], x["old"]) for x in m["edits"]] == [
+        ("b0009", "Q-01", "Перевод исполнен в пятницу")]
     # вторая, независимая проблема (комиссия) осталась подтверждённой обеими опорами
     fee = [f for f in rep["findings"] if "комисси" in f["title"].lower() and f["kind"] == "conflict"]
     assert fee and fee[0]["status"] == "confirmed" and fee[0]["witness"]
@@ -136,13 +140,15 @@ def test_engine_hands_resolved_edit_to_patch_and_source_path_to_writer(case, mon
         return real_parse(*a, **k)
 
     def patch(document, finding, decision, *rest, **k):
+        from bcc_review.contracts import as_plain
+
         calls["patch"].append({"document_id": document["id"], "finding": finding,
-                               "decision": json.loads(json.dumps(decision)), "rest": rest, "kwargs": k})
+                               "decision": as_plain(decision), "rest": rest, "kwargs": k})
         return real_patch(document, finding, decision, *rest, **k)
 
     def write(document, edits, output, *a, **k):
         calls["write"].append({"edits": json.loads(json.dumps(list(edits))), "output": Path(output).name,
-                               "args": a, "kwargs": {n: str(v) for n, v in k.items()}})
+                               "args": a, "kwargs": dict(k)})
         return real_write(document, edits, output, *a, **k)
 
     monkeypatch.setattr(answers, "parse_answers", parse)
@@ -154,10 +160,12 @@ def test_engine_hands_resolved_edit_to_patch_and_source_path_to_writer(case, mon
         "answers_path": str(case / "answers13_Q01_A.md"), "run_id": "p08-transfer-spy",
         "cache_dir": str(case / "cache")}))
 
-    (pa, pk), = calls["parse"]
-    assert pa[0] == str(case / "answers13_Q01_A.md") and pa[1]["id"] == ORIGINAL_SHA and not pk
-    (p,) = calls["patch"]
-    assert p["document_id"] == ORIGINAL_SHA and p["finding"] is None and not p["rest"] and not p["kwargs"]
+    (pa, pk), = calls["parse"]  # движок @2821989: parse_answers(path, document, questions=, expected_sha=)
+    assert pa[0] == str(case / "answers13_Q01_A.md") and pa[1]["id"] == ORIGINAL_SHA
+    assert pk == {"questions": [], "expected_sha": ORIGINAL_SHA}  # без --compare вопросов нет
+    (p,) = calls["patch"]  # propose_patch(document, finding, decision, question=)
+    assert p["document_id"] == ORIGINAL_SHA and p["finding"] is None and not p["rest"]
+    assert p["kwargs"] == {"question": None}
     dec = p["decision"]  # правка разрешена ещё на разборе файла ответов — вопрос движку не нужен
     assert (dec["question_id"], dec["answer"], dec["choice"]) == ("Q-01", "A", "A")
     assert dec["option"].startswith("На следующий рабочий день")
@@ -165,7 +173,8 @@ def test_engine_hands_resolved_edit_to_patch_and_source_path_to_writer(case, mon
         ("b0009", 64, 90, "Перевод исполнен в пятницу", "Перевод исполнен в следующий рабочий день", "option")]
     (w,) = calls["write"]
     assert w["output"] == "transfer_tz.rev-p08-transfer-spy.md" and not w["args"]
-    assert w["kwargs"] == {"source_path": str(case / "transfer_tz.md")}  # тот самый аргумент движка
+    assert w["kwargs"]["source"] == str(case / "transfer_tz.md")  # исходник передаётся движком
+    assert w["kwargs"]["questions"] is None and [x.question_id for x in w["kwargs"]["decisions"]] == ["Q-01"]
     assert [(e["block_id"], e["old"]) for e in w["edits"]] == [("b0009", "Перевод исполнен в пятницу")]
 
 
@@ -212,7 +221,7 @@ def test_colliding_edits_of_one_range_are_both_rejected(case):
     assert "«Перевод исполнен в пятницу» → «Перевод исполнен в пятницу, комиссия по тарифу»" in reason
     assert sum("пересекающиеся фрагменты" in w["message"] for w in rep["warnings"] if isinstance(w, dict)) == 1
     # независимое решение применено; спорная строка 16 не тронута
-    assert by_q["Q-03"]["patch_state"] == "proposed"
+    assert by_q["Q-03"]["decision_status"] == "accepted" and by_q["Q-03"]["edits"]
     rev = case / "transfer_tz.rev-p08-transfer-r5.md"
     la = (case / "transfer_tz.md").read_text(encoding="utf-8").split("\n")
     lb = rev.read_text(encoding="utf-8").split("\n")
@@ -303,5 +312,7 @@ def test_max_engine_diff_reads_revision_path_returned_by_writer(tmp_path):
     assert rep["run"]["source_name"] == "req.rev-p08-pdf-1.md" and rep["run"]["revision_of"] == doc["id"]
     assert rep["document"]["id"] == sha(work / "req.rev-p08-pdf-1.md")
     (d,) = rep["decisions"]
-    assert (d["patch_state"], d["fix_status"], d["revision"]) == ("applied", "applied_not_verified", "req.rev-p08-pdf-1.md")
+    assert d["edits"] and d["decision_status"] == "accepted"
+    m = json.loads((work / "req.rev-p08-pdf-1.revision.json").read_text(encoding="utf-8"))
+    assert m["status"] == "applied_not_verified" and m["revision"]["mode"] == "text_rendition"
     assert sha(work / "req.pdf") == doc["id"]

@@ -50,9 +50,10 @@ diff tests/p08/fixtures/transfer_tz.md out/transfer_tz.rev-p08-transfer-r2.md
 * в `out/r2.json`: `document.id` = `run.source_sha256` = SHA редакции,
   `run.revision_of` = SHA исходника, `run.source_name` = имя файла редакции.
   Второй прогон читает именно записанный файл;
-* `decisions[0]`: `answer: "A"`, `patch_state: "proposed"`. Правка
-  `b0009 [64:90]` помечена `status: "applied_not_verified"`, рядом
-  `revision_sha256` = SHA редакции. Это «внесено, ожидает проверки»;
+* `decisions[0]`: `answer: "A"`, `decision_status: "accepted"`, правка `b0009 [64:90]`.
+  «Внесено, ожидает проверки» записано в манифесте `*.revision.json`: там
+  `status: "applied_not_verified"` и SHA редакции. Движок `@2821989` снимает решение
+  до `propose_patch` и оставляет у правок только поля контракта;
 * `diff` (№09): `resolved` = F-002 (исполнение после 18:00); `persisting` = F-001
   (комиссия, независимый конфликт) и две `minor`.
 
@@ -82,23 +83,22 @@ diff tests/p08/fixtures/transfer_tz.md out/transfer_tz.rev-p08-transfer-r2.md
 * **Другой SHA** (`answers13_other_sha.md`) → то же предупреждение; исходник не
   изменён, файлов редакции нет.
 * **Две правки одного диапазона** (`answers13_collision.md`) → Q-01 и Q-02
-  получают `patch_state: "collision"`, в `note` — обе правки и место:
+  получают `patch_state: "collision"` и пустые `edits`, в `note` — обе правки и место:
   «Правки Q-01 и Q-02 меняют пересекающиеся фрагменты (строка 16 · блок b0009 …)».
   Независимая Q-03 применена; в редакции изменена только строка 6, строка 16 не
   тронута.
 
 ## Diff для Max (`max_engine_apply_answers.diff`)
 
-Для Markdown/TXT он не нужен — путь выше работает на текущем движке `bcc/integration` @ `6be9e97`.
+Для Markdown/TXT он не нужен — путь выше работает на текущем движке `bcc/integration` @ `2821989`.
 
 Для PDF/DOCX нужен. Писатель №08 пишет явную текстовую редакцию `*.rev-….md` и
 возвращает её путь, а `engine.apply_answers` возвращаемое значение игнорирует и
 читает `*.rev-….pdf` → `FileNotFoundError`. Diff:
 
-1. читает редакцию по пути, который вернул писатель;
+1. читает редакцию по пути, который вернул писатель (`_call_flex` возвращает его);
 2. ловит `ValueError` писателя (`PatchError` №08 и ошибки резерва — его
-   наследники): предупреждение и анализ исходника вместо трассировки;
-3. ставит решениям с правками `patch_state: "applied"`, `fix_status: "applied_not_verified"`.
+   наследники): предупреждение и анализ исходника вместо трассировки.
 
 Проверка — `test_max_engine_diff_reads_revision_path_returned_by_writer`. Он
 накладывает diff на копию `src/` через `git apply`, а после слияния у Max

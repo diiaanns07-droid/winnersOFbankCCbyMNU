@@ -21,12 +21,93 @@
       "old": "Перевод исполнен в пятницу",
       "new": "Перевод исполнен в следующий рабочий день",
       "source_sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
-      "origin": "option",
       "question_id": "Q-01",
       "loc": "строка 16 · блок b0009 · символы 64–90 · раздел «Перевод между своими счетами / Критерии приёмки»"
     }
   ],
-  "decisions": [],
-  "questions": [],
+  "decisions": [
+    {
+      "question_id": "Q-01",
+      "source_sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+      "answer": "A",
+      "edits": [
+        {
+          "block_id": "b0009",
+          "start": 64,
+          "end": 90,
+          "old": "Перевод исполнен в пятницу",
+          "new": "Перевод исполнен в следующий рабочий день",
+          "source_sha256": "21286a1fb07ef65c640dcc181bcdf19e04ccc6c9c726a510b6a5341601a9c3eb",
+          "origin": "option",
+          "question_id": "Q-01"
+        }
+      ],
+      "note": "",
+      "choice": "A",
+      "comment": "",
+      "wording": "",
+      "status": "accepted",
+      "decision_status": "accepted",
+      "finding_ids": [
+        "F-002"
+      ],
+      "option": "На следующий рабочий день — Перевод в 19:00 в пятницу исполнен в следующий рабочий день. · Правка [b0009]: «Перевод исполнен в пятницу» → «Перевод исполнен в следующий рабочий день» (Критерии приёмки, строка 16)"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-01",
+      "finding_ids": [
+        "F-002"
+      ],
+      "family": "conflict",
+      "kind": "decision",
+      "choice": "A",
+      "patch_state": "applied",
+      "decision_status": "accepted",
+      "expected_result": null,
+      "quotes": [
+        "исполняется на следующий рабочий день",
+        "Перевод исполнен в пятницу"
+      ],
+      "new_texts": [
+        "Перевод исполнен в следующий рабочий день"
+      ]
+    },
+    {
+      "id": "Q-02",
+      "finding_ids": [
+        "F-001"
+      ],
+      "family": "conflict",
+      "kind": "decision",
+      "choice": "open",
+      "patch_state": "open",
+      "decision_status": "open",
+      "expected_result": null,
+      "quotes": [
+        "Перевод между своими счетами выполняется без комиссии.",
+        "взимается комиссия 0,5% от суммы перевода"
+      ],
+      "new_texts": []
+    },
+    {
+      "id": "Q-03",
+      "finding_ids": [
+        "F-003"
+      ],
+      "family": "ambiguity",
+      "kind": "decision",
+      "choice": "open",
+      "patch_state": "open",
+      "decision_status": "open",
+      "expected_result": null,
+      "quotes": [
+        "после 18:00",
+        "в 19:00"
+      ],
+      "new_texts": []
+    }
+  ],
   "warnings": []
 }

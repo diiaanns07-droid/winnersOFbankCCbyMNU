@@ -1,0 +1,18 @@
+{
+  "individual": {
+    "requirements": []
+  },
+  "cross": {
+    "conflicts": [],
+    "coverage": [],
+    "facts": [],
+    "issues": []
+  },
+  "verify_meaning": {
+    "__verdicts__": "confirmed"
+  },
+  "clarify": {
+    "questions": [],
+    "skipped": []
+  }
+}

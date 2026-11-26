@@ -90,7 +90,11 @@
               }
             ]
           }
-        ]
+        ],
+        "target": {
+          "block_id": "",
+          "quote": ""
+        }
       }
     ],
     "skipped": []

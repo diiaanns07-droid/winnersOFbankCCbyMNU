@@ -74,6 +74,10 @@ _CYR_BARE = re.compile(r"^\s*([АБВСЕабвсе])(?:\s*$|\s*[.):;,]\s*|\s+[�
 _MULTI = re.compile(
     r"^(?:(?:и|или|or|and)\s+)?(?:вариант\s+)?(?:[A-F](?=$|[\s.):;,])|[АБВСЕ](?=$|[.):;,]))")
 _EMPTYISH = re.compile(r"^[\s\-—–.?…_*]*$")
+# «нужно уточнить», «уточним позже», «требует уточнения», «не знаю» — решения нет, вопрос открыт
+_CLARIFY = re.compile(
+    r"^\s*(?:(?:нужно|надо|требуется|необходимо|ещё|еще)\s+(?:ещё\s+|еще\s+)?уточн\w*|уточн(?:ить|им|яем|яется|ение)\b"
+    r"|требует\s+уточнени\w*|на\s+уточнении|не\s+знаю|непонятно)", re.I)
 _ANS_HEADING = re.compile(r"^[ \t]*#{3,4}[ \t]*Ответ[ \t]*:?[ \t]*$", re.M)
 _OPTIONS_LINE = re.compile(r"^[ \t]*Варианты[ \t]*:[ \t]*(.+)$", re.M)
 _OPTION_SPLIT = re.compile(r"\s+\|\s+(?=[A-F][.)]\s)")
@@ -132,11 +136,14 @@ def _options_from_section(body: str) -> dict[str, str]:
 def interpret(answer: str) -> tuple[str, str, str]:
     """Текст ответа -> (choice, comment, wording).
 
-    choice: буква варианта | "custom" | "defer" | "open" | "invalid".
+    choice: буква варианта | "custom" | "defer" | "clarify" | "open" | "invalid".
+    «clarify» — владелец написал «нужно уточнить»: решения нет, вопрос остаётся открытым.
     """
     text = (answer or "").strip()
     if _EMPTYISH.match(text):
         return "open", "", ""
+    if _CLARIFY.match(text):
+        return "clarify", text, ""
     wording = ""
     m = _WORDING.search(text)
     if m:
@@ -178,7 +185,10 @@ class Decision:
     @classmethod
     def from_answer(cls, question_id: str, source_sha256: str | None, answer: str) -> "Decision":
         choice, comment, wording = interpret(answer)
-        return cls(question_id, source_sha256, (answer or "").strip(), choice, comment, wording)
+        d = cls(question_id, source_sha256, (answer or "").strip(), choice, comment, wording)
+        if choice not in ("open", "clarify", "defer"):
+            d.edit_specs = parse_edit_specs(d.answer, "owner")  # явные «Правка: «…» → «…»» владельца
+        return d
 
     @classmethod
     def coerce(cls, obj: Any) -> "Decision":
@@ -193,13 +203,25 @@ class Decision:
         d.option_text = get(obj, "option")
         d.patch_state = str(get(obj, "patch_state") or "")
         d.note = str(get(obj, "note") or "")
+        d.finding_ids = [str(x) for x in (get(obj, "finding_ids") or [])]
         if not d.edits and not d.edit_specs and answer:  # dict из резервного формата: правки в тексте ответа
             d.edit_specs = parse_edit_specs(str(answer))
         return d
 
+    finding_ids: list[str] = field(default_factory=list)
+
     @property
     def status(self) -> str:
-        return {"open": "open", "defer": "deferred", "invalid": "invalid"}.get(self.choice, "accepted")
+        return {"open": "open", "defer": "deferred", "invalid": "invalid", "clarify": "open"}.get(
+            self.choice, "accepted")
+
+    @property
+    def decision_status(self) -> str:
+        """Статус решения, известный при разборе (статус текста ставят propose_patch и write_revision)."""
+        if self.patch_state in ("collision", "stale"):
+            return self.patch_state
+        return {"open": "open", "defer": "deferred", "invalid": "invalid",
+                "clarify": "needs_clarification"}.get(self.choice, "accepted")
 
     def to_dict(self) -> dict:
         """Decision v1 (question_id, source_sha256, answer, edits, note) и поля №08."""
@@ -207,8 +229,10 @@ class Decision:
             "question_id": self.question_id, "source_sha256": self.source_sha256,
             "answer": self.answer, "edits": [dict(e) for e in self.edits], "note": self.note,
             "choice": self.choice, "comment": self.comment, "wording": self.wording,
-            "status": self.status,
+            "status": self.status, "decision_status": self.decision_status,
         }
+        if self.finding_ids:
+            d["finding_ids"] = list(self.finding_ids)
         if self.edit_specs:
             d["edit_specs"] = [dict(e) for e in self.edit_specs]
         if self.option_text is not None:
@@ -229,18 +253,22 @@ class AnswerSet:
     warnings: list[str] = field(default_factory=list)
     _contract: list[dict] | None = field(default=None, repr=False, compare=False)
 
-    # Ведёт себя как list[Decision] (точка входа №08 в contracts/HANDOFF.md):
-    # итерация, len и индекс — по заполненным решениям; метаданные разбора — в полях.
+    # Ведёт себя как list[Decision] к ТЕКУЩЕЙ версии (точка входа №08 в contracts/HANDOFF.md):
+    # итерация, len и индекс — по заполненным решениям с привязкой к этой версии. Ответы к другой
+    # редакции и без source_sha256 остаются в ``decisions`` (для apply_answers) и в ``warnings``.
+    def applicable(self) -> list[Decision]:
+        return [d for d in self.decisions if d.source_sha256 and d.patch_state != "stale"]
+
     def __iter__(self):
-        return iter(self.decisions)
+        return iter(self.applicable())
 
     def __len__(self) -> int:
-        return len(self.decisions)
+        return len(self.applicable())
 
     def __getitem__(self, i):
         if isinstance(i, str):
             return self.get(i)
-        return self.decisions[i]
+        return self.applicable()[i]
 
     def get(self, key: str, default: Any = None) -> Any:
         """Вид для движка (``engine.apply_answers``): ``decisions`` — список dict Decision v1
@@ -248,8 +276,7 @@ class AnswerSet:
         ``warnings`` — пояснения разбора."""
         if key == "decisions":
             if self._contract is None:
-                self._contract = [d.to_dict() for d in self.decisions
-                                  if d.source_sha256 and d.patch_state != "stale"]
+                self._contract = [d.to_dict() for d in self.applicable()]
             return self._contract
         if key == "warnings":
             return self.warnings
@@ -328,7 +355,10 @@ def parse_answers(
         warns.append(f"[stale_answers] ответы относятся к другой редакции (source_sha256 {short_sha(sha)}…, "
                      f"документ {short_sha(expected_sha)}…): правки не применены")
 
-    known = {str(get(q, "id")) for q in questions} if questions is not None else None
+    # пустой список (движок без --compare) — «данных о вопросах нет», а не «вопросов нет»
+    qlist = list(questions) if questions is not None else []
+    known = {str(get(q, "id")) for q in qlist} if qlist else None
+    fids = {str(get(q, "id")): [str(x) for x in (get(q, "finding_ids") or [])] for q in qlist}
     raw: dict[str, list[str]] = {}
     options: dict[str, dict[str, str]] = {}
     order: list[str] = []
@@ -374,7 +404,8 @@ def parse_answers(
             aset.open_ids.append(qid)
             continue
         dec = Decision.from_answer(qid, sha, filled[0])
-        dec.edit_specs = parse_edit_specs(dec.answer, "owner")
+        dec.finding_ids = list(fids.get(qid, []))
+        dec.edit_specs = parse_edit_specs(dec.answer, "owner") if dec.choice != "clarify" else []
         if dec.choice in options.get(qid, {}):
             dec.option_text = options[qid][dec.choice]
             dec.edit_specs += parse_edit_specs(dec.option_text, "option")
@@ -398,7 +429,7 @@ def _resolve_and_check(doc: DocView, aset: AnswerSet) -> None:
     оба решения получают ``patch_state = "collision"`` и причину с фрагментами."""
     from .patches import describe_collision, find_collisions, resolve_spec
 
-    active = [d for d in aset.decisions if d.choice not in ("open", "defer", "invalid") and d.source_sha256]
+    active = [d for d in aset.decisions if d.choice not in ("open", "defer", "invalid", "clarify") and d.source_sha256]
     for d in active:
         kept = []
         for spec in d.edit_specs:
@@ -419,7 +450,8 @@ def _resolve_and_check(doc: DocView, aset: AnswerSet) -> None:
             aset.warnings.append(msg)
         for d in active:
             if d.question_id in (a, b):
-                d.patch_state, d.note = "collision", msg
+                # правки-кандидаты не попадают в отчёт: решение не применяется, причина — в note
+                d.patch_state, d.note, d.edits, d.edit_specs = "collision", msg, [], []
 
 
 # ---------------------------------------------------------------------------
@@ -443,10 +475,21 @@ def render_card(q: Any, doc: DocView | None = None) -> str:
     out = [f"## {q.id}. {q.prompt}", "", "| Поле | Значение |", "| :--- | :--- |"]
     out += [f"| {k} | {v.replace('|', '/')} |" for k, v in rows]
     out += ["", f"**Ситуация.** {q.situation}", "", f"**Вопрос.** {q.prompt}", "",
-            f"**Почему важно.** {q.why}", "", "**Исходные цитаты и координаты:**"]
+            f"**Почему важно.** {q.why}", ""]
+    if q.side:
+        tail = (f" Вторая сторона противоречия — {', '.join(q.counterpart_ids)}." if q.counterpart_ids else "")
+        out += [f"**Сторона противоречия.** Этот вопрос — только о фразе {_q(q.side['quote'])}: ответ меняет "
+                f"её и ничего больше.{tail}", ""]
+    if q.target:
+        tb = doc.block(q.target["block_id"]) if doc else None
+        out += [f"**Цель правки:** {_q(q.target['quote'])} — "
+                f"{format_loc(tb, q.target['start'], q.target['end']) if tb else q.target['block_id']}. "
+                "Эту фразу меняет «Формулировка:»; правки вариантов перечислены ниже.", ""]
+    out += ["**Исходные цитаты и координаты:**"]
+    role_ru = {"target": " — цель правки", "other_side": " — другая сторона противоречия"}
     for i, s in enumerate(q.sources, start=1):
         fid = f" ({s['finding_id']})" if s.get("finding_id") else ""
-        out.append(f"{i}. {_q(s['quote'])} — {s.get('loc', '')}{fid}")
+        out.append(f"{i}. {_q(s['quote'])} — {s.get('loc', '')}{fid}{role_ru.get(s.get('role'), '')}")
     if q.document_answer:
         da = q.document_answer
         out += ["", f"**Источник ответа в документе:** {_q(da['quote'])} — {da.get('loc', '')}. "
@@ -460,12 +503,23 @@ def render_card(q: Any, doc: DocView | None = None) -> str:
         out.append(f"  - Наблюдаемый результат: {o.observable_result}")
         if o.consequences:
             out.append(f"  - Последствия: {o.consequences}")
-        for e in o.edits:
-            loc = e.get("loc") or (format_loc(doc.block(e["block_id"]), e["start"], e["end"]) if doc else e["block_id"])
-            new = _q(e["new"]) if e["new"] else "— (фрагмент удаляется)"
-            out.append(f"  - Правка ({loc}): было {_q(e['old'])} → стало {new}")
-        if not o.edits:
-            out.append("  - Правка: нет — решение фиксируется, текст не меняется без формулировки владельца")
+        for c in o.changes or [{"section": "—", "line": None, "old": e["old"], "new": e["new"]} for e in o.edits]:
+            new = _q(c["new"]) if c["new"] else "— (фрагмент удаляется)"
+            out.append(f"  - Что изменится в тексте: раздел «{c['section']}», строка {c['line']}: "
+                       f"было {_q(c['old'])} → стало {new}")
+        if not o.edits and o.intent == "rewrite" and o.keeps:
+            out.append(f"  - Что изменится в тексте: фраза {_q(o.keeps['quote'])} (раздел «{o.keeps['section']}», "
+                       f"строка {o.keeps['line']}) заменится вашим текстом из «Формулировка: …»; без него — ничего")
+        elif not o.edits:
+            kept = (f"фраза {_q(o.keeps['quote'])} (раздел «{o.keeps['section']}», строка {o.keeps['line']}) "
+                    "остаётся как есть") if o.keeps else "текст документа не меняется"
+            out.append(f"  - Что изменится в тексте: ничего — {kept}")
+            others = [x for x in q.sources if x.get("role") == "other_side"]
+            if others:
+                out.append(f"  - Противоречие с {_q(others[0]['quote'])} при этом не снимается: нужно решение "
+                           "по другой стороне")
+        if o.acceptance:
+            out.append(f"  - Влияние на приёмку: {o.acceptance}")
         for w in o.warnings:
             out.append(f"  - ⚠ {w}")
     out += [
@@ -509,7 +563,7 @@ def render_questions_md(document: Any, questions: Iterable[Any]) -> str:
 def write_questions(document: Any, questions: Iterable[Any], path: str | Path) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(render_questions_md(document, questions), encoding="utf-8")
+    p.write_text(render_questions_md(document, questions), encoding="utf-8", newline="\n")
     return p
 
 
