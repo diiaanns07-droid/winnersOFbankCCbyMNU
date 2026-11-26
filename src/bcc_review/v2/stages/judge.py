@@ -933,15 +933,22 @@ def _public(f: dict) -> dict:
 
 
 def _rejected_entry(c: dict, code: str, reason: str, line: int) -> dict:
+    """Отклонённый кандидат: причина + то, по чему счётчик №15 отличит «линза не нашла» от «судья отклонил»."""
     return {
         "candidate_id": c["id"],
         "title": _cut(c.get("title"), 180),
         "source": _s(c.get("source")),
         "severity": _s(c.get("severity")),
+        "kind": _s(c.get("kind")),
+        "criterion": _s(c.get("criterion")),
+        "requirement_ids": list(c.get("requirement_ids") or []),
         "reason_code": code,
         "reason": _cut(reason, 400),
         "line": line,
         "lines": _lines_of(c),
+        "problem": _cut(c.get("problem"), 600),
+        "evidence": [{k: e.get(k) for k in ("quote", "line_start", "line_end", "page", "section", "verified")
+                      if k in e} for e in c.get("evidence") or []][:5],
     }
 
 
