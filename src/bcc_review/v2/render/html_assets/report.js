@@ -149,6 +149,38 @@
     $$(".ln.ex", doc).forEach(function (x) { x.title = "Не требование — " + x.dataset.ex; });
   }
 
+  /* ── мини-карта: где в документе замечания ── */
+  var mm = $("#minimap");
+  function drawMap() {
+    if (!doc || !mm || !doc.scrollHeight) return;
+    mm.innerHTML = "";
+    var H = doc.scrollHeight, h = mm.clientHeight;
+    $$(".ln.hl", doc).forEach(function (x) {
+      if (!x.offsetHeight) return;
+      var t = document.createElement("i");
+      t.className = (x.className.match(/sev-\w+/) || [""])[0];
+      t.style.top = (x.offsetTop / H * h) + "px";
+      t.style.height = Math.max(3, x.offsetHeight / H * h) + "px";
+      t.title = "Строка " + x.dataset.n + ": " + x.dataset.f;
+      t.addEventListener("click", function () { selectFinding(x.dataset.f.split(" ")[0], { scrollCard: true }); });
+      mm.appendChild(t);
+    });
+    var vw = document.createElement("div");
+    vw.className = "vw";
+    mm.appendChild(vw);
+    var upd = function () {
+      vw.style.top = (doc.scrollTop / H * h) + "px";
+      vw.style.height = Math.max(8, doc.clientHeight / H * h) + "px";
+    };
+    upd();
+    doc.onscroll = upd;
+  }
+  if (doc && mm) {
+    setTimeout(drawMap, 60);
+    addEventListener("resize", function () { clearTimeout(drawMap.t); drawMap.t = setTimeout(drawMap, 150); });
+    ["onlyhl", "showreq"].forEach(function (k) { $("#" + k).addEventListener("change", function () { setTimeout(drawMap, 30); }); });
+  }
+
   /* ── фильтры ── */
   var chips = $$(".sevchip");
   var q = $("#q"), fkind = $("#fkind"), fsrc = $("#fsrc"), fsort = $("#fsort"), fcount = $("#fcount");

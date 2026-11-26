@@ -652,7 +652,7 @@ def _findings_panel(findings: list[dict], view: dict | None, report: dict, reqs_
         <label class="tg"><input type="checkbox" id="showreq"> нарезка</label>
       </div>
     </div>
-    <div class="doc" id="doc" tabindex="0">{_doc_pane(view, findings, report)}</div>
+    <div class="docbody"><div class="doc" id="doc" tabindex="0">{_doc_pane(view, findings, report)}</div><div class="minimap" id="minimap" aria-hidden="true"></div></div>
     <div class="legend"><span class="lg sev-critical"></span>критичный<span class="lg sev-major"></span>существенный<span class="lg sev-minor"></span>незначительный</div>
   </aside>
   <div class="flist">
