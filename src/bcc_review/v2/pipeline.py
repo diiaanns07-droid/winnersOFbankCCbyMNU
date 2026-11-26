@@ -637,6 +637,13 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
                   "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
                                                                    "summary": "", "fix_first": []}}
     view = p.ctx.view if p.ctx else None
+    llm = p.ctx.llm if p.ctx else None
+    for stage, items in (getattr(llm, "responses", None) or {}).items():
+        try:
+            (p.run.path / "responses").mkdir(exist_ok=True)
+            p.run.write_json(f"responses/{stage}.json", items)
+        except OSError:
+            pass
     written = write_outputs(report, view, Path(input_path), Path(output_md), opts, log or (lambda m: None))
     for fmt in ("json", "md", "html"):
         if fmt in written:
