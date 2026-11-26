@@ -207,3 +207,19 @@ def test_daily_reset_time_in_gemini_quota_error():
     assert _us_pacific_offset_h(dt.datetime(2026, 7, 1, 0, 0)) == -7        # лето: PDT
     text = daily_reset_local(dt.datetime(2026, 11, 26, 20, 0, tzinfo=dt.timezone.utc))
     assert "по местному времени" in text and "полночь по тихоокеанскому" in text
+
+
+def test_pipeline_auto_prefers_gemini_key_over_installed_claude(monkeypatch):
+    """Как у жюри: в .env есть GEMINI_API_KEY, а на машине стоит Claude Code — выбирается Gemini."""
+    from bcc_review.v2 import pipeline
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/claude" if name == "claude" else None)
+    for name in ("GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    opts = {"provider": "auto", "model": None, "fallback_models": [], "max_calls": 12, "max_seconds": 600,
+            "max_retries": 2, "timeout": 600, "cache": False}
+    llm, name = pipeline.make_llm(opts, None)
+    assert name == "gemini" and llm.provider.name == "gemini"
+    monkeypatch.delenv("GEMINI_API_KEY")
+    llm2, name2 = pipeline.make_llm(opts, None)
+    assert name2 == "claude_cli"
