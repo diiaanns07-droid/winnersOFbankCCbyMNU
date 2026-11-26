@@ -17,6 +17,9 @@ reader, пересчитывает SHA-256 и сверяет с ``REPORT.json`` 
 * достаточность опор у замечаний ``confirmed`` (``anchor_status = supported``;
   конфликт — свидетель с двумя разными опорами; пропуск — область поиска);
 * числа фактов против их цитат;
+* подпись замечаний ``source``/``stage`` против паспорта: подпись модели (``llm``, ``mixed``) без
+  единого ответа модели в прогоне или в этапах подписи — предупреждение; ответ из кэша считается
+  ответом модели, пустая или ``unknown`` подпись (старые отчёты) не проверяется;
 * ``summary`` (числа, ``by_severity``, ``by_status``, ``critical_ids``, ``checks``),
   согласованность ``verdict`` с подтверждёнными критичными и статусом прогона,
   арифметику ``run.evidence_audit``.
@@ -120,7 +123,13 @@ ERRORS: dict[str, str] = {
     "reader_id_differs": "reader вернул document.id, не равный SHA-256 файла",
     "evidence_skipped": "источник не совпал или не прочитан: опоры не сверялись",
     "decision_other_version": "решение относится к другой версии источника, правки не сверялись",
+    "finding_source_without_model": "замечание подписано ответом модели, но в прогоне нет ни одного ответа модели: "
+                                    "ни физического вызова, ни попадания в кэш",
+    "finding_stage_without_model": "этапы из подписи замечания не получили ни одного ответа модели "
+                                   "(ни физического вызова, ни попадания в кэш)",
 }
+# подпись замечания, которая утверждает участие модели (№05 пишет и составную «llm+rules»)
+MODEL_SOURCE_PARTS = frozenset({"llm", "mixed"})
 
 
 def _err(code: str, path: str = "", detail: str = "") -> dict:
@@ -264,6 +273,7 @@ class _Verifier:
             "checked": 0, "confirmed": 0, "ambiguous": 0, "rejected": 0, "skipped": 0,
             "counters_checked": 0, "references_checked": 0, "findings_checked": 0, "edits_checked": 0,
             "repeats": {"objects": 0, "places": 0, "places_distinguished": 0, "places_undistinguished": 0},
+            "provenance": {"by_source": {}, "unlabeled": 0, "unsupported": 0},
         }
         self.repeats: dict[tuple[str, int, int], dict[str, Any]] = {}
         self.source: dict[str, Any] = {}
@@ -290,6 +300,7 @@ class _Verifier:
                 if skipped:
                     self.warnings.append(_err("evidence_skipped", detail=f"{skipped} опор"))
             self._check_ids_and_refs()
+            self._check_provenance()
             self._check_facts()
             self._check_summary()
             self._check_verdict()
@@ -667,6 +678,50 @@ class _Verifier:
                         self.errors.append(_err("dangling_reference", f"{path}.{key}",
                                                 f"{ref!r} нет в {target}"))
 
+    def _check_provenance(self) -> None:
+        """Подпись замечания против паспорта прогона.
+
+        Ответ модели — физический вызов или попадание в кэш: в тёплом кэше физических вызовов ноль, но
+        ответы модели есть. Подпись ``llm``/``mixed`` без единого ответа модели в прогоне, а при известных
+        этапах подписи — в этих этапах (``cross`` учитывает и ``cross.pairs``), даёт предупреждение. Пустая
+        или ``unknown`` подпись означает, что источник неизвестен (старые отчёты), и не проверяется.
+        """
+        run = self.report.get("run")
+        run = run if isinstance(run, Mapping) else {}
+        calls = run.get("calls") if isinstance(run.get("calls"), Mapping) else {}
+        answered: dict[str, int] = {}
+        for st in run.get("stages") or []:
+            if isinstance(st, Mapping):
+                name = str(st.get("name") or "").split("#", 1)[0]
+                answered[name] = answered.get(name, 0) + int(st.get("calls") or 0) + int(st.get("cache_hits") or 0)
+        total = int(calls.get("physical") or 0) + int(calls.get("cache_hits") or 0)
+        prov = self.counts["provenance"]
+        for i, finding in enumerate(_items(self.report, "findings")):
+            source = finding.get("source")
+            if not isinstance(source, str) or source in ("", "unknown"):
+                prov["unlabeled"] += 1
+                continue
+            prov["by_source"][source] = prov["by_source"].get(source, 0) + 1
+            if not set(source.split("+")) & MODEL_SOURCE_PARTS:
+                continue
+            stage = str(finding.get("stage") or "")
+            where = f"{finding.get('id')}: source={source}, stage={stage or '—'}"
+            if total == 0:
+                prov["unsupported"] += 1
+                self.warnings.append(_err("finding_source_without_model", f"findings[{i}].source",
+                                          f"{where}; run.calls: physical=0, cache_hits=0"))
+                continue
+            known: dict[str, int] = {}
+            for part in dict.fromkeys(p.split("#", 1)[0] for p in stage.split("+") if p):
+                related = [n for name, n in answered.items() if name == part or name.startswith(part + ".")]
+                if related:
+                    known[part] = sum(related)
+            if known and not any(known.values()):
+                prov["unsupported"] += 1
+                self.warnings.append(_err("finding_stage_without_model", f"findings[{i}].stage",
+                                          where + "; ответов модели по этапам: "
+                                          + ", ".join(f"{p} {n}" for p, n in known.items())))
+
     def _check_facts(self) -> None:
         for i, fact in enumerate(_items(self.report, "facts")):
             value = fact.get("value")
@@ -787,6 +842,13 @@ def render_text(result: Mapping[str, Any]) -> str:
             span = f"{place['block_id']} [{place['start']},{place['end']})"
             lines.append(f"  {span} «{place['quote']}» — {place['label']}; "
                          f"ссылок {len(place['refs'])}: {place['status']}")
+    prov = c.get("provenance") or {}
+    if prov.get("by_source") or prov.get("unlabeled"):
+        parts = [f"{k} {v}" for k, v in sorted(prov.get("by_source", {}).items())]
+        if prov.get("unlabeled"):
+            parts.append(f"без подписи {prov['unlabeled']}")
+        lines.append("Подпись замечаний (source): " + " · ".join(parts)
+                     + f"; подпись модели без ответа модели: {prov.get('unsupported', 0)}")
     for title, items in (("Ошибки", result["errors"]), ("Предупреждения", result["warnings"])):
         if items:
             lines.append(f"{title} ({len(items)}):")

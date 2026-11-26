@@ -1,0 +1,93 @@
+diff --git a/src/bcc_review/engine.py b/src/bcc_review/engine.py
+index adf7fad..30ad25d 100644
+--- a/src/bcc_review/engine.py
++++ b/src/bcc_review/engine.py
+@@ -33,6 +33,28 @@ DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "gemini": "gemini-2.5-flash",
+ MODEL_ENV = {"anthropic": "ANTHROPIC_MODEL", "gemini": "GEMINI_MODEL"}
+ LLM_STAGES = ("individual", "cross", "verify_meaning", "questions", "bank")
+ SLEEP: Callable[[float], None] = time.sleep  # тесты подменяют, чтобы не ждать Retry-After
++# отметки производителя у кандидатов: source модуля (№05, правила) или origin/confirmed_by (№06: facts — сверка фактов)
++PRODUCER_MARKS = {"rules": {"rules"}, "facts": {"rules"}, "llm": {"llm"}, "mixed": {"llm", "rules"}}
++
++
++def producers(c: dict[str, Any], asked: bool) -> set[str]:
++    """Кто произвёл кандидата: rules — детерминированный код, llm — ответ модели (в том числе из кэша).
++
++    Подпись берётся из отметки производящего этапа, а не из числа физических вызовов. Без отметки
++    кандидат считается правилом, только если модель в прогоне не опрашивалась; иначе — unknown.
++    """
++    marks = str(c["source"]).split("+") if c.get("source") else [c.get("origin"), *(c.get("confirmed_by") or [])]
++    marks = [m for m in marks if m]
++    if not marks:
++        return {"unknown"} if asked else {"rules"}
++    return set().union(*(PRODUCER_MARKS.get(m, {"unknown"}) for m in marks))
++
++
++def source_label(parts: set[str]) -> str:
++    """Подпись замечания по производителям всех его кандидатов: rules, llm, mixed или unknown."""
++    if "unknown" in parts or not parts:
++        return "unknown"
++    return "mixed" if len(parts) > 1 else next(iter(parts))
+ 
+ 
+ class UsageError(ValueError):
+@@ -283,8 +305,9 @@ class Engine:
+ 
+         # опоры, смысл, объединение
+         candidates = []
+-        for src in (rules_out.get("candidates", []), ind.get("candidates", []), cross.get("candidates", [])):
+-            candidates.extend(self.normalize_candidate(C.as_plain(c)) for c in src)
++        for stage, src in (("rules", rules_out.get("candidates", [])), ("individual", ind.get("candidates", [])),
++                           ("cross", cross.get("candidates", []))):
++            candidates.extend(self.normalize_candidate(C.as_plain(c), stage) for c in src)
+         verified, rejected, audit = self.verify_candidates(document, candidates, ask_or_none)
+         findings = self.build_findings(verified, requirements)
+         checks = self.build_checks(requirements, rules_out.get("checks", []) + ind.get("checks", []), findings,
+@@ -342,9 +365,14 @@ class Engine:
+             return set(codes() if callable(codes) else codes)
+         return set(crit) if isinstance(crit, dict) else set()
+ 
+-    def normalize_candidate(self, c: dict[str, Any]) -> dict[str, Any]:
+-        """Привести кандидата модуля к словарю контракта: коды критериев и виды дефектов."""
++    def normalize_candidate(self, c: dict[str, Any], stage: Optional[str] = None) -> dict[str, Any]:
++        """Привести кандидата модуля к словарю контракта: коды критериев и виды дефектов.
++
++        ``stage`` — этап движка, вернувший кандидата; по нему и отметке модуля считается подпись замечания.
++        """
+         c = dict(c)
++        if stage and not c.get("stage"):
++            c["stage"] = stage
+         crit = c.get("criterion")
+         codes = self.criteria_codes or set(C.INDIVIDUAL_CRITERIA + C.SET_CRITERIA)
+         if crit not in codes and crit in self.CRITERION_ALIASES:
+@@ -632,8 +660,11 @@ class Engine:
+         clusters = merge_candidates(verified)
+         order = {r["id"]: i for i, r in enumerate(requirements)}
+         sev = {"critical": 0, "major": 1, "minor": 2}
++        asked = getattr(self, "asker", None) is not None
++        made_by = {v["cid"]: (producers(v, asked), v.get("stage") or "") for v in verified}
+         findings = []
+         for c in clusters:
++            members = [m for m in [c["cid"]] + c.get("merged_from", []) if m in made_by]
+             notes = list(c.get("notes", []))
+             if c["severity"] == "critical" and (not (c.get("impact") or "").strip() or not (c.get("blocked_decision") or "").strip()):
+                 c["severity"] = "major"
+@@ -652,7 +683,8 @@ class Engine:
+                  "recommendation": c.get("recommendation", ""), "blocked_decision": c.get("blocked_decision", ""),
+                  "blocks": [], "witness": c.get("witness"), "inspected_block_ids": c.get("inspected_block_ids", []),
+                  "merged_from": [c["cid"]] + [x for x in c.get("merged_from", []) if x != c["cid"]],
+-                 "cause": c.get("cause"), "source": c.get("source", "llm"), "stage": c.get("stage", ""), "notes": notes}
++                 "cause": c.get("cause"), "source": source_label(set().union(*(made_by[m][0] for m in members))),
++                 "stage": "+".join(dict.fromkeys(made_by[m][1] for m in members if made_by[m][1])), "notes": notes}
+             if c.get("rule_id"):
+                 f["rule_id"] = c["rule_id"]
+             f["blocks"] = default_blocks(f)
+@@ -784,7 +816,7 @@ class Engine:
+                 merged.append(item)
+                 known.add(item["id"])
+         self.mark("facts", "ok", f"фактов: {len(merged) - n0}", implementation=mod.label, t=t)
+-        return merged, [self.normalize_candidate(C.as_plain(c)) for c in out.get("candidates", [])]
++        return merged, [self.normalize_candidate(C.as_plain(c), "facts") for c in out.get("candidates", [])]
+ 
+     def run_questions(self, document, findings, ask) -> list[dict[str, Any]]:
+         t = time.monotonic()
