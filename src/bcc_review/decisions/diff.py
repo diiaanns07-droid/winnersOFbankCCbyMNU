@@ -249,6 +249,8 @@ class _Edition:
         self.findings = [f for f in _as_list(report.get("findings")) if isinstance(f, dict) and f.get("id") is not None]
         self.checks = [c for c in _as_list(report.get("checks")) if isinstance(c, dict)]
         self.decisions = [d for d in _as_list(report.get("decisions")) if isinstance(d, dict)]
+        self.stages = [st for st in _as_list(self.run.get("stages")) if isinstance(st, dict)]
+        self.incomplete_stages = {str(x).split("#")[0] for x in _as_list(self.run.get("incomplete_stages"))}
         self.questions = {
             q["id"]: q for q in _as_list(report.get("questions")) if isinstance(q, dict) and q.get("id") is not None
         }
@@ -922,13 +924,18 @@ def _affected(prev: _Edition, fo: _Finding) -> list[tuple[str, str]]:
     return sorted(set(pairs), key=lambda p: (prev.req_pos(p[0]), _natural(p[0]), p[1]))
 
 
-def _closure_proof(fo: _Finding, prev: _Edition, cur: _Edition, links: dict) -> tuple[dict | None, str, str]:
-    """(proof | None, reason_code, explanation). Нужна явная проверка «pass» в новой редакции."""
+def _closure_proof(
+    fo: _Finding, prev: _Edition, cur: _Edition, links: dict, *, stage_covered: bool = False
+) -> tuple[dict | None, str, str]:
+    """(proof | None, reason_code, explanation). Нужна явная проверка «pass» в новой редакции.
+
+    stage_covered: этап, нашедший замечание, во втором прогоне завершён — тогда охват берётся по этапу,
+    а Requirement.review_status (сводный по всем этапам) не учитывается."""
     pairs = _affected(prev, fo)
     targets = [(o, fam, n) for o, fam in pairs for n in links.get(o, {}).get("new_ids", [])]
 
     partial = []
-    for _o, _fam, n in dict.fromkeys(targets):
+    for _o, _fam, n in [] if stage_covered else dict.fromkeys(targets):
         r = cur.req_by_id.get(n) or {}
         if r.get("review_status") in ("partial", "not_reviewed"):
             partial.append(f"{cur.req_label(n)} — {r.get('review_reason') or r.get('review_status')}")
@@ -1089,21 +1096,57 @@ def _closure_proof(fo: _Finding, prev: _Edition, cur: _Edition, links: dict) -> 
 # ---------------------------------------------------------------------------
 
 
+def _edit_touches(ed: _Edition, edit: dict, finding: dict) -> bool:
+    """Правка из решения заменяет опорный фрагмент замечания (по координатам или по тексту)."""
+    old = str(edit.get("old") or "")
+    for e in _as_list(finding.get("evidence")):
+        if not isinstance(e, dict):
+            continue
+        if (
+            e.get("block_id") == edit.get("block_id")
+            and isinstance(e.get("start"), int)
+            and isinstance(edit.get("start"), int)
+            and e["start"] < (edit.get("end") or 0)
+            and edit["start"] < (e.get("end") or 0)
+        ):
+            return True
+        q = _norm(str(e.get("quote") or ""))
+        if q and old and (q in _norm(old) or _norm(old) in q):
+            return True
+    return False
+
+
 def _decision_refs(prev: _Edition, cur: _Edition, old_ids: list, new_ids: list) -> list[dict]:
-    """Решения (--answers), связанные с записью: Decision.question_id → Question.finding_ids."""
+    """Решения (--answers), связанные с записью: через Question.finding_ids или правкой опорного фрагмента."""
     old_set, new_set = set(old_ids), set(new_ids)
+    old_f = {f["id"]: f for f in prev.findings if f["id"] in old_set}
+    new_f = {f["id"]: f for f in cur.findings if f["id"] in new_set}
     refs: dict[str, dict] = {}
     for label, ed in (("current", cur), ("previous", prev)):
         for d in ed.decisions:
             qid = d.get("question_id")
+            sha = d.get("source_sha256")
+            edits = [e for e in _as_list(d.get("edits")) if isinstance(e, dict)]
             linked = set(_as_list(d.get("finding_ids"))) | set(_as_list(d.get("finding_id")))
             hit = bool(linked & (old_set | new_set))
             hit |= bool(set(_as_list((prev.questions.get(qid) or {}).get("finding_ids"))) & old_set)
             hit |= bool(set(_as_list((cur.questions.get(qid) or {}).get("finding_ids"))) & new_set)
+            touches = sorted(
+                {
+                    fid
+                    for fid, f in old_f.items()
+                    if (not sha or sha == prev.sha) and any(_edit_touches(prev, e, f) for e in edits)
+                }
+                | {
+                    fid
+                    for fid, f in new_f.items()
+                    if sha and sha == cur.sha and any(_edit_touches(cur, e, f) for e in edits)
+                },
+                key=_natural,
+            )
             key = str(qid or d.get("id") or len(refs))
-            if not hit or key in refs:
+            if not (hit or touches) or key in refs:
                 continue
-            edits = [e for e in _as_list(d.get("edits")) if isinstance(e, dict)]
             applied = None
             if edits:
                 applied = all(cur.contains(str(e.get("new") or "")) for e in edits if e.get("new")) and not any(
@@ -1111,7 +1154,6 @@ def _decision_refs(prev: _Edition, cur: _Edition, old_ids: list, new_ids: list) 
                     for e in edits
                     if e.get("old") and _norm(str(e["old"])) not in _norm(str(e.get("new") or ""))
                 )
-            sha = d.get("source_sha256")
             refs[key] = {
                 "id": key,
                 "question_id": qid,
@@ -1121,6 +1163,8 @@ def _decision_refs(prev: _Edition, cur: _Edition, old_ids: list, new_ids: list) 
                 "answered_on": "previous" if sha and sha == prev.sha else "current" if sha and sha == cur.sha else None,
                 "edits": len(edits),
                 "edits_applied": applied,
+                "touches_anchor_of": touches,
+                "_edits": edits,
             }
     return sorted(refs.values(), key=lambda r: _natural(r["id"]))
 
@@ -1264,7 +1308,6 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
     used_old = {i for g in groups for i in g["old"]}
     used_new = {j for g in groups for j in g["new"]}
     same_source = bool(prev.sha) and prev.sha == cur.sha
-    run_ok = cur.status == "complete"
 
     result: dict[str, list] = {"resolved": [], "persisting": [], "introduced": [], "unassessed": []}
 
@@ -1344,7 +1387,7 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
             continue
         rl = rel_links_for([fo])
         e = base_entry("unassessed", [fo], [])
-        code, why, proof = _classify_closure(fo, prev, cur, rl, aux, run_ok, same_source, e["decision_refs"])
+        code, why, proof = _classify_closure(fo, prev, cur, rl, aux, same_source, e["decision_refs"])
         weak = [w for w in aux["weak"].get(i, []) if w[1] not in used_new]
         for s, j, _d in weak:
             possible_old.setdefault(j, []).append((s, fo))
@@ -1422,6 +1465,8 @@ def compare_reports(previous: dict, current: dict, *, ask: AskFn | None = None) 
             e["view"] = _view(prev, cur, e)
             e.pop("_sort", None)
             e.pop("_rel", None)
+            for d in e["decision_refs"]:
+                d.pop("_edits", None)
 
     for entries in result.values():
         for e in entries:  # DiffEntry.evidence: проверяемые опоры текущей редакции (контракт v1)
@@ -1464,7 +1509,6 @@ def _classify_closure(
     cur: _Edition,
     rl: list,
     aux: dict,
-    run_ok: bool,
     same_source: bool,
     decisions: list,
 ) -> tuple[str, str, dict | None]:
@@ -1472,15 +1516,9 @@ def _classify_closure(
     label = ", ".join(prev.req_label(r) for r in fo.req_ids) or "набор"
     dec_ids = ", ".join(str(d["id"]) for d in decisions)
     blockers: list[tuple[str, str]] = []
-    if not run_ok:
-        reasons = "; ".join(_as_list(cur.run.get("status_reasons"))) or "причина не указана"
-        blockers.append(
-            (
-                "run_incomplete",
-                f"Второй прогон завершился со статусом «{cur.status}» ({_short(reasons, 120)}): отсутствие "
-                "замечания не доказывает исправления.",
-            )
-        )
+    covered, why_not = _stage_gate(fo, cur)
+    if not covered:
+        blockers.append(("run_incomplete", why_not))
     if same_source:
         if decisions:
             blockers.append(
@@ -1530,25 +1568,89 @@ def _classify_closure(
             "но текст не исправлен." + suffix,
             None,
         )
-    proof, code, why = _closure_proof(fo, prev, cur, aux["links"])
+    stage_covered = bool(str(fo.raw.get("stage") or "")) and covered
+    proof, code, why = _closure_proof(fo, prev, cur, aux["links"], stage_covered=stage_covered)
+    if proof is None and code == "recheck_missing":
+        proof = _decision_proof(fo, prev, cur, decisions)
     moved = [lk for lk in rl if lk["changes"]]
     rel_txt = "; ".join(_link_ru(lk) for lk in moved)
     if proof is None:
         where = f" ({rel_txt})" if rel_txt else ""
         return code, f"Текст в месте опоры изменён{where}, но закрыть нельзя: {why[0].lower()}{why[1:]}", None
+    stage = str(fo.raw.get("stage") or "").split("#")[0] or "проверки"
     what = {
         "conflict_reconciled": "перепроверка сценария дала единый исход",
         "contract_appeared": "в новой редакции появился обещанный контракт",
         "requirement_rechecked": "обязательство перепроверено по тому же критерию",
+        "decision_applied": (
+            f"внесено решение {proof.get('decision')}: правка заменила опорный фрагмент, этап {stage} новой "
+            "редакции завершён и замечание не повторил (отдельной перепроверки сценария не было)"
+        ),
     }[proof["kind"]]
     refs = f" ({', '.join(proof['check_refs'])})" if proof.get("check_refs") else ""
     text = f"Текст изменён в месте опоры ({label}); {what}{refs}; в новом отчёте замечания нет."
     if rel_txt:
         text += f" Сопоставление: {rel_txt}."
-    if decisions:
+    if decisions and proof["kind"] != "decision_applied":
         applied = [d for d in decisions if d.get("edits_applied")]
         text += f" Связанное решение: {dec_ids}" + (" (правка внесена)." if applied else ".")
     return "resolved", text, proof
+
+
+def _stage_gate(fo: _Finding, cur: _Edition) -> tuple[bool, str]:
+    """Охват перепроверки: этап, который нашёл замечание, во втором прогоне завершён."""
+    if cur.partial_read:
+        return False, (
+            "Новая редакция прочитана не полностью (" + "; ".join(_short(w, 120) for w in cur.partial_read) + "): "
+            "отсутствие замечания не доказывает исправления."
+        )
+    run_reasons = _short("; ".join(map(str, _as_list(cur.run.get("status_reasons")))) or "причина не указана", 300)
+    run_msg = (
+        f"Второй прогон завершился со статусом «{cur.status}» ({run_reasons}): отсутствие замечания не доказывает "
+        "исправления."
+    )
+    if cur.status not in ("complete", "partial"):
+        return False, run_msg
+    stage = str(fo.raw.get("stage") or "").split("#")[0]
+    if stage:
+        runs = [st for st in cur.stages if str(st.get("name") or "").split("#")[0] == stage]
+        if runs or stage in cur.incomplete_stages:
+            if stage not in cur.incomplete_stages and all(st.get("status") in ("ok", "cached") for st in runs):
+                return True, ""
+            why = "; ".join(dict.fromkeys(str(st.get("reason")) for st in runs if st.get("reason"))) or "не завершён"
+            return False, (
+                f"Этап {stage}, который нашёл замечание, во втором прогоне не завершён ({_short(why, 200)}): "
+                "отсутствие замечания не доказывает исправления."
+            )
+    return (True, "") if cur.status == "complete" else (False, run_msg)
+
+
+def _decision_proof(fo: _Finding, prev: _Edition, cur: _Edition, decisions: list) -> dict | None:
+    """Решение по --answers закрывает замечание только вместе с внесённой в опорный фрагмент правкой.
+
+    Ответ без правки или правка в другом месте ничего не доказывают. Для пропуска годится правка,
+    добавившая новый текст."""
+    for d in decisions:
+        if not d.get("edits_applied"):
+            continue
+        edits = d.get("_edits") or []
+        fresh = [e for e in edits if e.get("new") and not prev.contains(str(e["new"]))]
+        if fo.id not in d.get("touches_anchor_of", []) and not (fo.is_omission and fresh):
+            continue
+        evidence = [a for a in (cur.locate(str(e.get("new") or "")) for e in edits if e.get("new")) if a]
+        evidence = [a for a in evidence if a["match"] != "fuzzy"]
+        if not evidence:
+            continue
+        return {
+            "kind": "decision_applied",
+            "decision": d["id"],
+            "checks": [],
+            "check_refs": [],
+            "outcome": d.get("summary") or None,
+            "edits": [{"old": e.get("old"), "new": e.get("new")} for e in edits],
+            "evidence": evidence,
+        }
+    return None
 
 
 def _resolution_evidence(cur: _Edition, rl: list, proof: dict | None) -> list:
@@ -1666,8 +1768,13 @@ def _basis_warnings(prev: _Edition, cur: _Edition, warnings: list) -> None:
             )
         )
     if cur.status != "complete":
+        stages = ", ".join(sorted(cur.incomplete_stages)) or "без отметки этапа"
+        tail = " и все замечания — при неполном чтении документа." if cur.partial_read else "."
         warnings.append(
-            _warn("current_incomplete", f"Текущий прогон: статус «{cur.status}»; ни одно замечание не закрывается.")
+            _warn(
+                "current_incomplete",
+                f"Текущий прогон: статус «{cur.status}»; не закрываются замечания этапов {stages}{tail}",
+            )
         )
     for w in cur.doc_warnings:
         warnings.append(_warn("extraction", "Текущая редакция: " + _short(w, 200)))

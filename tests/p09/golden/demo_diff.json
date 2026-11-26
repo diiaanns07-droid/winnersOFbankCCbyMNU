@@ -169,7 +169,10 @@
           "source_sha256": "a2962eaec5013265cb23c182b57259dd2f128735d1b9d1794d6acf081d21a67f",
           "answered_on": "previous",
           "edits": 1,
-          "edits_applied": true
+          "edits_applied": true,
+          "touches_anchor_of": [
+            "F-1"
+          ]
         }
       ],
       "proof": {

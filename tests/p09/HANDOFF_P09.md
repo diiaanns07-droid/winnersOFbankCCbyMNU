@@ -2,7 +2,7 @@
 
 Модуль: `src/bcc_review/decisions/diff.py` (точка входа из `contracts/HANDOFF.md`:
 `bcc_review.decisions.diff:compare_reports(previous, current)`). Тесты и фикстуры: `tests/p09/`.
-Основа — `bcc/integration` с контрактом v1 `431f76d`. Зависимостей вне стандартной библиотеки нет
+Основа — `bcc/integration` @ `091e504` (контракт v1 `431f76d`). Зависимостей вне стандартной библиотеки нет
 (тесты используют `bcc_review.contracts` и `jsonschema`). Python 3.11+.
 
 ## Интерфейс
@@ -39,14 +39,20 @@ md = render_markdown(report["diff"])    # раздел «Сравнение с �
 
 | # | Условие | Код при нарушении |
 |---|---|---|
-| 1 | `current.run.status == "complete"` (при partial_read движок ставит partial) | `run_incomplete` |
+| 1 | Охват: документ прочитан полностью (нет `partial_read`…), прогон не `failed`, и **этап, нашедший замечание** (`finding.stage`), во втором прогоне завершён. Без отметки этапа нужен `run.status == "complete"` | `run_incomplete` |
 | 2 | Редакция другая (`source_sha256`). Ответ по `--answers` без правки текста не закрывает | `answer_only` / `text_unchanged` |
 | 3 | Затронутое обязательство найдено в новой редакции | `obligation_missing` (`section_missing`, `extraction_gap`, `removed`), `alignment_ambiguous` |
 | 4 | Текст в месте опоры изменился (номер «Ф-1.» в сравнении не участвует) | `anchor_unchanged` |
-| 5 | Нужная перепроверка новой редакции даёт `pass`. Нужные пары «требование × критерий» берутся из прошлых проверок `issue` с этим `finding_id` (иначе из `req_ids` и критерия замечания) и переносятся на сопоставленные пункты. `review_status` partial/not_reviewed означает, что охвата нет | `recheck_failed` (есть `issue`), `recheck_missing` (нет `pass`), `recheck_skipped` |
+| 5 | Нужная перепроверка новой редакции даёт `pass`. Нужные пары «требование × критерий» берутся из прошлых проверок `issue` с этим `finding_id` (иначе из `req_ids` и критерия замечания) и переносятся на сопоставленные пункты. Для замечания без отметки этапа `review_status` partial/not_reviewed означает, что охвата нет | `recheck_failed` (есть `issue`), `recheck_missing` (нет `pass`), `recheck_skipped` |
 | 5а | **Противоречие**: на обеих сторонах `pass`, и хотя бы одна проверка несёт `scenario`, совпадающий с `witness.input` | `recheck_missing` |
 | 5б | **Пропуск**: опора на текст, которого не было в прошлой редакции (`evidence` проверки или добавленный пункт с `pass` того же критерия) | `recheck_missing` |
+| 5в | **Иначе — внесённое решение** (`proof.kind = decision_applied`): правка `Decision.edits` заменила именно опорный фрагмент замечания (по координатам или тексту), её новый текст есть в новой редакции, а старого нет. Этап-нашедший завершён и замечание не повторил, `issue` на сторонах нет. Ответ без правки, правка в другом месте или невнесённая правка не закрывают | `recheck_missing` / `anchor_unchanged` |
 | 6 | Рядом нет похожей новой находки | `ambiguous_match` |
+
+Путь 5в нужен для сценария движка «ответ → редакция B → --compare». Тест Max
+`tests/integration/test_engine.py::test_analyst_decision_closes_conflict_keeps_independent_defect` проходит с этим
+модулем. Причина закрытия честно пишет «отдельной перепроверки сценария не было». Ложные пути
+проверены в `tests/p09/test_p09_stage_decision.py`.
 
 Критерии набора отображаются на проверки требований так же, как в `contracts/examples`:
 `set_consistent → correct`, `set_complete → complete`, `set_comprehensible → unambiguous`,
@@ -100,3 +106,16 @@ python -m pytest tests/contract tests/p09
 ```bash
 PYTHONPATH=src python -m bcc_review.decisions.diff tests/p09/golden/demo_previous.json tests/p09/golden/demo_current.json -o diff.json --view view.json --md diff.md
 ```
+
+## Стык с движком (`bcc/integration` @ 091e504)
+
+* `run_review(..., compare_path=...)` вызывает этот модуль: в паспорте
+  `run.modules.compare_reports = team:bcc_review.decisions.diff:compare_reports`. Отчёт с diff проходит
+  `validate` и `evidence_errors`, приложение «Сравнение с предыдущей редакцией» рисуется
+  (`tests/p09/test_p09_engine_stitch.py`, вход — `contracts/examples`).
+* Весь `tests/` ветки с этим модулем: 213 passed, 1 skipped (Python 3.11, `pip install -e ".[dev,pdf]"`).
+* Пока в ветке нет модуля правил, прогон всегда `partial` (`rules`, `individual` не завершены). Замечания
+  этих этапов получают «нужно подтверждение». Замечания этапа `cross` закрываются, если `cross` завершён и
+  есть доказательство из 5а–5в.
+* Движок сам добавляет строку «сравнивается та же редакция…». Модуль уже пишет предупреждение
+  `same_source`, так что строку движка можно убрать, чтобы не было дубля.

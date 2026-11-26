@@ -379,6 +379,13 @@ SPECS = {
     ),
 }
 V1_NAMES = ("conflict", "tz", "nfr", "read", "units")
+QUESTION_Q1 = {
+    "id": "Q-001",
+    "finding_ids": ["F-1"],
+    "prompt": "Сбрасывает ли смена порога месячный лимит push?",
+    "options": ["Да", "Нет, лимит один push в месяц сохраняется"],
+    "affected_req_ids": ["R-3", "R-4"],
+}
 
 
 def witness(doc: dict, a: str = CONFLICT_QUOTES[0], b: str = CONFLICT_QUOTES[1], inp: str = WITNESS_INPUT) -> dict:
