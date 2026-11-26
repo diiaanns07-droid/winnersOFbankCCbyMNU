@@ -83,8 +83,7 @@ def body(sid, text: str) -> str:
     return f"{sid}. {text}" if sid else text
 
 
-def document(paras: Iterable[Para], *, warnings: Iterable = ()) -> dict:
-    """Markdown: заголовки — блоки heading, абзац — paragraph/list_item; строки с 1."""
+def _build(paras: Iterable[Para]) -> tuple[list, list]:
     lines = [f"# {ROOT}", ""]
     blocks = [{"id": "b0001", "kind": "heading", "section": [], "text": ROOT, "loc": {"line_start": 1, "line_end": 1}}]
     last: tuple = ()
@@ -112,6 +111,17 @@ def document(paras: Iterable[Para], *, warnings: Iterable = ()) -> dict:
             }
         )
         lines += [body(sid, text), ""]
+    return lines, blocks
+
+
+def markdown(paras: Iterable[Para]) -> str:
+    """Исходный Markdown той же редакции (SHA-256 его байтов равен document(paras)["id"])."""
+    return "\n".join(_build(paras)[0])
+
+
+def document(paras: Iterable[Para], *, warnings: Iterable = ()) -> dict:
+    """Markdown: заголовки — блоки heading, абзац — paragraph/list_item; строки с 1."""
+    lines, blocks = _build(paras)
     raw = "\n".join(lines).encode("utf-8")
     warns = [w if isinstance(w, dict) else {"code": "partial_read", "message": w} for w in warnings]
     return {

@@ -164,12 +164,12 @@ def test_golden_example_for_13_and_15(name, build):
     assert path.read_text(encoding="utf-8") == text, f"обновите эталон: P09_UPDATE_GOLDEN=1 pytest tests/p09 ({name})"
 
 
-def _run_cli(*args):
-    env = {**os.environ, "PYTHONPATH": str(SRC)}
+def _run_cli(*args, console: str = "utf-8"):
+    env = {**os.environ, "PYTHONPATH": str(SRC), "PYTHONIOENCODING": console}
     return subprocess.run(
         [sys.executable, "-m", "bcc_review.decisions.diff", *map(str, args)],
         capture_output=True,
-        text=True,
+        encoding="utf-8",  # CLI всегда пишет UTF-8, тест так и читает (Windows: консоль cp1251)
         env=env,
         check=False,
     )
@@ -260,3 +260,13 @@ def test_contested_weak_candidate_is_order_independent():
     assert st["F-2"][1]["candidates"][0]["new_id"] == "G-1" and "G-1" in st["F-2"][1]["reason"]
     # проверка «issue» по Ф-2 от новой находки не даёт закрыть старые даже при правке текста
     assert {st[i][1]["reason_code"] for i in ("F-1", "F-2")} == {"recheck_failed"}
+
+
+@pytest.mark.parametrize("console", ["cp1251", "cp866"])
+def test_cli_prints_utf8_on_windows_console(tmp_path, console):
+    """Консоль Windows: без перенастройки потока русский текст выходил бы в cp1251/cp866."""
+    proc = _run_cli(
+        GOLDEN / "demo_previous.json", GOLDEN / "demo_current.json", "-o", tmp_path / "d.json", console=console
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "исправлено в тексте: 1; сохранилось: 2; нужно подтверждение: 2; новые: 1" in proc.stderr

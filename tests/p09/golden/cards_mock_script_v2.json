@@ -1,0 +1,85 @@
+{
+  "individual": {
+    "requirements": []
+  },
+  "verify_meaning": {
+    "__verdicts__": "confirmed"
+  },
+  "cross.pairs": {
+    "pairs": [
+      {
+        "pair_id": "P-002",
+        "verdict": "compatible",
+        "reason": "при 500 000 ₸ расходы не превышают порог: оба пункта дают «push не отправляется»",
+        "a": {
+          "expected": "push не отправляется",
+          "quote": "превышают порог 500 000 ₸",
+          "block_id": "b0004",
+          "constraints": []
+        },
+        "b": {
+          "expected": "push не отправляется",
+          "quote": "push не отправляется",
+          "block_id": "b0006",
+          "constraints": []
+        }
+      },
+      {
+        "pair_id": "P-003",
+        "verdict": "conflict",
+        "title": "Критерий приёмки противоречит правилу отправки push",
+        "impact": "Разработчик и тестировщик получат противоположные ожидания на границе порога.",
+        "a": {
+          "expected": "push отправляется",
+          "quote": "push отправляется, когда расходы за календарный месяц достигают порога",
+          "block_id": "b0009",
+          "constraints": []
+        },
+        "b": {
+          "expected": "push не отправляется",
+          "quote": "push не отправляется",
+          "block_id": "b0011",
+          "constraints": []
+        },
+        "witness": {
+          "description": "Дебетовая карта: расходы 49 000 ₸, порог 50 000 ₸, покупка 1 000 ₸",
+          "input": [
+            {
+              "var": "расходы после покупки",
+              "value": "равны порогу",
+              "source": "illustrative",
+              "why": "граница порога"
+            }
+          ],
+          "outcome_a": "push отправляется",
+          "outcome_b": "push не отправляется",
+          "evidence_a": {
+            "block_id": "b0009",
+            "quote": "push отправляется, когда расходы за календарный месяц достигают порога"
+          },
+          "evidence_b": {
+            "block_id": "b0011",
+            "quote": "push не отправляется"
+          }
+        }
+      }
+    ]
+  },
+  "cross.coverage": {
+    "obligations": [],
+    "links": [
+      {
+        "obligation_id": "1.1#1",
+        "acceptance_id": "R-002",
+        "relation": "checks",
+        "explanation": "критерий 1.2 проверяет границу порога и ожидает тот же исход"
+      },
+      {
+        "obligation_id": "2.1#1",
+        "acceptance_id": "R-004",
+        "relation": "contradicts",
+        "explanation": "на границе порога исходы разные"
+      }
+    ]
+  }
+}
