@@ -1587,6 +1587,20 @@ def render(report: dict, *, max_lines: int | None = MAX_LINES) -> str:
     return text
 
 
+_ANCHOR_TAG = re.compile(r'<a id="[^"]*"></a>')
+_LINK_TITLE = re.compile(r'(\]\(#[\w-]+) "[^"]*"\)')
+
+
+def export_text(md: str) -> str:
+    """Markdown-отчёт для переноса в Word/PDF (экспорт №03): без HTML-якорей, без экранирования Markdown,
+    «|» внутри ячеек заменён на «∣», чтобы простые конвертеры не ломали столбцы таблиц."""
+    out = _ANCHOR_TAG.sub("", md)
+    out = _LINK_TITLE.sub(r"\1)", out)
+    out = out.replace("\\|", "∣")
+    out = re.sub(r"\\([\\`*_\[\]<>#])", r"\1", out)
+    return out
+
+
 def write(report: dict, path) -> str:
     from pathlib import Path
 

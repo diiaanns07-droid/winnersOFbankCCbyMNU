@@ -430,3 +430,21 @@ def test_sixty_plus_findings_fit_budget(sample):
     for h in REQUIRED_HEADINGS:
         assert h in md, h
     assert md.count('<a id="d-') == 66  # у каждого дефекта есть якорь, даже в сжатом виде
+
+
+def test_export_text_for_word(sample, tmp_path):
+    md = markdown.render(sample)
+    ex = markdown.export_text(md)
+    assert "<a id=" not in ex and "\\|" not in ex and "\\*" not in ex
+    assert "## 1. Паспорт прогона" in ex and "| R-07 / Ф-3 |" not in ex  # ссылки остаются ссылками
+    assert ex.count("\n") == md.count("\n")
+    exports = pytest.importorskip("bcc_review.v2.render.exports")
+    pytest.importorskip("docx")
+    import docx
+    res = exports.report_docx(sample, tmp_path / "r.docx", markdown=ex)
+    assert res["status"] == "written"
+    d = docx.Document(str(tmp_path / "r.docx"))
+    texts = [p.text for p in d.paragraphs] + [c.text for t in d.tables for row in t.rows for c in row.cells]
+    assert not [t for t in texts if "<a id" in t or "\\|" in t]
+    heads = [p.text for p in d.paragraphs if p.style.name.startswith("Heading")]
+    assert "1. Паспорт прогона" in heads and "Кратко" in heads
