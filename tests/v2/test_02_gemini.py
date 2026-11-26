@@ -88,7 +88,7 @@ def test_503_three_retries_2_5_10_then_next_model():
     assert s.calls == ["gemini-3.8-flash"] * 4 + ["gemini-3.6-flash"]
     assert sleeps == [2.0, 5.0, 10.0]
     assert r["meta"]["fallback_used"] is True and r["meta"]["called_model"] == "gemini-3.6-flash"
-    assert len(r["meta"]["attempts"]) == 4
+    assert len(r["meta"]["attempts"]) == 4 and r["meta"]["physical_calls"] == 5
 
 
 def test_503_recovers_on_retry():
@@ -171,7 +171,7 @@ def test_all_models_exhausted_message_lists_chain():
     assert e.value.kind == "overloaded"
     assert "Все модели Gemini" in e.value.message and "gemini-3.5-flash-lite" in e.value.message
     assert len(s.calls) == 12 and sleeps == [2.0, 5.0, 10.0] * 3
-    assert len(e.value.attempts) == 12
+    assert len(e.value.attempts) == 12 and e.value.physical_calls == 12
 
 
 def test_explicit_model_goes_first():

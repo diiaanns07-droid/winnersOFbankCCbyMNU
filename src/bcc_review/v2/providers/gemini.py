@@ -311,7 +311,8 @@ class GeminiProvider:
         actual = str(result.get("model") or called)
         meta.update({"provider": PROVIDER, "requested_model": chain[0], "called_model": called,
                      "fallback_used": called != chain[0], "attempts": attempts, "model_chain": chain,
-                     "thinking": dict(thinking)})
+                     "thinking": dict(thinking),
+                     "physical_calls": 1 + sum(1 for a in attempts if "kind" in a)})
         stop = str(result.get("stop_reason") or "STOP").upper()
         return {"data": result.get("data"), "usage": usage, "model": actual,
                 "request_id": str(result.get("request_id") or ""),
@@ -333,6 +334,7 @@ class GeminiProvider:
         err = ProviderError(exc.kind, message, retry_after_s=exc.retry_after_s, status=exc.status,
                             request_id=exc.request_id, usage=exc.usage, model=exc.model)
         err.attempts = attempts  # type: ignore[attr-defined]
+        err.physical_calls = sum(1 for a in attempts if "kind" in a)  # type: ignore[attr-defined]
         err.model_chain = chain  # type: ignore[attr-defined]
         err.provider = PROVIDER  # type: ignore[attr-defined]
         return err
