@@ -531,3 +531,19 @@ def test_user_texts_have_no_latin_severity_words():
     for t in texts:
         assert not re.search(r"\b(critical|major|minor)\b", t, re.I), t
     assert res["verdict_summary"].startswith("критичных дефектов нет")
+
+
+def test_plan_b_candidates_from_v1_report():
+    rep = json.loads((ROOT / "contracts" / "examples" / "minimal_report.json").read_text(encoding="utf-8"))
+    view = {"lines": [{"n": 39, "text": "На карту приходится максимум один push за календарный месяц."},
+                      {"n": 40, "text": "Если ниже, следующее достижение вызывает push независимо от истории."}]}
+    cs = judge.candidates_from_v1(rep, view)
+    assert len(cs) == 1
+    c = cs[0]
+    assert c["kind"] == "contradiction" and c["blocks"] == "both" and c["source"] == "v1:cross"
+    assert [e["line_start"] for e in c["evidence"]] == [39, 40]
+    assert all(e["verified"] != "missing" for e in c["evidence"])
+    assert "Push не отправляется" in c["scenario"]
+    res = judge.run(Ctx(FakeLLM(response([finding("F01", ["C-001"], kind="contradiction")])), view=view,
+                        requirements=[]), cs)
+    assert res["findings"][0]["evidence"][0]["line_start"] == 39

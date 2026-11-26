@@ -1182,6 +1182,65 @@ def compute_verdict(findings: list[dict], status: str = "complete") -> dict:
     return {"development": side("development"), "testing": side("testing"), "fix_first": fix_first}
 
 
+# --- план Б: судья поверх находок v1 ------------------------------------------------------------
+
+_V1_KINDS = {"conflict": "contradiction", "contradiction": "contradiction", "gap": "missing_element",
+             "missing": "missing_element", "vague": "ambiguity", "unclear": "ambiguity"}
+
+
+def _find_line(view: dict, quote: str, hint: int | None = None) -> int | None:
+    q = _norm_q(quote)
+    if not q:
+        return None
+    lines = view.get("lines") or []
+    hits = [ln.get("n") for ln in lines if q in _norm_q(ln.get("text"))]
+    if not hits:  # цитата через 2–3 соседние строки
+        for i in range(len(lines)):
+            if q in _norm_q(" ".join(_s(x.get("text")) for x in lines[i:i + 3])):
+                hits.append(lines[i].get("n"))
+    if not hits:
+        return None
+    return min(hits, key=lambda n: abs(n - (hint or n)))
+
+
+def candidates_from_v1(report: dict, view: dict) -> list[dict]:
+    """Замечания отчёта v1 (`contracts/v1.json`) → кандидаты v2 для судьи (план Б из README, раздел 3).
+    Цитаты ищутся в нумерованном документе; ненайденные помечаются `missing` (судья их отклонит)."""
+    out: list[dict] = []
+    for i, f in enumerate(report.get("findings") or [], 1):
+        ev = []
+        for e in f.get("evidence") or f.get("hints") or []:
+            n = _find_line(view, _s(e.get("quote")))
+            ev.append({"quote": _s(e.get("quote")), "line": n or 0, "line_start": n or 0, "line_end": n or 0,
+                       "page": (e.get("loc") or {}).get("page") if isinstance(e.get("loc"), dict) else None,
+                       "section": "", "verified": "normalized" if n else "missing"})
+        w = f.get("witness") or {}
+        scenario = " ".join(x for x in [_s(w.get("input")), _s(w.get("outcome_a")) and f"По одному месту: {_s(w.get('outcome_a'))}.",
+                                        _s(w.get("outcome_b")) and f"По другому: {_s(w.get('outcome_b'))}."] if x)
+        kind = _s(f.get("kind"))
+        blocks = f.get("blocks") or []
+        blocks = blocks if isinstance(blocks, str) else (
+            "both" if {"development", "testing"} <= set(blocks) else (blocks[0] if blocks else "none"))
+        out.append({
+            "id": f"C-{i:03d}",
+            "title": _s(f.get("title")),
+            "kind": kind if kind in KINDS else _V1_KINDS.get(kind, "other"),
+            "criterion": _s(f.get("criterion")) if _s(f.get("criterion")) in CRITERIA else "complete",
+            "severity": _s(f.get("severity")) if _s(f.get("severity")) in SEVERITIES else "major",
+            "requirement_ids": [],
+            "evidence": ev,
+            "problem": _s(f.get("meaning_reason")) or _s(f.get("impact")),
+            "scenario": scenario,
+            "impact": _s(f.get("impact")),
+            "recommendation": _s(f.get("recommendation")),
+            "rewrite": "",
+            "question": "",
+            "blocks": blocks if blocks in BLOCKS else "none",
+            "source": f"v1:{_s(f.get('stage')) or _s(f.get('source')) or 'engine'}",
+        })
+    return out
+
+
 # --- этап -------------------------------------------------------------------------------------
 
 
@@ -1266,5 +1325,5 @@ def dumps(result: dict) -> str:  # удобство отладки
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-__all__ = ["run", "assemble", "precluster", "render_candidates", "find_checklist", "checklist_items",
+__all__ = ["run", "assemble", "candidates_from_v1", "precluster", "render_candidates", "find_checklist", "checklist_items",
            "compute_verdict", "response_schema", "BANK_CHECKLIST", "STANDARD_REFS", "REJECT_REASONS"]
