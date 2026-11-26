@@ -62,6 +62,8 @@ SET_CRITERIA = ("set_complete", "set_consistent", "set_feasible", "set_comprehen
                 "ranked", "modifiable", "traceable")
 # Коды предупреждений документа, означающие неполное чтение (готовность не может быть положительной).
 PARTIAL_READ_CODES = ("partial_read", "unreadable_page", "decode_error", "ocr_required", "truncated_input")
+# Информационные предупреждения чтения: на полноту прогона не влияют.
+INFO_WARNING_CODES = ("encoding_guess", "empty_page", "images_not_read", "pdf_repaired")
 
 # Коды выхода CLI (согласуются с №18).
 EXIT_OK = 0
@@ -296,10 +298,14 @@ DEFS: dict[str, Any] = {
                                 "rect": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
                                 "quad": {"type": "array"}}, ["start", "end", "rect"])),
         "part": _STR, "path": _STR, "runs": {"type": "array"},
+        "level": {"type": "integer", "minimum": 1}, "columns": _STRS, "empty": {"type": "boolean"},
+        "bbox": {"type": "array", "items": {"type": "number"}}, "table": {"type": "integer"},
+        "row": {"type": "integer"}, "furniture": {"type": "boolean"}, "lang": _NSTR,
     }),
     "Block": _obj({"id": _STR, "kind": _enum(BLOCK_KINDS), "section": _STRS, "text": _STR, "loc": _ref("Loc")},
                   ["id", "kind", "section", "text", "loc"]),
-    "Warning": {"anyOf": [_STR, _obj({"code": _STR, "message": _STR, "stage": _STR, "block_ids": _STRS},
+    "Warning": {"anyOf": [_STR, _obj({"code": _STR, "message": _STR, "stage": _STR, "block_ids": _STRS,
+                                      "page": {"type": "integer", "minimum": 1}},
                                      ["code", "message"])]},
     "Document": _obj({
         "id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},

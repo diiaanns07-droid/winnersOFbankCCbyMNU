@@ -261,6 +261,40 @@
         },
         "runs": {
           "type": "array"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "table": {
+          "type": "integer"
+        },
+        "row": {
+          "type": "integer"
+        },
+        "furniture": {
+          "type": "boolean"
+        },
+        "lang": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [],
@@ -329,6 +363,10 @@
               "items": {
                 "type": "string"
               }
+            },
+            "page": {
+              "type": "integer",
+              "minimum": 1
             }
           },
           "required": [
