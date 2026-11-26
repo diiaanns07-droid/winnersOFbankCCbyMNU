@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
   "run": {
-    "run_id": "20261126T183404Z-dba61171-57d0",
+    "run_id": "20261126T192056Z-dba61171-d677",
     "parent_run_id": null,
     "source_sha256": "dba611718f649983b808d5f502e79fea4f8abe64b29b10da325bc0581ecd0b4b",
     "source_name": "other_topic_cashback.md",
     "agent_version": "0.1.0",
-    "agent_commit": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+    "agent_commit": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
     "provider": "none",
     "model": null,
     "requested_model": null,
@@ -20,9 +20,9 @@
       "questions: вопросы построены по правилам без модели",
       "bank: чек-лист размечен по правилам без модели"
     ],
-    "started_at": "2026-11-26T18:34:04Z",
-    "finished_at": "2026-11-26T18:34:05Z",
-    "duration_s": 0.782,
+    "started_at": "2026-11-26T19:20:56Z",
+    "finished_at": "2026-11-26T19:20:56Z",
+    "duration_s": 0.766,
     "calls": {
       "physical": 0,
       "cache_hits": 0,
@@ -76,7 +76,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.032,
+        "duration_s": 0.062,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "fallback:bcc_review.runtime.fallback.rules:lint"
@@ -89,7 +89,7 @@
         "retries": 0,
         "model": null,
         "reason": "модель не вызывалась: режим --offline-lint (только детерминированные правила)",
-        "duration_s": 0.062,
+        "duration_s": 0.047,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.individual:review_individual"
@@ -115,7 +115,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.0,
+        "duration_s": 0.016,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.evidence:resolve_candidate"
@@ -152,7 +152,7 @@
         "retries": 0,
         "model": null,
         "reason": "фактов: 0",
-        "duration_s": 0.0,
+        "duration_s": 0.015,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.facts:reconcile_facts"
@@ -165,7 +165,7 @@
         "retries": 0,
         "model": null,
         "reason": "вопросы построены по правилам без модели",
-        "duration_s": 0.063,
+        "duration_s": 0.047,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.decisions.clarify:build_questions"
@@ -178,7 +178,7 @@
         "retries": 0,
         "model": null,
         "reason": "чек-лист размечен по правилам без модели",
-        "duration_s": 0.109,
+        "duration_s": 0.125,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.bank.checklist:build_bank_pack"
@@ -216,8 +216,8 @@
       "review_set": "team:bcc_review.analysis.cross:review_set"
     },
     "evidence_audit": {
-      "checked": 43,
-      "confirmed": 42,
+      "checked": 42,
+      "confirmed": 41,
       "ambiguous": 0,
       "rejected": 1,
       "note": "Учтена каждая подсказка-цитата кандидатов (включая опоры witness): confirmed — найдена в тексте блока, ambiguous — в нескольких блоках, rejected — не найдена. Смысл проверяется отдельно (meaning_status)."
@@ -5480,7 +5480,7 @@
         "outcomes": []
       },
       "source": "rules",
-      "stage": "rules",
+      "stage": "rules+individual",
       "notes": [],
       "rule_id": "RULE-OPEN-LIST"
     },
@@ -5904,24 +5904,19 @@
     },
     {
       "id": "F-010",
-      "scope": "set",
+      "scope": "requirement",
       "kind": "omission",
       "criterion": "set_complete",
       "severity": "major",
       "title": "Описано чтение данных, но в API только изменяющий метод «/cashback/setCategories»",
       "impact": "Экран или клиент не сможет получить текущие данные: метод чтения придётся придумывать при разработке, контракт и тесты для него отсутствуют.",
       "req_ids": [
-        "R-008",
         "R-013"
       ],
       "hints": [
         {
           "block_id": "b0010",
           "quote": "клиент быстро видит"
-        },
-        {
-          "block_id": "b0022",
-          "quote": "Приложение получает"
         },
         {
           "block_id": "b0034",
@@ -5934,12 +5929,6 @@
           "start": 33,
           "end": 52,
           "quote": "клиент быстро видит"
-        },
-        {
-          "block_id": "b0022",
-          "start": 0,
-          "end": 19,
-          "quote": "Приложение получает"
         },
         {
           "block_id": "b0034",
@@ -9382,7 +9371,7 @@
   ],
   "rejected": [],
   "exports": {
-    "html": "C:\\t\\gen\\other_topic_cashback.html",
+    "html": "C:\\t\\gen2\\other_topic_cashback.html",
     "jira": "other_topic_cashback.jira.csv"
   }
 }

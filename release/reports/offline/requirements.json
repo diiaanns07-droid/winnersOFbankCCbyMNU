@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
   "run": {
-    "run_id": "20261126T183353Z-e7dae55e-f1c4",
+    "run_id": "20261126T192046Z-e7dae55e-b277",
     "parent_run_id": null,
     "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
     "source_name": "requirements.md",
     "agent_version": "0.1.0",
-    "agent_commit": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+    "agent_commit": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
     "provider": "none",
     "model": null,
     "requested_model": null,
@@ -20,9 +20,9 @@
       "questions: вопросы построены по правилам без модели",
       "bank: чек-лист размечен по правилам без модели"
     ],
-    "started_at": "2026-11-26T18:33:53Z",
-    "finished_at": "2026-11-26T18:33:54Z",
-    "duration_s": 1.156,
+    "started_at": "2026-11-26T19:20:46Z",
+    "finished_at": "2026-11-26T19:20:47Z",
+    "duration_s": 1.094,
     "calls": {
       "physical": 0,
       "cache_hits": 0,
@@ -50,7 +50,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.172,
+        "duration_s": 0.188,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.readers.text:read_text"
@@ -62,8 +62,8 @@
         "cache_hits": 0,
         "retries": 0,
         "model": null,
-        "reason": null,
-        "duration_s": 0.062,
+        "reason": "движок добавил требований из блоков, пропущенных нарезкой: 4",
+        "duration_s": 0.047,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.inventory:build_inventory"
@@ -76,7 +76,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.047,
+        "duration_s": 0.079,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "fallback:bcc_review.runtime.fallback.rules:lint"
@@ -89,7 +89,7 @@
         "retries": 0,
         "model": null,
         "reason": "модель не вызывалась: режим --offline-lint (только детерминированные правила)",
-        "duration_s": 0.125,
+        "duration_s": 0.109,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.individual:review_individual"
@@ -102,7 +102,7 @@
         "retries": 0,
         "model": null,
         "reason": "модель не вызывалась: режим --offline-lint (только детерминированные правила)",
-        "duration_s": 0.172,
+        "duration_s": 0.156,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.cross:review_set"
@@ -115,7 +115,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.016,
+        "duration_s": 0.015,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.evidence:resolve_candidate"
@@ -165,7 +165,7 @@
         "retries": 0,
         "model": null,
         "reason": "вопросы построены по правилам без модели",
-        "duration_s": 0.079,
+        "duration_s": 0.063,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.decisions.clarify:build_questions"
@@ -10472,6 +10472,107 @@
       ],
       "review_status": "partial",
       "review_reason": "только детерминированные правила; LLM-проверка не выполнена: LLM-проверка не выполнялась: работают только локальные правила"
+    },
+    {
+      "id": "R-U01",
+      "source_id": null,
+      "text": "Мобильное приложение → сервис настроек. Карточный процессинг → учёт расходов → сервис push.",
+      "block_ids": [
+        "b0016"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0016",
+          "start": 0,
+          "end": 91,
+          "quote": "Мобильное приложение → сервис настроек. Карточный процессинг → учёт расходов → сервис push."
+        }
+      ],
+      "hints": [],
+      "kind": "unclassified",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Архитектура решения"
+      ],
+      "review_status": "partial",
+      "review_reason": "только детерминированные правила; LLM-проверка не выполнена: LLM-проверка не выполнялась: работают только локальные правила"
+    },
+    {
+      "id": "R-U02",
+      "source_id": null,
+      "text": "Проведение покупки → пересчёт расходов → проверка порога → при достижении отправка push → завершение.",
+      "block_ids": [
+        "b0021"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0021",
+          "start": 0,
+          "end": 101,
+          "quote": "Проведение покупки → пересчёт расходов → проверка порога → при достижении отправка push → завершение."
+        }
+      ],
+      "hints": [],
+      "kind": "unclassified",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Требования к изменениям",
+        "BPMN схема процесса"
+      ],
+      "review_status": "partial",
+      "review_reason": "только детерминированные правила; LLM-проверка не выполнена: LLM-проверка не выполнялась: работают только локальные правила"
+    },
+    {
+      "id": "R-U03",
+      "source_id": null,
+      "text": "Процессинг → сервис расходов: проведена покупка. Сервис расходов → настройки: получить порог карты. Сервис расходов → push: передать последние четыре цифры карты и сумму при достижении порога.",
+      "block_ids": [
+        "b0028"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0028",
+          "start": 0,
+          "end": 192,
+          "quote": "Процессинг → сервис расходов: проведена покупка. Сервис расходов → настройки: получить порог карты. Сервис расходов → push: передать последние четыре цифры карты и сумму при достижении порога."
+        }
+      ],
+      "hints": [],
+      "kind": "unclassified",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть A. Новый функционал",
+        "Sequence Diagram"
+      ],
+      "review_status": "partial",
+      "review_reason": "только детерминированные правила; LLM-проверка не выполнена: LLM-проверка не выполнялась: работают только локальные правила"
+    },
+    {
+      "id": "R-U04",
+      "source_id": null,
+      "text": "Приложение → AlertsController → хранилище настроек → AlertsController → приложение.",
+      "block_ids": [
+        "b0090"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0090",
+          "start": 0,
+          "end": 83,
+          "quote": "Приложение → AlertsController → хранилище настроек → AlertsController → приложение."
+        }
+      ],
+      "hints": [],
+      "kind": "unclassified",
+      "section": [
+        "Уведомление о расходах по карте",
+        "Часть B. REST API",
+        "Схема"
+      ],
+      "review_status": "partial",
+      "review_reason": "только детерминированные правила; LLM-проверка не выполнена: LLM-проверка не выполнялась: работают только локальные правила"
     }
   ],
   "checks": [
@@ -14047,6 +14148,294 @@
       "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Соответствие шаблону».",
       "finding_ids": [],
       "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Необходимость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Уместность уровня».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Однозначность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Полнота».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Единичность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Реализуемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Проверяемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Корректность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U01",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Соответствие шаблону».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Необходимость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Уместность уровня».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Однозначность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Полнота».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Единичность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Реализуемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Проверяемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Корректность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U02",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Соответствие шаблону».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Необходимость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Уместность уровня».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Однозначность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Полнота».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Единичность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Реализуемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Проверяемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Корректность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U03",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Соответствие шаблону».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "necessary",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Необходимость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "appropriate",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Уместность уровня».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "unambiguous",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Однозначность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "complete",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Полнота».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "singular",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Единичность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "feasible",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Реализуемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "verifiable",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Проверяемость».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "correct",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Корректность».",
+      "finding_ids": [],
+      "source": "rules"
+    },
+    {
+      "req_id": "R-U04",
+      "criterion": "conforming",
+      "status": "unknown",
+      "reason": "Без модели не оценивается: локальные правила не дали сигналов по критерию «Соответствие шаблону».",
+      "finding_ids": [],
+      "source": "rules"
     }
   ],
   "findings": [
@@ -14619,7 +15008,7 @@
         "outcomes": []
       },
       "source": "rules",
-      "stage": "rules",
+      "stage": "rules+individual",
       "notes": [],
       "rule_id": "RULE-OPEN-LIST"
     },
@@ -21191,7 +21580,7 @@
         "available": "Да",
         "checked": "Нет"
       },
-      "note": "Наличие: да — требования для проверки есть: 49. Автопроверка: нет — блокирующие замечания: F-001, F-003, F-005, F-006, F-008, F-009, F-010, F-011. Ключевое замечание: F-001 «Приёмка №2 (R-010) противоречит правилу периода (Ф-2, R-003.1): событие на…» — «Месяц определяется по дате совершения покупки в Алматы.» (строка 38).",
+      "note": "Наличие: да — требования для проверки есть: 53. Автопроверка: нет — блокирующие замечания: F-001, F-003, F-005, F-006, F-008, F-009, F-010, F-011. Ключевое замечание: F-001 «Приёмка №2 (R-010) противоречит правилу периода (Ф-2, R-003.1): событие на…» — «Месяц определяется по дате совершения покупки в Алматы.» (строка 38).",
       "finding_ids": [
         "F-001",
         "F-003",
@@ -21242,7 +21631,7 @@
       "topic": "consistency",
       "presence": {
         "value": "yes",
-        "basis": "требования для проверки есть: 49",
+        "basis": "требования для проверки есть: 53",
         "evidence": [],
         "negative_evidence": [],
         "inspected_block_ids": []
@@ -25597,7 +25986,7 @@
     "basis": "Готовность считается отдельно для разработки и тестирования: блокирует только подтверждённое критичное замечание с указанным бизнес-последствием и блокируемым решением; неполный прогон даёт «не определено», а не «можно начинать»."
   },
   "summary": {
-    "requirements": 49,
+    "requirements": 53,
     "reviewed_requirements": 0,
     "findings": 27,
     "by_severity": {
@@ -25616,14 +26005,14 @@
     "checks": {
       "pass": 4,
       "issue": 25,
-      "unknown": 388,
+      "unknown": 424,
       "na": 24
     }
   },
   "warnings": [
     {
       "code": "unprocessed_blocks",
-      "message": "блоки не попали ни в требования, ни в исключения: b0016, b0021, b0028, b0090",
+      "message": "нарезка не включила 4 содержательных блоков ни в требования, ни в исключения; движок проверяет их как требования без классификации: R-U01, R-U02, R-U03, R-U04",
       "stage": "inventory"
     },
     {
@@ -25957,7 +26346,7 @@
   ],
   "rejected": [],
   "exports": {
-    "html": "C:\\t\\gen\\requirements.html",
+    "html": "C:\\t\\gen2\\requirements.html",
     "jira": "requirements.jira.csv"
   }
 }

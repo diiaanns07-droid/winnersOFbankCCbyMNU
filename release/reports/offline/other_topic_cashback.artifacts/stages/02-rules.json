@@ -268,24 +268,19 @@
       "rule_id": "RULE-UNITS"
     },
     {
-      "scope": "set",
+      "scope": "requirement",
       "kind": "omission",
       "criterion": "set_complete",
       "severity": "major",
       "title": "Описано чтение данных, но в API только изменяющий метод «/cashback/setCategories»",
       "impact": "Экран или клиент не сможет получить текущие данные: метод чтения придётся придумывать при разработке, контракт и тесты для него отсутствуют.",
       "req_ids": [
-        "R-008",
         "R-013"
       ],
       "hints": [
         {
           "block_id": "b0010",
           "quote": "клиент быстро видит"
-        },
-        {
-          "block_id": "b0022",
-          "quote": "Приложение получает"
         },
         {
           "block_id": "b0034",
