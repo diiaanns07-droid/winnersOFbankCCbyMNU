@@ -256,3 +256,11 @@ def test_recorded_official_run_reproduces_verdict(tmp_path):
     assert sev.count("critical") >= 2 and len(sev) >= 15
     assert report["verdict"]["development"] == "no"
     assert all(e.get("verified") != "missing" for f in report["findings"] for e in f.get("evidence") or [])
+
+
+def test_cli_output_limit_error_is_treated_as_truncation():
+    err = ProviderError("unknown", "claude -p вернул ошибку (success). [claude -p, модель haiku: API Error: Claude's "
+                                   "response exceeded the 16000 output token maximum.")
+    llm = client([err, {"items": ["ok"]}])
+    assert llm.ask("s", "sys", "u", SCHEMA) == {"items": ["ok"]}
+    assert llm.stats["expanded"] == 1
