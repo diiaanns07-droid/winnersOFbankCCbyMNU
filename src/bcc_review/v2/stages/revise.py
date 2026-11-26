@@ -329,15 +329,19 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
         return {"rewrites": [], "revised_markdown": "", "stats": {"replaced": 0, "inserted": 0, "not_applied": 0,
                                                                   "pending": 0}}
     ans_text, by_finding = _answers_block(answers)
-    block = _cl.format_findings(targets)
-    system, user = ctx.prompt(STAGE, findings=block, answers=ans_text)
-    if block[:200] not in user:
-        extra = f"<дефекты>\n{block}\n</дефекты>\n\n<ответы>\n{ans_text}\n</ответы>"
-        idx = user.find("Задание: исправленная редакция")
-        user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+
+    def build(items: list) -> tuple[str, str]:
+        block = _cl.format_findings(items)
+        system, user = ctx.prompt(STAGE, findings=block, answers=ans_text)
+        if block[:200] not in user:
+            extra = f"<дефекты>\n{block}\n</дефекты>\n\n<ответы>\n{ans_text}\n</ответы>"
+            idx = user.find("Задание: исправленная редакция")
+            user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+        return system, user
+
     warnings: list[str] = []
     try:
-        raw = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=16000) or {}
+        raw = _cl.ask_items(ctx, STAGE, targets, build, SCHEMA, max_output_tokens=16000)
     except Exception as exc:  # noqa: BLE001
         _cl._warn(ctx, f"revise: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); редакция не построена")
         return {"rewrites": [], "revised_markdown": "", "stats": {}, "status": "failed"}

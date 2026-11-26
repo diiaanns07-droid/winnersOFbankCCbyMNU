@@ -373,17 +373,21 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
         return _finish(ctx, result)
 
-    system, user = ctx.prompt(STAGE, answers=_format_answers(resolved), findings=_cl.format_findings(affected),
-                              others=_cl.format_findings(others, full=False) or "—")
     block = _format_answers(resolved)
-    if block[:200] not in user:  # шаблон не подставил переменные — вставляем блоки сами
-        extra = (f"<ответы>\n{block}\n</ответы>\n\n<затронутые_дефекты>\n{_cl.format_findings(affected)}\n"
-                 f"</затронутые_дефекты>\n\n<остальные_дефекты>\n{_cl.format_findings(others, full=False) or '—'}\n"
-                 f"</остальные_дефекты>")
-        idx = user.find("Задание: пересмотр")
-        user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+    others_block = _cl.format_findings(others, full=False) or "—"
+
+    def build(items: list) -> tuple[str, str]:
+        fb = _cl.format_findings(items)
+        system, user = ctx.prompt(STAGE, answers=block, findings=fb, others=others_block)
+        if block[:200] not in user:  # шаблон не подставил переменные — вставляем блоки сами
+            extra = (f"<ответы>\n{block}\n</ответы>\n\n<затронутые_дефекты>\n{fb}\n</затронутые_дефекты>\n\n"
+                     f"<остальные_дефекты>\n{others_block}\n</остальные_дефекты>")
+            idx = user.find("Задание: пересмотр")
+            user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+        return system, user
+
     try:
-        raw = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=12000) or {}
+        raw = _cl.ask_items(ctx, STAGE, affected, build, SCHEMA, max_output_tokens=12000)
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"recheck: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); дефекты оставлены открытыми")
         for g in out_findings:
