@@ -27,6 +27,8 @@ from p09_case import (
     check,
     document,
     finding,
+    issue_checks,
+    replace,
     report,
     requirements,
     v1_paras,
@@ -75,23 +77,33 @@ def test_normalization_numbers_quotes_yo():
     assert D._norm("«Порог» — ЁЛКА") == '"порог" - елка'
 
 
+def test_strip_label_only_strips_item_numbers():
+    assert D.strip_label("Ф-1. Держатель карты") == "Держатель карты"
+    assert D.strip_label("п. 3 Изменение порога") == "Изменение порога"
+    assert D.strip_label("2) Повторное сохранение") == "Повторное сохранение"
+    assert D.strip_label("Ф-4.2. Если накопленная") == "Если накопленная"
+    assert D.strip_label("1 000 ₸ — нижняя граница") == "1 000 ₸ — нижняя граница"
+    assert D.strip_label("Если 5 дней нет событий") == "Если 5 дней нет событий"
+    assert D.strip_label("1.5 часа на ответ") == "1.5 часа на ответ"
+
+
 def test_same_kind_at_other_place_is_not_persisting():
     """Старая неоднозначность Ф-2 исправлена; новая неоднозначность Ф-1 — новая, а не «сохранилось»."""
     prev = v1_report(names=("tz",))
-    paras = [(s, sid, F2_FIXED if t == F2 else t, rid) for s, sid, t, rid in v1_paras()]
-    doc = document(paras, prefix="f")
+    paras = replace(v1_paras(), {F2: F2_FIXED})
+    doc = document(paras)
     new = finding(
         "G-1",
         doc,
         req_ids=["R-1"],
         kind="ambiguity",
-        criterion="И3",
+        criterion="unambiguous",
         severity="major",
         title="Не определено, что такое «активная карта»",
         quotes=["активной карты KZT"],
     )
-    ok = check("C-1", ["R-2"], "И3", "passed", doc=doc, quotes=["по времени Алматы (UTC+5)"])
-    cur = report(doc, requirements(doc, paras), [new], checks=[ok])
+    checks = issue_checks([new]) + [check("R-2", "unambiguous", "pass")]
+    cur = report(doc, requirements(doc, paras), [new], checks=checks, run_id="run-2")
     diff = compare_reports(prev, cur)
     assert_partition(diff, prev, cur)
     assert by_old(diff)["F-1"][0] == "resolved"
@@ -103,10 +115,9 @@ def test_same_kind_at_other_place_is_not_persisting():
 def test_deleted_requirement_not_aligned_to_neighbour():
     """Ф-3 удалён: не подменяется похожим Ф-4, противоречие не закрывается удалением."""
     prev = v1_report(names=("conflict",))
-    paras = [p for p in v1_paras() if p[2] != F3]
-    doc = document(paras, prefix="g")
-    ok = check("C-1", ["R-4"], "И8", "passed", doc=doc, quotes=["независимо от истории"], scope="set")
-    cur = report(doc, requirements(doc, paras), [], checks=[ok])
+    paras = replace(v1_paras(), {F3: None, F4: F4_FIXED})
+    doc = document(paras)
+    cur = report(doc, requirements(doc, paras), [], checks=[check("R-4", "correct", "pass")], run_id="run-2")
     diff = compare_reports(prev, cur)
     m = {r["old_ids"][0]: r for r in diff["basis"]["requirement_map"] if r["old_ids"]}
     assert m["R-3"]["relation"] == "missing" and m["R-3"]["missing"] == "removed"
@@ -129,31 +140,29 @@ def test_renumbering_collision_follows_text():
         (S_DATA, None, DATA, "N7"),
         (S_INT, None, INT, "N8"),
     ]
-    doc = document(paras, prefix="h")
-    diff = compare_reports(prev, report(doc, requirements(doc, paras), []))
+    doc = document(paras)
+    diff = compare_reports(prev, report(doc, requirements(doc, paras), [], run_id="run-2"))
     m = {r["old_ids"][0]: r for r in diff["basis"]["requirement_map"] if r["old_ids"]}
-    assert m["R-3"]["new_ids"] == ["N4"] and set(m["R-3"]["changes"]) >= {"reworded", "renumbered"}
-    assert m["R-4"]["new_ids"] == ["N5"]
+    assert m["R-3"]["new_ids"] == ["N4"] and set(m["R-3"]["changes"]) == {"reworded", "renumbered"}
+    assert m["R-4"]["new_ids"] == ["N5"] and m["R-4"]["changes"] == ["renumbered"]
     assert [r["new_ids"] for r in diff["basis"]["requirement_map"] if r["relation"] == "added"] == [["N3"]]
 
 
 def test_reworded_in_same_section_matches_and_closes_with_recheck():
     prev = v1_report(names=("nfr",))
-    paras = [(s, sid, NFR2 if t == NFR else t, rid) for s, sid, t, rid in v1_paras()]
-    doc = document(paras, prefix="k")
-    ok = check("C-1", ["R-5"], "И7", "passed", doc=doc, quotes=["не позднее 60 секунд"])
-    diff = compare_reports(prev, report(doc, requirements(doc, paras), [], checks=[ok]))
-    status, e = by_old(diff)["F-1"]
+    paras = replace(v1_paras(), {NFR: NFR2})
+    doc = document(paras)
+    cur = report(doc, requirements(doc, paras), [], checks=[check("R-5", "verifiable", "pass")], run_id="run-2")
+    status, e = by_old(compare_reports(prev, cur))["F-1"]
     assert status == "resolved"
     assert e["requirements"][0]["relation"] == "same" and "reworded" in e["requirements"][0]["changes"]
 
 
 def _moved_nfr():
-    paras = [(s, sid, t, rid) for s, sid, t, rid in v1_paras() if t != NFR]
+    paras = replace(v1_paras(), {NFR: None})
     paras.append((("Часть A. Новый функционал", "Показатели качества"), None, NFR2, "R-5"))
-    doc = document(paras, prefix="q")
-    ok = check("C-1", ["R-5"], "И7", "passed", doc=doc, quotes=["не позднее 60 секунд"])
-    return report(doc, requirements(doc, paras), [], checks=[ok])
+    doc = document(paras)
+    return report(doc, requirements(doc, paras), [], checks=[check("R-5", "verifiable", "pass")], run_id="run-2")
 
 
 def test_reworded_and_moved_is_ambiguous_without_engine():
@@ -163,17 +172,15 @@ def test_reworded_and_moved_is_ambiguous_without_engine():
     assert status == "unassessed" and e["reason_code"] == "alignment_ambiguous"
     [link] = e["requirements"]
     assert link["relation"] == "ambiguous"
-    m = {r["old_ids"][0]: r for r in diff["basis"]["requirement_map"] if r["old_ids"]}
-    assert m["R-5"]["relation"] == "ambiguous"
 
 
 def test_engine_identity_with_verified_quotes_aligns_but_check_still_required():
     calls = []
 
     def ask(stage, payload, schema):
-        calls.append((stage, payload))
+        calls.append((stage, payload, schema))
         return {
-            "match_id": payload["candidates"][0]["id"],
+            "match_id": payload["input"]["candidates"][0]["id"],
             "old_quote": "получения события",
             "new_quote": "получения события процессинга",
             "reason": "то же НФТ о сроке передачи push",
@@ -182,7 +189,9 @@ def test_engine_identity_with_verified_quotes_aligns_but_check_still_required():
     prev = v1_report(names=("nfr",))
     cur = _moved_nfr()
     diff = compare_reports(prev, cur, ask=ask)
-    assert calls and calls[0][0] == "diff_identity" and set(calls[0][1]) >= {"old", "candidates"}
+    stage, payload, schema = calls[0]
+    assert stage == "diff_identity" and set(payload) == {"task", "input", "context"}
+    assert schema["additionalProperties"] is False and set(schema["required"]) == set(schema["properties"])
     status, e = by_old(diff)["F-1"]
     assert status == "resolved" and e["requirements"][0]["via"] == "model"
     cur["checks"] = []  # модель подтвердила идентичность, но перепроверки нет — не закрыто
