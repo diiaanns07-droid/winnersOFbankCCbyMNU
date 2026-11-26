@@ -160,8 +160,8 @@ GEMINI_FALLBACK_MODELS=
 | Живой API с фальшивым ключом | **400 INVALID_ARGUMENT, `API_KEY_INVALID`** (фикстура снята) |
 | `doctor` и `models` против живого API с фальшивым ключом | `auth/invalid_key`, `transient=false`, русское сообщение со ссылкой на AI Studio, exit 2, ключ не выводится |
 | `doctor` без ключа | `not_configured/missing_key`, 0 сетевых вызовов, exit 2 |
-| `pytest tests/contract tests/p12` на Python 3.13.18 | 133 passed, 4 skipped (адаптер №11 не влит, 3 живых теста без ключа) |
-| `cold_run.sh` на свежем клоне, Python **3.11.18**, чистый venv, `pip install -e ".[dev]" google-genai==3.6.1` | exit 0: те же 133 passed и 4 skipped; `doctor` из этого venv против живого API даёт `auth/invalid_key`, exit 2 |
+| `pytest tests/contract tests/p12` на Python 3.13.18 (второй проход, с влитым 6be9e97) | 166 passed, 3 skipped (3 живых теста без ключа) |
+| `cold_run.sh` на свежем клоне c7d7f7a, Python **3.11.18**, чистый venv, `pip install -e ".[dev]" google-genai==3.6.1` | exit 0: 164 passed, 5 skipped (ещё 2 пропуска: без пакета `anthropic` тесты с адаптером №11 пропускаются); в первом проходе `doctor` из такого venv против живого API давал `auth/invalid_key`, exit 2 |
 | ruff (E,F,W,B,UP,I), mypy по адаптеру | чисто |
 
 **Не проверено** (нужен ключ команды): успешный `generateContent` с `response_json_schema` на реальной модели,
