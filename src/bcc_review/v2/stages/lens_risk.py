@@ -10,6 +10,8 @@
 * замечание, все цитаты которого — определения из раздела терминов (или первая цитата-зацепка у
   «неоднозначности/неполноты»), — не выше minor;
 * major о дублях, гонках и сбоях смежных систем — minor, если документ этих тем не касается;
+  major-риск ИБ без опоры на описанный интерфейс (адрес, GET, чужой объект, владение, номер карты,
+  журналы, хранение) — minor;
 * не больше двух critical (остальные — major), дубли по заголовку, не более 12 замечаний,
   порядок: critical → major → minor.
 
@@ -84,15 +86,25 @@ MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
         "hooks": ["повтор", "дубл", "идемпотент", "исходный итог", "однократн"],
     },
     "гонки параллельных событий": {
-        "title": r"гонк|параллельн|одновременн|конкурентн|атомарн",
+        "title": r"гонк|конкурентн|атомарн|(параллельн|одновременн)\w*\s+(\w+\s+)?(событ|запрос|операц|покуп"
+                 r"|перевод|уведомлен|обработ|вызов|списан|пополнен|начислен)",
         "hooks": ["параллельн", "одновременн", "конкурентн", "гонк", "атомарн"],
     },
     "сбои смежных систем": {
-        "title": r"сбо[йяеию]|таймаут|недоступн|(ответ|код|статус|HTTP)\w*\s+5\d\d\b|не\s+прош\w*|не\s+выполн\w*",
+        "title": r"сбо[йяеию]|таймаут|недоступн|(ответ|код|статус|HTTP)\w*\s+5\d\d\b|не\s+прош\w*|не\s+выполн\w*"
+                 r"|не\s+подтвержд\w*",
         "hooks": ["сбо", "таймаут", "недоступност", "не отвечает"],
     },
 }
 _MAJOR_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in MAJOR_NEEDS_HOOK.items()}
+
+
+# Риск ИБ уровня major — только конкретный риск описанного интерфейса (данные в адресе, GET, ответ на чужой
+# объект, проверка владения, номер карты и персональные данные в уведомлениях, журналах, хранилище).
+# Прочие «риски ИБ» (подлинность входящих событий, общие угрозы) без такой опоры — вопрос, minor.
+SECURITY_MAJOR_RE = re.compile(
+    r"строк\w*\s+запрос|query|адрес|url|\bget\b|40[34]|чуж|владе|принадлеж|сесси|роль|роли|держател"
+    r"|номер\w*\s+карт|цифр|маск|персональн|журнал|лог[аиоу]|перебор|раскры", re.I)
 
 
 def major_without_hook(candidate: dict, doc_text: str) -> str | None:
@@ -100,10 +112,11 @@ def major_without_hook(candidate: dict, doc_text: str) -> str | None:
     if candidate.get("severity") != "major":
         return None
     title = str(candidate.get("title", ""))
-    for topic, rx in _MAJOR_RES.items():
-        if rx.search(title) and not any(h in doc_text for h in MAJOR_NEEDS_HOOK[topic]["hooks"]):
-            return topic
-    return None
+    if candidate.get("kind") == "security" and not SECURITY_MAJOR_RE.search(title):
+        return "риск ИБ без опоры на описанный интерфейс"
+    matched = [topic for topic, rx in _MAJOR_RES.items() if rx.search(title)]
+    hooked = [t for t in matched if any(h in doc_text for h in MAJOR_NEEDS_HOOK[t]["hooks"])]
+    return matched[0] if matched and not hooked else None
 
 
 _TERMS_RE = re.compile(r"термин|глоссари|определени|понятия", re.I)

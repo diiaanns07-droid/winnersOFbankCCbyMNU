@@ -137,6 +137,22 @@ def test_ops_major_without_hook_is_minor():
     assert kept[0]["severity"] == "major"
 
 
+def test_security_major_needs_interface_anchor():
+    kept, _ = lens_risk.postprocess([
+        _cand("Источник уведомления не описан: подложное уведомление запускает списание", "major", "security", "risk"),
+        _cand("Изменение настройки методом GET с суммой в строке запроса", "major", "security", "risk"),
+        _cand("Для чужой карты обещаны 403 и 404", "major", "security", "risk")], "документ")
+    assert [c["severity"] for c in kept] == ["major", "major", "minor"]
+    assert kept[-1]["title"].startswith("Источник уведомления")
+    kept, _ = lens_risk.postprocess([_cand("Для чужой карты одновременно обещаны 403 и 404", "major", "security",
+                                           "risk")], "документ")
+    assert kept[0]["severity"] == "major", "«одновременно обещаны» — не гонка событий"
+    doc = "Повторная доставка одного события сохраняет исходный итог."
+    kept, _ = lens_risk.postprocess([_cand("Идемпотентность без ключа дедупликации; гонки у границы не описаны",
+                                           "major", "ops_risk", "risk")], doc)
+    assert kept[0]["severity"] == "major", "одна из тем (повторы) имеет зацепку"
+
+
 def test_refund_rollback_wording_not_dropped():
     kept, _ = lens_risk.postprocess([_cand("Списание без отката денег, если пополнение не прошло")], "текст")
     assert len(kept) == 1 and kept[0]["severity"] == "minor"
