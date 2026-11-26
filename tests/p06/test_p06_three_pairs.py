@@ -8,7 +8,7 @@
 
 from decimal import Decimal
 
-from conftest import evidence_ok, requirements_from
+from p06_helpers import evidence_ok, requirements_from
 
 from bcc_review.analysis.cross import review_set
 from bcc_review.analysis.facts import reconcile_facts

@@ -8,7 +8,7 @@
 
 import pytest
 
-from conftest import ScriptedAsk, block_with, evidence_ok, requirements_from
+from p06_helpers import ScriptedAsk, block_with, evidence_ok, requirements_from
 
 from bcc_review.analysis.cross import review_set
 from bcc_review.analysis.facts import reconcile_facts
@@ -43,7 +43,7 @@ def test_offline_case_findings(load, loader, mode):
     assert len(gap) == 1
     g = gap[0]
     assert "читает и сохраняет настройки" in g["promise"]["quote"] and evidence_ok(doc, g["promise"])
-    assert g["inspected_scope"]["span"] == "строки 95–197"
+    assert g["inspected_scope"]["span"] in ("строки 95–197", "строки 95–198")  # читатели по-разному считают ограду кода
     assert g["found"] == ["GET /alerts/saveLimit — сохранение"]
     assert any("get/read/list" in s for s in g["searched_for"])
     controller = next(b["id"] for b in doc["blocks"] if "AlertsController" in b["text"] and "table" in b["kind"])

@@ -5,7 +5,7 @@
 цитаты («… 1 % …» и «… 2 % — 200 ₸») поддерживают разные исходы одного события.
 """
 
-from conftest import block_with, evidence_ok, requirements_from
+from p06_helpers import block_with, evidence_ok, requirements_from
 
 from bcc_review.analysis.cross import review_set
 

@@ -8,7 +8,7 @@
 
 import copy
 
-from conftest import ScriptedAsk, evidence_ok, requirements_from
+from p06_helpers import ScriptedAsk, evidence_ok, requirements_from
 
 from bcc_review.analysis.cross import review_set
 

@@ -16,7 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parents[1] / "src"), str(HERE)]
 
-from conftest import ScriptedAsk, block_with  # noqa: E402
+from p06_helpers import ScriptedAsk, block_with  # noqa: E402
 
 from bcc_review.analysis.cross import review_set  # noqa: E402
 from bcc_review.analysis.facts import reconcile_facts  # noqa: E402
@@ -141,9 +141,11 @@ def main(argv: list[str]) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     from bcc_review.runtime.modules import Modules
 
+    from bcc_review.contracts import as_plain, normalize_document
+
     m = Modules()
-    doc = m.get("read_pdf" if src.suffix.lower() == ".pdf" else "read_text").func(str(src))
-    inv = m.get("build_inventory").func(doc)
+    doc = normalize_document(m.get("read_pdf" if src.suffix.lower() == ".pdf" else "read_text").func(str(src)))
+    inv = as_plain(m.get("build_inventory").func(doc))
     ask = _scripted(doc) if "--scripted" in argv else None
     res = review_set(doc, inv["requirements"], ask, fact_hints=inv["fact_hints"])
     stem = src.stem + ("-pdf" if src.suffix.lower() == ".pdf" else "") + ("-scripted" if ask else "-rules")

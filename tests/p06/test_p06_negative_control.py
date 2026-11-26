@@ -3,7 +3,7 @@
 не порождают противоречия ни в правилах, ни после «наивного» ответа модели.
 """
 
-from conftest import ScriptedAsk, requirements_from
+from p06_helpers import ScriptedAsk, requirements_from
 
 from bcc_review.analysis.cross import review_set
 

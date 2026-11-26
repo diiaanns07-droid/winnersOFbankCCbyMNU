@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from conftest import evidence_ok
+from p06_helpers import evidence_ok
 
 from bcc_review.analysis.cross import eval_constraint, outcomes_incompatible, sentence_spans
 from bcc_review.analysis.facts import (
@@ -97,7 +97,7 @@ def test_hints_from_04_enrich_and_reject():
     amount = [f for f in fs.facts if f.field == "amount"][0]
     assert amount.unit == "KZT" and amount.range["min_inclusive"] is True and amount.range["min_minor"] == 100_000
     assert "№04:unit" in amount.enriched_by
-    assert any("отклонена" in w for w in fs.warnings)
+    assert any("без подтверждённой опоры не использованы: 1" in w for w in fs.warnings)
     out = reconcile_facts(doc, hints)
     assert out["evidence_audit"]["rejected"] == 1
 

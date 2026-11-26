@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from conftest import FIXTURES, requirements_from
+from p06_helpers import FIXTURES, requirements_from
 
 from bcc_review.analysis.cross import review_set
 from p06_mdloader import load_markdown

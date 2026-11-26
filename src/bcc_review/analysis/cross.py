@@ -82,9 +82,25 @@ class Req:
     block_ids: list
     evidence: list
 
+    unique_label: bool = True
+
+    def _sid(self) -> str:
+        sid = (self.source_id or "").strip()
+        return sid if re.fullmatch(r"[A-Za-zА-Яа-яЁё]{1,6}[-‑–]?\d+(?:\.\d+)*", sid) else ""
+
+    @property
+    def key(self) -> str:
+        """Ключ обязательств: ID документа («Ф-1»), если он уникален, иначе ID нарезки."""
+        sid = self._sid()
+        return sid if sid and self.unique_label else self.id
+
     @property
     def label(self) -> str:
-        return self.source_id or self.id
+        """Подпись для людей: «Ф-1», а при атомарной нарезке — «Ф-2, R-003.1»."""
+        sid = self._sid()
+        if sid and not self.unique_label:
+            return f"{sid}, {self.id}"
+        return sid or self.id
 
 
 @dataclass
@@ -203,6 +219,11 @@ def _norm_requirements(view: DocView, requirements: Any, warnings: list) -> list
             warnings.append(f"{rid}: нет block_ids текущего документа — требование не участвует в покрытии.")
         out.append(Req(rid, d.get("source_id"), str(d.get("text") or ""), bids, evs))
     if out:
+        counts: dict[str, int] = {}
+        for r in out:
+            counts[r.source_id or ""] = counts.get(r.source_id or "", 0) + 1
+        for r in out:
+            r.unique_label = counts.get(r.source_id or "", 0) == 1
         return out
     # Запасной путь: требования из разделов бизнес-правил.
     n = 0
@@ -247,7 +268,7 @@ def _obligations(view: DocView, reqs: list[Req], acc_blocks: set, excluded: Opti
                 for a, b in sentence_spans(text, s0, e0):
                     n += 1
                     q = text[a:b]
-                    obls.append(Obligation(f"{r.label}#{n}", r.id, r.label, " ".join(strip_md(q).split()),
+                    obls.append(Obligation(f"{r.key}#{n}", r.id, r.label, " ".join(strip_md(q).split()),
                                            {"block_id": bid, "start": a, "end": b, "quote": q},
                                            branches_of(q), view.group(bid)))
     return obls
@@ -284,7 +305,7 @@ def _acceptance(view: DocView, fs: FactSet, reqs: list[Req]) -> list[Acc]:
                     cells[name] = row[ci].ev()
             r = by_block.get(bid)
             aid = r.id if r and r.block_ids == [bid] and rows_in_block.get(bid) == 1 else f"AC-{n}"
-            items.append(Acc(aid, f"Приёмка №{n}" if aid.startswith("AC-") else (r.label if r else aid), bid,
+            items.append(Acc(aid, f"Приёмка №{n}" + ("" if aid.startswith("AC-") else f" ({aid})"), bid,
                              text[a:b], a, cells, {"block_id": bid, "start": a, "end": b, "quote": text[a:b]},
                              r.id if r else None))
             table_blocks.add(bid)
@@ -580,15 +601,19 @@ class CrossReview:
 
     # ----------------------------------------------------------- вспомогательное
     def req_ids_for(self, *evs: Optional[dict]) -> list[str]:
+        """Требования, чьи обязательства или опоры перекрывают фрагмент; иначе — все требования блока."""
         out: list[str] = []
         for e in evs:
-            if not e:
+            sp = self._span(e)
+            if not sp:
                 continue
-            bid = e.get("block_id")
-            for o in self.obls:
-                if o.hint["block_id"] == bid and e.get("start", 0) < o.hint["end"] and o.hint["start"] < e.get("end", 10**9):
-                    out.append(o.req_id)
-            out += self.block_reqs.get(bid, [])
+            bid, s0, e0 = sp
+            hit = [o.req_id for o in self.obls if o.hint["block_id"] == bid and s0 < o.hint["end"] and o.hint["start"] < e0]
+            if not hit:
+                hit = [r.id for r in self.reqs for ev in r.evidence
+                       if str(ev.get("block_id")) == bid and isinstance(ev.get("start"), int)
+                       and s0 < ev.get("end", 0) and ev["start"] < e0]
+            out += hit or self.block_reqs.get(bid, [])
         return list(dict.fromkeys(out))
 
     def acc_ids_for(self, *evs: Optional[dict]) -> list[str]:
@@ -854,7 +879,8 @@ class CrossReview:
             "evidence_a": ev_a, "evidence_b": ev_b,
         }
         cmp = self.log("period", "mismatch", f"{acc.label} противоречит правилу «{anc['ev']['quote']}» на границе периода.")
-        a_label = ", ".join(self.req_ids_for(ev_a, anc["ev"])) or "правило"
+        labels = {r.id: r.label for r in self.reqs}
+        a_label = "; ".join(labels.get(x, x) for x in self.req_ids_for(ev_a, anc["ev"])) or "правило"
         note = ""
         if a_st.offset is None:
             note = (f" Без пояса у «{a_st.text}» пример можно прочитать иначе (например, в UTC), но и тогда "
@@ -1507,7 +1533,7 @@ class CrossReview:
         else:
             self.stats["status"] = "complete"
         for f in self.fs.facts:
-            f.req_ids = list(self.block_reqs.get((f.evidence or {}).get("block_id"), []))
+            f.req_ids = list(dict.fromkeys(f.req_ids + self.block_reqs.get((f.evidence or {}).get("block_id"), [])))
         summary = summarize_coverage(cov, self.reqs)
         summary["excluded"] = self.cov_excluded
         return {

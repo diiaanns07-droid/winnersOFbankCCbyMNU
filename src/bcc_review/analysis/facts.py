@@ -1579,50 +1579,87 @@ def _hint_range(r: Any, unit: Optional[str]) -> Optional[dict]:
     return make_range(a, b, unit, d.get("min_inclusive"), d.get("max_inclusive"))
 
 
+def _hint_evidence(h: dict, resolver: "Resolver") -> list[Evidence]:
+    """Опоры подсказки: готовые Evidence №04 (с проверкой инварианта) или hints/hint через резолвер."""
+    out: list[Evidence] = []
+    for e in h.get("evidence") or []:
+        e = as_dict(e)
+        if e and resolver.check(e):
+            out.append({k: e[k] for k in ("block_id", "start", "end", "quote")})
+    if out:
+        return out
+    hints = [as_dict(x) for x in (h.get("hints") or [])] or [as_dict(h.get("hint"))] or []
+    if not any(hints) and h.get("quote"):
+        hints = [{k: h.get(k) for k in ("block_id", "quote", "context") if h.get(k) is not None}]
+    for hint in hints:
+        if hint and hint.get("quote"):
+            ev = resolver(hint)
+            if ev:
+                out.append(ev)
+    return out
+
+
 def merge_hints(facts: list[Fact], fact_hints: Any, resolver: Resolver, warnings: list[str]) -> list[Fact]:
-    """Обогащает детерминированные факты подсказками №04; новые факты — только с опорой."""
+    """Обогащает детерминированные факты подсказками №04; новые факты — только с опорой и содержанием.
+
+    Формат №04: ``{id, subject, field, direction (request|response|business), type, value, unit, range,
+    condition, required, size, values, db_field, hints[], evidence[], req_ids}``; принимаются и
+    упрощённые ``{field, …, hint: {block_id, quote}}``.
+    """
     added: list[Fact] = []
+    rejected = 0
     for h in _iter_hints(fact_hints):
-        hint = as_dict(h.get("hint")) or {k: h.get(k) for k in ("block_id", "quote", "context") if h.get(k) is not None}
-        ev = resolver(hint) if hint else None
-        if ev is None:
-            warnings.append(f"Подсказка №04 отклонена: цитата не найдена ({str(hint.get('quote', ''))[:60]!r}).")
+        evs = _hint_evidence(h, resolver)
+        if not evs:
+            rejected += 1
             continue
         unit = unit_of(h.get("unit")) or (str(h.get("unit")) if h.get("unit") else None)
+        direction = h.get("direction") if h.get("direction") in ("request", "response") else None
+        size = h.get("size")
         slots = {
             "subject": h.get("subject"),
             "field": h.get("field") or h.get("name"),
-            "direction": (h.get("direction") or None),
+            "direction": direction,
             "type": norm_type(h.get("type")) if h.get("type") else None,
             "unit": unit,
             "condition": h.get("condition"),
             "range": _hint_range(h.get("range"), unit),
+            "binding": h.get("db_field") or h.get("binding"),
+            "enum": [str(x) for x in h.get("values")] if isinstance(h.get("values"), list) and h.get("values") else None,
+            "mandatory": h.get("required") if isinstance(h.get("required"), bool) else None,
+            "size": parse_size(size) if isinstance(size, str) and size else (size if isinstance(size, dict) else None),
         }
         val = h.get("value")
         target = None
         for f in facts:
             fe = f.evidence or {}
-            if fe.get("block_id") != ev["block_id"]:
+            if not any(fe.get("block_id") == e["block_id"] and fe.get("start", 0) < e["end"] and e["start"] < fe.get("end", 0)
+                       for e in evs):
                 continue
-            overlap = fe.get("start", 0) < ev["end"] and ev["start"] < fe.get("end", 0)
-            same_field = not slots["field"] or (tuple(keys_of(slots["field"])) in f.alias_keys())
-            if overlap and same_field:
+            if not slots["field"] or tuple(keys_of(slots["field"])) in f.alias_keys() or not f.field:
                 target = f
                 break
+        req_ids = [str(x) for x in h.get("req_ids") or []]
         if target is None:
-            f = Fact(source="hint", evidence=ev)
+            informative = slots["field"] or val is not None or (slots["range"] and slots["range"].get("min") is not None)
+            if not informative:
+                continue  # уточнение без поля («обе границы включены») уже учтено разбором раздела
+            f = Fact(source="hint", evidence=evs[0], req_ids=req_ids)
             for k, v in slots.items():
                 if v is not None:
                     setattr(f, k, v)
+            if len(evs) > 1:
+                f.cells.update({f"hint{i}": e for i, e in enumerate(evs[1:], 1)})
             if val is not None:
-                pv = parse_money(str(val)) if unit in MONEY_UNITS or parse_money(str(val)) else None
+                pv = parse_money(str(val)) if unit in MONEY_UNITS else None
                 if pv:
                     f.value, f.unit, f.value_minor = dec_str(pv[0]), pv[1], pv[2]
                 else:
                     f.value = val
-            f.enriched_by.append("№04")
+            f.enriched_by.append(f"№04:{h.get('id') or 'hint'}")
             added.append(f)
             continue
+        target.req_ids = list(dict.fromkeys(target.req_ids + req_ids))
         for k, v in slots.items():
             if v is None:
                 continue
@@ -1632,13 +1669,17 @@ def merge_hints(facts: list[Fact], fact_hints: Any, resolver: Resolver, warnings
                 target.enriched_by.append(f"№04:{k}")
             elif k == "range":
                 if (cur.get("min"), cur.get("max")) != (v.get("min"), v.get("max")):
-                    warnings.append(f"{target.id or target.field}: диапазон из подсказки №04 расходится с разбором, оставлен разбор.")
+                    warnings.append(f"{target.field}: диапазон из подсказки №04 расходится с разбором, оставлен разбор.")
                 for inc in ("min_inclusive", "max_inclusive"):
                     if cur.get(inc) is None and v.get(inc) is not None:
                         cur[inc] = v[inc]
                         target.enriched_by.append(f"№04:{inc}")
+            elif k in ("subject", "field", "condition", "size", "enum", "mandatory"):
+                continue  # формулировки и вспомогательные слоты не спорят с разбором таблицы
             elif norm(cur) != norm(v):
                 warnings.append(f"{target.field}: «{k}» из подсказки №04 ({v}) расходится с разбором ({cur}), оставлен разбор.")
+    if rejected:
+        warnings.append(f"Подсказки №04 без подтверждённой опоры не использованы: {rejected}.")
     return added
 
 
