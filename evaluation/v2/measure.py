@@ -153,6 +153,8 @@ def main(argv: list[str] | None = None) -> int:
             print("report.json не найден — замер не записан")
             return 1
         run_dir = Path(a.run_dir) if a.run_dir else find_run_dir(dest / "report.json", log)
+    for extra in ("report.html",):  # HTML большой и не нужен для оценки
+        (dest / extra).unlink(missing_ok=True)
     gold = sc.load_gold(sc.DEFAULT_GOLD)
     report = sc.as_report(json.loads((dest / "report.json").read_text(encoding="utf-8")), gold)
     md = dest / "report.md"
