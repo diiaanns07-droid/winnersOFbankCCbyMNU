@@ -1,0 +1,80 @@
+{
+  "_comment": "№43: готовые отчёты и примеры документов для главной веб-демо. Пути — от корня репозитория. Запись отчёта показывается, только если есть json, html и source; md, docx, pdf, csv — необязательные выгрузки. Отчёты руками не править: команды генерации — в README.md рядом.",
+  "reports": [
+    {
+      "id": "official",
+      "title": "Официальный ТЗ",
+      "json": "reports/requirements.json",
+      "html": "reports/requirements.html",
+      "md": "reports/requirements.md",
+      "docx": "reports/requirements.docx",
+      "csv": "reports/requirements.jira.csv",
+      "source": "release/input/requirements.md"
+    },
+    {
+      "id": "official-pdf",
+      "title": "Тот же ТЗ в PDF",
+      "json": "reports/requirements_pdf.json",
+      "html": "reports/requirements_pdf.html",
+      "md": "reports/requirements_pdf.md",
+      "docx": "reports/requirements_pdf.docx",
+      "pdf": "reports/requirements_pdf.pdf",
+      "csv": "reports/requirements_pdf.jira.csv",
+      "source": "release/input/requirements.pdf"
+    },
+    {
+      "id": "cashback",
+      "title": "Тема: кэшбэк",
+      "json": "reports/other_topic_cashback.json",
+      "html": "reports/other_topic_cashback.html",
+      "md": "reports/other_topic_cashback.md",
+      "docx": "reports/other_topic_cashback.docx",
+      "csv": "reports/other_topic_cashback.jira.csv",
+      "source": "evaluation/dev/corpus/cases/cashback.base/source.md",
+      "file_name": "cashback.md"
+    },
+    {
+      "id": "mock",
+      "title": "Демо без модели",
+      "subtitle": "mock",
+      "json": "src/bcc_review/v2/web/examples/mock/requirements.json",
+      "html": "src/bcc_review/v2/web/examples/mock/requirements.html",
+      "md": "src/bcc_review/v2/web/examples/mock/requirements.md",
+      "source": "release/input/requirements.md",
+      "notice": "Готовый отчёт без модели: ответы модели записаны заранее, сверка цитат и вердикт — настоящие."
+    }
+  ],
+  "documents": [
+    {
+      "id": "official",
+      "title": "Официальный ТЗ",
+      "kind": "Markdown",
+      "path": "release/input/requirements.md",
+      "no_key": "mock"
+    },
+    {
+      "id": "official-pdf",
+      "title": "Тот же ТЗ в PDF",
+      "kind": "PDF",
+      "path": "release/input/requirements.pdf",
+      "no_key": "mock"
+    },
+    {
+      "id": "cashback",
+      "title": "Тема: кэшбэк",
+      "kind": "Markdown",
+      "path": "evaluation/dev/corpus/cases/cashback.base/source.md",
+      "file_name": "cashback.md",
+      "no_key": "offline"
+    },
+    {
+      "id": "transfer-limit",
+      "title": "Чистый ТЗ",
+      "kind": "Markdown",
+      "path": "evaluation/dev/corpus/cases/transfer_limit.base/source.md",
+      "file_name": "transfer_limit.md",
+      "no_key": "offline",
+      "note": "без блокеров"
+    }
+  ]
+}

@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Разработка: Можно; тестирование: Можно; критичных 0, существенных 2, незначительных 8.">
+<meta name="generator" content="BCC Review 2.0.0-dev">
+<title>Ревью: ТЗ: сервис уведомлений</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7C55'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem("bccr-theme");if(t)document.documentElement.dataset.theme=t}catch(_){}</script>
+<style>
+/* HTML-отчёт v2 (№14): один файл, без внешних шрифтов и библиотек. */
+:root {
+  color-scheme: light;
+  --bg: #F4F6F8;
+  --surface: #FFFFFF;
+  --surface-2: #F1F3F6;
+  --surface-3: #E8ECF1;
+  --ink: #131820;
+  --ink-2: #44505F;
+  --ink-3: #6E7887;
+  --line: #DFE4EA;
+  --line-2: #CBD2DB;
+  --brand: #0E7C55;
+  --brand-2: #0B6545;
+  --brand-ink: #FFFFFF;
+  --brand-soft: #E3F3EC;
+  --gold: #A9781F;
+  --gold-soft: #FBF1DE;
+  --crit: #C42B2B;
+  --crit-soft: #FCE9E9;
+  --crit-mark: rgba(214, 48, 48, .22);
+  --major: #C25E00;
+  --major-soft: #FDF0E2;
+  --major-mark: rgba(230, 126, 20, .24);
+  --minor: #8A6E00;
+  --minor-soft: #FBF5D9;
+  --minor-mark: rgba(214, 178, 20, .28);
+  --ok: #1E7F45;
+  --ok-soft: #E4F4EA;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
+  --shadow-lg: 0 6px 24px rgba(16, 24, 40, .10);
+  --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --top-h: 60px;
+  --tabs-h: 46px;
+  --r: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0D1117;
+    --surface: #151B23;
+    --surface-2: #1B222C;
+    --surface-3: #232B36;
+    --ink: #E6EAF0;
+    --ink-2: #B0B9C6;
+    --ink-3: #828C9A;
+    --line: #29313C;
+    --line-2: #36404D;
+    --brand: #2FB37E;
+    --brand-2: #4CC593;
+    --brand-ink: #06130D;
+    --brand-soft: rgba(47, 179, 126, .14);
+    --gold: #E0B15E;
+    --gold-soft: rgba(224, 177, 94, .14);
+    --crit: #FF7272;
+    --crit-soft: rgba(255, 114, 114, .13);
+    --crit-mark: rgba(255, 99, 99, .30);
+    --major: #FFAA55;
+    --major-soft: rgba(255, 170, 85, .12);
+    --major-mark: rgba(255, 160, 60, .28);
+    --minor: #E8CF5A;
+    --minor-soft: rgba(232, 207, 90, .11);
+    --minor-mark: rgba(232, 207, 90, .26);
+    --ok: #4CC98A;
+    --ok-soft: rgba(76, 201, 138, .13);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, .45);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0D1117;
+  --surface: #151B23;
+  --surface-2: #1B222C;
+  --surface-3: #232B36;
+  --ink: #E6EAF0;
+  --ink-2: #B0B9C6;
+  --ink-3: #828C9A;
+  --line: #29313C;
+  --line-2: #36404D;
+  --brand: #2FB37E;
+  --brand-2: #4CC593;
+  --brand-ink: #06130D;
+  --brand-soft: rgba(47, 179, 126, .14);
+  --gold: #E0B15E;
+  --gold-soft: rgba(224, 177, 94, .14);
+  --crit: #FF7272;
+  --crit-soft: rgba(255, 114, 114, .13);
+  --crit-mark: rgba(255, 99, 99, .30);
+  --major: #FFAA55;
+  --major-soft: rgba(255, 170, 85, .12);
+  --major-mark: rgba(255, 160, 60, .28);
+  --minor: #E8CF5A;
+  --minor-soft: rgba(232, 207, 90, .11);
+  --minor-mark: rgba(232, 207, 90, .26);
+  --ok: #4CC98A;
+  --ok-soft: rgba(76, 201, 138, .13);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, .45);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-padding-top: calc(var(--top-h) + var(--tabs-h) + 12px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14.5px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+h1, h2, h3 { margin: 0; line-height: 1.25; }
+.muted { color: var(--ink-3); }
+
+/* ── верхняя панель ───────────────────────────────────────────── */
+.top {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--top-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 clamp(16px, 3vw, 32px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo {
+  flex: none; width: 34px; height: 34px; border-radius: 9px;
+  background: var(--brand);
+  position: relative;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15);
+}
+.logo::after {
+  content: ""; position: absolute; left: 10px; top: 8px; width: 9px; height: 15px;
+  border: solid var(--brand-ink); border-width: 0 3px 3px 0; transform: rotate(45deg);
+}
+.bname { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.dname { font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw; }
+.actions { display: flex; gap: 8px; flex: none; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--brand); background: var(--brand); color: var(--brand-ink);
+  font-weight: 600; font-size: 13.5px; cursor: pointer;
+  transition: background .15s, border-color .15s, transform .05s;
+}
+.btn:hover { background: var(--brand-2); border-color: var(--brand-2); }
+.btn:active { transform: translateY(1px); }
+.btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+.i-theme { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor;
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ── итог ─────────────────────────────────────────────────────── */
+.hero { padding: 22px clamp(16px, 3vw, 32px) 18px; }
+.banner { border-radius: var(--r); padding: 10px 14px; margin-bottom: 16px; font-weight: 500; }
+.banner.info { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line-2); }
+.banner.warn { background: var(--major-soft); color: var(--major); border: 1px solid color-mix(in srgb, var(--major) 35%, transparent); }
+.hero-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 18px; }
+.eyebrow { font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; margin-bottom: 8px; }
+.vcards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vcard {
+  border-radius: 12px; padding: 14px 16px 13px; border: 1px solid var(--line);
+  background: var(--surface); box-shadow: var(--shadow); position: relative; overflow: hidden;
+}
+.vcard::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--ink-3); }
+.vcard.v-no::before { background: var(--crit); }
+.vcard.v-cond::before { background: var(--major); }
+.vcard.v-yes::before { background: var(--ok); }
+.vlabel { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.vword { font-size: 28px; font-weight: 750; letter-spacing: -.01em; margin: 2px 0 1px; }
+.v-no .vword { color: var(--crit); }
+.v-cond .vword { color: var(--major); }
+.v-yes .vword { color: var(--ok); }
+.vhint { font-size: 12.5px; color: var(--ink-3); }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface);
+  box-shadow: var(--shadow); min-height: 92px;
+}
+button.tile { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+button.tile:hover { border-color: var(--line-2); box-shadow: var(--shadow-lg); }
+.tnum { font-size: 30px; font-weight: 750; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.tlab { font-size: 12.5px; color: var(--ink-2); font-weight: 550; line-height: 1.3; }
+.tlab small { display: block; color: var(--ink-3); font-weight: 450; font-size: 11.5px; margin-top: 2px; }
+.t-critical .tnum { color: var(--crit); }
+.t-major .tnum { color: var(--major); }
+.t-minor .tnum { color: var(--minor); }
+.t-ok .tnum { color: var(--ok); }
+.hero-text { margin-top: 16px; }
+.vsummary { margin: 0; font-size: 16px; line-height: 1.55; max-width: 110ch; color: var(--ink); }
+.runmeta { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.fixfirst { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 8px; box-shadow: var(--shadow); }
+.fixfirst h2 { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.fixfirst ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); column-gap: 18px; }
+.fix { display: flex; align-items: baseline; gap: 8px; padding: 5px 6px; border-radius: 7px; text-decoration: none; min-width: 0; }
+.fix:hover { background: var(--surface-2); }
+.fixn { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); font-size: 11.5px; font-weight: 700; display: inline-grid; place-items: center; transform: translateY(-1px); }
+.fix .dot { flex: none; }
+.fix .fid { flex: none; }
+.fixt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.fixl { flex: none; color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.sev-critical .dot, .sev-critical.dot { background: var(--crit); }
+.sev-major .dot, .sev-major.dot { background: var(--major); }
+.sev-minor .dot, .sev-minor.dot { background: var(--minor); }
+.fid { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+
+/* ── вкладки ──────────────────────────────────────────────────── */
+.tabs {
+  position: sticky; top: var(--top-h); z-index: 25;
+  display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none;
+  padding: 0 clamp(16px, 3vw, 32px); height: var(--tabs-h); align-items: flex-end;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none; height: 38px; padding: 0 14px; border: 0; background: none; cursor: pointer;
+  color: var(--ink-2); font-weight: 600; font-size: 13.5px; border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--brand); }
+.cnt { font-size: 11.5px; font-weight: 650; background: var(--surface-3); color: var(--ink-2); border-radius: 10px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
+.tab[aria-selected="true"] .cnt { background: var(--brand-soft); color: var(--brand); }
+main { padding: 16px clamp(16px, 3vw, 32px) 32px; }
+.panel > .ph { display: none; }
+.sub { font-size: 15px; margin: 22px 0 8px; }
+.panel > .sub:first-child, .panel > .ph + .sub { margin-top: 4px; }
+.lead { color: var(--ink-2); margin: 0 0 12px; max-width: 100ch; }
+.none { color: var(--ink-3); padding: 24px 0; }
+
+/* ── документ + карточки ──────────────────────────────────────── */
+.split { display: grid; grid-template-columns: minmax(380px, 46fr) minmax(400px, 54fr); gap: 18px; align-items: start; }
+.docpane {
+  position: sticky; top: calc(var(--top-h) + var(--tabs-h) + 12px);
+  height: calc(100vh - var(--top-h) - var(--tabs-h) - 28px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.dochead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.doctitle { font-weight: 650; font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doctitle small { color: var(--ink-3); font-weight: 450; margin-left: 8px; }
+.doctools { display: flex; gap: 12px; flex: none; }
+.tg { font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+.tg input { accent-color: var(--brand); margin: 0; }
+.docbody { flex: 1; min-height: 0; display: flex; position: relative; }
+.minimap { flex: none; width: 12px; position: relative; border-left: 1px solid var(--line); background: var(--surface-2); }
+.minimap i { position: absolute; left: 2px; right: 2px; min-height: 3px; border-radius: 1px; cursor: pointer; background: var(--ink-3); }
+.minimap i.sev-critical { background: var(--crit); }
+.minimap i.sev-major { background: var(--major); }
+.minimap i.sev-minor { background: var(--minor); }
+.minimap .vw { position: absolute; left: 0; right: 0; border: 1px solid var(--line-2); background: color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: none; }
+.doc { flex: 1; overflow: auto; padding: 6px 0 24px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; scroll-behavior: smooth; }
+.doc-empty { padding: 24px; color: var(--ink-3); font-family: var(--sans); font-size: 14px; }
+.ln { display: grid; grid-template-columns: 46px 1fr auto; align-items: start; padding: 0 10px 0 0; border-left: 3px solid transparent; position: relative; }
+.ln .no { text-align: right; padding-right: 12px; color: var(--ink-3); user-select: none; font-size: 11.5px; line-height: 20px; opacity: .8; }
+.ln .tx { white-space: pre-wrap; word-break: break-word; min-height: 20px; color: var(--ink); }
+.ln.blank { min-height: 10px; }
+.ln.blank .tx, .ln.blank .no { min-height: 10px; line-height: 10px; font-size: 0; }
+.ln.h .tx { font-weight: 700; font-family: var(--sans); font-size: 13.5px; color: var(--ink); }
+.ln.hl { cursor: pointer; }
+.ln.hl.sev-critical { background: var(--crit-soft); border-left-color: var(--crit); }
+.ln.hl.sev-major { background: var(--major-soft); border-left-color: var(--major); }
+.ln.hl.sev-minor { background: var(--minor-soft); border-left-color: var(--minor); }
+mark.q { color: inherit; border-radius: 3px; padding: 1px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+mark.q.sev-critical { background: var(--crit-mark); box-shadow: inset 0 -2px 0 var(--crit); }
+mark.q.sev-major { background: var(--major-mark); box-shadow: inset 0 -2px 0 var(--major); }
+mark.q.sev-minor { background: var(--minor-mark); box-shadow: inset 0 -2px 0 var(--minor); }
+mark.q.on { outline: 2px solid var(--brand); outline-offset: 1px; }
+.fms { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; padding: 2px 0 2px 8px; max-width: 150px; }
+.fm {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700; line-height: 16px; padding: 0 5px; border-radius: 4px;
+  text-decoration: none; color: #fff; background: var(--ink-3); white-space: nowrap;
+}
+.fm.sev-critical { background: var(--crit); }
+.fm.sev-major { background: var(--major); }
+.fm.sev-minor { background: var(--minor); color: #1d1600; }
+:root[data-theme="dark"] .fm, :root[data-theme="dark"] .fm.sev-major { color: #160b00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fm { color: #160b00; } }
+.fms .fm:nth-child(n+4) { display: none; }
+.fmore { font: 700 10.5px/16px var(--mono); padding: 0 5px; border-radius: 4px; color: var(--ink-2); background: var(--surface-3); }
+.ln:hover .fms .fm, .ln.sel .fms .fm { display: inline; }
+.ln:hover .fmore, .ln.sel .fmore { display: none; }
+.ln.sel { outline: 2px solid var(--brand); outline-offset: -2px; z-index: 1; }
+/* фокус: выбран дефект — остальная подсветка гаснет, видно только его цитаты */
+.doc.focus .ln.hl:not(.sel) { background: transparent; border-left-color: transparent; }
+.doc.focus mark.q:not(.on) { background: transparent; box-shadow: inset 0 -1px 0 var(--line-2); }
+.doc.focus .ln.hl:not(.sel) .fm { opacity: .35; }
+.doc.focus mark.q.on { box-shadow: none; }
+.ln.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { 0% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--brand) 30%, transparent); } 100% { box-shadow: inset 0 0 0 999px transparent; } }
+.ln.rqsel { background: var(--brand-soft); border-left-color: var(--brand); }
+.rtag { display: none; font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border-radius: 4px; padding: 0 5px; margin-right: 6px; }
+.doc.showreq .rtag { display: inline-block; }
+.doc.showreq .ln.ex { opacity: .5; background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--surface-3) 6px 7px); }
+.doc.onlyhl .ln:not(.hl):not(.h) { display: none; }
+.doc.onlyhl .ln.h { opacity: .7; }
+.pgbreak { margin: 10px 12px 6px 46px; padding-top: 4px; border-top: 1px dashed var(--line-2); color: var(--ink-3); font-family: var(--sans); font-size: 11.5px; }
+.legend { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-3); background: var(--surface-2); }
+.lg { width: 10px; height: 10px; border-radius: 2px; margin-left: 8px; }
+.lg:first-child { margin-left: 0; }
+.lg.sev-critical { background: var(--crit); }
+.lg.sev-major { background: var(--major); }
+.lg.sev-minor { background: var(--minor); }
+
+.filters {
+  position: sticky; top: calc(var(--top-h) + var(--tabs-h)); z-index: 10;
+  background: var(--bg); padding: 0 0 10px; margin-bottom: 2px;
+}
+.frow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.frow:first-child { margin-top: 0; padding-top: 12px; }
+.frow.small { font-size: 12.5px; color: var(--ink-3); gap: 14px; }
+.sevchip {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 16px;
+  border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 550; color: var(--ink-2);
+}
+.sevchip b { font-variant-numeric: tabular-nums; color: var(--ink); }
+.sevchip[aria-pressed="false"] { opacity: .5; background: transparent; }
+.sevchip[aria-pressed="false"] .dot { background: var(--line-2); }
+.sevchip.sev-critical[aria-pressed="true"] { border-color: color-mix(in srgb, var(--crit) 50%, var(--line)); background: var(--crit-soft); }
+.sevchip.sev-major[aria-pressed="true"] { border-color: color-mix(in srgb, var(--major) 50%, var(--line)); background: var(--major-soft); }
+.sevchip.sev-minor[aria-pressed="true"] { border-color: color-mix(in srgb, var(--minor) 50%, var(--line)); background: var(--minor-soft); }
+#q { flex: 1 1 220px; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); min-width: 0; }
+select { height: 34px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; max-width: 210px; }
+.sortl { display: inline-flex; align-items: center; gap: 6px; }
+select.mini { height: 26px; font-size: 12.5px; padding: 0 22px 0 6px; border-radius: 6px; color: var(--ink-2); }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--brand); cursor: pointer; font-weight: 600; font-size: inherit; }
+.linkbtn:hover { text-decoration: underline; }
+.kbd { margin-left: auto; }
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.empty { padding: 28px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line-2); border-radius: 12px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--ink-3);
+  border-radius: 12px; padding: 13px 16px 12px; box-shadow: var(--shadow); cursor: pointer;
+  transition: box-shadow .15s, border-color .15s; scroll-margin-top: calc(var(--top-h) + var(--tabs-h) + 130px);
+}
+.card:hover { box-shadow: var(--shadow-lg); }
+.card.sev-critical { border-left-color: var(--crit); }
+.card.sev-major { border-left-color: var(--major); }
+.card.sev-minor { border-left-color: var(--minor); }
+.card.active { box-shadow: 0 0 0 2px var(--brand), var(--shadow-lg); }
+.ch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 2px 7px; }
+.badge.sev-critical { background: var(--crit-soft); color: var(--crit); }
+.badge.sev-major { background: var(--major-soft); color: var(--major); }
+.badge.sev-minor { background: var(--minor-soft); color: var(--minor); }
+.prio { margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--gold); background: var(--gold-soft); border-radius: 5px; padding: 2px 8px; }
+.ct { font-size: 15.5px; font-weight: 650; margin: 7px 0 6px; line-height: 1.35; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip { font-size: 12px; border-radius: 6px; padding: 2px 8px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.chip.blk { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 30%, var(--line)); background: transparent; }
+.evs { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ev {
+  width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer;
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2);
+  font-size: 13.5px; line-height: 1.45;
+}
+.ev:hover { border-color: var(--line-2); background: var(--surface-3); }
+.evl { flex: none; font-size: 12px; font-weight: 650; color: var(--ink-2); min-width: 74px; white-space: nowrap; }
+.ev q { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12.5px; color: var(--ink); quotes: "«" "»"; }
+.vf { flex: none; font-weight: 800; font-size: 13px; }
+.vf.ok { color: var(--ok); }
+.vf.fuzzy { color: var(--major); }
+.vf.miss { color: var(--crit); }
+.problem { margin: 0 0 6px; color: var(--ink); }
+.more { margin: 4px 0 6px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.more summary { cursor: pointer; color: var(--brand); font-weight: 600; font-size: 13px; list-style: none; padding: 2px 0; }
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .15s; }
+.more[open] summary::before { transform: rotate(90deg); }
+.dl { margin-top: 8px; }
+.dt { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+.dd { margin-top: 2px; white-space: pre-wrap; }
+.dl.rw .dd { background: var(--brand-soft); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: 8px; padding: 8px 11px; font-family: var(--mono); font-size: 12.5px; }
+.dl.qq .dd { font-style: italic; }
+.copy { border: 1px solid var(--line-2); background: var(--surface); border-radius: 5px; font-size: 11px; padding: 0 6px; cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--ink-2); }
+.cf { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-3); margin-top: 6px; }
+.cf b { color: var(--ink-2); font-weight: 600; margin-right: 3px; }
+.rref, .fref, .lnref {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 650; text-decoration: none; border-radius: 4px; padding: 0 4px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap;
+}
+.rref:hover, .fref:hover, .lnref:hover { border-color: var(--brand); color: var(--brand); }
+.fref.sev-critical { color: var(--crit); }
+.fref.sev-major { color: var(--major); }
+.fref.sev-minor { color: var(--minor); }
+
+/* ── таблицы и прочие вкладки ─────────────────────────────────── */
+.tw { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+thead th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 700; background: var(--surface-2); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.ans { display: inline-block; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.a-yes { background: var(--ok-soft); color: var(--ok); }
+.a-no { background: var(--crit-soft); color: var(--crit); }
+.a-part { background: var(--major-soft); color: var(--major); }
+.a-na { background: var(--surface-3); color: var(--ink-2); }
+.deriv { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+.warnmark { display: inline-block; font-weight: 650; color: var(--major); }
+table.tc td:nth-child(3) { min-width: 160px; }
+table.cl td:first-child { width: 42%; }
+table.kv th { width: 210px; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink-2); background: var(--surface-2); position: static; }
+.hash { word-break: break-all; font-size: 12px; }
+.pgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); gap: 20px; align-items: start; }
+.stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.st { display: flex; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.st b { font-size: 12px; }
+.st small { display: block; color: var(--ink-3); font-size: 11.5px; }
+.st-ok b { color: var(--ok); }
+.st-partial b { color: var(--major); }
+.st-failed b { color: var(--crit); }
+.st-skipped b { color: var(--ink-3); }
+.warns { margin: 0; padding-left: 18px; color: var(--ink-2); }
+.qtools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.qtools p { margin: 0; color: var(--ink-2); }
+.qlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
+.qcard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; box-shadow: var(--shadow); }
+.qcard .to { font-size: 12.5px; color: var(--ink-3); }
+.qcard .to b { color: var(--ink-2); }
+.qlinks { margin-left: auto; display: flex; gap: 4px; }
+.opts { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.opts label { display: flex; align-items: flex-start; gap: 9px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--surface-2); }
+.opts label:hover { border-color: var(--line-2); }
+.opts input { margin: 3px 0 0; accent-color: var(--brand); }
+.opts label:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.ol { flex: none; font-weight: 700; color: var(--brand); min-width: 14px; }
+.own { display: block; font-size: 12px; color: var(--ink-3); font-weight: 600; margin-top: 4px; }
+.own textarea { display: block; width: 100%; margin-top: 3px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--surface); resize: vertical; font-weight: 400; font-size: 13.5px; }
+.topic { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--brand); margin-top: 8px; }
+.qcard .evs { margin-top: 8px; }
+.was { font-family: var(--mono); font-size: 12.5px; background: var(--crit-soft); border-radius: 6px; padding: 4px 7px; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--crit) 60%, transparent); white-space: pre-wrap; }
+.became { font-family: var(--mono); font-size: 12.5px; background: var(--ok-soft); border-radius: 6px; padding: 4px 7px; white-space: pre-wrap; }
+table.rw td:nth-child(4), table.rw td:nth-child(5) { min-width: 240px; }
+table.ba { max-width: 720px; }
+.why { margin: 8px 0 0; color: var(--ink-2); font-size: 13.5px; }
+.foot { padding: 18px clamp(16px, 3vw, 32px) 28px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 50; box-shadow: var(--shadow-lg); }
+
+/* ── узкие экраны ─────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hero-grid { grid-template-columns: 1fr; }
+}
+.split > *, .hero-grid > *, .pgrid > * { min-width: 0; }
+@media (max-width: 960px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .docpane { position: relative; top: 0; height: 52vh; }
+  .filters { top: calc(var(--top-h) + var(--tabs-h)); }
+  .pgrid { grid-template-columns: 1fr; }
+  .fixfirst ol { grid-template-columns: minmax(0, 1fr); }
+  .kbd { display: none; }
+}
+@media (max-width: 600px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vword { font-size: 22px; }
+  .brand { flex: 1; }
+  .dname { max-width: none; font-size: 15px; }
+  #dljson, #print { display: none; }
+  .ev { flex-wrap: wrap; gap: 2px 10px; }
+  .ev q { flex-basis: 100%; }
+  #q { flex-basis: 100%; }
+  .qlist { grid-template-columns: 1fr; }
+  .fixl { display: none; }
+}
+
+/* ── печать ───────────────────────────────────────────────────── */
+@page { size: A4; margin: 14mm 12mm 16mm; }
+@media print {
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --bg: #fff; --surface: #fff; --surface-2: #F4F5F7; --surface-3: #ECEEF1; --ink: #111; --ink-2: #333; --ink-3: #666;
+    --line: #D5DAE0; --line-2: #C3C9D1; --brand: #0E7C55; --brand-soft: #E7F4EE; --gold: #8A5F10; --gold-soft: #F8EED8;
+    --crit: #B42020; --crit-soft: #FBEAEA; --major: #A85000; --major-soft: #FCEFE2; --minor: #7A6200; --minor-soft: #FAF4D8;
+    --ok: #1B6E3D; --ok-soft: #E4F2E9; --shadow: none; --shadow-lg: none;
+  }
+  body { font-size: 10.5pt; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .top { position: static; backdrop-filter: none; background: #fff; height: auto; padding: 0 0 8px; }
+  .actions, .tabs, .filters, .docpane, .kbd, .copy, .qtools button, .own, .toast { display: none !important; }
+  .hero { padding: 10px 0; }
+  .hero-grid { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(5, 1fr); }
+  .tile { min-height: 0; }
+  main { padding: 0; }
+  .panel { display: block !important; margin-top: 14px; }
+  .panel > .ph { display: block; font-size: 15pt; margin: 6px 0 10px; padding-bottom: 4px; border-bottom: 2px solid var(--ink); break-after: avoid; }
+  #p-questions, #p-checklist, #p-passport { break-before: page; }
+  .split, .flist, .cards, .evs, .meta, .ch, .cf { display: block; }
+  .meta .chip, .ch > *, .cf .fl { display: inline-block; margin: 0 6px 3px 0; }
+  .ev { display: flex; }
+  .card, .qcard, .vcard, .fixfirst, tr, .foot { break-inside: avoid; }
+  .foot { padding: 10px 0 0; }
+  .card { cursor: default; margin-bottom: 8px; }
+  .card.active { box-shadow: none; }
+  .more summary { display: none; }
+  .ev { border: 0; padding: 2px 0; background: none; }
+  .qlist { display: block; }
+  .qcard { margin-bottom: 8px; }
+  .opts label { background: none; }
+  .opts input { display: none; }
+  .tw { overflow: visible; border-radius: 0; }
+  thead th { position: static; }
+  table { font-size: 9.5pt; }
+  .fixfirst ol { grid-template-columns: minmax(0, 1fr); }
+  a { text-decoration: none; }
+}
+
+</style>
+</head>
+<body data-file="tz_clean">
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span><div><div class="bname">Ревью требований</div>
+  <h1 class="dname" title="ТЗ: сервис уведомлений">ТЗ: сервис уведомлений</h1></div></div>
+  <div class="actions">
+    <button type="button" class="btn ghost" id="theme" title="Светлая или тёмная тема" aria-label="Сменить тему"><span class="i-theme"></span></button>
+    <button type="button" class="btn ghost" id="dljson" title="Скачать report.json">JSON</button>
+    <button type="button" class="btn" id="print" title="Печать или сохранение в PDF">PDF / печать</button>
+  </div>
+</header>
+
+<section class="hero" aria-label="Итог ревью">
+  
+  <div class="hero-grid">
+    <div class="verdict">
+      <h2 class="eyebrow">Можно ли начинать</h2>
+      <div class="vcards"><div class="vcard v-yes"><div class="vlabel">Разработка</div><div class="vword">Можно</div><div class="vhint">блокирующих дефектов нет</div></div><div class="vcard v-yes"><div class="vlabel">Тестирование</div><div class="vword">Можно</div><div class="vhint">блокирующих дефектов нет</div></div></div>
+    </div>
+    <div class="stats">
+      <h2 class="eyebrow">Замечания</h2>
+      <div class="tiles"><button class="tile t-critical" data-sevonly="critical" title="Показать только: критичные"><span class="tnum">0</span><span class="tlab">Критичных</span></button><button class="tile t-major" data-sevonly="major" title="Показать только: существенные"><span class="tnum">2</span><span class="tlab">Существенных</span></button><button class="tile t-minor" data-sevonly="minor" title="Показать только: незначительные"><span class="tnum">8</span><span class="tlab">Незначительных</span></button><div class="tile t-neutral"><span class="tnum">5</span><span class="tlab">требований<small>0 без замечаний</small></span></div><div class="tile t-ok" title="Каждая цитата найдена в документе программой, номер строки посчитан кодом"><span class="tnum">100 %</span><span class="tlab">цитат сверено кодом<small>19 из 19 цитат</small></span></div></div>
+    </div>
+  </div>
+  <div class="hero-text">
+    <p class="vsummary">Разработку и тестирование можно начинать: критичных дефектов нет, существенных меньше трёх. До приёмки стоит закрыть D-01 (не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3), D-02 (нет интерфейсов для чтения статуса и настройки уведомлений). Исправить первым: D-01, D-02.</p>
+    <p class="runmeta">модель claude-sonnet-5-5 · время 1 мин 10 с · 8 вызовов модели · 2026-11-27 21:37</p>
+  </div>
+  <div class="fixfirst"><h2>Исправить первым</h2><ol><li><a href="#D-01" data-goto="D-01" class="fix sev-major"><span class="fixn">1</span><span class="dot"></span><span class="fid">D-01</span><span class="fixt">Не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3</span><span class="fixl">строка 9</span></a></li><li><a href="#D-02" data-goto="D-02" class="fix sev-major"><span class="fixn">2</span><span class="dot"></span><span class="fid">D-02</span><span class="fixt">Нет интерфейсов для чтения статуса и настройки уведомлений</span><span class="fixl">строка 11</span></a></li></ol></div>
+</section>
+<nav class="tabs" role="tablist" aria-label="Разделы отчёта"><button type="button" role="tab" class="tab" id="t-findings" aria-controls="p-findings" aria-selected="true" data-tab="findings">Замечания<span class=cnt>10</span></button><button type="button" role="tab" class="tab" id="t-questions" aria-controls="p-questions" aria-selected="false" data-tab="questions">Вопросы<span class=cnt>2</span></button><button type="button" role="tab" class="tab" id="t-tests" aria-controls="p-tests" aria-selected="false" data-tab="tests">Тест-кейсы<span class=cnt>8</span></button><button type="button" role="tab" class="tab" id="t-checklist" aria-controls="p-checklist" aria-selected="false" data-tab="checklist">Чек-лист банка<span class=cnt>14</span></button><button type="button" role="tab" class="tab" id="t-checks" aria-controls="p-checks" aria-selected="false" data-tab="checks">Проверки<span class=cnt>1</span></button><button type="button" role="tab" class="tab" id="t-segment" aria-controls="p-segment" aria-selected="false" data-tab="segment">Нарезка<span class=cnt>5</span></button><button type="button" role="tab" class="tab" id="t-rejected" aria-controls="p-rejected" aria-selected="false" data-tab="rejected">Отклонённые<span class=cnt>1</span></button><button type="button" role="tab" class="tab" id="t-passport" aria-controls="p-passport" aria-selected="false" data-tab="passport">Паспорт</button></nav>
+<main><section class="panel" role="tabpanel" id="p-findings" aria-labelledby="t-findings"><h2 class="ph">Замечания</h2>
+<div class="split">
+  <aside class="docpane" aria-label="Документ">
+    <div class="dochead">
+      <div class="doctitle" title="ТЗ: сервис уведомлений">ТЗ: сервис уведомлений<small>19 строк</small></div>
+      <div class="doctools">
+        <label class="tg"><input type="checkbox" id="onlyhl"> только с замечаниями</label>
+        <label class="tg"><input type="checkbox" id="showreq"> нарезка</label>
+      </div>
+    </div>
+    <div class="docbody"><div class="doc" id="doc" tabindex="0"><div class="ln h" id="L1" data-n="1"><span class="no">1</span><span class="tx">ТЗ: сервис уведомлений</span></div>
+<div class="ln blank" id="L2" data-n="2"><span class="no">2</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L3" data-n="3"><span class="no">3</span><span class="tx">1. Роли</span></div>
+<div class="ln blank" id="L4" data-n="4"><span class="no">4</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L5" data-n="5" data-ex="Перечень ролей: «Клиент, оператор.»: Метаданные: список ролей, не требование"><span class="no">5</span><span class="tx">Клиент, оператор.</span></div>
+<div class="ln blank" id="L6" data-n="6"><span class="no">6</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L7" data-n="7"><span class="no">7</span><span class="tx">2. Требования</span></div>
+<div class="ln blank" id="L8" data-n="8"><span class="no">8</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L9" data-n="9" data-f="D-01 D-03 D-04 D-05" data-r="R-01"><span class="no">9</span><span class="tx"><span class="rtag">R-01</span><mark class="q sev-major" data-f="D-01 D-03 D-05">Ф-1. Система должна отправлять клиенту </mark><mark class="q sev-major" data-f="D-01 D-03 D-04 D-05">push-уведомление</mark><mark class="q sev-major" data-f="D-01 D-03 D-05"> о списании в течение 5 секунд</mark>.</span><span class="fms"><a class="fm sev-major" href="#D-01" data-goto="D-01">D-01</a><a class="fm sev-minor" href="#D-03" data-goto="D-03">D-03</a><a class="fm sev-minor" href="#D-04" data-goto="D-04">D-04</a><a class="fm sev-minor" href="#D-05" data-goto="D-05">D-05</a><span class="fmore" title="D-05">+1</span></span></div>
+<div class="ln blank" id="L10" data-n="10"><span class="no">10</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L11" data-n="11" data-f="D-02 D-06" data-r="R-02"><span class="no">11</span><span class="tx"><span class="rtag">R-02</span><mark class="q sev-major" data-f="D-02 D-06">Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка</mark>».</span><span class="fms"><a class="fm sev-major" href="#D-02" data-goto="D-02">D-02</a><a class="fm sev-minor" href="#D-06" data-goto="D-06">D-06</a></span></div>
+<div class="ln blank" id="L12" data-n="12"><span class="no">12</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L13" data-n="13" data-f="D-01 D-06 D-07 D-08 D-09" data-r="R-03"><span class="no">13</span><span class="tx"><span class="rtag">R-03</span><mark class="q sev-minor" data-f="D-06 D-07 D-08 D-09">Ф-3. </mark><mark class="q sev-major" data-f="D-01 D-06 D-07 D-08 D-09">При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута</mark>.</span><span class="fms"><a class="fm sev-major" href="#D-01" data-goto="D-01">D-01</a><a class="fm sev-minor" href="#D-06" data-goto="D-06">D-06</a><a class="fm sev-minor" href="#D-07" data-goto="D-07">D-07</a><a class="fm sev-minor" href="#D-08" data-goto="D-08">D-08</a><a class="fm sev-minor" href="#D-09" data-goto="D-09">D-09</a><span class="fmore" title="D-08 D-09">+2</span></span></div>
+<div class="ln blank" id="L14" data-n="14"><span class="no">14</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L15" data-n="15" data-f="D-01 D-02 D-04 D-08" data-r="R-04"><span class="no">15</span><span class="tx"><span class="rtag">R-04</span><mark class="q sev-major" data-f="D-01 D-02 D-08">Ф-4. Клиент может отключить </mark><mark class="q sev-major" data-f="D-01 D-02 D-04 D-08">уведомления</mark><mark class="q sev-major" data-f="D-01 D-02 D-08"> в настройках профиля</mark>.</span><span class="fms"><a class="fm sev-major" href="#D-01" data-goto="D-01">D-01</a><a class="fm sev-major" href="#D-02" data-goto="D-02">D-02</a><a class="fm sev-minor" href="#D-04" data-goto="D-04">D-04</a><a class="fm sev-minor" href="#D-08" data-goto="D-08">D-08</a><span class="fmore" title="D-08">+1</span></span></div>
+<div class="ln blank" id="L16" data-n="16"><span class="no">16</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L17" data-n="17"><span class="no">17</span><span class="tx">3. Интерфейсы</span></div>
+<div class="ln blank" id="L18" data-n="18"><span class="no">18</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L19" data-n="19" data-f="D-02 D-05 D-09 D-10" data-r="R-05"><span class="no">19</span><span class="tx"><span class="rtag">R-05</span><mark class="q sev-major" data-f="D-02 D-05 D-09 D-10">API POST /notify принимает поля client_id, amount, currency</mark>.</span><span class="fms"><a class="fm sev-major" href="#D-02" data-goto="D-02">D-02</a><a class="fm sev-minor" href="#D-05" data-goto="D-05">D-05</a><a class="fm sev-minor" href="#D-09" data-goto="D-09">D-09</a><a class="fm sev-minor" href="#D-10" data-goto="D-10">D-10</a><span class="fmore" title="D-10">+1</span></span></div></div><div class="minimap" id="minimap" aria-hidden="true"></div></div>
+    <div class="legend"><span class="lg sev-critical"></span>критичный<span class="lg sev-major"></span>существенный<span class="lg sev-minor"></span>незначительный</div>
+  </aside>
+  <div class="flist">
+    <div class="filters" role="search">
+      <div class="frow"><button type="button" class="sevchip sev-critical" aria-pressed="true" data-sev="critical"><span class="dot"></span>Критичные <b>0</b></button><button type="button" class="sevchip sev-major" aria-pressed="true" data-sev="major"><span class="dot"></span>Существенные <b>2</b></button><button type="button" class="sevchip sev-minor" aria-pressed="true" data-sev="minor"><span class="dot"></span>Незначительные <b>8</b></button></div>
+      <div class="frow">
+        <input type="search" id="q" placeholder="Поиск по замечаниям, цитатам, ID…" aria-label="Поиск">
+        <select id="fkind" aria-label="Вид дефекта"><option value="">Все виды</option><option value="api_contract">Контракт API</option><option value="ambiguity">Неоднозначность</option><option value="incomplete">Неполнота</option><option value="missing_element">Обещанное не описано</option><option value="traceability">Прослеживаемость</option><option value="unit_mismatch">Расхождение единиц</option><option value="terminology">Терминология</option></select>
+        <select id="fsrc" aria-label="Кто нашёл"><option value="">Все линзы</option><option value="lens:analyst">Аналитик</option><option value="lens:qa">Тестировщик</option><option value="lens:architect">Архитектор</option><option value="consistency">Набор целиком</option></select>
+      </div>
+      <div class="frow small"><span id="fcount" aria-live="polite"></span>
+        <label class="sortl">Порядок <select id="fsort" class="mini"><option value="prio">по приоритету</option><option value="line">по месту в документе</option><option value="sev">по серьёзности</option></select></label>
+        <button type="button" class="linkbtn" id="toggleall">Развернуть все</button><span class="kbd" title="Клавиши">↑ ↓ — по карточкам</span></div>
+    </div>
+    <div class="cards" id="cards"><article class="card sev-major" id="D-01" tabindex="0" data-idx="0" data-sev="major"
+ data-rank="2" data-prio="1" data-line="9" data-kind="incomplete"
+ data-src="consistency lens:analyst lens:qa" data-blocks="both" data-lines="9 13 15" data-search="d-01 не определено влияние отключения уведомлений (ф-4) на отправку по ф-1 и повторы ф-3 ф-1 требует отправлять push о списании без условий, а ф-4 позволяет отключить уведомления; что делает post /notify для отключённого клиента, какой статус виден оператору и что с повторами ф-3 при отключении между попытками — не сказано. не ясно, отключаются все уведомления или только push. клиент отключил уведомления, приходит post /notify на списание 5000 kzt. одна реализация пропустит отправку, другая отправит push по ф-1; при отключении между повторами исход тоже разный. клиент может получать уведомления, которые отключил, или оператор не увидит, почему уведомления нет. описать поведение при отключённых уведомлениях: отправка, статус для оператора, повторы, область отключения. ф-4. клиент может отключить push-уведомления о списании в настройках профиля; при отключении система не отправляет уведомление, не выполняет повторы и показывает оператору статус &lt;уточнить: название статуса&gt;. что видит оператор, если клиент отключил уведомления, и отключаются только push или все каналы? ф-1. система должна отправлять клиенту push-уведомление о списании в течение 5 секунд при ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута ф-4. клиент может отключить уведомления в настройках профиля r-01 r-02 r-03 r-04 неполнота">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-01</span><span class="prio" title="Порядок исправления">Исправить №1</span></header>
+  <h3 class="ct">Не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3</h3>
+  <div class="meta"><span class="chip kind">Неполнота</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3">Полнота набора</span><span class="chip blk">Блокирует разработку и тестирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>Ф-4. Клиент может отключить уведомления в настройках профиля</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Ф-1 требует отправлять push о списании без условий, а Ф-4 позволяет отключить уведомления; что делает POST /notify для отключённого клиента, какой статус виден оператору и что с повторами Ф-3 при отключении между попытками — не сказано. Не ясно, отключаются все уведомления или только push.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Клиент отключил уведомления, приходит POST /notify на списание 5000 KZT. Одна реализация пропустит отправку, другая отправит push по Ф-1; при отключении между повторами исход тоже разный.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Клиент может получать уведомления, которые отключил, или оператор не увидит, почему уведомления нет.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Описать поведение при отключённых уведомлениях: отправка, статус для оператора, повторы, область отключения.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Ф-4. Клиент может отключить push-уведомления о списании в настройках профиля; при отключении система не отправляет уведомление, не выполняет повторы и показывает оператору статус &lt;уточнить: название статуса&gt;.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Что видит оператор, если клиент отключил уведомления, и отключаются только push или все каналы?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a> <a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a> <a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a> <a class="rref" href="#L15" data-req="R-04" data-ls="15" data-le="15" title="Ф-4 · Клиент может отключить уведомления в профиле">R-04</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Аналитик, Набор целиком, Тестировщик</span></footer>
+</article>
+<article class="card sev-major" id="D-02" tabindex="0" data-idx="1" data-sev="major"
+ data-rank="2" data-prio="2" data-line="11" data-kind="missing_element"
+ data-src="consistency lens:architect" data-blocks="both" data-lines="11 15 19" data-search="d-02 нет интерфейсов для чтения статуса и настройки уведомлений ф-2 обещает показ статуса оператору, ф-4 — отключение в профиле, но в разделе интерфейсов только post /notify (l019). метода чтения статуса и изменения настройки нет. разработчик экрана оператора не находит метод получения статуса; разработчик профиля не знает, куда сохранить отключение уведомлений. ф-2 и ф-4 нельзя реализовать и проверить по документу. описать операцию чтения статуса доставки и операцию изменения настройки уведомлений (методы, поля, коды ответа). либо указать, что они вне этого документа. get &lt;уточнить: путь&gt; возвращает статус доставки («отправлено», «доставлено», «ошибка») по &lt;уточнить: идентификатор уведомления&gt;; &lt;уточнить: метод и путь&gt; изменяет признак «уведомления отключены» клиента. какими методами оператор получает статус и клиент отключает уведомления? ф-2. оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка ф-4. клиент может отключить уведомления в настройках профиля api post /notify принимает поля client_id, amount, currency r-02 r-04 r-05 обещанное не описано">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-02</span><span class="prio" title="Порядок исправления">Исправить №2</span></header>
+  <h3 class="ct">Нет интерфейсов для чтения статуса и настройки уведомлений</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3">Полнота набора</span><span class="chip blk">Блокирует разработку и тестирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>Ф-4. Клиент может отключить уведомления в настройках профиля</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify принимает поля client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Ф-2 обещает показ статуса оператору, Ф-4 — отключение в профиле, но в разделе интерфейсов только POST /notify (строка 19). Метода чтения статуса и изменения настройки нет.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Разработчик экрана оператора не находит метод получения статуса; разработчик профиля не знает, куда сохранить отключение уведомлений.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Ф-2 и Ф-4 нельзя реализовать и проверить по документу.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Описать операцию чтения статуса доставки и операцию изменения настройки уведомлений (методы, поля, коды ответа). Либо указать, что они вне этого документа.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">GET &lt;уточнить: путь&gt; возвращает статус доставки («отправлено», «доставлено», «ошибка») по &lt;уточнить: идентификатор уведомления&gt;; &lt;уточнить: метод и путь&gt; изменяет признак «уведомления отключены» клиента.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Какими методами оператор получает статус и клиент отключает уведомления?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a> <a class="rref" href="#L15" data-req="R-04" data-ls="15" data-le="15" title="Ф-4 · Клиент может отключить уведомления в профиле">R-04</a> <a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Архитектор, Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-03" tabindex="0" data-idx="2" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="9" data-kind="ambiguity"
+ data-src="lens:analyst" data-blocks="none" data-lines="9" data-search="d-03 срок 5 секунд не привязан к началу и концу отсчёта в ф-1 не сказано, от какого события идут 5 секунд (списание или приход post /notify) и чем они заканчиваются (уход в push-сервис или получение на устройстве). не заданы доля запросов и нагрузка. списание в 10:00:00, запрос пришёл в 10:00:04, push ушёл в 10:00:08. от запроса — 4 с, выполнено; от списания — 8 с, нарушено. разработчик и тестировщик по-разному поймут, что измерять, и приёмка по этому требованию превратится в спор. указать начальное и конечное события, долю запросов и нагрузку, при которой срок должен выдерживаться. ф-1. система должна отправлять клиенту push-уведомление о списании не позднее 5 секунд после получения запроса post /notify для не менее &lt;уточнить: доля, например 95 или 99&gt; % запросов при нагрузке &lt;уточнить: число запросов в секунду&gt;. от какого события и до какого считать 5 секунд: от списания или от запроса post /notify, до отправки в push-сервис или до доставки на устройство? ф-1. система должна отправлять клиенту push-уведомление о списании в течение 5 секунд r-01 неоднозначность">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-03</span></header>
+  <h3 class="ct">Срок 5 секунд не привязан к началу и концу отсчёта</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">В Ф-1 не сказано, от какого события идут 5 секунд (списание или приход POST /notify) и чем они заканчиваются (уход в push-сервис или получение на устройстве). Не заданы доля запросов и нагрузка.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Списание в 10:00:00, запрос пришёл в 10:00:04, push ушёл в 10:00:08. От запроса — 4 с, выполнено; от списания — 8 с, нарушено.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Разработчик и тестировщик по-разному поймут, что измерять, и приёмка по этому требованию превратится в спор.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Указать начальное и конечное события, долю запросов и нагрузку, при которой срок должен выдерживаться.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Ф-1. Система должна отправлять клиенту push-уведомление о списании не позднее 5 секунд после получения запроса POST /notify для не менее &lt;уточнить: доля, например 95 или 99&gt; % запросов при нагрузке &lt;уточнить: число запросов в секунду&gt;.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">От какого события и до какого считать 5 секунд: от списания или от запроса POST /notify, до отправки в push-сервис или до доставки на устройство?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик</span></footer>
+</article>
+<article class="card sev-minor" id="D-04" tabindex="0" data-idx="3" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="9" data-kind="terminology"
+ data-src="consistency" data-blocks="none" data-lines="9 15" data-search="d-04 терминология не едина: «push-уведомление» и «уведомления» сообщение о списании названо «push-уведомление» (l009) и «уведомления» (l015), глоссария нет. документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое. добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия. какой термин оставить для каждого из перечисленных понятий? push-уведомление уведомления терминология">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-04</span></header>
+  <h3 class="ct">Терминология не едина: «push-уведомление» и «уведомления»</h3>
+  <div class="meta"><span class="chip kind">Терминология</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5">Соответствие шаблону</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>push-уведомление</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>уведомления</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Сообщение о списании названо «push-уведомление» (строка 9) и «уведомления» (строка 15), глоссария нет.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Последствия</div><div class="dd">Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Какой термин оставить для каждого из перечисленных понятий?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-05" tabindex="0" data-idx="4" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="9" data-kind="traceability"
+ data-src="consistency" data-blocks="none" data-lines="9 19" data-search="d-05 нет приоритетов, id у api-пункта и версии документа у требований нет приоритетов, у пункта api (l019) нет id и источника, версия документа не указана. при нехватке сроков неясно, чем жертвовать; тест post /notify не связать с ф-1. спор о порядке реализации. добавить столбец приоритета и статуса. ф-1. [приоритет: &lt;уточнить&gt;] система должна... ф-1. система должна отправлять клиенту push-уведомление о списании в течение 5 секунд api post /notify принимает поля client_id, amount, currency r-01 r-02 r-03 r-04 r-05 прослеживаемость">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-05</span></header>
+  <h3 class="ct">Нет приоритетов, ID у API-пункта и версии документа</h3>
+  <div class="meta"><span class="chip kind">Прослеживаемость</span><span class="chip crit" title="IEEE 830-1998 п. 4.3.5">Ранжирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify принимает поля client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">У требований нет приоритетов, у пункта API (строка 19) нет ID и источника, версия документа не указана.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">При нехватке сроков неясно, чем жертвовать; тест POST /notify не связать с Ф-1.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Спор о порядке реализации.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить столбец приоритета и статуса.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Ф-1. [Приоритет: &lt;уточнить&gt;] Система должна...</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a> <a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a> <a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a> <a class="rref" href="#L15" data-req="R-04" data-ls="15" data-le="15" title="Ф-4 · Клиент может отключить уведомления в профиле">R-04</a> <a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></span><span class="fl"><b>Стандарт</b> IEEE 830-1998 п. 4.3.5</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-06" tabindex="0" data-idx="5" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="11" data-kind="ambiguity"
+ data-src="lens:analyst lens:architect" data-blocks="none" data-lines="11 13" data-search="d-06 статусы доставки и момент установки «ошибка» не определены ф-2 не определяет, что значит «доставлено» (принято push-сервисом или получено устройством), и когда ставится «ошибка» (после каждой неудачи или после последнего повтора по ф-3). источник сигнала о доставке не описан. первая отправка неуспешна, повтор через минуту удался. одна реализация покажет «ошибка», другая — «отправлено», а затем «доставлено». оператор получит разный статус в одной ситуации, а тестировщик не сможет проверить переходы статусов. определить каждый статус по событию и описать переходы между статусами с учётом повторов. ф-2. оператор должен видеть статус доставки уведомления: «отправлено» — запрос принят push-сервисом; «доставлено» — &lt;уточнить: подтверждение push-сервиса или устройства&gt;; «ошибка» — &lt;уточнить: после каждой неудачной попытки или после исчерпания повторов&gt;. когда ставится «ошибка»: после каждой неудачной попытки или только после последнего повтора? ф-2. оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка ф-3. при ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута r-02 r-03 неоднозначность">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-06</span></header>
+  <h3 class="ct">Статусы доставки и момент установки «ошибка» не определены</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Ф-2 не определяет, что значит «доставлено» (принято push-сервисом или получено устройством), и когда ставится «ошибка» (после каждой неудачи или после последнего повтора по Ф-3). Источник сигнала о доставке не описан.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Первая отправка неуспешна, повтор через минуту удался. Одна реализация покажет «ошибка», другая — «отправлено», а затем «доставлено».</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Оператор получит разный статус в одной ситуации, а тестировщик не сможет проверить переходы статусов.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Определить каждый статус по событию и описать переходы между статусами с учётом повторов.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено» — запрос принят push-сервисом; «доставлено» — &lt;уточнить: подтверждение push-сервиса или устройства&gt;; «ошибка» — &lt;уточнить: после каждой неудачной попытки или после исчерпания повторов&gt;.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Когда ставится «ошибка»: после каждой неудачной попытки или только после последнего повтора?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a> <a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик, Архитектор</span></footer>
+</article>
+<article class="card sev-minor" id="D-07" tabindex="0" data-idx="6" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="13" data-kind="ambiguity"
+ data-src="lens:analyst" data-blocks="none" data-lines="13" data-search="d-07 ф-3: неясно, сколько всего отправок при «до 3 раз» «повторяет отправку до 3 раз» можно понять как 3 повтора после первой отправки (всего 4) или 3 попытки всего. не определено, что считается ошибкой доставки и от какого момента идёт минута. устройство недоступно: по толкованию a уходит 4 отправки, по толкованию b — 3 отправки (2 повтора). реализация и тесты разойдутся по числу отправок, а клиент может получить лишнее или недополученное уведомление. задать число повторов после первой отправки, момент отсчёта интервала и признак ошибки доставки. ф-3. при получении статуса «ошибка» система выполняет не более 3 повторных отправок (после первой), каждую через 1 минуту после предыдущей неуспешной попытки. 3 — это повторы после первой отправки или общее число попыток? ф-3. при ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута r-03 неоднозначность">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-07</span></header>
+  <h3 class="ct">Ф-3: неясно, сколько всего отправок при «до 3 раз»</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">«Повторяет отправку до 3 раз» можно понять как 3 повтора после первой отправки (всего 4) или 3 попытки всего. Не определено, что считается ошибкой доставки и от какого момента идёт минута.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Устройство недоступно: по толкованию A уходит 4 отправки, по толкованию B — 3 отправки (2 повтора).</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Реализация и тесты разойдутся по числу отправок, а клиент может получить лишнее или недополученное уведомление.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Задать число повторов после первой отправки, момент отсчёта интервала и признак ошибки доставки.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Ф-3. При получении статуса «ошибка» система выполняет не более 3 повторных отправок (после первой), каждую через 1 минуту после предыдущей неуспешной попытки.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">3 — это повторы после первой отправки или общее число попыток?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик</span></footer>
+</article>
+<article class="card sev-minor" id="D-08" tabindex="0" data-idx="7" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="13" data-kind="missing_element"
+ data-src="lens:qa" data-blocks="none" data-lines="13 15" data-search="d-08 критерии приёмки в документе отсутствуют нет критериев приёмки: не покрыты граница 5 с, повторы ф-3, отключение ф-4, статусы ф-2, ошибки post /notify. списание 100 kzt; успех на 3-м повторе и ошибка после 3-го повтора — ожидаемый статус и число отправок приёмкой не заданы. приёмка идёт по субъективной трактовке. непокрытые ветки закрывают тест-кейсы t-02, t-03, t-04, t-05, t-07, t-08 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки. какие случаи — границы значений, отказы, повторы — добавить в критерии приёмки, чтобы по ним можно было принять или отклонить реализацию? ф-3. при ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута ф-4. клиент может отключить уведомления в настройках профиля r-01 r-02 r-03 r-04 r-05 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-08</span></header>
+  <h3 class="ct">Критерии приёмки в документе отсутствуют</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.6">Возможность валидации</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>Ф-4. Клиент может отключить уведомления в настройках профиля</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Нет критериев приёмки: не покрыты граница 5 с, повторы Ф-3, отключение Ф-4, статусы Ф-2, ошибки POST /notify.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Списание 100 KZT; успех на 3-м повторе и ошибка после 3-го повтора — ожидаемый статус и число отправок приёмкой не заданы.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Приёмка идёт по субъективной трактовке.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Непокрытые ветки закрывают тест-кейсы T-02, T-03, T-04, T-05, T-07, T-08 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Какие случаи — границы значений, отказы, повторы — добавить в критерии приёмки, чтобы по ним можно было принять или отклонить реализацию?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a> <a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a> <a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a> <a class="rref" href="#L15" data-req="R-04" data-ls="15" data-le="15" title="Ф-4 · Клиент может отключить уведомления в профиле">R-04</a> <a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.6</span><span class="fl"><b>Нашли</b> Тестировщик</span></footer>
+</article>
+<article class="card sev-minor" id="D-09" tabindex="0" data-idx="8" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="13" data-kind="api_contract"
+ data-src="lens:architect" data-blocks="none" data-lines="13 19" data-search="d-09 post /notify: не описаны ответ, коды и повторный вызов для post /notify (l019) нет тела ответа, кодов успеха и отказа, типов полей. нет идентификатора запроса для защиты от повторного вызова. источник дважды шлёт post /notify с одним списанием: не определено, вернёт ли сервис ошибку и уйдёт ли два push. интегратор не сможет реализовать вызов, а тестировщик не определит ожидаемые ответы. описать типы, обязательность, единицы полей, коды ответов с телами и идентификатор для распознавания повторного запроса. post /notify: client_id — &lt;уточнить: тип&gt;, amount — число в &lt;уточнить: единица&gt;, currency — &lt;уточнить: формат&gt;; ответ 200 — &lt;уточнить: тело&gt;; ошибки — &lt;уточнить: коды и тела&gt;. ф-3. при ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута api post /notify принимает поля client_id, amount, currency r-05 контракт api">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-09</span></header>
+  <h3 class="ct">POST /notify: не описаны ответ, коды и повторный вызов</h3>
+  <div class="meta"><span class="chip kind">Контракт API</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3">Полнота требования</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify принимает поля client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Для POST /notify (строка 19) нет тела ответа, кодов успеха и отказа, типов полей. Нет идентификатора запроса для защиты от повторного вызова.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Источник дважды шлёт POST /notify с одним списанием: не определено, вернёт ли сервис ошибку и уйдёт ли два push.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Интегратор не сможет реализовать вызов, а тестировщик не определит ожидаемые ответы.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Описать типы, обязательность, единицы полей, коды ответов с телами и идентификатор для распознавания повторного запроса.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">POST /notify: client_id — &lt;уточнить: тип&gt;, amount — число в &lt;уточнить: единица&gt;, currency — &lt;уточнить: формат&gt;; ответ 200 — &lt;уточнить: тело&gt;; ошибки — &lt;уточнить: коды и тела&gt;.</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Архитектор</span></footer>
+</article>
+<article class="card sev-minor" id="D-10" tabindex="0" data-idx="9" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="19" data-kind="unit_mismatch"
+ data-src="lens:analyst" data-blocks="none" data-lines="19" data-search="d-10 в api не определены единица суммы и формат валюты для amount и currency в l019 не заданы единица (основная или минимальная) и формат валюты. приходит amount=1500, currency=kzt: это 1500 тенге или 15 тенге в тиынах. клиент может получить уведомление с неверной суммой списания. задать единицу суммы, формат кода валюты и обязательность полей. api post /notify принимает обязательные поля client_id, amount (сумма списания в &lt;уточнить: тенге или тиынах&gt;), currency (код валюты iso 4217). в каких единицах передаётся amount: в тенге или в тиынах? api post /notify принимает поля client_id, amount, currency r-05 расхождение единиц">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-10</span></header>
+  <h3 class="ct">В API не определены единица суммы и формат валюты</h3>
+  <div class="meta"><span class="chip kind">Расхождение единиц</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify принимает поля client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Для amount и currency в строке 19 не заданы единица (основная или минимальная) и формат валюты.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Приходит amount=1500, currency=KZT: это 1500 тенге или 15 тенге в тиынах.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Клиент может получить уведомление с неверной суммой списания.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Задать единицу суммы, формат кода валюты и обязательность полей.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">API POST /notify принимает обязательные поля client_id, amount (сумма списания в &lt;уточнить: тенге или тиынах&gt;), currency (код валюты ISO 4217).</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">В каких единицах передаётся amount: в тенге или в тиынах?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик</span></footer>
+</article><div class="empty" hidden>Под фильтр не попало ни одного замечания. <button type="button" class="linkbtn" data-reset>Сбросить фильтры</button></div></div>
+  </div>
+</div></section><section class="panel" role="tabpanel" id="p-questions" aria-labelledby="t-questions" hidden><h2 class="ph">Вопросы</h2><div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p><button type="button" class="btn" id="dlanswers">Скачать ответы</button></div><div class="qlist"><article class="qcard" data-q="Q-01" data-topic="Влияние отключения уведомлений на отправку">
+  <header class="ch"><span class="fid">Q-01</span><span class="to">Кому: <b>Владелец продукта</b></span><span class="qlinks"><a class="fref sev-major" href="#D-01" data-goto="D-01" title="Не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3">D-01</a></span></header>
+  <div class="topic">Влияние отключения уведомлений на отправку</div><h3 class="ct">Что должна делать система, если клиент отключил уведомления в профиле, а запрос на уведомление о списании уже пришёл или повторы ещё идут? Что при этом видит оператор и отключается только push или все каналы?</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>Ф-4. Клиент может отключить уведомления в настройках профиля.</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд.</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-01" value="0"><span class="ol">A</span>Отключение действует на все уведомления: запрос принимается, отправка не выполняется, оператор видит новый статус «отключено клиентом», незавершённые повторы прекращаются</label></li><li><label><input type="radio" name="Q-01" value="1"><span class="ol">B</span>Отключение действует только на push: запрос принимается, push не отправляется, оператор видит новый статус «отключено клиентом», повторы прекращаются</label></li><li><label><input type="radio" name="Q-01" value="2"><span class="ol">C</span>Отключение не распространяется на уведомления о списании: они отправляются всегда, а отключаются только прочие уведомления</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-01" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Ф-1 требует отправлять всегда, Ф-4 позволяет отключить. Для одного клиента с отключённой настройкой команды реализуют разное поведение, и тест нельзя написать.</p>
+</article><article class="qcard" data-q="Q-02" data-topic="Методы чтения статуса и отключения">
+  <header class="ch"><span class="fid">Q-02</span><span class="to">Кому: <b>Архитектор</b></span><span class="qlinks"><a class="fref sev-major" href="#D-02" data-goto="D-02" title="Нет интерфейсов для чтения статуса и настройки уведомлений">D-02</a></span></header>
+  <div class="topic">Методы чтения статуса и отключения</div><h3 class="ct">Какими интерфейсами оператор получает статус доставки, а клиент отключает уведомления, если в разделе интерфейсов есть только POST /notify?</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify принимает поля client_id, amount, currency.</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>Ф-4. Клиент может отключить уведомления в настройках профиля.</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-02" value="0"><span class="ol">A</span>Добавить отдельный метод чтения статуса доставки для оператора и отдельный метод изменения настройки уведомлений клиента</label></li><li><label><input type="radio" name="Q-02" value="1"><span class="ol">B</span>Статус оператор получает через интерфейс банковского приложения оператора, а настройка отключения берётся из профиля клиента внешней системой; сервис только читает её</label></li><li><label><input type="radio" name="Q-02" value="2"><span class="ol">C</span>Добавить один метод чтения статуса, а настройка отключения хранится в сервисе уведомлений и меняется отдельным методом</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-02" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Без описанных операций нельзя реализовать Ф-2 и Ф-4, и неясно, кто хранит настройку.</p>
+</article></div></section><section class="panel" role="tabpanel" id="p-tests" aria-labelledby="t-tests" hidden><h2 class="ph">Тест-кейсы</h2><p class="lead">Черновик для раздела «Тестирование требований»: проверки, которых не хватает в критериях приёмки. Где ожидаемый результат нельзя вывести из текста, это отмечено.</p><div class="tw"><table class="tc"><thead><tr><th>ID</th><th>Требования</th><th>Проверка</th><th>Дано</th><th>Когда</th><th>Тогда</th><th>Чего нет в приёмке</th></tr></thead><tbody><tr><td><span class="fid">T-01</span></td><td><a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a> <a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></td><td><b>Push о списании отправлен за 5 секунд</b></td><td>Клиент 1 с включёнными уведомлениями</td><td>POST /notify client_id=1, amount=100, currency=KZT</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Push отправлен не позднее 5 с. Не определено требованиями: точка начала и конца замера, перцентиль.</td><td></td></tr><tr><td><span class="fid">T-02</span></td><td><a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a></td><td><b>Отправка ровно на 5 секунде</b></td><td>Запрос принят, провайдер отвечает ровно через 5 с</td><td>Измеряется время отправки</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: включена ли граница 5 с, момент замера.</td><td>Граница срока не покрыта приёмкой.</td></tr><tr><td><span class="fid">T-03</span></td><td><a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a></td><td><b>Успех на третьем повторе</b></td><td>Первая отправка и 1-й, 2-й повторы закончились ошибкой</td><td>3-й повтор через 1 минуту после 2-го успешен</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Всего 4 отправки, повторы с интервалом 1 мин. Не определено требованиями: итоговый статус и считается ли первая отправка.</td><td>Повторы не покрыты приёмкой.</td></tr><tr><td><span class="fid">T-04</span></td><td><a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a> <a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a></td><td><b>Все повторы неуспешны — итог ошибка</b></td><td>Провайдер всегда возвращает ошибку</td><td>Прошли исходная отправка и 3 повтора</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями однозначно. По тексту требований: повторов не больше 3, четвёртого повтора нет. Статус «ошибка» — по Ф-2 для оператора.</td><td>Исчерпание повторов не покрыто.</td></tr><tr><td><span class="fid">T-05</span></td><td><a class="rref" href="#L15" data-req="R-04" data-ls="15" data-le="15" title="Ф-4 · Клиент может отключить уведомления в профиле">R-04</a> <a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></td><td><b>Уведомления отключены в профиле</b></td><td>Клиент 1 отключил уведомления в профиле</td><td>POST /notify client_id=1, amount=100, currency=KZT</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: отправляется ли push, какой код ответа и статус.</td><td>Выключенная функция не покрыта.</td></tr><tr><td><span class="fid">T-06</span></td><td><a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a></td><td><b>Оператор видит статус «доставлено»</b></td><td>Push отправлен и подтверждён доставкой</td><td>Оператор открывает статус уведомления</td><td>Показан статус «доставлено».</td><td></td></tr><tr><td><span class="fid">T-07</span></td><td><a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></td><td><b>POST /notify без поля amount</b></td><td>Сервис доступен</td><td>POST /notify с client_id=1, currency=KZT без amount</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: код и тело ответа, отправка push.</td><td>Ошибки интерфейса не описаны.</td></tr><tr><td><span class="fid">T-08</span></td><td><a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></td><td><b>POST /notify с неизвестным client_id</b></td><td>client_id=999999 не существует</td><td>POST /notify client_id=999999, amount=100, currency=KZT</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: ответ и поведение системы.</td><td>Негативный сценарий не описан.</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checklist" aria-labelledby="t-checklist" hidden><h2 class="ph">Чек-лист банка</h2><p class="lead">Чек-лист «Ревью требований» банка, заполненный по результатам проверки.</p><div class="tw"><table class="cl"><thead><tr><th>Проверка</th><th>Ответ</th><th>Комментарий</th><th>Замечания</th></tr></thead><tbody><tr><td>Техническое требование зафиксировано и покрывает бизнес-требование</td><td><span class="ans a-no">Нет</span></td><td>Влияние отключения на отправку не определено (строка 9, строка 15), срок и повторы неоднозначны.</td><td><a class="fref sev-minor" href="#D-03" data-goto="D-03" title="Срок 5 секунд не привязан к началу и концу отсчёта">D-03</a> <a class="fref sev-major" href="#D-01" data-goto="D-01" title="Не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3">D-01</a> <a class="fref sev-minor" href="#D-07" data-goto="D-07" title="Ф-3: неясно, сколько всего отправок при «до 3 раз»">D-07</a></td></tr><tr><td>Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)</td><td><span class="ans a-part">Частично</span></td><td>Требования пронумерованы Ф-1…Ф-4, но нет шаблона, версии, критериев приёмки и ID у API.</td><td><a class="fref sev-minor" href="#D-08" data-goto="D-08" title="Критерии приёмки в документе отсутствуют">D-08</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05" title="Нет приоритетов, ID у API-пункта и версии документа">D-05</a></td></tr><tr><td>Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений</td><td><span class="ans a-no">Нет</span></td><td>Диаграмм взаимодействия нет, а обмен с push-сервисом и источником списаний не описан.</td><td><a class="fref sev-minor" href="#D-06" data-goto="D-06" title="Статусы доставки и момент установки «ошибка» не определены">D-06</a> <a class="fref sev-minor" href="#D-09" data-goto="D-09" title="POST /notify: не описаны ответ, коды и повторный вызов">D-09</a></td></tr><tr><td>Требование покрывает спецификацию UX/UI дизайна</td><td><span class="ans a-na">Не требуется</span></td><td>Экраны не описаны; в документе только требования и один API-метод.</td><td></td></tr><tr><td>Реализация задачи/проекта предусматривает схему отката решений</td><td><span class="ans a-part">Частично</span></td><td>Схемы отката нет, и способ выключить функцию не описан (отключение только на уровне клиента, строка 15).</td><td><a class="fref sev-major" href="#D-01" data-goto="D-01" title="Не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3">D-01</a></td></tr><tr><td>Требование может быть протестировано</td><td><span class="ans a-no">Нет</span></td><td>Срок, число повторов и статусы неоднозначны, критериев приёмки нет.</td><td><a class="fref sev-minor" href="#D-03" data-goto="D-03" title="Срок 5 секунд не привязан к началу и концу отсчёта">D-03</a> <a class="fref sev-minor" href="#D-06" data-goto="D-06" title="Статусы доставки и момент установки «ошибка» не определены">D-06</a> <a class="fref sev-minor" href="#D-07" data-goto="D-07" title="Ф-3: неясно, сколько всего отправок при «до 3 раз»">D-07</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08" title="Критерии приёмки в документе отсутствуют">D-08</a></td></tr><tr><td>Требование предусматривает модель данных или поток, содержит описание</td><td><span class="ans a-no">Нет</span></td><td>Модели данных нет: хранение статусов и настройки уведомлений не описано, поля API без типов.</td><td><a class="fref sev-major" href="#D-02" data-goto="D-02" title="Нет интерфейсов для чтения статуса и настройки уведомлений">D-02</a> <a class="fref sev-minor" href="#D-09" data-goto="D-09" title="POST /notify: не описаны ответ, коды и повторный вызов">D-09</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10" title="В API не определены единица суммы и формат валюты">D-10</a></td></tr><tr><td>Требование не имеет противоречий или явных показателей операционных рисков</td><td><span class="ans a-no">Нет</span></td><td>Ф-1 и Ф-4 не согласованы по отключению уведомлений.</td><td><a class="fref sev-major" href="#D-01" data-goto="D-01" title="Не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3">D-01</a></td></tr><tr><td>Требование содержит архитектуру и согласовано с архитекторами</td><td><span class="ans a-no">Нет</span></td><td>Архитектура и согласование с архитекторами в документе не отражены, компоненты не названы.</td><td><a class="fref sev-major" href="#D-02" data-goto="D-02" title="Нет интерфейсов для чтения статуса и настройки уведомлений">D-02</a></td></tr><tr><td>Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами</td><td><span class="ans a-part">Частично</span></td><td>Влияние на push-сервис и профиль клиента не описано, согласований нет.</td><td><a class="fref sev-major" href="#D-02" data-goto="D-02" title="Нет интерфейсов для чтения статуса и настройки уведомлений">D-02</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05" title="Нет приоритетов, ID у API-пункта и версии документа">D-05</a></td></tr><tr><td>Структура требований не несёт изменений и рисков информационной безопасности</td><td><span class="ans a-part">Частично</span></td><td>Аутентификация POST /notify и права оператора не описаны, критичных рисков ИБ в тексте нет.</td><td><a class="fref sev-minor" href="#D-09" data-goto="D-09" title="POST /notify: не описаны ответ, коды и повторный вызов">D-09</a></td></tr><tr><td>В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки</td><td><span class="ans a-no">Нет</span></td><td>Схемы бизнес-процесса нет, источник списаний и жизненный цикл уведомления не показаны.</td><td><a class="fref sev-minor" href="#D-06" data-goto="D-06" title="Статусы доставки и момент установки «ошибка» не определены">D-06</a></td></tr><tr><td>Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия</td><td><span class="ans a-no">Нет</span></td><td>Контракт POST /notify (строка 19) без ответа, кодов, типов и повторного вызова.</td><td><a class="fref sev-minor" href="#D-09" data-goto="D-09" title="POST /notify: не описаны ответ, коды и повторный вызов">D-09</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10" title="В API не определены единица суммы и формат валюты">D-10</a></td></tr><tr><td>Поддерживается версионность документа / зафиксирована</td><td><span class="ans a-no">Нет</span></td><td>Версия и дата документа не указаны.</td><td><a class="fref sev-minor" href="#D-05" data-goto="D-05" title="Нет приоритетов, ID у API-пункта и версии документа">D-05</a></td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checks" aria-labelledby="t-checks" hidden><h2 class="ph">Проверки</h2><h3 class="sub">Попарная сверка требований</h3><div class="tw"><table class=""><thead><tr><th>Пара</th><th>Общий предмет</th><th>Сценарий</th><th>Исход A</th><th>Исход B</th><th>Итог</th></tr></thead><tbody><tr><td><a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a> ↔ <a class="rref" href="#L15" data-req="R-04" data-ls="15" data-le="15" title="Ф-4 · Клиент может отключить уведомления в профиле">R-04</a></td><td>Отправка push о списании и отключение уведомлений клиентом</td><td>Клиент отключил уведомления, затем происходит списание 1000 KZT.</td><td>Отправить push в течение 5 секунд.</td><td>Не отправлять, так как уведомления отключены.</td><td><span class="ans a-part">Не определено</span></td></tr></tbody></table></div><h3 class="sub">Трассировка</h3><div class="tw"><table class=""><thead><tr><th>Требование</th><th>Проверяется</th><th>Реализуется</th><th>Примечание</th></tr></thead><tbody><tr><td><a class="rref" href="#L9" data-req="R-01" data-ls="9" data-le="9" title="Ф-1 · Push-уведомление клиенту о списании за 5 секунд">R-01</a></td><td><span class="muted">нет</span></td><td><a class="rref" href="#L19" data-req="R-05" data-ls="19" data-le="19" title="API POST /notify с полями client_id, amount, currency">R-05</a></td><td>Нет критериев приёмки; нет поля канала/токена</td></tr><tr><td><a class="rref" href="#L11" data-req="R-02" data-ls="11" data-le="11" title="Ф-2 · Оператор видит статус доставки уведомления">R-02</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>Нет метода чтения статуса, нет критериев</td></tr><tr><td><a class="rref" href="#L13" data-req="R-03" data-ls="13" data-le="13" title="Ф-3 · Повтор отправки при ошибке доставки">R-03</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>Нет критериев; не определено, что считается ошибкой</td></tr><tr><td><a class="rref" href="#L15" data-req="R-04" data-ls="15" data-le="15" title="Ф-4 · Клиент может отключить уведомления в профиле">R-04</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>Нет метода и поля хранения настройки</td></tr></tbody></table></div><h3 class="sub">Глоссарий: один смысл — разные слова</h3><div class="tw"><table class=""><thead><tr><th>Понятие</th><th>Термины в документе</th><th>Проблема</th></tr></thead><tbody><tr><td><b>Сообщение клиенту о списании</b></td><td>push-уведомление <a class="lnref" href="#L9" data-line="9">строка 9</a>, уведомления <a class="lnref" href="#L15" data-line="15">строка 15</a></td><td>Неясно, касается ли отключение только push или всех каналов.</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-segment" aria-labelledby="t-segment" hidden><h2 class="ph">Нарезка</h2><p class="lead">Агент выделил 5 требований и присвоил им ID; номер строки — по исходному документу.</p><div class="tw"><table class="seg"><thead><tr><th>ID</th><th>В документе</th><th>Вид</th><th>Кратко</th><th>Строки</th><th>Замечания</th></tr></thead><tbody><tr><td><span class="fid">R-01</span></td><td>Ф-1</td><td>Функциональное</td><td>Push-уведомление клиенту о списании за 5 секунд</td><td><a class="lnref" href="#L9" data-line="9" data-le="9">9</a></td><td><a class="fref sev-major" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-minor" href="#D-03" data-goto="D-03">D-03</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05">D-05</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a></td></tr><tr><td><span class="fid">R-02</span></td><td>Ф-2</td><td>Функциональное</td><td>Оператор видит статус доставки уведомления</td><td><a class="lnref" href="#L11" data-line="11" data-le="11">11</a></td><td><a class="fref sev-major" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-major" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05">D-05</a> <a class="fref sev-minor" href="#D-06" data-goto="D-06">D-06</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a></td></tr><tr><td><span class="fid">R-03</span></td><td>Ф-3</td><td>Функциональное</td><td>Повтор отправки при ошибке доставки</td><td><a class="lnref" href="#L13" data-line="13" data-le="13">13</a></td><td><a class="fref sev-major" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05">D-05</a> <a class="fref sev-minor" href="#D-06" data-goto="D-06">D-06</a> <a class="fref sev-minor" href="#D-07" data-goto="D-07">D-07</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a></td></tr><tr><td><span class="fid">R-04</span></td><td>Ф-4</td><td>Функциональное</td><td>Клиент может отключить уведомления в профиле</td><td><a class="lnref" href="#L15" data-line="15" data-le="15">15</a></td><td><a class="fref sev-major" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-major" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05">D-05</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a></td></tr><tr><td><span class="fid">R-05</span></td><td></td><td>API</td><td>API POST /notify с полями client_id, amount, currency</td><td><a class="lnref" href="#L19" data-line="19" data-le="19">19</a></td><td><a class="fref sev-major" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05">D-05</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a> <a class="fref sev-minor" href="#D-09" data-goto="D-09">D-09</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10">D-10</a></td></tr></tbody></table></div><h3 class="sub">Не требования (исключено из проверки)</h3><div class="tw"><table class=""><thead><tr><th>Фрагмент</th><th>Строки</th><th>Почему</th></tr></thead><tbody><tr><td>Перечень ролей: «Клиент, оператор.»</td><td><a class="lnref" href="#L5" data-line="5" data-le="5">5</a></td><td>Метаданные: список ролей, не требование</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-rejected" aria-labelledby="t-rejected" hidden><h2 class="ph">Отклонённые</h2><p class="lead">Кандидаты, которые линзы предложили, а судья не включил в отчёт, — с причиной. Так видно, что точность важнее количества.</p><div class="tw"><table class=""><thead><tr><th>Кандидат</th><th>Что предлагалось</th><th>Кто</th><th>Где</th><th>Почему отклонено</th></tr></thead><tbody><tr><td><span class="fid"></span></td><td>Метод POST /notify не проверяет, кто вправе слать уведомление клиенту</td><td>Риски</td><td>строка 19, строка 9</td><td>вопрос предметной области без текстовой зацепки — не замечание линзы</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-passport" aria-labelledby="t-passport" hidden><h2 class="ph">Паспорт</h2><div class="pgrid"><div class="tw"><table class="kv"><tr><th>Агент</th><td>BCC Review 2.0.0-dev</td></tr><tr><th>Коммит</th><td>2741ab30 (есть незакоммиченные правки)</td></tr><tr><th>Статус прогона</th><td>полный</td></tr><tr><th>Начало / конец</th><td>2026-11-27 21:35:52+05:00 — 2026-11-27 21:37:02+05:00</td></tr><tr><th>Длительность</th><td>1 мин 10 с</td></tr><tr><th>Провайдер</th><td>claude_cli</td></tr><tr><th>Модель (запрошена)</th><td>sonnet</td></tr><tr><th>Модели (фактически)</th><td>claude-sonnet-5-5</td></tr><tr><th>Вызовы модели</th><td>8 всего · 0 из кэша · 0 с ошибкой · 0 делений пакета</td></tr><tr><th>Токены</th><td>97 337 на входе · 19 861 на выходе</td></tr><tr><th>Сверка цитат кодом</th><td>28 из 28 цитат всех кандидатов найдены в документе <span class="muted">(дословно 28)</span></td></tr><tr><th>Кандидаты</th><td>16 от ревьюеров → 16 с найденными цитатами → судье; отклонено 0</td></tr><tr><th>Стоимость</th><td>$0.59</td></tr><tr><th>Документ</th><td>ТЗ: сервис уведомлений <span class="muted">(tz_clean.md, md)</span></td></tr><tr><th>Строк / страниц</th><td>19 / —</td></tr><tr><th>SHA-256 документа</th><td><code class="hash">7eb6863176fe59f293bbcdb5dbc849d6b9f2264c37db904c28d71f21be294347</code></td></tr><tr><th>Схема отчёта</th><td>bcc-review/2</td></tr></table></div><div><h3 class="sub">Этапы</h3><ul class="stages"><li class="st st-ok"><span>Нарезка требований<small>5 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Правила<small>&lt; 1 с</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Аналитик»<small>29 с · 1 вызов · 5 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Тестировщик»<small>17 с · 1 вызов · 2 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Архитектор»<small>15 с · 1 вызов · 3 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Риски»<small>15 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Набор целиком<small>17 с · 1 вызов · 6 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Сверка цитат<small>&lt; 1 с · 16 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Судья<small>37 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Вопросы<small>&lt; 1 с · 1 вызов</small></span><b>готово</b></li></ul><h3 class="sub">Предупреждения</h3><ul class="warns"><li>судья: критичных дефектов нет; 5 существенных, найденных одним ревьюером, понижены до незначительных</li><li>судья: уровни изменены кодом — обоснование вердикта собрано кодом</li><li>clarify: вопрос «От какого события и до какого считать 5 секунд на отправку p» отброшен — касается только незначительных дефектов</li><li>clarify: вопрос «Что означает «до 3 раз» в правиле повтора: 3 повтора после п» отброшен — касается только незначительных дефектов</li><li>clarify: вопрос «Когда оператор видит статусы «отправлено», «доставлено» и «о» отброшен — касается только незначительных дефектов</li><li>clarify: вопрос «Каким должен быть ответ POST /notify: какие коды успеха и от» отброшен — касается только незначительных дефектов</li></ul><h3 class="sub">Как проверить отчёт</h3><p class="lead">Каждая цитата в замечаниях найдена в документе программой, номер строки посчитан кодом, а не моделью. Повторная сверка: <code>python -m bcc_review.v2.verify report.json документ</code>.</p></div></div></section></main>
+<footer class="foot">Сформировано агентом BCC Review 2.0.0-dev · статическое ревью по ISO/IEC/IEEE 29148:2018 и IEEE 830-1998 ·
+цитаты сверены с документом программой</footer>
+<script type="application/json" id="report-data">{"schema": "bcc-review/2", "run": {"agent": "BCC Review", "version": "2.0.0-dev", "commit": "2741ab30", "dirty": true, "run_id": "20261127-213552-b947", "started_at": "2026-11-27T21:35:52+05:00", "finished_at": "2026-11-27T21:37:02+05:00", "duration_s": 70.3, "provider": "claude_cli", "model_requested": "sonnet", "models_used": ["claude-sonnet-5-5"], "calls": {"total": 8, "cached": 0, "failed": 0, "split": 0}, "tokens": {"input": 97337, "output": 19861}, "cost_usd": 0.5879, "status": "complete", "stages": {"segment": "ok", "rules": "ok", "lens_analyst": "ok", "lens_qa": "ok", "lens_architect": "ok", "lens_risk": "ok", "consistency": "ok", "quotes": "ok", "judge": "ok", "clarify": "ok"}, "stage_stats": {"segment": {"calls": 1, "seconds": 4.88, "candidates": 0}, "rules": {"calls": 0, "seconds": 0.0, "candidates": 0}, "lens_analyst": {"calls": 1, "seconds": 28.59, "candidates": 5}, "lens_qa": {"calls": 1, "seconds": 17.16, "candidates": 2}, "lens_architect": {"calls": 1, "seconds": 15.21, "candidates": 3}, "lens_risk": {"calls": 1, "seconds": 15.4, "candidates": 0}, "consistency": {"calls": 1, "seconds": 17.42, "candidates": 6}, "quotes": {"calls": 0, "seconds": 0.0, "candidates": 16}, "judge": {"calls": 1, "seconds": 36.73, "candidates": 0}, "clarify": {"calls": 1, "seconds": 0.0, "candidates": 0, "early": true, "model_seconds": 16.6}}, "warnings": ["судья: критичных дефектов нет; 5 существенных, найденных одним ревьюером, понижены до незначительных", "судья: уровни изменены кодом — обоснование вердикта собрано кодом", "clarify: вопрос «От какого события и до какого считать 5 секунд на отправку p» отброшен — касается только незначительных дефектов", "clarify: вопрос «Что означает «до 3 раз» в правиле повтора: 3 повтора после п» отброшен — касается только незначительных дефектов", "clarify: вопрос «Когда оператор видит статусы «отправлено», «доставлено» и «о» отброшен — касается только незначительных дефектов", "clarify: вопрос «Каким должен быть ответ POST /notify: какие коды успеха и от» отброшен — касается только незначительных дефектов"], "options": {"max_calls": 16, "passes": 1, "lenses": ["analyst", "qa", "architect", "risk"], "export": [], "revise": false, "answers": false}, "fast_start": false}, "document": {"title": "ТЗ: сервис уведомлений", "file": "tz_clean.md", "format": "md", "sha256": "7eb6863176fe59f293bbcdb5dbc849d6b9f2264c37db904c28d71f21be294347", "lines": 19, "pages": null, "warnings": []}, "requirements": [{"id": "R-01", "source_id": "Ф-1", "kind": "functional", "section": "2. Требования", "summary": "Push-уведомление клиенту о списании за 5 секунд", "quote": "Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд.", "line_start": 9, "line_end": 9, "page": null}, {"id": "R-02", "source_id": "Ф-2", "kind": "functional", "section": "2. Требования", "summary": "Оператор видит статус доставки уведомления", "quote": "Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка».", "line_start": 11, "line_end": 11, "page": null}, {"id": "R-03", "source_id": "Ф-3", "kind": "functional", "section": "2. Требования", "summary": "Повтор отправки при ошибке доставки", "quote": "Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута.", "line_start": 13, "line_end": 13, "page": null}, {"id": "R-04", "source_id": "Ф-4", "kind": "functional", "section": "2. Требования", "summary": "Клиент может отключить уведомления в профиле", "quote": "Ф-4. Клиент может отключить уведомления в настройках профиля.", "line_start": 15, "line_end": 15, "page": null}, {"id": "R-05", "source_id": "", "kind": "api", "section": "3. Интерфейсы", "summary": "API POST /notify с полями client_id, amount, currency", "quote": "API POST /notify принимает поля client_id, amount, currency.", "line_start": 19, "line_end": 19, "page": null}], "excluded": [{"what": "Перечень ролей: «Клиент, оператор.»", "line_start": 5, "line_end": 5, "reason": "Метаданные: список ролей, не требование"}], "findings": [{"id": "D-01", "candidate_ids": ["C-004", "C-007", "C-011", "C-014"], "title": "Не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3", "kind": "incomplete", "criterion": "set_complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.3"], "severity": "major", "requirement_ids": ["R-01", "R-02", "R-03", "R-04"], "evidence": [{"quote": "Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд", "line_start": 9, "line_end": 9, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута", "line_start": 13, "line_end": 13, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "Ф-4. Клиент может отключить уведомления в настройках профиля", "line_start": 15, "line_end": 15, "page": null, "section": "2. Требования", "verified": "exact"}], "problem": "Ф-1 требует отправлять push о списании без условий, а Ф-4 позволяет отключить уведомления; что делает POST /notify для отключённого клиента, какой статус виден оператору и что с повторами Ф-3 при отключении между попытками — не сказано. Не ясно, отключаются все уведомления или только push.", "scenario": "Клиент отключил уведомления, приходит POST /notify на списание 5000 KZT. Одна реализация пропустит отправку, другая отправит push по Ф-1; при отключении между повторами исход тоже разный.", "impact": "Клиент может получать уведомления, которые отключил, или оператор не увидит, почему уведомления нет.", "recommendation": "Описать поведение при отключённых уведомлениях: отправка, статус для оператора, повторы, область отключения.", "rewrite": "Ф-4. Клиент может отключить push-уведомления о списании в настройках профиля; при отключении система не отправляет уведомление, не выполняет повторы и показывает оператору статус \u003cуточнить: название статуса\u003e.", "question": "Что видит оператор, если клиент отключил уведомления, и отключаются только push или все каналы?", "blocks": "both", "priority": 1, "sources": ["lens:analyst", "consistency", "lens:qa"]}, {"id": "D-02", "candidate_ids": ["C-008", "C-013"], "title": "Нет интерфейсов для чтения статуса и настройки уведомлений", "kind": "missing_element", "criterion": "set_complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.3"], "severity": "major", "requirement_ids": ["R-02", "R-04", "R-05"], "evidence": [{"quote": "Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка", "line_start": 11, "line_end": 11, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "Ф-4. Клиент может отключить уведомления в настройках профиля", "line_start": 15, "line_end": 15, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "API POST /notify принимает поля client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Интерфейсы", "verified": "exact"}], "problem": "Ф-2 обещает показ статуса оператору, Ф-4 — отключение в профиле, но в разделе интерфейсов только POST /notify (L019). Метода чтения статуса и изменения настройки нет.", "scenario": "Разработчик экрана оператора не находит метод получения статуса; разработчик профиля не знает, куда сохранить отключение уведомлений.", "impact": "Ф-2 и Ф-4 нельзя реализовать и проверить по документу.", "recommendation": "Описать операцию чтения статуса доставки и операцию изменения настройки уведомлений (методы, поля, коды ответа). Либо указать, что они вне этого документа.", "rewrite": "GET \u003cуточнить: путь\u003e возвращает статус доставки («отправлено», «доставлено», «ошибка») по \u003cуточнить: идентификатор уведомления\u003e; \u003cуточнить: метод и путь\u003e изменяет признак «уведомления отключены» клиента.", "question": "Какими методами оператор получает статус и клиент отключает уведомления?", "blocks": "both", "priority": 2, "sources": ["lens:architect", "consistency"]}, {"id": "D-03", "candidate_ids": ["C-001"], "title": "Срок 5 секунд не привязан к началу и концу отсчёта", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-01"], "evidence": [{"quote": "Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд", "line_start": 9, "line_end": 9, "page": null, "section": "2. Требования", "verified": "exact"}], "problem": "В Ф-1 не сказано, от какого события идут 5 секунд (списание или приход POST /notify) и чем они заканчиваются (уход в push-сервис или получение на устройстве). Не заданы доля запросов и нагрузка.", "scenario": "Списание в 10:00:00, запрос пришёл в 10:00:04, push ушёл в 10:00:08. От запроса — 4 с, выполнено; от списания — 8 с, нарушено.", "impact": "Разработчик и тестировщик по-разному поймут, что измерять, и приёмка по этому требованию превратится в спор.", "recommendation": "Указать начальное и конечное события, долю запросов и нагрузку, при которой срок должен выдерживаться.", "rewrite": "Ф-1. Система должна отправлять клиенту push-уведомление о списании не позднее 5 секунд после получения запроса POST /notify для не менее \u003cуточнить: доля, например 95 или 99\u003e % запросов при нагрузке \u003cуточнить: число запросов в секунду\u003e.", "question": "От какого события и до какого считать 5 секунд: от списания или от запроса POST /notify, до отправки в push-сервис или до доставки на устройство?", "blocks": "none", "priority": 0, "sources": ["lens:analyst"]}, {"id": "D-04", "candidate_ids": ["C-012"], "title": "Терминология не едина: «push-уведомление» и «уведомления»", "kind": "terminology", "criterion": "conforming", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5"], "severity": "minor", "requirement_ids": [], "evidence": [{"quote": "push-уведомление", "line_start": 9, "line_end": 9, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "уведомления", "line_start": 15, "line_end": 15, "page": null, "section": "2. Требования", "verified": "exact"}], "problem": "Сообщение о списании названо «push-уведомление» (L009) и «уведомления» (L015), глоссария нет.", "scenario": "", "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.", "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.", "rewrite": "", "question": "Какой термин оставить для каждого из перечисленных понятий?", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-05", "candidate_ids": ["C-015", "C-016"], "title": "Нет приоритетов, ID у API-пункта и версии документа", "kind": "traceability", "criterion": "ranked", "standard_refs": ["IEEE 830-1998 п. 4.3.5"], "severity": "minor", "requirement_ids": ["R-01", "R-02", "R-03", "R-04", "R-05"], "evidence": [{"quote": "Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд", "line_start": 9, "line_end": 9, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "API POST /notify принимает поля client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Интерфейсы", "verified": "exact"}], "problem": "У требований нет приоритетов, у пункта API (L019) нет ID и источника, версия документа не указана.", "scenario": "При нехватке сроков неясно, чем жертвовать; тест POST /notify не связать с Ф-1.", "impact": "Спор о порядке реализации.", "recommendation": "Добавить столбец приоритета и статуса.", "rewrite": "Ф-1. [Приоритет: \u003cуточнить\u003e] Система должна...", "question": "", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-06", "candidate_ids": ["C-003", "C-010"], "title": "Статусы доставки и момент установки «ошибка» не определены", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-02", "R-03"], "evidence": [{"quote": "Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка", "line_start": 11, "line_end": 11, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута", "line_start": 13, "line_end": 13, "page": null, "section": "2. Требования", "verified": "exact"}], "problem": "Ф-2 не определяет, что значит «доставлено» (принято push-сервисом или получено устройством), и когда ставится «ошибка» (после каждой неудачи или после последнего повтора по Ф-3). Источник сигнала о доставке не описан.", "scenario": "Первая отправка неуспешна, повтор через минуту удался. Одна реализация покажет «ошибка», другая — «отправлено», а затем «доставлено».", "impact": "Оператор получит разный статус в одной ситуации, а тестировщик не сможет проверить переходы статусов.", "recommendation": "Определить каждый статус по событию и описать переходы между статусами с учётом повторов.", "rewrite": "Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено» — запрос принят push-сервисом; «доставлено» — \u003cуточнить: подтверждение push-сервиса или устройства\u003e; «ошибка» — \u003cуточнить: после каждой неудачной попытки или после исчерпания повторов\u003e.", "question": "Когда ставится «ошибка»: после каждой неудачной попытки или только после последнего повтора?", "blocks": "none", "priority": 0, "sources": ["lens:analyst", "lens:architect"]}, {"id": "D-07", "candidate_ids": ["C-002"], "title": "Ф-3: неясно, сколько всего отправок при «до 3 раз»", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-03"], "evidence": [{"quote": "Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута", "line_start": 13, "line_end": 13, "page": null, "section": "2. Требования", "verified": "exact"}], "problem": "«Повторяет отправку до 3 раз» можно понять как 3 повтора после первой отправки (всего 4) или 3 попытки всего. Не определено, что считается ошибкой доставки и от какого момента идёт минута.", "scenario": "Устройство недоступно: по толкованию A уходит 4 отправки, по толкованию B — 3 отправки (2 повтора).", "impact": "Реализация и тесты разойдутся по числу отправок, а клиент может получить лишнее или недополученное уведомление.", "recommendation": "Задать число повторов после первой отправки, момент отсчёта интервала и признак ошибки доставки.", "rewrite": "Ф-3. При получении статуса «ошибка» система выполняет не более 3 повторных отправок (после первой), каждую через 1 минуту после предыдущей неуспешной попытки.", "question": "3 — это повторы после первой отправки или общее число попыток?", "blocks": "none", "priority": 0, "sources": ["lens:analyst"]}, {"id": "D-08", "candidate_ids": ["C-006"], "title": "Критерии приёмки в документе отсутствуют", "kind": "missing_element", "criterion": "set_validatable", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6"], "severity": "minor", "requirement_ids": ["R-01", "R-02", "R-03", "R-04", "R-05"], "evidence": [{"quote": "Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута", "line_start": 13, "line_end": 13, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "Ф-4. Клиент может отключить уведомления в настройках профиля", "line_start": 15, "line_end": 15, "page": null, "section": "2. Требования", "verified": "exact"}], "problem": "Нет критериев приёмки: не покрыты граница 5 с, повторы Ф-3, отключение Ф-4, статусы Ф-2, ошибки POST /notify.", "scenario": "Списание 100 KZT; успех на 3-м повторе и ошибка после 3-го повтора — ожидаемый статус и число отправок приёмкой не заданы.", "impact": "Приёмка идёт по субъективной трактовке.", "recommendation": "Непокрытые ветки закрывают тест-кейсы T-02, T-03, T-04, T-05, T-07, T-08 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки.", "rewrite": "", "question": "Какие случаи — границы значений, отказы, повторы — добавить в критерии приёмки, чтобы по ним можно было принять или отклонить реализацию?", "blocks": "none", "priority": 0, "sources": ["lens:qa"]}, {"id": "D-09", "candidate_ids": ["C-009"], "title": "POST /notify: не описаны ответ, коды и повторный вызов", "kind": "api_contract", "criterion": "complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.3"], "severity": "minor", "requirement_ids": ["R-05"], "evidence": [{"quote": "Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута", "line_start": 13, "line_end": 13, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "API POST /notify принимает поля client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Интерфейсы", "verified": "exact"}], "problem": "Для POST /notify (L019) нет тела ответа, кодов успеха и отказа, типов полей. Нет идентификатора запроса для защиты от повторного вызова.", "scenario": "Источник дважды шлёт POST /notify с одним списанием: не определено, вернёт ли сервис ошибку и уйдёт ли два push.", "impact": "Интегратор не сможет реализовать вызов, а тестировщик не определит ожидаемые ответы.", "recommendation": "Описать типы, обязательность, единицы полей, коды ответов с телами и идентификатор для распознавания повторного запроса.", "rewrite": "POST /notify: client_id — \u003cуточнить: тип\u003e, amount — число в \u003cуточнить: единица\u003e, currency — \u003cуточнить: формат\u003e; ответ 200 — \u003cуточнить: тело\u003e; ошибки — \u003cуточнить: коды и тела\u003e.", "question": "", "blocks": "none", "priority": 0, "sources": ["lens:architect"]}, {"id": "D-10", "candidate_ids": ["C-005"], "title": "В API не определены единица суммы и формат валюты", "kind": "unit_mismatch", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-05"], "evidence": [{"quote": "API POST /notify принимает поля client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Интерфейсы", "verified": "exact"}], "problem": "Для amount и currency в L019 не заданы единица (основная или минимальная) и формат валюты.", "scenario": "Приходит amount=1500, currency=KZT: это 1500 тенге или 15 тенге в тиынах.", "impact": "Клиент может получить уведомление с неверной суммой списания.", "recommendation": "Задать единицу суммы, формат кода валюты и обязательность полей.", "rewrite": "API POST /notify принимает обязательные поля client_id, amount (сумма списания в \u003cуточнить: тенге или тиынах\u003e), currency (код валюты ISO 4217).", "question": "В каких единицах передаётся amount: в тенге или в тиынах?", "blocks": "none", "priority": 0, "sources": ["lens:analyst"]}], "rejected": [{"candidate_id": "", "title": "Метод POST /notify не проверяет, кто вправе слать уведомление клиенту", "source": "lens:risk", "reason_code": "lens_dropped", "reason": "вопрос предметной области без текстовой зацепки — не замечание линзы", "line": 19, "severity": "minor", "kind": "security", "problem": "Метод принимает client_id, amount и currency от вызывающей стороны. Нигде не сказано, кто вправе его вызывать и проверяется ли вызывающая сторона и её право на этого клиента.", "evidence": [{"quote": "API POST /notify принимает поля client_id, amount, currency.", "line": 19}, {"quote": "Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд.", "line": 9}]}], "acceptance_checks": [], "test_cases": [{"id": "T-01", "requirement_ids": ["R-01", "R-05"], "title": "Push о списании отправлен за 5 секунд", "given": "Клиент 1 с включёнными уведомлениями", "when": "POST /notify client_id=1, amount=100, currency=KZT", "then": "Push отправлен не позднее 5 с. Не определено требованиями: точка начала и конца замера, перцентиль.", "gap": "", "expected_defined": false}, {"id": "T-02", "requirement_ids": ["R-01"], "title": "Отправка ровно на 5 секунде", "given": "Запрос принят, провайдер отвечает ровно через 5 с", "when": "Измеряется время отправки", "then": "Не определено требованиями: включена ли граница 5 с, момент замера.", "gap": "Граница срока не покрыта приёмкой.", "expected_defined": false}, {"id": "T-03", "requirement_ids": ["R-03"], "title": "Успех на третьем повторе", "given": "Первая отправка и 1-й, 2-й повторы закончились ошибкой", "when": "3-й повтор через 1 минуту после 2-го успешен", "then": "Всего 4 отправки, повторы с интервалом 1 мин. Не определено требованиями: итоговый статус и считается ли первая отправка.", "gap": "Повторы не покрыты приёмкой.", "expected_defined": false}, {"id": "T-04", "requirement_ids": ["R-03", "R-02"], "title": "Все повторы неуспешны — итог ошибка", "given": "Провайдер всегда возвращает ошибку", "when": "Прошли исходная отправка и 3 повтора", "then": "Не определено требованиями однозначно. По тексту требований: повторов не больше 3, четвёртого повтора нет. Статус «ошибка» — по Ф-2 для оператора.", "gap": "Исчерпание повторов не покрыто.", "expected_defined": false}, {"id": "T-05", "requirement_ids": ["R-04", "R-05"], "title": "Уведомления отключены в профиле", "given": "Клиент 1 отключил уведомления в профиле", "when": "POST /notify client_id=1, amount=100, currency=KZT", "then": "Не определено требованиями: отправляется ли push, какой код ответа и статус.", "gap": "Выключенная функция не покрыта.", "expected_defined": false}, {"id": "T-06", "requirement_ids": ["R-02"], "title": "Оператор видит статус «доставлено»", "given": "Push отправлен и подтверждён доставкой", "when": "Оператор открывает статус уведомления", "then": "Показан статус «доставлено».", "gap": "", "expected_defined": true}, {"id": "T-07", "requirement_ids": ["R-05"], "title": "POST /notify без поля amount", "given": "Сервис доступен", "when": "POST /notify с client_id=1, currency=KZT без amount", "then": "Не определено требованиями: код и тело ответа, отправка push.", "gap": "Ошибки интерфейса не описаны.", "expected_defined": false}, {"id": "T-08", "requirement_ids": ["R-05"], "title": "POST /notify с неизвестным client_id", "given": "client_id=999999 не существует", "when": "POST /notify client_id=999999, amount=100, currency=KZT", "then": "Не определено требованиями: ответ и поведение системы.", "gap": "Негативный сценарий не описан.", "expected_defined": false}], "pair_checks": [{"a": "R-01", "b": "R-04", "subject": "Отправка push о списании и отключение уведомлений клиентом", "same_subject": true, "quote_a": "Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд.", "line_a": 9, "quote_b": "Клиент может отключить уведомления в настройках профиля.", "line_b": 15, "scenario": "Клиент отключил уведомления, затем происходит списание 1000 KZT.", "outcome_a": "Отправить push в течение 5 секунд.", "outcome_b": "Не отправлять, так как уведомления отключены.", "one_condition": false, "verdict": "undefined", "basis": "none", "kind": "incomplete", "title": "Ф-1 и Ф-4: не сказано, действует ли отключение на списания", "impact": "Клиент получит или не получит уведомление вопреки настройке; спор при приёмке.", "recommendation": "Зафиксировать, что отключение подавляет push о списании, либо перечислить обязательные уведомления.", "question": "Подавляет ли отключение уведомлений push о списании и действует ли на ретраи?", "verified_a": "exact", "verified_b": "exact", "id": "P-01", "finding_ids": ["D-01"]}], "trace": [{"requirement_id": "R-01", "verified_by": [], "implemented_by": ["R-05"], "note": "Нет критериев приёмки; нет поля канала/токена"}, {"requirement_id": "R-02", "verified_by": [], "implemented_by": [], "note": "Нет метода чтения статуса, нет критериев"}, {"requirement_id": "R-03", "verified_by": [], "implemented_by": [], "note": "Нет критериев; не определено, что считается ошибкой"}, {"requirement_id": "R-04", "verified_by": [], "implemented_by": [], "note": "Нет метода и поля хранения настройки"}], "glossary": [{"id": "G-01", "concept": "Сообщение клиенту о списании", "terms": [{"term": "push-уведомление", "line": 9}, {"term": "уведомления", "line": 15}], "problem": "Неясно, касается ли отключение только push или всех каналов.", "severity": "minor", "finding_ids": ["D-04"]}], "questions": [{"id": "Q-01", "topic": "Влияние отключения уведомлений на отправку", "finding_ids": ["D-01"], "to": "Владелец продукта", "blocking": false, "question": "Что должна делать система, если клиент отключил уведомления в профиле, а запрос на уведомление о списании уже пришёл или повторы ещё идут? Что при этом видит оператор и отключается только push или все каналы?", "evidence": [{"quote": "Ф-4. Клиент может отключить уведомления в настройках профиля.", "line_start": 15, "line_end": 15, "page": null, "section": "2. Требования", "verified": "exact"}, {"quote": "Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд.", "line_start": 9, "line_end": 9, "page": null, "section": "2. Требования", "verified": "exact"}], "options": ["Отключение действует на все уведомления: запрос принимается, отправка не выполняется, оператор видит новый статус «отключено клиентом», незавершённые повторы прекращаются", "Отключение действует только на push: запрос принимается, push не отправляется, оператор видит новый статус «отключено клиентом», повторы прекращаются", "Отключение не распространяется на уведомления о списании: они отправляются всегда, а отключаются только прочие уведомления"], "why": "Ф-1 требует отправлять всегда, Ф-4 позволяет отключить. Для одного клиента с отключённой настройкой команды реализуют разное поведение, и тест нельзя написать."}, {"id": "Q-02", "topic": "Методы чтения статуса и отключения", "finding_ids": ["D-02"], "to": "Архитектор", "blocking": false, "question": "Какими интерфейсами оператор получает статус доставки, а клиент отключает уведомления, если в разделе интерфейсов есть только POST /notify?", "evidence": [{"quote": "API POST /notify принимает поля client_id, amount, currency.", "line_start": 19, "line_end": 19, "page": null, "section": "3. Интерфейсы", "verified": "exact"}, {"quote": "Ф-4. Клиент может отключить уведомления в настройках профиля.", "line_start": 15, "line_end": 15, "page": null, "section": "2. Требования", "verified": "exact"}], "options": ["Добавить отдельный метод чтения статуса доставки для оператора и отдельный метод изменения настройки уведомлений клиента", "Статус оператор получает через интерфейс банковского приложения оператора, а настройка отключения берётся из профиля клиента внешней системой; сервис только читает её", "Добавить один метод чтения статуса, а настройка отключения хранится в сервисе уведомлений и меняется отдельным методом"], "why": "Без описанных операций нельзя реализовать Ф-2 и Ф-4, и неясно, кто хранит настройку."}], "checklist": [{"item": "Техническое требование зафиксировано и покрывает бизнес-требование", "answer": "Нет", "comment": "Влияние отключения на отправку не определено (L009, L015), срок и повторы неоднозначны.", "finding_ids": ["D-03", "D-01", "D-07"]}, {"item": "Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)", "answer": "Частично", "comment": "Требования пронумерованы Ф-1…Ф-4, но нет шаблона, версии, критериев приёмки и ID у API.", "finding_ids": ["D-08", "D-05"]}, {"item": "Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений", "answer": "Нет", "comment": "Диаграмм взаимодействия нет, а обмен с push-сервисом и источником списаний не описан.", "finding_ids": ["D-06", "D-09"]}, {"item": "Требование покрывает спецификацию UX/UI дизайна", "answer": "Не требуется", "comment": "Экраны не описаны; в документе только требования и один API-метод.", "finding_ids": []}, {"item": "Реализация задачи/проекта предусматривает схему отката решений", "answer": "Частично", "comment": "Схемы отката нет, и способ выключить функцию не описан (отключение только на уровне клиента, L015).", "finding_ids": ["D-01"]}, {"item": "Требование может быть протестировано", "answer": "Нет", "comment": "Срок, число повторов и статусы неоднозначны, критериев приёмки нет.", "finding_ids": ["D-03", "D-06", "D-07", "D-08"]}, {"item": "Требование предусматривает модель данных или поток, содержит описание", "answer": "Нет", "comment": "Модели данных нет: хранение статусов и настройки уведомлений не описано, поля API без типов.", "finding_ids": ["D-02", "D-09", "D-10"]}, {"item": "Требование не имеет противоречий или явных показателей операционных рисков", "answer": "Нет", "comment": "Ф-1 и Ф-4 не согласованы по отключению уведомлений.", "finding_ids": ["D-01"]}, {"item": "Требование содержит архитектуру и согласовано с архитекторами", "answer": "Нет", "comment": "Архитектура и согласование с архитекторами в документе не отражены, компоненты не названы.", "finding_ids": ["D-02"]}, {"item": "Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами", "answer": "Частично", "comment": "Влияние на push-сервис и профиль клиента не описано, согласований нет.", "finding_ids": ["D-02", "D-05"]}, {"item": "Структура требований не несёт изменений и рисков информационной безопасности", "answer": "Частично", "comment": "Аутентификация POST /notify и права оператора не описаны, критичных рисков ИБ в тексте нет.", "finding_ids": ["D-09"]}, {"item": "В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки", "answer": "Нет", "comment": "Схемы бизнес-процесса нет, источник списаний и жизненный цикл уведомления не показаны.", "finding_ids": ["D-06"]}, {"item": "Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия", "answer": "Нет", "comment": "Контракт POST /notify (L019) без ответа, кодов, типов и повторного вызова.", "finding_ids": ["D-09", "D-10"]}, {"item": "Поддерживается версионность документа / зафиксирована", "answer": "Нет", "comment": "Версия и дата документа не указаны.", "finding_ids": ["D-05"]}], "verdict": {"development": "yes", "testing": "yes", "summary": "Разработку и тестирование можно начинать: критичных дефектов нет, существенных меньше трёх. До приёмки стоит закрыть D-01 (не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3), D-02 (нет интерфейсов для чтения статуса и настройки уведомлений). Исправить первым: D-01, D-02.", "fix_first": ["D-01", "D-02"], "why": "Критичных дефектов нет; существенных 2, но работу они не останавливают — начинать можно, исправляя их параллельно. До приёмки стоит закрыть D-01 (не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3), D-02 (нет интерфейсов для чтения статуса и настройки уведомлений). Исправить первым: D-01, D-02.", "reason": "Критичных дефектов нет; существенных 2, но работу они не останавливают — начинать можно, исправляя их параллельно. До приёмки стоит закрыть D-01 (не определено влияние отключения уведомлений (Ф-4) на отправку по Ф-1 и повторы Ф-3), D-02 (нет интерфейсов для чтения статуса и настройки уведомлений). Исправить первым: D-01, D-02."}, "checklist_source": "bank", "quote_stats": {"quotes": 28, "verified": 28, "exact": 28, "normalized": 0, "fuzzy": 0, "missing": 0, "candidates_in": 16, "candidates_kept": 16, "candidates_rejected": 0, "share_verified": 1.0}, "summary": {"requirements": 5, "findings": {"critical": 0, "major": 2, "minor": 8}, "requirements_without_findings": 0, "quotes_verified": 19, "quotes_total": 19, "questions": 2}}</script>
+<script>
+/* HTML-отчёт v2 (№14): фильтры, подсветка, вкладки, тема, печать. Без библиотек. */
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var root = document.documentElement;
+  var doc = $("#doc");
+  var cardsBox = $("#cards");
+  var cards = $$(".card", cardsBox || document);
+
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; }
+    return null;
+  }
+
+  function toast(msg) {
+    var t = document.createElement("div");
+    t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 1800);
+  }
+
+  /* ── тема ── */
+  function currentTheme() {
+    if (root.dataset.theme) return root.dataset.theme;
+    return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  $("#theme").addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    root.dataset.theme = next; store("bccr-theme", next);
+  });
+
+  /* ── вкладки ── */
+  var tabs = $$(".tab");
+  function showTab(name, focus) {
+    tabs.forEach(function (t) {
+      var on = t.dataset.tab === name;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      $("#p-" + t.dataset.tab).hidden = !on;
+      if (on && focus) t.focus();
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () {
+      showTab(t.dataset.tab);
+      history.replaceState(null, "", "#" + t.dataset.tab);
+      var y = $(".tabs").getBoundingClientRect().top + window.scrollY - parseInt(getComputedStyle(root).getPropertyValue("--top-h"), 10);
+      if (window.scrollY > y) window.scrollTo({ top: y });
+    });
+    t.addEventListener("keydown", function (ev) {
+      var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+      if (d) { ev.preventDefault(); showTab(tabs[(i + d + tabs.length) % tabs.length].dataset.tab, true); }
+    });
+  });
+
+  /* ── документ: прокрутка и подсветка ── */
+  function lineEl(n) { return doc ? doc.querySelector('.ln[data-n="' + n + '"]') : null; }
+  function scrollDocTo(n, n2) {
+    if (!doc) return;
+    var el = lineEl(n);
+    if (!el) return;
+    if (doc.classList.contains("onlyhl") && !el.classList.contains("hl")) { $("#onlyhl").checked = false; doc.classList.remove("onlyhl"); }
+    var top = el.offsetTop - doc.clientHeight / 3;
+    doc.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    var last = parseInt(n2 || n, 10);
+    for (var k = parseInt(n, 10); k <= last; k++) {
+      var x = lineEl(k);
+      if (x) { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); }
+    }
+    if (window.matchMedia("(max-width: 960px)").matches) {
+      var pane = $(".docpane");
+      if (pane) pane.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+  function clearSel() {
+    $$(".ln.sel, .ln.rqsel, mark.q.on").forEach(function (x) { x.classList.remove("sel", "rqsel", "on"); });
+    $$(".card.active").forEach(function (x) { x.classList.remove("active"); });
+    if (doc) doc.classList.remove("focus");
+  }
+
+  function selectFinding(id, opts) {
+    opts = opts || {};
+    var card = document.getElementById(id);
+    if (!card || !card.classList.contains("card")) return;
+    showTab("findings");
+    clearSel();
+    card.classList.add("active");
+    if (doc) doc.classList.add("focus");
+    if (card.hidden) { resetFilters(); }
+    var lines = (card.dataset.lines || "").split(" ").filter(Boolean);
+    if (doc) {
+      $$('.ln[data-f]', doc).forEach(function (x) {
+        if ((" " + x.dataset.f + " ").indexOf(" " + id + " ") >= 0) x.classList.add("sel");
+      });
+      $$("mark.q", doc).forEach(function (m) {
+        if ((" " + m.dataset.f + " ").indexOf(" " + id + " ") >= 0) m.classList.add("on");
+      });
+    }
+    if (lines.length && !opts.noDocScroll) scrollDocTo(lines[0]);
+    if (opts.scrollCard) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", "#" + id);
+  }
+
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest("[data-goto]");
+    if (a) { ev.preventDefault(); selectFinding(a.dataset.goto, { scrollCard: true }); return; }
+    var evb = ev.target.closest(".ev");
+    if (evb) {
+      var c = evb.closest(".card");
+      if (c) selectFinding(c.id, { noDocScroll: true });
+      scrollDocTo(evb.dataset.ls, evb.dataset.le);
+      return;
+    }
+    var r = ev.target.closest("[data-req]");
+    if (r) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var k = +r.dataset.ls; k <= +(r.dataset.le || r.dataset.ls); k++) { var x = lineEl(k); if (x) x.classList.add("rqsel"); }
+      scrollDocTo(r.dataset.ls, r.dataset.le);
+      return;
+    }
+    var l = ev.target.closest("[data-line]");
+    if (l && !l.closest(".card")) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var m = +l.dataset.line; m <= +(l.dataset.le || l.dataset.line); m++) { var y = lineEl(m); if (y) y.classList.add("rqsel"); }
+      scrollDocTo(l.dataset.line, l.dataset.le);
+      return;
+    }
+    var cp = ev.target.closest("[data-copy]");
+    if (cp) {
+      var txt = cp.closest(".dl").querySelector(".dd").textContent;
+      try { navigator.clipboard.writeText(txt).then(function () { toast("Формулировка скопирована"); }); } catch (_) { toast("Не удалось скопировать"); }
+      return;
+    }
+    var card = ev.target.closest(".card");
+    if (card && !ev.target.closest("a, button, summary, input, select, textarea") && !String(window.getSelection())) {
+      selectFinding(card.id);
+      return;
+    }
+    var ln = ev.target.closest(".ln.hl");
+    if (ln && !ev.target.closest("a")) {
+      var ids = ln.dataset.f.split(" ");
+      var cur = $(".card.active");
+      var i = cur ? ids.indexOf(cur.id) : -1;
+      selectFinding(ids[(i + 1) % ids.length], { scrollCard: true, noDocScroll: true });
+    }
+  });
+
+  if (doc) {
+    $("#onlyhl").addEventListener("change", function (ev) { doc.classList.toggle("onlyhl", ev.target.checked); });
+    $("#showreq").addEventListener("change", function (ev) { doc.classList.toggle("showreq", ev.target.checked); });
+    $$(".ln.ex", doc).forEach(function (x) { x.title = "Не требование — " + x.dataset.ex; });
+  }
+
+  /* ── мини-карта: где в документе замечания ── */
+  var mm = $("#minimap");
+  function drawMap() {
+    if (!doc || !mm || !doc.scrollHeight) return;
+    mm.innerHTML = "";
+    var H = doc.scrollHeight, h = mm.clientHeight;
+    $$(".ln.hl", doc).forEach(function (x) {
+      if (!x.offsetHeight) return;
+      var t = document.createElement("i");
+      t.className = (x.className.match(/sev-\w+/) || [""])[0];
+      t.style.top = (x.offsetTop / H * h) + "px";
+      t.style.height = Math.max(3, x.offsetHeight / H * h) + "px";
+      t.title = "Строка " + x.dataset.n + ": " + x.dataset.f;
+      t.addEventListener("click", function () { selectFinding(x.dataset.f.split(" ")[0], { scrollCard: true }); });
+      mm.appendChild(t);
+    });
+    var vw = document.createElement("div");
+    vw.className = "vw";
+    mm.appendChild(vw);
+    var upd = function () {
+      vw.style.top = (doc.scrollTop / H * h) + "px";
+      vw.style.height = Math.max(8, doc.clientHeight / H * h) + "px";
+    };
+    upd();
+    doc.onscroll = upd;
+  }
+  if (doc && mm) {
+    setTimeout(drawMap, 60);
+    addEventListener("resize", function () { clearTimeout(drawMap.t); drawMap.t = setTimeout(drawMap, 150); });
+    ["onlyhl", "showreq"].forEach(function (k) { $("#" + k).addEventListener("change", function () { setTimeout(drawMap, 30); }); });
+  }
+
+  /* ── фильтры ── */
+  var chips = $$(".sevchip");
+  var q = $("#q"), fkind = $("#fkind"), fsrc = $("#fsrc"), fsort = $("#fsort"), fcount = $("#fcount");
+  function applyFilters() {
+    if (!cardsBox) return;
+    var sev = {};
+    chips.forEach(function (c) { sev[c.dataset.sev] = c.getAttribute("aria-pressed") === "true"; });
+    var words = (q.value || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = sev[c.dataset.sev] !== false;
+      if (ok && fkind.value) ok = c.dataset.kind === fkind.value;
+      if (ok && fsrc.value) ok = (" " + c.dataset.src + " ").indexOf(" " + fsrc.value + " ") >= 0;
+      if (ok && words.length) {
+        var s = c.dataset.search;
+        ok = words.every(function (w) { return s.indexOf(w) >= 0; });
+      }
+      c.hidden = !ok;
+      if (ok) shown++;
+    });
+    fcount.textContent = "Показано " + shown + " из " + cards.length;
+    var empty = $(".empty[hidden], .empty", cardsBox);
+    if (empty && cards.length) empty.hidden = shown !== 0;
+  }
+  function sortCards() {
+    var key = fsort.value;
+    var sorted = cards.slice().sort(function (a, b) {
+      var A = a.dataset, B = b.dataset;
+      if (key === "line") return (+A.line - +B.line) || (+B.rank - +A.rank);
+      if (key === "sev") return (+B.rank - +A.rank) || (+A.line - +B.line);
+      var pa = +A.prio || 999, pb = +B.prio || 999;
+      return (pa - pb) || (+B.rank - +A.rank) || (+A.line - +B.line);
+    });
+    var empty = $(".empty", cardsBox);
+    sorted.forEach(function (c) { cardsBox.insertBefore(c, empty); });
+  }
+  function resetFilters() {
+    chips.forEach(function (c) { c.setAttribute("aria-pressed", "true"); });
+    q.value = ""; fkind.value = ""; fsrc.value = "";
+    applyFilters();
+  }
+  if (cardsBox) {
+    chips.forEach(function (c) {
+      c.addEventListener("click", function () {
+        c.setAttribute("aria-pressed", c.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        applyFilters();
+      });
+    });
+    q.addEventListener("input", applyFilters);
+    fkind.addEventListener("change", applyFilters);
+    fsrc.addEventListener("change", applyFilters);
+    fsort.addEventListener("change", sortCards);
+    $$("[data-reset]").forEach(function (b) { b.addEventListener("click", resetFilters); });
+    $$("[data-sevonly]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var s = b.dataset.sevonly;
+        chips.forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.sev === s ? "true" : "false"); });
+        showTab("findings"); applyFilters();
+        var t = $(".tabs"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 60, behavior: "smooth" });
+      });
+    });
+    var allOpen = false;
+    $("#toggleall").addEventListener("click", function (ev) {
+      allOpen = !allOpen;
+      $$(".card .more").forEach(function (d) { d.open = allOpen; });
+      ev.target.textContent = allOpen ? "Свернуть все" : "Развернуть все";
+    });
+    applyFilters();
+  }
+
+  /* ── клавиатура: ↑/↓ или j/k по карточкам ── */
+  document.addEventListener("keydown", function (ev) {
+    if (ev.target.closest("input, textarea, select") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key === "Escape") { clearSel(); history.replaceState(null, "", location.pathname); return; }
+    var d = (ev.key === "ArrowDown" || ev.key === "j") ? 1 : (ev.key === "ArrowUp" || ev.key === "k") ? -1 : 0;
+    if (!d || $("#p-findings").hidden || ev.target.closest(".doc")) return;
+    var vis = $$(".card", cardsBox).filter(function (c) { return !c.hidden; });
+    if (!vis.length) return;
+    ev.preventDefault();
+    var cur = $(".card.active");
+    var i = cur ? vis.indexOf(cur) : -1;
+    var next = vis[Math.min(vis.length - 1, Math.max(0, i + d))];
+    selectFinding(next.id, { scrollCard: true });
+  });
+
+  /* ── печать и скачивание ── */
+  var opened = [];
+  window.addEventListener("beforeprint", function () {
+    opened = $$("details").filter(function (d) { return !d.open; });
+    opened.forEach(function (d) { d.open = true; });
+  });
+  window.addEventListener("afterprint", function () { opened.forEach(function (d) { d.open = false; }); opened = []; });
+  $("#print").addEventListener("click", function () { window.print(); });
+
+  function download(name, text, type) {
+    var blob = new Blob([text], { type: type });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  var base = document.body.dataset.file || "report";
+  $("#dljson").addEventListener("click", function () {
+    download(base + ".report.json", $("#report-data").textContent, "application/json");
+  });
+
+  var dla = $("#dlanswers");
+  if (dla) {
+    dla.addEventListener("click", function () {
+      var data = JSON.parse($("#report-data").textContent);
+      var LET = "ABCDEFGH";
+      var md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
+        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.",
+        "> Передайте файл агенту: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers этот_файл.md", ""];
+      var n = 0;
+      (data.questions || []).forEach(function (qq) {
+        var pick = $('input[name="' + qq.id + '"]:checked');
+        var own = $('textarea[data-own="' + qq.id + '"]');
+        var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
+        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
+        if (!val) return;
+        n++;
+        md.push(qq.id + (qq.topic ? " [" + qq.topic + "]" : "") + ": " + val);
+      });
+      if (!n) { toast("Отметьте хотя бы один ответ"); return; }
+      download(base + ".answers.md", md.join("\n") + "\n", "text/markdown");
+      toast("Ответов в файле: " + n);
+    });
+  }
+
+  /* ── адрес страницы: #D-02 или #questions ── */
+  function fromHash() {
+    var h = decodeURIComponent(location.hash.slice(1));
+    if (!h) return;
+    if (document.getElementById("p-" + h)) { showTab(h); return; }
+    var el = document.getElementById(h);
+    if (el && el.classList.contains("card")) selectFinding(h, { scrollCard: true });
+    else if (/^L\d+$/.test(h)) { showTab("findings"); scrollDocTo(h.slice(1)); }
+  }
+  window.addEventListener("hashchange", fromHash);
+  fromHash();
+})();
+
+</script>
+</body>
+</html>

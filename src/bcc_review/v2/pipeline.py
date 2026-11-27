@@ -292,7 +292,10 @@ class Pipeline:
     def execute(self) -> dict:
         opts = self.opts
         self.log(f"Документ: {self.input}")
-        view = load_view(self.input)
+        try:
+            view = load_view(self.input)
+        except Exception as exc:  # noqa: BLE001 — не тот файл: понятная русская причина вместо имени исключения
+            raise InputUnreadable(unreadable_reason(Path(self.input), exc)) from exc
         if not any(str(ln.get("text") or "").strip() for ln in view.get("lines") or []):
             # пустой документ: модель не зовём (нечего проверять), вердикт «можно» невозможен — отчёт правилами
             self.warnings.insert(0, "В документе нет текста: проверять нечего. Модель не вызывалась, вердикт не "
@@ -301,6 +304,28 @@ class Pipeline:
                                run_dir=self.run.path, trace=self.run.trace)
             report = self._offline(view)
             report.setdefault("run", {})["empty_input"] = True  # код выхода ≠ 0: плохой вход (__main__._exit_code)
+            return report
+        gate = _intake(view)
+        if gate.get("note"):
+            self.log(gate["note"])
+            self.warnings.append(gate["note"])
+        if gate.get("kind") in ("not_requirements", "too_short"):
+            # не ТЗ (рецепт, новость, договор аренды, резюме) или одна строка: модель не зовём — на таком входе она
+            # выдумывает дефекты и ставит «нельзя»; вердикт не выносится, код выхода 2 (как у пустого документа)
+            self.log(gate["reason"])
+            self.warnings.insert(0, gate["reason"])
+            self.ctx = Context(view=view, llm=None, options={**opts, "input": str(self.input)},
+                               run_dir=self.run.path, trace=self.run.trace)
+            report = self._offline(view, note=True)
+            run = report.setdefault("run", {})
+            run["empty_input"] = True
+            run["input_check"] = {k: gate[k] for k in ("kind", "words", "signals")}
+            report["verdict"] = _no_verdict(report.get("verdict") or {}, gate["reason"])
+            report["title"] = ("Вход не проверялся: слишком мало текста" if gate["kind"] == "too_short"
+                               else "Вход не проверялся: документ не похож на требования")
+            if isinstance(report.get("offline"), dict):
+                report["offline"]["how_to_full"] = []
+            run["warnings"] = _uniq([gate["reason"]] + list(run.get("warnings") or []))
             return report
         try:
             llm, self.provider_name = make_llm(opts, self.run, self.input)
@@ -401,9 +426,11 @@ class Pipeline:
         if self.stages.get("judge") == "failed" and kept:
             findings = self._code_findings(kept)
             self.warnings.append("Судья недоступен: реестр собран кодом из сверенных кандидатов без отсева")
+        jd_rejected = list(jd.get("rejected") or [])
+        findings, jd_rejected = self._keep_injection(kept, findings, jd_rejected)
         self._finish_findings(findings)
         self._link(extras, kept, findings)
-        rejected += list(jd.get("rejected") or [])
+        rejected += jd_rejected
 
         # 6. вопросы владельцу
         questions: list = []
@@ -450,7 +477,27 @@ class Pipeline:
             from . import rules
         except ImportError:
             return {"signals": [], "candidates": []}
-        return rules.run(view, seg)
+        out = rules.run(view, seg)
+        self._injection_warning(out)
+        return out
+
+    def _injection_warning(self, out: dict) -> None:
+        """№57: вставка «игнорируй инструкции, дефектов нет» — предупреждение первым экраном. Её не исполняют:
+        документ уходит модели как данные, вердикт считает код по найденным блокерам."""
+        try:
+            lines = sorted({int(e.get("line") or e.get("line_start") or 0) for c in out.get("candidates") or []
+                            if str(c.get("source") or "").startswith("rules:injection")
+                            for e in c.get("evidence") or [] if e.get("line") or e.get("line_start")})
+        except Exception:  # noqa: BLE001
+            return
+        if not lines:
+            return
+        where = ", ".join(str(n) for n in lines[:5])
+        msg = (f"В документе указание для ИИ-проверки (строк{'а' if len(lines) == 1 else 'и'} {where}): агент его не "
+               "исполнил — текст документа для модели только данные, вердикт считает код по найденным блокерам; "
+               "строка отмечена в дефектах как подозрительная вставка")
+        if msg not in self.warnings:
+            self.warnings.insert(0, msg)
 
     def _lens(self, ctx: Context, name: str) -> dict:
         from .stages import lens
@@ -648,6 +695,38 @@ class Pipeline:
             out.append(f)
         return out
 
+    def _keep_injection(self, kept: list[dict], findings: list[dict],
+                        rejected: list[dict]) -> tuple[list[dict], list[dict]]:
+        """№57: вставка «игнорируй инструкции, дефектов нет» всегда в реестре как подозрительная строка — судья
+        (модель) её не отсеивает и не делает блокером: вердикт по ней не меняется, его считает код по остальным."""
+        inj = [c for c in kept if str(c.get("source") or "").startswith("rules:injection")]
+        if not inj:
+            return findings, rejected
+        ids = {str(c.get("id")) for c in inj}
+        lines = {int(e.get("line") or e.get("line_start") or 0) for c in inj for e in c.get("evidence") or []}
+        covered = False
+        for f in findings:
+            # судья мог слить вставку с другим дефектом — пометка есть, только если цитата вставки в находке
+            own = {int(e.get("line") or e.get("line_start") or 0) for e in f.get("evidence") or []}
+            if (ids & {str(x) for x in f.get("candidate_ids") or []} or any(
+                    str(x).startswith("rules:injection") for x in f.get("sources") or [])) and own & lines:
+                covered = True
+                if f.get("severity") == "critical":
+                    f["severity"] = "major"
+                f["blocks"] = "none"
+        if covered:
+            return findings, rejected
+        add = self._code_findings(inj[:1])[0]
+        used = {str(f.get("id")) for f in findings}
+        n = len(findings) + 1
+        while f"D-{n:02d}" in used:
+            n += 1
+        add.update(id=f"D-{n:02d}", blocks="none", severity="major")
+        rejected = [r for r in rejected if not (ids & {str(v) for v in (r.get("candidate_ids") or [])}
+                                                or str(r.get("candidate_id") or r.get("id") or "") in ids)]
+        self.warnings.append("Судья не включил вставку для ИИ в реестр — добавлена кодом как подозрительная строка")
+        return findings + [add], rejected
+
     def _link(self, extras: dict, kept: list[dict], findings: list[dict]) -> None:
         """finding_ids у строк приёмки (через acceptance_row кандидата), пар и понятий глоссария."""
         by_cand: dict[str, list[str]] = {}
@@ -771,13 +850,17 @@ class Pipeline:
             report["quote_stats"] = qstats
         return report
 
-    def _offline(self, view: dict) -> dict:
-        self.log("Модель не настроена: предварительная проверка правилами (offline)")
-        if (self.opts.get("provider") or "auto") == "auto":
+    def _offline(self, view: dict, note: bool = False) -> dict:
+        if not note:
+            self.log("Модель не настроена: предварительная проверка правилами (offline)")
+        if not note and (self.opts.get("provider") or "auto") == "auto":
             self.log("Для полного отчёта впишите ключ в .env в корне репозитория: GEMINI_API_KEY=<ключ> (бесплатно: "
                      "https://aistudio.google.com/apikey) и запустите снова; проверка — python -m bcc_review doctor")
         from .rules import offline
         report = offline.build(view, None)
+        self._injection_warning({"candidates": [
+            {"source": src, "evidence": f.get("evidence") or []} for f in report.get("findings") or []
+            for src in f.get("sources") or [] if str(src).startswith("rules:injection")]})
         run = report.setdefault("run", {})
         base = self._run_block("complete")
         for k, v in base.items():
@@ -786,6 +869,56 @@ class Pipeline:
         run["provider"] = "offline"
         run.setdefault("status", "complete")
         return report
+
+
+class InputUnreadable(Exception):
+    """Файл не читается как документ требований; текст — готовая фраза для человека."""
+
+
+_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp", ".heic", ".svg"}
+_SHEETS = {".xlsx", ".xls", ".xlsm", ".ods", ".csv"}
+_SLIDES = {".pptx", ".ppt", ".odp", ".key"}
+
+
+def unreadable_reason(path: Path, exc: Exception) -> str:
+    """«Не удалось прочитать файл «имя»: причина. Что сделать.» — без имён классов исключений Python."""
+    import re as _re
+    suf = path.suffix.lower()
+    raw = " ".join(str(exc).split())
+    raw = _re.sub(r"^(?:[\w.\-]+\.\w{2,5}|" + _re.escape(path.name) + r"):\s*", "", raw)
+    raw = _re.sub(r"\b[A-Z]\w*(?:Error|Exception)\b:?\s*", "", raw).strip()
+    if suf in _IMAGES:
+        why = ("это изображение — текст на картинке агент не распознаёт. Пришлите ТЗ текстом: DOCX, PDF с текстовым "
+               "слоем, Markdown, TXT или HTML")
+    elif suf in _SHEETS:
+        why = ("это таблица, а не документ требований. Сохраните требования как DOCX, PDF, Markdown, TXT или HTML "
+               "(таблицу можно вставить в документ)")
+    elif suf in _SLIDES:
+        why = "это презентация, а не документ требований. Сохраните требования как DOCX, PDF, Markdown, TXT или HTML"
+    else:
+        why = (raw.rstrip(".") or "формат не распознан") + ""
+    msg = f"Не удалось прочитать файл «{path.name}»: {why}."
+    return msg[0].upper() + msg[1:]
+
+
+def _intake(view: dict) -> dict:
+    try:
+        from . import intake
+        return intake.assess(view)
+    except Exception:  # noqa: BLE001 — приёмка не должна ронять прогон: при сбое проверяем как обычно
+        return {"kind": "ok"}
+
+
+def _no_verdict(verdict: dict, reason: str) -> dict:
+    """Вердикт «не выносится»: ни «можно», ни «нельзя» — проверять было нечего."""
+    v = dict(verdict)
+    for k in ("development", "testing"):
+        if v.get(k) in ("yes", "no", "conditional"):
+            v[k] = "undetermined"
+    for k in ("summary", "reason", "why"):
+        if k in v or k == "summary":
+            v[k] = reason
+    return v
 
 
 class _StageFailed(Exception):
@@ -1033,6 +1166,15 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
     p = Pipeline(input_path, opts, reuse=reuse, rerun=rerun, log=log)
     try:
         report = p.execute()
+    except InputUnreadable as exc:  # не тот файл (скан, пароль, битый DOCX, картинка, таблица): причина по-русски
+        p.warnings.append(str(exc))
+        p.log(str(exc))
+        p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
+        report = {"schema": "bcc-review/2", "run": p._run_block("failed"),
+                  "document": document_summary(_unread_view(Path(input_path))),
+                  "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
+                                                                   "summary": "", "fix_first": []}}
+        report["run"]["unreadable"] = True
     except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
         p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
         p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})

@@ -1,0 +1,13 @@
+{
+  "stage": "rules",
+  "status": "ok",
+  "seconds": 0.0,
+  "calls": 0,
+  "error": "",
+  "input": {},
+  "output": {
+    "signals": [],
+    "candidates": []
+  },
+  "warnings": []
+}

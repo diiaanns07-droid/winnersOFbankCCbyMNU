@@ -875,7 +875,10 @@ def _header(c: _Ctx) -> list[str]:
         why = _failure_reason(c)
         out += [">", "> ⛔ Прогон завершился сбоем" + (f": {why}" if why else "")
                 + ". Вердикт не вынесен; ниже — то, что успели проверить."]
-    if c.offline:
+    if (run.get("input_check") or {}).get("kind") in ("not_requirements", "too_short"):
+        # №57: не ТЗ или одна строка — проверка не проводилась; подсказка про ключ модели тут не к месту
+        out += [">", f"> ⛔ {prose(str(c.verdict.get('summary') or ''))}"]
+    elif c.offline:
         how = ("как подключить модель — в конце раздела «Кратко»"
                if isinstance(c.r.get("offline"), dict) and c.r["offline"].get("how_to_full")
                else "как подключить модель — в инструкции «README», раздел о ключе")
@@ -1041,6 +1044,8 @@ def _why(c: _Ctx, limit: int = 420) -> str:
     списком. Блокеров нет — текст судьи (не длиннее limit)."""
     text = " ".join(str(c.verdict.get("summary") or "").split())
     judge_down = any("судья недоступен" in str(w) or "реестр собран кодом" in str(w) for w in c.run.get("warnings") or [])
+    if (c.run.get("input_check") or {}).get("kind") in ("not_requirements", "too_short") and text:
+        return text
     if c.run.get("status") == "failed" or (not c.reqs and not c.findings
                                            and c.verdict.get("development") == "undetermined" and not c.offline):
         return _auto_why(c)

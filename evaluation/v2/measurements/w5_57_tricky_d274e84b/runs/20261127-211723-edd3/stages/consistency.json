@@ -1,0 +1,381 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 42.01,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 6
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "FR-1 и FR-4: push при отключённых уведомлениях (пункты 1 и 4)",
+        "kind": "incomplete",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-02",
+          "R-05"
+        ],
+        "evidence": [
+          {
+            "quote": "The system shall send a push notification to the customer within 5 seconds of a debit.",
+            "line": 9,
+            "line_start": 9,
+            "line_end": 9,
+            "page": null,
+            "section": "2. Requirements",
+            "verified": "exact"
+          },
+          {
+            "quote": "The customer may disable notifications in profile settings.",
+            "line": 15,
+            "line_start": 15,
+            "line_end": 15,
+            "page": null,
+            "section": "2. Requirements",
+            "verified": "exact"
+          }
+        ],
+        "problem": "FR-1 и FR-4 касаются одного случая — push после списания при отключенных уведомлениях, — но результат по ним не определить: документ не говорит, что делать.",
+        "scenario": "Клиент отключил уведомления в настройках; происходит списание. FR-1: push обязан уйти клиенту в течение 5 секунд. FR-4: не сказано, отправляется ли push при отключённых уведомлениях.",
+        "impact": "Разработчик и тестировщик по-разному поймут, отправлять ли push отключившему клиенту; приёмка спорна.",
+        "recommendation": "Зафиксировать, что при отключении push не отправляется, и правило для уже запланированных повторов.",
+        "rewrite": "",
+        "question": "Должен ли push отправляться клиенту, отключившему уведомления, и что делать с запланированными повторами?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-01"
+        ]
+      },
+      {
+        "title": "FR-2 и FR-3: статус 'failed' во время повторов (пункты 2 и 3)",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-03",
+          "R-04"
+        ],
+        "evidence": [
+          {
+            "quote": "The operator shall see the delivery status: sent, delivered, failed.",
+            "line": 11,
+            "line_start": 11,
+            "line_end": 11,
+            "page": null,
+            "section": "2. Requirements",
+            "verified": "exact"
+          },
+          {
+            "quote": "On failure the system retries up to 3 times every minute.",
+            "line": 13,
+            "line_start": 13,
+            "line_end": 13,
+            "page": null,
+            "section": "2. Requirements",
+            "verified": "exact"
+          }
+        ],
+        "problem": "FR-2 и FR-3 касаются одного случая — статус доставки во время и после повторных попыток, — но результат по ним не определить: документ не говорит, что делать.",
+        "scenario": "Первая отправка не удалась; вторая попытка через минуту успешна. FR-2: оператор видит статус failed или sent/delivered; правило выбора не задано. FR-3: система повторяет отправку до трёх раз с интервалом в минуту.",
+        "impact": "Оператор может увидеть failed при успешной повторной отправке; тест статуса не однозначен.",
+        "recommendation": "Определить, какой статус показывается между попытками и после успешного повтора.",
+        "rewrite": "",
+        "question": "Какой статус видит оператор, пока повторы ещё идут и после успешного повтора?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-02"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Участник-клиент»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "Customer",
+            "line": 5,
+            "verified": "normalized"
+          },
+          {
+            "quote": "client_id",
+            "line": 19,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Участник-клиент: «Customer» (строка 5), «client_id» (строка 19).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01"
+        ]
+      },
+      {
+        "title": "Статус доставки обещан оператору, но метода его получения нет",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-03",
+          "R-06"
+        ],
+        "evidence": [
+          {
+            "quote": "The operator shall see the delivery status: sent, delivered, failed.",
+            "line": 11,
+            "line_start": 11,
+            "line_end": 11,
+            "page": null,
+            "section": "2. Requirements",
+            "verified": "exact"
+          },
+          {
+            "quote": "API POST /notify accepts client_id, amount, currency.",
+            "line": 19,
+            "line_start": 19,
+            "line_end": 19,
+            "page": null,
+            "section": "3. Interfaces",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Оператор должен видеть статус, но в интерфейсе описан только POST /notify, который статус не отдаёт.",
+        "scenario": "Оператор открывает экран статусов уведомлений клиента.",
+        "impact": "Экран оператора не к чему подключить; FR-2 не реализуем по описанию.",
+        "recommendation": "Добавить в интерфейс метод чтения статуса доставки.",
+        "rewrite": "<уточнить: метод API, возвращающий статус доставки оператору: sent, delivered, failed>",
+        "question": "Каким методом оператор получает статус доставки?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нет сценария повторного включения и изменения настройки уведомлений",
+        "kind": "incomplete",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-05"
+        ],
+        "evidence": [
+          {
+            "quote": "The customer may disable notifications in profile settings.",
+            "line": 15,
+            "line_start": 15,
+            "line_end": 15,
+            "page": null,
+            "section": "2. Requirements",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Описано только отключение; не сказано о включении обратно и о влиянии на уже идущие повторы.",
+        "scenario": "Клиент отключил уведомления, затем включил их снова при активном повторе.",
+        "impact": "Разные реализации по-разному обработают включение; тесты не покрывают сценарий.",
+        "recommendation": "Добавить требование о повторном включении и правилах для повторов.",
+        "rewrite": "<уточнить: поведение при повторном включении уведомлений и для запланированных повторов>",
+        "question": "Что происходит с уведомлениями при повторном включении?",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Требования не ранжированы по приоритету",
+        "kind": "other",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-02",
+          "R-03",
+          "R-04",
+          "R-05"
+        ],
+        "evidence": [
+          {
+            "quote": "FR-1. The system shall send a push notification to the customer within 5 seconds of a debit.",
+            "line": 9,
+            "line_start": 9,
+            "line_end": 9,
+            "page": null,
+            "section": "2. Requirements",
+            "verified": "exact"
+          }
+        ],
+        "problem": "У пунктов FR-1..FR-4 нет приоритета или признака важности.",
+        "scenario": "Команда выбирает, что делать первым при нехватке времени.",
+        "impact": "Порядок реализации и приёмки не определён.",
+        "recommendation": "Добавить приоритет к каждому FR.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нет задачи и версии у пунктов требований",
+        "kind": "traceability",
+        "criterion": "traceable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-01",
+          "R-02",
+          "R-03",
+          "R-04",
+          "R-05",
+          "R-06"
+        ],
+        "evidence": [
+          {
+            "quote": "Notification service requirements",
+            "line": 1,
+            "line_start": 1,
+            "line_end": 1,
+            "page": null,
+            "section": "",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Не указаны версия документа, задача или источник требований.",
+        "scenario": "Ревьюер хочет понять, к какой задаче относятся FR-1..FR-4.",
+        "impact": "Сложно отследить изменения и источник требований.",
+        "recommendation": "Указать версию и задачу в шапке документа.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-02",
+        "b": "R-05",
+        "subject": "Push после списания при отключенных уведомлениях",
+        "same_subject": true,
+        "quote_a": "The system shall send a push notification to the customer within 5 seconds of a debit.",
+        "line_a": 9,
+        "quote_b": "The customer may disable notifications in profile settings.",
+        "line_b": 15,
+        "scenario": "Клиент отключил уведомления в настройках; происходит списание.",
+        "outcome_a": "Push обязан уйти клиенту в течение 5 секунд.",
+        "outcome_b": "Не сказано, отправляется ли push при отключённых уведомлениях.",
+        "one_condition": true,
+        "verdict": "undefined",
+        "basis": "none",
+        "kind": "incomplete",
+        "title": "FR-1 и FR-4: push при отключённых уведомлениях (пункты 1 и 4)",
+        "impact": "Разработчик и тестировщик по-разному поймут, отправлять ли push отключившему клиенту; приёмка спорна.",
+        "recommendation": "Зафиксировать, что при отключении push не отправляется, и правило для уже запланированных повторов.",
+        "question": "Должен ли push отправляться клиенту, отключившему уведомления, и что делать с запланированными повторами?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      },
+      {
+        "a": "R-03",
+        "b": "R-04",
+        "subject": "Статус доставки во время и после повторных попыток",
+        "same_subject": true,
+        "quote_a": "The operator shall see the delivery status: sent, delivered, failed.",
+        "line_a": 11,
+        "quote_b": "On failure the system retries up to 3 times every minute.",
+        "line_b": 13,
+        "scenario": "Первая отправка не удалась; вторая попытка через минуту успешна.",
+        "outcome_a": "Оператор видит статус failed или sent/delivered; правило выбора не задано.",
+        "outcome_b": "Система повторяет отправку до трёх раз с интервалом в минуту.",
+        "one_condition": true,
+        "verdict": "undefined",
+        "basis": "none",
+        "kind": "ambiguity",
+        "title": "FR-2 и FR-3: статус 'failed' во время повторов (пункты 2 и 3)",
+        "impact": "Оператор может увидеть failed при успешной повторной отправке; тест статуса не однозначен.",
+        "recommendation": "Определить, какой статус показывается между попытками и после успешного повтора.",
+        "question": "Какой статус видит оператор, пока повторы ещё идут и после успешного повтора?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-02"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-02",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет критериев приёмки; не связано с POST /notify"
+      },
+      {
+        "requirement_id": "R-03",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет метода чтения статуса доставки"
+      },
+      {
+        "requirement_id": "R-04",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет критериев приёмки; не сказано про первую попытку"
+      },
+      {
+        "requirement_id": "R-05",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет критериев; нет поля настройки отключения"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Участник-клиент",
+        "terms": [
+          {
+            "term": "Customer",
+            "line": 5
+          },
+          {
+            "term": "client_id",
+            "line": 19
+          }
+        ],
+        "problem": "Роль названа customer, в API — client_id; неясно, один ли это участник.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Отключение уведомлений клиентом и отправка push после списания",
+        "places": [
+          "R-02",
+          "R-05"
+        ]
+      },
+      {
+        "subject": "Статус доставки при сбое и последующих повторах",
+        "places": [
+          "R-03",
+          "R-04"
+        ]
+      },
+      {
+        "subject": "Срок отправки push и повторы при сбое",
+        "places": [
+          "R-02",
+          "R-04"
+        ]
+      }
+    ]
+  },
+  "warnings": []
+}

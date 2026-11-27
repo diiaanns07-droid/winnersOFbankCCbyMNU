@@ -1,0 +1,56 @@
+[
+  {
+    "requirements": [
+      {
+        "source_id": "",
+        "kind": "architecture",
+        "summary": "Участники процесса: клиент и оператор",
+        "line_start": 5,
+        "line_end": 5
+      },
+      {
+        "source_id": "Ф-1",
+        "kind": "functional",
+        "summary": "Push-уведомление клиенту после списания",
+        "line_start": 9,
+        "line_end": 9
+      },
+      {
+        "source_id": "Ф-2",
+        "kind": "functional",
+        "summary": "Оператор видит статус доставки уведомления",
+        "line_start": 11,
+        "line_end": 11
+      },
+      {
+        "source_id": "Ф-3",
+        "kind": "functional",
+        "summary": "Повторная отправка при ошибке доставки",
+        "line_start": 13,
+        "line_end": 13
+      },
+      {
+        "source_id": "Ф-4",
+        "kind": "functional",
+        "summary": "Клиент отключает уведомления в профиле",
+        "line_start": 15,
+        "line_end": 15
+      },
+      {
+        "source_id": "",
+        "kind": "api",
+        "summary": "Метод POST /notify принимает данные клиента и суммы",
+        "line_start": 19,
+        "line_end": 19
+      }
+    ],
+    "excluded": [
+      {
+        "what": "Хабарландыру қызметіне қойылатын талаптар",
+        "line_start": 1,
+        "line_end": 1,
+        "reason": "Название документа, не требование."
+      }
+    ]
+  }
+]

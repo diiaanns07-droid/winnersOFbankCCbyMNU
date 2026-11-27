@@ -1,0 +1,22 @@
+Документ: evaluation/v2/clean/roundup/source.md
+  segment: взят из roundup__clean
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 1
+  lens_analyst: запуск
+  lens_architect: взят из roundup__clean
+  consistency: взят из roundup__clean
+  lens_qa: взят из roundup__clean
+  lens_risk: взят из roundup__clean
+  lens_analyst: готово за 63 с, вызовов 1, кандидатов 2
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 18
+  judge: взят из roundup__clean
+  clarify: взят из roundup__clean
+Этап lens_analyst: ok, вызовов 1, 62.75 с, кандидатов 2
+Выход этапа: runs/20261127-205450-92a6/stages/lens_analyst.json
+BCC Review: «Копилка с округлением покупок по карте» — 82 требования, 14 дефектов (критичных 1, существенных 4, незначительных 9), вопросов 3
+Разработка: нельзя · тестирование: можно — блокер 1, останавливает разработку:
+  D-01 Сохранение настроек при выключении: Ф-8 и правило 2 противоречат
+Прогон завершён полностью: 1 мин 3 с, 1 вызов модели, claude-haiku-5-5; цитат сверено 30 из 30
+Отчёт: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean20-roundup__clean/lens_analyst.json и evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean20-roundup__clean/lens_analyst.json
+HTML: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean20-roundup__clean/lens_analyst.html

@@ -1,0 +1,25 @@
+Документ: release/input/requirements.md
+  segment: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  rules: запуск
+  rules: готово за 1 с, вызовов 0, кандидатов 15
+  consistency: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_architect: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_risk: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_analyst: запуск
+  lens_qa: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_analyst: готово за 40 с, вызовов 1, кандидатов 8
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 61
+  judge: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  clarify: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+Этап lens_analyst: ok, вызовов 1, 39.57 с, кандидатов 8
+Выход этапа: runs/20261127-205358-b8e7/stages/lens_analyst.json
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 31 дефект (критичных 5, существенных 13, незначительных 13), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, останавливают разработку и тестирование, D-03 — только разработку:
+  D-01 Ф-3 разрешает один push в месяц, Ф-4 требует новый push
+  D-02 Не определено, какое событие процессинга считается «проведена»
+  D-03 Обещано чтение настроек и суммы за месяц, метода чтения нет
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 41 с, 1 вызов модели, claude-sonnet-5-5; цитат сверено 84 из 84
+Отчёт: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/official_sonnet_2/lens_analyst.json и evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/official_sonnet_2/lens_analyst.json
+HTML: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/official_sonnet_2/lens_analyst.html

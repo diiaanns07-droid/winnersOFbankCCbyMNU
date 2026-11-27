@@ -221,6 +221,10 @@ def cmd_review(argv: list[str]) -> int:
     from . import pipeline
     report, written = pipeline.review(a.input, a.output, _opts(a), log=_log(a.quiet))
     _print_summary(report, written)
+    run = report.get("run") or {}
+    if (run.get("unreadable") or run.get("input_check")) and run.get("warnings"):
+        # №57: не тот файл, не ТЗ, одна строка — причина целиком и в тихом режиме (-q), без «…»
+        print("\n" + str(run["warnings"][0]), file=sys.stderr)
     if (report.get("run") or {}).get("model_error"):
         called = int(((report.get("run") or {}).get("calls") or {}).get("total") or 0)
         lead = ("Модель перестала отвечать во время прогона, отчёт неполный. " if called

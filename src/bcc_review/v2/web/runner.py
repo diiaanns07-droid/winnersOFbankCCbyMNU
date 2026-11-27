@@ -328,7 +328,9 @@ class PipelineRunner:
                     job.stages[k] = "done" if (k == "report" or job.stages[k] == "running") else "skipped"
         else:
             job.state = "failed"
-            if fatal and job.notice:
+            if fatal and job.notice.startswith("Не удалось прочитать файл"):
+                job.error = job.notice  # №57: та же фраза, что в командной строке
+            elif fatal and job.notice:
                 job.error = job.notice + " Проверьте, что файл открывается и содержит текст, а не только скан страниц."
             elif not job.error:
                 lines = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()
@@ -452,6 +454,13 @@ class PipelineRunner:
 def _notice(report: dict) -> str:
     run = report.get("run") or {}
     warns = [str(w) for w in run.get("warnings") or []]
+    # №57: не тот файл, не ТЗ, одна строка, вставка для ИИ — та же фраза, что в командной строке
+    unread = next((w for w in warns if w.startswith("Не удалось прочитать файл")), "")
+    if unread:
+        return unread
+    if (run.get("input_check") or {}).get("kind") in ("not_requirements", "too_short") and warns:
+        return warns[0]
+    inject = next((w for w in warns if w.startswith("В документе указание для ИИ-проверки")), "")
     if run.get("provider") == "offline" and run.get("status") != "failed":
         return ("Проверка без модели: найдены только формальные дефекты по правилам (заглушки, единицы, коды ответов, "
                 "язык). Противоречия по смыслу ищет модель — выберите провайдера с ключом.")
@@ -466,7 +475,7 @@ def _notice(report: dict) -> str:
     if run.get("status") == "partial":
         bad = [k for k, v in (run.get("stages") or {}).items() if v in ("failed", "partial")]
         return "Прогон неполный: не все этапы завершены" + (f" ({', '.join(bad)})" if bad else "") + " — вердикт не выше «с условиями»."
-    return ""
+    return inject
 
 
 def _summary(report: dict) -> dict[str, Any]:
