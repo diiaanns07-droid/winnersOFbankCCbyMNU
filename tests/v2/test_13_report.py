@@ -796,3 +796,18 @@ def test_rejected_duplicate_points_to_kept_card(sample):
 
 def test_code_spans_not_nested():
     assert markdown.prose("GET /savings/{accountId}/interest описан") == "GET `/savings/{accountId}/interest` описан"
+
+
+def test_console_counts_all_blockers(sample):
+    """Терминал называет все блокеры числом и ID (раньше — первые три из fix_first при счётчике 4)."""
+    text = console.summary(sample, md_path="r.md", json_path="r.json")
+    blockers = [f["id"] for f in sample["findings"] if f["severity"] == "critical" and f.get("blocks") != "none"]
+    assert f"блокеров {len(blockers)}" in text
+    assert all(b in text for b in blockers) and len(text.split("\n")) <= 8
+    r = copy.deepcopy(sample)
+    for f in r["findings"]:
+        if f["severity"] == "critical":
+            f["severity"], f["blocks"] = "major", "none"
+    r["verdict"].update(development="conditional", testing="conditional")
+    text = console.summary(r)
+    assert "исправить первым:" in text and "блокер" not in text
