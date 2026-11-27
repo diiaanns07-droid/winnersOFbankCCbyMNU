@@ -106,7 +106,8 @@ scripts/run_official.sh
 | `out/report.md` | отчёт для чтения (GitHub, VS Code, любой просмотрщик Markdown) |
 | `out/report.json` | то же для программ: замечания, полные цитаты, паспорт прогона (схема `contracts/v2.json`) |
 | `out/report.html` | интерактивный отчёт одним файлом: документ с подсвеченными цитатами, фильтры, работает без интернета |
-| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf`: копия документа с комментариями на местах цитат |
+| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf` для входа DOCX / PDF: копия документа с комментариями (выделениями) на местах цитат |
+| `out/report.docx` | по `--export docx` для входа MD, TXT, HTML, PDF: Word-версия отчёта |
 | `out/report.jira.csv` | по `--export jira`: замечание — строка для импорта в Jira |
 | `out/report.revised.md` | по `--revise`: исправленная редакция ТЗ |
 | `runs/<id прогона>/` | журнал: вход и выход каждого этапа, каждое обращение к модели |
