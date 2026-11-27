@@ -739,11 +739,19 @@ def _merge_responses(parts: list[dict]) -> dict:
     order = {"Нет": 0, "Частично": 1, "Да": 2, "Не требуется": 3}
     for pi, resp in enumerate(parts, 1):
         remap: dict[str, str] = {}
+        own = []
         for f in resp.get("findings") or []:
-            key = f"P{pi}{_s(f.get('key')) or len(findings) + 1}"
-            remap[_s(f.get("key"))] = key
-            findings.append({**f, "key": key})
-        rejected += list(resp.get("rejected") or [])
+            key = f"P{pi}{_s(f.get('key')) or len(findings) + len(own) + 1}"
+            if _s(f.get("key")):
+                remap[_s(f.get("key"))] = key
+            own.append({**f, "key": key})
+        for f in own:  # ссылки на дефекты своей части в текстах — на новые ключи
+            for field in ("title", "problem", "scenario"):
+                if _s(f.get(field)):
+                    f[field] = _replace_keys(_s(f[field]), remap)
+        findings += own
+        rejected += [dict(r, reason=_replace_keys(_s(r.get("reason")), remap)) if isinstance(r, dict) else r
+                     for r in resp.get("rejected") or []]
         for ch in resp.get("checklist") or []:
             n = ch.get("n")
             ch = {**ch, "finding_keys": [remap.get(k, k) for k in ch.get("finding_keys") or []],
@@ -1260,6 +1268,7 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
         "scenario": "", "impact": spec["impact"], "recommendation": spec["recommendation"],
         "rewrite": _cut("; ".join(rewrites[:3]), 700), "question": "" if rewrites else spec.get("question", ""),
         "sources": _sources(members), "_members": members, "_wish": False,
+        "_absorbed": [k for f in hits for k in [f["key"], *(f.get("_absorbed") or [])]],
     })
     main["_first_line"] = main["evidence"][0]["line_start"] if main["evidence"] else hits[0]["_first_line"]
     _warn(ctx, warnings, f"судья: {len(hits)} замечаний ({spec['warn']}) сведены в одно незначительное")
@@ -1293,6 +1302,53 @@ def _wishes_by_place(findings: list[dict], ctx: Any, warnings: list[str]) -> lis
             spec["title"] = f"{_WISHES['title']} (строка {line})"
         findings = _consolidate(findings, lambda f, ids=set(ids): id(f) in ids, spec, ctx, warnings)
     return findings
+
+
+GOAL_MISMATCH_KINDS = CONFLICT_KINDS | {"other", "traceability", "incorrect"}
+
+
+def _absorb_goal_minors(findings: list[dict], req_kind_at: dict[int, str], ctx: Any,
+                        warnings: list[str]) -> list[dict]:
+    """Minor «цель документа расходится с требованием», когда то же требование (те же строки, кроме строк цели, и
+    те же ID требований) уже разбирает другой дефект, — не отдельное замечание, а ещё одно место этого дефекта.
+    Слабая модель держит их порознь, и читатель видит два замечания об одном требовании (на официальном haiku:
+    «цель — в момент события ↔ срок до минуты» рядом с «срок без доли событий»). Цель документа не нормативна
+    (шкала: её расхождение — minor), поэтому дефект-хозяин уровень не меняет."""
+    if not req_kind_at:
+        return findings
+    absorbed: set[int] = set()
+    for f in findings:
+        # только само расхождение (цель ↔ требование); свойство требования (непроверяемо, неоднозначно, неполно),
+        # процитированное вместе с целью, — отдельная находка
+        if f["severity"] != "minor" or not f["_members"] or f["kind"] not in GOAL_MISMATCH_KINDS:
+            continue
+        lines = {e["line_start"] for e in f["evidence"]}
+        goal = {n for n in lines if req_kind_at.get(n) == "goal"}
+        rest = lines - goal
+        if not goal or not rest:
+            continue
+        reqs = set(f["requirement_ids"])
+        hosts = [g for g in findings if g is not f and id(g) not in absorbed and id(f) not in absorbed
+                 and rest <= {e["line_start"] for e in g["evidence"]}
+                 and (not reqs or not g["requirement_ids"] or set(g["requirement_ids"]) & reqs)]
+        if not hosts:
+            continue
+        g = min(hosts, key=lambda h: (SEV_RANK[h["severity"]], h["_first_line"]))
+        g["candidate_ids"] = sorted(set(g["candidate_ids"]) | set(f["candidate_ids"]), key=_cid_num)
+        g["_members"] = g["_members"] + f["_members"]
+        g["requirement_ids"] = list(dict.fromkeys(g["requirement_ids"] + f["requirement_ids"]))
+        have = {e["line_start"] for e in g["evidence"]}
+        g["evidence"] = sorted(g["evidence"] + [e for e in f["evidence"] if e["line_start"] not in have],
+                               key=lambda e: e["line_start"])[:MAX_EVIDENCE + len(goal)]
+        g["sources"] = _sources(g["_members"])
+        g["_absorbed"] = [*(g.get("_absorbed") or []), f["key"], *(f.get("_absorbed") or [])]
+        tail = re.sub(r"[.;:\s]+$", "", _lc_first(f["title"]))
+        head = re.sub(r"[.;:\s]+$", "", _s(g["problem"]))  # той же фразой: число предложений проблемы не растёт
+        g["problem"] = _cut(f"{head}; кроме того, {tail} (строка {min(goal)}).", 900)
+        absorbed.add(id(f))
+        _warn(ctx, warnings, f"судья: {f['title'][:60]!r} (расхождение с целью) присоединён к "
+                             f"{g['title'][:50]!r} — то же требование")
+    return [f for f in findings if id(f) not in absorbed]
 
 
 def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
@@ -1444,6 +1500,49 @@ def _replace_keys(text: str, key_map: dict[str, str]) -> str:
     return pattern.sub(lambda m: key_map[m.group(1)], text)
 
 
+_MODEL_KEY_RE = re.compile(r"(?<![\w-])(?:P\d{1,2})?[FR]\d{2,3}(?:#\d+)?(?![\w-])")  # F01, P1F02, R01, F03#4
+_DANGLING_REF = (r"\s*\((?:см\.\s*|как в\s+|в\s+)?{key}\)"  # «(см. F07)», «(F07)»
+                 r"|(?:\s*,\s*|\s+)(?:см\.|как в|покрыт\w*|учт[её]н\w*|в)\s+{key}(?=[\s.,;:)]|$)")  # «покрыт F03»
+
+
+def _dangling_keys(response: dict, key_map: dict[str, str], view: dict | None = None) -> set[str]:
+    """Ключи модели (F01, P1F02, R01), которых нет в реестре: дефект модели отпал (нет известных кандидатов,
+    нет цитат) или ключ выдуман. Ключ отпавшего дефекта, чьи кандидаты легли в другой дефект, ведёт к нему
+    (``key_map`` дополняется). Возвращает оставшиеся висячие ключи; слова документа (его собственные ID вида
+    F01) висячими не считаются."""
+    doc = {m.group(0) for ln in (view or {}).get("lines") or [] for m in _MODEL_KEY_RE.finditer(_s(ln.get("text")))}
+    for f in response.get("findings") or []:
+        k = _s(f.get("key"))
+        if not k or k in key_map:
+            continue
+        targets = list(dict.fromkeys(key_map[c] for c in (_s(x) for x in f.get("candidate_ids") or [])
+                                     if c in key_map))
+        if len(targets) == 1:
+            key_map[k] = targets[0]
+    texts = [_s(response.get("verdict_summary"))]
+    texts += [_s(f.get(x)) for f in response.get("findings") or [] for x in ("title", "problem", "scenario")]
+    texts += [_s(r.get("reason")) for r in response.get("rejected") or []]
+    texts += [_s(c.get("comment")) for c in response.get("checklist") or []]
+    used = {m.group(0) for t in texts for m in _MODEL_KEY_RE.finditer(t)}
+    keys = {_s(f.get("key")) for f in response.get("findings") or [] if _s(f.get("key"))}
+    return {k for k in used | keys if k not in key_map and k not in doc}
+
+
+def _has_keys(text: str, keys: set[str]) -> bool:
+    return bool(keys) and any(m.group(0) in keys for m in _MODEL_KEY_RE.finditer(text or ""))
+
+
+def _drop_keys(text: str, keys: set[str]) -> str:
+    """Ссылка на висячий ключ убирается из текста («(см. F07)», «покрыт F03»), иначе — «другое замечание»."""
+    if not _has_keys(text, keys):
+        return text
+    for k in sorted(keys, key=len, reverse=True):
+        key = r"(?<![\w-])" + re.escape(k) + r"(?![\w-])"
+        text = re.sub(_DANGLING_REF.replace("{key}", key), "", text)
+        text = re.sub(key, "другое замечание", text)
+    return re.sub(r"\s+([.,;:])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
+
+
 def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], *,
              requirements: list[dict] | None = None, checklist: list[str] | None = None,
              ctx: Any = None, warnings: list[str] | None = None,
@@ -1585,6 +1684,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             f["evidence"].sort(key=lambda e: e["line_start"])
             f["sources"] = _sources(f["_members"])
             f["_first_line"] = f["evidence"][0]["line_start"]
+    if _option(ctx, "judge_absorb_goal", True):
+        findings = _absorb_goal_minors(findings, req_maps[0], ctx, warnings)
     _cap_critical(findings, ctx, warnings)
     if _option(ctx, "judge_confirm_majors", True):
         _confirm_majors(findings, candidates, max(run_sources, reviewer_stages(ctx)), ctx, warnings)
@@ -1599,6 +1700,10 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         key_map[f["key"]] = f["id"]
         for cid in f["candidate_ids"]:
             key_map.setdefault(cid, f["id"])
+    for f in findings:  # дефекты, сведённые кодом в одно замечание, — ссылки на них ведут к нему
+        for k in f.get("_absorbed") or []:
+            key_map.setdefault(k, f["id"])
+    dangling = _dangling_keys(response, key_map, view)
 
     # 6. чек-лист
     items = checklist or [x for x, _ in BANK_CHECKLIST]
@@ -1620,7 +1725,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         final_check.append({
             "item": text,
             "answer": _s(ch.get("answer")),
-            "comment": _words_cut(_ru_levels(_replace_keys(_s(ch.get("comment")), key_map)), 30),
+            "comment": _words_cut(_ru_levels(_drop_keys(_replace_keys(_s(ch.get("comment")), key_map), dangling)), 30),
             "finding_ids": list(dict.fromkeys(fids)),
         })
     if missed_items:
@@ -1629,8 +1734,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     summary = _ru_levels(_replace_keys(_s(response.get("verdict_summary")), key_map))
     if not summary:
         summary = fallback_summary(clean)
-    code_summary = bool(summary) and bool(clean) and (_code_changed_verdict(findings)
-                                                      or _text_contradicts(summary, clean))
+    code_summary = bool(summary) and (_code_changed_verdict(findings) or _text_contradicts(summary, clean)
+                                      or _has_keys(summary, dangling))
 
     # 7. ссылки на ключи и кандидатов в текстах дефектов → D-xx, внутренние R-xx → ID документа
     names = _req_names(requirements)
@@ -1638,7 +1743,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         own = set(f["candidate_ids"])
         refs = {k: v for k, v in key_map.items() if not (k.startswith("C-") and k in own)}
         for field in ("title", "problem", "scenario", "impact", "recommendation", "question"):
-            f[field] = _doc_ids(_ru_levels(_replace_keys(f[field], refs)), names)
+            f[field] = _doc_ids(_ru_levels(_drop_keys(_replace_keys(f[field], refs), dangling)), names)
             f[field] = re.sub(r"\bC-\d{2,4}\b", "это замечание", f[field])  # ссылка на себя
         f["rewrite"] = _doc_ids(f["rewrite"], names)
 
@@ -1646,6 +1751,10 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         summary = verdict_text(clean)
         _warn(ctx, warnings, "судья: уровни изменены кодом — обоснование вердикта собрано кодом")
 
+    for r in rejected:  # причина отклонения ссылается на дефекты по ключам модели («покрыт F03») → D-xx
+        if r.get("reason"):
+            r["reason"] = _drop_keys(_replace_keys(r["reason"], {k: v for k, v in key_map.items()
+                                                                  if not k.startswith("C-")}), dangling)
     fix_first = [f["id"] for f in sorted((f for f in clean if f["priority"] > 0), key=lambda f: f["priority"])]
     changes = [{"id": key_map[k], **v} for k, v in (response.get("_checks") or {}).items() if k in key_map]
     changes.sort(key=lambda x: x["id"])
