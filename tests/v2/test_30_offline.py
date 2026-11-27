@@ -80,7 +80,8 @@ def test_new_offline_rules_silent_on_clean_documents() -> None:
     for p in paths:
         out = rules.run(docview.load(str(p)))
         bad = [c["title"] for c in out["candidates"]
-               if c["source"].startswith(("rules:ops.", "rules:conflicts.event_quantity", "rules:language.nfr_no_share", "rules:conflicts.period_attribution"))]
+               if c["source"].startswith(("rules:ops.", "rules:conflicts.event_quantity", "rules:language.nfr_no_share", "rules:conflicts.period_attribution",
+                                       "rules:ops.message_data"))]
         assert bad == [], (p, bad)
 
 
@@ -133,3 +134,28 @@ def test_period_attribution_consistent_is_silent(tmp_path: Path) -> None:
         PERIOD.replace("Авторизация операции 30.04 в 23:59", "Авторизация операции 01.05 в 00:01"),
     ):
         assert _src(_run(tmp_path, text), "rules:conflicts.period_attribution") == [], text
+
+
+MSG = """# Перевыпуск карты
+
+## Функциональные требования
+* **ФТ-3.** После выпуска клиент получает SMS «Карта с окончанием XXXX готова», где XXXX — последние четыре цифры нового номера.
+
+## Требования к данным
+Хранить идентификатор заказа, статус и дату выпуска.
+"""
+
+
+def test_message_field_not_stored(tmp_path: Path) -> None:
+    c = _src(_run(tmp_path, MSG), "rules:ops.message_data")
+    assert len(c) == 1 and c[0]["severity"] == "major"
+    assert {e["line"] for e in c[0]["evidence"]} == {4, 7}
+
+
+def test_message_field_stored_or_no_data_section_is_silent(tmp_path: Path) -> None:
+    for text in (
+        MSG.replace("Хранить идентификатор заказа,", "Хранить идентификатор заказа, последние четыре цифры номера,"),
+        MSG.replace("## Требования к данным\nХранить идентификатор заказа, статус и дату выпуска.\n", ""),
+        MSG.replace(", где XXXX — последние четыре цифры нового номера", ""),
+    ):
+        assert _src(_run(tmp_path, text), "rules:ops.message_data") == [], text

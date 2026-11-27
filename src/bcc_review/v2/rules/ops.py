@@ -1,7 +1,9 @@
 """Эксплуатационная полнота (№30): то, без чего требование нельзя реализовать одинаково и проверить.
 
 * повторная доставка события или запроса: документ требует, чтобы повтор не менял итог, но не говорит, по какому
-  признаку повтор узнаётся (идентификатор события, ключ идемпотентности) и не ссылается на правило, где это сказано.
+  признаку повтор узнаётся (идентификатор события, ключ идемпотентности) и не ссылается на правило, где это сказано;
+* поле шаблона сообщения («SMS «Заказ XXXX готов», где XXXX — последние четыре цифры номера») не хранится:
+  в требованиях к данным («Хранить …») такого значения нет.
 
 Правило не знает слов конкретного документа: только общие обороты банковских ТЗ об интеграции.
 """
@@ -10,6 +12,8 @@ from __future__ import annotations
 import re
 
 from ._text import Doc, candidate, ev, quoted, signal
+
+WORD = re.compile(r"[а-яёa-z]+", re.I)
 
 # «повторная доставка события», «событие доставлено повторно», «дубликат сообщения», «повторное получение уведомления»
 REPEAT = re.compile(
@@ -69,5 +73,54 @@ def rule_repeat_key(doc: Doc, out: dict) -> None:
         return  # одно замечание на документ
 
 
+# «… «Заказ XXXX готов», где XXXX — последние четыре цифры номера»
+TEMPLATE_VAR = re.compile(r"«[^»]{0,120}?(?P<var>\b[A-ZА-ЯЁ]{3,}\b|\{[^}]{1,30}\}|<[^>]{1,30}>)[^»]{0,120}»[^.;]{0,40}?"
+                          r",?\s*где\s+(?P=var)\s*[—–-]\s*(?P<what>[^.;]{4,120})")
+DATA_SECTION = re.compile(r"требовани\w*\s+к\s+данным|модел\w*\s+данных|хранени\w*\s+данных|^данные$", re.I)
+STORE = re.compile(r"^\s*(?:хранить|хранятся|хранится|сохраня\w*|в\s+базе\s+хран\w*)\b", re.I)
+STOP = {"номер", "номера", "карты", "карта", "клиент", "клиента", "значение", "время", "дата", "текущий", "текущая"}
+
+
+def _stems(text: str) -> list[str]:
+    return [w.lower()[:5] for w in WORD.findall(text) if len(w) >= 4 and w.lower() not in STOP]
+
+
+def rule_message_data(doc: Doc, out: dict) -> None:
+    data = [x for x in doc.lines if x.text and not x.is_heading
+            and (DATA_SECTION.search((x.section or "").split("›")[-1].strip()) or STORE.match(x.text))]
+    stored = {st for x in data if STORE.match(x.text) or DATA_SECTION.search(x.section or "")
+              for st in _stems(x.joined)}
+    if not any(STORE.match(x.text) for x in data):
+        return  # перечня хранимых данных нет — полноту хранения не судим
+    for x in doc.lines:
+        if not x.text or x.is_code or x.cells is not None:
+            continue
+        m = TEMPLATE_VAR.search(x.joined)
+        if not m:
+            continue
+        head = _stems(m.group("what"))[:3]
+        if len(head) < 2 or any(h in stored for h in head):
+            continue
+        store_line = next(x2 for x2 in data if STORE.match(x2.text))
+        what = m.group("what").strip()
+        out["candidates"].append(candidate(
+            "ops.message_data",
+            title=f"Поле сообщения не хранится: {quoted(what)}",
+            kind="missing_element", criterion="set_complete", severity="major", blocks="development",
+            evidence=[ev(x, m.group(0)[:200]), ev(store_line)],
+            problem=(f"Шаблон сообщения подставляет {quoted(m.group('var'))} — {quoted(what)}, но в требованиях к данным "
+                     f"этого значения нет: {quoted(store_line.joined[:200])}. Откуда сервис возьмёт его при отправке, "
+                     "не сказано."),
+            scenario=("Сервис формирует сообщение после события: подставить значение не из чего — сообщение уходит с "
+                      "пустым местом или не уходит, тест на текст сообщения не пройти."),
+            impact="Сообщение нельзя сформировать по документу; объём доработки хранилища или интеграции недооценён.",
+            recommendation=(f"Добавить {quoted(what)} в требования к данным или указать, из какой системы оно берётся "
+                            "в момент отправки."),
+            question=f"Откуда сервис берёт {quoted(what)} для сообщения — хранит сам или запрашивает у другой системы?",
+        ))
+        return
+
+
 def run(doc: Doc, out: dict) -> None:
     rule_repeat_key(doc, out)
+    rule_message_data(doc, out)
