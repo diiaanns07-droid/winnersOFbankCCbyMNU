@@ -2,6 +2,9 @@
 
     python tests/v2/fixtures/05_analyst/measure.py run --label v18_haiku --model haiku --sets official,corpus,open2 --jobs 4
     python tests/v2/fixtures/05_analyst/measure.py score --label v18_haiku
+    python tests/v2/fixtures/05_analyst/measure.py stability --label r1,r2,r3     # официальный: свои пункты по прогонам
+
+Чистые версии №18 второй редакции берутся из `out/05/open2src` (см. OPEN2_CLEAN2), если выгружены.
 
 Каждый документ: mock-прогон каркаса (нарезка — фикстура или эвристика кода, бесплатно) → `stage lens_analyst`
 с настоящей моделью (1 вызов, через `lens_analyst.run` с постобработкой). Ответы — в `out/05/<метка>/<кейс>.json`.
@@ -283,9 +286,35 @@ def score(label: str, sets: list[str], only: list[str] | None) -> str:
     return text
 
 
+def stability(labels: list[str], case: str = "official") -> str:
+    """Свои пункты эталона по нескольким прогоном одного документа: сколько раз найден каждый."""
+    from evaluation.v2 import score as sc
+    gold = sc.load_gold(sc.DEFAULT_GOLD)
+    mine = [g["id"] for g in gold["items"] if "analyst" in g.get("owners", [])]
+    hits: dict[str, int] = {}
+    rows = []
+    for lb in labels:
+        p = OUT / lb / f"{case}.json"
+        if not p.exists():
+            continue
+        d = json.loads(p.read_text(encoding="utf-8"))
+        res = sc.score_report(sc.as_report({"candidates": d["candidates"]}, gold), gold, arbiter="off")
+        found = {a["gold"] for a in res["assignment"]}
+        for g in found:
+            hits[g] = hits.get(g, 0) + 1
+        rows.append(f"| {lb} | {len(d['candidates'])} | {len(found)} | {', '.join(res['recall']['critical']['found'])} | "
+                    f"{res['recall']['major']['n']} | {sum(1 for g in mine if g in found)}/{len(mine)} | "
+                    f"{len(res['severity']['critical_false'])} | {d.get('seconds')} |")
+    n = len(rows)
+    L = ["| Прогон | Кандидатов | В эталоне | К | С | Свои | Крит. ложных | с |",
+         "| :--- | ---: | ---: | :--- | ---: | ---: | ---: | ---: |", *rows, "",
+         "Свои пункты: " + ", ".join(f"{g} {hits.get(g, 0)}/{n}" for g in mine)]
+    return "\n".join(L)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["run", "score"])
+    ap.add_argument("cmd", choices=["run", "score", "stability"])
     ap.add_argument("--label", required=True)
     ap.add_argument("--model", default="haiku")
     ap.add_argument("--effort")
@@ -296,6 +325,9 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     sets = a.sets.split(",")
     only = [x for x in a.cases.split(",") if x] or None
+    if a.cmd == "stability":
+        print(stability(a.label.split(",")))
+        return 0
     if a.cmd == "run":
         cs = cases(sets, only)
         with cf.ThreadPoolExecutor(a.jobs) as ex:
