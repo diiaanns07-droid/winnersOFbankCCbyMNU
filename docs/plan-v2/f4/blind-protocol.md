@@ -1,17 +1,16 @@
 # Blind3 · порядок прогона и зачёта
 
-В [папке входов](../../../evaluation/v2/blind3/) лежат шесть каталогов кейсов, в каждом — файл `source.md`. Для каждого нужен отдельный запуск агента, без доступа к соседним файлам и их отчётам. Идентификатор прогона — имя каталога кейса. Для сравнения моделей каждую проверяют на всех шести документах с одной версией кода и настроек.
+В [папке входов](../../../evaluation/v2/blind3/) лежат шесть файлов Markdown. Для каждого нужен отдельный запуск агента, без доступа к соседним файлам и их отчётам. Идентификатор прогона — имя входного файла. Для сравнения моделей каждую проверяют на всех шести документах с одной версией кода и настроек.
 
 **Для F1 или F3.** На машине с настроенным провайдером передайте каждому запуску отдельный вход. Например, из корня рабочей версии v2 в PowerShell:
 
 ```powershell
 $reportDir = 'out/blind3'
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-foreach ($caseDir in (Get-ChildItem -Directory -Path 'evaluation/v2/blind3' -Filter 'tz-*' | Sort-Object Name)) {
-    $sourcePath = Join-Path $caseDir.FullName 'source.md'
-    $reportPath = Join-Path $reportDir ($caseDir.Name + '.md')
-    python -m bcc_review $sourcePath $reportPath --no-cache
-    if ($LASTEXITCODE -ne 0) { Write-Warning "Неполный прогон: $($caseDir.Name)" }
+foreach ($specFile in Get-ChildItem -File -Path 'evaluation/v2/blind3/tz-*.md') {
+    $reportPath = Join-Path $reportDir $specFile.Name
+    python -m bcc_review $specFile.FullName $reportPath --no-cache
+    if ($LASTEXITCODE -ne 0) { Write-Warning "Неполный прогон: $($specFile.Name)" }
 }
 ```
 

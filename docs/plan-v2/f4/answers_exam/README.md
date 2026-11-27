@@ -6,9 +6,11 @@
 | --- | --- | --- | --- |
 | Уведомления о расходах | [ТЗ](../../../../release/input/requirements.md) | [Отчёт](../../../../evaluation/v2/measurements/zamer_08_30_6d03683_sonnet/report.md) · [JSON](../../../../evaluation/v2/measurements/zamer_08_30_6d03683_sonnet/report.json) | [Ответы](official/answers.md) |
 | Перевод через QR | [ТЗ](../../../../evaluation/v2/open2/qr/source.md) | [Отчёт](../../../../evaluation/v2/open2/results/sonnet_0820/qr.md.md) · [JSON](../../../../evaluation/v2/open2/results/sonnet_0820/qr.md.json) | [Ответы](qr/answers.md) |
-| Изменение дня платежа по автокредиту | [ТЗ](car-loan/source.md) | Новый документ F4, вопросы формируются первым запуском | Ответы фиксируются по его вопросам до пересмотра |
+| Изменение дня платежа по автокредиту | [ТЗ](car-loan/source.md) | [Первый отчёт](car-loan/baseline.md) · [JSON](car-loan/baseline.json) | [Ответы](car-loan/answers.md) |
 
 В первых двух файлах по десять адресных реплик и по одному общему решению. У исходного отчёта по уведомлениям модель `claude-sonnet-5-5`, код `e2f2cba`, девять вызовов. У отчёта QR та же модель, код `2cd7a28`, семь ответов из кэша и два вызова, паспорт отмечает изменения в рабочей копии. Эти отчёты задают формулировки и порядок вариантов, которые видел владелец.
+
+По автокредиту тот же Sonnet на `9bd5954` задал восемь вопросов за десять вызовов без кэша. Владелец дал девять адресных реплик и два общих решения. Всего в экзамене 33 реплики, из них 29 адресных и четыре общих решения. Входы и вопросы открыты команде по мере подготовки. Предварительные ключи остаются у F4 до фиксации результатов.
 
 ## Запуск
 
@@ -16,6 +18,7 @@
 
 ```powershell
 $env:PYTHONUTF8 = '1'
+$env:CLAUDE_CLI_FALLBACK_MODEL = 'off'
 $env:PYTHONPATH = (Resolve-Path 'src').Path
 $exam = (Resolve-Path '../f4-team-20261127/docs/plan-v2/f4/answers_exam').Path
 $opt = @('--provider', 'claude_cli', '--model', 'sonnet', '--no-cache', '--no-html')
