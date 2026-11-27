@@ -28,7 +28,7 @@
 **Windows (PowerShell):**
 
 ```powershell
-git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
+git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
 cd winnersOFbankCCbyMNU
 py -3.12 -m venv .venv
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
@@ -39,7 +39,7 @@ python -m pip install -r requirements.txt -e .
 **macOS и Linux:**
 
 ```bash
-git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
+git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
 cd winnersOFbankCCbyMNU
 python3.12 -m venv .venv
 source .venv/bin/activate

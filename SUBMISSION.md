@@ -7,7 +7,7 @@
 
 | Что | Где |
 | :--- | :--- |
-| Репозиторий | <https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU>, ветка по умолчанию `release` = тег `v2.0.0` |
+| Репозиторий | <https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/release> — ветка `release` (= тег `v2.0.0`); клонировать: `git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git` |
 | Как запустить | [`README.md`](README.md), «Быстрый старт»: три шага на бесплатном Gemini, Windows и macOS/Linux |
 | Одна команда | `python -m bcc_review <файл требований> <файл отчёта.md>` |
 | Исходный документ | [`release/input/requirements.md`](release/input/requirements.md) — официальный, байт в байт; его PDF — [`release/input/requirements.pdf`](release/input/requirements.pdf); происхождение и SHA-256 — [`release/input/PROVENANCE.md`](release/input/PROVENANCE.md) |
@@ -66,7 +66,8 @@
       пройден (только заведомые подделки в тестах). Если публиковать нельзя — Settings → Collaborators → Add people
       (логины жюри, роль Read).
 - [ ] **Ветка по умолчанию — `release`:** Settings → General → Default branch → ⇄ → `release` → Update. Сейчас по
-      умолчанию стоит ветка с разбором задачи, и жюри увидело бы её README.
+      умолчанию стоит ветка с разбором задачи (`claude/nice-edison-gpkcfl`), и жюри по ссылке без `/tree/release`
+      увидело бы её README. README и эта страница уже ведут на `release` (`git clone -b release`, `/tree/release`).
 - [ ] **CI.** Для публичного репозитория Actions бесплатны — после открытия зелёные прогоны «Тесты» (3 ОС, Docker)
       появятся на `release` и теге `v2.0.0`. Для приватного: Settings → Billing and plans — сейчас задания не
       стартуют из-за неуспешного платежа или лимита расходов.
@@ -77,5 +78,5 @@
       загружено ещё и на YouTube или Google Drive, вписать ссылку сюда: _____
 - [ ] **Проверка глазами жюри:** открыть репозиторий в окне инкогнито (или аккаунтом без доступа к команде): виден
       README ветки `release`, ссылки на отчёт, видео и слайды открываются.
-- [ ] **Форма сдачи:** ссылка на репозиторий, рядом — отчёт (`reports/requirements.md` или `.html`) и исходный
+- [ ] **Форма сдачи:** ссылка на репозиторий (`…/winnersOFbankCCbyMNU/tree/release`), рядом — отчёт (`reports/requirements.md` или `.html`) и исходный
       документ (`release/input/requirements.md`).
