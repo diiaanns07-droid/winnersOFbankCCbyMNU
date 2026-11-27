@@ -242,7 +242,7 @@ def coverage_gaps(cov: list[dict], candidates: list[dict], view: Any, *, limit: 
     Слабая модель (Flash) находит в описи 7–12 мест, где документ молчит, но пишет 5–6 кандидатов. Кандидат кода:
     заголовок — вопрос описи, цитата — фраза строки места, серьёзность `minor` (уровень решает судья).
     Не берутся: строки с ответом, темы Т1–Т2 (расхождение требует двух цитат и сценария), строки, у которых
-    есть кандидат на той же строке с общими словами вопроса."""
+    есть кандидат на той же строке, в заголовке которого не меньше 40 % слов вопроса."""
     out: list[dict] = []
     seen: set[tuple] = set()
     for row in cov or []:
@@ -251,8 +251,9 @@ def coverage_gaps(cov: list[dict], candidates: list[dict], view: Any, *, limit: 
                 or _CONFLICT_Q.search(q):
             continue
         qs = _stems(q)
+        need = max(2, -(-len(qs) * 2 // 5))  # не меньше двух и 40 % слов вопроса: общие слова предмета не в счёт
         if any(n in {e.get("line_start", e.get("line")) for e in c.get("evidence") or []}
-               and len(qs & _stems(str(c.get("title", "")) + " " + str(c.get("problem", "")))) >= 2
+               and len(qs & _stems(str(c.get("title", "")))) >= need  # по заголовку: в problem цитаты строки
                for c in candidates):
             continue
         text = _line_text(view, n)
