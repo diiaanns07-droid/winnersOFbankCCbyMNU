@@ -217,37 +217,64 @@ def _doc_vocab(view: dict) -> set[str]:
     return vocab
 
 
-def fix_mixed_script(text: str, vocab: set[str] | None = None) -> tuple[str, bool]:
-    """Чинит слова, где русские буквы смешаны с латинскими или буквами с диакритикой («порогe», «напоминání»).
+# остальные латинские буквы внутри русского слова — по звучанию («лимite» → «лимите»)
+_LAT_SOUND = {"a": "а", "b": "б", "c": "к", "d": "д", "e": "е", "f": "ф", "g": "г", "h": "х", "i": "и", "j": "й",
+              "k": "к", "l": "л", "m": "м", "n": "н", "o": "о", "p": "п", "q": "к", "r": "р", "s": "с", "t": "т",
+              "u": "у", "v": "в", "w": "в", "x": "кс", "y": "ы", "z": "з"}
 
-    Латинский двойник русской буквы заменяется русской; слово, которое так не чинится, заменяется ближайшим
-    словом документа. Возвращает (текст, всё ли починено). Слова целиком латиницей (имена из документа) не трогает.
+
+def _to_cyr(word: str, table: dict) -> str:
+    out = []
+    for ch in word:
+        if _CYR_CH.match(ch):
+            out.append(ch)
+            continue
+        base = unicodedata.normalize("NFD", ch)[0]
+        rep = table.get(base) or _LAT_SOUND.get(base.lower())
+        if rep and base.isupper() and table is not _LAT2CYR:
+            rep = rep.upper()
+        out.append(rep or ch)
+    return "".join(out)
+
+
+def fix_mixed_script(text: str, vocab: set[str] | None = None) -> tuple[str, bool]:
+    """Чинит слова, где русские буквы смешаны с латинскими или буквами с диакритикой («порогe», «лимite»,
+    «напоминání»).
+
+    Сначала латинский двойник русской буквы (e → е), остальное — по звучанию (t → т); если в документе есть
+    близкое слово, берётся оно. Возвращает (текст, всё ли починено). Слова целиком латиницей (имена из документа)
+    не трогает.
     """
     import difflib
     ok = True
+    words = sorted(vocab or ())
 
     def fix(m: re.Match) -> str:
         nonlocal ok
         w = m.group(0)
         if not _CYR_CH.search(w) or all(_CYR_CH.match(ch) for ch in w):
             return w
-        out = []
-        for ch in w:
-            if _CYR_CH.match(ch):
-                out.append(ch)
-                continue
-            base = unicodedata.normalize("NFD", ch)[0]
-            out.append(_LAT2CYR.get(base, ch))
-        w2 = "".join(out)
-        if all(_CYR_CH.match(ch) for ch in w2):
-            return w2
-        best = difflib.get_close_matches(w2.lower(), sorted(vocab or ()), n=1, cutoff=0.7)
-        if best:
-            return best[0].capitalize() if w2[:1].isupper() else best[0]
+        cands = []
+        for c in (_to_cyr(w, _LAT2CYR), _to_cyr(w, {})):
+            if c not in cands:
+                cands.append(c)
+        for c in cands:
+            if c.lower() in (vocab or ()):
+                return c
+        for c in cands:
+            best = difflib.get_close_matches(c.lower(), words, n=1, cutoff=0.8)
+            if best:
+                return best[0].capitalize() if c[:1].isupper() else best[0]
+        if all(_CYR_CH.match(ch) for ch in cands[0]):
+            return cands[0]
         ok = False
         return w
 
     return _WORD.sub(fix, text or ""), ok
+
+
+def _has_mixed(text: str) -> bool:
+    return any(_CYR_CH.search(w) and not all(_CYR_CH.match(ch) for ch in w) for w in _WORD.findall(text or ""))
 
 
 def clean_summary(summary: str, fallback: str, vocab: set[str] | None = None) -> str:
@@ -317,8 +344,7 @@ def normalize_requirement(view: dict, r: dict) -> dict | None:
     section = str(first.get("section") or "") or str(r.get("section") or "")
     pages = [by_n[n].get("page") for n in range(a, b + 1) if n in by_n and by_n[n].get("page") is not None]
     summary = re.sub(r"\s+", " ", str(r.get("summary") or "")).strip() or _short_quote(quote)[:80]
-    summary, ok = fix_mixed_script(summary)
-    if not ok:  # латиница внутри русского слова, которую не починить заменой букв: ищем слово в документе
+    if _has_mixed(summary):  # латиница внутри русского слова: чиним по словам документа
         summary = clean_summary(summary, quote, _doc_vocab(view))
     sid = re.sub(r"\s+", " ", str(r.get("source_id") or "")).strip()
     if "<" in sid or "уточнить" in sid.lower() or sid in ("—", "-", "нет"):
@@ -461,6 +487,9 @@ def _strip_heading_prefix(sid: str, parts: list[str], heads: list[str]) -> str:
     «Метод A, ответ 200: x» → «ответ 200: x» (ближайший заголовок вернёт канонизация). Неоднозначный ID
     («Метод A: Статус 200» при двух методах) снова уточнит `uniquify_source_ids` — одинаково при любой модели."""
     sid = re.sub(r"\s+", " ", sid or "").strip()
+    m = re.fullmatch(r"(?P<core>.+?)\s*\((?P<q>[^()]+)\)", sid)
+    if m and any(m.group("q").strip().lower() == h.lower() for h in heads):
+        sid = m.group("core")  # «Статус 200 (Метод A)» — уточнение разделом в скобках снимается, вернёт uniquify
     for _ in range(3):
         low = sid.lower()
         rest = None
@@ -563,7 +592,7 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
         if code and not _OWN_SID.fullmatch(sid):
             sid = f"Статус {code}"  # пункт или строка начинается с кода ответа: одно оформление при любой модели
         elif (_RESPONSE_PARA.match(_MD_DECOR.sub("", _text(first)).strip()) and not _is_row(_text(first))
-              and re.search(r"(?:ответ|статус|код)\s+[1-5]\d\d$", sid, re.I)):
+              and re.search(r"(?:ответ|статус|код)\s+[1-5]\d\d\b", sid, re.I)):
             sid = ""
         if not sid:
             r["source_id"] = ""
@@ -653,6 +682,50 @@ def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
             continue
         out.append(r)
     return out
+
+
+# пункт перечня кодов внутри одной строки: «200. Ответ в случае… 400. Ответ в случае…» (DOCX/PDF склеили строки)
+_CODE_ITEM = re.compile(r"(?:^|(?<=[.;!?]\s))\**([1-5]\d\d)\.?\**\s*[.:—–-]\s+(?=\S)")
+
+
+def split_status_lists(view: dict, requirements: list[dict]) -> list[dict]:
+    """Перечень кодов ответа, который читатель DOCX/PDF отдал одной строкой («200. Ответ… 400. Ответ…» — в MD это
+    отдельные строки), — по требованию «Статус N» на каждый код, как в MD: на одной строке несколько требований
+    со своими цитатами. Строка таблицы и пункт, где код один, не меняются."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    out: list[dict] = []
+    for r in requirements:
+        a, b = int(r["line_start"]), int(r["line_end"])
+        text = " ".join(_MD_DECOR.sub("", _text(by_n[n])).strip() for n in range(a, b + 1) if n in by_n)
+        items = list(_CODE_ITEM.finditer(text)) if not _is_row(text) else []
+        codes = [m.group(1) for m in items]
+        if len(items) < 2 or len(set(codes)) != len(codes) or items[0].start() != 0 \
+                or any(x is not r and int(x["line_start"]) <= b and a <= int(x["line_end"]) for x in requirements):
+            # модель уже разделила перечень (несколько требований на этих строках) — оставляем как есть
+            out.append(r)
+            continue
+        for i, m in enumerate(items):
+            seg = text[m.start():items[i + 1].start() if i + 1 < len(items) else len(text)].strip()
+            body = text[m.end():items[i + 1].start() if i + 1 < len(items) else len(text)].strip().rstrip(".")
+            body = re.sub(r"^ответ\s+в\s+случае,?\s*(?:если\s+)?", "", body, flags=re.I)
+            words = body.split()
+            summary = f"Код {m.group(1)} — " + " ".join(words[:9]) + ("…" if len(words) > 9 else "")
+            out.append({**r, "source_id": f"Статус {m.group(1)}", "kind": "api", "summary": summary,
+                        "quote": _short_quote(seg), "line_start": a, "line_end": b})
+    return out
+
+
+def code_in_summary(requirements: list[dict]) -> list[dict]:
+    """Краткая формулировка кода ответа называет код: в карточке замечания видно «R-36 (Код 400 — неверные
+    параметры)», а не «R-36 (Запрос выполнен)» — ID «Статус N» отчёт рядом не показывает."""
+    for r in requirements:
+        m = re.fullmatch(r"(?:.+: )?Статус ([1-5]\d\d)", r.get("source_id") or "")
+        summary = str(r.get("summary") or "").strip()
+        if not m or not summary or m.group(1) in summary:
+            continue
+        head = summary[:1].lower() if summary[1:2].islower() else summary[:1]
+        r["summary"] = f"Код {m.group(1)} — {head}{summary[1:]}"
+    return requirements
 
 
 def uniquify_source_ids(requirements: list[dict]) -> list[dict]:
@@ -1236,6 +1309,34 @@ def _trim_edges(r: dict, view: dict, headings: set[int]) -> dict:
     return out
 
 
+_RESPONSE_BODY = re.compile(r"^ответ\s+([1-5]\d\d)\s*[:—–-]\s*.*\{", re.I)
+
+
+def promote_response_bodies(view: dict, requirements: list[dict],
+                            excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Абзац «Ответ 200: {…}» — описание ответа метода (часто единственное), а не пример к другому требованию:
+    всегда требование без номера. Модели решают это по-разному (haiku исключает, sonnet выделяет)."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    covered = _covered(requirements)
+    new = []
+    for e in excluded:
+        for n in range(int(e["line_start"]), int(e["line_end"]) + 1):
+            t = _MD_DECOR.sub("", _text(by_n.get(n) or {})).strip()
+            m = _RESPONSE_BODY.match(t)
+            if n in covered or not m or _is_row(t):
+                continue
+            keys = re.findall(r'"([A-Za-z_][\w]*)"\s*:', t)
+            summary = f"Тело ответа {m.group(1)}" + (": " + ", ".join(keys[:4]) if keys else "")
+            r = normalize_requirement(view, {"source_id": "", "kind": "api", "summary": summary,
+                                             "line_start": n, "line_end": n})
+            if r:
+                new.append(r)
+                covered.add(n)
+    if not new:
+        return requirements, excluded
+    return merge_items(requirements + new, excluded)
+
+
 def demote_examples(view: dict, requirements: list[dict], excluded: list[dict]) -> tuple[list[dict], list[dict]]:
     """Абзац «Пример ответа: {…}» при уже выделенных строках того же раздела (таблица полей ответа) — пример к ним,
     а не требование: в excluded. Единственное описание ответа (других требований в разделе нет) остаётся."""
@@ -1321,10 +1422,13 @@ def segment_from_response(view: dict, raw: dict,
         auto = len(reqs) - before
     for r in reqs:
         r.pop("auto", None)
+    reqs, excl = promote_response_bodies(view, reqs, excl)
     reqs, excl = demote_examples(view, reqs, excl)
     reqs = merge_bare_codes(view, reqs)
     reqs = merge_same_source_ids(reqs, view)
+    reqs = split_status_lists(view, reqs)
     canonical_source_ids(view, reqs)
+    code_in_summary(reqs)
     uniquify_source_ids(reqs)
     assign_ids(reqs)
     return {"requirements": reqs, "excluded": excl,

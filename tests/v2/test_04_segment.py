@@ -574,11 +574,13 @@ def test_status_table_row_and_paragraph_ids_canonical():
              "Код | Когда | Тело", "", "200 | Запрос выполнен | —", "409 | Статус не позволяет операцию | —"]
     sections = ["Метод A", "Метод A", "Статусы", "Статусы", "Статусы", "Статусы", "Статусы"]
     view = _view(lines, sections=sections)
-    reqs = [{"source_id": "Метод A: ответ 200", "line_start": 2, "line_end": 2},
+    reqs = [{"source_id": "Статус 200 (Метод A)", "line_start": 2, "line_end": 2},
             {"source_id": "Статусы, строка 1", "line_start": 6, "line_end": 6},
             {"source_id": "Метод A, Статус 409", "line_start": 7, "line_end": 7}]
     out = sg.canonical_source_ids(view, reqs)
     assert [r["source_id"] for r in out] == ["", "Статус 200", "Статус 409"]
+    one = [{"source_id": "Метод A: ответ 200", "line_start": 2, "line_end": 2}]
+    assert sg.canonical_source_ids(view, one)[0]["source_id"] == ""
 
 
 def test_duplicate_status_ids_qualified_by_method_not_by_same_tail():
@@ -677,3 +679,38 @@ def test_example_paragraph_with_other_requirements_in_section_is_excluded():
     # единственное описание ответа остаётся требованием
     keep, excl = sg.demote_examples(view, reqs[2:], [])
     assert [r["line_start"] for r in keep] == [4] and not excl
+
+
+def test_status_summary_names_the_code():
+    reqs = [{"source_id": "Статус 200", "summary": "Запрос выполнен"},
+            {"source_id": "Метод A: Статус 409", "summary": "Код 409: операция недоступна"},
+            {"source_id": "Статусы, строка 2", "summary": "Нет сессии"},
+            {"source_id": "Статус 500", "summary": "HTTP-ошибка сервера"}]
+    out = sg.code_in_summary(reqs)
+    assert [r["summary"] for r in out] == ["Код 200 — запрос выполнен", "Код 409: операция недоступна",
+                                           "Нет сессии", "Код 500 — HTTP-ошибка сервера"]
+
+
+def test_status_list_on_one_docx_line_split_per_code():
+    """DOCX/PDF ТЗ №18 отдают перечень кодов одной строкой — haiku выделил его одним требованием без ID, в MD же
+    у каждого кода своё «Статус N». Код делит перечень: набор ID MD = PDF = DOCX."""
+    line = ("200. Ответ в случае успешного выполнения метода. 401. Ответ в случае, если запрос выполнен без "
+            "авторизации. 404. Ответ в случае, если карта не найдена.")
+    v = _view(["Статусы", line], sections=["Статусы", "Статусы"])
+    raw = {"requirements": [{"source_id": "", "kind": "api", "summary": "Коды ответа", "line_start": 2,
+                             "line_end": 2}], "excluded": []}
+    out = sg.segment_from_response(v, raw)
+    assert [r["source_id"] for r in out["requirements"]] == ["Статус 200", "Статус 401", "Статус 404"]
+    assert out["requirements"][1]["summary"].startswith("Код 401 — запрос выполнен без")
+    assert all(r["quote"] in line for r in out["requirements"])
+
+
+@pytest.mark.parametrize("case", ["grace", "capital"])
+def test_open2_pdf_status_line_split(case):
+    view = sg.load_view(str(ROOT / "evaluation" / "v2" / "open2" / case / "source.pdf"))
+    n = next(x["n"] for x in view["lines"] if x["text"].count("Ответ в случае") >= 4)
+    raw = {"requirements": [{"source_id": "", "kind": "api", "summary": "Коды", "line_start": n, "line_end": n}],
+           "excluded": []}
+    out = sg.segment_from_response(view, raw)
+    sids = [r["source_id"] for r in out["requirements"] if r["line_start"] == n]
+    assert len(sids) >= 5 and all(s.startswith("Статус ") for s in sids)
