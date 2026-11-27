@@ -869,3 +869,15 @@ def test_json_carries_code_verdict_texts(sample):
     assert not jsonout.validate(r)
     md = markdown.render(r)
     assert markdown.prose(r["verdict"]["why"]) in md and markdown.prose(r["verdict"]["reason"]) in md
+
+
+def test_why_does_not_repeat_no_critical_statement(sample):
+    r = copy.deepcopy(sample)
+    r["findings"] = [f for f in r["findings"] if f["severity"] == "minor"][:3]
+    r["questions"] = []
+    r["verdict"] = {"development": "yes", "testing": "yes",
+                    "summary": "Документ готов: критичных и существенных нет. Стоит уточнить часовой пояс."}
+    r.pop("summary", None)
+    jsonout.finalize(r)
+    why = markdown._why(markdown._Ctx(r))
+    assert why == "Критичных дефектов нет и существенных нет — начинать можно. Стоит уточнить часовой пояс."

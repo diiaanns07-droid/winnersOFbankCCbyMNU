@@ -991,7 +991,7 @@ def _why(c: _Ctx, limit: int = 420) -> str:
         # предложения без собственного вердикта: что именно стоит поправить
         out = _verdict_sentence(c)
         for s in sents:
-            if _VERDICT_WORDS.search(s):
+            if _VERDICT_WORDS.search(s) or _RESTATE.search(s):  # вердикт и «критичных нет» уже сказал код
                 continue
             if len(out) + len(s) + 1 > limit:
                 break
@@ -1005,6 +1005,7 @@ def _why(c: _Ctx, limit: int = 420) -> str:
     return why + (f" {shorten(prio, limit)}" if prio else "")
 
 
+_RESTATE = re.compile(r"\bкритичн\w*\s+(?:и\s+существенн\w*\s+)?(?:дефект\w*\s+)?нет|\bдокумент\s+готов", re.I)
 _VERDICT_WORDS = re.compile(r"можно\s+(?:начинать|начать|приступ)|начинать\s+можно|нельзя|с\s+условиями|"
                             r"не\s+готов|готов\w*\s+к\s+(?:разработке|тестированию)|блокир", re.I)
 
