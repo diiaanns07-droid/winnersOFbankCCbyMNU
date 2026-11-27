@@ -67,6 +67,14 @@ def _official_hashes() -> set[str]:
     return out
 
 
+def _gold_cell(report: Path, data: dict) -> str:
+    """Эталон кейса; у прогона с ответами владельца — с пометкой: дефекты после ответов сняты, а сверка считает
+    исходные (в той же строке «0 критичных, можно» и «К 5/5 критичными» — без пометки это читалось бы как противоречие)."""
+    cell = _score(report, data)
+    answered = bool((_get(data, "run", "options", default={}) or {}).get("answers")) or bool(data.get("clarification"))
+    return f"до ответов: {cell}" if answered and cell != "—" else cell
+
+
 def _score(report: Path, data: dict) -> str:
     """К и С по эталону официального документа (строгий счёт без арбитра); для других документов — «—»."""
     if _get(data, "document", "sha256", default="") not in _official_hashes():
@@ -126,7 +134,7 @@ def rows(reports_dir: Path, overrides: dict[str, str] | None = None) -> list[dic
             "commit": commit,
             "version": run.get("version", "—"),
             "verify": _verify(path, source),
-            "gold": _score(path, data),
+            "gold": _gold_cell(path, data),
         })
     return out
 

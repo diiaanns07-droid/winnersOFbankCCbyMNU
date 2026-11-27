@@ -1,0 +1,51 @@
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 1c8b47ec..2ffe3d03 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -13,6 +13,7 @@ from __future__ import annotations
+ import concurrent.futures as cf
+ import copy
+ import hashlib
++import json
+ import os
+ import re
+ import subprocess
+@@ -337,6 +338,8 @@ class Pipeline:
+                                          inputs={"lines": len(view.get("lines") or [])},
+                                          empty={"requirements": [], "excluded": []})
+                 started = fast is True or self._probe(seg_future, llm)
++                if fast is None and getattr(llm, "fatal", None) is None:
++                    started = self._fast_start_decision(view, llm, seg_future, started)
+                 if started:
+                     self.fast_start_used = True
+                     outs = self._parallel_reviewers(rctx, tag=HEURISTIC_TABLE)
+@@ -461,6 +464,29 @@ class Pipeline:
+         from .stages import consistency
+         return consistency.run(ctx)
+ 
++    def _fast_start_decision(self, view: dict, llm: Any, fut: "cf.Future", started: bool) -> bool:
++        """Повторяемость «пробы»: она решает по времени нарезки, а нарезка из кэша заканчивается мгновенно — повтор
++        живого прогона шёл бы обычным путём, линзы получали бы другую таблицу, кэш не срабатывал, отчёт менялся.
++        Живой прогон записывает решение рядом с кэшем; прогон, у которого нарезка из кэша, его повторяет."""
++        d = getattr(llm, "cache_dir", None)
++        if not d:
++            return started
++        key = hashlib.sha256("\x1f".join([str(view.get("sha256") or ""), str(self.provider_name or ""),
++                                          str(getattr(llm, "model", "") or "")]).encode("utf-8")).hexdigest()
++        marker = Path(d) / "fast_start" / f"{key}.json"
++        seg_stats = ((getattr(llm, "stats", None) or {}).get("by_stage") or {}).get("segment") or {}
++        if fut.done() and seg_stats.get("cached") and not seg_stats.get("calls"):
++            try:
++                return bool(json.loads(marker.read_text(encoding="utf-8")).get("fast_start"))
++            except (OSError, ValueError):
++                return started
++        try:
++            marker.parent.mkdir(parents=True, exist_ok=True)
++            marker.write_text(json.dumps({"fast_start": bool(started)}), encoding="utf-8")
++        except OSError:
++            pass
++        return started
++
+     def _probe(self, fut: "cf.Future", llm: Any) -> bool:
+         """Запускать ли рецензентов до конца нарезки: да, если нарезка идёт дольше пробы и модель отвечает
+         (нет фатальной ошибки). Нарезка закончилась раньше — нет: дальше обычный путь по таблице модели."""
