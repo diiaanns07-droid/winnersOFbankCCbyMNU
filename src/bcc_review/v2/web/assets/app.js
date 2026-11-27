@@ -6,6 +6,19 @@
   /* ── стол (№39): своя проверка — выбрать или бросить файл; меню модели ── */
   var form = $("#form");
   if (form && form.classList.contains("b-dock")) {
+    // одна верхняя панель и на главной (владелец 27.11: «сначала снизу, потом наверху»): шире телефона панель
+    // действий стоит в шапке .b-bar, как на странице отчёта; на телефоне — внизу, под большим пальцем
+    var bar = document.querySelector("header.b-bar"), wide = window.matchMedia ? window.matchMedia("(min-width: 761px)") : null;
+    if (bar && wide) {
+      var spot = document.createComment("dock");
+      form.parentNode.insertBefore(spot, form);
+      var place = function () {
+        if (wide.matches) { bar.insertBefore(form, bar.querySelector(".b-bar-end")); bar.classList.add("b-bar-home"); }
+        else { spot.parentNode.insertBefore(form, spot.nextSibling); bar.classList.remove("b-bar-home"); }
+      };
+      place();
+      if (wide.addEventListener) wide.addEventListener("change", place); else if (wide.addListener) wide.addListener(place);
+    }
     var file = $("#file"), veil = $("#veil"), dmsg = $("#dmsg"), pnote = $("#pnote"), pcur = $("#pcur");
     var model = $("#model"), models = $("#models");
     var radios = form.querySelectorAll('input[name="provider"]');

@@ -131,3 +131,20 @@
 .answers{display:inline-flex;margin:0}
 .dl.ans{cursor:pointer;box-shadow:inset 0 0 0 1px var(--b-green);color:var(--b-green-ink) !important}
 @media (max-width:720px){.phead{flex-direction:column;align-items:flex-start}}
+
+/* ── одна верхняя панель и на главной (владелец 27.11): шире 760 px app.js переносит панель действий в шапку .b-bar,
+ *    как вкладки отчёта (job.css .b-bar-tabs); меню и сообщения открываются вниз ── */
+.b-bar-home{max-width:min(1520px,calc(100% - 28px))}
+.b-bar-home>.b-dock{position:static;transform:none;z-index:auto;flex:0 0 auto;max-width:none;margin:0 auto;padding:0;
+  border-radius:0;background:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.b-bar-home>.b-dock>a,.b-bar-home>.b-dock>button,.b-bar-home>.b-dock>label,.b-bar-home .b-menu>summary{height:40px;padding:0 13px;font-size:14.5px}
+.b-bar-home .b-bar-doc{flex:0 1 auto}
+.b-bar-home .b-bar-end{flex:0 1 auto;margin-left:0}
+.b-bar-home .b-menu-pop{top:calc(100% + 12px);bottom:auto}
+.b-bar-home .dock-msg{top:calc(100% + 12px);bottom:auto}
+@media (max-width:1680px){.b-bar-home>.b-dock .long{display:none}.b-bar-home>.b-dock .short{display:inline}}
+@media (max-width:1120px){
+  .b-bar-home{flex-wrap:wrap;row-gap:2px}
+  .b-bar-home .b-bar-end{margin-left:auto}
+  .b-bar-home>.b-dock{order:3;flex:1 0 100%;justify-content:center;flex-wrap:wrap}
+}
