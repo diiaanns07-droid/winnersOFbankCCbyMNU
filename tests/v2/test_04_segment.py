@@ -521,3 +521,159 @@ def test_adjacent_same_source_id_merged(official_view):
     out = sg.segment_from_response(official_view, raw)
     assert [(x["line_start"], x["line_end"]) for x in out["requirements"] if x["source_id"] == "Общие параметры"] \
         == [(103, 114)]
+
+
+# ---- волна 3: расхождения ответов haiku с эталонной нарезкой ---------------------------------------------
+
+ANSWERS = FIX / "04_answers"
+CORPUS = ROOT / "evaluation" / "dev" / "corpus" / "cases"
+
+
+def _keys(reqs: list[dict]) -> list[tuple]:
+    return [(r["source_id"], r["line_start"], r["line_end"]) for r in reqs]
+
+
+@pytest.mark.parametrize("case", ["autopay.base", "cardblock.base", "cashback.base"])
+def test_haiku_answer_equals_reference_segmentation(case):
+    """Ответ haiku с другим оформлением ID («Метод X, Статус 200», «Тело запроса blockCard: days», заголовок
+    «Ответ 200» отдельным требованием, паспорт метода с шапки таблицы) код приводит к эталонной нарезке."""
+    view = sg.load_view(str(CORPUS / case / "source.md"))
+    raw = json.loads((ANSWERS / f"{case}.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw)
+    ref = json.loads((FIX / case / "segment.json").read_text(encoding="utf-8"))["requirements"]
+    assert _keys(out["requirements"]) == _keys(ref)
+    assert out["coverage"]["uncovered"] == []
+
+
+def test_heading_only_requirement_dropped_and_passport_starts_after_table_header():
+    view = sg.load_view(str(CORPUS / "cashback.paraphrase.rate" / "source.md"))
+    raw = json.loads((ANSWERS / "cashback.paraphrase.rate.haiku.json").read_text(encoding="utf-8"))
+    heads = sg.heading_lines(view)
+    out = sg.segment_from_response(view, raw)
+    by_n = {x["n"]: x for x in view["lines"]}
+    assert not any(r["line_start"] in heads and r["line_end"] == r["line_start"] for r in out["requirements"])
+    passports = [r for r in out["requirements"] if r["source_id"].startswith("Метод ")]
+    assert [r["source_id"] for r in passports] == ["Метод getCashback", "Метод saveCategory"]
+    assert all(by_n[r["line_start"]]["text"].startswith("REST type") for r in passports)
+    # «Метод getCashback. Ответ 200: category» — приставка метода через точку снимается
+    assert {"Ответ 200: category", "Ответ 200: accrued", "Тело запроса: category"} <= {
+        r["source_id"] for r in out["requirements"]}
+    assert out["coverage"]["uncovered"] == []
+
+
+def test_heading_only_keeps_bare_code_and_sentence_headings():
+    view = _view(["Ответ 200", "", "404", "Система блокирует карту после трёх неверных попыток ввода кода."])
+    heads = {1, 3, 4}
+    assert sg._heading_only({"line_start": 1, "line_end": 2}, view, heads)
+    assert not sg._heading_only({"line_start": 3, "line_end": 3}, view, heads)
+    assert not sg._heading_only({"line_start": 4, "line_end": 4}, view, heads)
+
+
+def test_status_table_row_and_paragraph_ids_canonical():
+    lines = ["Метод A", "Ответ 200: {\"x\":1}. Поле x — время в формате ISO 8601, дата 2026-11-01.", "Статусы",
+             "Код | Когда | Тело", "", "200 | Запрос выполнен | —", "409 | Статус не позволяет операцию | —"]
+    sections = ["Метод A", "Метод A", "Статусы", "Статусы", "Статусы", "Статусы", "Статусы"]
+    view = _view(lines, sections=sections)
+    reqs = [{"source_id": "Метод A: ответ 200", "line_start": 2, "line_end": 2},
+            {"source_id": "Статусы, строка 1", "line_start": 6, "line_end": 6},
+            {"source_id": "Метод A, Статус 409", "line_start": 7, "line_end": 7}]
+    out = sg.canonical_source_ids(view, reqs)
+    assert [r["source_id"] for r in out] == ["", "Статус 200", "Статус 409"]
+
+
+def test_duplicate_status_ids_qualified_by_method_not_by_same_tail():
+    reqs = [{"source_id": "Статус 200", "section": "Часть B › Метод A › Статусы"},
+            {"source_id": "Статус 200", "section": "Часть B › Метод B › Статусы"},
+            {"source_id": "Тело запроса: id", "section": "Часть B › Метод A › Тело запроса"},
+            {"source_id": "Тело запроса: id", "section": "Часть B › Метод B › Тело запроса"}]
+    out = sg.uniquify_source_ids(reqs)
+    assert [r["source_id"] for r in out] == ["Метод A: Статус 200", "Метод B: Статус 200",
+                                             "Метод A, Тело запроса: id", "Метод B, Тело запроса: id"]
+
+
+def test_model_suffix_on_heading_prefix_removed():
+    lines = ["Метод X", "Тело запроса", "Parameter | Format", "", "days | integer"]
+    sections = ["Метод X", "Метод X › Тело запроса", "Метод X › Тело запроса", "Метод X › Тело запроса",
+                "Метод X › Тело запроса"]
+    view = _view(lines, sections=sections)
+    out = sg.canonical_source_ids(view, [{"source_id": "Тело запроса methodX: days", "line_start": 5, "line_end": 5}])
+    assert out[0]["source_id"] == "Тело запроса: days"
+
+
+def test_code_regex_ignores_dates_years_and_thousands():
+    assert sg._CODE_RE.findall("2026-11-01T10:15, ISO 8601, 500 000 ₸, 1 500, 1.500") == []
+    assert sg._CODE_RE.findall("вернуть 404, если; коды 400, 401; (409); 200/201") == \
+        ["404", "400", "401", "409", "200", "201"]
+
+
+def test_mixed_script_words_fixed_in_summary(official_view):
+    assert sg.fix_mixed_script("при порогe 50 000 и push")[0] == "при пороге 50 000 и push"
+    fixed, ok = sg.fix_mixed_script("Push-напоминání за 3 дня", {"напоминание", "напоминания", "дня"})
+    assert ok and fixed.split()[0] in ("Push-напоминание", "Push-напоминания")
+    assert sg.fix_mixed_script("Метод cardId и QR-код")[0] == "Метод cardId и QR-код"
+    r = sg.normalize_requirement(official_view, {"source_id": "", "kind": "acceptance", "line_start": 63,
+                                                 "line_end": 63, "summary": "Покупка доводит расходы до порогe"})
+    words = re.findall(r"[^\W\d_]+", r["summary"])
+    assert not any(re.search("[а-яё]", w, re.I) and re.search("[a-zá-ž]", w, re.I) for w in words)
+    r = sg.normalize_requirement(official_view, {"source_id": "", "kind": "acceptance", "line_start": 63,
+                                                 "line_end": 63, "summary": "Покупка ğxqzщ"})
+    assert "ğ" not in r["summary"]
+
+
+def test_excluded_reason_never_empty(official_view):
+    e = sg.normalize_excluded(official_view, {"what": "", "line_start": 57, "line_end": 57, "reason": ""})
+    assert e["what"] and e["reason"]
+
+
+def test_own_id_in_document_wins_over_model_numbering():
+    """sonnet однажды дал «Функциональные требования, п. 1» пункту «Ф-1.» — ID документа теряется в отчёте."""
+    lines = ["Функциональные требования", "Ф-1. Клиент выбирает срок от 1 до 12 месяцев.",
+             "ТР-7 Система хранит журнал три года.", "Параметр | Тип", "", "ФТ-01 | Текст"]
+    sec = ["Функциональные требования"] * 6
+    view = _view(lines, sections=sec)
+    view["lines"][1]["kind"] = view["lines"][2]["kind"] = "list_item"
+    reqs = [{"source_id": "Функциональные требования, п. 1", "line_start": 2, "line_end": 2},
+            {"source_id": "", "line_start": 3, "line_end": 3},
+            {"source_id": "Функциональные требования, строка 1", "line_start": 6, "line_end": 6}]
+    assert [r["source_id"] for r in sg.canonical_source_ids(view, reqs)] == ["Ф-1", "ТР-7", "ФТ-01"]
+    # «ISO-8601 формат» — не номер пункта
+    assert sg._OWN_LEAD.match("ISO-8601 формат даты") is None
+
+
+def test_paragraph_gets_no_section_prefixed_id():
+    """haiku дал абзацу «Устройство считается новым…» ID «Как это должно работать: новое устройство»."""
+    lines = ["Как это должно работать", "Устройство считается новым, если его не было 180 дней.",
+             "Термины", "Сутки — интервал с 00:00 до 23:59."]
+    sec = ["Как это должно работать"] * 2 + ["Термины"] * 2
+    view = _view(lines, sections=sec)
+    for x in view["lines"]:
+        x["kind"] = "paragraph"
+    reqs = [{"source_id": "Как это должно работать: новое устройство", "line_start": 2, "line_end": 2},
+            {"source_id": "Термины: Сутки", "line_start": 4, "line_end": 4}]
+    assert [r["source_id"] for r in sg.canonical_source_ids(view, reqs)] == ["", "Термины: Сутки"]
+
+
+def test_range_edges_trimmed_and_placeholder_part_cut():
+    lines = ["Метод", "", "Подключение настройки.", "", "Path-параметры", "Не используются.", "", "Request body",
+             "Content-Type: application/json."]
+    view = _view(lines)
+    heads = {1, 5, 8}
+    assert sg._trim_edges({"line_start": 2, "line_end": 4}, view, heads)["line_start"] == 3
+    r = sg._trim_edges({"line_start": 6, "line_end": 9}, view, heads)
+    assert (r["line_start"], r["line_end"]) == (9, 9)
+    excl, rest = sg.auto_exclude(view, [6])
+    assert rest == [] and excl[0]["what"] == "Заглушка"
+
+
+def test_example_paragraph_with_other_requirements_in_section_is_excluded():
+    lines = ["Ответ 200", "category | string | Код", "accrued | string | Сумма",
+             "Пример ответа для первого критерия: {\"category\":\"TAXI\"}."]
+    view = _view(lines, sections=["Ответ 200"] * 4)
+    reqs = [{"source_id": "Ответ 200: category", "line_start": 2, "line_end": 2, "quote": "a"},
+            {"source_id": "Ответ 200: accrued", "line_start": 3, "line_end": 3, "quote": "b"},
+            {"source_id": "", "line_start": 4, "line_end": 4, "quote": "c"}]
+    keep, excl = sg.demote_examples(view, reqs, [])
+    assert [r["line_start"] for r in keep] == [2, 3] and excl[0]["line_start"] == 4
+    # единственное описание ответа остаётся требованием
+    keep, excl = sg.demote_examples(view, reqs[2:], [])
+    assert [r["line_start"] for r in keep] == [4] and not excl
