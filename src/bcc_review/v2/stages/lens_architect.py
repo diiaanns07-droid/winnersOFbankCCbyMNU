@@ -130,6 +130,59 @@ WIDE_OUTPUT_PROVIDERS = {"claude_cli", "gemini", "anthropic", "mock"}
 WIDE_OUTPUT_TOKENS = 32000
 
 
+BRANCH_TITLE = "Ветка логики без ответа"
+# Шаг, который сам называет исход: «вернуть …», «при …», «если …», «в случае …», «иначе …».
+NAMED_OUTCOME = re.compile(r"верн|\bпри\b|\bесли\b|в случае|иначе|отклон|отказ", re.I)
+MAX_BRANCH_CANDIDATES = 2
+HTTP_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")  # шаг сам называет код ответа — исход задан
+
+
+def _line_text(view: Any, n: int) -> str:
+    for ln in (view or {}).get("lines") or []:
+        if int(ln.get("n") or 0) == n:
+            return str(ln.get("text") or "").strip()
+    return ""
+
+
+def branch_candidates(inventory: dict, view: Any, candidates: list[dict]) -> list[dict]:
+    """Кандидаты на ветки логики без ответа, которые модель внесла в опись, но не оформила замечанием.
+
+    Слабая модель (haiku с effort=low) верно отмечает ветку без ответа в `inventory.branches`, но потом
+    сливает её с соседним замечанием. Код добавляет замечание, только если шаг сам называет исход
+    («вернуть …», «при …», «если …») и ни один кандидат не цитирует эту строку как ветку логики.
+    Цитата — дословный текст строки документа, поэтому сверка цитат пройдёт.
+    """
+    covered = {int(e.get("line") or 0) for c in candidates
+               if str(c.get("title") or "").startswith(BRANCH_TITLE) for e in c.get("evidence") or []}
+    out: list[dict] = []
+    for b in undefined_branches(inventory):
+        try:
+            n = int(b.get("line") or 0)
+        except (TypeError, ValueError):
+            continue
+        text = _line_text(view, n)
+        if not n or n in covered or not text or not NAMED_OUTCOME.search(text) or HTTP_CODE.search(text):
+            continue
+        covered.add(n)
+        step = str(b.get("step") or "").strip().rstrip(".") or text
+        out.append({
+            "title": f"{BRANCH_TITLE}: {step}"[:120],
+            "kind": "api_contract", "criterion": "complete", "severity": "major", "requirement_ids": [],
+            "evidence": [{"quote": text[:200], "line": n}],
+            "problem": f"Шаг логики «{text[:160]}» требует ответа, но документ не задаёт для этой ветки код и "
+                       "состав тела: в перечне кодов и в примерах тел её нет.",
+            "scenario": "Запрос попадает в эту ветку логики: по документу неизвестно, какой код и какие поля "
+                        "вернёт метод.",
+            "impact": "Сервер и клиент реализуют ответ по-разному; тест этой ветки нельзя написать однозначно.",
+            "recommendation": "Описать для ветки код ответа и тело: какие поля и с какими значениями возвращаются.",
+            "rewrite": "<уточнить: код и тело ответа для этой ветки>", "question": "", "blocks": "both",
+            "source": SOURCE, "origin": "inventory",
+        })
+        if len(out) >= MAX_BRANCH_CANDIDATES:
+            break
+    return out
+
+
 def _is_output_limit(exc: BaseException) -> bool:
     return getattr(exc, "kind", "") == "truncated" or bool(OUTPUT_LIMIT.search(str(exc)))
 
@@ -206,6 +259,10 @@ def run(ctx: Any) -> dict:
             ctx.warn("Линза «Архитектор»: ответ не уместился в лимит вывода — повтор двумя частями")
         raw = _run_parts(ctx)
     raw = dict(raw or {})
+    inv = raw.get("inventory") if isinstance(raw.get("inventory"), dict) else {}
+    extra = branch_candidates(inv, getattr(ctx, "view", None), list(raw.get("candidates") or []))
+    if extra:
+        raw["candidates"] = list(raw.get("candidates") or []) + extra
     reqs = {r.get("id") for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)}
     result = postprocess(raw, requirement_ids=reqs or None)
     extras = {k: v for k, v in raw.items() if k not in ("candidates", "inventory")}
