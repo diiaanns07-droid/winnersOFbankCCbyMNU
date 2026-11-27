@@ -194,13 +194,38 @@ def looks_like_heading(text: str) -> bool:
 # ---------------------------------------------------------------------------------------------------------
 # Сверка цитат
 
+_N_QUOTES = re.compile(r"[«»“”„\"']")
+_N_DASHES = re.compile(r"[—–‑−]")
+_N_LEAD = re.compile(r"^\s*(?:[*-]\s+|#+\s*)")
+_N_SPACE = re.compile(r"\s+")
+
+
 def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKC", s or "")
-    s = re.sub(r"[«»“”„\"']", '"', s)
-    s = re.sub(r"[—–‑−]", "-", s)
+    s = _N_QUOTES.sub('"', s)
+    s = _N_DASHES.sub("-", s)
     s = _MD_DECOR.sub("", s)
-    s = re.sub(r"^\s*(?:[*-]\s+|#+\s*)", "", s)
-    return re.sub(r"\s+", " ", s).strip().lower()
+    s = _N_LEAD.sub("", s)
+    return _N_SPACE.sub(" ", s).strip().lower()
+
+
+_HAY: dict[int, tuple[Any, int, str]] = {}
+
+
+def _doc_haystack(view: dict) -> str:
+    """Нормализованные тексты строк и названия разделов документа одной строкой (через перевод строки — его нет в
+    нормализованной фразе, поэтому «есть в строке» = «есть в этой строке»). Кэш на view: без него проверка каждого
+    требования проходила весь документ — O(требований × строк), 9 с нарезки на 150 страницах."""
+    raw = view.get("lines") or []
+    lines = list(raw)
+    hit = _HAY.get(id(view))
+    if hit and hit[0] is raw and hit[1] == len(lines):
+        return hit[2]
+    hay = "\n".join(f"{_norm(_text(x))}\n{_norm(str(x.get('section') or ''))}" for x in lines)
+    if len(_HAY) > 16:
+        _HAY.clear()
+    _HAY[id(view)] = (raw, len(lines), hay)
+    return hay
 
 
 def _simple_find(view: dict, quote: str, hint: int | None) -> int | None:
@@ -598,7 +623,7 @@ def _strip_num(s: str) -> str:
 def _in_doc(view: dict, text: str) -> bool:
     """Текст есть в документе: в строке или в названии раздела."""
     nt = _norm(text)
-    return bool(nt) and any(nt in _norm(_text(x)) or nt in _norm(str(x.get("section") or "")) for x in _lines(view))
+    return bool(nt) and nt in _doc_haystack(view)
 
 
 def _known_prefix(view: dict, pre: str, line_no: int, parts: list[str] | None = None) -> str:
@@ -610,7 +635,7 @@ def _known_prefix(view: dict, pre: str, line_no: int, parts: list[str] | None = 
     import difflib
     lines = _lines(view)
     np = _norm(pre)
-    if not np or any(np in _norm(_text(x)) or np in _norm(str(x.get("section") or "")) for x in lines):
+    if not np or np in _doc_haystack(view):
         return pre
     for head in reversed(parts or []):
         hn = _norm(_strip_num(head))
