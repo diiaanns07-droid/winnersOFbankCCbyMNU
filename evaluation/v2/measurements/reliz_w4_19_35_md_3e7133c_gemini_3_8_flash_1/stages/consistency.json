@@ -1,0 +1,399 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 378.69,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 40,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Метод GET изменяет состояние системы",
+        "kind": "event_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-16",
+          "R-20"
+        ],
+        "evidence": [
+          {
+            "quote": "REST type | GET",
+            "line": 104,
+            "line_start": 104,
+            "line_end": 104,
+            "page": null,
+            "section": "Часть B. REST API › Общие параметры",
+            "verified": "exact"
+          },
+          {
+            "quote": "4. Заменить настройку и вернуть результат сохранения.",
+            "line": 120,
+            "line_start": 120,
+            "line_end": 120,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«Общие параметры» и «Логика работы метода, п. 4» по-разному решают один случай — метод сохранения и HTTP-метод. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Клиент отправляет запрос сохранения порога через GET-метод. Общие параметры: метод выполняет чтение без изменения состояния. Логика работы метода, п. 4: метод изменяет настройку в базе данных.",
+        "impact": "Неверная реализация API, нарушение стандартов REST.",
+        "recommendation": "Изменить REST type на POST для операции сохранения.",
+        "rewrite": "",
+        "question": "Что верно: «метод выполняет чтение без изменения состояния» (как в «Общие параметры») или «метод изменяет настройку в базе данных» (как в «Логика работы метода, п. 4»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-01"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Компонент настроек», «Компонент расходов»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "сервис настроек",
+            "line": 26,
+            "verified": "normalized"
+          },
+          {
+            "quote": "настройки",
+            "line": 43,
+            "verified": "normalized"
+          },
+          {
+            "quote": "учёт расходов",
+            "line": 26,
+            "verified": "normalized"
+          },
+          {
+            "quote": "сервис расходов",
+            "line": 43,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Компонент настроек: «сервис настроек» (строка 26), «настройки» (строка 43), «хранилище настроек» (строка 130); Компонент расходов: «учёт расходов» (строка 26), «сервис расходов» (строка 43).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02"
+        ]
+      },
+      {
+        "title": "Использование метода GET для сохранения данных",
+        "kind": "api_contract",
+        "criterion": "correct",
+        "severity": "major",
+        "requirement_ids": [
+          "R-16",
+          "R-20"
+        ],
+        "evidence": [
+          {
+            "quote": "REST type | GET",
+            "line": 104,
+            "line_start": 104,
+            "line_end": 104,
+            "page": null,
+            "section": "Часть B. REST API › Общие параметры",
+            "verified": "exact"
+          },
+          {
+            "quote": "4. Заменить настройку и вернуть результат сохранения.",
+            "line": 120,
+            "line_start": 120,
+            "line_end": 120,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Метод GET используется для изменения данных, что нарушает стандарты REST API",
+        "scenario": "Клиент вызывает метод сохранения настроек",
+        "impact": "Неверная реализация сетевого взаимодействия и кэширование запросов",
+        "recommendation": "Заменить тип запроса на POST",
+        "rewrite": "REST type | POST",
+        "question": "Требуется ли использовать метод POST для изменения настроек?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Разные денежные единицы для суммы покупки и порога",
+        "kind": "unit_mismatch",
+        "criterion": "correct",
+        "severity": "major",
+        "requirement_ids": [
+          "R-11",
+          "R-27"
+        ],
+        "evidence": [
+          {
+            "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге.",
+            "line": 49,
+            "line_start": 49,
+            "line_end": 49,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к данным",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Сумма покупки хранится в тиынах, а порог в тенге без указания правил конвертации",
+        "scenario": "Сравнение суммы покупки и порога при расчете уведомления",
+        "impact": "Ошибка логики сравнения из-за разницы размерностей",
+        "recommendation": "Привести сумму покупки и порог к единой валютной единице",
+        "rewrite": "Хранить сумму покупки и порог в тенге.",
+        "question": "В каких едидиницах хранить сумму покупки?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Отсутствие приоритетов у требований",
+        "kind": "other",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "Функциональные требования",
+            "line": 36,
+            "line_start": 36,
+            "line_end": 36,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          }
+        ],
+        "problem": "У требований не проставлены приоритеты",
+        "scenario": "Планирование реализации функционала в спринтах",
+        "impact": "Сложность определения обязательного объема при дефиците времени",
+        "recommendation": "Проставить приоритеты для каждого требования",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-16",
+        "b": "R-20",
+        "subject": "Метод сохранения и HTTP-метод",
+        "same_subject": true,
+        "quote_a": "REST type | GET",
+        "line_a": 104,
+        "quote_b": "4. Заменить настройку и вернуть результат сохранения.",
+        "line_b": 120,
+        "scenario": "Клиент отправляет запрос сохранения порога через GET-метод",
+        "outcome_a": "Метод выполняет чтение без изменения состояния",
+        "outcome_b": "Метод изменяет настройку в базе данных",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "same_condition",
+        "kind": "event_conflict",
+        "title": "Метод GET изменяет состояние системы",
+        "impact": "Неверная реализация API, нарушение стандартов REST",
+        "recommendation": "Изменить REST type на POST для операции сохранения",
+        "question": "Какой HTTP-метод должен использоваться для сохранения настроек?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-05",
+        "verified_by": [
+          "R-13"
+        ],
+        "implemented_by": [
+          "R-27"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-06",
+        "verified_by": [
+          "R-14"
+        ],
+        "implemented_by": [],
+        "note": "нет метода для загрузки операций"
+      },
+      {
+        "requirement_id": "R-07",
+        "verified_by": [
+          "R-13"
+        ],
+        "implemented_by": [],
+        "note": "не описана отправка пуш"
+      },
+      {
+        "requirement_id": "R-08",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет критерия приёмки"
+      },
+      {
+        "requirement_id": "R-10",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет проверки времени отправки"
+      },
+      {
+        "requirement_id": "R-11",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет критерия приёмки"
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [],
+        "implemented_by": [
+          "R-16"
+        ],
+        "note": "нет критерия приёмки"
+      },
+      {
+        "requirement_id": "R-17",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-18",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-19",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-20",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "противоречие: Общие параметры; трассировка не построена",
+        "conflicts_with": [
+          "R-16"
+        ]
+      },
+      {
+        "requirement_id": "R-21",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-22",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-23",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-24",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Компонент настроек",
+        "terms": [
+          {
+            "term": "сервис настроек",
+            "line": 26
+          },
+          {
+            "term": "настройки",
+            "line": 43
+          },
+          {
+            "term": "хранилище настроек",
+            "line": 130
+          }
+        ],
+        "problem": "Разные названия одного компонента в архитектуре и схемах",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Компонент расходов",
+        "terms": [
+          {
+            "term": "учёт расходов",
+            "line": 26
+          },
+          {
+            "term": "сервис расходов",
+            "line": 43
+          }
+        ],
+        "problem": "Разные наименования сервиса учета расходов",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Порог расходов",
+        "places": [
+          "R-05",
+          "R-22",
+          "R-27"
+        ]
+      },
+      {
+        "subject": "Компонент настроек",
+        "places": [
+          "R-02",
+          "R-09",
+          "R-25"
+        ]
+      },
+      {
+        "subject": "Компонент расходов",
+        "places": [
+          "R-02",
+          "R-09"
+        ]
+      },
+      {
+        "subject": "Денежные единицы",
+        "places": [
+          "R-11",
+          "R-22",
+          "R-27"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

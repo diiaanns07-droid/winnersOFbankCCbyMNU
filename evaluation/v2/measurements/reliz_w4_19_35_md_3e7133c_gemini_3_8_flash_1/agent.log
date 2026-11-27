@@ -1,0 +1,35 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.md /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_1/report.md --provider gemini --model gemini-3.8-flash --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 44 требования, 14 дефектов (критичных 3, существенных 10, незначительных 1), вопросов 5
+Разработка: нельзя · тестирование: нельзя — блокеров 3, останавливают разработку и тестирование, D-01 — только разработку:
+  D-01 Отсутствует метод REST API для чтения настроек
+  D-02 Критерий приёмки №2 противоречит правилу Ф-2
+  D-03 Ошибка валидации возвращает HTTP 200 вместо 400
+Прогон завершён полностью: 8 мин 18 с, 9 вызовов модели, gemini-3.5-flash-lite, gemini-3.6-flash; цитат сверено 42 из 42
+Отчёт: /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_1/report.md и /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_1/report.json
+  ! судья: 5 дефектов (пожелания полноты) сведены в одно незначительное
+HTML: /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_1/report.html
+
+--- stderr
+Документ: release/input/requirements.md
+  segment: запуск
+  consistency: запуск
+  lens_analyst: запуск
+  lens_architect: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  lens_analyst: готово за 365 с, вызовов 1, кандидатов 2
+  lens_qa: готово за 365 с, вызовов 1, кандидатов 3
+  consistency: готово за 379 с, вызовов 1, кандидатов 5
+  lens_risk: готово за 430 с, вызовов 1, кандидатов 5
+  segment: готово за 442 с, вызовов 1
+  lens_architect: готово за 476 с, вызовов 1, кандидатов 9
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 39
+  judge: запуск
+  judge: готово за 14 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
