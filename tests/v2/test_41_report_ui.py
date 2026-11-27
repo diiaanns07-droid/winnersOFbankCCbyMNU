@@ -97,11 +97,12 @@ def test_job_page_is_the_sheet_with_glass_dock(srv):
     assert str(len(exp["crit"])) in say and exp["crit"][0] in say
     # стеклянная панель: свой документ · правка · вопросы · исправленная редакция · выгрузить
     dock = page[page.index('id="dock"'):]
-    for label in ("Свой документ", "Правка", "Вопросы владельцу", "Исправленная редакция", "Выгрузить"):
+    for label in ("Свой документ", "Правка", 'Вопросы<span class="long"> владельцу</span>', "Исправленная редакция",
+                  "Выгрузить"):  # №54: на телефоне — короткие подписи «Вопросы», «Редакция»
         assert label in dock, label
     n_findings = len(json.loads(FIXTURE.read_text(encoding="utf-8"))["findings"])
     assert f'Правка <span class="jb-n">{n_findings}</span>' in dock
-    assert f'Вопросы владельцу <span class="jb-n">{exp["questions"]}</span>' in dock
+    assert f'Вопросы<span class="long"> владельцу</span> <span class="jb-n">{exp["questions"]}</span>' in dock
     # выгрузки — в меню панели, ровно те файлы, что есть у прогона
     st = json.loads(_get(f"{base}/api/jobs/{jid}")[1])
     for name in ("report.html", "report.json"):

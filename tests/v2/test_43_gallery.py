@@ -301,3 +301,20 @@ def test_ready_report_html_in_current_light_view(tmp_path):
     html = (app.store.dir(jid) / "out" / "report.html").read_text(encoding="utf-8")
     assert "старый вид" not in html and "--canvas: #F3F6F5" in html and "D-01" in html
     assert json.loads((app.store.dir(jid) / "ready.json").read_text(encoding="utf-8"))["view"] == G.VIEW
+
+
+def test_ready_job_link_works_right_after_restart(tmp_path):
+    """№54: ссылка на готовый отчёт открывается и до первого захода на главную (сервер перезапущен)."""
+    import urllib.request
+    app = S.build_app(tmp_path / "data", step_s=0.01)
+    srv, _ = S.bind_server(app, "127.0.0.1", 0, tries=0)
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    try:
+        ready = [r for r in G.load_examples()["reports"] if r.get("ok")]
+        jid = G.ready_id(ready[0], G.report_meta(ready[0]["json"]))
+        with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/jobs/{jid}") as r:
+            assert r.status == 200 and b'id="rframe"' in r.read()
+    finally:
+        srv.shutdown()
+        srv.server_close()

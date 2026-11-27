@@ -151,6 +151,16 @@ def _job_files(app: App, job: Job) -> list[tuple[str, str]]:
 _DESK_AISHKA = '<div class="desk-aishka" data-bcc-agent data-size="96" data-mood="idle" aria-hidden="true"></div>'
 
 
+def _ready_jobs(app: App) -> None:
+    """№54: готовые отчёты №43 кладутся в хранилище при открытии главной; ссылка /jobs/<готовый> после перезапуска
+    сервера (закладка, обновление страницы) открывается сразу, а не «Не найдено»."""
+    try:
+        from .gallery import ensure_ready
+        ensure_ready(app)
+    except Exception:  # noqa: BLE001 — №43 не влит или examples.json не читается: обычный 404
+        pass
+
+
 def _top_sheet(app: App) -> dict[str, Any] | None:
     """Раскрытый лист на столе: своя последняя готовая проверка, иначе первый готовый отчёт №43."""
     for j in app.store.recent():
@@ -400,8 +410,8 @@ def _dock_html(job: Job, f: dict) -> str:
     return f"""<nav class="b-dock jb-dock" id="dock" aria-label="Отчёт">
   <a class="jb-d" href="/" title="Положить на стол свой документ">Свой документ</a><span class="jb-sep" aria-hidden="true"></span>
   <button type="button" class="jb-d" data-view="findings" aria-pressed="true">Правка <span class="jb-n">{f["findings"]}</span></button>
-  <button type="button" class="jb-d" data-view="questions" aria-pressed="false"{"" if q else " disabled"}>Вопросы владельцу <span class="jb-n">{q}</span></button>
-  <button type="button" class="jb-d" data-view="revised" data-rt="{revised}" aria-pressed="false">Исправленная редакция</button>
+  <button type="button" class="jb-d" data-view="questions" aria-pressed="false"{"" if q else " disabled"}>Вопросы<span class="long"> владельцу</span> <span class="jb-n">{q}</span></button>
+  <button type="button" class="jb-d" data-view="revised" data-rt="{revised}" aria-pressed="false"><span class="long">Исправленная редакция</span><span class="short">Редакция</span></button>
   <button type="button" class="jb-d" data-menu="more" aria-haspopup="menu" aria-expanded="false">Ещё ▾</button>
   <span class="jb-sep" aria-hidden="true"></span>
   <button type="button" class="jb-d" data-menu="files" aria-haspopup="menu" aria-expanded="false">Выгрузить ▾</button>
@@ -522,6 +532,7 @@ class Handler(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         path = url.path
         if path.startswith("/examples/"): from . import gallery; return gallery.handle(self)  # №43  # noqa: E701,E702
+        if path.startswith("/jobs/00000000-000043-"): _ready_jobs(self.app)  # №54: готовый отчёт по ссылке после перезапуска  # noqa: E701
         if path == "/":
             return self._html(200, index_page(self.app))
         if path == "/healthz":
