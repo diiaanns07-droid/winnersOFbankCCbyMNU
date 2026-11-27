@@ -15,10 +15,10 @@ export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
 # Экран: в терминале — одна тихая строка, которая обновляется на месте; в журнале (не терминал) — обычные строки
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
-  TTY=1 DIM=$'\033[38;5;245m' RED=$'\033[38;5;167m' OFF=$'\033[0m' CLR=$'\r\033[K'
+  TTY=1 DIM=$'\033[38;5;245m' RED=$'\033[38;5;167m' OFF=$'\033[0m' CLR=$'\r\033[K' PAD="  "
   printf '\033]0;BCC Review\007'   # заголовок окна терминала
 else
-  TTY=0 DIM="" RED="" OFF="" CLR=""
+  TTY=0 DIM="" RED="" OFF="" CLR="" PAD=""
 fi
 COLS="$( (tput cols) 2>/dev/null || echo 80)"
 case "$COLS" in ''|*[!0-9]*) COLS=80 ;; esac
@@ -26,12 +26,12 @@ case "$COLS" in ''|*[!0-9]*) COLS=80 ;; esac
 status() {  # строка состояния: в терминале — поверх прежней, без переноса
   if [ "$TTY" = 1 ]; then
     text="$*"
-    [ "$COLS" -lt 80 ] && text="${text:0:$((COLS - 1))}"
-    printf '%s%s%s%s' "$CLR" "$DIM" "$text" "$OFF"
+    [ "$COLS" -lt 82 ] && text="${text:0:$((COLS - 3))}"
+    printf '%s%s%s%s%s' "$CLR" "$PAD" "$DIM" "$text" "$OFF"
   fi
 }
-say() { printf '%s%s%s%s\n' "$CLR" "$DIM" "$*" "$OFF"; }
-fail() { printf '%s' "$CLR"; printf '%s%s%s\n' "$RED" "$*" "$OFF" >&2; exit 1; }
+say() { printf '%s%s%s%s%s\n' "$CLR" "$PAD" "$DIM" "$*" "$OFF"; }
+fail() { printf '%s' "$CLR"; printf '%s%s%s%s\n' "$PAD" "$RED" "$*" "$OFF" >&2; exit 1; }
 
 os="$(uname -s 2>/dev/null || echo unknown)"
 if [ "$os" = "Darwin" ]; then

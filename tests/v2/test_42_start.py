@@ -418,6 +418,14 @@ def test_greet_skipped_with_no_tty_and_check(tmp_path, monkeypatch, capsys):
     assert calls == [] and run.apps[0].default_provider == "auto"
 
 
+def test_greet_skipped_when_provider_given_or_fixture(tmp_path, monkeypatch, capsys):
+    calls: list = []
+    _fake_tty_agent(monkeypatch, lambda port, env_path: calls.append(port) or "gemini")
+    with _Run(monkeypatch, tmp_path, "--provider", "mock") as run:
+        pass
+    assert calls == [] and run.apps[0].default_provider == "mock"
+
+
 def test_ctrl_c_during_greet_stops_cleanly(tmp_path, monkeypatch, capsys):
     def greet(port, env_path):
         raise KeyboardInterrupt

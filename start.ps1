@@ -27,6 +27,7 @@ function Get-Width {
 }
 function Show-Status([string]$Text) {
     $w = Get-Width
+    $Text = "  " + $Text  # тот же отступ, что у реплик BCC AI
     if ($Text.Length -gt $w - 1) { $Text = $Text.Substring(0, $w - 1) }
     Write-Host -NoNewline ("`r" + $Text.PadRight($w - 1)) -ForegroundColor DarkGray
 }
@@ -36,11 +37,11 @@ function Clear-Status {
 }
 function Say([string]$Text) {
     Clear-Status
-    Write-Host $Text -ForegroundColor DarkGray
+    Write-Host ("  " + $Text) -ForegroundColor DarkGray
 }
 function Fail([string]$Text) {
     Clear-Status
-    Write-Host $Text -ForegroundColor Red
+    Write-Host ("  " + $Text) -ForegroundColor Red
     exit 1
 }
 

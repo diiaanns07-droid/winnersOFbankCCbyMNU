@@ -663,15 +663,17 @@ def main(argv: list[str] | None = None) -> int:
             srv.shutdown()
             srv.server_close()
     _set_title("BCC Review")
+    depth = _color_depth(sys.stdout)
+    pad = "  " if depth else ""  # в терминале — тот же отступ, что у реплик BCC AI; в журнале — без него
     try:
-        if not a.no_tty:
+        if not a.no_tty and a.provider == "auto" and not a.fixture:  # провайдер задан или показ — знакомиться незачем
             chosen = _greet(port, app.store.root)
-            if chosen and a.provider == "auto":
+            if chosen:
                 app.default_provider = chosen  # ключ введён в терминале — браузер сразу на главной
         if not _wait_ready(url):
-            _say(f"Сервер не ответил на {url}healthz — откройте {url} вручную.", err=True)
+            _say(f"{pad}Сервер не ответил на {url}healthz — откройте {url} вручную.", err=True)
         busy = f"порт {a.port} занят другой программой" if port != a.port and a.port else ""
-        print(_ready_line(url, busy, _color_depth(sys.stdout)), flush=True)
+        print(pad + _ready_line(url, busy, depth), flush=True)
         if a.open and _has_gui():
             try:
                 webbrowser.open(url)
@@ -680,7 +682,7 @@ def main(argv: list[str] | None = None) -> int:
         while serve.is_alive():  # join с таймаутом: Ctrl+C на Windows срабатывает сразу
             serve.join(0.5)
     except KeyboardInterrupt:
-        _say("\nBCC Review остановлен.", color=_MUTED)
+        _say(f"\n{pad}BCC Review остановлен.", color=_MUTED)
     finally:
         srv.shutdown()
         srv.server_close()
