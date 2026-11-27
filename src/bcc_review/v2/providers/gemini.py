@@ -95,12 +95,214 @@ EMPTY_RETRIES = 1
 # Не больше STOP_TRIES запросов на одно обращение: стойкий отказ не съедает суточную квоту всей цепочки.
 SAMPLED_STOPS = frozenset({"finish_recitation", "finish_safety", "finish_spii"})
 STOP_TRIES = 3
+# Обрезка MAX_TOKENS, когда рассуждение съело выход: у Gemini рассуждение входит в тот же предел 65 536, поднять
+# его нельзя. Если рассуждения в обрезанном ответе не меньше этой доли — повтор с рассуждением «low» (и дальше этот
+# этап у модели — с «low»); иначе велик сам JSON — обрезка уходит наверх, этап делит пакет или отвечает короче.
+THINKING_HEAVY_SHARE = 0.25
+LOWER_LEVEL = {"high": "low", "medium": "low"}
+LOW_BUDGET = 1024
 _OFF = ("off", "none", "no", "0", "false", "disable", "disabled")
 
 
 def is_sampled_stop(exc: ProviderError) -> bool:
     """Ответ остановлен фильтром на выходе — повтор может пройти (в отличие от блока самого запроса)."""
     return exc.kind == "refusal" and str(getattr(exc, "subkind", "") or "") in SAMPLED_STOPS
+
+
+def lower_thinking(thinking: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Рассуждение на ступень ниже (medium/high → low; бюджет 2.5 → 1024) или ``None``, если ниже некуда.
+
+    Не снимаем настройку совсем: у Gemini 3 без ``thinking_level`` модель рассуждает по умолчанию (high) — дольше.
+    """
+    level = str(thinking.get("thinking_level") or "").lower()
+    if level in LOWER_LEVEL:
+        return {"thinking_level": LOWER_LEVEL[level]}
+    budget = thinking.get("thinking_budget")
+    if isinstance(budget, int) and budget > LOW_BUDGET:
+        return {"thinking_budget": LOW_BUDGET}
+    return None
+
+
+def thinking_heavy(exc: ProviderError) -> bool:
+    """В обрезанном ответе рассуждение заняло заметную долю выхода (по usage ответа; нет данных — нет)."""
+    u = getattr(exc, "usage", None) or {}
+    think, out = u.get("thinking_tokens"), u.get("output_tokens")
+    if not think:
+        return False
+    total = int(think) + int(out or 0)
+    return int(think) >= THINKING_HEAVY_SHARE * total
+
+
+def salvage_json(text: str, schema: Mapping[str, Any] | None = None) -> tuple[Any, dict[str, Any]] | None:
+    """Спасти из обрезанного JSON целые поля верхнего уровня и целые элементы его массивов.
+
+    Точки среза — только после целого поля корневого объекта или целого элемента массива, лежащего прямо в корне:
+    недописанный элемент (кандидат без цитаты, обрывок списка внутри него) выбрасывается целиком, а не дописывается
+    пустыми полями. Недостающие обязательные поля верхнего уровня — пустые по схеме (``types.conform``).
+    Возвращает (данные, сводка) или ``None``.
+    """
+    import json
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+    start = raw.find("{")
+    if start < 0:
+        return None
+    raw = raw[start:]
+    stack: list[list] = []        # [тип, ждём_ключ] — тип "{" или "["
+    cuts: list[tuple[int, str]] = []   # (позиция среза, закрывающие скобки)
+    in_str = esc = False
+    literal = False
+
+    def closing() -> str:
+        return "".join("}" if t == "{" else "]" for t, _ in reversed(stack))
+
+    def value_done(pos: int) -> None:
+        if not stack:
+            return
+        top = stack[-1]
+        if len(stack) == 1 or (len(stack) == 2 and top[0] == "["):   # поле корня или элемент массива корня
+            cuts.append((pos, closing()))
+        if top[0] == "{":
+            top[1] = False
+
+    for i, ch in enumerate(raw):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+                if stack and stack[-1][0] == "{" and stack[-1][1]:
+                    pass                      # закрыт ключ, значение ещё впереди
+                else:
+                    value_done(i + 1)
+            continue
+        if literal and ch in ",}] \t\r\n":
+            literal = False
+            value_done(i)
+        if ch == '"':
+            in_str = True
+        elif ch in "{[":
+            stack.append([ch, ch == "{"])
+        elif ch in "}]":
+            if not stack:
+                break
+            stack.pop()
+            if not stack:
+                cuts.append((i + 1, ""))
+                break
+            value_done(i + 1)
+        elif ch == ":":
+            if stack and stack[-1][0] == "{":
+                stack[-1][1] = False
+        elif ch == ",":
+            if stack and stack[-1][0] == "{":
+                stack[-1][1] = True
+        elif not ch.isspace():
+            literal = True
+    for pos, close in reversed(cuts):
+        try:
+            data = json.loads(raw[:pos].rstrip().rstrip(",") + close)
+        except ValueError:
+            continue
+        if not isinstance(data, dict):
+            return None
+        info = {"text_chars": len(raw), "kept_chars": pos,
+                "items": {k: len(v) for k, v in data.items() if isinstance(v, list)}}
+        if schema:
+            from ..types import conform
+            missing = [k for k in (schema.get("required") or []) if k not in data]
+            fixed = conform(data, dict(schema))
+            if fixed is not None:
+                data = fixed
+            info["filled_empty"] = missing
+        return data, info
+    return None
+
+
+DEAD_TTL_S = {"not_found": 6 * 3600.0, "quota": 6 * 3600.0}
+
+
+def _seconds_to_daily_reset(now_utc: "datetime.datetime | None" = None) -> float:
+    """Секунд до сброса суточной квоты Gemini (полночь по тихоокеанскому времени США)."""
+    import datetime as dt
+    now = now_utc or dt.datetime.now(dt.timezone.utc)
+    off = _us_pacific_offset_h(now)
+    pacific = now + dt.timedelta(hours=off)
+    midnight = (pacific + dt.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    reset_utc = midnight - dt.timedelta(hours=_us_pacific_offset_h(midnight - dt.timedelta(hours=off)))
+    return max(60.0, (reset_utc.replace(tzinfo=dt.timezone.utc) - now).total_seconds())
+
+
+class _DeadModels:
+    """Модели, которые сейчас не отвечают ключу: 404 и квота. Срок — до сброса суточной квоты (или 6 ч).
+
+    Общая для всех экземпляров провайдера с тем же ключом в одном процессе: проходы ``--runs N`` и веб-демо
+    не тратят по запросу на каждую модель с уже исчерпанной квотой.
+    """
+
+    def __init__(self) -> None:
+        self._items: dict[str, tuple[ProviderError, float]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, model: str, now: float) -> ProviderError | None:
+        with self._lock:
+            item = self._items.get(model)
+            if item is None:
+                return None
+            if now >= item[1]:
+                self._items.pop(model, None)
+                return None
+            return item[0]
+
+    def put(self, model: str, exc: ProviderError, now: float) -> None:
+        ttl = DEAD_TTL_S.get(exc.kind, 3600.0)
+        if exc.kind == "quota" and str(getattr(exc, "subkind", "") or "") == "per_day":
+            ttl = _seconds_to_daily_reset()
+        with self._lock:
+            self._items[model] = (exc, now + ttl)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._items.clear()
+
+    def __contains__(self, model: object) -> bool:   # совместимость: «модель отключена?» без учёта срока
+        with self._lock:
+            return model in self._items
+
+
+_SHARED: dict[str, dict[str, Any]] = {}
+_SHARED_LOCK = threading.Lock()
+
+
+def _new_state() -> dict[str, Any]:
+    return {"window": {}, "window_lock": threading.Lock(), "cooling": {}, "dead": _DeadModels()}
+
+
+def _shared_state(api_key: str | None, shared: bool = True) -> dict[str, Any]:
+    """Окно запросов в минуту, «остывающие» и отключённые модели — общие для ключа в процессе.
+
+    Квоты Google считаются на проект ключа, а не на экземпляр провайдера: проходы ``--runs N`` (новый конвейер —
+    новый провайдер) иначе начинали с пустым окном и получали 429 на стыке проходов. Сам ключ не хранится — только
+    его отпечаток. Тесты с поддельным сервером сбрасывают общее состояние сами (``_SHARED.clear()``).
+    """
+    if not shared or not api_key:
+        return _new_state()
+    import hashlib
+    tag = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+    with _SHARED_LOCK:
+        return _SHARED.setdefault(tag, _new_state())
+
+
+def _response_text(response: Any) -> str:
+    """Текст ответа без частей-рассуждений (для спасения обрезанного JSON)."""
+    try:
+        parts = response.candidates[0].content.parts or []
+    except (AttributeError, IndexError, TypeError):
+        return ""
+    return "".join(p.text for p in parts if getattr(p, "text", None) and not getattr(p, "thought", False))
 
 
 def is_empty_answer(exc: ProviderError) -> bool:
@@ -318,12 +520,14 @@ class GeminiProvider:
         # резерв на дневную квоту — только для цепочки из окружения (явный fallback_models в коде — без резерва)
         self.reserve_models = cfg["reserve_models"] if fallback_models is None else []
         self.rpm = rpm if rpm is not None else cfg["rpm"]   # None — по профилю каждой модели
-        self._window: dict[str, deque] = {}
-        self._window_lock = threading.Lock()
+        # общее для всех экземпляров с этим ключом и адресом API (в тестах с подменой адаптера — своё)
+        shared = _shared_state(self._api_key, shared=adapter_factory is None)
+        self._window: dict[str, deque] = shared["window"]
+        self._window_lock = shared["window_lock"]
         explicit = max_output_tokens or cfg["max_output_tokens"]
         self.max_output_tokens = int(explicit) if explicit else None   # None — потолок модели из профиля
         self._out_cap: dict[str, int] = {}                             # модели, отвергшие большой лимит ответа
-        self._cooling: dict[str, float] = {}   # перегруженные модели: до какого времени — одна попытка без пауз
+        self._cooling: dict[str, float] = shared["cooling"]   # перегруженные: до какого времени — одна попытка
         self.thinking_level = cfg["thinking_level"]
         self.thinking_budget = cfg["thinking_budget"]
         self.temperature = cfg["temperature"]
@@ -349,7 +553,9 @@ class GeminiProvider:
                                or profiles.for_model(self.default_model).get("concurrency") or DEFAULT_CONCURRENCY)
         self._gate = threading.BoundedSemaphore(max(1, self.concurrency))
         self._adapters: dict[tuple[str, tuple], Any] = {}
-        self._dead: dict[str, ProviderError] = {}       # модели, отключённые до конца прогона (404, квота)
+        # модели, отключённые до конца прогона (404, квота); общие для проходов --runs N в одном процессе
+        self._dead: _DeadModels = shared["dead"]
+        self._short_think: set[tuple[str, str]] = set()  # (модель, этап): обрезка из-за рассуждения — дальше «low»
         self._no_thinking: set[tuple] = set()            # (модель, настройка рассуждений), которую модель отвергла
         # (модель, схема), которую модель отвергла как слишком сложную: текстом идёт только эта схема, остальные
         # этапы той же модели сохраняют ограниченное схемой декодирование (раньше — вся модель до конца прогона)
@@ -373,6 +579,14 @@ class GeminiProvider:
                     wire, log = None, [*log, {"path": "/", "keyword": "*", "action": "schema sent as text"}]
                 return wire, log, _PassValidator()
 
+            def _accept(self, response: Any, model: str, validator: Any) -> Any:
+                try:
+                    return super()._accept(response, model, validator)
+                except ProviderError as exc:
+                    if exc.kind == "truncated":   # текст обрезанного ответа — для спасения целых элементов
+                        exc.partial_text = _response_text(response)  # type: ignore[attr-defined]
+                    raise
+
         cls = LenientAdapter
         return cls(api_key=self._api_key, model=model, fallback_models=[], min_attempt_s=1.0,
                    temperature=self.temperature, max_output_tokens=self.max_output_tokens,
@@ -380,6 +594,8 @@ class GeminiProvider:
 
     def _adapter(self, model: str, stage: str = "", schema_key: str = "") -> tuple[Any, dict[str, Any], str]:
         thinking = thinking_for(model, self.thinking_level, self.thinking_budget, stage)
+        if (model, stage) in self._short_think:
+            thinking = lower_thinking(thinking) or thinking
         if (model, tuple(sorted(thinking.items()))) in self._no_thinking:
             thinking = {}   # отвергнута именно эта настройка: другой уровень (low у нарезки) остаётся в силе
         mode = "text" if (model, schema_key) in self._text_schema else "native"
@@ -396,7 +612,7 @@ class GeminiProvider:
     def _add_reserve(self, chain: list[str], start: int) -> None:
         """Дневная квота модели исчерпана: добавить резерв — Flash перед первой Flash-Lite оставшейся цепочки,
         Flash-Lite в конец. Квоты по моделям независимы: каждая Flash — ещё ~2 прогона на Flash вместо Lite."""
-        extra = [m for m in self.reserve_models if m not in chain and m not in self._dead]
+        extra = [m for m in self.reserve_models if m not in chain and self._dead.get(m, self._clock()) is None]
         if not extra:
             return
         pos = next((i for i in range(start, len(chain)) if "lite" in chain[i].lower()), len(chain))
@@ -474,7 +690,7 @@ class GeminiProvider:
         while idx < len(chain):
             current = chain[idx]
             idx += 1
-            dead = self._dead.get(current)
+            dead = self._dead.get(current, self._clock())
             if dead is not None:
                 attempts.append({"model": current, "skipped": dead.kind})
                 last = last or dead
@@ -516,7 +732,7 @@ class GeminiProvider:
                     if kind == "quota" and quota_limit(exc) is not None:
                         attempts[-1]["quota_limit"] = quota_limit(exc)
                     if kind in NEXT_MODEL:
-                        self._dead[current] = exc
+                        self._dead.put(current, exc, self._clock())
                         if kind == "quota":
                             quota_exc = quota_exc or exc
                             if not reserved:
@@ -569,6 +785,19 @@ class GeminiProvider:
                     if kind == "bad_request" and mode == "native" and ("schema" in low or "too many states" in low):
                         self._text_schema.add((current, schema_key))
                         continue
+                    if (kind == "truncated" and (current, stage) not in self._short_think
+                            and lower_thinking(thinking) is not None and thinking_heavy(exc)):
+                        # рассуждение съело предел ответа: тот же запрос с рассуждением «low», дальше этап — с «low»
+                        self._short_think.add((current, stage))
+                        attempts[-1]["thinking_lowered"] = True
+                        continue
+                    if kind == "truncated":
+                        err = self._final(exc, chain, attempts)
+                        saved = salvage_json(getattr(exc, "partial_text", "") or "", schema)
+                        if saved is not None:
+                            # целые элементы обрезанного ответа: решает вызывающий (деление пакета — лучше)
+                            err.partial, err.salvage = saved  # type: ignore[attr-defined]
+                        raise err from None
                     raise self._final(exc, chain, attempts) from None
                 self._cooling.pop(current, None)
                 out = self._normalize(result, chain, current, attempts, thinking)
