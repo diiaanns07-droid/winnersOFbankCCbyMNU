@@ -25,6 +25,7 @@ MUTATING_TOKENS = {
     "reset", "enable", "disable", "cancel", "confirm", "activate", "deactivate", "block", "unblock",
     "write", "insert", "upsert", "submit", "register", "assign", "apply", "approve", "reject", "store",
     "put", "post", "patch", "close", "lock", "unlock", "revoke", "transfer", "pay", "send",
+    "withdraw", "refund", "reissue", "renew", "extend", "accept", "decline", "order", "issue",
 }
 READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load", "view", "show", "query",
                "status", "info", "details", "history", "calc", "calculate", "compute", "estimate", "preview",
@@ -33,8 +34,10 @@ READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load"
 MUTATING_DESC = re.compile(
     r"^(сохранени|изменени|удалени|создани|обновлени|замен|установк|установлени|отключени|включени|"
     r"блокировк|разблокировк|отмен|добавлени|редактировани|запис|регистраци|подтверждени|перевод|списани|"
-    r"смен[аыуе]\b|заказ\b|подключени|оформлени|закрыти|открыти|привязк|отвязк|перевыпуск)",
+    r"смен[аыуе]\b|заказа?\b|подключени|оформлени|закрыти|открыти|привязк|отвязк|перевыпуск|отзыв|возврат)",
     re.I)
+# «Эндпоинт отзыва заявки», «Метод сохранения адреса»: слово-род перед описанием действия
+DESC_LEAD = re.compile(r"^(?:эндпоинт|endpoint|метод|операци\w*|запрос)\s+", re.I)
 # заголовок блока метода с описанием: «Метод 1. Смена PIN-кода», «Метод 2: заказ выписки»
 METHOD_TITLE = re.compile(r"^(?:метод|method|операция)\s*№?\s*\d+\s*[.:)—–-]\s*(.{3,80})$", re.I)
 
@@ -140,7 +143,7 @@ class Method:
                 toks = split_camel(segs[-1])
                 if toks and toks[0] in MUTATING_TOKENS:
                     return (f"путь {self.url}", self.url_line)
-        if self.desc and MUTATING_DESC.match(self.desc.strip()):
+        if self.desc and MUTATING_DESC.match(DESC_LEAD.sub("", self.desc.strip())):
             return (f"описание «{self.desc.split('.')[0].strip()}»", self.desc_line)
         return None
 
@@ -471,6 +474,8 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
         for m in MENTION.finditer(text):
             seq = m.group(1)
             base = m.start(1)
+            if NOT_USED.match(text[m.end(1):m.end(1) + 40]):
+                continue  # «Коды 201 и 403 не используются» — отказ от кода, а не неописанный код
             for cm in re.finditer(CODE, seq):
                 after = text[base + cm.end():]
                 if UNIT_AFTER.match(after):
@@ -482,6 +487,10 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
                 frag = text[s0:min(e1) + 1 if e1 and text[min(e1)] == "." else (min(e1) if e1 else len(text))]
                 mentions.append((code, x, frag.strip()))
     return decls, mentions
+
+
+NOT_USED = re.compile(r"^[\s,—–-]*(?:метод\w*\s+)?(?:не\s+(?:использу|применя|возвраща|предусмотрен|поддержива)\w*|"
+                      r"не\s+бывает|исключен\w*)", re.I)
 
 
 def _heading_sections(doc: Doc, decls: list[Status]) -> list[tuple[Status, list[Line]]]:
@@ -528,6 +537,11 @@ def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method |
     return best
 
 
+def _short(text: str, limit: int = 110) -> str:
+    t = re.sub(r"^\s*\d+[.)]\s*", "", text.strip())
+    return t if len(t) <= limit else t[:limit].rsplit(" ", 1)[0] + "…"
+
+
 COND_MARK = re.compile(r"\b(?:если|при|в\s+случае|иначе|когда)\b", re.I)
 
 
@@ -553,10 +567,17 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
         prev = line.joined[:k].rstrip() if k > 0 else ""
         prev_sent = re.split(r"(?<=[.;])\s+", prev)[-1] if prev else ""
         context = (prev_sent + " " + frag).strip()
+        # шаг с несколькими случаями («для чужой карты вернуть 404; для неактивной — 400»): условие — только часть
+        # шага с этим кодом
+        parts = [c for c in re.split(r";\s*", frag) if re.search(rf"\b{code}\b", c)]
+        if parts and len(parts[0]) < len(frag) and len(set(re.findall(r"\b[1-5]\d\d\b", frag))) >= 2:
+            context = parts[0] if COND_MARK.search(parts[0]) or re.search(r"\bдля\b", parts[0]) else context
         other = _same_case_decl(context, [d for d in decls if d.code != code and d.kind in ("table", "list")], code,
                                 method_of(methods, line.n), methods, any_class=True, min_overlap=need)
         if other is None or (code, other.code) in done:
             continue
+        if re.search(rf"\b{other.code}\b", frag):
+            continue  # тот же шаг сам разводит случаи по кодам {code} и {other.code} — расхождения нет
         own = [d for d in decls if d.code == code and d.kind in ("table", "list")]
         cst = _stems(re.sub(CODE, " ", context))
         if any(len(cst & _stems(re.sub(CODE, " ", d.text))) >= len(cst & _stems(re.sub(CODE, " ", other.text)))
@@ -570,8 +591,8 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
             evidence=[ev(line, frag), ev(other.line, other.text)],
             problem=(f"В логике сказано {quoted(frag)}, а в перечне статусов тот же случай описан кодом {other.code}: "
                      f"{quoted(other.text)}."),
-            scenario=(f"Наступает этот случай: сервер по логике метода отвечает {code}, клиент и автотест по перечню "
-                      f"статусов ждут {other.code}."),
+            scenario=(f"Наступает случай из логики метода — {quoted(_short(frag))}: сервер отвечает {code}, клиент "
+                      f"и автотест по перечню статусов ждут {other.code}."),
             impact="Клиент обработает ответ неверно; тест на этот случай нельзя написать однозначно.",
             recommendation=f"Оставить для случая один код ({code} или {other.code}) и описать его в логике и перечне одинаково.",
             question=f"Какой код возвращать в этом случае — {code} или {other.code}?",
@@ -949,6 +970,7 @@ def rule_date_format(doc: Doc, methods: list[Method], out: dict) -> None:
                     scenario=f"Сервер отдаёт {name} = «{value}», клиент разбирает по маске {mm.group(0)} — дата не читается.",
                     impact="Ошибка разбора даты у клиента; тесты контракта расходятся с примером.",
                     recommendation=f"Указать один формат для {name} (рекомендуется ISO 8601) в таблице и в примерах.",
+                    question=f"Какой формат у поля {name}: {mm.group(0)}, как в таблице, или как в примере — «{value}»?",
                     conflict=True,
                 ))
                 break
