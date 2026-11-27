@@ -375,11 +375,17 @@ def _rule_forms(rules: list[str], index: Mapping[str, Mapping[str, Any]],
         lines = [e.get("line") for e in evidence if e.get("line")]
         names = [f"в строке {lines[0]}"] if lines else []
     if not names:
-        return {"nom": "правила документа", "gen": "правил документа", "dat": "правилам документа"}
+        return {"nom": "правила документа", "gen": "правил документа", "dat": "правилам документа", "true": "верны",
+                "title_dat": "правилам документа"}
     joined = ", ".join(names)
+    # для заголовка (до 12 слов): короткие номера документа, длинное имя в кавычках — только если короткого нет
+    short = [n for n in names if not n.startswith("«")] or names[:1]
+    title = ", ".join(short[:2])
     if len(names) == 1:
-        return {"nom": f"правило {joined}", "gen": f"правила {joined}", "dat": f"правилу {joined}"}
-    return {"nom": f"правила {joined}", "gen": f"правил {joined}", "dat": f"правилам {joined}"}
+        return {"nom": f"правило {joined}", "gen": f"правила {joined}", "dat": f"правилу {joined}",
+                "true": "верно", "title_dat": f"правилу {title}"}
+    return {"nom": f"правила {joined}", "gen": f"правил {joined}", "dat": f"правилам {joined}", "true": "верны",
+            "title_dat": f"правилу {title}" if len(short[:2]) == 1 else f"правилам {title}"}
 
 
 _CASE_BY_PREP = {"по": "строке", "в": "строке", "на": "строке", "из": "строки", "до": "строки", "от": "строки",
@@ -390,11 +396,17 @@ def _line_refs(text: str) -> str:
     """«L038» (номер строки из нумерованного документа) → «строка 38», после предлога — в нужном падеже."""
     def sub(m: re.Match) -> str:
         prep = m.group(1)
-        word = _CASE_BY_PREP.get(prep.lower().strip(), "строка") if prep else "строка"
-        return f"{prep or ''}{word} {int(m.group(2))}"
-    text = re.sub(r"\b(строк[а-я]{0,2}\s+)L0*(\d{1,4})\b", r"\1\2", text or "", flags=re.I)  # «строке L012»
-    text = re.sub(r"\bL0*(\d{1,4})\s*[–-]\s*L?0*(\d{1,4})\b", lambda m: f"строки {m.group(1)}–{m.group(2)}",
-                  text)
+        if prep:
+            return f"{prep}{_CASE_BY_PREP.get(prep.lower().strip(), 'строка')} {int(m.group(2))}"
+        before = m.string[:m.start()].rstrip(" ")
+        if not before or before[-1] in ".!?:;\n":
+            return f"Строка {int(m.group(2))}" if before or m.start() == 0 else f"строка {int(m.group(2))}"
+        if before[-1] in "(,—–-":  # «(L040)», перечисление — уже отделено
+            return f"строка {int(m.group(2))}"
+        return f"(строка {int(m.group(2))})"  # «особое правило L131 задаёт» → «особое правило (строка 131) задаёт»
+    text = re.sub(r"\b(?:строк[а-я]{0,2}\s+)?L0*(\d{1,4})\s*[–-]\s*L?0*(\d{1,4})\b",
+                  lambda m: f"строки {m.group(1)}–{m.group(2)}", text or "", flags=re.I)
+    text = re.sub(r"\b(строк[а-я]{0,2}\s+)L0*(\d{1,4})\b", r"\1\2", text, flags=re.I)  # «строке L012»
     return re.sub(r"\b((?:по|в|на|из|до|от|у|для|с)\s+)?L0*(\d{1,4})\b", sub, text, flags=re.I)
 
 
@@ -478,7 +490,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
 
     if verdict == "conflict":
         return {
-            "title": f"{row_cap} противоречит {rule_f['dat']}",
+            "title": f"{row_cap} противоречит {rule_f['title_dat']}",
             "kind": c["conflict_kind"] if c["conflict_kind"] in CONFLICT_KINDS else "contradiction",
             "criterion": "set_consistent",
             "severity": "critical",
@@ -491,11 +503,11 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
                        f"упадёт, хотя код верен; код, подогнанный под критерий, нарушит {rule_f['nom']}. "
                        "Приёмка остановится до решения владельца продукта."),
             "recommendation": (
-                f"Исправить ожидаемый результат {row_f['gen']} на «{expected}», если верно {rule_f['nom']}; "
+                f"Исправить ожидаемый результат {row_f['gen']} на «{expected}», если {rule_f['true']} {rule_f['nom']}; "
                 f"если верен критерий — изменить {rule_f['nom']}. Решает владелец продукта."
                 if not fix_is_rule else
                 f"Изменить {rule_f['nom']} так, чтобы оно давало «{stated}» (формулировка ниже), или, если "
-                f"{rule_f['nom']} верно, исправить ожидаемый результат {row_f['gen']} на «{expected}». "
+                f"{rule_f['nom']} {rule_f['true']}, исправить ожидаемый результат {row_f['gen']} на «{expected}». "
                 "Решает владелец продукта."),
             "rewrite": rewrite,
             "rewrite_line": rewrite_line,
@@ -850,6 +862,26 @@ _METRIC_IN_QUOTE = re.compile(r"(?:в течение|не дольше|не по
                               r"(?=\s+(?:после|для|при|с момента|от|до|на)\b|[,.;]|$)", re.I)
 
 
+def _vague_terms(text: str) -> list[str]:
+    """Размытые оценки короткими словами: «мгновенно; Сервис выдерживает высокие нагрузки; в пиковые часы» →
+    [«мгновенно», «высокие нагрузки»] (слова словаря целиком). Фразы без слова словаря — только если словарь не
+    нашёл ничего, и не длиннее 4 слов."""
+    phrases = [p.strip(" .") for p in re.split(r"[;,]\s*|\s+и\s+", text or "") if p.strip(" .")]
+    terms: list[str] = []
+    for p in phrases:
+        if len(p.split()) <= 3 and _VAGUE.search(p):  # короткая фраза документа целиком: «всегда актуальны»
+            if p.lower() not in [x.lower() for x in terms]:
+                terms.append(p)
+            continue
+        for m in _VAGUE.finditer(p):
+            a = len(re.match(r"\w*", p[:m.start()][::-1]).group(0))
+            b = len(re.match(r"\w*", p[m.end():]).group(0))
+            t = p[m.start() - a:m.end() + b]
+            if t.lower() not in [x.lower() for x in terms]:
+                terms.append(t)
+    return terms or [p for p in phrases if len(p.split()) <= 4] or phrases[:1]
+
+
 def _doc_metric(c: Mapping[str, Any]) -> str:
     """Норматив словами документа: метрика модели, если она есть в цитате дословно, иначе фраза срока из цитаты."""
     if _norm(c["metric"]) in _norm(c["quote"]):
@@ -876,7 +908,8 @@ def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[s
     missing = [names[k] for k in first["missing"]]
     more = f" (и ещё {len(bad) - 1})" if len(bad) > 1 else ""
     if first["vague_words"]:
-        words = [w.strip() for w in re.split(r"[;,]\s*|\s+и\s+", first["vague_words"]) if w.strip()][:2]
+        words = _vague_terms(first["vague_words"])[:2]
+        first = {**first, "vague_words": ", ".join(_vague_terms(first["vague_words"]))}
         title = (f"{name}: " if src and _DOC_ID.fullmatch(src) else "") + \
             f"{', '.join('«' + w + '»' for w in words)}{where if not (src and _DOC_ID.fullmatch(src)) else ''} " \
             f"нельзя проверить тестом{more}"

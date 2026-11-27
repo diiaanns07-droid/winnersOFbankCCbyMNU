@@ -763,3 +763,22 @@ def test_model_contradiction_with_nfr_side_is_minor():
     assert c["severity"] == "minor" and c["severity_hint"] == "major"
     two = dict(base, evidence=[{"quote": "a", "line": 10}, {"quote": "b", "line": 12}])
     assert lens_qa.postprocess({"candidates": [two]}, reqs)["candidates"][0]["severity"] == "major"
+
+
+def test_vague_terms_short_and_rule_agreement():
+    assert lens_qa._vague_terms("мгновенно; Сервис выдерживает высокие нагрузки; в пиковые часы") == [
+        "мгновенно", "высокие нагрузки"]
+    assert lens_qa._vague_terms("быстро, всегда актуальны") == ["быстро", "всегда актуальны"]
+    two = lens_qa.postprocess({"acceptance_checks": [_check(rule_requirement_ids=["R-01", "R-02"])]}, REQS)
+    c = two["candidates"][0]
+    assert "если верны правила" in c["recommendation"], c["recommendation"]
+    one = lens_qa.postprocess({"acceptance_checks": [_check()]}, REQS)["candidates"][0]
+    assert "если верно правило П-1" in one["recommendation"]
+
+
+def test_line_refs_readable():
+    f = lens_qa._line_refs
+    assert f("особое правило L131 задаёт срок") == "особое правило (строка 131) задаёт срок"
+    assert f("По Ф-4 (L040) push") == "По Ф-4 (строка 40) push"
+    assert f("строки L061-L065") == "строки 61–65"
+    assert f("L064 ожидает февраль") == "Строка 64 ожидает февраль"
