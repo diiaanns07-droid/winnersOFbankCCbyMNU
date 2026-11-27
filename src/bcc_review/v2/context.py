@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,6 +34,15 @@ def numbered(view: dict, start: int = 1, end: int | None = None) -> str:
             page = f"[с.{x['page']}] " if x.get("page") else ""
             out.append(f"L{n:03d}| {page}{x.get('text', '')}")
         return "\n".join(out)
+
+
+_WRAPPERS = re.compile(r"<(/?)\s*(документ|требования|сигналы)\s*>", re.I)
+
+
+def data_only(text: str) -> str:
+    """№57: документ не может закрыть обёртку «<документ>» и выдать свой текст за задание этапа: служебные теги
+    внутри документа заменяются похожими скобками ‹…›. В обычном ТЗ таких тегов нет — текст для модели тот же."""
+    return _WRAPPERS.sub(lambda m: f"‹{m.group(1)}{m.group(2)}›", text) if "<" in text else text
 
 
 def requirements_table(requirements: list[dict]) -> str:
@@ -85,7 +95,7 @@ class Context:
 
     def document_block(self) -> str:
         if self._numbered is None:
-            self._numbered = numbered(self.view)
+            self._numbered = data_only(numbered(self.view))
         return f"<документ>\n{self._numbered}\n</документ>"
 
     def prompt(self, name: str, **variables: Any) -> tuple[str, str]:

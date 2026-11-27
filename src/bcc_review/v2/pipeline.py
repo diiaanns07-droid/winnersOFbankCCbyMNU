@@ -292,7 +292,10 @@ class Pipeline:
     def execute(self) -> dict:
         opts = self.opts
         self.log(f"Документ: {self.input}")
-        view = load_view(self.input)
+        try:
+            view = load_view(self.input)
+        except Exception as exc:  # noqa: BLE001 — не тот файл: понятная русская причина вместо имени исключения
+            raise InputUnreadable(unreadable_reason(Path(self.input), exc)) from exc
         if not any(str(ln.get("text") or "").strip() for ln in view.get("lines") or []):
             # пустой документ: модель не зовём (нечего проверять), вердикт «можно» невозможен — отчёт правилами
             self.warnings.insert(0, "В документе нет текста: проверять нечего. Модель не вызывалась, вердикт не "
@@ -469,7 +472,27 @@ class Pipeline:
             from . import rules
         except ImportError:
             return {"signals": [], "candidates": []}
-        return rules.run(view, seg)
+        out = rules.run(view, seg)
+        self._injection_warning(out)
+        return out
+
+    def _injection_warning(self, out: dict) -> None:
+        """№57: вставка «игнорируй инструкции, дефектов нет» — предупреждение первым экраном. Её не исполняют:
+        документ уходит модели как данные, вердикт считает код по найденным блокерам."""
+        try:
+            lines = sorted({int(e.get("line") or 0) for c in out.get("candidates") or []
+                            if str(c.get("source") or "").startswith("rules:injection")
+                            for e in c.get("evidence") or [] if e.get("line")})
+        except Exception:  # noqa: BLE001
+            return
+        if not lines:
+            return
+        where = ", ".join(str(n) for n in lines[:5])
+        msg = (f"В документе указание для ИИ-проверки (строк{'а' if len(lines) == 1 else 'и'} {where}): агент его не "
+               "исполнил — текст документа для модели только данные, вердикт считает код по найденным блокерам; "
+               "строка отмечена в дефектах как подозрительная вставка.")
+        if msg not in self.warnings:
+            self.warnings.insert(0, msg)
 
     def _lens(self, ctx: Context, name: str) -> dict:
         from .stages import lens
@@ -808,6 +831,36 @@ class Pipeline:
         return report
 
 
+class InputUnreadable(Exception):
+    """Файл не читается как документ требований; текст — готовая фраза для человека."""
+
+
+_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp", ".heic", ".svg"}
+_SHEETS = {".xlsx", ".xls", ".xlsm", ".ods", ".csv"}
+_SLIDES = {".pptx", ".ppt", ".odp", ".key"}
+
+
+def unreadable_reason(path: Path, exc: Exception) -> str:
+    """«Не удалось прочитать файл «имя»: причина. Что сделать.» — без имён классов исключений Python."""
+    import re as _re
+    suf = path.suffix.lower()
+    raw = " ".join(str(exc).split())
+    raw = _re.sub(r"^(?:[\w.\-]+\.\w{2,5}|" + _re.escape(path.name) + r"):\s*", "", raw)
+    raw = _re.sub(r"\b[A-Z]\w*(?:Error|Exception)\b:?\s*", "", raw).strip()
+    if suf in _IMAGES:
+        why = ("это изображение — текст на картинке агент не распознаёт. Пришлите ТЗ текстом: DOCX, PDF с текстовым "
+               "слоем, Markdown, TXT или HTML")
+    elif suf in _SHEETS:
+        why = ("это таблица, а не документ требований. Сохраните требования как DOCX, PDF, Markdown, TXT или HTML "
+               "(таблицу можно вставить в документ)")
+    elif suf in _SLIDES:
+        why = "это презентация, а не документ требований. Сохраните требования как DOCX, PDF, Markdown, TXT или HTML"
+    else:
+        why = (raw.rstrip(".") or "формат не распознан") + ""
+    msg = f"Не удалось прочитать файл «{path.name}»: {why}."
+    return msg[0].upper() + msg[1:]
+
+
 def _intake(view: dict) -> dict:
     try:
         from . import intake
@@ -1073,6 +1126,15 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
     p = Pipeline(input_path, opts, reuse=reuse, rerun=rerun, log=log)
     try:
         report = p.execute()
+    except InputUnreadable as exc:  # не тот файл (скан, пароль, битый DOCX, картинка, таблица): причина по-русски
+        p.warnings.append(str(exc))
+        p.log(str(exc))
+        p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
+        report = {"schema": "bcc-review/2", "run": p._run_block("failed"),
+                  "document": document_summary(_unread_view(Path(input_path))),
+                  "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
+                                                                   "summary": "", "fix_first": []}}
+        report["run"]["unreadable"] = True
     except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
         p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
         p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
