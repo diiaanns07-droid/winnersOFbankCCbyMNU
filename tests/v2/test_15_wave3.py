@@ -635,3 +635,28 @@ def test_final_sets_from_other_code_are_marked(monkeypatch):
     assert "⚠" not in text  # без --sets-from прогоны frz5678 стояли бы как «код не совпадает»
     plain = final.render("v2.0.0", "rel1234", "")
     assert "Наборы ниже" not in plain and "Корпус" not in plain
+
+
+def test_measure_does_not_write_history_for_quota_stopped_run(tmp_path, monkeypatch):
+    """Официальный замер, где агент упёрся в лимит подписки, в history.jsonl не попадает (иначе ворота взяли бы его
+    последним: статус failed, К и С от обрывка); --save-partial — записать как есть."""
+    import json as _json
+
+    from evaluation.v2 import measure
+    from evaluation.v2.common import ROOT
+
+    rep = _json.loads((ROOT / "evaluation/v2/measurements/w4_07_golova_17_50_868787d_sonnet/report.json")
+                      .read_text(encoding="utf-8"))
+    rep["run"].update({"status": "partial", "model_error": "Исчерпан лимит подписки Claude Code. Сброс лимита: 1:20pm (UTC)."})
+    src = tmp_path / "in" / "report.json"
+    src.parent.mkdir()
+    src.write_text(_json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+    hist = tmp_path / "history.jsonl"
+    hist.write_text("", encoding="utf-8")
+    monkeypatch.setattr(measure, "HISTORY", hist)
+    monkeypatch.setattr(measure, "MEAS", tmp_path / "m")
+    monkeypatch.setattr(measure, "update_results", lambda: None)
+    monkeypatch.setattr(measure, "ROOT", tmp_path)
+    args = ["--from-report", str(src), "--label", "лимит", "--arbiter", "off"]
+    assert measure.main(args) == 3 and hist.read_text(encoding="utf-8") == ""
+    assert measure.main(args + ["--save-partial"]) == 0 and len(hist.read_text(encoding="utf-8").splitlines()) == 1

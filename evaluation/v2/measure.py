@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT, run_shell, shell_quote
+from .common import ROOT, quota_hit, run_shell, shell_quote
 
 MEAS = ROOT / "evaluation" / "v2" / "measurements"
 HISTORY = ROOT / "evaluation" / "v2" / "history.jsonl"
@@ -121,6 +121,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--run-dir", help="каталог runs/<id> для разбора промахов")
     ap.add_argument("--arbiter", default="sonnet")
     ap.add_argument("--no-history", action="store_true")
+    ap.add_argument("--save-partial", action="store_true",
+                    help="записать в историю, даже если агент упёрся в лимит провайдера (подписка, квота API)")
     ap.add_argument("--table", action="store_true", help="только пересобрать таблицу истории в RESULTS.md")
     ap.add_argument("--no-cache", action="store_true", help="агент мимо кэша ответов модели (стабильность)")
     ap.add_argument("--extra", default="", help="доп. аргументы агента, например «--runs-dir out/runs»")
@@ -175,6 +177,13 @@ def main(argv: list[str] | None = None) -> int:
     text = sc.render_md(res, a.label)
     (dest / "score.md").write_text(text, encoding="utf-8")
     print(text)
+    raw = json.loads((dest / "report.json").read_text(encoding="utf-8"))
+    if not a.no_history and quota_hit(raw) and not a.save_partial:
+        print(f"агент упёрся в лимит провайдера ({str((raw.get('run') or {}).get('model_error'))[:160]}) — это не "
+              "замер качества: в history.jsonl не пишу, ворота его не увидят. После сброса лимита повторите замер "
+              "(--save-partial — записать как есть).")
+        print(f"разбор (не в истории): {dest.relative_to(ROOT)}")
+        return 3
     if not a.no_history:
         with HISTORY.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(_row(res, a.label, str(dest.relative_to(ROOT))), ensure_ascii=False) + "\n")
