@@ -280,3 +280,11 @@ def test_malformed_answer_does_not_crash_stage(data):
     assert set(out) >= {"candidates", "pair_checks", "trace", "glossary"}
     for c in out["candidates"]:
         assert all(isinstance(x, str) and x.startswith("R-") for x in c["requirement_ids"])
+
+
+def test_gated_pair_text_says_why_it_is_not_two_outcomes():
+    _, [c] = one(pair(5, 4, qa="Подключение 1 марта — отказ возможен по 15 марта включительно",
+                      qb='"refundUntil":"2026-03-19"', subject="последний день отказа"))
+    assert "пример" in c["problem"] and "не второй исход" in c["problem"]
+    assert c["question"] and len(c["title"].split()) <= C.MAX_TITLE_WORDS
+    assert set(C.GATE_TEXT) <= set(C.GATE_RU)
