@@ -3,6 +3,7 @@
 #
 #   scripts/final_reports.sh [ПРОВАЙДЕР] [МОДЕЛЬ]        # по умолчанию claude_cli opus
 #   SECOND_DOC=evaluation/dev/corpus/cases/cashback.base/source.md SECOND_NAME=cashback scripts/final_reports.sh
+#   ANSWERS= scripts/final_reports.sh                    # без прогона с ответами владельца
 #
 # Требования к прогону для сдачи: рабочее дерево чистое (коммит в паспорте без -dirty), HEAD на теге v2.*,
 # кэш выключен (все ответы модели получены в этом прогоне). Отчёты руками не править.
@@ -14,6 +15,7 @@ MODEL="${2:-}"
 EXPORT="${EXPORT:-jira,docx}"
 SECOND_DOC="${SECOND_DOC:-release/input/other_topic_cashback.md}"
 SECOND_NAME="${SECOND_NAME:-$(basename "${SECOND_DOC%.*}")}"
+ANSWERS="${ANSWERS-examples/v2/answers.md}"
 OUT="${OUT:-reports}"
 
 cd "$(dirname "$0")/.."
@@ -37,9 +39,10 @@ echo "коммит: $(git rev-parse --short HEAD) ${tag:+(тег $tag)}; код 
 suffix=""
 [ "$PROVIDER" != "claude_cli" ] && suffix=".${PROVIDER}"
 
-run() {  # вход, имя отчёта, форматы экспорта
+run() {  # вход, имя отчёта, форматы экспорта, дополнительные параметры агента
   local input="$1" name="$2" export="${3:-$EXPORT}"
-  local args=(--provider "$PROVIDER" --no-cache --export "$export")
+  shift 3 2>/dev/null || shift $#
+  local args=(--provider "$PROVIDER" --no-cache --export "$export" "$@")
   [ -n "$MODEL" ] && args+=(--model "$MODEL")
   echo
   echo "== $input -> $OUT/$name.md ($PROVIDER ${MODEL:-модель по умолчанию})"
@@ -51,6 +54,17 @@ run() {  # вход, имя отчёта, форматы экспорта
 
 run release/input/requirements.md "requirements${suffix}"
 run release/input/requirements.pdf "requirements_pdf${suffix}" "${EXPORT},pdf"
+# Ответы владельца (examples/v2/answers.md, №11): пересмотр «до / после» и исправленная редакция ТЗ, затем
+# повторная проверка исправленной редакции тем же агентом. ANSWERS= (пусто) — пропустить.
+if [ -n "$ANSWERS" ] && [ -f "$ANSWERS" ]; then
+  run release/input/requirements.md "requirements.answers${suffix}" "$EXPORT" --answers "$ANSWERS" --revise
+  revised="$OUT/requirements.answers${suffix}.revised.md"
+  if [ -f "$revised" ]; then
+    run "$revised" "requirements.answers${suffix}.revised.review" "$EXPORT"
+  else
+    echo "внимание: исправленная редакция не записана ($revised)" >&2
+  fi
+fi
 if [ -f "$SECOND_DOC" ]; then
   run "$SECOND_DOC" "${SECOND_NAME}${suffix}"
 fi

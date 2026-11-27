@@ -33,6 +33,7 @@ PARALLEL = ("consistency", "lens_architect", "lens_analyst", "lens_risk", "lens_
 # секунды на вызов: haiku (effort=low), официальный документ, прогон 27.11 08:58 (runs/20261127-085847-77dc)
 HAIKU_S = {"segment": 59.2, "lens_analyst": 35.8, "lens_architect": 63.3, "lens_qa": 82.2, "lens_risk": 87.3,
            "consistency": 135.5, "judge": 119.9, "judge_check": 17.0, "clarify": 38.4}
+FAST_START_PROBE_S = 8.0   # pipeline.FAST_START_PROBE_S
 SCHEMA = {"type": "object", "required": ["ok"], "properties": {"ok": {"type": "boolean"}}}
 
 
@@ -120,8 +121,13 @@ def make_provider(server: FreeTierServer, clock: ScaledClock, **kw) -> SimProvid
 
 def run_graph(*, concurrency: int | None = None, client_rpm: float = 10.0, server_rpm: int = 10,
               factor: float = 1.0, latency: dict | None = None, fail_503: int = 0, env: dict | None = None,
-              scale: float = SCALE, overloaded_until: float = 0.0, clarify_early: bool = True) -> dict:
-    """Один прогон графа вызовов. Возвращает модельное время, исходы запросов и максимум одновременных."""
+              scale: float = SCALE, overloaded_until: float = 0.0, clarify_early: bool = True,
+              fast_start: bool = False) -> dict:
+    """Один прогон графа вызовов. Возвращает модельное время, исходы запросов и максимум одновременных.
+
+    ``fast_start`` — быстрый старт по умолчанию (№01 929df20): рецензенты стартуют через ``FAST_START_PROBE_S``
+    после начала нарезки, не дожидаясь её (6 запросов за 8 с).
+    """
     clock = ScaledClock(scale)
     server = FreeTierServer(clock, rpm=server_rpm, latency=latency, factor=factor, fail_503=fail_503,
                             overloaded_until=overloaded_until)
@@ -135,9 +141,16 @@ def run_graph(*, concurrency: int | None = None, client_rpm: float = 10.0, serve
     def ask(stage: str) -> None:
         llm.ask(stage, "S", f"U {stage}", SCHEMA)
 
-    ask("segment")
-    with cf.ThreadPoolExecutor(max_workers=len(PARALLEL)) as ex:
-        list(ex.map(ask, PARALLEL))
+    if fast_start:
+        with cf.ThreadPoolExecutor(max_workers=1 + len(PARALLEL)) as ex:
+            seg = ex.submit(ask, "segment")
+            clock.sleep(FAST_START_PROBE_S)
+            list(ex.map(ask, PARALLEL))
+            seg.result()
+    else:
+        ask("segment")
+        with cf.ThreadPoolExecutor(max_workers=len(PARALLEL)) as ex:
+            list(ex.map(ask, PARALLEL))
     if clarify_early:   # №01 9c5ea31: вопросы стартуют вместе с судьёй, итог собирается после проверки судьи
         with cf.ThreadPoolExecutor(max_workers=2) as ex:
             early = ex.submit(ask, "clarify")
@@ -207,6 +220,22 @@ def test_low_free_tier_rpm_waits_instead_of_failing():
     assert r2["outcomes"].count("200") == 9
 
 
+def test_fast_start_on_five_rpm_key_waits_for_window_instead_of_429():
+    """Быстрый старт шлёт 6 запросов за 8 с. Ключ 5 запросов в минуту (бесплатный gemini-3.8-flash): с окном 5 из
+    профиля шестой ждёт окно — ни одного 429 и 9 запросов из 20 суточных; с окном 10 — 429 и лишний запрос.
+    Критический путь не растёт: ждёт самая короткая линза (она стартует последней)."""
+    now = run_graph(server_rpm=5, client_rpm=10, fast_start=True)
+    assert now["outcomes"] == ["200"] * 9, now["outcomes"]
+    was = run_graph(server_rpm=5, client_rpm=10, fast_start=True, env={"GEMINI_RPM": "10"})
+    assert was["outcomes"].count("429") >= 1 and len(was["outcomes"]) > 9, was["outcomes"]
+    fast_crit = max(HAIKU_S["segment"], FAST_START_PROBE_S + max(HAIKU_S[s] for s in PARALLEL)) + max(
+        HAIKU_S["judge"] + HAIKU_S["judge_check"], HAIKU_S["clarify"])
+    assert now["seconds"] <= fast_crit + 15, (now["seconds"], fast_crit)
+    # ключ с 10 в минуту: окно 5 стоит не больше нескольких секунд
+    ten = run_graph(server_rpm=10, client_rpm=10, fast_start=True)
+    assert ten["outcomes"] == ["200"] * 9 and ten["seconds"] <= fast_crit + 15, (ten["seconds"], fast_crit)
+
+
 def test_503_wave_falls_back_and_completes():
     r = run_graph(client_rpm=0, fail_503=6)
     assert r["outcomes"].count("200") == 9 and r["outcomes"].count("503") == 6
@@ -232,7 +261,11 @@ def _table() -> None:  # pragma: no cover - ручной запуск
             ("параллельность 5 (сейчас), окно --rpm 10", {"client_rpm": 10}),
             ("параллельность 5, только окно провайдера", {"client_rpm": 0}),
             ("сервер 5 RPM, GEMINI_RPM=5", {"server_rpm": 5, "client_rpm": 0, "env": {"GEMINI_RPM": "5"}}),
-            ("сервер 5 RPM, окно 10 (не знаем лимит)", {"server_rpm": 5, "client_rpm": 0}),
+            ("сервер 5 RPM, окно 10 (не знаем лимит)", {"server_rpm": 5, "client_rpm": 0, "env": {"GEMINI_RPM": "10"}}),
+            ("быстрый старт, сервер 10, профиль (окно 5)", {"server_rpm": 10, "fast_start": True}),
+            ("быстрый старт, сервер 5, профиль (окно 5)", {"server_rpm": 5, "fast_start": True}),
+            ("быстрый старт, сервер 5, окно 10 (было)", {"server_rpm": 5, "fast_start": True,
+                                                     "env": {"GEMINI_RPM": "10"}}),
             ("вызовы ×1,5", {"factor": 1.5, "client_rpm": 0}), ("волна 503 ×6", {"fail_503": 6, "client_rpm": 0}),
             ("основная перегружена первые 5 мин", {"overloaded_until": 300.0}),
             ("основная перегружена весь прогон", {"overloaded_until": 10_000.0})]

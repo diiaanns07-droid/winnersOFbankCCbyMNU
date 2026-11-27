@@ -31,6 +31,9 @@ RUNS = ROOT / "runs"
 CORPUS = ROOT / "evaluation" / "dev" / "corpus"
 OPEN2 = ROOT / "evaluation" / "v2" / "open2"
 OFFICIAL = ROOT / "release" / "input" / "requirements.md"
+# Действительно чистые ТЗ №20 (`evaluation/v2/clean`; пока не в `bcc/v2` — копия из ветки `v2/20-clean-docs`
+# в out/07bench/clean20: `git show origin/v2/20-clean-docs:evaluation/v2/clean/<кейс>/source.md`).
+CLEAN20 = next((d for d in (ROOT / "evaluation" / "v2" / "clean", OUT / "clean20") if d.is_dir()), OUT / "clean20")
 # Семейства корпуса в зоне линзы и комбинации, где они есть.
 CORPUS_FAMILIES = ("two_statuses", "drop_promised", "unit_change")
 NO_OP = re.compile(r"нет (метода|операци)|не описан\w* (метод|операци)|операци\w* .{0,40}не (описан|предусмотр)|"
@@ -117,6 +120,9 @@ def docs_for(set_name: str) -> list[tuple[str, Path, dict]]:
             r = next(r for r in c["renders"] if r["format"] == "md")
             out.append((cid, CORPUS / r["path"], {"clean": clean, "render_id": r["render_id"]}))
         return out
+    if set_name == "clean20":
+        return [(d.name, d / "source.md", {"clean": True})
+                for d in sorted(p for p in CLEAN20.iterdir() if (p / "source.md").exists())]
     if set_name == "open2":
         out = []
         for d in sorted(p for p in OPEN2.iterdir() if (p / "source.md").exists()):
@@ -219,12 +225,13 @@ def score_set(a: argparse.Namespace) -> None:
                      f"{s['critical_false']} | {s['duplicates']} | {s['quotes']} |")
             summary["docs"].append({"rid": r["rid"], "meta": meta, **s, "cands": [_brief(c) for c in cands]})
     elif a.set == "corpus":
-        out = base / "corpus"
+        k = getattr(a, "rep", 1) or 1   # повтор корпуса: каждый считается отдельно (`score --rep 2`)
+        out = base / ("corpus" if k == 1 else f"corpus_r{k}")
         sys.path.insert(0, str(ROOT))
         from evaluation.v2 import corpus as cp  # noqa: WPS433
 
         for r in rows:
-            if r["rep"] != 1:
+            if r["rep"] != k:
                 continue
             cands, meta = _cands_of(r["rid"])
             d = out / "reports" / cp._dir_name(r["render_id"])
@@ -232,7 +239,7 @@ def score_set(a: argparse.Namespace) -> None:
             (d / "report.json").write_text(json.dumps(as_report(cands, meta), ensure_ascii=False), encoding="utf-8")
             summary["docs"].append({"name": r["name"], "clean": r["clean"], "meta": meta,
                                     "cands": [_brief(c) for c in cands]})
-        names = [r["name"] for r in rows if r["rep"] == 1]
+        names = [r["name"] for r in rows if r["rep"] == k]
         subprocess.run([PY, "-m", "evaluation.v2.corpus", "score", "--out", str(out), "--cases", *names,
                         "--label", f"07 {a.label}"], cwd=str(ROOT), capture_output=True, text=True)
         cs = json.loads((out / "summary.json").read_text(encoding="utf-8"))
@@ -256,6 +263,22 @@ def score_set(a: argparse.Namespace) -> None:
                                if d["clean"] and c["severity"] != "minor")
             L.append(f"| {d['name']} | {'да' if d['clean'] else ''} | {d['meta'].get('seconds')} | "
                      f"{len(d['cands'])} ({bs['critical']}/{bs['major']}/{bs['minor']}) | {titles.replace('|', '/')} |")
+    elif a.set == "clean20":
+        L += ["| Документ | с | Кандидатов (к/с/н) | «операция не описана» | Critical/major |",
+              "| :--- | ---: | :--- | ---: | :--- |"]
+        for r in rows:
+            cands, meta = _cands_of(r["rid"])
+            bs = {s: sum(1 for c in cands if c.get("severity") == s) for s in ("critical", "major", "minor")}
+            entry = {"name": r["name"], "clean": True, "meta": meta, "by_severity": bs,
+                     "cands": [_brief(c) for c in cands]}
+            noop = sum(1 for c in entry["cands"] if c["no_op"])
+            crit = "; ".join(f"[{c['severity'][:3]}] {c['title'][:60]}" for c in entry["cands"] if c["severity"] != "minor")
+            L.append(f"| {r['name']} #{r['rep']} | {meta.get('seconds')} | {len(cands)} ({bs['critical']}/{bs['major']}/"
+                     f"{bs['minor']}) | {noop} | {crit.replace('|', '/') or '—'} |")
+            summary["docs"].append(entry)
+        cl = {s: sum(d["by_severity"][s] for d in summary["docs"]) for s in ("critical", "major", "minor")}
+        summary.update({"clean": cl})
+        L += ["", f"Итого на {len(rows)} чистых: critical {cl['critical']}, major {cl['major']}, minor {cl['minor']}."]
     elif a.set == "open2":
         L += ["| Документ | с | Кандидатов (к/с/н) | Свои пункты | Нет | «операция не описана» | Critical/major на чистой |",
               "| :--- | ---: | :--- | :--- | :--- | ---: | :--- |"]
@@ -294,19 +317,21 @@ def score_set(a: argparse.Namespace) -> None:
     secs = [d["meta"].get("seconds") or 0 for d in summary["docs"]]
     L += ["", f"Время этапа: среднее {sum(secs) / max(1, len(secs)):.0f} с, максимум {max(secs or [0]):.0f} с; "
               f"вызовов {sum((d['meta'].get('calls') or 0) for d in summary['docs'])} на {len(secs)} прогонов."]
-    (base / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    (base / "summary.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+    sfx = "" if (getattr(a, "rep", 1) or 1) == 1 else f"_r{a.rep}"
+    (base / f"summary{sfx}.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    (base / f"summary{sfx}.md").write_text("\n".join(L) + "\n", encoding="utf-8")
     print("\n".join(L))
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("action", choices=["run", "score"])
-    ap.add_argument("--set", required=True, choices=["official", "official_pdf", "corpus", "open2"])
+    ap.add_argument("--set", required=True, choices=["official", "official_pdf", "corpus", "open2", "clean20"])
     ap.add_argument("--model", default="haiku")
     ap.add_argument("--label", required=True)
     ap.add_argument("--reps", type=int, default=1)
     ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--rep", type=int, default=1, help="score корпуса: какой повтор считать")
     ap.add_argument("--cache", action="store_true", help="через кэш ответов (по умолчанию --no-cache)")
     ap.add_argument("--arbiter", default="off", help="off | sonnet: спорные пары размечает арбитр №15 (копия кэша)")
     a = ap.parse_args()

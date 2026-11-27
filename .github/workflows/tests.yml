@@ -37,6 +37,9 @@ jobs:
             python: "3.13"
           - os: ubuntu-latest
             python: "3.14"
+          # python.org сейчас ставит 3.14 по умолчанию — так будет у жюри на Windows (проверено Max вручную)
+          - os: windows-latest
+            python: "3.14"
     steps:
       - uses: actions/checkout@v4
 
@@ -113,3 +116,22 @@ jobs:
         run: |
           docker run --rm -v "$PWD/reports:/app/reports" bcc-review release/input/requirements.pdf reports/docker/requirements_pdf.md --provider offline
           docker run --rm -v "$PWD/reports:/app/reports" bcc-review verify reports/docker/requirements_pdf.json release/input/requirements.pdf
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+
+      # Тот же вход, те же записанные ответы — тот же отчёт в контейнере и вне его (без времени и паспорта)
+      - name: Контейнер = вне контейнера (mock по MD и PDF, scripts/repro_check.py)
+        run: |
+          python -m pip install -q -r requirements.txt -e .
+          for f in requirements.md requirements.pdf; do
+            stem="${f%.*}_${f##*.}"
+            docker run --rm -v "$PWD/reports:/app/reports" bcc-review "release/input/$f" "reports/docker/$stem.mock.md" --provider mock --no-cache
+            python -m bcc_review "release/input/$f" "out/host/$stem.mock.md" --provider mock --no-cache
+            python scripts/repro_check.py "out/host/$stem.mock.json" "reports/docker/$stem.mock.json" --content
+          done

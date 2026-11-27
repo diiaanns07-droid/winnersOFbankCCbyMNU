@@ -1,0 +1,219 @@
+{
+ "_note": "haiku 27.11 12:45 (волна 3, сессия 2, №04): «Документ описывает …» посреди выгрузки Word — служебное пояснение",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Снизить риск мошеннических переводов",
+   "line_start": 4,
+   "line_end": 4
+  },
+  {
+   "source_id": "ЛП-1",
+   "kind": "functional",
+   "summary": "Установка суточного лимита переводов клиентом",
+   "line_start": 6,
+   "line_end": 6
+  },
+  {
+   "source_id": "ЛП-2",
+   "kind": "functional",
+   "summary": "Подсчёт суммы переводов за сутки по Астане",
+   "line_start": 7,
+   "line_end": 7
+  },
+  {
+   "source_id": "ЛП-3",
+   "kind": "functional",
+   "summary": "Отклонение перевода при превышении лимита",
+   "line_start": 8,
+   "line_end": 8
+  },
+  {
+   "source_id": "ЛП-4",
+   "kind": "functional",
+   "summary": "Задержка увеличения лимита и уведомления",
+   "line_start": 9,
+   "line_end": 9
+  },
+  {
+   "source_id": "",
+   "kind": "nonfunctional",
+   "summary": "Время проверки лимита и срок хранения журнала",
+   "line_start": 11,
+   "line_end": 11
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Состав хранимых данных по лимиту и истории",
+   "line_start": 13,
+   "line_end": 13
+  },
+  {
+   "source_id": "Требования к данным: client_id",
+   "kind": "data",
+   "summary": "Идентификатор клиента",
+   "line_start": 15,
+   "line_end": 15
+  },
+  {
+   "source_id": "Требования к данным: limit",
+   "kind": "data",
+   "summary": "Текущий лимит в тиынах",
+   "line_start": 16,
+   "line_end": 16
+  },
+  {
+   "source_id": "Требования к данным: effective_at",
+   "kind": "data",
+   "summary": "Дата вступления нового лимита в силу",
+   "line_start": 17,
+   "line_end": 17
+  },
+  {
+   "source_id": "",
+   "kind": "integration",
+   "summary": "Методы getTransferLimit и setTransferLimit",
+   "line_start": 19,
+   "line_end": 19
+  },
+  {
+   "source_id": "",
+   "kind": "acceptance",
+   "summary": "Отклонение перевода сверх остатка лимита",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "",
+   "kind": "acceptance",
+   "summary": "Новый лимит действует со следующих суток 10:00",
+   "line_start": 22,
+   "line_end": 22
+  },
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Снизить риск мошеннических переводов",
+   "line_start": 25,
+   "line_end": 25
+  },
+  {
+   "source_id": "ЛП-11",
+   "kind": "functional",
+   "summary": "Установка суточного лимита переводов клиентом",
+   "line_start": 27,
+   "line_end": 27
+  },
+  {
+   "source_id": "ЛП-12",
+   "kind": "functional",
+   "summary": "Подсчёт суммы переводов за сутки по Астане",
+   "line_start": 28,
+   "line_end": 28
+  },
+  {
+   "source_id": "ЛП-13",
+   "kind": "functional",
+   "summary": "Отклонение перевода при превышении лимита",
+   "line_start": 29,
+   "line_end": 29
+  },
+  {
+   "source_id": "ЛП-14",
+   "kind": "functional",
+   "summary": "Задержка увеличения лимита и уведомления",
+   "line_start": 30,
+   "line_end": 30
+  },
+  {
+   "source_id": "",
+   "kind": "nonfunctional",
+   "summary": "Время проверки лимита и срок хранения журнала",
+   "line_start": 32,
+   "line_end": 32
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Состав хранимых данных по лимиту и истории",
+   "line_start": 34,
+   "line_end": 34
+  },
+  {
+   "source_id": "Требования к данным (продолжение): client_id",
+   "kind": "data",
+   "summary": "Идентификатор клиента",
+   "line_start": 36,
+   "line_end": 36
+  },
+  {
+   "source_id": "Требования к данным (продолжение): limit",
+   "kind": "data",
+   "summary": "Текущий лимит в тиынах",
+   "line_start": 37,
+   "line_end": 37
+  },
+  {
+   "source_id": "Требования к данным (продолжение): effective_at",
+   "kind": "data",
+   "summary": "Дата вступления нового лимита в силу",
+   "line_start": 38,
+   "line_end": 38
+  },
+  {
+   "source_id": "",
+   "kind": "integration",
+   "summary": "Методы getTransferLimit и setTransferLimit",
+   "line_start": 40,
+   "line_end": 40
+  },
+  {
+   "source_id": "",
+   "kind": "acceptance",
+   "summary": "Отклонение перевода сверх остатка лимита",
+   "line_start": 42,
+   "line_end": 42
+  },
+  {
+   "source_id": "",
+   "kind": "acceptance",
+   "summary": "Новый лимит действует со следующих суток 10:00",
+   "line_start": 43,
+   "line_end": 43
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Название документа «Лимит переводов между своими счетами»",
+   "line_start": 1,
+   "line_end": 1,
+   "reason": "Название документа, не требование."
+  },
+  {
+   "what": "Описание назначения документа «Документ описывает суточный лимит переводов…»",
+   "line_start": 2,
+   "line_end": 2,
+   "reason": "Служебное пояснение о самом документе, не обязательное поведение; повторено в L023."
+  },
+  {
+   "what": "Шапка таблицы «Поле | Тип | Описание»",
+   "line_start": 14,
+   "line_end": 14,
+   "reason": "Строка-шапка таблицы данных, не требование."
+  },
+  {
+   "what": "Повтор описания документа «Документ описывает суточный лимит переводов…»",
+   "line_start": 23,
+   "line_end": 23,
+   "reason": "Служебное пояснение о самом документе; повтор L002."
+  },
+  {
+   "what": "Шапка таблицы «Поле | Тип | Описание» (продолжение)",
+   "line_start": 35,
+   "line_end": 35,
+   "reason": "Строка-шапка таблицы данных, не требование."
+  }
+ ]
+}

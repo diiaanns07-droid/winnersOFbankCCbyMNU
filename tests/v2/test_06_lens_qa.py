@@ -242,7 +242,7 @@ def test_other_candidates_limited_conflicts_kept():
 def test_coverage_is_one_minor_remark_with_share_and_closing_tests():
     """Покрытие приёмкой — всегда minor (разбор №18: major на каждом ТЗ, и на чистом); в problem — доля
     проверенных функциональных требований, заголовок — факт, рекомендация — тест-кейсы, закрывающие пробел."""
-    cover = {"requirement_ids": ["R-03"], "evidence": [{"quote": "x", "line": 30}], "title": "Покрытие",
+    cover = {"requirement_ids": ["R-03"], "evidence": [{"quote": "x", "line": 12}], "title": "Покрытие",
              "problem": "Не покрыты границы.", "scenario": "s", "impact": "i", "recommendation": "Дополнить таблицу",
              "rewrite": "", "question": "", "blocks": "testing", "severity": "major", "kind": "missing_element",
              "criterion": "set_validatable"}
@@ -257,6 +257,8 @@ def test_coverage_is_one_minor_remark_with_share_and_closing_tests():
     assert c["title"] == "Критерии приёмки проверяют 1 из 2 функциональных требований"
     assert c["model_title"] == "Покрытие"
     assert c["recommendation"].startswith("Дополнить таблицу. Непокрытые ветки закрывают тест-кейсы T-02–T-04")
+    assert c["evidence"] == [{"quote": "Значение 10 | Добавить 5", "line": 30}, {"quote": "x", "line": 12}], \
+        "место — таблица приёмки, затем цитаты модели"
     none = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match", rule_requirement_ids=[],
                                                             rule_evidence=[])],
                                 "candidates": [dict(cover)]}, REQS)
@@ -289,13 +291,15 @@ def test_verifiability_only_vague_words_stay_others_dropped():
     assert "числом" in run("Методы отвечают не дольше 2 с для 95 % запросов.")["dropped"][0]["reason"]
     assert sev("Ответ приходит мгновенно.") == "major"
     assert sev("Ответ быстрый, доступность 99,9 %.") == "major"  # размытое слово рядом с числом
-    assert sev("Сообщение отправляется в течение минуты после события.") == "major"
+    # без размытой оценки — снимается: измеримость НФТ код проверяет по nfr_checks
+    assert sev("Сообщение отправляется в течение минуты после события.") == "dropped"
     fn = [{"id": "R-03", "kind": "functional", "line_start": 30, "line_end": 30}]
     assert sev("В сообщении указывается причина", line=30, ids=("R-03",), extra=fn) == "dropped"
     assert sev("Экран удобный и понятный", line=30, ids=("R-03",), extra=fn) == "major"
     goal = run("Снизить число ошибок.", line=5, ids=("R-01",))
     assert goal["candidates"] == [] and "цель продукта" in goal["dropped"][0]["reason"]
-    assert sev("Снизить число ошибок.", line=20, ids=("R-01",)) == "major"  # цитата из НФТ — не только цель
+    assert sev("Снизить число ошибок.", line=20, ids=("R-01",)) == "dropped"
+    assert sev("Ошибок должно быть как можно меньше.", line=20, ids=("R-01",)) == "major"  # размытая оценка
 
 
 def test_vague_words_quotes_not_doubled_in_title():
@@ -329,6 +333,7 @@ def test_test_cases_numbered_capped_and_undefined_marked():
     assert len(tests) == lens_qa.MAX_TEST_CASES and [t["id"] for t in tests[:3]] == ["T-01", "T-02", "T-03"]
     assert list(tests[0])[0] == "id"
     assert tests[1]["then"].startswith("Не определено требованиями") and not tests[1]["expected_defined"]
+    assert tests[1]["then"] == "Не определено требованиями однозначно. По тексту требований: код ответа"
     assert not tests[2]["expected_defined"]
     assert any(f"оставлено {lens_qa.MAX_TEST_CASES}" in w for w in out["warnings"])
 
@@ -557,7 +562,7 @@ def test_nfr_without_share_and_load_is_major_from_code():
     [c] = out["candidates"]
     assert c["origin"] == "nfr_check" and c["severity"] == "major" and c["kind"] == "unverifiable"
     assert c["requirement_ids"] == ["R-05"] and c["evidence"][0]["line"] == 20
-    assert c["title"] == "Норматив «в течение минуты» (строка 20) нельзя проверить: нет доли событий и нагрузки"
+    assert c["title"] == "Норматив «в течение минуты» нельзя проверить: нет доли событий и нагрузки"
     assert "нагрузка" in c["problem"] and c["rewrite"].startswith("Сообщение")
     assert [d["title"] for d in out["dropped"]] == ["НФТ без метрики"], "модельное того же вида — в dropped"
 
@@ -622,3 +627,170 @@ def test_near_amount_conflict_is_rounding_not_conflict():
     assert "меньше 1 %" in c["assumptions"] and "1 000,05" in c["assumptions"]
     out = lens_qa.postprocess({"acceptance_checks": [raw]}, REQS)
     assert not [x for x in out["candidates"] if x.get("origin") == "acceptance_check"]
+
+
+def test_model_candidate_texts_without_internal_codes():
+    """В текстах противоречия модели нет «L040» и ID нарезки: строка документа и собственный номер правила."""
+    raw = {"title": "R-01 и R-02 дают разный итог", "kind": "contradiction", "criterion": "set_consistent",
+           "severity": "major", "requirement_ids": ["R-01", "R-02"],
+           "evidence": [{"quote": "a", "line": 10}, {"quote": "b", "line": 12}], "problem": "По R-01 (L010) — 5.",
+           "scenario": "По П-1 (L010) итог 5, по строке L012 — 6.", "impact": "i", "recommendation": "r",
+           "rewrite": "", "question": "", "blocks": "both"}
+    c = lens_qa.postprocess({"candidates": [raw]}, REQS)["candidates"][0]
+    assert c["title"] == "П-1 и строка 12 дают разный итог"  # без своего номера — строка документа
+    assert c["problem"] == "По П-1 (строка 10) — 5." and "L0" not in c["scenario"]
+    assert "по строке 12" in c["scenario"]
+
+
+def test_stated_part_of_expected_is_match():
+    """Заявленное дословно входит в выведенное (строка проверяет часть результата) — match; после отрицания и
+    короткое заявленное — нет."""
+    w = lens_qa.stated_within_expected
+    assert w("Истёк срок: показано «QR-код недействителен»; код ответа не определён (400 или 410)",
+             "Показано «QR-код недействителен»")
+    assert not w("Push не отправлен, итог 19 900 ₸", "отправлен, итог 19 900 ₸")
+    assert not w("Итог 12", "Итог 12")  # короткое: решает точное совпадение выше
+    assert not w("Январский счётчик вырос на 4 000 ₸", "Февральский счётчик вырос на 4 000 ₸")
+    raw = _check(verdict="undefined", expected_by_rules="Итог 15 ₸ и один push; код ответа не определён",
+                 stated="Итог 15 ₸ и один push")
+    c = lens_qa.normalize_check(raw)
+    assert c["verdict"] == "match" and c["partial_match"]
+
+
+def test_nfr_check_rounding_rule_is_not_performance():
+    """Правило вычисления в разделе НФТ («округляются до тиына») — не норматив времени: доля и нагрузка ему не нужны."""
+    reqs = [{"id": "R-02", "kind": "nonfunctional", "line_start": 20, "line_end": 20}]
+    rnd = {"requirement_id": "R-02", "quote": "Ежедневные проценты округляются до тиына по математическому правилу",
+           "line": 20, "metric": "округление до тиына (0,01 ₸)", "start_end": "", "share": "", "load": "",
+           "vague_words": "", "rewrite": ""}
+    assert not lens_qa.postprocess({"nfr_checks": [rnd]}, reqs)["candidates"]
+    slow = dict(rnd, quote="Сервис передаёт сообщение в течение минуты после события", metric="в течение 1 минуты")
+    c = lens_qa.postprocess({"nfr_checks": [slow]}, reqs)["candidates"]
+    assert len(c) == 1 and c[0]["severity"] == "major"
+    ok = dict(slow, quote="Методы отвечают не дольше 1 с для 95 % запросов", metric="не дольше 1 с", share="95 %")
+    assert not lens_qa.postprocess({"nfr_checks": [ok]}, reqs)["candidates"]
+    vague = dict(rnd, quote="Проценты считаются точно и без ошибок округления", metric="")
+    assert lens_qa.postprocess({"nfr_checks": [vague]}, reqs)["candidates"][0]["severity"] == "major"
+
+
+def test_nfr_conditions_only_for_nonfunctional_and_shared_in_requirement():
+    """Срок у функционального требования — жёсткий предел (проверяем); доля и нагрузка из соседней фразы того же НФТ
+    относятся ко всему требованию; одиночное НФТ без доли и нагрузки — major."""
+    reqs = [{"id": "R-02", "kind": "nonfunctional", "line_start": 20, "line_end": 20},
+            {"id": "R-05", "kind": "functional", "line_start": 28, "line_end": 28}]
+    blk = {"requirement_id": "R-05", "quote": "Блокировка вступает в силу не позднее 10 секунд после ответа 200",
+           "line": 28, "metric": "не позднее 10 секунд", "start_end": "после ответа 200", "share": "", "load": "",
+           "vague_words": "", "rewrite": ""}
+    assert not lens_qa.postprocess({"nfr_checks": [blk]}, reqs)["candidates"]
+    a = dict(blk, requirement_id="R-02", line=20, quote="Метод отвечает не дольше 1 с для 95 % запросов при нагрузке "
+             "до 300 запросов в секунду", metric="не дольше 1 с", share="95 %", load="до 300 запросов в секунду")
+    b = dict(blk, requirement_id="R-02", line=20, quote="Сведения учитывают платежи не позднее чем за 5 минут до запроса",
+             metric="не позднее чем за 5 минут")
+    assert not lens_qa.postprocess({"nfr_checks": [a, b]}, reqs)["candidates"]
+    one = lens_qa.postprocess({"nfr_checks": [b]}, reqs)["candidates"]
+    assert len(one) == 1 and one[0]["severity"] == "major"
+    vague = dict(blk, quote="Блокировка вступает в силу мгновенно", metric="")
+    assert lens_qa.postprocess({"nfr_checks": [vague]}, reqs)["candidates"][0]["severity"] == "major"
+
+
+# ---------------------------------------------------------------- третья волна: новые ТЗ №18, haiku, без кэша
+
+OPEN2 = QA / "open2"
+# строка приёмки, которая противоречит правилу по эталону (К1/К2 кейса); на чистых версиях таких строк нет
+OPEN2_CONFLICT_ROW = {"official": 64, "grace": 63, "qr": 67, "capital": 65, "insurance": 66}
+
+
+def _open2(case: str) -> dict:
+    fx = _json(OPEN2 / f"{case}.haiku-w3.json")
+    data = {"acceptance_checks": [], "nfr_checks": [], "candidates": [], "test_cases": []}
+    for r in fx["responses"]:
+        data["acceptance_checks"] += r.get("acceptance_checks") or []
+        for k in ("nfr_checks", "candidates", "test_cases"):
+            data[k] = data[k] or r.get(k) or []
+    return {"fx": fx, "out": lens_qa.postprocess(data, fx["requirements"])}
+
+
+@pytest.mark.parametrize("case", sorted(OPEN2_CONFLICT_ROW))
+def test_open2_defective_acceptance_conflict_found(case):
+    """Дефектные ТЗ: противоречие строки приёмки из эталона — critical с цитатами правила и строки; один вызов;
+    НФТ с размытыми словами или без условий — одно major; покрытие — одно minor."""
+    r = _open2(case)
+    assert r["fx"]["calls"] == 1
+    out = r["out"]
+    verdicts = {c["row_line"]: c["verdict"] for c in out["acceptance_checks"]}
+    assert verdicts[OPEN2_CONFLICT_ROW[case]] == "conflict"
+    crit = [c for c in out["candidates"] if c["severity"] == "critical"]
+    assert len(crit) == 1 and crit[0]["origin"] == "acceptance_check"
+    assert OPEN2_CONFLICT_ROW[case] in {e["line"] for e in crit[0]["evidence"]}
+    nfr = [c for c in out["candidates"] if c.get("origin") == "nfr_check"]
+    assert len(nfr) == 1 and nfr[0]["severity"] == "major"
+    cover = [c for c in out["candidates"] if c["kind"] == "missing_element" and c["criterion"] == "set_validatable"]
+    assert len(cover) == 1 and cover[0]["severity"] == "minor"
+
+
+@pytest.mark.parametrize("case", ["grace_clean", "qr_clean", "capital_clean", "insurance_clean"])
+def test_open2_clean_no_alarms(case):
+    """Чистые версии: все строки приёмки — match, ни одного critical и major; остаются только minor о покрытии
+    приёмкой и о пустом разделе тестирования (он есть в эталоне чистой версии, М3)."""
+    out = _open2(case)["out"]
+    assert out["acceptance_checks"] and all(c["verdict"] == "match" for c in out["acceptance_checks"])
+    assert all(c["severity"] == "minor" for c in out["candidates"]), [c["title"] for c in out["candidates"]]
+    assert {c["kind"] for c in out["candidates"]} <= {"missing_element", "placeholder"}
+    assert len(out["candidates"]) <= 2
+
+
+def test_status_conflict_on_row_without_code_is_not_conflict():
+    """status_conflict, а строка кода ответа не называет (проверяет показанный текст) — не противоречие строки."""
+    raw = _check(verdict="conflict", conflict_kind="status_conflict", stated="Показано «Код недоступен»",
+                 expected_by_rules="Отказ 410 с message «Отменён»")
+    # «Код» внутри текста сообщения в кавычках — не код ответа
+    assert lens_qa.normalize_check(raw)["verdict"] == "match"
+    assert lens_qa.normalize_check(dict(raw, stated="Код ответа другой"))["verdict"] == "conflict"
+    raw = dict(raw, stated="Показано «QR-код недействителен»")
+    c = lens_qa.normalize_check(raw)
+    assert c["verdict"] == "match" and c["code_not_checked"]
+    assert lens_qa.normalize_check(dict(raw, stated="Ответ 400, показано «Ошибка»"))["verdict"] == "conflict"
+    assert lens_qa.normalize_check(dict(raw, stated="Статус DONE"))["verdict"] == "conflict"
+
+
+def test_model_contradiction_with_nfr_side_is_dropped():
+    """Противоречие модели, одна сторона которого — НФТ (окно отправки, свежесть данных), — в dropped; два функциональных
+    правила — major, как было."""
+    reqs = REQS + [{"id": "R-09", "kind": "nonfunctional", "line_start": 46, "line_end": 46}]
+    base = {"title": "Два исхода", "kind": "contradiction", "criterion": "set_consistent", "severity": "major",
+            "requirement_ids": ["R-01", "R-09"], "evidence": [{"quote": "a", "line": 10}, {"quote": "b", "line": 46}],
+            "problem": "p", "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "", "question": "",
+            "blocks": "both"}
+    out = lens_qa.postprocess({"candidates": [base]}, reqs)
+    assert out["candidates"] == [] and "нефункциональное" in out["dropped"][0]["reason"]
+    two = dict(base, evidence=[{"quote": "a", "line": 10}, {"quote": "b", "line": 12}])
+    assert lens_qa.postprocess({"candidates": [two]}, reqs)["candidates"][0]["severity"] == "major"
+
+
+def test_vague_terms_short_and_rule_agreement():
+    assert lens_qa._vague_terms("мгновенно; Сервис выдерживает высокие нагрузки; в пиковые часы") == [
+        "мгновенно", "высокие нагрузки"]
+    assert lens_qa._vague_terms("быстро, всегда актуальны") == ["быстро", "всегда актуальны"]
+    two = lens_qa.postprocess({"acceptance_checks": [_check(rule_requirement_ids=["R-01", "R-02"])]}, REQS)
+    c = two["candidates"][0]
+    assert "если верны правила" in c["recommendation"], c["recommendation"]
+    one = lens_qa.postprocess({"acceptance_checks": [_check()]}, REQS)["candidates"][0]
+    assert "если верно правило П-1" in one["recommendation"]
+
+
+def test_line_refs_readable():
+    f = lens_qa._line_refs
+    assert f("особое правило L131 задаёт срок") == "особое правило (строка 131) задаёт срок"
+    assert f("По Ф-4 (L040) push") == "По Ф-4 (строка 40) push"
+    assert f("строки L061-L065") == "строки 61–65"
+    assert f("L064 ожидает февраль") == "Строка 64 ожидает февраль"
+
+
+def test_rewrite_is_whole_row_when_row_quote_has_result():
+    """Цитата строки приёмки — вся строка с результатом: «стало» — та же строка с исправленной ячейкой."""
+    raw = _check(row_quote="Значение 10 | Добавить 5 | Итог 15", stated="Итог 15", fix="Итог 12")
+    c = lens_qa.postprocess({"acceptance_checks": [raw]}, REQS)["candidates"][0]
+    assert c["rewrite"] == "Значение 10 | Добавить 5 | Итог 12" and c["rewrite_line"] == 30
+    assert c["evidence"][-1]["quote"] == "Значение 10 | Добавить 5 | Итог 15"
+    only = lens_qa.postprocess({"acceptance_checks": [_check()]}, REQS)["candidates"][0]
+    assert only["rewrite"] == "Итог 12", "строка без результата в цитате — только новая ячейка"

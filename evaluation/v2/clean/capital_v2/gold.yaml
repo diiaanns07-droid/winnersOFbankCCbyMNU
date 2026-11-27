@@ -1,0 +1,22 @@
+# Эталон набора действительно чистых ТЗ №20 (кейс capital_v2). Собран сборщиком evaluation/v2/clean/build.py —
+# руками не править: правьте source.md и пересоберите. Формат bcc-v2-gold/1 (как чистые версии №18 в open2).
+# Эталон пустой: документ без дефектов, любое замечание агента — ложная тревога.
+schema: bcc-v2-gold/1
+document: evaluation/v2/clean/capital_v2/source.md
+sha256: ff27cc133bdb5209d9392ddc712ba616905206538a3d18c1fcf42f56d590a760
+case: capital_v2
+variant: clean
+title: Проценты по накопительному счёту
+lines: 205
+expected_verdict:
+  development: 'yes'
+  testing: 'yes'
+targets:
+  findings_min: 0
+  findings_max: 1
+  report_lines_max: 900
+  critical_found_min: 0
+  critical_as_critical_min: 0
+  major_found_min: 0
+items: []
+derived_from: evaluation/v2/open2/capital_clean/source.md

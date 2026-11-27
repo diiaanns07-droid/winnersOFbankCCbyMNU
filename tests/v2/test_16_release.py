@@ -253,6 +253,31 @@ def test_constraints_pin_everything_and_agree_with_requirements():
         assert name in locked, name
 
 
+def test_pyproject_extras_agree_with_pinned_versions():
+    """`pip install -e ".[all,dev]"` (так ставят разработчики) не уходит от версий жюри: зафиксированные версии
+    подходят под ограничения extras, а PyMuPDF — ветка 1.x (2.x тянет onnxruntime, ≈ +200 МБ; просьба №03)."""
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
+        pytest.skip("нет tomllib")
+    from packaging.requirements import Requirement
+
+    data = tomllib.loads(_read(ROOT / "pyproject.toml"))
+    locked = _pins(ROOT / "constraints.txt")
+    extras = data["project"].get("optional-dependencies", {})
+    checked = 0
+    for group in ("pdf", "all", "gemini", "anthropic", "docx"):
+        for spec in extras.get(group, []):
+            req = Requirement(spec)
+            name = re.sub(r"[-_.]+", "-", req.name).lower()
+            if name == "pymupdf":
+                assert not req.specifier.contains("2.0") and not req.specifier.contains("2.2"), f"{group}: {spec}"
+            if name in locked:
+                assert req.specifier.contains(locked[name]), f"{group}: {spec} не допускает {name}=={locked[name]}"
+                checked += 1
+    assert checked >= 5
+
+
 def test_cryptography_has_wheels_for_intel_mac():
     """В cryptography 49+ нет колёс для Intel Mac: pip собирал бы её из исходников (нужен Rust) и падал."""
     ver = _pins(ROOT / "constraints.txt").get("cryptography", "")
@@ -272,7 +297,7 @@ def test_docker_and_scripts_install_with_constraints():
 
 
 # Файлы с синтаксисом только для Python 3.12+ (PEP 701) — просьба владельцу в статусе №16; новых быть не должно.
-KNOWN_PY312_ONLY: set[str] = set()  # aggregate.py и newtz.py исправлены №15 (патч 15_py311_fstrings)
+KNOWN_PY312_ONLY: set[str] = {"src/bcc_review/v2/stages/judge.py"}  # №10: патч 10_judge_py311.patch
 
 
 def _py312_only_fstrings(path: Path) -> list[int]:
@@ -294,7 +319,7 @@ def _py312_only_fstrings(path: Path) -> list[int]:
         elif tok.type == tokenize.STRING and stack:
             body = tok.string.lstrip("rRbBuU")
             quote = body[:3] if body[:3] in ('"""', "'''") else body[:1]
-            if quote in stack:
+            if quote in stack or "\\" in tok.string:  # та же кавычка или обратная косая в выражении f-строки
                 lines.append(tok.start[0])
     return lines
 
@@ -323,6 +348,9 @@ def test_code_compiles_on_python_311():
     assert not bad, "\n".join(bad)
 
 
+@pytest.mark.xfail(strict=False, reason="просьба №10 (статус №16, патч 10_judge_py311.patch): stages/judge.py:1072 и "
+                                        ":1489 — обратная косая в выражении f-строки; на Python 3.11 судья падает "
+                                        "SyntaxError, отчёт без судьи")
 def test_known_py312_only_files_are_fixed():
     bad = []
     for rel in sorted(KNOWN_PY312_ONLY):
@@ -381,7 +409,7 @@ def test_dockerfile_runs_the_agent():
     ignore = _read(ROOT / ".dockerignore").splitlines()
     for entry in (".env", ".git/*", ".bcc_cache", "runs"):
         assert entry in ignore, entry
-    allowed = {"!tests/v2/fixtures/official"}  # записанные ответы для --provider mock в контейнере
+    allowed = {"!tests/v2/fixtures/official", "!tests/v2/fixtures/official_pdf"}  # ответы для --provider mock
     assert not any(ln.startswith("!") and ".git/" not in ln and ln not in allowed for ln in ignore), \
         "исключения .dockerignore только для .git и фикстур mock"
     assert "COPY tests/v2/fixtures/official" in text
@@ -553,3 +581,19 @@ def test_output_same_as_input_does_not_overwrite_source(tmp_path):
     src.write_bytes(original)
     _review(tmp_path, str(src), str(src))
     assert src.read_bytes() == original
+
+
+def test_docker_image_has_mock_fixtures_for_every_case_format():
+    """mock выбирает записанные ответы по входу (`pipeline._mock_dir_for`: для PDF — `official_pdf`). Каждая такая
+    папка должна попасть в образ, иначе mock-отчёт в контейнере другой, чем вне его (было: PDF — `official`)."""
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    from bcc_review.v2 import pipeline
+
+    docker = _read(ROOT / "Dockerfile")
+    ignore = _read(ROOT / ".dockerignore").splitlines()
+    for name in ("requirements.md", "requirements.pdf", "requirements.docx"):
+        d = pipeline._mock_dir_for(ROOT / "release" / "input" / name)
+        rel = d.relative_to(ROOT).as_posix()
+        assert f"COPY {rel} ./{rel}" in docker, f"{name}: в Dockerfile нет COPY {rel}"
+        assert f"!{rel}" in ignore, f"{name}: {rel} исключена .dockerignore"

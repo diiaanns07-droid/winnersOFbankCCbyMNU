@@ -167,7 +167,9 @@ def test_no_findings_no_call():
 
 def test_schema_options_bounds():
     item = clarify.SCHEMA["properties"]["questions"]["items"]
-    assert item["properties"]["options"]["minItems"] == 2 and item["properties"]["options"]["maxItems"] == 4
+    # схема шире того, что остаётся в отчёте: лишнее режет код (clean_options — до 4), без повторного вызова
+    assert item["properties"]["options"]["minItems"] == 2 and item["properties"]["options"]["maxItems"] >= 4
+    assert clarify.clean_options([f"Вариант номер {i}" for i in range(1, 7)]) == [f"Вариант номер {i}" for i in range(1, 5)]
     assert set(item["required"]) >= {"finding_ids", "to", "blocking", "question", "evidence", "options", "why"}
 
 
@@ -375,3 +377,77 @@ def test_placeholder_options_softened_only_when_needed():
     # хватает двух конкретных — вариант с заглушкой отбрасывается
     out2 = clarify.clean_options(["Первый вариант", "Второй вариант", "Третий <уточнить: срок>"])
     assert out2 == ["Первый вариант", "Второй вариант"]
+
+
+# --------------------------------------------------------------------------- каждый блокирующий critical — в вопросе
+def _ttl_finding() -> dict:
+    return {"id": "D-02", "severity": "critical", "blocks": "both", "kind": "unit_mismatch",
+            "title": "Единица ttl: минуты в данных и секунды в проверке срока",
+            "evidence": [{"quote": "срок действия ttl в минутах", "line_start": 51, "verified": "exact",
+                          "section": "Часть A › Требования к данным"},
+                         {"quote": "не позже времени создания QR-кода + ttl секунд", "line_start": 124,
+                          "verified": "exact", "section": "Часть B › Логика работы метода"}],
+            "scenario": "QR создан в 10:00 с ttl=15: по минутам действует до 10:15, по секундам — до 10:00:15.",
+            "rewrite": "Проверить, что текущее время не позже времени создания QR-кода + ttl минут."}
+
+
+def test_uncovered_critical_unit_conflict_gets_code_question():
+    """Судья поднял major до critical, а ранний вызов о нём не спросил: вопрос кодом, без нового вызова."""
+    f = _ttl_finding()
+    other = {"id": "D-01", "severity": "critical", "blocks": "both", "kind": "contradiction", "title": "x",
+             "evidence": []}
+    qs = [{"id": "Q-01", "finding_ids": ["D-01"], "blocking": True, "topic": "t", "question": "q",
+           "options": ["a", "b"], "evidence": [], "why": "", "to": "Аналитик"},
+          {"id": "Q-02", "finding_ids": ["D-09"], "blocking": False, "topic": "t2", "question": "q2",
+           "options": ["a", "b"], "evidence": [], "why": "", "to": "Аналитик"}]
+    w: list[str] = []
+    out = clarify.cover_critical(qs, [other, f], w)
+    assert [q["id"] for q in out] == ["Q-01", "Q-02", "Q-03"]
+    code = out[1]
+    assert code["finding_ids"] == ["D-02"] and code["blocking"] and code.get("origin") == "code"
+    # первым — сторона, которую сохраняет готовая формулировка «стало» (она переписывает секунды на минуты)
+    assert code["options"][0].startswith("Верно «срок действия ttl в минутах» (Требования к данным)")
+    assert "«Требования к данным»" in code["question"] and "«Логика работы метода»" in code["question"]
+    assert len(code["evidence"]) == 2 and "10:00:15" in code["why"]
+    assert not re.search(r"\bL\d{3}\b|\b[DR]-\d", code["question"] + " ".join(code["options"]))
+
+
+def test_code_question_only_for_units_and_boundaries():
+    """«Какое место верно» без модели — только когда стороны сами варианты (единицы, границы), не заголовки."""
+    f = _ttl_finding()
+    assert clarify.conflict_question(dict(f, kind="status_conflict")) is None
+    heading = dict(f, evidence=[{"quote": "200. Successful — Created", "line_start": 160, "verified": "exact",
+                                 "section": "Часть B › 200. Successful — Created"}, f["evidence"][1]])
+    assert clarify.conflict_question(heading) is None
+    w: list[str] = []
+    q = clarify.cover_critical([], [dict(f, kind="missing_element")], w)
+    assert q == [] and any("остался без вопроса" in x for x in w)
+
+
+def test_early_call_gets_room_for_judge_upgrades():
+    """Ранний вызов видит серьёзность линз: ему — запас до 10 вопросов, кап 8 — по итоговой серьёзности судьи."""
+    assert "до 10 вопросов" in clarify.EARLY_NOTE
+    from bcc_review.v2 import prompts
+    _, task = prompts.task("clarify", findings="—")
+    assert "до 10, если в конце блока <дефекты>" in task
+
+
+def test_keep_as_is_inside_a_decision_is_not_banned():
+    """«Пример оставить как есть» внутри решения — часть правки; запрещён только вариант «оставить как есть».
+    На официальном (haiku, P3) так пропадал вопрос по критичному противоречию: вариантов оставалось меньше двух."""
+    real = "По дате проведения покупки в часовом поясе Алматы; правило переписать под дату проведения, пример оставить как есть"
+    assert clarify.clean_options(["По дате совершения покупки; пример переписать", real]) == \
+        ["По дате совершения покупки; пример переписать", real]
+    for bad in ("Оставить как есть", "Оставить всё без изменений", "Ничего не менять, оставить как есть",
+                "Документ оставить как есть", "На усмотрение разработчика", "Решить позже"):
+        assert clarify.banned_option(bad), bad
+
+
+def test_self_correction_tail_is_cut_from_option():
+    """Обрывок самопроверки модели («... no») в конце варианта владельцу не показываем."""
+    out = clarify.clean_options(['Чужая карта даёт HTTP 403 с телом {"message":"Доступ запрещён"}... no',
+                                 "Чужая и отсутствующая карта дают 404", "Сумма до 1 000 ₸… wait"])
+    assert out == ['Чужая карта даёт HTTP 403 с телом {"message":"Доступ запрещён"}',
+                   "Чужая и отсутствующая карта дают 404", "Сумма до 1 000 ₸"]
+    # русское «нет» после многоточия — часть правила, не хвост
+    assert clarify.clean_options(["Ответ 410 … нет ответа 400", "Ответ 400"]) == ["Ответ 410 … нет ответа 400", "Ответ 400"]

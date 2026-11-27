@@ -21,7 +21,7 @@
 
 ## Быстрый старт
 
-Нужны [Python 3.11, 3.12 или 3.13](https://www.python.org/downloads/) и [Git](https://git-scm.com/downloads).
+Нужны [Python 3.11–3.14](https://www.python.org/downloads/) и [Git](https://git-scm.com/downloads).
 
 ### Шаг 1. Скачать и установить
 
@@ -46,7 +46,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt -e .
 ```
 
-Другая версия Python — укажите её (`py -3.13`, `python3.11`). Нет команды `py` — пишите `python`. На Ubuntu для
+Другая версия Python — укажите её (`py -3.13`, `py -3.14`, `python3.11`). Нет команды `py` — пишите `python`. На Ubuntu для
 venv нужен пакет `python3.12-venv`. Дальше все команды — в активированном окружении (в начале строки `(.venv)`).
 
 ### Шаг 2. Ключ Gemini (бесплатно, без карты)

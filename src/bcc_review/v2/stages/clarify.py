@@ -79,22 +79,37 @@ def is_formatting(f: dict) -> bool:
 
 # Варианты, которые не являются решением: их программа выбрасывает.
 _BANNED_OPTION = re.compile(
-    r"остав\w*\s+(как\s+есть|без\s+изменени)|на\s+усмотрени|как\s+сочт|по\s+ситуации|решить\s+позже|"
+    r"на\s+усмотрени|как\s+сочт|по\s+ситуации|решить\s+позже|"
     r"реши\w*\s+(позже|потом)|отлож\w*\s+решени|^друго[ей]\b|^иное\b|^прочее\b|не\s+знаю",
     re.I,
 )
+# «Оставить как есть» — не решение, только если это и есть весь вариант. Внутри решения это часть правки:
+# «правило Ф-2 переписать под дату проведения, пример оставить как есть» (на официальном haiku терял так
+# вопрос по критичному противоречию — вариантов оставалось меньше двух).
+_KEEP_AS_IS = re.compile(r"^\W*(?:(?:\w+\W+){0,2}?остав\w*\s+(?:вс[её]\s+)?(?:как\s+есть|без\s+изменени)|"
+                         r"ничего\s+не\s+(?:менять|меняем|изменять))", re.I)
+
+
+def banned_option(text: str) -> bool:
+    return bool(_BANNED_OPTION.search(text) or _KEEP_AS_IS.search(text))
+# обрывок самопроверки модели в конце варианта: «…{"message":"Требуется вход"}... no» (haiku, официальный)
+_SELF_FIX_TAIL = re.compile(r"\s*(?:\.{2,}|…)\s*(?:no|wait|hmm|actually|oops|sorry)\b[^.;]*$", re.I)
 _LEADING_LABEL = re.compile(r"^\s*(?:[A-DА-Г]|[1-4])\s*[).:\-—–]\s+", re.I)
 
 
 def _evidence_schema() -> dict:
-    return {"type": "array", "minItems": 1, "maxItems": 3, "items": {
+    # цитаты сверяет код: без цитаты модели берутся сверенные цитаты дефекта, лишние отрезаются до 3. Строгие
+    # границы в схеме стоили лишнего вызова «починки» (+16 с) из-за 0 или 4 цитат (просьба №02).
+    return {"type": "array", "maxItems": 6, "items": {
         "type": "object", "additionalProperties": False, "required": ["quote", "line"],
         "properties": {"quote": {"type": "string"}, "line": {"type": "integer"}}}}
 
 
 SCHEMA: dict = {
     "type": "object", "additionalProperties": False, "required": ["questions"],
-    "properties": {"questions": {"type": "array", "maxItems": 10, "items": {
+    # вопросов код оставляет не больше question_cap (8 / 5), вариантов — не больше 4 (clean_options): схема
+    # шире, чтобы 11 вопросов или 5 вариантов не стоили модели повторного ответа
+    "properties": {"questions": {"type": "array", "maxItems": 16, "items": {
         "type": "object", "additionalProperties": False,
         "required": ["topic", "finding_ids", "to", "blocking", "question", "evidence", "options", "why"],
         "properties": {
@@ -104,7 +119,7 @@ SCHEMA: dict = {
             "blocking": {"type": "boolean"},
             "question": {"type": "string"},
             "evidence": _evidence_schema(),
-            "options": {"type": "array", "minItems": 2, "maxItems": 4, "items": {"type": "string"}},
+            "options": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"type": "string"}},
             "why": {"type": "string"},
         }}}},
 }
@@ -293,12 +308,12 @@ def clean_options(options: Iterable[str]) -> list[str]:
         out: list[str] = []
         seen: set[str] = set()
         for opt in options or []:
-            text = _LEADING_LABEL.sub("", str(opt or "")).strip().rstrip(";")
+            text = _SELF_FIX_TAIL.sub("", _LEADING_LABEL.sub("", str(opt or ""))).strip().rstrip(";")
             if "<уточнить" in text.lower():
                 if not soft:
                     continue
                 text = soften_placeholder(text)
-            if len(text) < 3 or _BANNED_OPTION.search(text):
+            if len(text) < 3 or banned_option(text):
                 continue
             key = _norm(text)
             if key in seen:
@@ -402,6 +417,107 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
     return kept
 
 
+# --------------------------------------------------------------------------- каждый critical — в вопросе
+def _place(e: dict) -> str:
+    """Место цитаты для владельца: последний уровень раздела («Требования к данным»), иначе строка/страница."""
+    sec = str(e.get("section") or "").split("›")[-1].strip()
+    if sec:
+        return sec
+    if e.get("page"):
+        return f"с. {e['page']}"
+    return f"стр. {int(e.get('line_start') or 0)}" if e.get("line_start") else "документ"
+
+
+def _sentences(text: str, limit: int = 320) -> str:
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(t) <= limit:
+        return t
+    cut = t[:limit]
+    dot = max(cut.rfind(". "), cut.rfind("; "))
+    return (cut[:dot + 1] if dot > limit // 3 else cut.rstrip() + "…").strip()
+
+
+def _tok(s: str) -> set[str]:
+    return {w[:5] for w in re.findall(r"[\wа-яё]{3,}", _norm(s))}
+
+
+# Вопрос «какое из двух мест верно» без модели — только там, где стороны сами являются вариантами ответа:
+# разные единицы одной величины и разные границы одного диапазона. У прочих противоречий цитаты — места
+# расхождения, а не готовые правила (на официальном: заголовок «200. Successful — Created» против строки 400).
+CODE_QUESTION_KINDS = {"unit_mismatch", "boundary_conflict"}
+
+
+def conflict_question(f: dict, keep: set[str] | frozenset = frozenset()) -> dict | None:
+    """Вопрос кодом по critical-противоречию, которое модель не спросила: «какое из двух мест верно».
+
+    Только для разных единиц и границ с двумя различными сверенными цитатами: стороны — готовые проверяемые
+    варианты (в цитатах числа и единицы). Первым — сторона, которую судья предлагает сохранить: готовая
+    формулировка «стало» переписывает другую сторону (с ней у неё больше общих слов); без неё — первая
+    цитата (обычно основное правило)."""
+    if f.get("kind") not in CODE_QUESTION_KINDS:
+        return None
+    sides: list[dict] = []
+    for e in f.get("evidence") or []:
+        quote = str(e.get("quote") or "").strip()
+        if not quote or e.get("verified", "exact") == "missing" or _norm(quote) == _norm(_place(e)):
+            continue  # заголовок раздела — не сторона противоречия
+        if is_new_side(e, sides):
+            sides.append(dict(e))
+    if len(sides) < 2:
+        return None
+    a, b = sides[0], sides[1]
+    target = _tok(str(f.get("rewrite") or ""))
+    if target:  # «стало» — новая редакция одной из сторон: первой ставим другую, сохраняемую сторону
+        ta, tb = _tok(a["quote"]), _tok(b["quote"])
+        if len(ta & target) > len(tb & target):
+            a, b = b, a
+    qa, qb = _sentences(a["quote"], 140), _sentences(b["quote"], 140)
+    pa, pb = _place(a), _place(b)
+    where_a = f"в разделе «{pa}»" if pa != pb else "в одном месте"
+    where_b = f"в разделе «{pb}»" if pa != pb else "в другом"
+    question = f"Два места документа расходятся: {where_a} — «{qa}», а {where_b} — «{qb}». Какое из них верно?"
+    options = [f"Верно «{qa}» ({pa}); место «{qb}» приводится к нему",
+               f"Верно «{qb}» ({pb}); место «{qa}» приводится к нему"]
+    why = _sentences(plain_text(str(f.get("scenario") or f.get("problem") or ""), keep), 320)
+    role = "Архитектор" if f.get("kind") == "api_contract" else "Аналитик"
+    return {"id": "", "topic": plain_text(str(f.get("title") or ""), keep)[:80], "finding_ids": [f["id"]],
+            "to": role, "blocking": True, "question": question, "evidence": [a, b], "options": options,
+            "why": why, "origin": "code"}
+
+
+def cover_critical(questions: list[dict], findings: list[dict], warnings: list[str] | None = None,
+                   keep: set[str] | frozenset = frozenset()) -> list[dict]:
+    """Каждый блокирующий critical — в каком-нибудь вопросе: без ответа на него вердикт «нельзя» не снять.
+
+    Ранний вызов спрашивает по кандидатам линз, а судья может поднять major до critical (на `qr` haiku:
+    единица ttl, 6 ревьюеров) — такой дефект оставался без вопроса. Разные единицы или границы с двумя
+    цитатами получают вопрос кодом, без нового вызова модели; остальные — предупреждение. Затем кап и
+    номера Q-01…"""
+    warnings = warnings if warnings is not None else []
+    covered = {fid for q in questions for fid in q.get("finding_ids") or []}
+    added: list[dict] = []
+    for f in findings:
+        if f.get("severity") != "critical" or f.get("blocks", "both") == "none" or not f.get("id") \
+                or f["id"] in covered:
+            continue
+        q = conflict_question(f, keep)
+        if q is None:
+            warnings.append(f"clarify: критичный дефект {f['id']} остался без вопроса")
+            continue
+        added.append(q)
+        covered.add(f["id"])
+    if not added:
+        return questions
+    out = [q for q in questions if q.get("blocking")] + added + [q for q in questions if not q.get("blocking")]
+    cap = question_cap(findings)
+    if len(out) > cap:
+        warnings.append(f"clarify: оставлено {cap} вопросов из {len(out)}")
+        out = out[:cap]
+    for n, q in enumerate(out, 1):
+        q["id"] = f"Q-{n:02d}"
+    return out
+
+
 def option_label(index: int) -> str:
     return OPTION_LETTERS[index] if 0 <= index < len(OPTION_LETTERS) else str(index + 1)
 
@@ -438,6 +554,7 @@ def run(ctx: Any, findings: list[dict]) -> dict:
         _warn(ctx, f"clarify: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); вопросы не сформированы")
         return {"questions": [], "status": "failed"}
     questions = postprocess(raw or {}, findings, ctx.view, warnings)
+    questions = cover_critical(questions, findings, warnings, doc_codes(ctx.view))
     for w in warnings:
         _warn(ctx, w)
     return {"questions": questions}
@@ -492,12 +609,20 @@ def format_candidates(groups: list[list[dict]]) -> str:
     return "\n".join(rows)
 
 
+# Ранний вызов видит серьёзность линз, а не судьи: судья поднимает major, найденный многими ревьюерами,
+# до critical (на `qr` haiku — единица ttl, 6 ревьюеров, вопроса по нему не было). Поэтому раннему вызову —
+# запас в два вопроса; лишние `finish` отбрасывает по итоговой серьёзности (кап 8 / 5).
+EARLY_NOTE = ("Это кандидаты до решения ведущего ревьюера: итоговую серьёзность программа узнает позже и сама "
+              "оставит главные вопросы. Поэтому можно до 10 вопросов: кроме critical, спроси и о major-кандидатах "
+              "с тремя и более ревьюерами, если их исправление требует выбора людей.")
+
+
 def ask_candidates(ctx: Any, candidates: list[dict]) -> dict | None:
     """Ранний вызов: вопросы по сверенным кандидатам, пока судья ещё работает. ``None`` — спрашивать не о чем."""
     groups = select_candidates(candidates)
     if not groups:
         return None
-    return _ask_questions(ctx, [c for g in groups for c in g], format_candidates(groups))
+    return _ask_questions(ctx, [c for g in groups for c in g], format_candidates(groups) + "\n\n" + EARLY_NOTE)
 
 
 def remap(raw: dict, findings: list[dict]) -> dict:
@@ -566,6 +691,7 @@ def finish(ctx: Any, findings: list[dict], early: "Early | dict | None" = None) 
     if not questions or (crit and not any(c in covered for c in crit)):
         _warn(ctx, "clarify: вопросы раннего вызова не легли на итоговые дефекты — повторный вызов по ним")
         return run(ctx, findings)
+    questions = cover_critical(questions, findings, warnings, doc_codes(ctx.view))
     for w in warnings:
         _warn(ctx, w)
     return {"questions": questions}

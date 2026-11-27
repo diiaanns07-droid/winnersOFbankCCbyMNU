@@ -123,7 +123,7 @@ def _resp(decisions, candidates=()):
 CAND = {"title": "Ответ противоречит примеру ответа API", "kind": "contradiction", "criterion": "set_consistent",
         "severity": "major", "requirement_ids": ["R-41"],
         "evidence": [{"quote": '{"result":"ERROR","message":"Проверьте сумму"}', "line": 171}],
-        "problem": "По ответу Q-04 ошибка суммы — 400, а пример 200 содержит ERROR.", "scenario": "amount=500",
+        "problem": "По ответу Q-01 ошибка суммы — 400, а пример 200 содержит ERROR.", "scenario": "amount=500",
         "impact": "Тест", "recommendation": "Убрать пример", "rewrite": "", "question": "", "blocks": "testing"}
 FAKE = dict(CAND, title="Выдуманная цитата", evidence=[{"quote": "нет такой строки в документе", "line": 3}])
 
@@ -297,7 +297,9 @@ def test_conflicting_answers_keep_defect_open(findings, questions, stub_judge):
     clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), report, answers)["clarification"]
     ch = next(c for c in clar["changes"] if c["finding_id"] == fid)
     assert ch["status"] == "open" and "противоречат" in ch["reason"]
-    assert clar["answer_conflicts"] == [{"finding_id": fid, "answers": [q1["id"], "Решение-1"], "reason": ch["reason"]}]
+    assert [{k: v for k, v in c.items() if k != "texts"} for c in clar["answer_conflicts"]] == \
+        [{"finding_id": fid, "answers": [q1["id"], "Решение-1"], "reason": ch["reason"]}]
+    assert clar["answer_conflicts"][0]["texts"]["Решение-1"] == "Противоположное правило."
     assert "противоречат друг другу" in recheck.render_markdown(clar)
 
 
@@ -350,7 +352,8 @@ def test_others_only_closures_count(findings, questions):
                   {"finding_id": third["id"], "status": "open", "reason": "не касается"},
                   {"finding_id": minor["id"], "status": "resolved", "by": ["Решение-1"], "reason": "minor"}])
     llm = FakeLLM(resp)
-    res = recheck.run(FakeCtx(llm), findings, f"{q1['id']}: A\n\n## Решения\n- Правило.\n", questions)
+    # решение говорит о том же, что дефект (общие слова), — иначе чужой дефект им не снимается
+    res = recheck.run(FakeCtx(llm), findings, f"{q1['id']}: A\n\n## Решения\n- {other['title']}: правило.\n", questions)
     rc = {g["id"]: g["recheck"] for g in res["findings"]}
     assert rc[other["id"]]["status"] == "resolved" and rc[other["id"]]["affected"]
     assert not rc[third["id"]]["affected"]  # «open» по дефекту вне вопросов не превращает его в затронутый
@@ -361,7 +364,7 @@ def test_others_only_closures_count(findings, questions):
 def test_decisions_only_make_one_call(findings, questions):
     target = next(f for f in findings if f["severity"] == "major")
     llm = FakeLLM(_resp([{"finding_id": target["id"], "status": "resolved", "by": ["Решение-1"], "reason": "ok"}]))
-    res = recheck.run(FakeCtx(llm), findings, "## Решения\n- Общее правило для всех.\n", questions)
+    res = recheck.run(FakeCtx(llm), findings, f"## Решения\n- {target['title']}: общее правило.\n", questions)
     assert len(llm.calls) == 1
     assert {g["id"]: g["recheck"] for g in res["findings"]}[target["id"]]["status"] == "resolved"
 
@@ -404,3 +407,67 @@ def test_answer_clash_from_reason_only(findings, questions, stub_judge):
     resp2 = _resp([{"finding_id": fid, "status": "open", "by": [], "reason": f"{q1['id']} противоречит пункту документа."}])
     clar2 = recheck.apply_answers(FakeCtx(FakeLLM(resp2)), report, f"{q1['id']}: A\n")["clarification"]
     assert clar2["answer_conflicts"] == []
+
+
+def test_new_conflict_must_name_an_answer(findings, questions):
+    """Новый конфликт от ответа — ответ против места документа: без названного ответа он не проверяем."""
+    q1 = questions[0]
+    anon = dict(CAND, title="Пример успешного ответа не совпадает с описанием полей", scenario="amount=500",
+                problem="Пример расходится с таблицей полей.",
+                evidence=[{"quote": '{"result":"OK","amount":"50000","enabled":"1"}', "line": 167}])
+    res = recheck.run(FakeCtx(FakeLLM(_resp([], [anon, CAND]))), findings, f"{q1['id']}: A\n", questions)
+    assert [c["title"] for c in res["new_candidates"]] == [CAND["title"]]
+    assert any(r["reason"] == "не назван ответ, с которым расходится документ" for r in res["rejected"])
+    assert res["new_candidates"][0]["answer_refs"][0]["id"] == q1["id"]
+    assert res["new_candidates"][0]["answer_refs"][0]["text"] == q1["options"][0]
+
+
+def test_judge_sees_owner_answer_of_new_conflict(findings, questions, monkeypatch):
+    """Судья новых конфликтов видит текст ответа (вторую сторону), а дефект — какой ответ его породил."""
+    from bcc_review.v2.stages import judge
+    seen: list[dict] = []
+
+    def spy(ctx, candidates):
+        seen.extend(candidates)
+        return _stub_judge(ctx, candidates)
+    monkeypatch.setattr(judge, "run", spy)
+    q1 = questions[0]
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{q1['id']}: A")
+    assert seen and seen[0]["problem"].startswith("Решение владельца, которое будет вписано в документ:")
+    assert q1["options"][0][:40] in seen[0]["problem"]
+    new = [f for f in out["findings_after"] if f.get("status_after_answers") == "new"]
+    assert new and new[0]["answer_ids"] == [q1["id"]]
+    assert not new[0]["problem"].startswith("Решение владельца")  # служебная подсказка судье не идёт в отчёт
+
+
+def test_judge_tail_about_missing_quote_is_dropped(findings, questions, monkeypatch):
+    from bcc_review.v2.stages import judge
+
+    def tail(ctx, candidates):
+        res = _stub_judge(ctx, candidates)
+        res["findings"][0]["problem"] = ("После ответа Q-01: стр. 180 даёт тело 400 без поля result, а стр. 155 его "
+                                         "требует. Ссылка на «» в кандидате в документе не найдена, поэтому опора "
+                                         "только на стр. 155.")
+        return res
+    monkeypatch.setattr(judge, "run", tail)
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{questions[0]['id']}: A")
+    new = [f for f in out["findings_after"] if f.get("status_after_answers") == "new"][0]
+    assert new["problem"] == "После ответа Q-01: стр. 180 даёт тело 400 без поля result, а стр. 155 его требует."
+
+
+def test_judge_rewrite_into_old_defect_is_rejected(findings, questions, monkeypatch):
+    """Судья переписал кандидата в прежний дефект (тот же предмет на тех же строках) — это не новый конфликт."""
+    from bcc_review.v2.stages import judge
+    old = next(f for f in findings if len({e["line_start"] for e in f["evidence"]}) >= 2)
+
+    def rewrite(ctx, candidates):
+        res = _stub_judge(ctx, candidates)
+        res["findings"][0].update(title=old["title"], evidence=[dict(e) for e in old["evidence"]])
+        return res
+    monkeypatch.setattr(judge, "run", rewrite)
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{questions[0]['id']}: A")
+    assert out["clarification"]["new_findings"] == []
+    assert any(r["reason"] == f"повторяет дефект {old['id']}" for r in out["rejected_after"])
