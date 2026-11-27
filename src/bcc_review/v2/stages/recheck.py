@@ -154,7 +154,10 @@ def _parse_value(value: str) -> dict:
     if m:
         letter = m.group(1).upper()
         rest = (m.group(2) or m.group(3) or "").strip()
-        return {"choice": _LETTER.get(letter), "text": "", "comment": rest}
+        out = {"choice": _LETTER.get(letter), "text": "", "comment": rest}
+        if letter == "В":  # кириллическая «В»: похожа на латинскую B, но в алфавите А-Б-В это третий вариант
+            out["ambiguous_letter"] = True
+        return out
     return {"choice": None, "text": value, "comment": ""}
 
 
@@ -409,6 +412,9 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 continue
             text = opts[a["choice"]]
             label = _cl.option_label(a["choice"])
+            if a.get("ambiguous_letter") and len(opts) >= 3:
+                warnings.append(f"recheck: {q['id']}: кириллическая «В» понята как вариант B («{text[:60]}»); "
+                                f"если имелся в виду третий вариант (А, Б, В), укажите C")
         else:
             text, deferred = split_deferred(a.get("text", ""))
             label = ""

@@ -339,3 +339,13 @@ def test_revise_crash_keeps_recheck(monkeypatch):
     resp = _resp([{"finding_id": "D-01", "conflicting_answers": ["Q-01"], "reason": "ответы расходятся"}])
     out = revise.run_modes(FakeCtx(FakeLLM(resp)), _report(), answers=TWO, do_revise=True)
     assert out["clarification"]["answer_conflicts"] and out["revise_stats"]["status"] == "failed"
+
+
+def test_cyrillic_v_is_b_with_warning():
+    qs = [dict(QS[0], options=["422", "403", "409"])]
+    w: list[str] = []
+    a = recheck.resolve_answers(qs, recheck.load_answers("Q-01: В\n"), w)["answered"][0]
+    assert a["choice"] == "B" and any("кириллическая «В»" in x for x in w)
+    w2: list[str] = []
+    recheck.resolve_answers(qs, recheck.load_answers("Q-01: Б\n"), w2)
+    assert not any("кириллическая" in x for x in w2)
