@@ -313,10 +313,12 @@ def test_term_in_other_case_is_found_and_quoted_as_in_document():
     assert out["candidates"][0]["evidence"][1]["quote"] == "держатель счёта"
 
 
-def test_conflict_with_goal_or_nonfunctional_is_major():
+def test_event_pair_with_goal_or_nonfunctional_gives_no_candidate_value_pair_is_major():
     p = pair(a="R-01", quote_a="клиент видит доход по вкладу сразу после пополнения", line_a=2,
              b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7)
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"] and out["candidates"] == []  # цель ↔ требования — п. 1 шага 5, не пара
+    out = C.postprocess(answer(pair_checks=[dict(p, kind="boundary_conflict", basis="value_mismatch")]), VIEW, REQS)
     assert out["candidates"][0]["severity"] == "major"
 
 
@@ -528,3 +530,10 @@ def test_status_conflict_about_meaning_of_one_code_is_major():
     sev = {tuple(sorted(c["requirement_ids"])): c["severity"] for c in out["candidates"]}
     assert sev[("R-01", "R-02")] == "major"
     assert sev[("R-03", "R-04")] == "critical"
+
+
+def test_conflict_between_two_schemas_is_major():
+    reqs = [dict(r) for r in REQS]
+    reqs[1]["kind"], reqs[2]["kind"] = "architecture", "process"
+    out = C.postprocess(answer(pair_checks=[pair()]), VIEW, reqs)
+    assert out["candidates"][0]["severity"] == "major"

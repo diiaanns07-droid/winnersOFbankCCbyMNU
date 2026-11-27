@@ -278,6 +278,10 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     # Разные предметы не сравниваются: конфликта между ними быть не может.
     if not pair["same_subject"]:
         pair["verdict"] = "compatible"
+    # Цель и НФТ о сроке не задают поведение в событии (контрпример 2 промпта) — пара о событии с ними совместима.
+    side_kinds = [(known or {}).get(x, {}).get("kind") for x in (pair["a"], pair["b"])]
+    if any(k in SOFT_KINDS for k in side_kinds) and pair["kind"] not in ("unit_mismatch", "boundary_conflict"):
+        pair["verdict"], pair["basis"] = "compatible", "none"
     # Конфликт без названного основания (модель сама не нашла ни одного из трёх) — неопределённость.
     if pair["verdict"] == "conflict" and pair["basis"] == "none":
         pair["verdict"] = "undefined"
@@ -314,6 +318,7 @@ def _removes_limit(qa: str, qb: str) -> bool:
 # Виды требований, конфликт с которыми не блокирует сам по себе: цель — намерение, а не правило;
 # нефункциональное требование о сроке редко противоречит правилу поведения напрямую.
 SOFT_KINDS = ("goal", "nonfunctional")
+SCHEMA_KINDS = ("architecture", "process")
 MAJOR_CONFLICT_KINDS = ("unit_mismatch",)
 
 
@@ -327,10 +332,18 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         return None  # ни одной найденной цитаты: судье нечего показать
     two_places = _found(ev_a) and _found(ev_b) and not _overlap(ev_a, ev_b)
     kind = pair["kind"]
+    # Цель и НФТ о сроке не задают поведение в событии: «пополнение за 5 минут ↔ после отключения не пополнять»
+    # — не два исхода. Цель ↔ требования проверяет п. 1 шага 5; пара с ними — только о значении или единице.
+    side_kinds = [(known or {}).get(x, {}).get("kind") for x in (pair["a"], pair["b"])]
+    if any(k in SOFT_KINDS for k in side_kinds) and kind not in ("unit_mismatch", "boundary_conflict"):
+        return None
     if pair["verdict"] == "conflict":
         if kind not in PAIR_CONFLICT_KINDS:
             kind = "event_conflict"
-        soft = any((known or {}).get(x, {}).get("kind") in SOFT_KINDS for x in (pair["a"], pair["b"]))
+        kinds = [(known or {}).get(x, {}).get("kind") for x in (pair["a"], pair["b"])]
+        # Цель и НФТ — не правило поведения; две схемы (архитектура ↔ процесс/последовательность) расходятся
+        # в связях — это согласованность схем, существенный дефект, а не «один вход — два исхода».
+        soft = any(k in SOFT_KINDS for k in kinds) or all(k in SCHEMA_KINDS for k in kinds)
         # Разные единицы одной величины обычно снимаются правилом пересчёта — major; судья может поднять.
         severity = "critical" if two_places and not soft and kind not in MAJOR_CONFLICT_KINDS else "major"
         # «Один вход — два кода»: если цитаты не называют двух разных кодов (обе о коде 200, одна шире другой),
@@ -371,6 +384,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         "problem": problem, "scenario": scenario, "impact": impact, "recommendation": rec,
         "rewrite": "", "question": pair["question"], "blocks": "both",
         "source": SOURCE, "origin": "pair_check", "pair_ids": [pair["id"]] if pair.get("id") else [],
+        "_subject": pair["subject"],
     }
 
 
@@ -512,8 +526,26 @@ def _blocks(c: dict, requirements: list[dict]) -> set:
     return out
 
 
+_STOP = {"между", "против", "значение", "значения", "требование", "требования", "правило", "правила", "пункт",
+          "строка", "строки", "место", "места", "одного", "одной", "одном", "разные", "разный", "разных", "также"}
+
+
+def _subject_stems(s: str) -> set[str]:
+    return {_stem(w) for w in _WORD.findall(s or "") if len(w) >= 4 and w.lower() not in _STOP and not w.isdigit()}
+
+
+def same_subject_text(a: str, b: str) -> bool:
+    """Предметы двух пар об одном: не меньше половины значимых основ короткого предмета есть в другом.
+    Пустой предмет не мешает склейке (старые ответы без предмета)."""
+    sa, sb = _subject_stems(a), _subject_stems(b)
+    if not sa or not sb:
+        return True
+    return len(sa & sb) / min(len(sa), len(sb)) >= 0.5
+
+
 def merge_conflicts(cands: list[dict], requirements: list[dict] | None = None) -> list[dict]:
-    """Конфликты одного вида, у которых общее место (одно правило против нескольких мест), — одно замечание."""
+    """Конфликты одного вида, у которых общее место (одно правило против нескольких мест) и один предмет, —
+    одно замечание. Разные предметы при общей строке (в одном пункте два правила) — разные замечания."""
     out: list[dict] = []
     reqs = requirements or []
     for c in cands:
@@ -521,7 +553,8 @@ def merge_conflicts(cands: list[dict], requirements: list[dict] | None = None) -
         if c["kind"] in CONFLICT_KINDS:
             mine = _blocks(c, reqs)
             for o in out:
-                if o["kind"] == c["kind"] and o["severity"] == c["severity"] and mine & _blocks(o, reqs):
+                if (o["kind"] == c["kind"] and o["severity"] == c["severity"] and mine & _blocks(o, reqs)
+                        and same_subject_text(o.get("_subject", ""), c.get("_subject", ""))):
                     host = o
                     break
         if host is None:
@@ -690,6 +723,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
                 continue
         pair_cands.append(c)
     pair_cands = merge_conflicts(pair_cands, requirements)
+    for c in pair_cands:
+        c.pop("_subject", None)
     candidates.extend(pair_cands)
 
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]
