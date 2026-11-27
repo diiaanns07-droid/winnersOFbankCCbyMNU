@@ -1,0 +1,908 @@
+[
+ {
+  "findings": [
+   {
+    "key": "F01",
+    "candidate_ids": [
+     "C-003",
+     "C-022",
+     "C-038"
+    ],
+    "base": "C-003",
+    "title": "Не определено, какое событие процессинга считается проведением покупки",
+    "kind": "ambiguity",
+    "criterion": "unambiguous",
+    "requirement_ids": [
+     "R-01",
+     "R-06",
+     "R-09",
+     "R-10"
+    ],
+    "problem": "Цель обещает уведомление «в момент покупки» (L023), а расходы и событие — «проведена покупка» (L038, L043); авторизация и клиринг — разные этапы, документ этап не называет. «В течение минуты после события» (L046) отсчёт тоже не задаёт.",
+    "scenario": "Покупка 4 000 ₸ авторизована 31 января 23:58, клиринг 2 февраля. По авторизации расход в январе и push сразу; по клирингу — февраль и push через дни.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "critical",
+    "blocks": "both",
+    "priority": 1
+   },
+   {
+    "key": "F02",
+    "candidate_ids": [
+     "C-001",
+     "C-005",
+     "C-033"
+    ],
+    "base": "C-001",
+    "title": "Критерий приёмки №2 противоречит правилу Ф-2 о месяце",
+    "kind": "event_conflict",
+    "criterion": "set_consistent",
+    "requirement_ids": [
+     "R-06",
+     "R-14"
+    ],
+    "problem": "Ф-2 (L038) относит покупку к месяцу совершения, а критерий приёмки (L064) для покупки 31 января относит её к февралю по дате проведения.",
+    "scenario": "Покупка 31 января 23:58 на 4 000 ₸, проведена 1 февраля 00:03 по Алматы. По Ф-2 растёт январь, по критерию приёмки — февраль; тест упадёт на корректной реализации.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "critical",
+    "blocks": "both",
+    "priority": 2
+   },
+   {
+    "key": "F03",
+    "candidate_ids": [
+     "C-002",
+     "C-007",
+     "C-030"
+    ],
+    "base": "C-002",
+    "title": "Ф-3 и Ф-4 по-разному решают число push в месяц",
+    "kind": "contradiction",
+    "criterion": "set_consistent",
+    "requirement_ids": [
+     "R-07",
+     "R-08"
+    ],
+    "problem": "Ф-3 (L039) разрешает максимум один push в месяц на карту, Ф-4 (L040) требует push при следующем достижении нового порога независимо от истории.",
+    "scenario": "Порог 50 000 ₸ достигнут, push ушёл. Клиент поднял порог до 60 000 ₸, расходы дошли до 60 000 ₸ в том же месяце: по Ф-3 push нет, по Ф-4 push есть.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "critical",
+    "blocks": "both",
+    "priority": 3
+   },
+   {
+    "key": "F04",
+    "candidate_ids": [
+     "C-012",
+     "C-037",
+     "C-042"
+    ],
+    "base": "C-012",
+    "title": "Чтение порога и суммы обещано, но метода чтения нет",
+    "kind": "missing_element",
+    "criterion": "set_complete",
+    "requirement_ids": [
+     "R-03",
+     "R-12",
+     "R-16"
+    ],
+    "problem": "L052 и L103 обещают чтение настроек через дочерний документ, но описан только saveLimit; метода, возвращающего порог, переключатель и сумму за месяц (L029), нет.",
+    "scenario": "Клиент открывает экран Расходы → Уведомления: приложению нечем получить текущий порог и сумму за месяц, а saveLimit требует новых значений.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "critical",
+    "blocks": "both",
+    "priority": 4
+   },
+   {
+    "key": "F05",
+    "candidate_ids": [
+     "C-013",
+     "C-032",
+     "C-049"
+    ],
+    "base": "C-013",
+    "title": "Неверная сумма: 200 с ERROR против кода 400",
+    "kind": "status_conflict",
+    "criterion": "set_consistent",
+    "requirement_ids": [
+     "R-21",
+     "R-30",
+     "R-35",
+     "R-36"
+    ],
+    "problem": "Пример под кодом 200 (L171) возвращает result=ERROR для неверной суммы, а L163 задаёт для неверных параметров код 400; при этом L151 считает 200 успехом, а 400 — неуспехом.",
+    "scenario": "amount=500: по L171 приходит 200 с result=ERROR (успех по L151), по L163 — 400 {\"message\":\"Некорректный запрос\"} (неуспех). Клиент может показать «сохранено».",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "critical",
+    "blocks": "both",
+    "priority": 5
+   },
+   {
+    "key": "F06",
+    "candidate_ids": [
+     "C-014",
+     "C-031",
+     "C-046",
+     "C-047",
+     "C-050"
+    ],
+    "base": "C-014",
+    "title": "Перечень кодов ответа противоречив, неполон и открыт",
+    "kind": "status_conflict",
+    "criterion": "set_consistent",
+    "requirement_ids": [
+     "R-30",
+     "R-38",
+     "R-40"
+    ],
+    "problem": "Для чужой карты 403 (L175) и 404 (L189, внутри блока 403); код 404 не в перечне статусов; 201 назван успешным (L151), но описан только 200 «Created» (L165); правило «400, 401 и далее» открыто.",
+    "scenario": "Запрос с cardId чужой карты: по L175 код 403, по L189 код 404; тесты и клиент ждут разные ответы.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "both",
+    "priority": 6
+   },
+   {
+    "key": "F07",
+    "candidate_ids": [
+     "C-015",
+     "C-026",
+     "C-044",
+     "C-056"
+    ],
+    "base": "C-015",
+    "title": "Изменяющий метод saveLimit вызывается через GET с параметрами в URL",
+    "kind": "api_contract",
+    "criterion": "correct",
+    "requirement_ids": [
+     "R-16",
+     "R-26",
+     "R-27",
+     "R-28",
+     "R-29"
+    ],
+    "problem": "saveLimit меняет настройку, но REST type GET (L104), cardId, amount, enabled передаются в строке адреса (L109); также указан Content-Type: application/json при отсутствии тела (L147–L148).",
+    "scenario": "Прокси или предзагрузка повторяют GET с amount=50000&enabled=1 и перезаписывают порог без действия клиента; параметры попадают в журналы.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "development",
+    "priority": 7
+   },
+   {
+    "key": "F08",
+    "candidate_ids": [
+     "C-009",
+     "C-034"
+    ],
+    "base": "C-009",
+    "title": "Ф-1 требует активную карту KZT, метод это не проверяет",
+    "kind": "incomplete",
+    "criterion": "set_complete",
+    "requirement_ids": [
+     "R-05",
+     "R-19"
+    ],
+    "problem": "Ф-1 (L037) разрешает порог только для активной карты KZT, а шаг 3 (L119) проверяет лишь сумму и переключатель; отказ для неподходящей карты не описан.",
+    "scenario": "Закрытая карта в долларах США, amount=50000, enabled=1: по Ф-1 нельзя, по шагам 1–4 сохранение проходит.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "both",
+    "priority": 0
+   },
+   {
+    "key": "F09",
+    "candidate_ids": [
+     "C-025"
+    ],
+    "base": "C-025",
+    "title": "Держатель карты и владелец сессии — разные роли",
+    "kind": "security",
+    "criterion": "risk",
+    "requirement_ids": [
+     "R-05",
+     "R-16",
+     "R-18"
+    ],
+    "problem": "Ф-1 (L037) даёт право держателю карты, метод требует сессию владельца карты (L105) и принадлежность карты клиенту (L118).",
+    "scenario": "Держатель дополнительной карты сохраняет порог: по Ф-1 можно, по методу получит отказ; либо владелец счёта меняет порог чужой дополнительной карты.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "both",
+    "priority": 0
+   },
+   {
+    "key": "F10",
+    "candidate_ids": [
+     "C-023"
+    ],
+    "base": "C-023",
+    "title": "Состав учитываемых операций задан двумя примерами исключений",
+    "kind": "ambiguity",
+    "criterion": "complete",
+    "requirement_ids": [
+     "R-06"
+    ],
+    "problem": "Ф-2 (L038) исключает только переводы и снятие наличных; судьба пополнения кошельков, комиссий, платежей и операций в иной валюте не определена.",
+    "scenario": "Пополнение кошелька на 10 000 ₸ при расходах 45 000 ₸ и пороге 50 000 ₸: по одному толкованию push уйдёт, по другому нет.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "both",
+    "priority": 0
+   },
+   {
+    "key": "F11",
+    "candidate_ids": [
+     "C-020",
+     "C-027"
+    ],
+    "base": "C-020",
+    "title": "Идемпотентность повторной доставки события описана без ключа и итога",
+    "kind": "incomplete",
+    "criterion": "complete",
+    "requirement_ids": [
+     "R-07",
+     "R-11",
+     "R-12"
+    ],
+    "problem": "L052 обещает «исходный итог» при повторе, но не сказано, по какому полю повтор распознаётся и что сохраняется: сумма, push или оба.",
+    "scenario": "Покупка 1 500 ₸ при расходах 48 500 ₸ и пороге 50 000 ₸ пришла дважды: без ключа сумма 51 500 ₸ и повторный push.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "both",
+    "priority": 0
+   },
+   {
+    "key": "F12",
+    "candidate_ids": [
+     "C-018",
+     "C-043"
+    ],
+    "base": "C-018",
+    "title": "Сумма покупки в тиынах, порог в тенге без правила пересчёта",
+    "kind": "unit_mismatch",
+    "criterion": "unambiguous",
+    "requirement_ids": [
+     "R-11",
+     "R-27"
+    ],
+    "problem": "L049 хранит сумму покупки в тиынах, а порог в тенге; Ф-3 сравнивает их, правила пересчёта и округления нет.",
+    "scenario": "Значение 1 000 в тенге сравнивается с накопленными 100 000 в тиынах: без пересчёта сравнение ложно срабатывает или не срабатывает, а при пересчёте неясно, как округлять остаток в тиынах.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "both",
+    "priority": 0
+   },
+   {
+    "key": "F13",
+    "candidate_ids": [
+     "C-055"
+    ],
+    "base": "C-055",
+    "title": "Адрес Prod и Swagger заменены прочерками",
+    "kind": "api_contract",
+    "criterion": "complete",
+    "requirement_ids": [
+     "R-16"
+    ],
+    "problem": "В L108 «Prod: —» и в L110 «Swagger | —»: адрес вызова в промышленной среде и описание контракта не заданы.",
+    "scenario": "Команда разработки или эксплуатации ищет значение (адрес, ссылку, параметр) и не находит его.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "development",
+    "priority": 0
+   },
+   {
+    "key": "F14",
+    "candidate_ids": [
+     "C-016"
+    ],
+    "base": "C-016",
+    "title": "При отклонении суммы прежнее состояние не возвращается в ответе",
+    "kind": "api_contract",
+    "criterion": "complete",
+    "requirement_ids": [
+     "R-21",
+     "R-32",
+     "R-33"
+    ],
+    "problem": "П. 5 логики (L121) требует вернуть прежнее состояние, но amount и enabled возвращаются только при успехе (L156), а пример ERROR содержит лишь result и message.",
+    "scenario": "Порог 50000, запрос amount=500: прежние 50000 и enabled по таблице в ответе не приходят.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "both",
+    "priority": 0
+   },
+   {
+    "key": "F15",
+    "candidate_ids": [
+     "C-017",
+     "C-045"
+    ],
+    "base": "C-017",
+    "title": "Типы amount и enabled в запросе и ответе различаются",
+    "kind": "api_contract",
+    "criterion": "set_consistent",
+    "requirement_ids": [
+     "R-27",
+     "R-28",
+     "R-32",
+     "R-33"
+    ],
+    "problem": "В запросе amount и enabled — integer (L143–L144), в ответе — string (L156–L157, пример «50000»).",
+    "scenario": "Клиент отправляет amount как integer и получает обратно значение типа string; строгий разбор ответа или сравнение отправленного и сохранённого значения не проходит.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "major",
+    "blocks": "development",
+    "priority": 0
+   },
+   {
+    "key": "F16",
+    "candidate_ids": [
+     "C-011",
+     "C-041",
+     "C-051",
+     "C-052",
+     "C-053",
+     "C-054"
+    ],
+    "base": "C-011",
+    "title": "Разделы шаблона не заполнены: версия, чек-лист, согласующие, тесты",
+    "kind": "placeholder",
+    "criterion": "conforming",
+    "requirement_ids": [
+     "R-05"
+    ],
+    "problem": "Версия и дата не заполнены (L068), источник задачи отсутствует (L020), чек-лист без отметок (L072), блок согласующих пуст (L089), раздел тестирования — заглушка (L057).",
+    "scenario": "Тестировщик или разработчик открывает раздел и видит только заглушку.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F17",
+    "candidate_ids": [
+     "C-021",
+     "C-035",
+     "C-036"
+    ],
+    "base": "C-021",
+    "title": "Одни и те же понятия названы разными терминами",
+    "kind": "terminology",
+    "criterion": "set_comprehensible",
+    "requirement_ids": [
+     "R-02",
+     "R-09",
+     "R-25",
+     "R-05",
+     "R-27"
+    ],
+    "problem": "Разные названия одного понятия: один компонент назван по-разному: настройки, расходы (строка 26); порог назван по-разному в бизнес-части и API (строка 37).",
+    "scenario": "",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F18",
+    "candidate_ids": [
+     "C-004",
+     "C-010"
+    ],
+    "base": "C-004",
+    "title": "Описание экрана не задаёт состояния, ошибки и выбор карты",
+    "kind": "incomplete",
+    "criterion": "complete",
+    "requirement_ids": [
+     "R-03"
+    ],
+    "problem": "L029 не определяет выбор карты при нескольких картах, тексты ошибок, поведение при пустом поле и момент начала «суммы за месяц».",
+    "scenario": "Поле пустое, нажато «Сохранить»: текст под полем не определён.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F19",
+    "candidate_ids": [
+     "C-040"
+    ],
+    "base": "C-040",
+    "title": "У требований нет приоритетов",
+    "kind": "missing_element",
+    "criterion": "ranked",
+    "requirement_ids": [
+     "R-05",
+     "R-06",
+     "R-07",
+     "R-08"
+    ],
+    "problem": "Требования Ф-1…Ф-4 (L037–L040) без приоритета и важности.",
+    "scenario": "При сокращении сроков нельзя определить, что отложить.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F20",
+    "candidate_ids": [
+     "C-019"
+    ],
+    "base": "C-019",
+    "title": "Перечень хранимых данных не включает enabled, тип операции, связь возврата",
+    "kind": "missing_element",
+    "criterion": "set_complete",
+    "requirement_ids": [
+     "R-11",
+     "R-28",
+     "R-06"
+    ],
+    "problem": "L049 не содержит признака включения (L144), типа операции и ссылки возврата на исходную покупку, нужных для Ф-2.",
+    "scenario": "Пришёл возврат: без ссылки на исходную покупку месяц не определить; перевод не отличить от покупки.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F21",
+    "candidate_ids": [
+     "C-024"
+    ],
+    "base": "C-024",
+    "title": "Не описан исход возврата после отправленного push",
+    "kind": "incomplete",
+    "criterion": "complete",
+    "requirement_ids": [
+     "R-06",
+     "R-07"
+    ],
+    "problem": "Возврат уменьшает расходы прошлого месяца (L038), но не сказано, отзывается ли push и возобновляется ли право на новый (L039).",
+    "scenario": "В январе расходы достигли 50 000 ₸ при пороге 50 000 ₸, push отправлен. 3 февраля пришёл возврат 5 000 ₸ по январской покупке. Для января сумма 45 000 ₸ ниже порога; неясно, считается ли push отправленным и нужно ли что-то делать при новом достижении.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F22",
+    "candidate_ids": [
+     "C-029"
+    ],
+    "base": "C-029",
+    "title": "Часовой пояс задан городом без смещения от UTC",
+    "kind": "ambiguity",
+    "criterion": "unambiguous",
+    "requirement_ids": [
+     "R-06",
+     "R-14"
+    ],
+    "problem": "L038 и L064 называют пояс «Алматы» без смещения от UTC.",
+    "scenario": "Системы процессинга и расходов на UTC расходятся с Алматы на границе месяца.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F23",
+    "candidate_ids": [
+     "C-039"
+    ],
+    "base": "C-039",
+    "title": "Сохранение накопленной суммы продублировано в Ф-4 и API",
+    "kind": "duplicate",
+    "criterion": "modifiable",
+    "requirement_ids": [
+     "R-08",
+     "R-24"
+    ],
+    "problem": "Одно правило записано в L040 и L126, при правке возможно расхождение.",
+    "scenario": "Правило Ф-4 изменят, а особое правило API останется прежним.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F24",
+    "candidate_ids": [
+     "C-006"
+    ],
+    "base": "C-006",
+    "title": "Срок «в течение минуты» без доли событий и нагрузки",
+    "kind": "unverifiable",
+    "criterion": "verifiable",
+    "requirement_ids": [
+     "R-10"
+    ],
+    "problem": "L046 задаёт минуту, но не доли событий и нагрузки замера.",
+    "scenario": "Нагрузочный тест: 95 % событий уложились в норматив «в течение минуты», 5 % — нет; доля и нагрузка в документе не названы — нельзя решить, пройден ли тест.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F25",
+    "candidate_ids": [
+     "C-008"
+    ],
+    "base": "C-008",
+    "title": "Критерии приёмки не покрывают границы, ошибки и повторы",
+    "kind": "missing_element",
+    "criterion": "set_validatable",
+    "requirement_ids": [
+     "R-13",
+     "R-14",
+     "R-15"
+    ],
+    "problem": "Три строки приёмки (L063–L065) не проверяют границы порога, ошибки API, повтор события, смену порога, возврат и выключенное уведомление.",
+    "scenario": "Порог 1 000 000 ₸ или 999 ₸ — тест приёмки отсутствует, ожидаемый ответ неизвестен.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F26",
+    "candidate_ids": [
+     "C-028"
+    ],
+    "base": "C-028",
+    "title": "Нет схемы отката или способа выключить функцию",
+    "kind": "ops_risk",
+    "criterion": "risk",
+    "requirement_ids": [
+     "R-12"
+    ],
+    "problem": "Чек-лист требует схему отката (L076), но в требованиях её и способа скрыть функционал нет.",
+    "scenario": "После выпуска push уходят ошибочно, и нет описанного способа выключить функцию для всех клиентов.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   },
+   {
+    "key": "F27",
+    "candidate_ids": [
+     "C-048"
+    ],
+    "base": "C-048",
+    "title": "Ответы 400, 401, 403, 500 не содержат поле result",
+    "kind": "api_contract",
+    "criterion": "set_consistent",
+    "requirement_ids": [
+     "R-31",
+     "R-34"
+    ],
+    "problem": "Таблица ответа (L155) описывает result без условия, а примеры ошибок (L180, L185, L192, L197) содержат только message.",
+    "scenario": "Клиент разбирает ответ об ошибке и читает result, чтобы показать сообщение: поле отсутствует, разбор падает или ошибка показывается как неизвестная.",
+    "wish": false,
+    "severity_basis": "",
+    "severity": "minor",
+    "blocks": "none",
+    "priority": 0
+   }
+  ],
+  "rejected": [],
+  "checklist": [
+   {
+    "n": 1,
+    "answer": "Нет",
+    "comment": "Бизнес-цель не покрыта: событие проведения не определено (L043), чтение настроек обещано (L052), но не описано.",
+    "finding_keys": [
+     "F01",
+     "F04"
+    ]
+   },
+   {
+    "n": 2,
+    "answer": "Частично",
+    "comment": "Структура шаблона есть, но разделы тестирования и согласования пусты, версия не указана.",
+    "finding_keys": [
+     "F16"
+    ]
+   },
+   {
+    "n": 3,
+    "answer": "Частично",
+    "comment": "Sequence (L043) есть, но без чтения настроек и с разными названиями компонентов.",
+    "finding_keys": [
+     "F17",
+     "F04"
+    ]
+   },
+   {
+    "n": 4,
+    "answer": "Частично",
+    "comment": "Экран описан кратко (L029): нет выбора карты, состояний и текстов ошибок.",
+    "finding_keys": [
+     "F18"
+    ]
+   },
+   {
+    "n": 5,
+    "answer": "Частично",
+    "comment": "Схемы отката и способа скрыть функцию нет, пункт L076 не отмечен.",
+    "finding_keys": [
+     "F26"
+    ]
+   },
+   {
+    "n": 6,
+    "answer": "Нет",
+    "comment": "Критерий приёмки L064 противоречит Ф-2, а ответ на неверную сумму неоднозначен (L171 и L163).",
+    "finding_keys": [
+     "F02",
+     "F05",
+     "F25"
+    ]
+   },
+   {
+    "n": 7,
+    "answer": "Частично",
+    "comment": "Данные описаны (L049), но нет enabled, типа операции и правил пересчёта тиынов и тенге.",
+    "finding_keys": [
+     "F20",
+     "F12"
+    ]
+   },
+   {
+    "n": 8,
+    "answer": "Нет",
+    "comment": "Противоречия Ф-2 и приёмки, Ф-3 и Ф-4, 200 ERROR и 400.",
+    "finding_keys": [
+     "F02",
+     "F03",
+     "F05"
+    ]
+   },
+   {
+    "n": 9,
+    "answer": "Частично",
+    "comment": "Архитектура дана одной строкой (L026), компоненты названы по-разному, согласования архитекторов нет.",
+    "finding_keys": [
+     "F17"
+    ]
+   },
+   {
+    "n": 10,
+    "answer": "Частично",
+    "comment": "Затронуты процессинг и сервис push, блок согласующих пуст (L089).",
+    "finding_keys": [
+     "F16"
+    ]
+   },
+   {
+    "n": 11,
+    "answer": "Нет",
+    "comment": "Изменяющий GET с cardId в URL (L104, L109) и неясная роль держателя и владельца.",
+    "finding_keys": [
+     "F07",
+     "F09"
+    ]
+   },
+   {
+    "n": 12,
+    "answer": "Частично",
+    "comment": "BPMN линейна (L034), ветви ошибок и повторов не показаны.",
+    "finding_keys": []
+   },
+   {
+    "n": 13,
+    "answer": "Нет",
+    "comment": "Нет метода чтения, коды ответов противоречивы, адрес Prod пуст (L108).",
+    "finding_keys": [
+     "F04",
+     "F06",
+     "F13"
+    ]
+   },
+   {
+    "n": 14,
+    "answer": "Частично",
+    "comment": "Версия и дата не заполнены (L068).",
+    "finding_keys": [
+     "F16"
+    ]
+   }
+  ],
+  "verdict_summary": "Разработку и тестирование начинать нельзя: есть критичные дефекты, блокирующие оба этапа. Первым делом нужно определить событие процессинга «проведена покупка» (D-01), согласовать Ф-2 с критерием приёмки №2 (D-02) и Ф-3 с Ф-4 (D-03). Затем описать метод чтения порога и суммы за месяц (D-04) и единый ответ на неверную сумму: 200 с ERROR или 400 (D-05). После этого привести в порядок коды ответов и способ вызова saveLimit (D-06, D-07)."
+ },
+ {
+  "checks": [
+   {
+    "key": "F01",
+    "basis": "",
+    "severity": "critical",
+    "reason": ""
+   },
+   {
+    "key": "F02",
+    "basis": "",
+    "severity": "critical",
+    "reason": ""
+   },
+   {
+    "key": "F03",
+    "basis": "",
+    "severity": "critical",
+    "reason": ""
+   },
+   {
+    "key": "F04",
+    "basis": "",
+    "severity": "critical",
+    "reason": ""
+   },
+   {
+    "key": "F05",
+    "basis": "",
+    "severity": "critical",
+    "reason": ""
+   },
+   {
+    "key": "F06",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F07",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F08",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F09",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F10",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F11",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F12",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F13",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F14",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F15",
+    "basis": "",
+    "severity": "major",
+    "reason": ""
+   },
+   {
+    "key": "F16",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F17",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F18",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F19",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F20",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F21",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F22",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F23",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F24",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F25",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F26",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   },
+   {
+    "key": "F27",
+    "basis": "",
+    "severity": "minor",
+    "reason": ""
+   }
+  ],
+  "verdict_summary": "Разработку и тестирование начинать нельзя: есть критичные дефекты, блокирующие оба этапа. Первым делом нужно определить событие процессинга «проведена покупка» (D-01), согласовать Ф-2 с критерием приёмки №2 (D-02) и Ф-3 с Ф-4 (D-03). Затем описать метод чтения порога и суммы за месяц (D-04) и единый ответ на неверную сумму: 200 с ERROR или 400 (D-05). После этого привести в порядок коды ответов и способ вызова saveLimit (D-06, D-07)."
+ }
+]
