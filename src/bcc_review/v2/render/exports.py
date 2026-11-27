@@ -558,9 +558,14 @@ def _md_to_docx(d: Any, md: str) -> None:
                 ncol = max(len(r) for r in rows)
                 t = d.add_table(rows=len(rows), cols=ncol)
                 t.style = "Table Grid"
+                # t.cell() каждый раз строит сетку всей таблицы — на длинном отчёте это минуты; сетку берём один раз
+                # (таблица только что создана, объединённых ячеек нет — индекс ri * ncol + ci точный)
+                grid = list(t._cells)
+                if len(grid) != len(rows) * ncol:
+                    grid = [t.cell(ri, ci) for ri in range(len(rows)) for ci in range(ncol)]
                 for ri, row in enumerate(rows):
                     for ci in range(ncol):
-                        cell = t.cell(ri, ci)
+                        cell = grid[ri * ncol + ci]
                         cell.text = ""
                         _add_inline(cell.paragraphs[0], row[ci] if ci < len(row) else "")
                         if ri == 0:

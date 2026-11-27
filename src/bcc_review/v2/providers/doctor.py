@@ -230,6 +230,13 @@ def headline(exc: BaseException, provider: str | None = None) -> str:
         if kind == "not_configured":
             return ("Не задан ключ Gemini. Получите бесплатный ключ на https://aistudio.google.com/apikey и добавьте "
                     "в файл .env строку GEMINI_API_KEY=<ключ>.")
+        if kind in ("auth", "bad_request") and _proxy_refusal(message):
+            return ("Запрос к Google Gemini отклонил прокси или брандмауэр сети, а не Google (ключ тут ни при чём): "
+                    "разрешите доступ к generativelanguage.googleapis.com, проверьте HTTPS_PROXY или подключитесь "
+                    "к другой сети (например, раздайте интернет с телефона).")
+        if kind == "auth" and ("location" in low or "регион" in low or "failed_precondition" in low):
+            return ("Gemini недоступен для этого ключа из текущего региона или без подключённой оплаты в Google Cloud: "
+                    "попробуйте другую сеть или другой ключ AI Studio.")
         if kind == "auth":
             return ("Google не принял ключ Gemini (GEMINI_API_KEY): проверьте, что он скопирован целиком, без кавычек и "
                     "пробелов, или создайте новый на https://aistudio.google.com/apikey.")
@@ -256,6 +263,8 @@ def headline(exc: BaseException, provider: str | None = None) -> str:
         if kind in ("overloaded", "server"):
             return ("Gemini перегружен: все модели цепочки не ответили после повторов. Повторите через несколько минут "
                     "или задайте GEMINI_MODEL=<другая модель>.")
+        if kind == "timeout" and "брандмауэр" in low:
+            return message
         if kind == "timeout":
             return "Gemini не ответил вовремя даже после повторов. Повторите через несколько минут."
     if name == "claude_cli" and kind == "quota":
@@ -273,6 +282,21 @@ def headline(exc: BaseException, provider: str | None = None) -> str:
     title = TITLES.get(name, name or "модели")
     advice = _ADVICE.get((name, kind)) or _GENERIC.get(kind, _GENERIC["unknown"])
     return f"{title}: {_first_sentence(message)} Что сделать: {advice}"
+
+
+_GOOGLE_STATUSES = ("PERMISSION_DENIED", "UNAUTHENTICATED", "INVALID_ARGUMENT", "FAILED_PRECONDITION",
+                    "API_KEY_INVALID")
+
+
+def _proxy_refusal(message: str) -> bool:
+    """403/407 не от Google: у Google в ответе статус вида PERMISSION_DENIED, у прокси — «Forbidden» или пусто.
+
+    Корпоративный или университетский прокси, запрещающий googleapis.com, иначе выглядел как «ключ не принят».
+    """
+    m = re.search(r"\((40[37])\b([^)]*)\)", message or "")
+    if not m:
+        return False
+    return m.group(1) == "407" or not any(st in m.group(2).upper() for st in _GOOGLE_STATUSES)
 
 
 def _first_sentence(text: str, limit: int = 160) -> str:
@@ -364,7 +388,43 @@ def _attempt_lines(attempts: Sequence[Mapping[str, Any]]) -> list[str]:
     return lines
 
 
-def run_doctor(*, live: bool = False, provider: str | None = None, model: str | None = None, timeout_s: float = 120.0,
+LIVE_BUDGET_S = {"gemini": 9.0}   # doctor --live у Gemini: диагноз за ≤ 10 с (быстрые повторы, без долгих ожиданий 429)
+LIVE_BUDGET_DEFAULT_S = 120.0      # claude -p стартует 10–30 с — ему прежний запас
+NET_HEADLINE = ("Google Gemini не ответил за {s:.0f} с: похоже, соединение блокирует прокси или брандмауэр, либо "
+                "сеть очень медленная. Проверьте доступ к generativelanguage.googleapis.com и HTTPS_PROXY.")
+
+
+def _with_deadline(fn: Callable[[], Any], seconds: float) -> Any:
+    """Вызов с жёстким пределом времени (поток-демон): зависший сокет не держит doctor дольше ``seconds``."""
+    import threading
+    box: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            box["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001 - передаём наружу как есть
+            box["error"] = exc
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(max(0.1, seconds))
+    if t.is_alive():
+        raise ProviderError("timeout", NET_HEADLINE.format(s=seconds))
+    if "error" in box:
+        raise box["error"]
+    return box.get("value")
+
+
+def _quick_probe(instance: Any, budget_s: float) -> None:
+    """Политика пробного вызова Gemini: один короткий повтор вместо 2/5/10 с, 429 — без ожидания Retry-After."""
+    for attr, value in (("retry_delays", (1.0,)), ("network_delays", (1.0,)), ("max_rate_wait_s", 0.0),
+                        ("total_timeout_s", max(5.0, budget_s))):
+        if hasattr(instance, attr):
+            setattr(instance, attr, value)
+
+
+def run_doctor(*, live: bool = False, provider: str | None = None, model: str | None = None,
+               timeout_s: float | None = None,
                env: Mapping[str, str] | None = None, out: Callable[[str], None] = print,
                which: Callable[[str], str | None] | None = None,
                factory: Callable[..., Any] | None = None, list_models: bool = True) -> int:
@@ -426,6 +486,10 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
         problems.append("Модель не настроена: отчёт будет построен только правилами, качество ниже. "
                         + GEMINI_KEY_HELP)
 
+    started_all = time.monotonic()
+    budget = float(timeout_s) if timeout_s else LIVE_BUDGET_S.get(chosen, LIVE_BUDGET_DEFAULT_S)
+    list_s = min(budget / 2, 5.0) if live else 30.0
+    known: ProviderError | None = None
     instance = None
     if chosen not in ("offline",):
         try:
@@ -440,11 +504,15 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
         out(f"  Цепочка моделей: {' -> '.join(chain)}")
         if list_models and hasattr(instance, "list_models"):
             try:
-                ids = [str(m.get("id")) for m in instance.list_models()]
+                ids = [str(m.get("id")) for m in _with_deadline(instance.list_models, list_s)]
             except ProviderError as exc:
+                if exc.kind in ("auth", "network", "timeout", "not_configured"):
+                    known = exc   # диагноз уже ясен: пробный вызов дал бы то же самое, только дольше
                 out(f"  {NO} Список моделей (models.list) не получен: {explain(exc, 'gemini')}")
-                problems.append({"auth": "Ключ Gemini отклонён: проверьте GEMINI_API_KEY.",
+                problems.append("Доступ к Google API закрыт прокси или брандмауэром сети." if _proxy_refusal(
+                    exc.message) else {"auth": "Ключ Gemini отклонён: проверьте GEMINI_API_KEY.",
                                  "not_configured": f"Gemini не настроен: {exc.message}",
+                                 "timeout": "Google API не отвечает: проверьте сеть, прокси и брандмауэр.",
                                  "network": "Нет соединения с Google API: проверьте интернет и прокси."}.get(
                     exc.kind, f"Список моделей Gemini не получен ({exc.kind})."))
             else:
@@ -458,14 +526,25 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
         out(f"  {WARN} {FREE_TIER_NOTE}")
 
     code = 0 if not problems else 1
-    if live and instance is not None:
+    if live and instance is not None and known is not None:
+        out("")
+        out(f"{NO} Пробный вызов не делаю — причина уже найдена: {headline(known, chosen)}")
+        problems.append("Пробный вызов модели не прошёл.")
+        code = 2
+    elif live and instance is not None:
         out("")
         out(f"Пробный вызов ({chosen}{', модель ' + model if model else ''}) …")
         started = time.monotonic()
+        left = max(5.0, budget - (started - started_all))
+        if chosen == "gemini":
+            _quick_probe(instance, left)
         try:
-            r = instance.invoke(model=model, messages=PROBE_MESSAGES, schema=PROBE_SCHEMA, timeout_s=timeout_s)
+            r = _with_deadline(lambda: instance.invoke(model=model, messages=PROBE_MESSAGES, schema=PROBE_SCHEMA,
+                                                       timeout_s=max(5.0, left - 1.0)), left + 1.0)
         except ProviderError as exc:
             out(f"{NO} {explain(exc, chosen)}")
+            if exc.kind in ("rate_limit", "quota") and chosen == "gemini":
+                out(f"{WARN} Ключ рабочий: Google принял его, но лимит запросов сейчас исчерпан.")
             problems.append("Пробный вызов модели не прошёл.")
             code = 2
         else:
@@ -504,7 +583,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--live", action="store_true", help="сделать пробный вызов модели с коротким JSON")
     parser.add_argument("--provider", default=None, help=f"провайдер: {', '.join(PROVIDER_NAMES)} (по умолчанию auto)")
     parser.add_argument("--model", default=None, help="модель для пробного вызова")
-    parser.add_argument("--timeout", type=float, default=120.0, help="тайм-аут пробного вызова, с")
+    parser.add_argument("--timeout", type=float, default=None,
+                        help="предел времени пробного вызова, с (по умолчанию: Gemini — 10, claude -p — 120)")
     parser.add_argument("--env-file", default=".env", help="файл с ключами (по умолчанию .env)")
     args = parser.parse_args(argv)
     found = load_dotenv(args.env_file)
