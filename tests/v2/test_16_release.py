@@ -238,7 +238,10 @@ def test_dockerfile_runs_the_agent():
     ignore = _read(ROOT / ".dockerignore").splitlines()
     for entry in (".env", ".git/*", ".bcc_cache", "runs"):
         assert entry in ignore, entry
-    assert not any(ln.startswith("!") and ".git/" not in ln for ln in ignore), "исключения .dockerignore только для .git"
+    allowed = {"!tests/v2/fixtures/official"}  # записанные ответы для --provider mock в контейнере
+    assert not any(ln.startswith("!") and ".git/" not in ln and ln not in allowed for ln in ignore), \
+        "исключения .dockerignore только для .git и фикстур mock"
+    assert "COPY tests/v2/fixtures/official" in text
 
 
 def test_git_commit_script_resolves_head(tmp_path):

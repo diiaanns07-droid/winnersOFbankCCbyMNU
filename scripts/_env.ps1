@@ -1,6 +1,6 @@
 ﻿# Общая часть scripts\run_official.ps1 и scripts\jury_check.ps1 (подключается через точку, сама не запускается).
 # Переходит в корень репозитория, создаёт .venv (если его нет), ставит зависимости (если они изменились)
-# и создаёт .env из .env.example. После неё в $Py — python из .venv.
+# и создаёт .env из .env.example. После неё в $Py — python из активированного окружения или из .venv.
 # Файл сохранён в UTF-8 с BOM: без BOM Windows PowerShell 5.1 читает русский текст в кодировке ANSI.
 
 $ErrorActionPreference = "Continue"
@@ -17,6 +17,9 @@ function Test-PythonVersion([string[]]$Command) {
 }
 
 $Py = Join-Path (Get-Location) ".venv\Scripts\python.exe"
+if ($env:VIRTUAL_ENV -and (Test-Path (Join-Path $env:VIRTUAL_ENV "Scripts\python.exe"))) {
+    $Py = Join-Path $env:VIRTUAL_ENV "Scripts\python.exe"   # уже активированное окружение (шаг 1 README)
+}
 if (-not (Test-Path $Py)) {
     $base = $null
     if (Get-Command py -ErrorAction SilentlyContinue) {
@@ -41,7 +44,7 @@ if (-not (Test-Path $Py)) {
     }
 }
 
-$stamp = ".venv\.bcc_requirements"
+$stamp = Join-Path (Split-Path -Parent (Split-Path -Parent $Py)) ".bcc_requirements"
 $want = (Get-FileHash requirements.txt -Algorithm SHA256).Hash
 $have = if (Test-Path $stamp) { (Get-Content $stamp -Raw).Trim() } else { "" }
 & $Py -c "import bcc_review" *> $null
