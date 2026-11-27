@@ -328,3 +328,18 @@ def test_open_set_clean_only_template(case):
     out = rules.run(fallback_load(path))
     assert all(c["source"].startswith("rules:placeholder.") for c in out["candidates"]), \
         [c["title"] for c in out["candidates"]]
+
+
+def test_wave2_rules_on_synthetic_pair():
+    """Правила второй волны на своей паре «дефекты / чисто» (не зависят от набора №18)."""
+    out = rules.run(fallback_load(STYLES / "wave2_defects.md"))
+    src = _sources(out) | {c["source"].split(".L")[0] for c in out["candidates"]}
+    for need in ("rules:conflicts.range_acceptance", "rules:units.day_kinds", "rules:conflicts.event_negation",
+                 "rules:language.nfr_unverifiable", "rules:units.time_mix.retryDelay", "rules:api.same_case.200-409",
+                 "rules:api.date_format.nextDate"):
+        assert need in src, need
+    raw = (STYLES / "wave2_defects.md").read_text(encoding="utf-8").splitlines()
+    assert all(_quote_found(raw, e) for c in out["candidates"] for e in c["evidence"])
+    assert all(len(c["evidence"]) >= 2 for c in out["candidates"] if c.get("rule_conflict"))
+    clean = rules.run(fallback_load(STYLES / "wave2_clean.md"))
+    assert clean["candidates"] == [], [c["title"] for c in clean["candidates"]]
