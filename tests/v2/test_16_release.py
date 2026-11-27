@@ -342,6 +342,17 @@ def test_known_py312_only_files_are_fixed():
 # --------------------------------------------------------------------------- CI и Docker
 
 
+def test_ci_runs_jury_steps_in_native_windows_encoding():
+    """PYTHONUTF8 — только у шага pytest: прогон mock, verify и команда жюри идут в родной кодировке ОС, как у жюри."""
+    yaml = pytest.importorskip("yaml")
+    wf = yaml.safe_load(_read(WORKFLOWS / "tests.yml"))
+    assert "PYTHONUTF8" not in (wf.get("env") or {})
+    job = wf["jobs"]["tests"]
+    assert "PYTHONUTF8" not in (job.get("env") or {})
+    with_utf8 = [st.get("name", "") for st in job["steps"] if "PYTHONUTF8" in (st.get("env") or {})]
+    assert with_utf8 == ["Тесты tests/v2"], with_utf8
+
+
 def test_ci_matrix_covers_three_os_and_two_pythons():
     text = _read(WORKFLOWS / "tests.yml")
     for os_name in ("ubuntu-latest", "windows-latest", "macos-latest"):

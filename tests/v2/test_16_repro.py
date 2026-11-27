@@ -148,3 +148,38 @@ def test_report_from_cache_is_not_called_offline(tmp_path, monkeypatch):
     run["calls"] = {"total": 0, "cached": 9, "failed": 0, "split": 0}
     md = markdown.render(report)
     assert "Режим без модели" not in md
+
+
+def _repro_check():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("repro_check", ROOT / "scripts" / "repro_check.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_repro_check_ignores_time_but_not_content(tmp_path):
+    rc = _repro_check()
+    base = {"run": {"run_id": "20261127-090141-54d9", "started_at": "t1", "duration_s": 237.3,
+                    "stages": {"segment": "ok", "judge": "ok"}, "calls": {"total": 9, "cached": 0}},
+            "findings": [{"id": "D-01", "title": "А"}]}
+    later = json.loads(json.dumps(base))
+    later["run"].update({"run_id": "20261127-090637-630d", "started_at": "t2", "duration_s": 0.2})
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    a.write_text(json.dumps(base, ensure_ascii=False), encoding="utf-8")
+    b.write_text(json.dumps(later, ensure_ascii=False), encoding="utf-8")
+    a.with_suffix(".md").write_text("Прогон 27.11.2026 09:02–09:06 (UTC+5), 3 мин 57 с\n", encoding="utf-8")
+    b.with_suffix(".md").write_text("Прогон 27.11.2026 09:06 (UTC+5), 0 с\n", encoding="utf-8")
+    assert rc.main([str(a), str(b)]) == 0
+    later["run"]["calls"] = {"total": 0, "cached": 9}  # из кэша: паспорт другой, содержимое то же
+    b.write_text(json.dumps(later, ensure_ascii=False), encoding="utf-8")
+    assert rc.main([str(a), str(b)]) == 1
+    assert rc.main([str(a), str(b), "--content"]) == 0
+    later["findings"][0]["title"] = "Б"
+    b.write_text(json.dumps(later, ensure_ascii=False), encoding="utf-8")
+    assert rc.main([str(a), str(b), "--content"]) == 1
+    later["findings"][0]["title"] = "А"
+    later["run"]["stages"] = {"judge": "ok", "segment": "ok"}  # другой порядок этапов — тоже различие
+    b.write_text(json.dumps(later, ensure_ascii=False), encoding="utf-8")
+    assert rc.main([str(a), str(b), "--content"]) == 1

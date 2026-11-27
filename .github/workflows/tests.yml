@@ -49,8 +49,13 @@ jobs:
       - name: Установка (дословно по README)
         run: python -m pip install -r requirements.txt -e .
 
+      # UTF-8 только для pytest: вспомогательные скрипты тестов №02, №03, №15 печатают русский текст в конвейер, а на
+      # Windows без UTF-8 его кодировка — cp1252 (UnicodeEncodeError). Сам агент от этого не зависит: его кодировки
+      # проверяет test_16_windows_encoding (задаёт cp1252 и C-локаль сам), а шаги ниже идут без PYTHONUTF8.
       - name: Тесты tests/v2
         run: python -m pytest tests/v2 -q
+        env:
+          PYTHONUTF8: "1"
 
       - name: Колёса зависимостей для всех ОС и Python 3.11–3.14 (без них pip собирает из исходников)
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
