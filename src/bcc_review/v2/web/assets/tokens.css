@@ -34,7 +34,6 @@
   --b-green:#00B975; --b-green-strong:#008556; --b-green-ink:#00704A;
   --b-green-tint:#E3FFD9; --b-green-soft:#B5F4C5; --b-green-wash:#F1FBF5;
   --b-gold:#DCA262; --b-gold-ink:#7A5212; --b-gold-tint:#FFF9D6; --b-gold-soft:#FBE1BA;
-  --b-blue:#1C446C; --b-blue-tint:#E8EFF6;
   --b-red:#C2362B; --b-red-tint:#FDECEA;
   --b-canvas:#F3F6F5; --b-paper:#FFFFFF; --b-grey:#E7EDEB; --b-wash:#F6F8F7;
   --b-hair:rgba(15,40,65,.08); --b-hair-2:rgba(15,40,65,.14);
@@ -101,8 +100,8 @@ html{-webkit-text-size-adjust:100%;color-scheme:light;background:var(--b-canvas)
   box-shadow:0 0 0 1px var(--b-hair),var(--b-shadow-2);font:17px/1.65 var(--b-font);font-feature-settings:"cv11","tnum" 0}
 .b-sheet ::selection{background:rgba(0,185,117,.18)}
 .b-sheet a{color:var(--b-green-ink)}
-.b-sheet-top{display:flex;flex-direction:column;gap:4px;margin:0 0 22px;padding:22px 0 18px var(--b-gutter);
-  box-shadow:inset 0 -1px 0 var(--b-hair)}
+.b-sheet-top{display:flex;flex-direction:column;justify-content:center;gap:4px;min-height:var(--b-top-h,106px);margin:0 0 22px;
+  padding:18px 0 16px var(--b-gutter);box-shadow:inset 0 -1px 0 var(--b-hair)}
 .b-verdict{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 0;font-size:15.5px;line-height:1.4;color:var(--b-ink-2)}
 .b-verdict>span+span::before{content:"·";margin:0 9px;color:var(--b-ink-4)}
 .b-verdict .main{color:var(--b-ink);font-weight:600}
@@ -144,6 +143,16 @@ html{-webkit-text-size-adjust:100%;color-scheme:light;background:var(--b-canvas)
 
 /* ── заметки на полях: вторая бумага справа ── */
 .b-margin{background:var(--b-paper);border-radius:var(--b-r-lg);box-shadow:0 0 0 1px var(--b-hair),var(--b-shadow-1)}
+.b-margin-head{display:flex;flex-direction:column;justify-content:center;min-height:var(--b-top-h,106px);padding:18px 20px 16px;
+  box-shadow:inset 0 -1px 0 var(--b-hair)}
+.b-margin-head>b{display:block;font-size:15.5px;line-height:1.4;font-weight:600;color:var(--b-ink)}
+.b-legend{display:flex;flex-wrap:wrap;gap:2px 14px;margin-top:6px;font-size:13.5px;color:var(--b-ink-2)}
+.b-legend .lg{display:inline-flex;align-items:center;gap:7px}
+.b-legend .lg::before,.b-note b::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:transparent;
+  box-shadow:inset 0 0 0 1.5px var(--b-ink-4)}
+.b-legend .crit::before,.b-note.crit b::before{background:var(--b-red);box-shadow:none}
+.b-legend .major::before,.b-note.major b::before{width:12px;height:7px;border-radius:2px;background:var(--b-mark-major);
+  box-shadow:inset 0 0 0 1px rgba(15,40,65,.12)}
 .b-note{position:absolute;z-index:2;top:calc(var(--dy,0px) - 6px);
   left:calc(100% + var(--b-sheet-pr) + var(--b-desk-gap) + 12px);width:calc(var(--b-margin-w) - 24px);
   display:block;margin:0;padding:6px 10px 8px;border:0;border-radius:12px;background:none;text-align:left;cursor:pointer;
@@ -151,10 +160,6 @@ html{-webkit-text-size-adjust:100%;color-scheme:light;background:var(--b-canvas)
   transition:background var(--b-fast) var(--b-ease),opacity var(--b-base) var(--b-ease);
   animation:b-fade var(--b-slow) var(--b-ease) both;animation-delay:calc(var(--i,0) * 30ms + 400ms)}
 .b-note b{display:flex;align-items:center;gap:7px;font:400 12px/1.6 var(--b-mono);color:var(--b-ink-3)}
-.b-note b::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:transparent;
-  box-shadow:inset 0 0 0 1.5px var(--b-ink-4)}
-.b-note.crit b::before{background:var(--b-red);box-shadow:none}
-.b-note.major b::before{width:12px;height:7px;border-radius:2px;background:var(--b-mark-major);box-shadow:inset 0 0 0 1px rgba(15,40,65,.12)}
 .b-note .t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .b-note:hover,.b-note.on{background:var(--b-wash)}
 .b-note.on .t{-webkit-line-clamp:unset}
@@ -254,7 +259,7 @@ html{-webkit-text-size-adjust:100%;color-scheme:light;background:var(--b-canvas)
   .b-line.ok .b-ln::before{margin-right:3px}
   .b-line.h1 .b-tx{font-size:22px}
   .b-line.h2 .b-tx{font-size:18.5px}
-  .b-sheet-top{padding:18px 0 14px var(--b-gutter)}
+  .b-sheet-top{padding:16px 0 14px var(--b-gutter);min-height:0}
   .b-verdict{font-size:14.5px}
   .b-verdict>span:nth-child(3){flex-basis:100%}
   .b-verdict>span:nth-child(3)::before{display:none}

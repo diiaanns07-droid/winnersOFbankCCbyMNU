@@ -88,7 +88,8 @@
     var notes = Array.prototype.slice.call(sheet.querySelectorAll(".b-note"));
     var layout = function () {
       var wide = window.matchMedia("(min-width: 1241px)").matches;
-      var bottom = -1e9;
+      var head = document.querySelector(".b-margin-head");
+      var bottom = head ? head.offsetHeight + 6 : -1e9;  // поля начинаются под шапкой полей
       notes.forEach(function (n) {
         n.style.removeProperty("--dy");
         if (!wide) return;

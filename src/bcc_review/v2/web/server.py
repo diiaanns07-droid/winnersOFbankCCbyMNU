@@ -182,9 +182,26 @@ def _leaf(j: Job, *, on: bool = False) -> str:
     else:
         label = {"queued": "в очереди", "running": "идёт проверка", "failed": "ошибка прогона"}.get(j.state, j.state)
         line = f'<div class="b-verdict"><span>{e(label)}</span></div>'
-    return (f'<a class="b-leaf{" on" if on else ""}" href="/jobs/{e(j.id)}"{" aria-current=\"page\"" if on else ""}>'
+    cur = ' aria-current="page"' if on else ""
+    return (f'<a class="b-leaf{" on" if on else ""}" href="/jobs/{e(j.id)}"{cur}>'
             f'<span class="b-leaf-t">{e(Path(j.file_name).stem)}</span>{line}'
             f'<span class="b-leaf-m">{e(when)} · {e(_SHORT.get(j.provider, j.provider))}</span></a>')
+
+
+def _margin_head(report: dict[str, Any]) -> str:
+    """Шапка полей: сколько замечаний и вопросов, и легенда отметок — те же знаки, что у заметок."""
+    fs = report.get("findings") or []
+    n = {k: sum(1 for f in fs if f.get("severity") == k) for k in ("critical", "major", "minor")}
+    q = len(report.get("questions") or [])
+    total = len(fs)
+    legend = "".join(
+        f'<span class="lg {c}">{n[k]} {plural(n[k], *w)}</span>' for k, c, w in (
+            ("critical", "crit", ("блокер", "блокера", "блокеров")),
+            ("major", "major", ("существенное", "существенных", "существенных")),
+            ("minor", "minor", ("незначительное", "незначительных", "незначительных"))) if n[k])
+    ask = f' · {q} {plural(q, "вопрос", "вопроса", "вопросов")}' if q else ""
+    return (f'<div class="b-margin-head"><b>{total} {plural(total, "замечание", "замечания", "замечаний")}{ask}</b>'
+            f'<div class="b-legend">{legend}</div></div>')
 
 
 def index_page(app: App, *, error: str = "", provider: str = "", model: str = "") -> str:
@@ -245,7 +262,7 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
 <aside class="desk-stack" aria-label="Готовые листы">{stack}</aside>
 <aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
 <main class="desk-sheet">{sheet.html if sheet else ''}</main>
-<div class="desk-notes b-margin" aria-hidden="true"></div>
+<div class="desk-notes{' b-margin' if sheet and sheet.notes else ''}">{_margin_head(top["report"]) if top and sheet and sheet.notes else ''}</div>
 </div>
 <div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>BCC AI сразу начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
     sub = (top or {}).get("name") or (f"Пример: {app.sample.name}" if app.sample else "")
