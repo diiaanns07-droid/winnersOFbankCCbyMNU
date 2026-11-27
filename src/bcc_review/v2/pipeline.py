@@ -324,6 +324,11 @@ class Pipeline:
         if status == "ok" and hit > 0:
             status = "partial"
             self.warnings.append(f"Этап {name} выполнен частично: часть вызовов модели не удалась или упёрлась в бюджет")
+        saved = int(after.get("salvaged", 0)) - int(before.get("salvaged", 0))
+        if status == "ok" and saved > 0:   # обрезанный ответ: взяты целые элементы (LLMClient.salvaged), хвост потерян
+            status = "partial"
+            self.warnings.append(f"Этап {name} выполнен частично: ответ модели обрезан по длине — сохранены целые "
+                                 "элементы, конец ответа потерян")
         self.stages[name] = status
         st = {"calls": calls, "seconds": seconds, "candidates": len(out.get("candidates") or [])}
         if after.get("split", 0) - before.get("split", 0):

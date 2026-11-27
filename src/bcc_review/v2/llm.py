@@ -350,7 +350,11 @@ class LLMClient:
                 self._emit({"stage": stage, "model": model, "error": kind, "message": str(msg)[:300],
                             "seconds": round(seconds, 1), "attempt": attempt})
                 if is_truncation(kind, str(msg)):
-                    raise Truncated(stage, str(msg)) from None
+                    cut = Truncated(stage, str(msg))
+                    # целые элементы обрезанного ответа (провайдер gemini, №24): последний шанс этапа — salvaged()
+                    cut.partial = getattr(exc, "partial", None)  # type: ignore[attr-defined]
+                    cut.salvage = getattr(exc, "salvage", None)  # type: ignore[attr-defined]
+                    raise cut from None
                 if kind == "invalid_output" and not repaired and not handles_retries:
                     # ответ пришёл, но не JSON / не по схеме на стороне провайдера (claude -p без structured_output):
                     # одна попытка починки, как для ошибок схемы ниже; Gemini (handles_retries) повторяет сам
@@ -414,6 +418,25 @@ class LLMClient:
                 self.stats["repaired"] += 1
             cur_user = user + REPAIR_NOTE.format(errors="; ".join(errors))
 
+    def salvaged(self, stage: str, exc: BaseException, schema: dict) -> dict | None:
+        """Целые элементы обрезанного ответа (``Truncated.partial``), если они проходят схему; иначе ``None``.
+
+        Последний шанс этапа, когда делить больше нечего: часть ответа лучше потерянного этапа. Счётчик
+        ``salvaged`` (по прогону и по этапу) — для предупреждения в отчёте: прогон не может считаться полным.
+        """
+        data = getattr(exc, "partial", None)
+        if data is None or schema_errors(data, schema):
+            return None
+        with self._lock:
+            self.stats["salvaged"] = self.stats.get("salvaged", 0) + 1
+            st = self._stage_stats(stage)
+            st["salvaged"] = st.get("salvaged", 0) + 1
+        info = getattr(exc, "salvage", None) or {}
+        self._emit({"stage": stage, "event": "salvaged", "items": info.get("items"),
+                    "filled_empty": info.get("filled_empty")})
+        self._record(stage, data)
+        return data
+
     def ask_split(self, stage: str, build: Callable[[list], tuple[str, str]], items: list, schema: dict,
                   merge: Callable[[list], dict], *, max_output_tokens: int = 16000, _depth: int = 0) -> dict:
         """Запрос по пакету ``items``; если ответ обрезан — пакет делится пополам (бюджет вызовов общий).
@@ -425,8 +448,11 @@ class LLMClient:
         try:
             # сначала одна попытка с удвоенным лимитом (у моделей с рассуждением деление не помогает), потом деление
             return self.ask(stage, system, user, schema, max_output_tokens=max_output_tokens, expand=_depth == 0)
-        except Truncated:
+        except Truncated as exc:
             if len(items) < 2 or _depth >= self.max_split_depth:
+                saved = self.salvaged(stage, exc, schema)
+                if saved is not None:
+                    return saved
                 raise
             with self._lock:
                 self.stats["split"] += 1
