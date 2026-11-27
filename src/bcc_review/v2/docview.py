@@ -46,13 +46,24 @@ _PAGE_WARN_CODES = {"partial_read", "unreadable_page", "decode_error", "ocr_requ
 
 
 # --------------------------------------------------------------------------- публичный интерфейс
+CONVERTIBLE = {".doc", ".rtf", ".odt", ".docm", ".dotx", ".dot", ".wps"}
+SUPPORTED_RU = "DOCX, PDF, Markdown, TXT, HTML"
+
+
 def load(path: str | Path) -> dict:
-    """Прочитать файл и вернуть DocView. Неподдерживаемый формат — ``ValueError``."""
+    """Прочитать файл и вернуть DocView. Неподдерживаемый формат — ``ValueError`` с объяснением по-русски.
+
+    DOC, RTF, ODT читаются через преобразование в DOCX (LibreOffice ``soffice``), если он установлен."""
     p = Path(path)
-    fmt = FORMATS.get(p.suffix.lower())
+    if not p.is_file():
+        raise ValueError(f"файл не найден: {p}")
+    suffix = p.suffix.lower()
+    if suffix in CONVERTIBLE:
+        return _load_converted(p)
+    fmt = FORMATS.get(suffix)
     if fmt is None:
-        raise ValueError(f"формат {p.suffix or '(без расширения)'} не поддерживается: "
-                         f"{', '.join(sorted(set(FORMATS)))}")
+        raise ValueError(f"формат {p.suffix or '(без расширения)'} не поддерживается; сохраните документ как "
+                         f"{SUPPORTED_RU}")
     data = p.read_bytes()
     sha = hashlib.sha256(data).hexdigest()
     if fmt == "html":
@@ -71,8 +82,7 @@ def load(path: str | Path) -> dict:
         warnings.append(f"Читатель разметки не сработал ({type(exc).__name__}: {exc}); "
                         "строки взяты из файла как есть.")
     if fmt in ("md", "txt"):
-        text = data.decode("utf-8-sig", errors="replace")
-        lines = _text_lines(text, doc)
+        lines = _text_lines(_decode_text(data), doc)
     else:
         sizes = _page_sizes(p) if fmt == "pdf" else {}
         lines = _block_lines(doc or {}, sizes, warnings)
@@ -87,6 +97,45 @@ def load(path: str | Path) -> dict:
         warnings.append("В документе нет текста: проверять нечего.")
     return {"title": title, "file": p.name, "format": fmt, "sha256": sha, "lines": lines,
             "pages": pages, "warnings": _dedup(warnings)}
+
+
+def _decode_text(data: bytes) -> str:
+    """UTF-8 (с BOM или без), иначе Windows-1251 — так сохраняют текст в Блокноте на русской Windows."""
+    if data.startswith(b"\xff\xfe") or data.startswith(b"\xfe\xff"):
+        return data.decode("utf-16", errors="replace")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp1251", errors="replace")
+
+
+def _load_converted(p: Path) -> dict:
+    """DOC/RTF/ODT → DOCX через LibreOffice во временном каталоге; паспорт (имя, SHA-256) — исходного файла."""
+    import shutil
+    import subprocess
+    import tempfile
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise ValueError(f"формат {p.suffix} читается через LibreOffice, а он не установлен; сохраните документ "
+                         f"как {SUPPORTED_RU}")
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            subprocess.run([soffice, "--headless", "--convert-to", "docx", "--outdir", tmp, str(p)],
+                           check=True, capture_output=True, timeout=180)
+        except (subprocess.SubprocessError, OSError) as exc:
+            raise ValueError(f"не удалось преобразовать {p.name} в DOCX ({type(exc).__name__}); сохраните "
+                             f"документ как {SUPPORTED_RU}") from exc
+        out = Path(tmp) / (p.stem + ".docx")
+        if not out.is_file():
+            raise ValueError(f"не удалось преобразовать {p.name} в DOCX; сохраните документ как {SUPPORTED_RU}")
+        view = load(out)
+    view["file"] = p.name
+    view["sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()
+    view["warnings"] = [f"Документ {p.suffix.upper().lstrip('.')} прочитан через преобразование в DOCX "
+                        f"(LibreOffice); номера строк — по преобразованному тексту."] + list(view["warnings"])
+    if view.get("title") == p.stem + ".docx" or not view.get("title"):
+        view["title"] = p.stem
+    return view
 
 
 def from_text(text: str, *, file: str = "inline.md", fmt: str = "md", title: str = "") -> dict:

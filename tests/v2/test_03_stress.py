@@ -217,3 +217,41 @@ def test_long_document_docx_and_pdf_from_word():
             m = Q.verify_quote(v, "Журнал операций хранится 5 лет", b["n"] + 1)
             assert m["line_start"] == b["n"]
     assert "Пользователь вошёл в «Профиль» | Операция 2 | Результат за 4 с" in _texts(pdf)
+
+
+def test_windows_text_encodings_and_crlf(tmp_path):
+    """Файлы из Windows: TXT в cp1251 и UTF-16 (Блокнот), Markdown с переводами строк CRLF."""
+    body = "Требования к сервису\r\n\r\nФ-1. Клиент задаёт лимит.\r\nФ-2. Лимит действует сутки.\r\n"
+    for enc in ("cp1251", "utf-16", "utf-8-sig"):
+        p = tmp_path / f"win_{enc}.txt"
+        p.write_bytes(body.encode(enc))
+        v = dv.load(p)
+        assert _texts(v) == ["Требования к сервису", "", "Ф-1. Клиент задаёт лимит.", "Ф-2. Лимит действует сутки."], enc
+    assert dv._decode_text("Привет".encode("cp1251")) == "Привет"
+    p = tmp_path / "crlf.md"
+    p.write_bytes("# Заголовок\r\n\r\n* **Ф-1.** Клиент задаёт лимит.\r\n| a | b |\r\n| --- | --- |\r\n| 1 | 2 |\r\n".encode())
+    v = dv.load(p)
+    assert _texts(v) == ["Заголовок", "", "Ф-1. Клиент задаёт лимит.", "a | b", "", "1 | 2"]
+
+
+def test_unsupported_format_message(tmp_path):
+    p = tmp_path / "table.xlsx"
+    p.write_bytes(b"PK")
+    with pytest.raises(ValueError, match="не поддерживается; сохраните документ как DOCX, PDF"):
+        dv.load(p)
+    with pytest.raises(ValueError, match="файл не найден"):
+        dv.load(tmp_path / "missing.md")
+
+
+@pytest.mark.skipif(not __import__("shutil").which("soffice"), reason="нет LibreOffice")
+@pytest.mark.parametrize("ext", ["odt", "rtf", "doc"])
+def test_doc_rtf_odt_via_libreoffice(tmp_path, ext):
+    import subprocess
+    subprocess.run(["soffice", "--headless", "--convert-to", ext, "--outdir", str(tmp_path), str(S / "docx_merged.docx")],
+                   check=True, capture_output=True, timeout=180)
+    src = tmp_path / f"docx_merged.{ext}"
+    v = dv.load(src)
+    ref = dv.load(S / "docx_merged.docx")
+    assert v["file"] == src.name and v["title"] == ref["title"]
+    assert v["warnings"][0].startswith(f"Документ {ext.upper()} прочитан через преобразование в DOCX")
+    assert [x["n"] for x in dv.nonempty(ref) if not Q.verify_quote(v, x["text"])] == []
