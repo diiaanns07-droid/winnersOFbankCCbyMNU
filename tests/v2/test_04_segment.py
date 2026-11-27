@@ -1140,3 +1140,14 @@ def test_acceptance_row_summary_is_the_documents_expected_result():
     raw2 = {"requirements": [{"source_id": "", "kind": "api", "summary": "Код ошибки", "line_start": 3,
                               "line_end": 3}], "excluded": []}
     assert sg.segment_from_response(v2, raw2)["requirements"][0]["summary"] == "Код ошибки"
+
+
+def test_bare_parameter_id_gets_table_prefix():
+    """haiku в одном ответе назвал строки таблицы ответа «Метод getCashback: category» и «accrued» (без таблицы):
+    обе — «Ответ 200: …», как в офлайн-нарезке (корпус: офлайн = модели на 32 из 32 кейсов)."""
+    view = sg.load_view(str(CORPUS / "cashback.event_conflict.category_effective_now" / "source.md"))
+    raw = json.loads((ANSWERS / "cashback.event_conflict.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw)
+    assert _keys(out["requirements"]) == _keys(sg.heuristic_segment(view)["requirements"])
+    sids = {r["line_start"]: r["source_id"] for r in out["requirements"]}
+    assert sids[66] == "Ответ 200: category" and sids[67] == "Ответ 200: accrued"

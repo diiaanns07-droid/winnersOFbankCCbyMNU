@@ -854,6 +854,10 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
         if not sid:
             r["source_id"] = ""
             continue
+        cell0 = _MD_DECOR.sub("", _text(first)).strip().strip("|").strip().split(" | ")[0].strip()
+        if (parts and _is_row(_text(first)) and ": " not in sid and re.fullmatch(r"[A-Za-z_][\w.{}\[\]-]{0,39}", sid)
+                and (cell0 == sid or cell0.startswith(sid + " ("))):
+            sid = f"{parts[-1]}: {sid}"  # «accrued» без таблицы — как у соседних строк: «Ответ 200: accrued»
         m = re.match(r"^(?P<pre>.+?)(?P<sep>: |, п\. |, строка |, )(?P<rest>.+)$", sid)
         own = _ID_RE.match(re.sub(r"^\s*[-*•]\s+", "", _text(first)))
         if m and own and m.group("rest").strip().rstrip(".") == own.group("id"):
