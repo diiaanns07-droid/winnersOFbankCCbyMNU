@@ -22,7 +22,7 @@ def plain_warn(text) -> str:
     s = _md._EXC_PAREN.sub("", _md._EXC.sub("", s))
     s = _md._STAGE_WORD.sub(lambda m: f"«{_md.STAGES[m.group(1)][0]}»", s)
     s = _md._SEV_WORD.sub(lambda m: _md.SEV_NAME[m.group(1)], s)
-    return _md._LREF.sub(_md._lref, s)
+    return _md.count_words(_md._LREF.sub(_md._lref, s))
 
 READY = {"no": "нельзя", "conditional": "с условиями", "yes": "можно", "undetermined": "не определено",
          "none": "не вынесен"}

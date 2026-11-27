@@ -427,7 +427,7 @@ def test_revise_edits_rendered(sample):
 
 def test_stage_warnings_in_russian():
     assert markdown.warn_text("проверка серьёзности понизила 2 дефект(ов): critical→major 0, major→minor 2") == \
-        "проверка серьёзности понизила 2 дефект(ов): критичный→существенный 0, существенный→незначительный 2"
+        "проверка серьёзности понизила 2 дефекта: критичный→существенный 0, существенный→незначительный 2"
     assert markdown.warn_text("clarify: оставлено 10 вопросов из 11") == "Вопросы: оставлено 10 вопросов из 11"
     assert markdown.warn_text("вторая проверка не удалась (LLMError); лимит подписки Claude Code, выберите "
                               "(--model haiku)") == ("вторая проверка не удалась; лимит подписки «Claude Code», "
@@ -821,3 +821,10 @@ def test_action_not_cut_inside_placeholder():
     rec2 = "Привести строки 25 и 45 к одной схеме: <уточнить: вызывает ли API кредитов сервис напрямую>; схему дополнить"
     assert markdown._action({"recommendation": rec2}, limit=80).count("<") == markdown._action(
         {"recommendation": rec2}, limit=80).count(">")
+
+
+def test_warning_counts_agree_with_number():
+    assert markdown.warn_text("судья: 2 замечаний сведены") == "судья: 2 дефекта сведены"
+    assert markdown.warn_text("понизила 1 дефект(ов): критичный→существенный 1") == \
+        "понизила 1 дефект: критичный→существенный 1"
+    assert console.plain_warn("судья: 5 замечаний (пожелания)") == "судья: 5 дефектов (пожелания)"

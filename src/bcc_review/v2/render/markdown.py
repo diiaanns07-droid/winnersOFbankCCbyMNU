@@ -377,7 +377,17 @@ def warn_text(text) -> str:
     s = _STAGE_WORD.sub(lambda m: f"«{STAGES[m.group(1)][0]}»", s)
     s = _SEV_WORD.sub(lambda m: SEV_NAME[m.group(1)], s)
     s = _PRODUCT.sub(lambda m: f"«{m.group(0)}»", s)
-    return prose(_FLAG.sub(lambda m: f"`{m.group(0)}`", s))
+    return prose(_FLAG.sub(lambda m: f"`{m.group(0)}`", count_words(s)))
+
+
+_COUNT_NOUN = re.compile(r"\b(\d+)\s+(?:замечани(?:е|я|й|ями|ях)|дефект(?:\(ов\)|ов|а|ы)?)(?![\w(])")
+
+
+def count_words(text: str) -> str:
+    """Склонение после числа в сообщениях этапов: «2 замечаний» → «2 дефекта», «1 дефект(ов)» → «1 дефект»
+    (в отчёте находки называются дефектами)."""
+    return _COUNT_NOUN.sub(lambda m: f"{m.group(1)} {plural(int(m.group(1)), 'дефект', 'дефекта', 'дефектов')}",
+                           str(text or ""))
 
 
 def _cap(s: str) -> str:
