@@ -744,3 +744,19 @@ def test_clarity_sentence_split_ignores_dots_inside_quotes():
     assert len(_sentences('Цитата "200. Успех" расходится с L12. Второе.')) == 2
     assert len(_sentences("Ф-2 (стр. 38) относит покупку к месяцу. Критерий №2 — к другому. Третье.")) == 3
     assert len(_sentences("Открытая «цитата. Без конца")) == 1  # незакрытая кавычка — один кусок, не три
+
+
+def test_gate_corpus_f1_notes_rules_only_run(tmp_path, monkeypatch):
+    """Ворота F1 корпуса называют, что находят одни правила (последний прогон `--provider offline`): на 3e7133c —
+    TP 27, FP 0 при TP 27, FP 202 у полного haiku, т. е. ложные добавляют этапы модели."""
+    import json as _json
+
+    for name, prov, at, tp, fp in (("old", "offline", "2026-11-27 09:00", 12, 3), ("new", "offline", "2026-11-27 18:55", 27, 0),
+                                   ("haiku", "claude_cli", "2026-11-27 19:00", 27, 202)):
+        d = tmp_path / "corpus_results" / name
+        d.mkdir(parents=True)
+        (d / "summary.json").write_text(_json.dumps({"label": f"v2 офлайн-правила (3e7133c)" if name == "new" else name,
+                                                     "provider": prov, "at": at, "harness": {"tp": tp, "fp": fp,
+                                                     "support": 28, "f1": 0.98 if name == "new" else 0.2}}), encoding="utf-8")
+    monkeypatch.setattr(gate, "V2", tmp_path)
+    assert gate._rules_only_note() == "; правила без модели (3e7133c): TP 27, FP 0, F1 0.98 — ложные добавляют этапы модели"

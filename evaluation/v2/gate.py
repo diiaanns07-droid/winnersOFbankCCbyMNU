@@ -347,7 +347,8 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
                           "—" if f1 is None else f"{f1:.2f} (P {prec or 0:.2f}, R {rec or 0:.2f})",
                           None if f1 is None else f1 >= t["f1"],
                           ((_recall_owners(d_rec) + "; " if rec is not None and rec < 0.9 else "")
-                           + "ложные на мутантах и чистых → " + _clean_owners(d_rec) + _background_note(d_rec)) if h
+                           + "ложные на мутантах и чистых → " + _clean_owners(d_rec) + _background_note(d_rec)
+                           + _rules_only_note()) if h
                           else f"{missing_owner}: нет прогона корпуса с дефектами"))
         out[-1]["_src"] = rec_src
     if "clean_max_findings" in t:
@@ -369,6 +370,27 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
     for x in out:
         x["source"] = x.pop("_src", src)
     return out
+
+
+def _rules_only_note() -> str:
+    """«; правила без модели (3e7133c): TP 27, FP 0, F1 0.98» — последний прогон корпуса `--provider offline`: что
+    находят одни правила. Если у них столько же верных, а ложных нет, — все ложные полного прогона от этапов модели."""
+    best = None
+    for p in (V2 / "corpus_results").glob("*/summary.json"):
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if d.get("provider") != "offline" or not (d.get("harness") or {}).get("support"):
+            continue
+        if not best or d.get("at", "") > best.get("at", ""):
+            best = d
+    if not best:
+        return ""
+    h = best["harness"]
+    codes = _SHA.findall(str(best.get("label") or ""))
+    return (f"; правила без модели{f' ({codes[0]})' if codes else ''}: TP {h.get('tp')}, FP {h.get('fp')}, "
+            f"F1 {h.get('f1') or 0:.2f} — ложные добавляют этапы модели")
 
 
 def _background_note(d: dict) -> str:
