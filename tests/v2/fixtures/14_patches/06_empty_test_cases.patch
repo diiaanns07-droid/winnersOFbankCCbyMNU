@@ -1,0 +1,18 @@
+diff --git a/src/bcc_review/v2/stages/lens_qa.py b/src/bcc_review/v2/stages/lens_qa.py
+index a7e81ef8..8cdedf23 100644
+--- a/src/bcc_review/v2/stages/lens_qa.py
++++ b/src/bcc_review/v2/stages/lens_qa.py
+@@ -850,7 +850,12 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
+         model_cands.insert(0, nfr)
+     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
+     tests = [normalize_test_case(x) for x in data.get("test_cases") or [] if isinstance(x, Mapping)]
+-    tests = [t for t in tests if t["title"] or t["then"]]
++    # пустой тест-кейс: «Не определено» в then дописывает normalize_test_case, это не содержание модели
++    tests = [t for t in tests if t["title"] or t["when"]]
++    known = {str(r.get("id")) for r in reqs if isinstance(r, Mapping) and r.get("id")}
++    if known:
++        for t in tests:
++            t["requirement_ids"] = [x for x in t["requirement_ids"] if x in known]
+     if len(tests) > MAX_TEST_CASES:
+         warnings.append(f"{STAGE}: тест-кейсов {len(tests)}, оставлено {MAX_TEST_CASES}")
+         tests = tests[:MAX_TEST_CASES]

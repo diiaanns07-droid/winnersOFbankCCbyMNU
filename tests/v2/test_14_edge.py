@@ -646,3 +646,19 @@ def test_network_down_with_fast_start_stops_retries(tmp_path, monkeypatch):
     assert report["run"]["status"] == "failed"
     assert not any("исчерпан бюджет" in w for w in report["run"]["warnings"]), report["run"]["warnings"][:4]
     assert report["run"]["calls"]["total"] < 16
+
+
+@_bug("06", "пустой тест-кейс модели (без названия, «когда» и «тогда», expected_defined=false) попадает в отчёт строкой "
+            "«| T-01 | R-1 |  |  |  | ❔ Не определено требованиями. |»: normalize_test_case сам пишет «Не определено» в then, "
+            "и фильтр «title or then» его пропускает (stages/lens_qa.py:853); ID «R-1» не существует")
+def test_empty_test_cases_are_dropped(tmp_path):
+    from bcc_review.v2.stages import lens_qa
+    props = lens_qa.SCHEMA["properties"]
+    qa = {k: [] for k in props}
+    tc_props = props["test_cases"]["items"]["properties"]
+    tc = {k: ([] if v.get("type") == "array" else (False if v.get("type") == "boolean" else ""))
+          for k, v in tc_props.items()}
+    tc["requirement_ids"] = ["R-1"]
+    qa["test_cases"] = [tc, tc]
+    report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", mock_dir=str(_mock_dir(tmp_path, lens_qa=qa)))
+    assert all(t.get("title") or t.get("when") for t in report["test_cases"]), report["test_cases"][:2]
