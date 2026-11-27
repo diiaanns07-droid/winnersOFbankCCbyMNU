@@ -163,3 +163,11 @@ def test_newtz_set_separates_clean20_from_open2():
     assert gate._newtz_set({"rows": [{"doc": "C:\\repo\\evaluation\\v2\\clean\\fx\\source.md"}]}) == "№20"
     assert gate._newtz_set({"rows": [{"doc": "evaluation/v2/open2/qr_clean/source.md"}]}) == "open2"
     assert gate._newtz_set({"rows": []}) == "open2"
+
+
+def test_latin_allow_standards_bodies_iana():
+    """Просьба №13: IANA — имя организации стандартов (как ISO/RFC), не английский текст в отчёте."""
+    from evaluation.v2.common import latin_words
+
+    assert latin_words("смещение UTC+5 с идентификатором IANA (база tz)", set()) == []
+    assert latin_words("поле note не заполнено", set()) == ["note"]

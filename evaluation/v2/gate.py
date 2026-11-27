@@ -307,7 +307,9 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
                       c["critical"] == 0, _clean_owners(d, "critical") + "; №10 (серьёзность)"))
     if "clean_verdict_no" in t:
         out.append(_check(f"{title}: вердикт «нельзя» на чистых", "0", str(c["verdict_no"]), c["verdict_no"] == 0,
-                          "№10 (вердикт), №13"))
+                          # вердикт считает код по правилу CONTRACT 5 (critical блокирующий → «нельзя», №13):
+                          # «нельзя» на чистом — это серьёзность судьи и источник critical, а не отчёт
+                          "№10 (серьёзность судьи) и источник critical: " + _clean_owners(d, "critical")))
     if d.get("failed"):
         out.append(_check(f"{title}: прогон", "все кейсы измерены", f"не измерено {d['failed']} из {d['cases']}",
                           False, "№01, №02"))
@@ -447,7 +449,8 @@ def clarity_gates(row: dict | None) -> list[dict]:
                       for w in (cl.get("worst") or [])[:5])
     return [{**_check("Понятность: рубрика", f"≥ {100 * CLARITY['rubric']:.0f} %",
                       f"{100 * share:.0f} % ({cl['passed']}/{cl['n']})", share >= CLARITY["rubric"],
-                      "№10 (тексты), №13; худшие: " + worst), "source": src}]
+                      # рендер №13 показывает поля судьи и ролей как есть — владельцы текстов: №10 и источники
+                      "№10 (тексты судьи) и источники в скобках; худшие: " + worst), "source": src}]
 
 
 def stress_gate() -> dict:

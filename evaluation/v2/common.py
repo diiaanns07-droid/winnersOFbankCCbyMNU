@@ -209,7 +209,7 @@ GENERIC_PHRASES = [
 _GENERIC_RE = [re.compile(p, re.I) for p in GENERIC_PHRASES]
 
 LATIN_ALLOW = {
-    "iso", "iec", "ieee", "rfc", "http", "https", "api", "rest", "json", "url", "uri", "ui", "ux", "sla", "bpmn",
+    "iso", "iec", "ieee", "rfc", "iana", "tz", "http", "https", "api", "rest", "json", "url", "uri", "ui", "ux", "sla", "bpmn",
     "kzt", "utc", "gmt", "get", "post", "put", "patch", "delete", "head", "pdf", "docx", "md", "html", "jira",
     "swagger", "openapi", "id", "ids", "sms", "push", "jwt", "bearer", "oauth", "tls", "pci", "dss", "gdpr",
     "asia", "almaty", "content", "type", "true", "false", "null", "ok", "error", "nfr", "crud", "csv", "uuid",
