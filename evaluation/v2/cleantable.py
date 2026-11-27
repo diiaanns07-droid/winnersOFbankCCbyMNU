@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from .common import ROOT, put_results_block
+from .common import ROOT, cluster_by_title, put_results_block
 
 V2 = ROOT / "evaluation" / "v2"
 RESULTS = V2 / "RESULTS.md"
@@ -280,34 +280,17 @@ def render_stability(rows: list[dict]) -> str:
     return "\n".join(L) + "\n"
 
 
-SAME_COMPLAINT = 0.2  # близость заголовков по словам — тот же порог, что «та же жалоба» в `corpus.background`
-
-
 def recurring(rows: list[dict], min_runs: int = 2) -> list[dict]:
     """Повторяющиеся ложные замечания (critical и major) на чистом документе: одна и та же жалоба в ≥ `min_runs`
-    прогонах модели (выборка — как в `stability`). Жалобы склеиваются по заголовку (`corpus._title_sim` ≥
-    `SAME_COMPLAINT` хотя бы с одной из уже склеенных) — модель каждый раз формулирует её чуть иначе."""
-    from .corpus import _title_sim
-
+    прогонах модели (выборка — как в `stability`). Жалобы склеиваются по заголовку (`common.cluster_by_title`) —
+    модель каждый раз формулирует её чуть иначе."""
     out = []
     for (set_name, model), docs in stability(rows).items():
         for case, rs in docs.items():
             rs = [r for r in rs if r.get("findings") is not None]
             if len(rs) < min_runs:
                 continue
-            clusters: list[list[tuple[int, dict]]] = []
-            for i, r in enumerate(rs):
-                for f in r["findings"]:
-                    best, score = None, 0.0
-                    for c in clusters:
-                        sim = max(_title_sim(f.get("title") or "", g.get("title") or "") for _, g in c)
-                        if sim > score:
-                            best, score = c, sim
-                    if best is not None and score >= SAME_COMPLAINT:
-                        best.append((i, f))
-                    else:
-                        clusters.append([(i, f)])
-            for c in clusters:
+            for c in cluster_by_title([(i, f) for i, r in enumerate(rs) for f in r["findings"]]):
                 runs = sorted({i for i, _ in c})
                 if len(runs) < min_runs:
                     continue

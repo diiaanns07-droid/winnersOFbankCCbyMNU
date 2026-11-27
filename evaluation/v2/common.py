@@ -62,6 +62,37 @@ def tokens(s: str) -> list[str]:
     return [t.strip(".:") for t in TOKEN.findall(norm(s)) if t.strip(".:")]
 
 
+TITLE_STOP = set("не в и на по с к о об для из от до при что как или а но же ли бы".split())
+
+
+def title_sim(a: str, b: str) -> float:
+    """Близость двух заголовков замечаний по словам (Жаккар без служебных и коротких слов)."""
+    ta = {x for x in tokens(a) if x not in TITLE_STOP and len(x) > 2}
+    tb = {x for x in tokens(b) if x not in TITLE_STOP and len(x) > 2}
+    return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
+
+
+SAME_COMPLAINT = 0.2  # порог «та же жалоба» по заголовкам (калибровка — `corpus.background`)
+
+
+def cluster_by_title(items: list[tuple[int, dict]], threshold: float = SAME_COMPLAINT) -> list[list[tuple[int, dict]]]:
+    """Замечания разных прогонов (`(номер прогона, замечание)`) — в группы «та же жалоба»: замечание идёт в группу,
+    с одним из членов которой его заголовок близок не меньше `threshold` (самой близкой), иначе — в новую. Модель
+    каждый раз формулирует одну жалобу чуть иначе; группа — одна жалоба во всех её формулировках."""
+    clusters: list[list[tuple[int, dict]]] = []
+    for i, f in items:
+        best, score = None, 0.0
+        for c in clusters:
+            sim = max(title_sim(f.get("title") or "", g.get("title") or "") for _, g in c)
+            if sim > score:
+                best, score = c, sim
+        if best is not None and score >= threshold:
+            best.append((i, f))
+        else:
+            clusters.append([(i, f)])
+    return clusters
+
+
 def md_line_text(raw: str) -> str:
     """Видимый текст строки Markdown, как в docview: без `**`, обратных кавычек, маркеров списка и заголовков."""
     t = MD_DECOR.sub("", raw).rstrip()

@@ -126,6 +126,13 @@ def _injection_flagged(rep: dict, md: Path) -> bool:
     return any(INJECTION_RE.search(t) for t in texts)
 
 
+def _outside_list(res: dict) -> list[dict]:
+    """Замечания вне эталона из `score.json` (`outside`): id, серьёзность, тип, заголовок, источники, владельцы."""
+    return [{"id": o.get("finding"), "severity": o.get("severity"), "kind": o.get("kind"),
+             "title": str(o.get("title") or "")[:140], "sources": o.get("sources") or [],
+             "owners": sorted({source_owner(x) for x in o.get("sources") or []})} for o in res.get("outside") or []]
+
+
 def score_case(c: dict, out: Path, arbiter: str) -> dict:
     d = out / "reports" / _key(c)
     rj = d / "report.json"
@@ -182,7 +189,7 @@ def score_case(c: dict, out: Path, arbiter: str) -> dict:
                     + (["№10"] if "судья" in m["where"] else []) + (["№03"] if "цитат" in m["where"] else [])}
                    for m in res["misses"]],
         "critical_false": res["severity"]["critical_false"], "duplicates": res["precision"]["duplicates"],
-        "outside": res["counts"]["outside_gold"]["total"],
+        "outside": res["counts"]["outside_gold"]["total"], "outside_list": _outside_list(res),
         "quotes_missing": res["quotes"]["missing"], "quotes_total": res["quotes"]["total"],
         "stage_recall": {k: {"found": v.get("found") if isinstance(v, dict) else v} for k, v in
                          (res.get("stage_recall") or {}).items()} if res.get("stage_recall") else {},
@@ -225,7 +232,8 @@ def summarize(rows: list[dict]) -> dict:
                   "max_findings": max((len(r.get("false_alarms") or []) for r in clean), default=0),
                   "verdict_no": sum(1 for r in clean if "no" in r["verdict"].values())},
         "injection": {"n": len(inj), "flagged": sum(1 for r in inj if r.get("injection_flagged"))},
-        "details": {"fp": [{**fa, "case_id": r["case"], "clean": True} for r in clean for fa in r.get("false_alarms") or []]},
+        "details": {"fp": [{**fa, "case_id": r["case"], "clean": True} for r in clean for fa in r.get("false_alarms") or []],
+                    "outside": [{**o, "case_id": r["case"]} for r in defects for o in r.get("outside_list") or []]},
         "time": {"total_s": round(sum(r.get("duration_s") or 0 for r in rows), 1),
                  "calls": sum(r.get("calls") or 0 for r in rows),
                  "cost_usd": round(sum(r.get("cost_usd") or 0 for r in rows), 3)},

@@ -23,8 +23,8 @@ import sys
 import time
 from pathlib import Path
 
-from .common import ROOT, quota_hit, quota_refusal, reusable_report, run_shell, sha256_file, shell_quote, source_owner, \
-    tokens
+from .common import ROOT, TITLE_STOP, quota_hit, quota_refusal, reusable_report, run_shell, sha256_file, shell_quote, \
+    source_owner, title_sim, tokens
 
 CORPUS = ROOT / "evaluation" / "dev" / "corpus"
 HARNESS_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
@@ -196,7 +196,7 @@ def details(per_case: list[dict], matrix: list[dict]) -> dict:
     return {"fp": fp, "fn": fn, "dup": dup, "by_source": dict(sorted(by_source.items()))}
 
 
-_TITLE_STOP = set("не в и на по с к о об для из от до при что как или а но же ли бы".split())
+_TITLE_STOP = TITLE_STOP
 
 
 def _quote_close(a: str, b: str) -> bool:
@@ -206,10 +206,7 @@ def _quote_close(a: str, b: str) -> bool:
     return bool(ta and tb) and inter >= 3 and inter / min(len(ta), len(tb)) >= 0.8
 
 
-def _title_sim(a: str, b: str) -> float:
-    ta = {x for x in tokens(a) if x not in _TITLE_STOP and len(x) > 2}
-    tb = {x for x in tokens(b) if x not in _TITLE_STOP and len(x) > 2}
-    return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
+_title_sim = title_sim
 
 
 def background(preds_path: Path, matrix: list[dict], per_case: list[dict] | None = None) -> dict:
