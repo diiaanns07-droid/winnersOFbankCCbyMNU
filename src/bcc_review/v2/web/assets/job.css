@@ -25,6 +25,7 @@
 .jb-nm{flex:1;min-width:0;font-size:17px}
 .jb-tm{flex:none;font-size:15px;color:var(--b-ink-3);font-variant-numeric:tabular-nums}
 .jb-subs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.jb-subs:empty{display:none}
 .jb-sub{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:999px;font-size:15px;
   color:var(--b-ink-3);background:rgba(15,40,65,.04);transition:background var(--b-base) var(--b-ease),color var(--b-base) var(--b-ease)}
 .jb-sub.running{color:var(--b-ink);background:var(--b-green-wash);box-shadow:inset 0 0 0 1px rgba(0,185,117,.28)}
@@ -57,7 +58,7 @@
 .jb-result{display:flex;flex-direction:column;gap:var(--b-gap)}
 .jb-hero{display:flex;align-items:center;gap:24px}
 .jb-hmain{flex:1;min-width:0}
-.jb-verdict{margin:0;font-size:clamp(30px,3.2vw,44px);line-height:1.12;font-weight:700;letter-spacing:-.035em;color:var(--b-ink)}
+.jb-verdict{margin:0;font-size:clamp(30px,2.9vw,42px);line-height:1.12;font-weight:700;letter-spacing:-.035em;color:var(--b-ink)}
 .jb-verdict .v{white-space:nowrap}
 .jb-verdict .sep{color:var(--b-ink-3);font-weight:400;margin:0 .18em}
 .jb-verdict .v-no b{color:var(--b-red)}

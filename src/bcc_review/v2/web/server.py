@@ -282,7 +282,7 @@ def result_html(job: Job, f: dict, *, agent: bool = True) -> str:
   {agent_html}
   <div class="jb-hmain"><h1 class="jb-verdict" id="verdict">{_verdict_html(f)}</h1>
   <p class="jb-meta">{" · ".join(meta)}</p>{notice}</div>
-  <div class="jb-hact"><a class="b-button quiet" href="/">Новая проверка</a></div>
+  <div class="jb-hact"><a class="b-button small" href="/">Новая проверка</a></div>
 </header>
 {strip}
 {blockers}
@@ -329,10 +329,10 @@ def job_page(job: Job, app: App | None = None) -> str:
 </main>"""
     page = _layout(f"Проверка: {job.file_name}", body, sub=job.file_name)
     # до вливания №39 _layout ещё без токенов — подключаем сами (после вливания ветка не срабатывает)
-    if "tokens.css" not in page:
+    if "/assets/tokens.css" not in page:
         page = page.replace('<link rel="stylesheet" href="/assets/app.css">',
                             '<link rel="stylesheet" href="/assets/tokens.css"><link rel="stylesheet" href="/assets/app.css">')
-    if "b-root" not in page:
+    if "<body>" in page:
         page = page.replace("<body>", '<body class="b-root">', 1)
     return page
 
