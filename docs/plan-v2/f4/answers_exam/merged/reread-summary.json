@@ -1,0 +1,53 @@
+[
+  {
+    "document": "official",
+    "run": "f4-merged-20h-official-1",
+    "model": "claude-sonnet-5-5",
+    "code": "2eac95cb",
+    "development": "no",
+    "testing": "no",
+    "findings": 20,
+    "citations_verified": 46,
+    "calls": {
+      "total": 9,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "source_sha256": "400159acf0ee399262f5a372c5738d7a2e35c3df2ba0ca083b11009d9c3b38c8"
+  },
+  {
+    "document": "qr",
+    "run": "f4-merged-20h-qr-1",
+    "model": "claude-sonnet-5-5",
+    "code": "2eac95cb",
+    "development": "conditional",
+    "testing": "conditional",
+    "findings": 17,
+    "citations_verified": 43,
+    "calls": {
+      "total": 8,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "source_sha256": "c372ce5ab1200b8a22764be930182043df6b0f936b22ce7174f4b192347fac94"
+  },
+  {
+    "document": "car-loan",
+    "run": "f4-merged-20h-car-loan-1",
+    "model": "claude-sonnet-5-5",
+    "code": "2eac95cb",
+    "development": "yes",
+    "testing": "yes",
+    "findings": 13,
+    "citations_verified": 36,
+    "calls": {
+      "total": 9,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "source_sha256": "c214b626712a54415676be9e70c99a48f64995bbf63d0fdb7795b1fe33ab9199"
+  }
+]
