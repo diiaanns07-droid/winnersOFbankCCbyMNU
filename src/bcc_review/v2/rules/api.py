@@ -159,6 +159,9 @@ def _kv(line: Line) -> tuple[str, str] | None:
 
 METHOD_HEADING = re.compile(r"^(?:метод|method|операция|endpoint)\s+[«\"]?([A-Za-z_][\w]*)[»\"]?\s*$", re.I)
 VERB_PATH = re.compile(r"^(GET|HEAD|POST|PUT|PATCH|DELETE)\s+(/\S*)")
+# метод в строке текста: «Эндпоинт сохранения: PUT /cards/{id}/limit», «Метод: GET /x — …»
+INLINE_METHOD = re.compile(r"^(?P<lead>[^:|]{0,60}?(?:эндпоинт|endpoint|метод|операци\w*|адрес|запрос)\w*[^:|]{0,40}):\s*"
+                           r"(?P<verb>GET|HEAD|POST|PUT|PATCH|DELETE)\s+(?P<url>/[\w\-{}/.]*[\w}])", re.I)
 
 
 def find_methods(doc: Doc) -> list[Method]:
@@ -178,6 +181,14 @@ def find_methods(doc: Doc) -> list[Method]:
             m = VERB_PATH.match(x.text)
             if m and x.cells is None and not x.is_code:
                 verb = m.group(1).upper()
+        if verb is None and x.cells is None:
+            im = INLINE_METHOD.match(x.text)
+            if im and not any(mm.verb == im.group("verb").upper() and mm.url == im.group("url") for mm in methods):
+                rest = x.text[im.end():].strip(" .—–-")
+                meth = Method(verb=im.group("verb").upper(), verb_line=x, start=x.n, url=im.group("url"), url_line=x,
+                              desc=(im.group("lead").strip() + (" — " + rest if rest else "")), desc_line=x)
+                methods.append(meth)
+                continue
         if verb is None and x.cells:
             # сводная таблица методов: «| 3. Данные QR | GET `/qr/{id}` | … |»
             for ci, cell in enumerate(x.cells):
