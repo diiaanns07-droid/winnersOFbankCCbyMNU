@@ -28,7 +28,8 @@ SCHEMA: dict = {
         "properties": {
             "finding_id": {"type": "string"},
             "summary": {"type": "string"},
-            "edits": {"type": "array", "minItems": 1, "maxItems": 4, "items": {
+            # промпт просит 1–4 правки; код применяет любое число — пятая правка не стоит повторного ответа
+            "edits": {"type": "array", "minItems": 1, "maxItems": 8, "items": {
                 "type": "object", "additionalProperties": False, "required": ["action", "line", "old", "new"],
                 "properties": {
                     "action": {"type": "string", "enum": ["replace", "insert_after"]},
@@ -397,14 +398,173 @@ def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
     answered = answered or []
     decisions = answers.get("decisions") or []
     rows, by_finding = [], {}
+    # несколько реплик на вопрос — согласованное правило, только если пересмотр снял по ним дефект без конфликта
+    agreed = {c.get("finding_id") for c in answers.get("changes") or []
+              if c.get("status") in ("resolved", "changed") and not c.get("answer_conflict")}
     for a in answered:
-        rows.append(f"{a.get('question_id')} ({a.get('topic', '')}) → {', '.join(a.get('finding_ids', []))}: "
-                    f"{a.get('answer', '')}")
+        fids = a.get("finding_ids", [])
+        replies = a.get("replies") or []
+        head = f"{a.get('question_id')} ({a.get('topic', '')}) → {', '.join(fids)}: "
+        if len(replies) > 1 and not agreed & set(fids):
+            # ответы адресатов расходятся: правило не согласовано, значение не выбирать — маркер <уточнить: …>
+            rows.append(head + "ответы расходятся, владелец не выбрал одно правило — значение не вписывай, "
+                               "поставь маркер <уточнить: …> с обоими вариантами: "
+                        + " / ".join(r.get("text", "") for r in replies))
+        else:
+            rows.append(head + f"{a.get('answer', '')}")
+        for part in a.get("deferred") or []:
+            rows.append(f"  не решено владельцем (не вписывай как правило, поставь маркер <уточнить: …>): {part}")
+        if len(replies) > 1 and not agreed & set(fids):
+            continue  # несогласованные реплики — не источник значения правки
         for fid in a.get("finding_ids", []):
             by_finding.setdefault(fid, []).append(a.get("question_id"))
     rows += [f"Общее решение владельца: {d}" for d in decisions]
     return ("\n".join(rows) or "—"), by_finding
 
+
+def decision_targets(answers: Any) -> list[dict]:
+    """Общие решения владельца (раздел «Решения», без номера вопроса) — отдельные цели правки.
+
+    Редакция правит дефекты; решение, которое не сняло ни один дефект (новое правило, срок, поле), иначе в
+    текст не попадает, хотя владелец его принял. Решение, на которое пересмотр уже сослался при снятии дефекта
+    (``answer_ids`` = «Решение-N»), вносится правкой этого дефекта и отдельной целью не становится.
+    """
+    if not answers:
+        return []
+    used = {str(x) for c in answers.get("changes") or [] for x in c.get("answer_ids") or []}
+    # решение, которое спорит с другим ответом, — не согласованное правило: в текст его не вписываем
+    used |= {str(x) for c in answers.get("answer_conflicts") or [] for x in c.get("answers") or []}
+    out = []
+    for i, d in enumerate(answers.get("decisions") or [], 1):
+        text, did = str(d or "").strip(), f"Решение-{i}"
+        if not text or did in used:
+            continue
+        out.append({"id": did, "severity": "major", "blocks": "none", "kind": "owner_decision",
+                    "title": "Решение владельца, которого ещё нет в документе",
+                    "problem": f"Владелец принял решение: «{text}». В документе этого правила нет.",
+                    "recommendation": "Внеси решение в документ с его точными значениями: новое требование в "
+                                      "подходящем разделе (insert_after) или правка требования, которое решение "
+                                      "меняет; если у раздела есть критерии приёмки — добавь критерий.",
+                    "evidence": []})
+    return out
+
+
+def unsettled_findings(answers: Any) -> set[str]:
+    """Дефекты, по которым ответы владельца расходятся: правка по ним без маркера <уточнить> — выдуманный выбор."""
+    if not answers:
+        return set()
+    answered = answers.get("answers") if "answers" in answers and "changes" in answers else answers.get("answered")
+    agreed = {c.get("finding_id") for c in answers.get("changes") or []
+              if c.get("status") in ("resolved", "changed") and not c.get("answer_conflict")}
+    out = {c.get("finding_id") for c in answers.get("answer_conflicts") or [] if c.get("finding_id")}
+    for a in answered or []:
+        if len(a.get("replies") or []) > 1:
+            out |= set(a.get("finding_ids") or []) - agreed
+    return out
+
+
+def drop_unsettled(rewrites: list[dict], unsettled: set[str], warnings: list[str]) -> list[dict]:
+    """Правка дефекта с расходящимися ответами остаётся, только если оставляет решение владельцу (маркер)."""
+    out = []
+    for r in rewrites:
+        if r["finding_id"] in unsettled and not any(_PENDING.search(str(e.get("new") or "")) for e in r["edits"]):
+            warnings.append(f"revise: {r['finding_id']} — ответы владельца расходятся, а правка выбрала значение "
+                            f"без маркера <уточнить>; правка не внесена, текст оставлен как был")
+            continue
+        out.append(r)
+    return out
+
+
+# правило 1 промпта кодом: «используй выбранное правило и его точные значения… не выдумывай числа, сроки и коды».
+# Число правки — «48», «23:59:59», «100 000», «0,5»; одна цифра («2 попытки», номер пункта) не проверяется
+_NUM = re.compile(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])")
+_NUMBERING = re.compile(r"(?m)^\s*(?:#{1,6}\s*\d+(?:\.\d+)*\.?|\d+(?:\.\d+)*[.)]|\d+(?:\.\d+)+)(?=\s)"
+                        r"|^\s*\|\s*\d+(?:\.\d+)*\s*(?=\|)")  # номер строки таблицы — первая ячейка
+
+
+def _nums(text: Any) -> set[str]:
+    s = _PENDING.sub(" ", str(text or ""))  # варианты внутри <уточнить: …> — вопрос владельцу, а не значение
+    s = _NUMBERING.sub(" ", s)  # нумерация раздела, пункта, строки таблицы
+    s = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d{3}(?!\d))", "", s)  # «100 000» = «100000»
+    return {n.replace(",", ".") for n in _NUM.findall(s) if len(n) >= 2}
+
+
+def _answered(answers: Any) -> list[dict]:
+    if not answers:
+        return []
+    got = answers.get("answers") if "answers" in answers and "changes" in answers else answers.get("answered")
+    return [a for a in got or [] if isinstance(a, dict)]
+
+
+_RAW_NUM = re.compile(r"(?<![\w.,:-])(\d{1,3}(?:[\u00a0\u202f ]\d{3})+|\d+(?:[.,:]\d+)*)(?![\w-])"
+                      r"(\s*(?:[а-яёa-z]+|₸|%))?", re.I)
+
+
+def _mark_invented(text: str, invented: set[str]) -> str:
+    """«через 30 секунд» → «через <уточнить: 30 секунд>»: значение, которого владелец не давал, — вопрос, а не правило.
+    Строки таблиц (примеры, тестовые данные) не трогаются."""
+    def line(ln: str) -> str:
+        if ln.lstrip().startswith("|"):
+            return ln
+        parts = re.split(r"(<\s*уточнить\s*:[^>]*>)", ln, flags=re.I)  # внутри маркера не трогаем
+        for k in range(0, len(parts), 2):
+            parts[k] = _RAW_NUM.sub(lambda m: f"<уточнить: {m.group(0).strip()}>"
+                                    if _nums(m.group(1)) & invented else m.group(0), parts[k])
+        return "".join(parts)
+    return "\n".join(line(x) for x in str(text).split("\n"))
+
+
+def check_values(rewrites: list[dict], answers: Any, lines: list[str], by_id: dict, warnings: list[str]) -> list[dict]:
+    """Значения правок по ответам владельца (правило 1 промпта — кодом).
+
+    * Правка вписывает значение варианта, который владелец отверг, без выбранного им значения, — не вносится.
+    * В правке по ответу число, которого нет ни в документе, ни в ответах владельца, ни в дефекте (выдуманное
+      значение), — помечается маркером «<уточнить: …>»: решает владелец, а не модель.
+    """
+    known = _nums("\n".join(lines))
+    answered = _answered(answers)
+    for a in answered:
+        known |= _nums(a.get("answer")) | _nums(" ".join(str(r.get("text") or "") for r in a.get("replies") or []))
+    for d in (answers or {}).get("decisions") or []:
+        known |= _nums(d)
+    by_q = {a.get("question_id"): a for a in answered}
+    out = []
+    for r in rewrites:
+        if not r.get("answer_ids"):  # без ответа владельца сверять не с чем — правило 1 держит промпт
+            out.append(r)
+            continue
+        f = by_id.get(r["finding_id"]) or {}
+        quotes = " ".join(str(e.get("quote") or "") for e in f.get("evidence") or [] if isinstance(e, dict))
+        own = known | _nums(" ".join(str(f.get(k) or "") for k in
+                                     ("title", "problem", "scenario", "impact", "recommendation", "rewrite")) + " " + quotes)
+        picks = []  # (вопрос, выбранные числа, числа отвергнутых вариантов, ответ)
+        for qid in r["answer_ids"]:
+            a = by_q.get(qid) or {}
+            if a.get("rejected_options"):
+                chosen = _nums(a.get("answer"))
+                other = set().union(*(_nums(o) for o in a["rejected_options"])) - chosen
+                if other:
+                    picks.append((qid, chosen, other, str(a.get("answer") or "")))
+        edits = []
+        for e in r["edits"]:
+            new = str(e.get("new") or "")
+            body = "\n".join(x for x in new.split("\n") if not x.lstrip().startswith("|"))
+            vals = _nums(new)
+            wrong = next(((qid, sorted(vals & other), ans) for qid, chosen, other, ans in picks
+                          if vals & other and not vals & chosen), None)
+            if wrong:
+                warnings.append(f"revise: {r['finding_id']} — правка вписывает {', '.join(wrong[1])} из варианта, "
+                                f"который владелец отверг в {wrong[0]} (выбрано: «{wrong[2][:60]}»); правка не внесена")
+                continue
+            invented = _nums(body) - _nums(e.get("old")) - own
+            if invented:
+                warnings.append(f"revise: {r['finding_id']} — в правке {', '.join(sorted(invented))}: такого значения нет "
+                                f"ни в документе, ни в ответах владельца, ни в дефекте — помечено <уточнить: …>")
+                e = dict(e, new=_mark_invented(new, invented))
+            edits.append(e)
+        if edits:
+            out.append(dict(r, edits=edits))
+    return out
 
 # --------------------------------------------------------------------------- этап
 def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
@@ -414,10 +574,15 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
                      key=lambda f: (_SEV.get(f.get("severity"), 2), int(f.get("priority") or 0) or 99))
     title = (view.get("title") if isinstance(view, dict) else getattr(view, "title", "")) or "документ"
     lines, _raw = _source_lines(ctx, view)
+    n_findings = len(targets)
+    owner = decision_targets(answers)  # общие решения владельца без вопроса — тоже правка документа
+    targets = targets + owner
     if not targets:
         return {"rewrites": [], "revised_markdown": "", "stats": {"replaced": 0, "inserted": 0, "not_applied": 0,
                                                                   "pending": 0}}
     ans_text, by_finding = _answers_block(answers)
+    for t in owner:
+        by_finding[t["id"]] = [t["id"]]
 
     def build(items: list) -> tuple[str, str]:
         block = _cl.format_findings(items)
@@ -446,6 +611,8 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
                          "answer_ids": by_finding.get(fid, [])})
     order = {f["id"]: i for i, f in enumerate(targets)}
     rewrites.sort(key=lambda r: order.get(r["finding_id"], 999))
+    rewrites = drop_unsettled(rewrites, unsettled_findings(answers), warnings)
+    rewrites = check_values(rewrites, answers, lines, by_id, warnings)
     applied = apply_edits(lines, rewrites, warnings)
     opts = getattr(ctx, "options", None) or {}
     check = {"fixes": [], "stats": {}}
@@ -457,7 +624,7 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     for r in applied["rewrites"]:
         r["pending"] = sum(len(_PENDING.findall(e.get("became", ""))) for e in r["edits"])
     body = applied["markdown"].splitlines()
-    head = _header(title, bool(by_finding), applied["stats"])
+    head = _header(title, bool(by_finding), applied["stats"])  # решения владельца — тоже «по ответам»
     # пометка-шапка после заголовка документа (первая строка «# …»), иначе в начале
     if body and body[0].lstrip().startswith("#"):
         md = "\n".join([body[0], ""] + head + body[1:]) + "\n"
@@ -467,7 +634,8 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
         _cl._warn(ctx, w)
     missing = [f["id"] for f in targets if f["id"] not in {r["finding_id"] for r in rewrites}]
     return {"rewrites": applied["rewrites"], "revised_markdown": md, "check_fixes": check.get("fixes", []),
-            "stats": {**applied["stats"], "findings": len(targets), "with_rewrite": len(rewrites),
+            "stats": {**applied["stats"], "findings": n_findings, "decisions": len(owner),
+                      "with_rewrite": len(rewrites),
                       "without_rewrite": missing, "check_fixes": len(check.get("fixes", [])),
                       "check_edits": check.get("stats", {}).get("replaced", 0) + check.get("stats", {}).get("inserted", 0)}}
 
@@ -614,8 +782,28 @@ def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = 
         clar = a["clarification"]
         out.update(clarification=clar, findings_after=a["findings_after"], rejected_after=a["rejected_after"])
         out["markdown_sections"].append(recheck.render_markdown(clar, a["findings_after"]))
+        if report_path:  # файл ответов следующего круга: что решить + уже согласованное
+            try:
+                doc = (report.get("document") or {}).get("file") or (report.get("document") or {}).get("name") or ""
+                path = recheck.next_answers_path(report_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(recheck.render_next_answers(clar, str(doc), Path(report_path).name), encoding="utf-8")
+                clar["next_answers_file"] = str(path)
+                if clar.get("next_round"):
+                    _cl._warn(ctx, f"recheck: осталось решить {len(clar['next_round'])} — строки для следующего круга "
+                                   f"в {path.name} (там же уже согласованные ответы)")
+            except OSError as exc:
+                _cl._warn(ctx, f"recheck: файл ответов следующего круга не записан ({exc})")
     if do_revise:
-        r = run(ctx, list(report.get("findings") or []), clar)
+        try:
+            r = run(ctx, list(report.get("findings") or []), clar)
+        except Exception as exc:  # noqa: BLE001 — сбой редакции не должен стирать уже готовый пересмотр по ответам
+            if not answers:
+                raise
+            msg = f"revise: редакция не построена ({type(exc).__name__}: {str(exc)[:200]}); пересмотр по ответам сохранён"
+            _cl._warn(ctx, msg)
+            out["revise_stats"] = {"status": "failed", "error": msg}
+            return out
         path = write(report_path, r) if report_path else None
         out.update(rewrites=flat_rewrites(r), revise_stats=r.get("stats", {}),
                    revised_file=str(path) if path else "", revised_markdown=r.get("revised_markdown", ""))
