@@ -75,7 +75,9 @@ def test_success_first_model_normalized():
     assert r["data"] == {"answer": "да"}
     assert r["model"] == "gemini-3.8-flash-001"           # фактическая версия модели — в паспорт
     assert r["stop_reason"] == "end_turn"
-    assert r["usage"] == {"input_tokens": 100, "output_tokens": 25, "thinking_tokens": 5, "cache_read_input_tokens": 0}
+    assert {k: r["usage"][k] for k in ("input_tokens", "output_tokens", "thinking_tokens", "cache_read_input_tokens")} \
+        == {"input_tokens": 100, "output_tokens": 25, "thinking_tokens": 5, "cache_read_input_tokens": 0}
+    assert r["usage"]["thinking"] == "medium"                     # уровень рассуждения — в трассу
     assert r["meta"]["fallback_used"] is False and r["meta"]["requested_model"] == "gemini-3.8-flash"
     assert s.calls == ["gemini-3.8-flash"] and sleeps == []
     assert s.last_messages == [{"role": "system", "content": "S"}, {"role": "user", "content": "U"}]
@@ -219,7 +221,8 @@ def test_schema_rejected_retries_same_model_with_schema_as_text():
     assert s.calls == ["gemini-3.8-flash"] * 2 and sleeps == []
     assert ("gemini-3.8-flash", "text") in s.modes
     assert r["meta"]["schema_mode"] == "text"
-    assert '"required": ["answer"]' in s.last_messages[0]["content"]      # схема текстом в system
+    assert s.last_messages[0] == {"role": "system", "content": "S"}       # общий префикс для кэша не тронут
+    assert '"required": ["answer"]' in s.last_messages[-1]["content"]     # схема текстом — в конце user
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
     assert s.modes.count(("gemini-3.8-flash", "text")) == 1               # режим запомнен, адаптер переиспользуется
 

@@ -24,6 +24,20 @@
 
 Провайдер сам повторяет временные ошибки (``handles_retries = True``): ``LLMClient`` не должен
 повторять их ещё раз поверх.
+
+Третья волна (замер — ``tests/v2/test_02_wallclock.py``, модель времени прогона):
+
+* параллельность по умолчанию 5 — все четыре линзы и набор идут разом (при 4 пятый этап ждал свободного
+  места и удлинял прогон на 40–45 с);
+* темп — скользящее окно запросов в минуту **по каждой модели** (``GEMINI_RPM``, по умолчанию из профиля:
+  Flash 10, Flash-Lite 15): запрос ждёт, только если в последние 60 с к этой модели ушло уже столько
+  запросов. Квоты Google считаются по модели, поэтому запасная модель окна основной не ждёт
+  (``paces_requests = True`` — фиксированный шаг ``--rpm`` поверх не нужен);
+* пустой ответ, ответ не JSON, нечитаемый ответ, необычный ``finish_reason`` — один повтор на той же модели,
+  затем следующая модель цепочки: «молча пустых» ответов наверх нет;
+* ответ не по схеме возвращается как есть: ``LLMClient`` один раз просит модель исправить его по списку
+  нарушений (раньше этап сразу падал без попытки починки);
+* рассуждения по этапам — из профиля модели (``profiles.py``).
 """
 
 from __future__ import annotations
@@ -31,9 +45,12 @@ from __future__ import annotations
 import os
 import threading
 import time
+from collections import deque
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from bcc_review.contracts import ProviderError
+
+from . import profiles
 
 __all__ = ["DEFAULT_FALLBACKS", "DEFAULT_MODEL", "GeminiProvider", "settings"]
 
@@ -48,12 +65,24 @@ NETWORK_DELAYS_S = (2.0, 5.0)
 RATE_WAITS = 2
 RETRY_SLACK_S = 120.0               # запас времени на повторы сверх таймаута вызова
 DEFAULT_MAX_RATE_WAIT_S = 65.0
-DEFAULT_CONCURRENCY = 4
+DEFAULT_CONCURRENCY = 5             # 4 линзы + набор идут разом (модель времени: при 4 прогон дольше на 40–45 с)
+RATE_WINDOW_S = 60.0
 KEY_HELP = "Бесплатный ключ: https://aistudio.google.com/apikey — добавьте в .env строку GEMINI_API_KEY=<ключ>."
 
 TRANSIENT = frozenset({"overloaded", "server", "timeout"})
 NEXT_MODEL = frozenset({"not_found", "quota"})
+# «Пустой» ответ модели (нет текста, не JSON, нечитаемый, необычный finish_reason): один повтор, затем другая модель
+EMPTY_SUBKINDS = frozenset({"empty_candidates", "empty_text", "not_json", "unreadable_response"})
+EMPTY_RETRIES = 1
 _OFF = ("off", "none", "no", "0", "false", "disable", "disabled")
+
+
+def is_empty_answer(exc: ProviderError) -> bool:
+    """Ответ пришёл, но пользы в нём нет: повтор обычно помогает (известная болезнь моделей с рассуждением)."""
+    if exc.kind != "invalid_output":
+        return False
+    sub = str(getattr(exc, "subkind", "") or "")
+    return sub in EMPTY_SUBKINDS or (sub.startswith("finish_") and sub != "finish_stop")
 
 
 def _models(raw: str | Iterable[str] | None) -> list[str]:
@@ -92,13 +121,17 @@ def settings(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "thinking_budget": (env.get("GEMINI_THINKING_BUDGET") or "").strip().lower() or None,
         "temperature": _num(env, "GEMINI_TEMPERATURE", None),
         "max_rate_wait_s": float(_num(env, "GEMINI_MAX_RATE_WAIT_S", DEFAULT_MAX_RATE_WAIT_S) or 0),
-        "concurrency": int(_num(env, "GEMINI_CONCURRENCY", DEFAULT_CONCURRENCY) or DEFAULT_CONCURRENCY),
+        "concurrency": int(_num(env, "GEMINI_CONCURRENCY", 0) or 0) or None,   # None — по профилю модели
         "total_timeout_s": _num(env, "GEMINI_TOTAL_TIMEOUT_S", None),
+        "rpm": _num(env, "GEMINI_RPM", None),   # None — по профилю модели; 0 — без окна
     }
 
 
-def thinking_for(model: str, level: str | None, budget: str | None) -> dict[str, Any]:
-    """Параметры рассуждений для модели: ``{"thinking_level": ...}`` или ``{"thinking_budget": ...}`` или ``{}``."""
+def thinking_for(model: str, level: str | None, budget: str | None, stage: str = "") -> dict[str, Any]:
+    """Параметры рассуждений для модели: ``{"thinking_level": ...}`` или ``{"thinking_budget": ...}`` или ``{}``.
+
+    Явные ``GEMINI_THINKING_LEVEL`` / ``GEMINI_THINKING_BUDGET`` важнее профиля; без них — профиль модели и этапа.
+    """
     if (level or "") in _OFF or (budget or "") in _OFF:
         return {}
     if budget:
@@ -108,24 +141,24 @@ def thinking_for(model: str, level: str | None, budget: str | None) -> dict[str,
             raise ProviderError("not_configured", f"GEMINI_THINKING_BUDGET={budget!r}: ожидается число токенов.") from None
     if level:
         return {"thinking_level": level}
-    if model.startswith("gemini-3"):
-        return {"thinking_level": DEFAULT_THINKING_LEVEL}
-    if model.startswith("gemini-2.5"):
-        return {"thinking_budget": DEFAULT_THINKING_BUDGET}
-    return {}
+    return profiles.gemini_thinking(model, stage)
 
 
 def _with_schema_text(messages: list[dict[str, Any]], schema: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Схема ответа текстом в системном сообщении (режим без response_json_schema)."""
+    """Схема ответа текстом в конце последнего сообщения user (режим без response_json_schema).
+
+    Не в системном промпте: системный промпт и начало сообщения (документ, требования) одинаковы у всех
+    этапов — это общий префикс для неявного кэша Gemini; схема у каждого этапа своя и идёт последней.
+    """
     import json
     hint = ("Ответ — только один JSON-объект строго по этой JSON Schema, без пояснений и без markdown:\n"
             + json.dumps(schema, ensure_ascii=False))
     out = [dict(m) for m in messages]
-    for m in out:
-        if m.get("role") == "system":
+    for m in reversed(out):
+        if m.get("role") == "user":
             m["content"] = f"{m.get('content') or ''}\n\n{hint}"
             return out
-    return [{"role": "system", "content": hint}, *out]
+    return [*out, {"role": "user", "content": hint}]
 
 
 def _us_pacific_offset_h(utc: "datetime.datetime") -> int:
@@ -161,6 +194,24 @@ def daily_reset_local(now_utc: "datetime.datetime | None" = None) -> str:
     return f"{local:%H:%M} {day} по местному времени (полночь по тихоокеанскому времени США)"
 
 
+def _attempt_note(a: Mapping[str, Any]) -> str:
+    """Короткая запись попытки для трассы: «gemini-3.8-flash 503», «gemini-3.8-flash ждал окно 12 с»."""
+    if "rpm_wait_s" in a:
+        return f"{a.get('model')} ждал окно {a['rpm_wait_s']} с"
+    if "skipped" in a:
+        return f"{a.get('model')} пропущена ({a['skipped']})"
+    what = a.get("subkind") or a.get("kind") or "?"
+    status = f" {a['status']}" if a.get("status") else ""
+    return f"{a.get('model')}{status} {what}".strip()
+
+
+class _PassValidator:
+    """Валидатор без нарушений: адаптер v1 отдаёт ответ, проверку по схеме делает ``LLMClient`` (с починкой)."""
+
+    def iter_errors(self, _data: Any) -> list:
+        return []
+
+
 def _int(value: Any) -> int:
     try:
         return int(value or 0)
@@ -172,7 +223,8 @@ def _describe(kind: str, status: Any) -> str:
     names = {"overloaded": "перегружена", "server": "сбой сервера", "timeout": "тайм-аут", "network": "нет сети",
              "not_found": "недоступна ключу (404)", "quota": "квота исчерпана", "rate_limit": "лимит запросов (429)",
              "auth": "ключ отклонён", "bad_request": "запрос отклонён", "refusal": "отказ фильтром",
-             "truncated": "ответ обрезан", "invalid_output": "ответ не по схеме", "not_configured": "не настроено"}
+             "truncated": "ответ обрезан", "invalid_output": "ответ не по схеме", "not_configured": "не настроено",
+             "empty": "пустой ответ"}
     text = names.get(kind, kind)
     return f"{text}, HTTP {status}" if status and str(status) not in text else text
 
@@ -188,6 +240,7 @@ class GeminiProvider:
 
     name = PROVIDER
     handles_retries = True
+    paces_requests = True   # окно запросов в минуту по каждой модели — здесь; фиксированный шаг --rpm поверх не нужен
 
     def __init__(self, *, api_key: str | None = None, model: str | None = None,
                  fallback_models: Iterable[str] | str | None = None, env: Mapping[str, str] | None = None,
@@ -195,11 +248,14 @@ class GeminiProvider:
                  sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
                  retry_delays: Sequence[float] = RETRY_DELAYS_S, network_delays: Sequence[float] = NETWORK_DELAYS_S,
                  max_rate_wait_s: float | None = None, max_output_tokens: int | None = None,
-                 concurrency: int | None = None) -> None:
+                 concurrency: int | None = None, rpm: float | None = None) -> None:
         cfg = settings(env)
         self._api_key = api_key or cfg["api_key"]
         self.default_model = (model or cfg["model"]).strip().removeprefix("models/")
         self.fallback_models = _models(fallback_models) if fallback_models is not None else cfg["fallback_models"]
+        self.rpm = rpm if rpm is not None else cfg["rpm"]   # None — по профилю каждой модели
+        self._window: dict[str, deque] = {}
+        self._window_lock = threading.Lock()
         self.max_output_tokens = int(max_output_tokens or cfg["max_output_tokens"])
         self.thinking_level = cfg["thinking_level"]
         self.thinking_budget = cfg["thinking_budget"]
@@ -212,7 +268,9 @@ class GeminiProvider:
         self._sleep = sleep
         self._clock = clock
         self._lock = threading.Lock()
-        self._gate = threading.BoundedSemaphore(max(1, int(concurrency or cfg["concurrency"])))
+        self.concurrency = int(concurrency or cfg["concurrency"]
+                               or profiles.for_model(self.default_model).get("concurrency") or DEFAULT_CONCURRENCY)
+        self._gate = threading.BoundedSemaphore(max(1, self.concurrency))
         self._adapters: dict[tuple[str, tuple], Any] = {}
         self._dead: dict[str, ProviderError] = {}       # модели, отключённые до конца прогона (404, квота)
         self._no_thinking: set[str] = set()              # модели, отвергшие настройку рассуждений
@@ -224,19 +282,26 @@ class GeminiProvider:
         if not self._api_key:
             raise ProviderError("not_configured", f"Не задан GEMINI_API_KEY. {KEY_HELP}", model=model)
         from bcc_review.providers.gemini import GeminiAdapter
-        cls = GeminiAdapter
-        if schema_mode == "text":
-            class TextSchemaAdapter(GeminiAdapter):
-                def _schema_bundle(self, schema: Mapping[str, Any]) -> Any:
-                    wire, log, validator = super()._schema_bundle(schema)
-                    return None, [*log, {"path": "/", "keyword": "*", "action": "schema sent as text"}], validator
-            cls = TextSchemaAdapter
+        text_mode = schema_mode == "text"
+
+        class LenientAdapter(GeminiAdapter):
+            """Ответ не по схеме возвращается как есть: проверку и одну починку по списку нарушений делает
+            ``LLMClient`` (адаптер v1 бросал invalid_output, и этап падал без попытки исправить ответ)."""
+
+            def _schema_bundle(self, schema: Mapping[str, Any]) -> Any:
+                wire, log, _validator = super()._schema_bundle(schema)
+                if text_mode:
+                    wire, log = None, [*log, {"path": "/", "keyword": "*", "action": "schema sent as text"}]
+                return wire, log, _PassValidator()
+
+        cls = LenientAdapter
         return cls(api_key=self._api_key, model=model, fallback_models=[], min_attempt_s=1.0,
                    temperature=self.temperature, max_output_tokens=self.max_output_tokens,
                    thinking_budget=thinking.get("thinking_budget"), thinking_level=thinking.get("thinking_level"))
 
-    def _adapter(self, model: str) -> tuple[Any, dict[str, Any], str]:
-        thinking = {} if model in self._no_thinking else thinking_for(model, self.thinking_level, self.thinking_budget)
+    def _adapter(self, model: str, stage: str = "") -> tuple[Any, dict[str, Any], str]:
+        thinking = ({} if model in self._no_thinking
+                    else thinking_for(model, self.thinking_level, self.thinking_budget, stage))
         mode = "text" if model in self._text_schema else "native"
         key = (model, tuple(sorted(thinking.items())), mode)
         with self._lock:
@@ -254,10 +319,40 @@ class GeminiProvider:
             self._dead.clear()
             self._no_thinking.clear()
 
+    def rpm_for(self, model: str) -> float:
+        """Сколько запросов в минуту слать модели: ``GEMINI_RPM`` или профиль (бесплатный тариф)."""
+        if self.rpm is not None:
+            return max(0.0, float(self.rpm))
+        return float(profiles.for_model(model).get("rpm") or 0)
+
+    def _pace(self, model: str, deadline: float) -> float:
+        """Скользящее окно: ждём, только если за последние 60 с к модели ушло уже ``rpm`` запросов.
+
+        Возвращает секунды ожидания (0 — без паузы). Запрос занимает место в окне сразу, до отправки.
+        """
+        rpm = self.rpm_for(model)
+        if rpm <= 0:
+            return 0.0
+        limit = max(1, int(rpm))
+        with self._window_lock:
+            win = self._window.setdefault(model, deque())
+            now = self._clock()
+            while win and now - win[0] >= RATE_WINDOW_S:
+                win.popleft()
+            wait = 0.0
+            if len(win) >= limit:
+                wait = max(0.0, win[len(win) - limit] + RATE_WINDOW_S - now + 0.5)
+                if now + wait > deadline - 5:
+                    wait = 0.0   # не успеваем дождаться: отправляем, 429 обработает Retry-After
+            win.append(now + wait)
+        if wait > 0:
+            self._sleep(wait)
+        return wait
+
     # ------------------------------------------------------------------ invoke
 
     def invoke(self, *, model: str | None, messages: Sequence[Mapping[str, Any]], schema: Mapping[str, Any],
-               timeout_s: float, max_output_tokens: int | None = None, **_: Any) -> dict[str, Any]:
+               timeout_s: float, max_output_tokens: int | None = None, stage: str = "", **_: Any) -> dict[str, Any]:
         chain = self.model_chain(model)
         per_call = max(5.0, float(timeout_s or 300))
         # Бюджет всего invoke: таймаут вызывающего (LLMClient уже ограничил его остатком лимита этапа) + запас на
@@ -276,30 +371,42 @@ class GeminiProvider:
                 attempts.append({"model": current, "skipped": dead.kind})
                 last = last or dead
                 continue
-            transient = network = rate = 0
+            transient = network = rate = empty = 0
             while True:
                 remaining = deadline - self._clock()
                 if remaining < 5:
                     raise self._final(last or ProviderError("timeout", f"Бюджет времени вызова Gemini ({total:.0f} с) "
                                                                        "исчерпан.", model=current), chain, attempts)
                 try:
-                    adapter, thinking, mode = self._adapter(current)
+                    adapter, thinking, mode = self._adapter(current, stage)
                 except ProviderError as exc:
                     raise self._final(exc, chain, attempts) from None
-                started = self._clock()
                 sent = _with_schema_text(clean, schema) if mode == "text" else clean
+                started = self._clock()
                 try:
                     with self._gate:
+                        waited = self._pace(current, deadline)
+                        if waited:
+                            attempts.append({"model": current, "rpm_wait_s": round(waited, 1)})
+                        started = self._clock()
+                        remaining = deadline - started
                         result = adapter.invoke(model=current, messages=sent, schema=schema,
-                                                timeout_s=min(per_call, remaining), max_output_tokens=max_tokens)
+                                                timeout_s=max(5.0, min(per_call, remaining)),
+                                                max_output_tokens=max_tokens)
                 except ProviderError as exc:
                     last = exc
                     kind = exc.kind
                     attempts.append({"model": current, "kind": kind, "status": exc.status,
+                                     "subkind": getattr(exc, "subkind", None),
                                      "retry_after_s": exc.retry_after_s, "seconds": round(self._clock() - started, 2)})
                     if kind in NEXT_MODEL:
                         self._dead[current] = exc
                         break
+                    if is_empty_answer(exc):
+                        if empty < EMPTY_RETRIES:
+                            empty += 1
+                            continue
+                        break   # та же модель дважды ответила пустым — следующая модель цепочки
                     if kind in TRANSIENT:
                         if transient < len(self.retry_delays):
                             self._sleep(self.retry_delays[transient])
@@ -344,6 +451,15 @@ class GeminiProvider:
         think = _int(u.get("thinking_tokens"))
         usage = {"input_tokens": _int(u.get("input_tokens")), "output_tokens": out_tokens + think,
                  "thinking_tokens": think, "cache_read_input_tokens": _int(u.get("cache_read_input_tokens"))}
+        # попытки и паузы — в usage, чтобы они попали в trace.jsonl (разбор: python -m bcc_review.v2.providers.timing)
+        tried = [_attempt_note(a) for a in attempts]
+        if tried:
+            usage["attempts"] = tried
+        waited = sum(float(a.get("rpm_wait_s") or 0) for a in attempts)
+        if waited:
+            usage["rpm_wait_s"] = round(waited, 1)
+        if thinking:
+            usage["thinking"] = next(iter(thinking.values()))
         meta = dict(result.get("meta") or {})
         actual = str(result.get("model") or called)
         meta.update({"provider": PROVIDER, "requested_model": chain[0], "called_model": called,
@@ -362,7 +478,12 @@ class GeminiProvider:
         if exhausted and len(chain) > 1:
             tried: dict[str, list[str]] = {}
             for a in attempts:
-                tried.setdefault(a["model"], []).append(_describe(a.get("kind") or a.get("skipped") or "?", a.get("status")))
+                if "rpm_wait_s" in a:
+                    continue
+                kind = a.get("kind") or a.get("skipped") or "?"
+                if kind == "invalid_output" and str(a.get("subkind") or "") in EMPTY_SUBKINDS:
+                    kind = "empty"
+                tried.setdefault(a["model"], []).append(_describe(kind, a.get("status")))
             parts = [f"{m}: {', '.join(sorted(set(v)))}" + (f" ×{len(v)}" if len(v) > 1 else "")
                      for m, v in tried.items()]
             message = (f"Все модели Gemini из цепочки недоступны ({'; '.join(parts)}). Последняя ошибка: {message} "
