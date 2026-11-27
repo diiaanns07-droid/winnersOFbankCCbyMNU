@@ -175,3 +175,78 @@ def test_single_call_by_default():
     llm = _FakeLLM()
     C.run(_Ctx(llm, split=False))
     assert len(llm.calls) == 1 and set(C.SCHEMA["properties"]) == llm.calls[0][1]
+
+
+def test_period_mismatch_with_acceptance_row_stays_conflict():
+    # «за один час» в правиле и «за текущие сутки» в строке приёмки — разные периоды одного лимита, не единица показа
+    doc = ["* **А-5.** За один час выполняется не больше трёх пополнений.",
+           "| Три пополнения за текущие сутки | Баланс ниже порога | Пополнение не выполнено |"]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    reqs = [{"id": "R-01", "source_id": "А-5", "kind": "functional", "line_start": 1, "line_end": 1},
+            {"id": "R-02", "source_id": "Критерии приёмки, строка 1", "kind": "acceptance", "line_start": 2,
+             "line_end": 2}]
+    p = pair(a="R-01", b="R-02", quote_a=doc[0][10:], line_a=1, quote_b="Три пополнения за текущие сутки", line_b=2,
+             kind="unit_mismatch", basis="value_mismatch", outcome_a="четвёртое в сутки разрешено",
+             outcome_b="четвёртое в сутки отклонено")
+    out = C.postprocess(answer(pair_checks=[p]), view, reqs)
+    assert out["pair_checks"][0]["verdict"] == "conflict" and len(out["candidates"]) == 1
+
+
+def test_silence_with_two_conditions_is_incompleteness_not_check_order():
+    # «шаг логики не проверяет условие правила» — неполнота (major), даже если модель сказала «два условия»
+    p = pair(a="R-01", b="R-02", quote_a=DOC[1][10:], line_a=2, quote_b=DOC[2][3:], line_b=3, verdict="undefined",
+             basis="none", kind="incomplete", one_condition=False, outcome_a="второй раз — отказ",
+             outcome_b="код не назван")
+    [c] = run(p)["candidates"]
+    assert c["severity"] == "major" and c["kind"] == "incomplete"
+    p2 = dict(p, kind="ambiguity")
+    [c2] = run(p2)["candidates"]
+    assert c2["severity"] == "minor" and "Порядок проверок" in c2["problem"]
+
+
+def test_tiyn_with_decimals_against_tenge_row_stays_conflict():
+    # «в тиынах с двумя знаками после точки» — тиыны целые, единица действительно перепутана
+    p = pair(a="R-09", b="R-10", quote_a="Долг 120 000 ₸", line_a=10, quote_b="Сумма в тиынах", line_b=11,
+             kind="unit_mismatch", basis="value_mismatch", outcome_a="120 000 ₸", outcome_b="12 000 000 тиынов")
+    assert run(p)["candidates"] == []
+    p2 = dict(p, quote_b="Сумма в тиынах с двумя знаками после точки")
+    doc_line = VIEW["lines"][10]
+    old = doc_line["text"]
+    doc_line["text"] = "amount | integer | Сумма в тиынах с двумя знаками после точки"
+    try:
+        assert len(run(p2)["candidates"]) == 1
+    finally:
+        doc_line["text"] = old
+
+
+def test_degenerate_answer_gives_warning():
+    class LLM:
+        def ask(self, *a, **kw):
+            return {"subjects": [], "pair_checks": [], "glossary": [], "trace": [], "candidates": []}
+    reqs = REQS + [{"id": f"R-9{i}", "source_id": "", "kind": "functional", "line_start": 2, "line_end": 2}
+                   for i in range(3)]
+    ctx = _Ctx(LLM(), split=False)
+    ctx.requirements = reqs
+    C.run(ctx)
+    assert any("неполный" in w for w in ctx.warnings)
+
+
+def test_texts_pass_clarity_rubric_title_and_fix():
+    # заголовок пары ≤ 12 слов, у неопределённости — вопрос; у глоссария — вопрос с вариантами
+    p = pair(a="R-01", b="R-02", quote_a=DOC[1][10:], line_a=2, quote_b=DOC[2][3:], line_b=3, verdict="undefined",
+             basis="none", kind="incomplete", one_condition=True, outcome_a="второй раз — отказ",
+             outcome_b="код не назван", title="", question="",
+             subject="повторная оплата кода, который уже оплачен первым переводом, и код ответа для такого случая",
+             recommendation="Добавить правило: повторная оплата возвращает 410 или результат первого перевода.")
+    [c] = run(p)["candidates"]
+    assert len(c["title"].split()) <= 12
+    assert c["question"] == "Повторная оплата возвращает 410 или результат первого перевода?"
+    g = {"concept": "участник", "terms": [{"term": "Клиент", "line": 15}, {"term": "держатель счёта", "line": 15}],
+         "problem": "Неясно, одно ли это лицо.", "severity": "major"}
+    [gc] = run(glossary=[g])["candidates"]
+    assert "одно лицо или разные" in gc["question"] and gc["title"].startswith("Разные названия участника")
+    g2 = {"concept": "компонент", "terms": [{"term": "Сервис настроек", "line": 16},
+                                            {"term": "хранилище настроек", "line": 16}],
+          "problem": "Неясно, один ли это компонент.", "severity": "major"}
+    [gc2] = run(glossary=[g2])["candidates"]
+    assert gc2["question"].startswith("Какое название оставить") and "компонента" in gc2["title"]
