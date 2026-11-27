@@ -275,3 +275,13 @@ def test_field_missing_from_data_list_is_minor_unless_rule_needs_it():
     for t in minor + major:
         out = la.postprocess({"candidates": [_cand(title=t, kind="missing_element")]})["candidates"][0]
         assert out["severity"] == ("minor" if t in minor else "major"), t
+
+
+def test_success_body_reference_is_minor():
+    """«Тело успешного ответа не описано, таблица ссылается на раздел» — в списке «не пиши вовсе»; если модель
+    всё же написала — minor. «201 без описания» и ветки без ответа не трогаем."""
+    for t, want in {"Успешный ответ метода ссылается на описание, которого нет": "minor",
+                    "Ответ 200 метода не описан, хотя таблица ссылается на раздел метода": "minor",
+                    "Коды успеха: 200 назван Created, 201 без описания": "major",
+                    "Ветка логики без ответа: отказ по сумме": "major"}.items():
+        assert la.postprocess({"candidates": [_cand(title=t)]})["candidates"][0]["severity"] == want, t

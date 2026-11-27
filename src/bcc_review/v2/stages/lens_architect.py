@@ -10,8 +10,8 @@
 * точные дубли (тот же вид и тот же набор строк цитат) схлопываются;
 * порядок critical → major → minor, не больше MAX_CANDIDATES;
 * critical «нет операции» без цитаты явного обещания интерфейса (и без кода ответа) понижается до major;
-* «поле без условия нет в телах ошибок» (проверка 4а) и «поле не перечислено в хранимых данных» без правила,
-  которому оно нужно (разбор №18), — minor;
+* «поле без условия нет в телах ошибок» (проверка 4а), «поле не перечислено в хранимых данных» без правила,
+  которому оно нужно (разбор №18), и «тело успешного ответа не описано» — minor;
 * документ задаёт ключ идемпотентности — замечания о повторах minor (`cap_defined_repeats`);
 * страховки по описи и сигналам: ветка без ответа, обещанная операция без описания, «успех против ошибки»
   по сигналу правила `api.success_with_error` (`branch_candidates`, `promise_candidates`,
@@ -138,6 +138,19 @@ def data_list_only(c: dict) -> bool:
     return c.get("kind") == "missing_element" and bool(DATA_LIST_TITLE.search(title)) and not RULE_NEED.search(title)
 
 
+# «Тело успешного ответа не описано, хотя таблица кодов ссылается на раздел метода» — в списке промпта «не пиши
+# вовсе», но haiku пишет его major на чистых ТЗ корпуса (3 из 5 major итоговой версии, 1 из 4 у прежней).
+SUCCESS_BODY_TITLE = re.compile(r"успешн\w* ответ|ответ\w* 200|200\s.{0,25}(ссыла|отсыла)", re.I)
+SUCCESS_BODY_GAP = re.compile(r"не описан|ссыла|отсыла|\bнет\b", re.I)
+
+
+def success_body_ref(c: dict) -> bool:
+    """Замечание о неописанном теле успешного ответа (ссылка на описание, которого нет)."""
+    t = str(c.get("title") or "")
+    return c.get("kind") in ("api_contract", "missing_element", "incomplete") and \
+        bool(SUCCESS_BODY_TITLE.search(t)) and bool(SUCCESS_BODY_GAP.search(t))
+
+
 def error_body_gap(c: dict) -> bool:
     """Замечание проверки 4а: поле ответа без условия отсутствует в телах ошибок."""
     return c.get("kind") == "api_contract" and bool(ERROR_BODY_TITLE.search(str(c.get("title") or "")))
@@ -177,7 +190,7 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
             c["severity"] = "major"  # шкала линзы: противоречия правил и единицы — major (их critical — набор №09)
         if unpromised_critical(c):
             c["severity"] = "major"
-        if c["severity"] != "minor" and (error_body_gap(c) or data_list_only(c)):
+        if c["severity"] != "minor" and (error_body_gap(c) or data_list_only(c) or success_body_ref(c)):
             c["severity"] = "minor"
         if requirement_ids is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in requirement_ids]
