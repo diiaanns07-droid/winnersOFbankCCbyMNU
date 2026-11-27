@@ -636,3 +636,13 @@ def test_fast_start_remap_error_does_not_abort_run(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "remap_output", boom)
     report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", fast_start=True)
     assert report["run"]["status"] != "failed" and report["findings"]
+
+
+@_bug("01", "быстрый старт + нет сети: нарезка и 5 рецензентов повторяют network параллельно и сжигают все 16 вызовов, "
+            "не замечая, что ошибка уже признана фатальной (llm._ask_model не проверяет self.fatal перед повтором)")
+def test_network_down_with_fast_start_stops_retries(tmp_path, monkeypatch):
+    report, _, _ = _faulty_run(tmp_path, monkeypatch, lambda s, k: ProviderError("network", "нет соединения"),
+                               fast_start=True)
+    assert report["run"]["status"] == "failed"
+    assert not any("исчерпан бюджет" in w for w in report["run"]["warnings"]), report["run"]["warnings"][:4]
+    assert report["run"]["calls"]["total"] < 16
