@@ -169,7 +169,19 @@ def run(ctx: Any) -> dict:
     """Этап набора: один вызов модели (или два параллельных — опция) и разбор ответа кодом (CONTRACT 3)."""
     system, user = ctx.prompt(STAGE)
     data = _run_split(ctx, system, user) if _split_wanted(ctx) else _ask(ctx, system, user, SCHEMA)
-    return postprocess(data, ctx.view, getattr(ctx, "requirements", None) or [])
+    reqs = getattr(ctx, "requirements", None) or []
+    if _degenerate(data, reqs) and hasattr(ctx, "warn"):
+        ctx.warn("Проверка набора: ответ модели неполный — нет трассировки, глоссария и дефектов набора; "
+                 "противоречия набора могут быть пропущены.")
+    return postprocess(data, ctx.view, reqs)
+
+
+def _degenerate(data: dict, requirements: list[dict]) -> bool:
+    """Ответ прошёл схему, но пуст по всем частям, кроме пар (сбой модели: оборванный разбор), — на документе,
+    где есть что трассировать."""
+    targets = sum(1 for r in requirements if r.get("kind") in TRACE_KINDS)
+    return (targets >= 3 and not (data or {}).get("trace") and not (data or {}).get("glossary")
+            and not (data or {}).get("candidates") and len((data or {}).get("pair_checks") or []) <= 1)
 
 
 # ---------------------------------------------------------------- сверка цитат
@@ -1056,10 +1068,8 @@ def _duplicates_pair(cand: dict, pair_cands: list[dict]) -> bool:
 
 
 def _covered_by_promise(pc: dict, model_cands: list[dict]) -> bool:
-    """Кандидат пары (неопределённость), все найденные цитаты которого стоят на строках critical-кандидата
-    «обещано, но не описано» (±1 строка)."""
-    if pc["kind"] not in ("incomplete", "ambiguity"):
-        return False
+    """Кандидат пары, все найденные цитаты которого стоят на строках critical-кандидата «обещано, но не описано»
+    (±1 строка): «назначение метода: чтение или сохранение» — тот же дефект, что «чтение обещано, но не описано»."""
     mine = [e for e in pc["evidence"] if _found(e)]
     return bool(mine) and any(
         mc["severity"] == "critical" and mc["kind"] == "missing_element"
@@ -1163,8 +1173,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
         c = normalize_candidate(raw, view, known, requirements)
         if c and not _duplicates_pair(c, pair_cands):
             model_cands.append(c)
-    # Неопределённость пары, которая повторяет critical «обещано, но не описано» (те же строки), — тот же дефект
-    # в слабой форме: остаётся одно замечание, critical.
+    # Пара, которая повторяет critical «обещано, но не описано» (те же строки), — тот же дефект в другой форме:
+    # остаётся одно замечание, «обещано, но не описано».
     pair_cands = [c for c in pair_cands if not _covered_by_promise(c, model_cands)]
     candidates.extend(pair_cands)
 

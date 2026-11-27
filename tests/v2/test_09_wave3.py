@@ -217,3 +217,15 @@ def test_tiyn_with_decimals_against_tenge_row_stays_conflict():
         assert len(run(p2)["candidates"]) == 1
     finally:
         doc_line["text"] = old
+
+
+def test_degenerate_answer_gives_warning():
+    class LLM:
+        def ask(self, *a, **kw):
+            return {"subjects": [], "pair_checks": [], "glossary": [], "trace": [], "candidates": []}
+    reqs = REQS + [{"id": f"R-9{i}", "source_id": "", "kind": "functional", "line_start": 2, "line_end": 2}
+                   for i in range(3)]
+    ctx = _Ctx(LLM(), split=False)
+    ctx.requirements = reqs
+    C.run(ctx)
+    assert any("неполный" in w for w in ctx.warnings)
