@@ -55,6 +55,18 @@ DOC = [
     "| Сумма погашена 20-го | Закрыть период 25-го | Проценты за покупки начислены |",            # 32
     "Приложение получает сведения и включает или выключает напоминание через дочерний документ.",  # 33
     "Приложение → API: подключить услугу; подписание договора → выдача кредита → выпуск полиса.",  # 34
+    "* **У-12.** После выполненного обмена клиент получает одно уведомление.",                      # 35
+    "Сервис повторяет отправку уведомления три раза, после чего уведомление не отправляется.",      # 36
+    "2. Счёт не найден среди счетов клиента — 404 `ACCOUNT_NOT_FOUND`.",                           # 37
+    "| 404 | Метод 1: котировка не найдена | `{\"errorCode\":\"QUOTE_NOT_FOUND\"}` |",             # 38
+    "Пока экран заказа открыт, приложение запрашивает статус каждые 5 секунд.",                    # 39
+    "Приложение → сервис: статус заказа (метод 3) каждые 5 секунд, пока IN_PROGRESS.",             # 40
+    "При кодах 400, 404 и 422 погашение по этому запросу не проведено.",                           # 41
+    "Повтор с тем же ключом: если операция проведена — 200 с результатом этой операции.",          # 42
+    "| 404 | Карта не найдена | `{\"errorCode\":\"CARD_NOT_FOUND\"}` |",                           # 43
+    "Если карта не найдена, метод возвращает 200 и `{\"errorCode\":\"CARD_NOT_FOUND\"}`.",         # 44
+    "Приложение запрашивает статус каждые 10 секунд.",                                             # 45
+    "| Authorization | Bearer, сессия клиента — держателя карты |",                                 # 46
 ]
 SECTIONS = {8: "Требования к тестированию › Тестирование требований", 11: "Критерии приемки"}
 VIEW = {"lines": [{"n": i, "text": t, "page": None, "section": SECTIONS.get(i, "Требования")}
@@ -63,7 +75,9 @@ KINDS = {2: "functional", 3: "api", 4: "api", 5: "functional", 6: "data", 7: "co
          9: "functional", 10: "functional", 11: "acceptance", 12: "ui", 13: "functional", 14: "constraint", 15: "api",
          16: "constraint", 17: "constraint", 18: "api", 19: "api", 20: "functional", 21: "acceptance",
          22: "functional", 23: "functional", 24: "goal", 25: "goal", 26: "ui", 27: "functional", 28: "ui",
-         29: "functional", 30: "api", 31: "functional", 32: "acceptance", 33: "integration", 34: "process"}
+         29: "functional", 30: "api", 31: "functional", 32: "acceptance", 33: "integration", 34: "process",
+         35: "functional", 36: "integration", 37: "api", 38: "api", 39: "ui", 40: "architecture", 41: "api",
+         42: "constraint", 43: "api", 44: "api", 45: "functional", 46: "api"}
 REQS = [{"id": f"R-{n:02d}", "source_id": "", "kind": k, "line_start": n, "line_end": n,
          "section": SECTIONS.get(n, "Требования")} for n, k in KINDS.items()]
 
@@ -115,6 +129,17 @@ def one(p: dict) -> tuple[dict, list[dict]]:
     # отрицание о другом объекте: поля запроса не сохраняются, сохранённые настройки остаются
     (pair(29, 30, basis="same_condition", qb="При enabled = false поля step и limit не проверяются и не сохраняются"),
      "other_object", "compatible"),
+    # условие цитаты — в предыдущей фразе (исчерпанные попытки), а не вход другой стороны
+    (pair(35, 36, qb="после чего уведомление не отправляется"), "condition_elsewhere", "undefined"),
+    # коды ошибок про разные объекты
+    (pair(37, 38, kind="status_conflict", basis="same_condition", qa="404 ACCOUNT_NOT_FOUND",
+          qb='"errorCode":"QUOTE_NOT_FOUND"'), "different_condition", "compatible"),
+    # одно и то же действие с теми же значениями при разных условиях
+    (pair(39, 40, basis="same_condition", qb="статус заказа (метод 3) каждые 5 секунд, пока IN_PROGRESS"),
+     "same_outcome", "compatible"),
+    # список кодов — условие («при кодах 400, 404 и 422 …»), а не исход
+    (pair(41, 42, kind="status_conflict", basis="same_condition",
+          qb="если операция проведена — 200 с результатом этой операции"), "two_phase", "undefined"),
 ])
 def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
     pc, cands = one(p)
@@ -131,6 +156,9 @@ def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
     (pair(27, 11, kind="boundary_conflict"), "boundary_conflict"),                            # «включительно»
     (pair(28, 13), "event_conflict"),                                                         # экран со своим числом
     (pair(31, 32, qa="проценты по покупкам не начисляются"), "event_conflict"),                 # общий предмет
+    (pair(43, 44, kind="status_conflict", basis="same_condition",                             # тот же объект кода
+          qa="404 | Карта не найдена", qb="Если карта не найдена, метод возвращает 200"), "status_conflict"),
+    (pair(39, 45), "event_conflict"),                                                         # 5 и 10 секунд
 ])
 def test_real_conflicts_stay_critical(p, kind):
     pc, cands = one(p)
@@ -184,6 +212,10 @@ def test_glossary_other_person_and_qualified_name_are_not_major():
            "Страховая компания-партнёр рассчитывает премию.", "Страховая компания не ответила — 502.",
            "Владелец карты настраивает услугу."]
     view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    view_eq = {"lines": [{"n": 1, "text": DOC[45], "page": None, "section": ""},
+                         {"n": 2, "text": "Клиент настраивает услугу.", "page": None, "section": ""}]}
+    out = C.postprocess({"glossary": [g(("клиента", 1), ("держателя карты", 1))]}, view_eq, [])
+    assert [x["severity"] for x in out["glossary"]] == ["none"]  # документ приравнивает через тире
     data = {"glossary": [g(("держателя карты", 1), ("другому клиенту", 2)),
                          g(("Страховая компания-партнёр", 3), ("Страховая компания", 4)),
                          g(("держателя карты", 1), ("Владелец карты", 5))]}
@@ -218,7 +250,7 @@ def _repost(label: str) -> list[dict]:
     return out
 
 
-@pytest.mark.parametrize("label", ["h0", "h2"])
+@pytest.mark.parametrize("label", ["h0", "h2", "h3"])
 def test_clean_documents_give_no_critical_and_at_most_one_major(label):
     """20 чистых ТЗ (корпус, open2, №20), два прогона haiku: h0 было critical 8, major 58 (17 документов с
     major > 1); h2 (свежие ответы после правок) — проверка, что правила держатся на новых ответах."""

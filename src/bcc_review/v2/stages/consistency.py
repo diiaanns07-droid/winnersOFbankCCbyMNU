@@ -557,7 +557,8 @@ _NON_NORMATIVE_SECTION = re.compile(r"тестирование\s+требова�
                                     r"согласовани|глоссари", re.I)
 
 # Причины, по которым пара не конфликт, а совместима (разные предметы, условие права, уточнение границы приёмкой).
-GATE_DROP = ("right_condition", "storage_vs_validity", "non_normative", "acceptance_duration", "other_object")
+GATE_DROP = ("right_condition", "storage_vs_validity", "non_normative", "acceptance_duration", "other_object",
+             "same_outcome", "different_condition")
 GATE_RU = {
     "right_condition": "одно место задаёт условие права, другое — запрет для другого состояния",
     "storage_vs_validity": "срок хранения записи и срок действия — разные предметы",
@@ -569,17 +570,21 @@ GATE_RU = {
     "two_phase": "одна сторона — следствие ответа другой системы, а не ответ на тот же запрос",
     "same_place": "цитаты не найдены в двух разных местах документа",
     "other_object": "отрицание в одной цитате относится к другому объекту, чем утверждение другой",
+    "condition_elsewhere": "условие одной цитаты стоит в предыдущей фразе (сбой, исчерпанные попытки), а не во входе другой",
+    "different_condition": "коды ошибок называют разные объекты — это разные условия",
+    "same_outcome": "оба места требуют одного и того же с теми же значениями, ни одно не запрещает и не ограничивает",
 }
 
 
-_COND_CODE = re.compile(r"(?<![а-яё])(?:при|после|на)\s+(?:ответ\w*|код\w*|статус\w*)\s+([1-5]\d\d)(?!\d)|"
-                        r"(?<![а-яё])(?:если|когда)[^.;]{0,40}?(?:вернул\w*|ответил\w*|получ\w*\s+ответ\w*)\s+([1-5]\d\d)(?!\d)",
-                        re.I)
+_CODE_LIST = r"([1-5]\d\d(?!\d)(?:\s*(?:,|и|или)\s*[1-5]\d\d(?!\d))*)"  # «400, 401, 404 и 422»
+_COND_CODE = re.compile(r"(?<![а-яё])(?:при|после|на)\s+(?:ответ\w*|код\w*|статус\w*)\s+" + _CODE_LIST + "|"
+                        r"(?<![а-яё])(?:если|когда)[^.;]{0,40}?(?:вернул\w*|ответил\w*|получ\w*\s+ответ\w*)\s+"
+                        + _CODE_LIST, re.I)
 
 
 def _cond_codes(q: str) -> set[str]:
     """Коды ответа, которые стоят в цитате условием («при ответе 422», «если АБС вернула 500»), а не исходом."""
-    return {a or b for a, b in _COND_CODE.findall(q)}
+    return {c for a, b in _COND_CODE.findall(q) for c in _CODE.findall(a or b)}
 
 
 _NEG = re.compile(r"(?<![а-яё])не\s+([а-яё]{4,})", re.I)
@@ -636,6 +641,30 @@ GATE_TEXT = {
 }
 
 
+_ANAPHORA = re.compile(r"^\W*(?:после\s+чего|в\s+этом\s+случае|в\s+таком\s+случае|в\s+противном\s+случае|"
+                       r"иначе|тогда|при\s+этом)(?![а-яё])", re.I)
+# Номер-ссылка на место документа («метод 3», «п. 2», «шаг 4», «строка 12») — не значение.
+_REF_NUM = re.compile(r"(?<![а-яё])(?:метод\w*|п\.|пункт\w*|шаг\w*|раздел\w*|строк\w*|част\w*|глав\w*|"
+                      r"рисун\w*|таблиц\w*)\s*№?\s*\d+", re.I)
+_ONLY = re.compile(r"(?<![а-яё])(?:только|кроме|исключ\w*|лишь)(?![а-яё])", re.I)
+_ERR_TOKEN = re.compile(r"(?<![A-Za-z_])[A-Z]+(?:_[A-Z]+)+(?![A-Za-z_])")
+# Общие части кодов ошибок: остаётся объект («ACCOUNT», «QUOTE»).
+_ERR_GENERIC = {"NOT", "FOUND", "INVALID", "EXPIRED", "ALREADY", "ERROR", "FAILED", "LIMIT", "EXCEEDED", "DENIED",
+                "FORBIDDEN", "TOO", "MANY", "NO", "IS", "BY", "UNAVAILABLE", "AVAILABLE", "SUPPORTED", "INTERNAL",
+                "VALIDATION", "CONFLICT", "REQUIRED", "WRONG", "BAD", "UNKNOWN", "EXISTS", "EXIST"}
+
+
+def _different_error_objects(qa: str, qb: str) -> bool:
+    """Обе цитаты называют составные коды ошибок, и объекты кодов не пересекаются."""
+    objs = []
+    for q in (qa, qb):
+        toks = _ERR_TOKEN.findall(q)
+        if not toks:
+            return False
+        objs.append({p for t in toks for p in t.split("_") if p not in _ERR_GENERIC})
+    return bool(objs[0]) and bool(objs[1]) and not objs[0] & objs[1]
+
+
 def _req_of(ev: dict, known: dict[str, dict] | None) -> dict:
     """Требование нарезки, в строки которого попала цитата (по строкам, а не по ID, который назвала модель)."""
     if not _found(ev):
@@ -690,6 +719,20 @@ def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str
     # действие («настройки сохраняются»), исходы совместимы.
     if kind == "event_conflict" and _self_qualified(qa, qb, _line_text(view, ev_a), _line_text(view, ev_b)):
         return "other_object"
+    # Условие вне цитаты: «после чего …», «в этом случае …» — исход цитаты вызван условием предыдущей фразы (сбой,
+    # исчерпанные попытки), а не входом другой стороны.
+    if kind in ("event_conflict", "status_conflict") and any(_ANAPHORA.match(q) for q in quotes):
+        return "condition_elsewhere"
+    # Коды ошибок про разные объекты: «ACCOUNT_NOT_FOUND» и «QUOTE_NOT_FOUND» — разные условия, а не два кода одного.
+    if kind == "status_conflict" and _different_error_objects(qa, qb):
+        return "different_condition"
+    # Одно и то же действие с теми же значениями при разных условиях («пока экран открыт — каждые 5 секунд» и
+    # «каждые 5 секунд, пока IN_PROGRESS»): ни одна сторона не запрещает и не ограничивает — исходы совпадают.
+    if kind == "event_conflict" and pair["basis"] != "limit_removed" and not any(
+            _REFUSAL.search(q) or _LIMIT.search(q) or _ONLY.search(q) for q in quotes):
+        na, nb = (set(re.findall(r"\d+", _REF_NUM.sub("", _BARE_ID.sub("", _ITEM_NO.sub("", q))))) for q in quotes)
+        if na and na == nb:
+            return "same_outcome"
     # Граница срока: строка приёмки с конкретным временем против «действует N минут» без «включительно».
     if kind == "boundary_conflict":
         for (ev, q, r), (_ev2, q2, _r2) in ((sides[0], sides[1]), (sides[1], sides[0])):
@@ -1022,6 +1065,9 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
     # («сервис настроек» / «хранилище настроек», «держатель карты» / «владелец карты»).
     if sev == "major" and not _names_share_stem([t["term"] for t in terms]):
         sev = "minor"
+    # Документ сам приравнивает названия («сессия клиента — держателя карты», «клиент (держатель карты)») — none.
+    if sev in ("major", "minor") and _equated_in_text(view, [t["term"] for t in terms]):
+        sev = "none"
     # Название с уточнением («страховая компания-партнёр» и «страховая компания») — то же лицо или компонент:
     # major — только если остаются два русских названия, ни одно из которых не входит в другое.
     if sev == "major" and len(_distinct_names([t["term"] for t in terms])) < 2:
@@ -1032,6 +1078,28 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
 _CYR = re.compile(r"[а-яё]", re.I)
 # «Другой клиент», «чужая карта» — другое лицо или объект того же вида, а не второе название понятия.
 _OTHER_ONE = re.compile(r"(?<![а-яё])(?:друг(?:ой|ого|ому|им|ая|ую|ие|их)|чуж\w*|посторонн\w*)(?![а-яё])", re.I)
+
+
+def _equated_in_text(view: Any, terms: list[str]) -> bool:
+    """Документ сам приравнивает два названия: они стоят по разные стороны тире или скобки в одной строке
+    («сессия клиента — держателя карты», «клиент (держатель карты)»). Для понятия из трёх и больше названий — нет."""
+    if len(terms) != 2:
+        return False
+    stems = [[_stem(w) for w in _WORD.findall(t) if len(w) >= 3] for t in terms]
+    if not all(stems):
+        return False
+
+    def has(side: str, st: list[str]) -> bool:
+        words = [_stem(w) for w in _WORD.findall(side)]
+        return all(any(_same_stem(w, s) for w in words) for s in st)
+
+    for x in _lines(view):
+        text = _s(x.get("text"))
+        for m in re.finditer(r"\s[—–]\s|\(", text):
+            left, right = text[max(0, m.start() - 40):m.start()], text[m.end():m.end() + 40]
+            if (has(left, stems[0]) and has(right, stems[1])) or (has(left, stems[1]) and has(right, stems[0])):
+                return True
+    return False
 
 
 def _distinct_names(terms: list[str]) -> list[set]:
