@@ -1,0 +1,74 @@
+[
+  {
+    "kind": "judge",
+    "variant": "base",
+    "case": "car-loan",
+    "model_requested": "sonnet",
+    "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+    "status": "complete",
+    "seconds": 51.9,
+    "verify": null,
+    "quota": false,
+    "candidates": [
+      "C-022",
+      "C-023"
+    ],
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": 1,
+    "failed": 0,
+    "cached": 0,
+    "tokens": null,
+    "accepted": [],
+    "rejected": [
+      {
+        "ids": "C-022",
+        "reason": "Конфликт построен на «Q-03» (выбор 3-го числа), которого в документе нет; L031 и L129 согласованы: числа вне 5–25 дают 422 DAY_INVALID."
+      },
+      {
+        "ids": "C-023",
+        "reason": "Расхождение заявлено с «Решением-3», которого в документе нет, а L025 («Сервис графиков владеет договорными датами и редакциями…») ни с одним другим местом текста не спорит."
+      }
+    ]
+  },
+  {
+    "kind": "judge",
+    "variant": "patch",
+    "case": "car-loan",
+    "model_requested": "sonnet",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 82.2,
+    "verify": null,
+    "quota": false,
+    "candidates": [
+      "C-022",
+      "C-023"
+    ],
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": 2,
+    "failed": 0,
+    "cached": 0,
+    "tokens": null,
+    "accepted": [
+      {
+        "ids": [
+          "C-022"
+        ],
+        "severity": "critical",
+        "title": "Ответ Q-03 разрешает 3-е число вопреки диапазону 5–25"
+      },
+      {
+        "ids": [
+          "C-023"
+        ],
+        "severity": "major",
+        "title": "Владелец графика и редакций: Решение-3 расходится с стр. 25"
+      }
+    ],
+    "rejected": []
+  }
+]

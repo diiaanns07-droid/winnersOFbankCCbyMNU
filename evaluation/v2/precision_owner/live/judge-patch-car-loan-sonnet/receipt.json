@@ -1,0 +1,35 @@
+{
+  "job": [
+    "judge",
+    "patch",
+    "car-loan",
+    "sonnet"
+  ],
+  "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+  "code": 0,
+  "at": "2026-11-27T20:00:12+05:00",
+  "duration_s": 82.2,
+  "status": "complete",
+  "models": [
+    "claude-sonnet-5-5"
+  ],
+  "failed_calls": 0,
+  "cache": 0,
+  "accepted": [
+    {
+      "ids": [
+        "C-022"
+      ],
+      "title": "Ответ Q-03 разрешает 3-е число вопреки диапазону 5–25",
+      "severity": "critical"
+    },
+    {
+      "ids": [
+        "C-023"
+      ],
+      "title": "Владелец графика и редакций: Решение-3 расходится с стр. 25",
+      "severity": "major"
+    }
+  ],
+  "quota": false
+}
