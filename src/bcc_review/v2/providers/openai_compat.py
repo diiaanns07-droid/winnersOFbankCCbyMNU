@@ -125,6 +125,7 @@ class OpenAICompatProvider:
         if mode not in MODES:
             raise ProviderError("not_configured", f"OPENAI_RESPONSE_FORMAT={mode!r}: допустимо {', '.join(MODES)}.")
         self.mode = mode
+        self._max_tokens_fixed = bool(max_tokens or (env.get("OPENAI_MAX_TOKENS") or "").strip())
         try:
             self.max_tokens = int(max_tokens or env.get("OPENAI_MAX_TOKENS") or DEFAULT_MAX_TOKENS)
             temp = (env.get("OPENAI_TEMPERATURE") or "").strip()
@@ -222,7 +223,8 @@ class OpenAICompatProvider:
         if not model:
             raise ProviderError("not_configured", f"Не задан OPENAI_MODEL. {SETUP_HELP}")
         clean = [{"role": str(m.get("role") or "user"), "content": str(m.get("content") or "")} for m in messages]
-        max_tokens = int(max_output_tokens or self.max_tokens)
+        # OPENAI_MAX_TOKENS задан явно — он главный (контекст локальной модели); иначе не ниже 16 000
+        max_tokens = self.max_tokens if self._max_tokens_fixed else max(int(max_output_tokens or 0), self.max_tokens)
         url = f"{self.base_url}/chat/completions"
         start_mode = self.mode
         for mode in MODES[MODES.index(start_mode):]:

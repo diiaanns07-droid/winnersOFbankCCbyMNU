@@ -397,6 +397,29 @@ def _heading_sections(doc: Doc, decls: list[Status]) -> list[tuple[Status, list[
     return res
 
 
+STOP_STEMS = {"метод", "возвр", "верну", "ответ", "запро", "случа", "резул", "стату", "выпол", "описа", "котор",
+              "други", "этого", "также", "тогда", "после", "перед", "данны"}
+
+
+def _stems(text: str) -> set[str]:
+    words = re.findall(r"[а-яёa-z]{5,}", text.lower())
+    return {w[:5] for w in words} - STOP_STEMS
+
+
+def _same_case_decl(frag: str, decls: list[Status], code: int) -> Status | None:
+    """Объявленный статус с тем же условием, что у упомянутого кода (≥ 2 общих значимых основы)."""
+    cond = re.sub(CODE, " ", frag)
+    st = _stems(cond)
+    best, score = None, 1
+    for d in decls:
+        if d.code == code or (d.code // 100) != (code // 100):
+            continue
+        k = len(st & _stems(re.sub(CODE, " ", d.line.joined)))
+        if k > score:
+            best, score = d, k
+    return best
+
+
 def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
     decls, mentions = collect_statuses(doc)
     declared = sorted({d.code for d in decls})
@@ -438,12 +461,20 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
             parts.append(f"В разделе {quoted(d.line.text)} сказано {quoted(frag)} — описан ответ {code}, "
                          f"а не {d.code}.")
             title = f"В разделе ответа {d.code} описан код {code}"
+        same_case = None
         if p["mentions"] and undeclared:
             for line, frag in p["mentions"][:2]:
                 evidence.append(ev(line, frag))
             if not p["foreign"]:
+                same_case = _same_case_decl(p["mentions"][0][1], decls, code)
                 parts.append(f"В тексте сказано {quoted(p['mentions'][0][1])}, но кода {code} нет в перечне "
                              f"статусов (описаны {decl_list}).")
+                if same_case is not None:
+                    evidence.append(ev(same_case.line))
+                    parts.append(f"Тот же случай в перечне статусов описан кодом {same_case.code}: "
+                                 f"{quoted(same_case.line.joined)}.")
+                    title = (f"Один и тот же случай получает код {code} в тексте и {same_case.code} "
+                             f"в перечне статусов")
             else:
                 parts.append(f"Кода {code} нет в перечне статусов (описаны {decl_list}).")
         if p["reason"]:
@@ -463,11 +494,12 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
                 continue
         if undeclared and p["foreign"]:
             title += ", которого нет в перечне статусов"
+        conflict = bool(p["foreign"] or p["reason"] or same_case is not None)
         out["candidates"].append(candidate(
             f"api.status_{code}",
             title=title,
-            kind="status_conflict" if (p["foreign"] or p["reason"]) else "missing_element",
-            criterion="set_consistent" if (p["foreign"] or p["reason"]) else "set_complete",
+            kind="status_conflict" if conflict else "missing_element",
+            criterion="set_consistent" if conflict else "set_complete",
             severity="major", blocks="both",
             evidence=evidence,
             problem=" ".join(parts),
@@ -481,7 +513,7 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
             recommendation=(f"Описать код {code} в перечне статусов (когда возвращается, тело ответа) или убрать "
                             f"упоминание; привести заголовки разделов в соответствие с кодами."),
             rewrite=f"{code}. <уточнить: когда возвращается>. Тело ответа: <уточнить>.",
-            conflict=bool(p["foreign"] or p["reason"]),
+            conflict=conflict,
         ))
         out["signals"].append(signal(f"api.status_{code}", doc.get(evidence[0]["line"]),
                                      evidence[0]["quote"], title + ".", ("architect", "qa"), "status_conflict"))

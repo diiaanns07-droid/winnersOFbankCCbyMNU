@@ -14,11 +14,18 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 SECTION_SEP = " › "
-_SKIP = {"script", "style", "head", "noscript", "template", "svg", "nav", "iframe", "object", "button", "select",
+_SKIP = {"script", "style", "head", "noscript", "template", "svg", "nav", "footer", "iframe", "object", "button", "select",
          "option", "textarea", "form"}
 _BLOCK = {"p", "div", "section", "article", "header", "footer", "main", "aside", "blockquote", "figure",
           "figcaption", "caption", "dt", "dd", "address", "details", "summary", "center", "body", "html", "dl",
           "fieldset", "legend"}
+# служебные части страниц вики и порталов (Confluence и др.): хлебные крошки, метаданные, оглавление, вложения,
+# подвал, боковые панели — не текст требований
+_SKIP_IDS = {"breadcrumb-section", "breadcrumbs", "footer", "navigation", "sidebar", "header-precursor",
+             "comments-section", "likes-and-labels-container", "page-metadata-banner", "footer-logo"}
+_SKIP_CLASSES = ("breadcrumb", "page-metadata", "toc-macro", "pagesection", "footer", "aui-nav", "sidebar",
+                 "navigation", "comment-thread", "labels-section", "likes-section", "page-restrictions")
+_SKIP_ROLES = {"navigation", "contentinfo", "search", "complementary", "banner"}
 _HEAD = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
 _VOID = {"br", "hr", "img", "input", "meta", "link", "wbr", "col", "area", "base", "source", "track", "embed"}
 _WS = re.compile(r"[ \t\r\n\f\v    ]+")
@@ -31,6 +38,7 @@ class _Parser(HTMLParser):
         self.title = ""
         self._in_title = False
         self._skip = 0
+        self._attr_skip: list = []         # [тег, глубина] служебного блока, который пропускаем целиком
         self._pre = 0
         self._cur: dict | None = None      # текущий блок: kind, parts, src_line, level
         self._lists: list[dict] = []       # {"ordered": bool, "n": int}
@@ -74,6 +82,14 @@ class _Parser(HTMLParser):
     # ------------------------------------------------------------------ события парсера
     def handle_starttag(self, tag: str, attrs) -> None:
         tag = tag.lower()
+        if self._attr_skip:
+            if tag == self._attr_skip[0] and tag not in _VOID:
+                self._attr_skip[1] += 1
+            return
+        if tag not in _VOID and _service(attrs):
+            self._flush()
+            self._attr_skip = [tag, 1]
+            return
         if tag in _SKIP:
             self._skip += 1
             return
@@ -139,6 +155,12 @@ class _Parser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if self._attr_skip:
+            if tag == self._attr_skip[0]:
+                self._attr_skip[1] -= 1
+                if self._attr_skip[1] <= 0:
+                    self._attr_skip = []
+            return
         if tag in _SKIP:
             self._skip = max(0, self._skip - 1)
             return
@@ -187,7 +209,7 @@ class _Parser(HTMLParser):
         if self._in_title:
             self.title += data
             return
-        if self._skip:
+        if self._skip or self._attr_skip:
             return
         self._text(data)
 
@@ -197,12 +219,30 @@ class _Parser(HTMLParser):
         self._flush()
 
 
+def _service(attrs) -> bool:
+    """Служебный блок страницы по id, class или role."""
+    a = {k.lower(): (v or "") for k, v in attrs}
+    if a.get("id", "").lower() in _SKIP_IDS or a.get("role", "").lower() in _SKIP_ROLES:
+        return True
+    cls = a.get("class", "").lower()
+    return bool(cls) and any(c in cls for c in _SKIP_CLASSES)
+
+
 def parse_html(text: str) -> tuple[str, list[dict]]:
     """Разобрать HTML: (title, blocks), где block = {kind, lines, src_line, level}."""
     p = _Parser()
     p.feed(text)
     p.close()
-    return _WS.sub(" ", p.title).strip(), p.blocks
+    title = _WS.sub(" ", p.title).strip()
+    # Confluence: <title> и заголовок страницы — «Пространство : Название»; название пространства не нужно
+    if " : " in title:
+        short = title.split(" : ", 1)[1].strip()
+        for b in p.blocks:
+            if b["kind"] == "heading" and " ".join(b["lines"]).strip() == title:
+                b["lines"] = [short]
+                break
+        title = short
+    return title, p.blocks
 
 
 def view_from_html(text: str, *, file: str = "document.html") -> dict:
