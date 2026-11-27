@@ -224,3 +224,61 @@ def test_export_text_has_no_internal_line_codes(tmp_path):
     assert "строка 38 относит покупку" in text and "(строка 22)" in text and "в строках 38–40" in text
     assert "Часть A › Функциональные требования, строка 38" in text  # место — как в отчёте
     assert report["findings"][0]["problem"].startswith("L038")  # исходный отчёт не меняется
+
+
+# --------------------------------------------------------------------------- PDF: таблица без линеек, знаки другим шрифтом
+BORDERLESS_PDF = ROOT / "tests/v2/fixtures/03_stress/borderless.pdf"
+
+
+@pytest.fixture(scope="module")
+def borderless():
+    return dv.load(BORDERLESS_PDF)
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_key_value_table_rows(borderless):
+    """Таблица без линеек (PDF из Word, PyMuPDF как у жюри): «поле | значение» в одной строке, а не колонками."""
+    texts = [ln["text"] for ln in borderless["lines"]]
+    for row in ("Поле | Значение", "Наименование задачи | Кредитные каникулы по кредитной карте",
+                "Продукт | Мобильный банк, кредитные карты",
+                "Бизнес-процесс | Обслуживание держателя кредитной карты с просроченной задолженностью",
+                "Владелец | Управление розничного кредитования"):
+        assert row in texts, row
+    assert any("собрана по строкам" in w for w in borderless["warnings"])
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_acceptance_table_three_columns(borderless):
+    texts = [ln["text"] for ln in borderless["lines"]]
+    assert "Исходные условия | Действие | Ожидаемый результат" in texts
+    assert ("Каникулы уже брались 10 марта | Оформить повторно 1 июня того же года | "
+            "Отказ с текстом «Каникулы доступны раз в год»") in texts
+    assert "Просрочка 5 дней | Оформить каникулы | Отказ, кнопка недоступна" in texts
+    row = next(ln for ln in borderless["lines"] if ln["text"].startswith("Просрочки нет"))
+    assert row["kind"] == "table_row" and row["page"] == 1 and row["section"].endswith("Критерии приемки")
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_punctuation_in_other_font_stays_in_place(borderless):
+    """Знаки, набранные другим шрифтом, читатель уносил в конец строки: «нулю проценты; начисляются»."""
+    texts = [ln["text"] for ln in borderless["lines"]]
+    assert "К-2. На время каникул минимальный платёж равен нулю; проценты начисляются по ставке договора." in texts
+    assert "Документ подготовлен для проверки чтения PDF. Таблицы в нём — без линеек." in texts
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_bullets_become_list_items(borderless):
+    items = [ln for ln in borderless["lines"] if ln["section"].endswith("Логика метода") and not ln["heading"]]
+    assert [ln["text"] for ln in items] == ["Проверить сессию клиента.", "Проверить отсутствие просрочки.",
+                                            "Сохранить срок каникул и вернуть дату окончания."]
+    assert all(ln["kind"] == "list_item" for ln in items)
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_quotes_and_two_columns_untouched(borderless):
+    m = Q.verify_quote(borderless, "Продукт: Мобильный банк, кредитные карты")
+    assert m and m["text"] == "Продукт | Мобильный банк, кредитные карты"
+    # вёрстка в две колонки — не таблица: порядок по колонкам, как раньше
+    two = dv.load(ROOT / "tests/v2/fixtures/03_stress/two_columns.pdf")
+    assert not any(" | " in ln["text"] for ln in two["lines"])
+    assert not any("собрана по строкам" in w for w in two["warnings"])
