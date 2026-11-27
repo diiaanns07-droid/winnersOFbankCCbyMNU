@@ -18,7 +18,7 @@ ENV PYTHONUTF8=1 \
 
 WORKDIR /app
 
-COPY requirements.txt ./
+COPY requirements.txt constraints.txt ./
 RUN python -m pip install -r requirements.txt
 
 COPY pyproject.toml ./

@@ -1,0 +1,260 @@
+{
+ "_note": "Ответ модели (27.11, промпт волны 3) как есть; sonnet выделил «1.1–1.3» и «Не предъявляются», haiku пропустил подписи «Таблица N –».",
+ "requirements": [
+  {
+   "source_id": "1.1",
+   "kind": "other",
+   "summary": "Наименование системы: интернет-банк для физлиц",
+   "line_start": 5,
+   "line_end": 5
+  },
+  {
+   "source_id": "1.2",
+   "kind": "other",
+   "summary": "Основание работ: решение комитета по продуктам",
+   "line_start": 7,
+   "line_end": 7
+  },
+  {
+   "source_id": "1.3",
+   "kind": "constraint",
+   "summary": "Плановые сроки работ: 01.12.2026–28.02.2027",
+   "line_start": 9,
+   "line_end": 9
+  },
+  {
+   "source_id": "2.1",
+   "kind": "goal",
+   "summary": "Выпуск виртуальной карты без посещения отделения",
+   "line_start": 13,
+   "line_end": 13
+  },
+  {
+   "source_id": "2.2",
+   "kind": "goal",
+   "summary": "Сократить время получения карты, снизить нагрузку на отделения",
+   "line_start": 15,
+   "line_end": 15
+  },
+  {
+   "source_id": "3.1.1",
+   "kind": "functional",
+   "summary": "Выпуск одной виртуальной карты клиенту со счётом в тенге",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "3.1.2",
+   "kind": "functional",
+   "summary": "Выбор платёжной системы; выпуск бесплатный",
+   "line_start": 23,
+   "line_end": 23
+  },
+  {
+   "source_id": "3.1.3",
+   "kind": "functional",
+   "summary": "Показ условий и согласие клиента перед выпуском",
+   "line_start": 25,
+   "line_end": 25
+  },
+  {
+   "source_id": "3.1.4",
+   "kind": "functional",
+   "summary": "Показ реквизитов после подтверждения кодом из SMS",
+   "line_start": 27,
+   "line_end": 27
+  },
+  {
+   "source_id": "3.1.4.1",
+   "kind": "constraint",
+   "summary": "Срок действия SMS-кода и блокировка после неверных вводов",
+   "line_start": 29,
+   "line_end": 29
+  },
+  {
+   "source_id": "3.1.5",
+   "kind": "functional",
+   "summary": "Блокировка и разблокировка карты клиентом в любое время",
+   "line_start": 31,
+   "line_end": 31
+  },
+  {
+   "source_id": "3.1.6",
+   "kind": "constraint",
+   "summary": "Суточный лимит операций; клиент может только уменьшить",
+   "line_start": 33,
+   "line_end": 33
+  },
+  {
+   "source_id": "3.2.1",
+   "kind": "nonfunctional",
+   "summary": "Доступность функции выпуска не ниже 99,5% в месяц",
+   "line_start": 37,
+   "line_end": 37
+  },
+  {
+   "source_id": "3.2.2",
+   "kind": "nonfunctional",
+   "summary": "Поведение при недоступности процессингового центра",
+   "line_start": 39,
+   "line_end": 39
+  },
+  {
+   "source_id": "3.3.1",
+   "kind": "nonfunctional",
+   "summary": "Номер карты и CVV не сохраняются в журналах",
+   "line_start": 43,
+   "line_end": 43
+  },
+  {
+   "source_id": "3.3.2",
+   "kind": "nonfunctional",
+   "summary": "Автозавершение сеанса показа реквизитов через 60 секунд",
+   "line_start": 45,
+   "line_end": 45
+  },
+  {
+   "source_id": "3.4.1",
+   "kind": "integration",
+   "summary": "Передача заявки в процессинг и получение идентификатора карты",
+   "line_start": 49,
+   "line_end": 49
+  },
+  {
+   "source_id": "Таблица 1 – Параметры заявки на выпуск: clientId",
+   "kind": "api",
+   "summary": "Идентификатор клиента, обязательный",
+   "line_start": 55,
+   "line_end": 55
+  },
+  {
+   "source_id": "Таблица 1 – Параметры заявки на выпуск: accountId",
+   "kind": "api",
+   "summary": "Текущий счёт в тенге, обязательный",
+   "line_start": 56,
+   "line_end": 56
+  },
+  {
+   "source_id": "Таблица 1 – Параметры заявки на выпуск: paymentSystem",
+   "kind": "api",
+   "summary": "Платёжная система VISA или MASTERCARD, обязательный",
+   "line_start": 57,
+   "line_end": 57
+  },
+  {
+   "source_id": "Таблица 1 – Параметры заявки на выпуск: dailyLimit",
+   "kind": "api",
+   "summary": "Суточный лимит в тенге, необязательный",
+   "line_start": 58,
+   "line_end": 58
+  },
+  {
+   "source_id": "3.4.2",
+   "kind": "integration",
+   "summary": "Ответ процессинга за 15 секунд, иначе заявка неуспешна",
+   "line_start": 60,
+   "line_end": 60
+  },
+  {
+   "source_id": "",
+   "kind": "process",
+   "summary": "Два этапа работ: разработка и опытная эксплуатация",
+   "line_start": 64,
+   "line_end": 64
+  },
+  {
+   "source_id": "5.1",
+   "kind": "process",
+   "summary": "Приёмочные испытания на тестовом стенде по ПМИ",
+   "line_start": 68,
+   "line_end": 68
+  },
+  {
+   "source_id": "Таблица 2 – Сценарии приёмки, строка 1",
+   "kind": "acceptance",
+   "summary": "Выпуск карты Visa, реквизиты после SMS-кода",
+   "line_start": 74,
+   "line_end": 74
+  },
+  {
+   "source_id": "Таблица 2 – Сценарии приёмки, строка 2",
+   "kind": "acceptance",
+   "summary": "Три неверных кода блокируют показ реквизитов",
+   "line_start": 75,
+   "line_end": 75
+  },
+  {
+   "source_id": "Таблица 2 – Сценарии приёмки, строка 3",
+   "kind": "acceptance",
+   "summary": "Увеличение лимита до 600 000 отклоняется",
+   "line_start": 76,
+   "line_end": 76
+  },
+  {
+   "source_id": "6",
+   "kind": "other",
+   "summary": "Требования к документированию не предъявляются",
+   "line_start": 80,
+   "line_end": 80
+  },
+  {
+   "source_id": "Приложение А. Термины и сокращения: Виртуальная карта",
+   "kind": "other",
+   "summary": "Определение виртуальной карты",
+   "line_start": 84,
+   "line_end": 84
+  },
+  {
+   "source_id": "Приложение А. Термины и сокращения: CVV",
+   "kind": "other",
+   "summary": "Определение CVV",
+   "line_start": 85,
+   "line_end": 85
+  },
+  {
+   "source_id": "Приложение А. Термины и сокращения: Процессинговый центр",
+   "kind": "other",
+   "summary": "Определение процессингового центра",
+   "line_start": 86,
+   "line_end": 86
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Название документа",
+   "line_start": 1,
+   "line_end": 1,
+   "reason": "Название документа, не требование"
+  },
+  {
+   "what": "Строка-шапка таблицы 1",
+   "line_start": 53,
+   "line_end": 53,
+   "reason": "Шапка таблицы"
+  },
+  {
+   "what": "Название таблицы 1",
+   "line_start": 51,
+   "line_end": 51,
+   "reason": "Подпись таблицы параметров заявки, не требование"
+  },
+  {
+   "what": "Название таблицы 2",
+   "line_start": 70,
+   "line_end": 70,
+   "reason": "Подпись таблицы приёмки, не требование"
+  },
+  {
+   "what": "Строка-шапка таблицы 2",
+   "line_start": 72,
+   "line_end": 72,
+   "reason": "Шапка таблицы"
+  },
+  {
+   "what": "Лист согласования: шапка и согласующие",
+   "line_start": 88,
+   "line_end": 93,
+   "reason": "Блок согласующих, не заполнен: ФИО, подписи и даты пусты"
+  }
+ ]
+}

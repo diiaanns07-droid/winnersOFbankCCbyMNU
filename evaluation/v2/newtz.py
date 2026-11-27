@@ -32,6 +32,7 @@ from .common import ROOT, source_owner
 
 OPEN2 = ROOT / "evaluation" / "v2" / "open2"
 RESULTS_DIR = ROOT / "evaluation" / "v2" / "newtz_results"
+ARBITER_CACHE = RESULTS_DIR / "arbiter_cache.jsonl"  # свой кэш: эталоны №18 не трогаем
 DEFAULT_CMD = "{python} -m bcc_review {input} {output} --provider {provider} --model {model}"
 CLEAN_NAMES = ("clean.md", "source.clean.md", "clean/source.md", "source_clean.md")
 # Кто должен ловить дефект данного типа, если эталон не назвал владельца
@@ -63,8 +64,10 @@ def discover(root: Path = OPEN2) -> list[dict]:
             out.append({"case": d.name, "variant": "error", "doc": None, "gold": str(gp), "error": str(exc)[:200]})
             continue
         doc = ROOT / gold["document"]
-        inj = bool(gold.get("injection")) or "inject" in d.name.lower()
-        is_clean = not gold["items"] or str(gold.get("expected", "")).lower() == "clean"
+        declared = str(gold.get("variant") or "").lower()
+        inj = declared.startswith("inject") or bool(gold.get("injection")) or "inject" in d.name.lower()
+        is_clean = declared == "clean" or not gold["items"] or str(gold.get("expected", "")).lower() == "clean" \
+            or (not declared and d.name.endswith("_clean"))
         variant = "injection" if inj else ("clean" if is_clean else "defects")
         out.append({"case": d.name, "variant": variant, "doc": str(doc), "gold": str(gp)})
         cands = [gold.get("clean_document")] if gold.get("clean_document") else []
@@ -140,21 +143,33 @@ def score_case(c: dict, out: Path, arbiter: str) -> dict:
                 "findings": len(fs), "by_severity": {s: sum(1 for f in fs if f.get("severity") == s)
                                                      for s in ("critical", "major", "minor")},
                 "verdict": {"development": v.get("development"), "testing": v.get("testing")}})
-    if c["variant"] in ("clean",):
-        row["false_alarms"] = [{"id": f.get("id"), "severity": f.get("severity"), "kind": f.get("kind"),
-                                "title": str(f.get("title") or "")[:140], "sources": f.get("sources") or [],
-                                "owners": sorted({source_owner(s) for s in f.get("sources") or []})} for f in fs]
-        return row
     if c["variant"] == "injection":
         row["injection_flagged"] = _injection_flagged(rep, d / "report.md")
     gold = sc.load_gold(c["gold"])
     gold["_path"] = c["gold"]
-    if not gold["items"]:
+    legit: set[str] = set()
+    res = None
+    if gold["items"]:
+        rd = _run_dir(out, rep)
+        res = sc.score_report(sc.as_report(rep, gold), gold, report_md=str(d / "report.md")
+                              if (d / "report.md").exists() else None, run_dir=str(rd) if rd else None,
+                              arbiter=arbiter, cache_path=ARBITER_CACHE)
+        (d / "score.json").write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
+        legit = {a["finding"] for a in res["assignment"]} | set((res.get("duplicates") or {}).keys()
+                                                                 if isinstance(res.get("duplicates"), dict) else
+                                                                 [x.get("finding") for x in res.get("duplicates") or []])
+    if c["variant"] == "clean":
+        # на чистой версии законны только фоновые пункты эталона (шаблон банка не заполнен); остальное — ложные
+        row["background_found"] = sorted({a["gold"] for a in res["assignment"]}) if res else []
+        row["false_alarms"] = [{"id": f.get("id"), "severity": f.get("severity"), "kind": f.get("kind"),
+                                "title": str(f.get("title") or "")[:140], "sources": f.get("sources") or [],
+                                "owners": sorted({source_owner(s) for s in f.get("sources") or []})}
+                               for f in fs if f.get("id") not in legit]
+        row["fa_by_severity"] = {s_: sum(1 for x in row["false_alarms"] if x["severity"] == s_)
+                                 for s_ in ("critical", "major", "minor")}
         return row
-    rd = _run_dir(out, rep)
-    res = sc.score_report(sc.as_report(rep, gold), gold, report_md=str(d / "report.md") if (d / "report.md").exists()
-                          else None, run_dir=str(rd) if rd else None, arbiter=arbiter)
-    (d / "score.json").write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not res:
+        return row
     by_id = {it["id"]: it for it in gold["items"]}
     found = {a["gold"] for a in res["assignment"]}
     row.update({
@@ -181,7 +196,8 @@ def score_case(c: dict, out: Path, arbiter: str) -> dict:
 
 def summarize(rows: list[dict]) -> dict:
     defects = [r for r in rows if r["variant"] in ("defects", "injection") and r.get("items")]
-    clean = [r for r in rows if r["variant"] == "clean" and r.get("findings") is not None]
+    clean = [r for r in rows if r["variant"] == "clean" and r.get("findings") is not None
+             and r.get("status") not in (None, "failed")]
     tp = sum(len(r["found"]) for r in defects)
     tot = sum(r["items"] for r in defects)
     lv = {k: {"n": sum(r["by_level"][k]["n"] for r in defects), "of": sum(r["by_level"][k]["of"] for r in defects)}
@@ -201,11 +217,12 @@ def summarize(rows: list[dict]) -> dict:
                     "critical_false": sum(len(r.get("critical_false") or []) for r in defects)},
         "by_level": lv, "per_issue_type": {k: {**v, "recall": v["tp"] / max(1, v["tp"] + v["fn"])} for k, v in sorted(kinds.items())},
         "clean": {"n": len(clean), "measured": len(clean), "findings": sum(r["findings"] for r in clean),
-                  "critical": sum(r["by_severity"]["critical"] for r in clean),
-                  "major": sum(r["by_severity"]["major"] for r in clean),
-                  "docs_with_critical": sum(1 for r in clean if r["by_severity"]["critical"]),
-                  "docs_over_1_finding": sum(1 for r in clean if r["findings"] > 1),
-                  "max_findings": max((r["findings"] for r in clean), default=0),
+                  "false_alarms": sum(len(r.get("false_alarms") or []) for r in clean),
+                  "critical": sum(r["fa_by_severity"]["critical"] for r in clean),
+                  "major": sum(r["fa_by_severity"]["major"] for r in clean),
+                  "docs_with_critical": sum(1 for r in clean if r["fa_by_severity"]["critical"]),
+                  "docs_over_1_finding": sum(1 for r in clean if len(r.get("false_alarms") or []) > 1),
+                  "max_findings": max((len(r.get("false_alarms") or []) for r in clean), default=0),
                   "verdict_no": sum(1 for r in clean if "no" in r["verdict"].values())},
         "injection": {"n": len(inj), "flagged": sum(1 for r in inj if r.get("injection_flagged"))},
         "details": {"fp": [{**fa, "case_id": r["case"], "clean": True} for r in clean for fa in r.get("false_alarms") or []]},
@@ -224,7 +241,8 @@ def render(s: dict, rows: list[dict], label: str) -> str:
          f"{s['by_level']['critical']['n']}/{s['by_level']['critical']['of']}, major {s['by_level']['major']['n']}/"
          f"{s['by_level']['major']['of']}, minor {s['by_level']['minor']['n']}/{s['by_level']['minor']['of']}. "
          f"Вне эталона {h['fp']}, дублей {h['duplicates']}, критичных ложных {h['critical_false']}.", "",
-         f"Чистые версии ({c['n']}): замечаний {c['findings']}, critical {c['critical']}, major {c['major']}; "
+         f"Чистые версии ({c['n']}): замечаний {c['findings']}, из них ложных (вне фона шаблона) "
+         f"{c.get('false_alarms', c['findings'])}: critical {c['critical']}, major {c['major']}; "
          f"документов с critical {c['docs_with_critical']}, с > 1 замечанием {c['docs_over_1_finding']}, "
          f"вердикт «нельзя» {c['verdict_no']}.", ""]
     if s["injection"]["n"]:
@@ -241,7 +259,7 @@ def render(s: dict, rows: list[dict], label: str) -> str:
         L.append(f"| {r['case']} | {r['variant']} | {r.get('status')} | {fnd} | {r.get('findings')} "
                  f"({bs.get('critical', '-')}/{bs.get('major', '-')}/{bs.get('minor', '-')}) | "
                  f"{v.get('development', '—')}/{v.get('testing', '—')} | "
-                 f"{'—' if r.get('duration_s') is None else f'{r['duration_s'] / 60:.1f}'} | {r.get('calls', '—')} |")
+                 f"{'—' if r.get('duration_s') is None else format(r['duration_s'] / 60, '.1f')} | {r.get('calls', '—')} |")
     miss = [(r["case"], m) for r in rows for m in r.get("misses") or []]
     if miss:
         L += ["", "Пропуски:", "", "| Кейс | Пункт | Уровень | Тип | Где потерян | Владельцы |",
@@ -267,15 +285,15 @@ def results_table() -> str:
         rows.append(json.loads(p.read_text(encoding="utf-8")))
     rows.sort(key=lambda d: d.get("at", ""))
     L = ["| Прогон | Кейсов / прогонов (не изм.) | Recall | critical | major | Вне эталона | Крит. ложных | "
-         "Чистых | Замечаний на чистых (critical) | Чистых с > 1 | Вставка замечена | Мин на прогон |",
+         "Чистых | Ложных на чистых (critical) | Чистых с > 1 ложной | Вставка замечена | Мин на прогон |",
          "| :--- | :--- | ---: | :--- | :--- | ---: | ---: | ---: | :--- | ---: | :--- | ---: |"]
     for d in rows:
         h, c, lv = d["harness"], d["clean"], d["by_level"]
         n = max(1, d["runs"] - d["failed"])
         L.append(f"| {d['label']} | {d['cases']} / {d['runs']} ({d['failed']}) | "
-                 f"{'—' if h['recall'] is None else f'{100 * h['recall']:.0f} %'} ({h['tp']}/{h['support']}) | "
+                 f"{'—' if h['recall'] is None else format(100 * h['recall'], '.0f') + ' %'} ({h['tp']}/{h['support']}) | "
                  f"{lv['critical']['n']}/{lv['critical']['of']} | {lv['major']['n']}/{lv['major']['of']} | {h['fp']} | "
-                 f"{h['critical_false']} | {c['n']} | {c['findings']} ({c['critical']}) | {c['docs_over_1_finding']} | "
+                 f"{h['critical_false']} | {c['n']} | {c.get('false_alarms', c['findings'])} ({c['critical']}) | {c['docs_over_1_finding']} | "
                  f"{d['injection']['flagged']}/{d['injection']['n']} | {d['time']['total_s'] / 60 / n:.1f} |")
     return "\n".join(L)
 

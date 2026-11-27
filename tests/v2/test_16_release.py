@@ -204,7 +204,7 @@ def test_env_example_covers_variables_read_by_v2():
 
 def test_requirements_are_pinned():
     lines = [ln.split("#", 1)[0].strip() for ln in _read(REQUIREMENTS).splitlines()]
-    reqs = [ln for ln in lines if ln]
+    reqs = [ln for ln in lines if ln and not ln.startswith("-c ")]
     assert reqs
     for req in reqs:
         assert re.fullmatch(r"[A-Za-z0-9_.\-\[\],]+==[0-9][A-Za-z0-9.\-]*", req), f"версия не зафиксирована: {req}"
@@ -220,13 +220,138 @@ def test_pyproject_dependencies_are_in_requirements():
         pytest.skip("нет tomllib")
     data = tomllib.loads(_read(ROOT / "pyproject.toml"))
     pinned = {re.split(r"[\[=<>!~ ]", ln.split("#", 1)[0].strip(), maxsplit=1)[0].lower()
-              for ln in _read(REQUIREMENTS).splitlines() if ln.split("#", 1)[0].strip()}
+              for ln in _read(REQUIREMENTS).splitlines()
+              if ln.split("#", 1)[0].strip() and not ln.strip().startswith("-c ")}
     for dep in data["project"].get("dependencies", []):
         name = re.split(r"[\[=<>!~ ;]", dep, maxsplit=1)[0].lower()
         assert name in pinned, f"зависимость pyproject не зафиксирована в requirements.txt: {dep}"
 
 
+def _pins(path: Path) -> dict[str, str]:
+    out = {}
+    for ln in _read(path).splitlines():
+        ln = ln.split("#", 1)[0].strip()
+        m = re.fullmatch(r"([A-Za-z0-9_.\-]+)(?:\[[^\]]*\])?==([0-9][A-Za-z0-9.\-+]*)", ln)
+        if m:
+            out[re.sub(r"[-_.]+", "-", m.group(1)).lower()] = m.group(2)
+    return out
+
+
+def test_constraints_pin_everything_and_agree_with_requirements():
+    """constraints.txt фиксирует и транзитивные версии; requirements.txt подключает его и не спорит с ним."""
+    constraints = ROOT / "constraints.txt"
+    assert "-c constraints.txt" in _read(REQUIREMENTS).splitlines()
+    lines = [ln.split("#", 1)[0].strip() for ln in _read(constraints).splitlines()]
+    lines = [ln for ln in lines if ln]
+    for ln in lines:
+        assert re.fullmatch(r"[A-Za-z0-9_.\-]+==[0-9][A-Za-z0-9.\-+]*", ln), f"не версия: {ln}"
+    pinned, locked = _pins(REQUIREMENTS), _pins(constraints)
+    for name, ver in pinned.items():
+        assert locked.get(name) == ver, f"{name}: requirements.txt {ver}, constraints.txt {locked.get(name)}"
+    # транзитивные зависимости, которые чаще всего ломают установку, тоже зафиксированы
+    for name in ("pydantic", "pydantic-core", "httpx2", "google-auth", "cryptography", "lxml", "rpds-py"):
+        assert name in locked, name
+
+
+def test_cryptography_has_wheels_for_intel_mac():
+    """В cryptography 49+ нет колёс для Intel Mac: pip собирал бы её из исходников (нужен Rust) и падал."""
+    ver = _pins(ROOT / "constraints.txt").get("cryptography", "")
+    assert ver and int(ver.split(".")[0]) <= 48, ver
+
+
+def test_docker_and_scripts_install_with_constraints():
+    docker = _read(ROOT / "Dockerfile")
+    assert re.search(r"^COPY requirements\.txt constraints\.txt \./", docker, re.M), "Dockerfile без constraints.txt"
+    for script in ("_env.sh", "_env.ps1"):
+        assert "constraints.txt" in _read(ROOT / "scripts" / script), script
+    for wf in ("tests.yml", "report.yml"):
+        assert "constraints.txt" in _read(WORKFLOWS / wf), wf
+
+
+# --------------------------------------------------------------------------- Python 3.11
+
+
+# Файлы с синтаксисом только для Python 3.12+ (PEP 701) — просьба владельцу в статусе №16; новых быть не должно.
+KNOWN_PY312_ONLY = {"evaluation/v2/aggregate.py", "evaluation/v2/newtz.py"}
+
+
+def _py312_only_fstrings(path: Path) -> list[int]:
+    """Строки, где внутри f-строки стоит строка в тех же кавычках: Python 3.11 такой файл не компилирует."""
+    import io
+    import tokenize
+
+    if not hasattr(tokenize, "FSTRING_START"):  # Python 3.11: проверит compile()
+        return []
+    lines, stack = [], []
+    for tok in tokenize.generate_tokens(io.StringIO(path.read_text(encoding="utf-8")).readline):
+        if tok.type == tokenize.FSTRING_START:
+            quote = tok.string.lstrip("rRfFbBuU")
+            if quote in stack:
+                lines.append(tok.start[0])
+            stack.append(quote)
+        elif tok.type == tokenize.FSTRING_END:
+            stack.pop()
+        elif tok.type == tokenize.STRING and stack:
+            body = tok.string.lstrip("rRbBuU")
+            quote = body[:3] if body[:3] in ('"""', "'''") else body[:1]
+            if quote in stack:
+                lines.append(tok.start[0])
+    return lines
+
+
+def _python_files() -> list[Path]:
+    out = []
+    for top in ("src", "evaluation", "scripts", "tests"):
+        out += [f for f in (ROOT / top).rglob("*.py") if "fixtures" not in f.parts]
+    return out
+
+
+def test_code_compiles_on_python_311():
+    """README обещает Python 3.11: синтаксис 3.12+ (f\'{d[\'k\']}\') ломает установку у жюри и задания CI на 3.11."""
+    bad = []
+    for f in _python_files():
+        rel = f.relative_to(ROOT).as_posix()
+        if rel in KNOWN_PY312_ONLY:
+            continue
+        try:
+            compile(f.read_text(encoding="utf-8"), rel, "exec")
+        except SyntaxError as exc:
+            bad.append(f"{rel}:{exc.lineno}: {exc.msg}")
+            continue
+        bad += [f"{rel}:{n}: строка в тех же кавычках внутри f-строки (только Python 3.12+)"
+                for n in _py312_only_fstrings(f)]
+    assert not bad, "\n".join(bad)
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №15 (статус №16, «Волна 3»): f-строки с вложенными теми же "
+                                        "кавычками — на Python 3.11 tests/v2 не собираются (CI 3.11 красный)")
+def test_known_py312_only_files_are_fixed():
+    bad = []
+    for rel in sorted(KNOWN_PY312_ONLY):
+        f = ROOT / rel
+        if not f.exists():
+            continue
+        try:
+            compile(f.read_text(encoding="utf-8"), rel, "exec")
+        except SyntaxError as exc:
+            bad.append(f"{rel}:{exc.lineno}")
+            continue
+        bad += [f"{rel}:{n}" for n in _py312_only_fstrings(f)]
+    assert not bad, bad
+
+
 # --------------------------------------------------------------------------- CI и Docker
+
+
+def test_ci_runs_jury_steps_in_native_windows_encoding():
+    """PYTHONUTF8 — только у шага pytest: прогон mock, verify и команда жюри идут в родной кодировке ОС, как у жюри."""
+    yaml = pytest.importorskip("yaml")
+    wf = yaml.safe_load(_read(WORKFLOWS / "tests.yml"))
+    assert "PYTHONUTF8" not in (wf.get("env") or {})
+    job = wf["jobs"]["tests"]
+    assert "PYTHONUTF8" not in (job.get("env") or {})
+    with_utf8 = [st.get("name", "") for st in job["steps"] if "PYTHONUTF8" in (st.get("env") or {})]
+    assert with_utf8 == ["Тесты tests/v2"], with_utf8
 
 
 def test_ci_matrix_covers_three_os_and_two_pythons():
@@ -380,3 +505,59 @@ def test_run_summary_gates(tmp_path):
     # без --check сводка только печатается
     assert _run_summary(str(partial)).returncode == 0
     assert _run_summary(str(tmp_path / "нет.json")).returncode == 1
+
+
+# --------------------------------------------------------------------------- команда жюри: неудобный путь отчёта
+
+
+def _review(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
+    import os
+
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    for key in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL"):
+        env.pop(key, None)
+    return subprocess.run([sys.executable, "-m", "bcc_review", *args, "--provider", "offline", "-q",
+                           "--runs-dir", str(tmp_path / "runs")],
+                          cwd=tmp_path, env=env, capture_output=True, timeout=300)
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): папка "
+                                        "вместо файла отчёта — трейсбэк IsADirectoryError")
+def test_output_folder_gets_report_named_after_input(tmp_path):
+    """`python -m bcc_review ТЗ.pdf reports/` — отчёт ложится в папку под именем входа, без трейсбэка."""
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    (tmp_path / "reports").mkdir()
+    proc = _review(tmp_path, str(ROOT / "release" / "input" / "requirements.md"), "reports")
+    text = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+    assert "Traceback" not in text, text[-1500:]
+    assert proc.returncode == 0, text[-1500:]
+    assert (tmp_path / "reports" / "requirements.md").is_file()
+    assert (tmp_path / "reports" / "requirements.json").is_file()
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): "
+                                        "недоступный для записи путь отчёта — трейсбэк")
+def test_unwritable_output_gives_plain_error(tmp_path):
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    blocker = tmp_path / "file_not_dir"
+    blocker.write_text("x", encoding="utf-8")
+    proc = _review(tmp_path, str(ROOT / "release" / "input" / "requirements.md"), str(blocker / "r.md"))
+    text = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+    assert "Traceback" not in text, text[-1500:]
+    assert proc.returncode == 2
+    assert "отчёт" in text.lower()
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): "
+                                        "отчёт с путём входа затирает ТЗ")
+def test_output_same_as_input_does_not_overwrite_source(tmp_path):
+    """Отчёт с тем же путём, что вход, не должен затереть ТЗ."""
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    src = tmp_path / "tz.md"
+    original = (ROOT / "release" / "input" / "requirements.md").read_bytes()
+    src.write_bytes(original)
+    _review(tmp_path, str(src), str(src))
+    assert src.read_bytes() == original
