@@ -180,10 +180,21 @@ _HTML_START = re.compile(r"<(?=[A-Za-z/!?])")
 _DOC_ID = re.compile(r"[A-Za-zА-Яа-яЁё]{0,6}[-.]?\d+(?:[.-]\d+)*[a-zа-я]?")
 
 
+def _no_links(text: str) -> str:
+    """Своя Markdown-ссылка в тексте модели («[Ф-3](#ф-3)», «[тут](http://…)») — простым текстом: якоря в отчёте
+    ставит только код, чужая ссылка вела бы в никуда (вне `кода`; «\\(» GitHub показывает как «(»)."""
+    if "](" not in text:
+        return text
+    parts = re.split(r"(`[^`]*`)", text)
+    for i in range(0, len(parts), 2):
+        parts[i] = parts[i].replace("](", "]\\(")
+    return "".join(parts)
+
+
 def esc(text) -> str:
-    """Текст модели или документа в строку Markdown: без переводов строк и без HTML-тегов."""
+    """Текст модели или документа в строку Markdown: без переводов строк, без HTML-тегов и без своих ссылок."""
     s = " ".join(str(text or "").split())
-    return _HTML_START.sub(r"\\<", s)
+    return _no_links(_HTML_START.sub(r"\\<", s))
 
 
 _LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,20})\s+)?\bL0*(\d{1,5})"
@@ -370,10 +381,35 @@ _PRODUCT = re.compile(r"(?<![«\w`])(?:Claude Code|Google AI Studio|Google Gemin
 _FLAG = re.compile(r"(?<![\w`-])--[a-z][\w-]*(?:[ =](?![а-яё])[A-Za-z0-9][\w.:-]*)?")
 
 
+_SEV_GEN = {"critical": "критичного", "major": "существенного", "minor": "незначительного"}
+_SEV_AFTER_DO = re.compile(r"\bдо (critical|major|minor)\b")
+# «судья: 'Заголовок, обрезанный на 60 знаков' понижен до major (…)» — repr Python в тексте этапа
+_REPR_CUT = re.compile(r"(?<![\w«])(['\"])(.{1,60}?)\1(?= понижен| повышен| снят| объединён| отклонён)")
+# «вопрос «текст[:60]» отброшен — …» (этап вопросов)
+_QUOTE_CUT = re.compile(r"(вопрос\w* «)(.{60})(» отброшен)")
+CUT_AT = 60
+
+
+def _cut_mark(inner: str) -> str:
+    """Обрезанный этапом на CUT_AT знаков заголовок — по границе слова и с многоточием («…или кл» → «…или…»)."""
+    if len(inner) < CUT_AT:
+        return inner
+    sp = inner.rfind(" ")
+    return (inner[:sp] if sp > CUT_AT * 0.6 else inner).rstrip(" ,.;:—-") + "…"
+
+
+def warn_quotes(s: str) -> str:
+    """Тексты этапов о дефектах и вопросах: «'…' понижен до major» → «… понижен до существенного», обрезка на
+    60 знаков — с многоточием (было: «…авторизация или кл'»)."""
+    s = _SEV_AFTER_DO.sub(lambda m: "до " + _SEV_GEN[m.group(1)], s)
+    s = _REPR_CUT.sub(lambda m: f"«{_cut_mark(m.group(2))}»", s)
+    return _QUOTE_CUT.sub(lambda m: m.group(1) + _cut_mark(m.group(2)) + m.group(3), s)
+
+
 def warn_text(text) -> str:
     """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», «lens_risk» → «Риски», critical → критичный;
     служебные префиксы исключений («BudgetExceeded: judge: budget:») убираются."""
-    s = dejargon(" ".join(str(text or "").split()))
+    s = warn_quotes(dejargon(" ".join(str(text or "").split())))
     m = _STAGE_PREFIX.match(s)
     if m and stage_key(m.group(1)) in STAGES:
         s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
@@ -571,10 +607,22 @@ def source_name(src: str) -> str:
     return f"этап `{s}`" if s else "—"
 
 
+_BARE_PIPE = re.compile(r"(\\*)\|")
+
+
+def _table_cell(value) -> str:
+    """Последняя защита строки таблицы: перевод строки — пробел, «|» без экранирования — «\\|».
+
+    Чётное число обратных косых перед «|» (в документе уже было «\\|», и `cell()` дал «\\\\|») не экранирует черту —
+    GitHub разрезал бы ячейку и сдвинул столбцы; добавляем ещё одну косую."""
+    s = re.sub(r"[\r\n]+", " ", "" if value is None else str(value))
+    return _BARE_PIPE.sub(lambda m: m.group(1) + ("" if len(m.group(1)) % 2 else "\\") + "|", s)
+
+
 def table(header: list[str], rows: list[list[str]], align: list[str] | None = None) -> list[str]:
     align = align or [":---"] * len(header)
-    out = ["| " + " | ".join(header) + " |", "| " + " | ".join(align) + " |"]
-    out += ["| " + " | ".join(r) + " |" for r in rows]
+    out = ["| " + " | ".join(_table_cell(h) for h in header) + " |", "| " + " | ".join(align) + " |"]
+    out += ["| " + " | ".join(_table_cell(x) for x in r) + " |" for r in rows]
     return out
 
 
@@ -1318,7 +1366,12 @@ def _report_paths(c: _Ctx):
     out_json = PurePath(str(out)).with_suffix(".json") if out else None
     json_arg = (out_json.as_posix() if out_json and not out_json.is_absolute() else out_json.name if out_json
                 else "отчёт.json")
-    doc = str(c.doc.get("file") or "документ")
+    # документ — по пути, как его указали в командной строке (относительный: команду можно скопировать и
+    # выполнить из той же папки); абсолютный путь машины в отчёт не пишется — только имя файла
+    given = getattr(c, "doc_path", None)
+    given = PurePath(str(given)) if given else None
+    doc = (given.as_posix() if given and not given.is_absolute() and given.name == PurePath(
+        str(c.doc.get("file") or given.name)).name else str(c.doc.get("file") or "документ"))
     doc_arg = doc if re.fullmatch(r"[\w./\\:-]+", doc) else f'"{doc}"'
     clean = lambda x: str(x).replace("`", "").replace("|", "\\|")  # noqa: E731
     return out_json, clean(json_arg), clean(doc_arg)
@@ -2415,9 +2468,10 @@ def _sections():
             ("Приложение Е. Методика", _appendix_method)]
 
 
-def _render_level(report: dict, level: int, out_path=None) -> str:
+def _render_level(report: dict, level: int, out_path=None, doc_path=None) -> str:
     c = _Ctx(_clean_report(report), level)
     c.out_path = out_path
+    c.doc_path = doc_path
     _KNOWN_IDS.clear()
     _KNOWN_IDS.update(str(f.get("id")) for f in c.findings)
     _KNOWN_IDS.update(str(q.get("id")) for q in c.reqs)
@@ -2451,13 +2505,14 @@ def _render_level(report: dict, level: int, out_path=None) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render(report: dict, *, max_lines: int | None = MAX_LINES, out_path=None) -> str:
+def render(report: dict, *, max_lines: int | None = MAX_LINES, out_path=None, doc_path=None) -> str:
     """Markdown-отчёт по report.json v2. Если отчёт длиннее max_lines, вспомогательные таблицы сжимаются
-    (содержание дефектов не теряется: полные данные — в report.json). ``out_path`` — куда пишется этот .md
-    (для команд проверки в паспорте: report.json лежит рядом с тем же именем)."""
+    (содержание дефектов не теряется: полные данные — в report.json). ``out_path`` — куда пишется этот .md,
+    ``doc_path`` — путь к документу из командной строки: по ним паспорт пишет команды проверки и повтора, которые
+    можно выполнить как есть (без них — «отчёт.json» и имя файла документа)."""
     text = ""
     for level in range(MAX_LEVEL + 1):
-        text = _render_level(report, level, out_path)
+        text = _render_level(report, level, out_path, doc_path)
         if max_lines is None or text.count("\n") <= max_lines:
             break
     return text
@@ -2473,14 +2528,14 @@ def export_text(md: str) -> str:
     out = _ANCHOR_TAG.sub("", md)
     out = _LINK_TITLE.sub(r"\1)", out)
     out = out.replace("\\|", "∣")
-    out = re.sub(r"\\([\\`*_\[\]<>#])", r"\1", out)
+    out = re.sub(r"\\([\\`*_\[\]<>#(])", r"\1", out)
     return out
 
 
-def write(report: dict, path) -> str:
+def write(report: dict, path, doc_path=None) -> str:
     from pathlib import Path
 
-    text = render(report, out_path=path)
+    text = render(report, out_path=path, doc_path=doc_path)
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")
