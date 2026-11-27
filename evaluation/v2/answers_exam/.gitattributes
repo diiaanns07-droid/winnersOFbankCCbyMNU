@@ -1,0 +1,2 @@
+# Keep run artifacts byte-for-byte so verify can check the SHA-256 of revised inputs.
+*.revised.md -text

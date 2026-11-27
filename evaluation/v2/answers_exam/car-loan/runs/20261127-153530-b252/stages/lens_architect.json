@@ -1,0 +1,375 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 49.89,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 74,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Ветка логики без ответа: просрочка от 1 000 ₸ при подтверждении",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-41",
+          "R-54"
+        ],
+        "evidence": [
+          {
+            "quote": "Если сумма просрочки от 100000 тиын (1 000 ₸) включительно, <уточнить: подтверждение отклоняется (с каким кодом ответа) или разрешается>.",
+            "line": 94
+          },
+          {
+            "quote": "Недоступный тип или статус договора, просрочка при расчёте | 422 INELIGIBLE",
+            "line": 132
+          }
+        ],
+        "problem": "Для просрочки от 100000 тиын при подтверждении логика метода не задаёт исход: отказ или успех, код и тело не определены. Таблица ошибок покрывает просрочку только «при расчёте».",
+        "scenario": "Просрочка 150000 тиын возникла между расчётом и подтверждением. Сервер вернёт 201, 422 INELIGIBLE или иной код — по тексту неизвестно.",
+        "impact": "Реализации и тесты разойдутся, клиент с просрочкой может получить перенос или неопределённый отказ.",
+        "recommendation": "Определить исход ветки и добавить код и условие «при подтверждении» в таблицу ошибок.",
+        "rewrite": "Если сумма просрочки при подтверждении от 100000 тиын включительно, сервис возвращает <уточнить: код и code ответа> с телом {code, message}.",
+        "question": "Отклоняется ли подтверждение при просрочке от 1 000 ₸ и с каким кодом?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Единицы сумм в ответе расчёта: тиыны или тенге не определены",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-08",
+          "R-16",
+          "R-39"
+        ],
+        "evidence": [
+          {
+            "quote": "Приложение отображает суммы из ответа сервиса в тенге с двумя знаками после запятой.",
+            "line": 29
+          },
+          {
+            "quote": "Кредитный учёт сообщает сумму просрочки в тиынах и время её определения.",
+            "line": 42
+          },
+          {
+            "quote": "в тех же единицах, что суммы строк installments.",
+            "line": 85
+          }
+        ],
+        "problem": "Просрочка передаётся в тиынах, а единицы сумм строк installments и итогов процентов нигде не заданы; приложение выводит «в тенге».",
+        "scenario": "Сервис отдаёт proposedInterestTotal 1250050 (тиыны); приложение, считая тенге, покажет 1 250 050,00 вместо 12 500,50.",
+        "impact": "Клиент увидит суммы, завышенные в 100 раз, либо реализации разойдутся.",
+        "recommendation": "Зафиксировать единицу и тип сумм во всех полях ответа расчёта и правило пересчёта для отображения.",
+        "rewrite": "Суммы в ответах (основной долг, проценты, currentInterestTotal, proposedInterestTotal) передаются целым числом в тиынах; приложение делит на 100 при показе.",
+        "question": "В каких единицах сервис графиков возвращает суммы?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Поля строки installments не названы и не типизированы",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-24",
+          "R-25",
+          "R-39"
+        ],
+        "evidence": [
+          {
+            "quote": "У каждой строки есть порядковый номер, договорная дата, дата списания, основной долг и проценты.",
+            "line": 57
+          },
+          {
+            "quote": "installments со строками по Г-4",
+            "line": 85
+          }
+        ],
+        "problem": "Состав строки перечислен словами, без имён полей, типов и формата дат, хотя это ядро ответа расчёта.",
+        "scenario": "Серверный разработчик назовёт поле дата списания одним именем, клиентский — другим; разбор ответа сломается.",
+        "impact": "Интеграция серверной и клиентской частей потребует догадок.",
+        "recommendation": "Описать таблицу полей строки installments с именами, типами и форматом YYYY-MM-DD.",
+        "rewrite": "installments[]: <уточнить: имена полей> — номер (целое), договорная дата (YYYY-MM-DD), дата списания (YYYY-MM-DD), основной долг и проценты (целое, тиыны).",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Нет операции для действующего дня, baseRevision и нового графика",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-30",
+          "R-35",
+          "R-38"
+        ],
+        "evidence": [
+          {
+            "quote": "3. Приложение показывает действующий день и предлагает выбрать новое число.",
+            "line": 67
+          },
+          {
+            "quote": "8. После успеха показываются новая редакция графика и квитанция о принятой заявке.",
+            "line": 72
+          },
+          {
+            "quote": "принимает целое поле day и текущую редакцию baseRevision.",
+            "line": 83
+          }
+        ],
+        "problem": "Среди описанных операций нет той, что возвращает действующий день, текущую редакцию для baseRevision и график после подтверждения; квитанция содержит только номер редакции.",
+        "scenario": "После 201 приложению нечем получить строки новой редакции; перед расчётом неоткуда взять baseRevision.",
+        "impact": "Клиентский разработчик вынужден угадывать источник данных.",
+        "recommendation": "Указать операцию чтения договора и графика либо добавить график в ответ подтверждения.",
+        "rewrite": "<уточнить: операция чтения действующего графика, дня платежа и номера редакции договора>",
+        "question": "Какой существующий метод отдаёт действующий день, редакцию и график?",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "/loans/{loanId}/payment-day/previews",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 83
+        },
+        {
+          "name": "/loans/{loanId}/payment-day/changes",
+          "method": "POST",
+          "purpose": "создание и изменение",
+          "line": 91
+        },
+        {
+          "name": "/loans/{loanId}/payment-day/changes/{changeId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 104
+        },
+        {
+          "name": "вызов кредитного учёта: сумма просрочки",
+          "method": "вызов",
+          "purpose": "чтение",
+          "line": 94
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать действующий день платежа",
+          "line": 67,
+          "operation": ""
+        },
+        {
+          "what": "показать все строки графика и проценты до и после",
+          "line": 69,
+          "operation": "/loans/{loanId}/payment-day/previews"
+        },
+        {
+          "what": "показать новую редакцию графика после успеха",
+          "line": 72,
+          "operation": ""
+        },
+        {
+          "what": "показать квитанцию",
+          "line": 72,
+          "operation": "/loans/{loanId}/payment-day/changes/{changeId}"
+        },
+        {
+          "what": "передать текущую редакцию baseRevision в расчёт",
+          "line": 83,
+          "operation": ""
+        }
+      ],
+      "codes": [
+        {
+          "code": "401 SESSION_REQUIRED",
+          "lines": [
+            130
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404 NOT_FOUND",
+          "lines": [
+            131,
+            159
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 INELIGIBLE",
+          "lines": [
+            132
+          ],
+          "described": true,
+          "note": "просрочка только при расчёте"
+        },
+        {
+          "code": "422 DAY_INVALID",
+          "lines": [
+            133
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 TOO_LATE",
+          "lines": [
+            134,
+            153
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 CHANGE_LIMIT",
+          "lines": [
+            135
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "410 PREVIEW_EXPIRED",
+          "lines": [
+            136,
+            158
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "409 REVISION_CHANGED",
+          "lines": [
+            137,
+            157
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 BALANCE_LOW",
+          "lines": [
+            138
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "503 RETRY_LATER",
+          "lines": [
+            139
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "409 REQUEST_CHANGED",
+          "lines": [
+            123
+          ],
+          "described": false,
+          "note": "нет в таблице ошибок"
+        },
+        {
+          "code": "201",
+          "lines": [
+            97,
+            156
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "200",
+          "lines": [
+            85,
+            154
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "baseRevision",
+          "places": "запрос и ответ расчёта; целое; источник у клиента не описан"
+        },
+        {
+          "name": "requestId",
+          "places": "запрос подтверждения, журнал О-1, хранение М-4"
+        },
+        {
+          "name": "revision",
+          "places": "квитанция, целое номер редакции"
+        },
+        {
+          "name": "expiresAt",
+          "places": "ответ расчёта, UTC"
+        },
+        {
+          "name": "installments",
+          "places": "ответ расчёта; имена полей строки не заданы"
+        },
+        {
+          "name": "currentInterestTotal/proposedInterestTotal",
+          "places": "ответ расчёта; единицы 'как в installments'"
+        },
+        {
+          "name": "сумма просрочки",
+          "places": "в тиынах (строка 42, 94); суммы в приложении в тенге (строка 29)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST changes",
+          "step": "проверка принадлежности предложения и повтор requestId",
+          "line": 92,
+          "outcome": "404 NOT_FOUND; повтор — сохранённые код и квитанция"
+        },
+        {
+          "operation": "POST changes",
+          "step": "просрочка менее 100000 тиын — принять",
+          "line": 94,
+          "outcome": "201 и квитанция"
+        },
+        {
+          "operation": "POST changes",
+          "step": "просрочка от 100000 тиын включительно",
+          "line": 94,
+          "outcome": ""
+        },
+        {
+          "operation": "POST changes",
+          "step": "другое тело под занятым ключом",
+          "line": 123,
+          "outcome": "409 REQUEST_CHANGED"
+        },
+        {
+          "operation": "POST changes",
+          "step": "параллельные подтверждения",
+          "line": 100,
+          "outcome": "409 REVISION_CHANGED"
+        },
+        {
+          "operation": "POST previews",
+          "step": "просрочка при расчёте",
+          "line": 132,
+          "outcome": "422 INELIGIBLE"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

@@ -1,0 +1,823 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 80.78,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 73,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Д-3 допускает ровно 5 дней, П-1 отказывает",
+        "kind": "boundary_conflict",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-11",
+          "R-64"
+        ],
+        "evidence": [
+          {
+            "quote": "должно оставаться минимум пять календарных дней.",
+            "line": 32,
+            "line_start": 32,
+            "line_end": 32,
+            "page": null,
+            "section": "Правила доступности",
+            "verified": "exact"
+          },
+          {
+            "quote": "Сегодня 14 мая, ближайший взнос 19 мая. Клиент запрашивает расчёт для 18-го числа при актуальной редакции. | Отказ 422 TOO_LATE, предложение не создаётся.",
+            "line": 149,
+            "line_start": 149,
+            "line_end": 149,
+            "page": null,
+            "section": "Условия приёмки",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Д-3 и П-1 по-разному решают один случай — Д-3: минимум пять дней до взноса, граница ровно 5. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Сегодня 14 мая, взнос 19 мая: разность ровно 5 календарных дней. Д-3: 5 дней — не меньше минимума, расчёт разрешён. П-1: отказ 422 TOO_LATE.",
+        "impact": "Граница реализуется неоднозначно, приёмка П-1 падает на корректной реализации Д-3.",
+        "recommendation": "Привести Д-3 и П-1 к одной границе: либо минимум 5 включительно, либо П-1 с 20 мая.",
+        "rewrite": "",
+        "question": "Пять дней включительно допустимы или нужно строго больше пяти?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-02"
+        ]
+      },
+      {
+        "title": "Пример чтения квитанции без обязательного revision (М-3)",
+        "kind": "status_conflict",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-43",
+          "R-49"
+        ],
+        "evidence": [
+          {
+            "quote": "Поля квитанции обязательны для ответа как при подтверждении, так и при последующем чтении.",
+            "line": 102,
+            "line_start": 102,
+            "line_end": 102,
+            "page": null,
+            "section": "Обмен между системами › Квитанция и повтор",
+            "verified": "exact"
+          },
+          {
+            "quote": "{\"changeId\":\"ch-51\",\"loanId\":\"loan-7\",\"day\":18,\"acceptedAt\":\"2026-11-26T06:00:00Z\"}",
+            "line": 114,
+            "line_start": 114,
+            "line_end": 114,
+            "page": null,
+            "section": "Обмен между системами › Квитанция и повтор",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«описание интеграции, строка 102» и «описание интеграции, строка 114» по-разному решают один случай — квитанция: поле revision обязательно, в примере нет. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Клиент читает квитанцию через GET после подтверждения. Описание интеграции, строка 102: ответ содержит все пять полей, включая revision. Описание интеграции, строка 114: пример ответа без revision.",
+        "impact": "Клиент реализует ответ без revision, П-3 и П-4 не проверить.",
+        "recommendation": "Добавить revision в пример ответа.",
+        "rewrite": "",
+        "question": "Что верно: «ответ содержит все пять полей, включая revision» (как в «описание интеграции, строка 102») или «пример ответа без revision» (как в «описание интеграции, строка 114»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-04"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Предложение с новым графиком», «Плата за перенос»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "Расчёт",
+            "line": 20,
+            "verified": "normalized"
+          },
+          {
+            "quote": "Предложение",
+            "line": 55,
+            "verified": "normalized"
+          },
+          {
+            "quote": "плата по текущему счёту",
+            "line": 40,
+            "verified": "normalized"
+          },
+          {
+            "quote": "плату за перенос",
+            "line": 92,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Предложение с новым графиком: «Расчёт» (строка 20), «Предложение» (строка 55), «предварительный расчёт» (строка 65); Плата за перенос: «плата по текущему счёту» (строка 40), «плату за перенос» (строка 92), «платы за изменение дня» (строка 145).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02"
+        ]
+      },
+      {
+        "title": "Нет метода чтения действующего дня, редакции и графика",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-30",
+          "R-35",
+          "R-38"
+        ],
+        "evidence": [
+          {
+            "quote": "3. Приложение показывает действующий день и предлагает выбрать новое число.",
+            "line": 64,
+            "line_start": 64,
+            "line_end": 64,
+            "page": null,
+            "section": "Действия клиента",
+            "verified": "exact"
+          },
+          {
+            "quote": "М-1. POST /loans/{loanId}/payment-day/previews принимает целое поле day и текущую редакцию baseRevision.",
+            "line": 80,
+            "line_start": 80,
+            "line_end": 80,
+            "page": null,
+            "section": "Обмен между системами › Предварительный расчёт",
+            "verified": "exact"
+          },
+          {
+            "quote": "8. После успеха показываются новая редакция графика и квитанция о принятой заявке.",
+            "line": 69,
+            "line_start": 69,
+            "line_end": 69,
+            "page": null,
+            "section": "Действия клиента",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Экран показывает день и график, а baseRevision нужен в запросе, но метода чтения нет.",
+        "scenario": "Клиент открывает карточку договора: приложение не знает действующий день и baseRevision для М-1.",
+        "impact": "Нельзя построить первый шаг: расчёт и показ новой редакции не к чему подключить.",
+        "recommendation": "Описать метод GET графика договора с днём, revision и строками, либо указать, откуда приложение берёт эти данные.",
+        "rewrite": "М-0. GET /loans/{loanId}/payment-schedule возвращает revision, действующий day и installments по Г-4.",
+        "question": "Какой метод отдаёт приложению действующий день, редакцию и график?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Цель про день зарплаты, а Д-2 ограничивает числа 5–25",
+        "kind": "other",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-01",
+          "R-10"
+        ],
+        "evidence": [
+          {
+            "quote": "Назначение услуги — совместить день платежа с датой получения заработной платы.",
+            "line": 10,
+            "line_start": 10,
+            "line_end": 10,
+            "page": null,
+            "section": "Назначение и границы",
+            "verified": "exact"
+          },
+          {
+            "quote": "Д-2. Доступны новые числа месяца от 5 до 25 включительно, кроме действующего числа.",
+            "line": 31,
+            "line_start": 31,
+            "line_end": 31,
+            "page": null,
+            "section": "Правила доступности",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Зарплата 1–4 или 26–31 числа недоступна, цель выполнима частично.",
+        "scenario": "Зарплата 30-го: клиент не может выбрать 30.",
+        "impact": "Часть клиентов не достигнет цели услуги.",
+        "recommendation": "Обосновать диапазон 5–25 или сузить формулировку цели.",
+        "rewrite": "Назначение услуги — совместить день платежа с датой зарплаты в диапазоне чисел 5–25.",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "У требований нет приоритета и стабильности",
+        "kind": "missing_element",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-01"
+        ],
+        "evidence": [
+          {
+            "quote": "Версия 1.0 от 26 ноября 2026 года.",
+            "line": 5,
+            "line_start": 5,
+            "line_end": 5,
+            "page": null,
+            "section": "Назначение и границы",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ни у Д-, Г-, М- правил нет приоритета и признака стабильности.",
+        "scenario": "При нехватке сроков неясно, что резать.",
+        "impact": "Спор о порядке реализации.",
+        "recommendation": "Добавить столбец приоритета к правилам.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Пункты 1–9 действий клиента без ID и источника",
+        "kind": "traceability",
+        "criterion": "traceable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-28",
+          "R-36"
+        ],
+        "evidence": [
+          {
+            "quote": "1. Клиент выбирает действующий договор в разделе «Мой автокредит».",
+            "line": 62,
+            "line_start": 62,
+            "line_end": 62,
+            "page": null,
+            "section": "Действия клиента",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Шаги нумерованы без ID и не связаны с правилами и критериями.",
+        "scenario": "Тестировщик не может сослаться на шаг.",
+        "impact": "Нет трассировки шагов к приёмке.",
+        "recommendation": "Дать шагам ID и указать источник требования.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-17",
+        "b": "R-41",
+        "subject": "Плата за перенос: бесплатно по Д-6, 1 500 ₸ по М-2",
+        "same_subject": true,
+        "quote_a": "Перенос бесплатный для клиента. При подтверждении плата по текущему счёту не начисляется и не списывается.",
+        "line_a": 40,
+        "quote_b": "Кредитный учёт при подтверждении списывает с текущего счёта заемщика плату за перенос в размере 1 500 ₸.",
+        "line_b": 92,
+        "scenario": "Клиент подтверждает перенос при достаточном остатке на текущем счёте.",
+        "outcome_a": "Плата не списывается, баланс счёта не меняется.",
+        "outcome_b": "Со счёта списывается 1 500 ₸ в той же транзакции.",
+        "one_condition": true,
+        "verdict": "compatible",
+        "basis": "none",
+        "kind": "event_conflict",
+        "title": "Д-6 запрещает плату, М-2 списывает 1 500 ₸",
+        "impact": "Клиент получит списание при обещанной бесплатности; приёмка и тесты расходятся.",
+        "recommendation": "Зафиксировать одно решение: платный или бесплатный перенос, убрать лишнее правило и BALANCE_LOW.",
+        "question": "Перенос платный (1 500 ₸) или бесплатный?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      },
+      {
+        "a": "R-11",
+        "b": "R-64",
+        "subject": "Д-3: минимум пять дней до взноса, граница ровно 5",
+        "same_subject": true,
+        "quote_a": "должно оставаться минимум пять календарных дней.",
+        "line_a": 32,
+        "quote_b": "Сегодня 14 мая, ближайший взнос 19 мая. Клиент запрашивает расчёт для 18-го числа при актуальной редакции. | Отказ 422 TOO_LATE, предложение не создаётся.",
+        "line_b": 149,
+        "scenario": "Сегодня 14 мая, взнос 19 мая: разность ровно 5 календарных дней.",
+        "outcome_a": "5 дней — не меньше минимума, расчёт разрешён.",
+        "outcome_b": "Отказ 422 TOO_LATE.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "boundary_conflict",
+        "title": "Д-3 допускает ровно 5 дней, П-1 отказывает",
+        "impact": "Граница реализуется неоднозначно, приёмка П-1 падает на корректной реализации Д-3.",
+        "recommendation": "Привести Д-3 и П-1 к одной границе: либо минимум 5 включительно, либо П-1 с 20 мая.",
+        "question": "Пять дней включительно допустимы или нужно строго больше пяти?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-02"
+      },
+      {
+        "a": "R-41",
+        "b": "R-62",
+        "subject": "Порядок проверок при подтверждении",
+        "same_subject": true,
+        "quote_a": "Для первого запроса проверяются срок предложения, актуальность baseRevision, интервал Д-3 и право по Д-4.",
+        "line_a": 90,
+        "quote_b": "При нескольких причинах отказа у новой операции порядок проверки такой же, как порядок строк таблицы сверху вниз.",
+        "line_b": 137,
+        "scenario": "Предложение истекло и одновременно до взноса меньше минимума.",
+        "outcome_a": "Сначала срок предложения: 410 PREVIEW_EXPIRED.",
+        "outcome_b": "По таблице TOO_LATE выше PREVIEW_EXPIRED: 422 TOO_LATE.",
+        "one_condition": true,
+        "verdict": "compatible",
+        "basis": "none",
+        "kind": "status_conflict",
+        "title": "Порядок проверок в М-2 расходится с таблицей ошибок",
+        "impact": "Один и тот же запрос получает разные коды, тесты не сходятся.",
+        "recommendation": "Оставить один порядок проверок и убрать второй.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-03"
+      },
+      {
+        "a": "R-43",
+        "b": "R-49",
+        "subject": "Квитанция: поле revision обязательно, в примере нет",
+        "same_subject": true,
+        "quote_a": "Поля квитанции обязательны для ответа как при подтверждении, так и при последующем чтении.",
+        "line_a": 102,
+        "quote_b": "{\"changeId\":\"ch-51\",\"loanId\":\"loan-7\",\"day\":18,\"acceptedAt\":\"2026-11-26T06:00:00Z\"}",
+        "line_b": 114,
+        "scenario": "Клиент читает квитанцию через GET после подтверждения.",
+        "outcome_a": "Ответ содержит все пять полей, включая revision.",
+        "outcome_b": "Пример ответа без revision.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "status_conflict",
+        "title": "Пример чтения квитанции без обязательного revision (М-3)",
+        "impact": "Клиент реализует ответ без revision, П-3 и П-4 не проверить.",
+        "recommendation": "Добавить revision в пример ответа.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-04"
+      },
+      {
+        "a": "R-15",
+        "b": "R-41",
+        "subject": "Просрочка, возникшая между расчётом и подтверждением",
+        "same_subject": true,
+        "quote_a": "На этапе расчёта проверяется, что по договору нет просроченной задолженности.",
+        "line_a": 38,
+        "quote_b": "Порядок работы с просрочкой, впервые возникшей после расчёта предложения, подлежит согласованию с сопровождением кредита.",
+        "line_b": 91,
+        "scenario": "Просрочка возникла после расчёта, клиент подтверждает перенос.",
+        "outcome_a": "При подтверждении проверка не названа, перенос проходит.",
+        "outcome_b": "Порядок не определён, ждёт согласования.",
+        "one_condition": true,
+        "verdict": "compatible",
+        "basis": "none",
+        "kind": "incomplete",
+        "title": "Д-5 и М-2: просрочка после расчёта не определена",
+        "impact": "Банк может перенести график по договору с просрочкой.",
+        "recommendation": "Решить: проверять просрочку при подтверждении и вернуть 422 INELIGIBLE.",
+        "question": "Блокировать ли подтверждение при просрочке, возникшей после расчёта?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-05"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-09",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-10",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-11",
+        "verified_by": [
+          "R-64",
+          "R-65"
+        ],
+        "implemented_by": [],
+        "note": "противоречие: П-1",
+        "conflicts_with": [
+          "R-64"
+        ]
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-13",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия на лимит и годовщину"
+      },
+      {
+        "requirement_id": "R-14",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-15",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия на просрочку"
+      },
+      {
+        "requirement_id": "R-16",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-17",
+        "verified_by": [],
+        "implemented_by": [
+          "R-41"
+        ],
+        "note": "Нет критерия приёмки; противоречит М-2"
+      },
+      {
+        "requirement_id": "R-22",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-24",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-26",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-27",
+        "verified_by": [
+          "R-69"
+        ],
+        "implemented_by": [
+          "R-38"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-28",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-30",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет метода чтения действующего дня и редакции"
+      },
+      {
+        "requirement_id": "R-32",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-33",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-34",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-35",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет метода получения новой редакции графика"
+      },
+      {
+        "requirement_id": "R-36",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-37",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-38",
+        "verified_by": [
+          "R-64",
+          "R-65"
+        ],
+        "implemented_by": [],
+        "note": "Источник baseRevision не описан"
+      },
+      {
+        "requirement_id": "R-39",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-40",
+        "verified_by": [
+          "R-66",
+          "R-68",
+          "R-69"
+        ],
+        "implemented_by": [],
+        "note": "Нет критерия на BALANCE_LOW"
+      },
+      {
+        "requirement_id": "R-41",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-42",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия на чтение квитанции"
+      },
+      {
+        "requirement_id": "R-43",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "противоречие: описание интеграции, строка 114; трассировка не построена",
+        "conflicts_with": [
+          "R-49"
+        ]
+      },
+      {
+        "requirement_id": "R-44",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-45",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-46",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-47",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-48",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-49",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "противоречие: описание интеграции, строка 102; трассировка не построена",
+        "conflicts_with": [
+          "R-43"
+        ]
+      },
+      {
+        "requirement_id": "R-50",
+        "verified_by": [
+          "R-67"
+        ],
+        "implemented_by": [],
+        "note": "Нет критерия на REQUEST_CHANGED"
+      },
+      {
+        "requirement_id": "R-51",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-52",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-53",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-54",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-55",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-56",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-57",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-58",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-59",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-60",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-61",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-62",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Предложение с новым графиком",
+        "terms": [
+          {
+            "term": "Расчёт",
+            "line": 20
+          },
+          {
+            "term": "Предложение",
+            "line": 55
+          },
+          {
+            "term": "предварительный расчёт",
+            "line": 65
+          }
+        ],
+        "problem": "Три названия одной сущности, рядом поле previewId.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Плата за перенос",
+        "terms": [
+          {
+            "term": "плата по текущему счёту",
+            "line": 40
+          },
+          {
+            "term": "плату за перенос",
+            "line": 92
+          },
+          {
+            "term": "платы за изменение дня",
+            "line": 145
+          }
+        ],
+        "problem": "Разные названия одной платы.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Плата за перенос дня",
+        "places": [
+          "R-17",
+          "R-41"
+        ]
+      },
+      {
+        "subject": "Минимальный срок до взноса (Д-3)",
+        "places": [
+          "R-11",
+          "R-56",
+          "R-41"
+        ]
+      },
+      {
+        "subject": "Порядок проверок при отказе",
+        "places": [
+          "R-41",
+          "R-62"
+        ]
+      },
+      {
+        "subject": "Просрочка после расчёта",
+        "places": [
+          "R-15",
+          "R-41",
+          "R-54"
+        ]
+      },
+      {
+        "subject": "Состав полей квитанции",
+        "places": [
+          "R-43",
+          "R-46",
+          "R-49"
+        ]
+      },
+      {
+        "subject": "Срок предложения expiresAt",
+        "places": [
+          "R-26",
+          "R-27",
+          "R-58"
+        ]
+      },
+      {
+        "subject": "Повтор requestId и новая проверка редакции",
+        "places": [
+          "R-41",
+          "R-50",
+          "R-51"
+        ]
+      },
+      {
+        "subject": "Источник текущей редакции и дня",
+        "places": [
+          "R-30",
+          "R-38",
+          "R-35"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}
