@@ -180,10 +180,21 @@ _HTML_START = re.compile(r"<(?=[A-Za-z/!?])")
 _DOC_ID = re.compile(r"[A-Za-zА-Яа-яЁё]{0,6}[-.]?\d+(?:[.-]\d+)*[a-zа-я]?")
 
 
+def _no_links(text: str) -> str:
+    """Своя Markdown-ссылка в тексте модели («[Ф-3](#ф-3)», «[тут](http://…)») — простым текстом: якоря в отчёте
+    ставит только код, чужая ссылка вела бы в никуда (вне `кода`; «\\(» GitHub показывает как «(»)."""
+    if "](" not in text:
+        return text
+    parts = re.split(r"(`[^`]*`)", text)
+    for i in range(0, len(parts), 2):
+        parts[i] = parts[i].replace("](", "]\\(")
+    return "".join(parts)
+
+
 def esc(text) -> str:
-    """Текст модели или документа в строку Markdown: без переводов строк и без HTML-тегов."""
+    """Текст модели или документа в строку Markdown: без переводов строк, без HTML-тегов и без своих ссылок."""
     s = " ".join(str(text or "").split())
-    return _HTML_START.sub(r"\\<", s)
+    return _no_links(_HTML_START.sub(r"\\<", s))
 
 
 _LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,20})\s+)?\bL0*(\d{1,5})"
@@ -571,10 +582,22 @@ def source_name(src: str) -> str:
     return f"этап `{s}`" if s else "—"
 
 
+_BARE_PIPE = re.compile(r"(\\*)\|")
+
+
+def _table_cell(value) -> str:
+    """Последняя защита строки таблицы: перевод строки — пробел, «|» без экранирования — «\\|».
+
+    Чётное число обратных косых перед «|» (в документе уже было «\\|», и `cell()` дал «\\\\|») не экранирует черту —
+    GitHub разрезал бы ячейку и сдвинул столбцы; добавляем ещё одну косую."""
+    s = re.sub(r"[\r\n]+", " ", "" if value is None else str(value))
+    return _BARE_PIPE.sub(lambda m: m.group(1) + ("" if len(m.group(1)) % 2 else "\\") + "|", s)
+
+
 def table(header: list[str], rows: list[list[str]], align: list[str] | None = None) -> list[str]:
     align = align or [":---"] * len(header)
-    out = ["| " + " | ".join(header) + " |", "| " + " | ".join(align) + " |"]
-    out += ["| " + " | ".join(r) + " |" for r in rows]
+    out = ["| " + " | ".join(_table_cell(h) for h in header) + " |", "| " + " | ".join(align) + " |"]
+    out += ["| " + " | ".join(_table_cell(x) for x in r) + " |" for r in rows]
     return out
 
 
@@ -2473,7 +2496,7 @@ def export_text(md: str) -> str:
     out = _ANCHOR_TAG.sub("", md)
     out = _LINK_TITLE.sub(r"\1)", out)
     out = out.replace("\\|", "∣")
-    out = re.sub(r"\\([\\`*_\[\]<>#])", r"\1", out)
+    out = re.sub(r"\\([\\`*_\[\]<>#(])", r"\1", out)
     return out
 
 
