@@ -34,7 +34,7 @@ DEFAULTS: dict[str, Any] = {
     "timeout": 600.0, "max_retries": 5, "cache": True, "cache_dir": None, "runs_dir": "runs", "run_id": None,
     "export": [], "html": True, "answers": None, "revise": False, "passes": 1, "parallel": 5,
     "mock_dir": None, "lenses": list(LENSES), "consistency": True, "clarify": True, "judge_check": True,
-    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": False,
+    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": None,
     "clarify_early": True,
 }
 # Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
@@ -275,7 +275,13 @@ class Pipeline:
                 report["run"]["warnings"] = _uniq([self.model_error] + list(report["run"].get("warnings") or []))
             return report
 
-        heur = self._fast_start_table(view) if opts.get("fast_start") else None
+        fast = opts.get("fast_start")
+        if fast is None:
+            # По умолчанию пока выключен: при одновременном старте нарезки и рецензентов неверный ключ Gemini даёт
+            # 6 запросов вместо 1, исчерпанная квота — 8 вместо 3 (тесты №02), длинный документ — partial (№14).
+            # Нужна «проба»: рецензенты стартуют, когда нарезка закончилась или идёт ≥ 8 с без фатальной ошибки.
+            fast = False
+        heur = self._fast_start_table(view) if fast else None
         if heur is not None:
             # 1–3, быстрый старт: нарезка моделью идёт параллельно с рецензентами; рецензенты работают по таблице
             # эвристики кода, после нарезки ссылки R-ID переводятся на ID нарезки по строкам (_remap_reviewers)
