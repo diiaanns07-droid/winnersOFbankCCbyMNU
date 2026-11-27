@@ -95,6 +95,22 @@ def _s(x: Any) -> str:
     return x.strip() if isinstance(x, str) else ""
 
 
+# Названия полей схемы, которые слабая модель переносит в тексты для пользователя («Acceptance не покрывает…»).
+_SCHEMA_WORDS = [(re.compile(r"\bacceptance[_ ]checks?\b|\bacceptance\b", re.I), "критерии приёмки"),
+                 (re.compile(r"\btest[_ ]cases?\b", re.I), "тест-кейсы"),
+                 (re.compile(r"\bexpected_defined\b", re.I), "признак определённости результата"),
+                 (re.compile(r"\bcandidates?\b", re.I), "замечания")]
+
+
+def _t(x: Any) -> str:
+    """Текст для пользователя: как :func:`_s`, плюс названия полей схемы — по-русски."""
+    text = _s(x)
+    for rx, ru in _SCHEMA_WORDS:
+        text = rx.sub(lambda m: ru.capitalize() if m.start() == 0 or text[m.start() - 2:m.start()] in (". ", "\n") else ru,
+                      text)
+    return text
+
+
 def _ids(x: Any) -> list[str]:
     out: list[str] = []
     for v in x or []:
@@ -176,19 +192,19 @@ def normalize_check(raw: Mapping[str, Any]) -> dict:
         "row_requirement_id": _s(raw.get("row_requirement_id")),
         "row_quote": _s(raw.get("row_quote")),
         "row_line": _int(raw.get("row_line")),
-        "row_facts": _s(raw.get("row_facts")),
-        "assumptions": _s(raw.get("assumptions")),
+        "row_facts": _t(raw.get("row_facts")),
+        "assumptions": _t(raw.get("assumptions")),
         "rule_requirement_ids": _ids(raw.get("rule_requirement_ids")),
         "rule_evidence": [{"quote": _s(e.get("quote")), "line": _int(e.get("line"))}
                           for e in raw.get("rule_evidence") or [] if isinstance(e, Mapping) and _s(e.get("quote"))],
-        "derivation": _s(raw.get("derivation")),
-        "expected_by_rules": _s(raw.get("expected_by_rules")),
+        "derivation": _t(raw.get("derivation")),
+        "expected_by_rules": _t(raw.get("expected_by_rules")),
         "stated": _s(raw.get("stated")),
         "stated_line": _int(raw.get("stated_line")) or _int(raw.get("row_line")),
         "verdict": raw.get("verdict") if raw.get("verdict") in VERDICTS else "undefined",
         "conflict_kind": raw.get("conflict_kind") if raw.get("conflict_kind") in CONFLICT_KINDS else "none",
-        "explanation": _s(raw.get("explanation")),
-        "fix": _s(raw.get("fix")),
+        "explanation": _t(raw.get("explanation")),
+        "fix": _t(raw.get("fix")),
     }
     if c["verdict"] == "conflict" and c["stated"] and _norm(c["expected_by_rules"]).rstrip(".") == _norm(
             c["stated"]).rstrip("."):
@@ -300,7 +316,7 @@ _RID = re.compile(r"R-\d+")
 def normalize_candidate(raw: Mapping[str, Any]) -> dict:
     c = {k: raw.get(k) for k in CANDIDATE_SCHEMA["properties"]}
     for k in ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question"):
-        c[k] = _s(c[k])
+        c[k] = _t(c[k])
     c["kind"] = c["kind"] if c["kind"] in KINDS else "other"
     c["criterion"] = c["criterion"] if c["criterion"] in CRITERIA else "verifiable"
     c["severity"] = c["severity"] if c["severity"] in ("critical", "major", "minor") else "major"
@@ -308,13 +324,14 @@ def normalize_candidate(raw: Mapping[str, Any]) -> dict:
     c["requirement_ids"] = _ids(c["requirement_ids"])
     c["evidence"] = [{"quote": _s(e.get("quote")), "line": _int(e.get("line"))}
                      for e in c["evidence"] or [] if isinstance(e, Mapping) and _s(e.get("quote"))]
-    # Шкала: critical без сценария и последствий не бывает; blocks=none у critical недопустим.
-    # У линзы тестировщика critical — только противоречие (два места дают разные ожидаемые результаты);
-    # непроверяемость и непокрытые ветки на чистых документах давали ложные critical, судья может поднять.
-    if c["severity"] == "critical" and (not c["scenario"] or not c["impact"]
-                                        or c["kind"] not in _CONFLICT_FAMILY):
+    # Critical у линзы тестировщика — только вычисленный конфликт строки приёмки (check_to_candidate: две
+    # сверенные цитаты и вывод по шагам). Кандидат модели — не выше major: противоречия двух правил — зона
+    # проверки набора (№09), серьёзность по шкале ставит судья. На новых ТЗ №18 critical-противоречия модели
+    # были в основном major эталона (коды ответа, единицы), а на чистых версиях haiku давал ложные critical.
+    if c["severity"] == "critical":
         c["severity"] = "major"
-    if c["severity"] == "critical" and c["blocks"] == "none":
+        c["severity_hint"] = "critical"  # модель считала critical: подсказка судье, в вердикт не идёт
+    if c["blocks"] == "none" and c["kind"] in _CONFLICT_FAMILY:
         c["blocks"] = "testing"
     c["source"] = SOURCE
     return c
@@ -328,9 +345,9 @@ def _duplicates_check(cand: Mapping[str, Any], flagged_rows: set[str]) -> bool:
 
 
 def normalize_test_case(raw: Mapping[str, Any]) -> dict:
-    t = {"requirement_ids": _ids(raw.get("requirement_ids")), "title": _s(raw.get("title")),
-         "given": _s(raw.get("given")), "when": _s(raw.get("when")), "then": _s(raw.get("then")),
-         "gap": _s(raw.get("gap")), "expected_defined": raw.get("expected_defined") is not False}
+    t = {"requirement_ids": _ids(raw.get("requirement_ids")), "title": _t(raw.get("title")),
+         "given": _t(raw.get("given")), "when": _t(raw.get("when")), "then": _t(raw.get("then")),
+         "gap": _t(raw.get("gap")), "expected_defined": raw.get("expected_defined") is not False}
     if UNDEFINED_PREFIX.lower() in t["then"].lower():
         t["expected_defined"] = False
     elif not t["expected_defined"]:
@@ -340,11 +357,11 @@ def normalize_test_case(raw: Mapping[str, Any]) -> dict:
 
 # ---------------------------------------------------------------- сборка
 
-MAX_OTHER_CANDIDATES = 2
+MAX_OTHER_CANDIDATES = 2  # одно о покрытии приёмкой + одно о проверяемости
 
 
 def _other_rank(c: Mapping[str, Any]) -> int:
-    """Порядок замечаний модели вне противоречий: покрытие приёмкой, проверяемость, остальное."""
+    """Вид замечания модели вне противоречий: 0 — покрытие приёмкой, 1 — проверяемость, 2 — прочее."""
     if c.get("kind") == "missing_element" and c.get("criterion") == "set_validatable":
         return 0
     if c.get("kind") == "unverifiable":
@@ -353,20 +370,29 @@ def _other_rank(c: Mapping[str, Any]) -> int:
 
 
 def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Противоречия модели (два места — два исхода) остаются все; прочих замечаний — не больше
-    :data:`MAX_OTHER_CANDIDATES`: одно о покрытии приёмкой и одно о проверяемости раньше остальных.
-
-    На чистых документах корпуса haiku давал 3–5 major (неоднозначности одного места, контракт API, доставка
-    сообщений) — это зона аналитика и архитектора; линза тестировщика держит свои два вида. Снятые идут в
-    ``dropped`` (в отчёте — «отклонено линзой»), не теряются.
+    """Противоречия модели (два места — два исхода) остаются все; вне противоречий линза держит только свои
+    два вида — не больше одного замечания о покрытии приёмкой и одного о проверяемости. Прочее (неоднозначность
+    одного места, неполнота, контракт API, доставка сообщений) — зона аналитика и архитектора: на чистых
+    документах корпуса и №18 это был основной шум линзы. Снятые идут в ``dropped`` (отчёт: «отклонено линзой»).
     """
-    conflicts = [c for c in cands if c.get("kind") in _CONFLICT_FAMILY]
-    others = sorted((c for c in cands if c.get("kind") not in _CONFLICT_FAMILY),
-                    key=lambda c: (_other_rank(c), {"critical": 0, "major": 1, "minor": 2}.get(c.get("severity"), 3)))
-    keep_ids = {id(c) for c in conflicts + others[:MAX_OTHER_CANDIDATES]}
-    kept = [c for c in cands if id(c) in keep_ids]
-    reason = f"сверх лимита линзы тестировщика: не больше {MAX_OTHER_CANDIDATES} замечаний вне противоречий"
-    dropped = [{**c, "reason": reason} for c in others[MAX_OTHER_CANDIDATES:]]
+    sev = {"critical": 0, "major": 1, "minor": 2}
+    best: dict[int, dict] = {}
+    for c in cands:
+        if c.get("kind") in _CONFLICT_FAMILY:
+            continue
+        r = _other_rank(c)
+        if r < 2 and (r not in best or sev.get(c.get("severity"), 3) < sev.get(best[r].get("severity"), 3)):
+            best[r] = c
+    keep = {id(c) for c in best.values()}
+    kept, dropped = [], []
+    for c in cands:
+        if c.get("kind") in _CONFLICT_FAMILY or id(c) in keep:
+            kept.append(c)
+        else:
+            why = ("второе замечание того же вида" if _other_rank(c) < 2
+                   else "вне зоны линзы тестировщика (неоднозначность, неполнота, контракт — у аналитика и архитектора)")
+            dropped.append({**c, "reason": f"снято линзой тестировщика: {why}; вне противоречий — не больше "
+                                          f"{MAX_OTHER_CANDIDATES} замечаний (покрытие приёмкой, проверяемость)"})
     return kept, dropped
 
 
