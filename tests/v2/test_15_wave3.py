@@ -660,3 +660,37 @@ def test_measure_does_not_write_history_for_quota_stopped_run(tmp_path, monkeypa
     args = ["--from-report", str(src), "--label", "лимит", "--arbiter", "off"]
     assert measure.main(args) == 3 and hist.read_text(encoding="utf-8") == ""
     assert measure.main(args + ["--save-partial"]) == 0 and len(hist.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_round_runs_official_first_and_skips_sets_after_quota(tmp_path, monkeypatch):
+    """Раунд: сначала официальный документ, потом наборы; официальный упёрся в лимит подписки — наборы не стартуют."""
+    from evaluation.v2 import round as rnd
+
+    started: list[str] = []
+
+    class FakeProc:
+        def __init__(self, cmd, cwd=None, stdout=None, stderr=None):
+            name = cmd[-1]
+            started.append(name)
+            if name == "official_sonnet_1" and quota:
+                stdout.write("агент упёрся в лимит провайдера (Исчерпан лимит подписки Claude Code.)\n")
+            stdout.close()
+
+        def wait(self):
+            return 0
+
+    def fake_jobs(*_a, **_k):
+        return [("official_sonnet_1", ["x", "official_sonnet_1"]), ("corpus", ["x", "corpus"]),
+                ("clean20", ["x", "clean20"])]
+
+    monkeypatch.setattr(rnd.subprocess, "Popen", FakeProc)
+    monkeypatch.setattr(rnd.subprocess, "run", lambda *a, **k: None)
+    monkeypatch.setattr(rnd, "ROOT", tmp_path)
+    monkeypatch.setattr(rnd, "_build_jobs", fake_jobs, raising=False)
+    for quota, expect in ((False, ["official_sonnet_1", "corpus", "clean20"]), (True, ["official_sonnet_1"])):
+        started.clear()
+        logs = tmp_path / ("q" if quota else "ok")
+        logs.mkdir()
+        rcs = rnd.run_waves(fake_jobs(), logs, together=False)
+        assert started == expect
+        assert (rcs["corpus"] == 3) is quota

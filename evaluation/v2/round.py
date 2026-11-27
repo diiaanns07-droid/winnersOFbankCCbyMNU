@@ -11,6 +11,11 @@
 Без `--no-cache-sets` корпус, новые ТЗ и чистые наборы берут ответы модели из кэша: если промпты не менялись,
 это повтор старых ответов через новый код (0 вызовов), а не новая выборка — `final` помечает такие строки.
 
+Сначала — официальный документ (его прогоны параллельно между собой), потом наборы: время официального — цель ворот
+(sonnet ≤ 3 мин), а 12 одновременных процессов `claude` того же аккаунта растягивают его (кандидат 868787d в 18:00:
+2,9 и 3,3 мин против 2,4 мин в 17:46). `--together` — всё сразу, как раньше. Агент упёрся в лимит подписки на
+официальном — наборы не запускаются (они упрутся в тот же лимит и только сожгут его остаток у других сессий).
+
 Метки замеров: «<name>: <коммит>, <модель>» (повтор модели — «… #2»). Логи — `out/round/<slug>/*.log`.
 """
 from __future__ import annotations
@@ -70,6 +75,18 @@ def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]
     return out
 
 
+def quota_in_logs(logs: Path, names: list[str]) -> bool:
+    """В логе части раунда — отказ `measure` из-за лимита провайдера или сама ошибка лимита подписки агента."""
+    for n in names:
+        try:
+            text = (logs / f"{n}.log").read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "упёрся в лимит провайдера" in text or "Исчерпан лимит подписки" in text:
+            return True
+    return False
+
+
 def same_code_scores(model: str, labels: list[str]) -> list[str]:
     """score.json прошлых прогонов модели на том же коде, что прогоны этого раунда с метками ``labels``."""
     from .gate import HISTORY, _read_jsonl, model_kind, same_code_rows
@@ -106,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-cache-sets", action="store_true",
                     help="корпус, новые ТЗ и чистые наборы мимо кэша — новая выборка ответов, а не повтор")
     ap.add_argument("--arbiter", default="sonnet")
+    ap.add_argument("--together", action="store_true",
+                    help="официальный документ и наборы одновременно (быстрее, но время официального — под нагрузкой)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
@@ -150,12 +169,20 @@ def main(argv: list[str] | None = None) -> int:
     if a.dry_run:
         return 0
     t0 = time.monotonic()
-    procs = {name: subprocess.Popen(cmd, cwd=str(ROOT), stdout=(logs / f"{name}.log").open("w", encoding="utf-8"),
-                                    stderr=subprocess.STDOUT) for name, cmd in jobs}
-    rcs = {}
-    for name, p in procs.items():
-        rcs[name] = p.wait()
-        print(f"[{name}] rc={rcs[name]} ({(time.monotonic() - t0) / 60:.1f} мин)", flush=True)
+    first = [j for j in jobs if j[0].startswith("official_")]
+    waves = [jobs] if a.together or not first else [first, [j for j in jobs if j not in first]]
+    rcs: dict[str, int] = {}
+    for i, wave in enumerate(waves):
+        if i and quota_in_logs(logs, [n for n, _ in waves[0]]):
+            print("агент упёрся в лимит подписки на официальном документе — наборы не запускаю: "
+                  + ", ".join(n for n, _ in wave), flush=True)
+            rcs.update({n: 3 for n, _ in wave})
+            break
+        procs = {name: subprocess.Popen(cmd, cwd=str(ROOT), stdout=(logs / f"{name}.log").open("w", encoding="utf-8"),
+                                        stderr=subprocess.STDOUT) for name, cmd in wave}
+        for name, p in procs.items():
+            rcs[name] = p.wait()
+            print(f"[{name}] rc={rcs[name]} ({(time.monotonic() - t0) / 60:.1f} мин)", flush=True)
     # стабильность: прогоны модели в этом раунде и раньше на том же коде (деревья src/ по git, без повторов из кэша)
     for m in sorted({m for m, _ in labels}):
         paths = [str(MEAS / slugify(lb) / "score.json") for mm, lb in labels if mm == m]
