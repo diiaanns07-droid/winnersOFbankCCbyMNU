@@ -16,8 +16,10 @@
    1 попадании, на чистых — 7 из 8 замечаний. Исключение — дефект языка, который доказывает сама цитата
    (субъективное слово «быстро», «удобно», лазейка «по возможности», открытый перечень «и т. д.»): он не зависит
    от зрелости документа, их остаётся до `MATURE_MAX_LANGUAGE`. На сыром документе линза работает в полную силу;
-7. сортировка: critical → major → minor, внутри — порядок модели;
-8. не больше 12 кандидатов.
+7. заголовок, написанный в основном латиницей (слабая модель иногда переходит на английский), заменяется
+   началом поля `problem` (до 12 слов), если оно по-русски: отчёт читает аналитик банка;
+8. сортировка: critical → major → minor, внутри — порядок модели;
+9. не больше 12 кандидатов.
 
 Признаки зрелости считаются кодом по тексту документа, без модели: есть раздел терминов, указана версия,
 явный часовой пояс (UTC/GMT), нет заглушек («заполняются…», «TBD», неотмеченное «Да / Нет», прочерк
@@ -73,6 +75,35 @@ def maturity(view: Any) -> dict:
     return {**signs, "score": score, "mature": score >= MATURE_MIN_SIGNS}
 
 
+_LAT = re.compile(r"[A-Za-z]")
+_CYR = re.compile(r"[А-Яа-яЁё]")
+TITLE_MAX_WORDS = 12
+
+
+def _mostly_latin(text: str) -> bool:
+    lat, cyr = len(_LAT.findall(text)), len(_CYR.findall(text))
+    return lat > cyr
+
+
+def _russian_title(c: dict) -> str:
+    """Заголовок по-русски: свой, если он не латиницей, иначе начало первой фразы `problem`."""
+    title = str(c.get("title", "")).strip()
+    if title and not _mostly_latin(title):
+        return title
+    problem = str(c.get("problem", "")).strip()
+    if not problem or _mostly_latin(problem):
+        return title
+    first = re.split(r"(?<=[.!?])\s+", problem, maxsplit=1)[0].rstrip(".!? ")
+    words = first.split()
+    if len(words) > TITLE_MAX_WORDS:
+        words = words[:TITLE_MAX_WORDS]
+        while words and words[-1].lower().strip(",;:—-") in {"и", "а", "но", "или", "в", "на", "с", "по", "к", "от",
+                                                              "для", "что", "как", "не", "при", "до", "за", "из"}:
+            words.pop()
+        first = " ".join(words).rstrip(",;:—- ")
+    return first[:1].upper() + first[1:] if first else title
+
+
 def _lines(c: dict) -> tuple:
     out = []
     for ev in c.get("evidence") or []:
@@ -122,6 +153,7 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
                                   or c.get("blocks", "none") == "none"):
             sev = "major"
         c["severity"] = sev
+        c["title"] = _russian_title(c)
         kept.append(c)
 
     critical = 0
