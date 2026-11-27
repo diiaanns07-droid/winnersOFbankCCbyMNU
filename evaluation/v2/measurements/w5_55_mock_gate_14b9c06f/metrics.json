@@ -1,0 +1,112 @@
+{
+  "source_sha": "14b9c06f3956cdfad1966153c4afdb7f86450381",
+  "case": "mock_gate",
+  "entry": "cli",
+  "input": "release/input/requirements.md",
+  "state": 0,
+  "seconds": 0.81,
+  "queue_seconds": 0,
+  "outputs": [
+    "json"
+  ],
+  "cached": 0,
+  "logical_calls_traced": 9,
+  "physical_attempts_observed": 0,
+  "unattributed_failed_calls": 0,
+  "successful_models": {
+    "mock": 9
+  },
+  "provider_errors": [],
+  "stages": [
+    {
+      "stage": "segment",
+      "answered_by": "mock",
+      "seconds": 0.1,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "consistency",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_qa",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_architect",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_analyst",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_risk",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "clarify",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "mock",
+      "seconds": 0.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    }
+  ],
+  "report_bytes": 179968,
+  "report_status": "complete",
+  "gold": {
+    "K": 5,
+    "K_as_critical": 5,
+    "C": 17,
+    "key25": 22,
+    "findings": 29,
+    "duplicates": 2,
+    "critical_false": 0,
+    "quotes_missing": 0,
+    "quotes_total": 82
+  },
+  "missing_major": [
+    "С11",
+    "С15",
+    "С17"
+  ]
+}

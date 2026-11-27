@@ -1543,10 +1543,34 @@ def _lens_majors(group: list[dict]) -> dict[str, list[dict]]:
     return out
 
 
-def _other_place(home: list[dict], other: list[dict]) -> bool:
+def _is_rule(m: dict) -> bool:
+    return _s(m.get("source")).startswith("rules:")
+
+
+def _branch_and_rule(a: list[dict], b: list[dict]) -> bool:
+    """Неописанная ветка или неполный контракт от ревьюера-модели и существенный сигнал правила кода о другом
+    предмете — два дефекта: правило называет формальный пропуск (поле, код, метод), ревьюер — другой случай.
+    Одна часть — только кандидаты ревьюеров-моделей, среди них существенный вида «пропуск» или «контракт»;
+    другая — только сигналы правил кода, среди них существенный; общих строк нет (по построению), заголовки
+    не делят ни одного из двух опорных слов. Незначительный сигнал правила остаётся местом дефекта."""
+    for lens, rules in ((a, b), (b, a)):
+        if any(_is_rule(m) for m in lens) or not all(_is_rule(m) for m in rules):
+            continue
+        branches = [m for m in lens if _s(m.get("severity")) == "major" and _s(m.get("kind")) in _STRAY_KINDS]
+        majors = [m for m in rules if _s(m.get("severity")) == "major"]
+        if branches and majors and all(len(_subject_tokens(x.get("title")) & _subject_tokens(r.get("title"))) < 2
+                                       for x in branches for r in rules):
+            return True
+    return False
+
+
+def _other_place(home: list[dict], other: list[dict], ctx: Any = None) -> bool:
     """Другая часть склеенного дефекта — другой дефект: тот же ревьюер прислал о ней отдельный существенный
     кандидат, у частей нет общих строк (по построению) и общего раздела документа, а заголовки кандидатов
-    называют разные предметы. Значит, одна правка в одном месте не устраняет обе."""
+    называют разные предметы. Значит, одна правка в одном месте не устраняет обе. Так же — неописанная ветка
+    ревьюера и существенный сигнал правила кода о другом предмете (``_branch_and_rule``)."""
+    if _option(ctx, "judge_split_rule_branch", True) and _branch_and_rule(home, other):
+        return True
     lh, lo = _lens_majors(home), _lens_majors(other)
     same = set(lh) & set(lo)
     if not same:
@@ -1599,7 +1623,7 @@ def _split_places(drafts: list[dict], by_id: dict[str, dict], ctx: Any, warnings
         base_id = _s(f.get("base"))
         home = next((g for g in groups if any(m["id"] == base_id for m in g)), None) or max(
             groups, key=lambda g: (len(g), -min(_cid_num(m["id"]) for m in g)))
-        apart = [g for g in groups if g is not home and _other_place(home, g)]
+        apart = [g for g in groups if g is not home and _other_place(home, g, ctx)]
         if not apart:
             out.append(d)
             continue
