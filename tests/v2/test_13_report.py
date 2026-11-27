@@ -914,3 +914,40 @@ def test_critical_card_shows_short_answer_options(sample):
                                     "Один push; если расходы уже выше, push не нужен"]) == \
         ["один push; если расходы уже выше, push сразу", "один push; если расходы уже выше, push не нужен"]
     assert markdown._short_options(["только один"]) == []
+
+
+def test_fuzz_corrupted_reports_never_crash(sample):
+    """Битый report.json (не тот тип в любом поле, пропавшие поля) — рендер, терминал, finalize и сверка Markdown не
+    падают (фазз 1000 порч на живых отчётах — 0 ошибок; здесь 120 детерминированных)."""
+    import random
+    from bcc_review.v2 import verify
+    bad = [None, "", "x", 0, 3.5, True, [], {}, [None], [1, "a"], {"a": None}, "L038 R-99 D-77", "> 65 <уточнить"]
+
+    def paths(obj, prefix=()):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                yield prefix + (k,)
+                yield from paths(v, prefix + (k,))
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj[:4]):
+                yield prefix + (i,)
+                yield from paths(v, prefix + (i,))
+
+    rnd = random.Random(13)
+    for _ in range(120):
+        r = copy.deepcopy(sample)
+        ps = list(paths(r))
+        for _ in range(rnd.randint(1, 5)):
+            p = rnd.choice(ps)
+            try:
+                obj = r
+                for k in p[:-1]:
+                    obj = obj[k]
+                obj[p[-1]] = rnd.choice(bad)
+            except (KeyError, IndexError, TypeError):
+                pass
+        markdown.render(copy.deepcopy(r))
+        console.summary(copy.deepcopy(r))
+        fin = jsonout.finalize(copy.deepcopy(r))
+        verify.check_markdown(fin, markdown.render(fin))
+        markdown.rubric(copy.deepcopy(r))

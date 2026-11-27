@@ -103,7 +103,7 @@ def compute_summary(report: dict) -> dict:
     findings = open_findings(report)
     by_sev = {s: 0 for s in SEVERITIES}
     for f in findings:
-        if f.get("severity") in by_sev:
+        if _key(f.get("severity")) in by_sev:
             by_sev[f["severity"]] += 1
     touched = {_key(rid) for f in findings for rid in _list(f.get("requirement_ids"))} - {None}
     reqs = [r for r in _list(report.get("requirements")) if isinstance(r, dict)]
@@ -124,7 +124,7 @@ def rule_verdict(report: dict) -> dict:
     Прогон без модели (provider = offline, №12): «нельзя» только при блокирующем критичном дефекте или
     противоречии двух мест, найденном правилом (rule_conflict); иначе «не определено» — смысл не проверялся.
     Нет ни требований, ни дефектов (пустой документ) — «не определено»: проверять нечего."""
-    run = report.get("run", {}) or {}
+    run = report.get("run") if isinstance(report.get("run"), dict) else {}
     status = run.get("status", "complete")
     if status == "failed":
         return {"development": "none", "testing": "none"}
@@ -135,13 +135,13 @@ def rule_verdict(report: dict) -> dict:
         return {"development": "undetermined", "testing": "undetermined"}
     if run.get("provider") == "offline":
         for target, blockers in (("development", {"development", "both"}), ("testing", {"testing", "both"})):
-            hit = any((f.get("severity") == "critical" or (f.get("rule_conflict") and len(f.get("evidence") or []) >= 2))
-                      and f.get("blocks") in blockers for f in findings)
+            hit = any((f.get("severity") == "critical" or (f.get("rule_conflict") and len(_list(f.get("evidence"))) >= 2))
+                      and _key(f.get("blocks")) in blockers for f in findings)
             out[target] = "no" if hit else "undetermined"
         return out
     for target, blockers in (("development", {"development", "both"}), ("testing", {"testing", "both"})):
-        crit = any(f.get("severity") == "critical" and f.get("blocks") in blockers for f in findings)
-        majors = sum(1 for f in findings if f.get("severity") == "major" and f.get("blocks") in blockers)
+        crit = any(f.get("severity") == "critical" and _key(f.get("blocks")) in blockers for f in findings)
+        majors = sum(1 for f in findings if f.get("severity") == "major" and _key(f.get("blocks")) in blockers)
         if crit:
             value = "no"
         elif majors >= 3:
