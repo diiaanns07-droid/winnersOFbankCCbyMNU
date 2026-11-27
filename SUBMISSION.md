@@ -13,16 +13,20 @@
 | Исходный документ | [`release/input/requirements.md`](release/input/requirements.md) — официальный, байт в байт; его PDF — [`release/input/requirements.pdf`](release/input/requirements.pdf); происхождение и SHA-256 — [`release/input/PROVENANCE.md`](release/input/PROVENANCE.md) |
 | Отчёт агента по документу | [`reports/requirements.md`](reports/requirements.md), интерактивный [`reports/requirements.html`](reports/requirements.html), для программ [`reports/requirements.json`](reports/requirements.json) |
 | Тот же документ из PDF | [`reports/requirements_pdf.md`](reports/requirements_pdf.md) (+ копия PDF с выделенными цитатами) |
-| Прогон на бесплатном Gemini | [`reports/requirements.gemini.md`](reports/requirements.gemini.md) — Windows, ключ AI Studio |
-| Второй документ (другая тема) | [`reports/other_topic_cashback.md`](reports/other_topic_cashback.md) |
+| Прогон на бесплатном Gemini | В сдаче отчёта на Gemini нет: ключа Gemini у команды в вечер сдачи не было. Как прогнать самим — [`README.md`](README.md), шаги 2–3 (или `scripts\gemini_report.ps1` на Windows) |
+| Второй документ (другая тема) | [`reports/other_topic_cashback.md`](reports/other_topic_cashback.md) — «Кэшбэк в выбранной категории», чистый контрольный документ корпуса ([`source.md`](evaluation/dev/corpus/cases/cashback.base/source.md), дефекты в него не закладывались) |
+| Цепочка уточнения на чужом ТЗ | [`reports/demo_answers/README.md`](reports/demo_answers/README.md) — вопросы → ответы владельца → исправленное ТЗ → повторная проверка |
 | Все прогоны, модели, время, `verify` | [`reports/README.md`](reports/README.md) |
 | Видео-демо (2–3 мин) | [`presentation/demo.mp4`](presentation/demo.mp4); с вшитыми субтитрами — [`presentation/demo_subtitled.mp4`](presentation/demo_subtitled.mp4), отдельно — [`presentation/demo.srt`](presentation/demo.srt) |
 | Презентация | [`presentation/deck.pdf`](presentation/deck.pdf) (и `deck.pptx`) |
 | Качество: эталон, корпус, стабильность | [`evaluation/v2/RESULTS.md`](evaluation/v2/RESULTS.md) |
 | Разбор задачи и эталон дефектов | [`docs/task-analysis.md`](docs/task-analysis.md) |
 
-Каждый отчёт сформирован командой `python -m bcc_review …` на теге `v2.0.0` и руками не правился: коммит агента —
-в паспорте отчёта, а `python -m bcc_review verify отчёт.json исходник` заново находит каждую цитату в исходнике.
+Каждый отчёт в `reports/` сформирован командой `python -m bcc_review …` без кэша и руками не правился. Коммит агента —
+в паспорте отчёта: это финальная сборка `bcc/v2` 27.11; тег `v2.0.0` — та же сборка плюс отчёты и документы, код
+агента тот же (`git diff --stat <коммит из паспорта> v2.0.0 -- src` пуст). `python -m bcc_review verify отчёт.json
+исходник` заново находит каждую цитату в исходнике и сверяет SHA-256 входа. Команды и сводка прогонов —
+[`reports/README.md`](reports/README.md).
 
 ## Соответствие п. 7 ТЗ
 

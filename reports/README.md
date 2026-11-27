@@ -1,9 +1,10 @@
 # Финальные отчёты агента
 
-Все отчёты в этом каталоге сформированы командой `python -m bcc_review …` на теге `v2.0.0` и руками не
-правились. Коммит агента записан в паспорте каждого отчёта (раздел «1. Паспорт прогона» в `.md`,
-поле `run.commit` в `.json`). Любой отчёт можно проверить независимо от агента: команда `verify` заново
-ищет каждую цитату в исходнике и сверяет счётчики и SHA-256 входа.
+Все отчёты в этом каталоге (кроме [`demo_answers/`](demo_answers/README.md) — у него свой README) сформированы
+командой `python -m bcc_review …` без кэша на финальной сборке `bcc/v2` 27.11 и руками не правились. Коммит агента
+записан в паспорте каждого отчёта (раздел «1. Паспорт прогона» в `.md`, поле `run.commit` в `.json`); тег `v2.0.0`
+— та же сборка плюс отчёты и документы, код агента (`src/`) тот же. Любой отчёт можно проверить независимо от
+агента: команда `verify` заново ищет каждую цитату в исходнике и сверяет счётчики и SHA-256 входа.
 
 ```bash
 python -m bcc_review verify reports/requirements.json release/input/requirements.md
@@ -20,11 +21,21 @@ python -m bcc_review verify reports/requirements.json release/input/requirements
 
 ## Как повторить
 
+Модель — Sonnet через подписку Claude (`claude_cli`, `claude -p`), как в замерах качества
+[`evaluation/v2/RESULTS.md`](../evaluation/v2/RESULTS.md).
+
 | Отчёт | Команда |
 | :--- | :--- |
-| `requirements.*` | `python -m bcc_review release/input/requirements.md reports/requirements.md --provider claude_cli --model opus --no-cache --export jira,docx` |
-| `requirements_pdf.*` | `python -m bcc_review release/input/requirements.pdf reports/requirements_pdf.md --provider claude_cli --model opus --no-cache --export jira,docx,pdf` |
-| `other_topic_cashback.*` | `python -m bcc_review release/input/other_topic_cashback.md reports/other_topic_cashback.md --provider claude_cli --model opus --no-cache --export jira,docx` |
-| `requirements.gemini.*` | Windows, бесплатный ключ: `powershell -ExecutionPolicy Bypass -File scripts\gemini_report.ps1` (внутри — `python -m bcc_review release\input\requirements.md reports\requirements.gemini.md --provider gemini --no-cache --export jira`) |
+| `requirements.*` | `python -m bcc_review release/input/requirements.md reports/requirements.md --provider claude_cli --model sonnet --no-cache --export jira,docx` |
+| `requirements_pdf.*` | `python -m bcc_review release/input/requirements.pdf reports/requirements_pdf.md --provider claude_cli --model sonnet --no-cache --export jira,docx,pdf` |
+| `other_topic_cashback.*` | `python -m bcc_review evaluation/dev/corpus/cases/cashback.base/source.md reports/other_topic_cashback.md --provider claude_cli --model sonnet --no-cache --export jira,docx` |
 
-Все прогоны `claude_cli` разом, с `verify` и этой таблицей: `scripts/final_reports.sh` (на теге, чистое дерево).
+Все три разом, с `verify` и этой таблицей (чистое дерево, коммит в паспорте без `-dirty`):
+
+```bash
+SECOND_DOC=evaluation/dev/corpus/cases/cashback.base/source.md SECOND_NAME=other_topic_cashback ANSWERS= scripts/final_reports.sh claude_cli sonnet
+```
+
+На бесплатном Gemini (ключ AI Studio в `.env`) — тот же документ, отчёт рядом: на Windows
+`powershell -ExecutionPolicy Bypass -File scripts\gemini_report.ps1`, на любой ОС
+`python -m bcc_review release/input/requirements.md reports/my/requirements.md --provider gemini --no-cache`.
