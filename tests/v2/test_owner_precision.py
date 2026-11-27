@@ -34,3 +34,20 @@ def test_judge_receives_complete_owner_decision_separately_from_tz(monkeypatch):
     ordinary_system, ordinary_user = recorded.pop()
     assert ordinary_system == ""
     assert proposal not in ordinary_user
+
+
+def test_answered_report_distinguishes_revision_from_an_independent_read():
+    from pathlib import Path
+    import json
+
+    from bcc_review.v2.render import markdown
+
+    demo = Path(__file__).resolve().parents[2] / "reports/demo_answers/qr"
+    answered = json.loads((demo / "qr.json").read_text(encoding="utf-8"))
+    reread = json.loads((demo / "qr.revised.review.json").read_text(encoding="utf-8"))
+    first = markdown.render(answered).split("**Почему.", 1)[0]
+    assert "Предварительная оценка по ответам владельца" in first
+    assert "отдельная проверка исправленного текста" in first
+    blocker_line = next(line for line in markdown.render(answered).splitlines() if line.startswith("- 🔴") and "D-01" in line)
+    assert "Q-01" in blocker_line and "стр. 54" in blocker_line and "Приложения" in blocker_line
+    assert "Предварительная оценка по ответам владельца" not in markdown.render(reread)

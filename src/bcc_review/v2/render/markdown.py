@@ -898,6 +898,9 @@ def _partial_reason(c: _Ctx) -> str:
 def _brief(c: _Ctx) -> list[str]:
     v = c.verdict
     out = [h2("s0", "Кратко"), ""]
+    if c.r.get("clarification"):
+        out += ["**Предварительная оценка по ответам владельца.** "
+                "Готовность новой редакции подтверждает отдельная проверка исправленного текста.", ""]
     out += table(["Разработка", "Тестирование"],
                  [[f"**{READINESS.get(v.get('development'), '—')}**", f"**{READINESS.get(v.get('testing'), '—')}**"]],
                  [":---:", ":---:"])
@@ -1255,8 +1258,17 @@ def _before_after(c: _Ctx) -> list[str]:
             reason = str(x.get("reason") or "")
             qids = [q for q in x.get("question_ids") or [] if q not in reason]
             qs = ", ".join(qids) + ": " if qids else ("" if re.search(r"\bQ-\d", reason) else "общее решение: ")
-            out.append(f"- 🔴 {c.f_link(x.get('finding_id', ''))} {prose(x.get('title') or '')} — "
-                       f"{prose(qs + shorten(reason, 170))}")
+            fid = x.get("finding_id", "")
+            edit = next((e for e in c.r.get("rewrites") or [] if e.get("finding_id") == fid
+                         and e.get("line_start") and e.get("after")), None)
+            location = ""
+            if edit:
+                location = (f" Правка к стр. {edit['line_start']} исходника — "
+                            f"«{prose(shorten(edit['after'], 120))}». [Все правки](#pg)")
+            elif c.r.get("revised_file"):
+                location = " В списке применённых правок для этого блокера запись отсутствует."
+            out.append(f"- 🔴 {c.f_link(fid)} {prose(x.get('title') or '')} — "
+                       f"{prose(qs + shorten(reason, 170))}{location}")
     out += ["", f"Снято {num(cl.get('resolved', 0))}, уточнено {num(cl.get('changed', 0))}, осталось открытыми "
                 f"{num(cl.get('open', 0))}, новых конфликтов из-за ответов {len(cl.get('new_findings') or [])}"
                 + (f": {c.f_links(cl['new_findings'])}" if cl.get("new_findings") else "")
@@ -2010,7 +2022,8 @@ def _summary(c: _Ctx) -> list[str]:
 def _conclusion(c: _Ctx) -> list[str]:
     v = c.verdict
     out = [h2("s6", "6. Итог"), ""]
-    out += table(["Можно ли по этому документу начинать", "Ответ"],
+    question = "Предварительная готовность по ответам владельца" if c.r.get("clarification") else "Можно ли по этому документу начинать"
+    out += table([question, "Ответ"],
                  [["разработку", f"**{READINESS.get(v.get('development'), '—')}**"],
                   ["тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     out += [f"**Обоснование.** {prose(_final_reason(c))}", ""]
