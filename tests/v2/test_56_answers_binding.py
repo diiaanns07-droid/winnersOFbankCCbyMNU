@@ -50,3 +50,25 @@ def test_needs_binding_rule():
     for text in ("Да, клиент может отключить уведомления в настройках профиля.", "Срок — 14 календарных дней",
                  "Нет ограничения по сумме перевода внутри банка для своих счетов", ""):
         assert not recheck.needs_binding(text), text
+
+
+def test_editor_gets_both_sides_of_answer_vs_decision_conflict_as_unsettled():
+    from bcc_review.v2.stages import revise
+    clar = {
+        "answers": [{"question_id": "Q-01", "topic": "Срок хранения", "finding_ids": ["D-01"], "answer": "30 дней",
+                     "replies": [{"label": "Q-01.1", "text": "30 дней"}]},
+                    {"question_id": "Q-02", "topic": "Код", "finding_ids": ["D-02"], "answer": "423",
+                     "replies": [{"label": "Q-02.1", "text": "423"}]}],
+        "decisions": ["Выписку храним 90 дней.", "Push отправляем до 10:00."],
+        "changes": [{"finding_id": "D-01", "status": "open", "answer_conflict": ["Q-01", "Решение-1"]},
+                    {"finding_id": "D-02", "status": "resolved", "answer_ids": ["Q-02"], "answer_conflict": []}],
+        "answer_conflicts": [{"finding_id": "D-01", "answers": ["Q-01", "Решение-1"]}],
+    }
+    text, by_finding = revise._answers_block(clar)
+    lines = text.splitlines()
+    q1 = next(x for x in lines if x.startswith("Q-01"))
+    assert "спорит с Решение-1" in q1 and "<уточнить" in q1
+    d1 = next(x for x in lines if "90 дней" in x)
+    assert "спорит с Q-01" in d1 and "не вписывай" in d1
+    assert "Общее решение владельца: Push отправляем до 10:00." in lines
+    assert "D-01" not in by_finding and by_finding["D-02"] == ["Q-02"]
