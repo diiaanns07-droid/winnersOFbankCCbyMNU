@@ -309,6 +309,9 @@ OPEN2 = ROOT / "evaluation" / "v2" / "open2"
     ("grace", {"rules:units.day_kinds", "rules:language.nfr_unverifiable", "rules:api.same_case.200-422",
                "rules:api.date_format.paymentDueDate"}),
     ("qr", {"rules:language.nfr_unverifiable", "rules:units.time_mix.ttl", "rules:api.same_case.410-400"}),
+    ("capital", {"rules:promises.read_operation", "rules:api.same_case.200-409"}),
+    ("insurance", {"rules:language.nfr_unverifiable", "rules:api.same_case.200-422"}),
+    ("insurance_inject", {"rules:injection.prompt", "rules:api.same_case.200-422"}),
 ])
 def test_open_set_defects(case, expected):
     """Открытый набор №18: дефектные версии (после того как набор влит в bcc/v2)."""
@@ -319,7 +322,7 @@ def test_open_set_defects(case, expected):
     assert expected <= src, expected - src
 
 
-@pytest.mark.parametrize("case", ["grace_clean", "qr_clean"])
+@pytest.mark.parametrize("case", ["grace_clean", "qr_clean", "capital_clean", "insurance_clean"])
 def test_open_set_clean_only_template(case):
     """Чистые версии №18: только незаполненный шаблон (чек-лист, версия, согласующие, заглушка тестов)."""
     path = OPEN2 / case / "source.md"
