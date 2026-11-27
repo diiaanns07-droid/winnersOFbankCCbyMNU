@@ -94,7 +94,8 @@ class LLMClient:
     def __init__(self, provider: Any, *, model: str | None = None, provider_name: str = "",
                  fallback_models: Sequence[str] = (), max_calls: int = 16, max_seconds: float = 1500.0,
                  max_retries: int = 5, timeout_s: float = 600.0, cache_dir: str | Path | None = None,
-                 trace: Callable[[dict], None] | None = None, max_split_depth: int = 3,
+                 trace: Callable[[dict], None] | None = None, max_split_depth: int = 1,
+                 stage_timeout_s: float = 0.0, rpm: float = 0.0,
                  sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic):
         self.provider = provider
         self.provider_name = provider_name or getattr(provider, "name", "") or type(provider).__name__
@@ -106,7 +107,11 @@ class LLMClient:
         self.timeout_s = float(timeout_s)
         self.cache_dir = Path(cache_dir) if cache_dir else None
         self.trace = trace
-        self.max_split_depth = max_split_depth
+        self.max_split_depth = max_split_depth  # не больше одного деления на этап: каскад делений съедает время
+        self.stage_timeout_s = float(stage_timeout_s or 0)  # 0 — без лимита времени этапа
+        self.min_interval_s = 60.0 / float(rpm) if rpm and float(rpm) > 0 else 0.0  # темп запросов (RPM)
+        self._stage_t0: dict[str, float] = {}
+        self._next_slot = 0.0
         self._sleep, self._clock = sleep, clock
         self._t0 = clock()
         self._lock = threading.Lock()
@@ -162,17 +167,40 @@ class LLMClient:
 
     def _take_call(self, stage: str) -> None:
         with self._lock:
+            st = self._stage_stats(stage)
             if self.stats["calls"] >= self.max_calls:
+                st["budget"] = st.get("budget", 0) + 1
                 raise BudgetExceeded(stage, f"исчерпан бюджет вызовов модели ({self.max_calls})")
             if self.elapsed() > self.max_seconds:
+                st["budget"] = st.get("budget", 0) + 1
                 raise BudgetExceeded(stage, f"исчерпан бюджет времени прогона ({self.max_seconds:.0f} с)")
+            t0 = self._stage_t0.setdefault(stage, self._clock())
+            if self.stage_timeout_s and self._clock() - t0 > self.stage_timeout_s:
+                st["budget"] = st.get("budget", 0) + 1
+                raise BudgetExceeded(stage, f"исчерпан лимит времени этапа ({self.stage_timeout_s:.0f} с)")
             self.stats["calls"] += 1
-            self._stage_stats(stage)["calls"] += 1
+            st["calls"] += 1
+            wait = 0.0
+            if self.min_interval_s:
+                now = self._clock()
+                slot = max(now, self._next_slot)
+                self._next_slot = slot + self.min_interval_s
+                wait = slot - now
+        if wait > 0:
+            self._emit({"stage": stage, "event": "rpm_wait", "seconds": round(wait, 1)})
+            self._sleep(wait)
+
+    def call_timeout(self, stage: str) -> float:
+        """Таймаут одного вызова: не больше остатка лимита времени этапа (но не меньше минуты)."""
+        if not self.stage_timeout_s:
+            return self.timeout_s
+        left = self.stage_timeout_s - (self._clock() - self._stage_t0.get(stage, self._clock()))
+        return max(60.0, min(self.timeout_s, left))
 
     def _invoke(self, stage: str, model: str | None, system: str, user: str, schema: dict,
                 max_output_tokens: int) -> dict:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        return self.provider.invoke(model=model, messages=messages, schema=schema, timeout_s=self.timeout_s,
+        return self.provider.invoke(model=model, messages=messages, schema=schema, timeout_s=self.call_timeout(stage),
                                     max_output_tokens=max_output_tokens, stage=stage)
 
     def _account(self, stage: str, result: dict, seconds: float) -> None:

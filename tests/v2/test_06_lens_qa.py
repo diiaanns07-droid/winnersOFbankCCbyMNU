@@ -225,6 +225,21 @@ def test_official_k1_found_via_acceptance_checks(model):
     assert 10 <= len(out["test_cases"]) <= lens_qa.MAX_TEST_CASES
 
 
+@pytest.mark.parametrize("run", [1, 2, 3])
+def test_official_k1_on_weak_model_stage_runs(run):
+    """Вторая волна: этап `stage lens_qa` на haiku, три прогона без кэша — К1 critical, один вызов, без обрезки."""
+    st = _json(QA / "stage" / f"official.haiku-w2-{run}.json")
+    assert st["status"] == "ok" and st["calls"] == 1
+    out = st["output"]
+    verdicts = {c["row_line"]: c["verdict"] for c in out["acceptance_checks"]}
+    assert verdicts == {63: "match", 64: "conflict", 65: "match"}
+    k1 = [c for c in out["candidates"] if c.get("origin") == "acceptance_check"]
+    assert len(k1) == 1 and k1[0]["severity"] == "critical"
+    assert {38, 64} <= {e["line"] for e in k1[0]["evidence"]}
+    assert all(c["severity"] != "critical" for c in out["candidates"]
+               if c["kind"] not in lens_qa.CONFLICT_KINDS + ["incorrect"])
+
+
 @pytest.mark.parametrize("case", ["autopay.base", "cardblock.base", "cashback.base", "transfer_limit.base"])
 def test_clean_bases_have_no_conflicts(case):
     reqs = _segment(case)
