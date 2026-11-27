@@ -535,3 +535,14 @@ def test_unwritable_runs_dir_still_gives_report(tmp_path):
     out = tmp_path / "out" / "r.md"
     report, written = pipeline.review(OFFICIAL, out, {"provider": "offline", "runs_dir": str(blocker), "html": False})
     assert out.is_file() and report["findings"]
+
+
+@_bug("01", "путь отчёта — существующая папка (python -m bcc_review тз.md out/) → трейсбэк IsADirectoryError "
+            "(pipeline.write_outputs:639 пишет .md прямо в путь каталога)")
+def test_output_path_that_is_a_directory(tmp_path):
+    from bcc_review.v2.__main__ import main
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    code = main([str(OFFICIAL), str(out_dir), "--provider", "offline", "--runs-dir", str(tmp_path / "runs"), "-q"])
+    assert code in (0, 2)
+    assert code == 2 or any(p.suffix == ".md" for p in out_dir.iterdir())
