@@ -44,11 +44,18 @@ for provider in "${PROVIDERS[@]}"; do
   ls -la "$(dirname "$out")" | grep "requirements.${provider}" || true
 done
 
+step "CI: прогон без модели по PDF и verify (чтение PDF на этой ОС)"
+python -m bcc_review release/input/requirements.pdf reports/my/requirements_pdf.offline.md --provider offline --no-cache
+python -m bcc_review verify reports/my/requirements_pdf.offline.json release/input/requirements.pdf
+
+step "CI: колёса зависимостей для всех ОС и Python 3.11–3.14"
+python scripts/check_wheels.py || echo "внимание: проверка колёс не прошла (нужна сеть до pypi.org)" >&2
+
 step "одна команда для жюри: scripts/jury_check.sh mock"
 scripts/jury_check.sh mock | tail -n 16
 
-step "тесты tests/v2"
-python -m pytest tests/v2 -q
+step "тесты tests/v2 (как в CI: PYTHONUTF8=1 только для pytest)"
+PYTHONUTF8=1 python -m pytest tests/v2 -q
 
 step "дерево после прогонов (должно быть чистым)"
 git status --short

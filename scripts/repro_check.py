@@ -59,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("b", type=Path)
     ap.add_argument("--content", action="store_true", help="не сравнивать паспорт прогона (вызовы, токены, кэш)")
     args = ap.parse_args(argv)
+    for path in (args.a, args.b):
+        if not path.is_file():
+            print(f"Нет файла отчёта: {path}", file=sys.stderr)
+            return 2
     ja = json.loads(args.a.read_text(encoding="utf-8"))
     jb = json.loads(args.b.read_text(encoding="utf-8"))
     if args.content:

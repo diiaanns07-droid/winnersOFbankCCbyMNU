@@ -152,6 +152,10 @@ def test_anthropic_v1_adapter_request_has_no_cache_field():
     assert all(set(m) == {"role", "content"} for m in body["messages"])
     assert body["system"][-1]["cache_control"] == {"type": "ephemeral"}
     assert body["messages"][0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+    points = sum(1 for b in body["system"] if b.get("cache_control")) + sum(
+        1 for m in body["messages"] for b in (m["content"] if isinstance(m["content"], list) else [])
+        if b.get("cache_control"))
+    assert points == 3                                            # система + документ + требования; API допускает 4
     assert body["max_tokens"] == 32000
     assert body["output_config"]["format"]["type"] == "json_schema"
 

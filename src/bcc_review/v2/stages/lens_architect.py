@@ -9,7 +9,9 @@
 * critical без сценария, последствий или с `blocks = none` понижается до major (CONTRACT, раздел 5);
 * точные дубли (тот же вид и тот же набор строк цитат) схлопываются;
 * порядок critical → major → minor, не больше MAX_CANDIDATES;
-* `requirement_ids`, которых нет в нарезке, убираются (модель иногда ставит ID из документа).
+* critical «нет операции» без цитаты явного обещания интерфейса (и без кода ответа) понижается до major;
+* `requirement_ids`, которых нет в нарезке, убираются (модель иногда ставит ID из документа);
+* метки нумерации «L052» в текстах заменяются на «стр. 52» (рубрика понятности: без внутренних кодов).
 """
 from __future__ import annotations
 
@@ -87,6 +89,39 @@ def unfulfilled_promises(inventory: dict) -> list[dict]:
     return [p for p in (inventory or {}).get("promises") or [] if not str(p.get("operation") or "").strip()]
 
 
+TEXT_FIELDS = ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question")
+LINE_MARK = re.compile(r"\bL(\d{3})\b")  # метка нумерации документа «L052» в тексте для читателя
+
+
+def plain_line_refs(text: str) -> str:
+    """«L052» → «стр. 52»: метки нумерации — внутренний формат запроса, читателю нужен номер строки."""
+    return LINE_MARK.sub(lambda m: f"стр. {int(m.group(1))}", text)
+
+
+HTTP_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")  # шаг сам называет код ответа — исход задан
+# Явное обещание интерфейса в цитате: «через дочерний документ», «методом …», строка Description, спецификация,
+# API/REST, вызов в последовательности «A → B: действие».
+PROMISE_MARK = re.compile(r"дочерн\w* документ|метод|description|спецификац|\bapi\b|\brest\b|интерфейс|"
+                          r"→[^:.]{1,60}:", re.I)
+
+
+# Шкала линзы (промпт, «Серьёзность»): critical — только обещанная, но не описанная операция или код ответа
+# (missing_element) и успех против ошибки для одного входа (status_conflict). Замер волны 3: critical других видов
+# (contradiction, unit_mismatch) из линзы — 7 из 16 на чистых ТЗ №18, остальные — конфликты правил зоны №09.
+CRITICAL_KINDS = {"missing_element", "status_conflict"}
+
+
+def unpromised_critical(c: dict) -> bool:
+    """critical «нет операции», ни одна цитата которого не содержит явного обещания интерфейса и кода ответа.
+
+    Такой critical держится только на экране или на обмене со смежной системой (замер №18: «номер полиса от
+    страховой компании» на чистом ТЗ). По шкале линзы critical — только явно обещанная операция (п. 1)."""
+    if c.get("severity") != "critical" or c.get("kind") != "missing_element":
+        return False
+    quotes = [str(e.get("quote") or "") for e in c.get("evidence") or []]
+    return not any(PROMISE_MARK.search(q) or HTTP_CODE.search(q) for q in quotes)
+
+
 def postprocess(data: dict, requirement_ids: set[str] | None = None,
                 max_candidates: int = MAX_CANDIDATES) -> dict:
     """Нормализует ответ модели. Не меняет вход; возвращает {"candidates": [...], "inventory": {...}}."""
@@ -106,8 +141,15 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
                                             or not str(c.get("impact") or "").strip()
                                             or c.get("blocks") in (None, "", "none")):
             c["severity"] = "major"
+        if c["severity"] == "critical" and c.get("kind") not in CRITICAL_KINDS:
+            c["severity"] = "major"  # шкала линзы: противоречия правил и единицы — major (их critical — набор №09)
+        if unpromised_critical(c):
+            c["severity"] = "major"
         if requirement_ids is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in requirement_ids]
+        for k in TEXT_FIELDS:
+            if isinstance(c.get(k), str):
+                c[k] = plain_line_refs(c[k])
         key = _evidence_key(c)
         if key in seen:
             continue
@@ -137,7 +179,6 @@ BRANCH_TITLE = "Ветка логики без ответа"
 BRANCH_RETURN = re.compile(r"верн", re.I)
 BRANCH_CONDITION = re.compile(r"\bпри\b|\bесли\b|в случае|иначе|отклон|отказ", re.I)
 MAX_BRANCH_CANDIDATES = 2
-HTTP_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")  # шаг сам называет код ответа — исход задан
 
 
 def _line_text(view: Any, n: int) -> str:

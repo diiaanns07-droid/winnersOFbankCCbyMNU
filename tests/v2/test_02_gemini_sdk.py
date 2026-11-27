@@ -171,3 +171,14 @@ def test_sdk_schema_rejected_then_text_mode_without_response_schema():
     assert second[1].response_json_schema is None and second[1].response_mime_type == "application/json"
     assert second[1].system_instruction == "S"                      # общий префикс (неявный кэш) не тронут
     assert "JSON Schema" in json.dumps(fakes["gemini-3.8-flash"].contents[1], ensure_ascii=False, default=str)
+
+
+def test_sdk_stage_thinking_levels_reach_the_wire():
+    """Профиль по этапам доходит до запроса SDK: нарезка и вопросы — LOW, судья — MEDIUM, лимит ответа 65 536."""
+    p, fakes, _ = sdk_provider({})
+    for stage in ("segment", "clarify", "judge"):
+        p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage=stage)
+    levels = [str(cfg.thinking_config.thinking_level).upper().rsplit(".", 1)[-1]
+              for _, cfg in fakes["gemini-3.8-flash"].calls]
+    assert levels == ["LOW", "LOW", "MEDIUM"], levels
+    assert {cfg.max_output_tokens for _, cfg in fakes["gemini-3.8-flash"].calls} == {65536}

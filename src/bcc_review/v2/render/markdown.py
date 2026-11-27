@@ -185,7 +185,8 @@ def esc(text) -> str:
     return _HTML_START.sub(r"\\<", s)
 
 
-_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,20})\s+)?\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,20})\s+)?\bL0*(\d{1,5})"
+                   r"(?:\s*[–-]\s*L?0*(\d{1,5})\b|\s+(и|или)\s+L0*(\d{1,5})\b(?!\s*[–-]))?\b")
 # падеж слова «строка» после предлога: (одна строка, диапазон)
 _LCASE = {**dict.fromkeys(("по", "к", "ко"), ("строке", "строкам")),
           **dict.fromkeys(("в", "во", "на", "о", "об", "при"), ("строке", "строках")),
@@ -201,17 +202,26 @@ _LNOM = {"и", "или", "а", "но", "либо", "что", "где", "когд
 
 
 def _lref(m: re.Match) -> str:
+    """«L038» → «строка 38» с падежом по предыдущему слову; «L38–L40» → «строки 38–40»; «L052 и L103» →
+    «строки 52 и 103» (в том же падеже). Группы 4–5 есть только у этого модуля (HTML №14 передаёт свои 1–3)."""
     prep = m.group(1) or ""
     low = prep.lower()
+    a, rng = m.group(2), m.group(3)
+    conj, second = (m.group(4), m.group(5)) if m.re.groups >= 5 else (None, None)
+    nums = f"{a}–{rng}" if rng else (f"{a} {conj} {second}" if second else a)
     if low.startswith("строк"):  # «строки L10–L12» → «строки 10–12»: слово модель уже написала
-        return f"{prep} {m.group(2)}–{m.group(3)}" if m.group(3) else f"{prep} {m.group(2)}"
+        return f"{prep} {nums}"
+    if prep and low not in _LCASE and re.search(r"строк\w*\s+\S+\s*$", m.string[max(0, m.start() - 30):m.start()
+                                                                                 + len(prep) + 1], re.I):
+        # «строка приёмки L064»: слово «строка» уже стоит рядом в другом смысле — номер в скобках
+        return f"{prep} ({'строки' if (rng or second) else 'строка'} {nums})"
     if low in _LCASE:
         one, many = _LCASE[low]
     elif prep and low not in _LNOM and len(low) >= 3:
         one, many = "строки", "строк"
     else:
         one, many = "строка", "строки"
-    word = f"{many} {m.group(2)}–{m.group(3)}" if m.group(3) else f"{one} {m.group(2)}"
+    word = f"{many if (rng or second) else one} {nums}"
     return f"{prep} {word}" if prep else word
 
 
@@ -547,7 +557,8 @@ class _Ctx:
         self.edits = _applied_edits(report)
         self.verdict = report.get("verdict", {}) or {}
         self.offline = self.run.get("provider") == "offline" or (
-            not self.run.get("models_used") and self.run.get("provider") not in ("mock",))
+            not self.run.get("models_used") and self.run.get("provider") not in ("mock",)
+            and not (self.run.get("calls") or {}).get("cached"))  # ответы из кэша — тоже ответы модели
 
     def req_label(self, rid: str, link: bool = True) -> str:
         q = self.req_by_id.get(rid, {})
@@ -698,7 +709,8 @@ def _counts_line(c: _Ctx) -> str:
     if qs:
         blocking = sum(1 for q in qs if q.get("blocking"))
         parts.append(f"**{len(qs)}** {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')} владельцу"
-                     + (f" ({_q_word(c, 'many')} — {blocking})" if blocking else ""))
+                     + ((f", на {blocking} нужен ответ до начала работы" if _blockers(c)
+                         else f", на {blocking} — ответить в первую очередь") if blocking else ""))
     return " · ".join(parts)
 
 
@@ -750,7 +762,8 @@ def _header(c: _Ctx) -> list[str]:
                else "как подключить модель — в инструкции «README», раздел о ключе")
         out += [">", "> Режим без модели: работали только детерминированные правила. Поиск противоречий, "
                      f"проверка критериев приёмки и вопросы владельцу требуют модели ({how})."]
-    out += ["", "**Содержание:** [Кратко](#s0) · " + " · ".join(f"[{name}](#{a})" for a, name in NAV)]
+    skip = getattr(c, "skip_nav", set())
+    out += ["", "**Содержание:** [Кратко](#s0) · " + " · ".join(f"[{name}](#{a})" for a, name in NAV if a not in skip)]
     return out + [""]
 
 
@@ -795,19 +808,25 @@ def _brief(c: _Ctx) -> list[str]:
     out += _before_after(c)
     blockers = _blockers(c)
     if blockers:
-        out += [f"**{'Блокер' if len(blockers) == 1 else f'Блокеры ({len(blockers)})'}** — что не так, где и что "
-                f"блокирует:", ""]
+        same = len({f.get("blocks") for f in blockers}) == 1
+        what = BLOCKS.get(blockers[0].get("blocks"), "—")
+        head = "Блокер" if len(blockers) == 1 else f"Блокеры ({len(blockers)})"
+        if same:
+            verb = "останавливает" if len(blockers) == 1 else "каждый останавливает"
+            out += [f"**{head}** — {verb} {what}; что не так и где:", ""]
+        else:
+            out += [f"**{head}** — что не так, где и что останавливает:", ""]
         for i, f in enumerate(blockers, 1):
             out.append(f"{i}. {SEV_ICON.get(f.get('severity'), '')} [{f['id']}](#{anchor(f['id'])}) "
-                       f"**{prose(f.get('title'))}** — {prose(c.where_short(f))}; блокирует "
-                       f"{BLOCKS.get(f.get('blocks'), '—')}.")
+                       f"**{prose(f.get('title'))}** — {prose(c.where_short(f, limit=5))}"
+                       + ("." if same else f"; останавливает {BLOCKS.get(f.get('blocks'), '—')}."))
         out.append("")
     elif c.run.get("status") != "failed" and "блокирующ" not in str(v.get("summary") or "").lower():
         out += ["Блокирующих дефектов не найдено.", ""]
-    first = _fix_first(c)
+    first = _first_screen_fix(c, blockers)
     if first:
         shown = {f["id"] for f in blockers}
-        out += ["**Исправить первым**", ""]
+        out += ["**Исправить первым**" + (" — сначала блокеры" if shown and len(first) > len(shown) else ""), ""]
         for i, f in enumerate(first, 1):
             what = "" if f["id"] in shown else f" {prose(shorten(f.get('title'), 90))}"
             act = _action(f)
@@ -818,6 +837,19 @@ def _brief(c: _Ctx) -> list[str]:
         out += [f"{i}. {prose(step)}" for i, step in enumerate(off["how_to_full"], 1)] + [""]
     out += _how_obtained(c)
     return out
+
+
+FIRST_SCREEN_FIX = 5
+
+
+def _first_screen_fix(c: _Ctx, blockers: list[dict], limit: int = FIRST_SCREEN_FIX) -> list[dict]:
+    """«Исправить первым»: сначала блокеры (в порядке судьи), затем остальные из «исправить первым»; на первом
+    экране — не больше limit пунктов (полный список — в разделе 6, в том же порядке)."""
+    order = _fix_first(c)
+    rank = {f["id"]: i for i, f in enumerate(order)}
+    bl = sorted(blockers, key=lambda f: (rank.get(f["id"], 99), f.get("priority") or 99, _id_num(f.get("id"))))
+    rest = [f for f in order if f["id"] not in {b["id"] for b in bl}]
+    return (bl + rest)[:max(limit, len(bl))]
 
 
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z«])")
@@ -847,6 +879,9 @@ def _why(c: _Ctx, limit: int = 420) -> str:
             out = f"{out} {s}".strip()
         return out or shorten(text, limit)
     prio = next((s for s in sents if _PRIORITY.match(s)), "")
+    first_id = re.search(r"\bD-\d{2,4}\b", prio)
+    if first_id and first_id.group(0) not in {f["id"] for f in _blockers(c)}:
+        prio = ""  # судья начинает не с блокера — список «Исправить первым» ниже начинается с блокеров
     why = _auto_why(c)
     return why + (f" {shorten(prio, limit)}" if prio else "")
 
@@ -1359,7 +1394,9 @@ def _card(c: _Ctx, f: dict) -> list[str]:
                 body.append(f"**Было → стало.** Строка {e['line']}: {quote_md(e['before'])} → "
                             + (f"«{prose(e['after'])}»" if e["after"] else "удалить"))
     elif src is not None:
-        body.append(f"**Было → стало.** {_cap(_page_line(src.get('page'), src.get('line_start'), src.get('line_end')))}: "
+        label = ("Было → стало (места «<уточнить>» заполнит ответ владельца)"
+                 if re.search(r"<\s*уточнить", str(f.get("rewrite") or ""), re.I) else "Было → стало")
+        body.append(f"**{label}.** {_cap(_page_line(src.get('page'), src.get('line_start'), src.get('line_end')))}: "
                     f"{quote_md(src.get('quote'), CARD_QUOTE)} → «{prose(f.get('rewrite'))}»")
     qids = c.q_by_finding.get(f["id"], [])
     if f.get("question"):
@@ -1607,7 +1644,7 @@ def _conclusion(c: _Ctx) -> list[str]:
                   ["тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     reason = v.get("summary") or _auto_reason(c)
     out += [f"**Обоснование.** {prose(reason)}", ""]
-    first = _fix_first(c)
+    first = _first_screen_fix(c, _blockers(c), limit=7)
     if first:
         out += ["**Что исправить в первую очередь**", ""]
         for i, f in enumerate(first, 1):
@@ -1666,8 +1703,9 @@ def _appendix_questions(c: _Ctx) -> list[str]:
         lines = [" · ".join(head), prose(q.get("question"))]
         evs = [e for e in q.get("evidence") or [] if isinstance(e, dict) and e.get("quote")]
         if evs:
-            lines.append("Где: " + "; ".join(f"{lines_word(e.get('line_start'), e.get('line_end'))} "
-                                             f"{quote_md(e.get('quote'), 90)}" for e in evs[:3]))
+            prefer = [r for fid in q.get("finding_ids") or [] for r in (c.f_by_id.get(fid) or {}).get("requirement_ids") or []]
+            lines.append("Где: " + "; ".join(f"{esc(c.ev_place(e, prefer))}: {quote_md(e.get('quote'), 90)}"
+                                             for e in evs[:3]))
         opts = [o for o in q.get("options") or [] if str(o).strip()]
         tail = []
         if q.get("why"):
@@ -1951,8 +1989,16 @@ def _render_level(report: dict, level: int) -> str:
     _REQ_LABELS.clear()
     _REQ_LABELS.update({str(q.get("id")): (doc_label(q), str(q.get("source_id") or "")) for q in c.reqs
                         if doc_label(q)})
+    # офлайн: приложения, которые без модели всегда пусты (вопросы, тест-кейсы, чек-лист), не печатаются (№12)
+    c.skip = {fn for fn, key, anchor_id in ((_appendix_questions, "questions", "pa"), (_appendix_tests, "test_cases", "pb"),
+                                            (_appendix_checklist, "checklist", "pv"))
+              if c.offline and not c.r.get(key)}
+    c.skip_nav = {a for fn, key, a in ((_appendix_questions, "questions", "pa"), (_appendix_tests, "test_cases", "pb"),
+                                       (_appendix_checklist, "checklist", "pv")) if fn in c.skip}
     parts = []
     for title, fn in _sections():
+        if fn in c.skip:
+            continue
         try:
             parts.append(fn(c))
         except Exception as exc:  # noqa: BLE001 — один сломанный раздел не должен лишить аналитика отчёта
