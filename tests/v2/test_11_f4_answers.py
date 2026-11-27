@@ -252,3 +252,27 @@ def test_duplicate_model_decisions_most_cautious_wins():
     clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), TWO)["clarification"]
     ch = next(c for c in clar["changes"] if c["finding_id"] == "D-01")
     assert ch["status"] == "open" and ch["answer_conflict"] == ["Q-01.1", "Q-01.2"]
+
+
+# --------------------------------------------------------------------------- редакция при расходящихся ответах
+def _rw(fid, new):
+    return {"finding_id": fid, "edits": [{"action": "replace", "line": 1, "old": "x", "new": new}]}
+
+
+def test_conflict_rewrite_without_marker_is_dropped():
+    resp = _resp([{"finding_id": "D-01", "conflicting_answers": ["Q-01"], "reason": "ответы расходятся"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), TWO)["clarification"]
+    assert revise.unsettled_findings(clar) == {"D-01"}
+    assert revise._answers_block(clar)[1].get("D-01") is None  # правка не ссылается на несогласованный ответ
+    w: list[str] = []
+    kept = revise.drop_unsettled([_rw("D-01", "возвращаем 422"), _rw("D-02", "через шлюз")], {"D-01"}, w)
+    assert [r["finding_id"] for r in kept] == ["D-02"] and "D-01" in w[0]
+    kept = revise.drop_unsettled([_rw("D-01", "возвращаем <уточнить: 422 или 403>")], {"D-01"}, [])
+    assert len(kept) == 1
+
+
+def test_agreed_replies_are_not_unsettled():
+    resp = _resp([{"finding_id": "D-01", "status": "resolved", "by": ["Q-01"], "reason": "снят ответом Q-01"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), TWO)["clarification"]
+    assert revise.unsettled_findings(clar) == set()
+    assert revise._answers_block(clar)[1]["D-01"] == ["Q-01"]

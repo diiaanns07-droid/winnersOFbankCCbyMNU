@@ -413,10 +413,38 @@ def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
             rows.append(head + f"{a.get('answer', '')}")
         for part in a.get("deferred") or []:
             rows.append(f"  не решено владельцем (не вписывай как правило, поставь маркер <уточнить: …>): {part}")
+        if len(replies) > 1 and not agreed & set(fids):
+            continue  # несогласованные реплики — не источник значения правки
         for fid in a.get("finding_ids", []):
             by_finding.setdefault(fid, []).append(a.get("question_id"))
     rows += [f"Общее решение владельца: {d}" for d in decisions]
     return ("\n".join(rows) or "—"), by_finding
+
+
+def unsettled_findings(answers: Any) -> set[str]:
+    """Дефекты, по которым ответы владельца расходятся: правка по ним без маркера <уточнить> — выдуманный выбор."""
+    if not answers:
+        return set()
+    answered = answers.get("answers") if "answers" in answers and "changes" in answers else answers.get("answered")
+    agreed = {c.get("finding_id") for c in answers.get("changes") or []
+              if c.get("status") in ("resolved", "changed") and not c.get("answer_conflict")}
+    out = {c.get("finding_id") for c in answers.get("answer_conflicts") or [] if c.get("finding_id")}
+    for a in answered or []:
+        if len(a.get("replies") or []) > 1:
+            out |= set(a.get("finding_ids") or []) - agreed
+    return out
+
+
+def drop_unsettled(rewrites: list[dict], unsettled: set[str], warnings: list[str]) -> list[dict]:
+    """Правка дефекта с расходящимися ответами остаётся, только если оставляет решение владельцу (маркер)."""
+    out = []
+    for r in rewrites:
+        if r["finding_id"] in unsettled and not any(_PENDING.search(str(e.get("new") or "")) for e in r["edits"]):
+            warnings.append(f"revise: {r['finding_id']} — ответы владельца расходятся, а правка выбрала значение "
+                            f"без маркера <уточнить>; правка не внесена, текст оставлен как был")
+            continue
+        out.append(r)
+    return out
 
 
 # --------------------------------------------------------------------------- этап
@@ -459,6 +487,7 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
                          "answer_ids": by_finding.get(fid, [])})
     order = {f["id"]: i for i, f in enumerate(targets)}
     rewrites.sort(key=lambda r: order.get(r["finding_id"], 999))
+    rewrites = drop_unsettled(rewrites, unsettled_findings(answers), warnings)
     applied = apply_edits(lines, rewrites, warnings)
     opts = getattr(ctx, "options", None) or {}
     check = {"fixes": [], "stats": {}}
