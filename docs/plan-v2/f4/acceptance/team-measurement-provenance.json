@@ -1,0 +1,58 @@
+{
+  "reference": "6b55aacd",
+  "release": "d013c123",
+  "reports": [
+    {
+      "series": "reliz_w4_19_50_md_d013c12_haiku_1",
+      "path": "evaluation/v2/measurements/reliz_w4_19_50_md_d013c12_haiku_1/report.json",
+      "commit": "e9846b8a",
+      "dirty": false,
+      "model": [
+        "claude-haiku-5-5"
+      ],
+      "status": "complete",
+      "cached": 0,
+      "agent_source_tree": "a0b729f7c1516cd06d320df3cb3549d4da08dcfa",
+      "input_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381"
+    },
+    {
+      "series": "reliz_w4_19_50_md_d013c12_sonnet_1",
+      "path": "evaluation/v2/measurements/reliz_w4_19_50_md_d013c12_sonnet_1/report.json",
+      "commit": "069da9a1",
+      "dirty": true,
+      "model": [
+        "claude-sonnet-5-5"
+      ],
+      "status": "complete",
+      "cached": 0,
+      "agent_source_tree": "a0b729f7c1516cd06d320df3cb3549d4da08dcfa",
+      "input_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381"
+    },
+    {
+      "series": "reliz_w4_19_50_md_d013c12_sonnet_2",
+      "path": "evaluation/v2/measurements/reliz_w4_19_50_md_d013c12_sonnet_2/report.json",
+      "commit": "069da9a1",
+      "dirty": false,
+      "model": [
+        "claude-sonnet-5-5"
+      ],
+      "status": "complete",
+      "cached": 0,
+      "agent_source_tree": "a0b729f7c1516cd06d320df3cb3549d4da08dcfa",
+      "input_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381"
+    },
+    {
+      "series": "reliz_w4_19_50_md_d013c12_sonnet_3",
+      "path": "evaluation/v2/measurements/reliz_w4_19_50_md_d013c12_sonnet_3/report.json",
+      "commit": "f2d7da9d",
+      "dirty": false,
+      "model": [
+        "claude-sonnet-5-5"
+      ],
+      "status": "complete",
+      "cached": 0,
+      "agent_source_tree": "a0b729f7c1516cd06d320df3cb3549d4da08dcfa",
+      "input_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381"
+    }
+  ]
+}
