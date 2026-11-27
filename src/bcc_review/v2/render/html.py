@@ -34,6 +34,8 @@ from html import escape
 from pathlib import Path
 from typing import Any, Iterable
 
+from bcc_review.v2.render import jsonout
+
 ASSETS = Path(__file__).with_name("html_assets")
 
 SEV_ORDER = ("critical", "major", "minor")
@@ -411,7 +413,7 @@ def _hero(report: dict, findings: list[dict], by_id: dict) -> str:
     fix = []
     for i, fid in enumerate(verdict.get("fix_first") or [], 1):
         f = by_id.get(fid)
-        if not f:
+        if not f or jsonout.is_resolved(f):
             continue
         ev0 = (f.get("evidence") or [{}])[0]
         fix.append(f'<li><a href="#{e(fid)}" data-goto="{e(fid)}" class="fix sev-{_sev(f)}">'
@@ -445,6 +447,8 @@ def _hero(report: dict, findings: list[dict], by_id: dict) -> str:
     if run.get("finished_at"):
         meta.append(e(str(run["finished_at"]).replace("T", " ")[:16]))
 
+    if report.get("clarification"):
+        banner += f'<p class="banner" role="status">{e(jsonout.OWNER_ASSESSMENT)}</p>'
     return f"""
 <section class="hero" aria-label="Итог ревью">
   {banner}
@@ -454,7 +458,7 @@ def _hero(report: dict, findings: list[dict], by_id: dict) -> str:
       <div class="vcards">{"".join(vcards)}</div>
     </div>
     <div class="stats">
-      <h2 class="eyebrow">Замечания</h2>
+      <h2 class="eyebrow">{"Открытые замечания" if report.get("clarification") else "Замечания"}</h2>
       <div class="tiles">{"".join(tiles)}</div>
     </div>
   </div>
@@ -643,7 +647,7 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
         prio_html = f'<span class="ans {cls}" title="После ответов владельца">{lbl}</span>' + prio_html
     return f"""<article class="card sev-{sev}" id="{e(fid)}" tabindex="0" data-idx="{idx}" data-sev="{sev}"
  data-rank="{SEV_RANK[sev]}" data-prio="{prio}" data-line="{_first_line(f)}" data-kind="{e(kind)}"
- data-src="{e(" ".join(src_keys))}" data-blocks="{e(blocks)}" data-lines="{e(" ".join(ev_lines))}" data-search="{e(search.lower())}">
+ data-resolved="{int(jsonout.is_resolved(f))}" data-src="{e(" ".join(src_keys))}" data-blocks="{e(blocks)}" data-lines="{e(" ".join(ev_lines))}" data-search="{e(search.lower())}">
   <header class="ch"><span class="badge sev-{sev}">{SEV_LABEL[sev]}</span><span class="fid">{e(fid)}</span>{prio_html}</header>
   <h3 class="ct">{e(f.get("title", ""))}</h3>
   <div class="meta">{"".join(meta)}</div>
@@ -675,6 +679,8 @@ def _findings_panel(findings: list[dict], view: dict | None, report: dict, reqs_
     n_lines = len((view or {}).get("lines") or [])
     empty = ('<div class="empty" hidden>Под фильтр не попало ни одного замечания. '
              '<button type="button" class="linkbtn" data-reset>Сбросить фильтры</button></div>')
+    open_filter = ('<label class="tg"><input type="checkbox" id="openonly"> Только открытые</label>'
+                   if report.get("clarification") else "")
     no_findings = ('<div class="empty">Замечаний нет: агент не нашёл дефектов, подтверждённых цитатами.</div>'
                    if not findings else "")
     return f"""
@@ -698,7 +704,7 @@ def _findings_panel(findings: list[dict], view: dict | None, report: dict, reqs_
         <select id="fkind" aria-label="Вид дефекта"><option value="">Все виды</option>{kind_opts}</select>
         <select id="fsrc" aria-label="Кто нашёл"><option value="">Все линзы</option>{src_opts}</select>
       </div>
-      <div class="frow small"><span id="fcount" aria-live="polite"></span>
+      <div class="frow small">{open_filter}<span id="fcount" aria-live="polite"></span>
         <label class="sortl">Порядок <select id="fsort" class="mini"><option value="prio">по приоритету</option><option value="line">по месту в документе</option><option value="sev">по серьёзности</option></select></label>
         <button type="button" class="linkbtn" id="toggleall">Развернуть все</button><span class="kbd" title="Клавиши">↑ ↓ — по карточкам</span></div>
     </div>
@@ -783,6 +789,13 @@ def _clarification(report: dict, by_id: dict) -> str:
            f'{_fmt_int(c.get("changed", 0))}, осталось открытыми: {_fmt_int(c.get("open", 0))}, новых: '
            f'{len(c.get("new_findings") or [])}.</p>',
            _table(["Показатель", "До ответов", "После ответов"], rows, "ba")]
+    if (c.get("answers_document") or {}).get("match") is False:
+        out.append("<p>Владелец отвечал по другой редакции ТЗ. Проверьте привязки к текущим вопросам.</p>")
+    pending = c.get("needs_confirmation") or []
+    if pending:
+        rows = [[e(x.get("question_id", "")), tx(x.get("topic", "")), tx(x.get("text", "")),
+                 e(", ".join(x.get("possible_questions") or []) or "уточните текущий вопрос")] for x in pending]
+        out += ["<h3>Подтвердить привязку ответов</h3>", _table(["Номер", "Тема", "Ответ", "Вопрос сейчас"], rows)]
     ch = c.get("changes") or []
     if ch:
         crow = []
@@ -1013,7 +1026,8 @@ def render_html(report: dict, view: dict | None = None) -> str:
     reqs_by_id = {r.get("id", ""): r for r in report.get("requirements") or []}
     doc = report.get("document") or {}
     title = doc.get("title") or (view or {}).get("title") or "Документ"
-    counts = {s: sum(1 for f in findings if _sev(f) == s) for s in SEV_ORDER}
+    active = jsonout.open_findings(report)
+    counts = {s: sum(1 for f in active if _sev(f) == s) for s in SEV_ORDER}
 
     tabs = [
         ("findings", "Замечания", len(findings), _findings_panel(findings, view, report, reqs_by_id)),
@@ -1071,7 +1085,7 @@ def render_html(report: dict, view: dict | None = None) -> str:
     <button type="button" class="btn" id="print" title="Печать или сохранение в PDF">PDF / печать</button>
   </div>
 </header>
-{_hero(report, findings, by_id)}
+{_hero(report, active, by_id)}
 <nav class="tabs" role="tablist" aria-label="Разделы отчёта">{nav}</nav>
 <main>{panels}</main>
 <footer class="foot">Сформировано агентом {gen} · статическое ревью по ISO/IEC/IEEE 29148:2018 и IEEE 830-1998 ·
