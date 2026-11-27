@@ -947,8 +947,7 @@ def _brief(c: _Ctx) -> list[str]:
     v = c.verdict
     out = [h2("s0", "Кратко"), ""]
     if c.r.get("clarification"):
-        out += ["**Предварительная оценка по ответам владельца.** "
-                "Готовность новой редакции подтверждает отдельная проверка исправленного текста.", ""]
+        out += [jsonout.OWNER_ASSESSMENT, ""]
     out += table(["Разработка", "Тестирование"],
                  [[f"**{READINESS.get(v.get('development'), '—')}**", f"**{READINESS.get(v.get('testing'), '—')}**"]],
                  [":---:", ":---:"])

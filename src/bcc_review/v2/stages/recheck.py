@@ -1391,7 +1391,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
                               "texts": {x: texts.get(x, "") for x in c["answer_conflict"]}}
                              for c in changes if c.get("answer_conflict")],
         "before": {"verdict": v_before, "findings": severity_counts(findings)},
-        "after": {"verdict": {"development": after_rule["development"], "testing": after_rule["testing"],
+        "after": {"basis": "owner_answers", "verdict": {"development": after_rule["development"], "testing": after_rule["testing"],
                               "fix_first": after_rule.get("fix_first", [])},
                   "findings": severity_counts(after)},
         "resolved": sum(1 for c in changes if c["status"] == "resolved"),

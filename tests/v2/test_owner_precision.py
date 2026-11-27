@@ -111,3 +111,22 @@ def test_distinct_units_in_orphan_replies_do_not_create_a_conflict():
     assert recheck.decision_clashes(replies("Возвращаем 200 тенге.", "Срок возврата 48 часов.")) == []
     assert recheck.decision_clashes(replies("Возвращаем 200 тенге.", "Возвращаем 350 тенге."))
     assert recheck.decision_clashes(replies("Возвращаем 423 при блокировке.", "Возвращаем 409 при блокировке."))
+
+
+def test_html_and_console_count_open_blockers_after_answers():
+    from bcc_review.v2.render import console, html
+
+    demo = Path(__file__).resolve().parents[2] / "reports/demo_answers/qr"
+    answered = json.loads((demo / "qr.json").read_text(encoding="utf-8"))
+    rendered = html.render_html(answered)
+    assert "критичных 0, существенных 1, незначительных 8" in rendered.split("</head>", 1)[0]
+    hero = rendered.split('<section class="hero"', 1)[1].split("</section>", 1)[0]
+    assert "Предварительная оценка по ответам владельца" in hero
+    assert 'class="tnum">0</span>' in hero
+    assert "Предварительная оценка по ответам владельца" in console.summary(answered)
+    answered["clarification"]["needs_confirmation"] = [{"question_id": "Q-08", "topic": "Продление",
+                                                        "text": "На один месяц", "possible_questions": ["Q-01", "Q-02"]}]
+    pending = html.render_html(answered).split("Подтвердить привязку ответов", 1)[1]
+    assert "На один месяц" in pending and "Q-01, Q-02" in pending
+    reread = json.loads((demo / "qr.revised.review.json").read_text(encoding="utf-8"))
+    assert "Предварительная оценка по ответам владельца" not in html.render_html(reread)
