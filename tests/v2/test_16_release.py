@@ -204,7 +204,7 @@ def test_env_example_covers_variables_read_by_v2():
 
 def test_requirements_are_pinned():
     lines = [ln.split("#", 1)[0].strip() for ln in _read(REQUIREMENTS).splitlines()]
-    reqs = [ln for ln in lines if ln]
+    reqs = [ln for ln in lines if ln and not ln.startswith("-c ")]
     assert reqs
     for req in reqs:
         assert re.fullmatch(r"[A-Za-z0-9_.\-\[\],]+==[0-9][A-Za-z0-9.\-]*", req), f"версия не зафиксирована: {req}"
@@ -220,10 +220,51 @@ def test_pyproject_dependencies_are_in_requirements():
         pytest.skip("нет tomllib")
     data = tomllib.loads(_read(ROOT / "pyproject.toml"))
     pinned = {re.split(r"[\[=<>!~ ]", ln.split("#", 1)[0].strip(), maxsplit=1)[0].lower()
-              for ln in _read(REQUIREMENTS).splitlines() if ln.split("#", 1)[0].strip()}
+              for ln in _read(REQUIREMENTS).splitlines()
+              if ln.split("#", 1)[0].strip() and not ln.strip().startswith("-c ")}
     for dep in data["project"].get("dependencies", []):
         name = re.split(r"[\[=<>!~ ;]", dep, maxsplit=1)[0].lower()
         assert name in pinned, f"зависимость pyproject не зафиксирована в requirements.txt: {dep}"
+
+
+def _pins(path: Path) -> dict[str, str]:
+    out = {}
+    for ln in _read(path).splitlines():
+        ln = ln.split("#", 1)[0].strip()
+        m = re.fullmatch(r"([A-Za-z0-9_.\-]+)(?:\[[^\]]*\])?==([0-9][A-Za-z0-9.\-+]*)", ln)
+        if m:
+            out[re.sub(r"[-_.]+", "-", m.group(1)).lower()] = m.group(2)
+    return out
+
+
+def test_constraints_pin_everything_and_agree_with_requirements():
+    """constraints.txt фиксирует и транзитивные версии; requirements.txt подключает его и не спорит с ним."""
+    constraints = ROOT / "constraints.txt"
+    assert "-c constraints.txt" in _read(REQUIREMENTS).splitlines()
+    lines = [ln.split("#", 1)[0].strip() for ln in _read(constraints).splitlines()]
+    lines = [ln for ln in lines if ln]
+    for ln in lines:
+        assert re.fullmatch(r"[A-Za-z0-9_.\-]+==[0-9][A-Za-z0-9.\-+]*", ln), f"не версия: {ln}"
+    pinned, locked = _pins(REQUIREMENTS), _pins(constraints)
+    for name, ver in pinned.items():
+        assert locked.get(name) == ver, f"{name}: requirements.txt {ver}, constraints.txt {locked.get(name)}"
+    # транзитивные зависимости, которые чаще всего ломают установку, тоже зафиксированы
+    for name in ("pydantic", "pydantic-core", "httpx2", "google-auth", "cryptography", "lxml", "rpds-py"):
+        assert name in locked, name
+
+
+def test_cryptography_has_wheels_for_intel_mac():
+    """В cryptography 49+ нет колёс для Intel Mac: pip собирал бы её из исходников (нужен Rust) и падал."""
+    ver = _pins(ROOT / "constraints.txt").get("cryptography", "")
+    assert ver and int(ver.split(".")[0]) <= 48, ver
+
+
+def test_docker_and_scripts_install_with_constraints():
+    docker = _read(ROOT / "Dockerfile")
+    assert re.search(r"^COPY requirements\.txt constraints\.txt \./", docker, re.M), "Dockerfile без constraints.txt"
+    for script in ("_env.sh", "_env.ps1"):
+        assert "constraints.txt" in _read(ROOT / "scripts" / script), script
+    assert "constraints.txt" in _read(WORKFLOWS / "tests.yml")
 
 
 # --------------------------------------------------------------------------- CI и Docker
