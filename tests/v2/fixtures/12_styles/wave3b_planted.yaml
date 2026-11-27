@@ -1,0 +1,25 @@
+# Заложенные дефекты новых ТЗ №12 (волна 3, вторая сессия). Документы написаны после всех правок промптов и
+# правил до 11:30 — на них никто не настраивался. Чистая версия — тот же документ без этих правок; на ней любое
+# critical/major — ложная тревога (или непреднамеренный недочёт: разбирать по тексту).
+# Строки — по *_defects.md. «rules» — ловит ли детерминированное правило (на 1cdc424).
+wave3b_pin_defects.md:
+  - {lines: [71], severity: major, kind: api_contract, what: "метод смены PIN-кода объявлен как GET", rules: yes}
+  - {lines: [88, 101], severity: major, kind: status_conflict, what: "в логике 423 для неактивной карты, в перечне статусов тот же случай — 409", rules: yes}
+  - {lines: [27], severity: minor, kind: ambiguity, what: "открытый перечень простых PIN-кодов «и т. д.»", rules: yes}
+  - {lines: [36], severity: major, kind: unverifiable, what: "НФ-3 «мгновенно и без задержек» без числа", rules: yes}
+  - {lines: [28, 83], severity: major, kind: unit_mismatch, what: "блокировка смены 24 часа в Ф-3, поле lockPeriod — в минутах", rules: no}
+wave3b_statement_defects.md:
+  - {lines: [41], severity: critical, kind: missing_element, what: "интеграция обещает отмену заказа, метода отмены нет", rules: yes}
+  - {lines: [29, 23], severity: major, kind: unit_mismatch, what: "файл хранится 30 рабочих дней, список заказов — за 30 календарных", rules: yes}
+  - {lines: [120, 127], severity: major, kind: status_conflict, what: "неготовая выписка: 200 с result = ERROR в логике, 409 в перечне", rules: yes}
+  - {lines: [30, 83], severity: major, kind: boundary_conflict, what: "Ф-5 «не больше 10 выписок», логика отклоняет уже с 9 заказами", rules: no}
+wave3b_phone_defects.md:
+  - {lines: [23, 41], severity: critical, kind: boundary_conflict, what: "1 000 000 ₸ допустим по Ф-3, критерий приёмки ждёт отказ", rules: yes}
+  - {lines: [23, 86], severity: major, kind: unit_mismatch, what: "лимит за календарные сутки в Ф-3, в логике — за последний час", rules: no}
+  - {lines: [88, 95], severity: major, kind: status_conflict, what: "отказ антифрода: 200 со status = REJECTED в логике, 403 в перечне", rules: yes}
+  - {lines: [23, 80], severity: minor, kind: unit_mismatch, what: "нет правила пересчёта ₸ ↔ тиыны (диапазоны согласованы ×100)", rules: no}
+wave3b_holiday_defects.md:
+  - {lines: [15, 46], severity: critical, kind: boundary_conflict, what: "срок 6 месяцев допустим по КК-2, код 400 — для «не меньше 6»", rules: yes}
+  - {lines: [48], severity: major, kind: api_contract, what: "отзыв заявки — GET", rules: yes}
+  - {lines: [17, 52], severity: major, kind: unit_mismatch, what: "рассмотрение 3 рабочих дня в КК-4, 3 календарных дня в разделе API", rules: yes}
+  - {lines: [14], severity: minor, kind: ambiguity, what: "открытый перечень видов кредитов «и т. п.»", rules: yes}

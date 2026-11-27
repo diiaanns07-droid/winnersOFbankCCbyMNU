@@ -125,13 +125,18 @@ def _nfr_candidate(doc: Doc, out: dict) -> None:
         return
     x, words = hits[0]
     allw = [w for _, ws in hits for w in ws]
+    one = len(hits) == 1
+    # говорим о конкретных строках: числа в соседних НФТ не делают эти строки проверяемыми
+    where = (f"В нефункциональном требовании {quoted(x.joined)} нет измеримого значения"
+             if one else f"В {len(hits)} нефункциональных требованиях нет измеримого значения, например {quoted(x.joined)}")
     out["candidates"].append(candidate(
         "language.nfr_unverifiable",
-        title=f"Нефункциональные требования непроверяемы: {', '.join(quoted(w) for w in allw[:3])} без чисел",
+        title=(f"Нефункциональное требование без числа: {', '.join(quoted(w) for w in allw[:3])}" if one else
+               f"Нефункциональные требования без чисел: {', '.join(quoted(w) for w in allw[:3])}"),
         kind="unverifiable", criterion="verifiable", severity="major", blocks="testing",
         evidence=[ev(h[0]) for h in hits[:3]],
-        problem=(f"В нефункциональных требованиях нет ни одного измеримого значения: {quoted(x.joined)}. "
-                 f"Слова {', '.join(quoted(w) for w in allw[:4])} нельзя проверить тестом."),
+        problem=(f"{where}. Слова {', '.join(quoted(w) for w in allw[:4])} нельзя проверить тестом: не сказано, "
+                 "какое время, доля запросов или нагрузка считаются выполнением."),
         scenario="Нагрузочный тест показывает 3 секунды на 95-й перцентили: одна сторона считает это «быстро», другая — нет.",
         impact="Требование нельзя принять или отклонить; эксплуатационные риски не ограничены договорённостью.",
         recommendation=("Задать измеримые значения: время ответа и доля запросов (например, p95), нагрузка, "
