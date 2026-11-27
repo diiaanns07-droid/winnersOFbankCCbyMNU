@@ -190,10 +190,12 @@
     function rtab(name) { var d = rdoc(), t = d && d.getElementById("t-" + name); if (t) t.click(); return !!t; }
     function closeDrawer() { var d = rdoc(); if (d && d.body) d.body.dispatchEvent(new d.defaultView.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }
     /* страница встаёт так, чтобы вкладки были сверху, а рамка — сразу под ними (без вложенной прокрутки к ней) */
-    function toFrame() {
-      var bar = $(".jb-tabbar");
-      var y = bar.getBoundingClientRect().top + window.scrollY - 12;
-      if (Math.abs(window.scrollY - y) > 4) window.scrollTo({ top: y, behavior: "smooth" });
+    function toFrame(force) {
+      var prev = $(".jb-block"), res = $("#result");
+      if (!prev) return;
+      var gap = parseFloat(getComputedStyle(res).rowGap) || 24;
+      var y = prev.getBoundingClientRect().bottom + window.scrollY + gap - 12;
+      if (force ? Math.abs(window.scrollY - y) > 4 : window.scrollY > y + 4) window.scrollTo({ top: y, behavior: "smooth" });
     }
     function setView(v, rt) {
       view = v;
@@ -236,7 +238,7 @@
     fr.addEventListener("load", embed);
     if (!fr.getAttribute("src")) fr.src = fr.dataset.src;
     document.querySelectorAll("[data-view]").forEach(function (b) {
-      if (b.closest("#tabs") || b.closest("#revised-empty")) b.addEventListener("click", function () { setView(b.dataset.view); });
+      if (b.closest("#tabs") || b.closest("#revised-empty")) b.addEventListener("click", function () { setView(b.dataset.view); toFrame(); });
     });
     var tabs = Array.prototype.slice.call(document.querySelectorAll("#tabs [data-view]"));
     tabs.forEach(function (b, i) {
@@ -259,12 +261,14 @@
         if (!d) return;
         ev.preventDefault();
         setView("findings");
-        toFrame();
+        toFrame(true);
         var c = d.getElementById(a.dataset.goto);
         if (c) {
           c.click();
-          var w = d.defaultView, f = d.querySelector(".filters");
-          w.scrollTo({ top: Math.max(0, c.getBoundingClientRect().top + w.scrollY - (f ? f.offsetHeight : 0) - 12), behavior: "smooth" });
+          setTimeout(function () {  /* после того как окно с документом открылось и колонка карточек сузилась */
+            var w = d.defaultView, f = d.querySelector(".filters");
+            w.scrollTo({ top: Math.max(0, c.getBoundingClientRect().top + w.scrollY - (f ? f.offsetHeight : 0) - 12), behavior: "smooth" });
+          }, 30);
         }
       });
     });

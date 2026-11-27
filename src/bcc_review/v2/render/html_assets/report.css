@@ -497,7 +497,10 @@ table.ba { max-width: 720px; }
 :root[data-embed] .card:hover { box-shadow: 0 0 0 1px var(--line-2), var(--shadow-lg); }
 :root[data-embed] .card.active { box-shadow: 0 0 0 2px rgba(0, 185, 117, .6), var(--shadow-lg); }
 :root[data-embed] .filters { top: 0; margin: 0 calc(-1 * var(--px)) 8px; padding: 0 var(--px) 12px; }
-:root[data-embed] .flist { max-width: 900px; transition: margin 360ms var(--ease); }
+:root[data-embed] .flist { max-width: 900px; }
+/* окно открыто: колонка карточек уже — оставляем сегмент критичности, поиск и списки ждут закрытия окна */
+:root[data-embed][data-drawer] .filters .frow:not(:first-child) { display: none; }
+:root[data-embed][data-drawer] .sevchip { padding: 0 12px; font-size: 14px; }
 :root[data-embed] .docpane {
   position: fixed; z-index: 40; top: 12px; right: 12px; bottom: 12px; height: auto;
   width: min(600px, calc(100% - 24px)); border-radius: 28px;
