@@ -217,3 +217,16 @@ def test_report_has_no_local_paths(tmp_path, monkeypatch):
         text = path.read_text(encoding="utf-8")
         for needle in (str(tmp_path), str(ROOT), str(Path.home())):
             assert needle not in text, f"{path.name}: локальный путь {needle}"
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №04 (статус №16, патч 04_segment_latin_cache.patch): кэш _doc_latin "
+                                        "не срабатывает — словарь пересчитывается по всему документу на каждое требование")
+def test_segment_document_caches_are_reused():
+    """Длинное ТЗ: словарь латиницы и индекс строк считаются один раз на документ, а не на каждое требование."""
+    from bcc_review.v2.stages import segment
+
+    view = {"lines": [{"n": i, "text": f"Строка {i} amountValue saveLimit", "page": None, "section": ""}
+                      for i in range(1, 2001)]}
+    assert segment._doc_latin(view) is segment._doc_latin(view)
+    if hasattr(segment, "_by_n"):
+        assert segment._by_n(view) is segment._by_n(view)
