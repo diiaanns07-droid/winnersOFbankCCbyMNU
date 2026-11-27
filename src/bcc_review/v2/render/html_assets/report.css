@@ -491,15 +491,12 @@ table.ba { max-width: 720px; }
 
 /* ── встраивание в веб: своя шапка, сводка и вкладки — у страницы задания; документ — боковое окно ── */
 :root[data-embed] { --top-h: 0px; --tabs-h: 0px; --px: clamp(16px, 2.4vw, 28px); }
-:root[data-embed] body { background: var(--surface); }
+:root[data-embed], :root[data-embed] body { background: transparent; }
 :root[data-embed] body::before, :root[data-embed] body::after,
 :root[data-embed] .top, :root[data-embed] .hero, :root[data-embed] .tabs, :root[data-embed] .foot,
 :root[data-embed] #dlanswers { display: none !important; }
 :root[data-embed] main { padding-top: 8px; }
 :root[data-embed] .split { display: block; }
-:root[data-embed] .card, :root[data-embed] .qcard, :root[data-embed] .tw, :root[data-embed] .empty { box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(15, 40, 65, .04); }
-:root[data-embed] .card:hover { box-shadow: 0 0 0 1px var(--line-2), var(--shadow-lg); }
-:root[data-embed] .card.active { box-shadow: 0 0 0 2px rgba(0, 185, 117, .6), var(--shadow-lg); }
 :root[data-embed] .filters { top: 0; margin: 0 calc(-1 * var(--px)) 8px; padding: 0 var(--px) 12px; }
 :root[data-embed] .flist { max-width: 900px; }
 /* окно открыто: колонка карточек уже — оставляем сегмент критичности, поиск и списки ждут закрытия окна */
@@ -536,7 +533,7 @@ table.ba { max-width: 720px; }
 :root[data-embed][data-view="doc"] .docpane {
   position: relative; top: 0; right: 0; bottom: auto; width: auto; height: calc(100vh - 32px); margin-top: 8px;
   transform: none; opacity: 1; visibility: visible; transition: none; border-radius: var(--r-lg);
-  background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 0 0 1px var(--line);
+  background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--shadow);
 }
 :root[data-embed][data-view="doc"] .docpane .doc { background: transparent; }
 :root[data-embed][data-view="doc"] .dclose { display: none; }

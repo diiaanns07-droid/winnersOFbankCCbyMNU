@@ -376,7 +376,7 @@ def result_html(job: Job, f: dict, *, agent: bool = True) -> str:
   <button type="button" class="b-button primary" data-view="questions">К вопросам</button>
 </section>
 <section class="b-surface jb-files" id="exports" hidden><ul class="b-list">{files}</ul></section>
-<div class="b-surface jb-frame" id="framebox"><iframe id="rframe" title="Отчёт ревью" data-src="/jobs/{jid}/files/report.html?inline=1"></iframe></div>"""
+<div class="jb-frame" id="framebox"><iframe id="rframe" title="Отчёт ревью" data-src="/jobs/{jid}/files/report.html?inline=1"></iframe></div>"""
 
 
 def job_page(job: Job, app: App | None = None) -> str:
