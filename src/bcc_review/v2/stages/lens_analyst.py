@@ -9,7 +9,9 @@
 4. `critical` без сценария, последствий, с `blocks = none` или без расхождения двух мест документа (тип не из
    расхождений — `ambiguity`, `incomplete`…, или все цитаты из одной строки) понижается до `major`:
    critical у этой линзы — только когда другое место документа прямо поддерживает иное толкование;
-5. `critical` больше двух — лишние понижаются до `major`;
+5. `critical` больше двух — лишние понижаются до `major`; `critical` с цитатой из раздела описания API (заголовок
+   раздела называет API или REST; строка — по сверке цитаты) — тоже `major` с `severity_hint = critical` (№28):
+   бизнес-правило против шага логики метода или примера ответа — зона архитектора и проверки набора;
 6. **зрелый документ** (см. `maturity`) — строгий режим: остаются только расхождения двух мест документа
    (единицы, границы, события, противоречие правил) — `MATURE_MAX_OTHER_MAJOR = 0` прочих `major`, `minor` нет.
    Замер на корпусе (haiku, v13 с одним прочим major): прочие major на мутантах — 21 лишнее замечание при
@@ -27,6 +29,7 @@
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -131,12 +134,59 @@ def _is_conflict(c: dict) -> bool:
     return len({n for n in lines if isinstance(n, int)}) >= 2
 
 
+_API_SECTION = re.compile(r"\bAPI\b|\bREST\b", re.I)
+
+
+def api_lines(view: Any) -> set[int]:
+    """Строки раздела описания API (заголовок раздела по docview называет API или REST): поля, коды, логика метода."""
+    lines = view.get("lines") if isinstance(view, dict) else None
+    out: set[int] = set()
+    for x in lines or []:
+        if isinstance(x, dict) and isinstance(x.get("n"), int) and _API_SECTION.search(str(x.get("section") or "")):
+            out.add(x["n"])
+    return out
+
+
+def evidence_lines(view: Any, candidates: list[dict]) -> list[set[int]]:
+    """Строки цитат каждого кандидата — по сверке с документом (как у этапа quotes; у модели номер бывает сбит),
+    ненайденная цитата — по номеру модели."""
+    try:
+        from bcc_review.v2 import quotes
+    except ImportError:  # pragma: no cover
+        quotes = None
+    out = []
+    for c in candidates or []:
+        got: set[int] = set()
+        for ev in (c.get("evidence") if isinstance(c, dict) else None) or []:
+            if not isinstance(ev, dict):
+                continue
+            n = ev.get("line")
+            if quotes is not None and isinstance(view, dict):
+                try:
+                    m = quotes.verify_quote(view, ev.get("quote"), n)
+                except Exception:  # noqa: BLE001 — уточнение строки не условие работы линзы
+                    m = None
+                n = m.get("line_start") if m else n
+            if isinstance(n, int):
+                got.add(n)
+        out.append(got)
+    return out
+
+
+def touches_api(view: Any, candidates: list[dict], api: set[int]) -> list[bool]:
+    """По кандидату: есть ли цитата из раздела API (строки — `evidence_lines`)."""
+    return [bool(lines & api) for lines in evidence_lines(view, candidates)]
+
+
 def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_candidates: int = MAX_CANDIDATES,
-                max_critical: int = MAX_CRITICAL) -> list[dict[str, Any]]:
-    """Применить правила линзы к ответу модели. Не меняет входной список."""
+                max_critical: int = MAX_CRITICAL, api_flags: list[bool] | None = None) -> list[dict[str, Any]]:
+    """Применить правила линзы к ответу модели. Не меняет входной список. `api_flags` — по входному кандидату, есть
+    ли у него цитата из раздела описания API (`touches_api`): critical с такой цитатой понижается до major
+    (расхождение бизнес-правила и контракта или логики метода — зона архитектора и проверки набора; на чистых ТЗ №18
+    все разобранные ложные critical линзы были такими)."""
     seen: set[tuple] = set()
     kept: list[dict] = []
-    for raw in candidates or []:
+    for i, raw in enumerate(candidates or []):
         if not isinstance(raw, dict) or not _has_evidence(raw):
             continue
         c = dict(raw)
@@ -152,6 +202,9 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
                                   or not str(c.get("impact", "")).strip()
                                   or c.get("blocks", "none") == "none"):
             sev = "major"
+        if sev == "critical" and api_flags and i < len(api_flags) and api_flags[i]:
+            sev = "major"
+            c["severity_hint"] = "critical"  # модель считала critical: подсказка судье, в вердикт не идёт
         c["severity"] = sev
         c["title"] = _russian_title(c)
         kept.append(c)
@@ -184,14 +237,115 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
     return [kept[i] for i in order][:max_candidates]
 
 
+# Два просмотра (№28): у слабой модели набор найденного от прогона к прогону сильно разный (на официальном haiku
+# 5 и 2 пункта эталона из С у одной версии промпта), а ложные на чистых ТЗ — каждый раз свои. Второй независимый
+# просмотр (документ в обратном порядке разделов) и объединение поднимают полноту; major и critical остаются только
+# у мест, которые нашли оба просмотра, найденное одним — minor с `severity_hint`. На вычитанном документе строгий
+# режим и так точен — второй просмотр не делается.
+TWO_VIEWS = False  # выключено до замера (WIP прошлого чата №28, живой замер не закончен); код и тесты — для v2.1
+VIEWS_ENV = "BCC_ANALYST_VIEWS"  # «1» или «2» — число просмотров для замера (стенд №28); иначе — TWO_VIEWS
+SECOND_VIEW = ("\n\n### Второй просмотр\nЭтот документ уже просмотрел другой аналитик, начиная с первых разделов. "
+               "Пройди его в обратном порядке — от последних разделов бизнес-части к первым — с тем же фильтром, той же "
+               "шкалой серьёзности и теми же правилами оформления.")
+
+
+class _SecondView:
+    """Клиент модели для второго просмотра: то же задание с пометкой (другой ключ кэша, другой порядок обхода)."""
+
+    def __init__(self, llm: Any):
+        self._llm = llm
+
+    def ask(self, stage, system, user, schema, **kw):
+        return self._llm.ask(stage, system, user + SECOND_VIEW, schema, **kw)
+
+    def ask_split(self, stage, build, items, schema, merge, **kw):
+        return self._llm.ask_split(stage, lambda it: (lambda s_, u_: (s_, u_ + SECOND_VIEW))(*build(it)),
+                                   items, schema, merge, **kw)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._llm, name)
+
+
+def _demote(c: dict) -> dict:
+    c = dict(c)
+    if c.get("severity") != "minor":
+        c.setdefault("severity_hint", c.get("severity"))
+        c["severity"] = "minor"
+    c["views"] = 1
+    return c
+
+
+def merge_views(first: list[dict], second: list[dict], lines_first: list[set[int]], lines_second: list[set[int]],
+                max_candidates: int = MAX_CANDIDATES) -> list[dict]:
+    """Объединить два просмотра. Совпадение — общая строка цитаты (строки — по сверке с документом). Совпавший
+    кандидат берётся из первого просмотра с его серьёзностью; найденный одним просмотром — `minor`
+    (`severity_hint` — прежняя серьёзность). Порядок: critical → major → minor, внутри — первый просмотр, затем второй."""
+    used: set[int] = set()
+    out: list[dict] = []
+    for i, c in enumerate(first):
+        li = lines_first[i] if i < len(lines_first) else set()
+        j = next((j for j, _ in enumerate(second) if j not in used and li
+                  and li & (lines_second[j] if j < len(lines_second) else set())), None)
+        if j is None:
+            out.append(_demote(c))
+        else:
+            used.add(j)
+            out.append({**c, "views": 2})
+    out += [_demote(c) for j, c in enumerate(second) if j not in used]
+    order = sorted(range(len(out)), key=lambda k: (_RANK.get(out[k].get("severity"), 2), k))
+    return [out[k] for k in order][:max_candidates]
+
+
 def run(ctx, lens_run=None) -> dict:
     """Запуск линзы с постобработкой. `lens_run(ctx, name)` — общий запуск из `stages/lens.py` (№01);
     он сам берёт `MAX_OUTPUT_TOKENS` из этого модуля."""
     if lens_run is None:
         from . import lens as _lens  # каркас №01
         lens_run = _lens.run
-    m = maturity(getattr(ctx, "view", None))
-    out = dict(lens_run(ctx, "analyst"))
-    out["candidates"] = postprocess(out.get("candidates") or [], mature=m["mature"])
+    view = getattr(ctx, "view", None)
+    m = maturity(view)
+    api = api_lines(view)
+    options = getattr(ctx, "options", None) or {}
+    enabled = TWO_VIEWS if os.environ.get(VIEWS_ENV, "") not in ("1", "2") else os.environ[VIEWS_ENV] == "2"
+    two = enabled and not m["mature"] and int(options.get("passes", 1) or 1) < 2 and getattr(ctx, "llm", None)
+
+    def one(c) -> tuple[dict, list[dict]]:
+        res = dict(lens_run(c, "analyst"))
+        cands = res.get("candidates") or []
+        return res, postprocess(cands, mature=m["mature"], api_flags=touches_api(view, cands, api))
+
+    if not two:
+        out, cands = one(ctx)
+        out["candidates"] = cands
+        out["document_maturity"] = m
+        return out
+    import concurrent.futures as cf
+    import copy
+    ctx2 = copy.copy(ctx)
+    ctx2.llm = _SecondView(ctx.llm)
+    with cf.ThreadPoolExecutor(max_workers=2) as ex:
+        futs = [ex.submit(one, ctx), ex.submit(one, ctx2)]
+        results = []
+        for f in futs:
+            try:
+                results.append(f.result())
+            except Exception as exc:  # noqa: BLE001 — второй просмотр — улучшение, а не условие работы линзы
+                results.append(exc)
+    ok = [r for r in results if not isinstance(r, Exception)]
+    if not ok:
+        raise results[0]
+    if len(ok) == 1:
+        out, cands = ok[0]
+        warn = getattr(ctx, "warn", None)
+        failed = next(r for r in results if isinstance(r, Exception))
+        if callable(warn):
+            warn(f"Линза «Аналитик»: один из двух просмотров не удался ({type(failed).__name__}) — оставлен другой")
+        out["candidates"] = cands
+    else:
+        (out, a), (_, b) = ok
+        out["candidates"] = merge_views(a, b, evidence_lines(view, a), evidence_lines(view, b))
+        out["view_candidates"] = {"first": a, "second": b}  # для замера: один просмотр против двух на тех же ответах
+        out["views"] = {"first": len(a), "second": len(b), "agreed": sum(1 for c in out["candidates"]
+                                                                         if c.get("views") == 2)}
     out["document_maturity"] = m
     return out
