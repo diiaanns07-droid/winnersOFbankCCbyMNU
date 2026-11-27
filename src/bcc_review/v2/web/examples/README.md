@@ -28,8 +28,8 @@ PYTHONPATH=src python -m bcc_review release/input/requirements.md src/bcc_review
 | Пример | Файл | Почему он |
 | :--- | :--- | :--- |
 | Официальный ТЗ | `release/input/requirements.md` | вход официального прогона, без ключа — `mock` |
-| Официальный ТЗ, PDF | `release/input/requirements.pdf` | тот же текст в PDF (см. `release/input/PROVENANCE.md`), без ключа — `mock` |
+| Тот же ТЗ в PDF | `release/input/requirements.pdf` | тот же текст в PDF (см. `release/input/PROVENANCE.md`), без ключа — `mock` |
 | Другая тема: кэшбэк | `evaluation/dev/corpus/cases/cashback.base/source.md` | открытый корпус, другая предметная область |
-| Чистый ТЗ: лимит переводов | `evaluation/dev/corpus/cases/transfer_limit.base/source.md` | `evaluation/v2/RESULTS.md`, «корпус: базы и перефразы»: 0 critical, вердикт «можно / можно», P1 не нарушен |
+| Чистый ТЗ (лимит переводов) | `evaluation/dev/corpus/cases/transfer_limit.base/source.md` | `evaluation/v2/RESULTS.md`, «корпус: базы и перефразы»: 0 critical, вердикт «можно / можно», P1 не нарушен |
 
 Слепой набор (`eval/blind4`, `*.key.json`) не используется.

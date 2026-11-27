@@ -13,7 +13,7 @@
     },
     {
       "id": "official-pdf",
-      "title": "Официальный ТЗ из PDF",
+      "title": "Тот же ТЗ из PDF",
       "json": "reports/requirements_pdf.json",
       "html": "reports/requirements_pdf.html",
       "md": "reports/requirements_pdf.md",
@@ -24,7 +24,7 @@
     },
     {
       "id": "cashback",
-      "title": "Другая тема: кэшбэк",
+      "title": "Тема: кэшбэк",
       "json": "reports/other_topic_cashback.json",
       "html": "reports/other_topic_cashback.html",
       "md": "reports/other_topic_cashback.md",
@@ -35,7 +35,8 @@
     },
     {
       "id": "mock",
-      "title": "Официальный ТЗ · демо",
+      "title": "Демо без модели",
+      "subtitle": "официальный ТЗ",
       "json": "src/bcc_review/v2/web/examples/mock/requirements.json",
       "html": "src/bcc_review/v2/web/examples/mock/requirements.html",
       "md": "src/bcc_review/v2/web/examples/mock/requirements.md",
@@ -53,14 +54,14 @@
     },
     {
       "id": "official-pdf",
-      "title": "Официальный ТЗ, PDF",
+      "title": "Тот же ТЗ в PDF",
       "kind": "PDF",
       "path": "release/input/requirements.pdf",
       "no_key": "mock"
     },
     {
       "id": "cashback",
-      "title": "Другая тема: кэшбэк",
+      "title": "Тема: кэшбэк",
       "kind": "Markdown",
       "path": "evaluation/dev/corpus/cases/cashback.base/source.md",
       "file_name": "cashback.md",
@@ -68,7 +69,7 @@
     },
     {
       "id": "transfer-limit",
-      "title": "Чистый ТЗ: лимит переводов",
+      "title": "Чистый ТЗ",
       "kind": "Markdown",
       "path": "evaluation/dev/corpus/cases/transfer_limit.base/source.md",
       "file_name": "transfer_limit.md",

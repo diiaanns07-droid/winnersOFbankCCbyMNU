@@ -277,8 +277,11 @@ def pick_provider(doc: dict[str, Any]) -> str:
 
 
 def _doc_hint(doc: dict[str, Any], provider: str) -> str:
-    if provider in NO_MODEL:
-        return "без ключа — " + _NO_KEY[provider]
+    """Чем пойдёт проверка — коротко, для листа в стопке: «демо, без ключа», «только правила», «модель: Gemini»."""
+    if provider == "mock":
+        return "демо, без ключа"
+    if provider == "offline":
+        return "только правила, без ключа"
     return "модель: " + _SHORT.get(provider, provider)
 
 
@@ -290,19 +293,21 @@ def _doc_hint(doc: dict[str, Any], provider: str) -> str:
 # или фокус выдвигает лист целиком. Вторая стопка — «Свой документ» и примеры, которые проверяются одним нажатием.
 
 _CSS = """<style>
-.g43{display:flex;flex-direction:column;gap:26px;min-width:0;color:var(--b-ink,#0F2841)}
+.g43{display:flex;flex-direction:column;gap:20px;min-width:0;color:var(--b-ink,#0F2841)}
 .g43-sec{min-width:0}
 .g43-cap{margin:0 0 10px 2px;font-size:13px;line-height:1.3;font-weight:600;letter-spacing:.02em;color:var(--b-ink-2,#3A5068)}
-.g43-pile{--h:176px;--band:86px;display:flex;flex-direction:column;min-width:0}
-.g43-pile.docs{--h:140px;--band:62px}
-.g43-pile>*{position:relative;display:block;margin:0;min-width:0;
+.g43-pile{--h:146px;--band:86px;display:flex;flex-direction:column;min-width:0}
+.g43-pile.docs{--h:112px;--band:58px}
+.g43-slot{position:relative;height:var(--h);min-width:0;
   transition:margin-top var(--b-base,220ms) var(--b-ease,cubic-bezier(.2,.8,.2,1));
   animation:g43-in var(--b-slow,360ms) var(--b-ease,cubic-bezier(.2,.8,.2,1)) both;animation-delay:calc(var(--i,0) * 40ms)}
-.g43-pile>*+*{margin-top:calc(var(--band) - var(--h))}
-.g43-pile>*+*:hover,.g43-pile>*+*:focus-within{margin-top:8px}
+.g43-slot+.g43-slot{margin-top:calc(var(--band) - var(--h))}
+.g43-slot+.g43-slot:hover,.g43-slot+.g43-slot:focus-within{margin-top:8px}
+.g43-slot.own{height:auto}
+.g43-slot>form{height:100%;margin:0}
 @keyframes g43-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.g43-leaf{box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;width:100%;
-  height:var(--h);margin:0;padding:12px 16px 14px;border:0;border-radius:var(--b-r-md,14px);overflow:hidden;
+.g43-leaf{box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;width:100%;height:100%;
+  margin:0;padding:12px 14px 14px;border:0;border-radius:var(--b-r-md,14px);overflow:hidden;
   background:var(--b-paper,#fff);color:var(--b-ink,#0F2841);font:inherit;text-align:left;text-decoration:none;cursor:pointer;
   box-shadow:0 0 0 1px rgba(15,40,65,.07),0 1px 2px rgba(15,40,65,.05),0 8px 22px rgba(15,40,65,.07);
   transition:box-shadow var(--b-fast,120ms) var(--b-ease,ease),transform var(--b-fast,120ms) var(--b-ease,ease)}
@@ -310,28 +315,44 @@ _CSS = """<style>
 .g43-leaf:hover{box-shadow:0 0 0 1px rgba(15,40,65,.08),0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10)}
 .g43-leaf:active{transform:scale(.985)}
 .g43-leaf:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
-.g43-pv{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:1px;margin-bottom:6px;
-  font-size:7.5px;line-height:1.5;color:var(--b-ink-3,#5B6F84);opacity:.8;
-  -webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
+.g43-leaf>*{flex-shrink:0}
+.g43-pv{flex:1 1 0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:0;margin-bottom:4px;
+  font-size:10px;line-height:1.4;color:var(--b-ink-3,#5B6F84);opacity:.9;
+  transition:opacity var(--b-base,220ms) var(--b-ease,ease);
+  -webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.g43-leaf>.g43-pv{flex-shrink:1}
 .g43-pv>span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.g43-pv>span:first-child{font-weight:700;font-size:8.5px;color:var(--b-ink-2,#3A5068);margin-bottom:2px}
+.g43-pv>span:first-child{font-weight:650;font-size:10.5px;color:var(--b-ink-2,#3A5068);margin-bottom:1px}
+.g43-slot+.g43-slot .g43-pv,.g43-slot+.g43-slot .g43-meta{opacity:0;transition:opacity var(--b-base,220ms) var(--b-ease,ease)}
+.g43-slot+.g43-slot:hover .g43-pv,.g43-slot+.g43-slot:focus-within .g43-pv{opacity:.9}
+.g43-slot+.g43-slot:hover .g43-meta,.g43-slot+.g43-slot:focus-within .g43-meta{opacity:1}
+.g43-pile.docs .g43-slot .g43-meta{opacity:1}
 .g43-meta{font-size:13px;line-height:1.35;color:var(--b-ink-2,#3A5068);font-variant-numeric:tabular-nums;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g43-t{font-size:15px;line-height:1.35;font-weight:600;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.g43-v{font-size:15px;line-height:1.4;color:var(--b-ink,#0F2841)}
+.g43-v{font-size:15px;line-height:1.35;color:var(--b-ink,#0F2841);font-variant-numeric:tabular-nums}
 .g43-v b{font-weight:650}
 .g43-v b.no{color:var(--b-red,#C2362B)} .g43-v b.yes{color:var(--b-green-ink,#00704A)}
 .g43-v b.cond,.g43-v b.none{color:var(--b-ink,#0F2841)}
-.g43-own .g43-t{color:var(--b-green-ink,#00704A)}
-.g43-own{justify-content:flex-start}
+.g43-own{justify-content:flex-start;padding:13px 14px}
 .g43-own .g43-meta{white-space:normal}
-@media (max-width:760px){
-  .g43{gap:18px}
-  .g43-pile>*+*,.g43-pile>*+*:hover,.g43-pile>*+*:focus-within{margin-top:8px}
-  .g43-leaf{height:auto;min-height:0;padding:12px 14px}
-  .g43-pv{display:none}
+.g43-own .g43-t{color:var(--b-green-ink,#00704A)}
+@media (min-width:761px){
+  .g43{max-height:calc(100vh - 108px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+    padding:4px 8px 18px;margin:-4px -8px 0}
 }
-@media (prefers-reduced-motion:reduce){.g43-pile>*,.g43-leaf{animation:none;transition:none}}
+@media (max-width:760px){
+  .g43{gap:14px}
+  .g43-pile,.g43-pile.docs{flex-direction:row;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;
+    padding:2px 2px 10px;scrollbar-width:none}
+  .g43-pile::-webkit-scrollbar{display:none}
+  .g43-slot,.g43-slot+.g43-slot,.g43-slot+.g43-slot:hover,.g43-slot+.g43-slot:focus-within{flex:0 0 168px;height:auto;margin:0;scroll-snap-align:start}
+  .g43-leaf{min-height:88px;padding:12px 14px;justify-content:flex-start}
+  .g43-pv,.g43-pile:not(.docs) .g43-meta{display:none}
+  .g43-slot+.g43-slot .g43-meta{opacity:1}
+  .g43-meta{white-space:normal}
+}
+@media (prefers-reduced-motion:reduce){.g43-slot,.g43-leaf,.g43-pv{animation:none;transition:none}}
 </style>"""
 
 _VWORD = {"no": ("нельзя", "no"), "conditional": ("с условиями", "cond"), "yes": ("можно", "yes")}
@@ -344,7 +365,7 @@ def verdict_html(summary: dict[str, Any]) -> str:
     word, cls = _VWORD.get(str(summary.get("development") or ""), ("не вынесен", "none"))
     crit = int(summary.get("critical") or 0)
     tail = f"{crit} {_plural(crit, 'блокер', 'блокера', 'блокеров')}" if crit else "без блокеров"
-    return f'Разработка: <b class="{cls}">{e(word)}</b> · {e(tail)}'
+    return f'Разработка: <b class="{cls}">{e(word)}</b>&nbsp;· {e(tail).replace(" ", "&nbsp;", 1)}'
 
 
 def _plural(n: int, one: str, few: str, many: str) -> str:
@@ -354,7 +375,7 @@ def _plural(n: int, one: str, few: str, many: str) -> str:
     return {1: one, 2: few, 3: few, 4: few}.get(n % 10, many)
 
 
-def preview_lines(path: Path, n: int = 9) -> list[str]:
+def preview_lines(path: Path, n: int = 5) -> list[str]:
     """Начало документа для миниатюры листа: Markdown без разметки, у PDF — текст первой страницы."""
     try:
         st = path.stat()
@@ -412,14 +433,16 @@ def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = N
     for i, rec in enumerate(recs):
         m = report_meta(rec["json"])
         date = m["date"][:5] if m["date"] else ""
-        meta = " · ".join(x for x in (m["model"], date, _quotes(m["report"])) if x)
+        meta = " · ".join(x for x in (rec.get("subtitle") or m["model"], date) if x)
+        quotes = _quotes(m["report"])
         title = rec.get("title") or rec["id"]
         leaves.append(
+            f'<div class="g43-slot" style="z-index:{len(recs) - i};--i:{i}">'
             f'<a class="g43-leaf" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}" '
-            f'style="z-index:{len(recs) - i};--i:{i}" '
+            f'title="{e(meta)}{" · " + e(quotes) if quotes else ""}" '
             f'aria-label="{e(title)}: разработка — {e(m["verdict"])}, {e(m["line"].split(", ", 1)[-1])}; {e(meta)}">'
             f'{_pv(preview_lines(rec["source"]))}<span class="g43-meta">{e(meta)}</span>'
-            f'<span class="g43-t">{e(title)}</span><span class="g43-v">{verdict_html(m["summary"])}</span></a>')
+            f'<span class="g43-t">{e(title)}</span><span class="g43-v">{verdict_html(m["summary"])}</span></a></div>')
     return "".join(leaves)
 
 
@@ -430,18 +453,20 @@ def documents_block(examples: dict[str, list[dict[str, Any]]] | None = None, *, 
     n = len(docs) + (1 if own else 0)
     leaves = []
     if own:
-        leaves.append(f'<label class="g43-leaf g43-own" for="file" style="z-index:{n};--i:0">'
+        leaves.append(f'<div class="g43-slot own" style="z-index:{n};--i:0"><label class="g43-leaf g43-own" for="file">'
                       f'<span class="g43-t">Свой документ</span>'
-                      f'<span class="g43-meta">перетащите файл на стол или выберите — PDF, Word, Markdown, TXT</span></label>')
+                      f'<span class="g43-meta">перетащите файл на стол или выберите</span></label></div>')
     for j, d in enumerate(docs):
         i = j + (1 if own else 0)
         prov = pick_provider(d)
         hint = _doc_hint(d, prov)
         title = d.get("title") or d["id"]
-        leaves.append(f'<form method="post" action="/examples/check/{e(d["id"])}" style="z-index:{n - i};--i:{i}">'
-                      f'<button type="submit" class="g43-leaf" aria-label="Проверить этот документ: {e(title)}, {e(hint)}">'
+        leaves.append(f'<div class="g43-slot" style="z-index:{n - i};--i:{i}">'
+                      f'<form method="post" action="/examples/check/{e(d["id"])}">'
+                      f'<button type="submit" class="g43-leaf" title="Проверить этот документ ({e(hint)})" '
+                      f'aria-label="Проверить этот документ: {e(title)}, {e(hint)}">'
                       f'{_pv(preview_lines(d["path"]))}<span class="g43-t">{e(title)}</span>'
-                      f'<span class="g43-meta">проверить · {e(hint)}</span></button></form>')
+                      f'<span class="g43-meta">{e(hint)}</span></button></form></div>')
     return "".join(leaves)
 
 
@@ -454,9 +479,9 @@ def job_leaf(job: Any, *, i: int = 0, n: int = 1) -> str:
     else:
         line = e({"queued": "в очереди", "running": "идёт проверка", "failed": "ошибка прогона"}.get(job.state, job.state))
     meta = " · ".join(x for x in (when, _SHORT.get(job.provider, job.provider)) if x)
-    return (f'<a class="g43-leaf" href="/jobs/{e(job.id)}" style="z-index:{n - i};--i:{i}">'
+    return (f'<div class="g43-slot" style="z-index:{n - i};--i:{i}"><a class="g43-leaf" href="/jobs/{e(job.id)}">'
             f'{_pv(preview_lines(Path(job.input_path)))}<span class="g43-meta">{e(meta)}</span>'
-            f'<span class="g43-t">{e(Path(job.file_name).stem)}</span><span class="g43-v">{line}</span></a>')
+            f'<span class="g43-t">{e(Path(job.file_name).stem)}</span><span class="g43-v">{line}</span></a></div>')
 
 
 def gallery_block(app: Any) -> str:
