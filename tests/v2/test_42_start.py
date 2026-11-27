@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import threading
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -253,43 +254,181 @@ def test_default_ports_8014_to_8030(tmp_path, monkeypatch):
     assert seen == {"host": "127.0.0.1", "port": 8014, "tries": 16}  # 8014…8030, только этот компьютер
 
 
-def test_banner():
-    b = S._banner("http://127.0.0.1:8014/")
-    assert "BCC Review работает: http://127.0.0.1:8014 — остановить: Ctrl+C" in b
-    lines = [ln for ln in b.splitlines() if ln]
-    assert len(lines) == 3 and len({len(ln) for ln in lines}) == 1  # ровная рамка
-    ascii_frame = S._banner("http://127.0.0.1:8014/", "cp1251")  # вывод в файл на русской Windows
-    ascii_frame.encode("cp1251")
-    assert "BCC Review работает: http://127.0.0.1:8014" in ascii_frame and "+===" in ascii_frame
+def test_ready_line():
+    plain = S._ready_line("http://127.0.0.1:8014/")
+    assert plain == "Система открыта: http://127.0.0.1:8014 · остановить — Ctrl+C"
+    busy = S._ready_line("http://127.0.0.1:8015/", "порт 8014 занят другой программой")
+    assert busy == "Система открыта: http://127.0.0.1:8015 · порт 8014 занят другой программой · остановить — Ctrl+C"
+    colored = S._ready_line("http://127.0.0.1:8014/", "", 24)
+    assert "\x1b[1;38;2;0;185;117mhttp://127.0.0.1:8014\x1b[0m" in colored  # адрес — BCC Green
+    assert re.sub(r"\x1b\[[0-9;]*m", "", colored) == plain
+    assert "38;5;36m" in S._ready_line("http://127.0.0.1:8014/", "", 256)
 
 
-def test_open_browser_only_after_server_answers(tmp_path, monkeypatch, capsys):
-    servers: list = []
-    real_make = S.make_server
-    monkeypatch.setattr(S, "make_server", lambda *a, **k: servers.append(real_make(*a, **k)) or servers[-1])
-    answered: list[bytes] = []
-    done = threading.Event()
+def test_no_color_when_not_a_terminal(monkeypatch):
+    class Pipe:
+        def isatty(self):
+            return False
 
-    def fake_open(url, *a, **k):
-        with urllib.request.urlopen(url + "healthz", timeout=3) as r:  # сервер уже отвечает
-            answered.append(r.read())
-        done.set()
-        return True
+    class Tty:
+        def isatty(self):
+            return True
 
-    monkeypatch.setattr(S.webbrowser, "open", fake_open)
-    monkeypatch.setattr(S, "_has_gui", lambda: True)
-    port = _free_port()
-    th = threading.Thread(target=S.main, args=(["--open", "--port", str(port), "--data-dir", str(tmp_path / "w")],),
-                          daemon=True)
-    th.start()
-    try:
-        assert done.wait(15), "браузер не открылся"
-    finally:
-        for s in servers:
+    assert S._color_depth(Pipe()) == 0
+    if os.name != "nt":
+        monkeypatch.setenv("TERM", "xterm-256color")
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.delenv("COLORTERM", raising=False)
+        monkeypatch.delenv("WT_SESSION", raising=False)
+        monkeypatch.delenv("TERM_PROGRAM", raising=False)
+        assert S._color_depth(Tty()) == 256
+        monkeypatch.setenv("COLORTERM", "truecolor")
+        assert S._color_depth(Tty()) == 24
+        monkeypatch.setenv("NO_COLOR", "1")
+        assert S._color_depth(Tty()) == 0
+
+
+class _Run:
+    """main() в потоке, как из start.sh: ждём строку «Система открыта» (браузер), потом останавливаем сервер."""
+
+    def __init__(self, monkeypatch, tmp_path, *extra: str):
+        self.servers: list = []
+        self.opened = threading.Event()
+        self.apps: list = []
+        real_make, real_build = S.make_server, S.build_app
+        monkeypatch.setattr(S, "make_server", lambda *a, **k: self.servers.append(real_make(*a, **k)) or self.servers[-1])
+        monkeypatch.setattr(S, "build_app", lambda *a, **k: self.apps.append(real_build(*a, **k)) or self.apps[-1])
+        monkeypatch.setattr(S, "_has_gui", lambda: True)
+        monkeypatch.setattr(S.webbrowser, "open", lambda url, *a, **k: self.opened.set() or True)
+        self.port = _free_port()
+        self.data = tmp_path / "web"
+        self.result: list = []
+        args = ["--open", "--port", str(self.port), "--data-dir", str(self.data), *extra]
+        self.thread = threading.Thread(target=lambda: self.result.append(S.main(args)), daemon=True)
+
+    def __enter__(self):
+        self.thread.start()
+        assert self.opened.wait(15), "браузер не открылся"
+        return self
+
+    def get(self, path: str) -> int:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", timeout=5) as r:
+                r.read()
+                return r.status
+        except urllib.error.HTTPError as exc:
+            return exc.code
+
+    def __exit__(self, *exc):
+        for s in self.servers:
             s.shutdown()
-        th.join(10)
-    assert answered == [b"ok"]
-    assert f"BCC Review работает: http://127.0.0.1:{port} — остановить: Ctrl+C" in capsys.readouterr().out
+        self.thread.join(10)
+        assert not self.thread.is_alive()
+
+
+def test_console_has_no_request_log(tmp_path, monkeypatch, capsys):
+    with _Run(monkeypatch, tmp_path, "--no-tty") as run:
+        assert run.get("/") == 200 and run.get("/assets/app.css") == 200 and run.get("/nope") == 404
+    out = capsys.readouterr()
+    assert "GET /" not in out.out + out.err, "журнал запросов — не в консоль"
+    assert out.out.strip().splitlines()[-1] == f"Система открыта: http://127.0.0.1:{run.port} · остановить — Ctrl+C"
+    assert out.err == ""
+    log = (run.data / "web.log").read_text(encoding="utf-8")
+    assert '"GET / HTTP/1.1" 200' in log and '"GET /assets/app.css HTTP/1.1" 200' in log
+    assert run.result == [0]
+
+
+def test_server_error_one_line_in_console_traceback_in_log(tmp_path, monkeypatch, capsys):
+    def boom(*a, **k):
+        raise RuntimeError("сломалось")
+
+    with _Run(monkeypatch, tmp_path, "--no-tty") as run:
+        monkeypatch.setattr(S, "index_page", boom)
+        try:
+            run.get("/")
+        except Exception:  # noqa: BLE001 — соединение закрыто без ответа
+            pass
+    err = capsys.readouterr().err
+    assert "Ошибка при обработке запроса: RuntimeError: сломалось" in err and "Traceback" not in err
+    assert "Traceback" in (run.data / "web.log").read_text(encoding="utf-8")
+
+
+def test_broken_connection_is_silent(tmp_path, capsys):
+    app = S.build_app(tmp_path / "web", provider="mock")
+    srv = S.make_server(app, "127.0.0.1", 0)
+    try:
+        try:
+            raise ConnectionResetError("браузер закрыл вкладку")
+        except ConnectionResetError:
+            srv.handle_error(None, ("127.0.0.1", 1))
+    finally:
+        srv.server_close()
+    assert capsys.readouterr().err == ""
+
+
+def _fake_tty_agent(monkeypatch, greet):
+    import types
+
+    mod = types.ModuleType("bcc_review.v2.web.tty_agent")
+    mod.greet = greet
+    monkeypatch.setitem(sys.modules, "bcc_review.v2.web.tty_agent", mod)
+    import bcc_review.v2.web as web_pkg
+
+    monkeypatch.setattr(web_pkg, "tty_agent", mod, raising=False)
+
+
+def test_greet_runs_before_browser_and_sets_provider(tmp_path, monkeypatch, capsys):
+    calls: list = []
+
+    def greet(port, env_path):
+        calls.append((port, Path(env_path).name))
+        print("Здравствуйте! Я BCC AI.")
+        return "gemini"
+
+    _fake_tty_agent(monkeypatch, greet)
+    with _Run(monkeypatch, tmp_path) as run:
+        pass
+    assert calls == [(run.port, ".env")]
+    assert run.apps[0].default_provider == "gemini"  # браузер — сразу на главную, не на веб-знакомство
+    out = capsys.readouterr().out.strip().splitlines()
+    assert out[-2:] == ["Здравствуйте! Я BCC AI.", f"Система открыта: http://127.0.0.1:{run.port} · остановить — Ctrl+C"]
+
+
+def test_greet_failure_does_not_block_system(tmp_path, monkeypatch, capsys):
+    def greet(port, env_path):
+        raise RuntimeError("терминал странный")
+
+    _fake_tty_agent(monkeypatch, greet)
+    with _Run(monkeypatch, tmp_path) as run:
+        assert run.get("/healthz") == 200
+    assert run.apps[0].default_provider == "auto"
+    assert "Система открыта" in capsys.readouterr().out
+    assert "терминал странный" in (run.data / "web.log").read_text(encoding="utf-8")
+
+
+def test_greet_skipped_with_no_tty_and_check(tmp_path, monkeypatch, capsys):
+    calls: list = []
+    _fake_tty_agent(monkeypatch, lambda port, env_path: calls.append(port) or "gemini")
+    with _Run(monkeypatch, tmp_path, "--no-tty") as run:
+        pass
+    monkeypatch.setattr(S, "_CHECK_MODULES", ("json",))
+    assert S.main(["--check", "--port", str(_free_port()), "--data-dir", str(tmp_path / "c")]) == 0
+    assert calls == [] and run.apps[0].default_provider == "auto"
+
+
+def test_ctrl_c_during_greet_stops_cleanly(tmp_path, monkeypatch, capsys):
+    def greet(port, env_path):
+        raise KeyboardInterrupt
+
+    _fake_tty_agent(monkeypatch, greet)
+    monkeypatch.setattr(S, "_has_gui", lambda: True)
+    opened: list = []
+    monkeypatch.setattr(S.webbrowser, "open", lambda url, *a, **k: opened.append(url))
+    port = _free_port()
+    assert S.main(["--open", "--port", str(port), "--data-dir", str(tmp_path / "w")]) == 0
+    assert opened == [] and "BCC Review остановлен." in capsys.readouterr().out
+    with pytest.raises(OSError), socket.create_connection(("127.0.0.1", port), timeout=2):
+        pass
 
 
 def test_no_text_browser_on_headless_linux(monkeypatch):

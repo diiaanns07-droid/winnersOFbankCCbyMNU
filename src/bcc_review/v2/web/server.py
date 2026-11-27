@@ -20,6 +20,7 @@ import re
 import shlex
 import socket
 import sys
+import threading
 import time
 import urllib.request
 import webbrowser
@@ -187,10 +188,8 @@ class Handler(BaseHTTPRequestHandler):
     app: App
     server_version = "bcc-review-web/2"
 
-    def log_message(self, fmt: str, *args: Any) -> None:  # тише в консоли
-        if any(k in (args[0] if args else "") for k in ("/api/jobs/", "/healthz")):  # №42: /healthz — без шума
-            return
-        sys.stderr.write("%s %s\n" % (self.log_date_time_string(), fmt % args))
+    def log_message(self, fmt: str, *args: Any) -> None:  # №42: журнал — в <data-dir>/web.log, в консоль только 5xx
+        _log_request_line(self, fmt % args)
 
     # ── ответы ──
     def _send(self, code: int, body: bytes, ctype: str, headers: dict[str, str] | None = None) -> None:
@@ -337,6 +336,9 @@ class _Server(ThreadingHTTPServer):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         super().server_bind()
 
+    def handle_error(self, request: Any, client_address: Any) -> None:  # №42: без трейсбэков в консоли
+        _server_error(self, client_address)
+
 
 def make_server(app: App, host: str = "127.0.0.1", port: int = 8014) -> ThreadingHTTPServer:
     handler = type("BoundHandler", (Handler,), {"app": app})
@@ -398,6 +400,124 @@ def build_app(data_dir: Path, *, provider: str = "auto", fixture: Path | None = 
 PORTS = (8014, 8030)  # №42: порт по умолчанию и последний, который пробуем, если предыдущие заняты
 # №42: --check проверяет установку — эти модули должны импортироваться из окружения (requirements.txt)
 _CHECK_MODULES = ("jsonschema", "google.genai", "anthropic", "pymupdf", "docx", "yaml")
+_LOG_LOCK = threading.Lock()
+_LOG_MAX = 2 * 1024 * 1024  # web.log больше 2 МБ — в web.log.1, начинаем заново
+
+
+def _sysenv(name: str) -> str:
+    """Переменные терминала и системы (TERM, COLORTERM, NO_COLOR, DISPLAY…) — не настройки агента: в .env.example их нет."""
+    return os.environ.get(name, "")
+
+
+# ── консоль: журнал — в файл, на экран — только то, что нужно человеку ──
+
+def _log_to_file(root: Path | None, text: str) -> None:
+    if root is None:
+        return
+    path = Path(root) / "web.log"
+    try:
+        with _LOG_LOCK:
+            if path.is_file() and path.stat().st_size > _LOG_MAX:
+                path.replace(path.with_name("web.log.1"))
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {text}\n")
+    except OSError:
+        pass
+
+
+def _app_root(handler_cls: Any) -> Path | None:
+    store = getattr(getattr(handler_cls, "app", None), "store", None)
+    return getattr(store, "root", None)
+
+
+def _log_request_line(handler: BaseHTTPRequestHandler, text: str) -> None:
+    """№42: журнал запросов — в <data-dir>/web.log; в консоль — только ответы 5xx (ошибки сервера)."""
+    if any(k in text for k in ("/api/jobs/", "/healthz")):  # опрос прогресса и проверка живости — без шума
+        return
+    root = _app_root(handler)
+    _log_to_file(root, text)
+    if re.search(r'" 5\d\d ', text):
+        _say(f"Ошибка сервера: {text.strip()} — подробности в {Path(root or '.') / 'web.log'}", err=True)
+
+
+def _server_error(server: Any, client_address: Any) -> None:
+    """№42: обрыв соединения браузером (закрыл вкладку, ушёл со страницы) — не ошибка; прочее — в web.log."""
+    exc = sys.exc_info()[1]
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        return
+    import traceback
+
+    root = _app_root(getattr(server, "RequestHandlerClass", None))
+    _log_to_file(root, f"ошибка при обработке запроса от {client_address}:\n{traceback.format_exc()}")
+    _say(f"Ошибка при обработке запроса: {type(exc).__name__}: {exc} — подробности в "
+         f"{Path(root or '.') / 'web.log'}", err=True)
+
+
+def _enable_vt(stream: Any) -> bool:
+    """Windows 10+: включить разбор ANSI-последовательностей в консоли. Нельзя — без цвета."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        k32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        handle = k32.GetStdHandle(-12 if stream is sys.stderr else -11)
+        mode = wintypes.DWORD()
+        if not k32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return False
+        return bool(mode.value & 0x0004) or bool(k32.SetConsoleMode(handle, mode.value | 0x0004))
+    except Exception:  # noqa: BLE001 — старая консоль или не Windows
+        return False
+
+
+def _color_depth(stream: Any) -> int:
+    """0 — без цвета (не терминал, NO_COLOR, TERM=dumb), 256 или 16 млн (24 бита)."""
+    try:
+        tty = bool(stream.isatty())
+    except (AttributeError, ValueError):
+        tty = False
+    if not tty or "NO_COLOR" in os.environ or _sysenv("TERM") == "dumb":
+        return 0
+    if os.name == "nt" and not _enable_vt(stream):
+        return 0
+    truecolor = _sysenv("COLORTERM") in ("truecolor", "24bit") or _sysenv("WT_SESSION") or \
+        _sysenv("TERM_PROGRAM") in ("iTerm.app", "vscode", "WezTerm")
+    return 24 if truecolor else 256
+
+
+_GREEN = ((0, 185, 117), 36)    # BCC Green #00B975 (256 цветов — ближайший)
+_GOLD = ((220, 162, 98), 179)   # BCC Gold #DCA262
+_MUTED = ((139, 152, 165), 245)
+_RED = ((224, 95, 85), 167)
+
+
+def _paint(text: str, color: tuple[tuple[int, int, int], int] | None, depth: int, *, bold: bool = False,
+           underline: bool = False) -> str:
+    if not depth:
+        return text
+    codes = (["1"] if bold else []) + (["4"] if underline else [])
+    if color:
+        (r, g, b), c256 = color
+        codes.append(f"38;2;{r};{g};{b}" if depth == 24 else f"38;5;{c256}")
+    return f"\x1b[{';'.join(codes)}m{text}\x1b[0m" if codes else text
+
+
+def _say(text: str, *, err: bool = False, color: tuple[tuple[int, int, int], int] | None = None) -> None:
+    stream = sys.stderr if err else sys.stdout
+    depth = _color_depth(stream)
+    print(_paint(text, color or (_RED if err else None), depth), file=stream, flush=True)
+
+
+def _ready_line(url: str, note: str = "", depth: int = 0) -> str:
+    """Одна строка после знакомства: «Система открыта: http://127.0.0.1:8014 · остановить — Ctrl+C»."""
+    tail = f" · {note}" if note else ""
+    return (_paint("Система открыта: ", None, depth, bold=True) + _paint(url.rstrip("/"), _GREEN, depth, bold=True)
+            + _paint(f"{tail} · остановить — Ctrl+C", _MUTED, depth))
+
+
+def _set_title(title: str) -> None:
+    if _color_depth(sys.stdout):
+        sys.stdout.write(f"\x1b]0;{title}\x07")
+        sys.stdout.flush()
 
 
 def _shown_host(host: str) -> str:
@@ -426,19 +546,41 @@ def _has_gui() -> bool:
     """Linux без графики (ssh, сервер): webbrowser запустил бы текстовый lynx/w3m прямо в этом терминале."""
     if sys.platform in ("win32", "darwin"):
         return True
-    graphics = ("DISPLAY", "WAYLAND_DISPLAY")  # системные переменные, не настройки агента (.env.example)
-    return any(os.environ.get(name) for name in graphics)
+    return bool(_sysenv("DISPLAY") or _sysenv("WAYLAND_DISPLAY"))
 
 
-def _banner(url: str, encoding: str | None = None) -> str:
-    line = f"BCC Review работает: {url.rstrip('/')} — остановить: Ctrl+C"
-    h, v, (a, b, c, d) = "═", "║", "╔╗╚╝"
-    try:  # консоль Windows с выводом в файл (cp1251) рамку не напечатает — тогда рамка ASCII
-        (line + h + v + a + b + c + d).encode(encoding or getattr(sys.stdout, "encoding", None) or "utf-8")
-    except (UnicodeEncodeError, LookupError):
-        h, v, (a, b, c, d) = "=", "|", "++++"
-    bar = h * (len(line) + 4)
-    return f"\n{a}{bar}{b}\n{v}  {line}  {v}\n{c}{bar}{d}\n"
+def _env_path() -> Path:
+    """Куда знакомство в терминале запишет ключ: тот же .env, что читает load_dotenv (текущий каталог или корень)."""
+    for p in (Path.cwd() / ".env", REPO / ".env"):
+        if p.is_file():
+            return p
+    return Path.cwd() / ".env"
+
+
+_PROVIDER_ID = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
+
+
+def _greet(port: int, root: Path) -> str:
+    """№40 — BCC AI в терминале (`tty_agent.greet`): знакомство и ключ до браузера. Возвращает выбранного провайдера.
+
+    Модуля ещё нет (до вливания №40) или знакомство упало — ничего не спрашиваем, система открывается как есть
+    (ключ тогда спросит веб). Ctrl+C во время знакомства — выход.
+    """
+    try:
+        from . import tty_agent  # type: ignore[attr-defined]  # №40
+    except ImportError:
+        return ""
+    try:
+        got = tty_agent.greet(port, _env_path())
+    except KeyboardInterrupt:
+        raise
+    except Exception as exc:  # noqa: BLE001 — знакомство не должно мешать открыть систему
+        import traceback
+
+        _log_to_file(root, f"знакомство в терминале не удалось: {exc!r}\n{traceback.format_exc()}")
+        return ""
+    got = str(got or "").strip()
+    return got if _PROVIDER_ID.match(got) and got != "auto" else ""
 
 
 def _self_check(url: str) -> int:
@@ -485,6 +627,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--open", action="store_true", help="открыть браузер, когда сервер ответит")
     ap.add_argument("--check", action="store_true",
                     help="проверить установку: поднять сервер, получить /healthz и /, выйти (0 — в порядке)")
+    ap.add_argument("--no-tty", action="store_true",
+                    help="без знакомства в терминале (ключ не спрашивать): Docker, CI, запуск из скриптов")
     a = ap.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):  # непечатаемый символ — «?», а не UnicodeEncodeError
         try:
@@ -506,34 +650,38 @@ def main(argv: list[str] | None = None) -> int:
         if running and a.open and _has_gui():
             webbrowser.open(f"http://{_shown_host(a.host)}:{a.port}/")
         return 0 if running else 2
-    if note:
-        print(note, flush=True)
-    url = f"http://{_shown_host(a.host)}:{srv.server_address[1]}/"
-
-    def announce() -> None:
-        if not _wait_ready(url):
-            print(f"Сервер не ответил на {url}healthz — откройте адрес вручную.", file=sys.stderr, flush=True)
-        print(_banner(url), flush=True)
-        if a.open and _has_gui():
-            try:
-                webbrowser.open(url)
-            except Exception:  # noqa: BLE001 — нет браузера: адрес уже напечатан
-                pass
-
-    import threading
-
-    if a.check:  # сервер — в фоне, проверка — здесь; браузер не открываем
-        threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.2}, daemon=True).start()
+    port = srv.server_address[1]
+    url = f"http://{_shown_host(a.host)}:{port}/"
+    serve = threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.25}, daemon=True)
+    serve.start()
+    if a.check:  # сервер — в фоне, проверка — здесь; знакомства и браузера нет
+        if note:
+            print(note, flush=True)
         try:
             return _self_check(url)
         finally:
             srv.shutdown()
             srv.server_close()
-    threading.Thread(target=announce, daemon=True).start()
+    _set_title("BCC Review")
     try:
-        srv.serve_forever()
+        if not a.no_tty:
+            chosen = _greet(port, app.store.root)
+            if chosen and a.provider == "auto":
+                app.default_provider = chosen  # ключ введён в терминале — браузер сразу на главной
+        if not _wait_ready(url):
+            _say(f"Сервер не ответил на {url}healthz — откройте {url} вручную.", err=True)
+        busy = f"порт {a.port} занят другой программой" if port != a.port and a.port else ""
+        print(_ready_line(url, busy, _color_depth(sys.stdout)), flush=True)
+        if a.open and _has_gui():
+            try:
+                webbrowser.open(url)
+            except Exception:  # noqa: BLE001 — нет браузера: адрес уже напечатан
+                pass
+        while serve.is_alive():  # join с таймаутом: Ctrl+C на Windows срабатывает сразу
+            serve.join(0.5)
     except KeyboardInterrupt:
-        print("\nОстановлено.", flush=True)
+        _say("\nBCC Review остановлен.", color=_MUTED)
     finally:
+        srv.shutdown()
         srv.server_close()
     return 0
