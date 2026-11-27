@@ -433,3 +433,23 @@ def test_salvaged_whole_items_when_split_impossible():
         run(None)
     with pytest.raises(Truncated):
         run({"candidates": "не массив"})  # целые элементы не проходят схему — не берём
+
+
+def test_runs_passes_on_different_models_warned_and_shown():
+    """Просьба №24: на бесплатном ключе Gemini проходы ``--runs N`` идут на разных моделях (суточная квота) —
+    модель каждого прохода в таблице, предупреждение в отчёте; статусы проходов — по-русски."""
+    from bcc_review.v2 import stability
+    f = {"id": "D-01", "kind": "k", "evidence": [{"line_start": 3}], "title": "t"}
+    base = {"run": {"status": "complete", "models_used": ["gemini-3.8-flash"]}, "findings": [f], "requirements": [],
+            "verdict": {}}
+    same = {"run": {"status": "partial", "models_used": ["gemini-3.8-flash"]}, "findings": [dict(f)]}
+    other = {"run": {"status": "complete", "models_used": ["gemini-3.7-flash"]}, "findings": [dict(f)]}
+    rep = stability.merge(base, [same, other], 3)
+    assert [p["models_used"] for p in rep["stability"]["passes"]] == [["gemini-3.8-flash"]] * 2 + [["gemini-3.7-flash"]]
+    assert any("разных моделях" in w and "3: gemini-3.7-flash" in w for w in rep["run"]["warnings"])
+    md = stability.markdown(rep)
+    assert "| 2 | частично | gemini-3.8-flash | 1 |" in md and "complete" not in md and "partial" not in md
+    fresh = {"run": {"status": "complete", "models_used": ["gemini-3.8-flash"]}, "findings": [dict(f)],
+             "requirements": [], "verdict": {}}
+    one = stability.merge(fresh, [same], 2)
+    assert not any("разных моделях" in w for w in one["run"].get("warnings") or [])
