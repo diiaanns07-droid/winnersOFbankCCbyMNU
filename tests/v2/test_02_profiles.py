@@ -104,7 +104,7 @@ def test_rpm_window_is_sliding_and_per_model():
 
 def test_rpm_from_profile_and_env_and_off():
     clock = Clock()
-    assert provider(clock).rpm_for("gemini-3.8-flash") == 10
+    assert provider(clock).rpm_for("gemini-3.8-flash") == 5   # бесплатный 3.8 Flash: 5 в минуту, 20 в сутки
     assert provider(clock).rpm_for("gemini-3.5-flash-lite") == 15
     assert provider(clock, env={"GEMINI_RPM": "4"}).rpm_for("gemini-3.8-flash") == 4
     off = provider(clock, env={"GEMINI_RPM": "0"})

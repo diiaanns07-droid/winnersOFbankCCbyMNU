@@ -3,8 +3,11 @@
 Профиль выбирается по имени модели (``for_model``); переменные окружения и опции CLI важнее профиля.
 Каждое число здесь — из замера (``docs/plan-v2/status/02.md``, раздел «Волна 3»):
 
-* **Gemini Flash** — бесплатный тариф: окно 10 запросов в минуту на модель, все 5 параллельных этапов разом
-  (модель времени ``tests/v2/test_02_wallclock.py``); рассуждения ``medium`` (Gemini 3) / бюджет 4096 (2.5);
+* **Gemini Flash** — бесплатный тариф: окно **5 запросов в минуту** на модель (AI Studio, октябрь 2026: у
+  ``gemini-3.8-flash`` 5 в минуту и 20 в сутки на проект; суточные 20 подтвердил живой 429 F3). Быстрый старт
+  шлёт 6 запросов за 8 с: при окне 10 шестой получал 429 и тратил запрос из 20 суточных, при окне 5 он ждёт
+  освобождения окна (это самая короткая линза — критический путь не растёт, модель времени
+  ``tests/v2/test_02_wallclock.py``); все 5 параллельных этапов разом; рассуждения ``medium`` (Gemini 3) / бюджет 4096 (2.5);
   лимит ответа 65 536 — потолок модели (haiku на наборе выдал 34,5 тыс. токенов с рассуждением: 32 000 мало).
 * **Gemini Flash-Lite** — 15 запросов в минуту; рассуждения как у Flash (модель отвергнет — провайдер
   повторит без них).
@@ -24,13 +27,13 @@ from typing import Any
 __all__ = ["PROFILES", "STAGE_EFFORT", "claude_effort", "family", "for_model", "gemini_max_output", "gemini_thinking"]
 
 PROFILES: dict[str, dict[str, Any]] = {
-    "gemini-flash": {"rpm": 10, "concurrency": 5, "max_output_tokens": 65536,
+    "gemini-flash": {"rpm": 5, "concurrency": 5, "max_output_tokens": 65536,
                      "thinking_level": "medium", "thinking_budget": 4096},
     "gemini-flash-lite": {"rpm": 15, "concurrency": 5, "max_output_tokens": 65536,
                           "thinking_level": "medium", "thinking_budget": 4096},
     "gemini-pro": {"rpm": 5, "concurrency": 2, "max_output_tokens": 65536,
                    "thinking_level": "medium", "thinking_budget": 4096},
-    "gemini": {"rpm": 10, "concurrency": 5, "max_output_tokens": 65536,
+    "gemini": {"rpm": 5, "concurrency": 5, "max_output_tokens": 65536,
                "thinking_level": "medium", "thinking_budget": 4096},
     "haiku": {"effort": "low", "max_output_tokens": 64000},
     "sonnet": {"effort": None, "max_output_tokens": 64000},
