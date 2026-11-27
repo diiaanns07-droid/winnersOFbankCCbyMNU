@@ -35,7 +35,7 @@ DEFAULTS: dict[str, Any] = {
     "timeout": 600.0, "max_retries": 5, "cache": True, "cache_dir": None, "runs_dir": "runs", "run_id": None,
     "export": [], "html": True, "answers": None, "revise": False, "passes": 1, "parallel": 5,
     "mock_dir": None, "lenses": list(LENSES), "consistency": True, "clarify": True, "judge_check": True,
-    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": False,
+    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": None,
     "clarify_early": True,
 }
 # Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
@@ -46,6 +46,8 @@ LONGEST_FIRST = ["architect", "analyst", "risk", "qa"]
 # эвристики кода; на официальном документе она совпадает с нарезкой моделью по строкам и видам (42 против 40).
 HEURISTIC_TABLE = "heuristic"
 FAST_START_MIN_REQUIREMENTS = 5
+# «Проба» быстрого старта, с: отказ ключа, квоты и сети приходит за 1–3 с, нарезка моделью идёт 15–60 с
+FAST_START_PROBE_S = 8.0
 
 
 # --------------------------------------------------------------------------- вспомогательное
@@ -204,6 +206,7 @@ class Pipeline:
         self.ctx: Context | None = None
         self.provider_name = ""
         self.model_error = ""
+        self.fast_start_used = False
 
     # ------------------------------------------------------------------ один этап
 
@@ -312,7 +315,12 @@ class Pipeline:
                 report["run"]["warnings"] = _uniq([self.model_error] + list(report["run"].get("warnings") or []))
             return report
 
-        heur = self._fast_start_table(view) if opts.get("fast_start") else None
+        fast = opts.get("fast_start")
+        # None (по умолчанию) — быстрый старт с «пробой»: рецензенты стартуют, только если нарезка моделью идёт
+        # дольше FAST_START_PROBE_S без фатальной ошибки (неверный ключ, квота, сеть дают отказ за секунды — тогда
+        # рецензенты не шлют 5 лишних запросов). True — старт сразу, False — рецензенты ждут нарезку.
+        heur = self._fast_start_table(view) if fast is not False else None
+        seg: dict | None = None
         if heur is not None:
             # 1–3, быстрый старт: нарезка моделью идёт параллельно с рецензентами; рецензенты работают по таблице
             # эвристики кода, после нарезки ссылки R-ID переводятся на ID нарезки по строкам (_remap_reviewers)
@@ -323,12 +331,19 @@ class Pipeline:
                 rctx.signals = (self._rules(view, heur) or {}).get("signals") or []
             except Exception:  # noqa: BLE001 — без сигналов рецензенты работают как обычно
                 rctx.signals = []
+            outs = {}
             with cf.ThreadPoolExecutor(max_workers=1) as pool:
                 seg_future = pool.submit(self.stage, "segment", lambda: self._segment(ctx),
                                          inputs={"lines": len(view.get("lines") or [])},
                                          empty={"requirements": [], "excluded": []})
-                outs = self._parallel_reviewers(rctx, tag=HEURISTIC_TABLE)
+                started = fast is True or self._probe(seg_future, llm)
+                if started:
+                    self.fast_start_used = True
+                    outs = self._parallel_reviewers(rctx, tag=HEURISTIC_TABLE)
                 seg = seg_future.result()
+            if not started:
+                heur = None  # нарезка уже есть (или модель недоступна): обычный путь ниже, без перевода ссылок
+        if heur is not None and seg is not None:
             if not seg.get("requirements"):
                 seg = self._heuristic_segment(view, seg)
             ctx.requirements = seg.get("requirements") or []
@@ -340,9 +355,11 @@ class Pipeline:
             except Exception as exc:  # noqa: BLE001 — перевод ссылок не этап модели: прогон не роняет
                 self.warnings.append(f"Ссылки рецензентов на таблицу эвристики не переведены: {type(exc).__name__}: {exc}")
         else:
-            # 1. нарезка (при сбое — эвристика кода, прогон partial)
-            seg = self.stage("segment", lambda: self._segment(ctx), inputs={"lines": len(view.get("lines") or [])},
-                             empty={"requirements": [], "excluded": []})
+            # 1. нарезка (при сбое — эвристика кода, прогон partial); после неудачной «пробы» она уже сделана
+            if seg is None:
+                seg = self.stage("segment", lambda: self._segment(ctx),
+                                 inputs={"lines": len(view.get("lines") or [])},
+                                 empty={"requirements": [], "excluded": []})
             if not seg.get("requirements"):
                 seg = self._heuristic_segment(view, seg)
             ctx.requirements = seg.get("requirements") or []
@@ -443,6 +460,18 @@ class Pipeline:
     def _consistency(self, ctx: Context) -> dict:
         from .stages import consistency
         return consistency.run(ctx)
+
+    def _probe(self, fut: "cf.Future", llm: Any) -> bool:
+        """Запускать ли рецензентов до конца нарезки: да, если нарезка идёт дольше пробы и модель отвечает
+        (нет фатальной ошибки). Нарезка закончилась раньше — нет: дальше обычный путь по таблице модели."""
+        deadline = time.monotonic() + float(self.opts.get("fast_start_probe", FAST_START_PROBE_S) or 0)
+        while True:
+            if fut.done() or getattr(llm, "fatal", None) is not None:
+                return False
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return True
+            cf.wait([fut], timeout=min(0.25, left))
 
     def _fast_start_table(self, view: dict) -> dict | None:
         """Таблица требований эвристики кода для быстрого старта рецензентов; None — ждать нарезку моделью
@@ -690,6 +719,7 @@ class Pipeline:
                 "calls": s["calls"], "tokens": s["tokens"], "cost_usd": s["cost_usd"], "status": status,
                 "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
                 "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts,
+                "fast_start": self.fast_start_used,
                 **({"model_error": self.model_error} if self.model_error else {})}
 
     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
