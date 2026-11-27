@@ -573,7 +573,7 @@ def codes_of(checks: list[dict]) -> list[str]:
     return sorted({m for c in checks if not c.get("info") for m in _SHA.findall(str(c.get("source") or ""))})
 
 
-def history_line(rows: list[dict] | None, last: int = 6) -> str:
+def history_line(rows: list[dict] | None, last: int = 8) -> str:
     """Ворота по времени из gate_history.jsonl: подряд одинаковый счёт — одна запись (последняя), код — если записан
     (в записях до 16:56 27.11 кода нет)."""
     out: list[dict] = []

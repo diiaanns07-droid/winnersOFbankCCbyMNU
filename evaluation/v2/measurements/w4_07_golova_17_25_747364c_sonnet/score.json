@@ -41,8 +41,8 @@
       "major": 12,
       "minor": 11
     },
-    "duplicates": 1,
-    "parts": 0,
+    "duplicates": 0,
+    "parts": 1,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -155,13 +155,13 @@
   },
   "precision": {
     "matched": 27,
-    "duplicates": 1,
-    "parts": 0,
+    "duplicates": 0,
+    "parts": 1,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.964,
+    "precision_useful": 1.0,
     "precision_gold": 0.964
   },
   "severity": {
@@ -742,10 +742,15 @@
       "how": "детерминированно"
     }
   ],
-  "duplicates": [
+  "duplicates": [],
+  "parts": [
     {
       "finding": "D-16",
-      "gold": "К3",
+      "gold": "С2",
+      "parts": [
+        "открытый перечень «400, 401 и далее»"
+      ],
+      "credited": "D-17",
       "title": "Перечень кодов успеха и ошибки неполон и неточен",
       "sources": [
         "rules:api.status_201",
@@ -753,7 +758,6 @@
       ]
     }
   ],
-  "parts": [],
   "outside": [],
   "misses": [
     {
@@ -1215,13 +1219,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 36.5,
-    "cost_usd": 0.2530016,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 36.95,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_17_25/runs/20261127-172049-089b"
+  "seconds": 0.6,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_17_25/runs/20261127-172049-089b",
+  "rescored_at": "2026-11-27 17:26"
 }

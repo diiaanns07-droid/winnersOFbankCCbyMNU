@@ -414,7 +414,9 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         if cand:
             cand.sort(key=lambda x: (-x[0], x[1]))
             dups[f["id"]] = cand[0][1]
-    part_of = split_parts(assign, dups, edges, by_id, fmap)
+    # кандидаты в части — все строгие рёбра (до focus): «Перечень кодов: 201 не описан, «и далее»» ближе всего к К3
+    # по строкам L151/L165, но по заголовку это другая часть С2, чем засчитанное «403 или 404»
+    part_of = split_parts(assign, dups, edges_all, by_id, fmap)
     outside = [f for f in findings if f["id"] not in f2g and f["id"] not in dups and f["id"] not in part_of]
 
     # ─── метрики ───

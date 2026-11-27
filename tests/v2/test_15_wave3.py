@@ -461,3 +461,19 @@ def test_rescore_rewrites_history_rows_in_place(tmp_path, monkeypatch):
     assert got[0]["at"] == "2026-11-27 16:15" and got[0]["label"] == "замер: abc1234, sonnet"
     assert got[0]["duplicates"] == 0 and got[0]["parts"] == 2 and "rescored_at" in got[0]
     assert measure._rewrite_history({}) == 0
+
+
+def test_part_candidate_may_be_outside_focus():
+    """Перечень кодов «201 не описан, «и далее»» ближе к К3 по строкам L151/L165, но по заголовку — другая часть С2,
+    чем засчитанное «403 или 404»: часть, а не дубль К3 (живой отчёт sonnet на 747364c)."""
+    import json as _json
+
+    from evaluation.v2 import score as sc
+    from evaluation.v2.common import ROOT
+
+    gold = sc.load_gold(sc.DEFAULT_GOLD)
+    rep = _json.loads((ROOT / "evaluation/v2/measurements/w4_07_golova_17_25_747364c_sonnet/report.json")
+                      .read_text(encoding="utf-8"))
+    res = sc.score_report(rep, gold, arbiter="off")
+    assert {p["finding"]: p["gold"] for p in res["parts"]} == {"D-16": "С2"}
+    assert res["precision"]["duplicates"] == 0 and res["recall"]["major"]["n"] == 17
