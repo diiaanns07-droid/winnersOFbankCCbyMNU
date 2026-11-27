@@ -193,3 +193,14 @@ def test_full_answer_still_resolves():
     resp = _resp([{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "срок задан ответом Q-03"}])
     clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), text)["clarification"]
     assert next(c for c in clar["changes"] if c["finding_id"] == "D-03")["status"] == "resolved"
+
+
+@pytest.mark.parametrize("text", ["Q-03: B, но что после срока — решим позже", "Q-03: B. Пока не знаю, как считать срок"])
+def test_deferred_comment_to_letter_is_not_rule(text):
+    a = recheck.resolve_answers(QS, recheck.load_answers(text))["answered"][0]
+    assert a["choice"] == "B" and a["answer"] == "48 часов" and a["deferred"]
+
+
+def test_plain_comment_to_letter_is_kept():
+    a = recheck.resolve_answers(QS, recheck.load_answers("Q-03: B — считаем от первого запроса"))["answered"][0]
+    assert a["answer"] == "48 часов (считаем от первого запроса)" and a["deferred"] == []

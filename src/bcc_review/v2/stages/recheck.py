@@ -353,7 +353,11 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             why = "откладывает решение" if deferred else "не задаёт правила"
             warnings.append(f"recheck: ответ на {q['id']} {why} — вопрос остаётся открытым")
             continue
-        comment = a.get("comment") or ""
+        comment, later = split_deferred(a.get("comment") or "")
+        if a.get("comment") and not comment and not later:
+            comment = a["comment"]
+        # «Б, но что после срока — решим позже»: буква — правило, отложенная оговорка — не правило
+        deferred = deferred + [re.sub(r"^(?:но|однако|а)\s+", "", x, flags=re.I) for x in later]
         full = text + (f" ({comment})" if comment else "")
         if q["id"] in answered:  # ещё одна реплика на тот же вопрос — отдельно, пересмотр сверяет их
             prev = answered[q["id"]]
