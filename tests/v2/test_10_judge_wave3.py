@@ -201,8 +201,15 @@ def test_single_reviewer_major_confirmed_by_structured_origin_or_same_lines():
     by_title = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
     assert by_title["C-003"] == "major"  # строка приёмки исполнена линзой
     assert by_title["C-006"] == "minor"
-    # F02 подтверждён кандидатом другого ревьюера на тех же строках в соседнем дефекте
-    assert by_title["C-004"] == "major"
+    # №10-Б: одной общей строки мало — соседний кандидат подтверждает major при ≥ 2 общих строках и том же виде
+    assert by_title["C-004"] == "minor"
+    cs = _three_sources()
+    cs[3] = {**cs[3], "evidence": cs[3]["evidence"] + [{**cs[3]["evidence"][0], "line": 31, "line_start": 31,
+                                                         "line_end": 31, "quote": "Код ответа"}]}
+    cs.append({**cs[3], "id": "C-005", "source": "lens:risk"})
+    res, _ = run([finding("F01", ["C-003"], severity="major"), finding("F02", ["C-004"], severity="major"),
+                  finding("F03", ["C-005"], severity="minor")], cs)
+    assert {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}["C-004"] == "major"
 
 
 def test_major_rule_needs_three_sources_and_can_be_switched_off():
