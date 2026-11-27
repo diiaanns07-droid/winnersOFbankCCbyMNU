@@ -769,6 +769,10 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                         "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
                         "level": _level(b) if b.get("kind") == "heading" else 0,
                         "heading": b.get("kind") == "heading"})
+    if sizes:
+        out, repeated = _drop_repeated_headers(out)
+        if repeated:
+            warnings.append(f"Шапка таблицы, повторённая на новой странице, убрана: {repeated}.")
     out, toc = drop_toc(out)
     if toc:
         warnings.append(f"Оглавление убрано из текста ({toc} строк): оно повторяет заголовки разделов.")
@@ -804,6 +808,33 @@ def _demote_letterless_headings(blocks: list[dict]) -> list[dict]:
             b.pop("level", None)
         out.append(b)
     return out
+
+
+def _drop_repeated_headers(lines: list[dict]) -> tuple[list[dict], int]:
+    """Таблица, перенесённая на следующую страницу, в PDF повторяет шапку: в Markdown и DOCX шапка одна. Строка шапки
+    в начале новой страницы, если над ней — строка той же таблицы (того же числа колонок) и шапка совпадает с шапкой
+    этой таблицы, — повтор, а не новая таблица; убирается, номера строк идут подряд."""
+    out: list[dict] = []
+    header: dict | None = None      # шапка текущей таблицы
+    dropped = 0
+    for ln in lines:
+        kind = ln.get("kind")
+        prev = next((x for x in reversed(out) if x["text"].strip()), None)
+        if kind == "table_header" and header is not None and prev is not None and prev.get("kind") == "table_row" \
+                and ln.get("page") and prev.get("page") and ln["page"] != prev["page"] \
+                and _norm_key(ln["text"]) == _norm_key(header["text"]) \
+                and len(_cells(ln["text"])) == len(_cells(prev["text"])):
+            dropped += 1
+            continue
+        if kind == "table_header":
+            header = ln
+        elif kind != "table_row" and ln["text"].strip():
+            header = None
+        out.append(ln)
+    if dropped:
+        for i, ln in enumerate(out, 1):
+            ln["n"] = i
+    return out, dropped
 
 
 _TOC_ENTRY = re.compile(r"^(?P<title>.*?\S)(?:\s*(?:\.{2,}|…+|_{3,}|·{3,}))?\s*(?P<page>\d{1,4})\s*$")

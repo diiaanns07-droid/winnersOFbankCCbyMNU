@@ -194,3 +194,30 @@ def test_pdf_line_wrapped_before_dash_continues_sentence(tmp_path):
            "digits of the card number." in texts, texts
     # перечень после двоеточия — по-прежнему отдельные пункты
     assert texts[-3:] == ["R-8. The list of states:", "\u2014 active;", "\u2014 blocked."], texts
+
+
+def test_pdf_repeated_table_header_on_new_page_dropped():
+    def ln(n, text, kind, page):
+        return {"n": n, "text": text, "kind": kind, "page": page, "section": "M", "heading": False, "level": 0}
+    lines = [ln(1, "Field | Value", "table_header", 1), ln(2, "Type | POST", "table_row", 1),
+             ln(3, "Field | Value", "table_header", 2), ln(4, "Body | JSON", "table_row", 2),
+             ln(5, "Text after.", "paragraph", 2), ln(6, "Field | Value", "table_header", 3),
+             ln(7, "Type | GET", "table_row", 3)]
+    out, n = dv._drop_repeated_headers(lines)
+    assert n == 1
+    assert [x["text"] for x in out] == ["Field | Value", "Type | POST", "Body | JSON", "Text after.", "Field | Value",
+                                        "Type | GET"]
+    assert [x["n"] for x in out] == list(range(1, 7))
+
+
+CORPUS = __import__("pathlib").Path(__file__).resolve().parents[2] / "evaluation" / "dev" / "corpus" / "cases"
+
+
+@needs_pdf
+@needs_docx
+@pytest.mark.parametrize("case", sorted(p.parent.name for p in CORPUS.glob("*/source.pdf")
+                                        if (p.parent / "source.docx").is_file() and (p.parent / "source.md").is_file()))
+def test_corpus_three_formats_read_alike(case, capsys):
+    from evaluation.v2 import formats
+    d = CORPUS / case
+    assert formats.reading_diff([d / "source.md", d / "source.pdf", d / "source.docx"]) == 0, capsys.readouterr().out
