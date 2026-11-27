@@ -30,8 +30,28 @@ from __future__ import annotations
 import re
 from typing import Any
 
+try:  # тесты №05 загружают этот файл отдельно, без пакета
+    from bcc_review.v2.types import CANDIDATE_SCHEMA, INT, STR, obj
+except ImportError:  # pragma: no cover
+    CANDIDATE_SCHEMA, INT, STR = None, {"type": "integer"}, {"type": "string"}
+
+    def obj(props: dict, required: list | None = None) -> dict:
+        return {"type": "object", "additionalProperties": False, "properties": props,
+                "required": list(props) if required is None else required}
+
 MAX_CANDIDATES = 12
 MAX_OUTPUT_TOKENS = 32000  # `lens.run` берёт его из модуля: рассуждение слабой модели + JSON
+
+# Обход тем до кандидатов (№28, v28a): слабая модель по списку «перед ответом: покрытие» в тексте задания
+# рассматривала темы через раз (С8 «противоположная ветка при смене настройки», С9 «период ограничения частоты» —
+# 0–1 из 3 прогонов haiku); запись на каждую тему в самом ответе — как `nfr_checks` у линзы «Тестировщик».
+COVERAGE_TOPICS = ["event", "period", "branch", "reversal", "value", "screen", "actor", "unit", "list", "nfr"]
+COVERAGE_VERDICTS = ["answered", "derivable", "open"]
+COVERAGE_SCHEMA = obj({"topic": {"type": "string", "enum": COVERAGE_TOPICS}, "quote": STR, "line": INT,
+                       "question": STR, "answer": STR,
+                       "verdict": {"type": "string", "enum": COVERAGE_VERDICTS}})
+SCHEMA = obj({"coverage": {"type": "array", "items": COVERAGE_SCHEMA},
+              "candidates": {"type": "array", "items": CANDIDATE_SCHEMA}}) if CANDIDATE_SCHEMA else None
 MAX_CRITICAL = 2
 MATURE_MIN_SIGNS = 3
 MATURE_MAX_OTHER_MAJOR = 0
