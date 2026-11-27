@@ -1,0 +1,35 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.md /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_3/report.md --provider claude_cli --model sonnet --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 30 дефектов (критичных 5, существенных 14, незначительных 11), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, останавливают разработку и тестирование, D-05 — только разработку:
+  D-01 Не определено, какое событие покупки запускает пересчёт и push
+  D-02 Критерий приёмки №2 противоречит правилу Ф-2 о месяце
+  D-03 Ф-3 и Ф-4 по-разному определяют число push за месяц
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 2 мин 52 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 82 из 82
+Отчёт: /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_3/report.md и /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_3/report.json
+HTML: /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_3/report.html
+
+--- stderr
+Документ: release/input/requirements.md
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  segment: готово за 17 с, вызовов 1
+  lens_analyst: готово за 39 с, вызовов 1, кандидатов 7
+  lens_risk: готово за 41 с, вызовов 1, кандидатов 8
+  lens_qa: готово за 48 с, вызовов 1, кандидатов 5
+  consistency: готово за 49 с, вызовов 1, кандидатов 12
+  lens_architect: готово за 65 с, вызовов 1, кандидатов 11
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 58
+  judge: запуск
+  judge: готово за 98 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
