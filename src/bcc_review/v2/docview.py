@@ -159,6 +159,10 @@ def load(path: str | Path) -> dict:
     if fmt == "docx":
         warnings += _docx_revisions(data)
         try:
+            _docx_code_lines(data, doc or {}, lines)
+        except Exception:  # noqa: BLE001 — вид «код» необязателен: без него строка остаётся абзацем
+            pass
+        try:
             _docx_bold_headings(data, doc or {}, lines)
         except Exception:  # noqa: BLE001 — подзаголовки жирным необязательны
             pass
@@ -334,6 +338,78 @@ def _docx_bold_headings(data: bytes, doc: dict, lines: list[dict]) -> int:
                 break
             x["section"] = sec
         found += 1
+    return found
+
+
+_MONO_FONT = re.compile(r"mono|courier|consolas|menlo|monaco|lucida\s*console|source\s*code|fira\s*code|"
+                        r"jetbrains|inconsolata|cascadia|liberation\s*mono|ocr\s*a", re.I)
+_CODE_STYLE = re.compile(r"code|verbatim|preformat|macro|listing|листинг|(?<![а-яё])код(?![а-яё])", re.I)
+
+
+def _docx_code_lines(data: bytes, doc: dict, lines: list[dict]) -> int:
+    """Блок кода в Word — абзац, набранный моноширинным шрифтом (Consolas, Courier…) или стилем кода («Source Code»,
+    «HTML Preformatted», «Macro Text»). Читатель v1 видит в нём обычный абзац, а Markdown и PDF — код (```, шрифт
+    Mono): тогда правила языка читали бы JSON как текст требования, а нарезка — как требование. Такие абзацы тела
+    получают вид ``code``. Возвращает число строк."""
+    import io
+    import xml.etree.ElementTree as ET
+    import zipfile
+    blocks = {b.get("id"): b for b in doc.get("blocks") or [] if isinstance(b, dict)}
+    cand: dict[int, int] = {}
+    for i, ln in enumerate(lines):
+        if ln.get("kind") != "paragraph" or not ln["text"].strip():
+            continue
+        m = _BODY_P.match(str(((blocks.get(ln.get("block_id")) or {}).get("loc") or {}).get("path") or ""))
+        if m:
+            cand[i] = int(m.group(1))
+    if not cand:
+        return 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        body = ET.fromstring(z.read("word/document.xml")).find(f"{_W}body")
+        try:
+            styles = ET.fromstring(z.read("word/styles.xml"))
+        except KeyError:
+            styles = None
+    paras = [el for el in body if el.tag == f"{_W}p"] if body is not None else []
+
+    def fonts(rpr) -> str:
+        f = rpr.find(f"{_W}rFonts") if rpr is not None else None
+        return " ".join(f.get(f"{_W}{k}") or "" for k in ("ascii", "hAnsi")) if f is not None else ""
+
+    style_mono: dict[str, bool] = {}
+    style_code: dict[str, bool] = {}
+    if styles is not None:
+        for st in styles.iter(f"{_W}style"):
+            sid = st.get(f"{_W}styleId") or ""
+            name = (st.find(f"{_W}name").get(f"{_W}val") if st.find(f"{_W}name") is not None else "") or ""
+            style_mono[sid] = bool(_MONO_FONT.search(fonts(st.find(f"{_W}rPr"))))
+            style_code[sid] = bool(_CODE_STYLE.search(f"{sid} {name}"))
+
+    def is_code(par) -> bool:
+        ppr = par.find(f"{_W}pPr")
+        ps = ppr.find(f"{_W}pStyle") if ppr is not None else None
+        sid = ps.get(f"{_W}val") if ps is not None else ""
+        if sid and style_code.get(sid):
+            return True
+        runs = [r for r in par.iter(f"{_W}r") if "".join(t.text or "" for t in r.iter(f"{_W}t")).strip()]
+        if not runs:
+            return False
+        for r in runs:
+            rpr = r.find(f"{_W}rPr")
+            rs = rpr.find(f"{_W}rStyle") if rpr is not None else None
+            if rs is not None and style_code.get(rs.get(f"{_W}val") or ""):
+                continue  # знаковый стиль кода («Verbatim Char»)
+            f = fonts(rpr) or (" ".join(("mono" if style_mono.get(x) else "") for x in (
+                rs.get(f"{_W}val") if rs is not None else "", sid) if x))
+            if not _MONO_FONT.search(f):
+                return False
+        return True
+
+    found = 0
+    for i, k in cand.items():
+        if 1 <= k <= len(paras) and is_code(paras[k - 1]):
+            lines[i]["kind"] = "code"
+            found += 1
     return found
 
 
@@ -635,7 +711,7 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
     (верх/низ страницы, одинаковый текст на большинстве страниц, номер страницы не в счёт) убираются.
     DOCX: у пунктов автонумерации Word в начало строки ставится номер («1.», «2.1.»), как его видит читатель.
     """
-    blocks = [b for b in doc.get("blocks") or [] if isinstance(b, dict)]
+    blocks = _demote_letterless_headings([b for b in doc.get("blocks") or [] if isinstance(b, dict)])
     warnings = warnings if warnings is not None else []
     if sizes:
         try:
@@ -696,6 +772,37 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
     out, toc = drop_toc(out)
     if toc:
         warnings.append(f"Оглавление убрано из текста ({toc} строк): оно повторяет заголовки разделов.")
+    return out
+
+
+_LETTER = re.compile(r"[^\W\d_]")
+
+
+def _demote_letterless_headings(blocks: list[dict]) -> list[dict]:
+    """«Заголовок» без единой буквы — жирная метка («404», «2.1», «—»), а не раздел: PDF считает заголовком любую
+    короткую жирную строку крупнее текста, а в Markdown и DOCX та же метка — абзац. Такой блок становится абзацем
+    и остаётся в разделе предыдущего блока; следующие блоки, которые читатель отнёс к «разделу» метки, — тоже."""
+    out: list[dict] = []
+    false_path: list[str] | None = None
+    keep: list[str] = []
+    for b in blocks:
+        sec = [str(x) for x in (b.get("section") or [])]
+        if false_path is not None:
+            if sec[:len(false_path)] == false_path:
+                b = {**b, "section": keep + sec[len(false_path):]}
+                sec = b["section"]
+            else:
+                false_path = None
+        if b.get("kind") == "heading" and str(b.get("text") or "").strip() \
+                and not _LETTER.search(str(b.get("text") or "")):
+            head = _clean(str(b.get("text") or "")).strip()
+            path = sec if sec and sec[-1] == head else sec + [head]
+            prev = [str(x) for x in (out[-1].get("section") or [])] if out else sec[:-1]
+            false_path, keep = path, prev
+            loc = {k: v for k, v in (b.get("loc") or {}).items() if k not in ("level", "heading_level")}
+            b = {**b, "kind": "paragraph", "section": prev, "loc": loc}
+            b.pop("level", None)
+        out.append(b)
     return out
 
 
