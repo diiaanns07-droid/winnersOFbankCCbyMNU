@@ -106,9 +106,13 @@ def test_not_requirements_gives_no_verdict(tmp_path, capsys, name, provider):
 
 
 def test_gate_passes_every_real_tz_in_corpora():
-    """Ни одно настоящее ТЗ (официальное, чистые, открытые, стресс-фикстуры) не считается «не ТЗ»."""
-    files = [OFFICIAL, *sorted((ROOT / "evaluation" / "v2" / "clean").glob("*/source.md")),
+    """Ни одно настоящее ТЗ (официальное в md/pdf/docx, чистые, открытые, кейсы dev-корпуса, стресс-фикстуры)
+    не считается «не ТЗ» — ноль ложных срабатываний защиты (№62)."""
+    files = [*sorted(OFFICIAL.parent.glob("requirements.*")),
+             *sorted((ROOT / "evaluation" / "v2" / "clean").glob("*/source.*")),
              *sorted((ROOT / "evaluation" / "v2" / "open2").glob("*/*.md")),
+             *sorted((ROOT / "evaluation" / "v2" / "open2").glob("*/source.*")),
+             *sorted((ROOT / "evaluation" / "dev" / "corpus" / "cases").glob("*/source.*")),
              *sorted((ROOT / "tests" / "v2" / "fixtures" / "03_stress").glob("*.*")),
              *sorted((ROOT / "tests" / "v2" / "fixtures" / "25_zoo").glob("*.*"))]
     flagged = []
@@ -124,7 +128,27 @@ def test_gate_passes_every_real_tz_in_corpora():
         a = intake.assess(view)
         if a["kind"] != "ok":
             flagged.append((f.name, a["kind"], a["signals"]))
-    assert len(files) > 20
+    assert len(files) > 100
+    assert not flagged, flagged
+
+
+def test_gate_passes_each_section_of_real_tz(tmp_path):
+    """Жюри может прислать часть ТЗ: каждый раздел «## …» настоящего ТЗ отдельным файлом — тоже «ok»."""
+    files = [OFFICIAL, *sorted((ROOT / "evaluation" / "v2" / "clean").glob("*/source.md")),
+             *sorted((ROOT / "evaluation" / "v2" / "open2").glob("*/source.md")),
+             *sorted((ROOT / "evaluation" / "dev" / "corpus" / "cases").glob("*/source.md"))]
+    flagged, n = [], 0
+    for f in files:
+        for i, part in enumerate(re.split(r"(?m)^(?=##\s)", f.read_text(encoding="utf-8"))):
+            if len(part.split()) < 30:
+                continue
+            q = tmp_path / f"s{n}.md"
+            q.write_text(part, encoding="utf-8")
+            n += 1
+            a = intake.assess(docview.load(q))
+            if a["kind"] != "ok":
+                flagged.append((f.parent.name, i, a["kind"], part.strip().splitlines()[0][:60]))
+    assert n > 80
     assert not flagged, flagged
 
 
