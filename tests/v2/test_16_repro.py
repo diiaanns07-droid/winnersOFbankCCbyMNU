@@ -230,3 +230,31 @@ def test_segment_document_caches_are_reused():
     assert segment._doc_latin(view) is segment._doc_latin(view)
     if hasattr(segment, "_by_n"):
         assert segment._by_n(view) is segment._by_n(view)
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, патч 01_fast_start_repeatable.patch): «проба» быстрого "
+                                        "старта при нарезке из кэша выбирает другой путь — повтор не из кэша")
+def test_fast_start_decision_is_replayed_when_segment_comes_from_cache(tmp_path):
+    """Живой прогон записывает решение «пробы»; повтор с нарезкой из кэша идёт тем же путём, даже если проба
+    (нарезка закончилась мгновенно) сказала бы «обычный путь»."""
+    import concurrent.futures as cf
+
+    from bcc_review.v2 import pipeline
+
+    p = pipeline.Pipeline.__new__(pipeline.Pipeline)
+    p.provider_name = "claude_cli"
+
+    class FakeLLM:
+        cache_dir = tmp_path
+        model = "sonnet"
+        fatal = None
+        stats = {"by_stage": {"segment": {"calls": 1, "cached": 0}}}
+
+    done: cf.Future = cf.Future()
+    done.set_result({})
+    view = {"sha256": "ab" * 32}
+    assert p._fast_start_decision(view, FakeLLM(), done, True) is True       # живой прогон: быстрый старт
+    FakeLLM.stats = {"by_stage": {"segment": {"calls": 0, "cached": 1}}}      # повтор: нарезка из кэша
+    assert p._fast_start_decision(view, FakeLLM(), done, False) is True      # путь тот же
+    other = {"sha256": "cd" * 32}                                              # другой документ — решения нет
+    assert p._fast_start_decision(other, FakeLLM(), done, False) is False
