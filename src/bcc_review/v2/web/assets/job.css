@@ -70,7 +70,7 @@ body:has(main.jb.done) { overflow: hidden; }
 .jb-report.ready { opacity: 1; }
 
 /* ── стекло: нижняя плавающая панель действий — .b-dock (tokens.css №39); здесь только прокрутка на узком экране ── */
-.jb-dock { max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none; }
+.jb-dock { max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; justify-content: flex-start; }
 .jb-dock::-webkit-scrollbar { display: none; }
 .jb-d {
   flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px;

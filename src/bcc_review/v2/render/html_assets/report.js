@@ -367,7 +367,7 @@
     if (test && test !== dev) parts.push("тестирование: " + esc(LBL[test] || test));
     parts.push(n ? n + " " + plural(n, "блокер", "блокера", "блокеров") : "блокеров нет");
     if (total) parts.push("цитат сверено " + ok + " из " + total);
-    var line = el("div", "verdict-line", parts.join('<span class="sep">·</span>'));
+    var line = el("div", "verdict-line", parts.map(function (x) { return '<span class="vp">' + x + "</span>"; }).join(' <span class="sep">·</span> '));
     line.setAttribute("role", "status");
     head.appendChild(line);
   }

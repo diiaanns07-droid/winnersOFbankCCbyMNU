@@ -382,7 +382,7 @@ def _dock_html(job: Job, f: dict) -> str:
   <button type="button" class="jb-d" data-menu="more" aria-haspopup="menu" aria-expanded="false">Ещё ▾</button>
   <span class="jb-sep" aria-hidden="true"></span>
   <button type="button" class="jb-d" data-menu="files" aria-haspopup="menu" aria-expanded="false">Выгрузить ▾</button>
-  <button type="button" class="jb-d jb-go" id="recheck" hidden{"" if not job.answers_path else " disabled"}>Проверить заново</button>
+  <button type="button" class="jb-d jb-go primary" id="recheck" hidden{"" if not job.answers_path else " disabled"}>Проверить заново</button>
 </nav>
 <div class="jb-menu" id="menu-more" role="menu" hidden>{extra}</div>
 <div class="jb-menu" id="menu-files" role="menu" hidden>{files}</div>

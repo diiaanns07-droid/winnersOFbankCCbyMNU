@@ -160,7 +160,8 @@ main { padding: 28px 16px 40px; }
 .verdict-line b { font-weight: 650; color: var(--ink); }
 .verdict-line b.v-no { color: var(--crit); }
 .verdict-line b.v-yes { color: var(--ok); }
-.verdict-line .sep { margin: 0 .45em; color: var(--ink-4); }
+.verdict-line .sep { margin: 0 .15em; color: var(--ink-4); }
+.verdict-line .vp { white-space: nowrap; }
 .docbody { position: relative; }
 .doc { padding: 18px 48px 64px 0; font: 17px/1.65 var(--font); color: var(--ink); }
 .doc-empty { padding: 24px 48px 48px var(--gutter); color: var(--ink-2); font-size: 15px; }
@@ -223,7 +224,7 @@ mark.q.sev-minor { text-decoration-line: underline; text-decoration-style: dashe
 .filters { margin: 0 0 16px; }
 .frow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .frow:not(:first-child) { display: none; }
-.filters .frow:first-child { display: inline-flex; flex-wrap: nowrap; max-width: 100%; gap: 0; padding: 3px; border-radius: 999px; background: rgba(15, 40, 65, .05); box-shadow: inset 0 0 0 1px var(--hair); }
+.filters .frow:first-child { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 2px; padding: 3px; border-radius: 19px; background: rgba(15, 40, 65, .05); box-shadow: inset 0 0 0 1px var(--hair); }
 .sevchip {
   display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 999px; cursor: pointer;
   background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 600; white-space: nowrap;
