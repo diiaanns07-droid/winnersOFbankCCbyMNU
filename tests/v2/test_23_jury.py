@@ -221,8 +221,6 @@ def test_pdf_input_with_exports(tmp_path, capsys):
 # --- демонстрация без ключа ------------------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="№23 → №22/№16: mock-фикстуры official устарели — судья ссылается на "
-                                       "несуществующих кандидатов, К критичными 2 из 5, ложный критичный 1")
 def test_mock_demo_matches_recorded_run(tmp_path, capsys):
     """``--provider mock`` по документу кейса — то, что жюри запустит без ключа (SUBMISSION, шаг 3)."""
     out_md = tmp_path / "o" / "mock.md"
