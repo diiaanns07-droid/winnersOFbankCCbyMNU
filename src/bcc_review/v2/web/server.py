@@ -102,7 +102,7 @@ def _layout(title: str, body: str, *, sub: str = "") -> str:
     agent_css = '<link rel="stylesheet" href="/assets/agent.css">' if (ASSETS / "agent.css").is_file() else ""
     agent_js = '<script src="/assets/agent.js" defer></script>' if (ASSETS / "agent.js").is_file() else ""
     crumb = f'<span class="tb-sub" title="{e(sub)}">{e(sub)}</span>' if sub else ""
-    st = f'<span class="b-status {mod}" id="pstatus">{e(status)}</span>' if status else ""
+    st = f'<span class="b-status {mod}" id="pstatus" title="{e(status)}">{e(status)}</span>' if status else ""
     return f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F3F6F5">
@@ -141,6 +141,9 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
     for p in provs:
         ok = bool(p["ok"])
         what = p["note"] if ok else f'{p["note"]}. {_HINT.get(p["id"], "")}'.strip()
+        if p["id"] == "auto":
+            res = next((q for q in provs if q["id"] == p.get("resolved")), None)
+            what = f'Сейчас: {res["label"]} — {res["note"]}' if res else what
         caps.append(f'<label class="pv{"" if ok else " off"}" title="{e(p["label"])}">'
                     f'<input type="radio" name="provider" value="{e(p["id"])}"{" checked" if p["id"] == sel else ""} '
                     f'data-ok="{1 if ok else 0}" data-models="{e(",".join(p["models"]))}" data-label="{e(p["label"])}" '
