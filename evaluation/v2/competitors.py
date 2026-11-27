@@ -208,6 +208,10 @@ def ours() -> list[dict]:
     for r in rows:
         if r.get("version") != "v2":
             continue
+        if re.search(r"\b(pdf|docx)\b", r.get("label") or "", re.I):  # соперники — по Markdown; PDF/DOCX — отдельно
+            continue
+        if r.get("dir") and not (ROOT / r["dir"] / "score.json").exists():  # строка без сохранённого замера
+            continue
         k = next((m for m in ("opus", "sonnet", "haiku", "gemini") if m in f"{r.get('model')}".lower()), None)
         if k:
             latest[k] = r
