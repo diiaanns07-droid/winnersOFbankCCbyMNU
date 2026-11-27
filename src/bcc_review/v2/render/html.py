@@ -460,6 +460,7 @@ def _hero(report: dict, findings: list[dict], by_id: dict) -> str:
   </div>
   <div class="hero-text">
     <p class="vsummary">{tx(verdict.get("summary", ""))}</p>
+    {_stability_line(report)}
     <p class="runmeta">{" · ".join(meta)}</p>
   </div>
   {fix_html}
@@ -623,6 +624,9 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
         meta.append(f'<span class="chip crit" title="{e(std)}">{e(CRITERION_LABEL.get(crit, crit))}</span>')
     if blocks in BLOCKS_LABEL:
         meta.append(f'<span class="chip blk">Блокирует {e(BLOCKS_LABEL[blocks])}</span>')
+    stab = _stab(f)
+    if stab:
+        meta.append(stab)
 
     foot = []
     if reqs:
@@ -643,7 +647,7 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
         prio_html = f'<span class="ans {cls}" title="После ответов владельца">{lbl}</span>' + prio_html
     return f"""<article class="card sev-{sev}" id="{e(fid)}" tabindex="0" data-idx="{idx}" data-sev="{sev}"
  data-rank="{SEV_RANK[sev]}" data-prio="{prio}" data-line="{_first_line(f)}" data-kind="{e(kind)}"
- data-src="{e(" ".join(src_keys))}" data-blocks="{e(blocks)}" data-lines="{e(" ".join(ev_lines))}" data-search="{e(search.lower())}">
+ data-src="{e(" ".join(src_keys))}" data-blocks="{e(blocks)}" data-lines="{e(" ".join(ev_lines))}" data-stab="{_stab_value(f)}" data-search="{e(search.lower())}">
   <header class="ch"><span class="badge sev-{sev}">{SEV_LABEL[sev]}</span><span class="fid">{e(fid)}</span>{prio_html}</header>
   <h3 class="ct">{e(f.get("title", ""))}</h3>
   <div class="meta">{"".join(meta)}</div>
@@ -652,6 +656,64 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
   {more}
   <footer class="cf">{"".join(foot)}</footer>
 </article>"""
+
+
+def _kn(f: dict) -> tuple[int, int] | None:
+    s = f.get("stability")
+    if not isinstance(s, dict):
+        return None
+    k, n = s.get("k"), s.get("n")
+    if not (isinstance(k, int) and isinstance(n, int) and n > 0 and 0 <= k <= n):
+        return None
+    return k, n
+
+
+def _stab_value(f: dict) -> str:
+    kn = _kn(f)
+    return f"{kn[0] / kn[1]:.3f}" if kn else ""
+
+
+def _stab(f: dict) -> str:
+    """Метка «устойчивость k/N» (`--runs N`): в скольких независимых проходах найден дефект."""
+    kn = _kn(f)
+    if not kn:
+        return ""
+    k, n = kn
+    cls = "full" if k == n else "part" if k * 2 >= n else "low"
+    extra = " (найден только в других проходах)" if (f.get("stability") or {}).get("first_pass") is False else ""
+    return (f'<span class="chip stab stab-{cls}" title="Найден в {k} из {n} независимых '
+            f'{_plural(n, "прохода", "проходов", "проходов")} рецензентов и судьи{extra}">устойчивость {k}/{n}</span>')
+
+
+def _stability_line(report: dict) -> str:
+    st = report.get("stability")
+    if not isinstance(st, dict) or not st.get("runs_counted"):
+        return ""
+    n = int(st.get("runs_counted") or 0)
+    unstable = len(report.get("findings_unstable") or [])
+    kns = [_kn(f) for f in report.get("findings") or [] if isinstance(f, dict)]
+    full = sum(1 for kn in kns if kn and kn[0] == kn[1])
+    txt = (f"Устойчивость: {n} {_plural(n, 'независимый проход', 'независимых прохода', 'независимых проходов')}; "
+           f"{e(st.get('rule') or '')}. Найдены во всех проходах: {full}")
+    if unstable:
+        txt += f"; неустойчивых (во вкладке «Неустойчивые»): {unstable}"
+    return f'<p class="stabline">{txt}.</p>'
+
+
+def _unstable(report: dict) -> str:
+    items = [f for f in report.get("findings_unstable") or [] if isinstance(f, dict)]
+    st = report.get("stability") or {}
+    if not items:
+        return ""
+    rows = []
+    for f in sorted(items, key=lambda x: (-(_kn(x) or (0, 1))[0], -SEV_RANK[_sev(x)], _first_line(x))):
+        ev0 = (f.get("evidence") or [{}])[0]
+        a = ev0.get("line_start") or ev0.get("line")
+        where = (f'<a class="lnref" href="#L{e(a)}" data-line="{e(a)}">{e(_lines_label(ev0))}</a>' if a else "—")
+        rows.append([_stab(f) or "—", f'<span class="badge sev-{_sev(f)}">{SEV_LABEL[_sev(f)]}</span>',
+                     f'<b>{e(f.get("title", ""))}</b><div class="muted">{tx(f.get("problem", ""))}</div>', where])
+    return (f'<p class="lead">{e(st.get("rule") or "")}. Эти дефекты нашлись реже — в реестр не вошли: проверьте их '
+            'глазами, прежде чем отбросить.</p>' + _table(["Устойчивость", "Серьёзность", "Дефект", "Где"], rows, "unst"))
 
 
 def _sort_key(f: dict) -> tuple:
@@ -677,6 +739,7 @@ def _findings_panel(findings: list[dict], view: dict | None, report: dict, reqs_
              '<button type="button" class="linkbtn" data-reset>Сбросить фильтры</button></div>')
     no_findings = ('<div class="empty">Замечаний нет: агент не нашёл дефектов, подтверждённых цитатами.</div>'
                    if not findings else "")
+    stab_opt = ('<option value="stab">по устойчивости</option>' if any(_kn(f) for f in findings) else "")
     return f"""
 <div class="split">
   <aside class="docpane" aria-label="Документ">
@@ -699,7 +762,7 @@ def _findings_panel(findings: list[dict], view: dict | None, report: dict, reqs_
         <select id="fsrc" aria-label="Кто нашёл"><option value="">Все линзы</option>{src_opts}</select>
       </div>
       <div class="frow small"><span id="fcount" aria-live="polite"></span>
-        <label class="sortl">Порядок <select id="fsort" class="mini"><option value="prio">по приоритету</option><option value="line">по месту в документе</option><option value="sev">по серьёзности</option></select></label>
+        <label class="sortl">Порядок <select id="fsort" class="mini"><option value="prio">по приоритету</option><option value="line">по месту в документе</option><option value="sev">по серьёзности</option>{stab_opt}</select></label>
         <button type="button" class="linkbtn" id="toggleall">Развернуть все</button><span class="kbd" title="Клавиши">↑ ↓ — по карточкам</span></div>
     </div>
     <div class="cards" id="cards">{cards}{empty}{no_findings}</div>
@@ -744,18 +807,33 @@ def _questions(report: dict, by_id: dict) -> str:
         links = " ".join(_finding_link(fid, by_id) for fid in q.get("finding_ids") or [])
         block = '<span class="badge sev-critical">Блокирует</span>' if q.get("blocking") else ""
         topic = f'<div class="topic">{e(q.get("topic"))}</div>' if q.get("topic") else ""
+        ifno = (f'<p class="ifno"><b>Если ответа не будет:</b> {tx(q.get("if_no_answer"))}</p>'
+                if q.get("if_no_answer") else "")
         items.append(f"""<article class="qcard" data-q="{e(qid)}" data-topic="{e(q.get("topic", ""))}">
-  <header class="ch"><span class="fid">{e(qid)}</span>{block}<span class="to">Кому: <b>{e(q.get("to", ""))}</b></span><span class="qlinks">{links}</span></header>
+  <header class="ch"><span class="fid">{e(qid)}</span>{block}<span class="to">Кому: <b>{e(q.get("to", ""))}</b></span><span class="qstate" aria-live="polite"></span><span class="qlinks">{links}</span></header>
   {topic}<h3 class="ct">{e(q.get("question", ""))}</h3>
   {_ev_list(q.get("evidence") or [])}
   {f'<ol class="opts">{opts}</ol>' if opts else ''}
-  <label class="own">Свой ответ<textarea rows="2" data-own="{e(qid)}" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <div class="qnote" hidden></div>
+  <label class="own">Свой ответ или оговорка к варианту<textarea rows="2" data-own="{e(qid)}" placeholder="Если ни один вариант не подходит — впишите решение; «не знаю» оставит вопрос открытым"></textarea></label>
+  {ifno}
   {f'<p class="why"><b>Зачем:</b> {tx(q.get("why"))}</p>' if q.get("why") else ''}
 </article>""")
-    return (f'<div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент '
-            f'перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p>'
-            f'<button type="button" class="btn" id="dlanswers">Скачать ответы</button></div>'
-            f'<div class="qlist">{"".join(items)}</div>')
+    doc = report.get("document") or {}
+    sha = str(doc.get("sha256") or "")
+    return (f'<div class="qtools" data-doc="{e(doc.get("file") or "")}" data-sha="{e(sha)}">'
+            f'<p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент перепроверит замечания и '
+            f'покажет вердикт «до и после»: <code>python -m bcc_review ТЗ отчёт.md --answers ответы.md --revise</code>. '
+            f'Файл следующего круга (<code>отчёт.answers-next.md</code>) можно загрузить сюда — ответы встанут по темам '
+            f'вопросов, расхождения и «решите» будут подсвечены.</p>'
+            f'<div class="qbtns"><button type="button" class="btn" id="dlanswers">Скачать ответы</button>'
+            f'<label class="btn ghost" title="Файл ответов .md: свой или следующего круга">Загрузить ответы'
+            f'<input type="file" id="ulanswers" accept=".md,.txt,.markdown" hidden></label>'
+            f'<button type="button" class="linkbtn" id="clranswers">Очистить</button>'
+            f'<span class="qcount" id="qcount" aria-live="polite"></span></div></div>'
+            f'<div class="qlist">{"".join(items)}</div>'
+            f'<label class="own decisions">Общие решения — по одному в строке (попадут в раздел «Решения» файла ответов)'
+            f'<textarea rows="3" id="decisions" placeholder="Например: все суммы в API — в тиынах"></textarea></label>')
 
 
 STATUS_AFTER = {"resolved": ("закрыт", "a-yes"), "changed": ("изменён", "a-part"), "open": ("открыт", "a-no"),
@@ -795,7 +873,77 @@ def _clarification(report: dict, by_id: dict) -> str:
                          ", ".join(e(q) for q in x.get("question_ids") or [])])
         out.append('<h3 class="sub">Что изменилось по замечаниям</h3>'
                    + _table(["Замечание", "Было", "Статус", "Стало", "Почему", "Ответ"], crow))
+    out.append(_answer_conflicts(c, by_id))
+    out.append(_postponed(c, report))
+    closed = c.get("closed_by_decisions") or []
+    if closed:
+        out.append('<h3 class="sub">Закрыто общими решениями</h3><p class="lead">Вопросы, на которые ответили общие '
+                   'решения владельца (раздел «Решения» файла ответов): ' + ", ".join(e(q) for q in closed) + '.</p>')
+    out.append(_next_round(c, by_id))
     return "".join(out)
+
+
+def _answer_conflicts(c: dict, by_id: dict) -> str:
+    """Два адресата ответили на один вопрос по-разному: дефект остаётся открытым, пока не выбран один ответ."""
+    rows = []
+    for x in c.get("answer_conflicts") or []:
+        texts = x.get("texts") or {}
+        sides = "".join(f'<li><span class="fid">{e(a)}</span> {e(texts.get(a) or "—")}</li>' for a in x.get("answers") or [])
+        rows.append([_finding_link(x.get("finding_id", ""), by_id), f'<ul class="sides">{sides}</ul>', tx(x.get("reason", ""))])
+    if not rows:
+        return ""
+    return ('<h3 class="sub warnh">Ответы расходятся — выберите один</h3><p class="lead">На один вопрос пришли разные '
+            'ответы. Пока владелец не оставит одну строку, замечание остаётся открытым.</p>'
+            + _table(["Замечание", "Ответы", "В чём расхождение"], rows, "conf"))
+
+
+def _postponed(c: dict, report: dict) -> str:
+    items = c.get("postponed") or []
+    if not items:
+        return ""
+    topic = {q.get("id"): q.get("topic", "") for q in report.get("questions") or [] if isinstance(q, dict)}
+    rows = [[f'<span class="fid">{e(p.get("question_id", ""))}</span> {e(topic.get(p.get("question_id"), ""))}',
+             "часть ответа" if p.get("partial") else "весь ответ", f'«{e(p.get("text", ""))}»'] for p in items]
+    return ('<h3 class="sub">Решение отложено</h3><p class="lead">«Не знаю», «решим после встречи» — не ответ: '
+            'замечание по этой части остаётся открытым и попадает в следующий круг.</p>'
+            + _table(["Вопрос", "Что отложено", "Слова владельца"], rows))
+
+
+NEXT_KIND = {"conflict": ("ответы расходятся", "a-no"), "partial": ("решена часть", "a-part"),
+             "postponed": ("отложено", "a-part"), "unanswered": ("без ответа", "a-na")}
+
+
+def next_answers_text(report: dict) -> str:
+    """Файл следующего круга — тем же кодом, что пишет ``<отчёт>.answers-next.md`` (``recheck.render_next_answers``)."""
+    c = report.get("clarification") or {}
+    if not (c.get("next_round") or c.get("answers") or c.get("decisions")):
+        return ""
+    doc = Path(str((report.get("document") or {}).get("file") or "")).name
+    try:
+        from ..stages.recheck import render_next_answers
+        return render_next_answers(c, document=doc)
+    except Exception:  # noqa: BLE001 — без файла следующего круга отчёт всё равно открывается
+        return ""
+
+
+def _next_round(c: dict, by_id: dict) -> str:
+    todo = c.get("next_round") or []
+    if not todo and not c.get("answers"):
+        return ""
+    rows = []
+    for n in todo:
+        lbl, cls = NEXT_KIND.get(n.get("kind", ""), (n.get("kind", ""), "a-na"))
+        fids = " ".join(_finding_link(x.strip(), by_id) for x in str(n.get("finding_id") or "").split(",") if x.strip())
+        what = "<br>".join(f"<code>{e(ln)}</code>" for ln in n.get("lines") or []) or tx(n.get("note", ""))
+        rows.append([f'<span class="fid">{e(n.get("question_id") or "решения")}</span>',
+                     f'<span class="ans {cls}">{e(lbl)}</span>', fids, what])
+    table = (_table(["Вопрос", "Что с ответом", "Замечания", "Что вписать"], rows, "nextr") if rows
+             else '<p class="none">Всё согласовано: решать в следующем круге нечего.</p>')
+    return ('<h3 class="sub">Следующий круг</h3><p class="lead">Файл следующего круга — расхождения и отложенное '
+            'сверху, всё уже согласованное ниже: исправьте строки «&lt;решите: …&gt;», оставьте по одному ответу на '
+            'вопрос и снова запустите проверку с <code>--answers</code>. Или загрузите файл во вкладку «Вопросы».</p>'
+            f'{table}<p class="qbtns"><button type="button" class="btn" id="dlnext">Скачать файл следующего круга</button>'
+            f'<button type="button" class="btn ghost" id="loadnext">Заполнить вопросы из него</button></p>')
 
 
 def _rewrites(report: dict, by_id: dict) -> str:
@@ -971,7 +1119,17 @@ def _passport(report: dict) -> str:
     if qs.get("candidates_in") is not None:
         rows.insert(11, ("Кандидаты", f'{_fmt_int(qs.get("candidates_in", 0))} от ревьюеров → {_fmt_int(qs.get("candidates_kept", 0))} '
                                       f'с найденными цитатами → судье; отклонено {_fmt_int(qs.get("candidates_rejected", 0))}'))
+    stab = report.get("stability") if isinstance(report.get("stability"), dict) else {}
+    if stab.get("runs_counted"):
+        rows.append(("Устойчивость", f'{_fmt_int(stab.get("runs_counted"))} из {_fmt_int(stab.get("runs_requested"))} '
+                                     f'проходов засчитано · {e(stab.get("rule") or "")} · в реестре {_fmt_int(stab.get("kept", 0))}, '
+                                     f'неустойчивых {_fmt_int(stab.get("unstable", 0))}, добавлено из других проходов '
+                                     f'{_fmt_int(stab.get("added_from_other_passes", 0))}'))
     kv = "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in rows)
+    passes = stab.get("passes") or []
+    pass_rows = [[e(x.get("pass", "")), e({"complete": "полный", "partial": "неполный", "failed": "ошибка"}.get(
+        x.get("status", ""), x.get("status", ""))), _fmt_int(x.get("findings", 0)), _fmt_int(x.get("calls", 0)),
+        f'<code>{e(x.get("run_id", ""))}</code>'] for x in passes if isinstance(x, dict)]
     stages = dict(run.get("stages") or {})
     stats = run.get("stage_stats") or {}
     for k in stats:
@@ -998,6 +1156,8 @@ def _passport(report: dict) -> str:
     wl = "".join(f"<li>{tx(w)}</li>" for w in warns)
     return (f'<div class="pgrid"><div class="tw"><table class="kv">{kv}</table></div><div>'
             + (f'<h3 class="sub">Этапы</h3><ul class="stages">{st}</ul>' if st else "")
+            + (f'<h3 class="sub">Проходы устойчивости</h3>'
+               + _table(["Проход", "Статус", "Дефектов", "Вызовов", "Прогон"], pass_rows) if pass_rows else "")
             + (f'<h3 class="sub">Предупреждения</h3><ul class="warns">{wl}</ul>' if wl else "")
             + '<h3 class="sub">Как проверить отчёт</h3><p class="lead">Каждая цитата в замечаниях найдена в документе '
               'программой, номер строки посчитан кодом, а не моделью. Повторная сверка: '
@@ -1026,10 +1186,11 @@ def render_html(report: dict, view: dict | None = None) -> str:
         ("checks", "Проверки", len(report.get("acceptance_checks") or []) + len(report.get("pair_checks") or []),
          _checks(report, reqs_by_id)),
         ("segment", "Нарезка", len(report.get("requirements") or []), _segmentation(report, findings)),
+        ("unstable", "Неустойчивые", len(report.get("findings_unstable") or []), _unstable(report)),
         ("rejected", "Отклонённые", len(report.get("rejected") or []), _rejected(report, by_id)),
         ("passport", "Паспорт", None, _passport(report)),
     ]
-    tabs = [t for t in tabs if t[0] not in ("clarify", "rewrites") or t[3]]
+    tabs = [t for t in tabs if t[0] not in ("clarify", "rewrites", "unstable") or t[3]]
     nav = "".join(
         f'<button type="button" role="tab" class="tab" id="t-{k}" aria-controls="p-{k}" aria-selected="{"true" if i == 0 else "false"}" '
         f'data-tab="{k}">{lbl}{f"<span class=cnt>{n}</span>" if n is not None else ""}</button>'
@@ -1040,6 +1201,9 @@ def render_html(report: dict, view: dict | None = None) -> str:
 
     data = (json.dumps(report, ensure_ascii=False)
             .replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e"))
+    nxt = next_answers_text(report)
+    next_data = (json.dumps(nxt, ensure_ascii=False)
+                 .replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")) if nxt else ""
     run = report.get("run") or {}
     v = report.get("verdict") or {}
     desc = (f'Разработка: {VERDICT_LABEL.get(v.get("development", ""), "—")}; тестирование: '
@@ -1077,6 +1241,7 @@ def render_html(report: dict, view: dict | None = None) -> str:
 <footer class="foot">Сформировано агентом {gen} · статическое ревью по ISO/IEC/IEEE 29148:2018 и IEEE 830-1998 ·
 цитаты сверены с документом программой</footer>
 <script type="application/json" id="report-data">{data}</script>
+{f'<script type="application/json" id="next-answers">{next_data}</script>' if next_data else ""}
 <script>
 {_asset("report.js")}
 </script>

@@ -60,6 +60,7 @@ FILES = [  # (ключ, имя файла в out/, подпись, mime)
      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     ("pdf_annotated", "report.annotated.pdf", "PDF с выделениями", "application/pdf"),
     ("revised", "report.revised.md", "Исправленное ТЗ", "text/markdown; charset=utf-8"),
+    ("answers_next", "report.answers-next.md", "Следующий круг ответов", "text/markdown; charset=utf-8"),
 ]
 
 

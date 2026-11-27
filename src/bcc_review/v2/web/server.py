@@ -146,8 +146,9 @@ def job_page(job: Job) -> str:
     <div class="pmeta">{e(job.provider)}{(" · " + e(job.model)) if job.model else ""} · <span id="elapsed">0 с</span> · <span id="pstate">в очереди</span><span id="vsum"></span></div></div>
     <div class="dls"><span class="dll" id="dll" hidden>Скачать:</span>{links}
     <a class="dl" id="newtab" href="/jobs/{e(job.id)}/files/report.html?inline=1" target="_blank" rel="noopener" hidden>Открыть отдельно ↗</a>
-    <form class="answers" id="answers" hidden title="Отметьте варианты во вкладке «Вопросы» отчёта, нажмите «Скачать ответы» и загрузите файл: агент перепроверит замечания и покажет вердикт «до и после» и исправленное ТЗ.">
-      <label class="dl ans">Загрузить ответы ↻<input type="file" name="answers" accept=".md,.txt,.json" hidden></label></form>
+    <form class="answers" id="answers" hidden title="Отметьте варианты во вкладке «Вопросы» отчёта и нажмите «Пересчитать с ответами»: агент перепроверит замечания и покажет вердикт «до и после» и исправленное ТЗ. Или загрузите готовый файл ответов (в том числе файл следующего круга).">
+      <button type="button" class="dl ans" id="recalc">{"Следующий круг ↻" if job.answers_path else "Пересчитать с ответами ↻"}</button>
+      <label class="dl ans">Загрузить файл ответов<input type="file" name="answers" accept=".md,.txt,.json" hidden></label></form>
     <a class="btn ghost" href="/">Новая проверка</a></div>
   </div>
   {f'<p class="parent">Повторная проверка с ответами владельца к <a href="/jobs/{e(job.parent)}">исходной проверке</a>.</p>' if job.parent else ''}
