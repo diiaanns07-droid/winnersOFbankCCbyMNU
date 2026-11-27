@@ -5,7 +5,7 @@
 начинать разработку и тестирование. Решение кейса BCC-HUB × MNU FinTech Hackathon «ИИ-агент проверки требований»
 ([ТЗ](https://github.com/BCC-HUB/ai-requirements-validator-task)).
 
-**Видео-демо:** [`presentation/demo.mp4`](presentation/demo.mp4) · **Слайды:** [`presentation/deck.pdf`](presentation/deck.pdf) ·
+**Видео-демо:** [`presentation/demo.mp4`](presentation/demo.mp4) (с субтитрами — [`demo_subtitled.mp4`](presentation/demo_subtitled.mp4)) · **Слайды:** [`presentation/deck.pdf`](presentation/deck.pdf) ·
 **Готовый отчёт по документу кейса:** [`reports/requirements.md`](reports/requirements.md)
 (интерактивный — [`reports/requirements.html`](reports/requirements.html)) · **Что сдаём:** [`SUBMISSION.md`](SUBMISSION.md)
 
@@ -168,9 +168,15 @@ HTML: reports/my/requirements.html
 Тот же документ в другом формате (Sonnet): PDF — К 5 из 5, С 18 из 20 (4 мин 25 с); DOCX — К 5 из 5, все
 критичными, С 18 из 20 (4 мин 37 с).
 
-Корпус, только правила (без модели): точность 0,80, полнота 0,43, **0 ложных тревог на 8 чистых документах**
-(у v1 — тревоги на всех 8). Замеры с моделью на корпусе, стабильность и сравнение моделей —
-[`evaluation/v2/RESULTS.md`](evaluation/v2/RESULTS.md).
+Корпус [`evaluation/dev`](evaluation/dev), строгий счёт (находка засчитывается, только если её цитаты покрывают
+место дефекта; любое замечание на чистом документе — ложная тревога):
+
+* только правила, без модели: точность 0,80, полнота 0,43, **0 ложных тревог на 8 чистых документах**
+  (у v1 — тревоги на всех 8);
+* с моделью (Haiku, 27.11 05:20, до доработок второй волны): **полнота 0,93** (26 из 28 дефектов), но на 8 чистых
+  документах — 128 лишних замечаний (из них 4 критичных, вердикт «нельзя» на 4 документах). Доработки второй волны направлены на ложные
+  тревоги; повторный замер — в [`evaluation/v2/RESULTS.md`](evaluation/v2/RESULTS.md), там же стабильность и
+  сравнение моделей.
 
 ## Модели и провайдеры
 

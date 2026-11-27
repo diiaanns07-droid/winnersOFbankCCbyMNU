@@ -16,7 +16,7 @@
 | Прогон на бесплатном Gemini | [`reports/requirements.gemini.md`](reports/requirements.gemini.md) — Windows, ключ AI Studio |
 | Второй документ (другая тема) | [`reports/other_topic_cashback.md`](reports/other_topic_cashback.md) |
 | Все прогоны, модели, время, `verify` | [`reports/README.md`](reports/README.md) |
-| Видео-демо (2–3 мин) | [`presentation/demo.mp4`](presentation/demo.mp4) |
+| Видео-демо (2–3 мин) | [`presentation/demo.mp4`](presentation/demo.mp4); с вшитыми субтитрами — [`presentation/demo_subtitled.mp4`](presentation/demo_subtitled.mp4), отдельно — [`presentation/demo.srt`](presentation/demo.srt) |
 | Презентация | [`presentation/deck.pdf`](presentation/deck.pdf) (и `deck.pptx`) |
 | Качество: эталон, корпус, стабильность | [`evaluation/v2/RESULTS.md`](evaluation/v2/RESULTS.md) |
 | Разбор задачи и эталон дефектов | [`docs/task-analysis.md`](docs/task-analysis.md) |
