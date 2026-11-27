@@ -1,0 +1,11 @@
+**
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!src/
+!src/bcc_review/
+!src/bcc_review/**
+**/__pycache__/
+**/*.pyc
+**/.env
+**/.env.*
