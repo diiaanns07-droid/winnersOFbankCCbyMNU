@@ -238,8 +238,91 @@ def _row_evidence(c: Mapping[str, Any]) -> list[dict]:
     return ev
 
 
+def _row_forms(c: Mapping[str, Any], row: str, index: Mapping[str, Mapping[str, Any]]) -> dict[str, str]:
+    """«критерий приёмки №2» в падежах — номер строки в таблице приёмки (по порядку строк документа), а не ID
+    нарезки: читатель отчёта ищет строку в своём документе. Без нарезки — по номеру строки документа."""
+    rows = sorted((r for r in index.values() if r.get("kind") == "acceptance"),
+                  key=lambda r: (_int(r.get("line_start")) or 0, str(r.get("id"))))
+    ids = [str(r.get("id")) for r in rows]
+    line = c.get("stated_line") or c.get("row_line")
+    tail = f" №{ids.index(row) + 1}" if row and row in ids else (f" в строке {line}" if line else "")
+    return {"nom": f"критерий приёмки{tail}", "gen": f"критерия приёмки{tail}", "dat": f"критерию приёмки{tail}"}
+
+
+_DOC_ID = re.compile(r"[A-Za-zА-Яа-яЁё]{1,6}[-.]?\d+(?:[.-]\d+)*")
+
+
+def _rule_ident(rid: str, index: Mapping[str, Mapping[str, Any]]) -> str:
+    """Собственный номер правила в документе («Ф-2»; длинное имя — в кавычках), иначе «в строке N»,
+    иначе ID нарезки."""
+    r = index.get(rid) or {}
+    src = _s(r.get("source_id"))
+    if src and src != rid and len(src) <= 40 and not src.lower().startswith("критери"):
+        return src if _DOC_ID.fullmatch(src) else f"«{src}»"
+    line = _int(r.get("line_start"))
+    return f"в строке {line}" if line else rid
+
+
+def _rule_forms(rules: list[str], index: Mapping[str, Mapping[str, Any]],
+                evidence: list[Mapping[str, Any]]) -> dict[str, str]:
+    """«правило Ф-2» / «правила Ф-2, Ф-3» в падежах (именительный, родительный, дательный)."""
+    names = list(dict.fromkeys(_rule_ident(r, index) for r in rules))[:3]
+    if not names:
+        lines = [e.get("line") for e in evidence if e.get("line")]
+        names = [f"в строке {lines[0]}"] if lines else []
+    if not names:
+        return {"nom": "правила документа", "gen": "правил документа", "dat": "правилам документа"}
+    joined = ", ".join(names)
+    if len(names) == 1:
+        return {"nom": f"правило {joined}", "gen": f"правила {joined}", "dat": f"правилу {joined}"}
+    return {"nom": f"правила {joined}", "gen": f"правил {joined}", "dat": f"правилам {joined}"}
+
+
+def humanize_ids(text: str, index: Mapping[str, Mapping[str, Any]]) -> str:
+    """ID нарезки в тексте модели («R-06») → собственный номер документа («Ф-2»), если он короткий;
+    иначе ID остаётся (рендер делает его ссылкой на таблицу требований)."""
+    def sub(m: re.Match) -> str:
+        src = _s((index.get(m.group(0)) or {}).get("source_id"))
+        return src if src and _DOC_ID.fullmatch(src) else m.group(0)
+    text = re.sub(r"\bR-\d+\b", sub, text or "")
+    return re.sub(r"\b([A-Za-zА-Яа-яЁё]{1,6}-\d+) \(\1\)", r"\1", text)  # «Ф-2 (Ф-2)» после замены
+
+
+_RULE_FIX = re.compile(r"^\s*(?:правило|требование)\s*(?:[^:]{0,40})?:\s*", re.I)
+_ALT_SENTENCE = re.compile(r"^(?:либо|или|иначе|если|альтернатив|в противном)", re.I)
+_EXPECTED_PREFIX = re.compile(r"^\s*(?:ожидаемый результат|ожидается|стало)\s*:\s*", re.I)
+
+
+def split_fix(fix: str) -> tuple[str, bool]:
+    """Исправление модели → (одна формулировка для «было → стало», это правило?). Модель часто пишет два
+    варианта («…. Либо правило: …», «…. Если цель строки…»): в «было → стало» идёт первый, без пояснений."""
+    fix = _s(fix)
+    if not fix:
+        return "", False
+    is_rule = bool(_RULE_FIX.match(fix))
+    text = _RULE_FIX.sub("", fix, count=1) if is_rule else _EXPECTED_PREFIX.sub("", fix, count=1)
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    kept = [parts[0]] + [p for p in _takewhile_not_alt(parts[1:])]
+    text = " ".join(kept).strip()
+    text = re.sub(r"\s*\((?:[^()]*:[^()]*)\)\s*(?=[.!?]?$)", "", text)  # хвост «(Ф-2: месяц по дате …)»
+    text = text.strip().strip("«»\"").strip()
+    return (text[:1].upper() + text[1:]) if text else "", is_rule
+
+
+def _takewhile_not_alt(parts: list[str]):
+    for p in parts:
+        if _ALT_SENTENCE.match(p) or re.search(r"(?i)\b(?:либо|или)\s+правило\b", p):
+            return
+        yield p
+
+
 def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, Any]]) -> dict | None:
-    """``conflict`` → critical с цитатами правила и строки; ``undefined`` → major; ``match`` → None."""
+    """``conflict`` → critical с цитатами правила и строки; ``undefined`` → major; ``match`` → None.
+
+    Тексты — для аналитика банка (рубрика понятности): критерий называется номером строки таблицы
+    приёмки, правило — собственным номером документа («Ф-2»), а не ID нарезки; в сценарии — вход и два
+    исхода; «было → стало» — одна готовая формулировка той строки, которую она заменяет (``rewrite_line``).
+    """
     verdict = c["verdict"]
     if verdict == "match":
         return None
@@ -247,58 +330,69 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
     if (index and row not in index) or (not index and not _RID.fullmatch(row)):
         row = ""
     rules = [r for r in c["rule_requirement_ids"] if r != row and (not index or r in index)]
-    if not row:
-        row_label = f"в строке {c['row_line']}" if c["row_line"] else "(строка без ID)"
-    else:
-        row_label = _label(row, index)
-    rules_label = _labels(rules, index)
-    facts = _sentence(c["row_facts"])
-    assumptions = f" Допущения: {_sentence(c['assumptions'])}" if c["assumptions"] else ""
-    expected = _s(c["expected_by_rules"]).rstrip(".")
+    row_f = _row_forms(c, row, index)
+    rule_f = _rule_forms(rules, index, c["rule_evidence"])
+    facts = _sentence(humanize_ids(c["row_facts"], index))
+    assumptions = (f" Как прочитано условие: {_lower_first(_sentence(humanize_ids(c['assumptions'], index)))}"
+                   if c["assumptions"] else "")
+    expected = humanize_ids(_s(c["expected_by_rules"]), index).rstrip(".")
     stated = _s(c["stated"]).rstrip(".")
-    explanation = f" {_sentence(c['explanation'])}" if c["explanation"] else ""
+    explanation = f" {_sentence(humanize_ids(c['explanation'], index))}" if c["explanation"] else ""
     req_ids = _ids(([row] if row else []) + rules)
     rule_ev = [dict(e) for e in c["rule_evidence"][:2]]
+    rewrite, fix_is_rule = split_fix(humanize_ids(c["fix"], index))
+    rule_line = next((e.get("line") for e in rule_ev if e.get("line")), None)
+    rewrite_line = (rule_line if fix_is_rule else c["stated_line"]) if rewrite else None
+    row_cap = row_f["nom"][:1].upper() + row_f["nom"][1:]
 
     if verdict == "conflict":
         return {
-            "title": f"Ожидаемый результат критерия приёмки {row_label} противоречит {rules_label}",
+            "title": f"{row_cap} противоречит {rule_f['dat']}",
             "kind": c["conflict_kind"] if c["conflict_kind"] in CONFLICT_KINDS else "contradiction",
             "criterion": "set_consistent",
             "severity": "critical",
             "requirement_ids": req_ids,
             "evidence": rule_ev + _row_evidence(c),
-            "problem": (f"По {rules_label} на входе этого критерия результат — {_lower_first(expected) or 'другой'}, "
-                        f"а критерий приёмки ожидает «{stated}».{explanation}"),
-            "scenario": f"{facts}{assumptions} По {rules_label}: {expected}. По критерию: {stated}.",
-            "impact": ("Реализация по правилу не пройдёт этот критерий приёмки, а реализация «под критерий» "
-                       "нарушит правило: разработчик и тестировщик получат разный ожидаемый результат, "
-                       "приёмка остановится до решения владельца продукта."),
-            "recommendation": (f"Выбрать верный исход и исправить второе место: ожидаемый результат критерия "
-                               f"{row_label} или текст {rules_label}."),
-            "rewrite": c["fix"],
-            "question": (f"Какой результат верен для этого входа: «{expected}» (по {rules_label}) "
-                         f"или «{stated}» (по критерию приёмки)?"),
+            "problem": (f"По {rule_f['dat']} на входе {row_f['gen']} результат — «{expected or 'другой'}», "
+                        f"а критерий ожидает «{stated}».{explanation}"),
+            "scenario": f"{facts}{assumptions} По {rule_f['dat']}: {expected}. По {row_f['dat']}: {stated}.",
+            "impact": (f"Разработчик, реализовав {rule_f['nom']}, получит «{expected}», и тест по {row_f['dat']} "
+                       f"упадёт, хотя код верен; код, подогнанный под критерий, нарушит {rule_f['nom']}. "
+                       "Приёмка остановится до решения владельца продукта."),
+            "recommendation": (
+                f"Исправить ожидаемый результат {row_f['gen']} на «{expected}», если верно {rule_f['nom']}; "
+                f"если верен критерий — изменить {rule_f['nom']}. Решает владелец продукта."
+                if not fix_is_rule else
+                f"Изменить {rule_f['nom']} так, чтобы оно давало «{stated}» (формулировка ниже), или, если "
+                f"{rule_f['nom']} верно, исправить ожидаемый результат {row_f['gen']} на «{expected}». "
+                "Решает владелец продукта."),
+            "rewrite": rewrite,
+            "rewrite_line": rewrite_line,
+            "question": (f"Какой результат верен для этого входа: «{expected}» (по {rule_f['dat']}) "
+                         f"или «{stated}» (по {row_f['dat']})?"),
             "blocks": "both",
             "source": SOURCE,
             "origin": "acceptance_check",
             "acceptance_row": c["row_requirement_id"] or f"L{c['row_line']}",
             "derivation": c["derivation"],
         }
+    missing = re.sub(r"^\s*не определено\s*:?\s*", "", expected, flags=re.I)
     return {
-        "title": f"Ожидаемый результат критерия приёмки {row_label} нельзя вывести из требований",
+        "title": f"{row_cap}: ожидаемый результат не следует из требований",
         "kind": "incomplete",
         "criterion": "verifiable",
         "severity": "major",
         "requirement_ids": req_ids,
         "evidence": rule_ev + _row_evidence(c),
-        "problem": (f"Критерий приёмки ожидает «{stated}», но правила документа не определяют результат "
-                    f"для этого входа ({expected or 'правило не найдено'}).{explanation}"),
-        "scenario": f"{facts}{assumptions} По требованиям исход не определён; по критерию: {stated}.",
+        "problem": (f"{row_cap} ожидает «{stated}», но требования не задают результат для этого входа"
+                    f"{': ' + _lower_first(missing) if missing else ''}.{explanation}"),
+        "scenario": f"{facts}{assumptions} По требованиям исход не определён; по {row_f['dat']}: {stated}.",
         "impact": ("Тестировщик не может обосновать ожидаемый результат требованиями, а разработчик реализует "
                    "своё толкование: при приёмке возникнет спор, чья трактовка верна."),
-        "recommendation": "Дописать в требования правило, из которого следует ожидаемый результат этого критерия.",
-        "rewrite": c["fix"],
+        "recommendation": (f"Дописать в требования правило, из которого следует «{stated}», или убрать этот "
+                           f"исход из {row_f['gen']}."),
+        "rewrite": rewrite,
+        "rewrite_line": rewrite_line,
         "question": "",
         "blocks": "testing",
         "source": SOURCE,
@@ -450,7 +544,9 @@ _VAGUE = re.compile(r"быстр|мгновенн|моментальн|свое�
 def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) -> None:
     """Серьёзность замечания о проверяемости: ``minor``, если (а) оно только о целях продукта (цель не
     тестируется напрямую — её проверяют через требования), или (б) в цитатах есть числовой норматив и нет
-    размытых слов — тест написать можно, не хватает условий замера. Иначе — как у модели (major)."""
+    размытых слов — тест написать можно, не хватает условий замера, или (в) в цитатах нет размытых слов и ни
+    одно процитированное требование не нефункциональное: «не определено, что показать» у функции — это
+    неполнота (зона аналитика), а не непроверяемость. Иначе — как у модели (major)."""
     kinds = {r.get("id"): r.get("kind") for r in reqs}
 
     def kinds_at(line: int | None) -> set:
@@ -464,7 +560,10 @@ def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) ->
         only_goals = bool(ids) and all(kinds[i] == "goal" for i in ids) and cited <= {"goal"}
         quotes = [e["quote"] for e in c["evidence"]]
         measured = any(_NUMERIC_TARGET.search(q) for q in quotes) and not any(_VAGUE.search(q) for q in quotes)
-        if only_goals or measured:
+        vague = any(_VAGUE.search(q) for q in quotes)
+        nfr = "nonfunctional" in cited or any(kinds.get(i) == "nonfunctional" for i in ids)
+        functional_gap = bool(reqs) and bool(ids or cited) and not vague and not nfr
+        if only_goals or measured or functional_gap:
             c.setdefault("severity_hint", c["severity"])
             c["severity"] = "minor"
 

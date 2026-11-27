@@ -103,9 +103,14 @@ def test_conflict_becomes_critical_with_both_quotes():
     assert cand["requirement_ids"] == ["R-03", "R-01"]
     lines = [e["line"] for e in cand["evidence"]]
     assert 10 in lines and 30 in lines, "цитата правила и цитата строки приёмки"
-    assert "R-01 (П-1)" in cand["title"] and "R-03" in cand["title"]
+    # рубрика понятности: номер критерия в таблице и собственный номер правила, без ID нарезки
+    assert cand["title"] == "Критерий приёмки №1 противоречит правилу П-1"
+    assert not re.search(r"R-\d", " ".join(cand[k] for k in ("title", "problem", "scenario", "impact",
+                                                              "recommendation", "question")))
     assert cand["scenario"] and cand["impact"] and cand["question"]
+    assert "«10 + 5 = 15, ограничено до 12»" in cand["impact"] and "критерию приёмки №1" in cand["impact"]
     assert cand["rewrite"] == "Итог 12" and cand["source"] == "lens:qa"
+    assert cand["rewrite_line"] == 30, "«было → стало» заменяет строку приёмки, а не правило"
     assert cand["origin"] == "acceptance_check" and cand["acceptance_row"] == "R-03"
 
 
@@ -184,7 +189,8 @@ def test_model_critical_is_demoted_only_acceptance_conflict_stays_critical():
     """Critical линзы — только вычисленный конфликт строки приёмки; кандидат модели — не выше major
     (противоречие двух правил — зона проверки набора, серьёзность ставит судья), с подсказкой severity_hint."""
     c = {"title": "Нет метрики", "kind": "unverifiable", "criterion": "verifiable", "severity": "critical",
-         "requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
+         "requirement_ids": ["R-02"], "evidence": [{"quote": "Ответ приходит быстро", "line": 12}], "problem": "p",
+         "scenario": "s",
          "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "none"}
     conflict = dict(c, title="Два исхода", kind="contradiction", criterion="set_consistent")
     out = lens_qa.postprocess({"candidates": [c, conflict]}, REQS)
@@ -263,6 +269,12 @@ def test_verifiability_severity_numeric_target_and_goals():
     assert sev("Ответ приходит мгновенно.") == "major"
     assert sev("Ответ быстрый, доступность 99,9 %.") == "major"  # размытое слово рядом с числом
     assert sev("Сообщение отправляется в течение минуты после события.") == "major"
+    # «не определено, что показать» у функционального требования — неполнота, а не непроверяемость
+    fn = [{"id": "R-03", "kind": "functional", "line_start": 30, "line_end": 30}]
+    c = dict(base, evidence=[{"quote": "В сообщении указывается причина", "line": 30}], requirement_ids=["R-03"])
+    assert lens_qa.postprocess({"candidates": [c]}, reqs + fn)["candidates"][0]["severity"] == "minor"
+    c = dict(c, evidence=[{"quote": "Экран удобный и понятный", "line": 30}])
+    assert lens_qa.postprocess({"candidates": [c]}, reqs + fn)["candidates"][0]["severity"] == "major"
     assert sev("Снизить число ошибок.", line=5, ids=("R-01",)) == "minor"  # цель продукта
     assert sev("Снизить число ошибок.", line=20, ids=("R-01",)) == "major"  # цитата из НФТ — не только цель
 
