@@ -1,4 +1,4 @@
-# Прогон агента на бесплатном Gemini в Windows PowerShell — так, как его повторит жюри.
+﻿# Прогон агента на бесплатном Gemini в Windows PowerShell — так, как его повторит жюри.
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\gemini_report.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\gemini_report.ps1 -Doc release\input\requirements.pdf -Name requirements_pdf.gemini

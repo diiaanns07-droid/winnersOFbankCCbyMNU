@@ -26,6 +26,15 @@ OFFICIAL_WORDS = ["push", "savelimit", "тиын", "порог", "алмат", "
                   "проведенные покупки", "независимо от истории", "повторная доставка одного события"]
 
 
+def _sev(title, kept, dropped):
+    """Итог для заголовка: уровень, если оставлен, иначе «снято»."""
+    for c in kept:
+        if c["title"] == title:
+            return c["severity"]
+    assert any(d["title"] == title for d in dropped), title
+    return "снято"
+
+
 def _cand(title, severity="major", kind="ambiguity", criterion="unambiguous", **kw):
     c = {"title": title, "kind": kind, "criterion": criterion, "severity": severity,
          "requirement_ids": ["R-01"], "evidence": [{"quote": "цитата", "line": 1}],
@@ -100,9 +109,9 @@ def test_hook_in_document_keeps_topic():
 
 
 def test_postprocess_sorts_dedups_and_caps():
-    cands = [_cand(f"Риск {i}", "minor") for i in range(14)]
+    cands = [_cand(f"Риск {i}", "major") for i in range(14)]
     cands.insert(5, _cand("Ключевое событие", "critical"))
-    cands.append(_cand("Риск 0", "minor"))
+    cands.append(_cand("Риск 0", "major"))
     kept, dropped = lens_risk.postprocess(cands, "документ")
     assert len(kept) == lens_risk.MAX_CANDIDATES
     assert kept[0]["title"] == "Ключевое событие"
@@ -116,13 +125,18 @@ def test_terms_section_caps_severity_to_minor():
     c_terms = _cand("Месяц не привязан к дате операции", "critical", evidence=[{"quote": "Месяц", "line": 4}])
     c_mixed = _cand("Правило против определения", "critical", "contradiction", "set_consistent",
                     evidence=[{"quote": "Месяц", "line": 4}, {"quote": "Правило", "line": 7}])
-    kept, _ = lens_risk.postprocess([c_terms, c_mixed], doc)
-    sev = {c["title"]: c["severity"] for c in kept}
-    assert sev == {"Месяц не привязан к дате операции": "minor", "Правило против определения": "critical"}
+    kept, dropped = lens_risk.postprocess([c_terms, c_mixed], doc)
+    # тонкость определения → minor, а minor без зацепки — вопрос, не замечание линзы
+    assert _sev("Месяц не привязан к дате операции", kept, dropped) == "снято"
+    assert _sev("Правило против определения", kept, dropped) == "critical"
     c_vague = _cand("Месяц: дата авторизации или проведения", "major",
                     evidence=[{"quote": "Месяц", "line": 4}, {"quote": "Правило", "line": 7}])
-    kept, _ = lens_risk.postprocess([c_vague], doc)
-    assert kept[0]["severity"] == "minor"
+    kept, dropped = lens_risk.postprocess([c_vague], doc)
+    assert _sev(c_vague["title"], kept, dropped) == "снято"
+    c_tz = _cand("Пояс суток назван городом, а не смещением UTC", "major",
+                 evidence=[{"quote": "Месяц", "line": 4}, {"quote": "Правило", "line": 7}])
+    kept, dropped = lens_risk.postprocess([c_tz], doc)
+    assert _sev(c_tz["title"], kept, dropped) == "minor", "minor с зацепкой (пояс) остаётся"
 
 
 def test_terms_lines_from_docview_sections():
@@ -134,10 +148,9 @@ def test_terms_lines_from_docview_sections():
 
 def test_ops_major_without_hook_is_minor():
     doc = "Клиент задаёт лимит. Сервис начисляет кэшбэк."
-    kept, _ = lens_risk.postprocess([_cand("Нет ключа дедупликации событий", "major", "ops_risk", "risk"),
-                                     _cand("Параллельные покупки у границы лимита", "major", "ops_risk", "risk"),
-                                     _cand("Сбой зачисления: итог не описан", "major", "ops_risk", "risk")], doc)
-    assert {c["severity"] for c in kept} == {"minor"}
+    titles = ["Нет ключа дедупликации событий", "Параллельные покупки у границы лимита", "Сбой зачисления: итог не описан"]
+    kept, dropped = lens_risk.postprocess([_cand(t, "major", "ops_risk", "risk") for t in titles], doc)
+    assert not kept and {_sev(t, kept, dropped) for t in titles} == {"снято"}
     kept, _ = lens_risk.postprocess([_cand("Возврат при лимите 10 000 ₸ и пороге 500 ₸ даёт неопределённый итог")], doc)
     assert kept[0]["severity"] == "major", "сумма 500 ₸ — не код ответа 5xx"
     doc2 = "Повторная доставка одного события сохраняет исходный итог."
@@ -146,12 +159,12 @@ def test_ops_major_without_hook_is_minor():
 
 
 def test_security_major_needs_interface_anchor():
-    kept, _ = lens_risk.postprocess([
+    kept, dropped = lens_risk.postprocess([
         _cand("Источник уведомления не описан: подложное уведомление запускает списание", "major", "security", "risk"),
         _cand("Изменение настройки методом GET с суммой в строке запроса", "major", "security", "risk"),
         _cand("Для чужой карты обещаны 403 и 404", "major", "security", "risk")], "документ")
-    assert [c["severity"] for c in kept] == ["major", "major", "minor"]
-    assert kept[-1]["title"].startswith("Источник уведомления")
+    assert [c["severity"] for c in kept] == ["major", "major"]
+    assert _sev("Источник уведомления не описан: подложное уведомление запускает списание", kept, dropped) == "снято"
     kept, _ = lens_risk.postprocess([_cand("Для чужой карты одновременно обещаны 403 и 404", "major", "security",
                                            "risk")], "документ")
     assert kept[0]["severity"] == "major", "«одновременно обещаны» — не гонка событий"
@@ -162,16 +175,63 @@ def test_security_major_needs_interface_anchor():
 
 
 def test_refund_rollback_wording_not_dropped():
-    kept, _ = lens_risk.postprocess([_cand("Списание без отката денег, если пополнение не прошло")], "текст")
-    assert len(kept) == 1 and kept[0]["severity"] == "minor"
+    t = "Списание без отката денег, если пополнение не прошло"
+    kept, dropped = lens_risk.postprocess([_cand(t)], "текст")
+    # не снят фильтром темы «откат функции» (это возврат денег), но как сбой без зацепки — вопрос, не замечание
+    assert _sev(t, kept, dropped) == "снято" and "тема" not in dropped[0]["reject_reason"]
     doc = "Операция недоступна"  # «недоступна» в тексте ответа — не зацепка для темы сбоев
-    kept, _ = lens_risk.postprocess([_cand("При ответе 500 неизвестно, применена ли блокировка")], doc)
-    assert kept[0]["severity"] == "minor"
+    t = "При ответе 500 неизвестно, применена ли блокировка"
+    kept, dropped = lens_risk.postprocess([_cand(t)], doc)
+    assert _sev(t, kept, dropped) == "снято"
 
 
 def test_critical_cap():
     kept, _ = lens_risk.postprocess([_cand(f"Событие {i}", "critical") for i in range(4)], "текст")
     assert [c["severity"] for c in kept] == ["critical", "critical", "major", "major"]
+
+
+def test_minor_only_with_text_hook_and_capped():
+    cands = [_cand("Ключевое событие", "critical")] + [_cand(f"Пояс назван городом {i}", "minor") for i in range(4)]
+    kept, dropped = lens_risk.postprocess(cands, "документ")
+    assert [c["severity"] for c in kept].count("minor") == lens_risk.MAX_MINOR
+    assert sum("лимита minor" in d["reject_reason"] for d in dropped) == 2
+    cands = [_cand("Валюта операции не определена", "minor"), _cand("Гонка у границы", "minor"),
+             _cand("Пункт шаблона ревью про схему отката не заполнен", "minor")]
+    kept, dropped = lens_risk.postprocess(cands, "схема отката решений")
+    assert [c["title"] for c in kept] == ["Пункт шаблона ревью про схему отката не заполнен"]
+    assert all("без текстовой зацепки" in d["reject_reason"] for d in dropped)
+
+
+def test_key_event_critical_is_ambiguity():
+    c = lens_risk.calibrate(_cand("Цель «в момент покупки» несовместима: не определено, какое событие запускает правило",
+                                  "critical", "event_conflict", "set_consistent"))
+    assert (c["kind"], c["criterion"], c["severity"]) == ("ambiguity", "unambiguous", "critical")
+    c = lens_risk.calibrate(_cand("Не определён этап операции: авторизация или проведение", "critical",
+                                  "missing_element", "complete"))
+    assert c["kind"] == "ambiguity"
+    # противоречие критерия приёмки с правилом — основание (а), вид не трогаем
+    c = lens_risk.calibrate(_cand("Критерий приёмки и правило: событие проведения относит к другому месяцу",
+                                  "critical", "contradiction", "set_consistent"))
+    assert c["kind"] == "contradiction"
+
+
+def test_acceptance_conflicts_left_to_qa():
+    k1 = _cand("Месяц покупки: правило и проведение в строке приёмки расходятся", "critical", "contradiction",
+               "set_consistent", requirement_ids=["R-06", "R-14"])
+    k1_title = _cand("Критерий приёмки относит покупку к февралю, правило — к январю", "critical",
+                     "event_conflict", "set_consistent", requirement_ids=["R-06"])
+    rule_vs_rule = _cand("Два правила по-разному решают, уменьшает ли отмена сумму", "critical", "contradiction",
+                         "set_consistent", requirement_ids=["R-07", "R-09"])
+    period = _cand("Период ограничения без пояса: строка приёмки на границе месяца", "major", "ambiguity",
+                   requirement_ids=["R-07", "R-14"])
+    kept, dropped = lens_risk.postprocess([k1, k1_title, rule_vs_rule, period], "документ",
+                                          acceptance_ids=["R-13", "R-14"])
+    assert [c["title"] for c in kept] == [rule_vs_rule["title"], period["title"]]
+    assert all("тестировщика" in d["reject_reason"] for d in dropped)
+
+
+def test_lens_output_limit_for_reasoning_models():
+    assert lens_risk.MAX_OUTPUT_TOKENS == 32000
 
 
 def test_candidate_without_evidence_dropped():
@@ -213,6 +273,8 @@ def test_saved_live_answers_on_clean_bases(path):
     sev = [c["severity"] for c in kept]
     limit = 2 if "sonnet" in path.stem else 4
     assert sev.count("critical") == 0 and sev.count("major") <= limit, sev
+    if path.stem.endswith(("_v19",)):  # вторая волна: ≤ 1 замечания линзы на чистый документ
+        assert len(kept) <= (1 if "sonnet" in path.stem else 2), [c["title"] for c in kept]
 
 
 def test_run_uses_common_lens_and_postprocess(monkeypatch):
@@ -232,7 +294,7 @@ def test_run_uses_common_lens_and_postprocess(monkeypatch):
     import bcc_review.v2.stages as stages_pkg
     monkeypatch.setattr(stages_pkg, "lens", fake, raising=False)
     ctx = types.SimpleNamespace(view={"lines": [{"n": 1, "text": "Клиент задаёт лимит.", "section": ""}]},
-                                requirements=[{"id": "R-01"}])
+                                requirements=[{"id": "R-01", "kind": "functional"}])
     out = lens_risk.run(ctx)
     assert calls == ["risk"]
     assert [c["title"] for c in out["candidates"]] == ["Ключевое событие не определено"]

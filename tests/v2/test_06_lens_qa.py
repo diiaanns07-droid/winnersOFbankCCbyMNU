@@ -191,6 +191,23 @@ def test_non_conflict_critical_from_model_is_demoted():
     assert sev["Два исхода"] == ("critical", "testing")
 
 
+def test_other_candidates_limited_conflicts_kept():
+    """Противоречия модели остаются все; прочих замечаний — два: покрытие приёмкой и проверяемость первыми."""
+    base = {"requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
+            "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "testing",
+            "severity": "major"}
+    raw = [dict(base, title="Неоднозначность", kind="ambiguity", criterion="unambiguous"),
+           dict(base, title="Контракт", kind="api_contract", criterion="complete"),
+           dict(base, title="Два исхода", kind="contradiction", criterion="set_consistent", severity="critical"),
+           dict(base, title="Метрика", kind="unverifiable", criterion="verifiable"),
+           dict(base, title="Коды", kind="status_conflict", criterion="set_consistent"),
+           dict(base, title="Покрытие", kind="missing_element", criterion="set_validatable")]
+    out = lens_qa.postprocess({"candidates": raw}, REQS)
+    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие"]
+    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт"}
+    assert all("не больше 2" in d["reason"] for d in out["dropped"])
+
+
 # ---------------------------------------------------------------- тест-кейсы
 
 def test_test_cases_numbered_capped_and_undefined_marked():
@@ -270,6 +287,7 @@ class _LLM:
 
     def ask(self, stage, system, user, schema, **kw):
         self.calls.append((stage, user))
+        self.kw = kw
         return self.answers.pop(0)
 
 
@@ -300,6 +318,8 @@ def test_run_without_missing_rows_makes_one_call():
     llm = _LLM([full])
     out = lens_qa.run(_Ctx(llm, REQS))
     assert len(llm.calls) == 1 and out["candidates"] == []
+    # лимит ответа сразу 32 000: на haiku 16 000 включают рассуждение, обрезанная попытка стоит целого вызова
+    assert llm.kw.get("max_output_tokens") == lens_qa.MAX_OUTPUT_TOKENS == 32000
 
 
 def test_other_topic_both_acceptance_conflicts_found():

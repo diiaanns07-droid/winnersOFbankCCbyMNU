@@ -245,3 +245,20 @@ def doc_latin_vocab(lines: list[dict]) -> set[str]:
             for part in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])", w):
                 vocab.add(part.lower())
     return vocab
+
+
+# ─────────────────────── владельцы этапов ───────────────────────
+
+STAGE_OWNER = {"segment": "№04", "lens_analyst": "№05", "lens_qa": "№06", "lens_architect": "№07",
+               "lens_risk": "№08", "consistency": "№09", "judge": "№10", "clarify": "№11", "rules": "№12",
+               "quotes": "№03", "report": "№13", "provider": "№02", "pipeline": "№01"}
+
+
+def source_owner(src: str) -> str:
+    """Источник замечания (`lens:risk`, `consistency`, `rules:api.status_409`, …) → номер исполнителя."""
+    s = str(src or "")
+    if s.startswith("lens:"):
+        return STAGE_OWNER.get("lens_" + s.split(":", 1)[1], "?")
+    if s.startswith("rules"):
+        return "№12"
+    return STAGE_OWNER.get(s.split(":", 1)[0], "?")
