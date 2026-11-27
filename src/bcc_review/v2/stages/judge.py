@@ -994,6 +994,8 @@ _TERMS_RU = [
     (re.compile(r"\bUSD\b"), "доллары США"),
     (re.compile(r"\bв EUR\b"), "в евро"),
     (re.compile(r"\bfeature[- ]flag\w*", re.I), "флаг включения функции"),
+    (re.compile(r"\bevent[ _-]?id\b", re.I), "идентификатор события"),
+    (re.compile(r"\bNFR\b"), "НФТ"),
 ]
 
 
