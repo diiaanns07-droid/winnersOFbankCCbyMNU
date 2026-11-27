@@ -376,9 +376,15 @@ def test_cli_exit_codes_and_routing(tmp_path, mock_script):
 
 
 def test_cli_module_entry_point(tmp_path):
+    import importlib.util
+    import os
+
     out = tmp_path / "e.md"
-    res = subprocess.run([sys.executable, "-m", "bcc_review", str(BCC), str(out), "--offline-lint"],
-                         capture_output=True, text=True, encoding="utf-8", cwd=tmp_path)
+    # в bcc/v2 движок по умолчанию — v2, а v1 вызывается флагом --engine v1 (план Б)
+    engine_flag = ["--engine", "v1"] if importlib.util.find_spec("bcc_review.v2") else []
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    res = subprocess.run([sys.executable, "-m", "bcc_review", *engine_flag, str(BCC), str(out), "--offline-lint"],
+                         capture_output=True, text=True, encoding="utf-8", cwd=tmp_path, env=env)
     assert res.returncode == 0, res.stderr
     assert out.exists() and out.with_suffix(".json").exists()
     assert "Отчёт:" in res.stdout
