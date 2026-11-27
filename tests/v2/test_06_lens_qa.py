@@ -687,3 +687,49 @@ def test_nfr_conditions_only_for_nonfunctional_and_shared_in_requirement():
     assert len(one) == 1 and one[0]["severity"] == "major"
     vague = dict(blk, quote="Блокировка вступает в силу мгновенно", metric="")
     assert lens_qa.postprocess({"nfr_checks": [vague]}, reqs)["candidates"][0]["severity"] == "major"
+
+
+# ---------------------------------------------------------------- третья волна: новые ТЗ №18, haiku, без кэша
+
+OPEN2 = QA / "open2"
+# строка приёмки, которая противоречит правилу по эталону (К1/К2 кейса); на чистых версиях таких строк нет
+OPEN2_CONFLICT_ROW = {"official": 64, "grace": 63, "qr": 67, "capital": 65, "insurance": 66}
+
+
+def _open2(case: str) -> dict:
+    fx = _json(OPEN2 / f"{case}.haiku-w3.json")
+    data = {"acceptance_checks": [], "nfr_checks": [], "candidates": [], "test_cases": []}
+    for r in fx["responses"]:
+        data["acceptance_checks"] += r.get("acceptance_checks") or []
+        for k in ("nfr_checks", "candidates", "test_cases"):
+            data[k] = data[k] or r.get(k) or []
+    return {"fx": fx, "out": lens_qa.postprocess(data, fx["requirements"])}
+
+
+@pytest.mark.parametrize("case", sorted(OPEN2_CONFLICT_ROW))
+def test_open2_defective_acceptance_conflict_found(case):
+    """Дефектные ТЗ: противоречие строки приёмки из эталона — critical с цитатами правила и строки; один вызов;
+    НФТ с размытыми словами или без условий — одно major; покрытие — одно minor."""
+    r = _open2(case)
+    assert r["fx"]["calls"] == 1
+    out = r["out"]
+    verdicts = {c["row_line"]: c["verdict"] for c in out["acceptance_checks"]}
+    assert verdicts[OPEN2_CONFLICT_ROW[case]] == "conflict"
+    crit = [c for c in out["candidates"] if c["severity"] == "critical"]
+    assert len(crit) == 1 and crit[0]["origin"] == "acceptance_check"
+    assert OPEN2_CONFLICT_ROW[case] in {e["line"] for e in crit[0]["evidence"]}
+    nfr = [c for c in out["candidates"] if c.get("origin") == "nfr_check"]
+    assert len(nfr) == 1 and nfr[0]["severity"] == "major"
+    cover = [c for c in out["candidates"] if c["kind"] == "missing_element" and c["criterion"] == "set_validatable"]
+    assert len(cover) == 1 and cover[0]["severity"] == "minor"
+
+
+@pytest.mark.parametrize("case", ["grace_clean", "qr_clean", "capital_clean", "insurance_clean"])
+def test_open2_clean_no_alarms(case):
+    """Чистые версии: все строки приёмки — match, ни одного critical и major; остаются только minor о покрытии
+    приёмкой и о пустом разделе тестирования (он есть в эталоне чистой версии, М3)."""
+    out = _open2(case)["out"]
+    assert out["acceptance_checks"] and all(c["verdict"] == "match" for c in out["acceptance_checks"])
+    assert all(c["severity"] == "minor" for c in out["candidates"]), [c["title"] for c in out["candidates"]]
+    assert {c["kind"] for c in out["candidates"]} <= {"missing_element", "placeholder"}
+    assert len(out["candidates"]) <= 2
