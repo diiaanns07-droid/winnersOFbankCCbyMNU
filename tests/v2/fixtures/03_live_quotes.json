@@ -1,0 +1,2465 @@
+{
+"note": "Цитаты линз и проверки набора из 6 живых прогонов haiku (27.11, волна 3): документ, цитата, строка модели, строка, найденная сверкой. Тест test_03_wave3.py::test_live_quotes_*.",
+"quotes": [
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Месяц определяется по дате совершения покупки в Алматы.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Февральский счётчик вырос на 4 000 ₸",
+"line": 42,
+"found": 42
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "независимо от истории предыдущей настройки",
+"line": 27,
+"found": 27
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "максимум один такой push за календарный месяц",
+"line": 26,
+"found": 26
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "сумму покупки в тиынах",
+"line": 33,
+"found": 33
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "порог от 1 000 до 1 000 000 ₸",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "передать последние четыре цифры карты и сумму при достижении порога",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "По умолчанию уведомление выключено.",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "сумма за месяц",
+"line": 19,
+"found": 19
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Держатель активной карты KZT",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Проверить принадлежность карты клиенту.",
+"line": 81,
+"found": 81
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "В расходы входят проведённые покупки.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Карты → Расходы → Уведомления",
+"line": 19,
+"found": 19
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Сервис передаёт push на отправку в течение минуты после получения события.",
+"line": 31,
+"found": 31
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "в момент покупки",
+"line": 15,
+"found": 15
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Повторная доставка одного события процессинга сохраняет исходный итог.",
+"line": 35,
+"found": 35
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы",
+"line": 42,
+"found": 42
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "На карту приходится максимум один такой push за календарный месяц.",
+"line": 26,
+"found": 26
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "следующее достижение вызывает push независимо от истории предыдущей настройки",
+"line": 27,
+"found": 27
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR.",
+"line": 84,
+"found": 84
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "400. Ответ в случае, если параметры запроса заполнены неверно.",
+"line": 111,
+"found": 111
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}",
+"line": 115,
+"found": 115
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Возврат уменьшает расходы месяца исходной покупки.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Для чужой карты возвращается 404, как и для отсутствующей карты.",
+"line": 124,
+"found": 124
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API».",
+"line": 35,
+"found": 35
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Description | Сохранение порога. Функциональные требования: чтение порога",
+"line": 67,
+"found": 67
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "REST type | GET",
+"line": 68,
+"found": 68
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "CURL | curl -G \"$BASE/alerts/saveLimit\"",
+"line": 73,
+"found": 73
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "403. Ответ в случае, если на указанный ресурс доступ запрещен.",
+"line": 117,
+"found": 117
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+"line": 97,
+"found": 97
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "amount | string | При успехе | Порог в тенге | limit_kzt",
+"line": 106,
+"found": 106
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "result | string | OK / ERROR | Исход сохранения | —",
+"line": 105,
+"found": 105
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "{\"message\":\"Некорректный запрос\"}",
+"line": 120,
+"found": 120
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "5. При отклонении суммы вернуть прежнее состояние и результат ERROR.",
+"line": 84,
+"found": 84
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге.",
+"line": 33,
+"found": 33
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push",
+"line": 41,
+"found": 41
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
+"line": 98,
+"found": 98
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Мобильное приложение → сервис настроек. Карточный процессинг → учёт расходов → сервис push.",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Сервис расходов → настройки: получить порог карты.",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Приложение → AlertsController → хранилище настроек → AlertsController",
+"line": 90,
+"found": 90
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "проведена покупка",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "в течение минуты после получения события",
+"line": 31,
+"found": 31
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Переводы и снятие наличных исключаются.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "сессия владельца карты",
+"line": 69,
+"found": 69
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "--data 'cardId=demo-42&amount=50000&enabled=1'",
+"line": 73,
+"found": 73
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "по дате совершения покупки в Алматы",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "по Алматы",
+"line": 42,
+"found": 42
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Реализация задачи/проекта предусматривает схему отката решений",
+"line": 51,
+"found": 51
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "При отклонении суммы вернуть прежнее состояние и результат ERROR",
+"line": 84,
+"found": 84
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000 ₸ включительно.",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "2. Проверить принадлежность карты клиенту.",
+"line": 81,
+"found": 81
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "сервис настроек",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "настройки",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "хранилище настроек",
+"line": 90,
+"found": 90
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "учёт расходов",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "сервис расходов",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "клиенту",
+"line": 81,
+"found": 81
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Мобильное приложение",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Приложение",
+"line": 90,
+"found": 90
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Февральский счётчик",
+"line": 42,
+"found": 42
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Счётчик показывает",
+"line": 43,
+"found": 43
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Приложение читает и сохраняет настройки через дочерний документ",
+"line": 35,
+"found": 35
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Dev: /alerts/saveLimit",
+"line": 72,
+"found": 72
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Дать клиенту возможность узнать о достижении личного бюджета в момент покупки.",
+"line": 15,
+"found": 15
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Мобильное приложение → сервис настроек.",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "На экране видны переключатель",
+"line": 19,
+"found": 19
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "целый порог от 1 000 до 1 000 000 ₸ включительно",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Целое число тенге, обе границы включены.",
+"line": 86,
+"found": 86
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Ф-1. Держатель активной карты KZT задаёт целый порог",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Практикум без Jira-задачи",
+"line": 13,
+"found": 13
+},
+{
+"doc": "release/input/requirements.pdf",
+"quote": "Документ (версия/дата) в источнике не заполнен.",
+"line": 45,
+"found": 45
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Месяц определяется по дате совершения покупки в Алматы",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Проведение покупки → пересчёт расходов",
+"line": 22,
+"found": 22
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Покупка 31 января в 23:58 на 4 000 ₸",
+"line": 42,
+"found": 42
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Февральский счётчик вырос на 4 000 ₸",
+"line": 42,
+"found": 42
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "сумму покупки в тиынах, признак отправки и порог в тенге",
+"line": 33,
+"found": 33
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Расходы 48 500 ₸, порог 50 000 ₸",
+"line": 41,
+"found": 41
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Если она ниже нового порога, следующее достижение вызывает push",
+"line": 27,
+"found": 27
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "По умолчанию уведомление выключено.",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Держатель активной карты KZT",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Bearer, сессия владельца карты",
+"line": 69,
+"found": 69
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Держатель активной карты KZT задаёт целый порог",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Повторная доставка одного события процессинга сохраняет исходный итог.",
+"line": 35,
+"found": 35
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Сервис передаёт push на отправку в течение минуты после получения события.",
+"line": 31,
+"found": 31
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Дать клиенту возможность узнать о достижении личного бюджета в момент покупки.",
+"line": 15,
+"found": 15
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "При ошибке ввода сообщение появляется под полем.",
+"line": 19,
+"found": 19
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "В расходы входят проведённые покупки",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "В расходы входят проведённые покупки.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Покупка 31 января в 23:58 на 4 000 ₸ | Провести 1 февраля в 00:03 по Алматы",
+"line": 42,
+"found": 42
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "На карту приходится максимум один такой push за календарный месяц.",
+"line": 26,
+"found": 26
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "следующее достижение вызывает push независимо от истории предыдущей настройки",
+"line": 27,
+"found": 27
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Исходные условия | Действие | Ожидаемый результат",
+"line": 40,
+"found": 40
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push",
+"line": 41,
+"found": 41
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API».",
+"line": 35,
+"found": 35
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Сохранение порога. Функциональные требования: чтение порога",
+"line": 67,
+"found": 67
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "400. Ответ в случае, если параметры запроса заполнены неверно.",
+"line": 111,
+"found": 111
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}",
+"line": 115,
+"found": 115
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "REST type | GET",
+"line": 68,
+"found": 68
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "curl -G \"$BASE/alerts/saveLimit\" -H \"Authorization: Bearer $TOKEN\" --data 'cardId=demo-42&amount=50000&enabled=1'",
+"line": 73,
+"found": 73
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+"line": 97,
+"found": 97
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "amount | string | При успехе | Порог в тенге | limit_kzt",
+"line": 106,
+"found": 106
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Если результат 200 или 201 — успешный.",
+"line": 103,
+"found": 103
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "200. Successful — Created",
+"line": 112,
+"found": 112
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "403. Ответ в случае, если на указанный ресурс доступ запрещен.",
+"line": 117,
+"found": 117
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Для чужой карты возвращается 404, как и для отсутствующей карты.",
+"line": 124,
+"found": 124
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "result | string | OK / ERROR | Исход сохранения | —",
+"line": 105,
+"found": 105
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "{\"message\":\"Некорректный запрос\"}",
+"line": 120,
+"found": 120
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "5. При отклонении суммы вернуть прежнее состояние и результат ERROR.",
+"line": 84,
+"found": 84
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
+"line": 98,
+"found": 98
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге.",
+"line": 33,
+"found": 33
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Карточный процессинг → учёт расходов → сервис push.",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Сервис расходов → настройки: получить порог карты.",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Процессинг → сервис расходов: проведена покупка",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Дать клиенту возможность узнать о достижении личного бюджета в момент покупки",
+"line": 15,
+"found": 15
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Сервис передаёт push на отправку в течение минуты после получения события",
+"line": 31,
+"found": 31
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Переводы и снятие наличных исключаются",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Возврат уменьшает расходы месяца исходной покупки",
+"line": 25,
+"found": 25
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "На карту приходится максимум один такой push за календарный месяц",
+"line": 26,
+"found": 26
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Authorization | Bearer, сессия владельца карты",
+"line": 69,
+"found": 69
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Проверить принадлежность карты клиенту",
+"line": 81,
+"found": 81
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Тело не используется.",
+"line": 101,
+"found": 101
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Реализация задачи/проекта предусматривает схему отката решений",
+"line": 51,
+"found": 51
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "сумму покупки в тиынах",
+"line": 33,
+"found": 33
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Когда расходы переходят от суммы ниже порога к сумме, равной порогу или выше",
+"line": 26,
+"found": 26
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "По умолчанию уведомление выключено",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "клиент получает push",
+"line": 26,
+"found": 26
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "владельца карты",
+"line": 69,
+"found": 69
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "клиенту",
+"line": 81,
+"found": 81
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "сервис настроек",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "хранилище настроек",
+"line": 90,
+"found": 90
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "учёт расходов",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "сервис расходов",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Приложение читает и сохраняет настройки через дочерний документ",
+"line": 35,
+"found": 35
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Dev: /alerts/saveLimit",
+"line": 72,
+"found": 72
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Карточный процессинг → учёт расходов → сервис push",
+"line": 17,
+"found": 17
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Сервис расходов → настройки: получить порог карты",
+"line": 29,
+"found": 29
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Приложение → AlertsController → хранилище настроек",
+"line": 90,
+"found": 90
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "задаёт целый порог от 1 000 до 1 000 000 ₸ включительно",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Целое число тенге, обе границы включены",
+"line": 86,
+"found": 86
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Держатель активной карты KZT задаёт целый порог от 1 000 до 1 000 000",
+"line": 24,
+"found": 24
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Практикум без Jira-задачи",
+"line": 13,
+"found": 13
+},
+{
+"doc": "release/input/requirements.docx",
+"quote": "Документ (версия/дата) в источнике не заполнен.",
+"line": 45,
+"found": 45
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Срок кредита в днях",
+"line": 104,
+"found": 104
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "срок кредита в месяцах",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Кредит 1 000 000 ₸ на 24 месяца",
+"line": 43,
+"found": 43
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "за полные неиспользованные месяцы",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "через 10 месяцев кредит погашен полностью",
+"line": 46,
+"found": 46
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "в течение 14 календарных дней с даты подключения",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Премия оплачивается единовременно из суммы кредита при выдаче",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "отказ в период охлаждения и возврат премии (если клиент отказался)",
+"line": 22,
+"found": 22
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Стоимость страхования рассчитывается моментально",
+"line": 33,
+"found": 33
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "ответы анкеты здоровья клиента",
+"line": 35,
+"found": 35
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Страховая премия равна сумме кредита × 0,15 %",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Страховая премия, ₸",
+"line": 109,
+"found": 109
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "премия возвращается полностью на текущий счёт клиента в течение 7 рабочих дней",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "После отказа ставка по кредиту повышается до 27 % годовых со дня отказа",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Возвращено 32 400 ₸ (90 % премии), ставка 27 % годовых",
+"line": 44,
+"found": 44
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Страхование подключено 1 марта, премия 36 000 ₸",
+"line": 44,
+"found": 44
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Отказ от страхования не изменяет условия кредитного договора.",
+"line": 93,
+"found": 93
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Если он больше 65 лет, вернуть 200 со status = DECLINED и причиной.",
+"line": 87,
+"found": 87
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "422. Ответ в случае, если клиент не подходит по возрасту.",
+"line": 113,
+"found": 113
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "на срок от 6 до 60 месяцев",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Кредит 1 000 000 ₸ на 24 месяца | Подключить страхование",
+"line": 43,
+"found": 43
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Кредит на 24 месяца, премия 36 000 ₸, через 10 месяцев кредит погашен полностью",
+"line": 46,
+"found": 46
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Стоимость страхования рассчитывается моментально. Интерфейс подключения удобный и понятный для клиента.",
+"line": 33,
+"found": 33
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Приложение рассчитывает стоимость страхования, подключает его к заявке и оформляет отказ через дочерний документ",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Дочерний документ части A: «Страхование жизни к кредиту наличными — REST API».",
+"line": 68,
+"found": 68
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "REST type | POST",
+"line": 72,
+"found": 72
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "{\"message\":\"Страхование недоступно по возрасту\"}",
+"line": 125,
+"found": 125
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "term | integer | 1–2 знака | Да | 6–60 | Срок кредита в днях | loan_term",
+"line": 104,
+"found": 104
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Ф-1. Страхование предлагается при оформлении кредита наличными от 300 000 до 5 000 000 ₸ на срок от 6 до 60 месяцев.",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Мобильное приложение → API кредитов → кредитный конвейер.",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "API кредитов → сервис страхования: рассчитать премию и проверить клиента.",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "6. Передать данные клиента в СК для предварительной проверки, сохранить подключение страхования в заявке и вернуть результат.",
+"line": 89,
+"found": 89
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "502. Ответ в случае, если страховая компания не ответила.",
+"line": 113,
+"found": 113
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "status | string | CONNECTED / DECLINED | Результат подключения | insurance_status",
+"line": 108,
+"found": 108
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "{\"message\":\"Сумма или срок вне допустимого диапазона\"}",
+"line": 117,
+"found": 117
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Передавать страховой компании-партнёру ИИН, ФИО, дату рождения, номер телефона и ответы анкеты здоровья клиента.",
+"line": 35,
+"found": 35
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "curl -X POST \"$BASE/loans/applications/la-7781/insurance\" -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" -d '{\"amount\":1000000,\"term\":24}'",
+"line": 77,
+"found": 77
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "curl -X POST \"$BASE/loans/applications/la-7781/insurance\" -H \"Authorization: Bearer $TOKEN\"",
+"line": 77,
+"found": 77
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "После выдачи: Кредиты → кредит → «Страхование» → номер полиса, дата начала действия и кнопка «Отказаться от страхования».",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Сервис страхования получает номер полиса от страховой компании-партнёра после выдачи кредита.",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "выдача кредита и оплата премии",
+"line": 22,
+"found": 22
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "оформляет отказ через дочерний документ",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Дочерний документ части A",
+"line": 68,
+"found": 68
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Подключение страхования жизни к заявке на кредит наличными",
+"line": 71,
+"found": 71
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "премия возвращается полностью на текущий счёт клиента",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "дату отказа и сумму возврата",
+"line": 35,
+"found": 35
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "кредит выдан, выпустить полис",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Сервис страхования получает номер полиса от страховой компании-партнёра после выдачи кредита",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Реализация задачи/проекта предусматривает схему отката решений",
+"line": 54,
+"found": 54
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Возвращено 32 400 ₸ (90 % премии)",
+"line": 44,
+"found": 44
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "вернуть 200 со status = DECLINED и причиной",
+"line": 87,
+"found": 87
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Повторный вызов с теми же суммой и сроком возвращает действующие условия страхования",
+"line": 91,
+"found": 91
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Проверить, что заявка на кредит принадлежит клиенту и ещё не подписана.",
+"line": 85,
+"found": 85
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Страхование доступно клиенту от 18 лет",
+"line": 29,
+"found": 29
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Если он больше 65 лет, вернуть 200 со status = DECLINED и причиной",
+"line": 87,
+"found": 87
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "страховая компания-партнёр",
+"line": 12,
+"found": 12
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "СК",
+"line": 89,
+"found": 89
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Мобильное приложение",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Приложение",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "API кредитов",
+"line": 12,
+"found": 12
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "LoanInsuranceController",
+"line": 74,
+"found": 74
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "оформляет отказ через дочерний документ «Страхование жизни к кредиту наличными — REST API»",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Логика работы метода",
+"line": 83,
+"found": 83
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Клиент может отказаться от страхования в течение 14 календарных дней",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "номер полиса, дата начала действия и кнопка «Отказаться от страхования»",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Мобильное приложение → API кредитов → кредитный конвейер",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "API кредитов → сервис страхования: рассчитать премию и проверить клиента",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "При полном досрочном погашении кредита страхование прекращается",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "возвращается часть премии за полные неиспользованные месяцы",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Комплект из двух исходных документов",
+"line": 2,
+"found": 2
+},
+{
+"doc": "evaluation/v2/open2/insurance/source.docx",
+"quote": "Документ (версия/дата) в источнике не заполнен",
+"line": 48,
+"found": 48
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "срок действия ttl в минутах",
+"line": 36,
+"found": 36
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "текущее время не позже времени создания QR-кода + ttl секунд",
+"line": 90,
+"found": 90
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код действует 15 минут с момента создания",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код без суммы действует до конца календарного дня создания",
+"line": 96,
+"found": 96
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "с суммой от 100 до 500 000 ₸ включительно",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Перевод отклонён: сумма превышает максимальную",
+"line": 46,
+"found": 46
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Создание QR-кода и перевод выполняются мгновенно.",
+"line": 34,
+"found": 34
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Сервис выдерживает высокие нагрузки в пиковые часы.",
+"line": 34,
+"found": 34
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Получатель может отменить неоплаченный QR-код.",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код с суммой можно оплатить один раз, QR-код без суммы — несколько раз в течение срока действия",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "статус (активен, оплачен, отменён, истёк)",
+"line": 36,
+"found": 36
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код без суммы — несколько раз в течение срока действия",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Если в QR-коде задана сумма, использовать её, а поле amount запроса не учитывать",
+"line": 91,
+"found": 91
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код на сумму 500 000 ₸",
+"line": 46,
+"found": 46
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Проверить, что QR-код с суммой ещё не оплачен",
+"line": 92,
+"found": 92
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код с суммой можно оплатить один раз",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Показано «QR-код недействителен»",
+"line": 47,
+"found": 47
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код с суммой 7 000 ₸ уже оплачен",
+"line": 47,
+"found": 47
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Если срок истёк или QR-код отменён, вернуть 410.",
+"line": 90,
+"found": 90
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "400. Ответ в случае, если параметры запроса заполнены неверно или срок действия QR-кода истёк",
+"line": 119,
+"found": 119
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Срок действия QR-кода истёк",
+"line": 123,
+"found": 123
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Создание QR-кода и перевод выполняются мгновенно",
+"line": 34,
+"found": 34
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Сервис выдерживает высокие нагрузки в пиковые часы",
+"line": 34,
+"found": 34
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Проверить, что карта списания принадлежит плательщику, активна и открыта в тенге",
+"line": 88,
+"found": 88
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Если суммы нет, проверить amount: от 100 до 500 000 ₸",
+"line": 91,
+"found": 91
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "При отказе антифрода вернуть 200 со status = REJECTED",
+"line": 93,
+"found": 93
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Повторный запрос с тем же requestId возвращает результат первого запроса",
+"line": 97,
+"found": 97
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Приложения создают QR-код, получают данные QR-кода перед подтверждением и выполняют перевод через дочерний документ «Перевод по QR-коду — REST API».",
+"line": 38,
+"found": 38
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Description | Выполнение перевода по QR-коду",
+"line": 74,
+"found": 74
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Ф-2. QR-код действует 15 минут с момента создания.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "1. QR-код без суммы действует до конца календарного дня создания.",
+"line": 96,
+"found": 96
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "4. Проверить срок действия: текущее время не позже времени создания QR-кода + ttl секунд. Если срок истёк или QR-код отменён, вернуть 410.",
+"line": 90,
+"found": 90
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "400. Ответ в случае, если параметры запроса заполнены неверно или срок действия QR-кода истёк.",
+"line": 119,
+"found": 119
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Хранить идентификатор QR-кода, идентификатор клиента-получателя, карту зачисления, сумму в тенге, время создания, срок действия ttl в минутах",
+"line": 36,
+"found": 36
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "4. Проверить срок действия: текущее время не позже времени создания QR-кода + ttl секунд.",
+"line": 90,
+"found": 90
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Приложение отправителя → сервис QR-кодов → сервис переводов → антифрод.",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Приложение отправителя → сервис переводов: выполнить перевод по QR-коду.",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "status | string | DONE / REJECTED | Результат перевода | status",
+"line": 112,
+"found": 113
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "{\"message\":\"Срок действия QR-кода истёк\"}",
+"line": 123,
+"found": 123
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "6. Проверить, что QR-код с суммой ещё не оплачен.",
+"line": 92,
+"found": 92
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "410. Ответ в случае, если QR-код отменён получателем.",
+"line": 119,
+"found": 119
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "2. Проверить, что карта списания принадлежит плательщику, активна и открыта в тенге.",
+"line": 88,
+"found": 88
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Если результат 200 — успешный. Если результат 400, 401, 404, 410 или 500 — неуспешный.",
+"line": 111,
+"found": 111
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код показывается с таймером обратного отсчёта и кнопкой «Отменить».",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Ф-5. Получатель может отменить неоплаченный QR-код.",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "requestId | string | 36 | Да | UUID | Ключ идемпотентности | request_id",
+"line": 109,
+"found": 109
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "CURL | curl -X POST \"$BASE/qr/transfer\" -H \"Authorization: Bearer $TOKEN\"",
+"line": 80,
+"found": 80
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Выполнить списание и зачисление и вернуть результат",
+"line": 94,
+"found": 94
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Получатель может отменить неоплаченный QR-код",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Если срок истёк или QR-код отменён, вернуть 410",
+"line": 90,
+"found": 90
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код содержит идентификатор QR-кода, номер карты получателя и сумму, если она задана",
+"line": 36,
+"found": 36
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код показывается с таймером обратного отсчёта",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Реализация задачи/проекта предусматривает схему отката решений",
+"line": 56,
+"found": 56
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код действует 15 минут с момента создания.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "QR-код без суммы действует до конца календарного дня создания.",
+"line": 96,
+"found": 96
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "от 100 до 500 000 ₸ включительно",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Проверить, что QR-код с суммой ещё не оплачен.",
+"line": 92,
+"found": 92
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "404. Ответ в случае, если QR-код не найден.",
+"line": 119,
+"found": 119
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "При отказе антифрода вернуть 200 со status = REJECTED.",
+"line": 93,
+"found": 93
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Если результат 200 — успешный.",
+"line": 111,
+"found": 111
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "сервис переводов",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "переводов → сервис уведомлений",
+"line": 32,
+"found": 32
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Отправитель",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "клиента-отправителя",
+"line": 76,
+"found": 76
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "получают данные QR-кода перед подтверждением",
+"line": 38,
+"found": 38
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Приложение отправителя → сервис QR-кодов: получить данные QR-кода.",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "и кнопкой «Отменить»",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Приложение отправителя → сервис QR-кодов → сервис переводов",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Приложение отправителя → QrTransferController → сервис QR-кодов → сервис переводов",
+"line": 99,
+"found": 99
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Повторный запрос перевода с тем же requestId не создаёт второй перевод.",
+"line": 38,
+"found": 38
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Повторный запрос с тем же requestId возвращает результат первого запроса.",
+"line": 97,
+"found": 97
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Тип работы | Новый функционал",
+"line": 11,
+"found": 11
+},
+{
+"doc": "evaluation/v2/open2/qr/source.pdf",
+"quote": "Документ (версия/дата) в источнике не заполнен.",
+"line": 50,
+"found": 50
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "проценты по покупкам расчётного периода не начисляются",
+"line": 26,
+"found": 26
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Проценты за покупки февраля начислены",
+"line": 42,
+"found": 42
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Количество рабочих дней до окончания платёжного периода",
+"line": 110,
+"found": 110
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "за 3 календарных дня до окончания платёжного периода",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "сколько дней осталось",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Сведения о льготном периоде отображаются быстро и всегда актуальны.",
+"line": 32,
+"found": 32
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Напоминания отправляются своевременно.",
+"line": 32,
+"found": 32
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Наступило 22-е число",
+"line": 44,
+"found": 44
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Внесённый платёж уменьшает оставшуюся сумму",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "до окончания платёжного периода включительно",
+"line": 26,
+"found": 26
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "задолженности по покупкам расчётного периода на дату выписки",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Покупки, отражённые на счёте после даты выписки",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Внести 120 000 ₸ 25 марта в 14:00",
+"line": 42,
+"found": 42
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "По умолчанию переключатель включён.",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Если переключатель «Напоминать о платеже» включён и сумма для погашения не внесена полностью",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Снятие наличных и переводы с кредитной карты в льготный период не входят",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "сессия клиента — владельца карты",
+"line": 73,
+"found": 73
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "платёжный период заканчивается 25-го числа того же месяца",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Если клиент внёс сумму для погашения полностью до окончания платёжного периода включительно, проценты по покупкам расчётного периода не начисляются.",
+"line": 26,
+"found": 26
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Задолженность по покупкам февраля 120 000 ₸, выписка от 1 марта",
+"line": 42,
+"found": 42
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "проценты начисляются на всю задолженность по покупкам расчётного периода с даты каждой покупки",
+"line": 26,
+"found": 26
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "При частичном погашении прогноз процентов считается только на непогашенную часть суммы для погашения.",
+"line": 92,
+"found": 92
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Прогноз процентов, если оставшаяся сумма не будет внесена до окончания платёжного периода, тиыны",
+"line": 111,
+"found": 111
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Если карта не кредитная, вернуть 200 с status = NOT_APPLICABLE.",
+"line": 89,
+"found": 89
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "422. Ответ в случае, если карта не является кредитной.",
+"line": 115,
+"found": 115
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Сведения о льготном периоде отображаются быстро и всегда актуальны. Напоминания отправляются своевременно.",
+"line": 32,
+"found": 32
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Исходные условия | Действие | Ожидаемый результат",
+"line": 41,
+"found": 41
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Снятие наличных 20 000 ₸ 10 февраля",
+"line": 45,
+"found": 45
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "включает или выключает напоминание через дочерний документ",
+"line": 36,
+"found": 36
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "REST type | GET",
+"line": 72,
+"found": 72
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "paymentDueDate | string | ДД.ММ.ГГГГ | Дата окончания платёжного периода | due_date",
+"line": 108,
+"found": 108
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "{\"status\":\"ACTIVE\",\"paymentDueDate\":\"2026-03-25\",\"graceAmount\":12000000,\"daysLeft\":9,\"interestForecast\":0,\"total",
+"line": 117,
+"found": 117
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Мобильное приложение → API кредитных карт → кредитный модуль.",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Приложение → GraceController → кредитный модуль → GraceController → приложение.",
+"line": 95,
+"found": 95
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Кредитный модуль передаёт в сервис уведомлений одно напоминание на карту за платёжный период.",
+"line": 36,
+"found": 36
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Если клиент внёс сумму для погашения полностью до окончания платёжного периода включительно",
+"line": 26,
+"found": 26
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Внесённый платёж уменьшает оставшуюся сумму для погашения",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Льготный период действует для покупок по кредитной карте",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Расчётный период равен календарному месяцу, выписка формируется 1-го числа следующего месяца",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Покупки, отражённые на счёте после даты выписки, относятся к следующему расчётному периоду",
+"line": 28,
+"found": 28
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "выписка формируется 1-го числа следующего месяца",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "прогноз процентов считается только на непогашенную часть суммы для погашения",
+"line": 92,
+"found": 92
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Если внесено меньше, проценты начисляются",
+"line": 26,
+"found": 26
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Если льготный период утрачен, вместо даты показывается надпись «Начисляются проценты» и общая сумма задолженности.",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "API кредитных карт",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "GraceController",
+"line": 74,
+"found": 74
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Мобильное приложение",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Приложение",
+"line": 95,
+"found": 95
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Сумма для погашения без процентов",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Оставшаяся сумма для погашения без процентов",
+"line": 109,
+"found": 109
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "переключатель «Напоминать о платеже»",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Тело не используется.",
+"line": 103,
+"found": 103
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "карточный процессинг, сервис уведомлений",
+"line": 12,
+"found": 12
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "API кредитных карт → кредитный модуль: получить выписку и платежи.",
+"line": 30,
+"found": 30
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Тип работы | Новый функционал",
+"line": 11,
+"found": 11
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Документ (версия/дата) в источнике не заполнен.",
+"line": 47,
+"found": 47
+},
+{
+"doc": "evaluation/v2/open2/grace/source.pdf",
+"quote": "Задача в JIRA | CARD-2417",
+"line": 13,
+"found": 13
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "проценты текущего месяца выплачиваются прежним способом",
+"line": 26,
+"found": 26
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Проценты за март зачислены на карту",
+"line": 44,
+"found": 44
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Ставка, % в месяц",
+"line": 110,
+"found": 110
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "по ставке 14 % годовых",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "ставку в процентах годовых",
+"line": 35,
+"found": 35
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "минимальный остаток месяца × ставка / 12",
+"line": 111,
+"found": 111
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "база — фактическое число дней в году",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "К остатку прибавлено 11 890,36 ₸",
+"line": 43,
+"found": 43
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "меньше неснижаемого остатка, проценты за этот день не начисляются",
+"line": 27,
+"found": 27
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Остаток на конец 10 марта 500 ₸",
+"line": 45,
+"found": 45
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "выплачиваются в день закрытия вместе с остатком счёта",
+"line": 29,
+"found": 29
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "перечисление на свою карту KZT",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Сервис доступен круглосуточно.",
+"line": 33,
+"found": 33
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "активна и открыта в тенге",
+"line": 86,
+"found": 86
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Способ «На карту», карта активна",
+"line": 46,
+"found": 46
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "без ошибок округления",
+"line": 33,
+"found": 33
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "на остаток счёта на конец дня",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "1-е число следующего месяца",
+"line": 87,
+"found": 87
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Проценты начисляются ежедневно на остаток счёта на конец дня",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Расчёт процентов выполняется точно, без ошибок округления.",
+"line": 33,
+"found": 33
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "К остатку прибавлено 11 890,36 ₸, клиент получил push",
+"line": 43,
+"found": 43
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Остаток 1 000 000 ₸ весь март, способ «Капитализация»",
+"line": 43,
+"found": 43
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Сохранить способ выплаты с датой начала действия — 1-е число следующего месяца",
+"line": 87,
+"found": 87
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Способ «Капитализация», 15 марта клиент выбрал «На карту»",
+"line": 44,
+"found": 44
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Проценты за 10 марта не начислены",
+"line": 45,
+"found": 45
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Проценты за текущий месяц, ₸: минимальный остаток месяца × ставка / 12",
+"line": 111,
+"found": 111
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Повторная установка уже выбранного способа не считается ошибкой",
+"line": 90,
+"found": 90
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Этот способ выплаты уже выбран",
+"line": 123,
+"found": 123
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "При закрытии счёта проценты за неполный месяц выплачиваются в день закрытия",
+"line": 29,
+"found": 29
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "со следующего месяца действует последний выбранный",
+"line": 91,
+"found": 91
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Приложение получает ставку, проценты за текущий месяц и историю начислений",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "После сохранения под переключателем показывается дата, с которой действует новый способ.",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "409. Ответ в случае, если выбранный способ совпадает с текущим.",
+"line": 113,
+"found": 113
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Приложение получает ставку, проценты за текущий месяц и историю начислений и сохраняет способ выплаты через дочерний документ",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "REST type | PUT",
+"line": 72,
+"found": 72
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "currentMode | string | CAPITALIZATION / CARD | Способ выплаты в текущем месяце | payout_mode",
+"line": 107,
+"found": 107
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Некорректный запрос",
+"line": 117,
+"found": 117
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Владелец накопительного счёта в тенге выбирает способ выплаты процентов",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Проверить, что накопительный счёт принадлежит клиенту и открыт.",
+"line": 85,
+"found": 85
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "API сбережений, депозитный модуль",
+"line": 12,
+"found": 12
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Приложение → SavingsInterestController → депозитный модуль",
+"line": 94,
+"found": 94
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "выплачиваются в последний календарный день месяца",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "записать способ с 1-го числа следующего месяца",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "проверить, что карта cardId принадлежит клиенту, активна и открыта в тенге",
+"line": 86,
+"found": 86
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "409. Ответ в случае, если выбранный способ совпадает с текущим",
+"line": 113,
+"found": 113
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Реализация задачи/проекта предусматривает схему отката решений",
+"line": 54,
+"found": 54
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "отметки не проставлены",
+"line": 48,
+"found": 48
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Повторная установка уже выбранного способа не считается ошибкой: возвращается 200 с текущими условиями.",
+"line": 90,
+"found": 90
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Проценты, начисленные за месяц, выплачиваются в последний календарный день месяца.",
+"line": 25,
+"found": 25
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "При закрытии счёта проценты за неполный месяц выплачиваются в день закрытия вместе с остатком счёта.",
+"line": 29,
+"found": 29
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "API сбережений",
+"line": 12,
+"found": 12
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "SavingsInterestController",
+"line": 74,
+"found": 74
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "накопительного счёта",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "проценты по вкладу",
+"line": 15,
+"found": 15
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Мобильное приложение",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Приложение → API сбережений",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "получает ставку, проценты за текущий месяц и историю начислений",
+"line": 37,
+"found": 37
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "кнопка «История начислений»",
+"line": 19,
+"found": 19
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Изменение способа выплаты процентов по депозиту",
+"line": 71,
+"found": 71
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "видит, сколько процентов начислено за текущий месяц",
+"line": 15,
+"found": 15
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Вернуть способ выплаты текущего и следующего месяца, ставку и проценты за текущий месяц.",
+"line": 88,
+"found": 88
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Депозитный модуль → сервис уведомлений → push-уведомление клиенту",
+"line": 17,
+"found": 17
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Приложение → SavingsInterestController → депозитный модуль → SavingsInterestController → приложение.",
+"line": 94,
+"found": 94
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Приложение → API сбережений: получить условия и проценты.",
+"line": 31,
+"found": 31
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "карта cardId принадлежит клиенту, активна и открыта в тенге",
+"line": 86,
+"found": 86
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Ф-1. Владелец накопительного счёта в тенге выбирает способ выплаты процентов",
+"line": 24,
+"found": 24
+},
+{
+"doc": "evaluation/v2/open2/capital/source.docx",
+"quote": "Документ (версия/дата) в источнике не заполнен",
+"line": 48,
+"found": 48
+}
+]
+}

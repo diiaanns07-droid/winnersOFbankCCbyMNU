@@ -94,7 +94,14 @@ def load(path: str | Path) -> dict:
         pdf_fast_mode()
     try:
         from bcc_review.engine import read_document
-        doc = read_document(p)
+        doc = None
+        if fmt == "txt" and _looks_markdown(_decode_text(data)):
+            try:
+                doc = _read_as_markdown(p, data, read_document)
+            except Exception:  # noqa: BLE001 — не вышло как Markdown: читаем как простой текст
+                doc = None
+        if doc is None:
+            doc = read_document(p)
     except Exception as exc:  # noqa: BLE001 — читатель v1 не должен ронять v2 на MD/TXT
         if fmt in ("pdf", "docx"):
             raise
@@ -107,12 +114,18 @@ def load(path: str | Path) -> dict:
             warnings.append(f"{what}: читатель счёл текстовый слой нечитаемым, текст восстановлен напрямую из PDF "
                             "(проверьте в исходнике).")
     if fmt in ("md", "txt"):
-        lines = _text_lines(_decode_text(data), doc)
+        text = _decode_text(data)
+        lines = _text_lines(text, doc, tab_cells=fmt == "txt" and not _looks_markdown(text))
+        junk = _junk_share(text)
+        if junk > 0.10:
+            warnings.append(f"Файл похож на двоичный или повреждённый: {round(junk * 100)} % знаков не читаются как "
+                            "текст. Проверьте, что это текстовый документ, или сохраните его как DOCX, PDF, Markdown.")
     else:
         sizes = _page_sizes(p) if fmt == "pdf" else {}
         lines = _block_lines(doc or {}, sizes, warnings)
     title = _title(doc, lines, p)
-    _strip_title_from_sections(lines, title)
+    if fmt == "pdf" or _single_root(lines, title, doc):  # в PDF уровни заголовков — по кеглю, почти все первые
+        _strip_title_from_sections(lines, title)
     pages = None
     if fmt == "pdf":
         ext = (doc or {}).get("extraction") or {}
@@ -120,7 +133,14 @@ def load(path: str | Path) -> dict:
     warnings += _doc_warnings(doc)
     if fmt == "docx":
         warnings += _docx_revisions(data)
-        lines, boxes = _docx_textboxes(data, lines)
+        try:
+            _docx_bold_headings(data, doc or {}, lines)
+        except Exception:  # noqa: BLE001 — подзаголовки жирным необязательны
+            pass
+        try:
+            lines, boxes = _docx_textboxes(data, lines)
+        except Exception:  # noqa: BLE001 — надписи необязательны
+            boxes = 0
         if boxes:
             warnings.append(f"Текст из надписей Word (текстовых полей) добавлен после абзаца, к которому они "
                             f"привязаны: {boxes} абз.")
@@ -132,6 +152,28 @@ def load(path: str | Path) -> dict:
 
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+
+
+_MD_HEAD_LINE = re.compile(r"^\s{0,3}#{1,6}\s+\S", re.M)
+_MD_BOLD = re.compile(r"\*\*[^*\n]+\*\*")
+
+
+def _looks_markdown(text: str) -> bool:
+    """TXT, внутри которого Markdown (переименованный .md, выгрузка из Confluence/GitLab): заголовки «## …»,
+    разделители таблиц «|---|», «**жирный**». Обычный текст с одним «#» или парой звёздочек — не Markdown."""
+    heads = len(_MD_HEAD_LINE.findall(text))
+    delims = sum(1 for ln in text.splitlines() if "|" in ln and _TABLE_DELIM.match(ln))
+    bold = len(_MD_BOLD.findall(text))
+    return heads >= 2 or delims >= 2 or (heads >= 1 and (delims >= 1 or bold >= 2))
+
+
+def _read_as_markdown(p: Path, data: bytes, read_document) -> dict:
+    """Прочитать TXT читателем Markdown v1 (копия с расширением .md во временном каталоге); строки — те же."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        md = Path(tmp) / (p.stem + ".md")
+        md.write_text(_decode_text(data), encoding="utf-8")
+        return read_document(md)
 
 
 def _docx_textboxes(data: bytes, lines: list[dict]) -> tuple[list[dict], int]:
@@ -210,6 +252,65 @@ def _docx_textboxes(data: bytes, lines: list[dict]) -> tuple[list[dict], int]:
     return out, added
 
 
+_BOLD_HEAD_MAX_WORDS = 10
+_BODY_P = re.compile(r"^/w:document/w:body/w:p\[(\d+)\]$")
+
+
+def _docx_bold_headings(data: bytes, doc: dict, lines: list[dict]) -> int:
+    """Подзаголовок, оформленный жирным абзацем, а не стилем («Требования к данным» жирным): короткий (до 10 слов),
+    целиком жирный абзац вне таблицы, без точки в конце, за ним — обычный текст. Становится заголовком уровнем ниже
+    последнего настоящего; раздел следующих строк уточняется до следующего заголовка. Возвращает число таких строк."""
+    import io
+    import xml.etree.ElementTree as ET
+    import zipfile
+    blocks = {b.get("id"): b for b in doc.get("blocks") or [] if isinstance(b, dict)}
+    cand: dict[int, int] = {}   # индекс строки view → номер абзаца тела
+    for i, ln in enumerate(lines):
+        if ln.get("kind") != "paragraph" or not ln["text"].strip():
+            continue
+        m = _BODY_P.match(str(((blocks.get(ln.get("block_id")) or {}).get("loc") or {}).get("path") or ""))
+        t = ln["text"].strip()
+        if m and len(t.split()) <= _BOLD_HEAD_MAX_WORDS and len(t) <= 90 and not re.search(r"[.;,!?…]$", t):
+            cand[i] = int(m.group(1))
+    if not cand:
+        return 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        body = ET.fromstring(z.read("word/document.xml")).find(f"{_W}body")
+    paras = [el for el in body if el.tag == f"{_W}p"] if body is not None else []
+
+    def all_bold(p) -> bool:
+        runs = [r for r in p.iter(f"{_W}r") if "".join(t.text or "" for t in r.iter(f"{_W}t")).strip()]
+        if not runs:
+            return False
+        for r in runs:
+            b = r.find(f"{_W}rPr/{_W}b")
+            if b is None or b.get(f"{_W}val") in ("0", "false"):
+                return False
+        return True
+
+    found = 0
+    level = 0
+    for i, ln in enumerate(lines):
+        if ln.get("heading"):
+            level = ln.get("level") or level
+            continue
+        if i not in cand or not (1 <= cand[i] <= len(paras)) or not all_bold(paras[cand[i] - 1]):
+            continue
+        nxt = next((x for x in lines[i + 1:] if x["text"].strip()), None)
+        if nxt is None or nxt.get("heading"):
+            continue
+        parent = ln.get("section", "")
+        title = ln["text"].strip().rstrip(":").strip()
+        sec = f"{parent}{SECTION_SEP}{title}" if parent else title
+        ln.update({"kind": "heading", "heading": True, "level": min(level + 1, 6), "section": sec})
+        for x in lines[i + 1:]:
+            if x.get("heading") or x.get("section", "") != parent:
+                break
+            x["section"] = sec
+        found += 1
+    return found
+
+
 def _norm_key(t: str) -> str:
     return " ".join(str(t or "").split()).casefold()
 
@@ -228,6 +329,14 @@ def _docx_revisions(data: bytes) -> list[str]:
         return []
     return [f"В документе есть непринятые исправления (вставок {ins}, удалений {dels}): проверена итоговая редакция "
             "— вставки учтены, удалённый текст не проверялся."]
+
+
+def _junk_share(text: str) -> float:
+    """Доля управляющих знаков (кроме переводов строки и табуляции) и «�» — признак двоичного файла."""
+    if not text:
+        return 0.0
+    bad = sum(1 for ch in text if ch == "\ufffd" or (ord(ch) < 32 and ch not in "\n\r\t\f") or 0x7f <= ord(ch) < 0xa0)
+    return bad / len(text)
 
 
 def _decode_text(data: bytes) -> str:
@@ -343,7 +452,7 @@ def nonempty(view: dict) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- MD / TXT
-def _text_lines(text: str, doc: dict | None) -> list[dict]:
+def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[dict]:
     """Строка view = строка файла. Текст берётся из блоков читателя v1 (он снимает разметку и экранирование),
     строка, не покрытая блоком, — пустая (разделители таблиц, ограждения кода, ``---``)."""
     raw = text.splitlines()
@@ -397,6 +506,12 @@ def _text_lines(text: str, doc: dict | None) -> list[dict]:
             t = "" if not src.strip() or _MD_RULE.match(src) or _TABLE_DELIM.match(src) else _strip_md(src, in_fence)
         else:
             t = _strip_md(src, in_fence)
+        if tab_cells and t and "\t" in src.strip():
+            # простой текст из Word («Сохранить как обычный текст»): ячейки таблицы через табуляцию
+            cells = [c.strip() for c in src.strip().split("\t")]
+            if sum(1 for c in cells if c) >= 2:
+                t = " | ".join(c for c in cells if c)
+                kinds[k] = "table_row"
         t = _clean(t)
         html_row = None if in_fence or _MD_FENCE.match(src) else _html_table_line(t)
         if html_row is not None:
@@ -473,7 +588,10 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
     blocks = [b for b in doc.get("blocks") or [] if isinstance(b, dict)]
     warnings = warnings if warnings is not None else []
     if sizes:
-        blocks, tabled = _borderless_tables(blocks, sizes)
+        try:
+            blocks, tabled = _borderless_tables(blocks, sizes)
+        except Exception:  # noqa: BLE001 — сборка таблиц не должна ронять чтение: блоки как прочитал v1
+            tabled = []
         if tabled:
             what = f"странице {tabled[0]}" if len(tabled) == 1 else f"страницах {_pages_list(tabled)}"
             warnings.append(f"Таблица без линеек на {what} собрана по строкам (ячейки — по колонкам и рядам текста); "
@@ -497,12 +615,21 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
             sample = "; ".join(f"«{t}»" for t in dropped[:3])
             warnings.append(f"Колонтитулы убраны из текста ({n} {word}): {sample}.")
     out: list[dict] = []
+    heading_nums: dict[int, tuple[str, str]] = {}   # глубина пути → (заголовок, заголовок с номером автонумерации)
     for b in blocks:
         loc = b.get("loc") or {}
         page = loc.get("page")
         page = int(page) if isinstance(page, int) or (isinstance(page, str) and page.isdigit()) else None
         sec = _section(b)
+        if not sizes:
+            sec, hnum = _numbered_section(b, sec, heading_nums)
+            if hnum:
+                b = {**b, "text": hnum}
         text = _tight_text(b) if sizes else str(b.get("text") or "")
+        if not sizes and b.get("kind") in ("table_row", "table_header") and "\n" in text.strip():
+            # DOCX: абзацы внутри ячейки («Итог 50 000 ₸» + пункты списка) — одна строка таблицы, как в PDF;
+            # иначе «Один push» стал бы отдельной строкой без колонок и без связи с условиями строки
+            text = "; ".join(x.strip() for x in text.strip().splitlines() if x.strip())
         parts = text.splitlines() or [""]
         label = _list_label(b)
         for i, part in enumerate(parts):
@@ -620,9 +747,10 @@ def _reorder_fragments(b: dict) -> dict:
     (одно значение ``line``) пересобирается по рядам и координате x, только если порядок нарушен; между фрагментами —
     один пробел (лишние уберёт ``_tight_text`` по зазору)."""
     text = str(b.get("text") or "")
-    frags = sorted((f for f in (b.get("loc") or {}).get("fragments") or []
-                    if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and f.get("rect")
-                    and len(f["rect"]) == 4), key=lambda f: f["start"])
+    raw = (b.get("loc") or {}).get("fragments") or []
+    frags = sorted((f for f in (raw if isinstance(raw, list) else [])
+                    if isinstance(f, dict) and isinstance(f.get("start"), int) and isinstance(f.get("end"), int)
+                    and isinstance(f.get("rect"), (list, tuple)) and len(f["rect"]) == 4), key=lambda f: f["start"])
     if len(frags) < 2:
         return b
     groups: list[list[dict]] = []
@@ -671,7 +799,10 @@ def _tight_text(b: dict) -> str:
     """Текст блока PDF без лишних пробелов: читатель ставит пробел между соседними фрагментами строки, даже если
     зазора между ними нет («ВК -1», «приложении .»). Пробел убирается, если зазор < 8 % высоты строки.
     Знаки, которые читатель унёс в конец строки (другой шрифт), возвращаются на место (``_reorder_fragments``)."""
-    b = _reorder_fragments(b)
+    try:
+        b = _reorder_fragments(b)
+    except Exception:  # noqa: BLE001 — порядок как у читателя v1
+        pass
     text = str(b.get("text") or "")
     frags = sorted((f for f in (b.get("loc") or {}).get("fragments") or []
                     if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and f.get("rect")),
@@ -770,6 +901,24 @@ def _page_blocks(page, pg: int) -> list[dict]:
     return out
 
 
+def _numbered_section(b: dict, sec: str, nums: dict[int, tuple[str, str]]) -> tuple[str, str]:
+    """DOCX: номер автонумерации заголовка («2.», «2.1.») — в текст заголовка и в путь разделов, как в PDF того же
+    документа; иначе ссылка «см. п. 2.1» не находит свой раздел. Возвращает (раздел, текст заголовка с номером или "")."""
+    parts = sec.split(SECTION_SEP) if sec else []
+    hnum = ""
+    if b.get("kind") == "heading" and parts:
+        k = len(parts) - 1
+        for d in [d for d in nums if d >= k]:
+            del nums[d]
+        label = _list_label({**b, "kind": "list_item"})
+        head = parts[-1]
+        if label and not head.startswith(label):
+            hnum = f"{label} {head}"
+            nums[k] = (head, hnum)
+    parts = [nums[k][1] if k in nums and nums[k][0] == p else p for k, p in enumerate(parts)]
+    return SECTION_SEP.join(parts), hnum
+
+
 def _list_label(b: dict) -> str:
     """Номер пункта автонумерации DOCX («1.», «2.1.», «а)»), маркеры «•» не ставим."""
     lst = (b.get("loc") or {}).get("list") or {}
@@ -795,10 +944,16 @@ def _frags_of(b: dict) -> list[dict]:
     """Фрагменты блока с текстом (по смещениям в тексте блока; знаки, унесённые читателем, уже на месте)."""
     if "_frags" in b:
         return b["_frags"]
-    b = _reorder_fragments(b)
+    try:
+        b = _reorder_fragments(b)
+    except Exception:  # noqa: BLE001
+        pass
     text = str(b.get("text") or "")
     out = []
-    for f in (b.get("loc") or {}).get("fragments") or []:
+    raw = (b.get("loc") or {}).get("fragments") or []
+    for f in raw if isinstance(raw, list) else []:
+        if not isinstance(f, dict):
+            continue
         r = f.get("rect")
         if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and r and len(r) == 4:
             t = text[f["start"]:f["end"]]
@@ -901,8 +1056,8 @@ def _borderless_tables(blocks: list[dict], sizes: dict) -> tuple[list[dict], lis
             if any(not pieces[parent_of[i]] <= set(comp) for i in comp if i in parent_of):
                 continue  # блок, разрезанный по колонкам, должен целиком попасть в таблицу
             frags = [dict(f, col=cols.index(col_of[i])) for i in sorted(comp) for f in _frags_of(blocks[i])]
-            if len(frags) < 4:
-                continue
+            if len(frags) < 4 or len({f["col"] for f in frags}) < len(cols):
+                continue  # мало текста или у колонки нет координат слов — оставляем как прочитал v1
             rows = _rows(frags)
             aligned = sum(1 for r in rows if len({f["col"] for f in r}) >= 2)
             if aligned < 2 or aligned < 0.4 * len(rows):
@@ -1131,8 +1286,6 @@ def _split_merged_headings(blocks: list[dict], sizes: dict) -> list[dict]:
         l1 = [f for f in frags if f.get("line") == lines_idx[1]]
         h0 = max(f["rect"][3] - f["rect"][1] for f in l0)
         h1 = max(f["rect"][3] - f["rect"][1] for f in l1)
-        right0 = max(f["rect"][2] for f in l0)
-        width = sizes[_page_of(b)][0]
         cut = max(f["end"] for f in l0)
         first, second = text[:cut].strip(), text[cut:].strip()
         # только разный кегль строк: короткая первая строка бывает и у обычного переноса заголовка в узкой колонке
@@ -1260,6 +1413,24 @@ def _section(b: dict) -> str:
     return SECTION_SEP.join(sec)
 
 
+_TITLE_STYLES = {"title", "название", "заголовок", "subject", "titre"}
+
+
+def _single_root(lines: list[dict], title: str, doc: dict | None = None) -> bool:
+    """Заголовок-название — единственный на своём уровне (или оформлен стилем Word «Название»). Если первый
+    заголовок верхнего уровня («Часть A…») не единственный (дальше «Часть B…» того же уровня), это раздел, а не
+    название: из путей его не вырезаем, иначе у части A раздел «Функциональные требования», а у части B — «Часть B › …»."""
+    heads = [ln for ln in lines if ln.get("heading") and ln["text"].strip()]
+    root = next((ln for ln in heads if _clean(ln["text"]).strip() == title), None)
+    if root is None:
+        return True
+    blocks = {b.get("id"): b for b in (doc or {}).get("blocks") or [] if isinstance(b, dict)}
+    style = str(((blocks.get(root.get("block_id")) or {}).get("loc") or {}).get("style") or "").strip().lower()
+    if style in _TITLE_STYLES:
+        return True
+    return sum(1 for ln in heads if ln.get("level") == root.get("level")) <= 1
+
+
 def _strip_title_from_sections(lines: list[dict], title: str) -> None:
     """Заголовок документа (корень дерева) в разделе не повторяем: «Часть A › Цели», а не «Документ › Часть A › Цели»."""
     if not title:
@@ -1336,9 +1507,12 @@ def _dedup(items: Iterable[str]) -> list[str]:
 
 
 def summary(view: dict) -> dict[str, Any]:
-    """Паспорт документа для report.json: {title, file, format, sha256, lines, pages}."""
+    """Паспорт документа для report.json: {title, file, format, sha256, lines, pages, warnings}. Предупреждения
+    чтения (скан без текста, нечитаемая страница, правки Word, таблица без линеек) нужны читателю отчёта: что не
+    проверялось или собрано кодом (просьба №14)."""
     return {"title": view.get("title", ""), "file": view.get("file", ""), "format": view.get("format", ""),
-            "sha256": view.get("sha256", ""), "lines": len(view.get("lines") or []), "pages": view.get("pages")}
+            "sha256": view.get("sha256", ""), "lines": len(view.get("lines") or []), "pages": view.get("pages"),
+            "warnings": [str(w) for w in view.get("warnings") or []]}
 
 
 def main(argv: list[str] | None = None) -> int:

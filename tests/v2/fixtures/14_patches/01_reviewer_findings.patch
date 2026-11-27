@@ -1,0 +1,219 @@
+diff --git a/src/bcc_review/v2/__main__.py b/src/bcc_review/v2/__main__.py
+index 7dbae6be..62faed75 100644
+--- a/src/bcc_review/v2/__main__.py
++++ b/src/bcc_review/v2/__main__.py
+@@ -40,6 +40,38 @@ def _load_env() -> None:
+         pass
+ 
+ 
++# Сообщения argparse по-русски: argparse берёт их через gettext (``argparse._``) в момент вызова.
++_ARGPARSE_RU = {
++    "usage: ": "использование: ",
++    "positional arguments": "аргументы",
++    "options": "параметры",
++    "optional arguments": "параметры",
++    "show this help message and exit": "показать эту справку и выйти",
++    "the following arguments are required: %s": "не хватает аргументов: %s",
++    "unrecognized arguments: %s": "неизвестные параметры: %s",
++    "invalid %(type)s value: %(value)r": "недопустимое значение %(value)r",
++    "invalid choice: %(value)r (choose from %(choices)s)": "недопустимое значение %(value)r (допустимо: %(choices)s)",
++    "invalid choice: %(value)r, maybe you meant %(closest)r?": "недопустимое значение %(value)r — может быть, %(closest)r?",
++    "argument %(argument_name)s: %(message)s": "параметр %(argument_name)s: %(message)s",
++    "%(prog)s: error: %(message)s\n": "%(prog)s: ошибка: %(message)s\n",
++    "expected one argument": "нужно одно значение",
++    "ambiguous option: %(option)s could match %(matches)s": "неоднозначный параметр %(option)s: подходит %(matches)s",
++    "not allowed with argument %s": "нельзя вместе с %s",
++}
++
++
++def _russian_argparse() -> None:
++    orig = getattr(argparse, "_", None)
++    if getattr(orig, "_bcc_ru", False) or orig is None:
++        return
++
++    def ru(message: str) -> str:
++        return _ARGPARSE_RU.get(message) or orig(message)
++
++    ru._bcc_ru = True  # type: ignore[attr-defined]
++    argparse._ = ru  # type: ignore[attr-defined]
++
++
+ def _common(p: argparse.ArgumentParser) -> None:
+     p.add_argument("--provider", default="auto",
+                    help="auto (по ключам в .env), claude_cli, gemini, anthropic, openai, mock, offline")
+@@ -161,8 +193,8 @@ def cmd_review(argv: list[str]) -> int:
+                                 epilog="Другие команды: stage ЭТАП --doc ВХОД --from runs/<id> — перезапуск этапа; "
+                                        "verify ОТЧЁТ.json ВХОД — перепроверка цитат; doctor [--live] — проверка "
+                                        "настроек модели. Старый движок: --engine v1.")
+-    p.add_argument("input", help="файл требований: .md, .txt, .pdf, .docx, .html")
+-    p.add_argument("output", help="путь отчёта .md; рядом пишутся .json и .html")
++    p.add_argument("input", metavar="ВХОД", help="файл требований: .md, .txt, .pdf, .docx, .html")
++    p.add_argument("output", metavar="ОТЧЁТ.md", help="путь отчёта .md; рядом пишутся .json и .html")
+     _common(p)
+     p.add_argument("--answers", metavar="ФАЙЛ", help="ответы на вопросы отчёта: пересмотр дефектов «до/после»")
+     p.add_argument("--revise", action="store_true", help="исправленная редакция ТЗ «было → стало»")
+@@ -171,6 +203,13 @@ def cmd_review(argv: list[str]) -> int:
+     if not Path(a.input).is_file():
+         print(f"Файл не найден: {a.input}", file=sys.stderr)
+         return 2
++    if a.answers and not Path(a.answers).is_file():
++        print(f"Файл ответов не найден: {a.answers}", file=sys.stderr)
++        return 2
++    unknown = [x for x in (y.strip() for y in (a.lenses or "").split(",")) if x and x not in LENSES]
++    if unknown:
++        print(f"Неизвестная линза: {', '.join(unknown)}; допустимо: {', '.join(LENSES)}", file=sys.stderr)
++        return 2
+     out = _output_path(a.input, a.output)
+     if out is None:
+         return 2
+@@ -179,7 +218,10 @@ def cmd_review(argv: list[str]) -> int:
+     report, written = pipeline.review(a.input, a.output, _opts(a), log=_log(a.quiet))
+     _print_summary(report, written)
+     if (report.get("run") or {}).get("model_error"):
+-        print("\nМодель не вызывалась, отчёт построен только правилами. " + report["run"]["model_error"], file=sys.stderr)
++        called = int(((report.get("run") or {}).get("calls") or {}).get("total") or 0)
++        lead = ("Модель перестала отвечать во время прогона, отчёт неполный. " if called
++                else "Модель не вызывалась, отчёт построен только правилами. ")
++        print("\n" + lead + report["run"]["model_error"], file=sys.stderr)
+     return _exit_code(report, a.fail_on)
+ 
+ 
+@@ -232,6 +274,7 @@ def cmd_doctor(argv: list[str]) -> int:
+ 
+ def main(argv: list[str] | None = None) -> int:
+     _utf8_console()
++    _russian_argparse()
+     argv = list(sys.argv[1:] if argv is None else argv)
+     _load_env()
+     if argv and argv[0] in ("--version", "version"):
+diff --git a/src/bcc_review/v2/llm.py b/src/bcc_review/v2/llm.py
+index 7e5b61e9..5351d95b 100644
+--- a/src/bcc_review/v2/llm.py
++++ b/src/bcc_review/v2/llm.py
+@@ -29,7 +29,9 @@ except Exception:  # pragma: no cover - v1 всегда рядом, но v2 не
+ 
+ TRANSIENT = {"rate_limit", "overloaded", "server", "timeout", "network"}
+ NEXT_MODEL = {"not_found", "overloaded", "quota"}
+-FATAL = {"auth", "not_configured", "quota"}  # после такой ошибки модель в этом прогоне больше не зовём  # после повторов — следующая модель цепочки
++# После такой ошибки модель в этом прогоне больше не зовём. Сеть — тоже: сюда она доходит только после всех
++# повторов (2+4+8+16+32 с), и иначе каждый следующий этап тратил бы бюджет вызовов на те же повторы.
++FATAL = {"auth", "not_configured", "quota", "network"}
+ BACKOFF = (2, 4, 8, 16, 32)
+ MAX_TIMEOUT_RETRIES = 1
+ MAX_OUTPUT_CEILING = 32000  # выше лимит ответа не поднимаем: дальше — деление пакета  # таймаут claude -p — минуты; повторяем один раз
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 322988ff..4fc978b8 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -188,12 +188,19 @@ class Pipeline:
+         self.reuse = reuse
+         self.rerun = set(rerun)
+         self.log = log or (lambda msg: None)
+-        self.run = RunDir(self.opts["runs_dir"], self.opts.get("run_id"))
++        runs_note = ""
++        try:
++            self.run = RunDir(self.opts["runs_dir"], self.opts.get("run_id"))
++        except OSError as exc:  # каталог только для чтения (установленный пакет, Docker с --user) — не повод терять отчёт
++            import tempfile
++            self.run = RunDir(Path(tempfile.gettempdir()) / "bcc_review_runs", self.opts.get("run_id"))
++            runs_note = (f"Каталог прогонов недоступен для записи ({type(exc).__name__}): артефакты этапов записаны "
++                         "во временный каталог системы (bcc_review_runs); отчёт от этого не зависит")
+         self.started_at = now_iso()
+         self.t0 = time.monotonic()
+         self.stages: dict[str, str] = {}
+         self.stage_stats: dict[str, dict] = {}
+-        self.warnings: list[str] = []
++        self.warnings: list[str] = [runs_note] if runs_note else []
+         self.ctx: Context | None = None
+         self.provider_name = ""
+         self.model_error = ""
+@@ -282,6 +289,13 @@ class Pipeline:
+         opts = self.opts
+         self.log(f"Документ: {self.input}")
+         view = load_view(self.input)
++        if not any(str(ln.get("text") or "").strip() for ln in view.get("lines") or []):
++            # пустой документ: модель не зовём (нечего проверять), вердикт «можно» невозможен — отчёт правилами
++            self.warnings.insert(0, "В документе нет текста: проверять нечего. Модель не вызывалась, вердикт не "
++                                    "выносится — проверьте, тот ли файл передан.")
++            self.ctx = Context(view=view, llm=None, options={**opts, "input": str(self.input)},
++                               run_dir=self.run.path, trace=self.run.trace)
++            return self._offline(view)
+         try:
+             llm, self.provider_name = make_llm(opts, self.run, self.input)
+         except Exception as exc:  # noqa: BLE001 — нет ключа / не тот провайдер: отчёт правилами + объяснение
+@@ -321,7 +335,10 @@ class Pipeline:
+             ctx.excluded = seg.get("excluded") or []
+             rules_out = self.stage("rules", lambda: self._rules(view, seg), empty={"signals": [], "candidates": []})
+             ctx.signals = rules_out.get("signals") or []
+-            self._remap_reviewers(outs, rctx.requirements, ctx.requirements)
++            try:
++                self._remap_reviewers(outs, rctx.requirements, ctx.requirements)
++            except Exception as exc:  # noqa: BLE001 — перевод ссылок не этап модели: прогон не роняет
++                self.warnings.append(f"Ссылки рецензентов на таблицу эвристики не переведены: {type(exc).__name__}: {exc}")
+         else:
+             # 1. нарезка (при сбое — эвристика кода, прогон partial)
+             seg = self.stage("segment", lambda: self._segment(ctx), inputs={"lines": len(view.get("lines") or [])},
+@@ -458,6 +475,10 @@ class Pipeline:
+         if self.opts.get("consistency", True):
+             jobs["consistency"] = lambda: self._consistency(ctx)
+         names = list(self.opts.get("lenses") or LENSES)
++        for bad in [n for n in names if n not in LENSES]:
++            names.remove(bad)
++            self.stages[f"lens_{bad}"] = "failed"
++            self.warnings.append(f"Линза «{bad}» неизвестна — допустимо: {', '.join(LENSES)}")
+         for name in sorted(names, key=lambda n: (LONGEST_FIRST.index(n) if n in LONGEST_FIRST else 99)):
+             jobs[f"lens_{name}"] = (lambda n=name: self._lens(ctx, n))
+         for name in [f"lens_{x}" for x in LENSES] + ["consistency"]:
+@@ -615,8 +636,13 @@ class Pipeline:
+                                    do_revise=bool(self.opts.get("revise")),
+                                    report_path=self.opts.get("output") or None)
+         except Exception as exc:  # noqa: BLE001
+-            self.warnings.append(f"Режим --answers/--revise не выполнен: {type(exc).__name__}: {exc}")
++            msg = f"Режим --answers/--revise не выполнен: {type(exc).__name__}: {exc}"
++            self.warnings.append(msg)
+             self.stages["recheck"] = "failed"
++            # отчёт уже собран — сбой режима должен быть виден в нём, а не только в self.*
++            run = report.setdefault("run", {})
++            run["warnings"] = _uniq(list(run.get("warnings") or []) + [msg])
++            run.setdefault("stages", {})["recheck"] = "failed"
+             return
+         self.stages["recheck"] = "ok"
+         self.stage_stats["recheck"] = {"calls": 0, "seconds": round(time.monotonic() - t0, 2), "candidates": 0}
+@@ -663,7 +689,8 @@ class Pipeline:
+                 "model_requested": self.opts.get("model") or "", "models_used": s["models_used"],
+                 "calls": s["calls"], "tokens": s["tokens"], "cost_usd": s["cost_usd"], "status": status,
+                 "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
+-                "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts}
++                "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts,
++                **({"model_error": self.model_error} if self.model_error else {})}
+ 
+     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
+                 questions: list, qstats: dict) -> dict:
+@@ -925,6 +952,17 @@ def fallback_markdown(report: dict) -> str:
+     return "\n".join(lines) + "\n"
+ 
+ 
++def _unread_view(path: Path) -> dict:
++    """Паспорт нечитаемого входа для отчёта о сбое: тот же контракт (``contracts/v2.json``), что у прочитанного."""
++    try:
++        sha = hashlib.sha256(path.read_bytes()).hexdigest()
++    except OSError:
++        sha = hashlib.sha256(b"").hexdigest()
++    fmt = {".md": "md", ".markdown": "md", ".pdf": "pdf", ".docx": "docx", ".html": "html", ".htm": "html"}.get(
++        path.suffix.lower(), "txt")
++    return {"title": path.name, "file": path.name or "input", "format": fmt, "sha256": sha, "lines": []}
++
++
+ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = None, *,
+            reuse: RunDir | None = None, rerun: set[str] = frozenset(),
+            log: Callable[[str], None] | None = None) -> tuple[dict, dict]:
+@@ -936,8 +974,7 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
+     except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
+         p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
+         p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
+-        view = p.ctx.view if p.ctx else {"title": Path(input_path).name, "file": Path(input_path).name,
+-                                          "format": "", "sha256": "", "lines": []}
++        view = p.ctx.view if p.ctx else _unread_view(Path(input_path))
+         report = {"schema": "bcc-review/2", "run": p._run_block("failed"), "document": document_summary(view),
+                   "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
+                                                                    "summary": "", "fix_first": []}}

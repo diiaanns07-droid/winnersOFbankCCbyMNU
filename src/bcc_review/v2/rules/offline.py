@@ -177,9 +177,9 @@ def build(view: dict, requirements: Any = None, *, started_at: str | None = None
                 "stages": {"rules": "ok", "segment": "skipped", "lenses": "skipped", "consistency": "skipped",
                            "judge": "skipped", "clarify": "skipped"},
                 "warnings": list(out.get("warnings") or []) + [
-                    "Модель не вызывалась (--provider offline): отчёт — предварительная проверка правилами."]},
-        "document": {k: view.get(k) for k in ("title", "file", "format", "sha256", "pages")} | {
-            "lines": len(view.get("lines") or [])},
+                    "Модель не вызывалась (--provider offline): отчёт — предварительная проверка правилами."]
+                    + [w for w in (view.get("warnings") or []) if isinstance(w, str)]},
+        "document": _passport(view),
         "requirements": list(reqs or []), "excluded": [], "findings": findings, "rejected": rejected,
         "signals": out["signals"], "acceptance_checks": [], "pair_checks": [], "trace": [], "glossary": [],
         "test_cases": [], "questions": [], "checklist": [], "verdict": verdict(findings),
@@ -195,6 +195,19 @@ def build(view: dict, requirements: Any = None, *, started_at: str | None = None
                     "requirements_without_findings": max(0, len(reqs or []) - len(with_findings)),
                     "quotes_verified": quotes_total},
     }
+
+
+def _passport(view: dict) -> dict:
+    """Паспорт документа как в прогоне с моделью (docview.summary) — с предупреждениями чтения (скан, нечитаемые
+    страницы): они попадают и в офлайн-отчёт."""
+    try:
+        from ..docview import summary
+        doc = dict(summary(view))
+    except Exception:  # noqa: BLE001 — запасной вид, если docview недоступен
+        doc = {k: view.get(k) for k in ("title", "file", "format", "sha256", "pages")} | {
+            "lines": len(view.get("lines") or [])}
+    doc.setdefault("warnings", [w for w in (view.get("warnings") or []) if isinstance(w, str)])
+    return doc
 
 
 VERDICT_RU = {"no": "нельзя", "undetermined": "не определено", "conditional": "с условиями", "yes": "можно"}
