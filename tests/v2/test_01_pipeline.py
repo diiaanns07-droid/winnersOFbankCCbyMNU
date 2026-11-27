@@ -103,11 +103,42 @@ def test_stage_timeout_and_rpm():
                     rpm=30, sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
     llm.ask("s", "a", "1", SCHEMA)
     llm.ask("s", "a", "2", SCHEMA)
-    assert t[0] == pytest.approx(2.0)  # 30 в минуту — пауза 2 с между запросами
+    assert t[0] == pytest.approx(0.0)  # 30 в минуту — окно: два запроса без пауз
     t[0] += 200
     with pytest.raises(BudgetExceeded):
         llm.ask("s", "a", "3", SCHEMA)
     assert llm.ask("other", "a", "4", SCHEMA) == {"items": []}
+
+
+def test_rpm_sliding_window_burst_then_waits():
+    """rpm=3: три запроса сразу (параллельные рецензенты не ждут), четвёртый — когда первый выйдет из окна 60 с."""
+    t = [0.0]
+    sleeps: list[float] = []
+
+    def sleep(s):
+        sleeps.append(s)
+        t[0] += s
+
+    llm = LLMClient(FakeProvider([{"items": []}] * 6), model="m", provider_name="fake", rpm=3,
+                    sleep=sleep, clock=lambda: t[0])
+    for i in range(3):
+        llm.ask("s", "a", f"{i}", SCHEMA)
+    assert sleeps == []
+    t[0] = 10.0
+    llm.ask("s", "a", "3", SCHEMA)
+    assert sleeps == [pytest.approx(50.0)] and t[0] == pytest.approx(60.0)
+    t[0] = 200.0
+    llm.ask("s", "a", "4", SCHEMA)  # окно пустое — без паузы
+    assert len(sleeps) == 1
+
+
+def test_rpm_below_one_keeps_even_spacing():
+    t = [0.0]
+    llm = LLMClient(FakeProvider([{"items": []}] * 3), model="m", provider_name="fake", rpm=0.5,
+                    sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+    llm.ask("s", "a", "1", SCHEMA)
+    llm.ask("s", "a", "2", SCHEMA)
+    assert t[0] == pytest.approx(120.0)
 
 
 def test_truncated_retries_with_bigger_limit_then_raises():
@@ -309,3 +340,84 @@ def test_acceptance_checks_linked_to_findings():
     p._link(extras, kept, findings)
     assert extras["acceptance_checks"][0]["finding_ids"] == ["D-01"]
     assert extras["acceptance_checks"][1]["finding_ids"] == []
+
+
+# --------------------------------------------------------------------------- быстрый старт (--fast-start)
+
+def _req(rid, a, b=None, kind="functional"):
+    return {"id": rid, "line_start": a, "line_end": b or a, "kind": kind}
+
+
+def test_remap_table_by_line_overlap_and_near_line():
+    heur = [_req("R-01", 10), _req("R-02", 20, 22), _req("R-03", 40), _req("R-04", 90)]
+    model = [_req("R-01", 10), _req("R-02", 20), _req("R-03", 21, 22), _req("R-04", 41, 45)]
+    m = pipeline.remap_table(heur, model)
+    assert m == {"R-01": ["R-01"], "R-02": ["R-02", "R-03"], "R-03": ["R-04"], "R-04": []}
+
+
+def test_remap_output_translates_all_reference_fields():
+    mapping = {"R-01": ["R-01"], "R-02": ["R-02", "R-03"], "R-05": ["R-04"], "R-09": []}
+    model = [_req("R-01", 10), _req("R-02", 20), _req("R-03", 21, 22), _req("R-04", 41, 45), _req("R-07", 60)]
+    out = {"candidates": [{"requirement_ids": ["R-05", "R-02"], "acceptance_row": "R-05", "evidence": []},
+                          {"requirement_ids": ["R-09"], "evidence": [{"quote": "x", "line": 42}]},
+                          {"requirement_ids": ["R-07"], "evidence": []}],
+           "acceptance_checks": [{"row_requirement_id": "R-05", "rule_requirement_ids": ["R-01", "R-09"]}],
+           "test_cases": [{"requirement_ids": ["R-02"]}],
+           "pair_checks": [{"a": "R-01", "b": "R-05"}],
+           "trace": [{"requirement_id": "R-02", "verified_by": ["R-05"], "implemented_by": []},
+                     {"requirement_id": "R-09", "verified_by": ["R-01"], "implemented_by": []}]}
+    pipeline.remap_output(out, mapping, model)
+    c = out["candidates"]
+    assert c[0]["requirement_ids"] == ["R-04", "R-02", "R-03"] and c[0]["acceptance_row"] == "R-04"
+    assert c[1]["requirement_ids"] == ["R-04"]          # ссылка пропала — по строке цитаты 42
+    assert c[2]["requirement_ids"] == ["R-07"]          # ID только у модели — как есть
+    assert out["acceptance_checks"][0] == {"row_requirement_id": "R-04", "rule_requirement_ids": ["R-01"]}
+    assert out["test_cases"][0]["requirement_ids"] == ["R-02", "R-03"]
+    assert out["pair_checks"][0] == {"a": "R-01", "b": "R-04"}
+    assert [t["requirement_id"] for t in out["trace"]] == ["R-02"]  # без требования — строка трассировки уходит
+
+
+def test_fast_start_reviewers_get_heuristic_table_and_segment_runs_in_parallel(tmp_path, monkeypatch):
+    """Рецензенты видят таблицу эвристики, нарезка моделью идёт одновременно, отчёт — по нарезке модели."""
+    import threading
+    from bcc_review.v2.stages import lens, segment
+
+    seen: dict[str, int] = {}
+    seg_started = threading.Event()
+    lens_started = threading.Event()
+    real_segment = segment.run
+
+    def slow_segment(ctx):
+        seg_started.set()
+        assert lens_started.wait(5), "рецензенты ждали нарезку"
+        return real_segment(ctx)
+
+    def fake_lens(ctx, name):
+        lens_started.set()
+        seen[name] = len(ctx.requirements)
+        rid = ctx.requirements[5]["id"]
+        return {"candidates": [{"title": "t", "kind": "ambiguity", "criterion": "unambiguous", "severity": "minor",
+                                "requirement_ids": [rid], "evidence": [{"quote": "q", "line": 38}],
+                                "problem": "p", "scenario": "", "impact": "", "recommendation": "", "rewrite": "",
+                                "question": "", "blocks": "none"}]}
+
+    monkeypatch.setattr(segment, "run", slow_segment)
+    monkeypatch.setattr(lens, "run_named", fake_lens)
+    report, _, _ = _run(tmp_path, fast_start=True)
+    heur = segment.heuristic_segment(pipeline.load_view(OFFICIAL))["requirements"]
+    assert seg_started.is_set() and set(seen.values()) == {len(heur)}
+    run_dir = tmp_path / "runs" / report["run"]["run_id"] / "stages"
+    lens_out = json.loads((run_dir / "lens_analyst.json").read_text(encoding="utf-8"))
+    assert lens_out["input"]["requirements_source"] == "heuristic"
+    model_ids = {r["id"] for r in report["requirements"]}
+    assert report["requirements"] and all(set(f.get("requirement_ids") or []) <= model_ids
+                                          for f in report["findings"])
+
+
+def test_fast_start_off_when_heuristic_finds_too_little(tmp_path, monkeypatch):
+    from bcc_review.v2.stages import segment
+    monkeypatch.setattr(segment, "heuristic_segment", lambda view: {"requirements": [_req("R-01", 1)], "excluded": []})
+    report, _, _ = _run(tmp_path, fast_start=True)
+    run_dir = tmp_path / "runs" / report["run"]["run_id"] / "stages"
+    lens_out = json.loads((run_dir / "lens_analyst.json").read_text(encoding="utf-8"))
+    assert "requirements_source" not in lens_out["input"]
