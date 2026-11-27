@@ -1301,22 +1301,39 @@ def _collapse_key_value_tables(view: dict, reqs: list[dict]) -> list[dict]:
 
 def _guess_kind(section: str, text: str, is_row: bool) -> str:
     tail = section.split("›")[-1].strip().lower()
+    if re.match(r"^(?:[\d.]+\s+)?(?:get|post|put|delete|patch)\s+/", tail):
+        return "api"  # раздел — сам метод API («5.1 POST /items»)
     for s in (tail, section.lower()):
         kind = _kind_by_words(s)
         if kind:
             return kind
-    return "api" if is_row else "other"
+    if is_row:
+        return "api"
+    if re.search(r"\bограничен", text, re.I):
+        return "constraint"
+    if "требован" in tail:
+        return "functional"  # раздел «1.2 Требования» без уточнения — функциональные пункты
+    if re.search(r"предназнач|обеспечивает .* для|^цель", text, re.I):
+        return "goal"
+    return "functional" if _OBLIGATION.search(text) or re.search(
+        r"(?:^|\s)(?:система|сервис|клиент|банк|приложение|модуль|сотрудник)\b", text, re.I) else "other"
 
 
 def _kind_by_words(s: str) -> str:
-    pairs = [("цел", "goal"), ("нефункцион", "nonfunctional"), ("надёжн", "nonfunctional"), ("надежн", "nonfunctional"),
+    pairs = [("цел", "goal"), ("назначени", "goal"),
+             ("нефункцион", "nonfunctional"), ("надёжн", "nonfunctional"), ("надежн", "nonfunctional"),
              ("производительн", "nonfunctional"), ("защит", "nonfunctional"), ("безопасн", "nonfunctional"),
+             ("доступност", "nonfunctional"),
+             ("приемк", "acceptance"), ("приёмк", "acceptance"), ("как провер", "acceptance"),
+             ("испытан", "acceptance"), ("сценари", "acceptance"),
              ("функци", "functional"), ("данн", "data"), ("информационн", "integration"), ("обмен", "integration"),
-             ("интеграц", "integration"), ("ui", "ui"), ("интерфейс", "ui"), ("дизайн", "ui"),
+             ("интеграц", "integration"), ("взаимодейств", "integration"),
+             ("ui", "ui"), ("интерфейс", "ui"), ("дизайн", "ui"), ("экран", "ui"), ("видит", "ui"),
              ("архитектур", "architecture"), ("sequence", "process"), ("bpmn", "process"), ("процесс", "process"),
-             ("приемк", "acceptance"), ("приёмк", "acceptance"), ("логика", "functional"), ("правил", "constraint"),
+             ("порядок", "process"), ("содержание работ", "process"),
+             ("логика", "functional"), ("правил", "constraint"), ("огранич", "constraint"),
              ("параметр", "api"), ("ответ", "api"), ("статус", "api"), ("rest", "api"), ("метод", "api"),
-             ("термин", "other")]
+             ("api", "api"), ("термин", "other")]
     for key, kind in pairs:
         if key in s:
             return kind

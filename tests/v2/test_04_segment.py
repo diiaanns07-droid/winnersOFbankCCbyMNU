@@ -792,3 +792,14 @@ def test_gost_offline_equals_model(name):
     assert "Таблица 1 – Параметры заявки на выпуск: clientId" in sids  # «№ | Параметр …» — имя из второй ячейки
     assert len(h["requirements"]) == 27 and sg.uncovered_lines(view, h["requirements"], h["excluded"]) == []
     assert any(e["what"] == "Подпись к таблице или списку" for e in h["excluded"])
+
+
+def test_offline_kind_by_section_words():
+    assert sg._guess_kind("Ч › 3.2. Требования к надёжности", "3.2.1. Доступность не ниже 99 %.", False) == "nonfunctional"
+    assert sg._guess_kind("Что видит клиент", "Список устройств отсортирован.", False) == "ui"
+    assert sg._guess_kind("Как проверить", "Вход с нового телефона приводит к сообщению.", False) == "acceptance"
+    assert sg._guess_kind("5. API › 5.1 POST /items", "Подключение настройки.", False) == "api"
+    assert sg._guess_kind("Модуль › 1.2 Требования", "КИБ-1.5. Отмена документа возможна до исполнения.", False) \
+        == "functional"
+    assert sg._guess_kind("Модуль › 1.2 Требования", "КИБ-1.2. Параметр «сумма» ограничен значением 100.", False) \
+        == "constraint"
