@@ -465,7 +465,14 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
     if len(terms) < 2:
         return None
     sev = g.get("severity") if g.get("severity") in GLOSSARY_SEVERITIES else "minor"
+    # Бизнес-имя компонента и его техническое имя (контроллер, путь, поле) — норма шаблона, а не разночтение:
+    # major только если разных названий словами (не идентификаторов) хотя бы два.
+    if sev == "major" and len({_norm(t["term"]) for t in terms if _CYR.search(t["term"])}) < 2:
+        sev = "minor"
     return {"concept": _s(g.get("concept")), "terms": terms, "problem": _s(g.get("problem")), "severity": sev}
+
+
+_CYR = re.compile(r"[а-яё]", re.I)
 
 
 def glossary_to_candidate(g: dict) -> dict | None:
@@ -492,6 +499,29 @@ def glossary_to_candidate(g: dict) -> dict | None:
         "rewrite": "", "question": "", "blocks": "development" if severity == "major" else "none",
         "source": SOURCE, "origin": "glossary", "glossary_ids": [g["id"]] if g.get("id") else [],
     }
+
+
+def merge_glossary(cands: list[dict]) -> list[dict]:
+    """Понятия major, названия которых стоят в двух одних и тех же строках (например, компоненты в описании
+    архитектуры и последовательности), — одно замечание: это одно место документа, исправляется одной правкой."""
+    out: list[dict] = []
+    for c in cands:
+        lines = {e["line"] for e in c["evidence"]}
+        host = next((o for o in out if len(lines & {e["line"] for e in o["evidence"]}) >= 2), None)
+        if host is None:
+            out.append(c)
+            continue
+        host["evidence"].extend(e for e in c["evidence"]
+                                if not any(e["line"] == h["line"] and e["quote"] == h["quote"] for h in host["evidence"]))
+        host["glossary_ids"] = host.get("glossary_ids", []) + [x for x in c.get("glossary_ids", [])
+                                                               if x not in host.get("glossary_ids", [])]
+        host["problem"] += f" Также: {c['title']}."
+        host.setdefault("merged_titles", []).append(c["title"])
+    for c in out:
+        if c.get("merged_titles"):
+            c["title"] = "Одни и те же компоненты или участники названы по-разному: " + "; ".join(
+                [c["title"].split(": ", 1)[-1]] + [t.split(": ", 1)[-1] for t in c["merged_titles"]])[:300]
+    return out
 
 
 def minor_glossary_candidate(entries: list[dict]) -> dict | None:
@@ -753,11 +783,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]
     for i, g in enumerate(glossary, 1):
         g["id"] = f"G-{i:02d}"
-    for g in glossary:
-        if g["severity"] == "major":
-            c = glossary_to_candidate(g)
-            if c:
-                candidates.append(c)
+    candidates.extend(merge_glossary([c for c in (glossary_to_candidate(g) for g in glossary
+                                                  if g["severity"] == "major") if c]))
     c = minor_glossary_candidate(glossary)
     if c:
         candidates.append(c)

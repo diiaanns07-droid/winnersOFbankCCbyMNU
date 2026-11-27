@@ -114,3 +114,32 @@ def test_planted_false_candidates_are_rejected():
     crit = [f for f in res["findings"] if f["severity"] == "critical"]
     for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}):
         assert any(need <= lines(f) for f in crit), need
+
+
+def _replay_w2(name: str, doc: Path):
+    """Вторая волна: входы судьи из полного конвейера (линзы, набор, правила) и сырые ответы модели."""
+    data = json.loads((FX / f"{name}.w2.input.json").read_text(encoding="utf-8"))
+    resp = json.loads((FX / f"{name}.w2.responses.json").read_text(encoding="utf-8"))
+    from bcc_review.v2 import docview
+    llm = FakeLLM(*resp)
+    res = judge.run(Ctx(llm, view=docview.load(str(doc)), requirements=data["requirements"], options={}),
+                    data["candidates"])
+    return data["candidates"], res
+
+
+def test_wave2_official_k1_k5_critical_with_consensus():
+    cands, res = _replay_w2("official", ROOT / "release/input/requirements.md")
+    all_placed(res, [c["id"] for c in cands])
+    crit = [f for f in res["findings"] if f["severity"] == "critical"]
+    for need in ({38, 64}, {39, 40}, {52, 103}, {121, 163}, {23, 38}):
+        assert any(need <= lines(f) for f in crit), need
+    assert all(len({s.split(":")[0] if s.startswith("rules:") else s for s in f["sources"]}) >= 2 for f in crit)
+    assert 25 <= len(res["findings"]) <= 40
+
+
+def test_wave2_clean_new_tz_has_no_critical():
+    cands, res = _replay_w2("grace_clean", ROOT / "evaluation/v2/open2/grace_clean/source.md")
+    all_placed(res, [c["id"] for c in cands])
+    assert not [f for f in res["findings"] if f["severity"] == "critical"]
+    assert judge.compute_verdict(res["findings"])["development"] != "no"
+    assert res["checklist_source"] == "document" and len(res["checklist"]) >= 10

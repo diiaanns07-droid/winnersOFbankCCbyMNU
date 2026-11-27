@@ -31,8 +31,8 @@ def official_view() -> dict:
 
 def test_schema_matches_contract_fields():
     item = sg.SCHEMA["properties"]["requirements"]["items"]
-    # section модель не пишет: его ставит код по строкам `view`
-    assert set(item["required"]) == {"source_id", "kind", "summary", "quote", "line_start", "line_end"}
+    # section и quote модель не пишет: их ставит код по строкам `view`
+    assert set(item["required"]) == {"source_id", "kind", "summary", "line_start", "line_end"}
     assert set(item["properties"]["kind"]["enum"]) == set(sg.KINDS)
     ex = sg.SCHEMA["properties"]["excluded"]["items"]
     assert set(ex["required"]) == {"what", "line_start", "line_end", "reason"}
@@ -469,3 +469,55 @@ def test_bare_status_code_merged_with_sentence(official_view):
     last = out["requirements"][-1]
     assert (last["source_id"], last["line_start"], last["line_end"]) == ("Статус 404", 189, 192)
     assert len(out["requirements"]) == 40
+
+
+def test_quote_taken_from_document_when_model_gives_none(official_view):
+    raw = {"requirements": [{"source_id": "Ф-1", "kind": "functional", "summary": "п", "line_start": 37,
+                             "line_end": 37}], "excluded": []}
+    r = next(x for x in sg.segment_from_response(official_view, raw)["requirements"] if x["line_start"] == 37)
+    assert r["source_id"] == "Ф-1" and r["quote"].startswith("Ф-1. Держатель активной карты")
+
+
+def test_garbled_prefix_fixed_from_nearby_caption():
+    view = sg.load_view(str(STRUCT / "unnumbered.md"))
+    n = next(x["n"] for x in view["lines"] if x["text"].startswith("current |"))
+    raw = {"requirements": [{"source_id": "Ответ методаываСписка устройств: current", "kind": "api", "summary": "п",
+                             "line_start": n, "line_end": n}], "excluded": []}
+    r = next(x for x in sg.segment_from_response(view, raw)["requirements"] if x["line_start"] == n)
+    assert r["source_id"] == "Ответ метода списка устройств: current"
+
+
+def test_requirement_does_not_start_with_heading(official_view):
+    raw = _official_raw()
+    raw["requirements"] = [r for r in raw["requirements"] if r["source_id"] != "Статус 404"] + [
+        {"source_id": "", "kind": "api", "summary": "чужая карта", "line_start": 188, "line_end": 189},
+        {"source_id": "Статус 404", "kind": "api", "summary": "404", "line_start": 190, "line_end": 192}]
+    out = sg.segment_from_response(official_view, raw)
+    last = out["requirements"][-1]
+    assert (last["source_id"], last["line_start"], last["line_end"]) == ("Статус 404", 189, 192)
+    assert last["quote"].startswith("Для чужой карты")
+
+
+def test_table_tail_row_joins_passport_without_followup(official_view):
+    raw = _official_raw()
+    for r in raw["requirements"]:
+        if r["source_id"] == "Общие параметры":
+            r["line_end"] = 113
+    calls = []
+    out = sg.segment_from_response(official_view, raw, lambda u, d: calls.append(u) or {})
+    assert calls == []
+    r = next(x for x in out["requirements"] if x["source_id"] == "Общие параметры")
+    assert (r["line_start"], r["line_end"]) == (103, 114)
+    assert len(out["requirements"]) == 40
+
+
+def test_adjacent_same_source_id_merged(official_view):
+    raw = _official_raw()
+    for r in raw["requirements"]:
+        if r["source_id"] == "Общие параметры":
+            r["line_end"] = 113
+    raw["requirements"].append({"source_id": "Общие параметры", "kind": "api", "summary": "хвост",
+                                "line_start": 114, "line_end": 114})
+    out = sg.segment_from_response(official_view, raw)
+    assert [(x["line_start"], x["line_end"]) for x in out["requirements"] if x["source_id"] == "Общие параметры"] \
+        == [(103, 114)]

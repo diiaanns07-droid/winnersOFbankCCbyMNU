@@ -79,6 +79,12 @@ def from_report(path: Path | None) -> dict:
             "rejected": str(len(r.get("rejected") or [])), "report_source": src}
 
 
+def _tone(value: str, bad: bool, warn: bool = False) -> str:
+    """Цвет числа по смыслу: плохое — красным, спорное — оранжевым, иначе цвет карточки."""
+    cls = "bad" if bad else ("warn" if warn else "")
+    return f'<span class="{cls}">{e(value)}</span>' if cls else e(value)
+
+
 def _clip(s: str, n: int) -> str:
     s = " ".join(str(s).split())
     return s if len(s) <= n else s[:n].rsplit(" ", 1)[0] + "…"
@@ -130,7 +136,7 @@ def from_evaluation(root: Path) -> dict:
         cost = best.get("cost_usd")
         out.update({
             "k_found": f"{best['K']}/5", "k_crit": str(best.get("K_as_critical", "—")), "s_found": f"{best['C']}/20",
-            "crit_false": str(best.get("critical_false", "—")),
+            "crit_false": _tone(str(best.get("critical_false", "—")), bool(best.get("critical_false"))),
             "quotes": f"{(qt - qm) * 100 // qt} %" if qt else "—",
             "official_time": _dur(best.get("duration_s")), "official_calls": str(best.get("calls") or "—"),
             "official_cost": f"≈ ${cost:.2f}" if isinstance(cost, (int, float)) else "стоимость не замерена",
@@ -150,14 +156,23 @@ def from_evaluation(root: Path) -> dict:
         out["models_source"] = "Официальный документ, счётчик №15 (evaluation/v2/history.jsonl); статус каждого прогона — complete."
     # было → стало
     if v1 and best:
-        def row(lbl, a, b):
-            return f'<tr><td>{e(lbl)}</td><td class="old">{e(a)}</td><td class="new">{e(b)}</td></tr>'
-        rws = [row("Ключевые блокеры К1–К5", f"{v1['K']}/5", f"{best['K']}/5"),
-               row("Существенные дефекты С1–С20", f"{v1['C']}/20", f"{best['C']}/20"),
-               row("Дубли замечаний", str(v1.get("duplicates", "—")), str(best.get("duplicates", "—"))),
-               row("Английские слова в отчёте", str(v1.get("english", "—")), str(best.get("english", "—"))),
+        def row(lbl, a, b, better: bool | None = True):
+            cls = "new" if better else ("mixed" if better is None else "worse")
+            return f'<tr><td>{e(lbl)}</td><td class="old">{e(a)}</td><td class="{cls}">{e(b)}</td></tr>'
+
+        def num(r, k):
+            v = r.get(k)
+            return v if isinstance(v, (int, float)) else None
+
+        def better(k, more_is_better):
+            a, b = num(v1, k), num(best, k)
+            return None if a is None or b is None else (b >= a if more_is_better else b <= a)
+        rws = [row("Ключевые блокеры К1–К5", f"{v1['K']}/5", f"{best['K']}/5", better("K", True)),
+               row("Существенные дефекты С1–С20", f"{v1['C']}/20", f"{best['C']}/20", better("C", True)),
+               row("Дубли замечаний", str(v1.get("duplicates", "—")), str(best.get("duplicates", "—")), better("duplicates", False)),
+               row("Английские слова в отчёте", str(v1.get("english", "—")), str(best.get("english", "—")), better("english", False)),
                row("Строк в отчёте", f"{v1.get('report_md_lines', 0):,}".replace(",", " "),
-                   f"{best.get('report_md_lines', 0):,}".replace(",", " "))]
+                   f"{best.get('report_md_lines', 0):,}".replace(",", " "), better("report_md_lines", False))]
         out["_v1v2_rows"] = rws
         out["v1v2_rows"] = "".join(rws)
         out["v1v2_source"] = (f"Официальный документ, один счётчик №15: v1 — «{v1.get('label', '')}» ({v1.get('at', '')}), "
@@ -176,17 +191,21 @@ def from_evaluation(root: Path) -> dict:
     if best_c:
         h = best_c.get("harness") or {}
         clean = best_c.get("clean") or {}
+        alarms = h.get("clean_false_alarms", clean.get("findings"))
+        prec = h.get("precision") or 0
         out.update({
             "corpus_recall": f"{h.get('tp', 0)}/{h.get('support', 28)}",
-            "corpus_precision": f"{round((h.get('precision') or 0) * 100)} %",
-            "corpus_clean": str(h.get("clean_false_alarms", clean.get("findings", "—"))),
+            "corpus_precision": _tone(f"{round(prec * 100)} %", prec < 0.5, prec < 0.8),
+            "corpus_clean": _tone(str(alarms if alarms is not None else "—"), bool(alarms)),
             "corpus_source": f"Корпус evaluation/dev, строгий счётчик: «{best_c.get('label', '')}» ({best_c.get('at', '')}). "
                              f"v1 на том же корпусе: 0 из 28 и 44 тревоги на чистых.",
         })
         if out.get("_v1v2_rows"):  # v1 на корпусе — docs/plan-v2/ref/BCC-quality-08d3af5.md (bcc/eval-independent)
+            worse_alarms = isinstance(alarms, (int, float)) and alarms > 44
             out["_v1v2_rows"].append(
                 f'<tr><td>Корпус: заложенные дефекты / тревоги на 8 чистых ТЗ</td><td class="old">0 из 28 / 44</td>'
-                f'<td class="new">{h.get("tp", 0)} из {h.get("support", 28)} / {h.get("clean_false_alarms", "—")}</td></tr>')
+                f'<td class="{"mixed" if worse_alarms or alarms else "new"}">{h.get("tp", 0)} из {h.get("support", 28)} / '
+                f'{e(alarms if alarms is not None else "—")}</td></tr>')
             out["v1v2_rows"] = "".join(out["_v1v2_rows"])
     return out
 
