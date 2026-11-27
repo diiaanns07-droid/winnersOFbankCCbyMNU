@@ -119,6 +119,9 @@ def test_desk_opens_last_report_as_sheet(srv):
     assert 'id="sheet"' in html and 'class="b-verdict"' in html
     assert 'Разработка: <b class="no">нельзя</b>' in html and "5 блокеров" in html and "цитат сверено 39 из 39" in html
     assert 'class="desk-notes b-margin"' in html
+    # вопросы владельцу — на полях, чернилами; нажатие ведёт к первому замечанию вопроса
+    assert '<div class="b-margin-sub">Вопросы владельцу</div>' in html and html.count('class="b-q"') == 5
+    assert '<button type="button" class="b-q" data-f="D-01"><b>Q-01 · Владелец продукта</b>' in html
     assert f'href="/jobs/{job.id}#questions"' in html and f'href="/jobs/{job.id}#revised"' in html
     assert html.count('class="b-note ') == 20 and html.count('data-line="') == 20  # заметки и засечки карты
     assert "Выгрузить" in html and f"/jobs/{job.id}/files/report.html" in html
@@ -137,6 +140,17 @@ def test_sheet_marks_quotes_on_their_lines():
     # исходник не текстовый — лист собирается из цитат, номера строк те же
     sh2 = SH.build_sheet(rep, None, file_name="requirements.pdf")
     assert 'id="L39"' in sh2.html and "На карту приходится" in sh2.html
+
+
+def test_margin_questions_limit_and_escaping():
+    qs = [{"id": f"Q-0{i}", "to": "Владелец", "question": f"Вопрос {i} <b>?", "finding_ids": [f"D-0{i}"]} for i in range(1, 8)]
+    qs.append({"id": "Q-08", "question": "  "})  # пустой вопрос не показываем
+    html = S._margin_questions({"questions": qs}, "/jobs/abc")
+    assert html.count('class="b-q"') == 5 and "&lt;b&gt;?" in html and "<b>?" not in html
+    assert '<a class="b-q-more" href="/jobs/abc#questions">ещё 2 вопроса</a>' in html
+    assert S._margin_questions({"questions": []}, "/jobs/abc") == ""
+    lone = S._margin_questions({"questions": [{"question": "Без замечания?"}]}, "")
+    assert 'data-f=""' in lone and "b-q-more" not in lone
 
 
 def test_plural_and_verdict_variants():

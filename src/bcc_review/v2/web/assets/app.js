@@ -88,8 +88,9 @@
     var notes = Array.prototype.slice.call(sheet.querySelectorAll(".b-note"));
     var layout = function () {
       var wide = window.matchMedia("(min-width: 1241px)").matches;
-      var head = document.querySelector(".b-margin-head");
-      var bottom = head ? head.offsetHeight + 6 : -1e9;  // поля начинаются под шапкой полей
+      var head = document.querySelector(".b-margin-q") || document.querySelector(".b-margin-head");
+      // заметки начинаются под шапкой полей и вопросами владельцу
+      var bottom = head ? head.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top + 6 : -1e9;
       notes.forEach(function (n) {
         n.style.removeProperty("--dy");
         if (!wide) return;
@@ -107,6 +108,7 @@
         l.classList.toggle("on", !!on && (" " + (l.dataset.f || "") + " ").indexOf(" " + on + " ") >= 0);
       });
       notes.forEach(function (n) { n.classList.toggle("on", n.dataset.f === on); });
+      document.querySelectorAll(".b-q").forEach(function (q) { q.classList.toggle("on", !!on && q.dataset.f === on); });
       layout();
       var first = on && sheet.querySelector(".b-line.on");
       if (first) {
@@ -120,6 +122,10 @@
       else if (sheet.dataset.focus) focus(sheet.dataset.focus);
     });
     document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && sheet.dataset.focus) focus(sheet.dataset.focus); });
+    document.querySelectorAll(".b-q[data-f]").forEach(function (q) {  // вопрос владельцу → его место в листе
+      if (!q.dataset.f) return;
+      q.addEventListener("click", function () { focus(q.dataset.f); });  // focus() сам прокрутит к строке
+    });
     var map = $("#map"), view = $("#mapview");
     var syncView = function () {
       if (!map || !view) return;
