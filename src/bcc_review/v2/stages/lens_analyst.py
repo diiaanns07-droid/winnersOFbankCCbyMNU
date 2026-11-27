@@ -9,7 +9,9 @@
 4. `critical` без сценария, последствий, с `blocks = none` или без расхождения двух мест документа (тип не из
    расхождений — `ambiguity`, `incomplete`…, или все цитаты из одной строки) понижается до `major`:
    critical у этой линзы — только когда другое место документа прямо поддерживает иное толкование;
-5. `critical` больше двух — лишние понижаются до `major`;
+5. `critical` больше двух — лишние понижаются до `major`; `critical` с цитатой из раздела описания API (заголовок
+   раздела называет API или REST; строка — по сверке цитаты) — тоже `major` с `severity_hint = critical` (№28):
+   бизнес-правило против шага логики метода или примера ответа — зона архитектора и проверки набора;
 6. **зрелый документ** (см. `maturity`) — строгий режим: остаются только расхождения двух мест документа
    (единицы, границы, события, противоречие правил) — `MATURE_MAX_OTHER_MAJOR = 0` прочих `major`, `minor` нет.
    Замер на корпусе (haiku, v13 с одним прочим major): прочие major на мутантах — 21 лишнее замечание при
@@ -30,28 +32,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-try:  # тесты №05 загружают этот файл отдельно, без пакета
-    from bcc_review.v2.types import CANDIDATE_SCHEMA, INT, STR, obj
-except ImportError:  # pragma: no cover
-    CANDIDATE_SCHEMA, INT, STR = None, {"type": "integer"}, {"type": "string"}
-
-    def obj(props: dict, required: list | None = None) -> dict:
-        return {"type": "object", "additionalProperties": False, "properties": props,
-                "required": list(props) if required is None else required}
-
 MAX_CANDIDATES = 12
 MAX_OUTPUT_TOKENS = 32000  # `lens.run` берёт его из модуля: рассуждение слабой модели + JSON
-
-# Обход тем до кандидатов (№28, v28a): слабая модель по списку «перед ответом: покрытие» в тексте задания
-# рассматривала темы через раз (С8 «противоположная ветка при смене настройки», С9 «период ограничения частоты» —
-# 0–1 из 3 прогонов haiku); запись на каждую тему в самом ответе — как `nfr_checks` у линзы «Тестировщик».
-COVERAGE_TOPICS = ["event", "period", "branch", "reversal", "value", "screen", "actor", "unit", "list", "nfr"]
-COVERAGE_VERDICTS = ["answered", "derivable", "open"]
-COVERAGE_SCHEMA = obj({"topic": {"type": "string", "enum": COVERAGE_TOPICS}, "quote": STR, "line": INT,
-                       "question": STR, "answer": STR,
-                       "verdict": {"type": "string", "enum": COVERAGE_VERDICTS}})
-SCHEMA = obj({"coverage": {"type": "array", "items": COVERAGE_SCHEMA},
-              "candidates": {"type": "array", "items": CANDIDATE_SCHEMA}}) if CANDIDATE_SCHEMA else None
 MAX_CRITICAL = 2
 MATURE_MIN_SIGNS = 3
 MATURE_MAX_OTHER_MAJOR = 0
@@ -192,8 +174,9 @@ def touches_api(view: Any, candidates: list[dict], api: set[int]) -> list[bool]:
 def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_candidates: int = MAX_CANDIDATES,
                 max_critical: int = MAX_CRITICAL, api_flags: list[bool] | None = None) -> list[dict[str, Any]]:
     """Применить правила линзы к ответу модели. Не меняет входной список. `api_flags` — по входному кандидату, есть
-    ли у него цитата из раздела описания API (`touches_api`): critical с такой цитатой понижается до major (расхождение бизнес-правила и контракта или логики метода —
-    зона архитектора и проверки набора; на чистых ТЗ №18 все ложные critical линзы были такими)."""
+    ли у него цитата из раздела описания API (`touches_api`): critical с такой цитатой понижается до major
+    (расхождение бизнес-правила и контракта или логики метода — зона архитектора и проверки набора; на чистых ТЗ №18
+    все разобранные ложные critical линзы были такими)."""
     seen: set[tuple] = set()
     kept: list[dict] = []
     for i, raw in enumerate(candidates or []):

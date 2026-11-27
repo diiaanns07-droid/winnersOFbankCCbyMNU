@@ -1,6 +1,7 @@
-"""№28 — линза «Аналитик»: обход тем (coverage) в схеме ответа и critical с цитатой из раздела API.
+"""№28 — линза «Аналитик»: critical с цитатой из раздела описания API понижается до major.
 
-Без сети: записанные ответы haiku с промптом v28a (tests/v2/fixtures/28_analyst) и настоящие документы (docview).
+Без сети: записанные ответы haiku (tests/v2/fixtures/28_analyst — промпт v28a, отклонённый по замеру вариант с обходом
+тем; для проверки постобработки важны только кандидаты) и настоящие документы (docview).
 """
 from __future__ import annotations
 
@@ -16,13 +17,11 @@ for p in (ROOT, ROOT / "src"):
         sys.path.insert(0, str(p))
 
 from bcc_review.v2 import docview  # noqa: E402
-from bcc_review.v2.llm import schema_errors  # noqa: E402
-from bcc_review.v2.stages import lens, lens_analyst as A  # noqa: E402
+from bcc_review.v2.stages import lens_analyst as A  # noqa: E402
 
 FIX = ROOT / "tests" / "v2" / "fixtures" / "28_analyst"
 OFFICIAL = ROOT / "release" / "input" / "requirements.md"
 OPEN2 = ROOT / "evaluation" / "v2" / "open2"
-PROMPT = ROOT / "src" / "bcc_review" / "v2" / "prompts" / "lens_analyst.md"
 
 
 def _json(p: Path) -> dict:
@@ -34,23 +33,6 @@ def _run(view: dict, answer: dict) -> list[dict]:
     cands = answer["candidates"]
     return A.postprocess(cands, mature=A.maturity(view)["mature"],
                          api_flags=A.touches_api(view, cands, A.api_lines(view)))
-
-
-def test_schema_has_coverage_then_candidates():
-    """Схема ответа линзы — coverage (обход тем) и candidates; её берёт общий запуск линзы."""
-    assert lens.schema_for("analyst") is A.SCHEMA
-    assert list(A.SCHEMA["properties"]) == ["coverage", "candidates"]
-    for name in ("official", "official_r2", "grace_clean"):
-        d = _json(FIX / f"{name}.haiku-v28a.json")
-        assert not schema_errors({"coverage": d["coverage"], "candidates": []}, A.SCHEMA)
-        assert d["coverage"], name  # модель заполняет обход тем
-
-
-def test_prompt_asks_for_coverage_topics():
-    text = PROMPT.read_text(encoding="utf-8")
-    assert '{"coverage": [...], "candidates": [...]}' in text
-    for topic in A.COVERAGE_TOPICS:
-        assert f"`{topic}`" in text, topic
 
 
 def test_api_lines_are_rest_part():
