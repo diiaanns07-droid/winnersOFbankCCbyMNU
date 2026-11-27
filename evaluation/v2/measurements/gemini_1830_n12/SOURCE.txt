@@ -1,0 +1,21 @@
+Прогоны №12 27.11 (Астана): официальный документ release/input/requirements.md, Gemini 3.6 Flash, бесплатные ключи
+трёх разных проектов Google. Ключи в файлы не попали (проверено поиском значения каждого ключа).
+
+Входы — сохранённые этапы прогонов c1–c3 из gemini_1525_n12 (сегментация, правила, линзы архитектора, QA и риска,
+согласованность). Вживую заново: аналитик в два прохода (stage lens_analyst, 2 запроса) и судья (stage judge, 2 запроса).
+  c1: аналитик 17:47, судья 17:54 (ключ 2);
+  c2: аналитик 17:43, судья 17:46 (ключ 1; вторую проверку серьёзности отдал 3.5 Flash-Lite — квота 3.6 Flash кончилась);
+  c3: аналитик 17:27, судья 18:31 с проверками кода аналитика (ключ 3).
+
+report.json, report.md — сборка кода 453b40ca на этих ответах моделей; live_report.md — что напечатал живой прогон
+с кодом того времени. responses/ — сырые ответы моделей; lens_analyst.json — в порядке проходов (живой c2 записал
+их в порядке прихода, здесь они переставлены, и повтор даёт сохранённый stages/lens_analyst.json).
+
+Повтор без сети (каталог <c> — c1, c2 или c3):
+  BCC_ANALYST_PASSES=2 python -m bcc_review stage lens_analyst --doc release/input/requirements.md --from <c> \
+    --provider mock --mock-dir <c>/responses --no-cache --no-clarify
+  python -m bcc_review stage judge --doc release/input/requirements.md --from <c> \
+    --provider mock --mock-dir <c>/responses --no-cache --no-clarify
+  python -m evaluation.v2.score <c>/report.json
+Итог (счётчик строгий, арбитр выключен): С 18, 18, 18 из 20; К 5/5 (critical 3, 3, 4); ложных critical 0.
+Отчёты агента руками не правились. Разбор — docs/plan-v2/status/12c-recall.md.
