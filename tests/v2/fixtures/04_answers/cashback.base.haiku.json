@@ -1,0 +1,258 @@
+{
+ "_note": "Ответ haiku (27.11, промпт до волны 3), прошедший кодовую часть волны 2; тест прогоняет его через текущий код.",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Клиент выбирает одну категорию на месяц и получает кэшбэк за неё",
+   "line_start": 17,
+   "line_end": 17
+  },
+  {
+   "source_id": "Термины: Месяц",
+   "kind": "other",
+   "summary": "Месяц — календарный месяц по времени UTC+5",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "source_id": "Термины: Покупка",
+   "kind": "other",
+   "summary": "Покупка — оплата картой, переданная процессингом со статусом «проведена»",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "Термины: Категория",
+   "kind": "other",
+   "summary": "Категория — одна из CAFE, TAXI или PHARMACY",
+   "line_start": 22,
+   "line_end": 22
+  },
+  {
+   "source_id": "КБ-1",
+   "kind": "functional",
+   "summary": "Выбор категории до конца месяца, действует с первого дня следующего",
+   "line_start": 25,
+   "line_end": 25
+  },
+  {
+   "source_id": "КБ-2",
+   "kind": "functional",
+   "summary": "Кэшбэк начисляется за покупки от 500 ₸ включительно",
+   "line_start": 26,
+   "line_end": 26
+  },
+  {
+   "source_id": "КБ-3",
+   "kind": "functional",
+   "summary": "Ставка кэшбэка 5 % от суммы покупки",
+   "line_start": 27,
+   "line_end": 27
+  },
+  {
+   "source_id": "КБ-4",
+   "kind": "constraint",
+   "summary": "Кэшбэк за месяц не превышает 10 000 ₸",
+   "line_start": 28,
+   "line_end": 28
+  },
+  {
+   "source_id": "КБ-5",
+   "kind": "functional",
+   "summary": "Кэшбэк месяца зачисляется на карту 5-го числа следующего месяца",
+   "line_start": 29,
+   "line_end": 29
+  },
+  {
+   "source_id": "КБ-6",
+   "kind": "functional",
+   "summary": "Возврат уменьшает кэшбэк месяца покупки или следующее зачисление",
+   "line_start": 30,
+   "line_end": 30
+  },
+  {
+   "source_id": "КБ-7",
+   "kind": "ui",
+   "summary": "Приложение показывает выбранную категорию и кэшбэк текущего месяца",
+   "line_start": 31,
+   "line_end": 31
+  },
+  {
+   "source_id": "НФ-1",
+   "kind": "nonfunctional",
+   "summary": "getCashback и saveCategory до 500 мс для 95 % запросов при 50 rps",
+   "line_start": 34,
+   "line_end": 34
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Хранить карту, месяц, категорию, суммы покупок и кэшбэк в тиынах, округление вниз",
+   "line_start": 37,
+   "line_end": 37
+  },
+  {
+   "source_id": "",
+   "kind": "integration",
+   "summary": "Приложение читает настройки через getCashback и сохраняет категорию через saveCategory",
+   "line_start": 40,
+   "line_end": 40
+  },
+  {
+   "source_id": "Критерии приёмки, строка 1",
+   "kind": "acceptance",
+   "summary": "Такси, кэшбэк 0 ₸, покупка 2 000 ₸ дает кэшбэк 100 ₸",
+   "line_start": 46,
+   "line_end": 46
+  },
+  {
+   "source_id": "Критерии приёмки, строка 2",
+   "kind": "acceptance",
+   "summary": "Такси, кэшбэк 0 ₸, покупка 500 ₸ дает кэшбэк 25 ₸",
+   "line_start": 47,
+   "line_end": 47
+  },
+  {
+   "source_id": "Критерии приёмки, строка 3",
+   "kind": "acceptance",
+   "summary": "Такси, кэшбэк 9 900 ₸, покупка 4 000 ₸ дает кэшбэк 10 000 ₸",
+   "line_start": 48,
+   "line_end": 48
+  },
+  {
+   "source_id": "Критерии приёмки, строка 4",
+   "kind": "acceptance",
+   "summary": "Категория Кафе, покупка Такси 1 000 ₸ не дает кэшбэка",
+   "line_start": 49,
+   "line_end": 49
+  },
+  {
+   "source_id": "Метод getCashback",
+   "kind": "api",
+   "summary": "GET /cashback/{cardId}, авторизация Bearer сессией владельца карты",
+   "line_start": 55,
+   "line_end": 59
+  },
+  {
+   "source_id": "Метод getCashback, Статус 200",
+   "kind": "api",
+   "summary": "Успешный ответ 200 метода getCashback",
+   "line_start": 61,
+   "line_end": 61
+  },
+  {
+   "source_id": "Метод getCashback, ответ 200: category",
+   "kind": "api",
+   "summary": "Код выбранной категории: CAFE, TAXI или PHARMACY",
+   "line_start": 65,
+   "line_end": 65
+  },
+  {
+   "source_id": "Метод getCashback, ответ 200: accrued",
+   "kind": "api",
+   "summary": "Кэшбэк месяца строкой в тенге с двумя знаками",
+   "line_start": 66,
+   "line_end": 66
+  },
+  {
+   "source_id": "Метод saveCategory",
+   "kind": "api",
+   "summary": "POST /cashback/{cardId}/category, Bearer, Content-Type application/json",
+   "line_start": 72,
+   "line_end": 77
+  },
+  {
+   "source_id": "Метод saveCategory, тело запроса: category",
+   "kind": "api",
+   "summary": "Обязательный код категории CAFE, TAXI или PHARMACY",
+   "line_start": 83,
+   "line_end": 83
+  },
+  {
+   "source_id": "Метод saveCategory, Статус 200",
+   "kind": "api",
+   "summary": "Запрос выполнен, тело описано в разделе метода",
+   "line_start": 89,
+   "line_end": 89
+  },
+  {
+   "source_id": "Метод saveCategory, Статус 400",
+   "kind": "api",
+   "summary": "Код категории не из списка возвращает 400 с сообщением",
+   "line_start": 90,
+   "line_end": 90
+  },
+  {
+   "source_id": "Метод saveCategory, Статус 401",
+   "kind": "api",
+   "summary": "Нет действующей сессии возвращает 401 с сообщением",
+   "line_start": 91,
+   "line_end": 91
+  },
+  {
+   "source_id": "Метод saveCategory, Статус 404",
+   "kind": "api",
+   "summary": "Карта не найдена или не принадлежит клиенту возвращает 404",
+   "line_start": 92,
+   "line_end": 92
+  },
+  {
+   "source_id": "Метод saveCategory, Статус 500",
+   "kind": "api",
+   "summary": "Внутренняя ошибка сервиса возвращает 500 с сообщением",
+   "line_start": 93,
+   "line_end": 93
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Служебное пояснение «Открытый учебный документ корпуса bcc-eval. Семейство cashback.»",
+   "line_start": 3,
+   "line_end": 3,
+   "reason": "Служебное пояснение о комплекте документа, не требование"
+  },
+  {
+   "what": "Шапка таблицы общих сведений «Поле | Значение»",
+   "line_start": 9,
+   "line_end": 9,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Таблица общих сведений: наименование, продукт, задача в Jira, версия документа",
+   "line_start": 11,
+   "line_end": 14,
+   "reason": "Метаданные (общие сведения); поля заполнены: EVAL-101, версия 1.0 от 01.11.2026"
+  },
+  {
+   "what": "Шапка таблицы критериев приёмки «Исходные условия | Действие | Ожидаемый результат»",
+   "line_start": 44,
+   "line_end": 44,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы ответа 200 «Parameter | Format | Description»",
+   "line_start": 63,
+   "line_end": 63,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Пример ответа «{\"category\":\"TAXI\",\"accrued\":\"100.00\"}»",
+   "line_start": 68,
+   "line_end": 68,
+   "reason": "Пример тела ответа 200 метода getCashback; относится к уже выделенным требованиям ответа 200 (L061, L065–L066) и к критерию приёмки строка 1 (L046)"
+  },
+  {
+   "what": "Шапка таблицы тела запроса «Parameter | Format | Mandatory | Logic | Description»",
+   "line_start": 81,
+   "line_end": 81,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы статусов «Код | Когда возвращается | Тело ответа»",
+   "line_start": 87,
+   "line_end": 87,
+   "reason": "Строка-шапка таблицы"
+  }
+ ]
+}

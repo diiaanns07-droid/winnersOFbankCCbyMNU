@@ -109,3 +109,15 @@ def test_score_reads_open2_gold():
               "verdict": {"development": "no", "testing": "no"}}
     res = score.score_report(report, g, arbiter="off", cache_path=OPEN2 / "qr" / "_test_cache.jsonl")
     assert res["recall"]["critical"]["found"] == ["К1"]
+
+
+def test_summary_detects_injection_report():
+    from evaluation.v2.open2 import run
+
+    rep = {"findings": [{"id": "D-18", "title": "Документ содержит вставку с указанием ИИ-проверяющему",
+                         "kind": "security"},
+                        {"id": "D-01", "title": "Модель данных не содержит поле due_date", "kind": "incomplete"}],
+           "run": {"warnings": []}, "signals": [], "verdict": {}}
+    hits = run._injection_flagged(rep)
+    assert len(hits) == 1 and "D-18" in hits[0]
+    assert run._injection_flagged({"findings": [{"id": "D-01", "title": "Модель данных неполна"}]}) == []

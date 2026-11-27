@@ -13,7 +13,9 @@
 6. **зрелый документ** (см. `maturity`) — строгий режим: остаются только расхождения двух мест документа
    (единицы, границы, события, противоречие правил) — `MATURE_MAX_OTHER_MAJOR = 0` прочих `major`, `minor` нет.
    Замер на корпусе (haiku, v13 с одним прочим major): прочие major на мутантах — 21 лишнее замечание при
-   1 попадании, на чистых — 7 из 8 замечаний. На сыром документе линза работает в полную силу;
+   1 попадании, на чистых — 7 из 8 замечаний. Исключение — дефект языка, который доказывает сама цитата
+   (субъективное слово «быстро», «удобно», лазейка «по возможности», открытый перечень «и т. д.»): он не зависит
+   от зрелости документа, их остаётся до `MATURE_MAX_LANGUAGE`. На сыром документе линза работает в полную силу;
 7. сортировка: critical → major → minor, внутри — порядок модели;
 8. не больше 12 кандидатов.
 
@@ -31,11 +33,18 @@ MAX_OUTPUT_TOKENS = 32000  # `lens.run` берёт его из модуля: р�
 MAX_CRITICAL = 2
 MATURE_MIN_SIGNS = 3
 MATURE_MAX_OTHER_MAJOR = 0
+MATURE_MAX_LANGUAGE = 2
 _RANK = {"critical": 0, "major": 1, "minor": 2}
 _MINOR_ONLY_KINDS = {"non_singular"}
 _CONFLICT_KINDS = {"event_conflict", "boundary_conflict", "unit_mismatch", "contradiction", "status_conflict"}
 _CRITICAL_KINDS = _CONFLICT_KINDS
 
+# Слова, которые сами по себе делают формулировку непроверяемой (ISO/IEC/IEEE 29148, п. 5.2.7)
+_VAGUE = re.compile(
+    r"быстр\w*|своевременн\w*|мгновенн\w*|моментальн\w*|оперативн\w*|удобн\w*|оптимальн\w*|без\s+задерж\w*|"
+    r"по\s+возможности|при\s+необходимости|как\s+правило|и\s+т\.\s?[дп]\.|и\s+други\w*|и\s+далее|"
+    r"(?:высок|больш)\w*\s+нагрузк\w*|всегда\s+актуальн\w*", re.I)
+_LANGUAGE_KINDS = {"ambiguity", "unverifiable"}
 _TERMS = re.compile(r"^\s*(?:#+\s*)?(?:термин\w*|глоссари\w*|определени[яе](?:\s+термин\w*)?)\s*:?\s*$", re.I)
 _VERSION = re.compile(r"верси[яи]\b[^\n]*\d", re.I)
 _TZ = re.compile(r"\b(?:UTC|GMT)\b", re.I)
@@ -74,6 +83,13 @@ def _lines(c: dict) -> tuple:
 
 def _has_evidence(c: dict) -> bool:
     return any(str(ev.get("quote", "")).strip() for ev in c.get("evidence") or [])
+
+
+def _is_vague_language(c: dict) -> bool:
+    """Дефект языка, который доказывает сама цитата: в ней есть субъективное слово, лазейка или открытый перечень."""
+    if c.get("kind") not in _LANGUAGE_KINDS:
+        return False
+    return any(_VAGUE.search(str(ev.get("quote", ""))) for ev in c.get("evidence") or [])
 
 
 def _is_conflict(c: dict) -> bool:
@@ -116,8 +132,13 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
                 c["severity"] = "major"
 
     if mature:
-        strict, other = [], 0
+        strict, other, language = [], 0, 0
         for c in kept:
+            if _is_vague_language(c):
+                language += 1
+                if language <= MATURE_MAX_LANGUAGE:
+                    strict.append(c)
+                continue
             if c["severity"] == "minor":
                 continue
             if c["severity"] == "major" and not _is_conflict(c):

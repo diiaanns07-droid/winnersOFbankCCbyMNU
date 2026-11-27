@@ -1,0 +1,306 @@
+{
+ "_note": "Ответ haiku (27.11, промпт до волны 3), прошедший кодовую часть волны 2; тест прогоняет его через текущий код.",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Баланс телефона не опускается ниже порога без ручных действий",
+   "line_start": 17,
+   "line_end": 17
+  },
+  {
+   "source_id": "Термины: Сутки",
+   "kind": "other",
+   "summary": "Сутки — с 00:00:00 до 23:59:59 по UTC+5",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "source_id": "Термины: Уведомление о балансе",
+   "kind": "other",
+   "summary": "Сообщение оператора с номером, балансом в тенге и id события",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "АП-1",
+   "kind": "functional",
+   "summary": "Подключение автопополнения для одного номера и одной карты KZT",
+   "line_start": 24,
+   "line_end": 24
+  },
+  {
+   "source_id": "АП-2",
+   "kind": "functional",
+   "summary": "Порог баланса — целое от 100 до 5 000 ₸ включительно",
+   "line_start": 25,
+   "line_end": 25
+  },
+  {
+   "source_id": "АП-3",
+   "kind": "functional",
+   "summary": "Сумма пополнения — целое от 500 до 20 000 ₸ включительно",
+   "line_start": 26,
+   "line_end": 26
+  },
+  {
+   "source_id": "АП-4",
+   "kind": "functional",
+   "summary": "При балансе ниже порога списать сумму с карты и пополнить номер",
+   "line_start": 27,
+   "line_end": 27
+  },
+  {
+   "source_id": "АП-5",
+   "kind": "functional",
+   "summary": "Не больше трёх автопополнений одного номера за сутки",
+   "line_start": 28,
+   "line_end": 28
+  },
+  {
+   "source_id": "АП-6",
+   "kind": "functional",
+   "summary": "При недостатке средств пополнения нет, клиенту push-уведомление",
+   "line_start": 29,
+   "line_end": 29
+  },
+  {
+   "source_id": "АП-7",
+   "kind": "functional",
+   "summary": "После отключения пополнения по настройке не выполняются",
+   "line_start": 30,
+   "line_end": 30
+  },
+  {
+   "source_id": "НФ-1",
+   "kind": "nonfunctional",
+   "summary": "Пополнение не позднее 5 минут для 99 % уведомлений",
+   "line_start": 33,
+   "line_end": 33
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Хранить телефон, карту, порог, сумму, время пополнения UTC+5, id события",
+   "line_start": 36,
+   "line_end": 36
+  },
+  {
+   "source_id": "",
+   "kind": "integration",
+   "summary": "Методы createAutopay/getAutopay/deleteAutopay; повтор события не дублирует пополнение",
+   "line_start": 39,
+   "line_end": 39
+  },
+  {
+   "source_id": "Критерии приёмки, строка 1",
+   "kind": "acceptance",
+   "summary": "Порог 1 000, сумма 2 000, баланс 900 — одно пополнение на 2 000",
+   "line_start": 45,
+   "line_end": 45
+  },
+  {
+   "source_id": "Критерии приёмки, строка 2",
+   "kind": "acceptance",
+   "summary": "Порог 1 000, баланс 1 000 — пополнение не выполняется",
+   "line_start": 46,
+   "line_end": 46
+  },
+  {
+   "source_id": "Критерии приёмки, строка 3",
+   "kind": "acceptance",
+   "summary": "Три пополнения за сутки, баланс ниже порога — пополнения нет",
+   "line_start": 47,
+   "line_end": 47
+  },
+  {
+   "source_id": "Критерии приёмки, строка 4",
+   "kind": "acceptance",
+   "summary": "Недостаточно средств на карте — нет пополнения, есть push",
+   "line_start": 48,
+   "line_end": 48
+  },
+  {
+   "source_id": "Метод createAutopay",
+   "kind": "api",
+   "summary": "POST /autopay, Bearer-сессия владельца карты, application/json",
+   "line_start": 56,
+   "line_end": 59
+  },
+  {
+   "source_id": "Тело запроса: cardId",
+   "kind": "api",
+   "summary": "Параметр cardId: строка, карта клиента, обязательный",
+   "line_start": 65,
+   "line_end": 65
+  },
+  {
+   "source_id": "Тело запроса: phone",
+   "kind": "api",
+   "summary": "Параметр phone: строка в формате +7XXXXXXXXXX, обязательный",
+   "line_start": 66,
+   "line_end": 66
+  },
+  {
+   "source_id": "Тело запроса: threshold",
+   "kind": "api",
+   "summary": "Параметр threshold: целое от 100 до 5 000, обязательный",
+   "line_start": 67,
+   "line_end": 67
+  },
+  {
+   "source_id": "Тело запроса: amount",
+   "kind": "api",
+   "summary": "Параметр amount: целое от 500 до 20 000, обязательный",
+   "line_start": 68,
+   "line_end": 68
+  },
+  {
+   "source_id": "Логика метода, п. 1",
+   "kind": "functional",
+   "summary": "Проверить сессию и принадлежность карты клиенту",
+   "line_start": 71,
+   "line_end": 71
+  },
+  {
+   "source_id": "Логика метода, п. 2",
+   "kind": "functional",
+   "summary": "Проверить формат номера и диапазоны порога и суммы",
+   "line_start": 72,
+   "line_end": 72
+  },
+  {
+   "source_id": "Логика метода, п. 3",
+   "kind": "functional",
+   "summary": "Если настройка для карты есть, вернуть 409",
+   "line_start": 73,
+   "line_end": 73
+  },
+  {
+   "source_id": "Логика метода, п. 4",
+   "kind": "functional",
+   "summary": "Сохранить настройку и вернуть 200",
+   "line_start": 74,
+   "line_end": 74
+  },
+  {
+   "source_id": "Метод getAutopay",
+   "kind": "api",
+   "summary": "GET /autopay/{cardId}, Bearer-сессия владельца карты",
+   "line_start": 80,
+   "line_end": 82
+  },
+  {
+   "source_id": "Метод getAutopay: ответ 200",
+   "kind": "api",
+   "summary": "Ответ 200 содержит телефон, порог и сумму настройки",
+   "line_start": 84,
+   "line_end": 84
+  },
+  {
+   "source_id": "Метод deleteAutopay",
+   "kind": "api",
+   "summary": "DELETE /autopay/{cardId}, Bearer-сессия владельца карты",
+   "line_start": 90,
+   "line_end": 92
+  },
+  {
+   "source_id": "Статус 200",
+   "kind": "api",
+   "summary": "200 — запрос выполнен; для deleteAutopay тело пустое",
+   "line_start": 98,
+   "line_end": 98
+  },
+  {
+   "source_id": "Статус 400",
+   "kind": "api",
+   "summary": "400 — неверный формат номера или диапазон порога/суммы",
+   "line_start": 99,
+   "line_end": 99
+  },
+  {
+   "source_id": "Статус 401",
+   "kind": "api",
+   "summary": "401 — нет действующей сессии, тело «Требуется вход»",
+   "line_start": 100,
+   "line_end": 100
+  },
+  {
+   "source_id": "Статус 404",
+   "kind": "api",
+   "summary": "404 — карта или настройка не найдена либо чужая карта",
+   "line_start": 101,
+   "line_end": 101
+  },
+  {
+   "source_id": "Статус 409",
+   "kind": "api",
+   "summary": "409 — настройка для карты уже существует",
+   "line_start": 102,
+   "line_end": 102
+  },
+  {
+   "source_id": "Статус 500",
+   "kind": "api",
+   "summary": "500 — внутренняя ошибка сервиса",
+   "line_start": 103,
+   "line_end": 103
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Служебное пояснение о документе («Открытый учебный документ корпуса bcc-eval. Семейство autopay.»)",
+   "line_start": 3,
+   "line_end": 3,
+   "reason": "Служебное пояснение о самом документе, не требование"
+  },
+  {
+   "what": "Строка-шапка таблицы общих сведений («Поле | Значение»)",
+   "line_start": 9,
+   "line_end": 9,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Таблица общих сведений: наименование, продукт, задача в Jira, версия",
+   "line_start": 11,
+   "line_end": 14,
+   "reason": "Метаданные (наименование, продукт, ссылка на задачу, версия), заполнены, не требования"
+  },
+  {
+   "what": "Строка-шапка таблицы критериев приёмки",
+   "line_start": 43,
+   "line_end": 43,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Строка-шапка таблицы параметров createAutopay общих данных («Поле | Значение»)",
+   "line_start": 54,
+   "line_end": 54,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Строка-шапка таблицы параметров тела запроса createAutopay",
+   "line_start": 63,
+   "line_end": 63,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Строка-шапка таблицы общих параметров getAutopay («Поле | Значение»)",
+   "line_start": 78,
+   "line_end": 78,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Строка-шапка таблицы общих параметров deleteAutopay («Поле | Значение»)",
+   "line_start": 88,
+   "line_end": 88,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Строка-шапка таблицы статусов («Код | Когда возвращается | Тело ответа»)",
+   "line_start": 96,
+   "line_end": 96,
+   "reason": "Строка-шапка таблицы"
+  }
+ ]
+}

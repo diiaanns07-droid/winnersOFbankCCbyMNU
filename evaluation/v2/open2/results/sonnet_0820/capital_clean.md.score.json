@@ -1,0 +1,562 @@
+{
+ "schema": "bcc-v2-score/1",
+ "gold": {
+  "path": "evaluation/v2/open2/capital_clean/gold.yaml",
+  "document": "evaluation/v2/open2/capital_clean/source.md",
+  "sha256": "52f890ec94a1042c7c2e3943ed54cf1916264b50428c8032a9057ca67dad45df"
+ },
+ "report": {
+  "version": "v2",
+  "same_doc": true,
+  "document": {
+   "file": "source.md",
+   "format": "md",
+   "sha256": "52f890ec94a1042c7c2e3943ed54cf1916264b50428c8032a9057ca67dad45df",
+   "lines": 202
+  },
+  "status": "complete",
+  "provider": "claude_cli",
+  "model": "sonnet",
+  "models_used": [
+   "claude-sonnet-5-5"
+  ],
+  "commit": "2cd7a28",
+  "duration_s": 266.4,
+  "calls": {
+   "total": 9,
+   "cached": 0,
+   "failed": 0,
+   "split": 0
+  },
+  "tokens": {
+   "input": 225732,
+   "output": 67827
+  },
+  "cost_usd": 1.3998
+ },
+ "counts": {
+  "findings": 20,
+  "by_severity": {
+   "critical": 0,
+   "major": 8,
+   "minor": 12
+  },
+  "duplicates": 0,
+  "outside_gold": {
+   "total": 18,
+   "real": 0,
+   "partial": 0,
+   "false": 0,
+   "duplicate": 0,
+   "gold": 0,
+   "unknown": 18
+  },
+  "report_md_lines": 637
+ },
+ "recall": {
+  "critical": {
+   "found": [],
+   "n": 0,
+   "of": 5,
+   "as_critical": [],
+   "lenient": []
+  },
+  "major": {
+   "found": [],
+   "n": 0,
+   "of": 20,
+   "lenient": []
+  },
+  "minor": {
+   "found_parents": [
+    "М1",
+    "М2"
+   ],
+   "of": 4,
+   "parts_found": [
+    "М1",
+    "М2"
+   ]
+  },
+  "key_25": {
+   "n": 0,
+   "of": 25,
+   "lenient": 0,
+   "loose_any_edge": 0
+  },
+  "all_items": {
+   "n": 2,
+   "of": 4
+  },
+  "parents": {
+   "n": 2,
+   "of": 4
+  }
+ },
+ "precision": {
+  "matched": 2,
+  "duplicates": 0,
+  "outside_real": 0,
+  "outside_false": 0,
+  "outside_unknown": 18,
+  "outside_partial": 0,
+  "precision_useful": 0.1,
+  "precision_gold": 0.1
+ },
+ "severity": {
+  "pairs": 2,
+  "ok": 2,
+  "exact": 2,
+  "accuracy_ok": 1.0,
+  "accuracy_exact": 1.0,
+  "critical_false": [],
+  "rows": [
+   {
+    "gold": "М2",
+    "level": "minor",
+    "finding": "D-17",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М1",
+    "level": "minor",
+    "finding": "D-13",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   }
+  ]
+ },
+ "quotes": {
+  "total": 53,
+  "missing": 0,
+  "fuzzy": 0,
+  "line_mismatch": 0,
+  "verified_field_missing": 0,
+  "findings_without_evidence": [],
+  "missing_list": []
+ },
+ "language": {
+  "generic": [],
+  "english": [],
+  "english_report_md": []
+ },
+ "report_sections": {
+  "паспорт прогона": true,
+  "нарезка требований": true,
+  "проверка каждого требования": true,
+  "проверка набора": true,
+  "сводка": true,
+  "итог": true
+ },
+ "verdict": {
+  "got": {
+   "development": "conditional",
+   "testing": "conditional"
+  },
+  "expected": {
+   "development": "yes",
+   "testing": "yes"
+  }
+ },
+ "assignment": [
+  {
+   "gold": "М1",
+   "finding": "D-13",
+   "title": "Нет версии и даты документа, ID у большинства требований и приоритетов",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.version",
+    "consistency"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М2",
+   "finding": "D-17",
+   "title": "Шаблонные разделы не заполнены: тестирование, чек-лист ревью, согласующие",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.tbd",
+    "rules:placeholder.checklist",
+    "rules:placeholder.approvals"
+   ],
+   "how": "детерминированно"
+  }
+ ],
+ "duplicates": [],
+ "outside": [
+  {
+   "finding": "D-01",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Не определён момент выплаты 31-го числа относительно остатка на 23:59:59",
+   "sources": [
+    "lens:risk",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-02",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Экран предлагает выбор карты, но ни один метод API не отдаёт список карт",
+   "sources": [
+    "lens:architect",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-03",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Ф-6 не определяет получателя и расчётные дни процентов при закрытии счёта",
+   "sources": [
+    "lens:analyst",
+    "lens:qa",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-04",
+   "severity": "major",
+   "kind": "terminology",
+   "title": "Состояние карты описано по-разному: «закрыта или заблокирована» и «активна»",
+   "sources": [
+    "lens:analyst",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-05",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Для push нет данных: фактический способ и причина капитализации не передаются и не хранятся",
+   "sources": [
+    "lens:architect",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-06",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "«Уже выбранный способ» в особых правилах 1 и 2 толкуется по-разному",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-07",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "accruedInterest «на дату запроса»: неясно, входит ли текущий день",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-08",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Ф-1 ограничивает функцию счётом в тенге, а метод это не проверяет",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-09",
+   "severity": "minor",
+   "kind": "unverifiable",
+   "title": "Цель «снизить число обращений» не измерима",
+   "sources": [
+    "lens:analyst",
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-10",
+   "severity": "minor",
+   "kind": "terminology",
+   "title": "Терминология не едина, глоссария нет",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-11",
+   "severity": "minor",
+   "kind": "other",
+   "title": "BPMN и sequence-диаграмма не содержат ветвей Ф-5 и Ф-6",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-12",
+   "severity": "minor",
+   "kind": "non_singular",
+   "title": "В Ф-1, Ф-2, Ф-5 по несколько независимых правил в одном пункте",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-14",
+   "severity": "minor",
+   "kind": "ambiguity",
+   "title": "Не задан часовой пояс для границы месяца при смене способа",
+   "sources": [
+    "lens:risk",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-15",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Не описан технический сбой перечисления на карту, push и повтор выплаты",
+   "sources": [
+    "consistency",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-16",
+   "severity": "minor",
+   "kind": "unverifiable",
+   "title": "НФТ по времени ответа и доступности без точки измерения",
+   "sources": [
+    "lens:analyst",
+    "lens:architect",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-18",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Критерии приёмки не покрывают границы, отказ карты, закрытие и ошибки API",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-19",
+   "severity": "minor",
+   "kind": "ops_risk",
+   "title": "Нет схемы отката или отключения выплат на карту",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-20",
+   "severity": "minor",
+   "kind": "api_contract",
+   "title": "Не определено поведение при cardId с CAPITALIZATION",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  }
+ ],
+ "misses": [
+  {
+   "gold": "М3",
+   "level": "minor",
+   "title": "Раздел «Тестирование требований» — заглушка",
+   "where": "найден кандидатом (rules:placeholder.tbd), судья не взял",
+   "owners": [
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-17",
+     "status": "match",
+     "score": 3.6,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": [
+    {
+     "source": "rules:placeholder.tbd",
+     "id": "rules#9",
+     "title": "Раздел документа оставлен заглушкой: «заполняются тестировщиками»",
+     "reason": ""
+    }
+   ]
+  },
+  {
+   "gold": "М4",
+   "level": "minor",
+   "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+   "where": "есть близкое замечание, но не та проблема или не те строки",
+   "owners": [
+    "rules",
+    "analyst",
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-13",
+     "status": "disputed",
+     "score": 1.9,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": []
+  }
+ ],
+ "stage_recall": {
+  "consistency": {
+   "candidates": 9,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:analyst": {
+   "candidates": 7,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:architect": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:qa": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:risk": {
+   "candidates": 7,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "rules": {
+   "candidates": 20,
+   "K": [],
+   "C": [],
+   "only_here": []
+  }
+ },
+ "gates": [
+  {
+   "metric": "К1–К5 найдены",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "из них критичными",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "С1–С20 найдены",
+   "value": "0/20",
+   "ok": true
+  },
+  {
+   "metric": "критичных ложных",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "всего замечаний",
+   "value": "20",
+   "ok": true
+  },
+  {
+   "metric": "цитаты найдены в документе",
+   "value": "53/53",
+   "ok": true
+  },
+  {
+   "metric": "строк отчёта",
+   "value": "637",
+   "ok": true
+  },
+  {
+   "metric": "разделы п. 6 ТЗ",
+   "value": "6/6",
+   "ok": true
+  },
+  {
+   "metric": "общие фразы",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "английские слова",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "вердикт разработка/тестирование",
+   "value": "conditional/conditional",
+   "ok": false
+  },
+  {
+   "metric": "время, мин",
+   "value": "4.4",
+   "ok": true
+  },
+  {
+   "metric": "вызовов модели",
+   "value": "9",
+   "ok": true
+  }
+ ],
+ "arbiter": {
+  "mode": "off",
+  "calls": 0,
+  "seconds": 0.0,
+  "cost_usd": 0.0,
+  "pending": 21,
+  "model": ""
+ },
+ "seconds": 0.03
+}

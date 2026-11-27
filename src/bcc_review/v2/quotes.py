@@ -40,10 +40,11 @@ HINT_RADIUS = 2
 MAX_GLUE = 3
 MIN_QUOTE = 3          # короче (после нормализации) — не цитата
 MIN_FUZZY_QUOTE = 12   # нечёткий поиск только для достаточно длинных цитат
+SKELETON_MIN = 10      # «те же слова, другие знаки между ними» — для цитат не короче 10 букв и цифр
 REASON_MISSING = "цитата не найдена"
 
 _QUOTES = set("«»“”„‟\"'‘’‚‛`´ʹʺ〝〞＂")
-_DASHES = set("—–‑‒―−⁃﹘﹣－")
+_DASHES = set("—–‑‐‒―−⁃﹘﹣－")  # ‐ (U+2010): в него NFKC превращает неразрывный дефис Word (U+2011)
 _ZERO = set("\u200b\u200c\u200d\u2060\ufeff\u00ad")
 _ELLIPSIS = re.compile(r"\.{3,}")
 _LEAD = re.compile(r"^(?:\s|[#*•|>]|-(?=\s))+")
@@ -284,12 +285,12 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
     raw = _LINE_PREFIX.sub(" ", quote).strip() if _LINE_PREFIX.search(quote) else quote.strip()
     raw = re.sub(r"\s{2,}", " ", raw) if raw != quote.strip() else raw
     needle = _clean_quote(raw)
-    if len(needle) < MIN_QUOTE:
-        return None
     idx = _index(view)
     if not idx.full:
         return None
     hint, near = _anchors(line_hint, near_lines)
+    if len(needle) < MIN_QUOTE:
+        return _short_term(idx, needle, raw, hint, near)
 
     # 1–3: точное (после нормализации) вхождение, в том числе через соседние строки;
     # если не нашлось — та же цитата без ведущего номера пункта («5. …»: в DOCX нумерация не в тексте)
@@ -297,6 +298,12 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
     if not best and _LEAD_NUM.match(needle) and len(_LEAD_NUM.sub("", needle)) >= MIN_QUOTE:
         needle = _LEAD_NUM.sub("", needle)
         best = _pick(idx, idx.occurrences(needle), hint, near)
+    if best and hint is not None and best[0][0] >= 2:
+        # дословно — только далеко от строки модели; если у её строки те же слова с другим разделителем ячеек
+        # («Swagger: —» при строке таблицы «Swagger | —»), модель цитировала именно это место
+        m = _same_words(idx, needle, hint, [])
+        if m and m["line_start"] <= hint + HINT_RADIUS and m["line_end"] >= hint - HINT_RADIUS:
+            return m
     if best:
         _, a, b, ls, le = best
         text = idx.original(a, b)
@@ -321,8 +328,15 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
             _, a, b, ls, le = best
             return _match(idx, a, b, ls, le, "normalized")
 
-    # 4: многоточие внутри цитаты — части по порядку в пределах 3 строк
-    parts = [p.strip(_EDGE + "…") for p in _ELLIPSIS.split(needle)]
+    # 3б: те же слова документа подряд, другие знаки между ними — разделитель ячеек таблицы « | » модель пишет как
+    # «:» или «—» («REST type: GET», «Swagger: —»); слова не меняются, поэтому это та же цитата, а в отчёт идёт
+    # текст документа
+    m = _same_words(idx, needle, hint, near)
+    if m:
+        return m
+
+    # 4: многоточие внутри цитаты — части по порядку в пределах 3 строк; «[…]» и «(…)» — тоже пропуск
+    parts = [p.strip(_EDGE + "…").strip("[](){} ").strip(_EDGE) for p in _ELLIPSIS.split(needle)]
     parts = [p for p in parts if len(p) >= MIN_QUOTE]
     if len(parts) >= 2:
         m = _match_parts(idx, parts, hint, near)
@@ -335,7 +349,70 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
         m = _fuzzy(idx, needle, hint, points)
         if m:
             return m
+    # 6: модель экранировала разметку («limit\_kzt», «\*\*Ф-2.\*\*»), записала HTML-сущности («&laquo;») или
+    # «тенге» вместо «₸»
+    plain = _unescape(quote)
+    if plain != quote:
+        m = verify_quote(view, plain, line_hint, near_lines)
+        if m and m["verified"] == "exact":
+            m["verified"] = "normalized"  # модель писала не дословно — в документе другой текст
+        return m
     return None
+
+
+_MD_ESCAPE = re.compile(r"\\([\\`*_{}\[\]()#+\-.!|<>~\"'])")
+
+
+_TENGE_WORD = re.compile(r"(\d)\s*(?:тенге|тг\.?)(?![а-яё])", re.IGNORECASE)
+
+
+def _unescape(q: str) -> str:
+    """Цитата без экранирования Markdown и HTML-сущностей, «50 000 тенге» / «50 000 тг» → «50 000 ₸» (так в
+    документах банка); если менять нечего — та же строка."""
+    out = _MD_ESCAPE.sub(r"\1", q) if "\\" in q else q
+    if "&" in out and ";" in out:
+        import html
+        out = html.unescape(out)
+    return _TENGE_WORD.sub(r"\1 ₸", out)
+
+
+def _short_term(idx: _Index, needle: str, raw: str, hint: int | None, near: list[int]) -> dict | None:
+    """Термин из двух букв или цифр («СК», «OK»): только целым словом и только у строки модели (±2) или если такое
+    слово в документе одно — иначе это не цитата (дефект терминологии «СК без расшифровки» держится на ней)."""
+    if len(needle) != 2 or not needle.isalnum():
+        return None
+    spans = [(x.start(), x.end()) for x in re.finditer(rf"(?<!\w){re.escape(needle)}(?!\w)", idx.full)]
+    best = _pick(idx, spans, hint, near)
+    if not best or (best[0][0] > 1 and len(spans) > 1):
+        return None
+    _, a, b, ls, le = best
+    text = idx.original(a, b)
+    return _match(idx, a, b, ls, le, "exact" if raw.strip("«»\"' ") == text else "normalized", text)
+
+
+def _same_words(idx: _Index, needle: str, hint: int | None, near: list[int]) -> dict | None:
+    """Слова цитаты подряд, между ними — любые знаки (не буквы и не цифры). Краевые знаки цитаты («—» в
+    «Swagger: —») тоже должны быть в документе. Одно слово с краевым знаком — только рядом с подсказкой или если
+    такое место в документе одно."""
+    if _ELLIPSIS.search(needle):
+        return None
+    words = re.findall(r"\w+", needle)
+    alnum = sum(len(w) for w in words)
+    # краевые знаки без разделителей («:», «|», «;», «,»): «Swagger: —» ищется как «Swagger», затем «—»
+    lead = re.sub(r"[\s:;,|\"]", "", re.match(r"^\W*", needle).group())
+    tail = re.sub(r"[\s:;,|\"]", "", re.search(r"\W*$", needle).group())
+    if not words or (len(words) == 1 and not (lead or tail)) or alnum < (SKELETON_MIN if len(words) > 1 else 5):
+        return None
+    body = r"\W+".join(re.escape(w) for w in words)
+    pat = ((re.escape(lead) + r"\W*" if lead else r"(?<!\w)") + body + (r"\W*" + re.escape(tail) if tail else r"(?!\w)"))
+    spans = [(x.start(), x.end()) for x in re.finditer(pat, idx.full)]
+    best = _pick(idx, spans, hint, near)
+    if not best:
+        return None
+    (tier, *_), a, b, ls, le = best
+    if len(words) == 1 and tier > 1 and len(spans) > 1:
+        return None
+    return _match(idx, a, b, ls, le, "normalized")
 
 
 def _match_parts(idx: _Index, parts: list[str], hint: int | None, near: list[int]) -> dict | None:
@@ -526,13 +603,197 @@ def verify_requirements(view: dict, requirements: Iterable[dict]) -> dict:
     return {"requirements": reqs, "missing": missing}
 
 
+# --------------------------------------------------------------------------- аудит привязки готового отчёта
+_HINT_STAGES = ("lens_analyst", "lens_qa", "lens_architect", "lens_risk", "consistency", "rules")
+
+
+def _line_hits(view: dict, quote: str) -> list[int]:
+    """Номера строк, в которых цитата встречается (после нормализации) — для поиска повторяющихся фраз."""
+    idx = _index(view)
+    needle = _clean_quote(quote or "")
+    if len(needle) < MIN_QUOTE:
+        return []
+    out = []
+    for a, b in idx.occurrences(needle):
+        s1, s2 = idx.span_lines(a, b)
+        if s2 - s1 + 1 <= MAX_GLUE:
+            out.append(idx.nos[s1])
+    return sorted(set(out))
+
+
+def audit_report(report: dict, view: dict, stages: dict | None = None) -> dict:
+    """Проверить привязку цитат готового отчёта к документу — независимо от того, как их ставил прогон.
+
+    * каждое доказательство дефекта: сверено (не ``missing``), текст есть на указанных строках, страница и раздел
+      совпадают со строкой документа;
+    * повторяющаяся фраза: если цитата встречается в документе несколько раз, взятое вхождение должно лежать в
+      строках требований дефекта (или рядом), когда такое вхождение есть, — если только эту строку не указала сама
+      модель (видно по ``stages``);
+    * цитаты нарезки — в пределах строк требования (±2);
+    * ``stages`` (выходы этапов из ``runs/<id>/stages``): номер строки, который написала модель, против найденного
+      кодом, и кандидаты, потерянные сверкой («цитата не найдена»).
+
+    Возвращает ``{"ok", "evidence", "by_verified", "problems": [{"where", "what"}], "requirements", "hints",
+    "lost"}``.
+    """
+    lines = view.get("lines") or []
+    by_no = {ln["n"]: ln for ln in lines}
+    reqs = {r.get("id"): r for r in report.get("requirements") or []}
+    # строки, на которые указала сама модель (выходы этапов): повтор фразы там — её выбор, а не ошибка сверки
+    pointed: set[tuple[str, int]] = set()
+    hints = {"total": 0, "same_line": 0, "within_2": 0, "far": 0, "far_list": []}
+    lost: list[dict] = []
+    req_lines = requirement_lines(report.get("requirements"))
+    for name, out in (stages or {}).items():
+        if name == "quotes":
+            for c in (out or {}).get("rejected") or []:
+                lost.append({"source": c.get("source", ""), "title": str(c.get("title") or "")[:90],
+                             "quotes": [str(e.get("quote") or "")[:90] for e in c.get("evidence") or []]})
+            continue
+        if name not in _HINT_STAGES:
+            continue
+        for c in (out or {}).get("candidates") or []:
+            near = [req_lines[r] for r in c.get("requirement_ids") or [] if r in req_lines]
+            for ev in c.get("evidence") or []:
+                h = _as_int(ev.get("line"))
+                if h is None:
+                    continue
+                m = verify_quote(view, ev.get("quote"), h, near)
+                if not m:
+                    continue
+                hints["total"] += 1
+                if m["line_start"] - HINT_RADIUS <= h <= m["line_end"] + HINT_RADIUS:
+                    pointed.add((_clean_quote(m["text"]), m["line_start"]))
+                d = 0 if m["line_start"] <= h <= m["line_end"] else min(abs(h - m["line_start"]), abs(h - m["line_end"]))
+                if d == 0:
+                    hints["same_line"] += 1
+                elif d <= HINT_RADIUS:
+                    hints["within_2"] += 1
+                else:
+                    hints["far"] += 1
+                    hints["far_list"].append({"stage": name, "hint": h, "found": m["line_start"],
+                                              "repeats": _line_hits(view, ev.get("quote") or "")[:6],
+                                              "quote": str(ev.get("quote") or "")[:80]})
+    problems: list[dict] = []
+    by_verified: dict[str, int] = {}
+    n_ev = 0
+    for f in report.get("findings") or []:
+        fid = f.get("id", "?")
+        ranges = [(int(reqs[r].get("line_start") or 0), int(reqs[r].get("line_end") or reqs[r].get("line_start") or 0))
+                  for r in f.get("requirement_ids") or [] if r in reqs and reqs[r].get("line_start")]
+        for i, ev in enumerate(f.get("evidence") or [], 1):
+            n_ev += 1
+            where = f"{fid} цитата №{i}"
+            ver = ev.get("verified") or "missing"
+            by_verified[ver] = by_verified.get(ver, 0) + 1
+            q = str(ev.get("quote") or "")
+            ls, le = _as_int(ev.get("line_start")) or 0, _as_int(ev.get("line_end")) or 0
+            if ver == "missing":
+                problems.append({"where": where, "what": f"цитата не сверена: «{q[:80]}»"})
+                continue
+            le = max(le, ls)
+            text = " ".join(str(by_no.get(k, {}).get("text") or "") for k in range(ls, le + 1))
+            if not ls or ls not in by_no:
+                problems.append({"where": where, "what": f"строка {ls} вне документа"})
+                continue
+            if _clean_quote(q) not in normalize(text) and ver != "fuzzy":
+                problems.append({"where": where, "what": f"«{q[:80]}» нет в строках {ls}–{le}"})
+                continue
+            ln = by_no[ls]
+            if ev.get("page") not in (None, "", 0) and ln.get("page") and int(ev["page"]) != int(ln["page"]):
+                problems.append({"where": where, "what": f"страница {ev['page']}, а строка {ls} — на странице {ln['page']}"})
+            if (ev.get("section") or "") != (ln.get("section") or "") and ln.get("section"):
+                problems.append({"where": where, "what": f"раздел «{ev.get('section')}», у строки {ls} — «{ln.get('section')}»"})
+            hits = _line_hits(view, q)
+            if len(hits) > 1 and ranges and (_clean_quote(q), ls) not in pointed:
+                inside = [h for h in hits if any(a - HINT_RADIUS <= h <= b + HINT_RADIUS for a, b in ranges)]
+                if inside and not any(a - HINT_RADIUS <= ls <= b + HINT_RADIUS for a, b in ranges):
+                    problems.append({"where": where, "what": f"фраза встречается в строках {hits[:6]}; взята {ls}, "
+                                                             f"а в строках требований дефекта — {inside[:3]}"})
+    req_bad = []
+    for r in report.get("requirements") or []:
+        q = r.get("quote") or ""
+        if not q:
+            continue
+        a, b = _as_int(r.get("line_start")), _as_int(r.get("line_end"))
+        m = verify_quote(view, q, a, [(a, b or a)] if a else ())
+        if not m or not a or not (a - HINT_RADIUS <= m["line_start"] <= (b or a) + HINT_RADIUS):
+            req_bad.append({"id": r.get("id"), "quote": q[:80], "lines": f"{a}–{b}",
+                            "found": m["line_start"] if m else None})
+    return {"ok": not problems and not lost, "evidence": n_ev, "by_verified": by_verified, "problems": problems,
+            "requirements": {"total": sum(1 for r in report.get("requirements") or [] if r.get("quote")),
+                             "outside": req_bad},
+            "hints": hints, "lost": lost}
+
+
+def _audit_main(argv: list[str]) -> int:
+    """``python -m bcc_review.v2.quotes audit runs/<id>|report.json --doc ФАЙЛ [--json]``."""
+    import argparse
+    import json
+    from pathlib import Path
+
+    from . import docview
+
+    ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.quotes audit",
+                                 description="Аудит привязки цитат готового отчёта к документу")
+    ap.add_argument("target", help="каталог прогона runs/<id> или report.json")
+    ap.add_argument("--doc", required=True, help="файл требований, по которому строился отчёт")
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args(argv)
+    t = Path(a.target)
+    stages: dict[str, Any] = {}
+    if t.is_dir():
+        for p in sorted((t / "stages").glob("*.json")):
+            try:
+                stages[p.stem] = json.loads(p.read_text(encoding="utf-8")).get("output") or {}
+            except (OSError, ValueError):
+                continue
+        rp = t / "report.json"
+        report = json.loads(rp.read_text(encoding="utf-8")) if rp.is_file() else {}
+        if not report:  # прогон ещё идёт или упал: проверяем то, что есть в этапах
+            seg = stages.get("segment") or {}
+            report = {"requirements": seg.get("requirements") or [],
+                      "findings": (stages.get("quotes") or {}).get("candidates") or []}
+    else:
+        report = json.loads(t.read_text(encoding="utf-8"))
+    view = docview.load(a.doc)
+    res = audit_report(report, view, stages)
+    if a.json:
+        print(json.dumps(res, ensure_ascii=False, indent=1))
+        return 0 if res["ok"] else 4
+    h = res["hints"]
+    print(f"Доказательств: {res['evidence']} {res['by_verified']}; расхождений: {len(res['problems'])}; "
+          f"цитат нарезки вне строк требования: {len(res['requirements']['outside'])}/{res['requirements']['total']}; "
+          f"потеряно кандидатов: {len(res['lost'])}")
+    if h["total"]:
+        print(f"Строка модели ↔ найденная: та же {h['same_line']}, ±2 {h['within_2']}, дальше {h['far']} из {h['total']}")
+    for p in res["problems"]:
+        print(f"  ! {p['where']}: {p['what']}")
+    for r in res["requirements"]["outside"]:
+        print(f"  ~ {r['id']} ({r['lines']}): «{r['quote']}» → {r['found']}")
+    for x in h["far_list"][:20]:
+        print(f"  > {x['stage']}: модель L{x['hint']}, найдено L{x['found']}, повторы {x['repeats']}: «{x['quote']}»")
+    for x in res["lost"]:
+        print(f"  ✗ {x['source']}: {x['title']} — {x['quotes']}")
+    return 0 if res["ok"] else 4
+
+
 def main(argv: list[str] | None = None) -> int:
-    """``python -m bcc_review.v2.quotes ФАЙЛ "цитата" [--line N] [--near A-B]`` или ``--candidates out.json``."""
+    """``python -m bcc_review.v2.quotes ФАЙЛ "цитата" [--line N] [--near A-B]`` или ``--candidates out.json``;
+    ``python -m bcc_review.v2.quotes audit runs/<id> --doc ФАЙЛ`` — аудит привязки готового отчёта."""
     import argparse
     import json
     import sys
 
     from . import docview
+
+    argv = list(sys.argv[1:] if argv is None else argv)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+    if argv and argv[0] == "audit":
+        return _audit_main(argv[1:])
 
     ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.quotes", description="Сверка цитат с документом")
     ap.add_argument("file")

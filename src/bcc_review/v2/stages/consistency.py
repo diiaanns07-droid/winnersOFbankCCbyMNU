@@ -333,6 +333,87 @@ SCHEMA_KINDS = ("architecture", "process")
 MAJOR_CONFLICT_KINDS = ("unit_mismatch",)
 
 
+# ---------------------------------------------------------------- тексты для читателя
+
+MAX_TITLE_WORDS = 14
+# Место без номера пункта в документе называем по виду требования и строке.
+_KIND_PLACE = {"goal": "цель", "architecture": "схема архитектуры", "process": "описание процесса",
+               "ui": "описание экрана", "nonfunctional": "нефункциональное требование", "data": "требования к данным",
+               "integration": "описание интеграции", "api": "описание API", "acceptance": "критерий приёмки",
+               "constraint": "особое правило API", "functional": "требование"}
+_RID = re.compile(r"\bR-\d{1,3}\b")
+
+
+def place_label(rid: str, line: int | None, known: dict[str, dict] | None) -> str:
+    """Как назвать место читателю: номер пункта документа («Ф-3», «Статус 400»), иначе вид и строка
+    («схема архитектуры, строка 26»). Внутренние ID нарезки (R-07) читателю ничего не говорят."""
+    r = (known or {}).get(rid) or {}
+    src = _s(r.get("source_id"))
+    if src and len(src) <= 40:
+        src = re.sub(r"^Критерии при[её]мки", "критерий приёмки", src)
+        return src
+    n = line or r.get("line_start") or 0
+    what = _KIND_PLACE.get(_s(r.get("kind")), "")
+    if what and n:
+        return f"{what}, строка {n}"
+    return f"строка {n}" if n else (rid or "место документа")
+
+
+_BARE_ID = re.compile(r"[A-ZА-ЯЁ]{1,4}-\d+(?:\.\d+)?")
+
+
+def _quoted(label: str) -> str:
+    """Короткий номер пункта («Ф-3») — как есть, составное название места — в кавычках: так оно читается
+    в любом падеже («как в «Статус 400»», «по-разному решают Ф-2 и «критерий приёмки, строка 2»»)."""
+    return label if _BARE_ID.fullmatch(label) else f"«{label}»"
+
+
+def _humanizer(known: dict[str, dict] | None, labels: dict[str, str]):
+    """Замена внутренних ID нарезки в тексте модели номерами пунктов документа."""
+    def sub(m: re.Match) -> str:
+        rid = m.group(0)
+        return labels.get(rid) or _quoted(place_label(rid, None, known))
+
+    return lambda text: _RID.sub(sub, _s(text)) if text else ""
+
+
+def _phrase(s: str) -> str:
+    """Фраза для вставки внутрь предложения: без завершающей точки и с малой буквы, если это не аббревиатура."""
+    s = re.sub(r"[\s.;,]+$", "", _s(s))
+    if len(s) > 1 and s[0].isupper() and s[1].islower() and not re.match(r"[A-ZА-ЯЁ][а-яё]?-\d", s):
+        s = s[0].lower() + s[1:]
+    return s
+
+
+def _sentence(s: str) -> str:
+    """Законченное предложение: с большой буквы и одной точкой в конце (без «..»)."""
+    s = re.sub(r"\s+", " ", _s(s)).strip()
+    if not s:
+        return ""
+    s = re.sub(r"\.{2,}$", ".", s)
+    if s[-1] not in ".?!»)":
+        s += "."
+    return _cap(s)
+
+
+def _cap(s: str) -> str:
+    return s[0].upper() + s[1:] if s else s
+
+
+def _words(s: str) -> int:
+    return len(_s(s).split())
+
+
+def _short(s: str, n: int) -> str:
+    w = _s(s).split()
+    return " ".join(w[:n]) + (" …" if len(w) > n else "")
+
+
+def _has_variants(q: str) -> bool:
+    """Вопрос уже предлагает варианты («… или …»)."""
+    return bool(re.search(r"(?<![а-яё])или(?![а-яё])", q or "", re.I))
+
+
 def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict | None:
     """conflict → critical с двумя цитатами в разных местах; undefined → major."""
     if not pair["same_subject"] or pair["verdict"] == "compatible":
@@ -372,28 +453,41 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     if pair["verdict"] == "undefined" and kind == "incomplete":
         criterion = "set_complete"
     ids = [x for x in (pair["a"], pair["b"]) if x]
-    a_lbl = pair["a"] or f"строка {pair['line_a']}"
-    b_lbl = pair["b"] or f"строка {pair['line_b']}"
+    a_lbl = place_label(pair["a"], pair["line_a"], known)
+    b_lbl = place_label(pair["b"], pair["line_b"], known)
+    if a_lbl == b_lbl:  # два пункта одного раздела без своих номеров — различаем по строке
+        a_lbl, b_lbl = f"{a_lbl} (строка {pair['line_a']})", f"{b_lbl} (строка {pair['line_b']})"
+    qa_, qb_ = _quoted(a_lbl), _quoted(b_lbl)
+    human = _humanizer(known, {pair["a"]: qa_, pair["b"]: qb_})
+    subject = _phrase(human(pair["subject"]))
+    oa, ob = _phrase(human(pair["outcome_a"])), _phrase(human(pair["outcome_b"]))
+    model_title = human(pair["title"])
     if pair["verdict"] == "conflict":
-        title = pair["title"] or f"{a_lbl} и {b_lbl} дают несовместимые результаты: {pair['subject']}"
-        problem = (f"{a_lbl} и {b_lbl} регулируют один предмет — {pair['subject']} — и в одном сценарии "
-                   f"требуют несовместимого: по {a_lbl} — {pair['outcome_a']}; по {b_lbl} — {pair['outcome_b']}. "
-                   f"Ни одно место не объявлено исключением из другого.")
+        fallback = f"{qa_} и {qb_} дают разный результат: {_short(subject, 8)}"
+        problem = (f"{_cap(qa_)} и {qb_} по-разному решают один случай — {subject}. "
+                   f"Ни одно из мест не объявлено исключением из другого.")
     else:
-        title = pair["title"] or f"{a_lbl} и {b_lbl} не определяют исход: {pair['subject']}"
-        problem = (f"{a_lbl} и {b_lbl} регулируют один предмет — {pair['subject']}, — но исход сценария по ним "
-                   f"не определить: по {a_lbl} — {pair['outcome_a']}; по {b_lbl} — {pair['outcome_b']}.")
-    scenario = pair["scenario"]
-    if scenario and pair["outcome_a"] and pair["outcome_b"]:
-        scenario = f"{scenario} Исход по {a_lbl}: {pair['outcome_a']}. Исход по {b_lbl}: {pair['outcome_b']}."
-    impact = pair["impact"] or ("Разработчик и тестировщик выберут разные правила: реализация и приёмка "
-                                "разойдутся, клиент получит результат, который противоречит одному из пунктов.")
-    rec = pair["recommendation"] or f"Выбрать одно правило для этого сценария и записать его в {a_lbl} и {b_lbl} одинаково."
+        fallback = f"{qa_} и {qb_} не определяют результат: {_short(subject, 8)}"
+        problem = (f"{_cap(qa_)} и {qb_} касаются одного случая — {subject}, — но результат по ним "
+                   f"не определить: документ не говорит, что делать.")
+    title = model_title if model_title and _words(model_title) <= MAX_TITLE_WORDS else fallback
+    scenario = _sentence(human(pair["scenario"]))
+    if oa and ob:
+        scenario = " ".join(x for x in (scenario, f"{_cap(a_lbl)}: {oa}.", f"{_cap(b_lbl)}: {ob}.") if x)
+    impact = _sentence(human(pair["impact"])) or (
+        "Разработчик и тестировщик выберут разные правила: реализация и приёмка разойдутся, клиент получит "
+        "результат, который противоречит одному из пунктов.")
+    rec = _sentence(human(pair["recommendation"])) or (
+        f"Выбрать одно правило для этого случая и записать его в {qa_} и {qb_} одинаково.")
+    question = _sentence(human(pair["question"]))
+    if pair["verdict"] == "conflict" and oa and ob and not _has_variants(question):
+        # Вопрос владельцу с двумя вариантами: какой из двух исходов сценария верный.
+        question = f"{_cap(_short(subject, 12))}: какой результат верный — «{oa}» (как в {qa_}) или «{ob}» (как в {qb_})?"
     return {
         "title": title, "kind": kind, "criterion": criterion, "severity": severity,
         "requirement_ids": ids, "evidence": [{k: v for k, v in e.items()} for e in evidence],
         "problem": problem, "scenario": scenario, "impact": impact, "recommendation": rec,
-        "rewrite": "", "question": pair["question"], "blocks": "both",
+        "rewrite": "", "question": question, "blocks": "both",
         "source": SOURCE, "origin": "pair_check", "pair_ids": [pair["id"]] if pair.get("id") else [],
         "_subject": pair["subject"],
     }
@@ -486,7 +580,8 @@ def glossary_to_candidate(g: dict) -> dict | None:
     severity = "major" if g["severity"] == "major" else "minor"
     problem = g["problem"] or "Одно понятие названо в документе по-разному, и по тексту не понять, одно ли это."
     return {
-        "title": f"Одно понятие «{g['concept']}» названо по-разному: " + ", ".join(f"«{t['term']}»" for t in found[:4]),
+        "title": f"«{_short(g['concept'], 5)}» названо по-разному: " + ", ".join(f"«{t['term']}»" for t in found[:3])
+                 + (" и др." if len(found) > 3 else ""),
         "kind": "terminology", "criterion": "conforming", "severity": severity, "requirement_ids": [],
         "evidence": [{"quote": t["term"], "line": t["line"], "verified": t["verified"]} for t in found[:4]],
         "problem": f"{problem} Названия: {names}.",
@@ -519,8 +614,9 @@ def merge_glossary(cands: list[dict]) -> list[dict]:
         host.setdefault("merged_titles", []).append(c["title"])
     for c in out:
         if c.get("merged_titles"):
-            c["title"] = "Одни и те же компоненты или участники названы по-разному: " + "; ".join(
-                [c["title"].split(": ", 1)[-1]] + [t.split(": ", 1)[-1] for t in c["merged_titles"]])[:300]
+            names = list(dict.fromkeys(e["quote"] for e in c["evidence"]))
+            c["title"] = ("Компоненты и участники названы по-разному: " + ", ".join(f"«{n}»" for n in names[:4])
+                          + (" и др." if len(names) > 4 else ""))
     return out
 
 
@@ -741,6 +837,35 @@ def normalize_trace(raw: list[dict], requirements: list[dict]) -> list[dict]:
     return sorted(by_id.values(), key=lambda t: order.get(t["requirement_id"], 10 ** 6))
 
 
+MAX_NOTE_CHARS = 120
+
+
+def mark_trace_conflicts(trace: list[dict], pairs: list[dict], known: dict[str, dict]) -> None:
+    """Строка матрицы покрытия знает о противоречии своего требования: ``conflicts_with`` — ID второй стороны,
+    в ``note`` первым — «противоречит Ф-4» / «противоречит критерию приёмки, строка 2». Так матрица ведёт к дефекту,
+    а не только к пропущенной приёмке. Меняет список на месте."""
+    rows = {t["requirement_id"]: t for t in trace or []}
+    for p in pairs or []:
+        if p.get("verdict") != "conflict" or not p.get("same_subject"):
+            continue
+        for me, other, line in ((p["a"], p["b"], p["line_b"]), (p["b"], p["a"], p["line_a"])):
+            t = rows.get(me)
+            if not t or not other or other == me:
+                continue
+            if other in t.setdefault("conflicts_with", []):
+                continue
+            t["conflicts_with"].append(other)
+            mark = f"противоречие: {place_label(other, line, known)}"
+            # своя пометка модели о том же противоречии (часто с внутренним ID) — заменяется нашей
+            old = "; ".join(x.strip() for x in _s(t.get("note")).split(";")
+                            if x.strip() and "противореч" not in x.lower())
+            if old in ("нет критерия приёмки", "трассировка не построена") and (known.get(other) or {}).get(
+                    "kind") == "acceptance":
+                old = ""  # строка приёмки к правилу есть — она ему противоречит
+            note = f"{mark}; {old}" if old and mark not in old else (old if mark in old else mark)
+            t["note"] = note[:MAX_NOTE_CHARS]
+
+
 def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     """Ответ модели → выход этапа по CONTRACT 2.3/2.5 (чистая функция, тестируется на записанных ответах)."""
     data = data or {}
@@ -795,6 +920,7 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
             candidates.append(c)
 
     trace = normalize_trace(data.get("trace") or [], requirements)
+    mark_trace_conflicts(trace, pairs, known)
 
     out_pairs = []
     for p in pairs:
