@@ -1,0 +1,35 @@
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -28,9 +28,10 @@
+ **Windows (PowerShell):**
+ 
+ ```powershell
+-git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
+-cd winnersOFbankCCbyMNU
+-py -3.12 -m venv .venv
++git clone --branch release --single-branch --depth 1 https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git bcc-review
++cd bcc-review
++py -3 --version
++py -3 -m venv .venv
+ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+ .\.venv\Scripts\Activate.ps1
+ python -m pip install -r requirements.txt -e .
+@@ -39,14 +40,14 @@
+ **macOS и Linux:**
+ 
+ ```bash
+-git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
+-cd winnersOFbankCCbyMNU
++git clone --branch release --single-branch --depth 1 https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git bcc-review
++cd bcc-review
+ python3.12 -m venv .venv
+ source .venv/bin/activate
+ python -m pip install -r requirements.txt -e .
+ ```
+ 
+-Другая версия Python — укажите её (`py -3.13`, `py -3.14`, `python3.11`). Нет команды `py` — пишите `python`. На Ubuntu для
++Если команда показывает версию вне диапазона 3.11–3.14, выберите установленный интерпретатор из списка `py -0p`. Для конкретной версии укажите её (`py -3.13`, `py -3.14`, `python3.11`). Нет команды `py` — пишите `python`. На Ubuntu для
+ venv нужен пакет `python3.12-venv`. Дальше все команды — в активированном окружении (в начале строки `(.venv)`).
+ 
+ ### Шаг 2. Ключ Gemini (бесплатно, без карты)
