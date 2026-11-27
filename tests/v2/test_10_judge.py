@@ -422,7 +422,13 @@ def test_schema_is_strict_json_schema():
     jsonschema = pytest.importorskip("jsonschema")
     schema = judge.response_schema()
     jsonschema.Draft202012Validator.check_schema(schema)
-    jsonschema.validate(response([finding("F01", ["C-001"])]), schema)
+    resp = response([finding("F01", ["C-001"])])
+    for f in resp["findings"]:
+        f.pop("impact", None)
+        f.pop("recommendation", None)
+    jsonschema.validate(resp, schema)
+    props = schema["properties"]["findings"]["items"]["properties"]
+    assert "impact" not in props and "recommendation" not in props   # берутся у кандидата base
 
 
 FORBIDDEN = ["push", "savelimit", "тиын", "порог", "алмат", "ф-1", "ф-2", "ф-3", "ф-4", "держател", "kzt", "₸"]

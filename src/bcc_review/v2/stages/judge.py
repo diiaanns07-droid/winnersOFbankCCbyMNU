@@ -172,13 +172,11 @@ def response_schema() -> dict:
         "requirement_ids": _SA,
         "problem": _S,
         "scenario": _S,
-        "impact": _S,
         "severity_basis": _S,
         "severity": {"type": "string", "enum": SEVERITIES},
         "blocks": {"type": "string", "enum": BLOCKS},
         "priority": {"type": "integer"},
-        "recommendation": _S,
-    })
+    })  # impact, recommendation, rewrite, question — у кандидата base (короче ответ на слабых моделях)
     rejected = _obj({
         "candidate_id": _S,
         "reason_code": {"type": "string", "enum": _MODEL_REJECT_CODES},
