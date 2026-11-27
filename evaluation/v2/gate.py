@@ -540,6 +540,24 @@ def render(checks: list[dict]) -> str:
     return "\n".join(L) + "\n"
 
 
+def render_summary(checks: list[dict], at: str) -> str:
+    """Итог ворот для начала RESULTS.md: счёт и красное с владельцами одной таблицей (полностью — GATE.md)."""
+    gate = [c for c in checks if not c.get("info")]
+    red = [c for c in gate if c["ok"] is False]
+    wait = [c for c in gate if c["ok"] is None]
+    L = [f"**{at}:** зелёных {sum(1 for c in gate if c['ok'])}, красных {len(red)}, без замера {len(wait)} — "
+         "все проверки и источники в `evaluation/v2/GATE.md` (`python -m evaluation.v2.gate --save`).", ""]
+    if red:
+        L += ["| Красное | Факт (цель) | Замер | Кому |", "| :--- | :--- | :--- | :--- |"]
+        for c in red:
+            owners = str(c.get("owners") or "").replace("|", "/")
+            owners = owners if len(owners) <= 160 else owners[:157] + "…"
+            L.append(f"| {c['name']} | {c['fact']} ({c['target']}) | {c.get('source') or '—'} | {owners} |")
+    if wait:
+        L += ["", "Без замера: " + "; ".join(c["name"] for c in wait) + "."]
+    return "\n".join(L) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.gate", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -554,6 +572,10 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     if a.save:
         (V2 / "GATE.md").write_text(text, encoding="utf-8")
+        from .common import put_results_block
+
+        put_results_block(V2 / "RESULTS.md", "gate", render_summary(checks, f"Ворота WAVE3, {sc.astana_now()}"),
+                          "Итог ворот")
         with (V2 / "gate_history.jsonl").open("a", encoding="utf-8") as fh:
             fh.write(json.dumps({"at": sc.astana_now(), "green": sum(1 for c in checks if c["ok"]),
                                  "red": [c["name"] for c in checks if c["ok"] is False and not c.get("info")],

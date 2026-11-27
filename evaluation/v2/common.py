@@ -21,6 +21,20 @@ def shell_quote(arg: object) -> str:
     return subprocess.list2cmdline([s]) if os.name == "nt" else shlex.quote(s)
 
 
+def put_results_block(path: Path, name: str, body: str, title: str) -> None:
+    """Блок `<!-- name:start -->…<!-- name:end -->` в Markdown-файле (RESULTS.md): заменить на месте, а если блока
+    ещё нет — вставить новым разделом `## title` сразу после шапки документа (первым)."""
+    res = path.read_text(encoding="utf-8")
+    start, end = f"<!-- {name}:start -->", f"<!-- {name}:end -->"
+    block = f"{start}\n{body}{end}"
+    if start in res and end in res:
+        res = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: block, res, flags=re.S)
+    else:
+        head, sep, rest = res.partition("\n## ")
+        res = head.rstrip() + f"\n\n## {title}\n\n" + block + "\n" + sep + rest
+    path.write_text(res, encoding="utf-8")
+
+
 def run_shell(cmd: str, timeout: int, env: dict) -> subprocess.CompletedProcess:
     """Запуск агента строкой команды: вывод читается как UTF-8 (дочернему Python — PYTHONIOENCODING), чтобы
     русский текст в stderr не ронял харнес на Windows с кодовой страницей cp1251/cp866."""

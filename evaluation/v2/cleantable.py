@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from .common import ROOT
+from .common import ROOT, put_results_block
 
 V2 = ROOT / "evaluation" / "v2"
 RESULTS = V2 / "RESULTS.md"
@@ -130,14 +130,16 @@ def _verdict(v: dict) -> str:
     return f"{ru.get(v.get('development'), v.get('development'))} / {ru.get(v.get('testing'), v.get('testing'))}"
 
 
-def render_verdicts(groups: dict[tuple, list[dict]]) -> str:
+def render_verdicts(groups: dict[tuple, list[dict]], heading: bool = True) -> str:
     """«Вердикт на исправленных ТЗ» (таблица №01): по каждому набору — сколько чистых документов получили
     «можно», «с условиями», «нельзя» (по разработке) в последнем прогоне модели; цель — «нельзя» 0."""
     order = ["чистые ТЗ №20", "№18: чистые версии (2-я редакция)", "№18: чистые версии (1-я редакция)",
              "корпус: базы и перефразы", "прочие чистые"]
     keys = sorted((k for k in groups if not k[1].startswith("офлайн")),
                   key=lambda k: (order.index(k[0]) if k[0] in order else 9, k[1]))
-    L = ["### Вердикт на исправленных ТЗ (цель: «нельзя» 0, critical 0)", "",
+    L = (["### Вердикт на исправленных ТЗ (цель: «нельзя» 0, critical 0)", ""] if heading else
+         ["Цель: на исправленном (чистом) ТЗ «нельзя» 0 и critical 0. Последний прогон каждого набора и модели;"
+          " пересчитать — `python -m evaluation.v2.cleantable --write`.", ""]) + [
          "| Набор | Модель | Прогон | «можно» | «с условиями» | «нельзя» | critical | Документы с «нельзя» |",
          "| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- |"]
     for k in keys:
@@ -201,7 +203,8 @@ def main(argv: list[str] | None = None) -> int:
     text = render_verdicts(groups) + render(groups)
     print(text)
     if a.write:
-        write_results(text)
+        write_results(render(groups))
+        put_results_block(RESULTS, "verdict", render_verdicts(groups, heading=False), "Вердикт на исправленных ТЗ")
     return 0
 
 

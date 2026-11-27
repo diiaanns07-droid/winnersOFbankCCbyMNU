@@ -207,3 +207,25 @@ def test_score_required_keyword_group():
     assert sc.pair_info(item, k4)["status"] == "match"
     item["keywords"].pop("required")
     assert sc.pair_info(item, other)["status"] == "match"  # без required — прежнее поведение
+
+
+def test_put_results_block_inserts_first_and_replaces(tmp_path):
+    from evaluation.v2.common import put_results_block
+
+    p = tmp_path / "R.md"
+    p.write_text("# Результаты\n\nшапка\n\n## Старый раздел\n\nтекст\n", encoding="utf-8")
+    put_results_block(p, "gate", "итог 1\n", "Итог ворот")
+    put_results_block(p, "verdict", "таблица\n", "Вердикт")
+    put_results_block(p, "gate", "итог 2\n", "Итог ворот")
+    t = p.read_text(encoding="utf-8")
+    assert t.index("## Вердикт") < t.index("## Итог ворот") < t.index("## Старый раздел")
+    assert "итог 2" in t and "итог 1" not in t and t.count("<!-- gate:start -->") == 1
+
+
+def test_gate_render_summary_lists_red_with_owners():
+    checks = [{"name": "A: С", "target": "≥ 18/20", "fact": "17/20", "ok": False, "owners": "№10 | №05", "source": "з"},
+              {"name": "B", "target": "0", "fact": "0", "ok": True, "owners": ""},
+              {"name": "C", "target": "есть", "fact": "нет", "ok": None, "owners": "№15"}]
+    text = gate.render_summary(checks, "Ворота, 15:30")
+    assert "зелёных 1, красных 1, без замера 1" in text and "| A: С | 17/20 (≥ 18/20) | з | №10 / №05 |" in text
+    assert "Без замера: C." in text
