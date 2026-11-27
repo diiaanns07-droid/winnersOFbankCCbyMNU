@@ -951,3 +951,21 @@ def test_fuzz_corrupted_reports_never_crash(sample):
         fin = jsonout.finalize(copy.deepcopy(r))
         verify.check_markdown(fin, markdown.render(fin))
         markdown.rubric(copy.deepcopy(r))
+
+
+def test_refuted_report_rendered_in_russian(sample):
+    """Отчёт после повторной проверки №17 (`refute`): источник по-русски, снятые не считаются отклонёнными судьёй."""
+    r = copy.deepcopy(sample)
+    f = next(x for x in r["findings"] if x["severity"] == "major")
+    r["findings"].remove(f)
+    r["rejected"] = list(r.get("rejected") or []) + [{**f, "source": "refute", "reason_code": "refuted",
+                                                      "reason": "строка 40 прямо это разрешает"}]
+    r["refutation"] = {"status": "complete", "decisions": [{"id": f["id"], "decision": "refuted"},
+                                                           {"id": "D-01", "decision": "confirmed"}]}
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert "`refute`" not in md and "| повторная проверка |" in md
+    assert "повторная проверка критичных и существенных (2) сняла 1 и понизила 0" in md
+    assert "сняты повторной проверкой — 1" in md
+    errors, _ = __import__("bcc_review.v2.verify", fromlist=["x"]).check_markdown(r, md)
+    assert not errors, errors
