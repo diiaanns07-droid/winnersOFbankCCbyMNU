@@ -194,12 +194,21 @@ def verify_report(report: dict | str | Path, source: str | Path, *, markdown: st
     # 2. исходник
     data = src.read_bytes()
     sha = hashlib.sha256(data).hexdigest()
-    if doc.get("sha256") != sha:
+    if run.get("status") == "failed" and not doc.get("sha256"):
+        warnings.append("прогон завершился сбоем, документ не был прочитан — SHA-256 в отчёте не записан")
+    elif doc.get("sha256") != sha:
         err("sha256", "document.sha256",
             f"SHA-256 исходника {sha[:12]}… не совпадает с записанным {str(doc.get('sha256'))[:12]}…")
     if doc.get("file") and Path(doc["file"]).name != src.name:
         warnings.append(f"имя файла в отчёте «{doc['file']}», проверяется «{src.name}»")
-    lines, pages = load_lines(src)
+    try:
+        lines, pages = load_lines(src)
+    except (OSError, ValueError, RuntimeError, ImportError) as exc:
+        if run.get("status") != "failed" or jsonout.open_findings(report):
+            raise
+        # отчёт о сбое на нечитаемом входе: утверждений о документе в нём нет — сверять нечего
+        warnings.append(f"документ не читается ({exc}); отчёт сообщает о сбое и не содержит цитат")
+        lines, pages = [], []
     if doc.get("lines") not in (None, len(lines)):
         warnings.append(f"в отчёте {doc.get('lines')} строк документа, при чтении — {len(lines)}")
 
@@ -330,6 +339,11 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_VERIFY_FAILED
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif result["ok"] and any(w.startswith("прогон завершился сбоем") for w in result["warnings"]):
+        print("verify: OK — отчёт о сбое прогона: утверждений о документе в нём нет, числа и вердикт («не вынесен») "
+              "сходятся")
+        for w in result["warnings"][:10]:
+            print(f"  ! {w}")
     elif result["ok"]:
         c = result["counts"]
         print(f"verify: OK — исходник совпадает (SHA-256 {result['sha256'][:12]}…), цитат на своих строках "

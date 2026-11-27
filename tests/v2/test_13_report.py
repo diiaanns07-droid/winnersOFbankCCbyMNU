@@ -107,13 +107,14 @@ def test_resolved_findings_do_not_count(sample):
     ([{"severity": "critical", "blocks": "both"}], "failed", ("none", "none")),
 ])
 def test_rule_verdict(findings, status, expected):
-    r = {"run": {"status": status}, "findings": findings}
+    r = {"run": {"status": status}, "findings": findings, "requirements": [{"id": "R-01"}]}
     v = jsonout.rule_verdict(r)
     assert (v["development"], v["testing"]) == expected
 
 
 def test_finalize_enforces_rule_verdict_and_fills_lists():
-    r = {"run": {"status": "complete"}, "findings": [], "requirements": [], "verdict": {"development": "no"}}
+    r = {"run": {"status": "complete"}, "findings": [], "requirements": [{"id": "R-01"}],
+         "verdict": {"development": "no"}}
     jsonout.finalize(r)
     assert r["verdict"]["development"] == "yes" and r["verdict"]["testing"] == "yes"
     assert any("пересчитан по правилу" in w for w in r["run"]["warnings"])
@@ -553,3 +554,32 @@ def test_rubric_counts_cards_against_wave3(sample):
     r["questions"] = [q for q in r.get("questions") or [] if f["id"] not in q.get("finding_ids", [])]
     bad = markdown.rubric(r)["failed"][f["id"]]
     assert {"title", "codes", "fix"} <= set(bad), bad
+
+
+def test_empty_document_is_not_ready():
+    """Нет ни требований, ни дефектов (пустой документ): «можно» не выносится — «не определено» (№14, п. 1)."""
+    r = {"run": {"status": "complete", "provider": "mock"}, "findings": [], "requirements": []}
+    assert jsonout.rule_verdict(r) == {"development": "undetermined", "testing": "undetermined"}
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert "❔ не определено" in md and "не найдено ни одного требования" in md and "✅ можно" not in md
+
+
+def test_unreadable_input_report_names_the_cause():
+    """Сбой на нечитаемом входе: причина на первом экране, не «режим без модели» (№14, п. 7); схема проходит."""
+    r = {"schema": "bcc-review/2",
+         "run": {"agent": "BCC Review", "version": "2", "commit": "abcdef1", "provider": "", "status": "failed",
+                 "started_at": "2026-11-27T06:00:00Z", "finished_at": "2026-11-27T06:00:00Z", "duration_s": 0,
+                 "models_used": [], "calls": {"total": 0, "cached": 0, "failed": 0, "split": 0},
+                 "tokens": {"input": 0, "output": 0}, "stages": {},
+                 "warnings": ["Прогон прерван: PdfReadError: PDF fake.pdf повреждён и не открывается (FileDataError)."]},
+         "document": {"title": "fake.pdf", "file": "fake.pdf", "format": "", "sha256": "", "lines": 0, "pages": None},
+         "requirements": [], "findings": []}
+    jsonout.finalize(r)
+    assert r["verdict"]["development"] == "none" and jsonout.validate(r) == []
+    md = markdown.render(r)
+    head = md[:md.find('id="s1"')]
+    assert "Режим без модели" not in md and "повреждён и не открывается — откройте файл" in head
+    bad = copy.deepcopy(r)
+    bad["run"]["status"] = "complete"
+    assert any("sha256" in e for e in jsonout.validate(bad))  # пустой хеш допустим только у сбоя

@@ -355,12 +355,15 @@
             "txt",
             "pdf",
             "docx",
-            "html"
-          ]
+            "html",
+            ""
+          ],
+          "description": "пусто — только при run.status = failed (вход не прочитан)"
         },
         "sha256": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^([0-9a-f]{64})?$",
+          "description": "пусто — только при run.status = failed (вход не прочитан)"
         },
         "lines": {
           "type": "integer",
@@ -1071,5 +1074,47 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "run"
+        ],
+        "properties": {
+          "run": {
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        }
+      },
+      "then": {},
+      "else": {
+        "properties": {
+          "document": {
+            "properties": {
+              "format": {
+                "enum": [
+                  "md",
+                  "txt",
+                  "pdf",
+                  "docx",
+                  "html"
+                ]
+              },
+              "sha256": {
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

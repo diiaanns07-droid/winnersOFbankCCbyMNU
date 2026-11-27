@@ -556,8 +556,10 @@ class _Ctx:
         self.summary = report.get("summary") or jsonout.compute_summary(report)
         self.edits = _applied_edits(report)
         self.verdict = report.get("verdict", {}) or {}
+        # «без модели» — только офлайн-прогон; сбой (вход не прочитан) — не офлайн, у него своя причина (№14, п. 7)
         self.offline = self.run.get("provider") == "offline" or (
             not self.run.get("models_used") and self.run.get("provider") not in ("mock",)
+            and self.run.get("status") != "failed"
             and not (self.run.get("calls") or {}).get("cached"))  # ответы из кэша — тоже ответы модели
 
     def req_label(self, rid: str, link: bool = True) -> str:
@@ -749,13 +751,15 @@ def _header(c: _Ctx) -> list[str]:
         bad = [stage_name(k) for k, v in (run.get("stages") or {}).items()
                if v in ("partial", "failed")]
         why = _partial_reason(c)
-        out += [">", f"> ⚠️ Прогон завершён частично"
+        out += [">", "> ⚠️ Прогон завершён частично"
                 + (f": не полностью выполнены этапы {', '.join(bad)}" if bad else "")
                 + (f". Причина: {why}" if why else "")
                 + ". Вердикт «можно начинать» по частичной проверке не выносится; недостающие проверки — в "
                   "приложении Д."]
     elif status == "failed":
-        out += [">", "> ⛔ Прогон завершился сбоем: вердикт не вынесен, ниже — то, что успели проверить."]
+        why = _failure_reason(c)
+        out += [">", "> ⛔ Прогон завершился сбоем" + (f": {why}" if why else "")
+                + ". Вердикт не вынесен; ниже — то, что успели проверить."]
     if c.offline:
         how = ("как подключить модель — в конце раздела «Кратко»"
                if isinstance(c.r.get("offline"), dict) and c.r["offline"].get("how_to_full")
@@ -775,6 +779,33 @@ _REASONS = [
      "модель отклонила запросы из-за лимита запросов (квоты) — повторите позже или с другой моделью"),
     (re.compile(r"обрез\w*|truncat\w*|output token maximum", re.I), "ответ модели обрезан по длине"),
 ]
+
+
+_FAIL_HINT = [
+    (re.compile(r"повреж|не открывается|не является|PdfReadError|FileDataError|BadZip|zip", re.I),
+     "откройте файл в программе просмотра и сохраните заново (PDF, DOCX, MD, HTML или TXT)"),
+    (re.compile(r"не поддерживается|формат|расширени", re.I), "сохраните документ в PDF, DOCX, MD, HTML или TXT"),
+    (re.compile(r"нет текста|пуст", re.I), "проверьте, что в файле есть текст требований (не скан без текста)"),
+    (re.compile(r"ключ|auth|not_configured|квот|quota|429", re.I), "проверьте ключ модели: `python -m bcc_review doctor`"),
+]
+
+
+def _failure_reason(c: _Ctx) -> str:
+    """Почему прогон не состоялся — для первого экрана: причина из run.model_error или предупреждения
+    «Прогон прерван: …» и что сделать."""
+    raw = str(c.run.get("model_error") or "")
+    if not raw:
+        for w in c.run.get("warnings") or []:
+            if re.search(r"прерван|не выполнен|не удалось|не прочитан", str(w), re.I) and "схем" not in str(w):
+                raw = str(w)
+                break
+    if not raw:
+        return ""
+    text = re.sub(r"^\s*Прогон прерван:\s*", "", " ".join(raw.split()))
+    text = _EXC.sub("", text)
+    text = re.sub(r"\s*\((?:[A-Z][A-Za-z]*(?:Error|Exception))\)", "", text)
+    hint = next((h for rx, h in _FAIL_HINT if rx.search(raw)), "")
+    return warn_text(shorten(text.rstrip(". "), 200)) + (f" — {hint}" if hint else "")
 
 
 def _partial_reason(c: _Ctx) -> str:
@@ -864,6 +895,9 @@ def _why(c: _Ctx, limit: int = 420) -> str:
     списком. Блокеров нет — текст судьи (не длиннее limit)."""
     text = " ".join(str(c.verdict.get("summary") or "").split())
     judge_down = any("судья недоступен" in str(w) or "реестр собран кодом" in str(w) for w in c.run.get("warnings") or [])
+    if c.run.get("status") == "failed" or (not c.reqs and not c.findings
+                                           and c.verdict.get("development") == "undetermined" and not c.offline):
+        return _auto_why(c)
     if c.offline:
         lim = ("Смысл требований без модели не проверялся (противоречия правил, критерии приёмки, полнота основной "
                "функции), поэтому отсутствие других дефектов не означает, что их нет.")
@@ -889,7 +923,12 @@ def _why(c: _Ctx, limit: int = 420) -> str:
 def _auto_why(c: _Ctx) -> str:
     """Обоснование для первого экрана, если судья его не написал: без перечня (блокеры стоят ниже списком)."""
     if c.run.get("status") == "failed":
-        return _auto_reason(c)
+        why = _failure_reason(c)
+        return (f"Проверка не выполнена: {why}. Отсутствие дефектов здесь не означает готовность документа."
+                if why else _auto_reason(c))
+    if not c.reqs and not c.findings and c.verdict.get("development") == "undetermined":
+        return ("В документе не найдено ни одного требования — проверять нечего, поэтому вердикт не определён. "
+                "Проверьте, тот ли файл передан и есть ли в нём текст требований.")
     bl = _blockers(c)
     partial = c.run.get("status") == "partial"
     tail = (" Проверка неполная, поэтому возможны и другие дефекты." if partial else "")

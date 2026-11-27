@@ -110,13 +110,17 @@ def rule_verdict(report: dict) -> dict:
     """Вердикт по правилу кода (CONTRACT.md, раздел 5): {"development", "testing"}.
 
     Прогон без модели (provider = offline, №12): «нельзя» только при блокирующем критичном дефекте или
-    противоречии двух мест, найденном правилом (rule_conflict); иначе «не определено» — смысл не проверялся."""
+    противоречии двух мест, найденном правилом (rule_conflict); иначе «не определено» — смысл не проверялся.
+    Нет ни требований, ни дефектов (пустой документ) — «не определено»: проверять нечего."""
     run = report.get("run", {}) or {}
     status = run.get("status", "complete")
     if status == "failed":
         return {"development": "none", "testing": "none"}
     findings = open_findings(report)
     out = {}
+    if not report.get("requirements") and not findings and run.get("provider") != "offline":
+        # пустой документ или в нём нет ни одного требования: проверять нечего — «можно» не выносится (№14, п. 1)
+        return {"development": "undetermined", "testing": "undetermined"}
     if run.get("provider") == "offline":
         for target, blockers in (("development", {"development", "both"}), ("testing", {"testing", "both"})):
             hit = any((f.get("severity") == "critical" or (f.get("rule_conflict") and len(f.get("evidence") or []) >= 2))
