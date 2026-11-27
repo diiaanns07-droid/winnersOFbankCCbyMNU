@@ -450,3 +450,37 @@ def test_stage_rerun_after_fast_start_remaps_reused_reviewers(tmp_path, monkeypa
     cands = list(q["candidates"]) + list(q["rejected"])  # цитата «q» не находится — кандидаты линз в rejected
     lens_cands = [c for c in cands if str(c.get("source", "")).startswith("lens:")]
     assert lens_cands and all(c["requirement_ids"] == [model[-1]["id"]] for c in lens_cands)
+
+
+def test_clarify_starts_in_parallel_with_judge(tmp_path, monkeypatch):
+    """Ранний запуск вопросов №11: вызов вопросов идёт, пока работает судья (не после него)."""
+    import threading
+    from bcc_review.v2.stages import clarify, judge
+
+    started = threading.Event()
+    real_ask = clarify.ask_candidates
+
+    def ask(ctx, cands):
+        started.set()
+        return real_ask(ctx, cands)
+
+    real_judge = judge.run
+
+    def slow_judge(ctx, cands):
+        assert started.wait(5), "вопросы ждали судью"
+        return real_judge(ctx, cands)
+
+    monkeypatch.setattr(clarify, "ask_candidates", ask)
+    monkeypatch.setattr(judge, "run", slow_judge)
+    report, _, _ = _run(tmp_path)
+    assert report["questions"]
+    st = report["run"]["stage_stats"]["clarify"]
+    assert st.get("early") and st["calls"] >= 1
+    assert report["run"]["calls"]["total"] <= 12
+
+
+def test_clarify_early_off_keeps_late_call(tmp_path, monkeypatch):
+    from bcc_review.v2.stages import clarify
+    monkeypatch.setattr(clarify, "start", lambda ctx, kept: (_ for _ in ()).throw(AssertionError("ранний запуск")))
+    report, _, _ = _run(tmp_path, clarify_early=False)
+    assert report["questions"] and not report["run"]["stage_stats"]["clarify"].get("early")
