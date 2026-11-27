@@ -146,7 +146,7 @@ def rule_currency(doc: Doc, out: dict) -> None:
                 f"связанные величины ({a[1]} и {b[1]})")
         out["candidates"].append(candidate(
             "units.currency_mix",
-            title=f"Денежные величины в разных единицах без правила пересчёта: {quoted(qa)} и {quoted(qb)}",
+            title=f"Суммы в {MN[1]} и в {MJ[1]} без правила пересчёта",
             kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
             evidence=[ev(a[0], qa), ev(b[0], qb)],
             problem=(f"В документе {subj} заданы в разных единицах: {quoted(qa)} и {quoted(qb)}. "
@@ -230,7 +230,7 @@ def rule_timezone(doc: Doc, out: dict) -> None:
                 qb = qb if qb in b[0].joined else b[2]
                 out["candidates"].append(candidate(
                     "units.timezone_mix",
-                    title=f"Одно и то же время описано в разных часовых поясах: {quoted(qa)} и {quoted(qb)}",
+                    title=f"{(a[1][:1].upper() + a[1][1:]) or 'Время'} — {a[2]} и {b[2]}: разные часовые пояса",
                     kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
                     evidence=[ev(a[0], qa), ev(b[0], qb)],
                     problem=(f"{quoted(qa)} и {quoted(qb)} — одна величина в двух поясах: UTC и UTC со смещением. "
@@ -321,7 +321,7 @@ def rule_period(doc: Doc, out: dict) -> None:
                     qb = u[nm.start():qm.end()].strip()
                     out["candidates"].append(candidate(
                         "units.period_mix",
-                        title=(f"Один лимит задан за разные периоды: {quoted(pm.group(0))} и "
+                        title=(f"Один лимит за разные периоды: {quoted(pm.group(0))} и "
                                f"{quoted(qm.group(0))}"),
                         kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
                         evidence=[ev(x, qa), ev(y, qb)],

@@ -1502,6 +1502,8 @@ def _heading_only(r: dict, view: dict, headings: set[int]) -> bool:
     """
     a, b = _int(r.get("line_start"), 0), _int(r.get("line_end"), 0)
     by_n = {int(x["n"]): x for x in _lines(view)}
+    # номера строк от модели — не дальше документа: line_end = 10**9 иначе даёт миллиард итераций (минуты)
+    a, b = max(a, min(by_n, default=1)), min(b, max(by_n, default=0))
     content = [n for n in range(a, b + 1) if not is_trivial(_text(by_n.get(n) or {}))]
     if not content or not all(n in headings for n in content):
         return False
