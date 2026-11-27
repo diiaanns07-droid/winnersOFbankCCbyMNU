@@ -466,3 +466,48 @@ def test_own_text_longer_than_option_stays_own():
 def test_letter_with_repeated_option_text_has_no_duplicate():
     a = recheck.resolve_answers(QS, recheck.load_answers("Q-03: B) 48 часов\n"))["answered"][0]
     assert a["answer"] == "48 часов"
+
+
+# --------------------------------------------------------------------------- общие решения в исправленной редакции
+DOC_LINES = (Path(__file__).resolve().parents[2] / "release" / "input" / "requirements.md").read_text(
+    encoding="utf-8").splitlines()
+
+
+def test_decision_targets_skip_decisions_used_by_recheck():
+    clar = {"decisions": ["История изменений порога за 45 дней.", "Квитанция 12 дней."],
+            "changes": [{"finding_id": "D-01", "status": "resolved", "answer_ids": ["Решение-1"]}]}
+    assert [t["id"] for t in revise.decision_targets(clar)] == ["Решение-2"]
+    assert revise.decision_targets({"answered": [], "decisions": ["  "]}) == []
+    assert revise.decision_targets(None) == []
+
+
+def test_general_decision_is_written_into_revision():
+    from test_11_clarify import DOC
+    line40 = DOC_LINES[39]
+    resp = {"rewrites": [{"finding_id": "Решение-1", "summary": "история изменений порога", "edits": [
+        {"action": "insert_after", "line": 40, "old": "",
+         "new": "* **Ф-4а.** Клиент видит историю изменений порога за последние 45 календарных дней."}]}]}
+    ctx = FakeCtx(FakeLLM(resp))
+    ctx.options = {"input": str(DOC)}
+    answers = {"answered": [], "decisions": ["Клиент видит историю изменений порога за 45 календарных дней."]}
+    res = revise.run(ctx, [], answers)  # дефектов critical/major нет — решение всё равно вносится
+    user = ctx.llm.calls[0]["user"]
+    assert "Решение-1 |" in user and "45 календарных дней" in user
+    md = res["revised_markdown"]
+    assert "Ф-4а.** Клиент видит историю изменений порога за последние 45 календарных дней. [добавлено: Решение-1]" in md
+    assert line40 in md
+    assert res["rewrites"][0]["answer_ids"] == ["Решение-1"] and res["stats"]["decisions"] == 1
+
+
+def test_unwritten_decision_is_reported():
+    from test_11_clarify import DOC
+    ctx = FakeCtx(FakeLLM({"rewrites": []}))
+    ctx.options = {"input": str(DOC)}
+    res = revise.run(ctx, [], {"answered": [], "decisions": ["Квитанцию можно скачать 12 дней."]})
+    assert res["stats"]["without_rewrite"] == ["Решение-1"]
+
+
+def test_conflicting_decision_is_not_written():
+    clar = {"decisions": ["На отказ возвращаем 422.", "На отказ возвращаем 403.", "Квитанция 12 дней."],
+            "changes": [], "answer_conflicts": [{"finding_id": "D-01", "answers": ["Решение-1", "Решение-2"]}]}
+    assert [t["id"] for t in revise.decision_targets(clar)] == ["Решение-3"]

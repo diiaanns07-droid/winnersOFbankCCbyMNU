@@ -421,6 +421,33 @@ def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
     return ("\n".join(rows) or "—"), by_finding
 
 
+def decision_targets(answers: Any) -> list[dict]:
+    """Общие решения владельца (раздел «Решения», без номера вопроса) — отдельные цели правки.
+
+    Редакция правит дефекты; решение, которое не сняло ни один дефект (новое правило, срок, поле), иначе в
+    текст не попадает, хотя владелец его принял. Решение, на которое пересмотр уже сослался при снятии дефекта
+    (``answer_ids`` = «Решение-N»), вносится правкой этого дефекта и отдельной целью не становится.
+    """
+    if not answers:
+        return []
+    used = {str(x) for c in answers.get("changes") or [] for x in c.get("answer_ids") or []}
+    # решение, которое спорит с другим ответом, — не согласованное правило: в текст его не вписываем
+    used |= {str(x) for c in answers.get("answer_conflicts") or [] for x in c.get("answers") or []}
+    out = []
+    for i, d in enumerate(answers.get("decisions") or [], 1):
+        text, did = str(d or "").strip(), f"Решение-{i}"
+        if not text or did in used:
+            continue
+        out.append({"id": did, "severity": "major", "blocks": "none", "kind": "owner_decision",
+                    "title": "Решение владельца, которого ещё нет в документе",
+                    "problem": f"Владелец принял решение: «{text}». В документе этого правила нет.",
+                    "recommendation": "Внеси решение в документ с его точными значениями: новое требование в "
+                                      "подходящем разделе (insert_after) или правка требования, которое решение "
+                                      "меняет; если у раздела есть критерии приёмки — добавь критерий.",
+                    "evidence": []})
+    return out
+
+
 def unsettled_findings(answers: Any) -> set[str]:
     """Дефекты, по которым ответы владельца расходятся: правка по ним без маркера <уточнить> — выдуманный выбор."""
     if not answers:
@@ -455,10 +482,15 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
                      key=lambda f: (_SEV.get(f.get("severity"), 2), int(f.get("priority") or 0) or 99))
     title = (view.get("title") if isinstance(view, dict) else getattr(view, "title", "")) or "документ"
     lines, _raw = _source_lines(ctx, view)
+    n_findings = len(targets)
+    owner = decision_targets(answers)  # общие решения владельца без вопроса — тоже правка документа
+    targets = targets + owner
     if not targets:
         return {"rewrites": [], "revised_markdown": "", "stats": {"replaced": 0, "inserted": 0, "not_applied": 0,
                                                                   "pending": 0}}
     ans_text, by_finding = _answers_block(answers)
+    for t in owner:
+        by_finding[t["id"]] = [t["id"]]
 
     def build(items: list) -> tuple[str, str]:
         block = _cl.format_findings(items)
@@ -499,7 +531,7 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     for r in applied["rewrites"]:
         r["pending"] = sum(len(_PENDING.findall(e.get("became", ""))) for e in r["edits"])
     body = applied["markdown"].splitlines()
-    head = _header(title, bool(by_finding), applied["stats"])
+    head = _header(title, bool(by_finding), applied["stats"])  # решения владельца — тоже «по ответам»
     # пометка-шапка после заголовка документа (первая строка «# …»), иначе в начале
     if body and body[0].lstrip().startswith("#"):
         md = "\n".join([body[0], ""] + head + body[1:]) + "\n"
@@ -509,7 +541,8 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
         _cl._warn(ctx, w)
     missing = [f["id"] for f in targets if f["id"] not in {r["finding_id"] for r in rewrites}]
     return {"rewrites": applied["rewrites"], "revised_markdown": md, "check_fixes": check.get("fixes", []),
-            "stats": {**applied["stats"], "findings": len(targets), "with_rewrite": len(rewrites),
+            "stats": {**applied["stats"], "findings": n_findings, "decisions": len(owner),
+                      "with_rewrite": len(rewrites),
                       "without_rewrite": missing, "check_fixes": len(check.get("fixes", [])),
                       "check_edits": check.get("stats", {}).get("replaced", 0) + check.get("stats", {}).get("inserted", 0)}}
 
