@@ -67,7 +67,8 @@ def _source_lines(ctx: Any, view: Any) -> tuple[list[str], bool]:
             continue
         p = Path(str(c))
         if p.suffix.lower() in (".md", ".markdown", ".txt") and p.exists():
-            raw = p.read_text(encoding="utf-8-sig").splitlines()
+            from bcc_review.v2.docview import _decode_text  # та же кодировка, что у view (UTF-16, cp1251)
+            raw = _decode_text(p.read_bytes()).splitlines()
             if not vlines or len(raw) == len(vlines) or abs(len(raw) - len(vlines)) <= 1:
                 return raw, True
     return [str(x.get("text", "")) for x in vlines], False
