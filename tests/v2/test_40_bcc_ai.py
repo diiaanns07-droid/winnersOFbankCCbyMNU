@@ -92,9 +92,10 @@ def test_fresh_start_without_keys_goes_to_welcome(base):
     for s in ("Ключ модели для BCC AI", "Здравствуйте", "Gemini — бесплатно", "Claude", "https://aistudio.google.com/apikey",
               'type="password"', "показать", "Проверить ключ", "Запомнить на этом компьютере (файл .env)",
               "Открыть систему", "Продолжить без ключа", "/welcome/skip", "/assets/agent.js", "/assets/agent.css",
-              "feTurbulence", "КЛЮЧ ПРИНЯТ", "#0B1220"):
+              "#F3F6F5", 'id="w-verdict"', "не проверен", 'data-size="48"', "backdrop-filter"):
         assert s in text, s
-    for banned in ("radial-gradient", "blur(", "w-pill"):    # тёмный стол без пятен, без таблеток выбора
+    # светло и мягко: ни тёмного стола, ни печати, ни тёмного дрона, ни таблеток выбора
+    for banned in ("#0B1220", "w-stamp", "feTurbulence", "КЛЮЧ ПРИНЯТ", "radial-gradient", "w-pill", "makeDrone"):
         assert banned not in text, banned
 
 
@@ -227,8 +228,9 @@ def test_agent_assets_served(base):
     assert code == 200 and "javascript" in h["Content-Type"]
     js = body.decode()
     for s in ("BCCAgent", "mount", "mood", "say", "destroy", "data-bcc-agent", "IntersectionObserver",
-              "visibilitychange", "prefers-reduced-motion", "makeDrone"):
+              "visibilitychange", "prefers-reduced-motion", "makePixelBot", "PBASE", "tenge"):
         assert s in js, s
+    assert "makeDrone" not in js and "DSK" not in js       # тёмного дрона больше нет нигде
     code, body, h = _req(base + "/assets/agent.css")
     css = body.decode()
     assert code == 200 and "text/css" in h["Content-Type"]
@@ -357,10 +359,12 @@ def test_greet_claude_cli_needs_no_key(tty, monkeypatch):
 
 def test_greet_ascii_and_256(tty):
     r, text, _ = _greet([""], mode="ascii")
-    assert r == "offline" and "\x1b" not in text and "[  o  o  ]" in text
+    assert r == "offline" and "\x1b" not in text and "/ oo \\" in text
     lines = T.render("idle", "256")
     assert any("38;5;" in ln for ln in lines) and not any("38;2;" in ln for ln in lines)
-    assert len(T.render("idle", "truecolor")) == 22 and len(T.render("idle", "truecolor", small=True)) == 11
+    # AIshka без пустых полей, вдвое меньше: 18 строк полублоков (в тесном окне — 9), не шире 40 колонок
+    assert len(T.render("idle", "truecolor")) == 18 and len(T.render("idle", "truecolor", small=True)) == 9
+    assert max(len(T._ANSI.sub("", ln)) for ln in T.render("analyzing0", "truecolor")) <= 2 + 40
 
 
 def test_color_mode_detection():

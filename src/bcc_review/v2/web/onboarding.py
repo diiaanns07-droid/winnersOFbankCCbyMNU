@@ -34,6 +34,7 @@ CHECK_BUDGET_S = 9.0
 NO_KEY_LINE = "Без ключа: только правила и готовые отчёты"
 HELLO = "Здравствуйте! Я BCC AI, проверяю ТЗ до начала разработки. Чтобы думать, мне нужен ключ модели."
 HELLO_LINE = "Здравствуйте! Вставьте ключ модели в строку 4 — и начнём."
+HELLO_SHORT = "Здравствуйте! Ключ — в строку 4."   # узкий экран: реплика остаётся одной строкой
 MAX_BODY = 8 * 1024
 
 ENV_FILE: Path | None = None          # куда писать .env; None — .env в текущем каталоге (тесты подменяют)
@@ -308,93 +309,118 @@ def _e(v: Any) -> str:
 
 
 PAGE_CSS = """
-:root{--desk:#0B1220;--paper:#FFFFFF;--ink:#1A2433;--ink2:#4A5A6E;--num:#98A6B6;--green:#00B975;--gs:#008556;--gi:#00704A;
---red:#C2362B;--pad-r:64px;--ease:cubic-bezier(.2,.8,.2,1);
---serif:"PT Serif",Georgia,"Times New Roman",serif;
---mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
---sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+:root{--canvas:#F3F6F5;--paper:#FFFFFF;--ink:#0F2841;--ink2:#3A5068;--ink3:#5B6F84;--num:#A3B0BE;--hair:rgba(15,40,65,.08);
+--hair2:rgba(15,40,65,.14);--green:#00B975;--gs:#008556;--gi:#00704A;--red:#C2362B;--r-lg:22px;
+--shadow-1:0 1px 2px rgba(15,40,65,.04),0 6px 18px rgba(15,40,65,.06);--shadow-2:0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10);
+--ease:cubic-bezier(.2,.8,.2,1);--pad-l:92px;--pad-r:64px;
+--sans:Inter,"Suisse Int'l",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--desk)}
-body{color:#E6EDF5;font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
-.w-top{height:48px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid rgba(255,255,255,.06)}
-.w-top a{display:inline-flex;align-items:center;gap:10px;color:#E6EDF5;text-decoration:none;font:600 15px var(--sans);letter-spacing:-.01em}
-.w-desk{padding:150px 16px 96px}
-.w-sheet{position:relative;max-width:760px;margin:0 auto;background:var(--paper);color:var(--ink);border-radius:2px;
-padding:56px var(--pad-r) 52px 92px;box-shadow:0 1px 2px rgba(0,0,0,.45),0 28px 70px rgba(0,0,0,.5);counter-reset:ln;
+html,body{margin:0;min-height:100%;background:var(--canvas)}
+body{color:var(--ink);font:400 17px/1.55 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.w-bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.w-bg::before,.w-bg::after{content:"";position:absolute;border-radius:50%;filter:blur(110px)}
+.w-bg::before{width:680px;height:680px;left:-260px;top:-300px;background:rgba(0,185,117,.18)}
+.w-bg::after{width:620px;height:620px;right:-240px;top:-220px;background:rgba(220,162,98,.26)}
+.w-top{position:sticky;top:12px;z-index:5;max-width:1180px;margin:12px auto 0;height:60px;display:flex;align-items:center;
+gap:12px;padding:0 18px 0 10px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.76),rgba(255,255,255,.56));
+-webkit-backdrop-filter:blur(24px) saturate(175%);backdrop-filter:blur(24px) saturate(175%);
+box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 0 0 1px rgba(15,40,65,.06),var(--shadow-2)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.w-top{background:rgba(255,255,255,.92)}}
+.w-brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font:650 16px var(--sans);letter-spacing:-.01em}
+.w-brand .bcc-agent{gap:0}
+.w-top-note{margin-left:auto;font:400 15px var(--sans);color:var(--ink3)}
+.w-desk{position:relative;z-index:1;padding:196px 16px 96px}
+.w-sheet{position:relative;max-width:760px;margin:0 auto;background:var(--paper);color:var(--ink);border-radius:var(--r-lg);
+padding:0 var(--pad-r) 48px var(--pad-l);box-shadow:0 0 0 1px var(--hair),var(--shadow-1);counter-reset:ln;
 animation:w-in 360ms var(--ease) both}
-@keyframes w-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes w-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.w-head{margin:0 calc(var(--pad-r) * -1) 34px calc(var(--pad-l) * -1);
+padding:15px var(--pad-r) 14px var(--pad-l);border-bottom:1px solid var(--hair);font:400 15px/1.4 var(--sans);color:var(--ink3)}
+#w-verdict{color:var(--ink2)}
+#w-verdict b{font-weight:600;color:var(--ink)}
+#w-verdict.is-ok b{color:var(--gi)}
+#w-verdict.is-bad b{color:var(--red)}
+.w-head .w-sep{color:var(--num)}
 .ln{position:relative;margin:0}
-.ln::before{counter-increment:ln;content:counter(ln);position:absolute;left:-62px;width:34px;text-align:right;top:.42em;
+.ln::before{counter-increment:ln;content:counter(ln);position:absolute;left:-62px;width:34px;text-align:right;top:.5em;
 font:400 12px/1 var(--mono);color:var(--num)}
-.w-h{font:700 25px/1.3 var(--serif);margin:0 0 16px;letter-spacing:-.01em;padding-right:220px}
-.w-h::before{top:.62em}
-.w-p{font:400 16.5px/1.6 var(--serif)}
+.w-h{font:700 28px/1.25 var(--sans);margin:0 0 14px;letter-spacing:-.025em}
+.w-h::before{top:.72em}
+.w-p{font:400 17px/1.6 var(--sans);color:var(--ink)}
 .w-form{position:relative;margin-top:26px}
-.w-field{display:flex;align-items:baseline;gap:14px;padding:5px 2px 5px 0;border-bottom:1.5px solid #CBD5E0;
-transition:border-color 120ms var(--ease),background-color 220ms var(--ease)}
-.w-field::before{top:.9em}
+.w-field{position:relative;display:flex;align-items:baseline;gap:14px;padding:6px 2px 7px 0;border-bottom:1px solid var(--hair2);
+transition:border-color 120ms var(--ease)}
+.w-field::before{top:1em}
 .w-field:focus-within{border-bottom-color:var(--green)}
-.w-field label{font:400 16.5px/1.6 var(--serif);color:var(--ink2);flex:0 0 auto}
-.w-field input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 15px/1.75 var(--mono);color:var(--ink);
+.w-field label{font:400 17px/1.6 var(--sans);color:var(--ink3);flex:0 0 auto}
+.w-field input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:400 15px/1.8 var(--mono);color:var(--ink);
 letter-spacing:.02em;padding:0}
-.w-field input::placeholder{color:#A3AFBD}
-.w-show{border:0;background:none;font:500 14px var(--sans);color:var(--ink2);cursor:pointer;padding:2px;
-text-decoration:underline;text-underline-offset:3px;text-decoration-color:#CBD5E0}
+.w-field input::placeholder{color:#A9B5C2}
+.w-show{border:0;background:none;font:500 15px var(--sans);color:var(--ink3);cursor:pointer;padding:2px 0;
+text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--hair2)}
 .w-show:hover{color:var(--ink)}
-.w-field.is-bad{border-bottom-color:transparent;background:rgba(194,54,43,.07) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 3 Q2 0 4 2 T8 2' fill='none' stroke='%23C2362B' stroke-width='1.3'/%3E%3C/svg%3E") repeat-x left bottom}
-.w-hint{font:400 15.5px/1.6 var(--serif);color:var(--ink2);margin-top:10px}
-.w-hint::before{top:.5em}
-.w-sheet a{color:var(--gi);text-decoration-thickness:1px;text-underline-offset:3px}
-.w-remember{display:flex;align-items:center;gap:10px;margin-top:14px;font:400 16.5px/1.6 var(--serif);color:var(--ink);cursor:pointer}
-.w-remember::before{top:.55em}
+.w-field.is-bad{border-bottom-color:var(--red);box-shadow:0 1px 0 var(--red)}
+.w-field.is-checking::after{content:"";position:absolute;left:0;bottom:-1px;width:28%;height:1px;background:var(--green);
+animation:w-scan 1.1s var(--ease) infinite alternate}
+@keyframes w-scan{from{left:0}to{left:72%}}
+.w-hint{font:400 15px/1.6 var(--sans);color:var(--ink3);margin-top:12px}
+.w-hint::before{top:.55em}
+.w-sheet a{color:var(--gi);text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:rgba(0,112,74,.35)}
+.w-remember{display:flex;align-items:center;gap:10px;margin-top:16px;font:400 17px/1.6 var(--sans);color:var(--ink);cursor:pointer}
+.w-remember::before{top:.6em}
 .w-remember input{width:18px;height:18px;margin:0;accent-color:var(--gs)}
-.w-actions{display:flex;flex-wrap:wrap;align-items:center;gap:20px;margin-top:28px}
-.w-btn{height:44px;padding:0 22px;border:0;border-radius:8px;background:var(--gs);color:#fff;font:600 15px var(--sans);
-cursor:pointer;display:inline-flex;align-items:center;transition:transform 120ms var(--ease),background-color 120ms var(--ease)}
-.w-btn:hover{background:#007A4F}
+.w-actions{display:flex;flex-wrap:wrap;align-items:center;gap:20px;margin-top:30px}
+.w-btn{height:46px;padding:0 24px;border:0;border-radius:999px;background:var(--gs);color:#fff;font:600 16px var(--sans);
+cursor:pointer;display:inline-flex;align-items:center;box-shadow:var(--shadow-1);
+transition:transform 120ms var(--ease),box-shadow 120ms var(--ease),background-color 120ms var(--ease)}
+.w-btn:hover{background:#007A4F;transform:translateY(-1px);box-shadow:var(--shadow-2)}
 .w-btn:active{transform:scale(.98)}
-.w-btn[disabled]{opacity:.65;cursor:progress}
+.w-btn[disabled]{opacity:.7;cursor:progress;transform:none}
 .w-btn[hidden],.w-remember[hidden],.w-note[hidden]{display:none}
-.w-link{font:500 15px var(--sans);color:var(--ink2)!important;text-decoration:underline;text-underline-offset:4px;
-text-decoration-color:#CBD5E0}
+.w-link{font:500 16px var(--sans);color:var(--ink2)!important;text-decoration:underline;text-underline-offset:4px;
+text-decoration-color:var(--hair2)!important}
 .w-link:hover{color:var(--ink)!important}
-:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
+:focus-visible{outline:3px solid rgba(0,185,117,.45);outline-offset:2px}
 .w-field input:focus-visible{outline:0}
-.w-stamp{position:absolute;right:30px;top:24px;width:216px;color:#0B8A57;transform:rotate(-4deg);opacity:0;pointer-events:none}
-.w-stamp.is-on{animation:w-stamp 220ms cubic-bezier(.2,.8,.3,1.3) both}
-@keyframes w-stamp{from{opacity:0;transform:rotate(-4deg) scale(1.15)}to{opacity:.94;transform:rotate(-4deg) scale(1)}}
-.w-note{position:absolute;top:auto;left:calc(100% + var(--pad-r) + 28px);width:244px;margin:-2.1em 0 0;
-font:400 14px/1.45 var(--sans);color:#E6EDF5;animation:w-note 220ms var(--ease) both}
-@keyframes w-note{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
-.w-note::before{content:"";position:absolute;right:calc(100% + 4px);top:.72em;width:24px;height:1px;background:rgba(240,97,106,.75)}
-.w-note b{display:block;font:600 12px/1.7 var(--mono);color:#F0616A;letter-spacing:.06em}
-.w-foot{max-width:760px;margin:22px auto 0;font:400 14px/1.5 var(--sans);color:#8FA3BA;padding:0 2px}
+.w-note{position:absolute;top:-10px;left:calc(100% + var(--pad-r) + 24px);width:264px;margin:0;padding:14px 16px 15px;
+background:var(--paper);border-radius:16px;box-shadow:0 0 0 1px var(--hair),var(--shadow-1);
+font:400 15px/1.5 var(--sans);color:var(--ink);animation:w-note 220ms var(--ease) both}
+@keyframes w-note{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.w-note b{display:flex;align-items:center;gap:8px;margin-bottom:4px;font:400 12px/1.6 var(--mono);color:var(--num);letter-spacing:.04em}
+.w-note b::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--red)}
+.w-foot{position:relative;z-index:1;max-width:760px;margin:22px auto 0;font:400 15px/1.55 var(--sans);color:var(--ink3);padding:0 4px}
 .w-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media (max-width:1360px){.w-note{position:static;width:auto;margin:10px 0 0;color:var(--red);animation:none}
-.w-note::before{display:none}.w-note b{display:inline;margin-right:8px;color:var(--red)}}
-@media (max-width:640px){.w-top{padding:0 16px}.w-desk{padding:92px 0 56px}
-.w-sheet{padding:36px 18px 32px 46px;border-radius:0;--pad-r:18px}.ln::before{left:-38px;width:26px}
-.w-h{font-size:21px;padding-right:0;margin-top:58px}.w-stamp{right:14px;top:16px;width:176px}.w-foot{padding:0 16px}
+@media (max-width:1400px){.w-note{position:relative;top:auto;left:auto;width:auto;margin:12px 0 0;padding:0;background:none;
+box-shadow:none;animation:none}.w-note b{display:inline-flex;margin:0 8px 0 0}}
+@media (max-width:640px){.w-top{margin:8px 8px 0;top:8px;height:56px;border-radius:18px}.w-top-note{display:none}
+.w-desk{padding:108px 0 56px}
+.w-sheet{border-radius:var(--r-lg) var(--r-lg) 0 0;--pad-l:46px;--pad-r:18px;padding-bottom:32px}.ln::before{left:-38px;width:26px}
+.w-head{margin-bottom:26px}.w-h{font-size:24px}.w-foot{padding:0 18px}
 .w-actions{gap:16px}.w-actions .w-btn{flex:1 1 100%;justify-content:center}}
-@media (prefers-reduced-motion: reduce){.w-sheet,.w-note{animation:none}.w-stamp.is-on{animation:none;opacity:.94}}
+@media (prefers-reduced-motion: reduce){.w-sheet,.w-note{animation:none}.w-field.is-checking::after{animation:none;left:0;width:100%}
+.w-btn{transition:none}}
 """
 
 PAGE_JS = r"""
 (function(){
   var $=function(s){return document.querySelector(s)};
   var sheet=$('#w-sheet'), form=$('#w-form'), key=$('#w-key'), field=$('#w-field'), check=$('#w-check'), open=$('#w-open'),
-      remember=$('#w-remember'), rem=$('#w-rem'), note=$('#w-note'), noteText=$('#w-note-text'), stamp=$('#w-stamp'),
-      stampSub=$('#w-stamp-sub'), status=$('#w-status');
+      remember=$('#w-remember'), rem=$('#w-rem'), note=$('#w-note'), noteText=$('#w-note-text'), verdict=$('#w-verdict'),
+      status=$('#w-status');
   var small = window.matchMedia && matchMedia('(max-width:640px)').matches;
-  var P = window.BCCAgent ? BCCAgent.fly(sheet, {size: small ? 80 : 160, bottomInset: 0}) : null;
+  var P = window.BCCAgent ? BCCAgent.fly(sheet, {size: small ? 96 : 192, bottomInset: 0, mood: 'idle'}) : null;
   var verified=false, busy=false;
+  function line(wide, narrow){ return sheet.clientWidth < 600 ? narrow : wide; }   // реплика — всегда одна строка
   function after(fn){
     if (!P || P.state === 'landed') { fn(); return; }
     sheet.addEventListener('bcc-agent:landed', function h(){ sheet.removeEventListener('bcc-agent:landed', h); fn(); });
   }
-  if (P) { after(function(){ P.say(sheet.getAttribute('data-hello')); }); P.land(); }
+  if (P) { after(function(){ P.say(line(sheet.getAttribute('data-hello'), sheet.getAttribute('data-hello-short'))); }); P.land(); }
+  function show(state, html){ verdict.className = state ? 'is-' + state : ''; verdict.innerHTML = html; }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function bad(msg){ field.classList.toggle('is-bad', !!msg); noteText.textContent = msg || ''; note.hidden = !msg; }
-  function reset(){ verified=false; check.hidden=false; open.hidden=true; rem.hidden=true; stamp.classList.remove('is-on'); bad(''); }
+  function reset(){ verified=false; check.hidden=false; open.hidden=true; rem.hidden=true; bad(''); show('', 'не проверен'); }
   key.addEventListener('input', function(){ if (verified || !note.hidden) { reset(); if (P) P.mood('idle'); } });
   $('#w-show').addEventListener('click', function(){
     var s=key.type==='password'; key.type=s?'text':'password'; this.textContent=s?'скрыть':'показать';
@@ -416,44 +442,33 @@ PAGE_JS = r"""
     ev.preventDefault();
     if (busy) return;
     if (verified) { go(); return; }
-    if (!key.value.trim()) { bad('Вставьте ключ: у Gemini он начинается с AIza, у Claude — с sk-ant-.'); if (P) P.mood('alert'); key.focus(); return; }
+    if (!key.value.trim()) { bad('Вставьте ключ: у Gemini он начинается с AIza, у Claude — с sk-ant-.'); if (P) P.mood('oops'); key.focus(); return; }
     busy=true; check.disabled=true; check.textContent='Проверяю…'; bad(''); status.textContent='Проверяю ключ, это до 10 секунд.';
-    if (P) { P.say(''); P.takeoff(); P.mood('analyzing'); P.progress(field, 'проверяю ключ'); }
+    field.classList.add('is-checking'); show('', 'проверяю…');
+    if (P) { P.say(''); P.mood('work'); P.stage('проверяю ключ'); }
     var t0=Date.now();
     post(false).then(function(r){ return wait(Math.max(0, 1500-(Date.now()-t0))).then(function(){ return r; }); })
     .then(function(r){
-      if (P) P.land();
-      after(function(){
-        if (r.ok) {
-          verified=true; stampSub.textContent=(r.provider==='anthropic'?'CLAUDE':'GEMINI')+' · '+r.mask; stamp.classList.add('is-on');
-          check.hidden=true; open.hidden=false; rem.hidden=false; status.textContent=(r.message||'Ключ работает')+' · '+r.mask;
-          if (P) { P.mood('verified'); P.say('Ключ работает. Можно открывать систему.'); }
-          open.focus();
-        } else {
-          bad(r.message||'Ключ не подошёл.'); status.textContent=r.message||'';
-          if (P) { P.mood('alert'); P.say('Не подошёл. Что сделать — написал рядом с ключом.'); }
-          key.focus();
-        }
-      });
+      field.classList.remove('is-checking'); if (P) P.stage('');
+      if (r.ok) {
+        verified=true;
+        show('ok', '<b>работает</b> <span class="w-sep">·</span> ' + (r.provider==='anthropic'?'Claude':'Gemini') + ' <span class="w-sep">·</span> ' + esc(r.mask||''));
+        check.hidden=true; open.hidden=false; rem.hidden=false; status.textContent=(r.message||'Ключ работает')+' · '+r.mask;
+        if (P) { P.mood('happy'); P.say(line('Ключ работает. Можно открывать систему.', 'Ключ работает.')); }
+        open.focus();
+      } else {
+        bad(r.message||'Ключ не подошёл.'); status.textContent=r.message||''; show('bad', '<b>не подошёл</b>');
+        if (P) { P.mood('oops'); P.say(line('Не подошёл. Что сделать — написал рядом с ключом.', 'Не подошёл. Подсказка — под ключом.')); }
+        key.focus();
+      }
     }).catch(function(){
-      if (P) { P.land(); after(function(){ P.mood('alert'); P.say('Сервер не ответил.'); }); }
+      field.classList.remove('is-checking'); show('bad', '<b>нет ответа</b>');
+      if (P) { P.stage(''); P.mood('oops'); P.say('Сервер не ответил.'); }
       bad('Сервер не ответил. Окно терминала с BCC Review открыто?');
     }).then(function(){ busy=false; check.disabled=false; check.textContent='Проверить ключ'; });
   });
 })();
 """
-
-STAMP_SVG = """<svg id="w-stamp" class="w-stamp" viewBox="0 0 240 92" aria-hidden="true">
-<defs><filter id="w-ink" x="-5%" y="-5%" width="110%" height="110%">
-<feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="11" result="n"/>
-<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.45" result="a"/>
-<feComposite in="SourceGraphic" in2="a" operator="in"/></filter></defs>
-<g filter="url(#w-ink)"><rect x="3" y="3" width="234" height="86" rx="7" fill="none" stroke="currentColor" stroke-width="4"/>
-<rect x="11" y="11" width="218" height="70" rx="4" fill="none" stroke="currentColor" stroke-width="1.6"/>
-<text x="120" y="48" text-anchor="middle" fill="currentColor" font-family="PT Serif,Georgia,serif" font-weight="700"
-font-size="25" letter-spacing="2.5">КЛЮЧ ПРИНЯТ</text>
-<text id="w-stamp-sub" x="120" y="69" text-anchor="middle" fill="currentColor"
-font-family="JetBrains Mono,ui-monospace,Consolas,monospace" font-size="11.5" letter-spacing="1.2">GEMINI</text></g></svg>"""
 
 
 def welcome_page() -> str:
@@ -461,18 +476,20 @@ def welcome_page() -> str:
     return f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BCC AI · ключ модели</title>
-<meta name="theme-color" content="#0B1220">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B1220'/%3E%3Crect x='7' y='11' width='18' height='10' rx='4' fill='%23CAA166'/%3E%3Crect x='9' y='13' width='14' height='6' rx='2' fill='%230E1525'/%3E%3Crect x='11' y='15' width='3' height='2' fill='%2334D36A'/%3E%3Crect x='18' y='15' width='3' height='2' fill='%2334D36A'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#F3F6F5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 29 27H3z' fill='%23FFFFFF' stroke='%23161E31' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M16 10 24 24H8z' fill='%23E6BD74'/%3E%3Cpath d='M16 14 21 22H11z' fill='%231F2E4A'/%3E%3Ccircle cx='16' cy='19' r='1.6' fill='%235ED6FF'/%3E%3C/svg%3E">
 {tokens}<link rel="stylesheet" href="/assets/agent.css">
 <style>{PAGE_CSS}</style>
 </head><body>
-<header class="w-top"><a href="/welcome" aria-label="BCC Review"><span data-bcc-agent data-size="24" data-mood="idle"></span>BCC Review</a></header>
+<div class="w-bg" aria-hidden="true"></div>
+<header class="w-top"><a class="w-brand" href="/welcome" aria-label="BCC Review"><span data-bcc-agent data-size="48" data-mood="idle"></span>BCC Review</a>
+<span class="w-top-note">Знакомство с BCC AI</span></header>
 <main class="w-desk">
-<article id="w-sheet" class="w-sheet" data-hello="{_e(HELLO_LINE)}" aria-labelledby="w-title">
-{STAMP_SVG}
+<article id="w-sheet" class="w-sheet" data-hello="{_e(HELLO_LINE)}" data-hello-short="{_e(HELLO_SHORT)}" aria-labelledby="w-title">
+<div class="w-head">Ключ: <span id="w-verdict">не проверен</span></div>
 <h1 id="w-title" class="ln w-h">Ключ модели для BCC AI</h1>
 <p class="ln w-p">Здравствуйте! Я BCC AI — проверяю ТЗ до начала разработки.</p>
-<p class="ln w-p">Чтобы думать, мне нужен ключ модели: Gemini — бесплатно, или Claude.</p>
+<p class="ln w-p">Чтобы думать, мне нужен ключ: Gemini — бесплатно, или Claude.</p>
 <form id="w-form" class="w-form" autocomplete="off" novalidate>
 <div class="ln w-field" id="w-field"><label for="w-key">Ключ</label>
 <input id="w-key" name="key" type="password" placeholder="AIza… или sk-ant-…" spellcheck="false" autocapitalize="off"
@@ -490,8 +507,7 @@ rel="noopener noreferrer">консоли Anthropic</a>.</p>
 <p id="w-status" class="w-sr" role="status"></p>
 </form>
 </article>
-<p class="w-foot">{_e(NO_KEY_LINE)} — если продолжить без ключа. Ключ остаётся на этом компьютере
-и уходит только в Google или Anthropic.</p>
+<p class="w-foot">{_e(NO_KEY_LINE)}. Ключ остаётся на этом компьютере и уходит только в Google или Anthropic.</p>
 </main>
 <script src="/assets/agent.js"></script>
 <script>{PAGE_JS}</script>
