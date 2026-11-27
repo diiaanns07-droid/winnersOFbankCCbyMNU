@@ -648,3 +648,16 @@ def test_cli_messages_are_russian(argv, capsys):
     english = re.findall(r"\b(usage|positional arguments|options|show this help message|error|the following arguments"
                          r"|unrecognized arguments|invalid int value|required)\b", text)
     assert not english, english
+
+
+@_bug("01", "ход выполнения в консоли — внутренние имена этапов латиницей: «segment: запуск», «lens_architect: "
+            "готово за …» (pipeline.stage, self.log)")
+def test_console_progress_is_russian(tmp_path, capsys):
+    import re
+
+    from bcc_review.v2.__main__ import main
+    main([str(OFFICIAL), str(tmp_path / "r.md"), "--provider", "mock", "--runs-dir", str(tmp_path / "runs"),
+          "--no-html"])
+    err = capsys.readouterr().err
+    codes = re.findall(r"\b(segment|lens_\w+|consistency|judge|clarify|quotes|rules)\b", err)
+    assert not codes, sorted(set(codes))
