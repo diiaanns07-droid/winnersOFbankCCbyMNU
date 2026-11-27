@@ -267,7 +267,7 @@ def _repost(label: str) -> list[dict]:
     return out
 
 
-@pytest.mark.parametrize("label", ["h0", "h2", "h3", "h4"])
+@pytest.mark.parametrize("label", ["h0", "h2", "h3", "h4", "h5"])
 def test_clean_documents_give_no_critical_and_at_most_one_major(label):
     """20 чистых ТЗ (корпус, open2, №20), два прогона haiku: h0 было critical 8, major 58 (17 документов с
     major > 1); h2 (свежие ответы после правок) — проверка, что правила держатся на новых ответах."""
