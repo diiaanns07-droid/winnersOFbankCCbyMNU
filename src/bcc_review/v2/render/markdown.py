@@ -900,19 +900,23 @@ def _brief(c: _Ctx) -> list[str]:
         # блокер — одним пунктом: что не так — где (— что останавливает); под ним — что сделать. Порядок — порядок
         # исправления, поэтому отдельный список «Исправить первым» блокеры не повторяет
         blockers = [f for f in first if f["id"] in shown] + [f for f in blockers if f not in first]
-        same = len({f.get("blocks") for f in blockers}) == 1
-        what = BLOCKS.get(blockers[0].get("blocks"), "—")
+        common = _common_block(blockers)
+        what = BLOCKS.get(common, "—")
+        odd = [f for f in blockers if f.get("blocks") != common]
         head = "Блокер" if len(blockers) == 1 else f"Блокеры ({len(blockers)})"
-        if same:
+        if not odd:
             verb = "останавливает" if len(blockers) == 1 else "каждый останавливает"
             out += [f"**{head}** — {verb} {what}; что не так, где и что сделать (по порядку):", ""]
         else:
-            out += [f"**{head}** — что не так, где, что останавливает и что сделать (по порядку):", ""]
+            # общий адресат — в заголовке, у исключения — пометка в его строке (не повторять в каждой строке)
+            out += [f"**{head}** — останавливают {what}"
+                    + "".join(f", {f['id']} — только {BLOCKS.get(f.get('blocks'), '—')}" for f in odd)
+                    + "; что не так, где и что сделать (по порядку):", ""]
         for i, f in enumerate(blockers, 1):
             act = _screen_text(c, _action(f))
+            tail = f"; останавливает только {BLOCKS.get(f.get('blocks'), '—')}." if f in odd else "."
             out.append(f"{i}. {SEV_ICON.get(f.get('severity'), '')} [{f['id']}](#{anchor(f['id'])}) "
-                       f"**{prose(f.get('title'))}** — {prose(c.where_short(f, limit=5))}"
-                       + ("." if same else f"; останавливает {BLOCKS.get(f.get('blocks'), '—')}.")
+                       f"**{prose(f.get('title'))}** — {prose(c.where_short(f, limit=5))}{tail}"
                        + (f"  \n   → {prose(act)}" if act else ""))
         out.append("")
     elif c.run.get("status") != "failed" and "блокирующ" not in str(v.get("summary") or "").lower():
@@ -1091,6 +1095,14 @@ def _auto_why(c: _Ctx) -> str:
         return (f"Критичных дефектов нет; существенных — {len(majors)}: начинать можно, исправляя их параллельно "
                 f"с работой." + tail)
     return "Критичных дефектов нет, существенных меньше трёх." + tail
+
+
+def _common_block(blockers: list[dict]) -> str:
+    """Что останавливает большинство блокеров (при равенстве — «разработку и тестирование»)."""
+    counts: dict[str, int] = {}
+    for f in blockers:
+        counts[f.get("blocks")] = counts.get(f.get("blocks"), 0) + 1
+    return max(counts, key=lambda k: (counts[k], k == "both")) if counts else "both"
 
 
 def _blockers(c: _Ctx) -> list[dict]:

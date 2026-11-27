@@ -881,3 +881,19 @@ def test_why_does_not_repeat_no_critical_statement(sample):
     jsonout.finalize(r)
     why = markdown._why(markdown._Ctx(r))
     assert why == "Критичных дефектов нет и существенных нет — начинать можно. Стоит уточнить часовой пояс."
+
+
+def test_blockers_with_one_exception_named_once(sample):
+    """4 блокера останавливают и то и другое, один — только разработку: общий адресат — в заголовке, исключение
+    названо один раз (раньше «останавливает разработку и тестирование» повторялось в каждой строке)."""
+    r = copy.deepcopy(sample)
+    bl = [f for f in r["findings"] if f["severity"] == "critical"]
+    bl[-1]["blocks"] = "development"
+    md = markdown.render(r)
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
+    assert (f"**Блокеры ({len(bl)})** — останавливают разработку и тестирование, {bl[-1]['id']} — только разработку; "
+            "что не так, где и что сделать (по порядку):") in brief
+    assert brief.count("останавливает только разработку.") == 1
+    assert "; останавливает разработку и тестирование." not in brief
+    text = console.summary(r)
+    assert f"{bl[-1]['id']} — только разработку:" in text and len(text.split("\n")) <= 8

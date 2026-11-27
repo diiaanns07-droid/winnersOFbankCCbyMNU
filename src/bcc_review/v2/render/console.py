@@ -62,14 +62,17 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
     order = _md._first_screen_fix(ctx, blockers)
     shown = [f for f in order if f in blockers] + [f for f in blockers if f not in order]
     if blockers:
-        same = len({f.get("blocks") for f in blockers}) == 1
+        common = _md._common_block(blockers)
+        odd = {f["id"] for f in blockers if f.get("blocks") != common}
         n = len(blockers)
         lines.append(verdict + (f" — блокер 1, останавливает {BLOCKS.get(blockers[0].get('blocks'), '—')}:" if n == 1
-                                else f" — блокеров {n}" + (f", каждый останавливает "
-                                                           f"{BLOCKS.get(blockers[0].get('blocks'), '—')}:" if same else ":")))
+                                else f" — блокеров {n}, " + ("каждый останавливает" if not odd else "останавливают")
+                                + f" {BLOCKS.get(common, '—')}"
+                                + "".join(f", {f['id']} — только {BLOCKS.get(f.get('blocks'), '—')}"
+                                          for f in blockers if f["id"] in odd) + ":"))
         top = shown[:3] if n > 4 else shown
         for f in top:
-            tail = "" if same else f" — блокирует {BLOCKS.get(f.get('blocks'), '—')}"
+            tail = ""
             lines.append(f"  {f['id']} {shorten(f.get('title'), width - 8 - len(tail))}{tail}")
         if len(shown) > len(top):
             rest = shown[len(top):]
