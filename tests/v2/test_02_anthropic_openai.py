@@ -275,3 +275,16 @@ def test_normalize_base_url_and_extract_json():
     assert extract_json('Ответ: {"a": {"b": 2}} конец') == {"a": {"b": 2}}
     with pytest.raises(ValueError):
         extract_json("ничего")
+
+
+def test_stage_limits_anthropic_and_openai():
+    fake = FakeAnthropic([OK])
+    AnthropicProvider(api_key="sk-ant-test", env={}, adapter_factory=fake.factory).invoke(
+        model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=8000)
+    assert fake.created[-1]["max_tokens"] == 32000
+    p, http = oai([chat('{"answer": "да"}')])
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=8000)
+    assert http.requests[-1]["body"]["max_tokens"] == 16000
+    p2, http2 = oai([chat('{"answer": "да"}')], env={"OPENAI_MAX_TOKENS": "4096"})
+    p2.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=8000)
+    assert http2.requests[-1]["body"]["max_tokens"] == 4096
