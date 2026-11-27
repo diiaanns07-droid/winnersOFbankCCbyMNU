@@ -153,7 +153,33 @@ def test_no_answers_no_call(findings, questions):
     assert llm.calls == [] and all(g["recheck"]["status"] == "open" for g in res["findings"])
 
 
-def test_apply_answers_changes_verdict(findings, questions):
+def _stub_judge(ctx, candidates):
+    return {"findings": [{"id": f"D-{i:02d}", "candidate_ids": [c["id"]], "title": c["title"], "kind": c["kind"],
+                          "criterion": c["criterion"], "severity": c["severity"], "requirement_ids": c["requirement_ids"],
+                          "evidence": c["evidence"], "problem": c["problem"], "blocks": c["blocks"], "priority": 0,
+                          "sources": [c.get("source", "")]} for i, c in enumerate(candidates, 1)], "rejected": []}
+
+
+@pytest.fixture()
+def stub_judge(monkeypatch):
+    from bcc_review.v2.stages import judge
+    monkeypatch.setattr(judge, "run", _stub_judge)
+
+
+def test_judge_failure_falls_back(findings, questions, monkeypatch):
+    from bcc_review.v2.stages import judge
+
+    def boom(ctx, candidates):
+        raise RuntimeError("judge down")
+    monkeypatch.setattr(judge, "run", boom)
+    ctx = FakeCtx(FakeLLM(_resp([], [CAND])))
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = recheck.apply_answers(ctx, report, f"{questions[0]['id']}: A")
+    assert out["clarification"]["new_findings"] == ["D-29"]
+    assert any("судья недоступен" in w for w in out["clarification"]["warnings"])
+
+
+def test_apply_answers_changes_verdict(findings, questions, stub_judge):
     crit = [q for q in questions if any(fid in {"D-01", "D-02", "D-03", "D-04"} for fid in q["finding_ids"])]
     answers = "\n".join(f"{q['id']}: A" for q in crit)
     affected = sorted({fid for q in crit for fid in q["finding_ids"]})
@@ -179,6 +205,14 @@ def test_apply_answers_changes_verdict(findings, questions):
     assert "| Начинать разработку | нельзя |" in md and "До уточнения" in md and "D-29" in md
 
 
+def test_question_closed_by_decision_is_not_unanswered(findings, questions, stub_judge):
+    q = next(x for x in questions if x["finding_ids"] == ["D-09"])
+    ctx = FakeCtx(FakeLLM(_resp([{"finding_id": "D-09", "status": "resolved", "reason": "общее решение"}])))
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    clar = recheck.apply_answers(ctx, report, "## Решения\n- Учитываются только покупки у торговцев.\n")["clarification"]
+    assert q["id"] in clar["closed_by_decisions"] and q["id"] not in clar["unanswered"]
+
+
 def test_general_decision_affects_major(findings, questions):
     ctx = FakeCtx(FakeLLM(_resp([{"finding_id": "D-09", "status": "resolved", "reason": "общее решение"}])))
     res = recheck.run(ctx, findings, "## Решения\n- Учитываются только покупки у торговцев.\n", questions)
@@ -194,3 +228,10 @@ def test_llm_failure_keeps_findings_open(findings, questions):
     clar = out["clarification"]
     assert clar["resolved"] == 0 and clar["after"]["findings"] == clar["before"]["findings"]
     assert clar["after"]["verdict"]["development"] == "no"
+
+
+def test_example_answers_file_parses():
+    p = recheck.load_answers(str(ROOT / "examples" / "v2" / "answers.md"))
+    assert len(p["answers"]) == 10 and all(a["topic_hint"] and a["text"] for a in p["answers"])
+    assert len(p["decisions"]) == 7
+    assert not any("python -m" in a["text"] for a in p["answers"])  # строки-комментарии «>» не читаются

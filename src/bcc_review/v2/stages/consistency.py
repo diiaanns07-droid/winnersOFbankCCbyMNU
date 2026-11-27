@@ -21,9 +21,17 @@ from typing import Any, Iterable
 STAGE = "consistency"
 SOURCE = "consistency"
 
+# Ответ этапа ≈ 8–9 тыс. токенов JSON, но модели с рассуждением (haiku через claude -p) тратят ещё
+# 25–40 тыс. на рассуждение: при 16 000 ответ обрезался. Как у судьи — 32 000.
+MAX_OUTPUT_TOKENS = 32000
+# Повтор при обрезке: тот же запрос с просьбой отвечать короче.
+SHORT_MODE = ("\n\n### Краткий режим\nПредыдущий ответ не поместился. Отвечай короче: subjects — до 8, pair_checks — "
+              "до 8 самых рискованных, glossary — до 4, trace — только для функциональных требований с пустой note, "
+              "если всего хватает, candidates — до 5; каждое текстовое поле — одна фраза.")
+
 MAX_PAIRS = 15
-MAX_UNDEFINED_CANDIDATES = 3
-MAX_MODEL_CANDIDATES = 8
+MAX_UNDEFINED_CANDIDATES = 2
+MAX_MODEL_CANDIDATES = 6
 MAX_GLOSSARY = 8
 
 # Требования, для которых строится трассировка (CONTRACT 2.2, поле kind).
@@ -42,7 +50,9 @@ SEVERITIES = ["critical", "major", "minor"]
 BLOCKS = ["development", "testing", "both", "none"]
 
 CONFLICT_KINDS = ("event_conflict", "status_conflict", "boundary_conflict", "unit_mismatch", "contradiction")
-PAIR_KINDS = list(CONFLICT_KINDS) + ["ambiguity", "incomplete"]
+# У пары вид конфликта всегда конкретный: общий «contradiction» счётчик засчитывает только уровнем родителя.
+PAIR_CONFLICT_KINDS = ("event_conflict", "status_conflict", "boundary_conflict", "unit_mismatch")
+PAIR_KINDS = list(PAIR_CONFLICT_KINDS) + ["ambiguity", "incomplete"]
 VERDICTS = ["conflict", "compatible", "undefined"]
 BASES = ["same_condition", "limit_removed", "value_mismatch", "none"]
 GLOSSARY_SEVERITIES = ["major", "minor", "none"]
@@ -95,7 +105,14 @@ SCHEMA: dict = _obj({
 def run(ctx: Any) -> dict:
     """Этап набора: один вызов модели и разбор ответа кодом (CONTRACT 3)."""
     system, user = ctx.prompt(STAGE)
-    data = ctx.llm.ask(STAGE, system, user, SCHEMA)
+    try:
+        data = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS)
+    except Exception as exc:  # noqa: BLE001 — повторяем только обрезанный ответ
+        if type(exc).__name__ != "Truncated":
+            raise
+        if hasattr(ctx, "warn"):
+            ctx.warn("Проверка набора: ответ модели обрезан, повтор в кратком режиме.")
+        data = ctx.llm.ask(STAGE, system, user + SHORT_MODE, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS)
     return postprocess(data, ctx.view, getattr(ctx, "requirements", None) or [])
 
 
@@ -246,7 +263,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         "scenario": _s(p.get("scenario")), "outcome_a": _s(p.get("outcome_a")), "outcome_b": _s(p.get("outcome_b")),
         "verdict": p.get("verdict") if p.get("verdict") in VERDICTS else "undefined",
         "basis": p.get("basis") if p.get("basis") in BASES else "",
-        "kind": p.get("kind") if p.get("kind") in PAIR_KINDS else "contradiction",
+        "kind": p.get("kind") if p.get("kind") in PAIR_KINDS else "event_conflict",
         "title": _s(p.get("title")), "impact": _s(p.get("impact")),
         "recommendation": _s(p.get("recommendation")), "question": _s(p.get("question")),
     }
@@ -266,7 +283,23 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         pair["verdict"] = "undefined"
         if pair["kind"] in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
             pair["kind"] = "ambiguity"
+    # Обратная ошибка слабой модели: одна сторона ограничивает действие («максимум», «не более»), другая прямо
+    # снимает ограничение («независимо от», «без ограничения»), а вердикт — «не определено». Это limit_removed.
+    elif (pair["verdict"] == "undefined" and pair["same_subject"] and _found(ev_a) and _found(ev_b)
+          and not _overlap(ev_a, ev_b) and _removes_limit(pair["quote_a"], pair["quote_b"])):
+        pair.update(verdict="conflict", basis="limit_removed", kind="event_conflict")
     return pair
+
+
+_LIMIT_REMOVED = re.compile(r"независимо от|вне зависимости от|без ограничени|в любом случае", re.I)
+_LIMIT = re.compile(r"\b(не более|не больше|не чаще|максимум|не свыше|только один|только одн|один раз|"
+                    r"не превыша\w*|не может превышать)\b", re.I)
+
+
+def _removes_limit(qa: str, qb: str) -> bool:
+    """Одна цитата снимает ограничение, другая его задаёт (без слов снятия)."""
+    return any(_LIMIT_REMOVED.search(x) and _LIMIT.search(y) and not _LIMIT_REMOVED.search(y)
+               for x, y in ((qa, qb), (qb, qa)))
 
 
 # Виды требований, конфликт с которыми не блокирует сам по себе: цель — намерение, а не правило;
@@ -286,12 +319,15 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     two_places = _found(ev_a) and _found(ev_b) and not _overlap(ev_a, ev_b)
     kind = pair["kind"]
     if pair["verdict"] == "conflict":
-        if kind not in CONFLICT_KINDS:
-            kind = "contradiction"
+        if kind not in PAIR_CONFLICT_KINDS:
+            kind = "event_conflict"
         soft = any((known or {}).get(x, {}).get("kind") in SOFT_KINDS for x in (pair["a"], pair["b"]))
         # Разные единицы одной величины обычно снимаются правилом пересчёта — major; судья может поднять.
         severity = "critical" if two_places and not soft and kind not in MAJOR_CONFLICT_KINDS else "major"
     else:  # undefined
+        # Строка приёмки сверяется только на противоречие (шаг 2б); её неполноту проверяет линза тестировщика.
+        if any((known or {}).get(x, {}).get("kind") == "acceptance" for x in (pair["a"], pair["b"])):
+            return None
         if kind in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
             kind = "ambiguity"
         severity = "major"
@@ -321,7 +357,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         "requirement_ids": ids, "evidence": [{k: v for k, v in e.items()} for e in evidence],
         "problem": problem, "scenario": scenario, "impact": impact, "recommendation": rec,
         "rewrite": "", "question": pair["question"], "blocks": "both",
-        "source": SOURCE, "origin": "pair_check",
+        "source": SOURCE, "origin": "pair_check", "pair_ids": [pair["id"]] if pair.get("id") else [],
     }
 
 
@@ -416,7 +452,7 @@ def glossary_to_candidate(g: dict) -> dict | None:
         "recommendation": (f"Выбрать одно название (например, «{first}»), заменить им остальные во всех частях "
                            f"документа и добавить его в глоссарий с определением."),
         "rewrite": "", "question": "", "blocks": "development" if severity == "major" else "none",
-        "source": SOURCE, "origin": "glossary",
+        "source": SOURCE, "origin": "glossary", "glossary_ids": [g["id"]] if g.get("id") else [],
     }
 
 
@@ -443,6 +479,7 @@ def minor_glossary_candidate(entries: list[dict]) -> dict | None:
         "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого "
                           "понятия.",
         "rewrite": "", "question": "", "blocks": "none", "source": SOURCE, "origin": "glossary",
+        "glossary_ids": [g["id"] for g, _ in found if g.get("id")],
     }
 
 
@@ -483,6 +520,9 @@ def merge_conflicts(cands: list[dict], requirements: list[dict] | None = None) -
         for rid in c["requirement_ids"]:
             if rid not in host["requirement_ids"]:
                 host["requirement_ids"].append(rid)
+        for pid in c.get("pair_ids") or []:
+            if pid not in host.setdefault("pair_ids", []):
+                host["pair_ids"].append(pid)
         host["problem"] += f" Также: {c['title']}."
         host.setdefault("merged_titles", []).append(c["title"])
     return out
@@ -524,7 +564,32 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
         cand["severity"] = "major"
     if cand["severity"] == "critical" and cand["blocks"] == "none":
         cand["blocks"] = "both"
+    # «Обещано, но не описано»: если все названные в цитатах методы и поля описаны в заголовках документа,
+    # обещанное на месте — это не critical (модель приняла соседний процесс за обещанную операцию).
+    if cand["severity"] == "critical" and cand["kind"] == "missing_element" and _all_named_described(evidence, view):
+        cand["severity"] = "major"
     return cand
+
+
+_IDENT = re.compile(r"\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+
+
+def _headings(view: Any) -> list[str]:
+    return [_s(x.get("text")) for x in _lines(view) if x.get("heading") or x.get("kind") == "heading"]
+
+
+def _all_named_described(evidence: list[dict], view: Any) -> bool:
+    """Все идентификаторы (camelCase, snake_case) из цитируемых строк встречаются в заголовках документа."""
+    by_n = {x.get("n"): _s(x.get("text")) for x in _lines(view)}
+    texts = []
+    for e in evidence:
+        texts.append(_s(e.get("quote")))
+        if _found(e):
+            a, b = _span(e)
+            texts.extend(by_n.get(n, "") for n in range(a, b + 1))
+    names = {m.group(0) for t in texts for m in _IDENT.finditer(t)}
+    heads = " ".join(_headings(view))
+    return bool(names) and bool(heads) and all(re.search(rf"\b{re.escape(n)}\b", heads) for n in names)
 
 
 def _duplicates_pair(cand: dict, pair_cands: list[dict]) -> bool:
@@ -583,6 +648,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
         seen.add(key)
         uniq.append(p)
     pairs = uniq[:MAX_PAIRS]
+    for i, p in enumerate(pairs, 1):
+        p["id"] = f"P-{i:02d}"
 
     candidates: list[dict] = []
     pair_cands: list[dict] = []
@@ -600,6 +667,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     candidates.extend(pair_cands)
 
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]
+    for i, g in enumerate(glossary, 1):
+        g["id"] = f"G-{i:02d}"
     for g in glossary:
         if g["severity"] == "major":
             c = glossary_to_candidate(g)
@@ -620,10 +689,62 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     for p in pairs:
         q = {k: v for k, v in p.items() if not k.startswith("_")}
         out_pairs.append(q)
-    out_glossary = [{"concept": g["concept"], "terms": [{"term": t["term"], "line": t["line"]} for t in g["terms"]],
+    out_glossary = [{"id": g["id"], "concept": g["concept"],
+                     "terms": [{"term": t["term"], "line": t["line"]} for t in g["terms"]],
                      "problem": g["problem"], "severity": g["severity"]} for g in glossary]
     return {"candidates": candidates, "pair_checks": out_pairs, "trace": trace, "glossary": out_glossary,
             "subjects": list(data.get("subjects") or [])}
+
+
+# ---------------------------------------------------------------- ссылки на итоговые дефекты
+
+MAX_TRACE_LINKS = 3
+# Дефект, который касается почти всех требований (нет приоритетов, нет ID), строку матрицы не объясняет.
+MAX_TRACE_SPREAD = 6
+_SEV_ORDER = {"critical": 0, "major": 1, "minor": 2}
+
+
+def link_trace(trace: list[dict], findings: list[dict]) -> None:
+    """``finding_ids`` строки матрицы покрытия: до трёх итоговых дефектов, которые называют это требование
+    (сначала критичные), кроме дефектов «обо всём наборе». Меняет список на месте."""
+    ranked = sorted((f for f in findings or [] if f.get("id")),
+                    key=lambda f: (_SEV_ORDER.get(f.get("severity"), 3), str(f.get("id"))))
+    for t in trace or []:
+        rid = t.get("requirement_id")
+        ids = [str(f["id"]) for f in ranked
+               if rid in (f.get("requirement_ids") or []) and len(f.get("requirement_ids") or []) <= MAX_TRACE_SPREAD]
+        if ids:
+            t["finding_ids"] = ids[:MAX_TRACE_LINKS]
+
+
+def link_findings(pair_checks: list[dict], glossary: list[dict], candidates: list[dict],
+                  findings: list[dict], trace: list[dict] | None = None) -> None:
+    """Проставить ``finding_ids`` парам (P-xx) и понятиям глоссария (G-xx) по цепочке
+    пара → кандидат этапа (``pair_ids`` / ``glossary_ids``) → итоговый дефект (``candidate_ids``),
+    а если передана трассировка — и строкам матрицы покрытия (``link_trace``).
+    Вызывается конвейером после судьи; меняет списки на месте."""
+    if trace is not None:
+        link_trace(trace, findings)
+    by_cand: dict[str, list[str]] = {}
+    for f in findings or []:
+        for cid in f.get("candidate_ids") or []:
+            by_cand.setdefault(str(cid), []).append(str(f.get("id")))
+    by_pair: dict[str, list[str]] = {}
+    by_term: dict[str, list[str]] = {}
+    for c in candidates or []:
+        fids = by_cand.get(str(c.get("id")), [])
+        if not fids:
+            continue
+        for pid in c.get("pair_ids") or []:
+            by_pair.setdefault(pid, []).extend(fids)
+        for gid in c.get("glossary_ids") or []:
+            by_term.setdefault(gid, []).extend(fids)
+    for p in pair_checks or []:
+        if p.get("id") in by_pair:
+            p["finding_ids"] = list(dict.fromkeys(by_pair[p["id"]]))
+    for g in glossary or []:
+        if g.get("id") in by_term:
+            g["finding_ids"] = list(dict.fromkeys(by_term[g["id"]]))
 
 
 # ---------------------------------------------------------------- матрица покрытия

@@ -46,6 +46,7 @@ DEFAULT_THINKING_BUDGET = 4096      # Gemini 2.x
 RETRY_DELAYS_S = (2.0, 5.0, 10.0)   # 503/500/504/overloaded/timeout
 NETWORK_DELAYS_S = (2.0, 5.0)
 RATE_WAITS = 2
+RETRY_SLACK_S = 120.0               # запас времени на повторы сверх таймаута вызова
 DEFAULT_MAX_RATE_WAIT_S = 65.0
 DEFAULT_CONCURRENCY = 4
 KEY_HELP = "Бесплатный ключ: https://aistudio.google.com/apikey — добавьте в .env строку GEMINI_API_KEY=<ключ>."
@@ -125,6 +126,39 @@ def _with_schema_text(messages: list[dict[str, Any]], schema: Mapping[str, Any])
             m["content"] = f"{m.get('content') or ''}\n\n{hint}"
             return out
     return [{"role": "system", "content": hint}, *out]
+
+
+def _us_pacific_offset_h(utc: "datetime.datetime") -> int:
+    """Смещение тихоокеанского времени США от UTC: −7 летом (2-е воскресенье марта — 1-е воскресенье ноября), −8 зимой.
+
+    Без zoneinfo: на Windows без пакета tzdata база часовых поясов недоступна.
+    """
+    import datetime as dt
+
+    def sunday(year: int, month: int, nth: int) -> dt.datetime:
+        d = dt.datetime(year, month, 1)
+        d += dt.timedelta(days=(6 - d.weekday()) % 7 + 7 * (nth - 1))
+        return d
+
+    y = utc.year
+    start = sunday(y, 3, 2).replace(hour=10)   # 02:00 PST = 10:00 UTC
+    end = sunday(y, 11, 1).replace(hour=9)     # 02:00 PDT = 09:00 UTC
+    naive = utc.replace(tzinfo=None)
+    return -7 if start <= naive < end else -8
+
+
+def daily_reset_local(now_utc: "datetime.datetime | None" = None) -> str:
+    """Когда сбросится дневная квота Gemini (полночь по тихоокеанскому времени США) — в местном времени машины."""
+    import datetime as dt
+    now = now_utc or dt.datetime.now(dt.timezone.utc)
+    off = _us_pacific_offset_h(now)
+    pacific = now + dt.timedelta(hours=off)
+    midnight = (pacific + dt.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    reset_utc = (midnight - dt.timedelta(hours=_us_pacific_offset_h(midnight - dt.timedelta(hours=off))))
+    reset_utc = reset_utc.replace(tzinfo=dt.timezone.utc)
+    local = reset_utc.astimezone()
+    day = "сегодня" if local.date() == now.astimezone().date() else "завтра"
+    return f"{local:%H:%M} {day} по местному времени (полночь по тихоокеанскому времени США)"
 
 
 def _int(value: Any) -> int:
@@ -226,11 +260,14 @@ class GeminiProvider:
                timeout_s: float, max_output_tokens: int | None = None, **_: Any) -> dict[str, Any]:
         chain = self.model_chain(model)
         per_call = max(5.0, float(timeout_s or 300))
-        total = float(self.total_timeout_s) if self.total_timeout_s else per_call * 3 + 60
+        # Бюджет всего invoke: таймаут вызывающего (LLMClient уже ограничил его остатком лимита этапа) + запас на
+        # быстрые повторы (503, Retry-After). Зависший запрос не растянет этап втрое.
+        total = float(self.total_timeout_s) if self.total_timeout_s else per_call + RETRY_SLACK_S
         deadline = self._clock() + total
         attempts: list[dict[str, Any]] = []
         last: ProviderError | None = None
-        max_tokens = int(max_output_tokens or self.max_output_tokens)
+        # лимит этапа — не ниже лимита провайдера: у Gemini рассуждения расходуют тот же лимит
+        max_tokens = max(int(max_output_tokens or 0), self.max_output_tokens)
         clean = [{"role": m.get("role"), "content": m.get("content")} for m in messages]
 
         for current in chain:
@@ -331,8 +368,14 @@ class GeminiProvider:
             message = (f"Все модели Gemini из цепочки недоступны ({'; '.join(parts)}). Последняя ошибка: {message} "
                        "Задайте другую модель (GEMINI_MODEL, GEMINI_FALLBACK_MODELS) — список моделей ключа: "
                        "python -m bcc_review doctor.")
+        subkind = getattr(exc, "subkind", None)
+        if exc.kind == "quota" and (subkind == "per_day" or "дневн" in message.lower() or "perday" in message.lower()):
+            subkind = "per_day"
+            if "восстановится" not in message:
+                message = f"{message} Квота восстановится около {daily_reset_local()}."
         err = ProviderError(exc.kind, message, retry_after_s=exc.retry_after_s, status=exc.status,
                             request_id=exc.request_id, usage=exc.usage, model=exc.model)
+        err.subkind = subkind  # type: ignore[attr-defined]
         err.attempts = attempts  # type: ignore[attr-defined]
         err.physical_calls = sum(1 for a in attempts if "kind" in a)  # type: ignore[attr-defined]
         err.model_chain = chain  # type: ignore[attr-defined]

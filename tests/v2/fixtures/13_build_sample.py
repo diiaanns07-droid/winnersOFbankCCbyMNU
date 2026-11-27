@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 SOURCE = ROOT / "release" / "input" / "requirements.md"
 OUT = HERE / "13_report_sample.json"
-SEGMENT = HERE / "official" / "segment.json"
+SEGMENT = HERE / "13_segment_v0.json"  # своя копия нарезки v0: R-ссылки фикстуры на неё опираются
 
 STD = {
     "set_consistent": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.4"],

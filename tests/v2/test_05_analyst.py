@@ -121,6 +121,83 @@ def test_run_wraps_lens_run():
     assert calls == ["analyst"] and len(out["candidates"]) == 1 and out["extra"] == 1
 
 
+def test_lens_run_takes_output_limit_from_module():
+    """Каркас (`stages/lens.run`) берёт MAX_OUTPUT_TOKENS из модуля линзы: haiku укладывается в 1 вызов."""
+    from bcc_review.v2.stages import lens
+
+    calls = []
+
+    class LLM:
+        def ask_split(self, stage, build, items, schema, merge, *, max_output_tokens=16000):
+            calls.append(max_output_tokens)
+            return {"candidates": []}
+
+    class Ctx:
+        llm, requirements, view = LLM(), [{"id": "R-01"}], {"lines": []}
+
+        def prompt(self, name):
+            return "s", "u"
+
+        def warn(self, msg):
+            pass
+
+    mod = _load_stage()
+    lens.run(Ctx(), "analyst")
+    assert mod.MAX_OUTPUT_TOKENS >= 32000 and calls == [32000]
+
+
+def _view(*lines):
+    return {"lines": [{"n": i, "text": t} for i, t in enumerate(lines, 1)]}
+
+
+def test_maturity_signs():
+    m = _load_stage().maturity
+    raw = m(_view("Цели", "заполняются тестировщиками", "Проверка | Да / Нет", "Prod: —"))
+    assert raw["score"] == 0 and not raw["mature"]
+    clean = m(_view("Версия документа | 1.0 от 01.11.2026", "Термины", "Сутки — по времени UTC+5",
+                    "Клиент задаёт значение от 1 до 10."))
+    assert clean == {"terms": True, "version": True, "timezone": True, "no_placeholders": True, "score": 4,
+                     "mature": True}
+    assert m(None)["score"] == 0 and not m(_view())["mature"]
+
+
+def test_maturity_on_real_documents():
+    from bcc_review.v2 import docview
+    m = _load_stage().maturity
+    assert not m(docview.load(str(ROOT / "release" / "input" / "requirements.md")))["mature"]
+    for base in ("autopay", "cardblock", "cashback", "transfer_limit"):
+        assert m(docview.load(str(CASES / f"{base}.base" / "source.md")))["mature"], base
+
+
+def test_postprocess_mature_keeps_only_conflicts():
+    pp = _load_stage().postprocess
+    cands = [_cand("пробел 1", "major", "incomplete", lines=(1,)),
+             _cand("пробел 2", "major", "ambiguity", lines=(2,)),
+             _cand("мелочь", "minor", "ambiguity", lines=(3,)),
+             _cand("единицы", "major", "unit_mismatch", lines=(4, 40)),
+             _cand("граница", "critical", "boundary_conflict", lines=(5, 50))]
+    assert [c["title"] for c in pp(cands, mature=True)] == ["граница", "единицы"]
+    assert len(pp(cands, mature=False)) == 5
+
+
+def test_run_reports_maturity_and_applies_strict_mode():
+    mod = _load_stage()
+
+    class Ctx:
+        view = _view("Версия 2.0", "Термины", "UTC+5")
+
+    def fake_lens(ctx, name):
+        return {"candidates": [_cand("a", "minor", lines=(1,)), _cand("b", "major", lines=(2,))]}
+
+    out = mod.run(Ctx(), lens_run=fake_lens)
+    assert out["document_maturity"]["mature"] and out["candidates"] == []
+
+    def conflict_lens(ctx, name):
+        return {"candidates": [_cand("u", "major", "unit_mismatch", lines=(1, 9))]}
+
+    assert [c["title"] for c in mod.run(Ctx(), lens_run=conflict_lens)["candidates"]] == ["u"]
+
+
 @pytest.mark.parametrize("bad", [None, [], [None, "x", 3]])
 def test_postprocess_tolerates_garbage(bad):
     assert _load_stage().postprocess(bad) == []
@@ -190,3 +267,17 @@ def test_clean_base_answer_has_no_critical():
         if ".base." in fx.name:
             out = _load_stage().postprocess(_answer(fx)["candidates"])
             assert not [c for c in out if c["severity"] == "critical"], fx.name
+
+
+@pytest.mark.parametrize("ext", ["pdf", "docx"])
+def test_maturity_same_for_pdf_and_docx(ext):
+    from bcc_review.v2 import docview
+    m = _load_stage().maturity
+    try:
+        clean = m(docview.load(str(CASES / "cashback.base" / f"source.{ext}")))
+        raw = m(docview.load(str(ROOT / "release" / "input" / "requirements.pdf"))) if ext == "pdf" else None
+    except Exception as exc:  # нет читателя формата в окружении
+        pytest.skip(f"читатель {ext} недоступен: {exc}")
+    assert clean["mature"] and clean["score"] == 4
+    if raw is not None:
+        assert not raw["mature"] and raw["score"] == 0

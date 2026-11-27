@@ -34,11 +34,22 @@ DEFAULTS: dict[str, Any] = {
     "timeout": 600.0, "max_retries": 5, "cache": True, "cache_dir": None, "runs_dir": "runs", "run_id": None,
     "export": [], "html": True, "answers": None, "revise": False, "passes": 1, "parallel": 5,
     "mock_dir": None, "lenses": list(LENSES), "consistency": True, "clarify": True, "judge_check": True,
-    "quiet": False,
+    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None,
 }
+# Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
+DEFAULT_RPM = {"gemini": 10}
 
 
 # --------------------------------------------------------------------------- вспомогательное
+
+def explain(exc: BaseException, provider: str = "") -> str:
+    """Понятное объяснение ошибки провайдера с советом (doctor №02), без трейсбэка."""
+    try:
+        from .providers import doctor
+        return doctor.explain(exc, provider or None)
+    except Exception:  # noqa: BLE001
+        return f"Модель недоступна: {getattr(exc, 'message', None) or exc}"
+
 
 def git_commit() -> tuple[str, bool]:
     env = os.environ.get("BCC_AGENT_COMMIT", "").strip()
@@ -113,6 +124,12 @@ def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = Non
         if pname == "offline":
             return None, "offline"
         kw = {"model": opts["model"]} if opts.get("model") else {}
+        if pname == "claude_cli":
+            effort = opts.get("effort") or weak_profile_effort(opts.get("model"))
+            if effort and not os.environ.get("CLAUDE_CLI_EFFORT"):
+                kw["effort"] = effort
+            if opts.get("stage_timeout"):
+                kw["timeout_floor_s"] = min(600.0, float(opts["stage_timeout"]))
         provider = doctor.make_provider(pname, **kw)
     cache_dir = None
     if opts.get("cache") and pname != "mock":
@@ -120,8 +137,16 @@ def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = Non
     llm = LLMClient(provider, model=opts.get("model"), provider_name=pname,
                     fallback_models=opts.get("fallback_models") or [], max_calls=opts["max_calls"],
                     max_seconds=opts["max_seconds"], max_retries=opts["max_retries"], timeout_s=opts["timeout"],
-                    cache_dir=cache_dir, trace=run.trace if run else None)
+                    cache_dir=cache_dir, trace=run.trace if run else None,
+                    stage_timeout_s=float(opts.get("stage_timeout") or 0),
+                    rpm=float(opts["rpm"]) if opts.get("rpm") is not None else DEFAULT_RPM.get(pname, 0))
     return llm, pname
+
+
+def weak_profile_effort(model: str | None) -> str | None:
+    """Профиль слабой модели: у haiku рассуждения — 70 % вывода и 2–4 мин на вызов; effort=low вдвое быстрее
+    при том же качестве (замер 05:05: линза архитектора 232 → 108 с, судья 259 → 119 с, К и С те же)."""
+    return "low" if model and "haiku" in str(model).lower() else None
 
 
 def _mock_dir_for(input_path: str | Path | None) -> Path:
@@ -154,6 +179,7 @@ class Pipeline:
         self.warnings: list[str] = []
         self.ctx: Context | None = None
         self.provider_name = ""
+        self.model_error = ""
 
     # ------------------------------------------------------------------ один этап
 
@@ -186,6 +212,10 @@ class Pipeline:
             status, err, out = "failed", exc.message, copy.deepcopy(empty)
         except LLMError as exc:
             status, err, out = "failed", f"{exc.kind}: {exc.message}", copy.deepcopy(empty)
+            fatal = getattr(llm, "fatal", None)
+            if fatal is not None and not self.model_error:
+                self.model_error = explain(fatal, self.provider_name)
+                self.warnings.insert(0, self.model_error)
         except Exception as exc:  # noqa: BLE001 — инвариант: этап не роняет прогон
             status, err, out = "failed", f"{type(exc).__name__}: {exc}", copy.deepcopy(empty)
             self.run.trace({"stage": name, "event": "exception", "traceback": traceback.format_exc()[-4000:]})
@@ -194,9 +224,14 @@ class Pipeline:
             msg = f"Этап {name} не выполнен: {err[:300]}"
             self.warnings.append(msg)
             self.log(f"  {name}: СБОЙ — {err[:200]}")
-        self.stages[name] = status
         after = (llm.stats["by_stage"].get(name) or {}) if llm else {}
         calls = int(after.get("calls", 0)) - int(before.get("calls", 0))
+        hit = (int(after.get("budget", 0)) - int(before.get("budget", 0))) + \
+              (int(after.get("failed", 0)) - int(before.get("failed", 0)))
+        if status == "ok" and hit > 0:
+            status = "partial"
+            self.warnings.append(f"Этап {name} выполнен частично: часть вызовов модели не удалась или упёрлась в бюджет")
+        self.stages[name] = status
         st = {"calls": calls, "seconds": seconds, "candidates": len(out.get("candidates") or [])}
         if after.get("split", 0) - before.get("split", 0):
             st["split"] = after["split"] - before.get("split", 0)
@@ -217,11 +252,21 @@ class Pipeline:
         opts = self.opts
         self.log(f"Документ: {self.input}")
         view = load_view(self.input)
-        llm, self.provider_name = make_llm(opts, self.run, self.input)
+        try:
+            llm, self.provider_name = make_llm(opts, self.run, self.input)
+        except Exception as exc:  # noqa: BLE001 — нет ключа / не тот провайдер: отчёт правилами + объяснение
+            self.provider_name = str(opts.get("provider") or "")
+            self.model_error = explain(exc, self.provider_name)
+            self.warnings.insert(0, self.model_error)
+            llm = None
         ctx = self.ctx = Context(view=view, llm=llm, options={**opts, "input": str(self.input)},
                                  run_dir=self.run.path, trace=self.run.trace)
         if llm is None:
-            return self._offline(view)
+            report = self._offline(view)
+            if self.model_error:
+                report["run"]["model_error"] = self.model_error
+                report["run"]["warnings"] = _uniq([self.model_error] + list(report["run"].get("warnings") or []))
+            return report
 
         # 1. нарезка (при сбое — эвристика кода, прогон partial)
         seg = self.stage("segment", lambda: self._segment(ctx), inputs={"lines": len(view.get("lines") or [])},
@@ -254,6 +299,7 @@ class Pipeline:
             findings = self._code_findings(kept)
             self.warnings.append("Судья недоступен: реестр собран кодом из сверенных кандидатов без отсева")
         self._finish_findings(findings)
+        self._link(extras, kept, findings)
         rejected += list(jd.get("rejected") or [])
 
         # 6. вопросы владельцу
@@ -276,17 +322,7 @@ class Pipeline:
 
     def _segment(self, ctx: Context) -> dict:
         from .stages import segment
-        out = segment.run(ctx)
-        try:
-            from . import quotes
-            res = quotes.verify_requirements(ctx.view, out.get("requirements") or [])
-            out["requirements"] = res["requirements"]
-            if res.get("missing"):
-                out.setdefault("warnings", []).append(
-                    "Цитата требования не найдена: " + ", ".join(x for x in res["missing"] if x))
-        except ImportError:
-            pass
-        return out
+        return segment.run(ctx)  # этап сам сверяет цитаты и строки требований (№04)
 
     def _heuristic_segment(self, view: dict, seg: dict) -> dict:
         try:
@@ -412,6 +448,30 @@ class Pipeline:
             out.append(f)
         return out
 
+    def _link(self, extras: dict, kept: list[dict], findings: list[dict]) -> None:
+        """finding_ids у строк приёмки (через acceptance_row кандидата), пар и понятий глоссария."""
+        by_cand: dict[str, list[str]] = {}
+        for f in findings:
+            for cid in f.get("candidate_ids") or []:
+                by_cand.setdefault(str(cid), []).append(str(f.get("id")))
+        rows: dict[str, list[str]] = {}
+        for c in kept:
+            row = c.get("acceptance_row")
+            if row:
+                for fid in by_cand.get(str(c.get("id")), []):
+                    if fid not in rows.setdefault(str(row), []):
+                        rows[str(row)].append(fid)
+        for chk in extras.get("acceptance_checks") or []:
+            key = chk.get("row_requirement_id") or (f"L{chk['row_line']}" if chk.get("row_line") else "")
+            chk["finding_ids"] = list(dict.fromkeys(list(chk.get("finding_ids") or []) + rows.get(str(key), [])))
+        try:
+            from .stages import consistency
+            link = getattr(consistency, "link_findings", None)
+            if callable(link):
+                link(extras.get("pair_checks") or [], extras.get("glossary") or [], kept, findings)
+        except Exception as exc:  # noqa: BLE001
+            self.warnings.append(f"Связь пар и глоссария с дефектами не построена: {type(exc).__name__}: {exc}")
+
     @staticmethod
     def _finish_findings(findings: list[dict]) -> None:
         for f in findings:
@@ -449,6 +509,13 @@ class Pipeline:
         if res.get("markdown_sections"):
             report["extra_markdown"] = res["markdown_sections"]
         self.run.save_stage("recheck", {"stage": "recheck", "status": "ok", "output": res})
+        llm = ctx.llm
+        if llm is not None:
+            report["run"].update(llm.summary())
+        report["run"]["duration_s"] = round(time.monotonic() - self.t0, 1)
+        report["run"]["finished_at"] = now_iso()
+        report["run"]["stages"] = dict(self.stages)
+        report["run"]["stage_stats"] = dict(self.stage_stats)
 
     # ------------------------------------------------------------------ отчёт
 
@@ -563,12 +630,12 @@ def write_outputs(report: dict, view: dict | None, input_path: Path, out_md: Pat
     try:
         from .render import markdown
         md_text = markdown.render(report)
-        extra = report.get("extra_markdown") or []
-        if extra and not any(s[:60] in md_text for s in extra if s):
-            md_text = md_text.rstrip() + "\n\n" + "\n\n".join(s.strip() for s in extra if s) + "\n"
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"Отчёт Markdown собран упрощённо: {type(exc).__name__}: {exc}")
         md_text = fallback_markdown(report)
+        extra = report.get("extra_markdown") or []
+        if extra:
+            md_text = md_text.rstrip() + "\n\n" + "\n\n".join(x.strip() for x in extra if x) + "\n"
     out_md.write_text(md_text, encoding="utf-8")
     written["md"] = str(out_md)
     out_json = out_md.with_suffix(".json")

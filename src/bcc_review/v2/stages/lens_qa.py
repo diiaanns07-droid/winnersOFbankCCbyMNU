@@ -18,8 +18,11 @@ from typing import Any, Iterable, Mapping
 
 STAGE = "lens_qa"
 SOURCE = "lens:qa"
-MAX_TEST_CASES = 15
+MAX_TEST_CASES = 12
 MAX_MODEL_CANDIDATES = 12
+# Лимит ответа сразу 32 000: у моделей с рассуждением (haiku через claude -p) 16 000 включают рассуждение,
+# и на документе с 4 строками приёмки ответ иногда не помещается — обрезанная попытка стоит целого вызова (3–5 мин).
+MAX_OUTPUT_TOKENS = 32000
 UNDEFINED_PREFIX = "Не определено требованиями"
 
 KINDS = ["event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
@@ -145,18 +148,20 @@ def acceptance_rows(requirements: Iterable[Mapping[str, Any]] | None) -> list[st
 
 
 def resolve_row_id(check: Mapping[str, Any], requirements: Iterable[Mapping[str, Any]] | None) -> str:
-    """ID строки приёмки: как дала модель, если он есть в нарезке; иначе — требование acceptance по номеру строки."""
+    """ID строки приёмки: требование acceptance, в которое попадает номер строки; иначе ID модели, если он есть
+    в нарезке. Номер строки надёжнее: модель путает соседние ID, а без таблицы даёт всем строкам один «ID»."""
     reqs = list(requirements or [])
     rid = _s(check.get("row_requirement_id"))
-    if any(str(r.get("id")) == rid for r in reqs):
-        return rid
     line = _int(check.get("row_line"))
     if line:
         for r in reqs:
-            lo, hi = _int(r.get("line_start")), _int(r.get("line_end")) or _int(r.get("line_start"))
+            lo = _int(r.get("line_start"))
+            hi = _int(r.get("line_end")) or lo
             if r.get("kind") == "acceptance" and lo and lo <= line <= (hi or lo):
                 return str(r["id"])
-    return rid if reqs == [] else ""
+    if any(str(r.get("id")) == rid for r in reqs):
+        return rid
+    return rid if not reqs else ""
 
 
 def missing_rows(checks: list[Mapping[str, Any]], requirements: Iterable[Mapping[str, Any]] | None) -> list[str]:
@@ -260,6 +265,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
             "blocks": "both",
             "source": SOURCE,
             "origin": "acceptance_check",
+            "acceptance_row": c["row_requirement_id"] or f"L{c['row_line']}",
             "derivation": c["derivation"],
         }
     return {
@@ -280,6 +286,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
         "blocks": "testing",
         "source": SOURCE,
         "origin": "acceptance_check",
+        "acceptance_row": c["row_requirement_id"] or f"L{c['row_line']}",
         "derivation": c["derivation"],
     }
 
@@ -333,6 +340,36 @@ def normalize_test_case(raw: Mapping[str, Any]) -> dict:
 
 # ---------------------------------------------------------------- сборка
 
+MAX_OTHER_CANDIDATES = 2
+
+
+def _other_rank(c: Mapping[str, Any]) -> int:
+    """Порядок замечаний модели вне противоречий: покрытие приёмкой, проверяемость, остальное."""
+    if c.get("kind") == "missing_element" and c.get("criterion") == "set_validatable":
+        return 0
+    if c.get("kind") == "unverifiable":
+        return 1
+    return 2
+
+
+def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Противоречия модели (два места — два исхода) остаются все; прочих замечаний — не больше
+    :data:`MAX_OTHER_CANDIDATES`: одно о покрытии приёмкой и одно о проверяемости раньше остальных.
+
+    На чистых документах корпуса haiku давал 3–5 major (неоднозначности одного места, контракт API, доставка
+    сообщений) — это зона аналитика и архитектора; линза тестировщика держит свои два вида. Снятые идут в
+    ``dropped`` (в отчёте — «отклонено линзой»), не теряются.
+    """
+    conflicts = [c for c in cands if c.get("kind") in _CONFLICT_FAMILY]
+    others = sorted((c for c in cands if c.get("kind") not in _CONFLICT_FAMILY),
+                    key=lambda c: (_other_rank(c), {"critical": 0, "major": 1, "minor": 2}.get(c.get("severity"), 3)))
+    keep_ids = {id(c) for c in conflicts + others[:MAX_OTHER_CANDIDATES]}
+    kept = [c for c in cands if id(c) in keep_ids]
+    reason = f"сверх лимита линзы тестировщика: не больше {MAX_OTHER_CANDIDATES} замечаний вне противоречий"
+    dropped = [{**c, "reason": reason} for c in others[MAX_OTHER_CANDIDATES:]]
+    return kept, dropped
+
+
 def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None) -> dict:
     """Ответ модели → ``{"candidates", "acceptance_checks", "test_cases", "warnings"}``.
 
@@ -374,6 +411,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
 
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
+    kept, dropped = limit_other_candidates(kept)
     if len(kept) > MAX_MODEL_CANDIDATES:
         warnings.append(f"{STAGE}: кандидатов модели {len(kept)}, оставлено {MAX_MODEL_CANDIDATES}")
         rank = {"critical": 0, "major": 1, "minor": 2}
@@ -389,7 +427,8 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
         t["id"] = f"T-{i:02d}"
     tests = [{"id": t["id"], **{k: v for k, v in t.items() if k != "id"}} for t in tests]
 
-    return {"candidates": candidates, "acceptance_checks": checks, "test_cases": tests, "warnings": warnings}
+    return {"candidates": candidates, "acceptance_checks": checks, "test_cases": tests, "warnings": warnings,
+            "dropped": dropped}
 
 
 def retry_instruction(missing: list[str]) -> str:
@@ -406,11 +445,26 @@ def focus_instruction(rows: list[str], rest: int) -> str:
 
 
 BATCH_ROWS = 10
+SHORT_INSTRUCTION = ("\n\n### Дополнительно\nПрошлый ответ не поместился в лимит вывода. Пиши короче: candidates — "
+                     "не больше 4, test_cases — не больше 6, каждое текстовое поле — одно-два предложения.")
+NO_ROWS = " acceptance_checks — пустой список: строки приёмки исполнены отдельным запросом."
+
+
+_TRUNC_TEXT = re.compile(r"output token|max_tokens|max output|обрез|не поместился", re.I)
+
+
+def _is_truncation(exc: BaseException) -> bool:
+    """Обрезка ответа: ``llm.Truncated`` или ошибка провайдера, текст которой говорит о лимите вывода
+    (``claude -p`` сообщает «response exceeded the 16000 output token maximum» как обычную ошибку)."""
+    if type(exc).__name__ == "Truncated" or getattr(exc, "kind", "") == "truncated":
+        return True
+    return bool(_TRUNC_TEXT.search(f"{getattr(exc, 'message', '')} {exc}"))
 
 
 def _ask_rows(ctx: Any, system: str, user: str, rows: list[str], stage: str, warnings: list[str]) -> list:
     try:
-        extra = ctx.llm.ask(stage, system, user + retry_instruction(rows), SCHEMA) or {}
+        extra = ctx.llm.ask(stage, system, user + retry_instruction(rows), SCHEMA,
+                            max_output_tokens=MAX_OUTPUT_TOKENS) or {}
     except Exception as exc:  # дополнительный вызов — улучшение, а не условие работы линзы
         warnings.append(f"{STAGE}: строки приёмки {', '.join(rows)} не исполнены: {exc}")
         return []
@@ -422,21 +476,52 @@ def run(ctx: Any) -> dict:
 
     Вызовы: один основной; если строк приёмки больше BATCH_ROWS — по одному на каждые следующие BATCH_ROWS строк
     (ответ не упирается в лимит вывода); затем не больше одного повтора по строкам, которые модель пропустила.
+    Если основной ответ всё же обрезан — строки приёмки запрашиваются пакетами по 5, а кандидаты и тест-кейсы —
+    отдельным коротким запросом; этап получает статус partial.
     """
     system, user = ctx.prompt(STAGE)
     reqs = list(getattr(ctx, "requirements", None) or [])
     rows = acceptance_rows(reqs)
     first, later = rows[:BATCH_ROWS], rows[BATCH_ROWS:]
     warnings: list[str] = []
+    partial = False
     main_user = user + focus_instruction(first, len(later)) if later else user
-    data = dict(ctx.llm.ask(STAGE, system, main_user, SCHEMA) or {})
+    try:
+        data = dict(ctx.llm.ask(STAGE, system, main_user, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS) or {})
+    except Exception as exc:
+        if not _is_truncation(exc):
+            raise
+        partial = True
+        warnings.append(f"{STAGE}: ответ обрезан по лимиту вывода — строки приёмки и тест-кейсы запрошены раздельно")
+        later = rows  # все строки — пакетами ниже
+        short = SHORT_INSTRUCTION + (NO_ROWS if rows else "")
+        try:
+            data = dict(ctx.llm.ask(f"{STAGE}_short", system, user + short, SCHEMA,
+                                        max_output_tokens=MAX_OUTPUT_TOKENS) or {})
+        except Exception as exc2:
+            if not _is_truncation(exc2):
+                raise
+            data = {}
+            warnings.append(f"{STAGE}: короткий ответ тоже обрезан — кандидаты и тест-кейсы линзы не получены")
+        if rows:
+            data["acceptance_checks"] = []
     checks = [c for c in data.get("acceptance_checks") or [] if isinstance(c, Mapping)]
-    for i in range(0, len(later), BATCH_ROWS):
-        checks += _ask_rows(ctx, system, user, later[i:i + BATCH_ROWS], f"{STAGE}_rows", warnings)
+    step = BATCH_ROWS // 2 if partial else BATCH_ROWS
+    for i in range(0, len(later), step):
+        checks += _ask_rows(ctx, system, user, later[i:i + step], f"{STAGE}_rows", warnings)
     missing = missing_rows([normalize_check(c) for c in checks], reqs)
     if missing:
         checks += _ask_rows(ctx, system, user, missing[:BATCH_ROWS], f"{STAGE}_retry", warnings)
     data["acceptance_checks"] = checks
     out = postprocess(data, reqs)
     out["warnings"] = warnings + out["warnings"]
+    if missing_rows(out["acceptance_checks"], reqs):
+        partial = True
+    warn = getattr(ctx, "warn", None)
+    if callable(warn):  # каркас сам кладёт ctx.warnings в файл этапа и в паспорт — без дубля в out["warnings"]
+        for w in out["warnings"]:
+            warn(w)
+        out["warnings"] = []
+    if partial:
+        out["_partial"] = True
     return out

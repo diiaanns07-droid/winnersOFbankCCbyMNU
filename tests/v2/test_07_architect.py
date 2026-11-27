@@ -84,8 +84,8 @@ def test_prompt_exists_and_is_russian():
     text = PROMPT.read_text(encoding="utf-8")
     assert text.startswith("## Задача")
     assert len(re.findall(r"[а-яё]", text, re.I)) > 3000
-    for key in ("inventory", "operations", "promises", "codes", "fields", "missing_element", "status_conflict",
-                "unit_mismatch", "api_contract", "До 14 кандидатов"):
+    for key in ("inventory", "operations", "promises", "codes", "fields", "branches", "missing_element", "status_conflict",
+                "unit_mismatch", "api_contract", "До 12 кандидатов"):
         assert key in text, key
 
 
@@ -153,7 +153,7 @@ def test_unknown_requirement_ids_removed_and_input_not_mutated():
     snapshot = json.dumps(data, ensure_ascii=False, sort_keys=True)
     out = la.postprocess(data, requirement_ids={"R-01"})
     assert out["candidates"][0]["requirement_ids"] == ["R-01"]
-    assert set(out["inventory"]) == {"operations", "promises", "codes", "fields"}
+    assert set(out["inventory"]) == {"operations", "promises", "codes", "fields", "branches"}
     assert json.dumps(data, ensure_ascii=False, sort_keys=True) == snapshot
 
 
@@ -202,3 +202,9 @@ def test_recorded_answer_finds_key_api_defects(recorded):
     assert any(c["kind"] == "unit_mismatch" and 49 in lines(c) for c in out)
     # 403 ↔ 404 (L175/L188/L189)
     assert any(lines(c) & {188, 189} for c in out)
+
+
+def test_undefined_branches():
+    inv = {"branches": [{"operation": "o", "step": "проверка не прошла", "line": 7, "outcome": ""},
+                        {"operation": "o", "step": "успех", "line": 8, "outcome": "200 {ok}"}]}
+    assert [b["line"] for b in la.undefined_branches(inv)] == [7]

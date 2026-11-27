@@ -19,7 +19,7 @@ from bcc_review.v2.render import console, jsonout, markdown  # noqa: E402
 SAMPLE = ROOT / "tests" / "v2" / "fixtures" / "13_report_sample.json"
 
 REQUIRED_HEADINGS = [
-    "## Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
+    "></a>Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
     "></a>4. Проверка набора требований", "></a>5. Сводка", "></a>6. Итог", "></a>Приложение А. Вопросы владельцу",
     "></a>Приложение Б. Черновик тест-кейсов", "></a>Приложение В. Чек-лист", "></a>Приложение Г. Было → стало",
     "></a>Приложение Д. Как работал агент", "></a>Приложение Е. Методика",
@@ -112,11 +112,35 @@ def test_rule_verdict(findings, status, expected):
     assert (v["development"], v["testing"]) == expected
 
 
-def test_finalize_keeps_existing_verdict_and_fills_lists():
+def test_finalize_enforces_rule_verdict_and_fills_lists():
     r = {"run": {"status": "complete"}, "findings": [], "requirements": [], "verdict": {"development": "no"}}
     jsonout.finalize(r)
-    assert r["verdict"]["development"] == "no" and r["verdict"]["testing"] == "yes"
+    assert r["verdict"]["development"] == "yes" and r["verdict"]["testing"] == "yes"
+    assert any("пересчитан по правилу" in w for w in r["run"]["warnings"])
     assert r["questions"] == [] and r["schema"] == "bcc-review/2"
+
+
+def test_finalize_answers_mode_keeps_references_valid(sample):
+    """Конвейер в режиме --answers кладёт в findings только оставшиеся дефекты (№11 findings_after)."""
+    r = copy.deepcopy(sample)
+    r["findings_before"] = copy.deepcopy(r["findings"])
+    r["findings"] = [f for f in r["findings"] if f["severity"] != "critical"]
+    r["clarification"] = {"answers": [], "decisions": [], "unanswered": [], "changes": [], "new_findings": [],
+                          "before": {"verdict": {"development": "no", "testing": "no"},
+                                     "findings": {"critical": 5, "major": 20, "minor": 7}},
+                          "after": {"verdict": {"development": "conditional", "testing": "conditional"},
+                                    "findings": {"critical": 0, "major": 20, "minor": 7}},
+                          "resolved": 5, "changed": 0, "open": 0}
+    jsonout.finalize(r)
+    assert r["verdict"]["development"] == "conditional"
+    assert r["verdict"]["summary"].startswith("После ответов владельца разработка — с условиями")
+    assert "D-01" not in r["verdict"]["fix_first"] and r["verdict"]["fix_first"]
+    assert sum(1 for f in r["findings"] if f.get("status_after_answers") == "resolved") == 5
+    from bcc_review.v2 import verify
+    res = verify.verify_report(r, ROOT / "release" / "input" / "requirements.md")
+    assert res["ok"], res["errors"][:3]
+    md = markdown.render(r)
+    assert "[D-01](#d-01)" not in md and "D-01 (снят)" in md
 
 
 # ------------------------------------------------------------------ Markdown
@@ -136,7 +160,7 @@ def test_header_says_generated_and_verified(sample):
 
 def test_first_screen(sample):
     md = markdown.render(sample)
-    brief = md[md.find("## Кратко"):md.find("></a>1. Паспорт")]
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
     assert brief.count("| 🔴 [D-") == 5  # таблица блокеров
@@ -146,7 +170,7 @@ def test_first_screen(sample):
 
 def test_every_link_has_anchor(sample):
     md = markdown.render(sample)
-    links = set(re.findall(r"\]\(#([\w-]+)\)", md))
+    links = set(re.findall(r"\]\(#([\w-]+)(?: \"[^\"]*\")?\)", md))
     anchors = set(re.findall(r'<a id="([\w-]+)"></a>', md))
     assert links and links <= anchors, links - anchors
 
@@ -172,7 +196,7 @@ def test_card_quotes_are_short_and_located(sample):
 
 def test_ids_of_document_shown_next_to_report_ids(sample):
     md = markdown.render(sample)
-    assert "[R-07 / Ф-3](#r-07)" in md and "[R-30](#r-30)" in md  # «Query-параметры: cardId» — не ID
+    assert "[R-07 / Ф-3](#r-07 " in md and "[R-30](#r-30 " in md  # «Query-параметры: cardId» — не ID
 
 
 def test_no_internal_jargon(sample):
@@ -203,9 +227,12 @@ def test_partial_and_failed_status_banners():
     md = markdown.render(minimal(status="partial", stages={"segment": "ok", "judge": "failed"}, provider="gemini",
                                  models_used=["gemini-x"]))
     assert "Прогон завершён частично" in md and "Судья" in md
-    r = minimal(status="failed")
+    r = minimal(status="failed", stages={"segment": "ok", "lens_qa": "failed"}, provider="gemini",
+                models_used=["gemini-x"])
     jsonout.finalize(r)
-    assert "вердикт не вынесен" in markdown.render(r)
+    md = markdown.render(r)
+    assert "вердикт не вынесен" in md and "Проверка не завершена: сбой этапов Тестировщик" in md
+    assert "Блокирующих дефектов не найдено" not in md
 
 
 def test_before_after_block(sample):
@@ -229,10 +256,12 @@ def test_before_after_block(sample):
     assert jsonout.validate(r) == []
     md = markdown.render(r)
     assert "**До и после ответов владельца** — ответов 1, общих решений 1, без ответа 1" in md
+    assert "Снято 1, уточнено 1, осталось открытыми 0" in md
     assert "**Ответ владельца:** B — Нет" in md and "### Что изменили ответы" in md
     assert "D-01 (снят)" in md
     assert '<a id="d-01">' not in md  # снятый дефект не показывается карточкой
     assert "· уточнён после ответов" in md
+    assert "**Сняты ответами блокеры (1):**" in md and "D-01 (снят) Ф-3 и Ф-4 — [Q-01](#q-01): лимит действует всегда" in md
     assert r["summary"]["findings"]["critical"] == 4
 
 
@@ -307,7 +336,7 @@ def _mutations(report: dict):
 def test_render_never_crashes_on_broken_data(sample):
     for name, r in _mutations(sample):
         md = markdown.render(r)
-        assert "## Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
+        assert "></a>Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
         assert "BCC Review" in console.summary(r), name
 
 
@@ -318,3 +347,104 @@ def test_line_refs_from_model_text_become_russian():
     assert markdown.cell("a | L7") == "a \\| строка 7"
     assert markdown.source_name("lens:что-то") == "проверка ролью"
     assert markdown.source_name("rules:units") == "правило «units»"
+
+
+def test_revise_edits_rendered(sample):
+    r = copy.deepcopy(sample)
+    r["rewrites"] = [{"finding_id": "D-01", "title": "т", "severity": "critical", "summary": "с",
+                      "edits": [{"action": "replace", "line": 39, "old": "максимум один", "new": "не более <уточнить: N>",
+                                 "applied": True, "was": "максимум один", "became": "не более <уточнить: N>"},
+                                {"action": "insert", "line": 40, "old": "", "new": "Ф-5. Новое правило.",
+                                 "applied": True, "was": "", "became": "Ф-5. Новое правило."},
+                                {"action": "replace", "line": 41, "old": "x", "new": "y", "applied": False}]}]
+    r["revise_stats"] = {"replaced": 1, "inserted": 1, "not_applied": 1, "pending": 1}
+    r["revised_file"] = "/tmp/out/report.revised.md"
+    md = markdown.render(r)
+    card = md[md.find('id="d-01"'):md.find('id="d-02"')]
+    assert "**Было → стало.** Строка 39: «максимум один» → «не более <уточнить: N>»" in card
+    assert "**Добавить после строки 40.** «Ф-5. Новое правило.»" in card
+    app = md[md.find('id="pg"'):md.find('id="pd"')]
+    assert "| после 40 | — | Ф-5. Новое правило. |" in app and "не применено 1" in app
+    assert "`report.revised.md`" in app and "/tmp/out" not in app
+
+
+def test_stage_warnings_in_russian():
+    assert markdown.warn_text("проверка серьёзности понизила 2 дефект(ов): critical→major 0, major→minor 2") == \
+        "проверка серьёзности понизила 2 дефект(ов): критичный→существенный 0, существенный→незначительный 2"
+    assert markdown.warn_text("clarify: оставлено 10 вопросов из 11") == "Вопросы: оставлено 10 вопросов из 11"
+    assert markdown.prose("push при floor(расходы/100) ≥ порог") == "push при `floor(расходы/100)` ≥ порог"
+
+
+def test_links_inferred_for_set_checks_and_ids_in_text(sample):
+    r = copy.deepcopy(sample)
+    for p in r["pair_checks"]:
+        p["finding_ids"] = []
+    for a in r["acceptance_checks"]:
+        a["finding_ids"] = []
+    md = markdown.render(r)
+    pairs = md[md.find("### 4.2."):md.find("### 4.3.")]
+    assert "| ⛔ противоречат | [D-01](#d-01)" in pairs  # Ф-3 ↔ Ф-4 — оба требования в D-01
+    acc = md[md.find("### 4.3."):md.find("### 4.4.")]
+    assert "| ⛔ противоречит | [D-05](#d-05)" in acc
+    tests = md[md.find('id="pb"'):md.find('id="pv"')]
+    assert "(D-01)" not in tests and "([D-01](#d-01))" in tests  # упоминание в тексте — ссылка
+
+
+def test_candidate_count_excludes_non_proposing_stages(sample):
+    r = copy.deepcopy(sample)
+    r["run"]["stage_stats"]["quotes"]["candidates"] = 45
+    md = markdown.render(r)
+    assert "Кандидатов в дефекты: 45." in md
+
+
+def test_identifiers_in_model_text_become_code():
+    assert markdown.prose("Клиент читает response.result и поле monthSpent") == \
+        "Клиент читает `response.result` и поле `monthSpent`"
+    assert markdown.prose("Добавить GET /alerts/limit?cardId=... с ответом") == \
+        "Добавить GET `/alerts/limit?cardId=...` с ответом"
+    assert markdown.prose("поле limit_kzt и `уже код` и 1.5 и т.е.") == "поле `limit_kzt` и `уже код` и 1.5 и т.е."
+    assert markdown.prose("путь /alerts/saveLimit. Дальше") == "путь `/alerts/saveLimit`. Дальше"
+    assert markdown.prose("сумма 50 000 ₸, Ф-2, push, API") == "сумма 50 000 ₸, Ф-2, push, API"
+
+
+def test_stage_failure_warnings_readable():
+    assert markdown.warn_text("Этап lens_architect не выполнен: исчерпан бюджет вызовов модели (16)") == \
+        "Этап «Архитектор» не выполнен: исчерпан бюджет вызовов модели (16)"
+    assert markdown.warn_text("судья недоступен (BudgetExceeded: judge: budget: исчерпан бюджет вызовов модели (16)); "
+                              "реестр собран кодом") == \
+        "судья недоступен (исчерпан бюджет вызовов модели (16)); реестр собран кодом"
+
+
+def test_sixty_plus_findings_fit_budget(sample):
+    r = copy.deepcopy(sample)
+    base = list(r["findings"])
+    while len(r["findings"]) < 66:
+        f = copy.deepcopy(base[len(r["findings"]) % len(base)])
+        f["id"] = f"D-{len(r['findings']) + 1:02d}"
+        f["severity"] = "major" if f["severity"] == "critical" else f["severity"]
+        r["findings"].append(f)
+    del r["summary"]
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert md.count("\n") <= 900
+    for h in REQUIRED_HEADINGS:
+        assert h in md, h
+    assert md.count('<a id="d-') == 66  # у каждого дефекта есть якорь, даже в сжатом виде
+
+
+def test_export_text_for_word(sample, tmp_path):
+    md = markdown.render(sample)
+    ex = markdown.export_text(md)
+    assert "<a id=" not in ex and "\\|" not in ex and "\\*" not in ex
+    assert "## 1. Паспорт прогона" in ex and "| R-07 / Ф-3 |" not in ex  # ссылки остаются ссылками
+    assert ex.count("\n") == md.count("\n")
+    exports = pytest.importorskip("bcc_review.v2.render.exports")
+    pytest.importorskip("docx")
+    import docx
+    res = exports.report_docx(sample, tmp_path / "r.docx", markdown=ex)
+    assert res["status"] == "written"
+    d = docx.Document(str(tmp_path / "r.docx"))
+    texts = [p.text for p in d.paragraphs] + [c.text for t in d.tables for row in t.rows for c in row.cells]
+    assert not [t for t in texts if "<a id" in t or "\\|" in t]
+    heads = [p.text for p in d.paragraphs if p.style.name.startswith("Heading")]
+    assert "1. Паспорт прогона" in heads and "Кратко" in heads

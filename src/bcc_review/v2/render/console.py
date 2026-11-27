@@ -6,9 +6,12 @@
 from __future__ import annotations
 
 from . import jsonout
-from .markdown import BLOCKS, PROVIDERS, STATUS, _clean_report, duration, plural, shorten
+from .markdown import BLOCKS, STATUS, _clean_report, duration, plural, shorten
 
-READY = {"no": "нельзя", "conditional": "с условиями", "yes": "можно", "none": "не вынесен"}
+READY = {"no": "нельзя", "conditional": "с условиями", "yes": "можно", "undetermined": "не определено",
+         "none": "не вынесен"}
+PLAIN_PROVIDERS = {"claude_cli": "Claude Code (claude -p)", "gemini": "Google Gemini", "anthropic": "Anthropic API",
+                   "openai": "OpenAI-совместимый сервер", "mock": "mock", "offline": "без модели"}
 
 
 def summary(report: dict, *, md_path: str | None = None, json_path: str | None = None, width: int = 100) -> str:
@@ -43,9 +46,11 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
                      + (f" — блокирует {BLOCKS[f['blocks']]}" if f.get("severity") == "critical"
                         and f.get("blocks") in BLOCKS and f.get("blocks") != "none" else ""))
     calls = (run.get("calls") or {}).get("total", 0)
-    model = ", ".join(run.get("models_used") or []) or PROVIDERS.get(run.get("provider"), run.get("provider") or "—")
+    model = ", ".join(run.get("models_used") or []) or PLAIN_PROVIDERS.get(run.get("provider"), run.get("provider") or "—")
+    cached = (run.get("calls") or {}).get("cached", 0)
     lines.append(f"Прогон {STATUS.get(run.get('status'), run.get('status') or '—')}: {duration(run.get('duration_s'))}, "
-                 f"{calls} {plural(int(calls or 0), 'вызов', 'вызова', 'вызовов')} модели, {model}; "
+                 f"{calls} {plural(int(calls or 0), 'вызов', 'вызова', 'вызовов')} модели"
+                 + (f" (+{cached} из кэша)" if cached else "") + f", {model}; "
                  f"цитат сверено {s.get('quotes_verified', 0)} из {s.get('quotes_total', s.get('quotes_verified', 0))}")
     out = [p for p in (md_path, json_path) if p]
     if out:

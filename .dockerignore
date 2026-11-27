@@ -1,4 +1,8 @@
-.git
+# из .git в образ попадают только HEAD и ссылки — чтобы записать коммит в паспорт отчёта
+.git/*
+!.git/HEAD
+!.git/refs
+!.git/packed-refs
 .github
 .venv
 venv
@@ -13,7 +17,9 @@ reports
 *.egg-info
 build
 dist
+# из тестов в образ попадают только записанные ответы модели для --provider mock
 tests
+!tests/v2/fixtures/official
 evaluation
 docs
 presentation

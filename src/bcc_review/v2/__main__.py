@@ -45,6 +45,11 @@ def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--max-calls", type=int, default=16, help="бюджет вызовов модели на прогон (по умолчанию 16)")
     p.add_argument("--max-seconds", type=float, default=1500.0, help="бюджет времени прогона, с")
     p.add_argument("--timeout", type=float, default=600.0, help="таймаут одного вызова модели, с")
+    p.add_argument("--stage-timeout", type=float, default=480.0,
+                   help="лимит времени одного этапа, с (0 — без лимита); по умолчанию 480")
+    p.add_argument("--rpm", type=float, help="не больше стольких запросов к модели в минуту (Gemini по умолчанию 10; 0 — без паузы)")
+    p.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"],
+                   help="глубина рассуждений модели для claude_cli")
     p.add_argument("--no-cache", action="store_true", help="не брать ответы модели из кэша .bcc_cache/v2")
     p.add_argument("--cache-dir", help="каталог кэша ответов модели")
     p.add_argument("--runs-dir", default="runs", help="каталог артефактов прогонов (по умолчанию runs)")
@@ -64,6 +69,7 @@ def _opts(a: argparse.Namespace) -> dict:
         "provider": a.provider, "model": a.model,
         "fallback_models": [x.strip() for x in (a.fallback_models or "").split(",") if x.strip()],
         "max_calls": a.max_calls, "max_seconds": a.max_seconds, "timeout": a.timeout, "cache": not a.no_cache,
+        "stage_timeout": a.stage_timeout, "rpm": a.rpm, "effort": a.effort,
         "cache_dir": a.cache_dir, "runs_dir": a.runs_dir, "run_id": a.run_id, "mock_dir": a.mock_dir,
         "export": [x.strip().lower() for x in (a.export or "").split(",") if x.strip()], "html": not a.no_html,
         "passes": a.passes, "lenses": [x.strip() for x in a.lenses.split(",") if x.strip()],
@@ -104,7 +110,7 @@ def _print_summary(report: dict, written: dict) -> None:
 
 def _exit_code(report: dict, fail_on: str | None) -> int:
     status = report.get("run", {}).get("status")
-    if status == "failed":
+    if status == "failed" or report.get("run", {}).get("model_error"):
         return 3
     if fail_on == "partial" and status == "partial":
         return 3
@@ -134,6 +140,8 @@ def cmd_review(argv: list[str]) -> int:
     from . import pipeline
     report, written = pipeline.review(a.input, a.output, _opts(a), log=_log(a.quiet))
     _print_summary(report, written)
+    if (report.get("run") or {}).get("model_error"):
+        print("\nМодель не вызывалась, отчёт построен только правилами. " + report["run"]["model_error"], file=sys.stderr)
     return _exit_code(report, a.fail_on)
 
 

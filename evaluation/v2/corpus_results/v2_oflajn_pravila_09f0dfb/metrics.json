@@ -1,0 +1,1284 @@
+{
+  "schema_version": "bcc-eval-metrics/1",
+  "harness_version": "0.1.2",
+  "harness_sha256": "7b54d224c8115c5ec18c71ade817df4e53911ed53324c1e3f131c06bc0dc4660",
+  "policy_version": "bcc-eval-policy/1",
+  "policy": {
+    "type_match": "hierarchy",
+    "render_format": "md",
+    "mode": "rules_plus_llm",
+    "statuses": "все",
+    "anchor_rule": "непрерывный общий отрезок токенов ≥ 0.6 опоры или фрагмент ≥ 4 токенов (≥ 3 с числом или единицей) и ≥ 0.3 опоры, либо фрагмент ≥ 3 токенов, единственный в документе (нужен манифест); на краю отрезка не должны расходиться числа, отрицания и единицы",
+    "taxonomy": "/home/user/winnersOFbankCCbyMNU/evaluation/harness/taxonomy.toml"
+  },
+  "assumptions": [
+    "Эталон полностью описывает каждый размеченный кейс: дефект вне эталона считается FP до разбора.",
+    "Независимый кейс — case_id. Форматы одного case_id (MD, PDF, DOCX) не увеличивают число кейсов; основные метрики считаются по одному представлению на кейс (--render-format или primary_render манифеста).",
+    "Пустые знаменатели дают null: precision при TP+FP=0, recall при TP+FN=0, f1 при 2TP+FP+FN=0.",
+    "Дубли не входят в TP и FP основной precision; precision_strict считает их FP.",
+    "Одна находка закрывает не больше одного дефекта эталона (паросочетание один-к-одному).",
+    "Пограничные синонимы типов и частичное покрытие опор идут на разбор (pending) и до решения считаются FP.",
+    "Результат не зависит от порядка строк: при равной оценке выбор делается по pred_key и label_id; из разных строк run одного представления берётся худший статус."
+  ],
+  "counts": {
+    "gold_rows": 41,
+    "present_labels": 28,
+    "cases_labeled": 33,
+    "independent_cases": 33,
+    "families": 5,
+    "physical_renders_measured": 33,
+    "prediction_rows": 15,
+    "run_rows": 33,
+    "unresolved_predictions": 0,
+    "predictions_for_unlabeled_cases": 0,
+    "missing_measurements": 0
+  },
+  "micro": {
+    "tp": 12,
+    "fp": 3,
+    "fn": 16,
+    "duplicates": 0,
+    "precision": 0.8,
+    "recall": 0.42857142857142855,
+    "f1": 0.5581395348837209,
+    "precision_strict": 0.8,
+    "support": 28,
+    "predicted": 15,
+    "pending_adjudication": 2,
+    "new_real_defects": 0,
+    "clean_false_alarms": 0,
+    "control_hits": 0,
+    "fp_background": 0,
+    "tp_parent_level": 0,
+    "tp_adjudicated": 0
+  },
+  "per_issue_type": {
+    "boundary_conflict": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 5,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 5,
+      "predicted": 0
+    },
+    "event_conflict": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 5,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 5,
+      "predicted": 0
+    },
+    "missing_element": {
+      "tp": 5,
+      "fp": 1,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": 0.8333333333333334,
+      "recall": 0.8333333333333334,
+      "f1": 0.8333333333333334,
+      "precision_strict": 0.8333333333333334,
+      "support": 6,
+      "predicted": 6
+    },
+    "status_conflict": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 3,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6666666666666666,
+      "precision_strict": 1.0,
+      "support": 6,
+      "predicted": 3
+    },
+    "unit_mismatch": {
+      "tp": 4,
+      "fp": 2,
+      "fn": 2,
+      "duplicates": 0,
+      "precision": 0.6666666666666666,
+      "recall": 0.6666666666666666,
+      "f1": 0.6666666666666666,
+      "precision_strict": 0.6666666666666666,
+      "support": 6,
+      "predicted": 6
+    }
+  },
+  "per_family": {
+    "autopay": {
+      "cases": 8,
+      "tp": 4,
+      "fp": 1,
+      "fn": 3,
+      "duplicates": 0,
+      "precision": 0.8,
+      "recall": 0.5714285714285714,
+      "f1": 0.6666666666666666,
+      "precision_strict": 0.8,
+      "support": 7,
+      "predicted": 5,
+      "pending_adjudication": 0,
+      "new_real_defects": 0,
+      "clean_false_alarms": 0,
+      "control_hits": 0,
+      "fp_background": 0,
+      "tp_parent_level": 0,
+      "tp_adjudicated": 0
+    },
+    "cardblock": {
+      "cases": 8,
+      "tp": 2,
+      "fp": 0,
+      "fn": 5,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 0.2857142857142857,
+      "f1": 0.4444444444444444,
+      "precision_strict": 1.0,
+      "support": 7,
+      "predicted": 2,
+      "pending_adjudication": 0,
+      "new_real_defects": 0,
+      "clean_false_alarms": 0,
+      "control_hits": 0,
+      "fp_background": 0,
+      "tp_parent_level": 0,
+      "tp_adjudicated": 0
+    },
+    "cashback": {
+      "cases": 8,
+      "tp": 2,
+      "fp": 1,
+      "fn": 5,
+      "duplicates": 0,
+      "precision": 0.6666666666666666,
+      "recall": 0.2857142857142857,
+      "f1": 0.4,
+      "precision_strict": 0.6666666666666666,
+      "support": 7,
+      "predicted": 3,
+      "pending_adjudication": 1,
+      "new_real_defects": 0,
+      "clean_false_alarms": 0,
+      "control_hits": 0,
+      "fp_background": 0,
+      "tp_parent_level": 0,
+      "tp_adjudicated": 0
+    },
+    "edge": {
+      "cases": 1,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "pending_adjudication": 0,
+      "new_real_defects": 0,
+      "clean_false_alarms": 0,
+      "control_hits": 0,
+      "fp_background": 0,
+      "tp_parent_level": 0,
+      "tp_adjudicated": 0
+    },
+    "transfer_limit": {
+      "cases": 8,
+      "tp": 4,
+      "fp": 1,
+      "fn": 3,
+      "duplicates": 0,
+      "precision": 0.8,
+      "recall": 0.5714285714285714,
+      "f1": 0.6666666666666666,
+      "precision_strict": 0.8,
+      "support": 7,
+      "predicted": 5,
+      "pending_adjudication": 1,
+      "new_real_defects": 0,
+      "clean_false_alarms": 0,
+      "control_hits": 0,
+      "fp_background": 0,
+      "tp_parent_level": 0,
+      "tp_adjudicated": 0
+    }
+  },
+  "per_case": {
+    "autopay.base": {
+      "family": "autopay",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status": {
+      "family": "autopay",
+      "format": "md",
+      "clean": false,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 2,
+      "predicted": 2,
+      "new_real_defects": 0
+    },
+    "autopay.drop_promised.no_409_status": {
+      "family": "autopay",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "autopay.event_conflict.insufficient_funds_credit": {
+      "family": "autopay",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "autopay.paraphrase.nfr": {
+      "family": "autopay",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "autopay.range_boundary.trigger_at_threshold": {
+      "family": "autopay",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "autopay.two_statuses.range_422": {
+      "family": "autopay",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": 0.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "autopay.unit_change.limit_per_hour": {
+      "family": "autopay",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "cardblock.base": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6666666666666666,
+      "precision_strict": 1.0,
+      "support": 2,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "cardblock.drop_promised.no_last_digits": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cardblock.event_conflict.unblock_daily_limit": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cardblock.paraphrase.keep_authorizations": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cardblock.range_boundary.days_400_at_30": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cardblock.two_statuses.reblock_200": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cardblock.unit_change.blocked_at_utc": {
+      "family": "cardblock",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "cashback.base": {
+      "family": "cashback",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict": {
+      "family": "cashback",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 2,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 2,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cashback.drop_promised.no_read_method": {
+      "family": "cashback",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "cashback.event_conflict.category_effective_now": {
+      "family": "cashback",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cashback.paraphrase.rate": {
+      "family": "cashback",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cashback.range_boundary.cap_strict": {
+      "family": "cashback",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "cashback.two_statuses.bad_category_200": {
+      "family": "cashback",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "cashback.unit_change.accrued_in_tiyn": {
+      "family": "cashback",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": 0.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "edge.empty": {
+      "family": "edge",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "transfer_limit.base": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": false,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 2,
+      "predicted": 2,
+      "new_real_defects": 0
+    },
+    "transfer_limit.drop_promised.no_read_method": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "transfer_limit.event_conflict.cancel_no_restore": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "transfer_limit.paraphrase.new_limit": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": true,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "precision_strict": null,
+      "support": 0,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "transfer_limit.range_boundary.reaching_rejects": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": null,
+      "support": 1,
+      "predicted": 0,
+      "new_real_defects": 0
+    },
+    "transfer_limit.two_statuses.range_200_error": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": false,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "precision_strict": 1.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    },
+    "transfer_limit.unit_change.api_limit_in_tiyn": {
+      "family": "transfer_limit",
+      "format": "md",
+      "clean": false,
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "duplicates": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "precision_strict": 0.0,
+      "support": 1,
+      "predicted": 1,
+      "new_real_defects": 0
+    }
+  },
+  "clean_controls": {
+    "cases": 9,
+    "cases_with_alarms": 0,
+    "false_alarms": 0,
+    "per_case": {
+      "autopay.base": 0,
+      "autopay.paraphrase.nfr": 0,
+      "cardblock.base": 0,
+      "cardblock.paraphrase.keep_authorizations": 0,
+      "cashback.base": 0,
+      "cashback.paraphrase.rate": 0,
+      "edge.empty": 0,
+      "transfer_limit.base": 0,
+      "transfer_limit.paraphrase.new_limit": 0
+    },
+    "rule": "любая находка на кейсе с expected_outcome=clean — ложная тревога (FP)"
+  },
+  "edge_cases": {
+    "empty_input": [
+      {
+        "case_id": "edge.empty",
+        "findings": 0,
+        "run_status": "complete",
+        "empty_input_warning": null
+      }
+    ]
+  },
+  "severity_agreement": {
+    "pairs": 12,
+    "agree": 10,
+    "matrix": {
+      "critical->critical": 3,
+      "critical->major": 2,
+      "major->major": 7
+    }
+  },
+  "per_format": {
+    "md": {
+      "cases_measured": 33,
+      "cases_missing": 0,
+      "tp": 12,
+      "fp": 3,
+      "fn": 16,
+      "duplicates": 0,
+      "precision": 0.8,
+      "recall": 0.42857142857142855,
+      "f1": 0.5581395348837209,
+      "precision_strict": 0.8,
+      "support": 28,
+      "predicted": 15,
+      "pending_adjudication": 2,
+      "new_real_defects": 0,
+      "clean_false_alarms": 0,
+      "control_hits": 0,
+      "fp_background": 0,
+      "tp_parent_level": 0,
+      "tp_adjudicated": 0
+    }
+  },
+  "format_consistency": [],
+  "runs": {
+    "runs": 33,
+    "modes": [
+      "rules_plus_llm"
+    ],
+    "status": {
+      "complete": 33
+    },
+    "duration_s": {
+      "measured_runs": 33,
+      "total": 3.2,
+      "mean": 0.097,
+      "median": 0.1,
+      "max": 0.1
+    },
+    "physical_calls": {
+      "measured_runs": 33,
+      "total": 0
+    },
+    "tokens": {
+      "measured_runs": 33,
+      "input": 0,
+      "output": 0,
+      "note": null
+    },
+    "providers": [
+      "offline"
+    ],
+    "models": [],
+    "agent_versions": [
+      "2.0.0-dev"
+    ],
+    "manifest_sha256": [],
+    "cache": [
+      "None"
+    ],
+    "transport": [
+      "mode=rules_plus_llm, provider=offline, model=—"
+    ],
+    "implementations": {},
+    "violations": []
+  },
+  "missing_measurements": [],
+  "unmapped_kinds": {},
+  "true_positives": [
+    {
+      "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "label_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status#1",
+      "pred_key": "c90ae28274e1bea7",
+      "defect_id": "D-01",
+      "gold_type": "unit_mismatch",
+      "pred_type": "unit_mismatch",
+      "match_level": "exact",
+      "anchor_share": 0.75,
+      "covered_roles": [
+        "a",
+        "b"
+      ],
+      "gold_severity": "major",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "label_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status#2",
+      "pred_key": "1ea54d81a530cbd0",
+      "defect_id": "D-02",
+      "gold_type": "missing_element",
+      "pred_type": "missing_element",
+      "match_level": "exact",
+      "anchor_share": 1.0,
+      "covered_roles": [
+        "promise"
+      ],
+      "gold_severity": "critical",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "autopay.drop_promised.no_409_status",
+      "label_id": "autopay.drop_promised.no_409_status#1",
+      "pred_key": "7c4e3b7731b32303",
+      "defect_id": "D-01",
+      "gold_type": "missing_element",
+      "pred_type": "missing_element",
+      "match_level": "exact",
+      "anchor_share": 1.0,
+      "covered_roles": [
+        "promise"
+      ],
+      "gold_severity": "critical",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "autopay.unit_change.limit_per_hour",
+      "label_id": "autopay.unit_change.limit_per_hour#1",
+      "pred_key": "efeaf18d33b2af5d",
+      "defect_id": "D-01",
+      "gold_type": "unit_mismatch",
+      "pred_type": "unit_mismatch",
+      "match_level": "exact",
+      "anchor_share": 0.75,
+      "covered_roles": [
+        "a",
+        "b"
+      ],
+      "gold_severity": "major",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "label_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200#1",
+      "pred_key": "65989f841766635f",
+      "defect_id": "D-01",
+      "gold_type": "unit_mismatch",
+      "pred_type": "unit_mismatch",
+      "match_level": "exact",
+      "anchor_share": 0.512,
+      "covered_roles": [
+        "a",
+        "b"
+      ],
+      "gold_severity": "major",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "cardblock.unit_change.blocked_at_utc",
+      "label_id": "cardblock.unit_change.blocked_at_utc#1",
+      "pred_key": "4301787437fe9536",
+      "defect_id": "D-01",
+      "gold_type": "unit_mismatch",
+      "pred_type": "unit_mismatch",
+      "match_level": "exact",
+      "anchor_share": 0.512,
+      "covered_roles": [
+        "a",
+        "b"
+      ],
+      "gold_severity": "major",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "cashback.drop_promised.no_read_method",
+      "label_id": "cashback.drop_promised.no_read_method#1",
+      "pred_key": "da019fa2089dc684",
+      "defect_id": "D-01",
+      "gold_type": "missing_element",
+      "pred_type": "missing_element",
+      "match_level": "exact",
+      "anchor_share": 1.0,
+      "covered_roles": [
+        "promise",
+        "promise"
+      ],
+      "gold_severity": "critical",
+      "pred_severity": "critical"
+    },
+    {
+      "case_id": "cashback.two_statuses.bad_category_200",
+      "label_id": "cashback.two_statuses.bad_category_200#1",
+      "pred_key": "ed7916920ceaea5d",
+      "defect_id": "D-01",
+      "gold_type": "status_conflict",
+      "pred_type": "status_conflict",
+      "match_level": "exact",
+      "anchor_share": 1.0,
+      "covered_roles": [
+        "a",
+        "b"
+      ],
+      "gold_severity": "major",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "label_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method#1",
+      "pred_key": "51e031e242f82407",
+      "defect_id": "D-02",
+      "gold_type": "status_conflict",
+      "pred_type": "status_conflict",
+      "match_level": "exact",
+      "anchor_share": 1.0,
+      "covered_roles": [
+        "a",
+        "b"
+      ],
+      "gold_severity": "major",
+      "pred_severity": "major"
+    },
+    {
+      "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "label_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method#2",
+      "pred_key": "96e796003c5cfb2e",
+      "defect_id": "D-01",
+      "gold_type": "missing_element",
+      "pred_type": "missing_element",
+      "match_level": "exact",
+      "anchor_share": 0.611,
+      "covered_roles": [
+        "promise"
+      ],
+      "gold_severity": "critical",
+      "pred_severity": "critical"
+    },
+    {
+      "case_id": "transfer_limit.drop_promised.no_read_method",
+      "label_id": "transfer_limit.drop_promised.no_read_method#1",
+      "pred_key": "89ccaebb445c355f",
+      "defect_id": "D-01",
+      "gold_type": "missing_element",
+      "pred_type": "missing_element",
+      "match_level": "exact",
+      "anchor_share": 0.611,
+      "covered_roles": [
+        "promise"
+      ],
+      "gold_severity": "critical",
+      "pred_severity": "critical"
+    },
+    {
+      "case_id": "transfer_limit.two_statuses.range_200_error",
+      "label_id": "transfer_limit.two_statuses.range_200_error#1",
+      "pred_key": "2c0dbcbba30ced41",
+      "defect_id": "D-01",
+      "gold_type": "status_conflict",
+      "pred_type": "status_conflict",
+      "match_level": "exact",
+      "anchor_share": 1.0,
+      "covered_roles": [
+        "a",
+        "b"
+      ],
+      "gold_severity": "major",
+      "pred_severity": "major"
+    }
+  ],
+  "false_positives": [
+    {
+      "case_id": "autopay.two_statuses.range_422",
+      "pred_key": "88d049ec1a50182e",
+      "defect_id": "D-01",
+      "pred_type": "missing_element",
+      "kind": "missing_element",
+      "severity": "major",
+      "status": "confirmed",
+      "quotes": [
+        "Если порог или сумма вне диапазона, метод возвращает 422"
+      ],
+      "where": "/tmp/claude-0/corpus_offline/predictions.jsonl:10",
+      "reasons": [
+        "unexplained"
+      ],
+      "control_labels": [],
+      "near": [],
+      "background": false,
+      "pending": false,
+      "decision": null
+    },
+    {
+      "case_id": "cashback.unit_change.accrued_in_tiyn",
+      "pred_key": "4dc295faa3f05c60",
+      "defect_id": "D-01",
+      "pred_type": "unit_mismatch",
+      "kind": "unit_mismatch",
+      "severity": "major",
+      "status": "confirmed",
+      "quotes": [
+        "Кэшбэк текущего месяца в тиынах с двумя знаками после точки"
+      ],
+      "where": "/tmp/claude-0/corpus_offline/predictions.jsonl:33",
+      "reasons": [
+        "near_miss"
+      ],
+      "control_labels": [],
+      "near": [
+        {
+          "label_id": "cashback.unit_change.accrued_in_tiyn#1",
+          "reason": "partial_anchors:1/2",
+          "anchor_share": 0.5
+        }
+      ],
+      "background": false,
+      "pending": true,
+      "decision": null
+    },
+    {
+      "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "pred_key": "5b0c4d1a4322e011",
+      "defect_id": "D-01",
+      "pred_type": "unit_mismatch",
+      "kind": "unit_mismatch",
+      "severity": "major",
+      "status": "confirmed",
+      "quotes": [
+        "Лимит в тиынах",
+        "лимит в тенге"
+      ],
+      "where": "/tmp/claude-0/corpus_offline/predictions.jsonl:47",
+      "reasons": [
+        "near_miss"
+      ],
+      "control_labels": [],
+      "near": [
+        {
+          "label_id": "transfer_limit.unit_change.api_limit_in_tiyn#1",
+          "reason": "partial_anchors:1/2",
+          "anchor_share": 0.233
+        }
+      ],
+      "background": false,
+      "pending": true,
+      "decision": null
+    }
+  ],
+  "false_negatives": [
+    {
+      "case_id": "autopay.event_conflict.insufficient_funds_credit",
+      "label_id": "autopay.event_conflict.insufficient_funds_credit#1",
+      "gold_type": "event_conflict",
+      "gold_severity": "critical",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "autopay.range_boundary.trigger_at_threshold",
+      "label_id": "autopay.range_boundary.trigger_at_threshold#1",
+      "gold_type": "boundary_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "autopay.two_statuses.range_422",
+      "label_id": "autopay.two_statuses.range_422#1",
+      "gold_type": "status_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "label_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200#2",
+      "gold_type": "status_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cardblock.drop_promised.no_last_digits",
+      "label_id": "cardblock.drop_promised.no_last_digits#1",
+      "gold_type": "missing_element",
+      "gold_severity": "critical",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cardblock.event_conflict.unblock_daily_limit",
+      "label_id": "cardblock.event_conflict.unblock_daily_limit#1",
+      "gold_type": "event_conflict",
+      "gold_severity": "critical",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cardblock.range_boundary.days_400_at_30",
+      "label_id": "cardblock.range_boundary.days_400_at_30#1",
+      "gold_type": "boundary_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cardblock.two_statuses.reblock_200",
+      "label_id": "cardblock.two_statuses.reblock_200#1",
+      "gold_type": "status_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "label_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict#1",
+      "gold_type": "event_conflict",
+      "gold_severity": "critical",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "label_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict#2",
+      "gold_type": "boundary_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cashback.event_conflict.category_effective_now",
+      "label_id": "cashback.event_conflict.category_effective_now#1",
+      "gold_type": "event_conflict",
+      "gold_severity": "critical",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cashback.range_boundary.cap_strict",
+      "label_id": "cashback.range_boundary.cap_strict#1",
+      "gold_type": "boundary_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "cashback.unit_change.accrued_in_tiyn",
+      "label_id": "cashback.unit_change.accrued_in_tiyn#1",
+      "gold_type": "unit_mismatch",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": [
+        "4dc295faa3f05c60"
+      ]
+    },
+    {
+      "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+      "label_id": "transfer_limit.event_conflict.cancel_no_restore#1",
+      "gold_type": "event_conflict",
+      "gold_severity": "critical",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "transfer_limit.range_boundary.reaching_rejects",
+      "label_id": "transfer_limit.range_boundary.reaching_rejects#1",
+      "gold_type": "boundary_conflict",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": []
+    },
+    {
+      "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "label_id": "transfer_limit.unit_change.api_limit_in_tiyn#1",
+      "gold_type": "unit_mismatch",
+      "gold_severity": "major",
+      "claimed_by_group": [],
+      "near_misses": [
+        "5b0c4d1a4322e011"
+      ]
+    }
+  ],
+  "duplicates": [],
+  "new_real_defects": [],
+  "ignored_decisions": [],
+  "unresolved": [],
+  "unlabeled": [],
+  "warnings": [],
+  "inputs": {
+    "gold": {
+      "path": "/home/user/winnersOFbankCCbyMNU/evaluation/dev/corpus/labels.jsonl",
+      "sha256": "3acd3ae58726f2426f0bd4e8efb3b61c517070a94738c2a76e5e2c6cebdb52aa",
+      "bytes": 36973
+    },
+    "pred": {
+      "path": "/tmp/claude-0/corpus_offline/predictions.jsonl",
+      "sha256": "0e3ca2cd09d8e16b7c9b023f0a57bf88e97d3e4cf20ac170a6e2368188b7348e",
+      "bytes": 21957
+    },
+    "manifest": {
+      "path": "/home/user/winnersOFbankCCbyMNU/evaluation/dev/corpus/manifest.json",
+      "sha256": "7e6e8db6a8a4c7f4faa48522cf8ebf7b2f04ab410df0909f477714ab96c633f6",
+      "bytes": 46096
+    },
+    "adjudication": null,
+    "taxonomy": {
+      "path": "/home/user/winnersOFbankCCbyMNU/evaluation/harness/taxonomy.toml",
+      "sha256": "f3017275a0c0665c605be04c0feaa6bfe27595f8fe0196ea626274032d7a1001",
+      "bytes": 5432
+    }
+  }
+}

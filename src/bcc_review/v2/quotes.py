@@ -14,7 +14,8 @@
    пробел; пробелы схлопываются; ``**``, обратные кавычки, ведущие ``* ``, ``#``, ``|`` снимаются;
    ё → е; пробел внутри числа («1 000») не учитывается; сравнение без регистра;
 2. вхождение в строках ``line_hint`` ±2, иначе во всём документе — ближайшее к ``line_hint`` / ``near_lines``;
-3. цитата через соседние строки (склейка до 3 непустых строк);
+3. цитата через соседние строки (склейка до 3 непустых строк); затем то же без учёта пробелов — слово,
+   разорванное переносом в узкой ячейке таблицы PDF («integ er»);
 4. цитата с многоточием внутри — части ищутся по порядку в пределах 3 строк (``normalized``), ``text`` — сплошной
    отрезок документа от первой части до последней;
 5. нечёткое совпадение ≥ 0,92 (difflib) только в пределах ±5 строк от подсказки → ``fuzzy``;
@@ -140,6 +141,13 @@ class _Index:
             self.maps.append(mp)
         self.full = "".join(parts)
         self.by_no = {no: k for k, no in enumerate(self.nos)}
+
+    def compact(self) -> tuple[str, list[int]]:
+        """Текст без пробелов и карта позиций в self.full — для слов, разорванных в узкой ячейке PDF («integ er»)."""
+        if not hasattr(self, "_compact"):
+            keep = [i for i, ch in enumerate(self.full) if ch != " "]
+            self._compact = ("".join(self.full[i] for i in keep), keep)
+        return self._compact
 
     def slot(self, pos: int) -> int:
         """Индекс непустой строки, которой принадлежит позиция в self.full (разделитель — к предыдущей)."""
@@ -295,6 +303,23 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
         joined = " ".join(idx.line_of_slot(k).get("text", "") for k in range(idx.by_no[ls], idx.by_no[le] + 1))
         verified = "exact" if raw and (raw in joined or raw.strip("«»\"' ") in joined) else "normalized"
         return _match(idx, a, b, ls, le, verified, text)
+
+    # 3а: без учёта пробелов — слово, разорванное переносом в узкой ячейке таблицы PDF («integ er» = «integer»)
+    squeezed = needle.replace(" ", "")
+    if len(squeezed) >= 6:
+        ctext, cmap = idx.compact()
+        spans = []
+        start = 0
+        while True:
+            a = ctext.find(squeezed, start)
+            if a < 0:
+                break
+            spans.append((cmap[a], cmap[a + len(squeezed) - 1] + 1))
+            start = a + 1
+        best = _pick(idx, spans, hint, near)
+        if best:
+            _, a, b, ls, le = best
+            return _match(idx, a, b, ls, le, "normalized")
 
     # 4: многоточие внутри цитаты — части по порядку в пределах 3 строк
     parts = [p.strip(_EDGE + "…") for p in _ELLIPSIS.split(needle)]
@@ -477,6 +502,7 @@ def verify_candidates(view: dict, candidates: Iterable[dict], requirements: Iter
 
 def verify_requirements(view: dict, requirements: Iterable[dict]) -> dict:
     """Уточнить строки требований по их цитатам (выход segment): line_start/line_end/page, раздел — если пуст.
+    Диапазон, внутри которого лежит цитата, сохраняется целиком; исправляется только диапазон, не содержащий цитату.
 
     Возвращает ``{"requirements": [...], "missing": [ID…]}``; требования без найденной цитаты остаются как есть.
     """
@@ -490,8 +516,9 @@ def verify_requirements(view: dict, requirements: Iterable[dict]) -> dict:
             continue
         ls, le = m["line_start"], m["line_end"]
         old_s, old_e = _as_int(r.get("line_start")), _as_int(r.get("line_end"))
-        # цитата — часть требования: строки требования расширяем, но не сужаем без причины
-        if old_s and old_e and old_s <= ls and le <= old_e and old_e - old_s <= 6:
+        # цитата — часть требования: если она внутри диапазона требования, диапазон не сужаем (просьба №04:
+        # «Общие параметры» 103–114 не должны стать 103); диапазон меняется, только если цитата вне его
+        if old_s and old_e and old_s <= ls and le <= old_e:
             ls, le = old_s, old_e
         r["line_start"], r["line_end"], r["page"] = ls, le, m["page"]
         if not r.get("section"):

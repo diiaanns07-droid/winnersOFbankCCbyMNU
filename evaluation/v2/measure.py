@@ -53,7 +53,7 @@ def run_agent(inp: Path, out_dir: Path, cmd_tpl: str, provider: str, model: str,
     return rc, log, dt
 
 
-def find_run_dir(report_json: Path, log: str) -> Path | None:
+def find_run_dir(report_json: Path, log: str, bases: list[Path] | None = None) -> Path | None:
     """Каталог runs/<id> прогона: из отчёта (run.run_dir / run.id) или из лога агента."""
     try:
         rep = json.loads(report_json.read_text(encoding="utf-8"))
@@ -62,8 +62,9 @@ def find_run_dir(report_json: Path, log: str) -> Path | None:
             if run.get(k) and Path(run[k]).exists():
                 return Path(run[k])
         rid = run.get("run_id") or run.get("id")
-        if rid and (ROOT / "runs" / str(rid)).exists():
-            return ROOT / "runs" / str(rid)
+        for base in [*(bases or []), ROOT / "runs"]:
+            if rid and (base / str(rid)).exists():
+                return base / str(rid)
     except (OSError, json.JSONDecodeError):
         pass
     m = re.findall(r"(runs/[\w\-.:]+)", log or "")
@@ -122,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--arbiter", default="sonnet")
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--table", action="store_true", help="только пересобрать таблицу истории в RESULTS.md")
+    ap.add_argument("--no-cache", action="store_true", help="агент мимо кэша ответов модели (стабильность)")
+    ap.add_argument("--extra", default="", help="доп. аргументы агента, например «--runs-dir out/runs»")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     if a.table:
@@ -142,7 +145,8 @@ def main(argv: list[str] | None = None) -> int:
                 break
         run_dir = Path(a.run_dir) if a.run_dir else find_run_dir(src, "")
     else:
-        rc, log, dt = run_agent(Path(a.input), dest, a.cmd, a.provider, a.model, a.timeout)
+        cmd = a.cmd + (" --no-cache" if a.no_cache else "") + (f" {a.extra}" if a.extra else "")
+        rc, log, dt = run_agent(Path(a.input), dest, cmd, a.provider, a.model, a.timeout)
         print(f"агент: rc={rc}, {dt / 60:.1f} мин")
         if not (dest / "report.json").exists():
             js = sorted(dest.glob("*.json"))
@@ -152,7 +156,11 @@ def main(argv: list[str] | None = None) -> int:
             print(log[-3000:])
             print("report.json не найден — замер не записан")
             return 1
-        run_dir = Path(a.run_dir) if a.run_dir else find_run_dir(dest / "report.json", log)
+        m = re.search(r"--runs-dir\s+(\S+)", a.extra or "")
+        bases = [Path(m.group(1)) if Path(m.group(1)).is_absolute() else ROOT / m.group(1)] if m else []
+        run_dir = Path(a.run_dir) if a.run_dir else find_run_dir(dest / "report.json", log, bases)
+    for extra in ("report.html",):  # HTML большой и не нужен для оценки
+        (dest / extra).unlink(missing_ok=True)
     gold = sc.load_gold(sc.DEFAULT_GOLD)
     report = sc.as_report(json.loads((dest / "report.json").read_text(encoding="utf-8")), gold)
     md = dest / "report.md"
@@ -165,7 +173,11 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     if not a.no_history:
         with HISTORY.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(sc.history_row(res, a.label), ensure_ascii=False) + "\n")
+            row = sc.history_row(res, a.label)
+            row["dir"] = str(dest.relative_to(ROOT))
+            row["K_missed"] = [g for g in ("К1", "К2", "К3", "К4", "К5") if g not in res["recall"]["critical"]["found"]]
+            row["C_missed"] = [m["gold"] for m in res["misses"] if m.get("level") == "major"]
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
         update_results()
     print(f"сохранено: {dest.relative_to(ROOT)}")
     return 0

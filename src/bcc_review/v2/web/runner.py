@@ -8,6 +8,7 @@ pipeline. Для тестов и показа без модели есть `Fixt
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -21,23 +22,29 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-STAGES: list[tuple[str, str]] = [
+STAGES: list[tuple[str, str]] = [  # имена — как у файлов runs/<id>/stages/<этап>.json pipeline v2
     ("docview", "Чтение документа"),
-    ("rules", "Правила"),
     ("segment", "Нарезка требований"),
-    ("lens:analyst", "Аналитик"),
-    ("lens:qa", "Тестировщик"),
-    ("lens:architect", "Архитектор"),
-    ("lens:risk", "Риски"),
+    ("rules", "Правила"),
+    ("lens_analyst", "Аналитик"),
+    ("lens_qa", "Тестировщик"),
+    ("lens_architect", "Архитектор"),
+    ("lens_risk", "Риски"),
     ("consistency", "Набор целиком"),
+    ("quotes", "Сверка цитат кодом"),
     ("judge", "Судья"),
     ("clarify", "Вопросы владельцу"),
+    ("recheck", "Пересмотр по ответам"),
+    ("revise", "Исправленное ТЗ"),
     ("report", "Отчёт"),
 ]
-PARALLEL = {"lens:analyst", "lens:qa", "lens:architect", "lens:risk", "consistency"}
-STAGE_ALIASES = {"lens_analyst": "lens:analyst", "lens_qa": "lens:qa", "lens_architect": "lens:architect",
-                 "lens_risk": "lens:risk", "analyst": "lens:analyst", "qa": "lens:qa", "architect": "lens:architect",
-                 "risk": "lens:risk", "render": "report", "verdict": "report", "quotes": "judge"}
+PARALLEL = {"lens_analyst", "lens_qa", "lens_architect", "lens_risk", "consistency"}
+ANSWER_STAGES = {"recheck", "revise"}  # показываются только при --answers
+STAGE_ALIASES = {"lens:analyst": "lens_analyst", "lens:qa": "lens_qa", "lens:architect": "lens_architect",
+                 "lens:risk": "lens_risk", "analyst": "lens_analyst", "qa": "lens_qa", "architect": "lens_architect",
+                 "risk": "lens_risk", "render": "report", "verdict": "report", "answers": "recheck"}
+STATE_OF = {"ok": "done", "partial": "done", "failed": "failed", "skipped": "skipped"}
+_LOG_STAGE = re.compile(r"^\s+([a-z_:]+): (запуск|готово|СБОЙ|взят)")
 
 ALLOWED_EXT = {".pdf", ".docx", ".md", ".markdown", ".txt", ".html", ".htm"}
 MAX_UPLOAD = 20 * 1024 * 1024
@@ -49,6 +56,9 @@ FILES = [  # (ключ, имя файла в out/, подпись, mime)
     ("docx", "report.docx", "Word", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     ("pdf", "report.pdf", "PDF", "application/pdf"),
     ("csv", "report.jira.csv", "Jira CSV", "text/csv; charset=utf-8"),
+    ("docx_annotated", "report.annotated.docx", "Word с комментариями",
+     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("pdf_annotated", "report.annotated.pdf", "PDF с выделениями", "application/pdf"),
     ("revised", "report.revised.md", "Исправленное ТЗ", "text/markdown; charset=utf-8"),
 ]
 
@@ -104,8 +114,11 @@ def provider_status() -> list[dict[str, Any]]:
     return out
 
 
-def check_provider(pid: str) -> str:
+def check_provider(pid: str, model: str = "") -> str:
     """Пустая строка — можно запускать; иначе понятное сообщение для пользователя."""
+    if pid == "openai" and os.environ.get("OPENAI_BASE_URL") and not (model or os.environ.get("OPENAI_MODEL")):
+        return ("Свой сервер модели: не указана модель. Впишите её в поле «Вариант модели» (например qwen3:8b для "
+                "Ollama) или задайте OPENAI_MODEL в файле .env.")
     for p in provider_status():
         if p["id"] == pid:
             if p["ok"]:
@@ -137,6 +150,7 @@ class Job:
     files: dict[str, str] = field(default_factory=dict)
     log: list[str] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
+    notice: str = ""                    # предупреждение к готовому отчёту (модель недоступна, прогон неполный)
     parent: str = ""                    # задание, на вопросы которого отвечали
     answers_path: str = ""              # файл ответов владельца (--answers)
 
@@ -147,7 +161,8 @@ class Job:
         d["log"] = self.log[-40:]
         d["elapsed"] = round((self.finished or time.time()) - (self.started or self.created), 1)
         d["stage_list"] = [{"id": k, "label": lbl, "state": self.stages.get(k, "pending"),
-                            "parallel": k in PARALLEL} for k, lbl in STAGES]
+                            "parallel": k in PARALLEL} for k, lbl in STAGES
+                           if k not in ANSWER_STAGES or self.answers_path]
         return d
 
 
@@ -226,12 +241,19 @@ def _norm_stage(name: str) -> str | None:
 
 
 class PipelineRunner:
-    """Запускает `python -m bcc_review ВХОД out/report.md` и следит за каталогом прогона."""
+    """Запускает `python -m bcc_review ВХОД out/report.md` и следит за каталогом прогона.
 
-    def __init__(self, store: JobStore, *, extra_args: list[str] | None = None, timeout_s: float = 3600):
+    `cache_dir` — общий кэш ответов модели для всех проверок веба (повторная проверка того же файла — мгновенно).
+    `pace` — для съёмки демо: этапы показываются не быстрее одного раза в `pace` секунд (сам анализ не замедляется).
+    """
+
+    def __init__(self, store: JobStore, *, extra_args: list[str] | None = None, timeout_s: float = 3600,
+                 cache_dir: Path | None = None, pace: float = 0.0):
         self.store = store
         self.extra_args = list(extra_args or [])
         self.timeout_s = timeout_s
+        self.cache_dir = Path(cache_dir) if cache_dir else None
+        self.pace = float(pace or 0)
 
     def command(self, job: Job, out_md: Path, runs_dir: Path) -> list[str]:
         cmd = [sys.executable, "-m", "bcc_review", job.input_path, str(out_md), "--provider", job.provider]
@@ -239,7 +261,9 @@ class PipelineRunner:
             cmd += ["--model", job.model]
         if job.answers_path:
             cmd += ["--answers", job.answers_path, "--revise"]
-        cmd += ["--export", "html,json,docx,pdf,jira", "--runs-dir", str(runs_dir)]
+        cmd += ["--export", "jira,docx,pdf", "--runs-dir", str(runs_dir), "--run-id", job.id]
+        if self.cache_dir:
+            cmd += ["--cache-dir", str(self.cache_dir.resolve())]
         return cmd + self.extra_args
 
     def run(self, job: Job, progress: Callable[[Job], None]) -> None:
@@ -251,68 +275,121 @@ class PipelineRunner:
         cmd = self.command(job, out / "report.md", runs)
         env = dict(os.environ, PYTHONIOENCODING="utf-8", BCC_REVIEW_RUNS_DIR=str(runs))
         log_path = d / "run.log"
+        shadow = copy.deepcopy(job)  # истинное состояние этапов; на экран — через _reveal (темп)
+        self._last_reveal = 0.0
         with open(log_path, "w", encoding="utf-8") as logf:
             proc = subprocess.Popen(cmd, cwd=str(d), stdout=logf, stderr=subprocess.STDOUT, env=env, text=True)
             t0 = time.time()
             while proc.poll() is None:
-                time.sleep(0.7)
-                self._scan(job, runs, log_path)
+                time.sleep(0.5)
+                self._scan(shadow, runs, log_path)
+                self._reveal(job, shadow)
                 progress(job)
                 if time.time() - t0 > self.timeout_s:
                     proc.kill()
                     job.error = f"Анализ не уложился в {int(self.timeout_s // 60)} мин и был остановлен."
                     break
-        self._scan(job, runs, log_path)
+        self._scan(shadow, runs, log_path)
+        while self.pace and self._reveal(job, shadow):  # досмотреть этапы в темпе съёмки
+            progress(job)
+            time.sleep(0.2)
+        self._reveal(job, shadow, force=True)
         report_json = self._find_report_json(d)
         if report_json:
             self._collect(job, report_json, out)
-        if proc.returncode == 0 and "html" in job.files:
-            job.state = "done"
+        fatal = job.summary.get("fatal", False)
+        if "html" in job.files and not fatal:
+            job.state = "done"  # отчёт есть — показываем, даже если модель подвела (об этом — job.notice)
             for k in job.stages:
                 if job.stages[k] in ("pending", "running"):
-                    job.stages[k] = "done" if k == "report" else ("skipped" if job.stages[k] == "pending" else "done")
+                    job.stages[k] = "done" if (k == "report" or job.stages[k] == "running") else "skipped"
         else:
             job.state = "failed"
-            if not job.error:
-                tail = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-6:]
+            if fatal and job.notice:
+                job.error = job.notice + " Проверьте, что файл открывается и содержит текст, а не только скан страниц."
+            elif not job.error:
+                lines = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()
+                bangs = [x.strip(" !") for x in lines if x.strip().startswith("!")]
+                tail = bangs[:2] or lines[-4:]
                 job.error = "Анализ завершился с ошибкой. " + (" ".join(tail)[-600:] if tail else "")
         progress(job)
 
-    def _scan(self, job: Job, runs: Path, log_path: Path) -> None:
-        done = set()
-        for p in runs.glob("*/stages/*.json"):
-            st = _norm_stage(p.stem)
-            if st:
-                done.add(st)
-        for p in runs.glob("*/trace.jsonl"):
-            try:
-                for line in p.read_text(encoding="utf-8", errors="replace").splitlines()[-400:]:
-                    ev = json.loads(line)
-                    st = _norm_stage(str(ev.get("stage", "")))
-                    if not st:
-                        continue
-                    if ev.get("event") in ("stage_end", "end", "done") or ev.get("status") in ("ok", "partial"):
-                        done.add(st)
-                    elif job.stages.get(st) == "pending":
-                        job.stages[st] = "running"
-            except Exception:  # noqa: BLE001
+    def _reveal(self, job: Job, shadow: Job, *, force: bool = False) -> bool:
+        """Перенести состояние этапов с «истинного» на экран; с темпом — по одному шагу. True — ещё есть что показать."""
+        job.log, job.stage_times = shadow.log, dict(shadow.stage_times)
+        if not self.pace or force:
+            job.stages.update(shadow.stages)
+            return False
+        order = [k for k, _ in STAGES if k not in ANSWER_STAGES or job.answers_path]
+        final = ("done", "failed", "skipped")
+        for k in order:
+            if job.stages.get(k) in final:
                 continue
-        for st in done:
-            if job.stages.get(st) != "done":
-                job.stages[st] = "done"
-                job.stage_times[st] = round(time.time() - (job.started or time.time()), 1)
-        # следующий не начатый этап считаем идущим (линзы идут параллельно)
-        order = [k for k, _ in STAGES]
-        pending = [k for k in order if job.stages[k] == "pending"]
-        if pending and not any(v == "running" for v in job.stages.values()):
-            nxt = pending[0]
-            group = [k for k in pending if k in PARALLEL] if nxt in PARALLEL else [nxt]
-            for k in group:
-                job.stages[k] = "running"
+            group = [x for x in order if x in PARALLEL] if k in PARALLEL else [k]
+            if all(shadow.stages.get(g) in final for g in group):
+                if time.time() - self._last_reveal < self.pace:
+                    for g in group:  # пока ждём темпа — этап «идёт»
+                        if job.stages.get(g) == "pending":
+                            job.stages[g] = "running"
+                    return True
+                for g in group:
+                    job.stages[g] = shadow.stages[g]
+                self._last_reveal = time.time()
+                nxt = next((x for x in order if job.stages.get(x) == "pending"), None)
+                if nxt:
+                    for g in ([x for x in order if x in PARALLEL] if nxt in PARALLEL else [nxt]):
+                        job.stages[g] = "running"
+                return True
+            for g in group:
+                if shadow.stages.get(g) == "running" and job.stages.get(g) == "pending":
+                    job.stages[g] = "running"
+            return False
+        return False
+
+    def _scan(self, job: Job, runs: Path, log_path: Path) -> None:
+        now = round(time.time() - (job.started or time.time()), 1)
+        order = [k for k, _ in STAGES if k not in ANSWER_STAGES or job.answers_path]
+
+        def mark(st: str, state: str) -> None:
+            if st in job.stages and job.stages[st] != state and job.stages[st] not in ("failed",):
+                job.stages[st] = state
+                if state in ("done", "failed"):
+                    job.stage_times[st] = now
+
         try:
-            job.log = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+            log = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
-            pass
+            log = []
+        job.log = log[-40:]
+        if any(line.startswith("Документ:") for line in log) or any(runs.glob("*/stages/*.json")):
+            mark("docview", "done")
+        for line in log:  # «  lens_qa: запуск» → идёт
+            m = _LOG_STAGE.match(line)
+            st = _norm_stage(m.group(1)) if m else None
+            if st and m.group(2) == "запуск" and job.stages.get(st) == "pending":
+                mark(st, "running")
+        for p in runs.glob("*/stages/*.json"):  # файл этапа — этап завершён, статус внутри
+            st = _norm_stage(p.stem)
+            if not st:
+                continue
+            try:
+                rec = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001 — файл ещё пишется
+                continue
+            mark(st, STATE_OF.get(rec.get("status", "ok"), "done"))
+            if isinstance(rec.get("seconds"), (int, float)):  # длительность самого этапа, а не время от старта
+                job.stage_times[st] = round(float(rec["seconds"]), 1)
+        # этапы идут по порядку: всё до последнего завершённого последовательного этапа уже пройдено
+        last = max((i for i, k in enumerate(order) if job.stages.get(k) in ("done", "failed", "skipped")
+                    and k not in PARALLEL), default=-1)
+        for k in order[:last]:
+            if job.stages.get(k) in ("pending", "running"):
+                mark(k, "skipped" if job.stages[k] == "pending" else "done")
+        if not any(v == "running" for v in job.stages.values()):
+            nxt = next((k for k in order if job.stages.get(k) == "pending"), None)
+            if nxt:
+                for k in ([x for x in order if x in PARALLEL and job.stages[x] == "pending"] if nxt in PARALLEL else [nxt]):
+                    mark(k, "running")
 
     @staticmethod
     def _find_report_json(d: Path) -> Path | None:
@@ -346,6 +423,27 @@ class PipelineRunner:
             H.write(report, view, out / "report.html")
         job.files = {k: n for k, n, _, _ in FILES if (out / n).exists()}
         job.summary = _summary(report)
+        job.notice = _notice(report)
+
+
+def _notice(report: dict) -> str:
+    run = report.get("run") or {}
+    warns = [str(w) for w in run.get("warnings") or []]
+    if run.get("provider") == "offline" and run.get("status") != "failed":
+        return ("Проверка без модели: найдены только формальные дефекты по правилам (заглушки, единицы, коды ответов, "
+                "язык). Противоречия по смыслу ищет модель — выберите провайдера с ключом.")
+    if run.get("model_error"):
+        return f"Модель недоступна — отчёт построен только правилами. {run['model_error']}"
+    broken = next((w for w in warns if w.startswith("Прогон прерван")), "")
+    if broken:
+        return "Документ не удалось прочитать: " + broken.split(":", 1)[-1].strip()
+    if run.get("status") == "failed":
+        first = next((w for w in warns if w.startswith("Этап")), "")
+        return ("Модель не ответила — отчёт неполный, вердикт не вынесен. " + first).strip()
+    if run.get("status") == "partial":
+        bad = [k for k, v in (run.get("stages") or {}).items() if v in ("failed", "partial")]
+        return "Прогон неполный: не все этапы завершены" + (f" ({', '.join(bad)})" if bad else "") + " — вердикт не выше «с условиями»."
+    return ""
 
 
 def _summary(report: dict) -> dict[str, Any]:
@@ -356,7 +454,8 @@ def _summary(report: dict) -> dict[str, Any]:
             "minor": sum(1 for x in f if x.get("severity") == "minor"),
             "development": v.get("development", ""), "testing": v.get("testing", ""),
             "status": (report.get("run") or {}).get("status", ""),
-            "model": ", ".join((report.get("run") or {}).get("models_used") or [])}
+            "model": ", ".join((report.get("run") or {}).get("models_used") or []),
+            "fatal": not (report.get("document") or {}).get("lines") and (report.get("run") or {}).get("status") == "failed"}
 
 
 class FixtureRunner(PipelineRunner):
@@ -370,7 +469,7 @@ class FixtureRunner(PipelineRunner):
     def run(self, job: Job, progress: Callable[[Job], None]) -> None:
         out = self.store.dir(job.id) / "out"
         out.mkdir(exist_ok=True)
-        order = [k for k, _ in STAGES]
+        order = [k for k, _ in STAGES if k not in ANSWER_STAGES or job.answers_path]
         i = 0
         while i < len(order):
             k = order[i]

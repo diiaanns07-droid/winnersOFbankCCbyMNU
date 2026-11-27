@@ -222,3 +222,32 @@ def test_schema_rejected_retries_same_model_with_schema_as_text():
     assert '"required": ["answer"]' in s.last_messages[0]["content"]      # схема текстом в system
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
     assert s.modes.count(("gemini-3.8-flash", "text")) == 1               # режим запомнен, адаптер переиспользуется
+
+
+def test_stage_limit_never_lowers_gemini_output_limit():
+    p, s, _ = make({})
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=8000)
+    assert s.last_max_tokens == 32000
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=60000)
+    assert s.last_max_tokens == 60000
+
+
+def test_total_budget_is_call_timeout_plus_slack():
+    """LLMClient ограничивает таймаут остатком лимита этапа — повторы провайдера не должны растянуть этап втрое."""
+    now = [0.0]
+    script = Script({"gemini-3.8-flash": [err("timeout", 504)] * 10, "gemini-3.6-flash": [err("timeout", 504)] * 10})
+
+    class SlowAdapter:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def invoke(self, **kw):
+            now[0] += kw["timeout_s"]          # каждый запрос висит до своего таймаута
+            return self.inner.invoke(**kw)
+
+    p = GeminiProvider(api_key="k", env={}, adapter_factory=lambda m, t, **k: SlowAdapter(script.factory(m, t)),
+                       sleep=lambda s: now.__setitem__(0, now[0] + s), clock=lambda: now[0])
+    with pytest.raises(ProviderError) as e:
+        p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=200)
+    assert e.value.kind == "timeout"
+    assert now[0] <= 200 + 120 + 10

@@ -88,9 +88,26 @@ def test_ask_split_halves_truncated_batch():
         return {"items": items}
 
     llm = client([answer] * 10)
-    out = llm.ask_split("s", lambda it: ("sys", ",".join(it)), list("abcdef"), SCHEMA, merge_lists)
-    assert sorted(out["items"]) == list("abcdef")
-    assert llm.stats["split"] >= 2
+    out = llm.ask_split("s", lambda it: ("sys", ",".join(it)), list("abcd"), SCHEMA, merge_lists)
+    assert sorted(out["items"]) == list("abcd")
+    assert llm.stats["split"] == 1
+    # не больше одного деления на этап: половина, которая снова обрезана, — ошибка этапа, а не каскад
+    llm = client([answer] * 10)
+    with pytest.raises(Truncated):
+        llm.ask_split("s", lambda it: ("sys", ",".join(it)), list("abcdef"), SCHEMA, merge_lists)
+
+
+def test_stage_timeout_and_rpm():
+    t = [0.0]
+    llm = LLMClient(FakeProvider([{"items": []}] * 5), model="m", provider_name="fake", stage_timeout_s=100,
+                    rpm=30, sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+    llm.ask("s", "a", "1", SCHEMA)
+    llm.ask("s", "a", "2", SCHEMA)
+    assert t[0] == pytest.approx(2.0)  # 30 в минуту — пауза 2 с между запросами
+    t[0] += 200
+    with pytest.raises(BudgetExceeded):
+        llm.ask("s", "a", "3", SCHEMA)
+    assert llm.ask("other", "a", "4", SCHEMA) == {"items": []}
 
 
 def test_truncated_retries_with_bigger_limit_then_raises():
@@ -264,3 +281,31 @@ def test_cli_output_limit_error_is_treated_as_truncation():
     llm = client([err, {"items": ["ok"]}])
     assert llm.ask("s", "sys", "u", SCHEMA) == {"items": ["ok"]}
     assert llm.stats["expanded"] == 1
+
+
+def test_fatal_provider_error_stops_further_calls():
+    llm = client([ProviderError("auth", "ключ не принят"), {"items": ["never"]}])
+    with pytest.raises(LLMError):
+        llm.ask("a", "s", "u1", SCHEMA)
+    with pytest.raises(LLMError) as e:
+        llm.ask("b", "s", "u2", SCHEMA)
+    assert e.value.kind == "auth" and llm.stats["calls"] == 1
+
+
+def test_bad_provider_config_gives_rules_report_with_explanation(tmp_path, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    report, _, out = _run(tmp_path, provider="anthropic")
+    assert out.is_file()
+    assert report["run"].get("model_error") and report["run"]["warnings"][0] == report["run"]["model_error"]
+
+
+def test_acceptance_checks_linked_to_findings():
+    p = pipeline.Pipeline.__new__(pipeline.Pipeline)
+    p.warnings = []
+    extras = {"acceptance_checks": [{"row_requirement_id": "R-14"}, {"row_requirement_id": "R-15"}],
+              "pair_checks": [], "glossary": []}
+    kept = [{"id": "C-001", "acceptance_row": "R-14"}, {"id": "C-002"}]
+    findings = [{"id": "D-01", "candidate_ids": ["C-001", "C-002"]}]
+    p._link(extras, kept, findings)
+    assert extras["acceptance_checks"][0]["finding_ids"] == ["D-01"]
+    assert extras["acceptance_checks"][1]["finding_ids"] == []

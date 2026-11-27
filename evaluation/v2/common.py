@@ -216,7 +216,10 @@ LATIN_ALLOW = {
     "asia", "almaty", "content", "type", "true", "false", "null", "ok", "error", "nfr", "crud", "csv", "uuid",
     "idempotency", "key", "sequence", "diagram", "query", "body", "header", "mandatory", "string", "integer",
     "boolean", "int", "bit", "db", "sql", "cvv", "pan", "otp", "pin", "kyc", "aml", "p95", "p99",
+    "csrf", "xss", "cors", "origin", "usd", "eur", "rub", "kzt", "iban", "swift", "sms", "email", "mvp", "fifo",
+    "rpo", "rto", "dto", "dlq", "kafka", "redis", "postgresql", "ttl", "etag", "nfc", "qr", "ios", "android",
 }
+_CODE_ID = re.compile(r"[a-z]+[A-Z]\w*|\w*_\w+")  # camelCase и snake_case — имена полей и методов, не английский текст
 _LATIN_WORD = re.compile(r"(?<![A-Za-z0-9_$./-])[A-Za-z][A-Za-z]{2,}(?![A-Za-z0-9_])")
 
 
@@ -228,7 +231,7 @@ def latin_words(text: str, allowed: set[str]) -> list[str]:
     out = []
     for m in _LATIN_WORD.finditer(text or ""):
         w = m.group(0)
-        if w.lower() in LATIN_ALLOW or w.lower() in allowed:
+        if w.lower() in LATIN_ALLOW or w.lower() in allowed or _CODE_ID.fullmatch(w):
             continue
         out.append(w)
     return out
@@ -242,3 +245,20 @@ def doc_latin_vocab(lines: list[dict]) -> set[str]:
             for part in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])", w):
                 vocab.add(part.lower())
     return vocab
+
+
+# ─────────────────────── владельцы этапов ───────────────────────
+
+STAGE_OWNER = {"segment": "№04", "lens_analyst": "№05", "lens_qa": "№06", "lens_architect": "№07",
+               "lens_risk": "№08", "consistency": "№09", "judge": "№10", "clarify": "№11", "rules": "№12",
+               "quotes": "№03", "report": "№13", "provider": "№02", "pipeline": "№01"}
+
+
+def source_owner(src: str) -> str:
+    """Источник замечания (`lens:risk`, `consistency`, `rules:api.status_409`, …) → номер исполнителя."""
+    s = str(src or "")
+    if s.startswith("lens:"):
+        return STAGE_OWNER.get("lens_" + s.split(":", 1)[1], "?")
+    if s.startswith("rules"):
+        return "№12"
+    return STAGE_OWNER.get(s.split(":", 1)[0], "?")

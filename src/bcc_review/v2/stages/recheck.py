@@ -206,6 +206,13 @@ def _tokens(s: str) -> set[str]:
     return {w if len(w) <= 4 else w[:min(6, max(4, len(w) - 2))] for w in words}
 
 
+def _text_score(text: str, q: dict) -> float:
+    """Доля слов темы и вопроса, встречающихся в самом ответе."""
+    a = _tokens(text)
+    b = _tokens(f"{q.get('topic', '')} {q.get('question', '')}")
+    return len(a & b) / max(1, len(b)) if a and b else 0.0
+
+
 def _topic_score(hint: str, q: dict) -> float:
     """Доля слов подсказки в теме (вес 2) и в тексте вопроса (вес 1)."""
     h = _tokens(hint)
@@ -221,26 +228,41 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     by_id = {q["id"]: q for q in questions}
     answered: dict[str, dict] = {}
     extra: list[str] = list(parsed.get("decisions") or [])
-    for a in parsed.get("answers") or []:
-        q = by_id.get(a["id"])
+    entries = list(parsed.get("answers") or [])
+    # номера вопросов от прогона к прогону меняются: ответ с темой в скобках привязывается по теме.
+    # Сопоставление глобальное: сначала самые уверенные пары «ответ — вопрос», каждый вопрос — одному ответу.
+    bound: dict[int, dict | None] = {}
+    pairs = []
+    for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
-        if hint and questions:
-            # номера вопросов от прогона к прогону меняются: при подсказке темы решает тема
-            scored = sorted(((_topic_score(hint, x), x) for x in questions),
-                            key=lambda t: (-t[0], t[1]["id"] in answered, t[1]["id"] != a["id"]))
-            s_best, best = scored[0]
-            s_second = scored[1][0] if len(scored) > 1 else 0.0
-            s_num = _topic_score(hint, q) if q is not None else -1.0
-            if s_best >= 0.4 and (s_best > s_second or s_num == s_best):
-                if best is not q and s_num < s_best:
-                    warnings.append(f"recheck: ответ {a['id']} [{hint}] отнесён к {best['id']} по теме")
-                    q = best
+        if not hint:
+            continue
+        for x in questions:
+            sc = _topic_score(hint, x) + 0.25 * _text_score(a.get("text", ""), x) + (0.01 if x["id"] == a["id"] else 0)
+            pairs.append((sc, k, x["id"]))
+    taken: set[str] = set()
+    for sc, k, qid in sorted(pairs, key=lambda t: -t[0]):
+        if sc < 0.4 or k in bound or qid in taken:
+            continue
+        bound[k] = by_id[qid]
+        taken.add(qid)
+    for k, a in enumerate(entries):
+        hint = a.get("topic_hint") or ""
+        q = by_id.get(a["id"])
+        if hint:
+            if k in bound:
+                if q is None or bound[k]["id"] != q["id"]:
+                    warnings.append(f"recheck: ответ {a['id']} [{hint}] отнесён к {bound[k]['id']} по теме")
+                q = bound[k]
             elif a.get("choice") is None and a.get("text"):
                 q = None  # тема не совпала однозначно ни с одним вопросом — это общее решение
+            elif q is not None and q["id"] in taken:
+                q = None
         if q is None:
             if a.get("text"):
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
-                warnings.append(f"recheck: {a['id']} нет среди вопросов прогона — ответ учтён как общее решение")
+                why = "тема не совпала ни с одним вопросом прогона" if hint else "такого вопроса нет в прогоне"
+                warnings.append(f"recheck: {a['id']}: {why} — ответ учтён как общее решение")
             else:
                 warnings.append(f"recheck: {a['id']} нет среди вопросов прогона — ответ пропущен")
             continue
@@ -373,17 +395,21 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
         return _finish(ctx, result)
 
-    system, user = ctx.prompt(STAGE, answers=_format_answers(resolved), findings=_cl.format_findings(affected),
-                              others=_cl.format_findings(others, full=False) or "—")
     block = _format_answers(resolved)
-    if block[:200] not in user:  # шаблон не подставил переменные — вставляем блоки сами
-        extra = (f"<ответы>\n{block}\n</ответы>\n\n<затронутые_дефекты>\n{_cl.format_findings(affected)}\n"
-                 f"</затронутые_дефекты>\n\n<остальные_дефекты>\n{_cl.format_findings(others, full=False) or '—'}\n"
-                 f"</остальные_дефекты>")
-        idx = user.find("Задание: пересмотр")
-        user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+    others_block = _cl.format_findings(others, full=False) or "—"
+
+    def build(items: list) -> tuple[str, str]:
+        fb = _cl.format_findings(items)
+        system, user = ctx.prompt(STAGE, answers=block, findings=fb, others=others_block)
+        if block[:200] not in user:  # шаблон не подставил переменные — вставляем блоки сами
+            extra = (f"<ответы>\n{block}\n</ответы>\n\n<затронутые_дефекты>\n{fb}\n</затронутые_дефекты>\n\n"
+                     f"<остальные_дефекты>\n{others_block}\n</остальные_дефекты>")
+            idx = user.find("Задание: пересмотр")
+            user = (user[:idx] + extra + "\n\n" + user[idx:]) if idx >= 0 else (user + "\n\n" + extra)
+        return system, user
+
     try:
-        raw = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=12000) or {}
+        raw = _cl.ask_items(ctx, STAGE, affected, build, SCHEMA, max_output_tokens=32000)
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"recheck: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); дефекты оставлены открытыми")
         for g in out_findings:
@@ -511,10 +537,17 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
                         "question_ids": r["question_ids"], "title_after": r.get("title_after", "")})
     order = {"resolved": 0, "changed": 1, "open": 2}
     changes.sort(key=lambda c: (order.get(c["status"], 3), SEVERITIES.index(c["severity_before"] or "minor")))
+    # вопрос без прямого ответа, все дефекты которого сняты общими решениями, — не «без ответа»
+    status_by_id = {c["finding_id"]: c["status"] for c in changes}
+    q_by_id = {q.get("id"): q for q in report.get("questions") or []}
+    closed = [qid for qid in rc["answers"]["unanswered"]
+              if rc["answers"]["decisions"] and q_by_id.get(qid, {}).get("finding_ids")
+              and all(status_by_id.get(fid) == "resolved" for fid in q_by_id[qid]["finding_ids"])]
     clar = {
         "answers": rc["answers"]["answered"],
         "decisions": rc["answers"]["decisions"],
-        "unanswered": rc["answers"]["unanswered"],
+        "unanswered": [q for q in rc["answers"]["unanswered"] if q not in closed],
+        "closed_by_decisions": closed,
         "changes": changes,
         "new_findings": [f["id"] for f in new_found],
         "before": {"verdict": v_before, "findings": severity_counts(findings)},
@@ -542,6 +575,7 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
     b, a = clar["before"], clar["after"]
     lines = ["## Уточнение: до и после ответов владельца", "",
              f"Ответов на вопросы: {len(clar['answers'])}, общих решений: {len(clar['decisions'])}, "
+             f"закрыто общими решениями: {len(clar.get('closed_by_decisions') or [])}, "
              f"без ответа: {len(clar['unanswered'])}. Оценка «после» предполагает, что ответы внесены в документ "
              f"(см. исправленную редакцию).", "",
              "| Показатель | До уточнения | После уточнения |", "| :--- | :--- | :--- |",

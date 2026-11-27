@@ -93,6 +93,8 @@ STAGE_LABEL = {
     "lens:risk": "Линза «Риски»", "consistency": "Набор целиком", "quotes": "Сверка цитат", "judge": "Судья",
     "clarify": "Вопросы", "revise": "Исправленное ТЗ", "recheck": "Перепроверка", "report": "Отчёт",
     "analyst": "Линза «Аналитик»", "qa": "Линза «Тестировщик»", "architect": "Линза «Архитектор»", "risk": "Линза «Риски»",
+    "lens_analyst": "Линза «Аналитик»", "lens_qa": "Линза «Тестировщик»", "lens_architect": "Линза «Архитектор»",
+    "lens_risk": "Линза «Риски»", "answers": "Ответы владельца", "offline": "Без модели",
 }
 STAGE_STATE = {"ok": "готово", "partial": "частично", "failed": "ошибка", "skipped": "пропущен"}
 
@@ -251,6 +253,26 @@ def locate_quote(view: dict, quote: str, line_hint: int | None = None) -> dict |
 
 def e(v: Any) -> str:
     return escape("" if v is None else str(v), quote=True)
+
+
+_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,7})\s+)?\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+_SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
+_SEV_RU = {"critical": "критичный", "major": "существенный", "minor": "незначительный"}
+
+
+def _lref(m: re.Match) -> str:
+    try:  # падежи «по строке», «из строки» — как в Markdown-отчёте №13
+        from bcc_review.v2.render.markdown import _lref as md_lref
+        return md_lref(m)
+    except Exception:  # noqa: BLE001
+        word = f"строки {m.group(2)}–{m.group(3)}" if m.group(3) else f"строка {m.group(2)}"
+        return f"{m.group(1)} {word}" if m.group(1) else word
+
+
+def tx(v: Any) -> str:
+    """Текст модели для показа: «L038» → «строка 38», critical → критичный, затем экранирование."""
+    s = "" if v is None else str(v)
+    return e(_SEV_WORD.sub(lambda m: _SEV_RU[m.group(1)], _LREF.sub(_lref, s)))
 
 
 def _fmt_int(n: Any) -> str:
@@ -434,7 +456,7 @@ def _hero(report: dict, findings: list[dict], by_id: dict) -> str:
     </div>
   </div>
   <div class="hero-text">
-    <p class="vsummary">{e(verdict.get("summary", ""))}</p>
+    <p class="vsummary">{tx(verdict.get("summary", ""))}</p>
     <p class="runmeta">{" · ".join(meta)}</p>
   </div>
   {fix_html}
@@ -499,7 +521,7 @@ def _doc_pane(view: dict | None, findings: list[dict], report: dict) -> str:
             prev_page = page
         text = ln.get("text", "")
         cls = ["ln"]
-        heading = ln.get("heading")
+        heading = ln.get("heading") or (ln.get("level") or 1 if ln.get("kind") == "heading" else 0)
         if not heading and text.strip() and ln.get("section"):
             last = str(ln["section"]).split("›")[-1].strip()
             heading = 1 if last and text.strip() == last else 0
@@ -521,8 +543,12 @@ def _doc_pane(view: dict | None, findings: list[dict], report: dict) -> str:
             attrs += f' data-ex="{e(excl[n])}"'
         body = _marked(text, spans.get(n, []), rank_name)
         tags = "".join(f'<span class="rtag">{e(r)}</span>' for r in req_start.get(n, []))
+        order = sorted(fids, key=lambda x: -SEV_RANK[fsev[x]])  # сначала самые серьёзные
         marks = "".join(f'<a class="fm sev-{fsev[fid]}" href="#{e(fid)}" data-goto="{e(fid)}">{e(fid)}</a>'
-                        for fid in fids)
+                        for fid in order)
+        if len(order) > 3:
+            marks += f'<span class="fmore" title="{e(" ".join(order[3:]))}">+{len(order) - 3}</span>'
+
         out.append(f'<div class="{" ".join(cls)}"{attrs}><span class="no">{n}</span>'
                    f'<span class="tx">{tags}{body or "&#8203;"}</span>'
                    + (f'<span class="fms">{marks}</span>' if marks else "") + "</div>")
@@ -582,7 +608,7 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
             continue
         copy = ('<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button>'
                 if key == "rewrite" else "")
-        details.append(f'<div class="dl {extra}"><div class="dt">{label}{copy}</div><div class="dd">{e(val)}</div></div>')
+        details.append(f'<div class="dl {extra}"><div class="dt">{label}{copy}</div><div class="dd">{e(val) if key == "rewrite" else tx(val)}</div></div>')
     more = ""
     if details:
         open_attr = " open" if sev == "critical" else ""
@@ -619,7 +645,7 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
   <h3 class="ct">{e(f.get("title", ""))}</h3>
   <div class="meta">{"".join(meta)}</div>
   <ul class="evs">{"".join(ev_items)}</ul>
-  <p class="problem">{e(f.get("problem", ""))}</p>
+  <p class="problem">{tx(f.get("problem", ""))}</p>
   {more}
   <footer class="cf">{"".join(foot)}</footer>
 </article>"""
@@ -721,7 +747,7 @@ def _questions(report: dict, by_id: dict) -> str:
   {_ev_list(q.get("evidence") or [])}
   {f'<ol class="opts">{opts}</ol>' if opts else ''}
   <label class="own">Свой ответ<textarea rows="2" data-own="{e(qid)}" placeholder="Если ни один вариант не подходит"></textarea></label>
-  {f'<p class="why"><b>Зачем:</b> {e(q.get("why"))}</p>' if q.get("why") else ''}
+  {f'<p class="why"><b>Зачем:</b> {tx(q.get("why"))}</p>' if q.get("why") else ''}
 </article>""")
     return (f'<div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент '
             f'перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p>'
@@ -762,7 +788,7 @@ def _clarification(report: dict, by_id: dict) -> str:
             sb, sa = x.get("severity_before", ""), x.get("severity_after", "")
             crow.append([_finding_link(x.get("finding_id", ""), by_id) + " " + e(x.get("title_after") or x.get("title", "")),
                          e(SEV_LABEL.get(sb, sb).lower()), f'<span class="ans {cls}">{e(lbl)}</span>',
-                         e(SEV_LABEL.get(sa, sa).lower()) if sa else "—", e(x.get("reason", "")),
+                         e(SEV_LABEL.get(sa, sa).lower()) if sa else "—", tx(x.get("reason", "")),
                          ", ".join(e(q) for q in x.get("question_ids") or [])])
         out.append('<h3 class="sub">Что изменилось по замечаниям</h3>'
                    + _table(["Замечание", "Было", "Статус", "Стало", "Почему", "Ответ"], crow))
@@ -799,7 +825,7 @@ def _tests(report: dict, reqs_by_id: dict) -> str:
         rows.append([f'<span class="fid">{e(t.get("id", ""))}</span>',
                      " ".join(_req_link(r, reqs_by_id) for r in t.get("requirement_ids") or []),
                      f'<b>{e(t.get("title", ""))}</b>', e(t.get("given", "")), e(t.get("when", "")), then,
-                     e(t.get("gap", ""))])
+                     tx(t.get("gap", ""))])
     return ('<p class="lead">Черновик для раздела «Тестирование требований»: проверки, которых не хватает в '
             'критериях приёмки. Где ожидаемый результат нельзя вывести из текста, это отмечено.</p>'
             + _table(["ID", "Требования", "Проверка", "Дано", "Когда", "Тогда", "Чего нет в приёмке"], rows, "tc"))
@@ -813,7 +839,7 @@ def _checklist(report: dict, by_id: dict) -> str:
     for c in items:
         ans = str(c.get("answer", ""))
         cls = ANSWER_CLASS.get(ans.strip().lower(), "na")
-        rows.append([e(c.get("item", "")), f'<span class="ans a-{cls}">{e(ans)}</span>', e(c.get("comment", "")),
+        rows.append([e(c.get("item", "")), f'<span class="ans a-{cls}">{e(ans)}</span>', tx(c.get("comment", "")),
                      " ".join(_finding_link(fid, by_id) for fid in c.get("finding_ids") or [])])
     return ('<p class="lead">Чек-лист «Ревью требований» банка, заполненный по результатам проверки.</p>'
             + _table(["Проверка", "Ответ", "Комментарий", "Замечания"], rows, "cl"))
@@ -827,8 +853,11 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
     if acc:
         rows = [[_req_link(a.get("row_requirement_id", ""), reqs_by_id), e(a.get("row_facts", "")),
                  " ".join(_req_link(r, reqs_by_id) for r in a.get("rule_requirement_ids") or []),
-                 e(a.get("expected_by_rules", "")), e(a.get("stated", "")),
-                 f'<span class="ans {verdict_cls.get(a.get("verdict"), "a-na")}">{e(verdict_lbl.get(a.get("verdict"), a.get("verdict", "")))}</span>']
+                 e(a.get("expected_by_rules", "")) + (f'<div class="deriv">{tx(a["derivation"])}</div>' if a.get("derivation") else ""),
+                 e(a.get("stated", "")),
+                 f'<span class="ans {verdict_cls.get(a.get("verdict"), "a-na")}">{e(verdict_lbl.get(a.get("verdict"), a.get("verdict", "")))}</span>'
+                 + (f'<div class="deriv">{tx(a.get("explanation") or a.get("fix"))}</div>'
+                    if a.get("verdict") == "conflict" and (a.get("explanation") or a.get("fix")) else "")]
                 for a in acc]
         parts.append('<h3 class="sub">Исполнение критериев приёмки</h3><p class="lead">Ожидаемый результат выведен '
                      'из правил документа и сравнён с тем, что записано в критерии.</p>'
@@ -836,7 +865,7 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
     pairs = report.get("pair_checks") or []
     if pairs:
         rows = [[f'{_req_link(p.get("a", ""), reqs_by_id)} ↔ {_req_link(p.get("b", ""), reqs_by_id)}',
-                 e(p.get("subject", "")), e(p.get("scenario", "")), e(p.get("outcome_a", "")), e(p.get("outcome_b", "")),
+                 e(p.get("subject", "")), tx(p.get("scenario", "")), tx(p.get("outcome_a", "")), tx(p.get("outcome_b", "")),
                  f'<span class="ans {verdict_cls.get(p.get("verdict"), "a-na")}">{e(verdict_lbl.get(p.get("verdict"), p.get("verdict", "")))}</span>']
                 for p in pairs]
         parts.append('<h3 class="sub">Попарная сверка требований</h3>'
@@ -846,13 +875,13 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
         rows = [[_req_link(t.get("requirement_id", ""), reqs_by_id),
                  " ".join(_req_link(r, reqs_by_id) for r in t.get("verified_by") or []) or '<span class="muted">нет</span>',
                  " ".join(_req_link(r, reqs_by_id) for r in t.get("implemented_by") or []) or '<span class="muted">—</span>',
-                 e(t.get("note", ""))] for t in trace]
+                 tx(t.get("note", ""))] for t in trace]
         parts.append('<h3 class="sub">Трассировка</h3>' + _table(["Требование", "Проверяется", "Реализуется", "Примечание"], rows))
     gl = report.get("glossary") or []
     if gl:
         rows = [[f'<b>{e(g.get("concept", ""))}</b>',
                  ", ".join(f'{e(t.get("term", ""))} <a class="lnref" href="#L{e(t.get("line"))}" data-line="{e(t.get("line"))}">строка {e(t.get("line"))}</a>'
-                           for t in g.get("terms") or []), e(g.get("problem", ""))] for g in gl]
+                           for t in g.get("terms") or []), tx(g.get("problem", ""))] for g in gl]
         parts.append('<h3 class="sub">Глоссарий: один смысл — разные слова</h3>' + _table(["Понятие", "Термины в документе", "Проблема"], rows))
     return "".join(parts) or '<p class="none">Дополнительных проверок в отчёте нет.</p>'
 
@@ -897,7 +926,7 @@ def _rejected(report: dict, by_id: dict | None = None) -> str:
         lines = ", ".join(_lines_label(x) for x in ev if isinstance(x, dict))
         rows.append([f'<span class="fid">{e(r.get("candidate_id") or r.get("id", ""))}</span>', e(r.get("title", "")),
                      e(_source_label(r.get("source", ""))) if r.get("source") else "", e(lines),
-                     e(r.get("reason", "")) + (f' <span class="muted">→</span> {_finding_link(r["duplicate_of"], by_id or {})}'
+                     tx(r.get("reason", "")) + (f' <span class="muted">→</span> {_finding_link(r["duplicate_of"], by_id or {})}'
                                               if r.get("duplicate_of") else "")])
     return ('<p class="lead">Кандидаты, которые линзы предложили, а судья не включил в отчёт, — с причиной. '
             'Так видно, что точность важнее количества.</p>'
@@ -930,14 +959,26 @@ def _passport(report: dict) -> str:
         ("SHA-256 документа", f'<code class="hash">{e(doc.get("sha256", "—"))}</code>'),
         ("Схема отчёта", e(report.get("schema", "—"))),
     ]
+    qs = report.get("quote_stats") or {}
+    if qs.get("quotes"):
+        how = ", ".join(f"{lbl} {qs[k]}" for k, lbl in (("exact", "дословно"), ("normalized", "после нормализации"),
+                                                          ("fuzzy", "нечётко"), ("missing", "не найдено")) if qs.get(k))
+        rows.insert(10, ("Сверка цитат кодом", f'{_fmt_int(qs.get("verified", 0))} из {_fmt_int(qs["quotes"])} цитат '
+                                               f'всех кандидатов найдены в документе <span class="muted">({e(how)})</span>'))
+    if qs.get("candidates_in") is not None:
+        rows.insert(11, ("Кандидаты", f'{_fmt_int(qs.get("candidates_in", 0))} от ревьюеров → {_fmt_int(qs.get("candidates_kept", 0))} '
+                                      f'с найденными цитатами → судье; отклонено {_fmt_int(qs.get("candidates_rejected", 0))}'))
     kv = "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in rows)
     stages = dict(run.get("stages") or {})
     stats = run.get("stage_stats") or {}
     for k in stats:
         if k not in stages and f"lens:{k}" not in stages:
             stages[k] = "ok"
+    canon = ["docview", "segment", "rules", "lens_analyst", "lens:analyst", "analyst", "lens_qa", "lens:qa", "qa",
+             "lens_architect", "lens:architect", "architect", "lens_risk", "lens:risk", "risk", "consistency", "quotes",
+             "judge", "clarify", "answers", "recheck", "revise", "report"]
     items = []
-    for k, v in stages.items():
+    for k, v in sorted(stages.items(), key=lambda kv: canon.index(kv[0]) if kv[0] in canon else 99):
         ss = stats.get(k) or stats.get(k.split(":", 1)[-1]) or {}
         bits = []
         if isinstance(ss, dict):
@@ -945,13 +986,13 @@ def _passport(report: dict) -> str:
                 bits.append(_fmt_duration(ss["seconds"]) if ss["seconds"] >= 1 else "< 1 с")
             if ss.get("calls"):
                 bits.append(f'{ss["calls"]} {_plural(int(ss["calls"]), "вызов", "вызова", "вызовов")}')
-            if ss.get("candidates") is not None:
+            if ss.get("candidates"):
                 bits.append(f'{ss["candidates"]} канд.')
         extra = f'<small>{e(" · ".join(bits))}</small>' if bits else ""
         items.append(f'<li class="st st-{e(v)}"><span>{e(STAGE_LABEL.get(k, k))}{extra}</span><b>{e(STAGE_STATE.get(v, v))}</b></li>')
     st = "".join(items)
     warns = run.get("warnings") or []
-    wl = "".join(f"<li>{e(w)}</li>" for w in warns)
+    wl = "".join(f"<li>{tx(w)}</li>" for w in warns)
     return (f'<div class="pgrid"><div class="tw"><table class="kv">{kv}</table></div><div>'
             + (f'<h3 class="sub">Этапы</h3><ul class="stages">{st}</ul>' if st else "")
             + (f'<h3 class="sub">Предупреждения</h3><ul class="warns">{wl}</ul>' if wl else "")

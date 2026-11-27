@@ -226,6 +226,7 @@ def test_kind_and_level_fields(md, pdf):
     assert dv.line(md, 64)["kind"] == "table_row" and dv.line(md, 61)["kind"] == "table_header"
     assert dv.line(md, 167)["kind"] == "code" and dv.line(md, 2)["kind"] == ""
     assert dv.line(pdf, 23)["kind"] == "heading" and dv.line(pdf, 25)["kind"] == "list_item"
+    assert dv.line(md, 8)["heading"] is True and dv.line(md, 38)["heading"] is False and dv.line(pdf, 23)["heading"]
 
 
 def test_batch_quote_is_document_text(md):
@@ -237,3 +238,25 @@ def test_batch_quote_is_document_text(md):
     for e in res["candidates"][0]["evidence"]:
         line_text = " ".join(dv.line(md, n)["text"] for n in range(e["line_start"], e["line_end"] + 1))
         assert e["quote"] in line_text, e
+
+
+def test_verify_requirements_keeps_long_range(md):
+    """Длинное требование (таблица «Общие параметры», 103–114) не сужается до строки цитаты (просьба №04)."""
+    reqs = [{"id": "R-16", "quote": "Сохранение порога. Функциональные требования: чтение порога",
+             "line_start": 103, "line_end": 114},
+            {"id": "R-17", "quote": "Проверить пользовательскую сессию", "line_start": 10, "line_end": 12}]
+    res = Q.verify_requirements(md, reqs)
+    assert res["missing"] == []
+    assert (reqs[0]["line_start"], reqs[0]["line_end"]) == (103, 114)
+    assert (reqs[1]["line_start"], reqs[1]["line_end"]) == (117, 117)   # цитата вне диапазона — диапазон исправлен
+
+
+def test_no_pymupdf_layout_advice_in_stdout():
+    import os
+    import subprocess
+    import sys
+    code = ("from bcc_review.v2 import docview as d; v = d.load(%r); print('строк', len(v['lines']))" % str(OFFICIAL_PDF))
+    env = {k: v for k, v in os.environ.items() if k != "PYMUPDF_SUGGEST_LAYOUT_ANALYZER"}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=120)
+    assert out.returncode == 0, out.stderr
+    assert "pymupdf_layout" not in out.stdout and out.stdout.strip() == "строк 128"

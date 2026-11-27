@@ -2,18 +2,23 @@
 
     python scripts/reports_table.py reports            # печать таблицы
     python scripts/reports_table.py reports --write    # вписать таблицу в reports/README.md между маркерами
+    python scripts/reports_table.py reports --src cashback=evaluation/dev/.../source.md   # исходник не из release/input
 
 Для каждого отчёта заново запускается `python -m bcc_review verify ОТЧЁТ.json ИСХОДНИК`: исходник берётся из
-паспорта (document.file) и ищется в release/input/, рядом с отчётом и по пути из паспорта.
+паспорта (document.file) и ищется в release/input/, рядом с отчётом и по пути из паспорта. Отчёты по документу
+кейса (`release/input/requirements.md` или его PDF, сверка по SHA-256) дополнительно сверяются с эталоном К1–К5,
+С1–С20: `python -m evaluation.v2.score` в строгом счёте без арбитра — детерминированно и без модели.
 Сами отчёты скрипт не меняет.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +37,11 @@ def _get(d: dict, *path, default=None):
     return d
 
 
-def _find_source(report: Path, data: dict) -> Path | None:
+def _find_source(report: Path, data: dict, overrides: dict[str, str] | None = None) -> Path | None:
+    stem = report.name[: -len(".json")]
+    for key in (stem, stem.split(".", 1)[0]):
+        if overrides and key in overrides:
+            return Path(overrides[key])
     name = _get(data, "document", "file", default="") or ""
     candidates = [Path(name), ROOT / name, ROOT / "release" / "input" / Path(name).name, report.parent / Path(name).name]
     for c in candidates:
@@ -49,15 +58,44 @@ def _verify(report: Path, source: Path | None) -> str:
     return "OK" if r.returncode == 0 else f"ошибка (код {r.returncode})"
 
 
+def _official_hashes() -> set[str]:
+    out = set()
+    for name in ("requirements.md", "requirements.pdf", "requirements.docx"):
+        path = ROOT / "release" / "input" / name
+        if path.is_file():
+            out.add(hashlib.sha256(path.read_bytes()).hexdigest())
+    return out
+
+
+def _score(report: Path, data: dict) -> str:
+    """К и С по эталону официального документа (строгий счёт без арбитра); для других документов — «—»."""
+    if _get(data, "document", "sha256", default="") not in _official_hashes():
+        return "—"
+    if not (ROOT / "evaluation" / "v2" / "score.py").is_file():
+        return "—"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "score.json"
+        r = subprocess.run([sys.executable, "-m", "evaluation.v2.score", str(report.resolve()), "--out", str(out)],
+                           cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        if r.returncode != 0 or not out.is_file():
+            return "—"
+        gates = {g.get("metric"): g.get("value") for g in json.loads(out.read_text(encoding="utf-8")).get("gates", [])}
+    k, kc, s, fp = (gates.get(m) for m in ("К1–К5 найдены", "из них критичными", "С1–С20 найдены", "критичных ложных"))
+    if k is None or s is None:
+        return "—"
+    kc = str(kc).split("/", 1)[0] if kc is not None else "?"
+    return f"К {k} (крит. {kc}) · С {s} · ложных крит. {fp if fp is not None else '?'}"
+
+
 def _minutes(seconds) -> str:
     try:
         s = float(seconds)
     except (TypeError, ValueError):
         return "—"
-    return f"{s / 60:.1f} мин" if s >= 60 else f"{s:.0f} с"
+    return (f"{s / 60:.1f} мин" if s >= 60 else f"{s:.0f} с").replace(".", ",")
 
 
-def rows(reports_dir: Path) -> list[dict]:
+def rows(reports_dir: Path, overrides: dict[str, str] | None = None) -> list[dict]:
     out = []
     for path in sorted(reports_dir.glob("*.json")):
         try:
@@ -68,7 +106,7 @@ def rows(reports_dir: Path) -> list[dict]:
             continue
         run = data.get("run", {})
         findings = _get(data, "summary", "findings", default={}) or {}
-        source = _find_source(path, data)
+        source = _find_source(path, data, overrides)
         models = run.get("models_used") or [run.get("model_requested") or "—"]
         commit = str(run.get("commit") or "—")[:7] + ("-dirty" if run.get("dirty") else "")
         out.append({
@@ -88,19 +126,20 @@ def rows(reports_dir: Path) -> list[dict]:
             "commit": commit,
             "version": run.get("version", "—"),
             "verify": _verify(path, source),
+            "gold": _score(path, data),
         })
     return out
 
 
 def table(items: list[dict]) -> str:
     head = ("| Отчёт | Вход | Провайдер | Модель | Статус | Время | Вызовов (из кэша) | Требований | "
-            "Замечаний крит./сущ./незн. | Разработка / тестирование | Коммит | verify |\n"
-            "| :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | :--- | :--- | :--- | :--- |")
+            "Замечаний крит./сущ./незн. | Разработка / тестирование | Эталон кейса | Коммит | verify |\n"
+            "| :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | :--- | :--- | :--- | :--- | :--- |")
     lines = [head]
     for r in items:
         lines.append(f"| [{r['report']}]({r['report']}) | `{r['input']}` | {r['provider']} | {r['model']} | {r['status']} | "
                      f"{r['duration']} | {r['calls']} ({r['cached']}) | {r['requirements']} | {r['findings']} | "
-                     f"{r['verdict']} | `{r['commit']}` | {r['verify']} |")
+                     f"{r['verdict']} | {r['gold']} | `{r['commit']}` | {r['verify']} |")
     return "\n".join(lines)
 
 
@@ -108,9 +147,12 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="таблица прогонов из паспортов отчётов")
     p.add_argument("reports_dir", nargs="?", default=str(ROOT / "reports"))
     p.add_argument("--write", action="store_true", help="вписать таблицу в README.md каталога отчётов")
+    p.add_argument("--src", action="append", default=[], metavar="ОТЧЁТ=ИСХОДНИК",
+                   help="исходник для отчёта (имя файла отчёта без .json или его начало до точки)")
     args = p.parse_args(argv)
     d = Path(args.reports_dir)
-    items = rows(d)
+    overrides = dict(item.split("=", 1) for item in args.src if "=" in item)
+    items = rows(d, overrides)
     text = table(items)
     if not args.write:
         print(text)

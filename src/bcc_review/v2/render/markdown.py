@@ -54,6 +54,29 @@ CRITERIA: dict[str, tuple[str, str, str]] = {
     "traceable": ("Прослеживаемость", "IEEE 830-1998 п. 4.3.8", "Нб"),
     "risk": ("ИБ и операционные риски", "чек-лист «Ревью требований» банка", "Рс"),
 }
+# своими словами: какой вопрос агент задаёт требованию или набору
+CRITERION_WHAT = {
+    "necessary": "без требования продукт неполон; это не дубль другого пункта",
+    "appropriate": "сказано, что должна делать система, без лишнего решения реализации",
+    "unambiguous": "одно толкование: определены термины, единицы, границы, часовые пояса, события",
+    "complete": "есть условие, действие, ограничения, реакция на ошибки и граничные случаи",
+    "singular": "одно обязательство в одном пункте",
+    "feasible": "реализуемо при описанной архитектуре, данных и интеграциях",
+    "verifiable": "выполнение можно доказать тестом, анализом или осмотром: есть измеримый результат",
+    "correct": "соответствует предметной области и не противоречит критериям приёмки",
+    "conforming": "оформлено по шаблону банка: идентификатор, модальность, заполненные поля",
+    "language": "нет размытых слов, лазеек «по возможности» и открытых перечней «и т. д.»",
+    "set_complete": "набор покрывает цель: обещанные операции описаны, обязательные разделы заполнены",
+    "set_consistent": "ни одна пара требований, критериев приёмки или частей документа не даёт разный исход "
+                      "для одного входа",
+    "set_feasible": "весь набор вместе реализуем в заданных ограничениях",
+    "set_comprehensible": "из набора ясно, что ожидается; одно понятие — один термин",
+    "set_validatable": "можно показать, что набор достигает бизнес-цели: есть критерии приёмки",
+    "ranked": "у требований указаны важность и стабильность",
+    "modifiable": "правило записано в одном месте, документ версионируется",
+    "traceable": "у требований есть идентификаторы и связи с источником и приёмкой",
+    "risk": "нет рисков ИБ и эксплуатации: утечки данных, небезопасные методы, нет отката",
+}
 INDIVIDUAL = ["necessary", "appropriate", "unambiguous", "complete", "singular", "feasible", "verifiable",
               "correct", "conforming", "language"]
 SET_CRITERIA = ["set_consistent", "set_complete", "set_feasible", "set_comprehensible", "set_validatable",
@@ -110,6 +133,7 @@ STAGES = {
 
 def stage_name(key: str) -> str:
     return STAGES.get(stage_key(key), (f"этап `{key}`",))[0]
+PROPOSING = {"rules", "analyst", "qa", "architect", "risk", "consistency"}  # этапы, которые предлагают кандидатов
 STAGE_STATUS = {"ok": "✅ выполнен", "partial": "⚠️ частично", "failed": "⛔ сбой", "skipped": "— пропущен"}
 SOURCES = {"analyst": "аналитик", "qa": "тестировщик", "architect": "архитектор", "risk": "риски",
            "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр"}
@@ -177,9 +201,67 @@ def _lref(m: re.Match) -> str:
     return f"{prep} {word}" if prep else word
 
 
+_CALL = re.compile(r"(?<![\w`])([A-Za-z_][A-Za-z0-9_.]*\([^()`\n]{0,60}\))")
+
+
+_IDREF = re.compile(r"(?<![\w\[#/`-])([DRQ]-\d{2,4})(?![\w-])")
+_KNOWN_IDS: set[str] = set()  # ID дефектов, требований и вопросов текущего отчёта (заполняет render)
+
+
+def _link_ids(text: str) -> str:
+    if not _KNOWN_IDS:
+        return text
+    return _IDREF.sub(lambda m: f"[{m.group(1)}](#{m.group(1).lower()})" if m.group(1) in _KNOWN_IDS else m.group(1),
+                      text)
+
+
+_PATH = re.compile(r"(?<![\w`/.])(/[A-Za-z](?:[\w/{}.-]*[\w/}])?(?:\?[\w=&.%{}-]*[\w=}.])?)")
+_IDENT = re.compile(r"(?<![\w`$./=?&-])("
+                    r"[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+"          # camelCase
+                    r"|[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+"    # snake_case
+                    r"|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+"          # a.b.c
+                    r")(?![\w`(])")
+
+
+def _code_spans(text: str) -> str:
+    """Пути API и идентификаторы — как код; уже оформленный код не трогается."""
+    parts = re.split(r"(`[^`]*`)", text)
+    for i in range(0, len(parts), 2):
+        p = _CALL.sub(r"`\1`", parts[i])
+        sub = re.split(r"(`[^`]*`)", p)
+        for j in range(0, len(sub), 2):
+            sub[j] = _IDENT.sub(r"`\1`", _PATH.sub(r"`\1`", sub[j]))
+        parts[i] = "".join(sub)
+    return "".join(parts)
+
+
 def prose(text) -> str:
-    """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»."""
-    return _LREF.sub(_lref, esc(text))
+    """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»;
+    выражения floor(x/100), пути /a/b?x=1 и идентификаторы monthSpent, limit_kzt, response.result — как код;
+    упоминания D-…, R-…, Q-… — ссылки."""
+    return _link_ids(_code_spans(_LREF.sub(_lref, esc(text))))
+
+
+_SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
+_STAGE_PREFIX = re.compile(r"^\s*([a-z_:]+):\s+")
+
+
+_STAGE_WORD = re.compile(r"`?\b(?:lens[_:])?(segment|analyst|qa|architect|risk|consistency|judge|clarify|recheck|"
+                         r"revise)\b`?(?!\.)")
+_EXC = re.compile(r"\b[A-Z][A-Za-z]*(?:Error|Exceeded|Exception|Timeout)\b:\s*(?:[a-z_]+:\s*)*")
+
+
+def warn_text(text) -> str:
+    """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», «lens_risk» → «Риски», critical → критичный;
+    служебные префиксы исключений («BudgetExceeded: judge: budget:») убираются."""
+    s = " ".join(str(text or "").split())
+    m = _STAGE_PREFIX.match(s)
+    if m and stage_key(m.group(1)) in STAGES:
+        s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
+    s = _EXC.sub("", s)
+    s = _STAGE_WORD.sub(lambda m: f"«{STAGES[m.group(1)][0]}»", s)
+    s = _SEV_WORD.sub(lambda m: SEV_NAME[m.group(1)], s)
+    return prose(s)
 
 
 def cell(text) -> str:
@@ -340,6 +422,7 @@ class _Ctx:
             for fid in q.get("finding_ids", []) or []:
                 self.q_by_finding.setdefault(fid, []).append(q.get("id"))
         self.summary = report.get("summary") or jsonout.compute_summary(report)
+        self.edits = _applied_edits(report)
         self.verdict = report.get("verdict", {}) or {}
         self.offline = self.run.get("provider") == "offline" or (
             not self.run.get("models_used") and self.run.get("provider") not in ("mock",))
@@ -350,7 +433,17 @@ class _Ctx:
         label = rid
         if sid and _DOC_ID.fullmatch(sid):
             label = f"{rid} / {sid}"
-        return f"[{label}](#{anchor(rid)})" if link and q else label
+        if not (link and q):
+            return label
+        tip = shorten(q.get("summary") or "", 120).replace('"', "'").replace("\\", "/")
+        tip = re.sub(r"[\[\]()<>`*|]", "", tip)
+        return f'[{label}](#{anchor(rid)} "{tip}")' if tip else f"[{label}](#{anchor(rid)})"
+
+    def req_named(self, rid: str) -> str:
+        """Ссылка на требование с кратким названием: «R-07 / Ф-3 (Push при переходе порога…)»."""
+        q = self.req_by_id.get(rid, {})
+        summ = shorten(q.get("summary") or "", 48)
+        return self.req_label(rid) + (f" ({cell(summ)})" if summ else "")
 
     def f_link(self, fid: str, with_icon: bool = False) -> str:
         f = self.f_by_id.get(fid)
@@ -449,10 +542,24 @@ def _header(c: _Ctx) -> list[str]:
     else:
         quotes = f"исходник {src}, цитат в дефектах нет"
     head = esc(c.r.get("title")) if isinstance(c.r.get("title"), str) and c.r.get("title") else "Ревью требований"
+    models = ", ".join(f"`{m}`" for m in run.get("models_used") or [])
+    calls = (run.get("calls") or {}).get("total")
+    how = []
+    if models:
+        how.append(f"модель {models}")
+    elif c.offline:
+        how.append("без модели")
+    if run.get("duration_s") is not None:
+        how.append(duration(run.get("duration_s")))
+    if calls:
+        how.append(f"{num(calls)} {plural(int(calls), 'вызов', 'вызова', 'вызовов')}")
+    st = when(run.get("started_at"))
+    if st:
+        how.append(f"{st:%d.%m.%Y %H:%M} (UTC+5)")
     out = [f"# {head}: «{esc(title)}»", "",
            f"> Сформирован агентом «{esc(run.get('agent') or 'BCC Review')}» {esc(run.get('version') or '')} "
-           f"(коммит {commit}{dirty}) без ручных правок; {quotes}. Проверка повторяется командой "
-           f"`python -m bcc_review verify отчёт.json исходник`."]
+           f"(коммит {commit}{dirty}) без ручных правок" + (f": {', '.join(how)}" if how else "") + f"; {quotes}. "
+           f"Проверка повторяется командой `python -m bcc_review verify отчёт.json исходник`."]
     status = run.get("status")
     if status == "partial":
         bad = [stage_name(k) for k, v in (run.get("stages") or {}).items()
@@ -466,17 +573,19 @@ def _header(c: _Ctx) -> list[str]:
         out += [">", "> Режим без модели: работали только детерминированные правила. Поиск противоречий, "
                      "проверка критериев приёмки и вопросы владельцу требуют модели (инструкция «README», раздел о "
                      "ключе)."]
+    out += ["", "**Содержание:** [Кратко](#s0) · " + " · ".join(f"[{name}](#{a})" for a, name in NAV)]
     return out + [""]
 
 
 def _brief(c: _Ctx) -> list[str]:
     v = c.verdict
-    out = ["## Кратко", ""]
+    out = [h2("s0", "Кратко"), ""]
     out += table(["Разработка", "Тестирование"],
                  [[f"**{READINESS.get(v.get('development'), '—')}**", f"**{READINESS.get(v.get('testing'), '—')}**"]],
                  [":---:", ":---:"])
     out += ["", _counts_line(c), ""]
     out += [prose(v.get("summary") or _auto_reason(c)), ""]
+    out += _before_after(c)
     blockers = [f for f in c.findings if f.get("blocks") in BLOCKING and (
         f.get("severity") == "critical" or (c.offline and f.get("rule_conflict")))]
     blockers.sort(key=lambda f: (f.get("priority") or 99, _id_num(f.get("id"))))
@@ -496,16 +605,49 @@ def _brief(c: _Ctx) -> list[str]:
             rows.append(row + [pcell(first_sentence(f.get("impact") or f.get("problem"), 170))])
         out += table(["Дефект", "Где"] + ([] if same else ["Блокирует"]) + ["Почему блокирует"], rows)
         out.append("")
-    else:
+    elif c.run.get("status") != "failed" and "блокирующ" not in str(v.get("summary") or "").lower():
         out += ["Блокирующих дефектов не найдено.", ""]
     first = _fix_first(c)
     if first:
         out += ["**Исправить первым**", ""]
         out += [f"{i}. {c.f_link(f['id'], True)} {esc(f.get('title'))}" for i, f in enumerate(first, 1)]
         out.append("")
-    out += _before_after(c)
-    out += ["**Разделы:** " + " · ".join(f"[{name}](#{a})" for a, name in NAV), ""]
+    out += _how_obtained(c)
     return out
+
+
+def _how_obtained(c: _Ctx) -> list[str]:
+    """Строка доверия: откуда взялись дефекты и почему им можно верить."""
+    if c.run.get("status") == "failed":
+        return []
+    stats = c.run.get("stage_stats") or {}
+    roles = [STAGES[stage_key(k)][0].lower() for k in (c.run.get("stages") or {})
+             if stage_key(k) in PROPOSING and stage_key(k) != "rules" and c.run["stages"][k] in ("ok", "partial")]
+    accepted = sum(len(f.get("candidate_ids") or []) for f in c.r.get("findings") or [])
+    rej = c.r.get("rejected") or []
+    total = accepted + len(rej)
+    ok, qt = c.summary.get("quotes_verified", 0), c.summary.get("quotes_total", c.summary.get("quotes_verified", 0))
+    parts = []
+    stages = c.run.get("stages") or {}
+    has_rules = any(stage_key(k) == "rules" and v in ("ok", "partial") for k, v in stages.items())
+    who = " и ".join(x for x in ((f"роли ({', '.join(roles)})" if roles else ""),
+                                 ("правила без модели" if has_rules else "")) if x)
+    if who:
+        who = who[0].upper() + who[1:]
+        parts.append(f"{who} предложили {num(total)} {plural(total, 'кандидата', 'кандидатов', 'кандидатов')} в "
+                     f"дефекты" if total else f"{who} проверили документ")
+    judged = (c.run.get("stages") or {}).get("judge") in ("ok", "partial") and not c.offline
+    if total and judged:
+        parts.append(f"судья объединил дубли и оставил {len(c.findings)} "
+                     f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')}, отклонил {len(rej)}")
+    elif c.findings:
+        parts.append(f"в отчёт вошли {len(c.findings)} "
+                     f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')} без отбора судьёй")
+    if qt:
+        parts.append(f"каждая цитата найдена в документе программой ({ok} из {qt}), номер строки посчитан кодом")
+    if not parts:
+        return []
+    return [f"*Как получено:* {'; '.join(parts)}. Вердикт считает программа по правилу из приложения Е.", ""]
 
 
 def _fix_first(c: _Ctx) -> list[dict]:
@@ -539,6 +681,16 @@ def _before_after(c: _Ctx) -> list[str]:
         rows.append([f"{SEV_ICON[k]} {SEV_PLURAL[k][2].capitalize()}", num(bf.get(k)) if k in bf else "—",
                      num(af.get(k)) if k in af else "—"])
     out += table(["", "До ответов", "После ответов"], rows, [":---", ":---:", ":---:"])
+    gone = [x for x in cl.get("changes") or [] if isinstance(x, dict) and x.get("status") == "resolved"
+            and x.get("severity_before") == "critical"]
+    if gone:
+        out += ["", f"**Сняты ответами блокеры ({len(gone)}):**", ""]
+        for x in gone[:7]:
+            reason = str(x.get("reason") or "")
+            qids = [q for q in x.get("question_ids") or [] if q not in reason]
+            qs = ", ".join(qids) + ": " if qids else ("" if re.search(r"\bQ-\d", reason) else "общее решение: ")
+            out.append(f"- 🔴 {c.f_link(x.get('finding_id', ''))} {prose(x.get('title') or '')} — "
+                       f"{prose(qs + shorten(reason, 170))}")
     out += ["", f"Снято {num(cl.get('resolved', 0))}, уточнено {num(cl.get('changed', 0))}, осталось открытыми "
                 f"{num(cl.get('open', 0))}, новых конфликтов из-за ответов {len(cl.get('new_findings') or [])}"
                 + (f": {c.f_links(cl['new_findings'])}" if cl.get("new_findings") else "")
@@ -573,16 +725,28 @@ def _clarification_details(c: _Ctx) -> list[str]:
     return out
 
 
+# ------------------------------------------------------------------ общие подписи MD и HTML (№14 может импортировать)
+TERM = {"finding": "дефект", "findings": "дефекты", "requirement": "требование", "question": "вопрос владельцу"}
+READINESS_PLAIN = {"no": "нельзя начинать", "conditional": "можно с условиями", "yes": "можно начинать",
+                   "undetermined": "не определено", "none": "вердикт не вынесен"}
+
+
+def run_stamp(run: dict) -> str:
+    """Время прогона одинаково в MD и HTML: «27.11.2026 02:50–02:54 (UTC+5)»."""
+    st, fn = when((run or {}).get("started_at")), when((run or {}).get("finished_at"))
+    if st and fn and f"{st:%d.%m.%Y %H:%M}" == f"{fn:%d.%m.%Y %H:%M}":
+        return f"{st:%d.%m.%Y %H:%M} (UTC+5)"
+    if st and fn:
+        return (f"{st:%d.%m.%Y %H:%M}–{fn:%H:%M} (UTC+5)" if st.date() == fn.date()
+                else f"{st:%d.%m.%Y %H:%M} – {fn:%d.%m.%Y %H:%M} (UTC+5)")
+    if st or fn:
+        return f"{(st or fn):%d.%m.%Y %H:%M} (UTC+5)"
+    return "—"
+
+
 def _passport(c: _Ctx) -> list[str]:
     run, doc = c.run, c.doc
-    st, fn = when(run.get("started_at")), when(run.get("finished_at"))
-    if st and fn:
-        stamp = f"{st:%d.%m.%Y %H:%M}–{fn:%H:%M} (UTC+5)" if st.date() == fn.date() else \
-            f"{st:%d.%m.%Y %H:%M} – {fn:%d.%m.%Y %H:%M} (UTC+5)"
-    elif st:
-        stamp = f"{st:%d.%m.%Y %H:%M} (UTC+5)"
-    else:
-        stamp = "—"
+    stamp = run_stamp(run)
     models = ", ".join(f"`{m}`" for m in run.get("models_used") or []) or ("не использовалась" if c.offline else "—")
     asked = run.get("model_requested")
     model = models + (f" (запрошена: `{asked}`)" if asked and asked not in (run.get("models_used") or []) else "")
@@ -608,6 +772,9 @@ def _passport(c: _Ctx) -> list[str]:
         ["Документ", f"«{cell(doc.get('title') or '—')}»"],
         ["Файл", f"`{doc.get('file') or '—'}` · {fmt} · {size}"],
         ["Хеш файла (`SHA-256`)", f"`{doc.get('sha256') or '—'}`"],
+    ] + ([["Нумерация строк", "строка — фрагмент текста в нумерации агента (сквозная по документу); место на "
+                              "странице находится по номеру страницы и цитате"]]
+         if doc.get("format") in ("pdf", "docx") else []) + [
         ["Дата и время", stamp],
         ["Модель", model.replace("|", "\\|")],
         ["Провайдер", PROVIDERS.get(run.get("provider")) or f"`{run.get('provider') or '—'}`"],
@@ -615,10 +782,12 @@ def _passport(c: _Ctx) -> list[str]:
         ["Обращений к модели", f"{num(calls.get('total', 0))} (из кэша {num(calls.get('cached', 0))}, "
                                f"с ошибкой {num(calls.get('failed', 0))}, делений пакета {num(calls.get('split', 0))})"],
         ["Токены", f"вход {num(tok.get('input', 0))}, выход {num(tok.get('output', 0))}"
-                   + (f" · ≈ ${cost:.2f}" if isinstance(cost, (int, float)) and cost else "")],
+                   + (f" · ≈ {cost:.2f} $".replace(".", ",") if isinstance(cost, (int, float)) and cost else "")],
         ["Длительность", duration(run.get("duration_s"))],
         ["Статус прогона", STATUS.get(run.get("status"), run.get("status") or "—")],
         ["Этапы", cell(stage_txt)],
+        ["Файлы отчёта", "рядом с этим файлом: `.json` — все данные и полные цитаты (по нему работает `verify`), "
+                         "`.html` — интерактивная версия"],
     ]
     cl = c.r.get("clarification") or {}
     if cl:
@@ -626,7 +795,8 @@ def _passport(c: _Ctx) -> list[str]:
                                          f"{len(cl.get('decisions') or [])}, без ответа {len(cl.get('unanswered') or [])}"])
     warns = (run.get("warnings") or []) + (doc.get("warnings") or [])
     if warns:
-        rows.append(["Предупреждения", cell("; ".join(warns[:5]) + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else ""))])
+        rows.append(["Предупреждения", "; ".join(warn_text(w) for w in warns[:5]).replace("|", "\\|")
+                     + (f" и ещё {len(warns) - 5}" if len(warns) > 5 else "")])
     return [h2("s1", "1. Паспорт прогона"), ""] + table(["Поле", "Значение"], rows) + [""]
 
 
@@ -750,6 +920,22 @@ def _per_requirement(c: _Ctx) -> list[str]:
     return out
 
 
+def _applied_edits(report: dict) -> list[tuple[str, dict]]:
+    """Правки режима --revise (№11): [(D-…, {"line", "before", "after", "insert"})], только применённые."""
+    out = []
+    for rw in report.get("rewrites") or []:
+        if not isinstance(rw, dict):
+            continue
+        for e in rw.get("edits") or []:
+            if not isinstance(e, dict) or not e.get("applied") or not isinstance(e.get("line"), int):
+                continue
+            insert = e.get("action") == "insert"
+            out.append((str(rw.get("finding_id") or ""), {
+                "line": e["line"], "insert": insert, "before": "" if insert else str(e.get("was") or e.get("old") or ""),
+                "after": str(e.get("became") if e.get("became") is not None else e.get("new") or "")}))
+    return out
+
+
 def _rewrite_from(f: dict) -> dict | None:
     """Цитата, которую заменяет «стало»: та, где больше общих слов с новой формулировкой."""
     evs = f.get("evidence") or []
@@ -763,13 +949,39 @@ def _rewrite_from(f: dict) -> dict | None:
     return max(evs, key=lambda e: len(words & set(re.findall(r"\w{3,}", str(e.get("quote", "")).lower()))))
 
 
+def _card_compact(c: _Ctx, f: dict) -> list[str]:
+    """Карточка существенного дефекта для очень длинных отчётов (уровень сжатия 5): 5 строк вместо 10–12."""
+    rids = list(f.get("requirement_ids") or [])
+    meta = ["**Требования:** " + (", ".join(c.req_label(r) for r in rids) if rids else "документ в целом"),
+            f"**Критерий:** {esc(_criterion_name(f.get('criterion')))}"]
+    if f.get("blocks") and f.get("blocks") != "none":
+        meta.append(f"**Блокирует:** {BLOCKS.get(f['blocks'])}")
+    where = "; ".join(f"{esc(place(ev))}: {quote_md(ev.get('quote'), 120)}" for ev in (f.get("evidence") or [])[:3])
+    story = " ".join(x for x in (str(f.get("problem") or "").strip(), str(f.get("scenario") or "").strip(),
+                                 str(f.get("impact") or "").strip()) if x)
+    fix = f"**Что исправить.** {prose(f.get('recommendation'))}" if f.get("recommendation") else ""
+    if f.get("rewrite"):
+        fix += f" **Стало:** «{prose(shorten(f.get('rewrite'), 220))}»"
+    qids = c.q_by_finding.get(f.get("id"), [])
+    if qids:
+        fix += " **Вопрос:** " + ", ".join(f"[{q}](#{anchor(q)})" for q in qids)
+    lines = [" · ".join(meta), f"**Где:** {where}", f"**Суть.** {prose(story)}", fix.strip()]
+    lines = [ln for ln in lines if ln]
+    return [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(f.get('severity'), '')} {f['id']}. "
+            f"{prose(f.get('title'))}", ""] + [ln + "  " if i < len(lines) - 1 else ln
+                                               for i, ln in enumerate(lines)] + [""]
+
+
 def _card(c: _Ctx, f: dict) -> list[str]:
     sev = f.get("severity")
+    if c.level >= 5 and sev != "critical":
+        return _card_compact(c, f)
     badge = {"changed": " · уточнён после ответов", "new": " · новый после ответов"}.get(
         f.get("status_after_answers") or f.get("status"), "")
     out = [f"#### <a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(sev, '')} {f['id']}. {prose(f.get('title'))}", ""]
     meta = []
-    reqs = [c.req_label(r) for r in f.get("requirement_ids") or []]
+    rids = list(f.get("requirement_ids") or [])
+    reqs = [c.req_named(r) if len(rids) <= 3 else c.req_label(r) for r in rids]
     meta.append("**Требования:** " + (", ".join(reqs) if reqs else "документ в целом"))
     meta.append(f"**Критерий:** {esc(_criterion_name(f.get('criterion')))} ({esc(_criterion_ref(f))})")
     meta.append(f"**Вид:** {esc(KIND_NAME.get(f.get('kind'), f.get('kind') or '—'))}")
@@ -797,8 +1009,16 @@ def _card(c: _Ctx, f: dict) -> list[str]:
         fields = [("Проблема", f.get("problem")), ("Сценарий", f.get("scenario")), ("Последствия", f.get("impact")),
                   ("Что исправить", f.get("recommendation"))]
     body = [f"**{name}.** {prose(val)}" for name, val in fields if val]
+    edits = [e for fid, e in c.edits if fid == f.get("id")]
     src = _rewrite_from(f)
-    if src is not None:
+    if edits:
+        for e in edits[:2]:
+            if e["insert"]:
+                body.append(f"**Добавить после строки {e['line']}.** «{prose(e['after'])}»")
+            else:
+                body.append(f"**Было → стало.** Строка {e['line']}: {quote_md(e['before'])} → "
+                            + (f"«{prose(e['after'])}»" if e["after"] else "удалить"))
+    elif src is not None:
         body.append(f"**Было → стало.** {lines_word(src.get('line_start'), src.get('line_end')).capitalize()}: "
                     f"{quote_md(src.get('quote'))} → «{prose(f.get('rewrite'))}»")
     if f.get("question"):
@@ -833,7 +1053,7 @@ def _set_check(c: _Ctx) -> list[str]:
                     "undefined": "❔ не определено"}.get(p.get("verdict"), "—")
             rows.append([f"{c.req_label(p.get('a'))} ↔ {c.req_label(p.get('b'))}", cell(p.get("subject")),
                          cell(p.get("scenario")), cell(p.get("outcome_a")), cell(p.get("outcome_b")), mark,
-                         c.f_links(p.get("finding_ids"))])
+                         c.f_links(p.get("finding_ids") or _infer_pair(c, p))])
         out += table(["Пара", "Общий предмет", "Сценарий", "Исход по первому", "Исход по второму", "Итог", "Дефект"],
                      rows) + [""]
     else:
@@ -850,7 +1070,8 @@ def _set_check(c: _Ctx) -> list[str]:
                     "undefined": "❔ правила не определяют"}.get(a.get("verdict"), "—")
             rows.append([c.req_label(a.get("row_requirement_id")), cell(a.get("row_facts")),
                          ", ".join(c.req_label(r) for r in a.get("rule_requirement_ids") or []) or "—",
-                         cell(a.get("expected_by_rules")), cell(a.get("stated")), mark, c.f_links(a.get("finding_ids"))])
+                         cell(a.get("expected_by_rules")), cell(a.get("stated")), mark,
+                         c.f_links(a.get("finding_ids") or _infer_acceptance(c, a))])
         out += table(["Критерий", "Исходные данные", "Правила", "Ожидается по правилам", "Указано в критерии",
                       "Итог", "Дефект"], rows) + [""]
     else:
@@ -864,11 +1085,55 @@ def _set_check(c: _Ctx) -> list[str]:
         rows = [[cell(g.get("concept")),
                  ", ".join(f"«{cell(t.get('term'))}»" + (f" (строка {t['line']})" if t.get("line") else "")
                            for t in g.get("terms") or []),
-                 cell(g.get("problem")), c.f_links(g.get("finding_ids"))] for g in glossary]
+                 cell(g.get("problem")), c.f_links(g.get("finding_ids") or _infer_glossary(c, g))] for g in glossary]
         out += table(["Понятие", "Как названо в документе", "Проблема", "Дефект"], rows) + [""]
     else:
         out += ["Разночтений терминов не найдено.", ""]
     return out
+
+
+def _ev_lines(f: dict) -> set[int]:
+    out = set()
+    for e in f.get("evidence") or []:
+        a = e.get("line_start")
+        if isinstance(a, int):
+            b = e.get("line_end") if isinstance(e.get("line_end"), int) else a
+            out.update(range(a, b + 1))
+    return out
+
+
+def _infer_pair(c: _Ctx, p: dict) -> list[str]:
+    """Дефект для пары, если судья его не указал: оба требования или обе строки в одном дефекте."""
+    if p.get("verdict") == "compatible":
+        return []
+    a, b = p.get("a"), p.get("b")
+    la, lb = p.get("line_a"), p.get("line_b")
+    hits = []
+    for f in c.findings:
+        reqs = set(f.get("requirement_ids") or [])
+        lines = _ev_lines(f)
+        if (a in reqs and b in reqs) or (isinstance(la, int) and isinstance(lb, int) and la in lines and lb in lines):
+            hits.append(f)
+    hits.sort(key=lambda f: (f.get("kind") not in CONFLICT_KINDS, SEV_ORDER.get(f.get("severity"), 3)))
+    return [f["id"] for f in hits[:2]]
+
+
+def _infer_acceptance(c: _Ctx, a: dict) -> list[str]:
+    if a.get("verdict") == "match":
+        return []
+    row = a.get("row_requirement_id")
+    rules = set(a.get("rule_requirement_ids") or [])
+    hits = [f for f in c.findings if row in (f.get("requirement_ids") or [])
+            and (rules & set(f.get("requirement_ids") or []) or f.get("kind") in CONFLICT_KINDS)]
+    hits.sort(key=lambda f: (f.get("kind") not in CONFLICT_KINDS, SEV_ORDER.get(f.get("severity"), 3)))
+    return [f["id"] for f in hits[:2]]
+
+
+def _infer_glossary(c: _Ctx, g: dict) -> list[str]:
+    lines = {t.get("line") for t in g.get("terms") or [] if isinstance(t.get("line"), int)}
+    hits = [f for f in c.findings if (f.get("kind") == "terminology" or f.get("criterion") == "set_comprehensible")
+            and lines & _ev_lines(f)]
+    return [f["id"] for f in hits[:2]]
 
 
 def _coverage(c: _Ctx) -> list[str]:
@@ -888,6 +1153,13 @@ def _coverage(c: _Ctx) -> list[str]:
     if not trace and not checked:
         return out + ["Трассировка не выполнялась" + (" (режим без модели)." if c.offline else "."), ""]
     covered, rows, bare = 0, [], []
+    # одинаковая заметка у многих непокрытых требований («трассировка не построена») — одной строкой
+    note_count: dict[str, int] = {}
+    for rid in rows_ids:
+        t = trace.get(rid, {})
+        if not (set(t.get("verified_by") or []) | checked.get(rid, set())) and t.get("note"):
+            note_count[t["note"]] = note_count.get(t["note"], 0) + 1
+    grouped: dict[str, list[str]] = {}
     for rid in rows_ids:
         t = trace.get(rid, {})
         by = set(t.get("verified_by") or []) | checked.get(rid, set())
@@ -895,6 +1167,9 @@ def _coverage(c: _Ctx) -> list[str]:
             covered += 1
         elif not t.get("note"):
             bare.append(rid)
+            continue
+        elif note_count.get(t["note"], 0) >= 3:
+            grouped.setdefault(t["note"], []).append(rid)
             continue
         cells = []
         for aid in acc_ids:
@@ -907,8 +1182,11 @@ def _coverage(c: _Ctx) -> list[str]:
         rows.append([c.req_label(rid)] + cells + [cell(t.get("note") or ("нет критерия приёмки" if not by else ""))])
     out += [f"Покрыто приёмкой {covered} из {len(rows_ids)} требований, которые должны проверяться. "
             f"✓ — критерий проверяет требование, ⛔ — критерий противоречит требованию, «·» — не проверяет.", ""]
-    out += table(["Требование"] + [c.req_label(a) for a in acc_ids] + ["Чего не хватает"], rows,
-                 [":---"] + [":---:"] * len(acc_ids) + [":---"])
+    if rows:
+        out += table(["Требование"] + [c.req_label(a) for a in acc_ids] + ["Чего не хватает"], rows,
+                     [":---"] + [":---:"] * len(acc_ids) + [":---"])
+    for note, ids in grouped.items():
+        out += ["", f"Без критерия приёмки — {cell(note)} ({len(ids)}): " + ", ".join(c.req_label(r) for r in ids) + "."]
     if bare:
         out += ["", f"Без критерия приёмки также ({len(bare)}): " + ", ".join(c.req_label(r) for r in bare) + "."]
     return out + [""]
@@ -962,8 +1240,10 @@ def _conclusion(c: _Ctx) -> list[str]:
     if first:
         out += ["**Что исправить в первую очередь**", ""]
         for i, f in enumerate(first, 1):
-            out.append(f"{i}. {c.f_link(f['id'], True)} {prose(f.get('title'))}. Что сделать: "
-                       f"{prose(shorten(f.get('recommendation'), 260))}")
+            rec = shorten(f.get("recommendation"), 260)
+            if len(rec) > 1 and rec[0].isupper() and rec[1].islower():
+                rec = rec[0].lower() + rec[1:]  # после двоеточия — со строчной
+            out.append(f"{i}. {c.f_link(f['id'], True)} {prose(f.get('title'))}. Что сделать: {prose(rec)}")
         out.append("")
     nc = [x for x in c.r.get("not_checked") or [] if isinstance(x, str)]
     if nc:
@@ -978,6 +1258,11 @@ def _conclusion(c: _Ctx) -> list[str]:
 
 
 def _auto_reason(c: _Ctx) -> str:
+    if c.run.get("status") == "failed":
+        bad = [stage_name(k) for k, v in (c.run.get("stages") or {}).items() if v == "failed"]
+        return ("Проверка не завершена: " + (f"сбой этапов {', '.join(bad)}" if bad else "прогон прерван")
+                + ". Отсутствие дефектов здесь не означает готовность документа — повторите прогон; причина — в "
+                  "приложении Д.")
     crit = [f for f in c.findings if f.get("severity") == "critical" and f.get("blocks") != "none"]
     if crit:
         return (f"Найдено {len(crit)} {plural(len(crit), 'критичный дефект', 'критичных дефекта', 'критичных дефектов')}, "
@@ -1068,28 +1353,41 @@ def _appendix_checklist(c: _Ctx) -> list[str]:
 def _appendix_rewrites(c: _Ctx) -> list[str]:
     out = [h2("pg", "Приложение Г. Было → стало"), ""]
     items = []
+    for fid, e in _applied_edits(c.r):
+        items.append((fid, e["line"], e["line"], e["before"], e["after"], e["insert"]))
     for rw in c.r.get("rewrites") or []:
-        if rw.get("after") or rw.get("rewrite"):
+        if not rw.get("edits") and (rw.get("after") or rw.get("rewrite")):
             items.append((rw.get("finding_id") or ", ".join(rw.get("finding_ids") or []), rw.get("line_start"),
-                          rw.get("line_end"), rw.get("before") or rw.get("quote") or "", rw.get("after") or rw.get("rewrite")))
+                          rw.get("line_end"), rw.get("before") or rw.get("quote") or "",
+                          rw.get("after") or rw.get("rewrite"), False))
+    from_revise = bool(items)
     if not items:
         for f in c.findings:
             if c.level >= 2 and f.get("severity") in ("critical", "major"):
                 continue
             src = _rewrite_from(f)
             if src is not None:
-                items.append((f["id"], src.get("line_start"), src.get("line_end"), src.get("quote"), f.get("rewrite")))
+                items.append((f["id"], src.get("line_start"), src.get("line_end"), src.get("quote"), f.get("rewrite"),
+                              False))
     if not items and c.level >= 2:
         return out + ["Формулировки «было → стало» приведены в карточках раздела 3.2 и в `report.json`.", ""]
     if not items:
         return out + ["Готовых формулировок нет.", ""]
-    out += ["Готовые формулировки для правки ТЗ; «<уточнить: …>» — место, где нужен ответ владельца.", ""]
-    rows = [[c.f_link(fid, True) if fid in c.f_by_id else esc(fid), lines_word(a, b).replace("строки ", "")
-             .replace("строка ", ""), quote_md(before, 120, in_table=True), cell(after)]
-            for fid, a, b, before, after in items]
+    st = c.r.get("revise_stats") or {}
+    if from_revise and st:
+        out += [f"Правки внесены программой в копию документа: заменено фрагментов {num(st.get('replaced', 0))}, "
+                f"добавлено строк {num(st.get('inserted', 0))}, не применено {num(st.get('not_applied', 0))}; "
+                f"«<уточнить: …>» — место, где нужен ответ владельца ({num(st.get('pending', 0))}).", ""]
+    else:
+        out += ["Готовые формулировки для правки ТЗ; «<уточнить: …>» — место, где нужен ответ владельца.", ""]
+    rows = [[c.f_link(fid, True) if fid in c.f_by_id else esc(fid),
+             (f"после {a}" if ins else lines_word(a, b).replace("строки ", "").replace("строка ", "")),
+             "—" if ins else quote_md(before, 120, in_table=True), cell(after) if after else "фрагмент удалён"]
+            for fid, a, b, before, after, ins in items]
     out += table(["Дефект", "Строка", "Было", "Стало"], rows)
     if c.r.get("revised_file"):
-        out += ["", f"Исправленный текст ТЗ целиком: «{esc(c.r['revised_file'])}»."]
+        from pathlib import PurePath
+        out += ["", f"Исправленный текст ТЗ целиком: `{PurePath(str(c.r['revised_file'])).name}` (рядом с отчётом)."]
     return out + [""]
 
 
@@ -1103,12 +1401,17 @@ def _appendix_how(c: _Ctx) -> list[str]:
         for k, v in stages.items():
             name, what = STAGES.get(stage_key(k), (stage_name(k), ""))
             st = stats.get(k) or {}
-            rows.append([name, what, STAGE_STATUS.get(v, v), num(st.get("calls")) if "calls" in st else "—",
+            proposes = stage_key(k) in PROPOSING
+            status = STAGE_STATUS.get(v, v) + (" (из прошлого прогона)" if st.get("reused") else "")
+            calls = num(st.get("calls")) if "calls" in st else "—"
+            if st.get("split"):
+                calls += f" (пакет делился: {num(st['split'])})"
+            rows.append([name, what, status, calls if "calls" in st else "—",
                          duration(st.get("seconds")) if "seconds" in st else "—",
-                         num(st.get("candidates")) if "candidates" in st else "—"])
+                         num(st.get("candidates")) if proposes and "candidates" in st else "—"])
         out += table(["Этап", "Что делает", "Итог", "Вызовов", "Время", "Кандидатов"], rows,
                      [":---", ":---", ":---", ":---:", ":---:", ":---:"]) + [""]
-    proposed = sum(int((stats.get(k) or {}).get("candidates") or 0) for k in stats)
+    proposed = sum(int((stats.get(k) or {}).get("candidates") or 0) for k in stats if stage_key(k) in PROPOSING)
     accepted = sum(len(f.get("candidate_ids") or []) for f in c.r.get("findings") or [])
     rej = c.r.get("rejected") or []
     nfind = len(c.findings)
@@ -1135,7 +1438,7 @@ def _appendix_how(c: _Ctx) -> list[str]:
         out.append("")
     warns = run.get("warnings") or []
     if warns:
-        out += ["**Предупреждения прогона**", ""] + [f"- {esc(w)}" for w in warns[:15]] + [""]
+        out += ["**Предупреждения прогона**", ""] + [f"- {warn_text(w)}" for w in warns[:15]] + [""]
     return out
 
 
@@ -1152,8 +1455,8 @@ def _appendix_method(c: _Ctx) -> list[str]:
                 + ". Плюс ИБ и операционные риски по чек-листу банка.", ""]
     else:
         rows = [[CRITERIA[k][0], CRITERIA[k][1], "требование" if k in INDIVIDUAL else
-                 ("набор" if k in SET_CRITERIA else "риски")] for k in CRITERIA]
-        out += table(["Критерий", "Стандарт", "Уровень"], rows) + [""]
+                 ("набор" if k in SET_CRITERIA else "риски"), CRITERION_WHAT.get(k, "")] for k in CRITERIA]
+        out += table(["Критерий", "Стандарт", "Уровень", "Что проверяется"], rows) + [""]
     out += ["**Шкала серьёзности**", "",
             "- 🔴 **Критичный** — два места документа дают несовместимый результат для одного входа; ключевое "
             "правило нельзя однозначно реализовать или проверить; нет информации, без которой основную функцию не "
@@ -1176,14 +1479,14 @@ def _appendix_method(c: _Ctx) -> list[str]:
 # ================================================================== сборка
 
 MAX_LINES = 900
-MAX_LEVEL = 4
+MAX_LEVEL = 5
 
 
 _LIST_KEYS = ("requirements", "excluded", "findings", "rejected", "acceptance_checks", "pair_checks", "trace",
               "glossary", "test_cases", "questions", "checklist", "rewrites")
 _ID_LIST_KEYS = ("requirement_ids", "finding_ids", "candidate_ids", "sources", "rule_requirement_ids", "verified_by",
-                 "implemented_by", "options", "standard_refs", "fix_first", "resolved", "changed", "added",
-                 "models_used", "warnings")
+                 "implemented_by", "options", "standard_refs", "fix_first", "models_used", "warnings",
+                 "new_findings", "unanswered", "decisions", "question_ids", "answer_ids")
 
 
 def _clean_report(report) -> dict:
@@ -1229,7 +1532,7 @@ def _clean(value, key: str = ""):
                 if isinstance(v, (int, float)) and not isinstance(v, bool):
                     out[k] = str(v)
                 continue
-            if k in ("evidence", "terms", "answers"):
+            if k in ("evidence", "terms", "answers", "edits", "changes"):
                 out[k] = [_clean(x, k) for x in v if isinstance(x, dict)] if isinstance(v, list) else []
             elif k in _ID_LIST_KEYS:
                 out[k] = [str(x) for x in v if isinstance(x, (str, int, float)) and str(x).strip()] \
@@ -1257,6 +1560,10 @@ def _sections():
 
 def _render_level(report: dict, level: int) -> str:
     c = _Ctx(_clean_report(report), level)
+    _KNOWN_IDS.clear()
+    _KNOWN_IDS.update(str(f.get("id")) for f in c.findings)
+    _KNOWN_IDS.update(str(q.get("id")) for q in c.reqs)
+    _KNOWN_IDS.update(str(q.get("id")) for q in c.r.get("questions") or [])
     parts = []
     for title, fn in _sections():
         try:
@@ -1265,7 +1572,11 @@ def _render_level(report: dict, level: int) -> str:
             head = [f"## {title}", ""] if title else []
             parts.append(head + [f"⚠️ Раздел не построен: в данных прогона ошибка ({esc(type(exc).__name__)}: "
                                  f"{esc(shorten(str(exc), 160))}). Полные данные — в `report.json`.", ""])
-    lines = [ln for part in parts for ln in part]
+    lines = []
+    for ln in (ln for part in parts for ln in part):
+        if not ln.strip() and lines and not lines[-1].strip():
+            continue  # не больше одной пустой строки подряд
+        lines.append(ln)
     while lines and not lines[-1].strip():
         lines.pop()
     return "\n".join(lines) + "\n"
@@ -1280,6 +1591,20 @@ def render(report: dict, *, max_lines: int | None = MAX_LINES) -> str:
         if max_lines is None or text.count("\n") <= max_lines:
             break
     return text
+
+
+_ANCHOR_TAG = re.compile(r'<a id="[^"]*"></a>')
+_LINK_TITLE = re.compile(r'(\]\(#[\w-]+) "[^"]*"\)')
+
+
+def export_text(md: str) -> str:
+    """Markdown-отчёт для переноса в Word/PDF (экспорт №03): без HTML-якорей, без экранирования Markdown,
+    «|» внутри ячеек заменён на «∣», чтобы простые конвертеры не ломали столбцы таблиц."""
+    out = _ANCHOR_TAG.sub("", md)
+    out = _LINK_TITLE.sub(r"\1)", out)
+    out = out.replace("\\|", "∣")
+    out = re.sub(r"\\([\\`*_\[\]<>#])", r"\1", out)
+    return out
 
 
 def write(report: dict, path) -> str:

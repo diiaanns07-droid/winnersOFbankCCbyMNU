@@ -27,7 +27,8 @@ MUTATING_TOKENS = {
     "put", "post", "patch", "close", "lock", "unlock", "revoke", "transfer", "pay", "send",
 }
 READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load", "view", "show", "query",
-               "status", "info", "details", "history"}
+               "status", "info", "details", "history", "calc", "calculate", "compute", "estimate", "preview",
+               "quote", "lookup"}
 # Начало описания метода, означающее изменение состояния.
 MUTATING_DESC = re.compile(
     r"^(сохранени|изменени|удалени|создани|обновлени|замен|установк|установлени|отключени|включени|"
@@ -56,10 +57,23 @@ MENTION = re.compile(
 DECL_LIST = re.compile(rf"^(?:HTTP\s+)?({CODE})(?:\s*[.:)]\s*\S|\s+[A-Za-z][A-Za-z \-]{{1,30}}?\s*[—–:\-]\s*\S|\s*[—–]\s*\S)")
 DECL_OTVET = re.compile(rf"^(?:ответ|response)\s+({CODE})\b", re.I)
 BARE_CODE = re.compile(rf"^({CODE})\.?$")
+DECL_LIST_INLINE = re.compile(rf"(?<=[.!?»)]\s)({CODE})\.\s+[А-ЯЁA-Z]")
+DECL_INLINE = re.compile(rf"\b(?:Ответ|Статус|Код\s+ответа)\s+({CODE})\s*[—–:\-]\s*\S", re.I)
 ERROR_JSON = re.compile(
     r'"(?:result|status|state)"\s*:\s*"(error|fail\w*|err|failure|declined|rejected)"|"error"\s*:|'
     r'"success"\s*:\s*false', re.I)
 ERROR_WORD = re.compile(r"\b(ERROR|FAIL(?:ED|URE)?)\b|ошибк\w*", re.I)
+
+
+def _has_error(text: str) -> re.Match | None:
+    """Признак ошибки в тексте; «не считается ошибкой» и «без ошибок» — не ошибка."""
+    for m in ERROR_WORD.finditer(text):
+        before = text[max(0, m.start() - 25):m.start()].lower()
+        if m.group(0)[0].islower() and re.search(r"\bне\s+(?:считается|является|будет|приводит\s+к)\s*$|\bбез\s*$",
+                                                  before):
+            continue
+        return m
+    return None
 NO_BODY = re.compile(
     r"тело\s+(?:запроса\s+)?не\s+(?:используется|передаётся|передается|требуется|предусмотрено)|"
     r"без\s+тела|тело\s+(?:запроса\s+)?отсутствует|тело\s+запроса\s*[:\-—–]\s*(?:нет|отсутствует|не используется)|"
@@ -150,6 +164,7 @@ VERB_PATH = re.compile(r"^(GET|HEAD|POST|PUT|PATCH|DELETE)\s+(/\S*)")
 def find_methods(doc: Doc) -> list[Method]:
     L = doc.lines
     methods: list[Method] = []
+    row_methods: list[Method] = []
     for idx, x in enumerate(L):
         if not x.text or x.is_code:
             continue
@@ -163,6 +178,19 @@ def find_methods(doc: Doc) -> list[Method]:
             m = VERB_PATH.match(x.text)
             if m and x.cells is None and not x.is_code:
                 verb = m.group(1).upper()
+        if verb is None and x.cells:
+            # сводная таблица методов: «| 3. Данные QR | GET `/qr/{id}` | … |»
+            for ci, cell in enumerate(x.cells):
+                cm = VERB_PATH.match(cell.strip())
+                if cm and ci > 0:
+                    meth = Method(verb=cm.group(1).upper(), verb_line=x, start=x.n, end=x.n, url=cm.group(2),
+                                  url_line=x, desc=re.sub(r"^\d+[.)]\s*", "", x.cells[0]), desc_line=x)
+                    nm = re.search(r"\b([a-z]+[A-Z]\w*)\b", x.cells[0])
+                    if nm:
+                        meth.name, meth.name_line = nm.group(1), x
+                    row_methods.append(meth)
+                    break
+            continue
         if verb is None:
             continue
         # начало блока: заголовок «Метод X» выше (до 10 строк) или начало таблицы
@@ -197,6 +225,11 @@ def find_methods(doc: Doc) -> list[Method]:
     methods.sort(key=lambda m: m.start)
     for a, b in zip(methods, methods[1:]):
         a.end = b.start - 1
+    if row_methods:  # блок метода из текста заканчивается перед сводной таблицей методов
+        first_row = min(r.start for r in row_methods)
+        for m in methods:
+            if m.start < first_row:
+                m.end = min(m.end, first_row - 1)
     last = L[-1].n if L else 0
     for m in methods:
         m.end = min(m.end, last)
@@ -210,7 +243,7 @@ def find_methods(doc: Doc) -> list[Method]:
                 continue
             key, val = kv
             if any(key == k or key.startswith(k + " ") for k in URL_KEYS) and not m.url:
-                um = re.search(r"(/[\w\-{}/.]+)", val)
+                um = re.search(r"https?://[^/\s]+(/[\w\-{}/.]+)", val) or re.search(r"(?<![/\w])(/[\w\-{}/.]+)", val)
                 if um:
                     m.url, m.url_line = um.group(1), y
             elif any(key == k for k in DESC_KEYS) and not m.desc:
@@ -221,7 +254,9 @@ def find_methods(doc: Doc) -> list[Method]:
             segs = [s for s in m.url.split("/") if s and not s.startswith("{")]
             if segs and re.match(r"^[a-z]+[A-Z]\w*$", segs[-1]):
                 m.name, m.name_line = segs[-1], m.url_line
-    return methods
+    for m in row_methods:
+        m.lines = [m.verb_line]
+    return methods + row_methods
 
 
 def method_of(methods: list[Method], n: int) -> Method | None:
@@ -336,7 +371,12 @@ def rule_content_type_without_body(doc: Doc, methods: list[Method], out: dict) -
 class Status:
     code: int
     line: Line
-    kind: str  # list | heading | table | otvet
+    kind: str  # list | heading | table | otvet | inline
+    seg: str = ""  # текст объявления (в PDF/DOCX перечень статусов бывает склеен в одну строку)
+
+    @property
+    def text(self) -> str:
+        return self.seg or self.line.joined
 
 
 def _status_tables(doc: Doc) -> list[Table]:
@@ -359,11 +399,28 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
             continue
         m = DECL_LIST.match(x.text)
         if m:
-            decls.append(Status(int(m.group(1)), x, "list"))
+            starts = [0] + [k.start(1) for k in DECL_LIST_INLINE.finditer(x.text)]
+            if len(starts) == 1:
+                decls.append(Status(int(m.group(1)), x, "list"))
+            else:  # «200. Ответ … 401. Ответ … 422. Ответ …» в одной строке
+                for i, a in enumerate(starts):
+                    seg = x.text[a:starts[i + 1] if i + 1 < len(starts) else len(x.text)].strip()
+                    cm = re.match(CODE, seg)
+                    if cm:
+                        decls.append(Status(int(cm.group(0)), x, "list", seg))
             continue
+        if not DECL_LIST.match(x.text):  # PDF: перенос строки — объявления «422. Ответ …» с середины строки
+            for k in DECL_LIST_INLINE.finditer(x.text):
+                nxt = DECL_LIST_INLINE.search(x.text, k.end())
+                seg = x.text[k.start(1):nxt.start(1) if nxt else len(x.text)].strip()
+                if re.match(rf"{CODE}\.\s+(?:Ответ|Response|Статус)", seg, re.I):
+                    decls.append(Status(int(k.group(1)), x, "list", seg))
         m = DECL_OTVET.match(x.text)
         if m:
             decls.append(Status(int(m.group(1)), x, "otvet"))
+        for m in DECL_INLINE.finditer(x.text):  # «… Ответ 400 — поле отсутствует: {…}» внутри строки
+            if m.start() > 0:
+                decls.append(Status(int(m.group(1)), x, "inline"))
     mentions: list[tuple[int, Line, str]] = []
     for x in doc.lines:
         if not x.text or x.is_code:
@@ -395,6 +452,89 @@ def _heading_sections(doc: Doc, decls: list[Status]) -> list[tuple[Status, list[
         body = [x for x in doc.lines if d.line.n < x.n < nxt]
         res.append((d, body))
     return res
+
+
+STOP_STEMS = {"метод", "возвр", "верну", "ответ", "запро", "случа", "резул", "стату", "выпол", "описа", "котор",
+              "други", "этого", "также", "тогда", "после", "перед", "данны", "если", "либо", "или", "иначе", "когда",
+              "unsuc", "succe", "error", "messa", "body", "тело", "ответа", "код", "кода"}
+
+
+def _stems(text: str) -> set[str]:
+    words = re.findall(r"[а-яёa-z]{4,}", text.lower().replace("ё", "е"))
+    return {w[:5] for w in words} - STOP_STEMS
+
+
+def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method | None" = None,
+                    methods: "list[Method] | None" = None, any_class: bool = False,
+                    min_overlap: int = 2) -> Status | None:
+    """Объявленный статус с тем же условием, что у упомянутого кода (≥ 2 общих значимых основы).
+    Строка перечня, отнесённая к другому методу («createX: …»), — не тот же случай."""
+    cond = re.sub(CODE, " ", frag)
+    st = _stems(cond)
+    best, score = None, 1
+    names = {m.name.lower() for m in methods or [] if m.name}
+    score = min_overlap - 1
+    for d in decls:
+        if d.code == code or (not any_class and (d.code // 100) != (code // 100)):
+            continue
+        named = {w.lower() for w in re.findall(r"\b[a-z]+[A-Z]\w*\b", d.line.joined)} & names
+        if named and (method is None or (method.name or "").lower() not in named):
+            continue
+        k = len(st & _stems(re.sub(CODE, " ", d.text)))
+        if k > score:
+            best, score = d, k
+    return best
+
+
+COND_MARK = re.compile(r"\b(?:если|при|в\s+случае|иначе|когда)\b", re.I)
+
+
+def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status], mentions: list, sections: list,
+                             out: dict) -> None:
+    """«Если условие C, вернуть X» в логике ↔ строка перечня «Y — условие C» (X ≠ Y, оба объявлены)."""
+    declared = {d.code for d in decls}
+    decl_lines = {d.line.n for d in decls}
+    in_sections = {x.n for _, body in sections for x in body}
+    done: set[tuple[int, int]] = set()
+    for code, line, frag in mentions:
+        if code not in declared or line.n in decl_lines or line.n in in_sections:
+            continue
+        if not re.search(r"возвра|верн", frag, re.I):
+            continue
+        if 200 <= code < 300 and _has_error(frag):
+            continue  # «200 с ERROR» — это правило api.success_with_error
+        # «Если C, вернуть X» — хватит двух общих основ; утверждение без «если» («Повторная операция … возвращает X»)
+        # — только при сильном совпадении предмета (≥ 3 основы)
+        need = 2 if COND_MARK.search(frag) else 3
+        # условие бывает в предыдущем предложении шага («Проверить возраст… Если больше N, вернуть 200»)
+        k = line.joined.find(frag)
+        prev = line.joined[:k].rstrip() if k > 0 else ""
+        prev_sent = re.split(r"(?<=[.;])\s+", prev)[-1] if prev else ""
+        context = (prev_sent + " " + frag).strip()
+        other = _same_case_decl(context, [d for d in decls if d.code != code and d.kind in ("table", "list")], code,
+                                method_of(methods, line.n), methods, any_class=True, min_overlap=need)
+        if other is None or (code, other.code) in done:
+            continue
+        own = [d for d in decls if d.code == code and d.kind in ("table", "list")]
+        cst = _stems(re.sub(CODE, " ", context))
+        if any(len(cst & _stems(re.sub(CODE, " ", d.text))) >= len(cst & _stems(re.sub(CODE, " ", other.text)))
+               for d in own):
+            continue  # объявление самого кода X описывает этот случай не хуже — расхождения нет
+        done.add((code, other.code))
+        out["candidates"].append(candidate(
+            f"api.same_case.{code}-{other.code}",
+            title=f"Один и тот же случай: код {code} в логике метода и {other.code} в перечне статусов",
+            kind="status_conflict", criterion="set_consistent", severity="major", blocks="both",
+            evidence=[ev(line, frag), ev(other.line, other.text)],
+            problem=(f"В логике сказано {quoted(frag)}, а в перечне статусов тот же случай описан кодом {other.code}: "
+                     f"{quoted(other.text)}."),
+            scenario=(f"Наступает этот случай: сервер по логике метода отвечает {code}, клиент и автотест по перечню "
+                      f"статусов ждут {other.code}."),
+            impact="Клиент обработает ответ неверно; тест на этот случай нельзя написать однозначно.",
+            recommendation=f"Оставить для случая один код ({code} или {other.code}) и описать его в логике и перечне одинаково.",
+            question=f"Какой код возвращать в этом случае — {code} или {other.code}?",
+            conflict=True,
+        ))
 
 
 def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
@@ -438,12 +578,21 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
             parts.append(f"В разделе {quoted(d.line.text)} сказано {quoted(frag)} — описан ответ {code}, "
                          f"а не {d.code}.")
             title = f"В разделе ответа {d.code} описан код {code}"
+        same_case = None
         if p["mentions"] and undeclared:
             for line, frag in p["mentions"][:2]:
                 evidence.append(ev(line, frag))
             if not p["foreign"]:
+                same_case = _same_case_decl(p["mentions"][0][1], decls, code,
+                                            method_of(methods, p["mentions"][0][0].n), methods)
                 parts.append(f"В тексте сказано {quoted(p['mentions'][0][1])}, но кода {code} нет в перечне "
                              f"статусов (описаны {decl_list}).")
+                if same_case is not None:
+                    evidence.append(ev(same_case.line, same_case.text))
+                    parts.append(f"Тот же случай в перечне статусов описан кодом {same_case.code}: "
+                                 f"{quoted(same_case.text)}.")
+                    title = (f"Один и тот же случай получает код {code} в тексте и {same_case.code} "
+                             f"в перечне статусов")
             else:
                 parts.append(f"Кода {code} нет в перечне статусов (описаны {decl_list}).")
         if p["reason"]:
@@ -463,11 +612,12 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
                 continue
         if undeclared and p["foreign"]:
             title += ", которого нет в перечне статусов"
+        conflict = bool(p["foreign"] or p["reason"] or same_case is not None)
         out["candidates"].append(candidate(
             f"api.status_{code}",
             title=title,
-            kind="status_conflict" if (p["foreign"] or p["reason"]) else "missing_element",
-            criterion="set_consistent" if (p["foreign"] or p["reason"]) else "set_complete",
+            kind="status_conflict" if conflict else "missing_element",
+            criterion="set_consistent" if conflict else "set_complete",
             severity="major", blocks="both",
             evidence=evidence,
             problem=" ".join(parts),
@@ -481,10 +631,11 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
             recommendation=(f"Описать код {code} в перечне статусов (когда возвращается, тело ответа) или убрать "
                             f"упоминание; привести заголовки разделов в соответствие с кодами."),
             rewrite=f"{code}. <уточнить: когда возвращается>. Тело ответа: <уточнить>.",
-            conflict=bool(p["foreign"] or p["reason"]),
+            conflict=conflict,
         ))
         out["signals"].append(signal(f"api.status_{code}", doc.get(evidence[0]["line"]),
                                      evidence[0]["quote"], title + ".", ("architect", "qa"), "status_conflict"))
+    _rule_same_case_declared(doc, methods, decls, mentions, sections, out)
     # сводка для линз
     first = decls[0].line
     mentioned = sorted({c for c, _, _ in mentions})
@@ -509,7 +660,7 @@ def rule_success_with_error(doc: Doc, methods: list[Method], out: dict) -> None:
                 hits.append((d.code, x, d.line))
                 break
     for code, line, frag in mentions:
-        if 200 <= code < 300 and ERROR_WORD.search(frag) and re.search(r"возвра|верн", frag, re.I):
+        if 200 <= code < 300 and _has_error(frag) and re.search(r"возвра|верн", frag, re.I):
             hits.append((code, line, None))
     seen: set[int] = set()
     for code, line, head in hits:
@@ -521,7 +672,7 @@ def rule_success_with_error(doc: Doc, methods: list[Method], out: dict) -> None:
             evidence.append(ev(head))
         evidence.append(ev(line))
         evidence.append(ev(validation.line))
-        err = ERROR_JSON.search(line.text) or ERROR_WORD.search(line.joined)
+        err = ERROR_JSON.search(line.text) or _has_error(line.joined)
         err_s = err.group(0) if err else "ошибка"
         out["candidates"].append(candidate(
             "api.success_with_error",
@@ -585,6 +736,8 @@ def _table_role(doc: Doc, t: Table) -> str:
 
 def _base_type(s: str) -> str:
     s = s.strip().strip("`").strip()
+    if not any(rx.match(s) for rx, _ in TYPE_MAP):
+        s = s.replace(" ", "")  # PDF: «integ er»
     for rx, t in TYPE_MAP:
         if rx.match(s):
             return t
@@ -706,6 +859,57 @@ def rule_result_field_missing(doc: Doc, methods: list[Method], out: dict) -> Non
         return
 
 
+DATE_MASKS = [
+    (re.compile(r"ДД\.ММ\.ГГГГ|DD\.MM\.YYYY|dd\.MM\.yyyy", re.I), re.compile(r"^\d{2}\.\d{2}\.\d{4}$"), "ДД.ММ.ГГГГ"),
+    (re.compile(r"ГГГГ-ММ-ДД|YYYY-MM-DD|yyyy-MM-dd|ISO\s*8601", re.I), re.compile(r"^\d{4}-\d{2}-\d{2}"), "ГГГГ-ММ-ДД (ISO 8601)"),
+]
+JSON_PAIR = re.compile(r'"([A-Za-z_]\w*)"\s*:\s*"([^"]*)"')
+
+
+def rule_date_format(doc: Doc, methods: list[Method], out: dict) -> None:
+    """Формат даты поля в таблице не совпадает с примером значения этого поля."""
+    examples: dict[str, tuple[str, Line]] = {}
+    for x in doc.lines:
+        for m in JSON_PAIR.finditer(x.joined):
+            examples.setdefault(m.group(1), (m.group(2), x))
+    for t in tables(doc):
+        ni = t.col(*NAME_COLS)
+        if ni is None:
+            continue
+        for r in t.rows:
+            if not r.cells or ni >= len(r.cells):
+                continue
+            name = r.cells[ni].split()[0] if r.cells[ni] else ""
+            joined_name = r.cells[ni].replace(" ", "")
+            if name not in examples and IDENT.match(joined_name) and joined_name in examples:
+                name = joined_name  # PDF: «paymentDueD ate»
+            if not IDENT.match(name) or name not in examples:
+                continue
+            rest = " | ".join(r.cells[ni + 1:])
+            for mask_rx, value_rx, mask_name in DATE_MASKS:
+                mm = mask_rx.search(rest)
+                if not mm:
+                    continue
+                value, ex_line = examples[name]
+                if not re.match(r"^\d", value) or value_rx.match(value):
+                    break
+                q_row = " | ".join(r.cells[ni:ni + 1 + next(i for i, c in enumerate(r.cells[ni + 1:], 1)
+                                                           if mask_rx.search(c))])
+                out["candidates"].append(candidate(
+                    f"api.date_format.{_slug(name)}",
+                    title=f"Формат даты поля {name}: {mask_name} в описании, «{value}» в примере",
+                    kind="api_contract", criterion="set_consistent", severity="major", blocks="development",
+                    evidence=[ev(r, q_row), ev(ex_line, f'"{name}":"{value}"')],
+                    problem=(f"В таблице для {name} указан формат {quoted(mm.group(0))}, а в примере ответа "
+                             f"{quoted(value)}. Клиент не знает, какой формат разбирать."),
+                    scenario=f"Сервер отдаёт {name} = «{value}», клиент разбирает по маске {mm.group(0)} — дата не читается.",
+                    impact="Ошибка разбора даты у клиента; тесты контракта расходятся с примером.",
+                    recommendation=f"Указать один формат для {name} (рекомендуется ISO 8601) в таблице и в примерах.",
+                    conflict=True,
+                ))
+                break
+
+
 def rule_inventory(doc: Doc, methods: list[Method], out: dict) -> None:
     if not methods:
         return
@@ -726,4 +930,5 @@ def run(doc: Doc, out: dict) -> None:
     rule_success_with_error(doc, methods, out)
     rule_field_types(doc, methods, out)
     rule_result_field_missing(doc, methods, out)
+    rule_date_format(doc, methods, out)
     rule_inventory(doc, methods, out)
