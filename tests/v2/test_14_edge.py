@@ -136,8 +136,6 @@ def test_unreadable_input_gives_failed_report_with_reason(tmp_path, name, capsys
     assert "Traceback" not in out.read_text(encoding="utf-8")
 
 
-@_bug("01", "отчёт о нечитаемом входе нарушает contracts/v2.json: document.format = '' и sha256 = '' "
-            "(pipeline.review, запасной отчёт)")
 @pytest.mark.parametrize("name", ["fake.pdf", "doc.xyz"])
 def test_unreadable_input_report_matches_contract(tmp_path, name):
     doc = _unreadable_inputs(tmp_path)[name]
@@ -145,7 +143,6 @@ def test_unreadable_input_report_matches_contract(tmp_path, name):
     assert not _schema_errors(json.loads(Path(written["json"]).read_text(encoding="utf-8")))
 
 
-@_bug("01", "пустой документ получает вердикт «можно начинать» и тратит вызовы модели")
 @pytest.mark.parametrize("name", ["empty.md", "blank.md", "empty.html"])
 def test_empty_document_is_not_ready_and_costs_no_calls(tmp_path, name):
     doc = _odd_inputs(tmp_path)[name]
@@ -157,10 +154,9 @@ def test_empty_document_is_not_ready_and_costs_no_calls(tmp_path, name):
 
 
 @needs_pdf
-@_bug("03", "предупреждения документа (скан, нечитаемые страницы, правки Word) не попадают в отчёт: "
-            "docview.summary не переносит view.warnings")
-def test_document_warnings_reach_report(tmp_path):
-    report, written, out = _review(tmp_path, STRESS / "scan_page.pdf", provider="offline")
+@pytest.mark.parametrize("provider", ["offline", "mock"])
+def test_document_warnings_reach_report(tmp_path, provider):
+    report, written, out = _review(tmp_path, STRESS / "scan_page.pdf", provider=provider)
     warns = " ".join((report.get("document") or {}).get("warnings") or []) + " ".join(report["run"]["warnings"])
     assert "Страница 2" in warns and "скан" in warns
     assert "скан" in out.read_text(encoding="utf-8")
@@ -218,8 +214,6 @@ def test_network_down_gives_failed_report_not_traceback(tmp_path, monkeypatch):
     assert report["run"]["calls"]["total"] <= 16
 
 
-@_bug("01", "нет сети: первая строка предупреждений — «выполнен частично / исчерпан бюджет», а не «нет соединения»; "
-            "повторы network съедают бюджет вызовов следующих этапов (run.model_error пуст)")
 def test_network_down_is_explained_first(tmp_path, monkeypatch):
     report, _, _ = _faulty_run(tmp_path, monkeypatch, lambda s, k: ProviderError("network", "нет соединения"))
     first = report["run"]["warnings"][0].lower()
@@ -466,8 +460,6 @@ def test_empty_title_candidate_still_gives_valid_report(tmp_path):
     assert res["ok"], res["errors"][:3]
 
 
-@_bug("01", "неизвестное имя линзы (--lenses foo, опечатка) даёт «Прогон завершён полностью» без единой линзы "
-            "(__main__.py:61 не проверяет имена, стадия lens_foo — ok)")
 def test_unknown_lens_name_is_not_a_complete_run(tmp_path):
     report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", lenses=["foo"])
     assert report["run"]["status"] != "complete"
@@ -489,8 +481,6 @@ def test_answers_file_in_cp1251_is_read(tmp_path):
     assert (len(answers) if isinstance(answers, list) else int(answers or 0)) >= 1
 
 
-@_bug("01", "сбой режима --answers/--revise теряется: предупреждение и статус recheck=failed пишутся в self.*, "
-            "а report.run уже собран (pipeline.py:495–498; успешная ветка обновляет run в 512–518)")
 def test_answers_mode_failure_is_reported(tmp_path, monkeypatch):
     from bcc_review.v2.stages import revise
 
@@ -505,7 +495,6 @@ def test_answers_mode_failure_is_reported(tmp_path, monkeypatch):
     assert any("--answers" in w for w in report["run"]["warnings"])
 
 
-@_bug("01", "несуществующий файл ответов (--answers опечатка.md) молча считается «ответов 0»: код 0, без предупреждения")
 def test_missing_answers_file_is_an_error(tmp_path, capsys):
     from bcc_review.v2.__main__ import main
     out = tmp_path / "r.md"
@@ -525,8 +514,6 @@ def test_answers_utf8_file_changes_report(tmp_path):
     assert report.get("clarification") and report["run"]["stages"].get("recheck") == "ok"
 
 
-@_bug("01", "каталог прогонов нельзя создать (запуск из каталога только для чтения, Docker под обычным "
-            "пользователем) — трейсбэк вместо отчёта: RunDir создаётся в Pipeline.__init__ вне try (pipeline.py:174)")
 def test_unwritable_runs_dir_still_gives_report(tmp_path):
     blocker = tmp_path / "runs_is_a_file"
     blocker.write_text("", encoding="utf-8")
@@ -577,8 +564,6 @@ def test_same_input_gives_same_markdown(tmp_path):
     assert texts[0] == texts[1]
 
 
-@_bug("01", "фатальная ошибка посреди прогона (квота, ключ отклонён) не попадает в run.model_error: stage() пишет "
-            "self.model_error, а _run_block его не выносит — код выхода не 3, консоль молчит о причине")
 def test_fatal_error_mid_run_sets_model_error(tmp_path, monkeypatch):
     report, _, _ = _faulty_run(tmp_path, monkeypatch,
                                lambda s, k: ProviderError("quota", "дневная квота исчерпана") if s == "lens_risk" else None)
@@ -616,9 +601,6 @@ def test_transient_stage_file_write_error_does_not_abort_run(tmp_path, monkeypat
     assert report["run"]["status"] != "failed" and report["findings"]
 
 
-@_bug("01", "справка и ошибки командной строки на английском (argparse): «usage:», «positional arguments», "
-            "«options», «show this help message and exit», «error: the following arguments are required: output», "
-            "«unrecognized arguments», «invalid int value» (__main__.py)")
 @pytest.mark.parametrize("argv", [["вход.md"], ["вход.md", "отчёт.md", "--bogus"], ["вход.md", "o.md", "--max-calls", "x"],
                                   ["--help"]])
 def test_cli_messages_are_russian(argv, capsys):
@@ -647,8 +629,6 @@ def test_console_progress_is_russian(tmp_path, capsys):
     assert not codes, sorted(set(codes))
 
 
-@_bug("01", "быстрый старт: сбой перевода ссылок R-ID (_remap_reviewers, pipeline.py:324 — вне try) роняет весь "
-            "прогон в «Прогон прерван», хотя это не этап модели")
 def test_fast_start_remap_error_does_not_abort_run(tmp_path, monkeypatch):
     def boom(*a, **kw):
         raise ValueError("строка цитаты не число")
