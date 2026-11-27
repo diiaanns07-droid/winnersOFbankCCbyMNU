@@ -10,7 +10,9 @@ python -m bcc_review verify reports/requirements.json release/input/requirements
 ```
 
 Таблицу ниже собирает `python scripts/reports_table.py reports --write` из паспортов отчётов; при сборке
-`verify` запускается для каждого отчёта заново.
+`verify` запускается для каждого отчёта заново. Столбец «Эталон кейса» — сверка отчёта по документу кейса с нашим
+эталоном (5 критичных дефектов К1–К5, 20 существенных С1–С20, [`docs/task-analysis.md`](../docs/task-analysis.md),
+раздел 5) счётчиком `python -m evaluation.v2.score` в строгом счёте: без модели-арбитра, спорное не засчитывается.
 
 <!-- таблица прогонов: начало (scripts/reports_table.py) -->
 Отчёты появятся на теге `v2.0.0`.
@@ -20,6 +22,9 @@ python -m bcc_review verify reports/requirements.json release/input/requirements
 
 | Отчёт | Команда |
 | :--- | :--- |
-| `requirements.*` | `python -m bcc_review release/input/requirements.md reports/requirements.md --provider claude_cli --model opus --no-cache --export jira` |
-| `requirements_pdf.*` | `python -m bcc_review release/input/requirements.pdf reports/requirements_pdf.md --provider claude_cli --model opus --no-cache --export jira,pdf` |
-| `requirements.gemini.*` | `python -m bcc_review release/input/requirements.md reports/requirements.gemini.md --provider gemini --no-cache --export jira` |
+| `requirements.*` | `python -m bcc_review release/input/requirements.md reports/requirements.md --provider claude_cli --model opus --no-cache --export jira,docx` |
+| `requirements_pdf.*` | `python -m bcc_review release/input/requirements.pdf reports/requirements_pdf.md --provider claude_cli --model opus --no-cache --export jira,docx,pdf` |
+| `other_topic_cashback.*` | `python -m bcc_review release/input/other_topic_cashback.md reports/other_topic_cashback.md --provider claude_cli --model opus --no-cache --export jira,docx` |
+| `requirements.gemini.*` | Windows, бесплатный ключ: `powershell -ExecutionPolicy Bypass -File scripts\gemini_report.ps1` (внутри — `python -m bcc_review release\input\requirements.md reports\requirements.gemini.md --provider gemini --no-cache --export jira`) |
+
+Все прогоны `claude_cli` разом, с `verify` и этой таблицей: `scripts/final_reports.sh` (на теге, чистое дерево).

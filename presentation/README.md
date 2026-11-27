@@ -40,13 +40,25 @@ node presentation/shots.cjs reports/requirements.html presentation/img http://12
 
 ## Видео демо
 
-Нужен запущенный веб (`python -m bcc_review.v2.web`). Сценарий: загрузка → этапы → отчёт → клики по трём
-критичным дефектам (документ подсвечивает цитаты) → фильтр «только критичные» → вопросы → чек-лист → тест-кейсы →
-паспорт. Курсор нарисован оверлеем.
+Готовые файлы (2 мин 02 с, 1440×900): `demo.mp4` — без текста, под озвучку; `demo_subtitled.mp4` — с вшитыми
+субтитрами; `demo.webm` — исходная запись Playwright; `demo.srt` — субтитры (23 фразы) для монтажа.
+Снято 27.11 ≈05:05 (Астана): веб-демо на `v2/14-html-web` (`bcc/v2` 7d80df8), вход `release/input/requirements.pdf`,
+`claude_cli` / sonnet. Ответы модели взяты из кэша живого прогона того же PDF (4 мин 40 с, 9 вызовов, 32 дефекта:
+4 критичных, 18 существенных, 10 незначительных, цитат 92 из 92) — об этом говорит субтитр, а в паспорте видно
+«9 из кэша». Этапы показаны в темпе 2,6 с (`--pace`).
+
+Сценарий: титул → загрузка PDF → этапы → вердикт и «исправить первым» → клик по блокеру подсвечивает строки
+документа (обе стороны противоречия) → подробности дефекта → следующие блокеры → фильтр → вопросы владельцу с
+вариантами → чек-лист банка → скачивание Word, PDF с выделениями (показана страница) и Jira CSV (показана таблица) →
+паспорт → финал. Курсор нарисован оверлеем. Числа в субтитрах берутся из `report.json` этого прогона.
+
+Пересъёмка (например, по финальной сборке):
 
 ```bash
-node presentation/demo_video.cjs http://127.0.0.1:8014/ release/input/requirements.md presentation/out/video claude_cli sonnet
+python -m bcc_review release/input/requirements.pdf /tmp/warm/report.md --provider claude_cli --model sonnet --cache-dir /tmp/demo-cache
+python -m bcc_review.v2.web --port 8014 --data-dir /tmp/demo-web --cache-dir /tmp/demo-cache --pace 2.6 &
+node presentation/demo_video.cjs --base http://127.0.0.1:8014/ --file release/input/requirements.pdf --out presentation \
+     --provider claude_cli --model sonnet --real "4 мин 40 с"
 ```
 
-С `mock` запись идёт ≈ 50 с (mock воспроизводит записанные ответы живого прогона sonnet, в паспорте видно
-«mock»); с `claude_cli` между загрузкой и отчётом ≈ 5 минут этапов — этот кусок в монтаже ускоряется.
+Первая команда — живой прогон, который наполняет кэш; дальше веб повторяет его без модели за секунды.

@@ -26,6 +26,8 @@ COPY src ./src
 COPY contracts ./contracts
 COPY release/input ./release/input
 COPY examples ./examples
+# записанные ответы живого прогона: --provider mock в контейнере даёт настоящий отчёт без сети и ключа
+COPY tests/v2/fixtures/official ./tests/v2/fixtures/official
 
 # pymupdf без подсказки про pymupdf_layout в выводе
 ENV PYMUPDF_SUGGEST_LAYOUT_ANALYZER=0
