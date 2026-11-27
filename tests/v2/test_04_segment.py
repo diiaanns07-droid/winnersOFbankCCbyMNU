@@ -1033,6 +1033,8 @@ def test_reader_text_has_no_english_or_internal_codes():
     assert sg.ru_reader_text("Вставка в документ; передаётся как риск (criterion = risk)", view) == \
         "Вставка в документ; передаётся как риск"
     assert sg.ru_reader_text("Header таблицы, placeholder", view) == "Шапка таблицы, заглушка"
+    assert sg.ru_reader_text("Пример к коду 200; блок вынесен в excluded", view) == \
+        "Пример к коду 200; блок вынесен в «не вошло»"
     # имена из документа остаются
     assert sg.ru_reader_text("Поле cardId и push", view) == "Поле cardId и push"
     raw = {"requirements": [{"source_id": "", "kind": "api", "summary": "Field cardId, required",

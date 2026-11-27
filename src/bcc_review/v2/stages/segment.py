@@ -342,7 +342,8 @@ _EN_RU = {"note": "пометка", "notes": "пометки", "placeholder": "�
           "flag": "признак", "toggle": "переключатель", "button": "кнопка", "screen": "экран", "empty": "пустой",
           "separator": "разделитель", "divider": "разделитель", "marker": "маркер", "block": "блок",
           "description": "описание", "goal": "цель", "scheme": "схема", "diagram": "схема", "step": "шаг",
-          "steps": "шаги", "rule": "правило", "rules": "правила", "limit": "лимит", "threshold": "порог"}
+          "steps": "шаги", "rule": "правило", "rules": "правила", "limit": "лимит", "threshold": "порог",
+          "excluded": "«не вошло»", "requirement": "требование", "requirements": "требования", "quote": "цитата"}
 # внутренние коды ревью, которые модель повторяет из системного промпта: «(criterion = risk)», «kind: goal»
 _INTERNAL_CODE = re.compile(r"\s*\(\s*(?:criterion|kind|severity|lens|source_id|line_start|line_end|blocks)"
                             r"\s*[=:]\s*[\w-]+\s*\)|\b(?:criterion|kind|severity|lens|source_id|blocks)\s*[=:]\s*"
