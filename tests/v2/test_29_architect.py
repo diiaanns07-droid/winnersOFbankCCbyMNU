@@ -113,3 +113,25 @@ def test_state_rule_ignores_status_codes():
     assert not A.state_without_example(c)  # опора — не пример ответа
     c["evidence"][0]["quote"] = '{"status":"NEW"}'
     assert A.state_without_example(c)
+
+
+def test_adjacent_system_data_is_minor_on_clean_grace():
+    """grace_clean (haiku, 17:31): «возвратов / дат покупок нет в том, что шаг 3 получает из кредитного модуля»."""
+    raw = _saved_raw("grace_clean.architect.haiku.v1a.json")
+    out = A.postprocess(raw)
+    assert out["candidates"] and all(c["severity"] == "minor" for c in out["candidates"])
+
+
+def test_adjacent_rule_needs_fetch_step_quote():
+    c = _c("Последние цифры карты не приходят в событии", [(43, "Сервис → сервис уведомлений: передать сумму")])
+    assert not A.adjacent_data_gap(c)  # опора — не шаг «получить из …»: замечание 7(1) остаётся
+    c["evidence"].append({"quote": "3. Получить из процессинга операцию", "line": 120})
+    assert A.adjacent_data_gap(c)
+
+
+def test_official_saved_answers_keep_severity():
+    """Новые понижения не трогают официальный ТЗ: те же c/M/m на обоих сохранённых ответах haiku."""
+    for name, sev in (("official.architect.haiku.v0a.json", (2, 8, 2)), ("official.architect.haiku.v0b.json", (2, 7, 3))):
+        out = A.postprocess(_saved_raw(name))
+        got = tuple(sum(1 for c in out["candidates"] if c["severity"] == s) for s in ("critical", "major", "minor"))
+        assert got == sev, name

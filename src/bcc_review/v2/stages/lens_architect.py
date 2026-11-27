@@ -236,6 +236,22 @@ def state_without_example(c: dict) -> bool:
     return any('{"' in str(e.get("quote") or "") for e in c.get("evidence") or [] if isinstance(e, dict))
 
 
+# «Нужных данных нет в том, что шаг логики получает из смежной системы» («3. Получить из кредитного модуля выписку и
+# платежи» — а возвратов и дат покупок там якобы нет). Промпт: внутренние процессы и обмен со смежными системами без
+# обещания описать их интерфейс — не пробел контракта; выписка, заявка, операция приходят со своим содержимым.
+# haiku пишет это major на чистых ТЗ (grace_clean — оба major замера №29; insurance_clean, прогоны open2 05:20 и 08:35);
+# на официальном ТЗ и дефектных open2 таких замечаний нет. Опора — цитата шага «получить из / запросить у …».
+FETCH_STEP = re.compile(r"\b(получить|запросить|загрузить|взять|получает|запрашивает)\s+(\w+\s+){0,2}(из|у|от)\s+", re.I)
+FETCH_GAP_TITLE = re.compile(r"не\s+(входит|входят|запрашива\w*|получа\w*|переда\w*|приход\w*)|нет\s+в\s+(данных|ответе)|"
+                             r"без\s+источник|не\s+содерж", re.I)
+
+
+def adjacent_data_gap(c: dict) -> bool:
+    if c.get("kind") not in ("missing_element", "incomplete") or not FETCH_GAP_TITLE.search(str(c.get("title") or "")):
+        return False
+    return any(FETCH_STEP.search(str(e.get("quote") or "")) for e in c.get("evidence") or [] if isinstance(e, dict))
+
+
 def error_body_gap(c: dict) -> bool:
     """Замечание проверки 4а: поле ответа без условия отсутствует в телах ошибок."""
     return c.get("kind") == "api_contract" and bool(ERROR_BODY_TITLE.search(str(c.get("title") or "")))
@@ -276,7 +292,8 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
         if unpromised_critical(c):
             c["severity"] = "major"
         if c["severity"] != "minor" and (error_body_gap(c) or data_list_only(c) or success_body_ref(c)
-                                         or via_intermediate(c) or state_without_example(c)):
+                                         or via_intermediate(c) or state_without_example(c)
+                                         or adjacent_data_gap(c)):
             c["severity"] = "minor"
         if requirement_ids is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in requirement_ids]
