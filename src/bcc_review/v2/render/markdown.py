@@ -591,7 +591,9 @@ class _Ctx:
         self.f_by_id = {f.get("id"): f for f in all_f}
         self.q_by_finding: dict[str, list[str]] = {}
         self.q_text: dict[str, str] = {}  # сам вопрос (первое вопросительное предложение) — для карточки дефекта
+        self.q_options: dict[str, list] = {}
         for q in report.get("questions", []) or []:
+            self.q_options[q.get("id")] = [str(o) for o in q.get("options") or [] if str(o).strip()]
             for fid in q.get("finding_ids", []) or []:
                 self.q_by_finding.setdefault(fid, []).append(q.get("id"))
             text = " ".join(str(q.get("question") or "").split())
@@ -1611,6 +1613,19 @@ def _card_footer(c: _Ctx, f: dict, badge: str = "") -> str:
     return "*" + " · ".join(bits) + badge + "*"
 
 
+def _short_options(options, limit: int = 90) -> list[str]:
+    """Варианты ответа коротко: до первого «:» или «;», если так они остаются различимыми, иначе — по длине."""
+    opts = [" ".join(str(o).split()) for o in options or [] if str(o).strip()][:4]
+    if len(opts) < 2:
+        return []
+    heads = [re.split(r":\s|;\s", o, maxsplit=1)[0].rstrip(" .,") for o in opts]
+    out = heads if len(set(heads)) == len(heads) and all(len(h) >= 8 for h in heads) else opts
+    out = [shorten(o, limit) for o in out]
+    if len(set(out)) < len(out):
+        return []
+    return [o[0].lower() + o[1:] if len(o) > 1 and o[0].isupper() and o[1].islower() else o for o in out]
+
+
 def _and_list(items: list[str]) -> str:
     items = [str(x) for x in items]
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " и " + items[-1]
@@ -1701,6 +1716,9 @@ def _card(c: _Ctx, f: dict) -> list[str]:
         body.append(f"**Вопрос владельцу.** {prose(question)}{links}")
     elif qids:
         body.append("**Вопрос владельцу:** " + ", ".join(f"[{q}](#{anchor(q)})" for q in qids) + " (варианты ответа)")
+    opts = _short_options(c.q_options.get(qids[0]) if qids else None)
+    if opts and sev == "critical":  # у блокера решение — прямо в карточке: варианты коротко, полностью — в приложении А
+        body.append("**Варианты ответа:** " + "; ".join(f"{chr(65 + i)} — {prose(o)}" for i, o in enumerate(opts)))
     body.append(_card_footer(c, f, badge))
     out += [line + "  " if i < len(body) - 1 else line for i, line in enumerate(body)]
     return out + [""]

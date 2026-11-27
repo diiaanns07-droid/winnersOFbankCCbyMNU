@@ -897,3 +897,20 @@ def test_blockers_with_one_exception_named_once(sample):
     assert "; останавливает разработку и тестирование." not in brief
     text = console.summary(r)
     assert f"{bl[-1]['id']} — только разработку:" in text and len(text.split("\n")) <= 8
+
+
+def test_critical_card_shows_short_answer_options(sample):
+    """Рубрика, п. 6: у блокера — вопрос владельцу с вариантами прямо в карточке (коротко; полностью — в приложении А)."""
+    r = copy.deepcopy(sample)
+    q = r["questions"][0]
+    fid = q["finding_ids"][0]
+    f = next(x for x in r["findings"] if x["id"] == fid)
+    f["severity"], f["blocks"] = "critical", "both"
+    q["options"] = ["По дате совершения: покупка идёт в январь, критерий исправить",
+                    "По дате проведения: покупка идёт в февраль, правило исправить"]
+    card = _card_of(markdown.render(r), fid)
+    assert "**Варианты ответа:** A — по дате совершения; B — по дате проведения" in card
+    assert markdown._short_options(["Один push; если расходы уже выше, push сразу",
+                                    "Один push; если расходы уже выше, push не нужен"]) == \
+        ["один push; если расходы уже выше, push сразу", "один push; если расходы уже выше, push не нужен"]
+    assert markdown._short_options(["только один"]) == []
