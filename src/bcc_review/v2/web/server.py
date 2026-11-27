@@ -31,10 +31,16 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlsplit
 
+from .sheet import VERDICT as VERDICT_WORD, build_sheet, load_report, plural, read_source
 from .runner import (ALLOWED_EXT, FILES, MAX_UPLOAD, FixtureRunner, Job, JobStore, PipelineRunner, Worker,
                      check_provider, load_dotenv, provider_status)
 
 ASSETS = Path(__file__).with_name("assets")
+# №39: tokens.css — дизайн-система, шрифты Inter и JetBrains Mono (OFL); agent.* — BCC AI (№40), отдаются, когда файлы появятся
+ASSET_NAMES = ("app.css", "app.js", "tokens.css", "agent.css", "agent.js",
+               "inter-400.woff2", "inter-600.woff2", "inter-700.woff2", "jetbrains-mono-400.woff2", "fonts-OFL.txt")
+ASSET_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".woff2": "font/woff2",
+               ".txt": "text/plain; charset=utf-8"}
 REPO = Path(__file__).resolve().parents[4]
 JOB_PATH = re.compile(r"^/(api/)?jobs/(?P<id>\d{8}-\d{6}-[0-9a-f]{6})(?P<rest>/.*)?$")
 
@@ -61,79 +67,206 @@ class App:
 
 # ─────────────────────────────── страницы ───────────────────────────────
 
+# ── №39: знак продукта (свой, не логотип банка): лист с отметкой и зелёной галочкой «сверено» ──
+_MARK = ('<svg viewBox="0 0 32 32" width="{s}" height="{s}" aria-hidden="true" focusable="false">'
+         '<rect width="32" height="32" rx="9" fill="#008556"/>'
+         '<path d="M9.5 7h10l4 4v13.5a1.5 1.5 0 0 1-1.5 1.5H9.5A1.5 1.5 0 0 1 8 24.5v-16A1.5 1.5 0 0 1 9.5 7z" fill="#fff"/>'
+         '<path d="M11.5 13h7M11.5 20h5" stroke="#C9D3DC" stroke-width="1.5" stroke-linecap="round"/>'
+         '<path d="M11.5 16.5h9" stroke="#FBE1BA" stroke-width="3" stroke-linecap="round"/>'
+         '<circle cx="23.2" cy="23.2" r="4.8" fill="#00B975" stroke="#fff" stroke-width="1.4"/>'
+         '<path d="M21.1 23.3l1.5 1.5 2.7-3" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" '
+         'stroke-linejoin="round"/></svg>')
+_FAVICON = "data:image/svg+xml," + quote(_MARK.format(s=32).replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ', 1),
+                                          safe="")
+
+# короткие имена провайдеров
+_SHORT = {"auto": "Авто", "claude_cli": "Claude Code", "gemini": "Gemini", "anthropic": "Claude API",
+          "openai": "Свой сервер", "mock": "Демо без модели", "offline": "Только правила"}
+_NO_MODEL = ("mock", "offline")
+_HINT = {"gemini": 'Нет ключа. Он бесплатный: <a href="https://aistudio.google.com/apikey" target="_blank" '
+                   'rel="noopener">получить за минуту</a>, затем GEMINI_API_KEY=… в файле .env.',
+         "anthropic": "Нет ключа: добавьте ANTHROPIC_API_KEY=… в файл .env.",
+         "openai": "Нет адреса: добавьте OPENAI_BASE_URL=http://localhost:11434/v1 (Ollama) в файл .env.",
+         "claude_cli": "Не найден: установите Claude Code и войдите в аккаунт."}
+
+
+def _provider_line(provs: list[dict[str, Any]]) -> tuple[str, str]:
+    """Строка состояния в шапке: (текст, модификатор класса .b-status)."""
+    first = provs[0].get("resolved", "offline") if provs else "offline"
+    if first in _NO_MODEL:
+        return "Без ключа: только правила и готовые отчёты", "stale"
+    note = {"claude_cli": "по подписке", "openai": "свой сервер"}.get(first, "ключ найден")
+    return f"{_SHORT.get(first, first)} · {note}", ""
+
+
 def _layout(title: str, body: str, *, sub: str = "") -> str:
+    try:
+        status, mod = _provider_line(provider_status())
+    except Exception:  # noqa: BLE001 — шапка не должна падать из-за проверки провайдеров
+        status, mod = "", ""
+    agent_css = '<link rel="stylesheet" href="/assets/agent.css">' if (ASSETS / "agent.css").is_file() else ""
+    agent_js = '<script src="/assets/agent.js" defer></script>' if (ASSETS / "agent.js").is_file() else ""
+    doc = f'<span class="b-bar-doc" title="{e(sub)}">{e(sub)}</span>' if sub else ""
+    st = f'<span class="b-status {mod}" id="pstatus" title="{e(status)}">{e(status)}</span>' if status else ""
     return f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F3F6F5">
 <title>{e(title)}</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7C55'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="{_FAVICON}">
+<link rel="preload" href="/assets/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/tokens.css">
 <link rel="stylesheet" href="/assets/app.css">
-</head><body>
-<header class="top"><a class="brand" href="/"><span class="logo" aria-hidden="true"></span><span><span class="bname">Ревью требований</span>
-<span class="bsub">{e(sub or "ИИ-агент статического ревью ТЗ · BCC-HUB × MNU")}</span></span></a></header>
+{agent_css}
+</head><body class="b-desk">
+<header class="b-bar">
+  <a class="b-bar-brand" href="/" aria-label="BCC Review — на главную"><div class="b-bar-agent" data-bcc-agent data-size="48" data-mood="idle"></div><span class="b-bar-mark">{_MARK.format(s=34)}</span><span class="b-bar-name">BCC Review</span></a>{doc}
+  <div class="b-bar-end">{st}</div>
+</header>
 {body}
 <script src="/assets/app.js"></script>
+{agent_js}
 </body></html>"""
+
+
+def _gallery(app: App) -> str:
+    try:  # №43 — готовые отчёты стопкой; до его вливания блока нет
+        from .gallery import gallery_block
+    except ImportError:
+        return ""
+    try:
+        return gallery_block(app) or ""
+    except Exception:  # noqa: BLE001 — стол открывается, даже если стопка сломалась
+        return ""
+
+
+def _job_files(app: App, job: Job) -> list[tuple[str, str]]:
+    out = app.store.dir(job.id) / "out"
+    return [(lbl, f"/jobs/{job.id}/files/{n}") for k, n, lbl, _ in FILES
+            if k not in ("json",) and (out / n).is_file()]
+
+
+def _top_sheet(app: App) -> dict[str, Any] | None:
+    """Раскрытый лист на столе: своя последняя готовая проверка, иначе первый готовый отчёт №43."""
+    for j in app.store.recent():
+        if j.state != "done":
+            continue
+        rep = load_report(app.store.dir(j.id) / "out" / "report.json")
+        if rep:
+            return {"report": rep, "raw": read_source(j.input_path), "name": j.file_name, "href": f"/jobs/{j.id}",
+                    "files": _job_files(app, j), "id": j.id}
+    try:
+        from .gallery import load_examples
+        recs = load_examples().get("reports") or []
+    except Exception:  # noqa: BLE001 — №43 ещё не влит или examples.json не читается
+        recs = []
+    for r in recs:
+        rep = load_report(r.get("json")) if r.get("ok") else None
+        if rep:
+            src = r.get("source")
+            return {"report": rep, "raw": read_source(src), "name": Path(str(src)).name if src else r.get("title", ""),
+                    "href": f"/examples/{r.get('id')}", "files": [("Отчёт и выгрузки", f"/examples/{r.get('id')}")],
+                    "id": ""}
+    return None
+
+
+def _leaf(j: Job, *, on: bool = False) -> str:
+    s = j.summary or {}
+    when = time.strftime("%d.%m %H:%M", time.localtime(j.created))
+    if j.state == "done":
+        cls, word = VERDICT_WORD.get(s.get("development", ""), ("cond", "нет вердикта"))
+        crit = int(s.get("critical") or 0)
+        line = (f'<div class="b-verdict"><span class="main">Разработка: <b class="{cls}">{e(word)}</b></span>'
+                f'<span>{crit} {plural(crit, "блокер", "блокера", "блокеров")}</span></div>' if crit else
+                f'<div class="b-verdict"><span class="main">Разработка: <b class="{cls}">{e(word)}</b></span>'
+                f'<span>блокеров нет</span></div>')
+    else:
+        label = {"queued": "в очереди", "running": "идёт проверка", "failed": "ошибка прогона"}.get(j.state, j.state)
+        line = f'<div class="b-verdict"><span>{e(label)}</span></div>'
+    cur = ' aria-current="page"' if on else ""
+    return (f'<a class="b-leaf{" on" if on else ""}" href="/jobs/{e(j.id)}"{cur}>'
+            f'<span class="b-leaf-t">{e(Path(j.file_name).stem)}</span>{line}'
+            f'<span class="b-leaf-m">{e(when)} · {e(_SHORT.get(j.provider, j.provider))}</span></a>')
+
+
+def _margin_head(report: dict[str, Any]) -> str:
+    """Шапка полей: сколько замечаний и вопросов, и легенда отметок — те же знаки, что у заметок."""
+    fs = report.get("findings") or []
+    n = {k: sum(1 for f in fs if f.get("severity") == k) for k in ("critical", "major", "minor")}
+    q = len(report.get("questions") or [])
+    total = len(fs)
+    legend = "".join(
+        f'<span class="lg {c}">{n[k]} {plural(n[k], *w)}</span>' for k, c, w in (
+            ("critical", "crit", ("блокер", "блокера", "блокеров")),
+            ("major", "major", ("существенное", "существенных", "существенных")),
+            ("minor", "minor", ("незначительное", "незначительных", "незначительных"))) if n[k])
+    ask = f' · {q} {plural(q, "вопрос", "вопроса", "вопросов")}' if q else ""
+    return (f'<div class="b-margin-head"><b>{total} {plural(total, "замечание", "замечания", "замечаний")}{ask}</b>'
+            f'<div class="b-legend">{legend}</div></div>')
 
 
 def index_page(app: App, *, error: str = "", provider: str = "", model: str = "") -> str:
     provs = provider_status()
-    sel = provider or app.default_provider
+    ids = [p["id"] for p in provs]
+    sel = provider if provider in ids else (app.default_provider if app.default_provider in ids else "auto")
     opts = []
     for p in provs:
-        mark = "" if p["ok"] else " — недоступен"
-        opts.append(f'<option value="{e(p["id"])}" data-ok="{1 if p["ok"] else 0}" data-note="{e(p["note"])}" '
-                    f'data-models="{e(",".join(p["models"]))}"{" selected" if p["id"] == sel else ""}>'
-                    f'{e(p["label"])}{mark}</option>')
-    sample = ""
-    if app.sample:
-        sample = (f'<button type="submit" class="btn ghost" name="sample" value="1" formnovalidate>'
-                  f'Проверить пример: {e(app.sample.name)}</button>')
-    rows = []
-    for j in app.store.recent():
-        s = j.summary or {}
-        v = VERDICT.get(s.get("development", ""), ("—", "none"))
-        state = {"queued": "в очереди", "running": "идёт анализ", "done": "готово", "failed": "ошибка"}.get(j.state, j.state)
-        counts = (f'<span class="c crit">{s.get("critical", 0)}</span><span class="c major">{s.get("major", 0)}</span>'
-                  f'<span class="c minor">{s.get("minor", 0)}</span>') if j.state == "done" else ""
-        rows.append(f'<tr><td><a href="/jobs/{e(j.id)}">{e(j.file_name)}</a></td>'
-                    f'<td>{e(time.strftime("%d.%m %H:%M", time.localtime(j.created)))}</td>'
-                    f'<td>{e(j.provider)}{(" · " + e(j.model)) if j.model else ""}</td>'
-                    f'<td><span class="st st-{e(j.state)}">{e(state)}</span></td>'
-                    f'<td>{f"<span class=vd-{v[1]}>{e(v[0])}</span>" if j.state == "done" else ""}</td><td>{counts}</td></tr>')
-    recent = (f'<section class="card recent"><h2>Последние проверки</h2><div class="tw"><table><thead><tr><th>Файл</th>'
-              f'<th>Когда</th><th>Провайдер</th><th>Статус</th><th>Разработка</th><th>Замечания</th></tr></thead>'
-              f'<tbody>{"".join(rows)}</tbody></table></div></section>') if rows else ""
-    err = f'<div class="error" role="alert">{e(error)}</div>' if error else ""
-    body = f"""<main class="wrap">
-<section class="intro">
-  <h1>Проверка требований до начала разработки</h1>
-  <p>Загрузите техническое задание — агент найдёт противоречия, пробелы и непроверяемые формулировки.
-  Каждое замечание — с дословной цитатой и номером строки, которые проверены программой.</p>
-</section>
-<form class="card upload" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
+        ok = bool(p["ok"])
+        what = e(p["note"]) if ok else _HINT.get(p["id"], e(p["note"]))
+        if p["id"] == "auto":
+            res = next((q for q in provs if q["id"] == p.get("resolved")), None)
+            what = e(f'Сейчас — «{res["label"]}»: {res["note"]}') if res else what
+        opts.append(f'<label class="pv{"" if ok else " off"}"><input type="radio" name="provider" value="{e(p["id"])}"'
+                    f'{" checked" if p["id"] == sel else ""} data-ok="{1 if ok else 0}" '
+                    f'data-models="{e(",".join(p["models"]))}" data-short="{e(_SHORT.get(p["id"], p["label"]))}" '
+                    f'data-note="{e(what)}"><i aria-hidden="true"></i><span>{e(p["label"])}</span></label>')
+    top = _top_sheet(app)
+    sheet = build_sheet(top["report"], top["raw"], file_name=top["name"]) if top else None
+    if sheet is None and app.sample:  # проверок ещё нет: на столе чистый лист примера
+        sheet = build_sheet(None, read_source(app.sample), file_name=app.sample.name)
+    leaves = [_leaf(j, on=bool(top) and j.id == top.get("id")) for j in app.store.recent()[:5]]
+    stack = _gallery(app) + (f'<div class="b-stack">{"".join(leaves)}</div>' if leaves else "")
+    sample = (f'<button type="submit" class="pv-sample" name="sample" value="1" formnovalidate>'
+              f'Проверить пример: {e(app.sample.name)}</button>') if app.sample else ""
+    href = top["href"] if top else ""
+    q = sheet.questions if sheet and top else 0
+    acts = ""
+    if top:
+        files = "".join(f'<a href="{e(u)}">{e(lbl)}</a>' for lbl, u in top["files"])
+        acts = (f'<span class="sep" aria-hidden="true"></span>'
+                f'<a href="{e(href)}#questions"><span>Вопросы<span class="long"> владельцу</span></span><b class="n">{q}</b></a>'
+                f'<a href="{e(href)}#revised"><span class="long">Исправленная редакция</span><span class="short">Редакция</span></a>'
+                f'<details class="b-menu"><summary>Выгрузить</summary><div class="b-menu-pop">{files}</div></details>')
+    elif app.sample:  # проверок ещё нет: на столе чистый лист примера — его и проверить
+        acts = (f'<span class="sep" aria-hidden="true"></span><button type="submit" name="sample" value="1" '
+                f'formnovalidate>Проверить этот лист</button>')
+    cur = next((p for p in provs if p["id"] == sel), provs[0])
+    err = f'<p class="dock-msg bad" id="dmsg" role="alert">{e(error)}</p>' if error else \
+        '<p class="dock-msg" id="dmsg" role="status" hidden></p>'
+    body = f"""<form class="b-dock" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
   {err}
-  <label class="drop" id="drop">
-    <input type="file" name="file" id="file" accept=".pdf,.docx,.md,.markdown,.txt,.html,.htm" required>
-    <span class="dicon" aria-hidden="true"></span>
-    <span class="dtitle">Перетащите файл требований сюда или <u>выберите на компьютере</u></span>
-    <span class="dsub">PDF, Word (DOCX), Markdown, TXT, HTML · до 20 МБ</span>
-    <span class="fname" id="fname"></span>
-  </label>
-  <div class="row">
-    <label class="fld">Модель<select name="provider" id="provider">{"".join(opts)}</select></label>
-    <label class="fld narrow">Вариант модели<input name="model" id="model" list="models" value="{e(model)}" placeholder="по умолчанию" autocomplete="off"><datalist id="models"></datalist></label>
-  </div>
-  <p class="pnote" id="pnote"></p>
-  <div class="actions"><button type="submit" class="btn big" id="go">Проверить требования</button>{sample}</div>
+  <label class="primary" id="pick"><input class="vh" type="file" name="file" id="file" accept=".pdf,.docx,.md,.markdown,.txt,.html,.htm" required>Свой документ</label>
+  <noscript><button type="submit">Проверить</button></noscript>
+  {acts}
+  <span class="sep" aria-hidden="true"></span>
+  <details class="b-menu" id="pmenu"><summary id="pcur">{e(_SHORT.get(cur["id"], cur["label"]))}</summary>
+    <div class="b-menu-pop pv-pop" role="radiogroup" aria-label="Модель">
+      <div class="hint">Модель для своего документа</div>
+      {"".join(opts)}
+      <p class="pv-note" id="pnote"></p>
+      <input class="b-field pv-model" name="model" id="model" list="models" value="{e(model)}" placeholder="вариант модели — по умолчанию" autocomplete="off" aria-label="Вариант модели"><datalist id="models"></datalist>
+      {sample}
+    </div>
+  </details>
 </form>
-{recent}
-<section class="how">
-  <div><b>1. Документ</b><span>Читаем PDF, Word, Markdown; нумеруем строки, нарезаем требования и присваиваем им ID.</span></div>
-  <div><b>2. Четыре ревьюера</b><span>Аналитик, тестировщик, архитектор и риски смотрят параллельно, отдельно — согласованность набора.</span></div>
-  <div><b>3. Судья</b><span>Убирает дубли и ложные срабатывания, ставит критичность и выносит вердикт: можно ли начинать.</span></div>
-</section>
-</main>"""
-    return _layout("Ревью требований", body)
+<div class="desk" id="desk">
+<aside class="desk-stack" aria-label="Готовые листы">{stack}</aside>
+<aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
+<main class="desk-sheet">{sheet.html if sheet else ''}</main>
+<div class="desk-notes{' b-margin' if sheet and sheet.notes else ''}">{_margin_head(top["report"]) if top and sheet and sheet.notes else ''}</div>
+</div>
+<div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>BCC AI сразу начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
+    sub = (top or {}).get("name") or (f"Пример: {app.sample.name}" if app.sample else "")
+    return _layout("BCC Review · Проверка требований", body, sub=sub)
 
 
 def job_page(job: Job) -> str:
@@ -230,8 +363,8 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/assets/"):
             name = path.rsplit("/", 1)[-1]
             p = ASSETS / name
-            if p.is_file() and name in ("app.css", "app.js"):
-                ctype = "text/css; charset=utf-8" if name.endswith(".css") else "text/javascript; charset=utf-8"
+            if p.is_file() and name in ASSET_NAMES:
+                ctype = ASSET_TYPES.get(p.suffix, "application/octet-stream")
                 return self._send(200, p.read_bytes(), ctype)
             return self._html(404, _layout("Не найдено", '<main class="wrap"><p>Файл не найден.</p></main>'))
         m = JOB_PATH.match(path)
