@@ -99,7 +99,7 @@ def _formats(formats: Iterable[str] | str) -> list[str]:
 
 
 def plural(n: int, one: str, few: str, many: str) -> str:
-    """«1 замечание», «3 замечания», «5 замечаний»."""
+    """«1 дефект», «3 дефекта», «5 дефектов»."""
     n = abs(int(n))
     if n % 10 == 1 and n % 100 != 11:
         return one
@@ -371,7 +371,7 @@ def annotate_docx(report: dict, view: dict, input_path: Path, output_path: Path)
     anchored = len({a.finding_id for a in res.anchors})
     return _res("docx", "written", output_path,
                 f"Word с комментариями: отмечено {anchored} из "
-                f"{_n(len(rep1['findings']), 'замечания', 'замечаний', 'замечаний')} "
+                f"{_n(len(rep1['findings']), 'дефекта', 'дефектов', 'дефектов')} "
                 f"({_n(len(res.anchors), 'место', 'места', 'мест')} в тексте) и сводный комментарий", anchored=anchored,
                 total=len(rep1["findings"]), comments=len(res.anchors))
 
@@ -386,14 +386,66 @@ def report_docx(report: dict, output_path: Path, *, markdown: str | None = None)
     style.font.name = "Calibri"
     style.font.size = Pt(10.5)
     if markdown and markdown.strip():
+        try:  # тот же отчёт без HTML-якорей и экранирования Markdown (№13)
+            from .markdown import export_text
+            markdown = export_text(markdown)
+        except Exception:  # noqa: BLE001
+            markdown = re.sub(r"<a id=\"[^\"]*\"></a>", "", markdown).replace("\\|", "∣")
         _md_to_docx(d, markdown)
     else:
         _report_to_docx(d, report)
+    _add_toc(d)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     d.save(str(output_path))
     n = len(report.get("findings") or [])
-    return _res("docx", "written", output_path, f"Word-версия отчёта: {_n(n, 'замечание', 'замечания', 'замечаний')}",
+    return _res("docx", "written", output_path, f"Word-версия отчёта: {_n(n, 'дефект', 'дефекта', 'дефектов')}",
                 anchored=n, total=n)
+
+
+def _add_toc(d: Any) -> None:
+    """Оглавление Word после заголовка документа: поле TOC (уровни 1–3) и w:updateFields — Word соберёт его при
+    открытии (LibreOffice — по «Обновить»)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    heads = [p for p in d.paragraphs if p.style is not None and p.style.name.startswith(("Heading", "Title"))]
+    if len(heads) < 3:
+        return
+    anchor = heads[0]._p
+    title = OxmlElement("w:p")
+    r = OxmlElement("w:r")
+    rpr = OxmlElement("w:rPr")
+    rpr.append(OxmlElement("w:b"))
+    r.append(rpr)
+    t = OxmlElement("w:t")
+    t.text = "Содержание"
+    r.append(t)
+    title.append(r)
+    field = OxmlElement("w:p")
+    parts = [("begin", None), (None, ' TOC \\o "1-3" \\h \\z \\u '), ("separate", None),
+             ("text", "Оглавление соберётся при открытии документа (или F9 — «Обновить поле»)."), ("end", None)]
+    for kind, val in parts:
+        run = OxmlElement("w:r")
+        if kind in ("begin", "separate", "end"):
+            fc = OxmlElement("w:fldChar")
+            fc.set(qn("w:fldCharType"), kind)
+            run.append(fc)
+        elif kind == "text":
+            tt = OxmlElement("w:t")
+            tt.text = val
+            run.append(tt)
+        else:
+            it = OxmlElement("w:instrText")
+            it.set(qn("xml:space"), "preserve")
+            it.text = val
+            run.append(it)
+        field.append(run)
+    anchor.addnext(field)
+    anchor.addnext(title)
+    settings = d.settings.element
+    if settings.find(qn("w:updateFields")) is None:
+        uf = OxmlElement("w:updateFields")
+        uf.set(qn("w:val"), "true")
+        settings.append(uf)
 
 
 _MD_INLINE = re.compile(r"(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))")
@@ -494,9 +546,9 @@ def _report_to_docx(d: Any, report: dict) -> None:
             d.add_paragraph(str(v["summary"]))
     fs = findings_of(report)
     counts = {k: sum(1 for f in fs if f.get("severity") == k) for k in SEV_ORDER}
-    d.add_paragraph(f"Замечаний: {len(fs)} (критичных {counts['critical']}, существенных {counts['major']}, "
+    d.add_paragraph(f"Дефектов: {len(fs)} (критичных {counts['critical']}, существенных {counts['major']}, "
                     f"незначительных {counts['minor']}).")
-    d.add_heading("Замечания", level=1)
+    d.add_heading("Дефекты", level=1)
     for f in fs:
         d.add_heading(f"{f.get('id', '')}. {_one_line(f.get('title'))}", level=2)
         meta = [SEVERITY_RU.get(str(f.get("severity")), str(f.get("severity") or ""))]
@@ -643,7 +695,7 @@ def annotate_pdf(report: dict, view: dict, input_path: Path, output_path: Path) 
         hl = sum(1 for p in chk for x in p.annots() if x.type[0] == pymupdf.PDF_ANNOT_HIGHLIGHT)
     if hl != places:
         return _res("pdf", "failed", None, f"после записи найдено {hl} выделений вместо {places}")
-    msg = (f"PDF с выделениями: отмечено {len(anchored)} из {_n(len(findings), 'замечания', 'замечаний', 'замечаний')}"
+    msg = (f"PDF с выделениями: отмечено {len(anchored)} из {_n(len(findings), 'дефекта', 'дефектов', 'дефектов')}"
            f" ({_n(places, 'место', 'места', 'мест')})")
     if missed:
         msg += f"; без места на странице: {', '.join(sorted(set(missed) - anchored)) or 'нет'}"
@@ -752,7 +804,7 @@ def _summary_note(page: Any, report: dict, findings: list[dict], anchored: set[s
                      f"Тестирование: {VERDICT_RU.get(str(v.get('testing')), '—')}")
         if v.get("summary"):
             lines.append(str(v["summary"]))
-    lines.append(f"Замечаний: {len(findings)} (критичных {counts['critical']}, существенных {counts['major']}, "
+    lines.append(f"Дефектов: {len(findings)} (критичных {counts['critical']}, существенных {counts['major']}, "
                  f"незначительных {counts['minor']}); отмечено в тексте: {len(anchored)}.")
     loose = [str(f.get("id")) for f in findings if str(f.get("id")) not in anchored]
     if loose:

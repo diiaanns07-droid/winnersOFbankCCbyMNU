@@ -31,7 +31,7 @@ SHORT_MODE = ("\n\n### Краткий режим\nПредыдущий отве�
 
 MAX_PAIRS = 15
 MAX_UNDEFINED_CANDIDATES = 2
-MAX_MODEL_CANDIDATES = 6
+MAX_MODEL_CANDIDATES = 8
 MAX_GLOSSARY = 8
 
 # Требования, для которых строится трассировка (CONTRACT 2.2, поле kind).
@@ -81,7 +81,7 @@ CANDIDATE_SCHEMA = _obj({
 PAIR_SCHEMA = _obj({
     "a": _S, "b": _S, "subject": _S, "same_subject": {"type": "boolean"},
     "quote_a": _S, "line_a": _I, "quote_b": _S, "line_b": _I,
-    "scenario": _S, "outcome_a": _S, "outcome_b": _S,
+    "scenario": _S, "outcome_a": _S, "outcome_b": _S, "one_condition": {"type": "boolean"},
     "verdict": {"type": "string", "enum": VERDICTS},
     "basis": {"type": "string", "enum": BASES},
     "kind": {"type": "string", "enum": PAIR_KINDS},
@@ -261,6 +261,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         "quote_a": _s(p.get("quote_a")), "line_a": _int(p.get("line_a")) or 0,
         "quote_b": _s(p.get("quote_b")), "line_b": _int(p.get("line_b")) or 0,
         "scenario": _s(p.get("scenario")), "outcome_a": _s(p.get("outcome_a")), "outcome_b": _s(p.get("outcome_b")),
+        "one_condition": p.get("one_condition") is not False,  # нет поля (старые ответы) — одно условие
         "verdict": p.get("verdict") if p.get("verdict") in VERDICTS else "undefined",
         "basis": p.get("basis") if p.get("basis") in BASES else "",
         "kind": p.get("kind") if p.get("kind") in PAIR_KINDS else "event_conflict",
@@ -278,6 +279,18 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     # Разные предметы не сравниваются: конфликта между ними быть не может.
     if not pair["same_subject"]:
         pair["verdict"] = "compatible"
+    # Цель и НФТ о сроке не задают поведение в событии (контрпример 2 промпта) — пара о событии с ними совместима.
+    side_kinds = [(known or {}).get(x, {}).get("kind") for x in (pair["a"], pair["b"])]
+    if any(k in SOFT_KINDS for k in side_kinds) and pair["kind"] not in ("unit_mismatch", "boundary_conflict"):
+        pair["verdict"], pair["basis"] = "compatible", "none"
+    # Исходы вызваны двумя разными условиями, соединёнными в один сценарий, — это порядок проверок, не конфликт.
+    if pair["verdict"] == "conflict" and not pair["one_condition"]:
+        pair["basis"] = "none"
+    # Условное право («может …, если нет X») — необходимое, а не достаточное условие: запрет для другого состояния
+    # с ним не спорит (контрпример 7 промпта, который слабая модель пропускает).
+    if (pair["verdict"] == "conflict" and pair["kind"] in ("event_conflict", "status_conflict")
+            and (_PERMISSION.search(pair["quote_a"]) or _PERMISSION.search(pair["quote_b"]))):
+        pair["basis"] = "none"
     # Конфликт без названного основания (модель сама не нашла ни одного из трёх) — неопределённость.
     if pair["verdict"] == "conflict" and pair["basis"] == "none":
         pair["verdict"] = "undefined"
@@ -285,10 +298,21 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
             pair["kind"] = "ambiguity"
     # Обратная ошибка слабой модели: одна сторона ограничивает действие («максимум», «не более»), другая прямо
     # снимает ограничение («независимо от», «без ограничения»), а вердикт — «не определено». Это limit_removed.
-    elif (pair["verdict"] == "undefined" and pair["same_subject"] and _found(ev_a) and _found(ev_b)
+    elif (pair["verdict"] == "undefined" and pair["same_subject"] and pair["one_condition"] and _found(ev_a) and _found(ev_b)
           and not _overlap(ev_a, ev_b) and _removes_limit(pair["quote_a"], pair["quote_b"])):
         pair.update(verdict="conflict", basis="limit_removed", kind="event_conflict")
     return pair
+
+
+_PERMISSION = re.compile(r"(?<![а-яё])(?:может|могут|можно|вправе|разрешен\w*|доступн\w*)(?![а-яё])[^.;]{0,80}?"
+                         r"(?<![а-яё])если(?![а-яё])", re.I)
+_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")
+
+
+def _same_codes(qa: str, qb: str) -> bool:
+    """Обе цитаты называют коды ответа, и коды одной входят в коды другой (второго кода для входа нет)."""
+    a, b = set(_CODE.findall(qa)), set(_CODE.findall(qb))
+    return bool(a and b and (a <= b or b <= a))
 
 
 _LIMIT_REMOVED = re.compile(r"независимо от|вне зависимости от|без ограничени|в любом случае", re.I)
@@ -305,6 +329,7 @@ def _removes_limit(qa: str, qb: str) -> bool:
 # Виды требований, конфликт с которыми не блокирует сам по себе: цель — намерение, а не правило;
 # нефункциональное требование о сроке редко противоречит правилу поведения напрямую.
 SOFT_KINDS = ("goal", "nonfunctional")
+SCHEMA_KINDS = ("architecture", "process")
 MAJOR_CONFLICT_KINDS = ("unit_mismatch",)
 
 
@@ -318,12 +343,24 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         return None  # ни одной найденной цитаты: судье нечего показать
     two_places = _found(ev_a) and _found(ev_b) and not _overlap(ev_a, ev_b)
     kind = pair["kind"]
+    # Цель и НФТ о сроке не задают поведение в событии: «пополнение за 5 минут ↔ после отключения не пополнять»
+    # — не два исхода. Цель ↔ требования проверяет п. 1 шага 5; пара с ними — только о значении или единице.
+    side_kinds = [(known or {}).get(x, {}).get("kind") for x in (pair["a"], pair["b"])]
+    if any(k in SOFT_KINDS for k in side_kinds) and kind not in ("unit_mismatch", "boundary_conflict"):
+        return None
     if pair["verdict"] == "conflict":
         if kind not in PAIR_CONFLICT_KINDS:
             kind = "event_conflict"
-        soft = any((known or {}).get(x, {}).get("kind") in SOFT_KINDS for x in (pair["a"], pair["b"]))
+        kinds = [(known or {}).get(x, {}).get("kind") for x in (pair["a"], pair["b"])]
+        # Цель и НФТ — не правило поведения; две схемы (архитектура ↔ процесс/последовательность) расходятся
+        # в связях — это согласованность схем, существенный дефект, а не «один вход — два исхода».
+        soft = any(k in SOFT_KINDS for k in kinds) or all(k in SCHEMA_KINDS for k in kinds)
         # Разные единицы одной величины обычно снимаются правилом пересчёта — major; судья может поднять.
         severity = "critical" if two_places and not soft and kind not in MAJOR_CONFLICT_KINDS else "major"
+        # «Один вход — два кода»: если цитаты не называют двух разных кодов (обе о коде 200, одна шире другой),
+        # спор о смысле кода, а не два исхода — major.
+        if kind == "status_conflict" and _same_codes(pair["quote_a"], pair["quote_b"]):
+            severity = "major"
     else:  # undefined
         # Строка приёмки сверяется только на противоречие (шаг 2б); её неполноту проверяет линза тестировщика.
         if any((known or {}).get(x, {}).get("kind") == "acceptance" for x in (pair["a"], pair["b"])):
@@ -358,6 +395,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         "problem": problem, "scenario": scenario, "impact": impact, "recommendation": rec,
         "rewrite": "", "question": pair["question"], "blocks": "both",
         "source": SOURCE, "origin": "pair_check", "pair_ids": [pair["id"]] if pair.get("id") else [],
+        "_subject": pair["subject"],
     }
 
 
@@ -499,8 +537,26 @@ def _blocks(c: dict, requirements: list[dict]) -> set:
     return out
 
 
+_STOP = {"между", "против", "значение", "значения", "требование", "требования", "правило", "правила", "пункт",
+          "строка", "строки", "место", "места", "одного", "одной", "одном", "разные", "разный", "разных", "также"}
+
+
+def _subject_stems(s: str) -> set[str]:
+    return {_stem(w) for w in _WORD.findall(s or "") if len(w) >= 4 and w.lower() not in _STOP and not w.isdigit()}
+
+
+def same_subject_text(a: str, b: str) -> bool:
+    """Предметы двух пар об одном: не меньше половины значимых основ короткого предмета есть в другом.
+    Пустой предмет не мешает склейке (старые ответы без предмета)."""
+    sa, sb = _subject_stems(a), _subject_stems(b)
+    if not sa or not sb:
+        return True
+    return len(sa & sb) / min(len(sa), len(sb)) >= 0.5
+
+
 def merge_conflicts(cands: list[dict], requirements: list[dict] | None = None) -> list[dict]:
-    """Конфликты одного вида, у которых общее место (одно правило против нескольких мест), — одно замечание."""
+    """Конфликты одного вида, у которых общее место (одно правило против нескольких мест) и один предмет, —
+    одно замечание. Разные предметы при общей строке (в одном пункте два правила) — разные замечания."""
     out: list[dict] = []
     reqs = requirements or []
     for c in cands:
@@ -508,7 +564,8 @@ def merge_conflicts(cands: list[dict], requirements: list[dict] | None = None) -
         if c["kind"] in CONFLICT_KINDS:
             mine = _blocks(c, reqs)
             for o in out:
-                if o["kind"] == c["kind"] and o["severity"] == c["severity"] and mine & _blocks(o, reqs):
+                if (o["kind"] == c["kind"] and o["severity"] == c["severity"] and mine & _blocks(o, reqs)
+                        and same_subject_text(o.get("_subject", ""), c.get("_subject", ""))):
                     host = o
                     break
         if host is None:
@@ -566,20 +623,39 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
         cand["blocks"] = "both"
     # «Обещано, но не описано»: если все названные в цитатах методы и поля описаны в заголовках документа,
     # обещанное на месте — это не critical (модель приняла соседний процесс за обещанную операцию).
-    if cand["severity"] == "critical" and cand["kind"] == "missing_element" and _all_named_described(evidence, view):
+    # Если ни одна цитируемая строка не обещает действие словами (экран с элементом, перечень систем, пример ответа),
+    # обещания нет, есть только догадка модели — тоже не critical.
+    if cand["severity"] == "critical" and cand["kind"] == "missing_element" and (
+            _all_named_described(evidence, view) or not _promises(" ".join(_s(e.get("quote")) for e in evidence))
+            and not _PROMISE_SUBJ.search(" ".join(_cited_texts(evidence, view)))):
         cand["severity"] = "major"
     return cand
 
 
 _IDENT = re.compile(r"\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+# Глаголы обещанного действия (основы, с начала слова): читает, получает, отдаёт, возвращает, сохраняет, показывает…
+_VERB = (r"(?<![а-яё])(?:чита|получа|получ|отда|возвра|верн|сохран|показ|отобра|вызыв|отправ|запраш|"
+         r"переда|хран|меня|измен|удал|созда|отмен|отзыв|включ|выключ|рассчит|подключ|оформл|"
+         r"выполн|формир|загруж|обновл|блокир|разблокир|приходит|присыла)")
+_PROMISE = re.compile(_VERB, re.I)
+# Обещание интерфейса: действие приложения, клиента, экрана — в одной фразе с глаголом; или шаг логики («вернуть 409»).
+_PROMISE_SUBJ = re.compile(r"(?<![а-яё])(?:приложени|клиент|экран|интерфейс|пользовател|мобильн)\w*[^.;|]{0,80}?"
+                           + _VERB, re.I)
+_PROMISE_STEP = re.compile(r"(?<![а-яё])(?:вернуть|возвращать|отдать|отдавать|передать|отправить|показать|"
+                           r"сохранить|вызвать)(?![а-яё])", re.I)
+
+
+def _promises(text: str) -> bool:
+    """Цитаты содержат обещание операции интерфейса (а не действие внутреннего сервиса или элемент экрана)."""
+    return bool(_PROMISE_SUBJ.search(text) or _PROMISE_STEP.search(text))
 
 
 def _headings(view: Any) -> list[str]:
     return [_s(x.get("text")) for x in _lines(view) if x.get("heading") or x.get("kind") == "heading"]
 
 
-def _all_named_described(evidence: list[dict], view: Any) -> bool:
-    """Все идентификаторы (camelCase, snake_case) из цитируемых строк встречаются в заголовках документа."""
+def _cited_texts(evidence: list[dict], view: Any) -> list[str]:
+    """Цитаты и полный текст найденных строк."""
     by_n = {x.get("n"): _s(x.get("text")) for x in _lines(view)}
     texts = []
     for e in evidence:
@@ -587,6 +663,12 @@ def _all_named_described(evidence: list[dict], view: Any) -> bool:
         if _found(e):
             a, b = _span(e)
             texts.extend(by_n.get(n, "") for n in range(a, b + 1))
+    return texts
+
+
+def _all_named_described(evidence: list[dict], view: Any) -> bool:
+    """Все идентификаторы (camelCase, snake_case) из цитируемых строк встречаются в заголовках документа."""
+    texts = _cited_texts(evidence, view)
     names = {m.group(0) for t in texts for m in _IDENT.finditer(t)}
     heads = " ".join(_headings(view))
     return bool(names) and bool(heads) and all(re.search(rf"\b{re.escape(n)}\b", heads) for n in names)
@@ -664,6 +746,8 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
                 continue
         pair_cands.append(c)
     pair_cands = merge_conflicts(pair_cands, requirements)
+    for c in pair_cands:
+        c.pop("_subject", None)
     candidates.extend(pair_cands)
 
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]

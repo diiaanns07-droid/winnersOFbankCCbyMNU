@@ -13,6 +13,7 @@
   с номером страницы, переносы слов (мягкие переносы), 3+ страницы, таблица;
 * ``two_columns.pdf`` — PDF в две колонки (reportlab), 2 страницы;
 * ``scan_page.pdf`` — 2 страницы: текст и страница-скан (картинка без текстового слоя);
+* ``api_narrow.pdf`` — узкая таблица API (слова режутся без дефиса) и страница статусов почти целиком латиницей;
 * ``no_part_b.md`` — Markdown только с бизнес-частью, без спецификации API;
 * ``long_tz.md`` — длинное ТЗ на 600+ строк, с повторяющимися фразами в разных разделах; ``long_tz.docx`` и
   ``long_tz.pdf`` — оно же в Word и PDF из Word (многостраничные таблицы);
@@ -307,6 +308,37 @@ def make_two_columns(path: Path) -> None:
     doc.build(story)
 
 
+def make_api_pdf(path: Path) -> None:
+    """Спецификация API: узкая таблица (длинные слова режутся без дефиса — «strin g», «Mandator y») и последняя
+    страница со статусами почти целиком латиницей (читатель v1 принимает её за «нечитаемый шрифт»)."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle
+    _fonts()
+    hs = ParagraphStyle("h", fontName="DejaVu-Bold", fontSize=13, leading=16, spaceBefore=8, spaceAfter=6)
+    ps = ParagraphStyle("p", fontName="DejaVu", fontSize=10, leading=13, spaceAfter=5)
+    cs = ParagraphStyle("c", fontName="DejaVu", fontSize=9, leading=11)
+    story = [Paragraph("Метод getStatement", hs),
+             Paragraph("Метод возвращает выписку по счёту за период. Даты передаются в формате ГГГГ-ММ-ДД.", ps),
+             Paragraph("Параметры запроса", hs)]
+    rows = [["Parameter", "Format", "Mandatory", "Description"],
+            ["accountId", "string", "Да", "Идентификатор счёта"],
+            ["dateFrom", "string", "Да", "Начало периода"],
+            ["pageSize", "integer", "Нет", "Число операций на странице"],
+            ["includeHolds", "boolean", "Нет", "Показывать заблокированные суммы"]]
+    t = Table([[Paragraph(c, cs) for c in r] for r in rows], colWidths=[52, 34, 40, 170])
+    t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, "black"), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story += [t, PageBreak(), Paragraph("Статусы", hs)]
+    for code, title, body in (("200", "Successful", '{"items":[],"total":0}'),
+                              ("400", "Unsuccessful — Bad request", '{"message":"Invalid date range"}'),
+                              ("401", "Unsuccessful — Unauthorized", '{"message":"Authorization required"}'),
+                              ("404", "Unsuccessful — Not found", '{"message":"Account not found"}'),
+                              ("410", "Unsuccessful — Gone", '{"message":"Счёт закрыт"}'),
+                              ("500", "Unsuccessful — Internal server error", '{"message":"Internal error"}')):
+        story += [Paragraph(f"{code}. {title}", hs), Paragraph(body, ps)]
+    SimpleDocTemplate(str(path), pagesize=A4).build(story)
+
+
 def make_scan(path: Path) -> None:
     """Страница 1 — текст, страница 2 — картинка с текстом (скан без текстового слоя)."""
     import io
@@ -497,6 +529,7 @@ def main() -> int:
     make_word_export(HERE / "word_export.docx", HERE / "word_export.pdf")
     make_two_columns(HERE / "two_columns.pdf")
     make_scan(HERE / "scan_page.pdf")
+    make_api_pdf(HERE / "api_narrow.pdf")
     (HERE / "no_part_b.md").write_text(NO_PART_B, encoding="utf-8")
     n = make_long_md(HERE / "long_tz.md")
     # то же длинное ТЗ в DOCX (конвертер официального документа) и PDF из Word (LibreOffice)

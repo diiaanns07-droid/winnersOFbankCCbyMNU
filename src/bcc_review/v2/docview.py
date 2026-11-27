@@ -81,6 +81,12 @@ def load(path: str | Path) -> dict:
             raise
         warnings.append(f"Читатель разметки не сработал ({type(exc).__name__}: {exc}); "
                         "строки взяты из файла как есть.")
+    if fmt == "pdf" and doc:
+        recovered = _recover_garbled_pages(doc, p)
+        if recovered:
+            what = f"Страница {recovered[0]}" if len(recovered) == 1 else f"Страницы {_pages_list(recovered)}"
+            warnings.append(f"{what}: читатель счёл текстовый слой нечитаемым, текст восстановлен напрямую из PDF "
+                            "(проверьте в исходнике).")
     if fmt in ("md", "txt"):
         lines = _text_lines(_decode_text(data), doc)
     else:
@@ -424,6 +430,34 @@ def _toc_key(text: str) -> str:
     return t
 
 
+def _cell_word_break(b: dict, frags: list[dict], f1: dict, f2: dict, text: str) -> bool:
+    """Слово разорвано переносом внутри узкой ячейки таблицы без дефиса («strin g», «Mandator y»): первая часть —
+    последний фрагмент своей строки в ячейке и доходит до правого края ячейки (следующая буква не помещалась),
+    продолжение начинается со строчной буквы у левого края ячейки на следующей строке."""
+    cells = ((b.get("loc") or {}).get("table") or {}).get("cells") or []
+    cell = next((c for c in cells if isinstance(c, dict) and c.get("rect")
+                 and c.get("start", 0) <= f1["start"] and f2["end"] <= c.get("end", -1)), None)
+    if cell is None or not isinstance(f1.get("line"), int) or f2.get("line") != f1["line"] + 1:
+        return False
+    w1, w2 = text[f1["start"]:f1["end"]], text[f2["start"]:f2["end"]]
+    # только латинские идентификаторы (имена полей, типы, заголовки столбцов API): для кириллицы перенос по слову
+    # («Идентификатор / карты») геометрически не отличить от разрыва слова, а цитаты находит поиск без пробелов
+    # (и пути/URL: «/savings/{a ccountId}/inter est»)
+    if (len(w1) < 3 or not re.fullmatch(r"[\x21-\x7e]*[A-Za-z][A-Za-z0-9]*", w1) or sum(ch.isalpha() for ch in w1) < 2
+            or not re.fullmatch(r"[a-z][\x21-\x7e]*", w2)):
+        return False
+    same_line = [f for f in frags if f.get("line") == f1["line"] and cell["start"] <= f["start"] < cell["end"]]
+    if max(f["rect"][2] for f in same_line) > f1["rect"][2] + 0.5:
+        return False  # первая часть — последний фрагмент своей строки в ячейке
+    in_cell = [f for f in frags if cell["start"] <= f["start"] < cell["end"]]
+    pad = max(0.0, min(f["rect"][0] for f in in_cell) - cell["rect"][0])
+    inner_right = cell["rect"][2] - pad
+    char_w = max((f1["rect"][2] - f1["rect"][0]) / max(len(w1), 1), (f2["rect"][2] - f2["rect"][0]) / max(len(w2), 1))
+    left = cell["rect"][0] + pad
+    # следующая буква не помещалась в строку ячейки (средняя ширина знака занижает широкие «m», «w» — запас 1,6)
+    return inner_right - f1["rect"][2] < 1.6 * char_w + 0.5 and abs(f2["rect"][0] - left) < 2.5
+
+
 def _tight_text(b: dict) -> str:
     """Текст блока PDF без лишних пробелов: читатель ставит пробел между соседними фрагментами строки, даже если
     зазора между ними нет («ВК -1», «приложении .»). Пробел убирается, если зазор < 8 % высоты строки."""
@@ -433,10 +467,13 @@ def _tight_text(b: dict) -> str:
                    key=lambda f: f["start"])
     cut: list[int] = []
     for f1, f2 in zip(frags, frags[1:]):
-        if f1.get("line") != f2.get("line") or text[f1["end"]:f2["start"]] != " ":
+        if text[f1["end"]:f2["start"]] != " ":
             continue
-        h = max(f1["rect"][3] - f1["rect"][1], 1.0)
-        if f2["rect"][0] - f1["rect"][2] < 0.08 * h:
+        if f1.get("line") == f2.get("line"):
+            h = max(f1["rect"][3] - f1["rect"][1], 1.0)
+            if f2["rect"][0] - f1["rect"][2] < 0.08 * h:
+                cut.append(f1["end"])
+        elif _cell_word_break(b, frags, f1, f2, text):
             cut.append(f1["end"])
     if not cut:
         return text
@@ -446,6 +483,80 @@ def _tight_text(b: dict) -> str:
         prev = pos + 1
     out.append(text[prev:])
     return "".join(out)
+
+
+_API_EN = {"message", "error", "request", "response", "status", "server", "string", "integer", "boolean", "number",
+           "bad", "unauthorized", "forbidden", "found", "conflict", "internal", "gone", "successful", "unsuccessful",
+           "created", "result", "true", "false", "null", "parameter", "format", "description", "field", "type",
+           "required", "mandatory", "body", "header", "token", "bearer", "json", "get", "post", "put", "delete", "id"}
+
+
+def _recover_garbled_pages(doc: dict, path: Path) -> list[int]:
+    """Страница, которую читатель v1 счёл «нечитаемой» (латиница без английских слов), но PyMuPDF даёт нормальный текст —
+    например, страница статусов API: «410. Unsuccessful — Gone», «Internal server error». Строки страницы берутся
+    напрямую из PDF и вставляются на её место; предупреждения о нечитаемой странице убираются."""
+    ext = doc.get("extraction") or {}
+    status = ext.get("pages_status") or {}
+    garbled = sorted(int(k) for k, v in status.items() if v == "garbled" and str(k).isdigit())
+    if not garbled:
+        return []
+    try:
+        import pymupdf
+    except Exception:  # noqa: BLE001
+        return []
+    recovered: list[int] = []
+    blocks = list(doc.get("blocks") or [])
+    with pymupdf.open(str(path)) as pdf:
+        for pg in garbled:
+            if not 1 <= pg <= pdf.page_count:
+                continue
+            page = pdf[pg - 1]
+            text = page.get_text()
+            letters = [c for c in text if not c.isspace()]
+            bad = sum(c == "\ufffd" or "\ue000" <= c <= "\uf8ff" for c in letters)
+            words = re.findall(r"[A-Za-z]{2,}", text)
+            cyr = re.findall(r"[А-Яа-яЁё]{3,}", text)
+            api = sum(w.lower() in _API_EN for w in words)
+            if not letters or bad > 0.01 * len(letters) or not (cyr or (words and api >= 0.3 * len(words))):
+                continue
+            new = _page_blocks(page, pg)
+            if not new:
+                continue
+            at = max((i + 1 for i, b in enumerate(blocks) if (_page_of(b) or 0) < pg), default=0)
+            sec = list(blocks[at - 1].get("section") or []) if at else []
+            for b in new:
+                b["section"] = sec + ([b["text"]] if b["kind"] == "heading" else [])
+            blocks[at:at] = new
+            recovered.append(pg)
+    if recovered:
+        doc["blocks"] = blocks
+        doc["warnings"] = [w for w in doc.get("warnings") or [] if not (
+            isinstance(w, dict) and (w.get("page") in recovered or set(w.get("pages") or []) & set(recovered)))]
+        ext["pages_unread"] = [x for x in ext.get("pages_unread") or [] if x not in recovered]
+        for pg in recovered:
+            status[str(pg)] = "text"
+    return recovered
+
+
+def _page_blocks(page, pg: int) -> list[dict]:
+    """Строки страницы из PyMuPDF: строка текста — блок; жирная короткая строка — заголовок."""
+    out = []
+    data = page.get_text("dict")
+    sizes = [sp["size"] for bl in data.get("blocks", []) for ln in bl.get("lines", []) for sp in ln.get("spans", [])
+             if sp.get("text", "").strip()]
+    body = sorted(sizes)[len(sizes) // 2] if sizes else 10
+    for bl in data.get("blocks", []):
+        for ln in bl.get("lines", []):
+            spans = [sp for sp in ln.get("spans", []) if sp.get("text", "").strip()]
+            if not spans:
+                continue
+            text = "".join(sp["text"] for sp in ln["spans"]).strip()
+            bold = all("bold" in sp.get("font", "").lower() for sp in spans)
+            big = max(sp["size"] for sp in spans) > body * 1.1
+            kind = "heading" if (bold or big) and len(text) < 120 and not text.startswith("{") else "paragraph"
+            out.append({"id": f"p{pg:02d}l{len(out) + 1:03d}", "kind": kind, "text": text,
+                        "loc": {"page": pg, "bbox": list(ln["bbox"]), "level": 4 if kind == "heading" else None}})
+    return out
 
 
 def _list_label(b: dict) -> str:
@@ -548,7 +659,8 @@ def _split_merged_headings(blocks: list[dict], sizes: dict) -> list[dict]:
         width = sizes[_page_of(b)][0]
         cut = max(f["end"] for f in l0)
         first, second = text[:cut].strip(), text[cut:].strip()
-        if not first or not second or not (abs(h0 - h1) > 0.4 or right0 < width * 0.45):
+        # только разный кегль строк: короткая первая строка бывает и у обычного переноса заголовка в узкой колонке
+        if not first or not second or abs(h0 - h1) <= 0.4:
             out.append(b)
             continue
         lvl = _level(b)

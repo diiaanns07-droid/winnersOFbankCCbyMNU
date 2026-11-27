@@ -88,7 +88,7 @@ def test_negative_control_clean_base_has_no_conflicts(model):
             assert not ({25, 26} <= lines_of(c)), c["title"]
 
 
-WAVE2 = ["haiku_w2_1", "haiku_w2_2", "haiku_w2_3"]  # промпт с шагом 2б, `stage consistency`, 1 вызов без обрезки
+WAVE2 = [f"haiku_w2_{i}" for i in range(1, 13)]  # шаг 2б, `stage consistency` (effort low), 1 вызов без обрезки
 
 
 @pytest.mark.parametrize("model", WAVE2)
@@ -123,3 +123,14 @@ def test_official_document_set_level_findings(model):
     assert cov["verified"] <= 3 < cov["total"]
     # все кандидаты этапа подтверждены хотя бы одной найденной цитатой
     assert all(lines_of(c) for c in out["candidates"])
+
+
+@pytest.mark.parametrize("model", [f"haiku_w2_{i}" for i in (7, 8, 9, 10, 11, 12)])
+def test_official_all_critical_conflicts_on_weak_model_with_one_condition_field(model):
+    """Промпт с полем one_condition, haiku с effort low: К1–К4 critical в каждом прогоне."""
+    out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
+    crit = [c for c in out["candidates"] if c["severity"] == "critical"]
+    assert any({38, 64} <= lines_of(c) for c in crit)                       # К1
+    assert any({39, 40} <= lines_of(c) for c in crit)                       # К2
+    assert any(c["kind"] == "status_conflict" and lines_of(c) & {121, 163} for c in crit)  # К3
+    assert any(c["kind"] == "missing_element" and 52 in lines_of(c) for c in crit)        # К4
