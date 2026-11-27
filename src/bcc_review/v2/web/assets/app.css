@@ -64,7 +64,7 @@
   .b-stack>.b-leaf{flex:0 0 220px}
 }
 @media (max-width:760px){
-  .desk-aishka{display:none}
+  .desk-sheet>.desk-aishka{display:none}
   .desk{display:block;padding:16px 10px 150px}
   .desk-stack{padding:0 0 16px}
   .desk-map{display:none}

@@ -427,7 +427,7 @@ def _dock_html(job: Job, f: dict) -> str:
     return f"""<nav class="b-dock jb-dock" id="dock" aria-label="Отчёт">
   <a class="jb-d" href="/" title="Положить на стол свой документ">Свой документ</a><span class="jb-sep" aria-hidden="true"></span>
   <button type="button" class="jb-d" data-view="findings" aria-pressed="true">Правка <span class="jb-n">{f["findings"]}</span></button>
-  <button type="button" class="jb-d" data-view="questions" aria-pressed="false"{"" if q else " disabled"}>Вопросы<span class="long"> владельцу</span> <span class="jb-n">{q}</span></button>
+  <button type="button" class="jb-d" data-view="questions" aria-pressed="false"{"" if q else " disabled"}><span>Вопросы<span class="long"> владельцу</span></span> <span class="jb-n">{q}</span></button>
   <button type="button" class="jb-d" data-view="revised" data-rt="{revised}" aria-pressed="false"><span class="long">Исправленная редакция</span><span class="short">Редакция</span></button>
   <button type="button" class="jb-d" data-menu="more" aria-haspopup="menu" aria-expanded="false">Ещё ▾</button>
   <span class="jb-sep" aria-hidden="true"></span>
