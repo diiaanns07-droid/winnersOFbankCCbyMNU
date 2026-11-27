@@ -92,3 +92,24 @@ def test_via_intermediate_needs_two_arrow_quotes():
     assert not A.via_intermediate(c)
     c["evidence"][1]["quote"] = "Приложение → контроллер → сервис"
     assert A.via_intermediate(c)
+
+
+def test_state_without_example_is_minor_on_clean_insurance():
+    """insurance_clean (haiku, 17:16): «Статус полиса после отказа не описан в ответе» — опора на пример ответа."""
+    raw = _saved_raw("insurance_clean.architect.haiku.v1a.json")
+    out = A.postprocess(raw)
+    st = [c for c in out["candidates"] if c["title"].startswith("Статус полиса")]
+    assert st and st[0]["severity"] == "minor"
+    # настоящий дефект (формула премии без округления при целом поле) остаётся major
+    assert [c for c in out["candidates"] if c["kind"] == "unit_mismatch" and c["severity"] == "major"]
+
+
+def test_state_rule_ignores_status_codes():
+    c = _c("Статус 410 из логики не описан в перечне статусов", [(1, '{"message":"x"}')], kind="missing_element")
+    assert not A.state_without_example(c)
+    c = _c("Код статуса после отмены не описан в ответе", [(1, '{"status":"A"}')], kind="incomplete")
+    assert not A.state_without_example(c)
+    c = _c("Статус заказа после отмены не описан в ответе", [(1, "Метод возвращает заказ")], kind="incomplete")
+    assert not A.state_without_example(c)  # опора — не пример ответа
+    c["evidence"][0]["quote"] = '{"status":"NEW"}'
+    assert A.state_without_example(c)

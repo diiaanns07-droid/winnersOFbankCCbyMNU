@@ -216,6 +216,26 @@ def via_intermediate(c: dict) -> bool:
     return len(arrows) >= 2 and bool(VIA_TITLE.search(str(c.get("title") or "")))
 
 
+# «Значение поля статуса для состояния, которого нет в примере ответа, не описано» — в списке «не пиши вовсе» промпта
+# («ответ для состояний, для которых нет примера»); haiku пишет это major на чистых ТЗ (insurance_clean, замер №29:
+# «Статус полиса после отказа не описан в ответе сведений»). Опора замечания — пример ответа (цитата с JSON), кода
+# ответа в заголовке нет: «410 не описан в статусах» (перечень кодов, пункты С1 open2) правило не трогает. Minor, а
+# не снятие: незаданный перечень значений статуса — законный вопрос к контракту.
+STATE_TITLE = re.compile(r"статус\w*", re.I)
+STATE_GAP = re.compile(r"не\s+(описан|определ|задан|перечисл)\w*|\bнет\b|без\s+значени", re.I)
+STATE_CTX = re.compile(r"ответ|значени|после|перече?н", re.I)
+
+
+def state_without_example(c: dict) -> bool:
+    t = str(c.get("title") or "")
+    if c.get("kind") not in ("incomplete", "api_contract", "missing_element") or HTTP_CODE.search(t) or \
+            re.search(r"\bкод", t, re.I):
+        return False
+    if not (STATE_TITLE.search(t) and STATE_GAP.search(t) and STATE_CTX.search(t)):
+        return False
+    return any('{"' in str(e.get("quote") or "") for e in c.get("evidence") or [] if isinstance(e, dict))
+
+
 def error_body_gap(c: dict) -> bool:
     """Замечание проверки 4а: поле ответа без условия отсутствует в телах ошибок."""
     return c.get("kind") == "api_contract" and bool(ERROR_BODY_TITLE.search(str(c.get("title") or "")))
@@ -256,7 +276,7 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
         if unpromised_critical(c):
             c["severity"] = "major"
         if c["severity"] != "minor" and (error_body_gap(c) or data_list_only(c) or success_body_ref(c)
-                                         or via_intermediate(c)):
+                                         or via_intermediate(c) or state_without_example(c)):
             c["severity"] = "minor"
         if requirement_ids is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in requirement_ids]
