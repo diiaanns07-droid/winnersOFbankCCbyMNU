@@ -965,6 +965,7 @@ def rule_date_format(doc: Doc, methods: list[Method], out: dict) -> None:
                     scenario=f"Сервер отдаёт {name} = «{value}», клиент разбирает по маске {mm.group(0)} — дата не читается.",
                     impact="Ошибка разбора даты у клиента; тесты контракта расходятся с примером.",
                     recommendation=f"Указать один формат для {name} (рекомендуется ISO 8601) в таблице и в примерах.",
+                    question=f"Какой формат у поля {name}: {mm.group(0)}, как в таблице, или как в примере — «{value}»?",
                     conflict=True,
                 ))
                 break
