@@ -364,6 +364,9 @@ ZONE_AFTER = re.compile(r"^\s*(?:\(?\s*(?:по\s+(?:времени\s+)?[A-ZА-Я
                         r"местн\w+|московск\w+))", re.I)
 
 
+TIME_RANGE_GAP = re.compile(r"^\s*(?:до|по|[-–—])\s*$", re.I)
+
+
 def rule_time_without_zone(doc: Doc, out: dict) -> None:
     """В одной строке два момента времени, пояс указан только у одного (сигнал для приёмки и набора)."""
     for x in doc.lines:
@@ -374,6 +377,10 @@ def rule_time_without_zone(doc: Doc, out: dict) -> None:
         if len(times) < 2:
             continue
         zoned = [bool(ZONE_AFTER.match(t[m.end():m.end() + 25])) for m in times]
+        # диапазон «с 10:00 до 12:00 по времени Астаны», «10:00–12:00 (UTC+5)»: пояс второго конца — для обоих
+        for i in range(len(times) - 2, -1, -1):
+            if not zoned[i] and zoned[i + 1] and TIME_RANGE_GAP.match(t[times[i].end():times[i + 1].start()]):
+                zoned[i] = True
         if any(zoned) and not all(zoned):
             bare = times[zoned.index(False)].group(0)
             withz = times[zoned.index(True)]

@@ -338,8 +338,7 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
         # обещание есть и чтение есть — линзе архитектора полезно знать, что именно читается
         names = fmt_list([m.label or m.verb for m in reads])
         out["signals"].append(signal("promises.read", promises[0][0], promises[0][1],
-                                     f"Обещано чтение или показ данных; операции чтения: {names}. "
-                                     "Проверьте, что они возвращают всё, что показывается.",
+                                     f"Справка для описи, не дефект: обещанный показ данных читают операции {names}.",
                                      ("architect",), "inventory"))
         return
     if any(split_camel(n)[0] in READ_TOKENS for n in named):
