@@ -7,7 +7,9 @@
 * корпус `evaluation/dev` — `evaluation/v2/corpus_results/*/summary.json`, кейсы с `expected: clean` (базы и перефразы);
 * чистые ТЗ №20 и чистые версии №18 — `evaluation/v2/newtz_results/*/summary.json` (`newtz run|score … --save`),
   строки с `variant: clean`; набор определяется по пути документа (`evaluation/v2/clean/` — №20, `open2/` — №18);
-* прогоны №18 — `evaluation/v2/open2/results/*/summary.json` (формат `open2/run.py`), строки `variant: clean`.
+* прогоны №18 — `evaluation/v2/open2/results/*/summary.json` (формат `open2/run.py`), строки `variant: clean`;
+* прогоны других ролей, у которых в git только таблица в статусе (№19, №10 — прогоны на своих машинах), —
+  `evaluation/v2/clean_external.json`: числа переписаны из статуса со ссылкой на коммит, метка «(статус №NN)».
 
 Цель WAVE3 (P1): на чистом документе 0 critical, вердикт не «нельзя», major ≤ 3 (только настоящие).
 Разметка «настоящий / по делу, но minor / ложный» — у №19 (`evaluation/v2/measurements/19_*/clean_review.md`).
@@ -24,6 +26,7 @@ from .common import ROOT
 
 V2 = ROOT / "evaluation" / "v2"
 RESULTS = V2 / "RESULTS.md"
+EXTERNAL = V2 / "clean_external.json"
 START, END = "<!-- clean:start -->", "<!-- clean:end -->"
 MAJOR_MAX = 3
 
@@ -89,6 +92,20 @@ def _open2_rows() -> list[dict]:
                 continue
             out.append(_row(f"№18: чистые версии ({edition})", r.get("model"), f"№18 {p.parent.name}",
                             f"~{p.parent.name.split('_')[-1]}", r["case"], r.get("by_severity") or {}, r.get("verdict")))
+    return out
+
+
+def _external_rows(path: Path | None = None) -> list[dict]:
+    """Прогоны из статусов других ролей: [{set, model, label, at, source, rows: [{case, critical, major, minor,
+    verdict: {development, testing}}]}]. Нужны, пока сами `summary.json` не закоммичены."""
+    path = path or EXTERNAL
+    if not path.exists():
+        return []
+    out = []
+    for run in json.loads(path.read_text(encoding="utf-8")):
+        for r in run.get("rows") or []:
+            out.append(_row(run["set"], run.get("model"), run["label"], run.get("at", ""), r["case"],
+                            {k: r.get(k, 0) for k in ("critical", "major", "minor")}, r.get("verdict")))
     return out
 
 
@@ -160,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--write", action="store_true", help="записать первой таблицей в evaluation/v2/RESULTS.md")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
-    groups = latest(_corpus_rows() + _newtz_rows() + _open2_rows())
+    groups = latest(_corpus_rows() + _newtz_rows() + _open2_rows() + _external_rows())
     text = render(groups)
     print(text)
     if a.write:

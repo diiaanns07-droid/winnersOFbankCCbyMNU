@@ -131,3 +131,19 @@ def test_corpus_gates_clean_only_run_takes_f1_from_run_with_defects():
     assert ch["critical на чистых"]["source"].startswith("чистые 13:00")
     alone = {c["name"].split(": ")[1]: c for c in gate.corpus_gates("Корпус", clean_only, gate.CORPUS, "№15")}
     assert alone["F1 (строгий)"]["ok"] is None  # ⏳, а не ❌ F1 = 0
+
+
+def test_cleantable_external_rows_from_status(tmp_path):
+    import json as _json
+
+    from evaluation.v2 import cleantable as ct
+
+    p = tmp_path / "ext.json"
+    p.write_text(_json.dumps([{"set": "№18: чистые версии (2-я редакция)", "model": "sonnet", "label": "№19 (статус)",
+                               "at": "2026-11-27 12:05", "rows": [
+                                   {"case": "qr_clean", "critical": 0, "major": 2, "minor": 12,
+                                    "verdict": {"development": "yes", "testing": "yes"}}]}]), encoding="utf-8")
+    rows = ct._external_rows(p)
+    assert rows[0]["case"] == "qr_clean" and rows[0]["major"] == 2 and rows[0]["model"] == "sonnet"
+    assert "| qr_clean | №18: чистые версии (2-я редакция) | sonnet | 0 | 2 | 12 | можно / можно |" in ct.render(ct.latest(rows))
+    assert ct._external_rows(tmp_path / "нет.json") == []
