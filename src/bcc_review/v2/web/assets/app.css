@@ -130,5 +130,7 @@ tr:last-child td { border-bottom: 0; }
 }
 
 .parent { margin: -6px 0 12px; font-size: 13.5px; color: var(--ink-3); }
-.answers { display: inline-flex; margin: 0; }
+.answers { display: inline-flex; gap: 8px; margin: 0; flex-wrap: wrap; }
 .dl.ans { cursor: pointer; border-color: var(--brand); color: var(--brand); }
+button.dl { font: inherit; font-weight: 600; font-size: 13.5px; }
+button.dl:disabled, .dl.ans input:disabled { opacity: .6; cursor: progress; }

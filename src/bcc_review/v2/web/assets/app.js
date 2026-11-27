@@ -107,21 +107,47 @@
     if (nt && j.state === "done" && j.notice) { nt.hidden = false; nt.textContent = j.notice; }
     if (j.state === "done") {
       var af = $("#answers");
-      if (af && af.hidden && !j.answers_path) {
+      if (af && af.hidden) {
         af.hidden = false;
         var inp = af.querySelector("input[type=file]");
-        inp.addEventListener("change", function () {
-          if (!inp.files.length) return;
-          var lbl = af.querySelector("label");
-          lbl.firstChild.textContent = "Пересчитываем… ";
-          fetch("/api/jobs/" + id + "/answers", { method: "POST", body: new FormData(af), headers: { Accept: "application/json" } })
+        var rc = $("#recalc");
+        var rcLabel = rc ? rc.textContent : "";
+        var busy = function (on, el, text) {
+          af.querySelectorAll("button, input").forEach(function (b) { b.disabled = on; });
+          if (el) el.firstChild.textContent = text;
+        };
+        var send = function (fd, el, label) {
+          busy(true, el, "Пересчитываем… ");
+          fetch("/api/jobs/" + id + "/answers", { method: "POST", body: fd, headers: { Accept: "application/json" } })
             .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, x: x }; }); })
             .then(function (res) { if (res.ok) location.href = res.x.url; else throw new Error(res.x.error); })
             .catch(function (err) {
-              lbl.firstChild.textContent = "Загрузить ответы ↻";
+              busy(false, el, label);
               inp.value = "";
               var e2 = $("#err"); e2.hidden = false; e2.textContent = err.message;
             });
+        };
+        inp.addEventListener("change", function () {
+          if (!inp.files.length) return;
+          var lbl = inp.closest("label");
+          send(new FormData(af), lbl, "Загрузить файл ответов");
+        });
+        if (rc) rc.addEventListener("click", function () {
+          // ответы берём прямо из вкладки «Вопросы» отчёта во фрейме (та же страница, тот же адрес сервера)
+          var api = null;
+          try { api = $("#frame").contentWindow.bccReport; } catch (_) { api = null; }
+          var e2 = $("#err");
+          if (!api || !api.answersText) { e2.hidden = false; e2.textContent = "Отчёт ещё загружается — попробуйте через секунду."; return; }
+          var a = api.answersText();
+          if (!a.answered && !a.decisions) {
+            e2.hidden = false;
+            e2.textContent = "Отметьте варианты или впишите ответы во вкладке «Вопросы» отчёта ниже — или загрузите файл ответов.";
+            return;
+          }
+          e2.hidden = true;
+          var fd = new FormData();
+          fd.append("answers_text", a.text);
+          send(fd, rc, rcLabel);
         });
       }
       $("#prog").classList.add("compact");

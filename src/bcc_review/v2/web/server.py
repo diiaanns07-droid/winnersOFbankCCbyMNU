@@ -13,12 +13,15 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import re
 import shlex
+import socket
 import sys
 import time
+import urllib.request
 import webbrowser
 from email import policy
 from email.parser import BytesParser
@@ -143,8 +146,9 @@ def job_page(job: Job) -> str:
     <div class="pmeta">{e(job.provider)}{(" · " + e(job.model)) if job.model else ""} · <span id="elapsed">0 с</span> · <span id="pstate">в очереди</span><span id="vsum"></span></div></div>
     <div class="dls"><span class="dll" id="dll" hidden>Скачать:</span>{links}
     <a class="dl" id="newtab" href="/jobs/{e(job.id)}/files/report.html?inline=1" target="_blank" rel="noopener" hidden>Открыть отдельно ↗</a>
-    <form class="answers" id="answers" hidden title="Отметьте варианты во вкладке «Вопросы» отчёта, нажмите «Скачать ответы» и загрузите файл: агент перепроверит замечания и покажет вердикт «до и после» и исправленное ТЗ.">
-      <label class="dl ans">Загрузить ответы ↻<input type="file" name="answers" accept=".md,.txt,.json" hidden></label></form>
+    <form class="answers" id="answers" hidden title="Отметьте варианты во вкладке «Вопросы» отчёта и нажмите «Пересчитать с ответами»: агент перепроверит замечания и покажет вердикт «до и после» и исправленное ТЗ. Или загрузите готовый файл ответов (в том числе файл следующего круга).">
+      <button type="button" class="dl ans" id="recalc">{"Следующий круг ↻" if job.answers_path else "Пересчитать с ответами ↻"}</button>
+      <label class="dl ans">Загрузить файл ответов<input type="file" name="answers" accept=".md,.txt,.json" hidden></label></form>
     <a class="btn ghost" href="/">Новая проверка</a></div>
   </div>
   {f'<p class="parent">Повторная проверка с ответами владельца к <a href="/jobs/{e(job.parent)}">исходной проверке</a>.</p>' if job.parent else ''}
@@ -310,7 +314,8 @@ class Handler(BaseHTTPRequestHandler):
         fields, files = _parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
         data = files.get("answers", ("", b""))[1] or (fields.get("answers_text") or "").encode("utf-8")
         if not data.strip():
-            return self._json(400, {"error": "Загрузите файл ответов (кнопка «Скачать ответы» во вкладке «Вопросы» отчёта)."})
+            return self._json(400, {"error": "Отметьте ответы во вкладке «Вопросы» отчёта и нажмите «Пересчитать с ответами» "
+                                             "или загрузите файл ответов (кнопка «Скачать ответы» в отчёте)."})
         problem = check_provider(parent.provider, parent.model)
         if problem:
             return self._json(400, {"error": problem})
@@ -325,11 +330,59 @@ class Handler(BaseHTTPRequestHandler):
         self._html(code, index_page(self.app, error=msg, provider=provider, model=model))
 
 
+class _Server(ThreadingHTTPServer):
+    """На Windows SO_REUSEADDR пускает второй сервер на занятый порт молча — там берём исключительный порт."""
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self) -> None:
+        if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def make_server(app: App, host: str = "127.0.0.1", port: int = 8014) -> ThreadingHTTPServer:
     handler = type("BoundHandler", (Handler,), {"app": app})
-    srv = ThreadingHTTPServer((host, port), handler)
+    srv = _Server((host, port), handler)
     srv.daemon_threads = True
     return srv
+
+
+_ADDR_IN_USE = {errno.EADDRINUSE, 10048, 10013}  # 10048/10013 — WSAEADDRINUSE/WSAEACCES (порт занят или запрещён)
+
+
+def _is_demo_running(host: str, port: int) -> bool:
+    """Отвечает ли на этом порту уже запущенное веб-демо (тогда второй запуск не нужен)."""
+    probe = "127.0.0.1" if host in ("", "0.0.0.0", "::") else host
+    try:
+        with urllib.request.urlopen(f"http://{probe}:{port}/healthz", timeout=1.5) as r:
+            return r.read(16) == b"ok" and (r.headers.get("Server") or "").startswith("bcc-review-web")
+    except Exception:  # noqa: BLE001 — любой сбой пробы значит «нашего демо там нет»
+        return False
+
+
+def bind_server(app: App, host: str, port: int, *, tries: int = 20) -> tuple[ThreadingHTTPServer | None, str]:
+    """Сервер на `port`, а если порт занят чужой программой — на следующем свободном.
+
+    Возвращает (сервер, сообщение). Сервер None — запускать не нужно или нельзя; сообщение объясняет почему
+    (по-русски, с адресом уже запущенного демо или подсказкой про --port).
+    """
+    for p in ([port] + [port + i for i in range(1, tries + 1)] if port else [0]):
+        try:
+            srv = make_server(app, host, p)
+        except OSError as exc:
+            if getattr(exc, "winerror", None) not in _ADDR_IN_USE and exc.errno not in _ADDR_IN_USE:
+                why = ("такого адреса нет" if isinstance(exc, socket.gaierror) else
+                       "нет прав на этот порт (порты до 1024 — только администратору)" if isinstance(exc, PermissionError)
+                       else f"ошибка системы {exc.errno}")
+                return None, (f"Не удалось запустить веб-демо на {host}:{p}: {why}. "
+                              f"Укажите другой адрес: --host 127.0.0.1 --port 8015.")
+            if p == port and _is_demo_running(host, port):
+                return None, f"Веб-демо уже запущено: http://{host}:{port}/ — откройте этот адрес в браузере."
+            continue
+        note = "" if p == port else f"Порт {port} занят другой программой — веб-демо запущено на порту {p}."
+        return srv, note
+    return None, (f"Порты {port}–{port + tries} заняты другими программами. "
+                  f"Укажите свободный порт: python -m bcc_review.v2.web --port 9000.")
 
 
 def build_app(data_dir: Path, *, provider: str = "auto", fixture: Path | None = None, sample: Path | None = None,
@@ -364,7 +417,15 @@ def main(argv: list[str] | None = None) -> int:
                     sample=Path(a.sample) if a.sample else None, workers=a.workers,
                     cache_dir=Path(a.cache_dir) if a.cache_dir else None, pace=a.pace,
                     extra_args=shlex.split(a.pipeline_args, posix=(os.name != "nt")))
-    srv = make_server(app, a.host, a.port)
+    srv, note = bind_server(app, a.host, a.port)
+    if srv is None:
+        running = note.startswith("Веб-демо уже запущено")
+        print(note, file=sys.stdout if running else sys.stderr, flush=True)
+        if running and a.open:
+            webbrowser.open(f"http://{'127.0.0.1' if a.host in ('', '0.0.0.0', '::') else a.host}:{a.port}/")
+        return 0 if running else 2
+    if note:
+        print(note, flush=True)
     url = f"http://{a.host}:{srv.server_address[1]}/"
     print(f"Веб-демо: {url}  (остановить — Ctrl+C)", flush=True)
     if a.open:

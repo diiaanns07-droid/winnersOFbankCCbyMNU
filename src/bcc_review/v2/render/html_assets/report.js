@@ -213,6 +213,7 @@
       var A = a.dataset, B = b.dataset;
       if (key === "line") return (+A.line - +B.line) || (+B.rank - +A.rank);
       if (key === "sev") return (+B.rank - +A.rank) || (+A.line - +B.line);
+      if (key === "stab") return ((+B.stab || 0) - (+A.stab || 0)) || (+B.rank - +A.rank) || (+A.line - +B.line);
       var pa = +A.prio || 999, pb = +B.prio || 999;
       return (pa - pb) || (+B.rank - +A.rank) || (+A.line - +B.line);
     });
@@ -289,29 +290,207 @@
     download(base + ".report.json", $("#report-data").textContent, "application/json");
   });
 
+  /* ── ответы владельца: файл в формате recheck.parse_answers_text, загрузка следующего круга ── */
+  var LET = "ABCDEFGH";
+  var LETTER = { A: 0, B: 1, C: 2, D: 3, "А": 0, "Б": 1, "В": 1, "С": 2, "Г": 3, "1": 0, "2": 1, "3": 2, "4": 3 };
+  var QLINE = /^\s*(?:[-*+]\s+)?(?:\*\*|__)?\s*((?:Q|Вопрос)\s*-?\s*(\d{1,3})(?:\.\d+)?)\s*(?:\*\*|__)?\s*(?:\[((?:[^\[\]\n]|\[[^\[\]\n]*\]){1,200})\]|\(([^()\n]{1,200})\))?\s*(?:\*\*|__)?\s*(?:[:：=—–-]|[.)](?=[\s*_]))\s*(?:\*\*|__)?\s*(.*)$/i;
+  var CHOICE = /^\s*(?:\*\*)?([A-DА-ГС1-4])(?:\*\*)?\s*(?:$|[).,;:—–-]\s*([\s\S]*)$|\s+[—–-]\s*([\s\S]*)$)/i;
+  var TODO = /<решите:\s*([^>]*)>/g;
+  var reportData = null;
+  function rdata() { if (!reportData) reportData = JSON.parse($("#report-data").textContent); return reportData; }
+  function oneLine(t) { return String(t || "").replace(/\s+/g, " ").trim(); }
+  function normTopic(t) { return oneLine(t).toLowerCase().replace(/[«»"'()\[\].,:;!?—–-]/g, "").replace(/ё/g, "е"); }
+  function qid(n) { return "Q-" + ("0" + parseInt(n, 10)).slice(-2); }
+  var qcards = $$(".qcard");
+  function card(id) { return qcards.filter(function (c) { return c.dataset.q === id; })[0] || null; }
+  function topicSafe(t) {  // тема в [] разбирается, если в ней нет своих [ ] и она короче 200 символов
+    return oneLine(t).replace(/\[/g, "(").replace(/\]/g, ")").slice(0, 200).trim();
+  }
+  function ownSafe(t) {  // свой текст не должен прочитаться как буква варианта («B. …», «1) …»)
+    t = oneLine(t);
+    return CHOICE.test(t) ? "«" + t + "»" : t;
+  }
+  function cardValue(c) {
+    var id = c.dataset.q;
+    var pick = $('input[name="' + id + '"]:checked', c);
+    var own = $('textarea[data-own="' + id + '"]', c);
+    var text = own ? oneLine(own.value) : "";
+    var letter = pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "";
+    if (letter && text) return letter + " — " + text;
+    return letter || (text ? ownSafe(text) : "");
+  }
+  function decisionLines() {
+    var d = $("#decisions");
+    return d ? d.value.split(/\n/).map(oneLine).filter(Boolean) : [];
+  }
+  function answersText() {
+    var data = rdata(), doc = data.document || {};
+    var md = ["# Ответы владельца на вопросы ревью: «" + oneLine(doc.title) + "»", ""];
+    if (doc.file || doc.sha256) md.push("> Документ: " + (doc.file || "") + (doc.sha256 ? " · SHA-256: " + doc.sha256 : ""));
+    md.push("> Формат строки: `Q-01 [тема]: B` (буква варианта), `Q-01 [тема]: B — оговорка` или `Q-01 [тема]: свой ответ`.",
+      "> Запуск: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers ЭТОТ_ФАЙЛ --revise", "");
+    var n = 0;
+    (data.questions || []).forEach(function (qq) {
+      var c = card(qq.id);
+      var val = c ? cardValue(c) : "";
+      if (!val) return;
+      n++;
+      var t = topicSafe(qq.topic);
+      md.push(qq.id + (t ? " [" + t + "]" : "") + ": " + val);
+    });
+    var dec = decisionLines();
+    if (dec.length) md.push("", "## Решения", "");
+    dec.forEach(function (d) { md.push("- " + d); });
+    return { text: md.join("\n") + "\n", answered: n, decisions: dec.length };
+  }
+  function refreshState() {
+    var done = 0;
+    qcards.forEach(function (c) {
+      var st = $(".qstate", c), v = cardValue(c);
+      var note = $(".qnote", c);
+      var flag = note && !note.hidden ? note.dataset.kind : "";
+      if (v) done++;
+      if (st) {
+        st.textContent = flag === "conflict" && !v ? "расхождение" : flag === "todo" && !v ? "нужно решить" : v ? "есть ответ" : "";
+        st.className = "qstate " + (flag && !v ? "q-" + flag : v ? "q-done" : "");
+      }
+    });
+    var qc = $("#qcount");
+    if (qc) qc.textContent = qcards.length ? "Отвечено: " + done + " из " + qcards.length : "";
+  }
+  qcards.forEach(function (c) {
+    c.addEventListener("change", refreshState);
+    c.addEventListener("input", refreshState);
+  });
+  function setNote(c, kind, html) {
+    var note = $(".qnote", c);
+    if (!note) return;
+    note.hidden = !html; note.dataset.kind = kind || ""; note.innerHTML = html || "";
+    note.className = "qnote" + (kind ? " qn-" + kind : "");
+  }
+  function esc(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+  function applyValue(c, value) {
+    var id = c.dataset.q;
+    $$('input[name="' + id + '"]', c).forEach(function (r) { r.checked = false; });
+    var own = $('textarea[data-own="' + id + '"]', c);
+    if (own) own.value = "";
+    value = oneLine(value);
+    if (!value) return;
+    var m = CHOICE.exec(value);
+    if (m) {
+      var idx = LETTER[m[1].toUpperCase()];
+      var radio = $('input[name="' + id + '"][value="' + idx + '"]', c);
+      var rest = oneLine(m[2] || m[3] || "");
+      if (radio) {
+        radio.checked = true;
+        var label = radio.closest("label");
+        var optText = label ? oneLine(label.textContent).replace(/^[A-HА-Г]\s*/, "") : "";
+        if (rest && own && normTopic(rest) !== normTopic(optText)) own.value = rest;
+        return;
+      }
+    }
+    if (own) own.value = value.replace(/^«([\s\S]*)»$/, "$1");
+  }
+  function loadAnswers(text) {
+    var byTopic = {}, byId = {};
+    qcards.forEach(function (c) { byId[c.dataset.q] = c; if (c.dataset.topic) byTopic[normTopic(c.dataset.topic)] = c; });
+    var got = {}, order = [], unmatched = [], decisions = [], inDec = false;
+    String(text || "").replace(/^﻿/, "").split(/\r?\n/).forEach(function (raw) {
+      var line = raw.replace(/\s+$/, "");
+      if (!line.trim()) return;
+      if (/^\s*#/.test(line)) { inDec = /^\s*#{1,6}\s*(решени|общие решени|дополнительн)/i.test(line); return; }
+      if (/^\s*(>|<!--)/.test(line)) return;
+      var m = QLINE.exec(line);
+      if (!m) {
+        if (inDec) { var d = oneLine(line.replace(/^\s*[-*+]\s+/, "")); if (d) decisions.push(d); }
+        return;
+      }
+      var topic = m[3] || m[4] || "";
+      // номер вопроса между прогонами может смениться — сначала тема, иначе номер
+      var c = (topic && byTopic[normTopic(topic)]) || byId[qid(m[2])] || null;
+      if (!c) { unmatched.push(oneLine(line).slice(0, 90)); return; }
+      var key = c.dataset.q;
+      if (!got[key]) { got[key] = []; order.push(key); }
+      var v = oneLine(m[5]);
+      if (got[key].indexOf(v) < 0) got[key].push(v);
+    });
+    var filled = 0, conflicts = 0, todos = 0;
+    qcards.forEach(function (c) { setNote(c, "", ""); });
+    order.forEach(function (key) {
+      var c = byId[key], vals = got[key];
+      if (vals.length > 1) {
+        conflicts++;
+        applyValue(c, "");
+        setNote(c, "conflict", "<b>Ответы расходятся — оставьте один:</b> " + vals.map(function (v, i) {
+          return '<button type="button" class="pickans" data-i="' + i + '">' + esc(v) + "</button>";
+        }).join(" "));
+        $$(".pickans", c).forEach(function (b) {
+          b.addEventListener("click", function () { applyValue(c, vals[+b.dataset.i]); setNote(c, "", ""); refreshState(); });
+        });
+        return;
+      }
+      var v = vals[0], todo = [];
+      v = v.replace(TODO, function (_, x) { todo.push(oneLine(x)); return ""; }).trim();
+      applyValue(c, v);
+      if (todo.length) { todos++; setNote(c, "todo", "<b>Нужно решить:</b> " + esc(todo.join("; "))); }
+      else if (v) filled++;
+    });
+    var d = $("#decisions");
+    if (d && decisions.length) d.value = decisions.join("\n");
+    refreshState();
+    showTab("questions");
+    var parts = ["Ответов: " + filled];
+    if (conflicts) parts.push("расхождений: " + conflicts);
+    if (todos) parts.push("нужно решить: " + todos);
+    if (decisions.length) parts.push("общих решений: " + decisions.length);
+    if (unmatched.length) parts.push("не нашлось вопроса: " + unmatched.length);
+    toast(parts.join(", "));
+    return { filled: filled, conflicts: conflicts, todo: todos, decisions: decisions.length, unmatched: unmatched };
+  }
+  function nextText() {
+    var el = $("#next-answers");
+    try { return el ? JSON.parse(el.textContent) : ""; } catch (_) { return ""; }
+  }
   var dla = $("#dlanswers");
   if (dla) {
     dla.addEventListener("click", function () {
-      var data = JSON.parse($("#report-data").textContent);
-      var LET = "ABCDEFGH";
-      var md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
-        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.",
-        "> Передайте файл агенту: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers этот_файл.md", ""];
-      var n = 0;
-      (data.questions || []).forEach(function (qq) {
-        var pick = $('input[name="' + qq.id + '"]:checked');
-        var own = $('textarea[data-own="' + qq.id + '"]');
-        var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
-        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
-        if (!val) return;
-        n++;
-        md.push(qq.id + (qq.topic ? " [" + qq.topic + "]" : "") + ": " + val);
-      });
-      if (!n) { toast("Отметьте хотя бы один ответ"); return; }
-      download(base + ".answers.md", md.join("\n") + "\n", "text/markdown");
-      toast("Ответов в файле: " + n);
+      var a = answersText();
+      if (!a.answered && !a.decisions) { toast("Отметьте хотя бы один ответ"); return; }
+      download(base + ".answers.md", a.text, "text/markdown");
+      toast("Ответов в файле: " + a.answered + (a.decisions ? ", общих решений: " + a.decisions : ""));
     });
   }
+  var ula = $("#ulanswers");
+  if (ula) {
+    ula.addEventListener("change", function () {
+      var f = ula.files && ula.files[0];
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () { loadAnswers(String(rd.result || "")); ula.value = ""; };
+      rd.onerror = function () { toast("Не удалось прочитать файл"); };
+      rd.readAsText(f, "utf-8");
+    });
+  }
+  var clr = $("#clranswers");
+  if (clr) clr.addEventListener("click", function () {
+    qcards.forEach(function (c) { applyValue(c, ""); setNote(c, "", ""); });
+    var d = $("#decisions"); if (d) d.value = "";
+    refreshState();
+  });
+  var dln = $("#dlnext");
+  if (dln) dln.addEventListener("click", function () {
+    var t = nextText();
+    if (!t) { toast("Файла следующего круга в отчёте нет"); return; }
+    download(base + ".answers-next.md", t, "text/markdown");
+  });
+  var ldn = $("#loadnext");
+  if (ldn) ldn.addEventListener("click", function () {
+    var t = nextText();
+    if (t) loadAnswers(t); else toast("Файла следующего круга в отчёте нет");
+  });
+  refreshState();
+  // для веб-демо (та же страница во фрейме): пересчёт с ответами без скачивания файла
+  window.bccReport = { answersText: answersText, loadAnswers: loadAnswers, nextText: nextText };
 
   /* ── адрес страницы: #D-02 или #questions ── */
   function fromHash() {
