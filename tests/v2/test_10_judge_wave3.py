@@ -216,3 +216,35 @@ def test_major_rule_needs_three_sources_and_can_be_switched_off():
     res = judge.assemble(response([finding("F01", ["C-003"])]), cs, [[c["id"]] for c in cs], requirements=REQS,
                          ctx=ctx, warnings=[])
     assert sev(res) == ["major"]
+
+
+def test_verdict_text_rebuilt_when_code_changes_levels():
+    """Модель писала «нельзя» по своему critical, код его понизил: текст вердикта не противоречит вердикту."""
+    cs = _three_sources() + [pair("C-005", RULE, ACCEPT, source="lens:qa")]
+    f1 = crit("F01", ["C-005"], "(а) период начисления: L010 ↔ L020",
+              title="Приёмка относит платёж к другому периоду, чем правило начисления")
+    resp = response([f1, finding("F02", ["C-003"], severity="major")],
+                    summary="Разработку начинать нельзя: F01 критичный.")
+    ctx = Ctx(None, requirements=REQS)
+    res = judge.assemble(resp, cs, [[c["id"]] for c in cs], requirements=REQS, ctx=ctx, warnings=[])
+    verdict = judge.compute_verdict(res["findings"])
+    assert (verdict["development"], verdict["testing"]) == ("yes", "yes")  # critical одного ревьюера → major → minor
+    assert res["verdict_summary"].startswith("Разработку и тестирование можно")
+    assert "нельзя" not in res["verdict_summary"] and "F0" not in res["verdict_summary"]
+    assert any("обоснование вердикта собрано кодом" in w for w in ctx.warnings)
+
+
+def test_verdict_text_kept_when_levels_unchanged():
+    cs = [pair("C-001", RULE, ACCEPT, source="lens:qa"), pair("C-002", RULE, ACCEPT, source="consistency")]
+    res, _ = run([crit("F01", ["C-001", "C-002"], "(а) период начисления: L010 ↔ L020",
+                       title="Приёмка относит платёж к другому периоду, чем правило начисления")], cs)
+    assert res["verdict_summary"] == "Разработку начинать нельзя: D-01."
+
+
+def test_verdict_text_wording_by_side():
+    fs = [{"id": "D-01", "title": "Метод не описан.", "severity": "critical", "blocks": "testing", "priority": 1},
+          {"id": "D-02", "title": "Код ответа двумя способами", "severity": "major", "blocks": "both", "priority": 2}]
+    text = judge.verdict_text(fs)
+    assert text.startswith("Разработку можно, тестирование — нельзя: критичные дефекты блокируют работу — "
+                           "D-01 — метод не описан.")
+    assert "Исправить первым: D-01, D-02." in text

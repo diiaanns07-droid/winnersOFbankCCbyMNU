@@ -86,6 +86,8 @@ NEVER_CRITICAL_CRITERIA = {"conforming", "language", "ranked", "modifiable", "tr
 # одним. Исключение — кандидаты, где исход выведен на конкретном входе по двум сверенным цитатам.
 MISSING_KINDS = {"missing_element", "incomplete"}
 STRUCTURED_ORIGINS = {"acceptance_check", "pair_check"}
+# для major без critical в документе: попарная сверка — мнение одного ревьюера (набора), строка приёмки — исполнена
+MAJOR_STRUCTURED_ORIGINS = {"acceptance_check"}
 MIN_SOURCES_FOR_CONSENSUS = 3  # правило действует, если в прогоне не меньше трёх разных источников
 
 # Противоречие (critical по пункту «а» шкалы) доказывается цитатами двух разных мест.
@@ -698,11 +700,13 @@ def _source_family(src: str) -> str:
     return "rules" if src.startswith("rules:") else src
 
 
-def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None) -> bool:
+def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
+               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS) -> bool:
     """Critical подтверждён двумя ревьюерами: два источника среди кандидатов дефекта или кандидат другого
-    источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект."""
+    источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект.
+    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам."""
     fams = {_source_family(_s(m.get("source"))) for m in members}
-    if len(fams) >= 2 or any(_s(m.get("origin")) in STRUCTURED_ORIGINS for m in members):
+    if len(fams) >= 2 or any(_s(m.get("origin")) in structured for m in members):
         return True
     lines = {e["line_start"] for e in f["evidence"]}
     need = min(2, len(lines))
@@ -918,15 +922,15 @@ def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
 def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: int, ctx: Any,
                     warnings: list[str]) -> None:
     """В документе без критичных дефектов существенные дефекты решают вердикт («можно» или «с условиями»),
-    поэтому major остаётся major, только если его подтвердили два разных ревьюера (или кандидат вывел исход
-    строкой приёмки или попарной сверкой) — как critical. Найденное одним ревьюером — minor с предупреждением.
+    поэтому major остаётся major, только если его подтвердили два разных ревьюера (или кандидат вывел исход,
+    исполнив строку приёмки). Попарная сверка набора здесь — мнение одного ревьюера. Найденное одним ревьюером — minor с предупреждением.
     Если в документе есть critical, правило не действует: его вердикт и так «нельзя», а все существенные
     дефекты нужны для исправления."""
     if run_sources < MIN_SOURCES_FOR_CONSENSUS or any(f["severity"] == "critical" for f in findings):
         return
     lowered = 0
     for f in findings:
-        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates):
+        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS):
             continue
         f["severity"], f["blocks"], f["priority"] = "minor", "none", 0
         lowered += 1
@@ -1128,6 +1132,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             "_wish": f.get("wish") is True,
             "_basis": _s(f.get("severity_basis")),
             "_check_basis": _s(f.get("_check_basis")),
+            "_model_sev": sev,
+            "_model_blocks": blocks,
         }
         _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps)
         findings.append(item)
@@ -1185,11 +1191,16 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     summary = _ru_levels(_replace_keys(_s(response.get("verdict_summary")), key_map))
     if not summary:
         summary = fallback_summary(clean)
+    code_summary = bool(summary) and bool(clean) and _code_changed_verdict(findings)
 
     # 7. ссылки на ключи в текстах дефектов → D-xx
     for f in clean:
         for field in ("title", "problem", "scenario", "impact", "recommendation", "question"):
             f[field] = _ru_levels(_replace_keys(f[field], {k: v for k, v in key_map.items() if not k.startswith("C-")}))
+
+    if code_summary:  # после замены ключей: в заголовках уже D-xx
+        summary = verdict_text(clean)
+        _warn(ctx, warnings, "судья: уровни изменены кодом — обоснование вердикта собрано кодом")
 
     fix_first = [f["id"] for f in sorted((f for f in clean if f["priority"] > 0), key=lambda f: f["priority"])]
     changes = [{"id": key_map[k], **v} for k, v in (response.get("_checks") or {}).items() if k in key_map]
@@ -1225,6 +1236,50 @@ def _rejected_entry(c: dict, code: str, reason: str, line: int) -> dict:
         "evidence": [{k: e.get(k) for k in ("quote", "line_start", "line_end", "page", "section", "verified")
                       if k in e} for e in c.get("evidence") or []][:5],
     }
+
+
+_SIDE_RU = {"no": "нельзя", "conditional": "можно с условиями", "yes": "можно"}
+
+
+def _list_ids(fs: list[dict], n: int = 3) -> str:
+    return "; ".join(f"{f['id']} — {_lc_first(re.sub(r'[.;:\s]+$', '', f['title']))}" for f in fs[:n])
+
+
+def verdict_text(findings: list[dict]) -> str:
+    """Обоснование вердикта кодом — когда уровни, по которым модель писала свой текст, изменил код
+    (понижения проверкой, консенсус, сведение мелочей): текст модели тогда противоречил бы вердикту."""
+    v = compute_verdict(findings)
+    dev, test = v["development"], v["testing"]
+    by_prio = sorted(findings, key=lambda f: (f.get("priority") or 99, SEV_RANK.get(f.get("severity"), 3)))
+    crit = [f for f in by_prio if f.get("severity") == "critical"]
+    major = [f for f in by_prio if f.get("severity") == "major"]
+    head = (f"Разработку и тестирование {_SIDE_RU[dev]}" if dev == test
+            else f"Разработку {_SIDE_RU[dev]}, тестирование — {_SIDE_RU[test]}")
+    if crit:
+        parts = [f"{head}: критичные дефекты блокируют работу — {_list_ids(crit)}."]
+        if major:
+            parts.append(f"Также до приёмки нужно закрыть существенные: {_list_ids(major, 2)}.")
+    elif "conditional" in (dev, test):
+        parts = [f"{head}: критичных дефектов нет, но существенные нужно закрыть до приёмки — {_list_ids(major)}."]
+    elif major:
+        parts = [f"{head}: критичных дефектов нет, существенных меньше трёх.",
+                 f"До приёмки стоит закрыть {_list_ids(major, 2)}."]
+    else:
+        parts = [f"{head}: критичных и существенных дефектов нет; незначительные замечания можно закрыть по ходу "
+                 "работы."]
+    if v["fix_first"]:
+        parts.append("Исправить первым: " + ", ".join(v["fix_first"][:5]) + ".")
+    return " ".join(parts)
+
+
+def _code_changed_verdict(findings: list[dict]) -> bool:
+    """Код изменил уровни так, что текст модели устарел: другой вердикт или снят critical модели."""
+    if any(f.get("_model_sev") == "critical" and f["severity"] != "critical" for f in findings):
+        return True
+    model = [{"severity": f.get("_model_sev", f["severity"]), "blocks": f.get("_model_blocks", f["blocks"])}
+             for f in findings]
+    a, b = compute_verdict(model), compute_verdict(findings)
+    return (a["development"], a["testing"]) != (b["development"], b["testing"])
 
 
 def fallback_summary(findings: list[dict]) -> str:
