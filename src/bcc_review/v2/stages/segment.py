@@ -535,7 +535,10 @@ def _lead_status_code(view: dict, r: dict) -> str | None:
 
 # номер пункта: «Ф-1», «ФТ-2.2.3.1», «НФТ-3», «Т01-1», «REQ_001», «BR-12a»
 ITEM_ID = r"[A-ZА-ЯЁ]{1,8}\d{0,3}[-‑–_]\d+(?:\.\d+)*[a-zа-я]?"
-_OWN_LEAD = re.compile(r"^(?P<id>" + ITEM_ID + r")(?:[.):]\s*|\s+[—–]\s+|\s+(?=[A-ZА-ЯЁ«\"])|$)")
+# номер пункта по ГОСТ 34: «3.1.1.», «4.2.1.3» — не меньше двух уровней (одноуровневый «1.» — пункт списка)
+NUM_ITEM_ID = r"\d{1,2}(?:\.\d{1,3}){1,5}(?!\d)"
+_OWN_LEAD = re.compile(r"^(?P<id>" + ITEM_ID + r")(?:[.):]\s*|\s+[—–]\s+|\s+(?=[A-ZА-ЯЁ«\"])|$)"
+                       r"|^(?P<num>" + NUM_ITEM_ID + r")(?:\.?\s+(?=[A-ZА-ЯЁ«\"]))")
 _GLOSSARY_WORDS = ("термин", "глоссар", "определени", "понят", "сокращени", "словар")
 
 
@@ -550,7 +553,7 @@ def _own_id(view: dict, r: dict) -> str | None:
         cell = t.split(" | ")[0].strip().rstrip(".")
         return cell if re.fullmatch(ITEM_ID, cell) else None
     m = _OWN_LEAD.match(t)
-    return m.group("id") if m else None
+    return (m.group("id") or m.group("num")) if m else None
 
 
 def _paragraph_section_prefix(view: dict, first: dict, sid: str, parts: list[str]) -> bool:
@@ -738,7 +741,7 @@ def split_status_lists(view: dict, requirements: list[dict]) -> list[dict]:
             body = text[m.end():items[i + 1].start() if i + 1 < len(items) else len(text)].strip().rstrip(".")
             body = re.sub(r"^ответ\s+в\s+случае,?\s*(?:если\s+)?", "", body, flags=re.I)
             words = body.split()
-            summary = f"Код {m.group(1)} — " + " ".join(words[:9]) + ("…" if len(words) > 9 else "")
+            summary = f"Код {m.group(1)} — " + " ".join(words[:7]) + ("…" if len(words) > 7 else "")
             out.append({**r, "source_id": f"Статус {m.group(1)}", "kind": "api", "summary": summary,
                         "quote": _short_quote(seg), "line_start": a, "line_end": b})
     return out
@@ -860,14 +863,18 @@ def table_header_lines(view: dict) -> set[int]:
     return out
 
 
+# подпись по ГОСТ: «Таблица 1 – Параметры заявки», «Рисунок 2 — Схема»
+_TABLE_CAPTION = re.compile(r"^(?:таблица|табл\.|рисунок|рис\.)\s+[\dА-ЯA-Z][\w.]*\s*[–—-]\s*\S", re.I)
+
+
 def _is_caption(view: dict, n: int) -> bool:
     """Короткая строка с двоеточием в конце, за которой идёт таблица, список или пример."""
     lines = _lines(view)
     idx = next((i for i, x in enumerate(lines) if int(x["n"]) == n), None)
     if idx is None:
         return False
-    t = _text(lines[idx]).strip()
-    if not t.endswith(":") or len(t) > 80 or _is_row(t):
+    t = _MD_DECOR.sub("", _text(lines[idx])).strip()
+    if not (t.endswith(":") or _TABLE_CAPTION.match(t)) or len(t) > 100 or _is_row(t):
         return False
     nxt = next((x for x in lines[idx + 1:] if _text(x).strip()), None)
     if nxt is None:
@@ -1118,13 +1125,14 @@ def _warn(ctx: Any, msg: str) -> None:
 # ---------------------------------------------------------------------------------------------------------
 # Эвристическая нарезка (без модели)
 
-_ID_RE = re.compile(r"^(?P<id>" + ITEM_ID + r")\.?\s+")
+_ID_RE = re.compile(r"^(?P<id>" + ITEM_ID + r"|" + NUM_ITEM_ID + r"(?=\.?\s+[A-ZА-ЯЁ«\"]))\.?\s+")
 _NUM_RE = re.compile(r"^(?P<n>\d{1,2})[.)]\s+")
 _STATUS_RE = re.compile(r"^(?P<code>[1-5]\d\d)\b")
 _SKIP_SECTIONS = ("общие сведения", "ревью требований", "чек-лист", "согласующ", "лист согласования",
                   "история изменений", "история версий")
 _GLOSSARY = {"термины", "глоссарий", "определения", "термины и определения", "словарь терминов"}
-_PLACEHOLDER = re.compile(r"^(не используется|не используются|не применяется|tbd|заполняются? .*)\.?$", re.I)
+_PLACEHOLDER = re.compile(r"^(не используется|не используются|не применяется|не предъявляю?тся|не требуется|"
+                          r"tbd|заполняются? .*)\.?$", re.I)
 
 
 def heuristic_segment(view: dict) -> dict:
@@ -1227,7 +1235,10 @@ def heuristic_segment(view: dict) -> dict:
         elif (m := _NUM_RE.match(clean)) and not is_row:
             sid = f"{tail}, п. {m.group('n')}" if tail else f"п. {m.group('n')}"
         elif is_row:
-            first_cell = clean.strip("| ").split(" | ")[0].strip()
+            cells = [c.strip() for c in clean.strip("| ").split(" | ")]
+            first_cell = cells[0]
+            if first_cell.isdigit() and len(cells) > 1 and re.fullmatch(r"[A-Za-z_][\w.{}\[\]-]{0,39}", cells[1]):
+                first_cell = cells[1]  # столбец «№», затем имя параметра
             tname = table_name or tail
             pm = re.match(r"^([A-Za-z_][\w.{}/\[\]-]{0,39})(?:\s*\([^)]*\))?$", first_cell)
             if not first_cell.isdigit() and (pm or re.fullmatch(r"[\w.{}/\[\]-]{1,40}", first_cell)):
@@ -1298,7 +1309,9 @@ def _guess_kind(section: str, text: str, is_row: bool) -> str:
 
 
 def _kind_by_words(s: str) -> str:
-    pairs = [("цел", "goal"), ("нефункцион", "nonfunctional"), ("функцион", "functional"), ("данн", "data"),
+    pairs = [("цел", "goal"), ("нефункцион", "nonfunctional"), ("надёжн", "nonfunctional"), ("надежн", "nonfunctional"),
+             ("производительн", "nonfunctional"), ("защит", "nonfunctional"), ("безопасн", "nonfunctional"),
+             ("функци", "functional"), ("данн", "data"), ("информационн", "integration"), ("обмен", "integration"),
              ("интеграц", "integration"), ("ui", "ui"), ("интерфейс", "ui"), ("дизайн", "ui"),
              ("архитектур", "architecture"), ("sequence", "process"), ("bpmn", "process"), ("процесс", "process"),
              ("приемк", "acceptance"), ("приёмк", "acceptance"), ("логика", "functional"), ("правил", "constraint"),
@@ -1405,6 +1418,38 @@ def promote_response_bodies(view: dict, requirements: list[dict],
     return merge_items(requirements + new, excluded)
 
 
+_OBLIGATION = re.compile(r"долж|обязан|обеспечива|необходимо|не допуска|запрещ|разреш|позволя|возвраща|выполня",
+                         re.I)
+
+
+def demote_non_requirements(view: dict, requirements: list[dict],
+                            excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+    """То, что модели то выделяют, то исключают, код решает одинаково: заглушка («Не предъявляются.») и пункт
+    раздела «Общие сведения» без обязательства (наименование системы, основание, сроки) — в excluded."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    keep, moved = [], []
+    for r in requirements:
+        a, b = int(r["line_start"]), int(r["line_end"])
+        body = [_MD_DECOR.sub("", _text(by_n[n])).strip() for n in range(a, b + 1)
+                if n in by_n and not is_trivial(_text(by_n[n]))]
+        text = " ".join(body)
+        own = _OWN_LEAD.match(text)
+        bare = text[own.end():].strip() if own else text
+        sec = str((by_n.get(a) or {}).get("section") or "").lower()
+        if body and all(_PLACEHOLDER.match(re.sub(r"^\s*[-*•]\s+", "", t)) for t in [bare]):
+            moved.append({"what": "Заглушка", "line_start": a, "line_end": b,
+                          "reason": "Раздел без содержания: «не используется», «не предъявляются» или «заполняется позже»"})
+            continue
+        if "общие сведения" in sec and not _OBLIGATION.search(text) and r.get("kind") not in ("goal",):
+            moved.append({"what": "Общие сведения", "line_start": a, "line_end": b,
+                          "reason": "Сведения о документе и работах (наименование, основание, сроки), не требование"})
+            continue
+        keep.append(r)
+    if not moved:
+        return requirements, excluded
+    return merge_items(keep, excluded + moved)
+
+
 def demote_examples(view: dict, requirements: list[dict], excluded: list[dict]) -> tuple[list[dict], list[dict]]:
     """Абзац «Пример ответа: {…}» при уже выделенных строках того же раздела (таблица полей ответа) — пример к ним,
     а не требование: в excluded. Единственное описание ответа (других требований в разделе нет) остаётся."""
@@ -1492,6 +1537,7 @@ def segment_from_response(view: dict, raw: dict,
         r.pop("auto", None)
     reqs, excl = promote_response_bodies(view, reqs, excl)
     reqs, excl = demote_examples(view, reqs, excl)
+    reqs, excl = demote_non_requirements(view, reqs, excl)
     reqs = merge_bare_codes(view, reqs)
     reqs = merge_same_source_ids(reqs, view)
     reqs = split_status_lists(view, reqs)

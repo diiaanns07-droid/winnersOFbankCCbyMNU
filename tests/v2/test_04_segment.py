@@ -760,3 +760,35 @@ def test_numbered_table_row_and_method_qualifier_canonical():
             {"source_id": "Ответ 200, getX: limit", "line_start": 7, "line_end": 7}]
     assert [r["source_id"] for r in sg.canonical_source_ids(view, reqs)] == ["Методы чтения: 2. Условия",
                                                                               "Ответ 200: limit"]
+
+
+# ---- ТЗ по ГОСТ 34 (нумерованные абзацы «3.1.4.1.», «Таблица 1 –», приложение, лист согласования) ------------
+
+GOST = STRUCT / "gost.md"
+GOST_IDS = {"2.1", "2.2", "3.1.1", "3.1.2", "3.1.3", "3.1.4", "3.1.4.1", "3.1.5", "3.1.6", "3.2.1", "3.2.2", "3.3.1",
+            "3.3.2", "3.4.1", "3.4.2", "5.1"}
+
+
+@pytest.mark.parametrize("answer", ["gost.sonnet", "gost.haiku"])
+def test_gost_answers_give_one_segmentation(answer):
+    """sonnet в одном из прогонов выделил «1.1. Полное наименование системы…» и «Не предъявляются.», haiku оставил
+    подписи «Таблица 1 – …» без разбора (лишний дозапрос): код приводит оба ответа к одной нарезке без вызовов."""
+    view = sg.load_view(str(GOST))
+    raw = json.loads((ANSWERS / f"{answer}.json").read_text(encoding="utf-8"))
+    calls = []
+    out = sg.segment_from_response(view, raw, lambda u, d: calls.append(u) or {})
+    assert calls == [] and out["coverage"]["uncovered"] == []
+    sids = [r["source_id"] for r in out["requirements"]]
+    assert GOST_IDS <= set(sids) and not {"1.1", "1.2", "1.3", "6"} & set(sids)
+    assert len(out["requirements"]) == 27
+
+
+@pytest.mark.parametrize("name", ["gost.md", "gost.docx"])
+def test_gost_offline_equals_model(name):
+    view = sg.load_view(str(STRUCT / name))
+    h = sg.heuristic_segment(view)
+    sids = {r["source_id"] for r in h["requirements"]}
+    assert GOST_IDS <= sids
+    assert "Таблица 1 – Параметры заявки на выпуск: clientId" in sids  # «№ | Параметр …» — имя из второй ячейки
+    assert len(h["requirements"]) == 27 and sg.uncovered_lines(view, h["requirements"], h["excluded"]) == []
+    assert any(e["what"] == "Подпись к таблице или списку" for e in h["excluded"])
