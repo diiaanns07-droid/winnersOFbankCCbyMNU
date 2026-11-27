@@ -3,22 +3,26 @@
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1                  # Gemini, ключ в .env
 #   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 gemini gemini-3.6-flash
-#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 claude_cli haiku
+#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 claude_cli haiku     # или -Provider claude_cli -Model haiku
 #   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 mock            # без сети: проверка установки
-#   $env:DOC = "release\input\requirements.pdf"; powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1
+#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 -Doc release\input\requirements.pdf
 #
 # Отчёт: out\jury\<документ>.<провайдер>.md (+ .json, .html, score.*.md). Код выхода 0 — все ворота
-# пройдены. Сверка с эталоном — только для документа кейса (release\input\requirements.md, .pdf, .docx). Пределы: $env:MAX_MINUTES (по умолчанию 6 для gemini, 15 для остальных), $env:MAX_CALLS (12).
+# пройдены. Сверка с эталоном — только для документа кейса (release\input\requirements.md, .pdf, .docx).
+# Пределы: $env:MAX_MINUTES (по умолчанию 6 для gemini, 15 для остальных), $env:MAX_CALLS (12).
 # Файл сохранён в UTF-8 с BOM (иначе Windows PowerShell 5.1 искажает русский текст).
 
-$Provider = if ($args.Count -ge 1) { [string]$args[0] } else { "gemini" }
-$Model = if ($args.Count -ge 2) { [string]$args[1] } else { "" }
+param(
+    [Parameter(Position = 0)][string]$Provider = "gemini",
+    [Parameter(Position = 1)][string]$Model = "",
+    [string]$Doc = ""
+)
 
 . (Join-Path $PSScriptRoot "_env.ps1")
 
 $maxMinutes = if ($env:MAX_MINUTES) { $env:MAX_MINUTES } elseif ($Provider -eq "gemini") { "6" } else { "15" }
 $maxCalls = if ($env:MAX_CALLS) { $env:MAX_CALLS } else { "12" }
-$Doc = if ($env:DOC) { $env:DOC } else { "release\input\requirements.md" }
+if (-not $Doc) { $Doc = if ($env:DOC) { $env:DOC } else { "release\input\requirements.md" } }
 if (-not (Test-Path -LiteralPath $Doc -PathType Leaf)) {
     Write-Host "Файл не найден: $Doc (путь — от корня репозитория)" -ForegroundColor Red
     exit 2
