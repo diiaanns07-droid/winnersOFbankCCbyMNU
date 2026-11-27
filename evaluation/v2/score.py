@@ -124,11 +124,14 @@ def pair_info(item: dict, f: dict) -> dict:
     kw_hits = [bool(r.search(text)) for r in item["_kw"]]
     n_kw = sum(kw_hits)
     kw_min = int(item["keywords"].get("min", 1))
+    # required — номера групп ключевых слов, без которых пункт не засчитывается (тема пункта): у К4 это «чтение»,
+    # иначе «нет … операции» с общей строкой-опорой забирает К4 у замечания о другом (просьба №08)
+    req_ok = all(kw_hits[i] for i in item["keywords"].get("required") or [] if i < len(kw_hits))
     policy = item["anchors"].get("policy", "any")
     lines_ok = all(groups_hit) if policy == "all" else any(groups_hit)
     lines_any = any(groups_hit)
     kind_ok = f.get("kind") in (item.get("kinds") or [])
-    if lines_ok and n_kw >= kw_min:
+    if lines_ok and n_kw >= kw_min and req_ok:
         status = "match"
     elif (lines_any and n_kw >= 1) or (not lines_any and n_kw >= max(2, kw_min) and n_kw == len(kw_hits)):
         status = "disputed"

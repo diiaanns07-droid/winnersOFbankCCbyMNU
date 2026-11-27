@@ -191,3 +191,19 @@ def test_run_shell_reads_utf8_output():
     cmd = f"{common.shell_quote(sys.executable)} -c \"import sys; sys.stderr.write('ошибка ₸')\""
     r = common.run_shell(cmd, 60, dict(__import__('os').environ))
     assert r.returncode == 0 and "ошибка ₸" in r.stderr
+
+
+def test_score_required_keyword_group():
+    """Просьба №08: у К4 группа «чтение» обязательна — «нет операции» на общей строке-опоре не засчитывается за К4."""
+    import re
+
+    from evaluation.v2 import score as sc
+
+    item = {"_groups": [{52}], "_kw": [re.compile("чтени|получени"), re.compile("нет|не описан"), re.compile("операци")],
+            "keywords": {"min": 2, "required": [0]}, "anchors": {"policy": "any"}, "kinds": []}
+    other = {"_lines": {52}, "_text": "нет ключа идемпотентности для повторной операции", "_title": ""}
+    k4 = {"_lines": {52}, "_text": "нет операции чтения настроек", "_title": ""}
+    assert sc.pair_info(item, other)["status"] != "match"
+    assert sc.pair_info(item, k4)["status"] == "match"
+    item["keywords"].pop("required")
+    assert sc.pair_info(item, other)["status"] == "match"  # без required — прежнее поведение
