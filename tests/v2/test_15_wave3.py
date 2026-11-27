@@ -1046,3 +1046,55 @@ def test_final_calls_offline_rules_are_not_cache_replay():
     assert final._calls({"provider": "offline", "cases": 33, "time": {"calls": 0}}) == "0 — без модели (правила)"
     assert final._calls({"provider": "claude_cli", "cases": 8, "time": {"calls": 0}}) == "0 — повтор из кэша"
     assert final._calls({"provider": "claude_cli", "cases": 8, "time": {"calls": 75, "cost_usd": 1.06}}) == "75, $1.06"
+
+
+def test_itemdiff_per_item_changes_between_codes_with_noise_and_reasons(tmp_path):
+    """Голова чинит пункты (судья — С12), а итог «С 18/20» этого не показывает: по пунктам — «ни разу → найден»,
+    шум прогонов отдельной строкой, у промаха на B — почему; повтор из кэша и модель без прогона на B — не в счёт."""
+    import json
+
+    from evaluation.v2 import itemdiff
+
+    def row(commit, at, missed, calls=9, model="sonnet"):
+        return {"version": "v2", "status": "complete", "calls": calls, "provider": "claude_cli", "model": model,
+                "commit": commit, "at": f"2026-11-27 {at}", "label": f"проба {commit}", "K_missed": [],
+                "C_missed": missed, "K_as_critical": 5, "findings": 28, "duplicates": 0}
+    hist = tmp_path / "history.jsonl"
+    rows = [row("a1", "10:00", ["С12", "С17"]), row("a2", "11:00", ["С12", "С9"]), row("b1", "12:00", ["С9"]),
+            row("b1", "12:30", ["С1", "С2"], calls=0), row("a1", "10:05", ["С3"], model="haiku")]
+    hist.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8")
+    loaded = itemdiff.history_rows(hist)
+    assert len(loaded) == 4  # повтор ответов из кэша (calls 0) — не новая выборка
+    trees = {"A": "T1", "a1": "T1", "a2": "T1", "B": "T2", "b1": "T2"}
+    scores = {"b1": {"stage_recall": {"lens:analyst": {"K": [], "C": ["С9", "С12"]}, "rules": {"K": [], "C": ["С2"]}},
+                     "misses": [{"gold": "С9", "where": "найден кандидатом (lens:analyst), судья не взял"}]},
+              "a1": {"stage_recall": {"lens:analyst": {"K": [], "C": ["С9"]}}, "misses": []},
+              "a2": {"stage_recall": {"lens:analyst": {"K": [], "C": ["С9"]}}, "misses": []}}
+    d = itemdiff.compare(loaded, "A", "B", focus=["С9"], tree=trees.get, score_of=lambda r: scores[r["commit"]])
+    assert [m["kind"] for m in d["models"]] == ["sonnet"]  # у haiku нет прогона на B
+    m = d["models"][0]
+    assert (m["n_a"], m["n_b"], m["C_a"], m["C_b"]) == (2, 1, [18, 18], [19])
+    it = {x["id"]: x for x in m["items"]}
+    assert it["С12"]["verdict"].startswith("**найден**") and (it["С12"]["seen_a"], it["С12"]["seen_b"]) == (0, 1)
+    assert it["С17"]["noise"] and not it["С9"]["noise"]  # С9 — цель правки: в таблице и без изменения
+    assert it["С9"]["miss_b"] == "линза нашла, судья не взял → №10" and it["С9"]["stages_b"] == ["analyst"]
+    md = itemdiff.render(d, {"С12": "Содержимое push не определено"})
+    assert "| С12 Содержимое push не определено | sonnet | 0/2 → 1/1 | 0/2 → 1/1 (analyst) | **найден**" in md
+    assert "В шуме у sonnet (на A пункт то находился, то нет): С17 1/2 → 1/1." in md
+    assert "С1–С20 18, 18 → 19 (среднее 18,0 → 19,0)" in md
+    assert "Нет прогонов" in itemdiff.render(itemdiff.compare(loaded, "A", "Z", tree=trees.get, score_of=lambda r: None))
+
+
+def test_put_results_block_new_block_goes_after_named_block(tmp_path):
+    """Новый блок (`itemdiff`) встаёт после финальных цифр, а не первым — первым в RESULTS.md остаётся вердикт."""
+    from evaluation.v2.common import put_results_block
+
+    p = tmp_path / "RESULTS.md"
+    p.write_text("# R\n\n## Вердикт\n\n<!-- verdict:start -->\nv\n<!-- verdict:end -->\n\n## Финал\n\n"
+                 "<!-- final:start -->\nf\n<!-- final:end -->\n\n## Как считаем\n", encoding="utf-8")
+    put_results_block(p, "itemdiff", "i\n", "Головы по пунктам", after="final")
+    s = p.read_text(encoding="utf-8")
+    assert s.index("## Вердикт") < s.index("<!-- final:end -->") < s.index("## Головы по пунктам") < s.index("## Как считаем")
+    put_results_block(p, "itemdiff", "j\n", "Головы по пунктам", after="final")
+    s2 = p.read_text(encoding="utf-8")
+    assert s2.count("## Головы по пунктам") == 1 and "<!-- itemdiff:start -->\nj\n<!-- itemdiff:end -->" in s2

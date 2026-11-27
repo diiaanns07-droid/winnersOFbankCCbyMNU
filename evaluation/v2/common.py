@@ -21,14 +21,19 @@ def shell_quote(arg: object) -> str:
     return subprocess.list2cmdline([s]) if os.name == "nt" else shlex.quote(s)
 
 
-def put_results_block(path: Path, name: str, body: str, title: str) -> None:
+def put_results_block(path: Path, name: str, body: str, title: str, after: str | None = None) -> None:
     """Блок `<!-- name:start -->…<!-- name:end -->` в Markdown-файле (RESULTS.md): заменить на месте, а если блока
-    ещё нет — вставить новым разделом `## title` сразу после шапки документа (первым)."""
+    ещё нет — вставить новым разделом `## title` после блока `after` (если он есть), иначе сразу после шапки
+    документа (первым)."""
     res = path.read_text(encoding="utf-8")
     start, end = f"<!-- {name}:start -->", f"<!-- {name}:end -->"
     block = f"{start}\n{body}{end}"
+    after_end = f"<!-- {after}:end -->" if after else None
     if start in res and end in res:
         res = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: block, res, flags=re.S)
+    elif after_end and after_end in res:
+        head, sep, rest = res.partition(after_end)
+        res = head + sep + f"\n\n## {title}\n\n" + block + "\n" + rest
     else:
         head, sep, rest = res.partition("\n## ")
         res = head.rstrip() + f"\n\n## {title}\n\n" + block + "\n" + sep + rest
