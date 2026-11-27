@@ -424,16 +424,17 @@ def _heading_sections(doc: Doc, decls: list[Status]) -> list[tuple[Status, list[
 
 
 STOP_STEMS = {"метод", "возвр", "верну", "ответ", "запро", "случа", "резул", "стату", "выпол", "описа", "котор",
-              "други", "этого", "также", "тогда", "после", "перед", "данны"}
+              "други", "этого", "также", "тогда", "после", "перед", "данны", "если", "либо", "или", "иначе", "когда",
+              "unsuc", "succe", "error", "messa", "body", "тело", "ответа", "код", "кода"}
 
 
 def _stems(text: str) -> set[str]:
-    words = re.findall(r"[а-яёa-z]{5,}", text.lower())
+    words = re.findall(r"[а-яёa-z]{4,}", text.lower().replace("ё", "е"))
     return {w[:5] for w in words} - STOP_STEMS
 
 
 def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method | None" = None,
-                    methods: "list[Method] | None" = None) -> Status | None:
+                    methods: "list[Method] | None" = None, any_class: bool = False) -> Status | None:
     """Объявленный статус с тем же условием, что у упомянутого кода (≥ 2 общих значимых основы).
     Строка перечня, отнесённая к другому методу («createX: …»), — не тот же случай."""
     cond = re.sub(CODE, " ", frag)
@@ -441,7 +442,7 @@ def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method |
     best, score = None, 1
     names = {m.name.lower() for m in methods or [] if m.name}
     for d in decls:
-        if d.code == code or (d.code // 100) != (code // 100):
+        if d.code == code or (not any_class and (d.code // 100) != (code // 100)):
             continue
         named = {w.lower() for w in re.findall(r"\b[a-z]+[A-Z]\w*\b", d.line.joined)} & names
         if named and (method is None or (method.name or "").lower() not in named):
@@ -450,6 +451,44 @@ def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method |
         if k > score:
             best, score = d, k
     return best
+
+
+COND_MARK = re.compile(r"\b(?:если|при|в\s+случае|иначе|когда)\b", re.I)
+
+
+def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status], mentions: list, sections: list,
+                             out: dict) -> None:
+    """«Если условие C, вернуть X» в логике ↔ строка перечня «Y — условие C» (X ≠ Y, оба объявлены)."""
+    declared = {d.code for d in decls}
+    decl_lines = {d.line.n for d in decls}
+    in_sections = {x.n for _, body in sections for x in body}
+    done: set[tuple[int, int]] = set()
+    for code, line, frag in mentions:
+        if code not in declared or line.n in decl_lines or line.n in in_sections:
+            continue
+        if not COND_MARK.search(frag) or not re.search(r"возвра|верн", frag, re.I):
+            continue
+        if 200 <= code < 300 and ERROR_WORD.search(frag):
+            continue  # «200 с ERROR» — это правило api.success_with_error
+        other = _same_case_decl(frag, [d for d in decls if d.code != code and d.kind in ("table", "list")], code,
+                                method_of(methods, line.n), methods, any_class=True)
+        if other is None or (code, other.code) in done:
+            continue
+        done.add((code, other.code))
+        out["candidates"].append(candidate(
+            f"api.same_case.{code}-{other.code}",
+            title=f"Один и тот же случай: код {code} в логике метода и {other.code} в перечне статусов",
+            kind="status_conflict", criterion="set_consistent", severity="major", blocks="both",
+            evidence=[ev(line, frag), ev(other.line)],
+            problem=(f"В логике сказано {quoted(frag)}, а в перечне статусов тот же случай описан кодом {other.code}: "
+                     f"{quoted(other.line.joined)}."),
+            scenario=(f"Наступает этот случай: сервер по логике метода отвечает {code}, клиент и автотест по перечню "
+                      f"статусов ждут {other.code}."),
+            impact="Клиент обработает ответ неверно; тест на этот случай нельзя написать однозначно.",
+            recommendation=f"Оставить для случая один код ({code} или {other.code}) и описать его в логике и перечне одинаково.",
+            question=f"Какой код возвращать в этом случае — {code} или {other.code}?",
+            conflict=True,
+        ))
 
 
 def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
@@ -550,6 +589,7 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
         ))
         out["signals"].append(signal(f"api.status_{code}", doc.get(evidence[0]["line"]),
                                      evidence[0]["quote"], title + ".", ("architect", "qa"), "status_conflict"))
+    _rule_same_case_declared(doc, methods, decls, mentions, sections, out)
     # сводка для линз
     first = decls[0].line
     mentioned = sorted({c for c, _, _ in mentions})
@@ -771,6 +811,54 @@ def rule_result_field_missing(doc: Doc, methods: list[Method], out: dict) -> Non
         return
 
 
+DATE_MASKS = [
+    (re.compile(r"ДД\.ММ\.ГГГГ|DD\.MM\.YYYY|dd\.MM\.yyyy", re.I), re.compile(r"^\d{2}\.\d{2}\.\d{4}$"), "ДД.ММ.ГГГГ"),
+    (re.compile(r"ГГГГ-ММ-ДД|YYYY-MM-DD|yyyy-MM-dd|ISO\s*8601", re.I), re.compile(r"^\d{4}-\d{2}-\d{2}"), "ГГГГ-ММ-ДД (ISO 8601)"),
+]
+JSON_PAIR = re.compile(r'"([A-Za-z_]\w*)"\s*:\s*"([^"]*)"')
+
+
+def rule_date_format(doc: Doc, methods: list[Method], out: dict) -> None:
+    """Формат даты поля в таблице не совпадает с примером значения этого поля."""
+    examples: dict[str, tuple[str, Line]] = {}
+    for x in doc.lines:
+        for m in JSON_PAIR.finditer(x.joined):
+            examples.setdefault(m.group(1), (m.group(2), x))
+    for t in tables(doc):
+        ni = t.col(*NAME_COLS)
+        if ni is None:
+            continue
+        for r in t.rows:
+            if not r.cells or ni >= len(r.cells):
+                continue
+            name = r.cells[ni].split()[0] if r.cells[ni] else ""
+            if not IDENT.match(name) or name not in examples:
+                continue
+            rest = " | ".join(r.cells[ni + 1:])
+            for mask_rx, value_rx, mask_name in DATE_MASKS:
+                mm = mask_rx.search(rest)
+                if not mm:
+                    continue
+                value, ex_line = examples[name]
+                if not re.match(r"^\d", value) or value_rx.match(value):
+                    break
+                q_row = " | ".join(r.cells[ni:ni + 1 + next(i for i, c in enumerate(r.cells[ni + 1:], 1)
+                                                           if mask_rx.search(c))])
+                out["candidates"].append(candidate(
+                    f"api.date_format.{_slug(name)}",
+                    title=f"Формат даты поля {name}: {mask_name} в описании, «{value}» в примере",
+                    kind="api_contract", criterion="set_consistent", severity="major", blocks="development",
+                    evidence=[ev(r, q_row), ev(ex_line, f'"{name}":"{value}"')],
+                    problem=(f"В таблице для {name} указан формат {quoted(mm.group(0))}, а в примере ответа "
+                             f"{quoted(value)}. Клиент не знает, какой формат разбирать."),
+                    scenario=f"Сервер отдаёт {name} = «{value}», клиент разбирает по маске {mm.group(0)} — дата не читается.",
+                    impact="Ошибка разбора даты у клиента; тесты контракта расходятся с примером.",
+                    recommendation=f"Указать один формат для {name} (рекомендуется ISO 8601) в таблице и в примерах.",
+                    conflict=True,
+                ))
+                break
+
+
 def rule_inventory(doc: Doc, methods: list[Method], out: dict) -> None:
     if not methods:
         return
@@ -791,4 +879,5 @@ def run(doc: Doc, out: dict) -> None:
     rule_success_with_error(doc, methods, out)
     rule_field_types(doc, methods, out)
     rule_result_field_missing(doc, methods, out)
+    rule_date_format(doc, methods, out)
     rule_inventory(doc, methods, out)

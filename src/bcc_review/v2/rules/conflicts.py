@@ -497,8 +497,48 @@ def rule_acceptance_bounds(doc: Doc, out: dict) -> None:
                     return
 
 
+BOUND_REASON = re.compile(r"превыша\w*|максим\w*|минимал\w*|меньше\s+минимал\w*|вне\s+диапазон\w*|"
+                          r"больше\s+допустим\w*|за\s+пределами", re.I)
+
+
+def rule_range_acceptance(doc: Doc, out: dict) -> None:
+    """Диапазон «от A до B включительно» ↔ строка приёмки, где значение ровно A или B отклоняется."""
+    rows = _acceptance_rows(doc)
+    if not rows:
+        return
+    ranges = []
+    for x in doc.lines:
+        if not x.text or x.is_code or REJECT.search(x.joined):
+            continue
+        for m in RANGE.finditer(x.joined):
+            a, b = _num(m.group(1)), _num(m.group(2))
+            if a is not None and b is not None and a < b:
+                ranges.append((x, a, b, m.group(0)))
+    for r, cells in rows:
+        res = cells[-1]
+        if not NEG_OUT.search(res):
+            continue
+        vals = {_num(m.group(0)) for m in re.finditer(NUM, " ".join(cells[:-1]))}
+        for x, a, b, rq in ranges:
+            v = b if b in vals else (a if a in vals else None)
+            if v is None:
+                continue
+            if not BOUND_REASON.search(res):
+                continue  # отказ объяснён именно границей («превышает максимальную»), а не другим событием
+            row_q = " | ".join(cells) if len(" | ".join(cells)) <= 200 else res
+            _emit(out, "conflicts.range_acceptance", "boundary_conflict", x, _clause(x.joined, rq), r, row_q,
+                  title=f"Критерий приёмки отклоняет {_fmt(v)}, хотя это значение входит в допустимый диапазон",
+                  problem=(f"{quoted(rq)} — значение {_fmt(v)} допустимо, а критерий приёмки ожидает отказ: "
+                           f"{quoted(res)}."),
+                  scenario=f"Операция ровно на {_fmt(v)}: по требованию она проходит, по критерию приёмки — отклоняется.",
+                  recommendation="Исправить критерий приёмки или границу диапазона, чтобы они совпадали.",
+                  question=f"Значение {_fmt(v)} допустимо?")
+            return
+
+
 def run(doc: Doc, out: dict) -> None:
     rule_events(doc, out)
     rule_ranges(doc, out)
     rule_noun_bounds(doc, out)
     rule_acceptance_bounds(doc, out)
+    rule_range_acceptance(doc, out)

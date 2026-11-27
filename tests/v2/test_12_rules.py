@@ -300,3 +300,31 @@ def test_prompt_injection_no_false_alarm(text):
 def test_prompt_injection_variants(text):
     view = {"lines": [{"n": 1, "text": "Требования"}, {"n": 2, "text": text}]}
     assert [c for c in rules.run(view)["candidates"] if c["source"] == "rules:injection.prompt"], text
+
+
+OPEN2 = ROOT / "evaluation" / "v2" / "open2"
+
+
+@pytest.mark.parametrize("case,expected", [
+    ("grace", {"rules:units.day_kinds", "rules:language.nfr_unverifiable", "rules:api.same_case.200-422",
+               "rules:api.date_format.paymentDueDate"}),
+    ("qr", {"rules:language.nfr_unverifiable", "rules:units.time_mix.ttl", "rules:api.same_case.410-400"}),
+])
+def test_open_set_defects(case, expected):
+    """Открытый набор №18: дефектные версии (после того как набор влит в bcc/v2)."""
+    path = OPEN2 / case / "source.md"
+    if not path.exists():
+        pytest.skip("набор №18 ещё не влит")
+    src = {c["source"] for c in rules.run(fallback_load(path))["candidates"]}
+    assert expected <= src, expected - src
+
+
+@pytest.mark.parametrize("case", ["grace_clean", "qr_clean"])
+def test_open_set_clean_only_template(case):
+    """Чистые версии №18: только незаполненный шаблон (чек-лист, версия, согласующие, заглушка тестов)."""
+    path = OPEN2 / case / "source.md"
+    if not path.exists():
+        pytest.skip("набор №18 ещё не влит")
+    out = rules.run(fallback_load(path))
+    assert all(c["source"].startswith("rules:placeholder.") for c in out["candidates"]), \
+        [c["title"] for c in out["candidates"]]
