@@ -262,8 +262,10 @@ def test_promise_candidates_from_inventory(ctx):
     assert m and m["line_start"] == 52
     post = lens_architect.postprocess({"candidates": out})["candidates"][0]
     assert post["severity"] == "critical"  # цитата содержит явное обещание интерфейса
-    cited = [{"kind": "missing_element", "title": "Нет чтения", "evidence": [{"quote": "q", "line": 52}]}]
+    cited = [{"kind": "missing_element", "title": "Нет чтения настроек", "evidence": [{"quote": "q", "line": 52}]}]
     assert lens_architect.promise_candidates(inv, ctx.view, cited) == []
+    other = [{"kind": "missing_element", "title": "Номер карты на экране без источника", "evidence": [{"quote": "q", "line": 52}]}]
+    assert [c["evidence"][0]["line"] for c in lens_architect.promise_candidates(inv, ctx.view, other)] == [52]
     same = [{"kind": "missing_element", "title": "Чтение настроек не описано", "problem": "читать настройки нечем",
              "evidence": [{"quote": "q", "line": 103}]}]
     assert lens_architect.promise_candidates(inv, ctx.view, same) == []

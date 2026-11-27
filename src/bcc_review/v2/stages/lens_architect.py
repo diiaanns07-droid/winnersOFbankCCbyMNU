@@ -144,11 +144,18 @@ SUCCESS_BODY_TITLE = re.compile(r"успешн\w* ответ|ответ\w* 200|2
 SUCCESS_BODY_GAP = re.compile(r"не описан|ссыла|отсыла|\bнет\b", re.I)
 
 
+# Тот же список «не пиши вовсе»: тела вызовов смежных систем, ответ для состояния без примера — заголовок, где
+# подлежащее — «ответ / тело … не описаны» (на сохранённых ответах волны 3 ни одно такое замечание не пункт эталона).
+BODY_GAP_TITLE = re.compile(r"^([^:]{1,20}:\s*)?(ответ\w*|тел[оа]\w*|формат\w* ответ\w*)\b.{0,80}"
+                            r"(не описан\w*|без описания)", re.I)
+
+
 def success_body_ref(c: dict) -> bool:
-    """Замечание о неописанном теле успешного ответа (ссылка на описание, которого нет)."""
+    """Замечание о неописанном теле ответа: успешного (ссылка на описание, которого нет), вызова смежной системы,
+    состояния без примера."""
     t = str(c.get("title") or "")
-    return c.get("kind") in ("api_contract", "missing_element", "incomplete") and \
-        bool(SUCCESS_BODY_TITLE.search(t)) and bool(SUCCESS_BODY_GAP.search(t))
+    return c.get("kind") in ("api_contract", "missing_element", "incomplete") and (
+        (bool(SUCCESS_BODY_TITLE.search(t)) and bool(SUCCESS_BODY_GAP.search(t))) or bool(BODY_GAP_TITLE.search(t)))
 
 
 def error_body_gap(c: dict) -> bool:
@@ -296,8 +303,10 @@ def promise_candidates(inventory: dict, view: Any, candidates: list[dict]) -> li
     «нет элемента» не цитирует эту строку и не говорит о том же действии. Обещания одной строки — одно замечание.
     """
     mine = [c for c in candidates if c.get("kind") == "missing_element"]
-    cited = {int(e.get("line") or 0) for c in mine for e in c.get("evidence") or []}
     told = [_stems(" ".join(str(c.get(k) or "") for k in ("title", "problem"))) for c in mine]
+    # Строка покрыта, только если её цитирует замечание о том же действии: на insurance строку обещания цитировало
+    # постороннее замечание о номере полиса, и обещание «оформить отказ» пропадало.
+    cited = [({int(e.get("line") or 0) for e in c.get("evidence") or []}, t) for c, t in zip(mine, told)]
     by_line: dict[int, list[str]] = {}
     for p in unfulfilled_promises(inventory):
         try:
@@ -306,9 +315,9 @@ def promise_candidates(inventory: dict, view: Any, candidates: list[dict]) -> li
             continue
         what = str(p.get("what") or "").strip().rstrip(".")
         text = _line_text(view, n)
-        if not n or n in cited or not what or not text or not EXPLICIT_PROMISE.search(text):
+        if not n or not what or not text or not EXPLICIT_PROMISE.search(text):
             continue
-        if any(len(_stems(what) & t) >= 2 for t in told):
+        if any(len(_stems(what) & t) >= 2 for t in told) or any(n in ls and _stems(what) & t for ls, t in cited):
             continue
         by_line.setdefault(n, []).append(what)
     out: list[dict] = []
