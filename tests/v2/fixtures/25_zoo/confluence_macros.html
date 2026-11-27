@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Перевыпуск карты : Требования</title></head>
+<body class="theme-default aui-theme-default">
+<div id="page"><div id="main" class="aui-page-panel">
+<div id="main-header"><div id="breadcrumb-section"><ol id="breadcrumbs">
+<li><a href="index.html">Карточные продукты</a></li><li><a href="r.html">Требования</a></li></ol></div>
+<h1 id="title-heading" class="pagetitle"><span id="title-text">Перевыпуск карты : Требования</span></h1></div>
+<div id="content" class="view"><div class="page-metadata">Создано Аналитик, последнее изменение 20.11.2026</div>
+<div id="main-content" class="wiki-content group">
+<p><span class="status-macro aui-lozenge aui-lozenge-current">В РАБОТЕ</span> Статус документа.</p>
+<h2 id="id-req-1">1. Сценарий</h2>
+<ol><li>Клиент открывает карту и нажимает «Перевыпустить».</li>
+<li>Клиент выбирает причину; для причины «утеря» карта блокируется сразу.</li></ol>
+<div class="expand-container"><div class="expand-control"><span class="expand-control-text">Подробности проверки</span></div>
+<div class="expand-content expand-hidden"><p>Повторный заказ по той же карте запрещён, пока предыдущий не завершён.</p></div></div>
+<div class="confluence-information-macro confluence-information-macro-warning"><span class="aui-icon"></span>
+<div class="confluence-information-macro-body"><p>Перевыпуск корпоративных карт в приложении не поддерживается.</p></div></div>
+<h2 id="id-req-2">2. Задачи релиза</h2>
+<ul class="inline-task-list"><li class="checked">Согласовать тарифы перевыпуска с казначейством</li>
+<li>Подготовить тексты уведомлений для курьерской доставки</li></ul>
+<h2 id="id-req-3">3. Параметры</h2>
+<div class="table-wrap"><table class="confluenceTable"><tbody>
+<tr><th class="confluenceTh">Параметр</th><th class="confluenceTh">Значение</th><th class="confluenceTh">Комментарий</th></tr>
+<tr><th class="confluenceTh">Срок выпуска</th><td class="confluenceTd">5 рабочих дней</td><td class="confluenceTd" rowspan="2">Для всех типов карт</td></tr>
+<tr><th class="confluenceTh">Срок доставки</th><td class="confluenceTd">до 3 дней</td></tr>
+<tr><th class="confluenceTh">Стоимость</th><td class="confluenceTd" colspan="2">по тарифу карты</td></tr>
+</tbody></table></div>
+<div class="code panel pdl"><div class="codeContent panelContent pdl"><pre class="syntaxhighlighter-pre">POST /cards/{id}/reissue
+{"reason": "LOST"}</pre></div></div>
+</div></div></div>
+<div id="footer"><section class="footer-body"><p>Документ сгенерирован Confluence</p></section></div>
+</div></body></html>
