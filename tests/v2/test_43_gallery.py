@@ -132,10 +132,12 @@ def test_cards_only_for_existing_files(tmp_path):
     assert [r["id"] for r in ex["reports"] if r["ok"]] == ["have"]
     app = _app(tmp_path)
     html = G.reports_block(app, ex)
-    assert html.count('class="b-surface g43-card"') == 1
+    assert html.count('class="g43-leaf" href="/examples/') == 1
     assert "Есть отчёт" in html and "Нет json" not in html and "Нет документа" not in html
-    assert "Демо без модели · 27.11.2026" in html and "вердикт: нельзя, блокеров 5" in html
-    assert 'b-badge crit' in html
+    assert "Демо без модели · 27.11" in html
+    assert 'Разработка: <b class="no">нельзя</b>&nbsp;· 5&nbsp;блокеров' in html  # цветом — только слово
+    assert "Уведомление о расходах по карте" not in html  # doc.md — свой заголовок «ТЗ»
+    assert ">ТЗ<" in html
     btns = G.documents_block(ex)
     assert "/examples/check/d1" in btns and "d2" not in btns and "только правила" in btns
 
@@ -144,21 +146,27 @@ def test_gallery_block_on_real_examples(tmp_path):
     app = _app(tmp_path)
     html = G.gallery_block(app)
     ok = [r for r in G.load_examples()["reports"] if r["ok"]]
-    assert html.count('class="b-surface g43-card"') == len(ok) >= 1
+    assert html.count('class="g43-leaf" href="/examples/') == len(ok) >= 1
     assert "Готовые отчёты" in html and "/examples/mock" in html
-    assert "Проверить пример" in html and "/examples/check/official" in html
-    assert "Без ключа: официальный ТЗ — демо без модели, остальные — только правила." in html
+    assert "Свой документ" in html and 'for="file"' in html  # «Свой документ» — в той же стопке
+    assert "/examples/check/official" in html and "демо, без ключа" in html and "только правила" in html
+    # правка 20:25: без штампов и цветных плашек; из цветов — нейтральные, зелёный акцент и красное «нельзя»
+    assert "b-stamp" not in html and "b-badge" not in html and "b-surface" not in html
+    for banned in ("--b-blue", "--b-gold", "#1C446C", "#DCA262", "gradient(9", "radial-gradient"):
+        assert banned not in html, banned
     assert "http://" not in html and "https://" not in html  # без внешних ссылок
     ready = [j for j in app.store.jobs.values() if G.is_ready(j)]
     assert len(ready) == len(ok) and all(j.state == "done" for j in ready)
     assert not G.is_ready("20261127-120000-abcdef")
 
 
-def test_empty_when_nothing_to_show(tmp_path, monkeypatch):
-    monkeypatch.setattr(G, "EXAMPLES", _examples(tmp_path, [{"id": "x", "json": "a", "html": "b", "md": "", "source": "c"}]))
-    assert G.gallery_block(_app(tmp_path)) == ""
-    monkeypatch.setattr(G, "EXAMPLES", tmp_path / "no-such.json")
-    assert G.gallery_block(_app(tmp_path)) == ""
+def test_only_own_document_when_nothing_to_show(tmp_path, monkeypatch):
+    """Нет ни одного готового отчёта и примера — в стопке остаётся только «Свой документ», главная не падает."""
+    for ex in (_examples(tmp_path, [{"id": "x", "json": "a", "html": "b", "md": "", "source": "c"}]),
+               tmp_path / "no-such.json"):
+        monkeypatch.setattr(G, "EXAMPLES", ex)
+        html = G.gallery_block(_app(tmp_path))
+        assert "Свой документ" in html and "Готовые отчёты" not in html and "/examples/check/" not in html
 
 
 def test_ready_job_survives_restart_and_refreshes(tmp_path):
@@ -194,6 +202,30 @@ def test_ready_job_survives_restart_and_refreshes(tmp_path):
     jid2 = G.ensure_ready(app2, G.load_examples(exp, tmp_path))["m"]
     assert jid2 != jid and app2.store.get(jid) is None and not app2.store.dir(jid).exists()
     assert "с условиями" in G.reports_block(app2, G.load_examples(exp, tmp_path))
+
+
+def test_verdict_line_and_own_leaf(tmp_path):
+    assert G.verdict_html({"development": "no", "critical": 5}) == \
+        'Разработка: <b class="no">нельзя</b>&nbsp;· 5&nbsp;блокеров'
+    assert G.verdict_html({"development": "no", "critical": 1}).endswith("1&nbsp;блокер")
+    assert G.verdict_html({"development": "no", "critical": 3}).endswith("3&nbsp;блокера")
+    assert G.verdict_html({"development": "no", "critical": 11}).endswith("11&nbsp;блокеров")
+    assert '<b class="yes">можно</b>' in G.verdict_html({"development": "yes", "critical": 0})
+    assert "без&nbsp;блокеров" in G.verdict_html({"development": "yes", "critical": 0})
+    assert '<b class="cond">с условиями</b>' in G.verdict_html({"development": "conditional", "critical": 0})
+    app = _app(tmp_path)
+    job = app.store.create("Моё ТЗ.md", "# Перевод по QR\n\ntext\n".encode("utf-8"), "gemini", "")
+    job.state, job.summary = "done", {"development": "yes", "critical": 0}
+    leaf = G.job_leaf(job)
+    assert f'href="/jobs/{job.id}"' in leaf and "Моё ТЗ" in leaf and "Перевод по QR" in leaf and "можно" in leaf
+    job.state = "running"
+    assert "идёт проверка" in G.job_leaf(job)
+
+
+def test_preview_is_document_heading():
+    assert G.preview_lines(ROOT / "release" / "input" / "requirements.md") == ["Уведомление о расходах по карте"]
+    assert G.preview_lines(ROOT / "release" / "input" / "requirements.pdf") == ["Уведомление о расходах по карте"]
+    assert G.preview_lines(ROOT / "no-such.md") == []
 
 
 def test_model_label():

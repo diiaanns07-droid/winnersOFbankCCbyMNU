@@ -13,7 +13,7 @@
     },
     {
       "id": "official-pdf",
-      "title": "Тот же ТЗ из PDF",
+      "title": "Тот же ТЗ в PDF",
       "json": "reports/requirements_pdf.json",
       "html": "reports/requirements_pdf.html",
       "md": "reports/requirements_pdf.md",

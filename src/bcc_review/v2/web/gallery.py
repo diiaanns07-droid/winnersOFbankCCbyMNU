@@ -281,7 +281,7 @@ def _doc_hint(doc: dict[str, Any], provider: str) -> str:
     if provider == "mock":
         return "демо, без ключа"
     if provider == "offline":
-        return "только правила, без ключа"
+        return "только правила"
     return "модель: " + _SHORT.get(provider, provider)
 
 
@@ -316,15 +316,12 @@ _CSS = """<style>
 .g43-leaf:active{transform:scale(.985)}
 .g43-leaf:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
 .g43-leaf>*{flex-shrink:0}
-.g43-pv{flex:1 1 0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:0;margin-bottom:4px;
-  font-size:10px;line-height:1.4;color:var(--b-ink-3,#5B6F84);opacity:.9;
-  transition:opacity var(--b-base,220ms) var(--b-ease,ease);
-  -webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.g43-pv{flex:1 1 0;min-height:0;overflow:hidden;margin-bottom:6px;font-size:13px;line-height:1.35;
+  color:var(--b-ink-2,#3A5068);transition:opacity var(--b-base,220ms) var(--b-ease,ease)}
 .g43-leaf>.g43-pv{flex-shrink:1}
-.g43-pv>span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.g43-pv>span:first-child{font-weight:650;font-size:10.5px;color:var(--b-ink-2,#3A5068);margin-bottom:1px}
+.g43-pv>span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .g43-slot+.g43-slot .g43-pv,.g43-slot+.g43-slot .g43-meta{opacity:0;transition:opacity var(--b-base,220ms) var(--b-ease,ease)}
-.g43-slot+.g43-slot:hover .g43-pv,.g43-slot+.g43-slot:focus-within .g43-pv{opacity:.9}
+.g43-slot+.g43-slot:hover .g43-pv,.g43-slot+.g43-slot:focus-within .g43-pv{opacity:1}
 .g43-slot+.g43-slot:hover .g43-meta,.g43-slot+.g43-slot:focus-within .g43-meta{opacity:1}
 .g43-pile.docs .g43-slot .g43-meta{opacity:1}
 .g43-meta{font-size:13px;line-height:1.35;color:var(--b-ink-2,#3A5068);font-variant-numeric:tabular-nums;
@@ -375,8 +372,8 @@ def _plural(n: int, one: str, few: str, many: str) -> str:
     return {1: one, 2: few, 3: few, 4: few}.get(n % 10, many)
 
 
-def preview_lines(path: Path, n: int = 5) -> list[str]:
-    """Начало документа для миниатюры листа: Markdown без разметки, у PDF — текст первой страницы."""
+def preview_lines(path: Path, n: int = 1) -> list[str]:
+    """Первые строки документа (по умолчанию — заголовок) для листа в стопке: Markdown без разметки, у PDF — первая страница."""
     try:
         st = path.stat()
     except OSError:
