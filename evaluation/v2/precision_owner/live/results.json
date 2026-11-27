@@ -298,6 +298,74 @@
     "rejected": []
   },
   {
+    "kind": "reread",
+    "variant": "base",
+    "case": "qr",
+    "model_requested": "sonnet",
+    "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+    "status": "complete",
+    "seconds": 103.6,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 8,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 186814,
+      "output": 38971
+    },
+    "dirty": false,
+    "verdict": [
+      "yes",
+      "yes"
+    ],
+    "open": {
+      "major": 1,
+      "minor": 13
+    },
+    "critical": []
+  },
+  {
+    "kind": "reread",
+    "variant": "patch",
+    "case": "qr",
+    "model_requested": "sonnet",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 118.2,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 8,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 189975,
+      "output": 41826
+    },
+    "dirty": false,
+    "verdict": [
+      "yes",
+      "yes"
+    ],
+    "open": {
+      "major": 2,
+      "minor": 12
+    },
+    "critical": []
+  },
+  {
     "kind": "review",
     "variant": "base",
     "case": "fx",

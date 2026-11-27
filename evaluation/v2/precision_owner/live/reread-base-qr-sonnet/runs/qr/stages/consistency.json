@@ -1,0 +1,505 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 44.3,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 52,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Терминология не едина, глоссария нет: «Отправитель перевода», «Срок действия QR-кода»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "плательщику",
+            "line": 127,
+            "verified": "normalized"
+          },
+          {
+            "quote": "отправителю",
+            "line": 175,
+            "verified": "normalized"
+          },
+          {
+            "quote": "срок действия ttl в секундах",
+            "line": 54,
+            "verified": "normalized"
+          },
+          {
+            "quote": "QR-код действует 15 минут",
+            "line": 41,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Отправитель перевода: «плательщику» (строка 127), «отправителю» (строка 175), «Карта отправителя» (строка 157); Срок действия QR-кода: «срок действия ttl в секундах» (строка 54), «QR-код действует 15 минут» (строка 41).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02"
+        ]
+      },
+      {
+        "title": "Схемы процесса и последовательности без отмены и отказа",
+        "kind": "missing_element",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-04",
+          "R-11",
+          "R-09",
+          "R-14"
+        ],
+        "evidence": [
+          {
+            "quote": "Приложения создают QR-код, получают данные QR-кода перед подтверждением и отменяют QR-код",
+            "line": 57,
+            "line_start": 57,
+            "line_end": 57,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          },
+          {
+            "quote": "Приложение отправителя → сервис QR-кодов: выполнить перевод по QR-коду.",
+            "line": 48,
+            "line_start": 48,
+            "line_end": 48,
+            "page": null,
+            "section": "Часть A. Новый функционал › Sequence Diagram",
+            "verified": "exact"
+          },
+          {
+            "quote": "проверка антифродом → списание и зачисление → push получателю и отправителю → завершение.",
+            "line": 37,
+            "line_start": 37,
+            "line_end": 37,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › BPMN схема процесса",
+            "verified": "exact"
+          }
+        ],
+        "problem": "В Sequence нет вызова отмены QR-кода, в BPMN нет ветвей отмены, истечения и отказа антифрода.",
+        "scenario": "Получатель отменяет QR-код: на диаграммах такого взаимодействия и ветки процесса нет.",
+        "impact": "Разработчик и тестировщик не видят сквозной сценарий отмены и отказа по схемам.",
+        "recommendation": "Добавить в Sequence вызов отмены, а в BPMN ветки отмены, истечения и отказа антифрода.",
+        "rewrite": "Приложение получателя → сервис QR-кодов: отменить QR-код.",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Правила срока и идемпотентности записаны в нескольких местах",
+        "kind": "duplicate",
+        "criterion": "modifiable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-06",
+          "R-31",
+          "R-13",
+          "R-14",
+          "R-23",
+          "R-32"
+        ],
+        "evidence": [
+          {
+            "quote": "1. Любой QR-код, с суммой и без, действует 15 минут с момента создания.",
+            "line": 136,
+            "line_start": 136,
+            "line_end": 136,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          },
+          {
+            "quote": "QR-код действует 15 минут с момента создания.",
+            "line": 41,
+            "line_start": 41,
+            "line_end": 41,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "повторный запрос с тем же requestId в течение 24 часов возвращает результат первого запроса и не создаёт второй перевод.",
+            "line": 137,
+            "line_start": 137,
+            "line_end": 137,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          },
+          {
+            "quote": "Повторный запрос перевода с тем же requestId не создаёт второй перевод.",
+            "line": 57,
+            "line_start": 57,
+            "line_end": 57,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Срок 15 минут и идемпотентность повторены в нескольких пунктах, при правке значения разойдутся.",
+        "scenario": "Срок меняют на 10 минут в Ф-2, а в особых правилах API остаётся 15.",
+        "impact": "Расхождение реализации и приёмки.",
+        "recommendation": "Оставить правило в одном месте, в остальных дать ссылку.",
+        "rewrite": "Срок действия и идемпотентность определены в Ф-2 и особых правилах API; прочие места ссылаются на них.",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нет приоритетов и версии документа",
+        "kind": "missing_element",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-05",
+          "R-06",
+          "R-07",
+          "R-08",
+          "R-09",
+          "R-10"
+        ],
+        "evidence": [
+          {
+            "quote": "Документ (версия/дата) в источнике не заполнен.",
+            "line": 77,
+            "line_start": 77,
+            "line_end": 77,
+            "page": null,
+            "section": "Часть A. Новый функционал › Ревью требований",
+            "verified": "exact"
+          },
+          {
+            "quote": "Ф-4. Комиссия за перевод по QR-коду не взимается.",
+            "line": 43,
+            "line_start": 43,
+            "line_end": 43,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          }
+        ],
+        "problem": "У требований нет приоритета и признака стабильности, версия и дата не заполнены.",
+        "scenario": "При нехватке времени команда не знает, какие требования переносить, а какие обязательны.",
+        "impact": "Спор о приоритетах и невозможность отследить версию требований.",
+        "recommendation": "Добавить приоритет и заполнить версию, дату и источник.",
+        "rewrite": "Версия: <уточнить: номер и дата>. Приоритет Ф-1…Ф-6: <уточнить: приоритет>.",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [],
+    "trace": [
+      {
+        "requirement_id": "R-05",
+        "verified_by": [
+          "R-17",
+          "R-20"
+        ],
+        "implemented_by": [
+          "R-39",
+          "R-27"
+        ],
+        "note": "Нет критерия на нижнюю границу 100 ₸"
+      },
+      {
+        "requirement_id": "R-06",
+        "verified_by": [
+          "R-15",
+          "R-16",
+          "R-18"
+        ],
+        "implemented_by": [
+          "R-26",
+          "R-28",
+          "R-13"
+        ],
+        "note": "Нет критерия на повторную оплату QR без суммы"
+      },
+      {
+        "requirement_id": "R-07",
+        "verified_by": [],
+        "implemented_by": [
+          "R-45"
+        ],
+        "note": "Нет критерия на экран подтверждения"
+      },
+      {
+        "requirement_id": "R-08",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия и поля комиссии"
+      },
+      {
+        "requirement_id": "R-09",
+        "verified_by": [
+          "R-19"
+        ],
+        "implemented_by": [
+          "R-14"
+        ],
+        "note": "Нет критерия на отмену во время обработки"
+      },
+      {
+        "requirement_id": "R-10",
+        "verified_by": [
+          "R-15"
+        ],
+        "implemented_by": [
+          "R-02"
+        ],
+        "note": "Push отправителю не проверяется"
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет проверки времени ответа и нагрузки"
+      },
+      {
+        "requirement_id": "R-13",
+        "verified_by": [],
+        "implemented_by": [
+          "R-37"
+        ],
+        "note": "Нет критерия на состав данных QR-кода"
+      },
+      {
+        "requirement_id": "R-14",
+        "verified_by": [
+          "R-21"
+        ],
+        "implemented_by": [
+          "R-22"
+        ],
+        "note": "Методы создания, получения, отмены вне комплекта"
+      },
+      {
+        "requirement_id": "R-23",
+        "verified_by": [
+          "R-21"
+        ],
+        "implemented_by": [
+          "R-40"
+        ],
+        "note": "Нет критерия на повтор по истёкшему QR"
+      },
+      {
+        "requirement_id": "R-24",
+        "verified_by": [],
+        "implemented_by": [
+          "R-38",
+          "R-48"
+        ],
+        "note": "Нет критерия на неверную карту"
+      },
+      {
+        "requirement_id": "R-25",
+        "verified_by": [],
+        "implemented_by": [
+          "R-50"
+        ],
+        "note": "Нет критерия на несуществующий QR"
+      },
+      {
+        "requirement_id": "R-26",
+        "verified_by": [
+          "R-16"
+        ],
+        "implemented_by": [
+          "R-51"
+        ],
+        "note": "Нет критерия на границу ровно 15 минут"
+      },
+      {
+        "requirement_id": "R-27",
+        "verified_by": [
+          "R-17",
+          "R-20"
+        ],
+        "implemented_by": [
+          "R-39"
+        ],
+        "note": "Нет критерия: amount запроса при заданной сумме"
+      },
+      {
+        "requirement_id": "R-28",
+        "verified_by": [
+          "R-18"
+        ],
+        "implemented_by": [
+          "R-51"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-29",
+        "verified_by": [],
+        "implemented_by": [
+          "R-47"
+        ],
+        "note": "Нет критерия на отказ антифрода"
+      },
+      {
+        "requirement_id": "R-30",
+        "verified_by": [
+          "R-15",
+          "R-20"
+        ],
+        "implemented_by": [
+          "R-42",
+          "R-43"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-31",
+        "verified_by": [
+          "R-15",
+          "R-16"
+        ],
+        "implemented_by": [
+          "R-26"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-32",
+        "verified_by": [
+          "R-21"
+        ],
+        "implemented_by": [
+          "R-40"
+        ],
+        "note": "Нет критерия на границу 24 часа"
+      },
+      {
+        "requirement_id": "R-33",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия и признака блокировки в данных"
+      },
+      {
+        "requirement_id": "R-34",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия на возврат статуса «активен»"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Отправитель перевода",
+        "terms": [
+          {
+            "term": "плательщику",
+            "line": 127
+          },
+          {
+            "term": "отправителю",
+            "line": 175
+          },
+          {
+            "term": "Карта отправителя",
+            "line": 157
+          }
+        ],
+        "problem": "Роль названа по-разному в логике метода и таблицах; читать и искать неудобно.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Срок действия QR-кода",
+        "terms": [
+          {
+            "term": "срок действия ttl в секундах",
+            "line": 54
+          },
+          {
+            "term": "QR-код действует 15 минут",
+            "line": 41
+          }
+        ],
+        "problem": "Одна величина названа по-разному в бизнес-части и данных.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Срок действия QR-кода 15 минут",
+        "places": [
+          "R-06",
+          "R-13",
+          "R-26",
+          "R-31"
+        ]
+      },
+      {
+        "subject": "Идемпотентность по requestId, 24 часа",
+        "places": [
+          "R-14",
+          "R-21",
+          "R-23",
+          "R-32"
+        ]
+      },
+      {
+        "subject": "Диапазон суммы 100–500 000",
+        "places": [
+          "R-05",
+          "R-07",
+          "R-27",
+          "R-39",
+          "R-48"
+        ]
+      },
+      {
+        "subject": "Код 410 и недействительный QR-код",
+        "places": [
+          "R-09",
+          "R-26",
+          "R-28",
+          "R-51"
+        ]
+      },
+      {
+        "subject": "Блокировка и статус QR-кода с суммой",
+        "places": [
+          "R-06",
+          "R-09",
+          "R-33",
+          "R-34"
+        ]
+      },
+      {
+        "subject": "Отказ антифрода: код и статус",
+        "places": [
+          "R-29",
+          "R-41",
+          "R-47"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}
