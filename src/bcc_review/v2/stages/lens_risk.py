@@ -591,6 +591,80 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
     return kept[:MAX_CANDIDATES], dropped
 
 
+REPEAT_TOPIC_RE = _MAJOR_RES["повторы и дубли событий"]
+# Признак повтора назван где-то в документе (не в строке обещания): «идентификатор события — ключ повтора»,
+# «дубль узнаётся по …». Тогда страховка не нужна: вопрос закрыт текстом.
+_REPEAT_WORD_RE = re.compile(r"повтор|дубл|дедуплик", re.I)
+
+
+def repeat_promise_line(view: Any) -> dict | None:
+    """Первая строка с обещанием «повтор события не меняет / сохраняет итог», где признак повтора не назван ни в
+    ней, ни в другой строке о повторах. None — обещания нет или признак назван."""
+    lines = [x for x in _lines(view) if str(x.get("text") or "").strip()]
+    if any(_REPEAT_WORD_RE.search(x["text"]) and _REPEAT_KEYED_RE.search(x["text"]) for x in lines):
+        return None
+    for x in lines:
+        low = x["text"].lower()
+        if _REPEAT_PROMISE_RE.search(low) and not _REPEAT_KEYED_RE.search(low):
+            return x
+    return None
+
+
+def _sentence_with(text: str, rx: re.Pattern) -> str:
+    """Предложение строки, где сработал шаблон (цитата — дословная часть строки, до 200 символов)."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    hit = next((p for p in parts if rx.search(p.lower())), text.strip())
+    return hit[:200]
+
+
+def _int_or(v: Any, default: int) -> int:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _covers(req: dict, n: int) -> bool:
+    """Строка n внутри диапазона строк требования (нечисловые границы нарезки — не внутри)."""
+    a = _int_or(req.get("line_start"), 0)
+    return a > 0 and a <= n <= _int_or(req.get("line_end"), a)
+
+
+def repeat_key_candidates(kept: list[dict], view: Any, requirements: list | None = None) -> list[dict]:
+    """Страховка: документ обещает, что повтор события не меняет итог, но не называет признак повтора, — а модель
+    замечания о повторах не написала (haiku на официальном ТЗ, замер №08 v29: 6/8, нет замечания о повторах).
+
+    Обещание и отсутствие признака видны в тексте (раздел 8 промпта, major), поэтому замечание добавляет код с цитатой
+    строки обещания. На 51 документе наборов (официальный, open2, чистые №20, корпус) такое обещание без признака —
+    только одно (строка обещания официального ТЗ); в чистых признак назван («с тем же идентификатором …»)."""
+    if any(REPEAT_TOPIC_RE.search(str(c.get("title") or "")) for c in kept):
+        return []
+    line = repeat_promise_line(view)
+    if not line:
+        return []
+    quote = _sentence_with(line["text"], _REPEAT_PROMISE_RE)
+    n = int(line["n"])
+    req_ids = [r.get("id") for r in requirements or [] if isinstance(r, dict) and r.get("id")
+               and _covers(r, n)]
+    return [{
+        "title": "Повтор события: не назван признак, по которому повтор узнаётся",
+        "kind": "ops_risk", "criterion": "risk", "severity": "major", "requirement_ids": req_ids[:2],
+        "evidence": [{"quote": quote, "line": n}],
+        "problem": f"Документ обещает: «{quote[:160]}», — но не называет, по какому признаку (идентификатор события "
+                   "или операции) повтор распознаётся, и что именно сохраняется при повторе.",
+        "scenario": "Одно и то же событие приходит дважды: без признака повтора система учтёт его второй раз и "
+                    "повторит действие; два почти одновременных события у границы правила дадут два действия.",
+        "impact": "Клиент получит неверный итог или повторное уведомление; повторную доставку нельзя проверить "
+                  "тестом однозначно.",
+        "recommendation": "Назвать ключ повтора, хранить его и записать правило: событие с уже учтённым ключом итог "
+                          "не меняет и действие не повторяет.",
+        "rewrite": "Повторная доставка события с тем же <уточнить: признак — идентификатор события или операции> не "
+                   "меняет учтённую сумму и не создаёт повторного действия.",
+        "question": "По какому признаку узнаётся повтор: идентификатор события или идентификатор операции?",
+        "blocks": "both", "source": f"lens:{NAME}", "origin": "doc_text",
+    }]
+
+
 def run(ctx: Any) -> dict:
     """Запуск линзы через общий `lens.run` и постобработка ответа."""
     from . import lens  # общий запуск линзы (№01)
@@ -599,7 +673,12 @@ def run(ctx: Any) -> dict:
     reqs = [r for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)]
     known = [r.get("id") for r in reqs if r.get("id")] or None
     accept = [r.get("id") for r in reqs if r.get("kind") == "acceptance" and r.get("id")]
-    kept, dropped = postprocess(out.get("candidates", []), getattr(ctx, "view", None), known, accept)
+    view = getattr(ctx, "view", None)
+    model_cands = [c for c in out.get("candidates", []) or [] if isinstance(c, dict)]
+    first, _ = postprocess(model_cands, view, known, accept)
+    extra = repeat_key_candidates(first, view, reqs)
+    # страховка — первой среди major: замечание доказано текстом документа и не должно уйти «сверх лимита»
+    kept, dropped = postprocess(extra + model_cands, view, known, accept)
     out["candidates"] = kept
     if dropped:
         out["dropped"] = dropped
