@@ -752,7 +752,7 @@ def test_judge_raise_to_critical_without_support_is_major():
     fs = [finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
                   scenario="Вход: два исхода.", impact="Две реализации.", priority=1),
           finding("F02", ["C-002"], kind="unverifiable", criterion="verifiable")]
-    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    res = judge.run(Ctx(FakeLLM(response(fs)), options={"judge_check": False, "judge_critical_support": True}), cs)
     sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
     assert sev["C-001"] == "major"
     assert any("без опоры" in w for w in res["warnings"])

@@ -954,7 +954,7 @@ def _critical_support(members: list[dict], run_has_critical: bool = True) -> boo
 
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0,
                all_cands: list[dict] | None = None, req_maps: tuple[dict, dict] | None = None,
-               run_has_critical: bool = True) -> None:
+               run_has_critical: bool = True, critical_support: bool = False) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
         # критерий у противоречия и пропуска — по виду: модель иногда ставит «conforming» и т. п.
@@ -978,7 +978,7 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "противоречие подтверждено цитатой только одного места"
         elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed(f, members, all_cands):
             why = "critical подтвердил только один ревьюер"
-        elif not _critical_support(members, run_has_critical):
+        elif critical_support and not _critical_support(members, run_has_critical):
             why = "подъём до critical без опоры: ни один ревьюер не предложил critical, нет строки приёмки, " \
                   "ревьюеров меньше трёх"
         else:
@@ -1357,7 +1357,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         }
         if _add_named_sides(item, view):
             _warn(ctx, warnings, f"судья: к {item['title'][:50]!r} добавлена цитата места, названного в тексте")
-        _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps, run_has_critical)
+        _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps, run_has_critical,
+                   bool(_option(ctx, "judge_critical_support", False)))
         findings.append(item)
 
     findings = _consolidate(findings, lambda f: bool(_NO_ID_RE.search(f["title"])) and (
