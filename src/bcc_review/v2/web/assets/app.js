@@ -268,7 +268,12 @@
     var fr = $("#rframe"), dock = $("#dock");
     if (!fr) return;
     var hdr = document.querySelector(".tb-wrap, header");
-    var setTop = function () { var t = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 64; document.documentElement.style.setProperty("--jb-top", Math.max(0, t) + "px"); };
+    var setTop = function () {  // панель — под шапкой, лист — под панелью
+      var root = document.documentElement.style, t = hdr ? Math.max(0, Math.round(hdr.getBoundingClientRect().bottom)) : 64;
+      root.setProperty("--jb-hdr", t + "px");
+      if (dock) t = Math.round(dock.getBoundingClientRect().bottom) + 6;
+      root.setProperty("--jb-top", t + "px");
+    };
     setTop();
     window.addEventListener("resize", setTop);
     var view = "findings";
