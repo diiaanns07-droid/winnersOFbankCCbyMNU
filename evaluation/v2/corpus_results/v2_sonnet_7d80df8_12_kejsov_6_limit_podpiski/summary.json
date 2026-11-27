@@ -1,6 +1,6 @@
 {
-  "label": "v2 sonnet, 7d80df8, 12 кейсов",
-  "at": "2026-11-27 05:28",
+  "label": "v2 sonnet, 7d80df8, 12 кейсов (6 — лимит подписки)",
+  "at": "2026-11-27 08:23",
   "harness": {
     "tp": 4,
     "fp": 82,
@@ -103,7 +103,7 @@
   "failed": 6,
   "clean": {
     "n": 4,
-    "measured": 4,
+    "measured": 2,
     "findings": 29,
     "critical": 0,
     "major": 12,
