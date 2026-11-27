@@ -291,7 +291,8 @@ def cmd_review(argv: list[str]) -> int:
 
 
 LETTERS = "ABCD"
-_RU_LETTERS = {"А": "A", "Б": "B", "В": "C", "Г": "D", "С": "C"}
+# Как в разборе файла ответов (recheck._LETTER): похожие буквы А, В, С — это A, B, C; Б — B, Г — D.
+_RU_LETTERS = {"А": "A", "Б": "B", "В": "B", "Г": "D", "С": "C"}
 
 
 def ask_questions(questions: list[dict], *, input_fn=None, print_fn=print) -> list[str]:
@@ -341,25 +342,41 @@ def write_answers_file(report_md: str | Path, lines: list[str], report: dict) ->
     return path
 
 
+def _run_dir_of(a: argparse.Namespace, report: dict):
+    """Каталог только что сделанного прогона: ``--runs-dir`` или запасной временный (каталог только для чтения)."""
+    import tempfile
+    from .runs import RunDir
+    run_id = str((report.get("run") or {}).get("run_id") or "")
+    if not run_id:
+        return None
+    for root in (Path(a.runs_dir), Path(tempfile.gettempdir()) / "bcc_review_runs"):
+        src = RunDir(root / run_id, create=False)
+        if src.stages.is_dir():
+            return src
+    return None
+
+
 def _interactive(a: argparse.Namespace, report: dict, written: dict) -> tuple[dict, dict] | None:
+    """Вопросы в консоли → файл ответов → второй проход на этапах первого (вызовы модели — только пересмотр и
+    исправленная редакция). Без ответов второй проход нужен, только если просили ``--revise``."""
     questions = [q for q in report.get("questions") or [] if isinstance(q, dict)]
+    lines = ask_questions(questions) if questions else []
     if not questions:
         print("\nВопросов нет — пересматривать нечего.")
+    elif not lines:
+        print("\nОтветов нет — дефекты остаются как есть.")
+    if lines:
+        path = write_answers_file(a.output, lines, report)
+        print(f"\nОтветы: {path} ({len(lines)} из {len(questions)}). Пересмотр дефектов…")
+        a.answers = str(path)
+    elif not a.revise:
         return None
-    lines = ask_questions(questions)
-    if not lines:
-        print("\nОтветов нет — отчёт остаётся как есть.")
-        return None
-    path = write_answers_file(a.output, lines, report)
-    print(f"\nОтветы: {path} ({len(lines)} из {len(questions)}). Пересмотр дефектов…")
     from . import pipeline
-    from .runs import RunDir
-    run_id = (report.get("run") or {}).get("run_id")
-    src = RunDir(Path(a.runs_dir) / str(run_id), create=False) if run_id else None
-    a.answers = str(path)
     opts = _opts(a)
     opts["run_id"] = None
-    if src is None or not src.stages.is_dir():
+    src = _run_dir_of(a, report)
+    if src is None:
+        print("Этапы первого прохода не найдены — проверка выполняется заново.", file=sys.stderr)
         return pipeline.review(a.input, a.output, opts, log=_log(a.quiet))
     return pipeline.review(a.input, a.output, opts, reuse=src, rerun=set(), log=_log(a.quiet))
 
@@ -375,6 +392,11 @@ def cmd_stage(argv: list[str]) -> int:
                    help="перезапустить и следующие этапы модели (для segment — всё; для линз — судью и вопросы)")
     _common(p)
     a = p.parse_args(argv)
+    try:
+        parse_cost(a.max_cost)
+    except ValueError:
+        print(f"--max-cost: не понял «{a.max_cost}»; примеры: 0.5 (доллары), 200k (токены)", file=sys.stderr)
+        return 2
     from . import pipeline
     from .runs import RunDir
     src = RunDir(a.from_run, create=False)

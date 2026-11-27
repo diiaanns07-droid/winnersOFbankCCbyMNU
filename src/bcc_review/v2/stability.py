@@ -83,6 +83,33 @@ def _next_id(ids: list[str]) -> Callable[[], str]:
     return nxt
 
 
+# Разделы, где ссылки на дефекты не трогаем: сами дефекты, отклонённые и паспорт.
+_OWN = {"findings", "findings_unstable", "findings_before", "rejected", "stability", "run", "document",
+        "requirements", "excluded"}
+
+
+def _drop_refs(report: dict, gone: set[str]) -> None:
+    """Ссылки на ушедшие в приложение дефекты (``finding_ids``, ``finding_id``) — из вопросов, чек-листа, строк
+    приёмки, пар, глоссария и прочих разделов: иначе отчёт ссылается на дефект, которого нет в реестре."""
+    if not gone:
+        return
+
+    def walk(x: Any) -> None:
+        if isinstance(x, dict):
+            if isinstance(x.get("finding_ids"), list):
+                x["finding_ids"] = [i for i in x["finding_ids"] if i not in gone]
+            if isinstance(x.get("finding_id"), str) and x["finding_id"] in gone:
+                x["finding_id"] = ""
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    for key, value in report.items():
+        if key not in _OWN:
+            walk(value)
+
+
 def merge(base: dict, others: list[dict], n_requested: int) -> dict:
     """Свести отчёт первого прохода ``base`` с отчётами остальных проходов ``others``."""
     report = base
@@ -116,11 +143,7 @@ def merge(base: dict, others: list[dict], n_requested: int) -> dict:
     gone = {f.get("id") for f in unstable}
     report["findings"] = kept
     report["findings_unstable"] = unstable
-    for q in report.get("questions") or []:
-        q["finding_ids"] = [x for x in q.get("finding_ids") or [] if x not in gone]
-    for c in report.get("checklist") or []:
-        if isinstance(c, dict):
-            c["finding_ids"] = [x for x in c.get("finding_ids") or [] if x not in gone]
+    _drop_refs(report, gone)
     v = report.setdefault("verdict", {})
     v["fix_first"] = [x for x in v.get("fix_first") or [] if x not in gone]
     calls = sum(int(((r.get("run") or {}).get("calls") or {}).get("total") or 0) for r in reps)

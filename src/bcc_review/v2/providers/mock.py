@@ -59,9 +59,17 @@ class MockProvider:
     def invoke(self, *, model: str | None, messages: Sequence[Mapping[str, Any]], schema: Mapping[str, Any],
                timeout_s: float = 0, max_output_tokens: int | None = None, stage: str = "", **_: Any) -> dict:
         stage = stage or "unknown"
+        k = self._next(stage)
+        return self._respond(stage, k, self._lookup(stage, k), schema, messages, model)
+
+    def _next(self, stage: str) -> int:
+        """Номер вызова этапа (с 1); под замком — параллельные вызовы одного этапа получают разные номера."""
         with self._lock:
             k = self.counts[stage] = self.counts.get(stage, 0) + 1
-        raw = self._lookup(stage, k)
+        return k
+
+    def _respond(self, stage: str, k: int, raw: Any, schema: Mapping[str, Any],
+                 messages: Sequence[Mapping[str, Any]], model: str | None) -> dict:
         data = conform(raw, dict(schema)) if raw is not None else None
         source = "fixture"
         if data is None or not _valid(data, schema):
@@ -87,15 +95,27 @@ class ReplayProvider(MockProvider):
     def __init__(self, *, fixtures_dir: str | Path | None = None, model: str | None = None, **kw: Any) -> None:
         super().__init__(fixtures_dir=fixtures_dir, model=model or "replay", **kw)
 
+    def _lookup(self, stage: str, k: int) -> Any:
+        """Строго k-я запись: в отличие от mock, последний ответ не повторяется для лишних вызовов."""
+        p = self.dir / f"{stage}.{k}.json"
+        if p.is_file():
+            return json.loads(p.read_text(encoding="utf-8"))
+        p = self.dir / f"{stage}.json"
+        if not p.is_file():
+            return None
+        data = json.loads(p.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return data[k - 1] if 0 < k <= len(data) else None
+        return data if k == 1 else None
+
     def invoke(self, *, model: str | None, messages: Sequence[Mapping[str, Any]], schema: Mapping[str, Any],
                timeout_s: float = 0, max_output_tokens: int | None = None, stage: str = "", **kw: Any) -> dict:
         stage = stage or "unknown"
-        with self._lock:
-            k = self.counts.get(stage, 0) + 1
+        k = self._next(stage)
         raw = self._lookup(stage, k)
         if raw is None or not _valid(conform(raw, dict(schema)), schema):
             from bcc_review.contracts import ProviderError
-            raise ProviderError("not_configured", f"в сохранённом прогоне нет ответа модели для этапа {stage} "
-                                                  f"(вызов {k}); повтор без модели невозможен")
-        return super().invoke(model=model, messages=messages, schema=schema, timeout_s=timeout_s,
-                              max_output_tokens=max_output_tokens, stage=stage, **kw)
+            # bad_request, а не not_configured: ошибка одного этапа, а не «модель не настроена» на весь прогон
+            raise ProviderError("bad_request", f"в сохранённом прогоне нет ответа модели для этапа {stage} "
+                                               f"(вызов {k}); повтор без модели невозможен")
+        return self._respond(stage, k, raw, schema, messages, model)
