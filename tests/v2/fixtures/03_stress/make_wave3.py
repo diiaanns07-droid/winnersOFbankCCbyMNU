@@ -12,6 +12,8 @@
   остаться одной строкой («Итог 50 000 ₸; Один push; Счётчик не сбрасывается»).
 * ``ru_styles.docx`` — Word без заголовка-названия: части A и B — стилем «Заголовок 1» (уровень структуры), свой
   стиль «МойЗаголовок», подзаголовок «Требования к данным» — просто жирным абзацем.
+* ``numbered_headings.docx`` — Word: заголовки с автонумерацией («1. Общие сведения», «2. Требования»: номер Word
+  показывает, в тексте XML его нет), требование ссылается на «п. 2».
 * ``textbox.docx`` — Word: требование в надписи (текстовом поле, ``w:txbxContent`` с запасной копией VML),
   вложенная таблица, комментарий рецензента, гиперссылка. Читатель v1 надписи не видит — ``docview`` их добавляет.
 
@@ -161,7 +163,30 @@ def make_ru_styles(path: Path) -> None:
     d.save(path)
 
 
+def make_numbered_headings(path: Path) -> None:
+    from docx import Document
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    d = Document()
+    num_id = d.styles["List Number"].element.pPr.find(qn("w:numPr")).find(qn("w:numId")).get(qn("w:val"))
+
+    def numbered(p, lvl: int) -> None:
+        n, i, x = OxmlElement("w:numPr"), OxmlElement("w:ilvl"), OxmlElement("w:numId")
+        i.set(qn("w:val"), str(lvl))
+        x.set(qn("w:val"), num_id)
+        n.append(i)
+        n.append(x)
+        p._p.get_or_add_pPr().append(n)
+    d.add_heading("ТЗ: Кэшбэк", 0)
+    numbered(d.add_heading("Общие сведения", 1), 0)
+    d.add_paragraph("Кэшбэк начисляется за покупки в выбранных категориях.")
+    numbered(d.add_heading("Требования", 1), 0)
+    d.add_paragraph("Ф-1. Лимит кэшбэка — 10 000 ₸ в месяц; исключения — в п. 1.")
+    d.save(path)
+
+
 def main() -> int:
+    make_numbered_headings(HERE / "numbered_headings.docx")
     make_ru_styles(HERE / "ru_styles.docx")
     make_textbox_docx(HERE / "textbox.docx")
     make_cell_paragraphs(HERE / "cell_paragraphs.docx")

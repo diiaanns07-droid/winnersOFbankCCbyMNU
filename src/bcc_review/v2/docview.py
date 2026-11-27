@@ -603,11 +603,16 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
             sample = "; ".join(f"«{t}»" for t in dropped[:3])
             warnings.append(f"Колонтитулы убраны из текста ({n} {word}): {sample}.")
     out: list[dict] = []
+    heading_nums: dict[int, tuple[str, str]] = {}   # глубина пути → (заголовок, заголовок с номером автонумерации)
     for b in blocks:
         loc = b.get("loc") or {}
         page = loc.get("page")
         page = int(page) if isinstance(page, int) or (isinstance(page, str) and page.isdigit()) else None
         sec = _section(b)
+        if not sizes:
+            sec, hnum = _numbered_section(b, sec, heading_nums)
+            if hnum:
+                b = {**b, "text": hnum}
         text = _tight_text(b) if sizes else str(b.get("text") or "")
         if not sizes and b.get("kind") in ("table_row", "table_header") and "\n" in text.strip():
             # DOCX: абзацы внутри ячейки («Итог 50 000 ₸» + пункты списка) — одна строка таблицы, как в PDF;
@@ -882,6 +887,24 @@ def _page_blocks(page, pg: int) -> list[dict]:
             out.append({"id": f"p{pg:02d}l{len(out) + 1:03d}", "kind": kind, "text": text,
                         "loc": {"page": pg, "bbox": list(ln["bbox"]), "level": 4 if kind == "heading" else None}})
     return out
+
+
+def _numbered_section(b: dict, sec: str, nums: dict[int, tuple[str, str]]) -> tuple[str, str]:
+    """DOCX: номер автонумерации заголовка («2.», «2.1.») — в текст заголовка и в путь разделов, как в PDF того же
+    документа; иначе ссылка «см. п. 2.1» не находит свой раздел. Возвращает (раздел, текст заголовка с номером или "")."""
+    parts = sec.split(SECTION_SEP) if sec else []
+    hnum = ""
+    if b.get("kind") == "heading" and parts:
+        k = len(parts) - 1
+        for d in [d for d in nums if d >= k]:
+            del nums[d]
+        label = _list_label({**b, "kind": "list_item"})
+        head = parts[-1]
+        if label and not head.startswith(label):
+            hnum = f"{label} {head}"
+            nums[k] = (head, hnum)
+    parts = [nums[k][1] if k in nums and nums[k][0] == p else p for k, p in enumerate(parts)]
+    return SECTION_SEP.join(parts), hnum
 
 
 def _list_label(b: dict) -> str:

@@ -490,3 +490,15 @@ def test_docx_parts_and_bold_subheading():
     # название стилем Word «Название» по-прежнему вырезается из путей
     tb = dv.load(ROOT / "tests/v2/fixtures/03_stress/textbox.docx")
     assert next(ln for ln in tb["lines"] if ln["text"].startswith("Ф-1."))["section"] == "1. Часть A. Бизнес-требования"
+
+
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_heading_autonumber_in_text_and_section():
+    """Номер автонумерации заголовка Word («2.») — в тексте заголовка и в пути раздела, как в PDF того же документа."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/numbered_headings.docx")
+    by = {ln["text"]: ln for ln in view["lines"]}
+    assert "1. Общие сведения" in by and "2. Требования" in by and by["2. Требования"]["heading"]
+    assert by["Ф-1. Лимит кэшбэка — 10 000 ₸ в месяц; исключения — в п. 1."]["section"] == "2. Требования"
+    assert by["Кэшбэк начисляется за покупки в выбранных категориях."]["section"] == "1. Общие сведения"
+    m = Q.verify_quote(view, "2. Требования")
+    assert m and m["line_start"] == by["2. Требования"]["n"]
