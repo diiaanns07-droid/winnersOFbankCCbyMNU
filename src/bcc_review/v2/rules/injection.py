@@ -299,6 +299,11 @@ def _locate(doc: Doc, text: str):
                 return x, _visible_quote(j)
             if needle in normalize(j)[0]:
                 return x, _visible_quote(j)
+    # фрагмент на нескольких строках (многострочный комментарий): строка документа целиком внутри фрагмента
+    for x in doc.lines:
+        j = re.sub(r"\s+", " ", x.joined or "").strip()
+        if len(j) >= 12 and j in t:
+            return x, (x.joined or "")[:200]
     return None, ""
 
 
