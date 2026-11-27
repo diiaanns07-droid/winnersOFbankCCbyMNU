@@ -50,7 +50,7 @@ def test_run_named_postprocesses_and_keeps_inventory(ctx):
     assert all(c["source"] == "lens:architect" for c in cands)
     sev = [c["severity"] for c in cands]
     assert sev == sorted(sev, key=lambda s: {"critical": 0, "major": 1, "minor": 2}[s])
-    assert set(out["inventory"]) == {"operations", "promises", "codes", "fields"}
+    assert set(out["inventory"]) == {"operations", "promises", "codes", "fields", "branches"}
     reqs = {r["id"] for r in ctx.requirements}
     assert all(set(c["requirement_ids"]) <= reqs for c in cands)
 

@@ -97,11 +97,11 @@ h2 em { font-style: normal; color: var(--gold); }
 .cmd { margin-top: 6px; font: 600 15px/1.4 var(--mono); color: var(--mint); background: rgba(0, 0, 0, .35); border-radius: 8px; padding: 8px 12px; border: 1px solid var(--line); }
 
 /* 5 — блокеры */
-.blk { display: flex; flex-direction: column; gap: 14px; margin-top: 30px; }
-.bk { display: grid; grid-template-columns: 70px 1fr 220px; gap: 20px; align-items: center; padding: 18px 24px; border-left: 6px solid var(--crit); }
+.blk { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+.bk { display: grid; grid-template-columns: 70px 1fr 200px; gap: 20px; align-items: center; padding: 13px 22px; border-left: 6px solid var(--crit); }
 .bk .id { font: 15px/1 var(--pix); color: var(--crit); }
-.bk .t { font: 700 23px/1.3 var(--sans); }
-.bk .t small { display: block; font: 500 17px/1.4 var(--sans); color: var(--ink2); margin-top: 5px; }
+.bk .t { font: 700 21px/1.28 var(--sans); }
+.bk .t small { display: block; font: 500 15.5px/1.38 var(--sans); color: var(--ink2); margin-top: 4px; }
 .bk .where { font: 600 16px/1.4 var(--mono); color: var(--ink3); text-align: right; }
 
 /* 6 — архитектура */
@@ -183,6 +183,47 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
 .need .panel { padding: 20px 24px; }
 .need h4 { margin: 0 0 10px; font: 11px/1 var(--pix); color: var(--gold); letter-spacing: .04em; }
 .need p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--ink2); }
+
+/* 8 — метрики №15 */
+.mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 44px; }
+.mcard { padding: 26px 26px 20px; display: flex; flex-direction: column; gap: 26px; min-height: 520px; }
+.mcard h4 { margin: 0 0 2px; font: 11px/1.2 var(--pix); color: var(--gold); letter-spacing: .04em; }
+.mrow { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: center; }
+.mrow .v { font: 800 58px/1 var(--sans); letter-spacing: -.03em; }
+.mrow .v.g { color: var(--mint); } .mrow .v.y { color: var(--gold); }
+.mrow .l { font-size: 19px; color: var(--ink2); line-height: 1.3; }
+.mrow .l small { display: block; font-size: 14px; color: var(--ink3); margin-top: 2px; }
+.msrc { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); font: 500 12.5px/1.45 var(--mono); color: var(--ink3); }
+
+/* 9 — v1 → v2 */
+table.vt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 36px; font-size: 27px; }
+.vt th { font: 11px/1.3 var(--pix); color: var(--ink3); text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--line); letter-spacing: .03em; }
+.vt th:last-child { color: var(--mint); }
+.vt td { padding: 19px 18px; border-bottom: 1px solid var(--line); }
+.vt td:first-child { color: var(--ink2); font-size: 21px; width: 36%; }
+.vt td.old { color: var(--crit); font-weight: 700; }
+.vt td.new { color: var(--mint); font-weight: 800; }
+.vt td.worse { color: var(--crit); font-weight: 800; }
+.vt td.mixed { color: var(--major); font-weight: 800; }
+.bad { color: var(--crit) !important; }
+.warn { color: var(--major) !important; }
+
+/* 10 — схема контура */
+.perim { margin-top: 26px; display: flex; align-items: center; gap: 14px; }
+.pbox { flex: 1; display: flex; align-items: center; gap: 14px; padding: 26px 20px 18px; border: 2px dashed rgba(124, 255, 178, .45); border-radius: 16px; position: relative; }
+.plbl { position: absolute; top: -9px; left: 18px; background: var(--bg); padding: 0 8px; font: 11px/1 var(--pix); color: var(--mint); }
+.pnode { flex: 1; text-align: center; padding: 14px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-weight: 700; font-size: 19px; }
+.pnode small { display: block; font: 500 13px/1.3 var(--mono); color: var(--ink3); margin-top: 4px; }
+.pnode.g { border-color: rgba(124, 255, 178, .5); color: var(--mint); }
+.parr { color: var(--gold); font: 700 26px/1 var(--sans); }
+.perim > .pnode { flex: 0 0 210px; }
+
+/* 11 — дорожка внедрения */
+.road2 { margin-top: 22px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.road2 div { padding: 14px 18px; background: var(--panel); border-right: 1px solid var(--line); }
+.road2 div:last-child { border-right: 0; }
+.road2 b { display: block; font: 12px/1.3 var(--pix); color: var(--gold); margin-bottom: 6px; }
+.road2 span { color: var(--ink2); font-size: 16px; }
 
 /* 12 — команда */
 .team { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 34px; }
@@ -283,7 +324,7 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
 <!-- 5. Пять блокеров -->
 <section class="slide" id="s5" data-title="Блокеры">
   <div class="kick">05 · ОФИЦИАЛЬНЫЙ ДОКУМЕНТ КЕЙСА</div>
-  <h2>{{critical_count}} блокеров, <em>которые агент нашёл сам</em></h2>
+  <h2>{{blockers_title}}</h2>
   <div class="blk">{{blockers}}</div>
   <div class="foot"><span><b>STUPITS</b> · {{report_source}}</span><span>05 / 12</span></div>
 </section>
@@ -338,66 +379,83 @@ table.mt { width: 100%; border-collapse: separate; border-spacing: 0; margin-top
   <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>07 / 12</span></div>
 </section>
 
-<!-- 8. Метрики -->
+<!-- 8. Метрики №15 -->
 <section class="slide" id="s8" data-title="Метрики">
-  <div class="kick">08 · ЗАМЕР НА ЭТАЛОНЕ</div>
+  <div class="kick">08 · ЗАМЕРЫ НА ЭТАЛОНЕ</div>
   <h2>Проверили <em>цифрами</em>, а не на глаз</h2>
-  <div class="kpis">
-    <div class="panel kpi"><div class="v g">{{k_found}}</div><div class="l">ключевых блокеров К1–К5 найдено на официальном документе</div></div>
-    <div class="panel kpi"><div class="v y">{{s_found}}</div><div class="l">существенных дефектов С1–С20 из эталона</div></div>
-    <div class="panel kpi"><div class="v g">{{clean_fp}}</div><div class="l">критичных ложных тревог на чистых ТЗ корпуса</div></div>
-    <div class="panel kpi"><div class="v">{{stability}}</div><div class="l">прогона подряд находят все К1–К5</div></div>
+  <div class="mgrid">
+    <div class="panel mcard">
+      <h4>ОФИЦИАЛЬНЫЙ ДОКУМЕНТ КЕЙСА</h4>
+      <div class="mrow"><div class="v g">{{k_found}}</div><div class="l">ключевых блокеров К1–К5<small>критичными — {{k_crit}}</small></div></div>
+      <div class="mrow"><div class="v y">{{s_found}}</div><div class="l">существенных дефектов С1–С20</div></div>
+      <div class="mrow"><div class="v g">{{crit_false}}</div><div class="l">ложных критичных</div></div>
+      <div class="msrc">{{official_source}}</div>
+    </div>
+    <div class="panel mcard">
+      <h4>КОРПУС: 33 ТЗ, 28 ЗАЛОЖЕННЫХ ДЕФЕКТОВ</h4>
+      <div class="mrow"><div class="v g">{{corpus_recall}}</div><div class="l">заложенных дефектов найдено<small>строгий счёт: цитата на месте дефекта</small></div></div>
+      <div class="mrow"><div class="v y">{{corpus_precision}}</div><div class="l">точность находок</div></div>
+      <div class="mrow"><div class="v g">{{corpus_clean}}</div><div class="l">тревог на 8 чистых ТЗ</div></div>
+      <div class="msrc">{{corpus_source}}</div>
+    </div>
+    <div class="panel mcard">
+      <h4>СТАБИЛЬНОСТЬ И СКОРОСТЬ</h4>
+      <div class="mrow"><div class="v g">{{stability}}</div><div class="l">прогонов подряд находят все К1–К5</div></div>
+      <div class="mrow"><div class="v">{{official_time}}</div><div class="l">на документ<small>{{official_calls}} вызовов модели, {{official_cost}}</small></div></div>
+      <div class="mrow"><div class="v g">{{quotes}}</div><div class="l">цитат найдены в документе программой</div></div>
+      <div class="msrc">{{stability_source}}</div>
+    </div>
   </div>
-  <div class="vs">
-    <div class="panel"><h4>БЫЛО: v1, ПРАВИЛА + ОЦЕНКА ПО КРИТЕРИЯМ</h4><p><b>0 из 28</b> заложенных дефектов, <b>44 ложные тревоги</b> на 8 чистых ТЗ, отчёт 2 300 строк.</p></div>
-    <div class="panel new"><h4>СТАЛО: v2, РЕВЬЮЕРЫ + СУДЬЯ</h4><p>{{v2_summary}}</p></div>
-  </div>
-  <div class="src">{{metrics_source}}</div>
-  <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>08 / 12</span></div>
+  <div class="foot"><span><b>STUPITS</b> · счётчик и эталон — evaluation/v2, команда №15</span><span>08 / 12</span></div>
 </section>
 
-<!-- 9. Модели и закрытый контур -->
-<section class="slide" id="s9" data-title="Модели">
-  <div class="kick">09 · МОДЕЛИ И ЗАКРЫТЫЙ КОНТУР</div>
-  <h2>Работает на любой модели — <em>и внутри банка</em></h2>
-  <table class="mt"><thead><tr><th>МОДЕЛЬ</th><th>К1–К5</th><th>С1–С20</th><th>ЗАМЕЧАНИЙ</th><th>ВРЕМЯ</th><th>ВЫЗОВОВ</th></tr></thead>
-  <tbody>{{models_rows}}</tbody></table>
-  <div class="closed">
-    <div class="panel"><b>Один интерфейс провайдера</b><span>Claude, Gemini, OpenAI-совместимые серверы; запасная цепочка моделей при перегрузке.</span></div>
-    <div class="panel"><b>Закрытый контур</b><span>Ollama или vLLM в периметре банка: документ не покидает сеть.</span></div>
-    <div class="panel"><b>Без модели</b><span>Офлайн-режим только на правилах — формальные дефекты за секунды.</span></div>
-  </div>
+<!-- 9. Было v1 → стало v2 -->
+<section class="slide" id="s9" data-title="v1 → v2">
+  <div class="kick">09 · БЫЛО → СТАЛО</div>
+  <h2>За ночь переписали ядро: <em>v1 → v2</em></h2>
+  <table class="vt"><thead><tr><th></th><th>БЫЛО: v1 — правила и оценка «требование × критерий»</th><th>СТАЛО: v2 — ревьюеры, судья, сверка цитат кодом</th></tr></thead>
+  <tbody>{{v1v2_rows}}</tbody></table>
+  <div class="src">{{v1v2_source}}</div>
   <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>09 / 12</span></div>
 </section>
 
-<!-- 10. Процесс банка -->
-<section class="slide" id="s10" data-title="Процесс банка">
-  <div class="kick">10 · ВСТРАИВАНИЕ В ПРОЦЕСС</div>
-  <h2>Говорит на языке <em>процесса банка</em></h2>
-  <div class="procwrap"><div class="proc">
-    <div class="panel"><span class="ico g">✓</span><h3>Чек-лист «Ревью требований»</h3><p>Шаблон банка заполнен: «Да / Нет / Частично» с комментарием и ссылками на дефекты.</p></div>
-    <div class="panel"><span class="ico">W</span><h3>Word с комментариями</h3><p>Замечания стоят прямо в документе аналитика — там, где он привык работать.</p></div>
-    <div class="panel"><span class="ico o">J</span><h3>Задачи Jira</h3><p>CSV для импорта: дефект, серьёзность, цитата, рекомендация, приоритет.</p></div>
-    <div class="panel"><span class="ico r">?</span><h3>Вопросы и ответы</h3><p>Владелец отвечает вариантом — агент пересчитывает: вердикт «до» и «после».</p></div>
-    <div class="panel"><span class="ico">✎</span><h3>Исправленное ТЗ</h3><p>Редакция «было → стало» с пометками дефектов и маркерами «уточнить».</p></div>
-    <div class="panel"><span class="ico g">T</span><h3>Тест-кейсы</h3><p>Черновик для пустого раздела «заполняются тестировщиками» — с пробелами приёмки.</p></div>
-  </div><div class="shot"><img src="img/report_checklist.png" alt="Заполненный чек-лист ревью требований банка в отчёте"></div></div>
+<!-- 10. Модели и закрытый контур -->
+<section class="slide" id="s10" data-title="Модели">
+  <div class="kick">10 · МОДЕЛИ И ЗАКРЫТЫЙ КОНТУР</div>
+  <h2>Работает на любой модели — <em>и внутри банка</em></h2>
+  <table class="mt"><thead><tr><th>МОДЕЛЬ</th><th>К1–К5</th><th>С1–С20</th><th>ЗАМЕЧАНИЙ</th><th>ВРЕМЯ</th><th>ВЫЗОВОВ</th></tr></thead>
+  <tbody>{{models_rows}}</tbody></table>
+  <div class="perim">
+    <div class="pnode">Документ<br><small>PDF · DOCX · MD</small></div><div class="parr">→</div>
+    <div class="pbox"><span class="plbl">ПЕРИМЕТР БАНКА</span>
+      <div class="pnode">Агент<br><small>python -m bcc_review</small></div><div class="parr">⇄</div>
+      <div class="pnode g">Модель в контуре<br><small>Ollama · vLLM · OPENAI_BASE_URL</small></div><div class="parr">→</div>
+      <div class="pnode">Отчёт, Word, Jira<br><small>в процесс банка</small></div></div>
+  </div>
+  <div class="closed">
+    <div class="panel"><b>Один интерфейс провайдера</b><span>Claude, Gemini, OpenAI-совместимые серверы; запасная цепочка моделей при перегрузке, темп запросов для бесплатного тарифа.</span></div>
+    <div class="panel"><b>Закрытый контур</b><span>Ollama или vLLM в периметре банка: <span class="mono">OPENAI_BASE_URL</span> — и документ не покидает сеть.</span></div>
+    <div class="panel"><b>Без модели</b><span>Офлайн-режим на правилах: формальные дефекты за секунды, вердикт честно «не определён».</span></div>
+  </div>
+  <div class="src">{{models_source}}</div>
   <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>10 / 12</span></div>
 </section>
 
-<!-- 11. План внедрения -->
-<section class="slide" id="s11" data-title="План">
-  <div class="kick">11 · ПЛАН ВНЕДРЕНИЯ</div>
-  <h2>От хакатона до <em>гейта «можно начинать»</em></h2>
-  <div class="road">
-    <div class="ph"><div class="dot">1</div><h3>Пилот</h3><div class="when">2 недели</div><p>Одна продуктовая команда, реальные ТЗ; аналитик отмечает полезные и ложные замечания.</p></div>
-    <div class="ph"><div class="dot">2</div><h3>Калибровка</h3><div class="when">+2 недели</div><p>Эталон банка из разборов пилота; промпты и шкала серьёзности под внутренние стандарты.</p></div>
-    <div class="ph"><div class="dot">3</div><h3>Закрытый контур</h3><div class="when">+1 месяц</div><p>Модель в периметре (vLLM), журнал прогонов, доступ по ролям, требования ИБ.</p></div>
-    <div class="ph"><div class="dot">4</div><h3>Гейт в процессе</h3><div class="when">далее</div><p>Проверка при переводе задачи в разработку: Jira, Confluence, чек-лист ревью.</p></div>
-  </div>
-  <div class="need">
-    <div class="panel"><h4>ЧТО НУЖНО ОТ БАНКА</h4><p>20–30 реальных ТЗ с разборами ревьюеров · стенд с моделью в контуре · доступ к Jira и Confluence для пилотной команды</p></div>
-    <div class="panel"><h4>КАК ИЗМЕРИМ ПИЛОТ</h4><p>Доля замечаний, принятых аналитиком · ложные тревоги на согласованных ТЗ · дефекты требований, дошедшие до тестирования</p></div>
+<!-- 11. Процесс банка и внедрение -->
+<section class="slide" id="s11" data-title="Процесс банка">
+  <div class="kick">11 · ВСТРАИВАНИЕ В ПРОЦЕСС БАНКА</div>
+  <h2>Говорит на языке <em>процесса банка</em></h2>
+  <div class="procwrap"><div class="proc">
+    <div class="panel"><span class="ico g">✓</span><h3>Чек-лист «Ревью требований»</h3><p>Шаблон банка заполнен: «Да / Нет / Частично» с комментарием и ссылками на дефекты.</p></div>
+    <div class="panel"><span class="ico">W</span><h3>Word и PDF аналитика</h3><p>Комментарии и выделения прямо в исходном документе — там, где он привык работать.</p></div>
+    <div class="panel"><span class="ico o">J</span><h3>Задачи Jira</h3><p>CSV для импорта: дефект, серьёзность, цитата, место, рекомендация.</p></div>
+    <div class="panel"><span class="ico r">?</span><h3>Вопросы → ответы</h3><p>Владелец отвечает вариантом — агент пересчитывает вердикт «до» и «после» и правит ТЗ.</p></div>
+  </div><div class="shot"><img src="img/report_checklist.png" alt="Заполненный чек-лист ревью требований банка в отчёте"></div></div>
+  <div class="road2">
+    <div><b>1 · Пилот</b><span>2 недели, одна команда, реальные ТЗ</span></div>
+    <div><b>2 · Калибровка</b><span>эталон банка, шкала серьёзности</span></div>
+    <div><b>3 · Закрытый контур</b><span>vLLM в периметре, журнал, роли, ИБ</span></div>
+    <div><b>4 · Гейт</b><span>проверка при переводе задачи в разработку</span></div>
   </div>
   <div class="foot"><span><b>STUPITS</b> · ИИ-агент проверки требований</span><span>11 / 12</span></div>
 </section>

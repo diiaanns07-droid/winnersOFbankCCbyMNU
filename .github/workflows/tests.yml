@@ -1,17 +1,18 @@
 name: Тесты
 
-# Тесты ядра v2 и сквозной прогон без сети (провайдеры mock и offline)
-# на трёх ОС и двух версиях Python. Ключи модели не нужны.
+# Тесты ядра v2 и сквозной прогон без сети (провайдеры mock и offline) на трёх ОС и двух версиях Python,
+# одна команда для жюри (scripts/jury_check.*, на Windows — в Windows PowerShell 5.1) и образ Docker.
+# Ключи модели не нужны.
 
 # Запуск только на интеграционной и основной ветках, тегах релиза и вручную: репозиторий приватный,
 # минуты Actions общие (macOS считается x10), а веток исполнителей десятки.
 on:
   push:
-    branches: [main, master, "bcc/v2"]
+    branches: [main, master, release, "bcc/v2"]
     tags: ["v2.*"]
     paths-ignore: ["docs/**", "presentation/**"]
   pull_request:
-    branches: [main, master, "bcc/v2"]
+    branches: [main, master, release, "bcc/v2"]
   workflow_dispatch:
 
 concurrency:
@@ -61,6 +62,15 @@ jobs:
       - name: verify отчёта по PDF
         run: python -m bcc_review verify out/offline/requirements_pdf.json release/input/requirements.pdf
 
+      - name: Одна команда для жюри (mock) — macOS и Linux
+        if: runner.os != 'Windows'
+        run: bash scripts/jury_check.sh mock
+
+      - name: Одна команда для жюри (mock) — Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 mock
+
       - name: Отчёты в артефакты
         if: always() && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         uses: actions/upload-artifact@v4
@@ -69,3 +79,24 @@ jobs:
           path: out/
           if-no-files-found: ignore
           retention-days: 7
+
+  docker:
+    name: Docker · mock и offline в контейнере
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Сборка образа
+        run: docker build -t bcc-review .
+
+      - name: Прогон mock в контейнере и verify
+        run: |
+          mkdir -p reports
+          docker run --rm -v "$PWD/reports:/app/reports" bcc-review release/input/requirements.md reports/docker/requirements.md --provider mock
+          docker run --rm -v "$PWD/reports:/app/reports" bcc-review verify reports/docker/requirements.json release/input/requirements.md
+
+      - name: Прогон без модели по PDF в контейнере и verify
+        run: |
+          docker run --rm -v "$PWD/reports:/app/reports" bcc-review release/input/requirements.pdf reports/docker/requirements_pdf.md --provider offline
+          docker run --rm -v "$PWD/reports:/app/reports" bcc-review verify reports/docker/requirements_pdf.json release/input/requirements.pdf

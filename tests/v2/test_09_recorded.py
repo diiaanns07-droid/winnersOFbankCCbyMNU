@@ -47,8 +47,10 @@ def load_view(path: Path) -> dict:
 def run_recorded(doc: Path, fixture_dir: str, model: str) -> dict:
     view = load_view(doc)
     seg = FIX / ("official" if fixture_dir == "09_official" else fixture_dir) / "segment.json"
-    if (FIX / fixture_dir / f"segment.{model}.json").exists():  # ответ получен на другой нарезке
-        seg = FIX / fixture_dir / f"segment.{model}.json"
+    for name in (f"segment.{model}.json", f"segment.{model.rsplit('_', 1)[0]}.json"):
+        if (FIX / fixture_dir / name).exists():  # ответ получен на другой нарезке
+            seg = FIX / fixture_dir / name
+            break
     reqs = json.loads(seg.read_text(encoding="utf-8"))["requirements"]
     raw = json.loads((FIX / fixture_dir / f"consistency.{model}.json").read_text(encoding="utf-8"))
     return C.postprocess(raw, view, reqs)
@@ -86,7 +88,19 @@ def test_negative_control_clean_base_has_no_conflicts(model):
             assert not ({25, 26} <= lines_of(c)), c["title"]
 
 
-@pytest.mark.parametrize("model", ["haiku", "sonnet", "opus"])
+WAVE2 = [f"haiku_w2_{i}" for i in range(1, 16)]  # шаг 2б, `stage consistency` (effort low), 1 вызов без обрезки
+
+
+@pytest.mark.parametrize("model", WAVE2)
+def test_official_boundary_step_finds_acceptance_row_against_rule(model):
+    """К1: критерий приёмки относит покупку на стыке месяцев не к тому месяцу, что правило."""
+    out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
+    crit = [c for c in out["candidates"] if c["severity"] == "critical"]
+    assert any({38, 64} <= lines_of(c) and c["kind"] in ("event_conflict", "boundary_conflict") for c in crit)
+    assert not any(c["kind"] == "contradiction" for c in out["candidates"] if c["origin"] == "pair_check")
+
+
+@pytest.mark.parametrize("model", ["haiku", "sonnet", "opus"] + WAVE2)
 def test_official_document_set_level_findings(model):
     out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
     crit = [c for c in out["candidates"] if c["severity"] == "critical"]
@@ -109,3 +123,21 @@ def test_official_document_set_level_findings(model):
     assert cov["verified"] <= 3 < cov["total"]
     # все кандидаты этапа подтверждены хотя бы одной найденной цитатой
     assert all(lines_of(c) for c in out["candidates"])
+
+
+@pytest.mark.parametrize("model", [f"haiku_w2_{i}" for i in (7, 8, 9, 10, 11, 12, 13, 14, 15)])
+def test_official_all_critical_conflicts_on_weak_model_with_one_condition_field(model):
+    """Промпт с полем one_condition, haiku с effort low: К1–К4 critical в каждом прогоне."""
+    out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
+    crit = [c for c in out["candidates"] if c["severity"] == "critical"]
+    assert any({38, 64} <= lines_of(c) for c in crit)                       # К1
+    assert any({39, 40} <= lines_of(c) for c in crit)                       # К2
+    assert any(c["kind"] == "status_conflict" and lines_of(c) & {121, 163} for c in crit)  # К3
+    assert any(c["kind"] == "missing_element" and 52 in lines_of(c) for c in crit)        # К4
+
+
+@pytest.mark.parametrize("model", ["haiku_w2_13", "haiku_w2_14"])
+def test_official_half_specified_condition_is_reported_as_undefined(model):
+    """С8: Ф-4 задаёт исход только для «накопленная сумма ниже нового порога»; другая ветвь не определена."""
+    out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
+    assert any(c["severity"] == "major" and c["origin"] == "pair_check" and 40 in lines_of(c) for c in out["candidates"])

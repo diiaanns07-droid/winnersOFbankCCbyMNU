@@ -195,3 +195,164 @@ def test_official_docx_parity():
     for r in seg["requirements"]:
         m = Q.verify_quote(dx, r["quote"], r["line_start"])
         assert m and r["line_start"] - 2 <= m["line_start"] <= r["line_end"] + 2, r["id"]
+
+
+@needs_pdf
+@needs_docx
+def test_long_document_docx_and_pdf_from_word():
+    """Длинное ТЗ в DOCX и PDF из Word (19 страниц): все строки MD на месте, повторяющаяся фраза — в своём разделе
+    (k-е вхождение), строки таблиц, разорванные переносом страницы, склеены, маркеров «•» в тексте нет."""
+    md = dv.load(S / "long_tz.md")
+    pdf = dv.load(S / "long_tz.pdf")
+    dx = dv.load(S / "long_tz.docx")
+    assert pdf["pages"] >= 15 and any("разорванные переходом" in w for w in pdf["warnings"])
+    for v in (pdf, dx):
+        assert [x["n"] for x in dv.nonempty(md) if not Q.verify_quote(v, x["text"])] == []
+        assert not any(x["text"].startswith("•") for x in v["lines"])
+        occ_md = [x for x in md["lines"] if x["text"] == "Журнал операций хранится 5 лет."]
+        occ = [x for x in v["lines"] if x["text"].strip() == "Журнал операций хранится 5 лет."]
+        assert len(occ) == 17
+        assert all(a["section"].split(" › ")[0] == b["section"].split(" › ")[0] for a, b in zip(occ_md, occ))
+        for a, b in zip(occ_md, occ):     # цитата с подсказкой — своё вхождение, не соседнее
+            m = Q.verify_quote(v, "Журнал операций хранится 5 лет", b["n"] + 1)
+            assert m["line_start"] == b["n"]
+    assert "Пользователь вошёл в «Профиль» | Операция 2 | Результат за 4 с" in _texts(pdf)
+
+
+def test_windows_text_encodings_and_crlf(tmp_path):
+    """Файлы из Windows: TXT в cp1251 и UTF-16 (Блокнот), Markdown с переводами строк CRLF."""
+    body = "Требования к сервису\r\n\r\nФ-1. Клиент задаёт лимит.\r\nФ-2. Лимит действует сутки.\r\n"
+    for enc in ("cp1251", "utf-16", "utf-8-sig"):
+        p = tmp_path / f"win_{enc}.txt"
+        p.write_bytes(body.encode(enc))
+        v = dv.load(p)
+        assert _texts(v) == ["Требования к сервису", "", "Ф-1. Клиент задаёт лимит.", "Ф-2. Лимит действует сутки."], enc
+    assert dv._decode_text("Привет".encode("cp1251")) == "Привет"
+    p = tmp_path / "crlf.md"
+    p.write_bytes("# Заголовок\r\n\r\n* **Ф-1.** Клиент задаёт лимит.\r\n| a | b |\r\n| --- | --- |\r\n| 1 | 2 |\r\n".encode())
+    v = dv.load(p)
+    assert _texts(v) == ["Заголовок", "", "Ф-1. Клиент задаёт лимит.", "a | b", "", "1 | 2"]
+
+
+def test_unsupported_format_message(tmp_path):
+    p = tmp_path / "table.xlsx"
+    p.write_bytes(b"PK")
+    with pytest.raises(ValueError, match="не поддерживается; сохраните документ как DOCX, PDF"):
+        dv.load(p)
+    with pytest.raises(ValueError, match="файл не найден"):
+        dv.load(tmp_path / "missing.md")
+
+
+@pytest.mark.skipif(not __import__("shutil").which("soffice"), reason="нет LibreOffice")
+@pytest.mark.parametrize("ext", ["odt", "rtf", "doc"])
+def test_doc_rtf_odt_via_libreoffice(tmp_path, ext):
+    import subprocess
+    subprocess.run(["soffice", "--headless", "--convert-to", ext, "--outdir", str(tmp_path), str(S / "docx_merged.docx")],
+                   check=True, capture_output=True, timeout=180)
+    src = tmp_path / f"docx_merged.{ext}"
+    v = dv.load(src)
+    ref = dv.load(S / "docx_merged.docx")
+    assert v["file"] == src.name and v["title"] == ref["title"]
+    assert v["warnings"][0].startswith(f"Документ {ext.upper()} прочитан через преобразование в DOCX")
+    assert [x["n"] for x in dv.nonempty(ref) if not Q.verify_quote(v, x["text"])] == []
+
+
+@needs_docx
+def test_html_saved_from_word_matches_docx():
+    """HTML «Сохранить как веб-страницу» (LibreOffice/Word): переносы строк внутри <p> — пробелы, <li><p>…</p></li> —
+    один пункт с номером; построчно совпадает с DOCX и содержит все строки MD."""
+    h = dv.load(S / "word_saved.html")
+    dx = dv.load(ROOT / "release/input/requirements.docx")
+    md = dv.load(ROOT / "release/input/requirements.md")
+    assert h["title"] == md["title"] and len(h["lines"]) == len(dx["lines"])
+    assert all(Q.normalize(a["text"]) == Q.normalize(b["text"]) for a, b in zip(h["lines"], dx["lines"]))
+    assert [x["n"] for x in dv.nonempty(md) if not Q.verify_quote(h, x["text"])] == []
+    assert "5. При отклонении суммы вернуть прежнее состояние и результат ERROR." in _texts(h)
+
+
+@needs_docx
+def test_docx_tracked_changes_final_text_and_warning():
+    v = dv.load(S / "docx_tracked.docx")
+    assert "СН-2. Лимит снятия составляет 200 000 тенге в сутки." in _texts(v)
+    assert "100 000" not in _joined(v)
+    assert any("непринятые исправления (вставок 1, удалений 1)" in w for w in v["warnings"])
+    assert dv.load(S / "docx_merged.docx")["warnings"] == []
+
+
+def test_split_merged_pdf_headings_unit():
+    """Читатель PDF склеил два заголовка подряд в один блок (строки разного кегля) — делим и чиним разделы."""
+    def frag(s, e, rect, line):
+        return {"start": s, "end": e, "rect": rect, "line": line}
+    merged = "Требования к изменениям BPMN схема процесса"
+    blocks = [
+        {"id": "b1", "kind": "heading", "text": merged, "section": ["Док", "Часть A", merged],
+         "loc": {"page": 1, "level": 3, "bbox": [57, 509, 224, 533],
+                 "fragments": [frag(0, 23, [57, 509.5, 224, 520.5], 0), frag(24, 43, [57, 523.3, 185, 533.3], 1)]}},
+        {"id": "b2", "kind": "paragraph", "text": "Схема процесса.", "section": ["Док", "Часть A", merged],
+         "loc": {"page": 1, "bbox": [57, 540, 300, 550]}},
+        {"id": "b3", "kind": "heading", "text": "Функциональные требования", "section": ["Док", "Часть A", merged],
+         "loc": {"page": 1, "level": 4, "bbox": [57, 576, 229, 586]}},
+        {"id": "b4", "kind": "list_item", "text": "Ф-1. Текст.", "section": ["Док", "Часть A", merged,
+                                                                          "Функциональные требования"],
+         "loc": {"page": 1, "bbox": [57, 590, 400, 600]}},
+    ]
+    out = dv._split_merged_headings(blocks, {1: (595, 842)})
+    assert [b["text"] for b in out[:2]] == ["Требования к изменениям", "BPMN схема процесса"]
+    assert dv._level(out[1]) == 4
+    assert out[2]["section"] == ["Док", "Часть A", "Требования к изменениям", "BPMN схема процесса"]
+    assert out[3]["section"] == ["Док", "Часть A", "Требования к изменениям"]
+    assert out[4]["section"] == ["Док", "Часть A", "Требования к изменениям", "Функциональные требования"]
+    # длинный заголовок, перенесённый на вторую строку тем же кеглем и во всю ширину, не делится
+    long = {"id": "x", "kind": "heading", "text": "Очень длинный заголовок раздела " * 3, "section": [],
+            "loc": {"page": 1, "level": 2, "fragments": [frag(0, 60, [57, 100, 540, 112], 0),
+                                                         frag(61, 96, [57, 114, 300, 126], 1)]}}
+    assert len(dv._split_merged_headings([long], {1: (595, 842)})) == 1
+
+
+def test_quote_matches_word_broken_in_narrow_cell():
+    """Узкая ячейка PDF: слово разорвано без дефиса («integ er»); цитата «integer» находится на своей строке."""
+    v = dv.from_text("# Док\n\n| Поле | Тип |\n| --- | --- |\n| daysLeft | integ er |\n| reminderEna bled | boole an |\n")
+    m = Q.verify_quote(v, "daysLeft | integer", 5)
+    assert m and m["line_start"] == 5 and m["verified"] == "normalized" and m["text"] == "daysLeft | integ er"
+    assert Q.verify_quote(v, "reminderEnabled | boolean")["line_start"] == 6
+
+
+@pytest.mark.parametrize("ext", ["docx", "pdf"])
+def test_table_of_contents_removed_and_tight_spacing(ext):
+    """Оглавление («1. Общие сведения ……… 2») убирается с предупреждением; в PDF нет лишних пробелов между
+    фрагментами без зазора («ВК -1», «приложении .»)."""
+    pytest.importorskip("docx" if ext == "docx" else "pymupdf")
+    v = dv.load(S / f"toc.{ext}")
+    t = _texts(v)
+    assert t == ["Выпуск виртуальной карты", "1. Общие сведения", "Клиент выпускает виртуальную карту в приложении.",
+                 "2. Цели", "Карта доступна для оплаты сразу после выпуска.", "3. Функциональные требования",
+                 "ВК-1. Выпуск бесплатный.", "4. Критерии приёмки", "Карта выпущена за 10 секунд."]
+    assert any("Оглавление убрано из текста (5 строк)" in w for w in v["warnings"])
+    assert [ln["n"] for ln in v["lines"]] == list(range(1, 10))
+
+
+def test_toc_detector_does_not_eat_normal_lines():
+    lines = [{"n": i + 1, "text": t, "kind": k} for i, (t, k) in enumerate([
+        ("Статусы", "heading"), ("Статусы 200", "paragraph"), ("Ответ 200 при успехе.", "paragraph"),
+        ("Лимит", "heading"), ("Лимит 5", "paragraph")])]
+    out, n = dv.drop_toc(lines)
+    assert n == 0 and out == lines
+
+
+@needs_pdf
+def test_api_pdf_narrow_cells_and_latin_status_page():
+    """Спецификация API из reportlab: длинные слова в узких ячейках режутся без дефиса («strin g», «Mandat ory») —
+    в тексте они целые; последнюю страницу статусов (почти целиком латиница) читатель v1 выбрасывает как
+    «нечитаемый шрифт» — текст восстановлен напрямую из PDF с предупреждением."""
+    v = dv.load(S / "api_narrow.pdf")
+    t = _texts(v)
+    assert "Parameter | Format | Mandatory | Description" in t
+    assert "accountId | string | Да | Идентификатор счёта" in t
+    assert "includeHolds | boolean | Нет | Показывать заблокированные суммы" in t
+    assert "pageSize | integer | Нет | Число операций на странице" in t
+    assert "410. Unsuccessful — Gone" in t and "500. Unsuccessful — Internal server error" in t
+    assert '{"message":"Счёт закрыт"}' in t and "400. Unsuccessful — Bad request" in t
+    assert all(ln["page"] == 2 for ln in v["lines"] if ln["text"].startswith("410."))
+    assert any("Страница 2: читатель счёл текстовый слой нечитаемым" in w for w in v["warnings"])
+    assert not any("не прочитаны" in w.lower() or "не полностью" in w.lower() for w in v["warnings"])
+    assert dv.line(v, t.index("410. Unsuccessful — Gone") + 1)["kind"] == "heading"

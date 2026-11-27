@@ -99,7 +99,7 @@ def _formats(formats: Iterable[str] | str) -> list[str]:
 
 
 def plural(n: int, one: str, few: str, many: str) -> str:
-    """«1 замечание», «3 замечания», «5 замечаний»."""
+    """«1 дефект», «3 дефекта», «5 дефектов»."""
     n = abs(int(n))
     if n % 10 == 1 and n % 100 != 11:
         return one
@@ -328,7 +328,8 @@ def to_v1_report(report: dict, view: dict, input_path: Path, doc1: dict | None =
         fix = str(f.get("recommendation") or "").strip()
         if f.get("rewrite"):
             fix = (fix + "\n" if fix else "") + "Формулировка: " + str(f["rewrite"]).strip()
-        findings.append({"id": f.get("id"), "status": "confirmed", "severity": f.get("severity"), "title": title,
+        # status None: в v2 все дефекты прошли судью, пометка «подтверждено» в комментарии лишняя
+        findings.append({"id": f.get("id"), "status": None, "severity": f.get("severity"), "title": title,
                          "criterion": criterion_label(f.get("criterion")) if f.get("criterion") else None,
                          "kind": f.get("kind"), "impact": impact, "question": f.get("question") or None,
                          "recommendation": fix or None, "req_ids": list(f.get("requirement_ids") or []),
@@ -370,7 +371,7 @@ def annotate_docx(report: dict, view: dict, input_path: Path, output_path: Path)
     anchored = len({a.finding_id for a in res.anchors})
     return _res("docx", "written", output_path,
                 f"Word с комментариями: отмечено {anchored} из "
-                f"{_n(len(rep1['findings']), 'замечания', 'замечаний', 'замечаний')} "
+                f"{_n(len(rep1['findings']), 'дефекта', 'дефектов', 'дефектов')} "
                 f"({_n(len(res.anchors), 'место', 'места', 'мест')} в тексте) и сводный комментарий", anchored=anchored,
                 total=len(rep1["findings"]), comments=len(res.anchors))
 
@@ -385,14 +386,66 @@ def report_docx(report: dict, output_path: Path, *, markdown: str | None = None)
     style.font.name = "Calibri"
     style.font.size = Pt(10.5)
     if markdown and markdown.strip():
+        try:  # тот же отчёт без HTML-якорей и экранирования Markdown (№13)
+            from .markdown import export_text
+            markdown = export_text(markdown)
+        except Exception:  # noqa: BLE001
+            markdown = re.sub(r"<a id=\"[^\"]*\"></a>", "", markdown).replace("\\|", "∣")
         _md_to_docx(d, markdown)
     else:
         _report_to_docx(d, report)
+    _add_toc(d)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     d.save(str(output_path))
     n = len(report.get("findings") or [])
-    return _res("docx", "written", output_path, f"Word-версия отчёта: {_n(n, 'замечание', 'замечания', 'замечаний')}",
+    return _res("docx", "written", output_path, f"Word-версия отчёта: {_n(n, 'дефект', 'дефекта', 'дефектов')}",
                 anchored=n, total=n)
+
+
+def _add_toc(d: Any) -> None:
+    """Оглавление Word после заголовка документа: поле TOC (уровни 1–3) и w:updateFields — Word соберёт его при
+    открытии (LibreOffice — по «Обновить»)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    heads = [p for p in d.paragraphs if p.style is not None and p.style.name.startswith(("Heading", "Title"))]
+    if len(heads) < 3:
+        return
+    anchor = heads[0]._p
+    title = OxmlElement("w:p")
+    r = OxmlElement("w:r")
+    rpr = OxmlElement("w:rPr")
+    rpr.append(OxmlElement("w:b"))
+    r.append(rpr)
+    t = OxmlElement("w:t")
+    t.text = "Содержание"
+    r.append(t)
+    title.append(r)
+    field = OxmlElement("w:p")
+    parts = [("begin", None), (None, ' TOC \\o "1-3" \\h \\z \\u '), ("separate", None),
+             ("text", "Оглавление соберётся при открытии документа (или F9 — «Обновить поле»)."), ("end", None)]
+    for kind, val in parts:
+        run = OxmlElement("w:r")
+        if kind in ("begin", "separate", "end"):
+            fc = OxmlElement("w:fldChar")
+            fc.set(qn("w:fldCharType"), kind)
+            run.append(fc)
+        elif kind == "text":
+            tt = OxmlElement("w:t")
+            tt.text = val
+            run.append(tt)
+        else:
+            it = OxmlElement("w:instrText")
+            it.set(qn("xml:space"), "preserve")
+            it.text = val
+            run.append(it)
+        field.append(run)
+    anchor.addnext(field)
+    anchor.addnext(title)
+    settings = d.settings.element
+    if settings.find(qn("w:updateFields")) is None:
+        uf = OxmlElement("w:updateFields")
+        uf.set(qn("w:val"), "true")
+        settings.append(uf)
 
 
 _MD_INLINE = re.compile(r"(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))")
@@ -493,9 +546,9 @@ def _report_to_docx(d: Any, report: dict) -> None:
             d.add_paragraph(str(v["summary"]))
     fs = findings_of(report)
     counts = {k: sum(1 for f in fs if f.get("severity") == k) for k in SEV_ORDER}
-    d.add_paragraph(f"Замечаний: {len(fs)} (критичных {counts['critical']}, существенных {counts['major']}, "
+    d.add_paragraph(f"Дефектов: {len(fs)} (критичных {counts['critical']}, существенных {counts['major']}, "
                     f"незначительных {counts['minor']}).")
-    d.add_heading("Замечания", level=1)
+    d.add_heading("Дефекты", level=1)
     for f in fs:
         d.add_heading(f"{f.get('id', '')}. {_one_line(f.get('title'))}", level=2)
         meta = [SEVERITY_RU.get(str(f.get("severity")), str(f.get("severity") or ""))]
@@ -619,12 +672,14 @@ def annotate_pdf(report: dict, view: dict, input_path: Path, output_path: Path) 
                 continue
             page = doc[int(page_no) - 1]
             bbox = _area(view, rects, int(n), int(ev.get("line_end") or n), int(page_no)) if n else None
-            quads = _find_quads(page, str(ev.get("quote") or ""), bbox)
+            quads = _find_quads(page, str(ev.get("quote") or ""), bbox) or \
+                _word_quads(page, str(ev.get("quote") or ""), bbox)
             if not quads:
                 missed.append(fid)
                 continue
             a = page.add_highlight_annot(quads=quads)
             a.set_colors(stroke=color)
+            a.set_opacity(0.45)  # полупрозрачно: текст под выделением читается, наложения не чернеют
             a.set_info(title=AUTHOR, subject=f"{fid} · {SEVERITY_RU.get(str(f.get('severity')), '')}", content=note)
             a.set_name(f"bcc-{fid}-{places}")
             a.update()
@@ -640,7 +695,7 @@ def annotate_pdf(report: dict, view: dict, input_path: Path, output_path: Path) 
         hl = sum(1 for p in chk for x in p.annots() if x.type[0] == pymupdf.PDF_ANNOT_HIGHLIGHT)
     if hl != places:
         return _res("pdf", "failed", None, f"после записи найдено {hl} выделений вместо {places}")
-    msg = (f"PDF с выделениями: отмечено {len(anchored)} из {_n(len(findings), 'замечания', 'замечаний', 'замечаний')}"
+    msg = (f"PDF с выделениями: отмечено {len(anchored)} из {_n(len(findings), 'дефекта', 'дефектов', 'дефектов')}"
            f" ({_n(places, 'место', 'места', 'мест')})")
     if missed:
         msg += f"; без места на странице: {', '.join(sorted(set(missed) - anchored)) or 'нет'}"
@@ -673,6 +728,7 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
 
     for vi, variant in enumerate(_search_variants(quote)):
         found: list = []
+        prev_x = None
         for piece in variant:
             hits = page.search_for(piece, quads=True)
             if not hits and len(piece) > 60:
@@ -684,7 +740,13 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
             if vi == 0 and ins:
                 hits = ins  # цитата целиком: все части переноса внутри блока
             elif ins:
-                hits = ins[:1]  # часть цитаты (ячейка, фрагмент): одно вхождение внутри блока
+                # часть цитаты (ячейка, фрагмент): одно вхождение внутри блока, ячейки — слева направо;
+                # перенос внутри ячейки даёт несколько четырёхугольников — берём их все
+                cand = [h for h in ins if prev_x is None or h.rect.x0 >= prev_x - 1] or ins
+                first = cand[0]
+                hits = [first] + [h for h in cand[1:] if abs(h.rect.x0 - first.rect.x0) < 4
+                                  and 0 < h.rect.y0 - first.rect.y0 <= 2.6 * max(first.rect.height, 1)]
+                prev_x = first.rect.x1
             elif area is not None:
                 hits = sorted(hits, key=lambda h: abs(h.rect.y0 - area.y0))[:1]
             else:
@@ -693,6 +755,43 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
         if found:
             return found
     return []
+
+
+def _word_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
+    """Запасной поиск по словам: фрагменты строки в PDF могут лежать не по порядку (другой шрифт у цифр и точек),
+    и search_for не находит фразу. Слова в рамке блока раскладываются по строкам слева направо и сравниваются
+    с цитатой без пробелов. Не нашлось — выделяется весь блок (место дефекта всё равно видно)."""
+    import pymupdf
+    from bcc_review.v2.quotes import normalize
+    area = pymupdf.Rect(bbox) + (-2, -2, 2, 2) if bbox else None
+    words = page.get_text("words", clip=area) if area is not None else page.get_text("words")
+    if not words:
+        return []
+    words = sorted(words, key=lambda w: (w[1] + w[3]) / 2)
+    lines: list[list] = []
+    for w in words:
+        mid, h = (w[1] + w[3]) / 2, w[3] - w[1]
+        if lines and abs(mid - lines[-1][0]) <= max(h, 1) * 0.5:
+            lines[-1][1].append(w)
+        else:
+            lines.append([mid, [w]])
+    ordered = [w for _, ws in lines for w in sorted(ws, key=lambda w: w[0])]
+    chars, owner = [], []
+    for k, w in enumerate(ordered):
+        t = normalize(w[4]).replace(" ", "")
+        chars.append(t)
+        owner += [k] * len(t)
+    text = "".join(chars)
+    first = quote.split(" … ")[0]
+    needle = normalize(first).replace(" ", "").strip('".,;:')
+    pos = text.find(needle) if len(needle) >= 4 else -1
+    if pos >= 0:
+        sel = ordered[owner[pos]:owner[pos + len(needle) - 1] + 1]
+    elif area is not None:
+        sel = ordered
+    else:
+        return []
+    return [pymupdf.Rect(w[:4]).quad for w in sel]
 
 
 def _summary_note(page: Any, report: dict, findings: list[dict], anchored: set[str]) -> None:
@@ -705,7 +804,7 @@ def _summary_note(page: Any, report: dict, findings: list[dict], anchored: set[s
                      f"Тестирование: {VERDICT_RU.get(str(v.get('testing')), '—')}")
         if v.get("summary"):
             lines.append(str(v["summary"]))
-    lines.append(f"Замечаний: {len(findings)} (критичных {counts['critical']}, существенных {counts['major']}, "
+    lines.append(f"Дефектов: {len(findings)} (критичных {counts['critical']}, существенных {counts['major']}, "
                  f"незначительных {counts['minor']}); отмечено в тексте: {len(anchored)}.")
     loose = [str(f.get("id")) for f in findings if str(f.get("id")) not in anchored]
     if loose:

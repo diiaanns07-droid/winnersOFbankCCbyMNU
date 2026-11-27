@@ -35,7 +35,7 @@ def test_clean_offline_is_undetermined():
     md = offline.render_fallback(r)
     assert offline.TITLE in md and "не определено" in md
     assert "можно" not in md.lower().replace("можно начинать", "")
-    assert "Отсутствие замечаний не означает готовность" in md
+    assert "отсутствие других замечаний не означает, что их нет" in md
 
 
 def test_verdict_rule():
@@ -66,9 +66,24 @@ def test_fallback_render_short(tmp_path):
     md = offline.render_fallback(r)
     lines = md.splitlines()
     assert len(lines) < 400
-    for h in ("## Кратко", "## Замечания правил", "## Что без модели не проверялось"):
+    for h in ("## Итог", "## Как получить полную проверку", "## Замечания без модели", "## Что без модели не проверялось"):
         assert h in md
     assert "нельзя" in md
     out = tmp_path / "r.md"
     assert offline.main([str(OFFICIAL), str(out), "--json", str(tmp_path / "r.json")]) == 0
     assert out.read_text(encoding="utf-8").startswith("# ")
+
+
+def test_brief_report_for_jury():
+    r = offline.build(fallback_load(OFFICIAL), reason="не задан GEMINI_API_KEY")
+    md = offline.render_brief(r)
+    lines = md.splitlines()
+    assert len(lines) <= 200
+    assert lines[0].startswith("# Предварительная проверка без модели")
+    assert "не задан GEMINI_API_KEY" in md and "https://aistudio.google.com/apikey" in md
+    assert "GEMINI_API_KEY=" in md and "## Как получить полную проверку" in md
+    assert "Без модели найдено 15 замечаний" in md or "Без модели найдено" in md
+    assert "можно начинать" not in md.replace("нельзя начинать", "")
+    assert r["offline"]["how_to_full"] and r["offline"]["found"].startswith("Без модели найдено")
+    clean = offline.render_brief(offline.build(fallback_load(CLEAN)))
+    assert "❔ не определено" in clean and "замечаний не нашли" in clean and len(clean.splitlines()) <= 60

@@ -3,17 +3,23 @@
 Сам вызов модели делает общий запуск линзы (`stages/lens.py`, №01) с промптом `prompts/lens_risk.md`.
 Здесь — детерминированная постобработка ответа модели, которая не зависит от провайдера:
 
+* critical о неопределённом ключевом событии (этап операции) подаётся как `ambiguity`/`unambiguous` — основание (б)
+  судьи, а не «пропуск» и не «расхождение с целью»;
 * калибровка серьёзности по шкале контракта (раздел 5): риск ИБ и эксплуатационный риск — не выше major;
+  нет схемы отката (пункт шаблона ревью) — всегда minor;
   расхождение ролей с видом `terminology` переводится в `security` (риск доступа, а не оформление);
   critical без сценария, последствий или с `blocks = none` — major;
 * страховка от «фантазий»: замечание о теме, которой документ не касается ни словом (PCI DSS, шифрование,
   аудит, мониторинг, откат, антифрод…), снимается — у такой темы нет текстовой зацепки;
 * замечание, все цитаты которого — определения из раздела терминов (или первая цитата-зацепка у
   «неоднозначности/неполноты»), — не выше minor;
-* major о дублях, гонках и сбоях смежных систем — minor, если документ этих тем не касается;
+* противоречие с критерием приёмки снимается: это зона тестировщика (№06), у линзы — дубль;
+* major о дублях, гонках и сбоях смежных систем — minor, если документ этих тем не касается; отмена объекта во
+  время начатой по нему операции при разрешённой документом отмене — major (не вопрос);
   major-риск ИБ без опоры на описанный интерфейс (адрес, GET, чужой объект, владение, номер карты,
   журналы, хранение) — minor;
-* не больше двух critical (остальные — major), дубли по заголовку, не более 12 замечаний,
+* minor — только с текстовой зацепкой (откат по шаблону ревью, пояс городом), не больше двух; прочие minor —
+  вопросы «о чём документ молчит», они снимаются, не больше двух critical (остальные — major), дубли по заголовку, не более 12 замечаний,
   порядок: critical → major → minor.
 
 Снятые замечания возвращаются отдельно с причиной, чтобы судья и отчёт могли их показать.
@@ -25,6 +31,13 @@ from typing import Any, Iterable
 
 NAME = "risk"
 MAX_CANDIDATES = 12
+MAX_MINOR = 2  # minor линзы — только с зацепкой: пункт шаблона ревью (откат), пояс, названный городом
+# minor с текстовой зацепкой идут первыми при отборе (вопросы «о чём документ молчит» — в конец и под лимит)
+_HOOKED_MINOR_RE = re.compile(r"схем\w*\s+откат|откат\w*\s+(решени|функц|релиз|выпуск)|шаблон|чек-?лист"
+                              r"|пункт\w*\s+ревью|город|местн\w+\s+врем|utc|пояс", re.I)
+# Лимит вывода линзы сразу 32 000: у моделей с рассуждением (haiku через claude -p) рассуждение входит в лимит,
+# при 16 000 первый вызов падает по обрезке через ~5 мин и повторяется — лишний вызов и время.
+MAX_OUTPUT_TOKENS = 32000
 # Виды «не определено / неполно»: если их зацепка — определение термина, это тонкость, а не дефект.
 VAGUE_KINDS = ("ambiguity", "incomplete", "missing_element", "other")
 MAX_CRITICAL = 2  # ключевое событие и одно противоречие; остальное у линзы — major
@@ -35,8 +48,8 @@ SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2}
 # в документе считается зацепкой.
 OUT_OF_SCOPE_TOPICS: dict[str, dict[str, Any]] = {
     "соответствие стандартам и регуляторике": {
-        "title": r"PCI|GDPR|ISO\s*27|ГОСТ|регулятор|закон|персональн\w*\s+данн|ПДн",
-        "hooks": ["pci", "gdpr", "27001", "гост", "регулятор", "закон", "персональн", "пдн"],
+        "title": r"PCI|GDPR|ISO\s*27|ГОСТ|регулятор|закон",
+        "hooks": ["pci", "gdpr", "27001", "гост", "регулятор", "закон"],
     },
     "шифрование": {
         "title": r"шифр|TLS|HTTPS",
@@ -110,8 +123,8 @@ SECURITY_MAJOR_RE = re.compile(
 
 def major_without_hook(candidate: dict, doc_text: str) -> str | None:
     """Тема эксплуатационного major, которой документ не касается (тогда это minor), или None."""
-    if candidate.get("severity") != "major":
-        return None
+    if candidate.get("severity") != "major" or _is_key_event(candidate):
+        return None  # неопределённое ключевое событие не понижается из-за попутных слов («сбой», «повтор»)
     title = str(candidate.get("title", ""))
     if candidate.get("kind") == "security" and not SECURITY_MAJOR_RE.search(title):
         return "риск ИБ без опоры на описанный интерфейс"
@@ -191,9 +204,37 @@ def missing_hook(candidate: dict, doc_text: str) -> str | None:
 _ROLE_RE = re.compile(r"рол[ьие]|держател|владел|клиент\w*.{0,40}(прав|доступ|сесси)|дополнительн\w*\s+карт", re.I)
 
 
+# Неопределённое ключевое событие (этап операции): основание critical (б) у судьи — термин с двумя толкованиями
+# в ключевом правиле. Подавать как ambiguity/unambiguous, а не как «пропуск» или «расхождение с целью».
+_KEY_EVENT_RE = re.compile(
+    r"этап\w*\s+(карточн\w+\s+)?операц|как\w*\s+(именно\s+)?событи|событи\w*.{0,50}не\s+(определ|уточн)"
+    r"|не\s+(определ|уточн)\w*.{0,60}событи|авторизац\w*\s+или\s+(проведени|клиринг)"
+    r"|не\s+определ\w*,?\s+(когда|в\s+какой\s+момент|каким\s+событием|какой\s+момент)"
+    r"|какой\s+момент\s+дела\w*|считается\s+(оплачен|внес[её]н|провед[её]н|выполнен|исполнен|зачислен)", re.I)
+_CANCEL_DURING_RE = re.compile(
+    r"отмен\w*.{0,80}(во\s+время|одновременн|параллельн|уже\s+начат|в\s+обработк|начат\w*\s+по|в\s+процессе)"
+    r"|(во\s+время|одновременн|в\s+процессе)\w*.{0,60}отмен", re.I)
+_ACCEPTANCE_RE = re.compile(r"критери\w*\s+приёмк|критери\w*\s+приемк", re.I)
+
+
+def _is_key_event(c: dict) -> bool:
+    title = str(c.get("title", ""))
+    return bool(_KEY_EVENT_RE.search(title)) and not _ACCEPTANCE_RE.search(title)
+
+
 def calibrate(candidate: dict) -> dict:
     """Приводит серьёзность к шкале контракта; возвращает копию кандидата."""
     c = dict(candidate)
+    if _is_key_event(c):
+        if c.get("severity") == "minor":
+            # неопределённое ключевое событие — не вопрос предметной области (модель занизила уровень)
+            c["severity"] = "major"
+        if c.get("severity") == "critical" and c.get("kind") != "ambiguity":
+            c["kind"], c["criterion"] = "ambiguity", "unambiguous"
+    if c.get("severity") in ("critical", "major") and _TITLE_RES["откат и выключение функции"].search(
+            str(c.get("title", ""))):
+        # отсутствие схемы отката по пункту шаблона ревью — оформление процесса, не дефект требования
+        c["severity"] = "minor"
     if c.get("kind") == "terminology" and _ROLE_RE.search(str(c.get("title", ""))):
         # расхождение ролей — риск доступа (дополнительная карта), а не оформление терминов
         c["kind"], c["criterion"] = "security", "risk"
@@ -220,14 +261,30 @@ def _title_key(c: dict) -> str:
     return re.sub(r"[^\w]+", " ", str(c.get("title", "")).lower()).strip()
 
 
+CONFLICT_KINDS = ("contradiction", "event_conflict", "boundary_conflict", "status_conflict")
+
+
+def acceptance_conflict(c: dict, acceptance_ids: set[str]) -> bool:
+    """Противоречие правила с критерием приёмки — зона тестировщика (№06 сверяет каждую строку приёмки):
+    у линзы это дубль, судья получает его от тестировщика."""
+    if c.get("kind") not in CONFLICT_KINDS:
+        return False
+    if acceptance_ids and any(r in acceptance_ids for r in c.get("requirement_ids") or []):
+        return True
+    return bool(_ACCEPTANCE_RE.search(str(c.get("title", ""))))
+
+
 def postprocess(candidates: Iterable[dict], view: Any = None,
-                known_ids: Iterable[str] | None = None) -> tuple[list[dict], list[dict]]:
+                known_ids: Iterable[str] | None = None,
+                acceptance_ids: Iterable[str] | None = None) -> tuple[list[dict], list[dict]]:
     """Калибровка, отсев тем без зацепки, дубли, лимит и порядок.
 
     `known_ids` — ID требований из нарезки: чужие ID (номера пунктов документа) из `requirement_ids` убираются.
+    `acceptance_ids` — ID строк критериев приёмки: противоречия с ними снимаются (зона тестировщика).
     Возвращает (оставленные, снятые); у снятых есть поле `reject_reason`.
     """
     known = set(known_ids) if known_ids is not None else None
+    accept = set(acceptance_ids or [])
     doc = _doc_text(view)
     defined = terms_lines(view)
     kept: list[dict] = []
@@ -242,6 +299,9 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
         if not c.get("evidence"):
             dropped.append(_drop(c, "нет цитаты-зацепки"))
             continue
+        if acceptance_conflict(c, accept):
+            dropped.append(_drop(c, "противоречие с критерием приёмки — зона тестировщика (дубль)"))
+            continue
         ev_lines = _evidence_lines(c)
         if defined and ev_lines and (all(n in defined for n in ev_lines)
                                      or (ev_lines[0] in defined and c.get("kind") in VAGUE_KINDS)):
@@ -249,6 +309,9 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
             c["severity"] = "minor"
         if doc and major_without_hook(c, doc):
             c["severity"] = "minor"
+        if c["severity"] == "minor" and doc and "отмен" in doc and _CANCEL_DURING_RE.search(str(c.get("title", ""))):
+            # документ разрешает отмену, а исход начатой по объекту операции не описан — дефект, не вопрос
+            c["severity"] = "major"
         topic = missing_hook(c, doc) if doc else None
         if topic:
             dropped.append(_drop(c, f"тема «{topic}» в документе не затрагивается"))
@@ -266,6 +329,17 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
             if n_critical > MAX_CRITICAL:
                 c["severity"] = "major"
     kept.sort(key=lambda c: SEVERITY_ORDER.get(c.get("severity"), 3))
+    minors = []
+    for c in kept:
+        if c.get("severity") != "minor":
+            continue
+        if _HOOKED_MINOR_RE.search(str(c.get("title", ""))):
+            minors.append(c)
+        else:  # вопрос «о чём документ молчит» — не замечание линзы (ложная тревога на чистых документах)
+            dropped.append(_drop(c, "вопрос предметной области без текстовой зацепки — не замечание линзы"))
+    for c in minors[MAX_MINOR:]:
+        dropped.append(_drop(c, f"сверх лимита minor линзы ({MAX_MINOR})"))
+    kept = [c for c in kept if c.get("severity") != "minor"] + minors[:MAX_MINOR]
     for c in kept[MAX_CANDIDATES:]:
         dropped.append(_drop(c, f"сверх лимита линзы ({MAX_CANDIDATES})"))
     return kept[:MAX_CANDIDATES], dropped
@@ -276,9 +350,10 @@ def run(ctx: Any) -> dict:
     from . import lens  # общий запуск линзы (№01)
 
     out = dict(lens.run(ctx, NAME))
-    reqs = getattr(ctx, "requirements", None)
-    known = [r.get("id") for r in reqs if isinstance(r, dict) and r.get("id")] if reqs else None
-    kept, dropped = postprocess(out.get("candidates", []), getattr(ctx, "view", None), known)
+    reqs = [r for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)]
+    known = [r.get("id") for r in reqs if r.get("id")] or None
+    accept = [r.get("id") for r in reqs if r.get("kind") == "acceptance" and r.get("id")]
+    kept, dropped = postprocess(out.get("candidates", []), getattr(ctx, "view", None), known, accept)
     out["candidates"] = kept
     if dropped:
         out["dropped"] = dropped
