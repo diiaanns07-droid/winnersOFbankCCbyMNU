@@ -1169,7 +1169,7 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
     return out
 
 
-CODE_QUESTION_ORIGINS = {"coverage", "state_check"}  # вопросы полноты, заданные кодом аналитика (№12)
+CODE_QUESTION_ORIGINS = {"coverage", "state_check", "period_check"}  # вопросы, заданные кодом аналитика (№12)
 
 
 def _completeness_check(c: dict) -> bool:

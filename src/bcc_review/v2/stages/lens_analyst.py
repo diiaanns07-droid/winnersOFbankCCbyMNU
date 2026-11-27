@@ -365,6 +365,59 @@ def state_probes(view: Any, requirements: Any, candidates: list[dict], *, limit:
     return out
 
 
+# ─────────────── проверка кодом: ограничение частоты за календарный период без границ периода ───────────────
+# «Не больше N … за месяц / в сутки»: по дате какого события (операции или реакции на неё) и в каком часовом поясе
+# считается период ограничения. Если в той же фразе это сказано («по дате …», «по времени …», UTC) — не срабатывает.
+_PERIOD_LIMIT = re.compile(r"(?<![а-яё])(?:максимум|не более|не больше|не чаще|не свыше|только|лишь)\s+(?:[^.;]{0,60}?\s)?"
+                           r"(?:за|в)\s+((?:календарн\w+|кажд\w+|одн\w+)\s+)?(месяц|сутки|день|недел\w+|год|час)\b", re.I)
+_PERIOD_DEFINED = re.compile(r"по\s+дат\w*|по\s+времен\w*|по\s+местн\w*|час\w*\s+пояс|\bUTC\b|\bGMT\b", re.I)
+_PERIOD_RULE = re.compile(r"(?:месяц|день|сутки|период|недел\w+)\w*\s+(?:определя\w+|счита\w+|отсчитыва\w+)\s+по\b", re.I)
+# у модели уже есть кандидат о границах периода (не просто упоминание «в месяц»)
+_PERIOD_WORDS = re.compile(r"пояс|границ|по\s+дат|по\s+времен|отсчит|какой\s+месяц|какому\s+месяцу|календарн\w*\s+месяц\w*\s+(?:огранич|считает)", re.I)
+MAX_PERIOD_PROBES = 1
+
+
+def period_probes(view: Any, requirements: Any, candidates: list[dict], *, limit: int = MAX_PERIOD_PROBES) -> list[dict]:
+    """Кандидаты кода: ограничение количества за календарный период, у которого не задано, по какому событию и
+    в каком часовом поясе считается период. Правило периода для другой величины (учёта операций) называется в
+    тексте кандидата: оно не отвечает на вопрос, если ограничение на него не ссылается."""
+    business = _req_lines(requirements, lambda r: r.get("kind") == "functional"
+                          and not _BUSINESS_SECTION_SKIP.search(str(r.get("section") or "")))
+    out: list[dict] = []
+    for n in business:
+        text = _line_text(view, n)
+        for sent in _SENT.split(text):
+            m = _PERIOD_LIMIT.search(sent)
+            if not m or _PERIOD_DEFINED.search(sent):
+                continue
+            if any(n in {e.get("line_start", e.get("line")) for e in c.get("evidence") or []}
+                   and _PERIOD_WORDS.search(str(c.get("title", ""))) for c in candidates):
+                break
+            period = (m.group(1) or "") + m.group(2)
+            other = next(((k, s.strip()) for k in business if k != n for s in _SENT.split(_line_text(view, k))
+                          if _PERIOD_RULE.search(s)), None)
+            elsewhere = (f" Правило «{other[1]}» (строка {other[0]}) задано для другой величины, и неясно, "
+                         "действует ли оно для ограничения.") if other else ""
+            out.append({
+                "title": f"Не определено, как считается период ограничения «за {period}»",
+                "kind": "ambiguity", "criterion": "unambiguous", "severity": "major", "requirement_ids": [],
+                "evidence": [{"quote": sent.strip()[:300], "line": n}],
+                "problem": f"Ограничение действует «за {period}», но не сказано, по дате какого события (операции "
+                           "или отправки реакции) и в каком часовом поясе считается период." + elsewhere,
+                "scenario": "Операция совершена в последнюю минуту периода, а реакция на неё отправлена в первую "
+                            "минуту следующего: неясно, к какому периоду относится реакция и действует ли ограничение.",
+                "impact": "На границе периода реализации и тесты дадут разное число срабатываний.",
+                "recommendation": "Указать событие и часовой пояс, по которым считается период ограничения.",
+                "rewrite": "", "question": f"По дате какого события и в каком часовом поясе считается «{period}» "
+                                           "ограничения?",
+                "blocks": "testing", "origin": "period_check",
+            })
+            break
+        if len(out) >= limit:
+            break
+    return out
+
+
 # ─────────────── несколько независимых проходов линзы (слабые модели) ───────────────
 # Flash от прохода к проходу находит разные пробелы описи (замер 27.11, 9 сохранённых ответов 3.6 Flash на
 # официальном документе: С из эталона на уровне кандидатов — один проход 18,0 / 18,2 / 16,6 на входах c1 / c2 / c3,
@@ -490,12 +543,14 @@ def run(ctx, lens_run=None) -> dict:
     out["candidates"] = postprocess(out.get("candidates") or [], mature=m["mature"])
     out["coverage"] = coverage(out.get("coverage"), limit=MAX_COVERAGE * len(outs))
     if not m["mature"]:  # вычитанный документ — только расхождения (см. `postprocess`), пробелы описи не добираем
-        probes = state_probes(view, getattr(ctx, "requirements", None), out["candidates"])
+        reqs = getattr(ctx, "requirements", None)
+        probes = state_probes(view, reqs, out["candidates"])
+        probes += period_probes(view, reqs, out["candidates"])
         gaps = coverage_gaps(out["coverage"], out["candidates"] + probes, view,
                              limit=MAX_GAPS if len(outs) == 1 else MAX_PASS_GAPS)
         out["candidates"] += probes + gaps
         out["coverage_gaps"] = len(gaps)
-        out["state_checks"] = len(probes)
+        out["code_checks"] = len(probes)
     out["passes"] = len(outs)
     out["document_maturity"] = m
     return out

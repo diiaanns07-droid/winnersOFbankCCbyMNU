@@ -235,3 +235,23 @@ def test_code_question_rejected_as_exact_sense_stays_minor_finding():
     assert kept[0]["title"] == "Определено ли состояние активной карты для доступа к функции?"
     # кандидат о размытом слове и вопрос модели (не кода) снимаются, как раньше
     assert {r["candidate_id"] for r in res["rejected"]} == {"C-002", "C-003"}
+
+
+def test_count_limit_per_period_without_boundaries_becomes_candidate():
+    doc = {38: "Ф. Период определяется по дате операции. Учитываются покупки.",
+           39: "Ф. Когда сумма доходит до значения, клиент получает сообщение. Не больше одного сообщения за календарный месяц."}
+    reqs = [{"id": f"R-{n}", "kind": "functional", "section": "Часть A › Функциональные требования",
+             "line_start": n, "line_end": n} for n in (38, 39)]
+    out = lens_analyst.period_probes(_view(doc), reqs, [])
+    assert len(out) == 1
+    c = out[0]
+    assert c["title"] == "Не определено, как считается период ограничения «за календарный месяц»"
+    assert c["evidence"] == [{"quote": "Не больше одного сообщения за календарный месяц.", "line": 39}]
+    assert "часовом поясе" in c["problem"] and "(строка 38)" in c["problem"] and c["origin"] == "period_check"
+    # граница названа в той же фразе — молчит; у модели уже есть кандидат о границе периода — молчит
+    told = {**doc, 39: "Не больше одного сообщения за календарный месяц по времени UTC+5."}
+    assert lens_analyst.period_probes(_view(told), reqs, []) == []
+    have = [{"title": "Не задан часовой пояс месяца ограничения", "evidence": [{"line": 39, "quote": "x"}]}]
+    assert lens_analyst.period_probes(_view(doc), reqs, have) == []
+    k2 = [{"title": "Противоречие ограничения в месяц и повторной реакции", "evidence": [{"line": 39, "quote": "x"}]}]
+    assert len(lens_analyst.period_probes(_view(doc), reqs, k2)) == 1   # «в месяц» в заголовке — не о границе
