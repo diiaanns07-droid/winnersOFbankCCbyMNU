@@ -128,6 +128,9 @@ class LLMClient:
         self.fatal: LLMError | None = None  # первая фатальная ошибка провайдера (ключ, настройка, квота)
         self._net_failures = 0  # сетевые сбои всех этапов: у параллельных этапов общий запас повторов
         self.responses: dict[str, list] = {}  # сырые ответы по этапам в порядке вызовов — для mock-фикстур
+        # --runs N (№22): метка прохода в конце запроса — у прохода k свой ключ кэша (повтор `--runs 3` берёт
+        # из кэша те же три прохода), модель видит тот же документ и ту же задачу
+        self.salt = ""
 
     def _record(self, stage: str, data: Any) -> None:
         with self._lock:
@@ -250,6 +253,8 @@ class LLMClient:
     def ask(self, stage: str, system: str, user: str, schema: dict, *, max_output_tokens: int = 16000,
             expand: bool = True) -> dict:
         """Один логический вызов: ответ, прошедший схему. Ошибки — ``LLMError`` / ``Truncated`` / ``BudgetExceeded``."""
+        if self.salt:
+            user = user + self.salt
         key = self._key(self.model, system, user, schema)
         cached = self._cache_get(key)
         if cached is not None and not schema_errors(cached.get("data"), schema):

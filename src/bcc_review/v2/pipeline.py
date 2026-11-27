@@ -182,6 +182,8 @@ def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = Non
                     cache_dir=cache_dir, trace=run.trace if run else None,
                     stage_timeout_s=float(opts.get("stage_timeout") or 0),
                     rpm=float(opts["rpm"]) if opts.get("rpm") is not None else DEFAULT_RPM.get(pname, 0))
+    if int(opts.get("pass_index") or 1) > 1:
+        llm.salt = f"\n\n<!-- независимый проход {int(opts['pass_index'])} -->"
     return llm, pname
 
 
@@ -1028,6 +1030,12 @@ def write_outputs(report: dict, view: dict | None, input_path: Path, out_md: Pat
         extra = report.get("extra_markdown") or []
         if extra:
             md_text = md_text.rstrip() + "\n\n" + "\n\n".join(x.strip() for x in extra if x) + "\n"
+    if report.get("stability"):
+        try:
+            from . import stability
+            md_text = md_text.rstrip() + "\n\n" + stability.markdown(report)
+        except Exception as exc:  # noqa: BLE001
+            warnings.append(f"Раздел устойчивости не записан: {type(exc).__name__}: {exc}")
     out_md.write_text(md_text, encoding="utf-8")
     written["md"] = str(out_md)
     out_json = out_md.with_suffix(".json")
@@ -1090,21 +1098,30 @@ def _unread_view(path: Path) -> dict:
     return {"title": path.name, "file": path.name or "input", "format": fmt, "sha256": sha, "lines": []}
 
 
+def _execute(p: "Pipeline", input_path: str | Path) -> dict:
+    try:
+        return p.execute()
+    except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
+        p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
+        p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
+        view = p.ctx.view if p.ctx else _unread_view(Path(input_path))
+        return {"schema": "bcc-review/2", "run": p._run_block("failed"), "document": document_summary(view),
+                "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
+                                                                 "summary": "", "fix_first": []}}
+
+
 def review(input_path: str | Path, output_md: str | Path, opts: dict | None = None, *,
            reuse: RunDir | None = None, rerun: set[str] = frozenset(),
            log: Callable[[str], None] | None = None) -> tuple[dict, dict]:
     """Полный прогон: (report, {формат: путь}). Никогда не бросает исключение из-за этапа."""
     opts = {**DEFAULTS, **(opts or {}), "output": str(output_md)}
     p = Pipeline(input_path, opts, reuse=reuse, rerun=rerun, log=log)
-    try:
-        report = p.execute()
-    except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
-        p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
-        p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
-        view = p.ctx.view if p.ctx else _unread_view(Path(input_path))
-        report = {"schema": "bcc-review/2", "run": p._run_block("failed"), "document": document_summary(view),
-                  "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
-                                                                   "summary": "", "fix_first": []}}
+    report = _execute(p, input_path)
+    n_runs = int(opts.get("runs") or 1)
+    if n_runs > 1 and not opts.get("replay") and report["run"].get("status") != "failed" \
+            and report["run"].get("provider") != "offline":
+        from . import stability
+        report = stability.repeat(report, p, input_path, opts, n_runs, log or (lambda m: None))
     view = p.ctx.view if p.ctx else None
     llm = p.ctx.llm if p.ctx else None
     for stage, items in (getattr(llm, "responses", None) or {}).items():

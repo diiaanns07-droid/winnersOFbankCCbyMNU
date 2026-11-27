@@ -142,3 +142,71 @@ def test_replay_cli_end_to_end(tmp_path):
     assert code == 0
     data = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
     assert data["run"]["replay"]["run_id"] == report["run"]["run_id"]
+
+
+# --------------------------------------------------------------------------- 2. --runs N
+
+def test_runs_three_mock_all_stable(tmp_path):
+    report, written, _ = _run(tmp_path, runs=3)
+    st = report["stability"]
+    assert st["runs_counted"] == 3 and st["threshold"] == 2
+    assert report["findings"] and all(f["stability"]["k"] == 3 for f in report["findings"])
+    assert report["findings_unstable"] == []
+    assert st["calls_total"] > report["stability"]["passes"][0]["calls"]
+    assert _verify(written) == 0
+    md = Path(written["md"]).read_text(encoding="utf-8")
+    assert "Устойчивость: независимые проходы" in md and "3 из 3" in md
+
+
+def test_runs_unstable_goes_to_appendix(tmp_path, monkeypatch):
+    """Проход 2 и 3 не находят часть дефектов первого и находят один свой — он идёт в реестр, если в 2 из 3."""
+    from bcc_review.v2.stages import judge
+    real = judge.run
+    calls = {"n": 0}
+
+    def flaky(ctx, cands):
+        calls["n"] += 1
+        out = real(ctx, cands)
+        fs = out.get("findings") or []
+        if calls["n"] > 1 and fs:
+            out["findings"] = fs[1:]  # первый дефект первого прохода больше не находится
+        return out
+    monkeypatch.setattr(judge, "run", flaky)
+    report, written, _ = _run(tmp_path, runs=3)
+    unstable = report["findings_unstable"]
+    assert len(unstable) == 1 and unstable[0]["stability"] == {"k": 1, "n": 3, "passes": [1]}
+    gone = unstable[0]["id"]
+    assert gone not in [f["id"] for f in report["findings"]]
+    for q in report.get("questions") or []:
+        assert gone not in q.get("finding_ids", [])
+    assert gone not in report["verdict"].get("fix_first", [])
+    assert _verify(written) == 0
+    assert "Неустойчивые замечания" in Path(written["md"]).read_text(encoding="utf-8")
+
+
+def test_stability_group_matches_by_lines_and_kind():
+    from bcc_review.v2 import stability
+    a = {"id": "D-01", "kind": "ambiguity", "evidence": [{"line_start": 10, "line_end": 10}], "title": "x"}
+    b = {"id": "D-07", "kind": "ambiguity", "evidence": [{"line_start": 10, "line_end": 11}], "title": "y"}
+    c = {"id": "D-02", "kind": "missing", "evidence": [{"line_start": 50}], "title": "z"}
+    cl = stability.group([[a, c], [b], [dict(c)]])
+    assert [sorted(x["hits"]) for x in cl] == [[0, 1], [0, 2]]
+    assert stability.similarity(a, c) == 0
+
+
+def test_failed_pass_not_counted():
+    from bcc_review.v2 import stability
+    f = {"id": "D-01", "kind": "k", "evidence": [{"line_start": 3}], "title": "t"}
+    base = {"run": {"status": "complete"}, "findings": [f], "requirements": [], "verdict": {}}
+    bad = {"run": {"status": "failed"}, "findings": []}
+    rep = stability.merge(base, [bad, {"run": {"status": "complete"}, "findings": [dict(f)]}], 3)
+    assert rep["stability"]["runs_counted"] == 2
+    assert rep["findings"][0]["stability"]["k"] == 2
+    assert any("не удались" in w for w in rep["run"]["warnings"])
+
+
+def test_runs_cli_rejects_with_answers(tmp_path, capsys):
+    from bcc_review.v2.__main__ import main
+    ans = tmp_path / "a.md"
+    ans.write_text("Q-01: A\n", encoding="utf-8")
+    assert main([str(OFFICIAL), str(tmp_path / "r.md"), "--runs", "2", "--answers", str(ans)]) == 2

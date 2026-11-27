@@ -116,7 +116,7 @@ def _opts(a: argparse.Namespace) -> dict:
         "consistency": not a.no_consistency, "clarify": not a.no_clarify, "quiet": a.quiet,
         "fast_start": getattr(a, "fast_start", None),
         "answers": getattr(a, "answers", None), "revise": getattr(a, "revise", False),
-        "replay": getattr(a, "replay", None),
+        "replay": getattr(a, "replay", None), "runs": getattr(a, "runs", 1) or 1,
     }
 
 
@@ -205,7 +205,17 @@ def cmd_review(argv: list[str]) -> int:
     p.add_argument("--fail-on", choices=["blocker", "partial"], help="ненулевой код выхода при блокере/неполном прогоне")
     p.add_argument("--replay", metavar="runs/<id>",
                    help="собрать отчёт заново из сохранённых ответов этапов прогона: без ключа, сети и вызовов модели")
+    p.add_argument("--runs", type=int, default=1, metavar="N",
+                   help="N независимых проходов рецензентов и судьи: у каждого дефекта устойчивость k/N; в реестр "
+                        "идут найденные не меньше чем в половине проходов, остальные — в приложение")
     a = p.parse_args(argv)
+    if a.runs < 1 or a.runs > 9:
+        print("--runs: от 1 до 9", file=sys.stderr)
+        return 2
+    if a.runs > 1 and (a.answers or a.revise or a.replay):
+        print("--runs нельзя вместе с --answers, --revise и --replay: сначала соберите отчёт с устойчивостью, "
+              "затем ответы — отдельным запуском", file=sys.stderr)
+        return 2
     if not Path(a.input).is_file():
         print(f"Файл не найден: {a.input}", file=sys.stderr)
         return 2
