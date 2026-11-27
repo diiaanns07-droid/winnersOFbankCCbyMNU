@@ -426,7 +426,8 @@ def _has_gui() -> bool:
     """Linux без графики (ssh, сервер): webbrowser запустил бы текстовый lynx/w3m прямо в этом терминале."""
     if sys.platform in ("win32", "darwin"):
         return True
-    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+    graphics = ("DISPLAY", "WAYLAND_DISPLAY")  # системные переменные, не настройки агента (.env.example)
+    return any(os.environ.get(name) for name in graphics)
 
 
 def _banner(url: str, encoding: str | None = None) -> str:
