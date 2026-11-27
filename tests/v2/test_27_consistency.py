@@ -69,6 +69,12 @@ DOC = [
     "| Authorization | Bearer, сессия клиента — держателя карты |",                                 # 46
     "* **У-13.** Выбор действует с 1-го числа следующего месяца.",                                 # 47
     "* **У-14.** Выбор применяется с 1-го числа текущего месяца.",                                 # 48
+    "5. Проверить, что карта принадлежит клиенту; если нет, вернуть 400.",                          # 49
+    "| 2. Создание | POST /codes | 404 — карта не найдена или принадлежит другому клиенту |",       # 50
+    "Повторный запрос с тем же ключом идемпотентности не создаёт второе погашение.",               # 51
+    "Ключ идемпотентности действует 30 дней (затем запрос с ним обрабатывается как новый).",        # 52
+    "* **У-15.** Код действует 15 минут с момента создания.",                                      # 53
+    "1. Код без суммы действует до конца календарного дня создания.",                              # 54
 ]
 SECTIONS = {8: "Требования к тестированию › Тестирование требований", 11: "Критерии приемки"}
 VIEW = {"lines": [{"n": i, "text": t, "page": None, "section": SECTIONS.get(i, "Требования")}
@@ -79,7 +85,8 @@ KINDS = {2: "functional", 3: "api", 4: "api", 5: "functional", 6: "data", 7: "co
          22: "functional", 23: "functional", 24: "goal", 25: "goal", 26: "ui", 27: "functional", 28: "ui",
          29: "functional", 30: "api", 31: "functional", 32: "acceptance", 33: "integration", 34: "process",
          35: "functional", 36: "integration", 37: "api", 38: "api", 39: "ui", 40: "architecture", 41: "api",
-         42: "constraint", 43: "api", 44: "api", 45: "functional", 46: "api", 47: "functional", 48: "functional"}
+         42: "constraint", 43: "api", 44: "api", 45: "functional", 46: "api", 47: "functional", 48: "functional",
+         49: "api", 50: "api", 51: "integration", 52: "constraint", 53: "functional", 54: "constraint"}
 REQS = [{"id": f"R-{n:02d}", "source_id": "", "kind": k, "line_start": n, "line_end": n,
          "section": SECTIONS.get(n, "Требования")} for n, k in KINDS.items()]
 
@@ -142,6 +149,12 @@ def one(p: dict) -> tuple[dict, list[dict]]:
     # список кодов — условие («при кодах 400, 404 и 422 …»), а не исход
     (pair(41, 42, kind="status_conflict", basis="same_condition",
           qb="если операция проведена — 200 с результатом этой операции"), "two_phase", "undefined"),
+    # «если нет, вернуть 400» — условие в предыдущей фразе
+    (pair(49, 50, kind="status_conflict", basis="same_condition", qa="если нет, вернуть 400"),
+     "condition_elsewhere", "undefined"),
+    # общее правило и его срок действия
+    (pair(51, 52, qb="действует 30 дней (затем запрос с ним обрабатывается как новый)"), "validity_period",
+     "compatible"),
 ])
 def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
     pc, cands = one(p)
@@ -162,6 +175,7 @@ def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
           qa="404 | Карта не найдена", qb="Если карта не найдена, метод возвращает 200"), "status_conflict"),
     (pair(39, 45), "event_conflict"),                                                         # 5 и 10 секунд
     (pair(47, 48), "event_conflict"),                                    # те же числа, но «следующего» ↔ «текущего»
+    (pair(53, 54), "event_conflict"),                                    # два срока действия одного кода
 ])
 def test_real_conflicts_stay_critical(p, kind):
     pc, cands = one(p)
@@ -253,7 +267,7 @@ def _repost(label: str) -> list[dict]:
     return out
 
 
-@pytest.mark.parametrize("label", ["h0", "h2", "h3"])
+@pytest.mark.parametrize("label", ["h0", "h2", "h3", "h4"])
 def test_clean_documents_give_no_critical_and_at_most_one_major(label):
     """20 чистых ТЗ (корпус, open2, №20), два прогона haiku: h0 было critical 8, major 58 (17 документов с
     major > 1); h2 (свежие ответы после правок) — проверка, что правила держатся на новых ответах."""

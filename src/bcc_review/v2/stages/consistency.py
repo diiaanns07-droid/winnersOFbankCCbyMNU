@@ -558,7 +558,7 @@ _NON_NORMATIVE_SECTION = re.compile(r"тестирование\s+требова�
 
 # Причины, по которым пара не конфликт, а совместима (разные предметы, условие права, уточнение границы приёмкой).
 GATE_DROP = ("right_condition", "storage_vs_validity", "non_normative", "acceptance_duration", "other_object",
-             "same_outcome", "different_condition")
+             "same_outcome", "different_condition", "validity_period")
 GATE_RU = {
     "right_condition": "одно место задаёт условие права, другое — запрет для другого состояния",
     "storage_vs_validity": "срок хранения записи и срок действия — разные предметы",
@@ -573,6 +573,7 @@ GATE_RU = {
     "condition_elsewhere": "условие одной цитаты стоит в предыдущей фразе (сбой, исчерпанные попытки), а не во входе другой",
     "different_condition": "коды ошибок называют разные объекты — это разные условия",
     "same_outcome": "оба места требуют одного и того же с теми же значениями, ни одно не запрещает и не ограничивает",
+    "validity_period": "одно место задаёт срок действия общего правила другого места — это уточнение",
 }
 
 
@@ -642,7 +643,7 @@ GATE_TEXT = {
 
 
 _ANAPHORA = re.compile(r"^\W*(?:после\s+чего|в\s+этом\s+случае|в\s+таком\s+случае|в\s+противном\s+случае|"
-                       r"иначе|тогда|при\s+этом)(?![а-яё])", re.I)
+                       r"иначе|тогда|при\s+этом|если\s+нет|если\s+(?:это\s+)?не\s+так|а\s+если\s+нет)(?![а-яё])", re.I)
 # Номер-ссылка на место документа («метод 3», «п. 2», «шаг 4», «строка 12») — не значение.
 _REF_NUM = re.compile(r"(?<![а-яё])(?:метод\w*|п\.|пункт\w*|шаг\w*|раздел\w*|строк\w*|част\w*|глав\w*|"
                       r"рисун\w*|таблиц\w*)\s*№?\s*\d+", re.I)
@@ -650,6 +651,11 @@ _REF_NUM = re.compile(r"(?<![а-яё])(?:метод\w*|п\.|пункт\w*|шаг
 _MOMENT_WORD = re.compile(r"^(?:следующ|текущ|предыдущ|прошл|после|через|сразу|немедлен|раньш|ранее|позж|позднее|"
                           r"начал|конц|конец|перв|последн|накануне|завтр|вчер|сегодн)", re.I)
 _MOMENT_SHORT = {"до", "с", "со", "по", "от"}
+
+
+def _moment_words(q: str) -> bool:
+    """В цитате есть слово момента или порядка («до конца дня», «после», «следующего»)."""
+    return any(w.lower() == "до" or _MOMENT_WORD.match(w) for w in _WORD.findall(q))
 
 
 def _moment_differs(qa: str, qb: str) -> bool:
@@ -762,6 +768,15 @@ def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str
     if kind == "event_conflict" and any(r.get("kind") == "ui" and not re.search(r"\d", _BARE_ID.sub("", _ITEM_NO.sub("", q)))
                                         for _ev, q, r in sides):
         return "ui_display"
+    # Общее правило и оно же со сроком действия («повтор с тем же ключом не создаёт второго» и «ключ действует
+    # 30 дней, затем запрос — как новый»): срок ограничивает общее правило, а не задаёт другой исход (шаг 2 промпта:
+    # ограничение уточняет общее правило). Конфликт — если общее правило прямо снимает срок («всегда», «бессрочно»).
+    if kind == "event_conflict" and any(
+            _DURATION.search(x) and not re.search(r"\d", _REF_NUM.sub("", _BARE_ID.sub("", _ITEM_NO.sub("", y))))
+            and not (_LIMIT_REMOVED.search(y) or _ALWAYS.search(y) or re.search(r"бессрочн", y, re.I))
+            and not (_VALID.search(y) or _moment_words(y))  # другая сторона сама задаёт срок или момент — два значения
+            for x, y in ((qa, qb), (qb, qa))):
+        return "validity_period"
     # Граница — значение у обеих сторон: без числа и без слова границы расхождение вывела модель, а не документ.
     if kind == "boundary_conflict" and not all(_BOUND.search(_ITEM_NO.sub("", q)) for q in quotes):
         return "no_value"

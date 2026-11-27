@@ -1,0 +1,722 @@
+{
+ "case": "cardblock.paraphrase.keep_authorizations",
+ "doc": "evaluation/dev/corpus/cases/cardblock.paraphrase.keep_authorizations/source.md",
+ "seconds": 47.8,
+ "error": "",
+ "warnings": [],
+ "stats": {
+  "calls": 1,
+  "cached": 0,
+  "failed": 0,
+  "split": 0,
+  "repaired": 0,
+  "retries": 0,
+  "tokens_in": 73452,
+  "tokens_out": 10280,
+  "cost_usd": 0.007649,
+  "models_used": [
+   "claude-haiku-5-5"
+  ],
+  "seconds": 47.7,
+  "by_stage": {
+   "consistency": {
+    "calls": 1,
+    "cached": 0,
+    "failed": 0,
+    "split": 0,
+    "tokens_in": 73452,
+    "tokens_out": 10280,
+    "seconds": 47.7
+   }
+  }
+ },
+ "raw": {
+  "subjects": [
+   {
+    "subject": "Диапазон срока блокировки 1–30 суток",
+    "places": [
+     "R-05",
+     "R-17",
+     "R-22"
+    ]
+   },
+   {
+    "subject": "Окончание срока блокировки и возврат в ACTIVE",
+    "places": [
+     "R-05"
+    ]
+   },
+   {
+    "subject": "Момент вступления блокировки в силу",
+    "places": [
+     "R-08",
+     "R-13"
+    ]
+   },
+   {
+    "subject": "Статус карты после блокировки",
+    "places": [
+     "R-04",
+     "R-06",
+     "R-14",
+     "R-25"
+    ]
+   },
+   {
+    "subject": "Авторизации, одобренные до блокировки",
+    "places": [
+     "R-07",
+     "R-15"
+    ]
+   },
+   {
+    "subject": "Разблокировка без ограничения числа раз",
+    "places": [
+     "R-09",
+     "R-18"
+    ]
+   }
+  ],
+  "pair_checks": [],
+  "glossary": [
+   {
+    "concept": "Статус карты",
+    "terms": [
+     {
+      "term": "Статусы карты",
+      "line": 21
+     },
+     {
+      "term": "статус карты",
+      "line": 25
+     },
+     {
+      "term": "статус",
+      "line": 33
+     }
+    ],
+    "problem": "Одно поле названо тремя способами; на реализацию не влияет, но затрудняет поиск и проверку.",
+    "severity": "minor"
+   }
+  ],
+  "trace": [
+   {
+    "requirement_id": "R-04",
+    "verified_by": [
+     "R-13"
+    ],
+    "implemented_by": [
+     "R-16",
+     "R-18"
+    ],
+    "note": "нет критерия приёмки на разблокировку"
+   },
+   {
+    "requirement_id": "R-05",
+    "verified_by": [],
+    "implemented_by": [
+     "R-17"
+    ],
+    "note": "нет критерия на окончание срока и возврат в ACTIVE"
+   },
+   {
+    "requirement_id": "R-06",
+    "verified_by": [
+     "R-14"
+    ],
+    "implemented_by": [],
+    "note": "правило процессинга не описано в части B"
+   },
+   {
+    "requirement_id": "R-07",
+    "verified_by": [
+     "R-15"
+    ],
+    "implemented_by": [],
+    "note": ""
+   },
+   {
+    "requirement_id": "R-08",
+    "verified_by": [
+     "R-13"
+    ],
+    "implemented_by": [
+     "R-16"
+    ],
+    "note": ""
+   },
+   {
+    "requirement_id": "R-09",
+    "verified_by": [],
+    "implemented_by": [
+     "R-18"
+    ],
+    "note": "нет критерия на повторную разблокировку"
+   },
+   {
+    "requirement_id": "R-10",
+    "verified_by": [],
+    "implemented_by": [],
+    "note": "нет критерия и описания push-сообщения"
+   },
+   {
+    "requirement_id": "R-11",
+    "verified_by": [],
+    "implemented_by": [
+     "R-20"
+    ],
+    "note": "инициатор изменения не описан ни в одном методе"
+   },
+   {
+    "requirement_id": "R-12",
+    "verified_by": [],
+    "implemented_by": [
+     "R-16",
+     "R-18",
+     "R-19"
+    ],
+    "note": "нет критерия приёмки на getCardStatus"
+   }
+  ],
+  "candidates": [
+   {
+    "title": "Приоритет и важность требований в документе не указаны",
+    "kind": "missing_element",
+    "criterion": "ranked",
+    "severity": "minor",
+    "requirement_ids": [
+     "R-04",
+     "R-05",
+     "R-06",
+     "R-07",
+     "R-08",
+     "R-09",
+     "R-10"
+    ],
+    "evidence": [
+     {
+      "quote": "Версия документа | 1.0 от 01.11.2026",
+      "line": 14
+     }
+    ],
+    "problem": "В таблице общих сведений нет поля приоритета; функциональные требования не ранжированы.",
+    "scenario": "",
+    "impact": "",
+    "recommendation": "Добавить в таблицу общих сведений приоритет для каждого функционального требования.",
+    "rewrite": "",
+    "question": "",
+    "blocks": "none"
+   }
+  ]
+ },
+ "requirements": [
+  {
+   "id": "R-01",
+   "source_id": "",
+   "kind": "goal",
+   "section": "Часть A. Бизнес-требования › Цели",
+   "summary": "Клиент сам временно блокирует карту в приложении, если не уверен в её сохранности.",
+   "quote": "Клиент сам временно блокирует карту в приложении, если не уверен в её сохранности.",
+   "line_start": 17,
+   "line_end": 17,
+   "page": null
+  },
+  {
+   "id": "R-02",
+   "source_id": "Термины: Авторизация",
+   "kind": "other",
+   "section": "Часть A. Бизнес-требования › Термины",
+   "summary": "Авторизация — запрос карточного процессинга на одобрение операции по карте.",
+   "quote": "Авторизация — запрос карточного процессинга на одобрение операции по карте.",
+   "line_start": 20,
+   "line_end": 20,
+   "page": null
+  },
+  {
+   "id": "R-03",
+   "source_id": "Термины: Статусы карты",
+   "kind": "other",
+   "section": "Часть A. Бизнес-требования › Термины",
+   "summary": "Статусы карты — ACTIVE (рабочий) и BLOCKED_BY_CLIENT (заблокирована клиентом).",
+   "quote": "Статусы карты — ACTIVE (рабочий) и BLOCKED_BY_CLIENT (заблокирована клиентом).",
+   "line_start": 21,
+   "line_end": 21,
+   "page": null
+  },
+  {
+   "id": "R-04",
+   "source_id": "БК-1",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "БК-1. Клиент блокирует свою карту в статусе ACTIVE и разблокирует свою карту в статусе BLO",
+   "quote": "БК-1. Клиент блокирует свою карту в статусе ACTIVE и разблокирует свою карту в статусе BLOCKED_BY_CLIENT.",
+   "line_start": 24,
+   "line_end": 24,
+   "page": null
+  },
+  {
+   "id": "R-05",
+   "source_id": "БК-2",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "БК-2. Клиент указывает срок блокировки от 1 до 30 суток включительно или выбирает бессрочн",
+   "quote": "БК-2. Клиент указывает срок блокировки от 1 до 30 суток включительно или выбирает бессрочную блокировку. По окончании срока статус карты снова ACTIVE.",
+   "line_start": 25,
+   "line_end": 25,
+   "page": null
+  },
+  {
+   "id": "R-06",
+   "source_id": "БК-3",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "БК-3. Пока карта в статусе BLOCKED_BY_CLIENT, процессинг отклоняет новые авторизации с при",
+   "quote": "БК-3. Пока карта в статусе BLOCKED_BY_CLIENT, процессинг отклоняет новые авторизации с причиной «Карта заблокирована клиентом».",
+   "line_start": 26,
+   "line_end": 26,
+   "page": null
+  },
+  {
+   "id": "R-07",
+   "source_id": "БК-4",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "БК-4. Авторизации, одобренные до блокировки, остаются в силе.",
+   "quote": "БК-4. Авторизации, одобренные до блокировки, остаются в силе.",
+   "line_start": 27,
+   "line_end": 27,
+   "page": null
+  },
+  {
+   "id": "R-08",
+   "source_id": "БК-5",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "БК-5. Блокировка вступает в силу не позднее 10 секунд после ответа 200 метода blockCard.",
+   "quote": "БК-5. Блокировка вступает в силу не позднее 10 секунд после ответа 200 метода blockCard.",
+   "line_start": 28,
+   "line_end": 28,
+   "page": null
+  },
+  {
+   "id": "R-09",
+   "source_id": "БК-6",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "БК-6. Разблокировка доступна без ограничения числа раз.",
+   "quote": "БК-6. Разблокировка доступна без ограничения числа раз.",
+   "line_start": 29,
+   "line_end": 29,
+   "page": null
+  },
+  {
+   "id": "R-10",
+   "source_id": "БК-7",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "БК-7. После блокировки клиент получает push «Карта •• NNNN заблокирована», где NNNN — посл",
+   "quote": "БК-7. После блокировки клиент получает push «Карта •• NNNN заблокирована», где NNNN — последние четыре цифры номера карты.",
+   "line_start": 30,
+   "line_end": 30,
+   "page": null
+  },
+  {
+   "id": "R-11",
+   "source_id": "",
+   "kind": "data",
+   "section": "Часть A. Бизнес-требования › Требования к данным",
+   "summary": "Хранить идентификатор карты, последние четыре цифры номера карты, статус, срок блокировки",
+   "quote": "Хранить идентификатор карты, последние четыре цифры номера карты, статус, срок блокировки в сутках, время блокировки по UTC+5 и инициатора изменения.",
+   "line_start": 33,
+   "line_end": 33,
+   "page": null
+  },
+  {
+   "id": "R-12",
+   "source_id": "",
+   "kind": "integration",
+   "section": "Часть A. Бизнес-требования › Требования к интеграции",
+   "summary": "Приложение блокирует карту методом blockCard, разблокирует методом unblockCard и читает ст",
+   "quote": "Приложение блокирует карту методом blockCard, разблокирует методом unblockCard и читает статус методом getCardStatus. Методы описаны в части B.",
+   "line_start": 36,
+   "line_end": 36,
+   "page": null
+  },
+  {
+   "id": "R-13",
+   "source_id": "Критерии приёмки, строка 1",
+   "kind": "acceptance",
+   "section": "Часть A. Бизнес-требования › Критерии приёмки",
+   "summary": "Ответ 200; авторизация через 10 секунд отклонена",
+   "quote": "Карта в статусе ACTIVE | Заблокировать карту на 30 суток | Ответ 200; авторизация через 10 секунд отклонена",
+   "line_start": 42,
+   "line_end": 42,
+   "page": null
+  },
+  {
+   "id": "R-14",
+   "source_id": "Критерии приёмки, строка 2",
+   "kind": "acceptance",
+   "section": "Часть A. Бизнес-требования › Критерии приёмки",
+   "summary": "Карта в статусе BLOCKED_BY_CLIENT | Запросить авторизацию на 1 000 ₸ | Авторизация отклоне",
+   "quote": "Карта в статусе BLOCKED_BY_CLIENT | Запросить авторизацию на 1 000 ₸ | Авторизация отклонена с причиной «Карта заблокирована клиентом»",
+   "line_start": 43,
+   "line_end": 43,
+   "page": null
+  },
+  {
+   "id": "R-15",
+   "source_id": "Критерии приёмки, строка 3",
+   "kind": "acceptance",
+   "section": "Часть A. Бизнес-требования › Критерии приёмки",
+   "summary": "Авторизация остаётся одобренной",
+   "quote": "Авторизация на 5 000 ₸ одобрена до блокировки | Заблокировать карту | Авторизация остаётся одобренной",
+   "line_start": 44,
+   "line_end": 44,
+   "page": null
+  },
+  {
+   "id": "R-16",
+   "source_id": "Метод blockCard",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод blockCard",
+   "summary": "Общие параметры: REST type, Request URL, Authorization, Content-Type",
+   "quote": "REST type | POST",
+   "line_start": 52,
+   "line_end": 55,
+   "page": null
+  },
+  {
+   "id": "R-17",
+   "source_id": "Тело запроса: days",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод blockCard › Тело запроса",
+   "summary": "days | integer | Нет | от 1 до 30 включительно; без поля — бессрочно | Срок блокировки в с",
+   "quote": "days | integer | Нет | от 1 до 30 включительно; без поля — бессрочно | Срок блокировки в сутках",
+   "line_start": 61,
+   "line_end": 61,
+   "page": null
+  },
+  {
+   "id": "R-18",
+   "source_id": "Метод unblockCard",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод unblockCard",
+   "summary": "Общие параметры: REST type, Request URL, Authorization",
+   "quote": "REST type | POST",
+   "line_start": 67,
+   "line_end": 69,
+   "page": null
+  },
+  {
+   "id": "R-19",
+   "source_id": "Метод getCardStatus",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод getCardStatus",
+   "summary": "Общие параметры: REST type, Request URL, Authorization",
+   "quote": "REST type | GET",
+   "line_start": 75,
+   "line_end": 77,
+   "page": null
+  },
+  {
+   "id": "R-20",
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод getCardStatus",
+   "summary": "Ответ 200: {\"status\":\"BLOCKED_BY_CLIENT\",\"blockedAt\":\"2026-11-01T10:15:00+05:00\",\"days\":30",
+   "quote": "Ответ 200: {\"status\":\"BLOCKED_BY_CLIENT\",\"blockedAt\":\"2026-11-01T10:15:00+05:00\",\"days\":30}. Поле blockedAt — время блокировки по UTC+5 в формате ISO",
+   "line_start": 79,
+   "line_end": 79,
+   "page": null
+  },
+  {
+   "id": "R-21",
+   "source_id": "Статус 200",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "200 | Запрос выполнен | Описано в разделе метода; для blockCard и unblockCard тело пустое",
+   "quote": "200 | Запрос выполнен | Описано в разделе метода; для blockCard и unblockCard тело пустое",
+   "line_start": 85,
+   "line_end": 85,
+   "page": null
+  },
+  {
+   "id": "R-22",
+   "source_id": "Статус 400",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "400 | Поле days вне диапазона от 1 до 30 | {\"message\":\"Проверьте срок\"}",
+   "quote": "400 | Поле days вне диапазона от 1 до 30 | {\"message\":\"Проверьте срок\"}",
+   "line_start": 86,
+   "line_end": 86,
+   "page": null
+  },
+  {
+   "id": "R-23",
+   "source_id": "Статус 401",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "401 | Нет действующей сессии | {\"message\":\"Требуется вход\"}",
+   "quote": "401 | Нет действующей сессии | {\"message\":\"Требуется вход\"}",
+   "line_start": 87,
+   "line_end": 87,
+   "page": null
+  },
+  {
+   "id": "R-24",
+   "source_id": "Статус 404",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "404 | Карта не найдена или не принадлежит клиенту | {\"message\":\"Карта не найдена\"}",
+   "quote": "404 | Карта не найдена или не принадлежит клиенту | {\"message\":\"Карта не найдена\"}",
+   "line_start": 88,
+   "line_end": 88,
+   "page": null
+  },
+  {
+   "id": "R-25",
+   "source_id": "Статус 409",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "409 | Статус карты не позволяет операцию: блокировка не из ACTIVE или разблокировка не из",
+   "quote": "409 | Статус карты не позволяет операцию: блокировка не из ACTIVE или разблокировка не из BLOCKED_BY_CLIENT | {\"message\":\"Операция недоступна\"}",
+   "line_start": 89,
+   "line_end": 89,
+   "page": null
+  },
+  {
+   "id": "R-26",
+   "source_id": "Статус 500",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "500 | Внутренняя ошибка сервиса | {\"message\":\"Ошибка сервиса\"}",
+   "quote": "500 | Внутренняя ошибка сервиса | {\"message\":\"Ошибка сервиса\"}",
+   "line_start": 90,
+   "line_end": 90,
+   "page": null
+  }
+ ],
+ "output": {
+  "candidates": [
+   {
+    "title": "Терминология не едина, глоссария нет: «Статус карты»",
+    "kind": "terminology",
+    "criterion": "conforming",
+    "severity": "minor",
+    "requirement_ids": [],
+    "evidence": [
+     {
+      "quote": "Статусы карты",
+      "line": 21,
+      "line_start": 21,
+      "line_end": 21,
+      "verified": "normalized"
+     },
+     {
+      "quote": "статус карты",
+      "line": 25,
+      "line_start": 25,
+      "line_end": 25,
+      "verified": "normalized"
+     }
+    ],
+    "problem": "Одни и те же понятия названы в разных частях документа по-разному. Статус карты: «Статусы карты» (строка 21), «статус карты» (строка 25), «статус» (строка 33).",
+    "scenario": "",
+    "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+    "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+    "rewrite": "",
+    "question": "",
+    "blocks": "none",
+    "source": "consistency",
+    "origin": "glossary",
+    "glossary_ids": [
+     "G-01"
+    ]
+   },
+   {
+    "title": "Приоритет и важность требований в документе не указаны",
+    "kind": "missing_element",
+    "criterion": "ranked",
+    "severity": "minor",
+    "requirement_ids": [
+     "R-04",
+     "R-05",
+     "R-06",
+     "R-07",
+     "R-08",
+     "R-09",
+     "R-10"
+    ],
+    "evidence": [
+     {
+      "quote": "Версия документа | 1.0 от 01.11.2026",
+      "line": 14,
+      "line_start": 14,
+      "line_end": 14,
+      "page": null,
+      "section": "Часть A. Бизнес-требования › Общие сведения",
+      "verified": "exact"
+     }
+    ],
+    "problem": "В таблице общих сведений нет поля приоритета; функциональные требования не ранжированы.",
+    "scenario": "",
+    "impact": "",
+    "recommendation": "Добавить в таблицу общих сведений приоритет для каждого функционального требования.",
+    "rewrite": "",
+    "question": "",
+    "blocks": "none",
+    "source": "consistency",
+    "origin": "model"
+   }
+  ],
+  "pair_checks": [],
+  "trace": [
+   {
+    "requirement_id": "R-04",
+    "verified_by": [
+     "R-13"
+    ],
+    "implemented_by": [
+     "R-16",
+     "R-18"
+    ],
+    "note": "нет критерия приёмки на разблокировку"
+   },
+   {
+    "requirement_id": "R-05",
+    "verified_by": [],
+    "implemented_by": [
+     "R-17"
+    ],
+    "note": "нет критерия на окончание срока и возврат в ACTIVE"
+   },
+   {
+    "requirement_id": "R-06",
+    "verified_by": [
+     "R-14"
+    ],
+    "implemented_by": [],
+    "note": "правило процессинга не описано в части B"
+   },
+   {
+    "requirement_id": "R-07",
+    "verified_by": [
+     "R-15"
+    ],
+    "implemented_by": [],
+    "note": ""
+   },
+   {
+    "requirement_id": "R-08",
+    "verified_by": [
+     "R-13"
+    ],
+    "implemented_by": [
+     "R-16"
+    ],
+    "note": ""
+   },
+   {
+    "requirement_id": "R-09",
+    "verified_by": [],
+    "implemented_by": [
+     "R-18"
+    ],
+    "note": "нет критерия на повторную разблокировку"
+   },
+   {
+    "requirement_id": "R-10",
+    "verified_by": [],
+    "implemented_by": [],
+    "note": "нет критерия и описания push-сообщения"
+   },
+   {
+    "requirement_id": "R-11",
+    "verified_by": [],
+    "implemented_by": [
+     "R-20"
+    ],
+    "note": "инициатор изменения не описан ни в одном методе"
+   },
+   {
+    "requirement_id": "R-12",
+    "verified_by": [],
+    "implemented_by": [
+     "R-16",
+     "R-18",
+     "R-19"
+    ],
+    "note": "нет критерия приёмки на getCardStatus"
+   }
+  ],
+  "glossary": [
+   {
+    "id": "G-01",
+    "concept": "Статус карты",
+    "terms": [
+     {
+      "term": "Статусы карты",
+      "line": 21
+     },
+     {
+      "term": "статус карты",
+      "line": 25
+     },
+     {
+      "term": "статус",
+      "line": 33
+     }
+    ],
+    "problem": "Одно поле названо тремя способами; на реализацию не влияет, но затрудняет поиск и проверку.",
+    "severity": "minor"
+   }
+  ],
+  "subjects": [
+   {
+    "subject": "Диапазон срока блокировки 1–30 суток",
+    "places": [
+     "R-05",
+     "R-17",
+     "R-22"
+    ]
+   },
+   {
+    "subject": "Окончание срока блокировки и возврат в ACTIVE",
+    "places": [
+     "R-05"
+    ]
+   },
+   {
+    "subject": "Момент вступления блокировки в силу",
+    "places": [
+     "R-08",
+     "R-13"
+    ]
+   },
+   {
+    "subject": "Статус карты после блокировки",
+    "places": [
+     "R-04",
+     "R-06",
+     "R-14",
+     "R-25"
+    ]
+   },
+   {
+    "subject": "Авторизации, одобренные до блокировки",
+    "places": [
+     "R-07",
+     "R-15"
+    ]
+   },
+   {
+    "subject": "Разблокировка без ограничения числа раз",
+    "places": [
+     "R-09",
+     "R-18"
+    ]
+   }
+  ]
+ }
+}
