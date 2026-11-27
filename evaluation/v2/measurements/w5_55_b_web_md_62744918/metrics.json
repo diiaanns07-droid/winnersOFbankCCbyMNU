@@ -1,0 +1,251 @@
+{
+  "source_sha": "627449186de6e9873ee7c6894350d05537f99b89",
+  "case": "b_web_md",
+  "entry": "web",
+  "input": "requirements.md",
+  "state": "done",
+  "seconds": 57.76,
+  "queue_seconds": 0.0,
+  "outputs": [
+    "csv",
+    "docx",
+    "html",
+    "json",
+    "md",
+    "pdf"
+  ],
+  "cached": 0,
+  "logical_calls_traced": 9,
+  "physical_attempts_observed": 21,
+  "unattributed_failed_calls": 0,
+  "successful_models": {
+    "gemini-3.5-flash-lite": 8,
+    "gemini-3.1-flash-lite": 1
+  },
+  "provider_errors": [
+    {
+      "model": "gemini-3.1-flash-lite",
+      "http": "400",
+      "class": "schema_rejected",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 4
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "http": "503",
+      "class": "http_503",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "400",
+      "class": "schema_rejected",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "error",
+      "class": "not_json",
+      "count": 2
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    }
+  ],
+  "stages": [
+    {
+      "stage": "consistency",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 5.4,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash",
+          "429",
+          "per_day"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_analyst",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 5.9,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash",
+          "429",
+          "per_day"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_risk",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 7.1,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash",
+          "429",
+          "per_day"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_architect",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 8.2,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 1.0
+    },
+    {
+      "stage": "lens_qa",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 8.7,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash",
+          "429",
+          "per_day"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "segment",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 20.5,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.8-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.7-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.6-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.5-flash",
+          "503",
+          "http_503"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 13.6,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 1.7,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "clarify",
+      "answered_by": "gemini-3.1-flash-lite",
+      "seconds": 31.2,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash-lite",
+          "400",
+          "schema_rejected"
+        ],
+        [
+          "gemini-3.5-flash-lite",
+          "error",
+          "not_json"
+        ],
+        [
+          "gemini-3.5-flash-lite",
+          "error",
+          "not_json"
+        ],
+        [
+          "gemini-3.1-flash-lite",
+          "400",
+          "schema_rejected"
+        ]
+      ],
+      "rpm_wait_s": 0
+    }
+  ],
+  "report_bytes": 128712,
+  "report_status": "complete",
+  "stages_with_partial_or_failed_status": [],
+  "failed_logical_calls": 0,
+  "physical_attempts_are_lower_bound": false,
+  "gold": {
+    "K": 4,
+    "K_as_critical": 3,
+    "C": 9,
+    "key25": 13,
+    "findings": 20,
+    "duplicates": 3,
+    "critical_false": 0,
+    "quotes_missing": 0,
+    "quotes_total": 46
+  },
+  "missing_major": [
+    "С5",
+    "С6",
+    "С7",
+    "С8",
+    "С9",
+    "С10",
+    "С11",
+    "С12",
+    "С15",
+    "С18",
+    "С20"
+  ],
+  "counts": {
+    "critical": 3,
+    "major": 13,
+    "minor": 4
+  },
+  "verify_exit": 0,
+  "queue_to_report_seconds": 57.76
+}
