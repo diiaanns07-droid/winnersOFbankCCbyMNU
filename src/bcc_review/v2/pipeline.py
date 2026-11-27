@@ -313,6 +313,14 @@ class Pipeline:
 
             # 3. линзы и набор — параллельно
             outs = self._parallel_reviewers(ctx)
+            # выходы, взятые из прогона с быстрым стартом (команда stage), ссылаются на таблицу эвристики
+            if any((o or {}).get("requirements_source") == HEURISTIC_TABLE for o in outs.values()):
+                try:
+                    from .stages import segment as _segment_mod
+                    heur_reqs = _segment_mod.heuristic_segment(view).get("requirements") or []
+                    self._remap_reviewers(outs, heur_reqs, ctx.requirements)
+                except Exception as exc:  # noqa: BLE001
+                    self.warnings.append(f"Ссылки рецензентов на таблицу эвристики не переведены: {exc}")
 
         # 4. сбор и сверка цитат
         cands, rejected, extras = self._collect(ctx, outs, rules_out)
