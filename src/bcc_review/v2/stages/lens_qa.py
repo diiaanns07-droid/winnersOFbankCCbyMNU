@@ -396,6 +396,39 @@ def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
     return kept, dropped
 
 
+COVERAGE_MAJOR_SHARE = 1 / 3  # приёмка проверяет меньше трети функциональных требований — набор неполон
+
+
+def coverage_share(checks: list[Mapping[str, Any]], reqs: list[Mapping[str, Any]]) -> tuple[int, int]:
+    """Сколько функциональных требований проверяет хотя бы одна строка приёмки: (проверено, всего)."""
+    functional = {r.get("id") for r in reqs if r.get("kind") == "functional" and r.get("id")}
+    covered: set[str] = set()
+    for c in checks:
+        covered |= set(c.get("rule_requirement_ids") or [])
+    return len(covered & functional), len(functional)
+
+
+def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs: list[Mapping[str, Any]]) -> None:
+    """Серьёзность замечания о покрытии приёмкой — по доле функциональных требований, которые проверяет
+    приёмка, а не по мнению модели. Меньше трети — набор критериев неполон, major (тест готовности функции
+    написать не по чему). Иначе не покрытые границы и ветки — дополнение набора, minor: модель пишет это
+    замечание на каждом документе, и на чистом тоже. Без нарезки (нет функциональных требований) — как есть.
+    """
+    done, total = coverage_share(checks, reqs)
+    if not total:
+        return
+    severity = "major" if done < COVERAGE_MAJOR_SHARE * total else "minor"
+    for c in cands:
+        if _other_rank(c) != 0 or c.get("kind") in _CONFLICT_FAMILY:
+            continue
+        if c["severity"] != severity:
+            c.setdefault("severity_hint", c["severity"])
+            c["severity"] = severity
+        fact = f"Строки приёмки проверяют {done} из {total} функциональных требований."
+        if fact not in c["problem"]:
+            c["problem"] = f"{c['problem']} {fact}".strip()
+
+
 def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None) -> dict:
     """Ответ модели → ``{"candidates", "acceptance_checks", "test_cases", "warnings"}``.
 
@@ -438,6 +471,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
     kept, dropped = limit_other_candidates(kept)
+    calibrate_coverage(kept, checks, reqs)
     if len(kept) > MAX_MODEL_CANDIDATES:
         warnings.append(f"{STAGE}: кандидатов модели {len(kept)}, оставлено {MAX_MODEL_CANDIDATES}")
         rank = {"critical": 0, "major": 1, "minor": 2}

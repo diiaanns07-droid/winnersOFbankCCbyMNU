@@ -227,6 +227,31 @@ def test_other_candidates_limited_conflicts_kept():
     assert only["candidates"] == [] and [d["title"] for d in only["dropped"]] == ["Неоднозначность"]
 
 
+def test_coverage_severity_from_share_of_checked_requirements():
+    """Покрытие приёмкой: major, если строки приёмки проверяют меньше трети функциональных требований, иначе minor."""
+    cover = {"requirement_ids": ["R-03"], "evidence": [{"quote": "x", "line": 30}], "title": "Покрытие",
+             "problem": "Не покрыты границы.", "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "",
+             "question": "", "blocks": "testing", "severity": "major", "kind": "missing_element",
+             "criterion": "set_validatable"}
+    half = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match")], "candidates": [cover]}, REQS)
+    c = half["candidates"][0]
+    assert c["severity"] == "minor" and c["severity_hint"] == "major"
+    assert c["problem"].endswith("Строки приёмки проверяют 1 из 2 функциональных требований.")
+    none = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match", rule_requirement_ids=[])],
+                                "candidates": [dict(cover, severity="minor")]}, REQS)
+    assert none["candidates"][0]["severity"] == "major"
+    # без нарезки доли не посчитать — серьёзность модели
+    assert lens_qa.postprocess({"candidates": [cover]})["candidates"][0]["severity"] == "major"
+
+
+@pytest.mark.parametrize("model", ["sonnet", "haiku"])
+def test_official_coverage_stays_major(model):
+    """Официальный документ: 3 строки приёмки на 11 функциональных требований — набор неполон, major."""
+    out = lens_qa.postprocess(_json(QA / f"official.{model}.json"), _segment("official"))
+    cover = [c for c in out["candidates"] if c["kind"] == "missing_element" and c["criterion"] == "set_validatable"]
+    assert len(cover) == 1 and cover[0]["severity"] == "major"
+
+
 # ---------------------------------------------------------------- тест-кейсы
 
 def test_test_cases_numbered_capped_and_undefined_marked():
@@ -284,6 +309,9 @@ def test_clean_bases_have_no_conflicts(case):
     assert all(c["verdict"] == "match" for c in out["acceptance_checks"])
     assert not lens_qa.missing_rows(out["acceptance_checks"], reqs)
     assert all(c["severity"] != "critical" for c in out["candidates"])
+    # приёмка проверяет половину правил и больше — непокрытые ветки на чистом документе только minor
+    assert all(c["severity"] == "minor" for c in out["candidates"]
+               if c["kind"] == "missing_element" and c["criterion"] == "set_validatable")
 
 
 @pytest.mark.parametrize("case,line", [("autopay.range_boundary.trigger_at_threshold", 46),
