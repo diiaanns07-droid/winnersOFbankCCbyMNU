@@ -57,7 +57,8 @@ class _Parser(HTMLParser):
 
     def _flush(self) -> None:
         cur, self._cur = self._cur, None
-        if cur is None:
+        drop, self._drop = getattr(self, "_drop", False), False
+        if cur is None or drop:
             return
         raw = "".join(cur["parts"])
         if cur["kind"] == "code":
@@ -92,6 +93,13 @@ class _Parser(HTMLParser):
             return
         if tag not in _VOID and _service(attrs):
             self._flush()
+            self._attr_skip = [tag, 1]
+            return
+        if tag == "a" and _comment_anchor(attrs):
+            # Google Docs: ссылка на комментарий «[a]» в тексте — пропускаем; сам комментарий внизу страницы
+            # (абзац с якорем id="cmnt1") — не текст требований, абзац выбрасывается
+            if _comment_anchor(attrs) == "body":
+                self._drop = True
             self._attr_skip = [tag, 1]
             return
         if tag in _SKIP:
@@ -221,6 +229,20 @@ class _Parser(HTMLParser):
         super().close()
         self._end_row()
         self._flush()
+
+
+_CMNT_REF = re.compile(r"^#?cmnt\d+$")
+_CMNT_BODY = re.compile(r"^cmnt\d+$")
+
+
+def _comment_anchor(attrs) -> str:
+    """Якорь комментария Google Docs: «ref» — ссылка «[a]» в тексте, «body» — сам комментарий, иначе пусто."""
+    a = {k.lower(): (v or "") for k, v in attrs}
+    if _CMNT_BODY.match(a.get("id", "")) and a.get("href", "").startswith("#cmnt_ref"):
+        return "body"
+    if a.get("id", "").startswith("cmnt_ref") and _CMNT_REF.match(a.get("href", "")):
+        return "ref"
+    return ""
 
 
 def _service(attrs) -> bool:
