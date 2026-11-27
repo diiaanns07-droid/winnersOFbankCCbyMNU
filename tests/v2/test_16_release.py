@@ -259,6 +259,37 @@ def test_git_commit_script_resolves_head(tmp_path):
     assert mod.resolve(tmp_path / "нет") == ""
 
 
+# --------------------------------------------------------------------------- скрипты
+
+
+def test_powershell_scripts_have_utf8_bom():
+    """Windows PowerShell 5.1 читает .ps1 без BOM как ANSI: байт 0x94 из «—» становится кавычкой ” и рвёт строку."""
+    scripts = sorted((ROOT / "scripts").glob("*.ps1"))
+    assert scripts, "нет скриптов PowerShell"
+    for path in scripts:
+        data = path.read_bytes()
+        assert data.startswith(b"\xef\xbb\xbf"), f"{path.name}: сохраните в UTF-8 с BOM"
+        data[3:].decode("utf-8")
+
+
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="bash-скрипты — для Linux и macOS")
+def test_shell_scripts_parse_and_are_executable():
+    for path in sorted((ROOT / "scripts").glob("*.sh")):
+        r = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True, encoding="utf-8")
+        assert r.returncode == 0, f"{path.name}: {r.stderr}"
+        mode = subprocess.run(["git", "ls-files", "-s", str(path.relative_to(ROOT))], cwd=ROOT,
+                              capture_output=True, text=True).stdout.split(" ", 1)[0]
+        if mode:  # файл уже в git
+            assert mode == "100755", f"{path.name}: git update-index --chmod=+x {path.relative_to(ROOT)}"
+
+
+def test_readme_mentions_one_command_scripts():
+    readme = _read(README)
+    for name in ("scripts/run_official.sh", "scripts\\run_official.ps1"):
+        assert name in readme, name
+        assert (ROOT / name.replace("\\", "/")).is_file(), name
+
+
 # --------------------------------------------------------------------------- секреты в репозитории
 
 

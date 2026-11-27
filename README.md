@@ -105,6 +105,19 @@ python -m bcc_review release/input/requirements.md reports/my/requirements.md
 python -m bcc_review verify reports/my/requirements.json release/input/requirements.md
 ```
 
+**Всё одной командой.** Скрипт сам создаёт `.venv`, ставит зависимости, создаёт `.env` из шаблона, если его нет,
+проверяет настройку, запускает агента на официальном документе и `verify`; отчёт — в `reports/my/`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_official.ps1                  # Windows
+powershell -ExecutionPolicy Bypass -File scripts\run_official.ps1 -Provider gemini -Doc release\input\requirements.pdf
+```
+
+```bash
+scripts/run_official.sh                                   # macOS и Linux
+DOC=release/input/requirements.pdf scripts/run_official.sh gemini
+```
+
 **Без ключа** агент тоже запускается: `--provider offline` — предварительная проверка только детерминированными
 правилами (без модели, за секунды: контракт API, единицы измерения, заглушки, размытые слова); отчёт честно
 помечен как проверка без модели, смысл требований и противоречия в нём не оцениваются. `--provider mock` прогоняет
@@ -209,6 +222,9 @@ python -m bcc_review stage ЭТАП --doc ВХОД --from runs/<id прогон�
 | `--lenses СПИСОК` | какие ревьюеры работают: `analyst,qa,architect,risk` |
 | `--no-consistency`, `--no-clarify` | без проверки набора целиком / без вопросов владельцу (быстрее, но беднее отчёт) |
 | `--max-calls N`, `--max-seconds N`, `--timeout N` | бюджет обращений к модели (по умолчанию 16), времени прогона и одного обращения, с |
+| `--stage-timeout N` | предел времени одного этапа, с (по умолчанию 480; 0 — без предела): медленная модель не растянет прогон |
+| `--rpm N` | не больше N запросов к модели в минуту (для Gemini по умолчанию 10 — укладывается в бесплатный уровень; 0 — без паузы) |
+| `--effort low\|medium\|high\|xhigh\|max` | глубина рассуждений модели для `claude_cli` |
 | `--no-cache`, `--cache-dir КАТАЛОГ` | не брать ответы модели из кэша `.bcc_cache/` / другой каталог кэша |
 | `--runs-dir КАТАЛОГ`, `--run-id ИМЯ` | где хранить журнал прогона (по умолчанию `runs/`) и как назвать его каталог |
 | `--fail-on blocker\|partial` | ненулевой код выхода, если есть блокер или прогон неполный (для CI) |
