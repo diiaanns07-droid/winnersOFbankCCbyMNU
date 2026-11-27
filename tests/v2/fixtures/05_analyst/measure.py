@@ -111,7 +111,7 @@ def rubric(cands: list[dict]) -> dict:
     """Проверяемая кодом часть рубрики понятности: заголовок ≤ 12 слов, проблема ≤ 2 предложений, в сценарии
     есть числа, есть исправление (rewrite) или вопрос с вариантами, нет внутренних кодов и общих фраз."""
     fails = {"заголовок > 12 слов": 0, "проблема > 2 предложений": 0, "сценарий без чисел": 0,
-             "нет исправления": 0, "внутренние коды": 0, "общие фразы": 0, "многоточие в правке": 0}
+             "нет исправления": 0, "внутренние коды": 0, "общие фразы": 0, "многоточие в правке": 0, "латиница в заголовке": 0}
     ok, ex = 0, []
     for c in cands:
         bad = []
@@ -125,6 +125,9 @@ def rubric(cands: list[dict]) -> dict:
             bad.append("нет исправления")
         text = " ".join(str(c.get(k, "")) for k in ("title", "problem", "scenario", "impact", "recommendation",
                                                      "rewrite", "question"))
+        t = str(c.get("title", ""))
+        if len(re.findall(r"[A-Za-z]", t)) > len(re.findall(r"[А-Яа-яЁё]", t)):
+            bad.append("латиница в заголовке")
         if _CODES.search(text):
             bad.append("внутренние коды")
         if _GENERIC.search(text):

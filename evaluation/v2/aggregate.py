@@ -147,6 +147,33 @@ def write_models_section(results: Path | None = None) -> None:
         results.write_text(text, encoding="utf-8")
 
 
+def write_stability_section(results: Path | None = None) -> None:
+    """Все сводки `stability/*.json` (новые сверху) → RESULTS.md между метками stability."""
+    import re
+
+    results = results or Path(__file__).resolve().parent / "RESULTS.md"
+    text = results.read_text(encoding="utf-8")
+    st, en = "<!-- stability:start -->", "<!-- stability:end -->"
+    if st not in text or en not in text:
+        return
+    ds = sorted((json.loads(p.read_text(encoding="utf-8")) for p in STABILITY_DIR.glob("*.json")),
+                key=lambda d: d.get("at", ""), reverse=True)
+    L = ["| Прогоны | n | К1–К5 во всех | К критичными по прогонам | С по прогонам | С во всех | Замечаний | Мин | $ за прогон |",
+         "| :--- | ---: | :--- | :--- | :--- | ---: | :--- | :--- | ---: |"]
+    for d in ds:
+        runs = d["runs"]
+        cost = [r["cost_usd"] for r in runs if r.get("cost_usd") is not None]
+        L.append(f"| {d['label']} ({d['at'][11:16]}) | {d['n']} | {len(d['K_all_runs'])}/5 | "
+                 f"{', '.join(str(len(r['K_as_critical'])) for r in runs)} | {', '.join(str(len(r['C'])) for r in runs)} | "
+                 f"{len(d['C_all_runs'])}/20 | {d['findings']['min']}–{d['findings']['max']} | "
+                 f"{d['duration_s']['min'] / 60:.1f}–{d['duration_s']['max'] / 60:.1f} | "
+                 f"{'—' if not cost else f'{sum(cost) / len(cost):.2f}'} |")
+    body = "\n".join(L) + "\n\n" + "\n".join(
+        f"<details><summary>{d['label']}: по пунктам</summary>\n\n{d.get('markdown', '')}\n</details>\n" for d in ds)
+    text = re.sub(re.escape(st) + r".*?" + re.escape(en), lambda m: f"{st}\n{body}{en}", text, flags=re.S)
+    results.write_text(text, encoding="utf-8")
+
+
 def _pct(x) -> str:
     return "—" if x is None else f"{100 * x:.0f} %"
 
@@ -180,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     if js:
         Path(js).parent.mkdir(parents=True, exist_ok=True)
         Path(js).write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_stability_section()
     print(text)
     return 0
 
