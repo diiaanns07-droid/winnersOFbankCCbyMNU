@@ -13,6 +13,7 @@
 * ``drop`` — сервер закрывает соединение, не ответив; ``slow`` — ответ через ``delay`` с (тайм-аут клиента);
 * ``truncated_json`` — finishReason STOP, но JSON оборван; ``empty`` — кандидат без текста;
 * ``no_candidates`` — пустой список кандидатов; ``max_tokens`` — finishReason MAX_TOKENS;
+* ``403_proxy`` — 403 от прокси сети (HTML, не JSON Google); ``407`` — прокси требует пароль;
 * ``safety`` — promptFeedback.blockReason=SAFETY; ``finish_safety`` — finishReason SAFETY.
 
 Задержка ответа ``latency`` (с, на каждый успешный ответ, можно по этапам) — для замера времени прогона.
@@ -50,6 +51,9 @@ def _markers() -> list[tuple[str, str]]:
                 out.append((ln, stem))
                 break
     return out
+
+
+PROXY_PAGE = "<html><body><h1>Access denied</h1>Blocked by network policy</body></html>"
 
 
 def _error(code: int, status: str, message: str, details: list | None = None) -> dict:
@@ -106,10 +110,12 @@ class FakeGemini:
             data = empty_for(dict(schema)) if schema else {}
         return data
 
-    def _fault(self, stage: str, model: str) -> dict | None:
+    def _fault(self, stage: str, model: str, kinds: tuple = ()) -> dict | None:
         with self.lock:
             for f in self.faults:
                 if f.get("stage") not in (None, stage) or f.get("model") not in (None, model):
+                    continue
+                if kinds and f.get("kind") not in kinds:
                     continue
                 if f["used"] < int(f.get("times", 1)):
                     f["used"] += 1
@@ -166,6 +172,8 @@ class FakeGemini:
         if kind in simple:
             code, status, msg = simple[kind]
             return code, {}, _error(code, status, msg), kind
+        if kind in ("403_proxy", "407"):
+            return int(kind[:3]), {}, PROXY_PAGE, kind
         if kind == "401":
             return 400, {}, _error(400, "INVALID_ARGUMENT", "API key not valid. Please pass a valid API key.", [
                 {"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": "API_KEY_INVALID"}]), kind
@@ -210,10 +218,11 @@ class FakeGemini:
             def log_message(self, *a: Any) -> None:  # тишина в консоли тестов
                 pass
 
-            def _send(self, code: int, headers: dict, data: dict) -> None:
-                raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            def _send(self, code: int, headers: dict, data: dict | str) -> None:
+                html = isinstance(data, str)
+                raw = (data if html else json.dumps(data, ensure_ascii=False)).encode("utf-8")
                 self.send_response(code)
-                self.send_header("Content-Type", "application/json; charset=UTF-8")
+                self.send_header("Content-Type", "text/html" if html else "application/json; charset=UTF-8")
                 self.send_header("Content-Length", str(len(raw)))
                 for k, v in headers.items():
                     self.send_header(k, v)
@@ -222,6 +231,28 @@ class FakeGemini:
 
             def do_GET(self) -> None:
                 if "/models" in self.path:
+                    # models.list (doctor): ключ, обрыв и задержка действуют и здесь; правило с stage=None — тоже
+                    f = fake._fault("models_list", "", kinds=("401", "403", "403_proxy", "407", "drop", "slow"))
+                    kind = (f or {}).get("kind")
+                    with fake.lock:
+                        fake.log.append({"t": time.monotonic(), "model": "", "stage": "models_list",
+                                         "kind": kind or "ok", "schema_mode": ""})
+                    if kind == "drop":
+                        self.close_connection = True
+                        self.connection.shutdown(2)
+                        return
+                    if kind == "slow":
+                        time.sleep(float(f.get("delay", 30)))
+                    if kind == "401":
+                        self._send(400, {}, _error(400, "INVALID_ARGUMENT", "API key not valid.", [
+                            {"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": "API_KEY_INVALID"}]))
+                        return
+                    if kind in ("403_proxy", "407"):
+                        self._send(int(kind[:3]), {}, PROXY_PAGE)
+                        return
+                    if kind == "403":
+                        self._send(403, {}, _error(403, "PERMISSION_DENIED", "Permission denied."))
+                        return
                     self._send(200, {}, fake.models_list())
                 else:
                     self._send(404, {}, _error(404, "NOT_FOUND", "not found"))
