@@ -315,3 +315,25 @@ def test_quote_matches_word_broken_in_narrow_cell():
     m = Q.verify_quote(v, "daysLeft | integer", 5)
     assert m and m["line_start"] == 5 and m["verified"] == "normalized" and m["text"] == "daysLeft | integ er"
     assert Q.verify_quote(v, "reminderEnabled | boolean")["line_start"] == 6
+
+
+@pytest.mark.parametrize("ext", ["docx", "pdf"])
+def test_table_of_contents_removed_and_tight_spacing(ext):
+    """Оглавление («1. Общие сведения ……… 2») убирается с предупреждением; в PDF нет лишних пробелов между
+    фрагментами без зазора («ВК -1», «приложении .»)."""
+    pytest.importorskip("docx" if ext == "docx" else "pymupdf")
+    v = dv.load(S / f"toc.{ext}")
+    t = _texts(v)
+    assert t == ["Выпуск виртуальной карты", "1. Общие сведения", "Клиент выпускает виртуальную карту в приложении.",
+                 "2. Цели", "Карта доступна для оплаты сразу после выпуска.", "3. Функциональные требования",
+                 "ВК-1. Выпуск бесплатный.", "4. Критерии приёмки", "Карта выпущена за 10 секунд."]
+    assert any("Оглавление убрано из текста (5 строк)" in w for w in v["warnings"])
+    assert [ln["n"] for ln in v["lines"]] == list(range(1, 10))
+
+
+def test_toc_detector_does_not_eat_normal_lines():
+    lines = [{"n": i + 1, "text": t, "kind": k} for i, (t, k) in enumerate([
+        ("Статусы", "heading"), ("Статусы 200", "paragraph"), ("Ответ 200 при успехе.", "paragraph"),
+        ("Лимит", "heading"), ("Лимит 5", "paragraph")])]
+    out, n = dv.drop_toc(lines)
+    assert n == 0 and out == lines

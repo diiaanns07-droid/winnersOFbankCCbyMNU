@@ -7,6 +7,8 @@
 * ``docx_merged.docx`` — Word: колонтитулы, автонумерация (List Number), таблица с объединёнными ячейками
   по горизонтали и вертикали, маркированный список;
 * ``docx_tracked.docx`` — Word с непринятыми исправлениями (вставка и удаление);
+* ``toc.docx`` + ``toc.pdf`` — оглавление с точками и номерами страниц; в PDF из LibreOffice «-1.» и точки —
+  отдельные фрагменты без зазора;
 * ``word_export.docx`` + ``word_export.pdf`` — PDF «из Word» (LibreOffice): колонтитулы на каждой странице
   с номером страницы, переносы слов (мягкие переносы), 3+ страницы, таблица;
 * ``two_columns.pdf`` — PDF в две колонки (reportlab), 2 страницы;
@@ -90,6 +92,29 @@ def make_docx_tracked(path: Path) -> None:
         el.append(r)
         p._p.append(el)
     p.add_run(" тенге в сутки.")
+    d.save(path)
+
+
+def make_docx_toc(path: Path) -> None:
+    """Word с оглавлением (табуляция с точками и номером страницы) перед разделами; PDF из него — через LibreOffice
+    со шрифтом по умолчанию (подстановка Calibri даёт отдельные фрагменты для «-1.» и точек)."""
+    import docx
+    from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
+    from docx.shared import Pt
+    d = docx.Document()
+    d.add_heading("Выпуск виртуальной карты", level=1)
+    d.add_paragraph("Содержание").runs[0].bold = True
+    for t, pg in (("1. Общие сведения", 2), ("2. Цели", 2), ("3. Функциональные требования", 3),
+                  ("4. Критерии приёмки", 4)):
+        p = d.add_paragraph()
+        p.paragraph_format.tab_stops.add_tab_stop(Pt(450), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+        p.add_run(f"{t}\t{pg}")
+    for head, body in (("1. Общие сведения", "Клиент выпускает виртуальную карту в приложении."),
+                       ("2. Цели", "Карта доступна для оплаты сразу после выпуска."),
+                       ("3. Функциональные требования", "ВК-1. Выпуск бесплатный."),
+                       ("4. Критерии приёмки", "Карта выпущена за 10 секунд.")):
+        d.add_heading(head, level=2)
+        d.add_paragraph(body)
     d.save(path)
 
 
@@ -462,6 +487,13 @@ CONFLUENCE = """<!DOCTYPE html>
 def main() -> int:
     make_docx_merged(HERE / "docx_merged.docx")
     make_docx_tracked(HERE / "docx_tracked.docx")
+    make_docx_toc(HERE / "toc.docx")
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(HERE / "toc.docx")],
+                           check=True, capture_output=True, timeout=180)
+            shutil.copy(Path(tmp) / "toc.pdf", HERE / "toc.pdf")
     make_word_export(HERE / "word_export.docx", HERE / "word_export.pdf")
     make_two_columns(HERE / "two_columns.pdf")
     make_scan(HERE / "scan_page.pdf")

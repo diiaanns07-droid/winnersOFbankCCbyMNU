@@ -358,7 +358,8 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
         page = loc.get("page")
         page = int(page) if isinstance(page, int) or (isinstance(page, str) and page.isdigit()) else None
         sec = _section(b)
-        parts = str(b.get("text") or "").splitlines() or [""]
+        text = _tight_text(b) if sizes else str(b.get("text") or "")
+        parts = text.splitlines() or [""]
         label = _list_label(b)
         for i, part in enumerate(parts):
             t = part
@@ -370,7 +371,81 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                         "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
                         "level": _level(b) if b.get("kind") == "heading" else 0,
                         "heading": b.get("kind") == "heading"})
+    out, toc = drop_toc(out)
+    if toc:
+        warnings.append(f"Оглавление убрано из текста ({toc} строк): оно повторяет заголовки разделов.")
     return out
+
+
+_TOC_ENTRY = re.compile(r"^(?P<title>.*?\S)(?:\s*(?:\.{2,}|…+|_{3,}|·{3,}))?\s*(?P<page>\d{1,4})\s*$")
+_TOC_TITLES = {"содержание", "оглавление", "contents", "table of contents", "содержание документа"}
+
+
+def drop_toc(lines: list[dict]) -> tuple[list[dict], int]:
+    """Оглавление: подряд ≥ 2 строки «заголовок … номер страницы», где заголовок совпадает с заголовком раздела
+    документа, и строка «Содержание»/«Оглавление» перед ними. Убираются, номера строк пересчитываются."""
+    heads = {_toc_key(ln["text"]) for ln in lines if ln.get("kind") == "heading" and ln["text"].strip()}
+    if not heads:
+        return lines, 0
+
+    def entry(ln: dict) -> bool:
+        if ln.get("kind") == "heading":
+            return False
+        m = _TOC_ENTRY.match(ln["text"])
+        return bool(m) and _toc_key(m.group("title")) in heads
+    drop: set[int] = set()
+    i = 0
+    while i < len(lines):
+        if entry(lines[i]):
+            j = i
+            while j < len(lines) and (entry(lines[j]) or not lines[j]["text"].strip()):
+                j += 1
+            run = [k for k in range(i, j) if lines[k]["text"].strip()]
+            if len(run) >= 2:
+                drop.update(range(i, j))
+                k = i - 1
+                while k >= 0 and not lines[k]["text"].strip():
+                    k -= 1
+                if k >= 0 and lines[k]["text"].strip().casefold().rstrip(":") in _TOC_TITLES:
+                    drop.add(k)
+            i = max(j, i + 1)
+        else:
+            i += 1
+    if not drop:
+        return lines, 0
+    kept = [dict(ln) for k, ln in enumerate(lines) if k not in drop]
+    for n, ln in enumerate(kept, 1):
+        ln["n"] = n
+    return kept, sum(1 for k in drop if lines[k]["text"].strip())
+
+
+def _toc_key(text: str) -> str:
+    t = re.sub(r"\s+", " ", text.casefold().replace("ё", "е")).strip(" .:")
+    return t
+
+
+def _tight_text(b: dict) -> str:
+    """Текст блока PDF без лишних пробелов: читатель ставит пробел между соседними фрагментами строки, даже если
+    зазора между ними нет («ВК -1», «приложении .»). Пробел убирается, если зазор < 8 % высоты строки."""
+    text = str(b.get("text") or "")
+    frags = sorted((f for f in (b.get("loc") or {}).get("fragments") or []
+                    if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and f.get("rect")),
+                   key=lambda f: f["start"])
+    cut: list[int] = []
+    for f1, f2 in zip(frags, frags[1:]):
+        if f1.get("line") != f2.get("line") or text[f1["end"]:f2["start"]] != " ":
+            continue
+        h = max(f1["rect"][3] - f1["rect"][1], 1.0)
+        if f2["rect"][0] - f1["rect"][2] < 0.08 * h:
+            cut.append(f1["end"])
+    if not cut:
+        return text
+    out, prev = [], 0
+    for pos in cut:
+        out.append(text[prev:pos])
+        prev = pos + 1
+    out.append(text[prev:])
+    return "".join(out)
 
 
 def _list_label(b: dict) -> str:
