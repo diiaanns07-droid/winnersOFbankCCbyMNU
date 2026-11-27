@@ -282,3 +282,23 @@ def test_validity_period_is_not_effective_date() -> None:
         (sec, "Ф-2. Выбранная категория кэшбэка действует сразу после сохранения."),
     ]))
     assert [c for c in out["candidates"] if "event_effective" in c["source"]]
+
+
+@pytest.mark.parametrize("name", ["wave3b_phone_clean.md", "wave3b_holiday_clean.md"])
+def test_more_new_clean_documents(name: str) -> None:
+    from bcc_review.v2 import docview
+    from bcc_review.v2.stages import segment
+    view = docview.load(STYLES / name)
+    for seg in (None, segment.heuristic_segment(view)):
+        out = rules.run(view, seg)
+        assert out["candidates"] == [], [(c["source"], c["title"]) for c in out["candidates"]]
+        assert _defect_signals(out) == [], [(s["rule"], s["line"]) for s in _defect_signals(out)]
+
+
+def test_several_in_condition_is_not_vague() -> None:
+    sec = "Часть A › Функциональные требования"
+    out = rules.run(_view([
+        (sec, "Ф-1. Если номер привязан к нескольким картам получателя, деньги зачисляются на основную карту."),
+        (sec, "Ф-2. Перевод можно повторить несколькими способами, описанными в инструкции."),
+    ]))
+    assert [s["line"] for s in _sig(out, "language.indefinite")] == [2]

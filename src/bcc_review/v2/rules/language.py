@@ -50,6 +50,7 @@ NUMBER = re.compile(r"\d")
 # «X считается Y в момент Z», «отказ считается оформленным в момент, когда …» — определение момента событием, а не
 # размытый срок; «узнать в момент покупки» (обещание реакции без допуска) остаётся сигналом
 DEFINES_MOMENT = re.compile(r"\b(?:счита\w+|признаё\w+|признае\w+|определя\w+|фиксиру\w+)\b", re.I)
+CONDITION = re.compile(r"(?:^|[\s,(])(?:если|когда|при)\s", re.I)
 # раздел целей: «Снизить число обращений» — бизнес-цель, а не проверяемое требование
 GOAL_SECTION = re.compile(r"(?:^|›\s*)(?:\d+[.)]?\s*)?(?:цел[иья]\b|бизнес-цел|goals?\b|objectives?\b)", re.I)
 
@@ -150,6 +151,10 @@ def run(doc: Doc, out: dict, requirements: list[dict] | None = None, excluded: l
                 word = text[m.start():m.end()].strip()
                 if cat == "comparison" and (NUMBER.search(text) or GOAL_SECTION.search(x.section or "")):
                     continue
+                if cat == "indefinite" and m.group(0).lower().startswith("нескольк"):
+                    c0 = max(masked.rfind(";", 0, m.start()), masked.rfind(".", 0, m.start())) + 1
+                    if CONDITION.search(masked[c0:m.start()]):
+                        continue  # «если номер привязан к нескольким картам» — «больше одной», а не размытое число
                 if cat == "vague_time" and "момент" in m.group(0).lower():
                     c0 = max(masked.rfind(";", 0, m.start()), masked.rfind(".", 0, m.start())) + 1
                     if DEFINES_MOMENT.search(masked[c0:m.start()]):
