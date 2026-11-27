@@ -292,9 +292,10 @@ def test_no_quote_candidates_rejected_before_model():
 
 
 def test_critical_cap_and_priorities():
-    cs = [cand(f"C-{i:03d}", 30 + i * 3, f"q{i}", kind="contradiction", criterion="set_consistent",
-               reqs=(f"R-{i:02d}",), extra=[(100 + i, f"p{i}")]) for i in range(1, 11)]
-    view = {"lines": [{"n": 30 + i * 3, "text": f"q{i}"} for i in range(1, 11)]}
+    # цитаты двух мест об одном предмете (общее слово «лимит»): волна 3 проверяет это кодом
+    cs = [cand(f"C-{i:03d}", 30 + i * 3, f"лимит {i} в правиле", kind="contradiction", criterion="set_consistent",
+               reqs=(f"R-{i:02d}",), severity="critical", extra=[(100 + i, f"лимит {i} в приёмке")]) for i in range(1, 11)]
+    view = {"lines": [{"n": 30 + i * 3, "text": f"лимит {i} в правиле"} for i in range(1, 11)]}
     fs = [finding(f"F{i:02d}", [f"C-{i:03d}"], severity="critical", kind="contradiction",
                   criterion="set_consistent", priority=i if i <= 3 else 0, scenario="Вход: два исхода.",
                   impact="Две реализации.") for i in range(1, 11)]
@@ -397,7 +398,8 @@ def test_texts_fall_back_to_base_candidate():
     res = judge.run(Ctx(FakeLLM(response([f]))), cs)
     d = res["findings"][0]
     assert d["title"] == "Заголовок кандидата"
-    assert d["recommendation"] == "Исправить C-001." and d["scenario"] == "Вход X даёт два исхода."
+    assert d["recommendation"].startswith("Исправить") and d["scenario"] == "Вход X даёт два исхода."
+    assert "C-001" not in d["recommendation"]   # внутренний код кандидата читателю не показываем
 
 
 def test_compute_verdict_rule():
@@ -446,6 +448,7 @@ def test_prompt_has_no_official_document_words():
 
 def test_severity_check_only_lowers_and_rewrites_summary():
     cs = [cand("C-001", 39, "максимум один такой push", kind="contradiction", criterion="set_consistent",
+               severity="critical",
                extra=[(40, "следующее достижение вызывает push")]),
           cand("C-002", 21, "сообщение оператора связи", kind="missing_element", criterion="set_complete"),
           cand("C-003", 46, "в течение минуты", kind="unverifiable", criterion="verifiable"),
@@ -477,6 +480,7 @@ def test_severity_check_only_lowers_and_rewrites_summary():
 
 def test_severity_check_failure_keeps_judge_levels():
     cs = [cand("C-001", 39, "максимум один такой push", kind="contradiction", criterion="set_consistent",
+               severity="critical",
                extra=[(40, "следующее достижение вызывает push")])]
     fs = [finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
                   scenario="Вход: два исхода.", impact="Две реализации.", priority=1)]
@@ -525,7 +529,7 @@ def test_missing_element_critical_needs_two_reviewers():
     assert sev["C-001"] == "critical" and sev["C-003"] == "major"
     assert any("один ревьюер" in w for w in res["warnings"])
     # мало источников в прогоне (например, повторная проверка №11) — правило не действует
-    res2 = judge.run(Ctx(FakeLLM(response([fs[1]]))), [cs[2]])
+    res2 = judge.run(Ctx(FakeLLM(response([fs[1]]))), [{**cs[2], "severity": "critical"}])
     assert res2["findings"][0]["severity"] == "critical"
 
 
@@ -601,13 +605,14 @@ def test_single_reviewer_critical_is_major_unless_structured():
     cs = [cand("C-001", 39, "максимум один", kind="contradiction", criterion="set_consistent", source="lens:qa",
                extra=[(40, "независимо от истории")]),
           cand("C-002", 121, "вернуть ERROR", kind="status_conflict", criterion="set_consistent",
-               source="consistency", origin="pair_check", extra=[(163, "400")]),
+               source="consistency", origin="pair_check", extra=[(163, "400")], severity="critical"),
           cand("C-003", 23, "в момент", kind="ambiguity", source="lens:risk", extra=[(38, "проведённые")]),
           cand("C-004", 46, "в течение минуты", kind="unverifiable", source="rules:x")]
     fs = [finding(f"F0{i}", [f"C-00{i}"], severity="critical", kind=k, criterion=c, scenario="s", impact="i",
                   priority=i)
           for i, k, c in ((1, "contradiction", "set_consistent"), (2, "status_conflict", "set_consistent"),
                           (3, "ambiguity", "unambiguous"))]
+    fs[1]["title"] = "Ответ на ошибку: ERROR в ответе 200 против кода 400"  # предмет обеих цитат
     res = judge.run(Ctx(FakeLLM(response(fs + [finding("F04", ["C-004"])]))), cs)
     sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
     assert sev["C-001"] == "major" and sev["C-003"] == "major"        # один ревьюер
@@ -620,7 +625,8 @@ def test_conflict_critical_with_odd_criterion_keeps_level():
           cand("C-002", 39, "максимум один такой", kind="contradiction", criterion="conforming", source="lens:analyst",
                extra=[(40, "следующее достижение")])]
     f = finding("F01", ["C-001", "C-002"], severity="critical", kind="contradiction", criterion="conforming",
-                scenario="Вход: два исхода.", impact="Две реализации.", priority=1)
+                scenario="Вход: два исхода.", impact="Две реализации.", priority=1,
+                title="Максимум один раз против «независимо от истории»")
     res = judge.run(Ctx(FakeLLM(response([f]))), cs)
     d = res["findings"][0]
     assert d["severity"] == "critical" and d["criterion"] == "set_consistent"
@@ -639,9 +645,75 @@ def test_major_spec_placeholder_stays_separate():
     assert titles == ["Адрес вызова в бою не указан", "Не заполнены поля и разделы шаблона документа"]
 
 
+# --- третья волна: понятность текстов реестра ---------------------------------------------------
+
+
+def test_internal_requirement_ids_become_document_ids():
+    names = judge._req_names([{"id": "R-06", "source_id": "Ф-2"}, {"id": "R-14", "source_id": "Критерии приемки, строка 2"},
+                              {"id": "R-20", "source_id": ""}])
+    t = judge._doc_ids("По R-06 (Ф-2) январь, по R-14 (Критерии приемки, строка 2) — февраль; см. R-06 и R-20.", names)
+    assert t == "По Ф-2 январь, по «Критерии приемки, строка 2» — февраль; см. Ф-2 и R-20."
+
+
+def test_long_title_is_cut_at_colon_only_when_head_is_meaningful():
+    long = "Перечень кодов успеха и ошибок открыт и неполон: «и далее», 201 без описания, 404 под заголовком 403"
+    assert judge._short_title(long, []) == "Перечень кодов успеха и ошибок открыт и неполон"
+    keep = "Не определён исход, когда расходы уже не ниже порога при включении или смене порога"
+    assert judge._short_title(keep, []) == keep            # первая часть не называет проблему — не режем
+    assert judge._nwords("Поле result отсутствует в ответах 400, 401, 403, 500") == 5
+
+
+def test_merged_finding_takes_scenario_and_fix_from_other_member():
+    cs = [cand("C-001", 39, "максимум один такой push за календарный месяц", scenario="", kind="contradiction"),
+          cand("C-002", 40, "следующее достижение вызывает push независимо от истории", kind="contradiction",
+               scenario="Push 10.03, смена порога 12.03, достижение 15.03: Ф-3 — нет, Ф-4 — да.")]
+    cs[1]["rewrite"] = "Ф-4. … лимит push за месяц сохраняется."
+    f = finding("F01", ["C-001", "C-002"], kind="contradiction")
+    res = judge.run(Ctx(FakeLLM(response([f]))), cs)
+    d = res["findings"][0]
+    assert "15.03" in d["scenario"] and d["rewrite"].startswith("Ф-4")
+
+
+def test_same_kind_minors_become_one_per_document():
+    cs = [cand(f"C-00{i}", ln, q, kind="terminology", severity="minor", criterion="set_comprehensible")
+          for i, (ln, q) in enumerate([(26, "Сервис настроек"), (43, "Сервис push"), (130, "Хранилище настроек")], 1)]
+    fs = [finding(f"F0{i}", [c["id"]], kind="terminology", criterion="set_comprehensible", severity="minor",
+                  blocks="none") for i, c in enumerate(cs, 1)]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    assert len(res["findings"]) == 1
+    d = res["findings"][0]
+    assert d["severity"] == "minor" and set(d["candidate_ids"]) == {"C-001", "C-002", "C-003"}
+    assert "строка 26" in d["problem"] and (d["rewrite"] or d["question"])
+
+
+def test_no_priorities_and_no_ids_are_one_minor():
+    cs = [cand("C-001", 36, "Функциональные требования", kind="other", criterion="ranked", severity="minor",
+               title="У требований нет приоритетов"),
+          cand("C-002", 46, "передаётся на отправку", kind="other", criterion="conforming", severity="major",
+               title="У НФТ и данных нет ID")]
+    fs = [finding("F01", ["C-001"], kind="other", criterion="ranked", severity="minor", title="У требований нет приоритетов"),
+          finding("F02", ["C-002"], kind="other", criterion="conforming", severity="major", title="У НФТ и данных нет ID")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    assert len(res["findings"]) == 1 and res["findings"][0]["severity"] == "minor"
+
+
+def test_clarity_rubric_flags_codes_latin_and_missing_fix():
+    good = {"title": "Критерий приёмки №2 относит покупку к другому месяцу", "severity": "critical",
+            "kind": "event_conflict", "evidence": [{"line_start": 64, "quote": "q"}],
+            "problem": "Ф-2 относит покупку 31 января к январю, а критерий приёмки №2 — к февралю.",
+            "scenario": "Покупка 4 000 ₸ 31.01 в 23:58: по Ф-2 — январь, по критерию — февраль.",
+            "impact": "Реализация по правилу не пройдёт приёмку, тестировщик и разработчик разойдутся.",
+            "recommendation": "Выбрать один исход.", "rewrite": "", "question": "Какой месяц верен: январь или февраль?"}
+    assert judge.clarity_issues(good) == []
+    bad = dict(good, problem=good["problem"] + " См. C-010 от lens:qa.", question="", impact="",
+               title="Проблема with the implementation")
+    issues = " ".join(judge.clarity_issues(bad))
+    assert "внутренний код" in issues and "латиница" in issues and "исправление" in issues and "последствие" in issues
+
 def test_critical_confirmed_by_other_reviewer_in_neighbour_finding():
     """Судья разложил одну первопричину на два дефекта: подтверждение второго ревьюера по тем же строкам считается."""
-    cs = [cand("C-001", 23, "в момент покупки", kind="ambiguity", source="lens:risk", extra=[(38, "проведённые")]),
+    cs = [cand("C-001", 23, "в момент покупки", kind="ambiguity", source="lens:risk", extra=[(38, "проведённые")],
+               severity="critical"),
           cand("C-002", 23, "в момент", kind="contradiction", source="consistency", extra=[(38, "проведённые покупки")]),
           cand("C-003", 46, "в течение минуты", kind="unverifiable", source="lens:qa"),
           cand("C-004", 90, "другое место", kind="ambiguity", source="lens:analyst", extra=[(91, "ещё")])]
@@ -655,3 +727,68 @@ def test_critical_confirmed_by_other_reviewer_in_neighbour_finding():
     sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
     assert sev["C-001"] == "critical"     # те же строки 23 и 38 цитирует набор
     assert sev["C-004"] == "major"        # никто больше эти места не цитирует
+
+
+# ---------------------------------------------------------------- №10-Б: перенос правок судьи
+
+def test_critical_needs_support_from_reviewers():
+    """Подъём major → critical без опоры — major: никто не предложил critical, нет строки приёмки, < 3 ревьюеров."""
+    sup = judge._critical_support
+    one = [cand("C-1", 10, "x", source="lens:qa")]
+    two = one + [cand("C-2", 10, "x", source="lens:risk")]
+    three = two + [cand("C-3", 10, "x", source="consistency")]
+    assert not sup(one, run_has_critical=True) and not sup(one, run_has_critical=False)  # один — никогда
+    assert not sup(two, run_has_critical=True)
+    assert sup(two, run_has_critical=False)           # страховка: в прогоне никто не предлагал critical
+    assert sup(three, run_has_critical=True)
+    assert sup([cand("C-1", 10, "x", severity="critical")], run_has_critical=True)
+    assert sup([cand("C-1", 10, "x", origin="acceptance_check")], run_has_critical=True)
+
+
+def test_judge_raise_to_critical_without_support_is_major():
+    cs = [cand("C-001", 39, "максимум один такой push", kind="contradiction", criterion="set_consistent",
+               extra=[(40, "следующее достижение вызывает push")], source="lens:qa"),
+          cand("C-002", 46, "в течение минуты", kind="unverifiable", source="lens:risk", severity="critical")]
+    fs = [finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
+                  scenario="Вход: два исхода.", impact="Две реализации.", priority=1),
+          finding("F02", ["C-002"], kind="unverifiable", criterion="verifiable")]
+    res = judge.run(Ctx(FakeLLM(response(fs)), options={"judge_check": False, "judge_critical_support": True}), cs)
+    sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert sev["C-001"] == "major"
+    assert any("без опоры" in w for w in res["warnings"])
+
+
+def test_confirm_majors_strict_neighbour_and_reviewer_stages(tmp_path):
+    st = tmp_path / "stages"
+    st.mkdir()
+    for name in ("lens_analyst", "lens_qa", "lens_risk", "consistency", "segment"):
+        (st / f"{name}.json").write_text(json.dumps({"status": "ok", "output": {"candidates": []}}), "utf-8")
+    (st / "lens_architect.json").write_text(json.dumps({"status": "failed"}), "utf-8")
+    ctx = Ctx(FakeLLM(None))
+    ctx.run_dir = tmp_path
+    assert judge.reviewer_stages(ctx) == 4
+    # два источника в кандидатах, но четыре отработавших рецензента — правило действует
+    cs = [cand("C-001", 30, "a", source="lens:qa", extra=[(31, "b")]),
+          cand("C-002", 30, "a", kind="terminology", source="lens:risk", extra=[(31, "b")]),
+          cand("C-003", 60, "c", source="lens:risk", extra=[(61, "d")])]
+    fs = [finding("F01", ["C-001"]), finding("F02", ["C-002"], kind="terminology", criterion="unambiguous"),
+          finding("F03", ["C-003"])]
+    ctx.llm = FakeLLM(response(fs, summary=""))
+    res = judge.run(ctx, cs)
+    sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert sev["C-001"] == "minor"     # соседний кандидат другого вида не подтверждает
+    assert sev["C-003"] == "minor"
+
+
+def test_latin_terms_in_final_texts():
+    ru = judge._ru_levels
+    assert ru("Приоритет Must у Ф-2, Won't у Ф-3") == "Приоритет обязательно у Ф-2, не будет у Ф-3"
+    assert ru("до 100 rps") == "до 100 запросов в секунду"
+    assert ru("Sequence Diagram не совпадает с текстом.") == "Диаграмма последовательности не совпадает с текстом."
+    assert ru("на диаграмме Sequence шаг 3") == "на диаграмме последовательности шаг 3"
+    assert "Sequence" in ru("в разделе Sequence Diagram")  # падеж не ломаем
+
+
+def test_summary_minors_have_owner_question():
+    for spec in (judge._NO_IDS, judge._NONSINGULAR, judge._DUPLICATES, judge._PLACEHOLDERS):
+        assert spec["question"].endswith("?")
