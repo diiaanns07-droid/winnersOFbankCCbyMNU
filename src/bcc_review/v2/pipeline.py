@@ -299,7 +299,9 @@ class Pipeline:
                                     "выносится — проверьте, тот ли файл передан.")
             self.ctx = Context(view=view, llm=None, options={**opts, "input": str(self.input)},
                                run_dir=self.run.path, trace=self.run.trace)
-            return self._offline(view)
+            report = self._offline(view)
+            report.setdefault("run", {})["empty_input"] = True  # код выхода ≠ 0: плохой вход (__main__._exit_code)
+            return report
         try:
             llm, self.provider_name = make_llm(opts, self.run, self.input)
         except Exception as exc:  # noqa: BLE001 — нет ключа / не тот провайдер: отчёт правилами + объяснение
@@ -950,7 +952,11 @@ def write_outputs(report: dict, view: dict | None, input_path: Path, out_md: Pat
     md_text = ""
     try:
         from .render import markdown
-        md_text = markdown.render(report)
+        try:
+            # пути из командной строки — чтобы команды проверки и повтора в паспорте выполнялись как есть (№33)
+            md_text = markdown.render(report, out_path=out_md, doc_path=input_path)
+        except TypeError:  # рендер без doc_path: прежний паспорт
+            md_text = markdown.render(report)
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"Отчёт Markdown собран упрощённо: {type(exc).__name__}: {exc}")
         md_text = fallback_markdown(report)
