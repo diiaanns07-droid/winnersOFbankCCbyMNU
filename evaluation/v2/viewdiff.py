@@ -369,6 +369,35 @@ def rules_line(s: dict) -> str:
     return line + "."
 
 
+_RULES_CACHE: dict[tuple[str, tuple[str, ...]], dict] = {}
+
+
+def rules_check(a: str, b: str) -> dict:
+    """Правила без модели на двух коммитах: чистые документы оценки (сумма и где лучше/хуже) и официальный (что
+    находят по эталону). Результат по коммиту кэшируется на время процесса (`final` сверяет несколько голов)."""
+    docs = tuple(clean_docs())
+    out = {}
+    for sha in (a, b):
+        key = (sha, docs)
+        if key not in _RULES_CACHE:
+            _RULES_CACHE[key] = {"clean": rules_at(sha, list(docs)), "official": official_rules_recall(sha)}
+        out[sha] = _RULES_CACHE[key]
+    ra, rb = out[a]["clean"], out[b]["clean"]
+    return {"a": ra, "b": rb, **rules_summary(ra, rb), "official": [out[a]["official"], out[b]["official"]]}
+
+
+def official_rules_line(rs: dict) -> str:
+    oa, ob = rs.get("official") or [{}, {}]
+    if "error" in oa or "error" in ob or not oa or not ob:
+        return ""
+    lost = [x for x in oa["K"] + oa["C"] if x not in ob["K"] + ob["C"]]
+    new = [x for x in ob["K"] + ob["C"] if x not in oa["K"] + oa["C"]]
+    return (f"На официальном правила без модели находят: {', '.join(oa['K'] + oa['C']) or '—'} → "
+            f"{', '.join(ob['K'] + ob['C']) or '—'} (замечаний {oa['findings']} → {ob['findings']})"
+            + (f"; **потеряны: {', '.join(lost)}**" if lost else "; ничего не потеряно")
+            + (f"; новые: {', '.join(new)}" if new else "") + ".")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.viewdiff", description=__doc__.split("\n\n")[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -382,10 +411,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     res = check(a.a, a.b, a.docs, a.all_formats)
     if a.rules:
-        docs = clean_docs()
-        ra, rb = rules_at(res["a"], docs), rules_at(res["b"], docs)
-        res["rules"] = {"a": ra, "b": rb, **rules_summary(ra, rb),
-                        "official": [official_rules_recall(res["a"]), official_rules_recall(res["b"])]}
+        res["rules"] = rules_check(res["a"], res["b"])
     if a.json:
         Path(a.json).parent.mkdir(parents=True, exist_ok=True)
         Path(a.json).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -393,14 +419,9 @@ def main(argv: list[str] | None = None) -> int:
     if res.get("rules"):
         rs = res["rules"]
         sys.stdout.write("\n" + rules_line(rs) + "\n")
-        oa, ob = rs.get("official") or [{}, {}]
-        if "error" not in oa and "error" not in ob:
-            lost = [x for x in oa["K"] + oa["C"] if x not in ob["K"] + ob["C"]]
-            new = [x for x in ob["K"] + ob["C"] if x not in oa["K"] + oa["C"]]
-            sys.stdout.write(f"На официальном правила без модели находят: {', '.join(oa['K'] + oa['C']) or '—'} → "
-                             f"{', '.join(ob['K'] + ob['C']) or '—'} (замечаний {oa['findings']} → {ob['findings']})"
-                             + (f"; **потеряны: {', '.join(lost)}**" if lost else "; ничего не потеряно")
-                             + (f"; новые: {', '.join(new)}" if new else "") + ".\n")
+        line = official_rules_line(rs)
+        if line:
+            sys.stdout.write(line + "\n")
         for d in sorted(set(rs["a"]) | set(rs["b"])):
             x, y = rs["a"].get(d) or {}, rs["b"].get(d) or {}
             if (x.get("critical"), x.get("major")) != (y.get("critical"), y.get("major")):

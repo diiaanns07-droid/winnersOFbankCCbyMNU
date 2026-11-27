@@ -215,9 +215,16 @@ def view_line(sha: str, nsha: str) -> str:
         res = viewdiff.check(sha, nsha)
     except Exception as exc:  # noqa: BLE001 — сверка вида не роняет итог релиза
         return f"Вход модели не сверен (`viewdiff {sha} {nsha}`): {str(exc).splitlines()[0][:200]}"
-    return (f"Вход модели (`python -m evaluation.v2.viewdiff {sha} {nsha}`): {viewdiff.summary_line(res)}"
+    line = (f"Вход модели (`python -m evaluation.v2.viewdiff {sha} {nsha}`): {viewdiff.summary_line(res)}"
             + (" — модель получает тот же вход, разница в цифрах — разброс выборки ответов."
                if viewdiff.same_input(res) else "."))
+    if any(str(x).startswith("rules/") for x in res.get("stage_code_changed") or []):
+        try:  # правила менялись — что они дают без модели на чистых и на официальном (детерминированно, ~15 с)
+            rs = viewdiff.rules_check(res["a"], res["b"])
+            line += " " + viewdiff.rules_line(rs) + (" " + viewdiff.official_rules_line(rs)).rstrip()
+        except Exception as exc:  # noqa: BLE001 — сверка правил не роняет итог релиза
+            line += f" Правила без модели не сверены: {str(exc).splitlines()[0][:160]}."
+    return line
 
 
 def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newer: list[str] | None = None,
