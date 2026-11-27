@@ -1665,6 +1665,63 @@ def _split_places(drafts: list[dict], by_id: dict[str, dict], ctx: Any, warnings
     return out
 
 
+def _split_own_question(drafts: list[dict], by_id: dict[str, dict], ctx: Any, warnings: list[str]) -> list[dict]:
+    """Замечание не «покрывает» кандидата, если у них разные цитаты и разный вопрос владельцу: склеивать можно
+    только замечания об одной и той же норме. Кандидат ревьюера-модели уровня major или critical со своим
+    вопросом, чьи строки цитат не пересекаются ни с одним другим кандидатом склейки, а заголовок называет другой
+    предмет (< 2 общих опорных слов с каждым), возвращается отдельным дефектом не выше major. Не трогаются
+    critical-дефекты (там законно сливаются следствия одного пропуска) и склейки, где выделять пришлось бы всех."""
+    out: list[dict] = []
+    for d in drafts:
+        f = d["raw"]
+        members = [by_id[x] for x in d["ids"]]
+        if len(members) < 2 or _s(f.get("severity")) == "critical":
+            out.append(d)
+            continue
+        base_id = _s(f.get("base"))
+        apart = []
+        for m in members:
+            src = _s(m.get("source"))
+            if (not src or src.startswith("rules:") or not _s(m.get("question"))
+                    or _s(m.get("severity")) not in ("major", "critical") or _s(m.get("kind")) in NEVER_CRITICAL_KINDS):
+                continue
+            others = [o for o in members if o is not m and o not in apart]
+            ls = set(_lines_of(m))
+            if not ls or any(ls & set(_lines_of(o)) for o in others):
+                continue
+            q = _subject_tokens(m.get("question"))
+            t = _subject_tokens(m.get("title"))
+            if any(len(t & _subject_tokens(o.get("title"))) >= 2 or len(q & _subject_tokens(o.get("question"))) >= 2
+                   for o in others):
+                continue
+            apart.append(m)
+        if not apart or len(apart) >= len(members):
+            out.append(d)
+            continue
+        apart_ids = {m["id"] for m in apart}
+        raw = dict(f)
+        apart_lines = {n for m in apart for n in _lines_of(m)}
+        apart_q = {t for m in apart for t in _subject_tokens(m.get("question"))}
+        if (base_id in apart_ids or len(_subject_tokens(f.get("question")) & apart_q) >= 2
+                or any(_mentions_lines(_s(f.get(k)), apart_lines) for k in ("title", "problem", "scenario"))):
+            # тексты судьи написаны о выделенном кандидате — у остатка тексты своих кандидатов
+            for k in ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question"):
+                raw[k] = ""
+        if _s(raw.get("base")) in apart_ids:
+            raw.pop("base", None)
+        out.append({"key": d["key"], "raw": raw, "ids": [x for x in d["ids"] if x not in apart_ids]})
+        for n, m in enumerate(apart, 1):
+            key = f"{d['key']}#q{n}"
+            out.append({"key": key, "ids": [m["id"]], "raw": {
+                "key": key, "candidate_ids": [m["id"]], "base": m["id"],
+                "kind": _s(m.get("kind")), "criterion": _s(m.get("criterion")), "severity": "major",
+                "blocks": _s(m.get("blocks")) or "none", "wish": False, "priority": 0, "requirement_ids": [],
+                "title": "", "problem": "", "scenario": ""}})
+            _warn(ctx, warnings, f"судья: из {_cut(_s(f.get('title')) or m.get('title'), 60)!r} выделен отдельный "
+                                 f"дефект {_cut(m.get('title'), 60)!r} — своя цитата и свой вопрос владельцу")
+    return out
+
+
 _STRAY_KINDS = MISSING_KINDS | {"api_contract"}
 
 
@@ -1783,6 +1840,11 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     # 3а. склейка разных мест правки — разные дефекты
     if _option(ctx, "judge_split_places", True):
         drafts = _split_places(drafts, by_id, ctx, warnings)
+        for d in drafts:
+            for cid in d["ids"]:
+                placed[cid] = d["key"]
+    if _option(ctx, "judge_split_own_question", True):
+        drafts = _split_own_question(drafts, by_id, ctx, warnings)
         for d in drafts:
             for cid in d["ids"]:
                 placed[cid] = d["key"]
