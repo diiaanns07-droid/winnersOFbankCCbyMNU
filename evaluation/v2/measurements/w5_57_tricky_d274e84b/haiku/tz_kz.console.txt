@@ -1,0 +1,18 @@
+Документ: evaluation/v2/measurements/w5_57_tricky_d274e84b/input/tz_kz.md
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  segment: готово за 11 с, вызовов 1
+  lens_analyst: готово за 26 с, вызовов 1, кандидатов 1
+  lens_risk: готово за 36 с, вызовов 1
+  lens_architect: готово за 42 с, вызовов 1, кандидатов 4
+  consistency: готово за 59 с, вызовов 1, кандидатов 7
+  lens_qa: готово за 71 с, вызовов 1, кандидатов 3
+  rules: запуск
+  rules: готово за 0 с, вызовов 0
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 15
+  judge: запуск

@@ -1,0 +1,91 @@
+{
+  "stage": "segment",
+  "status": "ok",
+  "seconds": 6.92,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "lines": 19
+  },
+  "output": {
+    "requirements": [
+      {
+        "id": "R-01",
+        "source_id": "",
+        "kind": "other",
+        "section": "1. Roles",
+        "summary": "Роли участников: клиент и оператор",
+        "quote": "Customer, operator.",
+        "line_start": 5,
+        "line_end": 5,
+        "page": null
+      },
+      {
+        "id": "R-02",
+        "source_id": "FR-1",
+        "kind": "functional",
+        "section": "2. Requirements",
+        "summary": "Push-уведомление клиенту после списания",
+        "quote": "FR-1. The system shall send a push notification to the customer within 5 seconds of a debit.",
+        "line_start": 9,
+        "line_end": 9,
+        "page": null
+      },
+      {
+        "id": "R-03",
+        "source_id": "FR-2",
+        "kind": "functional",
+        "section": "2. Requirements",
+        "summary": "Оператор видит статус доставки уведомления",
+        "quote": "FR-2. The operator shall see the delivery status: sent, delivered, failed.",
+        "line_start": 11,
+        "line_end": 11,
+        "page": null
+      },
+      {
+        "id": "R-04",
+        "source_id": "FR-3",
+        "kind": "functional",
+        "section": "2. Requirements",
+        "summary": "Повторные попытки при сбое отправки уведомления",
+        "quote": "FR-3. On failure the system retries up to 3 times every minute.",
+        "line_start": 13,
+        "line_end": 13,
+        "page": null
+      },
+      {
+        "id": "R-05",
+        "source_id": "FR-4",
+        "kind": "functional",
+        "section": "2. Requirements",
+        "summary": "Клиент может отключить уведомления в настройках",
+        "quote": "FR-4. The customer may disable notifications in profile settings.",
+        "line_start": 15,
+        "line_end": 15,
+        "page": null
+      },
+      {
+        "id": "R-06",
+        "source_id": "",
+        "kind": "api",
+        "section": "3. Interfaces",
+        "summary": "Метод POST /notify принимает данные для уведомления",
+        "quote": "API POST /notify accepts client_id, amount, currency.",
+        "line_start": 19,
+        "line_end": 19,
+        "page": null
+      }
+    ],
+    "excluded": [],
+    "coverage": {
+      "lines": 19,
+      "uncovered_after_model": [],
+      "auto_excluded": 0,
+      "followup_calls": 0,
+      "auto_added": 0,
+      "uncovered": [],
+      "mode": "llm"
+    }
+  },
+  "warnings": []
+}

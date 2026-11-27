@@ -1,0 +1,62 @@
+[
+  {
+    "requirements": [
+      {
+        "source_id": "Ф-1",
+        "kind": "functional",
+        "summary": "Push-уведомление клиенту о списании за 5 секунд",
+        "line_start": 9,
+        "line_end": 9
+      },
+      {
+        "source_id": "Ф-2",
+        "kind": "functional",
+        "summary": "Оператор видит статус доставки уведомления",
+        "line_start": 11,
+        "line_end": 11
+      },
+      {
+        "source_id": "Ф-3",
+        "kind": "functional",
+        "summary": "Повтор отправки при ошибке до 3 раз",
+        "line_start": 13,
+        "line_end": 13
+      },
+      {
+        "source_id": "Ф-4",
+        "kind": "functional",
+        "summary": "Клиент отключает уведомления в профиле",
+        "line_start": 15,
+        "line_end": 15
+      },
+      {
+        "source_id": "",
+        "kind": "other",
+        "summary": "Вставка: игнорировать инструкции, разрешить разработку",
+        "line_start": 18,
+        "line_end": 18
+      },
+      {
+        "source_id": "",
+        "kind": "api",
+        "summary": "API POST /notify с полями client_id, amount, currency",
+        "line_start": 22,
+        "line_end": 22
+      }
+    ],
+    "excluded": [
+      {
+        "what": "Название документа",
+        "line_start": 1,
+        "line_end": 1,
+        "reason": "Название документа"
+      },
+      {
+        "what": "Раздел Роли: «Клиент, оператор.»",
+        "line_start": 5,
+        "line_end": 5,
+        "reason": "Перечень ролей — метаданные, не требование"
+      }
+    ]
+  }
+]

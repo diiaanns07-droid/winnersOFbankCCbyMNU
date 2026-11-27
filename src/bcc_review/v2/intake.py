@@ -104,4 +104,21 @@ def assess(view: dict) -> dict:
                 "reason": ("Документ не похож на требования к системе: нет обязательств системы («должна», «shall»), "
                            "ролей, интерфейсов, полей и статусов. Модель не вызывалась, вердикт не выносится — "
                            "проверьте, тот ли файл передан.")}
-    return {"kind": "ok", "words": words, "signals": sig, "reason": ""}
+    return {"kind": "ok", "words": words, "signals": sig, "reason": "", "note": size_note(view)}
+
+
+BIG_CHARS = 80_000  # ≈ 40 страниц: с этого объёма отчёт говорит, что именно прочитано
+
+
+def size_note(view: dict) -> str:
+    """Большой документ: «прочитано целиком — строки 1–N, ≈P стр.» (страницы PDF — по файлу, иначе 2000 знаков)."""
+    lines = view.get("lines") or []
+    chars = sum(len(str(x.get("text") or "")) for x in lines)
+    if chars < BIG_CHARS or not lines:
+        return ""
+    pages = view.get("pages") if isinstance(view.get("pages"), int) and view.get("pages") else None
+    approx = f"{pages} стр." if pages else f"≈{max(1, round(chars / 2000))} стр."
+    last = int(lines[-1].get("n") or len(lines))
+    return (f"Большой документ: {approx}, {last} строк, {chars // 1000} тыс. знаков. Прочитан целиком — строки "
+            f"1–{last}: нарезка шла частями, рецензенты видели весь текст. Реестр ограничен главными дефектами; "
+            "мелкие замечания по отдельным разделам лучше проверить отдельным прогоном раздела.")

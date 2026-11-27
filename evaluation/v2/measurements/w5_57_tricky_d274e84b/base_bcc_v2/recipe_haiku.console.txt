@@ -1,0 +1,18 @@
+Документ: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/w5_57_tricky_d274e84b/input/recipe.md
+  segment: запуск
+  segment: готово за 8 с, вызовов 1
+  rules: запуск
+  rules: готово за 0 с, вызовов 0
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  lens_risk: готово за 4 с, вызовов 1
+  lens_architect: готово за 8 с, вызовов 2
+  lens_analyst: готово за 10 с, вызовов 1, кандидатов 1
+  consistency: готово за 19 с, вызовов 1, кандидатов 2
+  lens_qa: готово за 23 с, вызовов 1, кандидатов 1
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 4
+  judge: запуск

@@ -306,6 +306,9 @@ class Pipeline:
             report.setdefault("run", {})["empty_input"] = True  # код выхода ≠ 0: плохой вход (__main__._exit_code)
             return report
         gate = _intake(view)
+        if gate.get("note"):
+            self.log(gate["note"])
+            self.warnings.append(gate["note"])
         if gate.get("kind") in ("not_requirements", "too_short"):
             # не ТЗ (рецепт, новость, договор аренды, резюме) или одна строка: модель не зовём — на таком входе она
             # выдумывает дефекты и ставит «нельзя»; вердикт не выносится, код выхода 2 (как у пустого документа)

@@ -1,0 +1,158 @@
+{
+  "stage": "lens_analyst",
+  "status": "ok",
+  "seconds": 32.7,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 6
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Отключение уведомлений не согласовано с обязательной отправкой push",
+        "kind": "contradiction",
+        "criterion": "unambiguous",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-02",
+          "R-05"
+        ],
+        "evidence": [
+          {
+            "line": 9,
+            "quote": "The system shall send a push notification to the customer within 5 seconds of a debit."
+          },
+          {
+            "line": 15,
+            "quote": "The customer may disable notifications in profile settings."
+          }
+        ],
+        "problem": "FR-1 безусловно обязывает отправлять push после каждого списания, а FR-4 позволяет клиенту отключить уведомления, но не говорит, что отключение делает с отправкой FR-1. Также не задано начальное состояние настройки.",
+        "scenario": "Клиент отключил уведомления в профиле, затем с его счёта списано 5 000 единиц валюты. По толкованию A (FR-1 важнее) push отправляется в течение 5 секунд, вопреки отключению. По толкованию B (отключение отменяет отправку) push не отправляется, и оператор видит статус без попытки доставки.",
+        "impact": "Разработчик и тестировщик получат разные ожидаемые результаты для одного и того же списания, а клиент может получить уведомление, которое отключил, или не получить обязательное.",
+        "recommendation": "Указать, отключает ли настройка push-уведомление после списания, и задать начальное значение настройки.",
+        "rewrite": "FR-4. Клиент может отключить push-уведомления о списаниях в настройках профиля; по умолчанию уведомления <уточнить: включены или выключены>. При отключении система не отправляет push-уведомление по FR-1.",
+        "question": "Должна ли настройка отключения блокировать push-уведомление о каждом списании, и каким по умолчанию будет её значение: включено или выключено?",
+        "blocks": "both",
+        "source": "lens:analyst"
+      },
+      {
+        "title": "Не сказано, когда статус «failed» появляется при повторах",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-03",
+          "R-04"
+        ],
+        "evidence": [
+          {
+            "line": 11,
+            "quote": "The operator shall see the delivery status: sent, delivered, failed."
+          },
+          {
+            "line": 13,
+            "quote": "On failure the system retries up to 3 times every minute."
+          }
+        ],
+        "problem": "FR-2 задаёт статус failed, FR-3 задаёт повторы, но не говорит, ставится ли failed при первом сбое или только после исчерпания повторов.",
+        "scenario": "Первая отправка в 10:00:00 не удалась; повторы в 10:01, 10:02 и 10:03 тоже не удались. По толкованию A оператор видит failed уже с 10:00:00, пока повторы продолжаются. По толкованию B оператор видит failed только после 10:03:00, а до этого статус другой.",
+        "impact": "Оператор получит разный статус в одном и том же сбое, а тестировщик не сможет проверить момент перехода в failed.",
+        "recommendation": "Добавить в FR-3, когда присваивается статус failed.",
+        "rewrite": "On failure the system retries up to 3 times every minute; the status failed is set only after the last retry fails.",
+        "question": "Должен ли оператор видеть статус failed сразу после первого сбоя или только после исчерпания всех повторов?",
+        "blocks": "both",
+        "source": "lens:analyst"
+      },
+      {
+        "title": "Не сказано, сколько всего попыток: три повтора или три попытки",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-04"
+        ],
+        "evidence": [
+          {
+            "line": 13,
+            "quote": "On failure the system retries up to 3 times every minute."
+          }
+        ],
+        "problem": "Фраза «up to 3 times» не говорит, входит ли первая неудачная отправка в три попытки или три повтора идут после неё.",
+        "scenario": "Первая отправка не удалась. По толкованию A всего 3 отправки (первая и 2 повтора). По толкованию B всего 4 отправки (первая и 3 повтора).",
+        "impact": "Разработчик и тестировщик по-разному посчитают число отправок при сбое.",
+        "recommendation": "Уточнить, что означает число 3: общее число попыток или число повторов после первой.",
+        "rewrite": "On failure the system retries <уточнить: 2 или 3> more times every minute.",
+        "question": "Считать ли 3 общим числом попыток отправки или числом повторов после первой неудачной попытки?",
+        "blocks": "testing",
+        "source": "lens:analyst"
+      },
+      {
+        "title": "Клиент назван по-разному: customer и client_id",
+        "kind": "terminology",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-01",
+          "R-06"
+        ],
+        "evidence": [
+          {
+            "line": 5,
+            "quote": "Customer, operator."
+          },
+          {
+            "line": 19,
+            "quote": "API POST /notify accepts client_id, amount, currency."
+          }
+        ],
+        "problem": "Роль названа customer, а в API поле названо client_id; документ не говорит, что это один и тот же участник.",
+        "scenario": "Разработчик может решить, что client_id ссылается на клиента банка, а может на другой объект, например клиента в другой системе.",
+        "impact": "Может возникнуть спор о том, какой идентификатор передавать для получателя уведомления.",
+        "recommendation": "Указать соответствие роли customer полю client_id.",
+        "rewrite": "API POST /notify accepts client_id (идентификатор клиента, роль customer), amount, currency.",
+        "question": "",
+        "blocks": "none",
+        "source": "lens:analyst"
+      },
+      {
+        "title": "Не сказано, запускает ли вызов POST /notify отправку уведомления",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-06",
+          "R-02"
+        ],
+        "evidence": [
+          {
+            "line": 9,
+            "quote": "The system shall send a push notification to the customer within 5 seconds of a debit."
+          },
+          {
+            "line": 19,
+            "quote": "API POST /notify accepts client_id, amount, currency."
+          }
+        ],
+        "problem": "FR-1 связывает отправку со списанием, а API принимает данные для уведомления; документ не говорит, отправляет ли вызов /notify push сам или отправка идёт только по списанию.",
+        "scenario": "Списание прошло, но вызов /notify не был сделан. По толкованию A push отправляется по списанию. По толкованию B push не отправляется без вызова /notify.",
+        "impact": "Разработчик может построить отправку только на вызове API, и уведомления по списаниям без вызова не придут.",
+        "recommendation": "Указать, что запускает отправку push: списание или вызов POST /notify.",
+        "rewrite": "",
+        "question": "Что запускает отправку push-уведомления: событие списания или вызов POST /notify?",
+        "blocks": "development",
+        "source": "lens:analyst"
+      }
+    ],
+    "document_maturity": {
+      "terms": false,
+      "version": false,
+      "timezone": false,
+      "no_placeholders": true,
+      "score": 1,
+      "mature": false
+    }
+  },
+  "warnings": []
+}
