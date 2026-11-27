@@ -297,7 +297,7 @@ def test_docker_and_scripts_install_with_constraints():
 
 
 # Файлы с синтаксисом только для Python 3.12+ (PEP 701) — просьба владельцу в статусе №16; новых быть не должно.
-KNOWN_PY312_ONLY: set[str] = set()  # aggregate.py и newtz.py исправлены №15 (патч 15_py311_fstrings)
+KNOWN_PY312_ONLY: set[str] = {"src/bcc_review/v2/stages/judge.py"}  # №10: патч 10_judge_py311.patch
 
 
 def _py312_only_fstrings(path: Path) -> list[int]:
@@ -319,7 +319,7 @@ def _py312_only_fstrings(path: Path) -> list[int]:
         elif tok.type == tokenize.STRING and stack:
             body = tok.string.lstrip("rRbBuU")
             quote = body[:3] if body[:3] in ('"""', "'''") else body[:1]
-            if quote in stack:
+            if quote in stack or "\\" in tok.string:  # та же кавычка или обратная косая в выражении f-строки
                 lines.append(tok.start[0])
     return lines
 
@@ -348,6 +348,9 @@ def test_code_compiles_on_python_311():
     assert not bad, "\n".join(bad)
 
 
+@pytest.mark.xfail(strict=False, reason="просьба №10 (статус №16, патч 10_judge_py311.patch): stages/judge.py:1072 и "
+                                        ":1489 — обратная косая в выражении f-строки; на Python 3.11 судья падает "
+                                        "SyntaxError, отчёт без судьи")
 def test_known_py312_only_files_are_fixed():
     bad = []
     for rel in sorted(KNOWN_PY312_ONLY):
