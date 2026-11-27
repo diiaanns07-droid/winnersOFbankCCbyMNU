@@ -62,10 +62,15 @@ def _pdf(path: Path, sections: int) -> None:
     SimpleDocTemplate(str(path), pagesize=A4).build(story)
 
 
-def _timed(fn, *a):
-    t = time.perf_counter()
-    out = fn(*a)
-    return out, time.perf_counter() - t
+def _timed(fn, *a, best_of: int = 1):
+    """Результат и лучшее время из ``best_of`` запусков (один медленный запуск под нагрузкой — не O(n²))."""
+    best = None
+    for _ in range(best_of):
+        t = time.perf_counter()
+        out = fn(*a)
+        dt = time.perf_counter() - t
+        best = dt if best is None else min(best, dt)
+    return out, best
 
 
 def test_big_markdown_reads_and_segments_fast(tmp_path):
@@ -89,8 +94,8 @@ def test_segment_time_grows_linearly(tmp_path):
     b.write_text(_md(60), encoding="utf-8")
     va, vb = dv.load(a), dv.load(b)
     _timed(S.heuristic_segment, va)  # прогрев
-    _, ta = _timed(S.heuristic_segment, va)
-    _, tb = _timed(S.heuristic_segment, vb)
+    _, ta = _timed(S.heuristic_segment, va, best_of=3)
+    _, tb = _timed(S.heuristic_segment, vb, best_of=2)
     # вчетверо больше строк: линейно — ≈ 4×, квадратично — ≈ 16× (до исправления было 11×)
     assert tb < 8 * max(ta, 0.02), (ta, tb)
 
@@ -102,7 +107,7 @@ def test_big_pdf_time_grows_linearly(tmp_path):
     small, big = tmp_path / "s.pdf", tmp_path / "b.pdf"
     _pdf(small, 10)
     _pdf(big, 40)
-    vs, ts = _timed(dv.load, small)
+    vs, ts = _timed(dv.load, small, best_of=2)
     vb, tb = _timed(dv.load, big)
     assert vs["pages"] == 20 and vb["pages"] == 80
     assert tb < 8 * max(ts, 0.05), (ts, tb)
