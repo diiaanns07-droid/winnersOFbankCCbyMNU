@@ -203,7 +203,10 @@ _CLOSE_ALL = re.compile(
     r"|\bстатус\w*\s+[«\"']?(?:resolved|closed|закрыт|снят|устран)\w*[»\"']?[^.!?;]*?\b(?:все\w*|кажд\w*|любы\w*)\s+"
     r"(?:дефект|замечани|находк)\w*",
     re.I)
-_MODEL_ADDR = re.compile(r"^\s*(?:модель|model|assistant|ассистент|бот|bot)\s*[,:—-]", re.I)
+# обращение к модели — в начале предложения («Модель, …», «Уважаемый ИИ: …»); упоминание «ИИ-скоринга» в правиле —
+# не обращение: «При отказе ИИ-скоринга верни 422» — правило владельца
+_MODEL_ADDR = re.compile(r"^\s*(?:(?:уважаем|дорог)\w*\s+)?(?:модель|model|assistant|ассистент|бот|bot|нейросеть|ии|ai|llm"
+                         r"|gpt|chatgpt|claude|gemini|агент|agent)\s*[,:—–-](?!\w)", re.I)
 try:
     from bcc_review.v2.rules import injection as _inj
 except Exception:  # noqa: BLE001 — без детектора №12 остаётся своя проверка
@@ -218,9 +221,8 @@ def _injected(part: str) -> bool:
         return False
     if _inj.OVERRIDE.search(part) or _inj.VERDICT_STRONG.search(part):
         return True
-    to_model = _MODEL_ADDR.search(part) or _inj.AI_ADDRESSEE.search(part)
-    return bool(to_model and (_inj.VERDICT.search(part) or _inj.VERDICT_ADDR.search(part)
-                              or _inj.IMPERATIVE.search(part)))
+    return bool(_MODEL_ADDR.search(part) and (_inj.VERDICT.search(part) or _inj.VERDICT_ADDR.search(part)
+                                              or _inj.IMPERATIVE.search(part)))
 
 
 def strip_injection(text: str) -> tuple[str, list[str]]:
