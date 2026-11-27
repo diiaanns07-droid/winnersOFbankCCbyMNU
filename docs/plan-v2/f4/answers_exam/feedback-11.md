@@ -1,0 +1,35 @@
+# №11 · обратная связь по экзамену ответов
+
+Промежуточная проверка на интеграционном коде `9bd5954`. Вызваны штатные `load_answers` и `resolve_answers` на опубликованных вопросах двух документов, до обращения к модели. Это измерение работы привязки. Полный исход пересмотра и результат чтения исправленного ТЗ измеряются отдельно. [Входы и вопросы](README.md) · [Код привязки](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/blob/9bd5954/src/bcc_review/v2/stages/recheck.py).
+
+| Класс | Что получилось | Что проверить в полном прогоне |
+| --- | --- | --- |
+| Два адресата отвечают на один вопрос с одинаковой темой | На обоих документах парсер прочитал обе реплики. После привязки одна осталась у вопроса, другая попала в общие решения. Оба адресата сохранили прямую связь с вопросом в 0 из 2 пар. | Может ли пересмотр явно установить конфликт двух реплик и оставить дефект открытым. |
+| Мягкий отказ от решения | На одном документе фраза об отложенном решении попала в `answered`. Знак вопроса на другом попал в `unanswered`. | Может ли отсутствие правила ошибочно закрыть дефект или попасть в текст как согласованная правка. |
+| Устаревший номер и похожее начало ответа | Привязка нашла исходную тему по смысловой подсказке в 2 из 2 случаев. | При полной регенерации проверить, что остался нужный вопрос и по-прежнему применим выбранный вариант. |
+
+Воспроизведение из корня `9bd5954` на Python с `PYTHONPATH=src`. В переменной среды `F4_EXAM` укажите каталог `answers_exam` из этой ветки.
+
+```python
+import json
+import os
+from collections import Counter
+from pathlib import Path
+from bcc_review.v2.stages.recheck import load_answers, resolve_answers
+
+exam = Path(os.environ["F4_EXAM"])
+reports = {
+    "official": "evaluation/v2/measurements/zamer_08_30_6d03683_sonnet/report.json",
+    "qr": "evaluation/v2/open2/results/sonnet_0820/qr.md.json",
+}
+for name, report_file in reports.items():
+    questions = json.loads(Path(report_file).read_text(encoding="utf-8"))["questions"]
+    source = load_answers(exam / name / "answers.md")
+    warnings = []
+    bound = resolve_answers(questions, source, warnings)
+    print(name, Counter(a["id"] for a in source["answers"]))
+    print(Counter(a["question_id"] for a in bound["answered"]))
+    print("Без ответа", bound["unanswered"])
+    print("Ушли в общие решения", len(bound["decisions"]) - len(source["decisions"]))
+    print(*warnings, sep="\n")
+```
