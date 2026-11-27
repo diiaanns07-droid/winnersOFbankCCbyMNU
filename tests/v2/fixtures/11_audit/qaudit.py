@@ -25,7 +25,7 @@ from bcc_review.v2.stages import clarify  # noqa: E402
 LATIN_ALLOW = {
     "iso", "iec", "ieee", "http", "https", "api", "rest", "json", "url", "ui", "id", "sms", "push", "kzt", "utc",
     "get", "post", "put", "patch", "delete", "qr", "ios", "android", "pdf", "true", "false", "null", "ok",
-    "usd", "eur", "rub", "sla", "uuid", "ttl", "otp", "pin", "pan", "cvv", "iban",
+    "usd", "eur", "rub", "sla", "uuid", "ttl", "otp", "pin", "pan", "cvv", "iban", "xx",
 }
 _CODE = re.compile(r"\b(?:[DRCQT]-\d{1,3}|L\d{2,4}|lens:\w+|rules:\w+|same_subject|set_(?:consistent|complete|feasible))\b")
 _LATIN = re.compile(r"[A-Za-z][A-Za-z0-9_]*")

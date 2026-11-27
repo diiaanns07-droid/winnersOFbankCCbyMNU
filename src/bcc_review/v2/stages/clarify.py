@@ -92,6 +92,8 @@ _KEEP_AS_IS = re.compile(r"^\W*(?:(?:\w+\W+){0,2}?остав\w*\s+(?:вс[её]\
 
 def banned_option(text: str) -> bool:
     return bool(_BANNED_OPTION.search(text) or _KEEP_AS_IS.search(text))
+# обрывок самопроверки модели в конце варианта: «…{"message":"Требуется вход"}... no» (haiku, официальный)
+_SELF_FIX_TAIL = re.compile(r"\s*(?:\.{2,}|…)\s*(?:no|wait|hmm|actually|oops|sorry)\b[^.;]*$", re.I)
 _LEADING_LABEL = re.compile(r"^\s*(?:[A-DА-Г]|[1-4])\s*[).:\-—–]\s+", re.I)
 
 
@@ -302,7 +304,7 @@ def clean_options(options: Iterable[str]) -> list[str]:
         out: list[str] = []
         seen: set[str] = set()
         for opt in options or []:
-            text = _LEADING_LABEL.sub("", str(opt or "")).strip().rstrip(";")
+            text = _SELF_FIX_TAIL.sub("", _LEADING_LABEL.sub("", str(opt or ""))).strip().rstrip(";")
             if "<уточнить" in text.lower():
                 if not soft:
                     continue
