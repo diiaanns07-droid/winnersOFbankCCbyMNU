@@ -35,6 +35,8 @@ from .runner import (ALLOWED_EXT, FILES, MAX_UPLOAD, FixtureRunner, Job, JobStor
                      check_provider, load_dotenv, provider_status)
 
 ASSETS = Path(__file__).with_name("assets")
+# №39: tokens.css — дизайн-система; agent.* — BCC AI (№40), отдаются, когда файлы появятся
+ASSET_NAMES = ("app.css", "app.js", "tokens.css", "agent.css", "agent.js")
 REPO = Path(__file__).resolve().parents[4]
 JOB_PATH = re.compile(r"^/(api/)?jobs/(?P<id>\d{8}-\d{6}-[0-9a-f]{6})(?P<rest>/.*)?$")
 
@@ -230,7 +232,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/assets/"):
             name = path.rsplit("/", 1)[-1]
             p = ASSETS / name
-            if p.is_file() and name in ("app.css", "app.js"):
+            if p.is_file() and name in ASSET_NAMES:
                 ctype = "text/css; charset=utf-8" if name.endswith(".css") else "text/javascript; charset=utf-8"
                 return self._send(200, p.read_bytes(), ctype)
             return self._html(404, _layout("Не найдено", '<main class="wrap"><p>Файл не найден.</p></main>'))

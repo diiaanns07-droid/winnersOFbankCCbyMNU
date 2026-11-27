@@ -1,0 +1,183 @@
+/* BCC Review — дизайн-система (№39). Источник: docs/design/bcc-ui.md, разделы 2–6.
+ *
+ * Шпаргалка: какой класс для чего
+ *   .b-root      <body>: тихий фон --b-canvas и два неподвижных пятна BCC (зелёное слева, золотое справа)
+ *   .b-wrap      колонка контента до 1180 px по центру, поля 16 px на телефоне
+ *   .b-surface   бумага: белая поверхность с данными (радиус 22, тень вместо рамки, внутри --b-pad)
+ *   .b-glass     стекло: только то, что плавает над данными (шапка, реплика BCC AI, фильтры, боковое окно);
+ *                не больше трёх на экране, стекло на стекло не кладём
+ *   .b-button    капсула 46 px; .primary — одна зелёная на экран; .quiet — тихая; .small — 36 px
+ *   .b-segment   вкладки-капсулы: <div class="b-segment"><button aria-selected="true">…</button>…</div>
+ *                или <label><input type="radio">…</label>; выбранное — белая «линза»
+ *   .b-status    строка состояния с точкой: обычная — зелёная точка; .stale — золотая; .error — красная
+ *   .b-strip     полоса из четырёх чисел; внутри .b-metric > b (число) + span (подпись)
+ *   .b-list      одна поверхность со строками; .b-row — строка от 52 px, между строками тонкая линия
+ *   .b-badge     метка критичности: .crit (красная), .major (золотая), .minor (синяя), .ok (зелёная), .plain
+ *   .b-field     поле ввода 46 px (input, select, textarea); подпись — <label class="b-label">
+ *   .b-rise      появление: 0 → 1 и сдвиг 8 px; .b-rise:nth-child(n) идут по очереди с шагом 40 мс
+ *   .b-title / .b-lead / .b-h2 / .b-note — заголовок страницы, строка под ним, заголовок раздела, подпись
+ * Цвет — это смысл: зелёный — можно/сверено, красный — только блокер или ошибка, золотой — существенное/ждём
+ * ответа, синий — незначительное/справка. Золотой и светло-зелёный текст на белом нельзя.
+ */
+:root{
+  --b-ink:#0F2841; --b-ink-2:#3A5068; --b-ink-3:#5B6F84;
+  --b-green:#00B975; --b-green-strong:#008556; --b-green-ink:#00704A;
+  --b-green-tint:#E3FFD9; --b-green-soft:#B5F4C5; --b-green-wash:#F1FBF5;
+  --b-gold:#DCA262; --b-gold-ink:#7A5212; --b-gold-tint:#FFF9D6; --b-gold-soft:#FBE1BA;
+  --b-blue:#1C446C; --b-blue-tint:#E8EFF6;
+  --b-red:#C2362B; --b-red-tint:#FDECEA;
+  --b-canvas:#F3F6F5; --b-paper:#FFFFFF; --b-grey:#E7EDEB;
+  --b-hair:rgba(15,40,65,.08); --b-hair-2:rgba(15,40,65,.14);
+  --b-shadow-1:0 1px 2px rgba(15,40,65,.04),0 6px 18px rgba(15,40,65,.06);
+  --b-shadow-2:0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10);
+  --b-shadow-3:0 10px 28px rgba(15,40,65,.12),0 36px 80px rgba(15,40,65,.18);
+  --b-r-sm:10px; --b-r-md:14px; --b-r-lg:22px; --b-r-xl:28px;
+  --b-ease:cubic-bezier(.2,.8,.2,1); --b-fast:120ms; --b-base:220ms; --b-slow:360ms;
+  --b-h:46px; --b-gap:32px; --b-pad:24px;
+  --b-font:Inter,"Suisse Int'l",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  /* производные (не из брендбука, только для удобства) */
+  --b-mono:"JetBrains Mono","Cascadia Mono",Consolas,"DejaVu Sans Mono",monospace;
+  --b-focus:0 0 0 3px rgba(0,185,117,.55);
+  --b-max:1180px;
+}
+@media (max-width:1400px){:root{--b-gap:24px;--b-pad:20px}}
+
+/* ── основа ── */
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none !important}
+html{-webkit-text-size-adjust:100%;color-scheme:light}
+.b-root{
+  margin:0;min-height:100vh;background:var(--b-canvas);color:var(--b-ink);
+  font:17px/1.5 var(--b-font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  position:relative;isolation:isolate;overflow-x:hidden;
+}
+.b-root::before,.b-root::after{
+  content:"";position:fixed;z-index:-1;pointer-events:none;border-radius:50%;filter:blur(110px);
+}
+.b-root::before{width:680px;height:680px;left:-220px;top:-260px;background:rgba(0,185,117,.18)}
+.b-root::after{width:620px;height:620px;right:-200px;top:-220px;background:rgba(220,162,98,.26)}
+.b-root a{color:var(--b-green-ink);text-underline-offset:3px}
+.b-root :focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
+
+.b-wrap{width:100%;max-width:calc(var(--b-max) + 2*16px);margin:0 auto;padding:0 16px}
+
+.b-title{margin:0;font-size:clamp(34px,3.2vw,46px);line-height:1.08;font-weight:700;letter-spacing:-.035em}
+.b-lead{margin:10px 0 0;font-size:17px;color:var(--b-ink-2);max-width:62ch}
+.b-h2{margin:0;font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.015em}
+.b-note{font-size:15px;color:var(--b-ink-3)}
+
+/* ── три слоя ── */
+.b-surface{
+  background:var(--b-paper);border:0;border-radius:var(--b-r-lg);
+  box-shadow:0 0 0 1px var(--b-hair),var(--b-shadow-1);padding:var(--b-pad);
+}
+.b-glass{
+  background:rgba(255,255,255,.92);border:0;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 0 0 1px rgba(15,40,65,.06),var(--b-shadow-2);
+}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .b-glass{
+    background:linear-gradient(180deg,rgba(255,255,255,.76),rgba(255,255,255,.56));
+    -webkit-backdrop-filter:blur(24px) saturate(175%);backdrop-filter:blur(24px) saturate(175%);
+  }
+}
+
+/* ── кнопки ── */
+.b-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;height:var(--b-h);padding:0 22px;
+  border:0;border-radius:999px;font:inherit;font-size:16px;font-weight:600;line-height:1;white-space:nowrap;
+  text-decoration:none;cursor:pointer;color:var(--b-ink);background:var(--b-paper);
+  box-shadow:0 0 0 1px var(--b-hair-2),var(--b-shadow-1);
+  transition:transform var(--b-fast) var(--b-ease),box-shadow var(--b-fast) var(--b-ease),background var(--b-base) var(--b-ease);
+}
+.b-root a.b-button{color:var(--b-ink)}
+.b-button:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--b-hair-2),var(--b-shadow-2)}
+.b-button:active{transform:scale(.98)}
+.b-button.primary,.b-root a.b-button.primary{background:var(--b-green-strong);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 6px 18px rgba(0,133,86,.28)}
+.b-button.primary:hover{background:#007A4F;box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 10px 26px rgba(0,133,86,.34)}
+.b-button.quiet{background:transparent;box-shadow:none;color:var(--b-ink-2)}
+.b-button.quiet:hover{background:rgba(15,40,65,.05);box-shadow:none;color:var(--b-ink)}
+.b-button.small{height:36px;padding:0 16px;font-size:15px}
+.b-button[disabled],.b-button[aria-disabled="true"]{opacity:.55;cursor:default;transform:none}
+
+/* ── сегмент: вкладки-капсулы, выбранное — белая линза ── */
+.b-segment{
+  display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:999px;
+  background:rgba(15,40,65,.06);box-shadow:inset 0 0 0 1px var(--b-hair);
+}
+.b-segment>button,.b-segment>a,.b-segment>label{
+  position:relative;display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 16px;border:0;
+  border-radius:999px;background:transparent;font:inherit;font-size:15px;font-weight:600;color:var(--b-ink-2);
+  text-decoration:none;cursor:pointer;white-space:nowrap;
+  transition:background var(--b-base) var(--b-ease),color var(--b-base) var(--b-ease),box-shadow var(--b-base) var(--b-ease);
+}
+.b-segment>label>input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.b-segment>*:hover{color:var(--b-ink)}
+.b-segment>[aria-selected="true"],.b-segment>.on,.b-segment>label:has(input:checked){
+  background:var(--b-paper);color:var(--b-ink);
+  box-shadow:inset 0 1px 0 #fff,0 0 0 1px var(--b-hair),0 2px 8px rgba(15,40,65,.10);
+}
+.b-segment>label:has(input:focus-visible){outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
+
+/* ── строка состояния ── */
+.b-status{display:inline-flex;align-items:center;gap:8px;font-size:15px;color:var(--b-ink-2);min-width:0}
+.b-status::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--b-green);box-shadow:0 0 0 3px rgba(0,185,117,.18)}
+.b-status.stale::before{background:var(--b-gold);box-shadow:0 0 0 3px rgba(220,162,98,.22)}
+.b-status.error{color:var(--b-red)}
+.b-status.error::before{background:var(--b-red);box-shadow:0 0 0 3px rgba(194,54,43,.16)}
+
+/* ── полоса из четырёх чисел ── */
+.b-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:0;overflow:hidden}
+.b-metric{display:flex;flex-direction:column;gap:2px;padding:18px var(--b-pad);min-width:0}
+.b-metric+.b-metric{box-shadow:inset 1px 0 0 var(--b-hair)}
+.b-metric>b{font-size:30px;line-height:1.1;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.b-metric>span{font-size:15px;color:var(--b-ink-3)}
+.b-metric.crit>b{color:var(--b-red)} .b-metric.ok>b{color:var(--b-green-ink)}
+.b-metric.major>b{color:var(--b-gold-ink)} .b-metric.minor>b{color:var(--b-blue)}
+@media (max-width:640px){
+  .b-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .b-metric:nth-child(3){box-shadow:inset 0 1px 0 var(--b-hair)}
+  .b-metric:nth-child(4){box-shadow:inset 1px 0 0 var(--b-hair),inset 0 1px 0 var(--b-hair)}
+}
+
+/* ── список: одна поверхность, строки через тонкую линию ── */
+.b-list{list-style:none;margin:0;padding:0 var(--b-pad)}
+.b-row{display:flex;align-items:center;gap:14px;min-height:52px;padding:12px 0;color:inherit;text-decoration:none}
+.b-row+.b-row{box-shadow:0 -1px 0 var(--b-hair)}
+a.b-row,button.b-row{transition:color var(--b-fast) var(--b-ease)}
+a.b-row:hover{color:var(--b-green-ink)}
+
+/* ── метки ── */
+.b-badge{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;
+  font-size:14px;font-weight:650;line-height:1;white-space:nowrap;background:var(--b-grey);color:var(--b-ink-2);
+}
+.b-badge.crit{background:var(--b-red-tint);color:var(--b-red)}
+.b-badge.major{background:var(--b-gold-tint);color:var(--b-gold-ink)}
+.b-badge.minor{background:var(--b-blue-tint);color:var(--b-blue)}
+.b-badge.ok{background:var(--b-green-tint);color:var(--b-green-ink)}
+.b-badge.plain{background:transparent;box-shadow:inset 0 0 0 1px var(--b-hair-2);color:var(--b-ink-2)}
+
+/* ── поле ── */
+.b-label{display:block;font-size:15px;font-weight:600;color:var(--b-ink-2);margin:0 0 6px}
+.b-field{
+  width:100%;height:var(--b-h);padding:0 16px;border:0;border-radius:var(--b-r-md);background:var(--b-paper);
+  font:inherit;font-size:16px;color:var(--b-ink);box-shadow:inset 0 0 0 1px var(--b-hair-2);
+  transition:box-shadow var(--b-fast) var(--b-ease);
+}
+textarea.b-field{height:auto;min-height:120px;padding:12px 16px}
+.b-field::placeholder{color:var(--b-ink-3)}
+.b-field:hover{box-shadow:inset 0 0 0 1px rgba(15,40,65,.24)}
+.b-field:focus{outline:0;box-shadow:inset 0 0 0 1px var(--b-green),var(--b-focus)}
+.b-field[disabled]{background:var(--b-canvas);color:var(--b-ink-3)}
+
+/* ── появление ── */
+@keyframes b-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.b-rise{animation:b-rise var(--b-slow) var(--b-ease) both}
+.b-rise:nth-child(2){animation-delay:40ms} .b-rise:nth-child(3){animation-delay:80ms}
+.b-rise:nth-child(4){animation-delay:120ms} .b-rise:nth-child(5){animation-delay:160ms}
+.b-rise:nth-child(6){animation-delay:200ms}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important;scroll-behavior:auto !important}
+}
