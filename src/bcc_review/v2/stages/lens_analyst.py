@@ -19,7 +19,15 @@
 7. заголовок, написанный в основном латиницей (слабая модель иногда переходит на английский), заменяется
    началом поля `problem` (до 12 слов), если оно по-русски: отчёт читает аналитик банка;
 8. сортировка: critical → major → minor, внутри — порядок модели;
-9. не больше 12 кандидатов.
+9. не больше 16 кандидатов.
+
+**Опись вопросов полноты** (`coverage`, №12, 27.11): прежде чем писать кандидатов, модель проходит по темам
+промпта (два места об одном, событие, период, состояние в условии, противоположная ветка, изменение настройки,
+величины для клиента, перечни, возврат, экран, участники, единицы, нефункциональные) и для каждого места записывает вопрос и
+ответ документа (`L0xx: «…»` или пусто). Пустой ответ, прошедший фильтр, становится кандидатом. Опись остаётся
+в файле этапа (`runs/<id>/stages/lens_analyst.json`): видно, какие темы линза проверила и где документ молчит.
+Замер (официальный документ, по одному запросу на сохранённых входах): без описи Flash давал 4–6 кандидатов
+и 2–4 существенных из эталона, haiku — 8 и 6.
 
 Признаки зрелости считаются кодом по тексту документа, без модели: есть раздел терминов, указана версия,
 явный часовой пояс (UTC/GMT), нет заглушек («заполняются…», «TBD», неотмеченное «Да / Нет», прочерк
@@ -30,7 +38,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
-MAX_CANDIDATES = 12
+from bcc_review.v2.types import CANDIDATE_SCHEMA, INT, STR, obj  # абсолютный: тесты №05 грузят модуль файлом
+
+MAX_CANDIDATES = 16
+MAX_COVERAGE = 40
+COVERAGE_ITEM = obj({"topic": STR, "line": INT, "question": STR, "answer": STR})
+# Опись первой: модель отвечает полями по порядку схемы и пишет кандидатов, уже пройдя все темы
+SCHEMA = obj({"coverage": {"type": "array", "items": COVERAGE_ITEM},
+              "candidates": {"type": "array", "items": CANDIDATE_SCHEMA}})
 MAX_OUTPUT_TOKENS = 32000  # `lens.run` берёт его из модуля: рассуждение слабой модели + JSON
 MAX_CRITICAL = 2
 MATURE_MIN_SIGNS = 3
@@ -184,6 +199,17 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
     return [kept[i] for i in order][:max_candidates]
 
 
+def coverage(items: Any) -> list[dict]:
+    """Опись вопросов полноты из ответа модели: только строки-объекты с темой, не больше `MAX_COVERAGE`."""
+    out = []
+    for it in items or []:
+        if isinstance(it, dict) and str(it.get("topic") or "").strip():
+            out.append({"topic": str(it.get("topic")).strip(), "line": it.get("line") if isinstance(it.get("line"), int)
+                        else 0, "question": str(it.get("question") or "").strip(),
+                        "answer": str(it.get("answer") or "").strip()})
+    return out[:MAX_COVERAGE]
+
+
 def run(ctx, lens_run=None) -> dict:
     """Запуск линзы с постобработкой. `lens_run(ctx, name)` — общий запуск из `stages/lens.py` (№01);
     он сам берёт `MAX_OUTPUT_TOKENS` из этого модуля."""
@@ -193,5 +219,6 @@ def run(ctx, lens_run=None) -> dict:
     m = maturity(getattr(ctx, "view", None))
     out = dict(lens_run(ctx, "analyst"))
     out["candidates"] = postprocess(out.get("candidates") or [], mature=m["mature"])
+    out["coverage"] = coverage(out.get("coverage"))
     out["document_maturity"] = m
     return out
