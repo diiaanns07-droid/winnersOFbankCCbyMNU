@@ -1,0 +1,28 @@
+diff --git a/src/bcc_review/v2/stages/judge.py b/src/bcc_review/v2/stages/judge.py
+index bb4060d..fdafc83 100644
+--- a/src/bcc_review/v2/stages/judge.py
++++ b/src/bcc_review/v2/stages/judge.py
+@@ -571,6 +571,23 @@ def _call_judge(ctx: Any, cands: list[dict], clusters: list[list[str]], checklis
+                 warnings: list[str], depth: int = 0, part: str = "") -> list[dict]:
+     """Один вызов судьи на пакет кластеров; при обрезке ответа — деление пополам (кластеры не рвём).
+     Возвращает список ответов (по одному на часть)."""
++    import os as _os
++    _par = int(_os.environ.get("BCC_JUDGE_PARALLEL_MIN", "0") or 0)
++    if depth == 0 and _par and len(cands) >= _par and len(clusters) > 1:
++        import concurrent.futures as _cf
++        mid = _split_point(clusters, cands)
++        by_id = {c["id"]: c for c in cands}
++        halves = (clusters[:mid], clusters[mid:])
++        def _one(k, part_cl):
++            ids = [x for g in part_cl for x in g]
++            note = f" Это часть {k} из 2 пакета кандидатов; остальные кандидаты будут оценены отдельно."
++            return _call_judge(ctx, [by_id[x] for x in ids], part_cl, checklist, warnings, depth + 1, note)
++        with _cf.ThreadPoolExecutor(max_workers=2) as ex:
++            futs = [ex.submit(_one, k, h) for k, h in enumerate(halves, 1)]
++            out = []
++            for f in futs:
++                out += f.result()
++        return out
+     compact = len(cands) > COMPACT_THRESHOLD
+     block = render_candidates(cands, clusters, compact)
+     system, user = _build_messages(ctx, block, checklist, len(cands), compact, part)
