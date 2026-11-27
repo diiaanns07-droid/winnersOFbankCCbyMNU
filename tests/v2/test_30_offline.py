@@ -46,3 +46,39 @@ def test_official_offline_finds_cap_conflict() -> None:
     out = rules.run(docview.load(str(ROOT / "release" / "input" / "requirements.md")))
     c = _src(out, "rules:conflicts.event_quantity")
     assert len(c) == 1 and c[0]["severity"] == "critical"
+
+
+REPEAT = """# Начисление бонусов
+
+## Требования к интеграции
+Сервис бонусов получает от процессинга событие о покупке. Повторная доставка одного события не меняет начисленный бонус.
+"""
+
+
+def test_repeat_delivery_without_key(tmp_path: Path) -> None:
+    c = _src(_run(tmp_path, REPEAT), "rules:ops.repeat_key")
+    assert len(c) == 1 and c[0]["severity"] == "major" and c[0]["evidence"][0]["line"] == 4
+
+
+def test_repeat_delivery_with_key_or_reference_is_silent(tmp_path: Path) -> None:
+    for text in (
+        REPEAT.replace("Повторная доставка одного события", "Повторная доставка события с тем же `eventId`"),
+        REPEAT.replace("не меняет начисленный бонус", "обрабатывается по ключу идемпотентности"),
+        REPEAT.replace(".\n", "; повторная доставка — по ФТ-9.\n", 1).replace(
+            " Повторная доставка одного события не меняет начисленный бонус.", ""),
+        "# Доставка\nЗа повторную доставку курьером банк начисляет плату 500 ₸.\n",
+    ):
+        assert _src(_run(tmp_path, text), "rules:ops.repeat_key") == [], text
+
+
+def test_new_offline_rules_silent_on_clean_documents() -> None:
+    paths = sorted((ROOT / "evaluation" / "v2" / "clean").glob("*/source.md"))
+    paths += sorted((ROOT / "evaluation" / "v2" / "open2").glob("*_clean/source.md"))
+    paths += sorted((ROOT / "evaluation" / "dev" / "corpus" / "cases").glob("*.base/source.md"))
+    paths += sorted((ROOT / "tests" / "v2" / "fixtures" / "12_styles").glob("*clean*.md"))
+    assert len(paths) >= 20
+    for p in paths:
+        out = rules.run(docview.load(str(p)))
+        bad = [c["title"] for c in out["candidates"]
+               if c["source"].startswith(("rules:ops.", "rules:conflicts.event_quantity"))]
+        assert bad == [], (p, bad)

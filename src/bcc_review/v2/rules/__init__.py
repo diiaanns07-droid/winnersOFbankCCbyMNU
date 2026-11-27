@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import api, conflicts, injection, language, placeholders, promises, terms, units
+from . import api, conflicts, injection, language, ops, placeholders, promises, terms, units
 from ._text import Doc, build_doc
 
 __all__ = ["run", "format_signals", "signals_for"]
@@ -80,6 +80,7 @@ def run(view: dict, requirements: Any = None) -> dict:
                      ("conflicts", lambda: conflicts.run(doc, out)),
                      ("injection", lambda: injection.run(doc, out, _hidden(view))),
                      ("placeholders", lambda: placeholders.run(doc, out)),
+                     ("ops", lambda: ops.run(doc, out)),
                      ("language", lambda: language.run(doc, out, reqs, excluded)),
                      ("terms", lambda: terms.run(doc, out))):
         try:
