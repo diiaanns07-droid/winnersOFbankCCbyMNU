@@ -139,7 +139,20 @@ def settings(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "total_timeout_s": _num(env, "GEMINI_TOTAL_TIMEOUT_S", None),
         "rpm": _num(env, "GEMINI_RPM", None),   # None — по профилю модели; 0 — без окна
         "reserve_models": _reserve(env, fallbacks, raw_fb),
+        "stage_models": _stage_models(env.get("GEMINI_STAGE_MODELS")),
     }
+
+
+def _stage_models(raw: str | None) -> dict[str, str]:
+    """``GEMINI_STAGE_MODELS=segment=gemini-3.5-flash-lite`` — первая модель цепочки для этапа (по умолчанию нет).
+    Нарезка на Flash-Lite не занимает окно «5 в минуту» и суточную квоту Flash: пять рецензентов быстрого старта
+    укладываются в окно основной модели без ожидания. Остальная цепочка — как у всех этапов."""
+    out: dict[str, str] = {}
+    for part in (raw or "").split(","):
+        stage, sep, model = part.partition("=")
+        if sep and stage.strip() and model.strip():
+            out[stage.strip()] = model.strip().removeprefix("models/")
+    return out
 
 
 def _reserve(env: Mapping[str, str], fallbacks: list[str], raw_fb: str | None) -> list[str]:
@@ -298,6 +311,7 @@ class GeminiProvider:
         self.fallback_models = _models(fallback_models) if fallback_models is not None else cfg["fallback_models"]
         # резерв на дневную квоту — только для цепочки из окружения (явный fallback_models в коде — без резерва)
         self.reserve_models = cfg["reserve_models"] if fallback_models is None else []
+        self.stage_models: dict[str, str] = dict(cfg["stage_models"])
         self.rpm = rpm if rpm is not None else cfg["rpm"]   # None — по профилю каждой модели
         self._window: dict[str, deque] = {}
         self._window_lock = threading.Lock()
@@ -435,6 +449,8 @@ class GeminiProvider:
     def invoke(self, *, model: str | None, messages: Sequence[Mapping[str, Any]], schema: Mapping[str, Any],
                timeout_s: float, max_output_tokens: int | None = None, stage: str = "", **_: Any) -> dict[str, Any]:
         chain = self.model_chain(model)
+        if self.stage_models.get(stage):  # модель этапа — первой, затем обычная цепочка
+            chain = _models([self.stage_models[stage], *chain])
         per_call = max(5.0, float(timeout_s or 300))
         # Бюджет всего invoke: таймаут вызывающего (LLMClient уже ограничил его остатком лимита этапа) + запас на
         # быстрые повторы (503, Retry-After). Зависший запрос не растянет этап втрое.
