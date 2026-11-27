@@ -15,7 +15,7 @@ if str(ROOT / "src") not in sys.path:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from bcc_review.v2.stages import recheck, revise  # noqa: E402
-from test_11_clarify import FakeCtx, FakeLLM  # noqa: E402
+from test_11_clarify import FakeCtx, FakeLLM, load_view  # noqa: E402
 
 QS = [
     {"id": "Q-01", "topic": "Код ответа при отказе антифрода", "question": "Какой код вернуть при отказе антифрода?",
@@ -511,3 +511,30 @@ def test_conflicting_decision_is_not_written():
     clar = {"decisions": ["На отказ возвращаем 422.", "На отказ возвращаем 403.", "Квитанция 12 дней."],
             "changes": [], "answer_conflicts": [{"finding_id": "D-01", "answers": ["Решение-1", "Решение-2"]}]}
     assert [t["id"] for t in revise.decision_targets(clar)] == ["Решение-3"]
+
+
+# --------------------------------------------------------------------------- схема без лишней «починки»
+def test_schema_accepts_what_code_normalizes():
+    import json as _json
+    from bcc_review.v2.llm import schema_errors
+    from bcc_review.v2.stages import clarify
+    from test_11_clarify import FIX
+    findings = _json.loads((FIX / "findings.json").read_text(encoding="utf-8"))["findings"]
+    raw = _json.loads((FIX / "clarify.json").read_text(encoding="utf-8"))
+    q = dict(raw["questions"][0])
+    q["evidence"] = []  # модель не дала цитату
+    q["options"] = [f"Свой вариант правила номер {i}" for i in range(1, 7)]  # 6 вариантов
+    data = {"questions": [q] + raw["questions"][1:] + raw["questions"][:3]}  # больше 10 вопросов
+    assert schema_errors(data, clarify.SCHEMA) == []  # раньше — повторный вызов «починки»
+    kept = clarify.postprocess(data, findings, load_view())
+    assert kept and all(2 <= len(x["options"]) <= 4 for x in kept)
+    assert all(1 <= len(x["evidence"]) <= 3 for x in kept)
+    assert len(kept) <= clarify.question_cap(findings)
+    first = next(x for x in kept if x["options"][0].startswith("Свой вариант правила"))
+    assert len(first["options"]) == 4 and first["evidence"]  # цитаты взяты из дефекта
+
+
+def test_revise_schema_accepts_five_edits():
+    from bcc_review.v2.llm import schema_errors
+    edit = {"action": "replace", "line": 1, "old": "а", "new": "б"}
+    assert schema_errors({"rewrites": [{"finding_id": "D-01", "summary": "", "edits": [edit] * 5}]}, revise.SCHEMA) == []

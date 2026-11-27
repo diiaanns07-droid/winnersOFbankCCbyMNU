@@ -28,7 +28,8 @@ SCHEMA: dict = {
         "properties": {
             "finding_id": {"type": "string"},
             "summary": {"type": "string"},
-            "edits": {"type": "array", "minItems": 1, "maxItems": 4, "items": {
+            # промпт просит 1–4 правки; код применяет любое число — пятая правка не стоит повторного ответа
+            "edits": {"type": "array", "minItems": 1, "maxItems": 8, "items": {
                 "type": "object", "additionalProperties": False, "required": ["action", "line", "old", "new"],
                 "properties": {
                     "action": {"type": "string", "enum": ["replace", "insert_after"]},
