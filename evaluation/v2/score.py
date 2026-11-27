@@ -35,6 +35,7 @@ def load_gold(path: str | Path) -> dict:
     import yaml  # PyYAML: только для оценки, в зависимостях агента не нужен
 
     g = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    _normalize_gold(g, Path(path))
     for it in g["items"]:
         it["_groups"] = [parse_lines(gr["lines"]) for gr in it["anchors"]["groups"]]
         it["_kw"] = [re.compile(k.replace("ё", "е"), re.I) for k in it["keywords"]["groups"]]
@@ -42,6 +43,56 @@ def load_gold(path: str | Path) -> dict:
         it.setdefault("owners", [])
         it.setdefault("related", [])
     return g
+
+
+CONFLICT_KINDS = ("conflict", "contradiction", "mismatch", "inconsisten")
+
+
+def _normalize_gold(g: dict, path: Path) -> None:
+    """Эталоны других ТЗ (№18, `evaluation/v2/open2/*/gold.yaml`) — в вид официального: путь документа от файла
+    эталона, `severity` вместо `level`, опоры списком или только цитатами, ключевые слова необязательны."""
+    doc = g.get("document") or "source.md"
+    if not (ROOT / doc).exists() and (path.parent / doc).exists():
+        doc = str((path.parent / doc).resolve().relative_to(ROOT)) if str(path.resolve()).startswith(str(ROOT)) \
+            else str((path.parent / doc).resolve())
+    g["document"] = doc
+    if not g.get("sha256") and (ROOT / doc).exists():
+        import hashlib
+
+        g["sha256"] = hashlib.sha256((ROOT / doc).read_bytes()).hexdigest()
+    lines = None
+    items = g.get("items") or g.get("defects") or []
+    g["items"] = items
+    for i, it in enumerate(items, 1):
+        it.setdefault("id", f"G{i:02d}")
+        it["level"] = it.get("level") or it.get("severity") or "major"
+        it.setdefault("severity_ok", [it["level"]])
+        it.setdefault("title", it.get("essence") or it.get("summary") or it["id"])
+        kinds = it.get("kinds") or ([it["kind"]] if it.get("kind") else []) + ([it["type"]] if it.get("type") else [])
+        it["kinds"] = kinds
+        anc = it.get("anchors") or {}
+        if isinstance(anc, list):
+            anc = {"groups": anc}
+        groups = []
+        for gr in anc.get("groups") or []:
+            gr = dict(gr) if isinstance(gr, dict) else {"lines": gr}
+            if gr.get("lines") in (None, "") and gr.get("quote"):
+                if lines is None:
+                    lines = load_doc(ROOT / g["document"])
+                loc = locate(lines, gr["quote"])
+                gr["lines"] = f"{loc['line_start']}-{loc['line_end']}" if loc else "0"
+            gr["lines"] = str(gr.get("lines"))
+            groups.append(gr)
+        conflict = any(c in str(k).lower() for k in kinds for c in CONFLICT_KINDS)
+        anc.setdefault("policy", "all" if conflict and len(groups) > 1 else "any")
+        anc["groups"] = groups
+        it["anchors"] = anc
+        kw = it.get("keywords") or {}
+        if isinstance(kw, list):
+            kw = {"groups": kw}
+        kw.setdefault("groups", [])
+        kw.setdefault("min", 1 if kw["groups"] else 0)
+        it["keywords"] = kw
 
 
 # ─────────────────────────── пары замечание ↔ эталон ───────────────────────────

@@ -1,0 +1,808 @@
+{
+ "schema": "bcc-v2-score/1",
+ "gold": {
+  "path": "evaluation/v2/open2/qr_clean/gold.yaml",
+  "document": "evaluation/v2/open2/qr_clean/source.md",
+  "sha256": "ee686d6bf0670b8faa3e20492888de7460ab82bbe40953f714afa02a6f282a18"
+ },
+ "report": {
+  "version": "v2",
+  "same_doc": true,
+  "document": {
+   "file": "source.md",
+   "format": "md",
+   "sha256": "ee686d6bf0670b8faa3e20492888de7460ab82bbe40953f714afa02a6f282a18",
+   "lines": 212
+  },
+  "status": "complete",
+  "provider": "claude_cli",
+  "model": "haiku",
+  "models_used": [
+   "claude-haiku-5-5"
+  ],
+  "commit": "79b0fa1",
+  "duration_s": 451.1,
+  "calls": {
+   "total": 9,
+   "cached": 0,
+   "failed": 0,
+   "split": 0
+  },
+  "tokens": {
+   "input": 257465,
+   "output": 193268
+  },
+  "cost_usd": 0.1314
+ },
+ "counts": {
+  "findings": 41,
+  "by_severity": {
+   "critical": 3,
+   "major": 20,
+   "minor": 18
+  },
+  "duplicates": 0,
+  "outside_gold": {
+   "total": 38,
+   "real": 0,
+   "partial": 0,
+   "false": 0,
+   "duplicate": 0,
+   "gold": 0,
+   "unknown": 38
+  },
+  "report_md_lines": 898
+ },
+ "recall": {
+  "critical": {
+   "found": [],
+   "n": 0,
+   "of": 5,
+   "as_critical": [],
+   "lenient": []
+  },
+  "major": {
+   "found": [],
+   "n": 0,
+   "of": 20,
+   "lenient": []
+  },
+  "minor": {
+   "found_parents": [
+    "М1",
+    "М2",
+    "М3"
+   ],
+   "of": 4,
+   "parts_found": [
+    "М1",
+    "М2",
+    "М3"
+   ]
+  },
+  "key_25": {
+   "n": 0,
+   "of": 25,
+   "lenient": 0,
+   "loose_any_edge": 0
+  },
+  "all_items": {
+   "n": 3,
+   "of": 4
+  },
+  "parents": {
+   "n": 3,
+   "of": 4
+  }
+ },
+ "precision": {
+  "matched": 3,
+  "duplicates": 0,
+  "outside_real": 0,
+  "outside_false": 0,
+  "outside_unknown": 38,
+  "outside_partial": 0,
+  "precision_useful": 0.073,
+  "precision_gold": 0.073
+ },
+ "severity": {
+  "pairs": 3,
+  "ok": 3,
+  "exact": 3,
+  "accuracy_ok": 1.0,
+  "accuracy_exact": 1.0,
+  "critical_false": [
+   {
+    "finding": "D-01",
+    "title": "QR без суммы после оплаты: GET отдаёт 410, а Ф-2 разрешает повторную оплату",
+    "reason": "вне эталона"
+   },
+   {
+    "finding": "D-02",
+    "title": "Отмена оплаченного QR: Ф-5 разрешает отмену, метод 4 отвечает 410",
+    "reason": "вне эталона"
+   },
+   {
+    "finding": "D-03",
+    "title": "Повтор requestId по оплаченному QR: DONE по особым правилам или 410 по логике",
+    "reason": "вне эталона"
+   }
+  ],
+  "rows": [
+   {
+    "gold": "М1",
+    "level": "minor",
+    "finding": "D-35",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М2",
+    "level": "minor",
+    "finding": "D-38",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М3",
+    "level": "minor",
+    "finding": "D-34",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   }
+  ]
+ },
+ "quotes": {
+  "total": 88,
+  "missing": 0,
+  "fuzzy": 0,
+  "line_mismatch": 0,
+  "verified_field_missing": 0,
+  "findings_without_evidence": [],
+  "missing_list": []
+ },
+ "language": {
+  "generic": [],
+  "english": [
+   {
+    "finding": "D-35",
+    "field": "recommendation",
+    "word": "DATA"
+   },
+   {
+    "finding": "Q-05",
+    "field": "options",
+    "word": "PENDING"
+   }
+  ],
+  "english_report_md": [
+   "Could",
+   "DATA",
+   "Must",
+   "PENDING",
+   "Should"
+  ]
+ },
+ "report_sections": {
+  "паспорт прогона": true,
+  "нарезка требований": true,
+  "проверка каждого требования": true,
+  "проверка набора": true,
+  "сводка": true,
+  "итог": true
+ },
+ "verdict": {
+  "got": {
+   "development": "no",
+   "testing": "no"
+  },
+  "expected": {
+   "development": "yes",
+   "testing": "yes"
+  }
+ },
+ "assignment": [
+  {
+   "gold": "М1",
+   "finding": "D-35",
+   "title": "Версия, дата и ID нефункциональных, данных и интеграционных пунктов не заполнены",
+   "severity": "minor",
+   "sources": [
+    "consistency",
+    "rules:placeholder.version"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М2",
+   "finding": "D-38",
+   "title": "Блок согласующих пуст: нет ни одного согласующего",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.approvals"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М3",
+   "finding": "D-34",
+   "title": "Раздел «Тестирование требований» оставлен заглушкой",
+   "severity": "minor",
+   "sources": [
+    "lens:qa",
+    "rules:placeholder.tbd"
+   ],
+   "how": "детерминированно"
+  }
+ ],
+ "duplicates": [],
+ "outside": [
+  {
+   "finding": "D-01",
+   "severity": "critical",
+   "kind": "status_conflict",
+   "title": "QR без суммы после оплаты: GET отдаёт 410, а Ф-2 разрешает повторную оплату",
+   "sources": [
+    "consistency",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-02",
+   "severity": "critical",
+   "kind": "status_conflict",
+   "title": "Отмена оплаченного QR: Ф-5 разрешает отмену, метод 4 отвечает 410",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-03",
+   "severity": "critical",
+   "kind": "status_conflict",
+   "title": "Повтор requestId по оплаченному QR: DONE по особым правилам или 410 по логике",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-04",
+   "severity": "major",
+   "kind": "status_conflict",
+   "title": "Ответ 200 при отказе антифрода описан и как успех, и как отказ",
+   "sources": [
+    "lens:architect",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-05",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "Пример ответа показывает 5 000 ₸ при сумме 3 000 ₸ в QR (п. 5 логики)",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-06",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Ручная проверка антифродом упомянута в NFR, но не описана в логике и ответах",
+   "sources": [
+    "lens:analyst",
+    "lens:qa",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-07",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "Путь вызова перевода по QR: через сервис QR-кодов или напрямую в сервис переводов",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-08",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Отмена QR и истечение срока не отражены в BPMN и sequence",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-09",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Статус карты зачисления получателя не проверяется при переводе",
+   "sources": [
+    "lens:risk",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-10",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "«Несколько раз» для QR без суммы не задаёт число оплат",
+   "sources": [
+    "lens:analyst",
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-11",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Переход QR в «в обработке» и «оплачен» не передаётся в сервис QR-кодов",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-12",
+   "severity": "major",
+   "kind": "terminology",
+   "title": "Статус «оплачен» и состояние «перевод в обработке» названы по-разному и не разделены",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-13",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Поле amount для QR без суммы: требуемость противоречит Ф-3 и таблице параметров",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-14",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Данные для push двум сторонам (сумма и маска имени) не определены",
+   "sources": [
+    "lens:architect",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-15",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Срок 3 с не привязан к началу и концу отсчёта",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-16",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Срок QR при ручной проверке антифродом после подтверждения не определён",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-17",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "request_id и debit_card_id есть в DB field таблиц, но не в перечне хранимых данных",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-18",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Повтор requestId после неуспешного первого запроса: результат не определён",
+   "sources": [
+    "lens:analyst",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-19",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Пять строк приёмки не покрывают границы, повторы, отмену и REJECTED",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-20",
+   "severity": "major",
+   "kind": "security",
+   "title": "GET /qr/{qrId} отдаёт имя и сумму получателя без проверки владельца",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-21",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Шаг 2 метода 1 не имеет кода ответа при провале проверки карты",
+   "sources": [
+    "lens:architect",
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-22",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Сбой между списанием и зачислением не описан в шаге 8",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-23",
+   "severity": "major",
+   "kind": "api_contract",
+   "title": "Тела ошибок не содержат полей status, amount и recipientName таблицы ответа",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-24",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Цель «снизить число переводов по ошибочным реквизитам» не измерима",
+   "sources": [
+    "lens:analyst",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-25",
+   "severity": "minor",
+   "kind": "terminology",
+   "title": "Карта зачисления названа в двух местах по-разному",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-26",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Несколько правил QR описаны в одних пунктах Ф-1, Ф-2 и Ф-5",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-27",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Приоритет и признак стабильности не заданы для Ф-1–Ф-6",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-28",
+   "severity": "minor",
+   "kind": "ops_risk",
+   "title": "Проверка «не оплачен» и отметка оплаты не атомарны: двойная оплата QR с суммой",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-29",
+   "severity": "minor",
+   "kind": "duplicate",
+   "title": "Срок 15 минут записан в Ф-2 и в особых правилах метода",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-30",
+   "severity": "minor",
+   "kind": "ops_risk",
+   "title": "Отмена получателем и перевод отправителем одновременно: порядок не задан",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-31",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Сервис уведомлений есть в sequence, но не в схеме API",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-32",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Нагрузка 200 переводов в секунду без периода, доли успешных и компонента",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-33",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Для отмены QR и методов 2–4 нет нефункционального требования по времени",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-36",
+   "severity": "minor",
+   "kind": "placeholder",
+   "title": "Чек-лист ревью не отмечен: в 14 пунктах оба варианта «Да / Нет»",
+   "sources": [
+    "rules:placeholder.checklist"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-37",
+   "severity": "minor",
+   "kind": "ops_risk",
+   "title": "Откат функции и скрытие функционала не описаны",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-39",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Возврат и отмена выполненного перевода не описаны",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-40",
+   "severity": "minor",
+   "kind": "api_contract",
+   "title": "Нет примера тела ответа 200 со статусом REJECTED",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-41",
+   "severity": "minor",
+   "kind": "api_contract",
+   "title": "Тип поля amount в ответе метода 3 для QR без суммы не объявлен",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  }
+ ],
+ "misses": [
+  {
+   "gold": "М4",
+   "level": "minor",
+   "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+   "where": "есть близкое замечание, но не та проблема или не те строки",
+   "owners": [
+    "rules",
+    "analyst",
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-35",
+     "status": "disputed",
+     "score": 1.6,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": []
+  }
+ ],
+ "stage_recall": {
+  "consistency": {
+   "candidates": 16,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:analyst": {
+   "candidates": 8,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:architect": {
+   "candidates": 10,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:qa": {
+   "candidates": 5,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:risk": {
+   "candidates": 10,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "rules": {
+   "candidates": 8,
+   "K": [],
+   "C": [],
+   "only_here": []
+  }
+ },
+ "gates": [
+  {
+   "metric": "К1–К5 найдены",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "из них критичными",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "С1–С20 найдены",
+   "value": "0/20",
+   "ok": true
+  },
+  {
+   "metric": "критичных ложных",
+   "value": "3",
+   "ok": false
+  },
+  {
+   "metric": "всего замечаний",
+   "value": "41",
+   "ok": false
+  },
+  {
+   "metric": "цитаты найдены в документе",
+   "value": "88/88",
+   "ok": true
+  },
+  {
+   "metric": "строк отчёта",
+   "value": "898",
+   "ok": true
+  },
+  {
+   "metric": "разделы п. 6 ТЗ",
+   "value": "6/6",
+   "ok": true
+  },
+  {
+   "metric": "общие фразы",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "английские слова",
+   "value": "7",
+   "ok": false
+  },
+  {
+   "metric": "вердикт разработка/тестирование",
+   "value": "no/no",
+   "ok": false
+  },
+  {
+   "metric": "время, мин",
+   "value": "7.5",
+   "ok": true
+  },
+  {
+   "metric": "вызовов модели",
+   "value": "9",
+   "ok": true
+  }
+ ],
+ "arbiter": {
+  "mode": "off",
+  "calls": 0,
+  "seconds": 0.0,
+  "cost_usd": 0.0,
+  "pending": 40,
+  "model": ""
+ },
+ "seconds": 0.04
+}

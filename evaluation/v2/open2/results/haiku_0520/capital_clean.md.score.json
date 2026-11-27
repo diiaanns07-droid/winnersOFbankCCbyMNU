@@ -1,0 +1,598 @@
+{
+ "schema": "bcc-v2-score/1",
+ "gold": {
+  "path": "evaluation/v2/open2/capital_clean/gold.yaml",
+  "document": "evaluation/v2/open2/capital_clean/source.md",
+  "sha256": "52f890ec94a1042c7c2e3943ed54cf1916264b50428c8032a9057ca67dad45df"
+ },
+ "report": {
+  "version": "v2",
+  "same_doc": true,
+  "document": {
+   "file": "source.md",
+   "format": "md",
+   "sha256": "52f890ec94a1042c7c2e3943ed54cf1916264b50428c8032a9057ca67dad45df",
+   "lines": 202
+  },
+  "status": "complete",
+  "provider": "claude_cli",
+  "model": "haiku",
+  "models_used": [
+   "claude-haiku-5-5"
+  ],
+  "commit": "79b0fa1",
+  "duration_s": 345.9,
+  "calls": {
+   "total": 9,
+   "cached": 0,
+   "failed": 0,
+   "split": 0
+  },
+  "tokens": {
+   "input": 295863,
+   "output": 134405
+  },
+  "cost_usd": 0.0993
+ },
+ "counts": {
+  "findings": 22,
+  "by_severity": {
+   "critical": 3,
+   "major": 8,
+   "minor": 11
+  },
+  "duplicates": 0,
+  "outside_gold": {
+   "total": 19,
+   "real": 0,
+   "partial": 0,
+   "false": 0,
+   "duplicate": 0,
+   "gold": 0,
+   "unknown": 19
+  },
+  "report_md_lines": 673
+ },
+ "recall": {
+  "critical": {
+   "found": [],
+   "n": 0,
+   "of": 5,
+   "as_critical": [],
+   "lenient": []
+  },
+  "major": {
+   "found": [],
+   "n": 0,
+   "of": 20,
+   "lenient": []
+  },
+  "minor": {
+   "found_parents": [
+    "М1",
+    "М2",
+    "М3"
+   ],
+   "of": 4,
+   "parts_found": [
+    "М1",
+    "М2",
+    "М3"
+   ]
+  },
+  "key_25": {
+   "n": 0,
+   "of": 25,
+   "lenient": 0,
+   "loose_any_edge": 0
+  },
+  "all_items": {
+   "n": 3,
+   "of": 4
+  },
+  "parents": {
+   "n": 3,
+   "of": 4
+  }
+ },
+ "precision": {
+  "matched": 3,
+  "duplicates": 0,
+  "outside_real": 0,
+  "outside_false": 0,
+  "outside_unknown": 19,
+  "outside_partial": 0,
+  "precision_useful": 0.136,
+  "precision_gold": 0.136
+ },
+ "severity": {
+  "pairs": 3,
+  "ok": 3,
+  "exact": 3,
+  "accuracy_ok": 1.0,
+  "accuracy_exact": 1.0,
+  "critical_false": [
+   {
+    "finding": "D-01",
+    "title": "Выбор карты выплаты: нет операции, которая отдаёт список карт клиента",
+    "reason": "вне эталона"
+   },
+   {
+    "finding": "D-02",
+    "title": "Время выплаты 31-го числа не задано: выплата может пройти до начисления за этот день",
+    "reason": "вне эталона"
+   },
+   {
+    "finding": "D-03",
+    "title": "Повтор выбора «На карту» при заблокированной карте: 200 или 400, порядок проверок не задан",
+    "reason": "вне эталона"
+   }
+  ],
+  "rows": [
+   {
+    "gold": "М1",
+    "level": "minor",
+    "finding": "D-19",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М2",
+    "level": "minor",
+    "finding": "D-21",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М3",
+    "level": "minor",
+    "finding": "D-18",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   }
+  ]
+ },
+ "quotes": {
+  "total": 55,
+  "missing": 0,
+  "fuzzy": 0,
+  "line_mismatch": 0,
+  "verified_field_missing": 0,
+  "findings_without_evidence": [],
+  "missing_list": []
+ },
+ "language": {
+  "generic": [],
+  "english": [
+   {
+    "finding": "D-13",
+    "field": "recommendation",
+    "word": "MoSCoW"
+   },
+   {
+    "finding": "Q-02",
+    "field": "why",
+    "word": "job"
+   }
+  ],
+  "english_report_md": [
+   "MoSCoW",
+   "job"
+  ]
+ },
+ "report_sections": {
+  "паспорт прогона": true,
+  "нарезка требований": true,
+  "проверка каждого требования": true,
+  "проверка набора": true,
+  "сводка": true,
+  "итог": true
+ },
+ "verdict": {
+  "got": {
+   "development": "no",
+   "testing": "no"
+  },
+  "expected": {
+   "development": "yes",
+   "testing": "yes"
+  }
+ },
+ "assignment": [
+  {
+   "gold": "М1",
+   "finding": "D-19",
+   "title": "Не указаны версия и дата документа, критерии приёмки без ID",
+   "severity": "minor",
+   "sources": [
+    "consistency",
+    "rules:placeholder.version"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М2",
+   "finding": "D-21",
+   "title": "Блок согласующих пуст: нет ни одного подразделения и подписи",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.approvals"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М3",
+   "finding": "D-18",
+   "title": "Раздел «Тестирование требований» не заполнен, стоит заглушка",
+   "severity": "minor",
+   "sources": [
+    "lens:qa",
+    "rules:placeholder.tbd"
+   ],
+   "how": "детерминированно"
+  }
+ ],
+ "duplicates": [],
+ "outside": [
+  {
+   "finding": "D-01",
+   "severity": "critical",
+   "kind": "missing_element",
+   "title": "Выбор карты выплаты: нет операции, которая отдаёт список карт клиента",
+   "sources": [
+    "lens:architect",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-02",
+   "severity": "critical",
+   "kind": "ambiguity",
+   "title": "Время выплаты 31-го числа не задано: выплата может пройти до начисления за этот день",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-03",
+   "severity": "critical",
+   "kind": "contradiction",
+   "title": "Повтор выбора «На карту» при заблокированной карте: 200 или 400, порядок проверок не задан",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-04",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Закрытие счёта в режиме «На карту»: получатель выплаты не определён",
+   "sources": [
+    "lens:qa",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-05",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "Закрытие счёта при недоступной карте: Ф-5 капитализирует, Ф-6 выплачивает остатком",
+   "sources": [
+    "lens:risk",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-06",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Закрытие счёта в режиме «Капитализация»: получатель выплаты не определён",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-07",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Граница месяца и 1-го числа без часового пояса: смена способа может сдвинуться",
+   "sources": [
+    "lens:risk",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-08",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Не определено, начисляются ли проценты за день закрытия счёта",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-09",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Ф-5: способ на следующий месяц при заблокированной карте не определён",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-10",
+   "severity": "major",
+   "kind": "status_conflict",
+   "title": "Закрытая или заблокированная карта: в статусах 400 и 404 описано по-разному",
+   "sources": [
+    "lens:architect",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-11",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Критерии приёмки покрывают только основной сценарий, ветки ошибок и повторов пропущены",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-12",
+   "severity": "minor",
+   "kind": "terminology",
+   "title": "Одни и те же компоненты названы разными терминами, глоссария нет",
+   "sources": [
+    "lens:architect",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-13",
+   "severity": "minor",
+   "kind": "other",
+   "title": "Приоритеты функциональных требований Ф-1…Ф-6 не заданы",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-14",
+   "severity": "minor",
+   "kind": "other",
+   "title": "Цель по снижению обращений в контакт-центр не измеряется требованиями",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-15",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Схема отката для функции выплат не описана, пункт шаблона не отмечен",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-16",
+   "severity": "minor",
+   "kind": "duplicate",
+   "title": "Правило о 1-м числе продублировано в бизнес-части и в логике API",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-17",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Sequence-диаграмма не содержит вызова истории начислений",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-20",
+   "severity": "minor",
+   "kind": "placeholder",
+   "title": "Чек-лист ревью не отмечен: в 14 пунктах оба варианта «Да / Нет»",
+   "sources": [
+    "rules:placeholder.checklist"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-22",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Ответ метода 2 не описан полями; тип payoutCardId не задан",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  }
+ ],
+ "misses": [
+  {
+   "gold": "М4",
+   "level": "minor",
+   "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+   "where": "есть близкое замечание, но не та проблема или не те строки",
+   "owners": [
+    "rules",
+    "analyst",
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-19",
+     "status": "disputed",
+     "score": 1.9,
+     "arbiter": ""
+    },
+    {
+     "finding": "D-13",
+     "status": "disputed",
+     "score": 1.3,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": []
+  }
+ ],
+ "stage_recall": {
+  "consistency": {
+   "candidates": 12,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:analyst": {
+   "candidates": 2,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:architect": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:qa": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:risk": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "rules": {
+   "candidates": 20,
+   "K": [],
+   "C": [],
+   "only_here": []
+  }
+ },
+ "gates": [
+  {
+   "metric": "К1–К5 найдены",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "из них критичными",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "С1–С20 найдены",
+   "value": "0/20",
+   "ok": true
+  },
+  {
+   "metric": "критичных ложных",
+   "value": "3",
+   "ok": false
+  },
+  {
+   "metric": "всего замечаний",
+   "value": "22",
+   "ok": true
+  },
+  {
+   "metric": "цитаты найдены в документе",
+   "value": "55/55",
+   "ok": true
+  },
+  {
+   "metric": "строк отчёта",
+   "value": "673",
+   "ok": true
+  },
+  {
+   "metric": "разделы п. 6 ТЗ",
+   "value": "6/6",
+   "ok": true
+  },
+  {
+   "metric": "общие фразы",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "английские слова",
+   "value": "4",
+   "ok": false
+  },
+  {
+   "metric": "вердикт разработка/тестирование",
+   "value": "no/no",
+   "ok": false
+  },
+  {
+   "metric": "время, мин",
+   "value": "5.8",
+   "ok": true
+  },
+  {
+   "metric": "вызовов модели",
+   "value": "9",
+   "ok": true
+  }
+ ],
+ "arbiter": {
+  "mode": "off",
+  "calls": 0,
+  "seconds": 0.0,
+  "cost_usd": 0.0,
+  "pending": 23,
+  "model": ""
+ },
+ "seconds": 0.02
+}
