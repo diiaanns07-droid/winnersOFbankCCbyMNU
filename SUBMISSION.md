@@ -7,7 +7,7 @@
 
 | Что | Где |
 | :--- | :--- |
-| Репозиторий | <https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/release> — ветка `release`; клонировать: `git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git` |
+| Репозиторий | <https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/main> — ветка `main` (= `release`, тот же коммит); клонировать: `git clone -b main https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git` |
 | Как запустить | [`README.md`](README.md), «Быстрый старт»: три шага на бесплатном Gemini, Windows и macOS/Linux |
 | Одна команда | `python -m bcc_review <файл требований> <файл отчёта.md>` |
 | Исходный документ | [`release/input/requirements.md`](release/input/requirements.md) — официальный, байт в байт; его PDF — [`release/input/requirements.pdf`](release/input/requirements.pdf); происхождение и SHA-256 — [`release/input/PROVENANCE.md`](release/input/PROVENANCE.md) |
@@ -24,8 +24,8 @@
 
 Каждый отчёт в корне `reports/` сформирован командой `python -m bcc_review …` без кэша и руками не правился.
 Коммит агента — в паспорте отчёта: это финальная сборка `bcc/v2` 27.11 (у `reports/demo_answers/` — более ранняя
-сборка, она названа в его README). Что изменилось в коде после неё в ветке `release`, показывает
-`git log --oneline <коммит из паспорта>..release -- src`. `python -m bcc_review verify отчёт.json исходник` заново
+сборка, она названа в его README). Что изменилось в коде после неё в ветке `main`, показывает
+`git log --oneline <коммит из паспорта>..main -- src`. `python -m bcc_review verify отчёт.json исходник` заново
 находит каждую цитату в исходнике и сверяет SHA-256 входа. Команды и сводка прогонов —
 [`reports/README.md`](reports/README.md).
 
@@ -66,11 +66,11 @@
       visibility → Public. Публичными станут все ветки и вся история; аудит секретов по всей истории всех веток
       пройден (только заведомые подделки в тестах). Если публиковать нельзя — Settings → Collaborators → Add people
       (логины жюри, роль Read).
-- [ ] **Ветка по умолчанию — `release`:** Settings → General → Default branch → ⇄ → `release` → Update. Сейчас по
-      умолчанию стоит ветка с разбором задачи (`claude/nice-edison-gpkcfl`), и жюри по ссылке без `/tree/release`
-      увидело бы её README. README и эта страница уже ведут на `release` (`git clone -b release`, `/tree/release`).
+- [ ] **Ветка по умолчанию — `main`:** Settings → General → Default branch → ⇄ → `main` → Update. Сейчас по
+      умолчанию стоит ветка с разбором задачи (`claude/nice-edison-gpkcfl`), и жюри по ссылке без `/tree/main`
+      увидело бы её README. README и эта страница уже ведут на `main` (`git clone -b main`, `/tree/main`).
 - [ ] **CI.** Для публичного репозитория Actions бесплатны — после открытия зелёные прогоны «Тесты» (3 ОС, Docker)
-      появятся на `release`. Для приватного: Settings → Billing and plans — сейчас задания не
+      появятся на `main`. Для приватного: Settings → Billing and plans — сейчас задания не
       стартуют из-за неуспешного платежа или лимита расходов.
 - [ ] **По желанию — секрет `GEMINI_API_KEY`:** Settings → Secrets and variables → Actions → New repository secret,
       имя `GEMINI_API_KEY`. Тогда Actions → «Сформировать отчёт» → Run workflow строит отчёт на Gemini прямо
@@ -78,6 +78,6 @@
 - [ ] **Видео:** `presentation/demo.mp4` открывается по ссылке выше. Если видео
       загружено ещё и на YouTube или Google Drive, вписать ссылку сюда: _____
 - [ ] **Проверка глазами жюри:** открыть репозиторий в окне инкогнито (или аккаунтом без доступа к команде): виден
-      README ветки `release`, ссылки на отчёт и видео открываются (`python scripts/check_links.py` — 0 битых).
-- [ ] **Форма сдачи:** ссылка на репозиторий (`…/winnersOFbankCCbyMNU/tree/release`), рядом — отчёт (`reports/requirements.md` или `.html`) и исходный
+      README ветки `main`, ссылки на отчёт и видео открываются (`python scripts/check_links.py` — 0 битых).
+- [ ] **Форма сдачи:** ссылка на репозиторий (`…/winnersOFbankCCbyMNU/tree/main`), рядом — отчёт (`reports/requirements.md` или `.html`) и исходный
       документ (`release/input/requirements.md`).
