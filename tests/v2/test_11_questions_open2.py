@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import glob
 import json
+import os
 import re
 from pathlib import Path
 
@@ -16,7 +17,10 @@ import pytest
 from bcc_review.v2.stages import clarify
 
 ROOT = Path(__file__).resolve().parents[2]
-REPORTS = sorted(glob.glob(str(ROOT / "evaluation" / "v2" / "open2" / "results" / "*" / "*.md.json")))
+# BCC_OPEN2_RESULTS — дополнительные каталоги с results/<метка>/*.md.json (например, ветка №18 до слияния)
+_DIRS = [ROOT / "evaluation" / "v2" / "open2" / "results"] + \
+    [Path(p) for p in os.environ.get("BCC_OPEN2_RESULTS", "").split(os.pathsep) if p]
+REPORTS = sorted({p for d in _DIRS for p in glob.glob(str(d / "*" / "*.md.json"))})
 _CODE = re.compile(r"\b(?:[DRC]-\d{1,3}|L\d{2,4})\b|lens:")
 
 
@@ -44,10 +48,12 @@ def test_questions_on_new_documents(path):
     for q in qs:
         linked = [by_id[i] for i in q["finding_ids"]]
         lines = {e.get("line_start") for e in q["evidence"]}
+        # стороны конфликта — различные цитаты (противоречие бывает внутри одной строки)
+        sides = clarify.count_sides(q["evidence"])
         assert lines, f"{q['id']}: нет цитаты"
         assert 2 <= len(q["options"]) <= 4, f"{q['id']}: вариантов {len(q['options'])}"
         if any(f.get("kind") in clarify.CONFLICT_KINDS for f in linked):
-            assert len(lines) >= 2, f"{q['id']}: у конфликта цитата одной стороны"
+            assert sides >= 2, f"{q['id']}: у конфликта цитата одной стороны"
         assert not all(clarify.is_formatting(f) for f in linked), f"{q['id']}: вопрос об оформлении"
         assert not any("<уточнить" in o for o in q["options"]), f"{q['id']}: <уточнить> в варианте"
         assert q["blocking"] == any(f["severity"] == "critical" and f.get("blocks", "both") != "none" for f in linked)

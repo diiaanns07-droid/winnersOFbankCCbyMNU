@@ -186,6 +186,27 @@ def verified_evidence(view: Any, items: Iterable[dict], near_lines: Iterable[int
     return out
 
 
+def is_new_side(e: dict, evidence: list[dict]) -> bool:
+    """Другая сторона: другая строка или та же строка, но цитата не входит в уже взятую (и наоборот)."""
+    q = _norm(e.get("quote", ""))
+    for x in evidence:
+        if x.get("line_start") != e.get("line_start"):
+            continue
+        p = _norm(x.get("quote", ""))
+        if not q or not p or q in p or p in q:
+            return False
+    return True
+
+
+def count_sides(evidence: list[dict]) -> int:
+    """Сколько различных сторон у цитат: противоречие бывает и внутри одной строки."""
+    taken: list[dict] = []
+    for e in evidence:
+        if is_new_side(e, taken):
+            taken.append(e)
+    return len(taken)
+
+
 def finding_lines(finding: dict) -> list[int]:
     return [int(e["line_start"]) for e in finding.get("evidence", []) if e.get("line_start")]
 
@@ -315,16 +336,15 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
         if all(is_formatting(by_id[fid]) for fid in ids):
             warnings.append(f"clarify: вопрос «{text[:60]}» отброшен — вопрос об оформлении")
             continue
-        # у конфликта — цитаты обеих сторон: недостающую сторону берём из сверенных цитат дефекта
+        # у конфликта — цитаты обеих сторон (различные цитаты: противоречие бывает внутри одной строки);
+        # недостающую сторону берём из сверенных цитат дефекта
         if any(by_id[fid].get("kind") in CONFLICT_KINDS for fid in ids):
-            lines_have = {e["line_start"] for e in evidence}
             for fid in ids:
                 for e in by_id[fid].get("evidence", []):
-                    if len(lines_have) >= 2 or len(evidence) >= 3:
+                    if count_sides(evidence) >= 2 or len(evidence) >= 3:
                         break
-                    if e.get("line_start") and e["line_start"] not in lines_have and e.get("verified", "exact") != "missing":
+                    if e.get("line_start") and e.get("verified", "exact") != "missing" and is_new_side(e, evidence):
                         evidence.append(dict(e))
-                        lines_have.add(e["line_start"])
         options = [plain_text(o, keep_codes) for o in clean_options(q.get("options") or [])]
         options = [o for o in options if len(o) >= 3]
         if len(options) < 2:

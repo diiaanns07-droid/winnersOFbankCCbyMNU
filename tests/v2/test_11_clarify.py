@@ -343,3 +343,12 @@ def test_finish_without_early_is_plain_run(findings):
 def test_start_without_llm_returns_none():
     ctx = FakeCtx(None)
     assert clarify.start(ctx, []) is None
+
+
+def test_sides_inside_one_line():
+    a = {"line_start": 36, "quote": "срок 25-го числа включительно"}
+    b = {"line_start": 36, "quote": "проценты начисляются с 26-го"}
+    c = {"line_start": 36, "quote": "25-го числа"}
+    assert clarify.count_sides([a, b]) == 2  # две разные цитаты одной строки — две стороны
+    assert clarify.count_sides([a, c]) == 1  # вложенная цитата — та же сторона
+    assert clarify.is_new_side({"line_start": 40, "quote": "x"}, [a])
