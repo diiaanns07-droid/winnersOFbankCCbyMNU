@@ -247,30 +247,35 @@ def report_facts(app: App | None, job: Job) -> dict[str, Any] | None:
     except (OSError, ValueError):
         return None
     from bcc_review.v2.render import html as H
+    from bcc_review.v2.render import jsonout as J
+    from bcc_review.v2.render import markdown as M
     findings = [f for f in report.get("findings") or [] if isinstance(f, dict)]
     run = report.get("run") or {}
     verdict = report.get("verdict") or {}
-    summary = report.get("summary") or {}
+    summary = report.get("summary") or J.compute_summary(report)
+    fs = summary.get("findings") or {}
     ok, total = H._quotes_verified(report)
     qv, qt = summary.get("quotes_verified"), summary.get("quotes_total")
     if isinstance(qv, int) and isinstance(qt, int) and not isinstance(qv, bool) and qt >= qv >= 0:
         ok, total = qv, qt
     status = run.get("status", "")
+    # блокеры — те же и в том же порядке, что на первом экране Markdown-отчёта и в итоге терминала
+    ctx = M._Ctx(report)
+    bl = M._blockers(ctx)
+    order = M._first_screen_fix(ctx, bl)
     blockers = []
-    for f in findings:
-        if H._sev(f) != "critical":
-            continue
+    for f in [f for f in order if f in bl] + [f for f in bl if f not in order]:
         ev0 = (f.get("evidence") or [{}])[0]
         sec = str(ev0.get("section") or "").split(" › ")[-1]
         blockers.append({"id": f.get("id", ""), "title": f.get("title", ""), "blocks": f.get("blocks", ""),
                          "where": H._lines_label(ev0) + (f" · {sec}" if sec else "")})
+    major = fs.get("major", sum(1 for f in J.open_findings(report) if H._sev(f) == "major"))
     present = {"clarify": bool(report.get("clarification")),
                "rewrites": bool(report.get("rewrites"))}
     return {
         "development": verdict.get("development", "") if status != "failed" else "",
         "testing": verdict.get("testing", "") if status != "failed" else "",
-        "critical": len(blockers), "major": sum(1 for f in findings if H._sev(f) == "major"),
-        "minor": sum(1 for f in findings if H._sev(f) == "minor"), "findings": len(findings),
+        "critical": len(blockers), "major": major, "findings": len(findings),
         "questions": len(report.get("questions") or []), "quotes_ok": ok, "quotes_total": total,
         "blockers": blockers, "status": status,
         "model": ", ".join(run.get("models_used") or []) or run.get("model_requested") or "",

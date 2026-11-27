@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 
 from bcc_review.v2.render import html as H
+from bcc_review.v2.render import jsonout as J
+from bcc_review.v2.render import markdown as M
 from bcc_review.v2.web import runner as R
 from bcc_review.v2.web import server as S
 
@@ -64,12 +66,18 @@ def _done_job(base: str) -> str:
     raise AssertionError("задание не завершилось")
 
 
-def _expected() -> dict:
-    rep = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    f = rep["findings"]
+def _expected(path: Path = FIXTURE) -> dict:
+    """Числа — как в Markdown-отчёте и итоге терминала: блокеры — markdown._blockers, счётчики — summary."""
+    rep = json.loads(path.read_text(encoding="utf-8"))
+    ctx = M._Ctx(rep)
+    bl = M._blockers(ctx)
+    order = M._first_screen_fix(ctx, bl)
+    s = rep.get("summary") or J.compute_summary(rep)
     ok, total = H._quotes_verified(rep)
-    return {"crit": [x["id"] for x in f if x["severity"] == "critical"],
-            "major": sum(1 for x in f if x["severity"] == "major"),
+    if isinstance(s.get("quotes_verified"), int) and isinstance(s.get("quotes_total"), int):
+        ok, total = s["quotes_verified"], s["quotes_total"]
+    return {"crit": [f["id"] for f in order if f in bl] + [f["id"] for f in bl if f not in order],
+            "major": (s.get("findings") or {}).get("major"),
             "questions": len(rep.get("questions") or []), "ok": ok, "total": total, "verdict": rep["verdict"]}
 
 
@@ -177,3 +185,23 @@ def test_html_report_embeds_new_css_and_keeps_dark_theme():
     assert "--crit-acc: #C2362B" in html and ":root[data-embed]" in html
     assert ':root[data-theme="dark"]' in html and "@media (prefers-color-scheme: dark)" in html
     assert 'id="report-data"' in html and "Исправить первым" in html
+
+
+def test_facts_follow_markdown_after_owner_answers(tmp_path):
+    """После ответов владельца снятое критичное замечание — не блокер (как в Markdown и терминале)."""
+    src = ROOT / "reports" / "demo_answers" / "qr" / "qr.round2.json"
+    store = R.JobStore(tmp_path)
+    job = store.create("qr.md", b"# x\n", "mock", "")
+    out = store.dir(job.id) / "out"
+    out.mkdir()
+    (out / "report.json").write_bytes(src.read_bytes())
+    job.state = "done"
+    app = S.App(store, None)  # type: ignore[arg-type]
+    f = S.report_facts(app, job)
+    exp = _expected(src)
+    assert [b["id"] for b in f["blockers"]] == exp["crit"]
+    assert (f["critical"], f["major"], f["questions"]) == (len(exp["crit"]), exp["major"], exp["questions"])
+    assert (f["quotes_ok"], f["quotes_total"]) == (exp["ok"], exp["total"])
+    assert f["has"]["rewrites"] and f["has"]["clarify"]
+    html = S.result_html(job, f)
+    assert "Блокеров нет" in html and 'data-ready="1"' in html and 'data-rtab="clarify"' in html
