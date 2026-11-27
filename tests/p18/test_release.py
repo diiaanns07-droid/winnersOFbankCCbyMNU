@@ -73,11 +73,16 @@ def test_verify_rejects_another_revision(tmp_path, source):
     run_cli(tmp_path, "verify", out.with_suffix(".json"), source, expected=contracts.EXIT_VERIFY_FAILED)
 
 
-def test_anthropic_without_team_key(tmp_path, source):
+@pytest.mark.parametrize(("extra", "exit_code"), [
+    ((), contracts.EXIT_OK),
+    (("--fail-on", "partial"), contracts.EXIT_PARTIAL),
+], ids=["default-report", "official-release"])
+def test_anthropic_without_team_key(tmp_path, source, extra, exit_code):
     out = tmp_path / "no-key.md"
-    run_cli(tmp_path, source, out, "--provider", "anthropic", "--no-cache")
+    run_cli(tmp_path, source, out, "--provider", "anthropic", "--no-cache", *extra, expected=exit_code)
     result = report(out)["run"]
     assert result["mode"] == "rules_only" and result["model"] is None
+    assert result["provider"] == "anthropic" and result["incomplete_stages"]
     assert result["status"] == "partial" and result["calls"]["physical"] == 0
     assert "ANTHROPIC_API_KEY" in " ".join(result["status_reasons"])
     run_cli(tmp_path, "verify", out.with_suffix(".json"), source)

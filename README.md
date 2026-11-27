@@ -4,7 +4,7 @@
 
 ## Запустить пример жюри без ключа
 
-Нужны Git и Python 3.11 или новее. Команды ниже получают официальную сборку Max `12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3`. Для закрытого репозитория используется учётная запись GitHub с доступом команды. [Интеграционная ветка](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/bcc/integration) · [Состав релиза](release/README.md)
+Нужны Git и Python 3.11 или новее. Отчёты для жюри упакованы в `0ffbbaa`. Команды ниже получают код агента, который их создал, — `12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3`. Для закрытого репозитория используется учётная запись GitHub с доступом команды. [Комплект для жюри](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/0ffbbaa1c36d547840d8831329eb173013bff4b4/release) · [Интеграционная ветка](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/bcc/integration)
 
 ```sh
 git clone --branch bcc/integration --single-branch https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git bcc-review
@@ -41,10 +41,9 @@ Max координирует платный запуск. Командный к�
 
 ```sh
 python -m pip install -e ".[anthropic]"
-python -m bcc_review release/input/requirements.md out/live/requirements.md --provider anthropic --no-cache --export html,jira --max-calls 40 --max-seconds 1800
-python -m bcc_review verify out/live/requirements.json release/input/requirements.md
+python -m bcc_review release/input/requirements.md out/live/requirements.md --provider anthropic --no-cache --fail-on partial --export html,jira --max-calls 40 --max-seconds 1800
 ```
 
-Для сдачи полного прогона нужны `rules_plus_llm`, статус `complete`, пустой список незавершённых этапов, фактическая модель, положительное число физических вызовов и успешный `verify`. Для PDF и Word доступны группы установки `.[pdf]` и `.[docx]`. [Демонстрация по материалам релиза](release/README.md)
+Код 5 у этой команды означает неполный прогон. Причина записана в `out/live/requirements.json`. После кода 0 выполните `python -m bcc_review verify out/live/requirements.json release/input/requirements.md` и сверьте паспорт по инструкции владельца. В нём должны быть `rules_plus_llm`, `complete`, фактическая модель, физические вызовы и SHA `12ed4d7`. Для PDF и Word доступны группы установки `.[pdf]` и `.[docx]`. [Приёмка официального отчёта](release/reports/live/README.md)
 
 Проверенный путь от чек-листа до решения аналитика, команды Docker и результаты установки на двух ОС собраны в [протоколе №18](packaging/README.md).
