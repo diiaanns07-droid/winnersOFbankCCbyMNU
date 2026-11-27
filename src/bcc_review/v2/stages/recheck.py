@@ -177,6 +177,26 @@ def parse_answers_json(data: Any) -> dict:
     return {"answers": [a for a in answers if a["id"]], "decisions": decisions}
 
 
+def read_answers_file(path: Path) -> str:
+    """Текст файла ответов в любой кодировке, в которой его сохранит Блокнот Windows.
+
+    UTF-8 (с BOM и без) → UTF-16 с BOM («Юникод») → cp1251 («ANSI» русской Windows). Раньше файл в ANSI
+    давал UnicodeDecodeError, и режим --answers молча не выполнялся (код выхода 0, без предупреждения).
+    """
+    data = path.read_bytes()
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        pass
+    try:
+        return data.decode("cp1251")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"файл ответов {path.name} не в UTF-8: откройте его в Блокноте и сохраните "
+                         f"с кодировкой UTF-8") from exc
+
+
 def load_answers(source: Any) -> dict:
     """Путь к ``answers.md|json``, строка с текстом ответов или уже разобранный объект."""
     if isinstance(source, (dict, list)):
@@ -184,7 +204,7 @@ def load_answers(source: Any) -> dict:
     s = str(source or "")
     p = Path(s) if len(s) < 4096 and "\n" not in s else None
     if p is not None and p.exists():
-        text = p.read_text(encoding="utf-8-sig")
+        text = read_answers_file(p)
         if p.suffix.lower() == ".json":
             return parse_answers_json(json.loads(text))
     else:
