@@ -80,5 +80,28 @@ def test_new_offline_rules_silent_on_clean_documents() -> None:
     for p in paths:
         out = rules.run(docview.load(str(p)))
         bad = [c["title"] for c in out["candidates"]
-               if c["source"].startswith(("rules:ops.", "rules:conflicts.event_quantity"))]
+               if c["source"].startswith(("rules:ops.", "rules:conflicts.event_quantity", "rules:language.nfr_no_share"))]
         assert bad == [], (p, bad)
+
+
+NFR = """# Выписка
+
+## Нефункциональные требования
+Сервис формирует выписку в течение 30 секунд после запроса клиента.
+"""
+
+
+def test_nfr_time_without_share(tmp_path: Path) -> None:
+    c = _src(_run(tmp_path, NFR), "rules:language.nfr_no_share")
+    assert len(c) == 1 and c[0]["severity"] == "major" and c[0]["evidence"][0]["line"] == 4
+
+
+def test_nfr_share_anywhere_or_batch_is_silent(tmp_path: Path) -> None:
+    for text in (
+        NFR.replace("после запроса клиента.", "после запроса клиента для 95 % запросов."),
+        NFR.replace("после запроса клиента.", "после запроса для 95 процентов запросов."),
+        NFR + "Методы отвечают не дольше 1 с для 99 % запросов при нагрузке 50 в секунду.\n",  # доля задана рядом
+        NFR.replace("Сервис формирует выписку", "Пакетный расчёт за месяц выполняется"),
+        NFR.replace("## Нефункциональные требования", "## Функциональные требования"),
+    ):
+        assert _src(_run(tmp_path, text), "rules:language.nfr_no_share") == [], text

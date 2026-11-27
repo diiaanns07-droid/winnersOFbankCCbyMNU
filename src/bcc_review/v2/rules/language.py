@@ -109,6 +109,56 @@ NFR_VAGUE = re.compile(
     r"\bотказоустойчив\w*|\bвысок\w+\s+(?:доступност|производительност|скорост)\w*", re.I)
 
 
+# срок в НФТ: «в течение минуты», «не позднее 5 с», «не дольше 500 мс», «за 2 секунды»
+NFR_TIME = re.compile(
+    r"\b(?:в\s+течение|не\s+позднее|не\s+позже|не\s+дольше|не\s+более|не\s+больше|за|до)\s+"
+    r"(?:\d+(?:[.,]\d+)?\s*|од(?:ну|ной|ин)\s+|дв[ае]\s+|тр[её]х?\s+|пят\w*\s+|десят\w*\s+)?"
+    r"(?:мс|миллисекунд\w*|с\b|сек\w*|секунд\w*|минут\w*|мин\b|час\w*)", re.I)
+# доля операций, на которой меряется срок: «для 95 % запросов», «p95», «95-й перцентиль», «в 99 % случаев»
+NFR_SHARE = re.compile(r"\d+(?:[.,]\d+)?\s*%|\bp\d{2}\b|перцентил|процентил|percentile|квантил|\bпроцент\w*", re.I)
+# пакетная или регламентная задача — одна операция, доля к ней неприменима
+NFR_BATCH = re.compile(r"пакетн|регламентн|ежемесячн|ежедневн|ночн\w+\s+(?:обработк|задач|расч)|\bраз\s+в\s+(?:сутки|день|месяц)",
+                       re.I)
+
+
+def _nfr_share(doc: Doc, out: dict) -> None:
+    """НФТ со сроком, а доли операций нет ни в одном НФТ документа: «в течение минуты после получения события» — для
+    каждой операции, в среднем или для 99 %? Если доля где-то задана, отдельные сроки (тайм-ауты) не трогаем."""
+    hits = []
+    nfr = [x for x in doc.lines if x.text and not x.is_code and not x.is_heading
+           and (NFR_SECTION.search(x.section or "") or NFR_ID.match(x.text))]
+    if any(NFR_SHARE.search(x.joined) for x in nfr):
+        return  # доля операций где-то задана — отдельные сроки (тайм-ауты, свежесть данных) судим не по этому правилу
+    for x in nfr:
+        if x.cells is not None:
+            continue
+        for part in re.split(r"(?<=[.;])\s+(?=(?:\*\*)?[А-ЯЁA-Z])", x.joined):
+            m = NFR_TIME.search(part)
+            if m and not NFR_SHARE.search(part) and not NFR_BATCH.search(part) \
+                    and all(h[1] != part.strip() for h in hits):
+                hits.append((x, part.strip(), m.group(0)))
+                break
+    if not hits:
+        return
+    x, part, when = hits[0]
+    out["candidates"].append(candidate(
+        "language.nfr_no_share",
+        title=f"Срок в нефункциональном требовании без доли операций: {quoted(when)}",
+        kind="unverifiable", criterion="verifiable", severity="major", blocks="testing",
+        evidence=[ev(h[0], h[1]) for h in hits[:3]],
+        problem=(f"{quoted(part)}: срок есть, но не сказано, для какой доли операций он выполняется (каждая, 95 % или "
+                 "99 % за сутки), при какой нагрузке и где начинается и заканчивается замер."
+                 + (f" Таких мест: {len(hits)}." if len(hits) > 1 else "")),
+        scenario=("Нагрузочный тест: 98 % операций укладываются в срок, 2 % — нет. Одна сторона считает требование "
+                  "выполненным, другая — нарушенным: «каждая операция» или «в среднем» документ не уточняет."),
+        impact="Требование нельзя принять или отклонить; эксплуатация не знает, при какой задержке поднимать тревогу.",
+        recommendation=("Добавить долю операций и условия замера: «… для 95 % (99 %) операций за сутки при нагрузке до "
+                        "N в секунду; замер — от получения события до передачи сообщения»."),
+        rewrite=f"{part.rstrip('.')} для <уточнить: 95 или 99> % операций за сутки при нагрузке до <уточнить: N> в секунду.",
+        question="Для какой доли операций и при какой нагрузке должен выполняться этот срок?",
+    ))
+
+
 def _nfr_candidate(doc: Doc, out: dict) -> None:
     """Нефункциональное требование без числа, но с размытым сроком или оценкой: «быстро», «мгновенно»."""
     hits = []
@@ -149,6 +199,7 @@ def _nfr_candidate(doc: Doc, out: dict) -> None:
 
 def run(doc: Doc, out: dict, requirements: list[dict] | None = None, excluded: list[dict] | None = None) -> None:
     _nfr_candidate(doc, out)
+    _nfr_share(doc, out)
     open_list_done = False
     for x in obligation_lines(doc, requirements, excluded):
         text = x.joined
