@@ -1050,7 +1050,11 @@ def write_outputs(report: dict, view: dict | None, input_path: Path, out_md: Pat
     md_text = ""
     try:
         from .render import markdown
-        md_text = markdown.render(report)
+        try:
+            # пути из командной строки — чтобы команды проверки и повтора в паспорте выполнялись как есть (№33)
+            md_text = markdown.render(report, out_path=out_md, doc_path=input_path)
+        except TypeError:  # рендер без doc_path: прежний паспорт
+            md_text = markdown.render(report)
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"Отчёт Markdown собран упрощённо: {type(exc).__name__}: {exc}")
         md_text = fallback_markdown(report)

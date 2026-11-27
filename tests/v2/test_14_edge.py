@@ -556,7 +556,8 @@ def test_same_input_gives_same_markdown(tmp_path):
 
         lens.run_named = chained
         try:
-            _, written, _ = _review(tmp_path, OFFICIAL, name="det" + order[0], provider="mock")
+            # одно имя отчёта в разных папках: паспорт пишет команды с путём отчёта (№33/№22), абсолютный — по имени
+            _, written, _ = _review(tmp_path / order[0], OFFICIAL, name="det", provider="mock")
         finally:
             lens.run_named = real
         md = Path(written["md"]).read_text(encoding="utf-8")

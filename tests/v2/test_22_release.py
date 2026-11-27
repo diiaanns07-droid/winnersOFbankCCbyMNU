@@ -31,3 +31,25 @@ def test_normal_document_exit_code_0(tmp_path):
     official = Path(__file__).resolve().parents[2] / "release" / "input" / "requirements.md"
     assert main([str(official), str(tmp_path / "r.md"), "--provider", "mock", "-q", "--no-html",
                  "--runs-dir", str(tmp_path / "runs")]) == 0
+<<<<<<< HEAD
+=======
+
+
+def test_passport_commands_use_command_line_paths(tmp_path, monkeypatch):
+    """Команды проверки в паспорте — с путями из командной строки (просьба №33, их af4969c9); без doc_path у рендера —
+    прежний паспорт, а не упрощённый отчёт."""
+    import inspect
+    from pathlib import Path
+    from bcc_review.v2 import pipeline
+    from bcc_review.v2.render import markdown
+    root = Path(__file__).resolve().parents[2]
+    monkeypatch.chdir(root)
+    out = tmp_path / "reports" / "r.md"
+    report, written = pipeline.review("release/input/requirements.md", out,
+                                      {"provider": "mock", "runs_dir": str(tmp_path / "runs"), "html": False})
+    md = Path(written["md"]).read_text(encoding="utf-8")
+    assert not any("упрощённо" in w for w in report["run"]["warnings"])
+    if "doc_path" in inspect.signature(markdown.render).parameters:
+        line = next(x for x in md.splitlines() if "bcc_review verify" in x)
+        assert "release/input/requirements.md" in line and "r.json" in line
+>>>>>>> 80b4f371
