@@ -719,25 +719,27 @@ _VAGUE = re.compile(r"быстр|мгновенн|моментальн|свое�
                     r"высок\w* нагрузк|надёжн|надежн|\bточно\b|без ошибок|круглосуточн", re.I)
 
 
-def calibrate_nfr_contradictions(cands: list[dict], reqs: list[Mapping[str, Any]]) -> None:
+def calibrate_nfr_contradictions(cands: list[dict], reqs: list[Mapping[str, Any]]) -> list[dict]:
     """Противоречие модели, одна сторона которого — нефункциональное требование (срок, окно отправки, свежесть
-    данных, доступность), — ``minor``: такое требование задаёт качество, а не исход операции, и расхождение с
-    функциональным правилом — уточнение условий, а не два ожидаемых результата одного теста. На чистых ТЗ №18
-    haiku давал так major в 4 из 5 прогонов grace_clean («напоминание после 12:00», «платёж за последние 5
-    минут»); в эталонах официального документа и №18 таких противоречий нет (строки НФТ — только в пунктах о
-    проверяемости)."""
+    данных, доступность), снимается в ``dropped``: такое требование задаёт качество, а не исход операции, и
+    расхождение с функциональным правилом — уточнение условий, а не два ожидаемых результата одного теста. На
+    чистых ТЗ №18 haiku давал так major в 5 из 6 прогонов grace_clean («напоминание после 12:00», «платёж за
+    последние 5 минут»), а судья поднимал и minor обратно до major; в эталонах официального документа и №18
+    таких противоречий нет (строки НФТ — только в пунктах о проверяемости, их даёт ``nfr_checks``)."""
     nfr = [(_int(r.get("line_start")), _int(r.get("line_end")) or _int(r.get("line_start")))
            for r in reqs if r.get("kind") == "nonfunctional" and _int(r.get("line_start"))]
-    if not nfr:
-        return
-    for c in cands:
-        if c.get("kind") not in _CONFLICT_FAMILY or c.get("origin") or c["severity"] == "minor":
+    out: list[tuple[dict, dict]] = []
+    for c in cands if nfr else []:
+        if c.get("kind") not in _CONFLICT_FAMILY or c.get("origin"):
             continue
         lines = [e.get("line") for e in c["evidence"] if e.get("line")]
         if any(lo <= n <= hi for n in lines for lo, hi in nfr):
-            c.setdefault("severity_hint", c["severity"])
-            c["severity"] = "minor"
-            c["calibrated"] = "nfr_side"
+            out.append((c, {**c, "reason": "снято линзой тестировщика: одна сторона — нефункциональное требование "
+                                          "(качество, а не исход операции); это уточнение условий, а не два "
+                                          "ожидаемых результата одного теста"}))
+    gone = {id(c) for c, _ in out}
+    cands[:] = [c for c in cands if id(c) not in gone]
+    return [d for _, d in out]
 
 
 def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) -> list[dict]:
@@ -1017,7 +1019,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     kept, dropped = limit_other_candidates(kept)
     calibrate_coverage(kept, checks, reqs, tests)
     dropped += calibrate_verifiability(kept, reqs)
-    calibrate_nfr_contradictions(kept, reqs)
+    dropped += calibrate_nfr_contradictions(kept, reqs)
     if len(kept) > MAX_MODEL_CANDIDATES:
         warnings.append(f"{STAGE}: кандидатов модели {len(kept)}, оставлено {MAX_MODEL_CANDIDATES}")
         rank = {"critical": 0, "major": 1, "minor": 2}

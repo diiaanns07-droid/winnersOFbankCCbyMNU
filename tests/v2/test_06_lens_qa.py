@@ -753,16 +753,16 @@ def test_status_conflict_on_row_without_code_is_not_conflict():
     assert lens_qa.normalize_check(dict(raw, stated="Статус DONE"))["verdict"] == "conflict"
 
 
-def test_model_contradiction_with_nfr_side_is_minor():
-    """Противоречие модели, одна сторона которого — НФТ (окно отправки, свежесть данных), — minor; два функциональных
+def test_model_contradiction_with_nfr_side_is_dropped():
+    """Противоречие модели, одна сторона которого — НФТ (окно отправки, свежесть данных), — в dropped; два функциональных
     правила — major, как было."""
     reqs = REQS + [{"id": "R-09", "kind": "nonfunctional", "line_start": 46, "line_end": 46}]
     base = {"title": "Два исхода", "kind": "contradiction", "criterion": "set_consistent", "severity": "major",
             "requirement_ids": ["R-01", "R-09"], "evidence": [{"quote": "a", "line": 10}, {"quote": "b", "line": 46}],
             "problem": "p", "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "", "question": "",
             "blocks": "both"}
-    c = lens_qa.postprocess({"candidates": [base]}, reqs)["candidates"][0]
-    assert c["severity"] == "minor" and c["severity_hint"] == "major"
+    out = lens_qa.postprocess({"candidates": [base]}, reqs)
+    assert out["candidates"] == [] and "нефункциональное" in out["dropped"][0]["reason"]
     two = dict(base, evidence=[{"quote": "a", "line": 10}, {"quote": "b", "line": 12}])
     assert lens_qa.postprocess({"candidates": [two]}, reqs)["candidates"][0]["severity"] == "major"
 
