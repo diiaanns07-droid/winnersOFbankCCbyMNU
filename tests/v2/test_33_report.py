@@ -120,3 +120,18 @@ def test_same_markdown_under_different_hash_seeds():
     outs = {subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=ROOT,
                            env=dict(os.environ, PYTHONHASHSEED=seed), check=True).stdout for seed in ("0", "1", "777")}
     assert len(outs) == 1
+
+
+def test_stage_warnings_read_as_russian_sentences():
+    """Паспорт и терминал: судья пишет repr заголовка, обрезанного на 60 знаков, и «понижен до major»."""
+    from bcc_review.v2.render import console
+
+    judge = ("судья: 'Событие «проведённые покупки» не выбрано: авторизация или кл' понижен до major "
+             "(критичный подтвердил только один ревьюер)")
+    clar = "clarify: вопрос «Где клиент заполняет анкету здоровья для страхования, какие » отброшен — повтор"
+    for out in (markdown.warn_text(judge), console.plain_warn(judge)):
+        assert "«Событие «проведённые покупки» не выбрано: авторизация или…» понижен до существенного" in out
+        assert "'" not in out
+    for out in (markdown.warn_text(clar), console.plain_warn(clar)):
+        assert "«Где клиент заполняет анкету здоровья для страхования, какие…» отброшен" in out
+    assert "«Короткий?» отброшен" in markdown.warn_text("clarify: вопрос «Короткий?» отброшен — повтор")

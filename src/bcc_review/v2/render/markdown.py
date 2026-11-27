@@ -381,10 +381,35 @@ _PRODUCT = re.compile(r"(?<![«\w`])(?:Claude Code|Google AI Studio|Google Gemin
 _FLAG = re.compile(r"(?<![\w`-])--[a-z][\w-]*(?:[ =](?![а-яё])[A-Za-z0-9][\w.:-]*)?")
 
 
+_SEV_GEN = {"critical": "критичного", "major": "существенного", "minor": "незначительного"}
+_SEV_AFTER_DO = re.compile(r"\bдо (critical|major|minor)\b")
+# «судья: 'Заголовок, обрезанный на 60 знаков' понижен до major (…)» — repr Python в тексте этапа
+_REPR_CUT = re.compile(r"(?<![\w«])(['\"])(.{1,60}?)\1(?= понижен| повышен| снят| объединён| отклонён)")
+# «вопрос «текст[:60]» отброшен — …» (этап вопросов)
+_QUOTE_CUT = re.compile(r"(вопрос\w* «)(.{60})(» отброшен)")
+CUT_AT = 60
+
+
+def _cut_mark(inner: str) -> str:
+    """Обрезанный этапом на CUT_AT знаков заголовок — по границе слова и с многоточием («…или кл» → «…или…»)."""
+    if len(inner) < CUT_AT:
+        return inner
+    sp = inner.rfind(" ")
+    return (inner[:sp] if sp > CUT_AT * 0.6 else inner).rstrip(" ,.;:—-") + "…"
+
+
+def warn_quotes(s: str) -> str:
+    """Тексты этапов о дефектах и вопросах: «'…' понижен до major» → «… понижен до существенного», обрезка на
+    60 знаков — с многоточием (было: «…авторизация или кл'»)."""
+    s = _SEV_AFTER_DO.sub(lambda m: "до " + _SEV_GEN[m.group(1)], s)
+    s = _REPR_CUT.sub(lambda m: f"«{_cut_mark(m.group(2))}»", s)
+    return _QUOTE_CUT.sub(lambda m: m.group(1) + _cut_mark(m.group(2)) + m.group(3), s)
+
+
 def warn_text(text) -> str:
     """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», «lens_risk» → «Риски», critical → критичный;
     служебные префиксы исключений («BudgetExceeded: judge: budget:») убираются."""
-    s = dejargon(" ".join(str(text or "").split()))
+    s = warn_quotes(dejargon(" ".join(str(text or "").split())))
     m = _STAGE_PREFIX.match(s)
     if m and stage_key(m.group(1)) in STAGES:
         s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
