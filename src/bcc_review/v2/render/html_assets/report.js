@@ -44,8 +44,7 @@
     t.addEventListener("click", function () {
       showTab(t.dataset.tab);
       history.replaceState(null, "", "#" + t.dataset.tab);
-      var y = $(".tabs").getBoundingClientRect().top + window.scrollY - parseInt(getComputedStyle(root).getPropertyValue("--top-h"), 10);
-      if (window.scrollY > y) window.scrollTo({ top: y });
+      window.scrollTo({ top: 0 });  /* панель разделов внизу (№41): новый раздел — с начала листа */
     });
     t.addEventListener("keydown", function (ev) {
       var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
@@ -60,16 +59,15 @@
     var el = lineEl(n);
     if (!el) return;
     if (doc.classList.contains("onlyhl") && !el.classList.contains("hl")) { $("#onlyhl").checked = false; doc.classList.remove("onlyhl"); }
-    var top = el.offsetTop - doc.clientHeight / 3;
-    doc.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    if (doc.scrollHeight > doc.clientHeight + 4) {
+      doc.scrollTo({ top: Math.max(0, el.offsetTop - doc.clientHeight / 3), behavior: "smooth" });
+    } else {  /* лист на столе (№41): прокручивается страница, строка встаёт на треть экрана */
+      window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3), behavior: "smooth" });
+    }
     var last = parseInt(n2 || n, 10);
     for (var k = parseInt(n, 10); k <= last; k++) {
       var x = lineEl(k);
       if (x) { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); }
-    }
-    if (window.matchMedia("(max-width: 960px)").matches) {
-      var pane = $(".docpane");
-      if (pane) pane.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
   function clearSel() {
@@ -324,4 +322,244 @@
   }
   window.addEventListener("hashchange", fromHash);
   fromHash();
+})();
+
+/* ── лист на столе (№41): печать-вердикт, заметки на полях с линиями к строкам, карта листа,
+ *    исправленная редакция «как у юриста», пометки рисуются пером. Содержание отчёта не меняется. ── */
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var root = document.documentElement;
+  var NS = "http://www.w3.org/2000/svg";
+  var data = {};
+  try { data = JSON.parse(($("#report-data") || {}).textContent || "{}"); } catch (_) { data = {}; }
+  var split = $(".split"), pane = $(".docpane"), doc = $("#doc"), box = $("#cards"), flist = $(".flist");
+  var cards = box ? $$(".card", box) : [];
+  var LBL = { no: "нельзя", conditional: "с условиями", yes: "можно", undetermined: "не определён" };
+  function plural(n, a, b, c) { var m = Math.abs(n) % 100, k = m % 10; return m > 10 && m < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; }
+  function esc(t) { var d = document.createElement("div"); d.textContent = t == null ? "" : String(t); return d.innerHTML; }
+  function el(tag, cls, html) { var x = document.createElement(tag); if (cls) x.className = cls; if (html != null) x.innerHTML = html; return x; }
+  function resolved(f) { return f.status === "resolved" || f.status_after_answers === "resolved"; }
+
+  /* печать: те же вердикт и блокеры, что в Markdown и в итоге терминала */
+  function stamp() {
+    if (!pane || $(".stamp-box", pane)) return;
+    var run = data.run || {}, v = data.verdict || {}, s = data.summary || {};
+    var offline = run.provider === "offline";
+    var bl = (data.findings || []).filter(function (f) {
+      return !resolved(f) && ["development", "testing", "both"].indexOf(f.blocks) >= 0 &&
+        (f.severity === "critical" || (offline && f.rule_conflict));
+    });
+    var failed = run.status === "failed";
+    var dev = failed ? "" : (v.development || ""), test = failed ? "" : (v.testing || "");
+    var cls = { no: "v-no", conditional: "v-cond", yes: "v-yes" }[dev] || "v-none";
+    var head = dev === "no" ? "Нельзя в разработку" : dev === "yes" ? "Можно в разработку"
+      : dev === "conditional" ? "В разработку с условиями" : "Вердикт не вынесен";
+    var n = bl.length;
+    var small = [n ? n + " " + plural(n, "блокер", "блокера", "блокеров") : (dev === "yes" ? "блокеров нет" : ""),
+      test ? "тестирование: " + (LBL[test] || test) : ""].filter(Boolean).join(" · ");
+    var ok = 0, total = 0;
+    if (typeof s.quotes_verified === "number" && typeof s.quotes_total === "number" && s.quotes_verified % 1 === 0) {
+      ok = s.quotes_verified; total = s.quotes_total;
+    } else {
+      (data.findings || []).forEach(function (f) {
+        (f.evidence || []).forEach(function (e) { total++; if (["exact", "normalized", "fuzzy"].indexOf(e.verified) >= 0) ok++; });
+      });
+    }
+    var d = parseFloat(run.duration_s);
+    var dur = isFinite(d) ? (d >= 60 ? (d / 60).toFixed(1).replace(".", ",") + " мин" : Math.round(d) + " с") : "";
+    var meta = [total ? "цитат сверено " + ok + " из " + total : "", (run.models_used || []).join(", ") || run.model_requested || "", dur]
+      .filter(Boolean).join(" · ");
+    var b = el("div", "stamp-box");
+    b.innerHTML = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">' +
+      '<filter id="stamp-ink" x="-10%" y="-10%" width="120%" height="120%">' +
+      '<feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" result="n"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="d"/>' +
+      '<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -2.6 0 0 0 2.2" result="m"/>' +
+      '<feComposite in="d" in2="m" operator="in"/></filter></svg>' +
+      '<div class="stamp ' + cls + '" role="img" aria-label="' + esc(head + (small ? ": " + small : "")) + '"><b>' + esc(head) + "</b>" +
+      (small ? "<small>" + esc(small) + "</small>" : "") + "</div>" + (meta ? '<div class="stamp-meta">' + esc(meta) + "</div>" : "");
+    pane.insertBefore(b, pane.firstChild);
+  }
+
+  /* итог агента — на полях над заметками, рядом с печатью */
+  function resolution() {
+    var ht = $(".hero-text");
+    if (!ht || !flist || $(".resolution", flist)) return;
+    var r = el("div", "resolution", '<div class="rl">Итог агента</div>');
+    r.appendChild(ht);
+    flist.insertBefore(r, flist.firstChild);
+  }
+
+  /* заметки на полях: каждая — напротив своей строки, тонкая линия к месту; на узком экране — под строкой */
+  var wide = window.matchMedia ? window.matchMedia("(min-width: 1001px)") : { matches: true };
+  var svg = null, raf = 0, inlined = false;
+  function lineOf(c) { return doc ? doc.querySelector('.ln[data-n="' + (c.dataset.line || (c.dataset.lines || "").split(" ")[0]) + '"]') : null; }
+  function setInline(on) {
+    if (on === inlined || !doc || !box) return;
+    inlined = on;
+    if (on) {
+      var last = {};
+      cards.forEach(function (c) {
+        var ln = lineOf(c);
+        if (!ln) return;
+        var after = last[ln.dataset.n] || ln;
+        after.parentNode.insertBefore(c, after.nextSibling);
+        last[ln.dataset.n] = c;
+        c.style.top = "";
+      });
+    } else {
+      var empty = $(".empty", box);
+      cards.forEach(function (c) { box.insertBefore(c, empty); });
+    }
+  }
+  function layout() {
+    raf = 0;
+    if (!split || !doc || !box || !pane || !pane.offsetParent) return;
+    if (!wide.matches) { setInline(true); box.style.height = ""; if (svg) svg.innerHTML = ""; return; }
+    setInline(false);
+    var base = box.getBoundingClientRect().top;
+    var items = cards.filter(function (c) { return !c.hidden; }).map(function (c) {
+      var ln = lineOf(c);
+      return { c: c, ln: ln, y: ln ? ln.getBoundingClientRect().top - base : 0 };
+    }).sort(function (a, b) { return a.y - b.y || (+b.c.dataset.rank - +a.c.dataset.rank); });
+    var cur = 0, gap = 6;
+    var seq = function (list) { list.forEach(function (it) { it.top = Math.max(it.y - 3, cur); cur = it.top + it.c.offsetHeight + gap; }); };
+    var ai = -1;
+    items.forEach(function (it, i) { if (it.c.classList.contains("active")) ai = i; });
+    if (ai < 0) {
+      seq(items);
+    } else {  /* раскрытая заметка стоит напротив своей строки, соседние расступаются вверх и вниз */
+      var A = items[ai], lim;
+      A.top = Math.max(0, A.y - 3);
+      lim = A.top - gap;
+      for (var i = ai - 1; i >= 0; i--) { items[i].top = Math.min(items[i].y - 3, lim - items[i].c.offsetHeight); lim = items[i].top - gap; }
+      if (ai > 0 && items[0].top < 0) { cur = 0; seq(items.slice(0, ai)); A.top = Math.max(A.top, cur); }
+      cur = A.top + A.c.offsetHeight + gap;
+      seq(items.slice(ai + 1));
+    }
+    items.forEach(function (it) { it.c.style.top = Math.round(it.top) + "px"; });
+    box.style.height = Math.max(cur, 0) + "px";
+    links(items);
+  }
+  function links(items) {
+    if (!svg) { svg = document.createElementNS(NS, "svg"); svg.setAttribute("class", "links"); svg.setAttribute("aria-hidden", "true"); split.appendChild(svg); }
+    var sr = split.getBoundingClientRect(), pr = pane.getBoundingClientRect();
+    svg.setAttribute("width", Math.round(sr.width));
+    svg.setAttribute("height", Math.round(Math.max(split.scrollHeight, sr.height)));
+    var x1 = pr.right - sr.left, out = [], any = false;
+    items.forEach(function (it) {
+      if (!it.ln) return;
+      var lr = it.ln.getBoundingClientRect(), cr = it.c.getBoundingClientRect();
+      var y1 = lr.top - sr.top + Math.min(13, lr.height / 2), x2 = cr.left - sr.left + 2, y2 = cr.top - sr.top + 15;
+      var on = it.c.classList.contains("active");
+      any = any || on;
+      var k = Math.max(16, (x2 - x1) / 2);
+      out.push('<path class="' + (on ? "on " : "") + "sev-" + it.c.dataset.sev + '" d="M' + x1.toFixed(1) + " " + y1.toFixed(1) +
+        " C" + (x1 + k).toFixed(1) + " " + y1.toFixed(1) + " " + (x2 - k).toFixed(1) + " " + y2.toFixed(1) + " " + x2.toFixed(1) + " " + y2.toFixed(1) + '"/>');
+    });
+    svg.innerHTML = out.join("");
+    svg.setAttribute("class", "links" + (any ? " focus" : ""));
+  }
+  function relayout() { if (!raf) raf = requestAnimationFrame(layout); }
+
+  /* карта листа: рамка видимой части едет вместе со страницей */
+  function mapView() {
+    var mm = $("#minimap"), vw = mm && $(".vw", mm);
+    if (!vw || !doc || !mm.clientHeight) return;
+    var r = doc.getBoundingClientRect(), H = r.height || 1, h = mm.clientHeight;
+    vw.style.top = (Math.min(H, Math.max(0, -r.top + 60)) / H * h) + "px";
+    vw.style.height = Math.max(10, Math.min(H, window.innerHeight) / H * h) + "px";
+  }
+
+  /* исправленная редакция: тот же лист, вычеркнутое красным, вставленное зелёным */
+  function redline() {
+    var p = $("#p-rewrites"), rws = data.rewrites || [];
+    if (!p || !rws.length || !doc || $(".redline", p)) return;
+    var edits = [];
+    rws.forEach(function (r) {
+      if (r.edits && r.edits.length) {
+        r.edits.forEach(function (e) { edits.push({ line: +e.line, before: e.was || "", after: e.became || "", act: e.action || "" }); });
+      } else if (r.after || r.before) {
+        edits.push({ line: +(r.line_start || r.line || 0), before: r.before || "", after: r.after || "", act: r.action || "" });
+      }
+    });
+    if (!edits.length) return;
+    var clone = el("div", "doc");
+    $$(".ln, .pgbreak", doc).forEach(function (ln) {
+      var x = ln.cloneNode(true);
+      x.removeAttribute("id"); x.removeAttribute("data-f");
+      x.className = ln.className.split(" ").filter(function (c) { return c === "ln" || c === "h" || c === "blank" || c === "pgbreak"; }).join(" ");
+      $$(".fms, .rtag, .card", x).forEach(function (m) { m.remove(); });
+      $$("mark", x).forEach(function (m) { m.replaceWith(document.createTextNode(m.textContent)); });
+      clone.appendChild(x);
+    });
+    var byLine = {};
+    edits.forEach(function (e) { (byLine[e.line] = byLine[e.line] || []).push(e); });
+    Object.keys(byLine).forEach(function (n) {
+      var ln = clone.querySelector('.ln[data-n="' + n + '"]');
+      if (!ln) return;
+      var tx = $(".tx", ln), text = tx.textContent.replace(/​/g, ""), cuts = [], extra = [];
+      byLine[n].forEach(function (e) {
+        var at = e.before ? text.indexOf(e.before) : -1;
+        var free = at >= 0 && cuts.every(function (c) { return at >= c.b || at + e.before.length <= c.a; });
+        if (free) cuts.push({ a: at, b: at + e.before.length, e: e }); else extra.push(e);
+      });
+      cuts.sort(function (x, y) { return x.a - y.a; });
+      var html = "", pos = 0;
+      cuts.forEach(function (c) {
+        html += esc(text.slice(pos, c.a)) + "<del>" + esc(c.e.before) + "</del>" + (c.e.after ? "<ins>" + esc(c.e.after) + "</ins>" : "");
+        pos = c.b;
+      });
+      if (cuts.length) { tx.innerHTML = html + esc(text.slice(pos)); ln.classList.add("ed"); }
+      var at = ln;
+      extra.forEach(function (e) {
+        if (!e.after) return;
+        var add = el("div", "ln add ed", '<span class="no"></span><span class="tx"><ins>' + esc(e.after) + "</ins></span>");
+        at.parentNode.insertBefore(add, at.nextSibling);
+        at = add;
+      });
+    });
+    var wrap = el("div", "redline");
+    var lead = $(".lead", p);
+    var head = el("div", "rl-head");
+    if (lead) head.appendChild(lead.cloneNode(true));
+    wrap.appendChild(head);
+    wrap.appendChild(clone);
+    p.insertBefore(wrap, p.firstChild);
+  }
+
+  /* пометки рисуются по порядку чтения, шаг 30 мс */
+  function ink() {
+    if (!doc) return;
+    $$("mark.q", doc).forEach(function (m, i) { m.style.setProperty("--i", Math.min(i, 70)); });
+    requestAnimationFrame(function () { root.classList.add("ink"); });
+  }
+
+  if (!split || !doc || !$(".ln", doc)) { redline(); return; }
+  stamp();
+  resolution();
+  redline();
+  ink();
+  layout();
+  window.addEventListener("resize", relayout);
+  window.addEventListener("scroll", mapView, { passive: true });
+  if (window.MutationObserver) {
+    var mo = new MutationObserver(relayout);
+    if (box) mo.observe(box, { subtree: true, attributes: true, attributeFilter: ["class", "hidden"] });
+    var pf = $("#p-findings");
+    if (pf) mo.observe(pf, { attributes: true, attributeFilter: ["hidden"] });
+    mo.observe(doc, { attributes: true, attributeFilter: ["class"] });
+  }
+  document.addEventListener("toggle", relayout, true);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { relayout(); window.dispatchEvent(new Event("resize")); });
+  setTimeout(function () { relayout(); mapView(); }, 120);
+  /* щелчок по столу — снять фокус с правки */
+  document.addEventListener("click", function (ev) {
+    var t = ev.target;
+    if (t === document.body || t === split || t === flist || t === box || (t.tagName === "MAIN")) {
+      if ($(".card.active")) document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    }
+  });
 })();
