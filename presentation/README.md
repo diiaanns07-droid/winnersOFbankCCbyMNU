@@ -40,25 +40,31 @@ node presentation/shots.cjs reports/requirements.html presentation/img http://12
 
 ## Видео демо
 
-Готовые файлы (2 мин 02 с, 1440×900): `demo.mp4` — без текста, под озвучку; `demo_subtitled.mp4` — с вшитыми
-субтитрами; `demo.webm` — исходная запись Playwright; `demo.srt` — субтитры (23 фразы) для монтажа.
-Снято 27.11 ≈05:05 (Астана): веб-демо на `v2/14-html-web` (`bcc/v2` 7d80df8), вход `release/input/requirements.pdf`,
-`claude_cli` / sonnet. Ответы модели взяты из кэша живого прогона того же PDF (4 мин 40 с, 9 вызовов, 32 дефекта:
-4 критичных, 18 существенных, 10 незначительных, цитат 92 из 92) — об этом говорит субтитр, а в паспорте видно
-«9 из кэша». Этапы показаны в темпе 2,6 с (`--pace`).
+Готовые файлы (2 мин 15 с, 1440×900): `demo.mp4` — без текста, под озвучку; `demo_subtitled.mp4` — с вшитыми
+субтитрами; `demo.webm` — исходная запись Playwright; `demo.srt` — субтитры (25 фраз) для монтажа.
+Снято 27.11 ≈06:30 (Астана) на сборке `0d09654` (`v2/14-html-web` = `bcc/v2` 4bbb299 + №14), `claude_cli` / sonnet:
+* `release/input/requirements.pdf` — живой прогон 5 мин 24 с, 9 вызовов, 33 дефекта (5 критичных, 18 существенных,
+  10 незначительных), цитат 96 из 96;
+* `release/input/requirements.docx` — живой прогон 4 мин 30 с, 9 вызовов, 31 дефект (5/14/12), цитат 85 из 85,
+  в Word 81 комментарий (31 замечание на 80 местах + сводный).
+
+При съёмке веб повторил эти прогоны из кэша ответов модели (об этом говорит субтитр, в паспорте видно «9 из кэша»);
+этапы показаны в темпе 2,6 с (`--pace`). Word с комментариями отрисован LibreOffice (комментарии на полях).
 
 Сценарий: титул → загрузка PDF → этапы → вердикт и «исправить первым» → клик по блокеру подсвечивает строки
 документа (обе стороны противоречия) → подробности дефекта → следующие блокеры → фильтр → вопросы владельцу с
 вариантами → чек-лист банка → скачивание Word, PDF с выделениями (показана страница) и Jira CSV (показана таблица) →
-паспорт → финал. Курсор нарисован оверлеем. Числа в субтитрах берутся из `report.json` этого прогона.
+тот же ТЗ в DOCX: Word с комментариями на полях → паспорт → финал. Курсор нарисован оверлеем; числа в субтитрах
+берутся из `report.json` этих прогонов.
 
 Пересъёмка (например, по финальной сборке):
 
 ```bash
 python -m bcc_review release/input/requirements.pdf /tmp/warm/report.md --provider claude_cli --model sonnet --cache-dir /tmp/demo-cache
-python -m bcc_review.v2.web --port 8014 --data-dir /tmp/demo-web --cache-dir /tmp/demo-cache --pace 2.6 &
-node presentation/demo_video.cjs --base http://127.0.0.1:8014/ --file release/input/requirements.pdf --out presentation \
-     --provider claude_cli --model sonnet --real "4 мин 40 с"
+python -m bcc_review release/input/requirements.docx /tmp/warm2/report.md --provider claude_cli --model sonnet --cache-dir /tmp/demo-cache
+python -m bcc_review.v2.web --port 8014 --data-dir /tmp/demo-web --cache-dir /tmp/demo-cache --pace 2.6 --workers 2 &
+node presentation/demo_video.cjs --base http://127.0.0.1:8014/ --file release/input/requirements.pdf \
+     --docx release/input/requirements.docx --out presentation --provider claude_cli --model sonnet --real "5 мин 24 с"
 ```
 
-Первая команда — живой прогон, который наполняет кэш; дальше веб повторяет его без модели за секунды.
+Первые две команды — живые прогоны, которые наполняют кэш (после смены промптов кэш устаревает — прогнать заново); дальше веб повторяет их без модели за секунды.

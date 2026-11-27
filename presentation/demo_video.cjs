@@ -121,6 +121,7 @@ function srtTime(ms) {
   say("Агент читает документ, нумерует строки и нарезает требования с собственными ID");
   await p.waitForFunction(() => [...document.querySelectorAll(".stg")].some((x) => /Ревьюеры/.test(x.textContent) && /running|done/.test(x.className)), null, { timeout: 600000 });
   say("Четыре ревьюера — аналитик, тестировщик, архитектор и риски — и проверка набора работают параллельно");
+  await pause(3800);  // подпись должна успеть прочитаться, даже если этапы идут из кэша
   await p.waitForFunction(() => [...document.querySelectorAll(".stg")].some((x) => /Сверка цитат/.test(x.textContent) && /running|done/.test(x.className)), null, { timeout: 600000 });
   say("Код сверяет каждую цитату с документом; судья склеивает дубли и ставит критичность");
   await p.waitForSelector("#result:not([hidden])", { timeout: 1800000 });
@@ -353,7 +354,7 @@ async function prepareDocx(request, base, file, provider, model, tmp) {
   } catch (e) { comments = 0; }
   let png = "";
   try {
-    const filter = 'pdf:writer_pdf_Export:{"ExportNotesInMargin":{"type":"boolean","value":"true"}}';
+    const filter = 'pdf:writer_pdf_Export:{"ExportNotesInMargin":{"type":"boolean","value":"true"},"ExportNotes":{"type":"boolean","value":"false"}}';
     await new Promise((res, rej) => require("child_process").execFile("soffice", ["--headless", "--convert-to", filter, "--outdir", out, docPath],
       { timeout: 120000 }, (err) => (err ? rej(err) : res())));
     const pdf = path.join(out, "requirements.annotated.pdf");
