@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -177,3 +178,26 @@ def test_markdown_numbers_checked_next_to_json(tmp_path, sample):
     res = verify.verify_report(rj, SOURCE)
     msgs = [e["message"] for e in res["errors"] if e["code"] == "markdown"]
     assert not res["ok"] and any("«Кратко»" in m for m in msgs) and any("D-07" in m for m in msgs), msgs
+
+
+def test_markdown_verdict_blockers_and_counts_checked(sample):
+    """Вердикт в «Кратко» и «Итоге», число блокеров, требования в сводке и кандидаты «Как получено» = приложение Д —
+    те же, что в JSON; ручная правка любого из них — ошибка."""
+    from bcc_review.v2.render import markdown
+    md = markdown.render(sample)
+    errors, _ = verify.check_markdown(sample, md)
+    assert not errors, errors
+    brief_end = md.find('id="s1"')
+    tampered = {
+        "Кратко": md[:brief_end].replace("| **⛔ нельзя начинать** | **⛔ нельзя начинать** |",
+                                         "| **✅ можно начинать** | **⛔ нельзя начинать** |", 1) + md[brief_end:],
+        "Итог": md.replace("| разработку | **⛔ нельзя начинать** |", "| разработку | **⚠️ можно с условиями** |"),
+        "блокеров": md.replace("**Блокеры (5)**", "**Блокеры (3)**"),
+        "Требований выделено": re.sub(r"\| Требований выделено \| (\d+) \|",
+                                      lambda m: f"| Требований выделено | {int(m.group(1)) + 1} |", md),
+        "приложении Д": re.sub(r"найдено (\d+) возможн", lambda m: f"найдено {int(m.group(1)) + 3} возможн", md),
+    }
+    for word, text in tampered.items():
+        assert text != md, word
+        errors, _ = verify.check_markdown(sample, text)
+        assert any(word in e for e in errors), (word, errors)

@@ -163,7 +163,52 @@ def check_markdown(report: dict, md: str) -> tuple[list[str], list[str]]:
     ok, total = s["quotes_verified"], s["quotes_total"]
     if total and f"{ok} из {total}" not in md and f"все {total} цитат" not in md:
         errors.append(f"число сверенных цитат ({ok} из {total}) в Markdown не указано")
+    errors += _check_markdown_more(report, md, brief, s)
     return errors, []
+
+
+def _section(md: str, a: str, b: str | None) -> str:
+    i = md.find(f'id="{a}"')
+    if i < 0:
+        return ""
+    j = md.find(f'id="{b}"', i) if b else -1
+    return md[i:j] if j > i else md[i:]
+
+
+def _check_markdown_more(report: dict, md: str, brief: str, s: dict) -> list[str]:
+    """Вердикт, блокеры, требования и кандидаты — одни и те же в «Кратко», сводке, итоге, приложении Д и JSON."""
+    from .render import markdown as M
+
+    errors: list[str] = []
+    v = report.get("verdict") or {}
+    want = [M.READINESS.get(v.get(k), "—") for k in ("development", "testing")]
+    m = re.search(r"\| \*\*(.+?)\*\* \| \*\*(.+?)\*\* \|", brief)
+    if m and list(m.groups()) != want:
+        errors.append(f"«Кратко»: вердикт {list(m.groups())}, в JSON {want}")
+    final = _section(md, "s6", "pa")
+    got = re.findall(r"^\| (?:разработку|тестирование) \| \*\*(.+?)\*\* \|", final, re.M)
+    if got and got != want:
+        errors.append(f"«Итог»: вердикт {got}, в JSON {want}")
+    try:
+        ctx = M._Ctx(M._clean_report(report))
+        n_block = len(M._blockers(ctx))
+    except Exception:  # noqa: BLE001 — сверка не должна падать на неполном отчёте
+        n_block = None
+    m = re.search(r"\*\*Блокер(?:ы \((\d+)\))?\*\*", brief)
+    if n_block is not None and m and (int(m.group(1)) if m.group(1) else 1) != n_block:
+        errors.append(f"«Кратко»: блокеров {m.group(1) or 1}, по дефектам JSON {n_block}")
+    if n_block and not m:
+        errors.append(f"«Кратко»: блокеров по JSON {n_block}, а списка блокеров нет")
+    summ = _section(md, "s5", "s6")
+    for label, key in (("Требований выделено", "requirements"), ("Без замечаний", "requirements_without_findings")):
+        m = re.search(rf"^\| {label} \| (\d[\d\s ]*) \|", summ, re.M)
+        if m and int(re.sub(r"\D", "", m.group(1))) != s.get(key):
+            errors.append(f"«Сводка»: «{label}» {m.group(1).strip()}, в JSON {s.get(key)}")
+    m1 = re.search(r"найдено ([\d  ]+) возможн\w+ дефект", brief)
+    m2 = re.search(r"Кандидатов в дефекты: ([\d  ]+)", _section(md, "pd", "pe"))
+    if m1 and m2 and re.sub(r"\D", "", m1.group(1)) != re.sub(r"\D", "", m2.group(1)):
+        errors.append(f"«Как получено»: возможных дефектов {m1.group(1)}, в приложении Д {m2.group(1)}")
+    return errors
 
 
 def verify_report(report: dict | str | Path, source: str | Path, *, markdown: str | Path | None = None) -> dict:
