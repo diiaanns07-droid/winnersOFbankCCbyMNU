@@ -172,6 +172,63 @@ def max_matching(items: list[dict], findings: list[dict], edges: dict[tuple[str,
 
 # ─────────────────────────── основной подсчёт ───────────────────────────
 
+# Рубрика понятности замечания (WAVE3.md, «Рубрика понятности замечания»): эвристики кода, без модели.
+CLARITY_SCENARIO_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
+                          "incomplete", "missing_element"}
+CLARITY_CHECKS = ("заголовок", "место", "проблема", "сценарий", "последствие", "исправление", "язык")
+# Внутренние коды, которых читатель отчёта не видит: C- (кандидаты), R- (номера нарезки), источники этапов, служебные поля.
+# D-, Q-, T- — номера дефектов, вопросов и тест-кейсов из самого отчёта: на них можно ссылаться.
+_INTERNAL_CODE = re.compile(r"(?<![\w-])(?:C-\d{2,4}|R-\d{1,3})(?![\w-])|\blens:\w+|\brules:[\w.]+"
+                            r"|\bsame_subject\b|\bcandidate_ids?\b|\brequirement_ids?\b|\bsource_ids?\b")
+_SENT_SPLIT = re.compile(r"(?<=[.!?…])\s+(?=[«\"(]?[А-ЯЁA-Z0-9])")
+_WORD = re.compile(r"[0-9A-Za-zА-Яа-яЁё][0-9A-Za-zА-Яа-яЁё‑-]*")
+
+
+def _sentences(text: str) -> list[str]:
+    s = " ".join(str(text or "").split())
+    return [x for x in _SENT_SPLIT.split(s) if x.strip()] if s else []
+
+
+def clarity_row(f: dict, vocab) -> dict:
+    """Одна карточка по рубрике: список невыполненных пунктов (пустой — карточка проходит)."""
+    r = f.get("raw") if isinstance(f.get("raw"), dict) else f
+    title = str(r.get("title") or f.get("title") or "")
+    fails = []
+    if not title.strip() or len(_WORD.findall(title)) > 12:
+        fails.append("заголовок")
+    if not any(isinstance(e.get("line_start", e.get("line")), int) for e in f.get("evidence") or r.get("evidence") or []):
+        fails.append("место")
+    prob = str(r.get("problem") or "")
+    if not prob.strip() or len(_sentences(prob)) > 2:
+        fails.append("проблема")
+    kind = r.get("kind") or f.get("kind")
+    if kind in CLARITY_SCENARIO_KINDS:
+        scen = str(r.get("scenario") or "")
+        # противоречие и неполнота — конкретный вход с числами; «обещано, но не описано» — просто конкретный случай
+        if not scen.strip() or (kind != "missing_element" and not re.search(r"\d", scen)):
+            fails.append("сценарий")
+    if not str(r.get("impact") or "").strip():
+        fails.append("последствие")
+    if not (str(r.get("rewrite") or "").strip() or str(r.get("question") or "").strip()):
+        fails.append("исправление")
+    text = " ".join(str(r.get(k) or "") for k in ("title", "problem", "scenario", "impact", "recommendation", "question"))
+    if _INTERNAL_CODE.search(text) or generic_hits(text) or latin_words(text, vocab):
+        fails.append("язык")
+    return {"id": f.get("id"), "title": title[:110], "severity": f.get("severity") or r.get("severity"),
+            "source": ", ".join(str(s) for s in (f.get("sources") or r.get("sources") or [r.get("source", "")]) if s),
+            "fails": fails}
+
+
+def clarity_of(findings: list[dict], vocab) -> dict:
+    """Доля замечаний, проходящих рубрику WAVE3; разбивка по пунктам; 10 худших (с источником — для владельцев)."""
+    rows = [clarity_row(f, vocab) for f in findings]
+    n, passed = len(rows), sum(1 for x in rows if not x["fails"])
+    by_check = {c: sum(1 for x in rows if c in x["fails"]) for c in CLARITY_CHECKS}
+    rank = {"critical": 0, "major": 1, "minor": 2}
+    worst = sorted((x for x in rows if x["fails"]), key=lambda x: (-len(x["fails"]), rank.get(x["severity"], 3)))[:10]
+    return {"n": n, "passed": passed, "share": _ratio(passed, n), "by_check": by_check, "worst": worst}
+
+
 def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_dir: str | None = None,
                  arbiter: str = "off", cache_path: Path = DEFAULT_CACHE) -> dict:
     t0 = time.monotonic()
@@ -342,6 +399,7 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
     vsum = (report.get("verdict") or {}).get("summary", "")
     for w in latin_words(str(vsum), vocab):
         english.append({"finding": "verdict", "field": "summary", "word": w})
+    clarity = clarity_of(findings, vocab)
 
     md_lines = None
     md_english: list[str] = []
@@ -449,6 +507,8 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         _gate("разделы п. 6 ТЗ", "—" if sections is None else f"{sum(sections.values())}/{len(sections)}",
               None if sections is None else all(sections.values())),
         _gate("общие фразы", str(len(generic)), len(generic) == 0),
+        _gate("рубрика понятности", "—" if not clarity["n"] else f"{clarity['passed']}/{clarity['n']}",
+              None if not clarity["n"] else clarity["passed"] >= 0.9 * clarity["n"]),
         _gate("английские слова", str(len(english) + len(md_english)), len(english) + len(md_english) == 0),
         _gate("вердикт разработка/тестирование",
               f"{verdict.get('development', '—')}/{verdict.get('testing', '—')}",
@@ -501,6 +561,7 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                    "verified_field_missing": q_field_missing, "findings_without_evidence": no_evidence,
                    "missing_list": [q for q in quote_checks if q["found"] == "missing"][:30]},
         "language": {"generic": generic, "english": english, "english_report_md": md_english},
+        "clarity": clarity,
         "report_sections": sections,
         "verdict": {"got": {k: verdict.get(k) for k in ("development", "testing")}, "expected": exp},
         "assignment": [{"gold": gid, "finding": fid, "title": fmap[fid]["title"], "severity": fmap[fid]["severity"],
@@ -653,6 +714,16 @@ def render_md(res: dict, label: str = "") -> str:
         cl = r.get("calls") or {}
         L.append(f"* Время {r['duration_s'] / 60:.1f} мин, вызовов {cl.get('total', cl.get('physical', '—'))}, "
                  f"стоимость ${r.get('cost_usd') if r.get('cost_usd') is not None else '—'}.")
+    cl = res.get("clarity") or {}
+    if cl.get("n"):
+        L += ["", "## Понятность (рубрика WAVE3, эвристики кода)", "",
+              f"Проходят рубрику: **{cl['passed']}/{cl['n']}** ({100 * (cl.get('share') or 0):.0f} %, цель ≥ 90 %). "
+              "Не выполнено по пунктам: " + ", ".join(f"{k} {v}" for k, v in (cl.get("by_check") or {}).items() if v)
+              + ".", ""]
+        if cl.get("worst"):
+            L += ["| Замечание | Серьёзность | Источник | Не выполнено |", "| :--- | :--- | :--- | :--- |"]
+            L += [f"| {_cut(w.get('id') or '', 12)}: {_cut(w.get('title') or '', 90)} | {w.get('severity') or ''} | {_cut(w.get('source') or '', 40)} | "
+                  f"{', '.join(w.get('fails') or [])} |" for w in cl["worst"]]
     L += ["", "## Найдено", "", "| Эталон | Замечание | Серьёзность | Источник | Как |", "| :--- | :--- | :--- | :--- | :--- |"]
     for a in res["assignment"]:
         L.append(f"| {a['gold']} | {a['finding']}: {_cut(a['title'])} | {a['severity']} | {', '.join(a['sources'])} | {a['how']} |")

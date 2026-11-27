@@ -51,3 +51,26 @@ def test_clarity_gate_reads_score(monkeypatch):
     assert c["ok"] is False and "80 %" in c["fact"] and "D-03" in c["owners"]
     score["clarity"]["passed"] = 10
     assert gate.clarity_gates({"label": "x", "at": "2026-11-27 13:00"})[0]["ok"] is True
+
+
+def test_clarity_rubric_rows():
+    from evaluation.v2 import score as sc
+
+    good = {"id": "D-01", "title": "Критерий приёмки №2 относит покупку к другому месяцу", "kind": "event_conflict",
+            "severity": "critical", "evidence": [{"quote": "q", "line_start": 38}],
+            "problem": "Правило относит покупку к месяцу совершения. Критерий — к месяцу проведения.",
+            "scenario": "Покупка 31 января в 23:58, проведена 1 февраля: по правилу январь, по критерию февраль.",
+            "impact": "Тест по критерию упадёт на верном коде.", "rewrite": "Было: … Стало: …", "question": "",
+            "recommendation": "Исправить критерий.", "sources": ["lens:qa"]}
+    assert sc.clarity_row(good, set())["fails"] == []
+    bad = {**good, "id": "D-02", "title": " ".join(["слово"] * 13), "scenario": "Без чисел", "rewrite": "",
+           "problem": "Раз. Два. Три.", "impact": "", "evidence": [{"quote": "q"}],
+           "recommendation": "Кандидат C-007 от lens:qa"}
+    assert set(sc.clarity_row(bad, set())["fails"]) == {"заголовок", "место", "проблема", "сценарий", "последствие",
+                                                        "исправление", "язык"}
+    missing = {**good, "id": "D-03", "kind": "missing_element", "scenario": "Приложение открывает экран без значения."}
+    assert sc.clarity_row(missing, set())["fails"] == []  # «обещано, но не описано» — сценарий без чисел допустим
+    ref = {**good, "id": "D-04", "recommendation": "Добавить тест-кейсы T-01–T-05 и вопрос Q-02 из отчёта."}
+    assert sc.clarity_row(ref, set())["fails"] == []  # ссылки на D-/Q-/T- отчёта — не внутренние коды
+    res = sc.clarity_of([{**good, "raw": good}, {**bad, "raw": bad}], set())
+    assert res["n"] == 2 and res["passed"] == 1 and res["worst"][0]["id"] == "D-02"
