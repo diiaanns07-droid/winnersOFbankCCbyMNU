@@ -634,7 +634,7 @@ def _how_obtained(c: _Ctx) -> list[str]:
                                  ("правила без модели" if has_rules else "")) if x)
     if who:
         who = who[0].upper() + who[1:]
-        parts.append(f"{who} предложили {num(total)} {plural(total, 'кандидата', 'кандидатов', 'кандидатов')} в "
+        parts.append(f"{who} предложили {num(total)} {plural(total, 'кандидата', 'кандидата', 'кандидатов')} в "
                      f"дефекты" if total else f"{who} проверили документ")
     judge_down = any("судья недоступен" in str(w) or "реестр собран кодом" in str(w)
                      for w in c.run.get("warnings") or [])
