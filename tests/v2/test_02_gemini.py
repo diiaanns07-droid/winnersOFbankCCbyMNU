@@ -272,3 +272,16 @@ def test_total_budget_is_call_timeout_plus_slack():
         p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=200)
     assert e.value.kind == "timeout"
     assert now[0] <= 200 + 120 + 10
+
+
+def test_overloaded_primary_cools_down_one_try_without_sleep_then_recovers():
+    """После исчерпанных повторов 503 модель «остывает»: следующий вызов пробует её один раз без пауз."""
+    p, s, sleeps = make({"gemini-3.8-flash": [err("overloaded", 503)] * 5 + [ok("gemini-3.8-flash")]})
+    r1 = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert r1["meta"]["called_model"] == "gemini-3.6-flash" and sleeps == [2.0, 5.0, 10.0]
+    sleeps.clear()
+    r2 = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert r2["meta"]["called_model"] == "gemini-3.6-flash" and sleeps == []      # одна попытка, без пауз
+    assert s.calls.count("gemini-3.8-flash") == 5
+    r3 = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)      # основная ожила — снова она
+    assert r3["meta"]["called_model"] == "gemini-3.8-flash" and sleeps == []

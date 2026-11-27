@@ -38,7 +38,10 @@
   затем следующая модель цепочки: «молча пустых» ответов наверх нет;
 * ответ не по схеме возвращается как есть: ``LLMClient`` один раз просит модель исправить его по списку
   нарушений (раньше этап сразу падал без попытки починки);
-* рассуждения по этапам — из профиля модели (``profiles.py``).
+* рассуждения по этапам — из профиля модели (``profiles.py``);
+* перегрузка в часы пик: если у модели исчерпаны повторы 503, следующие 10 минут она пробуется один раз без
+  пауз, при 503 — сразу запасная (модель времени: основная перегружена весь прогон — 8,5 → 6,5 мин, вместо 45
+  запросов 21). Успешный ответ снимает «охлаждение».
 """
 
 from __future__ import annotations
@@ -65,6 +68,7 @@ RETRY_DELAYS_S = (2.0, 5.0, 10.0)   # 503/500/504/overloaded/timeout
 NETWORK_DELAYS_S = (2.0, 5.0)
 RATE_WAITS = 2
 RETRY_SLACK_S = 120.0               # запас времени на повторы сверх таймаута вызова
+COOL_S = 600.0                      # после исчерпанных повторов 503: столько секунд модель — одна попытка без пауз
 DEFAULT_MAX_RATE_WAIT_S = 65.0
 DEFAULT_CONCURRENCY = 5             # 4 линзы + набор идут разом (модель времени: при 4 прогон дольше на 40–45 с)
 RATE_WINDOW_S = 60.0
@@ -264,6 +268,7 @@ class GeminiProvider:
         explicit = max_output_tokens or cfg["max_output_tokens"]
         self.max_output_tokens = int(explicit) if explicit else None   # None — потолок модели из профиля
         self._out_cap: dict[str, int] = {}                             # модели, отвергшие большой лимит ответа
+        self._cooling: dict[str, float] = {}   # перегруженные модели: до какого времени — одна попытка без пауз
         self.thinking_level = cfg["thinking_level"]
         self.thinking_budget = cfg["thinking_budget"]
         self.temperature = cfg["temperature"]
@@ -428,10 +433,13 @@ class GeminiProvider:
                             continue
                         break   # та же модель дважды ответила пустым — следующая модель цепочки
                     if kind in TRANSIENT:
-                        if transient < len(self.retry_delays):
+                        cooling = self._cooling.get(current, 0.0) > self._clock()
+                        if transient < len(self.retry_delays) and not cooling:
                             self._sleep(self.retry_delays[transient])
                             transient += 1
                             continue
+                        # повторы исчерпаны (или модель уже «остывает»): COOL_S секунд пробуем её один раз без пауз
+                        self._cooling[current] = self._clock() + COOL_S
                         break
                     if kind == "rate_limit":
                         wait = exc.retry_after_s
@@ -459,6 +467,7 @@ class GeminiProvider:
                         self._text_schema.add(current)
                         continue
                     raise self._final(exc, chain, attempts) from None
+                self._cooling.pop(current, None)
                 out = self._normalize(result, chain, current, attempts, thinking)
                 out["meta"]["schema_mode"] = mode
                 return out
