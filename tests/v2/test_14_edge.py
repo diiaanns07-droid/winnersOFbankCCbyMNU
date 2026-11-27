@@ -407,3 +407,121 @@ def test_llm_errors_have_russian_message_for_budget():
     with pytest.raises(LLMError) as e:
         llm.ask("judge", "s", "u", SCHEMA)
     assert "бюджет" in e.value.message
+
+
+# --------------------------------------------------------------------------- враждебные (но валидные по схеме) ответы
+
+def _mock_dir(tmp_path: Path, **stages) -> Path:
+    d = tmp_path / "mock"
+    d.mkdir(exist_ok=True)
+    for name in ("lens_analyst", "lens_qa", "lens_architect", "lens_risk", "consistency"):
+        (d / f"{name}.json").write_text(json.dumps(stages.get(name, {"candidates": []}), ensure_ascii=False),
+                                        encoding="utf-8")
+    for name, data in stages.items():
+        (d / f"{name}.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return d
+
+
+def _cand(**kw) -> dict:
+    c = {"title": "Месяц операции не определён", "kind": "ambiguity", "criterion": "unambiguous", "severity": "major",
+         "requirement_ids": ["R-01"], "evidence": [{"quote": "Месяц определяется по дате совершения покупки", "line": 38}],
+         "problem": "Не сказано, какая дата считается датой покупки.", "scenario": "", "impact": "", "recommendation": "",
+         "rewrite": "", "question": "", "blocks": "both"}
+    c.update(kw)
+    return c
+
+
+def test_hostile_segment_ranges_are_clamped(tmp_path):
+    seg = {"requirements": [
+        {"source_id": "Ф-1", "kind": "functional", "summary": "a", "line_start": -5, "line_end": 10 ** 9},
+        {"source_id": "Ф-2", "kind": "functional", "summary": "b", "line_start": 50, "line_end": 40},
+        {"source_id": "Ф-2", "kind": "functional", "summary": "b", "line_start": 50, "line_end": 40},
+        {"source_id": "", "kind": "other", "summary": "", "line_start": 0, "line_end": 0}],
+        "excluded": [{"what": "", "line_start": 999999, "line_end": -1, "reason": ""}]}
+    report, written, _ = _review(tmp_path, OFFICIAL, provider="mock", mock_dir=str(_mock_dir(tmp_path, segment=seg)))
+    n = report["document"]["lines"]
+    for r in report["requirements"]:
+        assert 1 <= r["line_start"] <= r["line_end"] <= n, r
+    assert len({r["id"] for r in report["requirements"]}) == len(report["requirements"])
+
+
+def test_markup_in_model_text_is_escaped_in_html(tmp_path):
+    bad = _cand(title="<script>alert(1)</script> | --- | ## Заголовок",
+                problem="<img src=x onerror=alert(2)> </details></td></tr>")
+    report, written, _ = _review(tmp_path, OFFICIAL, provider="mock", html=True,
+                                 mock_dir=str(_mock_dir(tmp_path, lens_analyst={"candidates": [bad]})))
+    html = Path(written["html"]).read_text(encoding="utf-8")
+    assert "<script>alert(1)" not in html and "<img src=x onerror" not in html
+    md = Path(written["md"]).read_text(encoding="utf-8")
+    import re
+    assert not re.search(r"(?<!\\)<script>", md) and not re.search(r"(?<!\\)<img src=x", md)   # только \<…
+
+
+@_bug("10", "кандидат с пустым заголовком даёт дефект с пустым title: отчёт не проходит contracts/v2.json и verify "
+            "(stages/judge.py:983 — запасного заголовка нет; так же code_only_response:1251)")
+def test_empty_title_candidate_still_gives_valid_report(tmp_path):
+    from bcc_review.v2 import verify
+    empty = _cand(title="")
+    report, written, _ = _review(tmp_path, OFFICIAL, provider="mock",
+                                 mock_dir=str(_mock_dir(tmp_path, lens_analyst={"candidates": [empty]})))
+    assert all(f["title"].strip() for f in report["findings"])
+    res = verify.verify_report(Path(written["json"]), OFFICIAL)
+    assert res["ok"], res["errors"][:3]
+
+
+@_bug("01", "неизвестное имя линзы (--lenses foo, опечатка) даёт «Прогон завершён полностью» без единой линзы "
+            "(__main__.py:61 не проверяет имена, стадия lens_foo — ok)")
+def test_unknown_lens_name_is_not_a_complete_run(tmp_path):
+    report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", lenses=["foo"])
+    assert report["run"]["status"] != "complete"
+
+
+# --------------------------------------------------------------------------- режим --answers
+
+ANSWERS = ("Q-01 [месяц расходов]: Месяц расходов определяется по дате и времени совершения покупки в UTC+5.\n"
+           "Q-02: B\n")
+
+
+@_bug("11", "файл ответов в cp1251 (Блокнот Windows) роняет пересмотр: recheck.load_answers читает только UTF-8 "
+            "(UnicodeDecodeError)")
+def test_answers_file_in_cp1251_is_read(tmp_path):
+    ans = tmp_path / "answers.md"
+    ans.write_bytes(ANSWERS.encode("cp1251"))
+    report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", answers=str(ans))
+    assert report.get("clarification") and report["clarification"]["answers"] >= 1
+
+
+@_bug("01", "сбой режима --answers/--revise теряется: предупреждение и статус recheck=failed пишутся в self.*, "
+            "а report.run уже собран (pipeline.py:495–498; успешная ветка обновляет run в 512–518)")
+def test_answers_mode_failure_is_reported(tmp_path, monkeypatch):
+    from bcc_review.v2.stages import revise
+
+    def boom(*a, **kw):
+        raise RuntimeError("сбой пересмотра")
+
+    monkeypatch.setattr(revise, "run_modes", boom)
+    ans = tmp_path / "answers.md"
+    ans.write_text(ANSWERS, encoding="utf-8")
+    report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", answers=str(ans))
+    assert report["run"]["stages"].get("recheck") == "failed"
+    assert any("--answers" in w for w in report["run"]["warnings"])
+
+
+@_bug("01", "несуществующий файл ответов (--answers опечатка.md) молча считается «ответов 0»: код 0, без предупреждения")
+def test_missing_answers_file_is_an_error(tmp_path, capsys):
+    from bcc_review.v2.__main__ import main
+    out = tmp_path / "r.md"
+    code = main([str(OFFICIAL), str(out), "--provider", "mock", "--answers", str(tmp_path / "нет.md"),
+                 "--runs-dir", str(tmp_path / "runs"), "--no-html", "-q"])
+    if code == 0:
+        report = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+        assert any("не найден" in w for w in report["run"]["warnings"])
+    else:
+        assert "не найден" in capsys.readouterr().err
+
+
+def test_answers_utf8_file_changes_report(tmp_path):
+    ans = tmp_path / "answers.md"
+    ans.write_text(ANSWERS, encoding="utf-8")
+    report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", answers=str(ans))
+    assert report.get("clarification") and report["run"]["stages"].get("recheck") == "ok"
