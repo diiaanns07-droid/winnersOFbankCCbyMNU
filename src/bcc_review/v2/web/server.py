@@ -502,7 +502,7 @@ def main(argv: list[str] | None = None) -> int:
     if srv is None:
         running = note.startswith("Веб-демо уже запущено")
         print(note, file=sys.stdout if running else sys.stderr, flush=True)
-        if running and a.open:
+        if running and a.open and _has_gui():
             webbrowser.open(f"http://{_shown_host(a.host)}:{a.port}/")
         return 0 if running else 2
     if note:
