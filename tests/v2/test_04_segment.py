@@ -434,3 +434,11 @@ def test_caption_line_auto_excluded():
     n = next(x["n"] for x in view["lines"] if x["text"].strip() == "Ответ метода списка устройств:")
     excl, rest = sg.auto_exclude(view, [n])
     assert rest == [] and excl[0]["what"].startswith("Подпись")
+
+
+def test_duplicate_source_ids_qualified_by_section():
+    view = sg.load_view(str(STRUCT / "long.md"))
+    h = sg.heuristic_segment(view)
+    sids = [r["source_id"] for r in h["requirements"] if r["source_id"]]
+    assert len(sids) == len(set(sids))
+    assert any(s.endswith(": Статус 200") for s in sids)
