@@ -1,8 +1,8 @@
-"""№41: прогресс и отчёт в новом дизайне — страница задания и вид HTML-отчёта (bcc-ui.md, разделы 3, 8.3, 8.4).
+"""№41: правка на листе — «белый лист на тёмном столе» (страница задания и HTML-отчёт CLI).
 
-Проверяем содержание, а не пиксели: вердикт, полоса из четырёх чисел и блокеры берутся из того же report.json,
-что и отчёт; слот BCC AI на месте; report.css без внешних ссылок; цвета критичности — как в разделе 3.
-Без сети и без ключа (FixtureRunner).
+Проверяем содержание, а не пиксели: лист документа со сканером во время проверки, правка на листе и одна
+стеклянная панель после; числа и блокеры — те же, что в Markdown; report.css/report.js без внешних ссылок;
+цвета пометок — по смыслу (раздел 3 bcc-ui.md). Без сети и без ключа (FixtureRunner).
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DOC = ROOT / "release" / "input" / "requirements.md"
 FIXTURE = ROOT / "tests" / "v2" / "fixtures" / "14_report_official.json"
 REPORT_CSS = ROOT / "src" / "bcc_review" / "v2" / "render" / "html_assets" / "report.css"
+REPORT_JS = ROOT / "src" / "bcc_review" / "v2" / "render" / "html_assets" / "report.js"
 JOB_CSS = ROOT / "src" / "bcc_review" / "v2" / "web" / "assets" / "job.css"
 DESIGN = ROOT / "docs" / "design" / "bcc-ui.md"
 
@@ -81,61 +82,52 @@ def _expected(path: Path = FIXTURE) -> dict:
             "questions": len(rep.get("questions") or []), "ok": ok, "total": total, "verdict": rep["verdict"]}
 
 
-def _metrics(html: str) -> list[tuple[str, str]]:
-    return re.findall(r'<div class="b-metric[^"]*"><b>([^<]+)</b><span>([^<]+)</span></div>', html)
-
-
-def test_job_page_shows_verdict_strip_and_mascot_slot(srv):
+def test_job_page_is_the_sheet_with_glass_dock(srv):
+    """Готовая правка: лист-отчёт на весь стол и одна стеклянная панель; числа — как в Markdown."""
     base, _ = srv
     jid = _done_job(base)
     code, page = _get(f"{base}/jobs/{jid}")
-    assert code == 200 and f'data-job="{jid}"' in page
+    assert code == 200 and f'data-job="{jid}"' in page and 'class="jb done"' in page
     exp = _expected()
-    # вердикт крупно, теми же словами, что в отчёте
-    v = re.search(r'<h1 class="jb-verdict"[^>]*>(.*?)</h1>', page, re.S)
-    assert v, "нет вердикта"
-    words = re.sub(r"<[^>]+>", "", v.group(1))
-    assert "Разработка: " + H.VERDICT_LABEL[exp["verdict"]["development"]].lower() in words
-    assert "Тестирование: " + H.VERDICT_LABEL[exp["verdict"]["testing"]].lower() in words
-    assert 'class="v v-no"' in v.group(1)  # «нельзя» — красным (смысл, раздел 3)
-    # полоса — ровно четыре числа: блокеры, существенные, вопросы, «цитат сверено N из N»
-    strip = re.search(r'<div class="b-strip[^"]*"[^>]*>(.*?)</div></div>', page, re.S)
-    assert strip
-    m = _metrics(strip.group(0))
-    assert len(m) == 4, m
-    assert m[0] == (str(len(exp["crit"])), "блокеров")
-    assert m[1] == (str(exp["major"]), "существенных")
-    assert m[2][0] == str(exp["questions"]) and "вопрос" in m[2][1]
-    assert m[3] == (f'{exp["ok"]} из {exp["total"]}', "цитат сверено кодом")
-    # блокеры списком: номер, суть, где в документе
-    assert re.findall(r'<span class="jb-id">(D-\d+)</span>', page) == exp["crit"]
-    assert "строка " in re.search(r'<span class="jb-where">([^<]+)</span>', page).group(1)
-    # слот маскота 96 px (BCC AI, №40) и вкладки-капсулы
-    assert re.search(r'<div data-bcc-agent data-size="96" data-mood="(alert|verified)"', page)
-    for tab in ("Замечания", "Вопросы", "Документ", "Исправленная редакция", "Выгрузки"):
-        assert f">{tab}" in page, tab
-    res = page[page.index('id="result"'):]
-    assert res.count("b-button primary") <= 2  # «Скачать ответы» и «К вопросам» — в разных видах, не вместе
+    # лист с правкой — HTML-отчёт этого прогона в режиме встраивания
     assert f'data-src="/jobs/{jid}/files/report.html?inline=1"' in page
+    # BCC AI садится на край листа: режим и реплика — по блокерам, как в Markdown
+    assert 'data-mood="alert"' in page if exp["crit"] else 'data-mood="verified"' in page
+    say = re.search(r'data-say="([^"]+)"', page).group(1)
+    assert str(len(exp["crit"])) in say and exp["crit"][0] in say
+    # стеклянная панель: свой документ · правка · вопросы · исправленная редакция · выгрузить
+    dock = page[page.index('id="dock"'):]
+    for label in ("Свой документ", "Правка", "Вопросы владельцу", "Исправленная редакция", "Выгрузить"):
+        assert label in dock, label
+    n_findings = len(json.loads(FIXTURE.read_text(encoding="utf-8"))["findings"])
+    assert f'Правка <span class="jb-n">{n_findings}</span>' in dock
+    assert f'Вопросы владельцу <span class="jb-n">{exp["questions"]}</span>' in dock
+    # выгрузки — в меню панели, ровно те файлы, что есть у прогона
+    st = json.loads(_get(f"{base}/api/jobs/{jid}")[1])
+    for name in ("report.html", "report.json"):
+        assert f'href="/jobs/{jid}/files/{name}" download' in page, name
+    assert set(st["files"]) >= {"html", "json"}
+    assert page.count('class="jb-dock"') == 1  # одно стекло
 
 
 def test_result_fragment_for_live_page(srv):
-    """Прогон закончился при открытой странице: отчёт над рамкой приходит фрагментом, маскот переезжает сам."""
+    """Прогон закончился при открытой странице: правка приходит фрагментом — лист и панель."""
     base, _ = srv
     jid = _done_job(base)
     code, frag = _get(f"{base}/jobs/{jid}?part=result")
     assert code == 200 and "<html" not in frag
-    assert 'id="agent-slot"></div>' in frag and "data-bcc-agent" not in frag
-    assert len(_metrics(frag)) == 4
+    assert 'id="rframe"' in frag and 'id="dock"' in frag
 
 
-def test_progress_page_has_agent_and_stage_list(tmp_path):
+def test_progress_is_the_document_sheet_with_scanner(tmp_path):
+    """Во время проверки на столе лежит сам документ: строки с номерами, луч сканера и BCC AI над листом."""
     store = R.JobStore(tmp_path)
-    job = store.create("tz.md", b"# x\n", "mock", "")
+    job = store.create("tz.md", "# Заголовок\n\nПервая строка требований\n".encode("utf-8"), "mock", "")
     page = S.job_page(job)
-    assert '<div data-bcc-agent data-size="96" data-mood="scanning" id="agent"></div>' in page
-    assert 'id="stages"' in page and 'id="result" hidden' in page
-    assert 'class="b-status error"' in page and "Что сделать" in (ROOT / "src/bcc_review/v2/web/assets/app.js").read_text(encoding="utf-8")
+    assert 'id="sheet"' in page and 'id="beam"' in page and 'id="pilot"' in page
+    assert '<span class="no">3</span><span class="tx">Первая строка требований</span>' in page
+    assert '<div data-bcc-agent data-size="80" data-mood="scanning" id="agent"></div>' in page
+    assert 'id="errtext"' in page and "Что сделать" in (ROOT / "src/bcc_review/v2/web/assets/app.js").read_text(encoding="utf-8")
     assert "/assets/tokens.css" in page and 'class="b-root"' in page
 
 
@@ -148,9 +140,11 @@ def test_api_reports_model_calls_from_log(tmp_path):
 
 
 def test_css_has_no_external_links():
-    for p in (REPORT_CSS, JOB_CSS):
-        css = p.read_text(encoding="utf-8")
-        assert not re.search(r"https?://|//[a-z0-9.-]+\.[a-z]{2,}/|@import|url\(", css, re.I), p.name
+    for p in (REPORT_CSS, JOB_CSS, REPORT_JS):
+        text = p.read_text(encoding="utf-8")
+        assert not re.search(r"https?://(?!www\.w3\.org/2000/svg)|@import", text, re.I), p.name
+        if p.suffix == ".css":  # в стилях — только ссылки на свой SVG-фильтр (url(#…)), без файлов и сети
+            assert not re.search(r"url\((?!#)", text), p.name
 
 
 def _tokens() -> dict[str, str]:
@@ -163,28 +157,29 @@ def _root_vars(css: str) -> dict[str, str]:
     return {k: v.upper() for k, v in re.findall(r"--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})", root)}
 
 
-def test_severity_colors_match_design_section_3():
-    """Красный — блокер, золотой — существенное, синий — незначительное, зелёный — можно/сверено."""
+def test_marks_on_the_sheet_follow_the_meaning_of_colour():
+    """Критичное — красная волна и бледно-красная подложка, существенное — золотой маркер BCC,
+    незначительное — синий пунктир; зелёная галочка «сверено» на полях; стол — тёмно-синий."""
     t = _tokens()
-    v = _root_vars(REPORT_CSS.read_text(encoding="utf-8"))
-    assert v["crit"] == v["crit-acc"] == t["b-red"]
-    assert v["major-acc"] == t["b-gold"] and v["major"] == t["b-gold-ink"]  # золото — заливки, текст — gold-ink
-    assert v["minor"] == v["minor-acc"] == t["b-blue"]
-    assert v["ok"] == v["link"] == t["b-green-ink"] and v["accent"] == t["b-green"] and v["brand"] == t["b-green-strong"]
-    assert v["ink"] == t["b-ink"] and v["bg"] == t["b-canvas"]
-    # страница задания — те же смыслы через токены №39
+    css = REPORT_CSS.read_text(encoding="utf-8")
+    v = _root_vars(css)
+    assert v["desk"] == "#0B1220" and v["paper"] == "#FFFFFF"
+    assert v["crit"] == t["b-red"] and v["major-acc"] == t["b-gold"] and v["minor"] == t["b-blue"]
+    assert v["accent"] == t["b-green"] and v["ink"] == t["b-ink"]
+    assert re.search(r"mark\.q\.sev-critical \{[^}]*text-decoration-style: wavy[^}]*var\(--crit\)", css)
+    assert re.search(r"--major-mark: rgba\(220, 162, 98, \.3[0-9]\)", css)  # маркер BCC Gold ~35 %
+    assert re.search(r"mark\.q\.sev-minor \{[^}]*text-decoration-style: dashed[^}]*var\(--minor\)", css)
+    assert re.search(r"\.ln\.hl \.no::after \{[^}]*var\(--accent\)", css)
+    assert "feTurbulence" in REPORT_JS.read_text(encoding="utf-8")  # печать с фактурой чернил, без картинок
     job = JOB_CSS.read_text(encoding="utf-8")
-    assert ".jb-verdict .v-no b{color:var(--b-red)}" in job
-    assert ".jb-verdict .v-cond b{color:var(--b-gold-ink)}" in job
-    assert ".jb-verdict .v-yes b{color:var(--b-green-ink)}" in job
+    assert "#0B1220" in job and "backdrop-filter: blur(24px)" in job
 
 
-def test_html_report_embeds_new_css_and_keeps_dark_theme():
+def test_html_report_embeds_sheet_css_and_js():
     rep = json.loads(FIXTURE.read_text(encoding="utf-8"))
     html = H.render_html(rep, H.load_view(DOC))
-    assert "--crit-acc: #C2362B" in html and ":root[data-embed]" in html
-    assert ':root[data-theme="dark"]' in html and "@media (prefers-color-scheme: dark)" in html
-    assert 'id="report-data"' in html and "Исправить первым" in html
+    assert "--desk: #0B1220" in html and ":root[data-embed]" in html and "stamp-ink" in html
+    assert 'id="report-data"' in html and 'class="docpane"' in html and "Исправить первым" in html
 
 
 def test_facts_follow_markdown_after_owner_answers(tmp_path):
@@ -204,4 +199,5 @@ def test_facts_follow_markdown_after_owner_answers(tmp_path):
     assert (f["quotes_ok"], f["quotes_total"]) == (exp["ok"], exp["total"])
     assert f["has"]["rewrites"] and f["has"]["clarify"]
     html = S.result_html(job, f)
-    assert "Блокеров нет" in html and 'data-ready="1"' in html and 'data-rtab="clarify"' in html
+    assert "Блокеров нет" in html and 'data-mood="verified"' in html
+    assert 'data-rt="rewrites"' in html and 'data-rtab="clarify"' in html
