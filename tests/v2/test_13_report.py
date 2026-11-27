@@ -422,6 +422,9 @@ def test_stage_warnings_in_russian():
     assert markdown.warn_text("проверка серьёзности понизила 2 дефект(ов): critical→major 0, major→minor 2") == \
         "проверка серьёзности понизила 2 дефект(ов): критичный→существенный 0, существенный→незначительный 2"
     assert markdown.warn_text("clarify: оставлено 10 вопросов из 11") == "Вопросы: оставлено 10 вопросов из 11"
+    assert markdown.warn_text("вторая проверка не удалась (LLMError); лимит подписки Claude Code, выберите "
+                              "(--model haiku)") == ("вторая проверка не удалась; лимит подписки «Claude Code», "
+                                                     "выберите (`--model haiku`)")
     assert markdown.prose("push при floor(расходы/100) ≥ порог") == "push при `floor(расходы/100)` ≥ порог"
 
 
