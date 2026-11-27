@@ -39,6 +39,8 @@ DEFAULTS: dict[str, Any] = {
     "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": None,
     "clarify_early": True,
 }
+STAGE_RU = {"lens_analyst": "«Аналитик»", "lens_qa": "«Тестировщик»", "lens_architect": "«Архитектор»",
+            "lens_risk": "«Риски»", "consistency": "«Набор целиком»", "judge": "«Судья»"}
 # Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
 DEFAULT_RPM = {"gemini": 10}
 # Линзы от самой долгой к самой короткой (замер 27.11 09:00: haiku architect 102 с, analyst 66, risk 51, qa 50).
@@ -110,8 +112,18 @@ def document_summary(view: dict) -> dict:
                 "warnings": list(view.get("warnings") or [])}
 
 
-def verdict_rule(findings: list[dict], status: str) -> dict:
-    """CONTRACT.md, раздел 5. ``failed`` — вердикта нет; ``partial`` — не выше ``conditional``."""
+# Этапы, без которых «можно» и «с условиями» — ложный вердикт: дефекты, которые нашёл бы упавший этап, не видны.
+VERDICT_STAGES = [f"lens_{x}" for x in LENSES] + ["consistency", "judge"]
+
+
+def incomplete_stages(stages: dict) -> list[str]:
+    """Упавшие (``failed``) линзы, набор целиком и судья — при них вердикт кроме «нельзя» не определён."""
+    return [s for s in VERDICT_STAGES if stages.get(s) == "failed"]
+
+
+def verdict_rule(findings: list[dict], status: str, incomplete: list[str] | None = None) -> dict:
+    """CONTRACT.md, раздел 5. ``failed`` — вердикта нет; ``partial`` — не выше ``conditional``; упал рецензент
+    или судья (``incomplete``) — «нельзя», если блокер уже найден, иначе «не определено» (``undetermined``)."""
     if status == "failed":
         return {"development": "none", "testing": "none"}
     open_f = [f for f in findings if f.get("status") not in ("resolved", "rejected")]
@@ -125,6 +137,8 @@ def verdict_rule(findings: list[dict], status: str) -> dict:
             value = "yes"
         if status == "partial" and value == "yes":
             value = "conditional"
+        if incomplete and value != "no":
+            value = "undetermined"
         out[target] = value
     return out
 
@@ -746,12 +760,20 @@ class Pipeline:
                 "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
                 "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts,
                 "fast_start": self.fast_start_used,
+                **({"incomplete_stages": incomplete_stages(self.stages)} if incomplete_stages(self.stages) else {}),
                 **({"model_error": self.model_error} if self.model_error else {})}
 
     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
                 questions: list, qstats: dict) -> dict:
         status = self._status()
-        verdict = verdict_rule(findings, status)
+        incomplete = incomplete_stages(self.stages)
+        if incomplete and status != "failed":
+            # первым остаётся объяснение отказа модели (model_error), если оно есть
+            self.warnings.insert(1 if self.model_error and self.warnings[:1] == [self.model_error] else 0,
+                                 "Вердикт «можно» не выносится: не выполнены этапы " + ", ".join(
+                STAGE_RU.get(x, x) for x in incomplete) + ". Дефекты, которые они нашли бы, в отчёте не видны — "
+                "повторите прогон (уже готовые этапы возьмутся из кэша).")
+        verdict = verdict_rule(findings, status, incomplete)
         verdict["summary"] = jd.get("verdict_summary") or ""
         verdict["fix_first"] = list(jd.get("fix_first") or [f["id"] for f in sorted(
             (f for f in findings if f.get("priority")), key=lambda f: f["priority"])][:7])
