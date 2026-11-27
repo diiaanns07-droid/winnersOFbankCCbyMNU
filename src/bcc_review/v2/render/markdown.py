@@ -185,7 +185,8 @@ def esc(text) -> str:
     return _HTML_START.sub(r"\\<", s)
 
 
-_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,20})\s+)?\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,20})\s+)?\bL0*(\d{1,5})"
+                   r"(?:\s*[–-]\s*L?0*(\d{1,5})\b|\s+(и|или)\s+L0*(\d{1,5})\b(?!\s*[–-]))?\b")
 # падеж слова «строка» после предлога: (одна строка, диапазон)
 _LCASE = {**dict.fromkeys(("по", "к", "ко"), ("строке", "строкам")),
           **dict.fromkeys(("в", "во", "на", "о", "об", "при"), ("строке", "строках")),
@@ -201,17 +202,22 @@ _LNOM = {"и", "или", "а", "но", "либо", "что", "где", "когд
 
 
 def _lref(m: re.Match) -> str:
+    """«L038» → «строка 38» с падежом по предыдущему слову; «L38–L40» → «строки 38–40»; «L052 и L103» →
+    «строки 52 и 103» (в том же падеже). Группы 4–5 есть только у этого модуля (HTML №14 передаёт свои 1–3)."""
     prep = m.group(1) or ""
     low = prep.lower()
+    a, rng = m.group(2), m.group(3)
+    conj, second = (m.group(4), m.group(5)) if m.re.groups >= 5 else (None, None)
+    nums = f"{a}–{rng}" if rng else (f"{a} {conj} {second}" if second else a)
     if low.startswith("строк"):  # «строки L10–L12» → «строки 10–12»: слово модель уже написала
-        return f"{prep} {m.group(2)}–{m.group(3)}" if m.group(3) else f"{prep} {m.group(2)}"
+        return f"{prep} {nums}"
     if low in _LCASE:
         one, many = _LCASE[low]
     elif prep and low not in _LNOM and len(low) >= 3:
         one, many = "строки", "строк"
     else:
         one, many = "строка", "строки"
-    word = f"{many} {m.group(2)}–{m.group(3)}" if m.group(3) else f"{one} {m.group(2)}"
+    word = f"{many if (rng or second) else one} {nums}"
     return f"{prep} {word}" if prep else word
 
 
