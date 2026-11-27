@@ -155,7 +155,8 @@
 | `paymentDueDate` | string | ГГГГ-ММ-ДД | Дата окончания платёжного периода | `due_date` |
 | `graceAmount` | integer | ≥ 0 | Оставшаяся сумма для погашения без процентов, тиыны | `grace_amount` |
 | `daysLeft` | integer | ≥ 0 | Количество календарных дней до окончания платёжного периода | — |
-| `interestForecast` | integer | ≥ 0 | Прогноз процентов при частичном погашении, тиыны | — |
+| `interestForecast` | integer | ≥ 0 | Прогноз процентов, если оставшаяся сумма не будет внесена до окончания платёжного периода, тиыны | — |
+| `totalDebt` | integer | ≥ 0 | Общая задолженность по карте на дату запроса, тиыны | `total_debt` |
 | `reminderEnabled` | boolean | true / false | Признак включения напоминания | `reminder_enabled` |
 
 ### Статусы
@@ -168,7 +169,7 @@
 
 #### 200. Successful
 ```json
-{"status":"ACTIVE","paymentDueDate":"2026-03-25","graceAmount":12000000,"daysLeft":9,"interestForecast":0,"reminderEnabled":true}
+{"status":"ACTIVE","paymentDueDate":"2026-03-25","graceAmount":12000000,"daysLeft":9,"interestForecast":0,"totalDebt":12000000,"reminderEnabled":true}
 ```
 
 #### 401. Unsuccessful — Unauthorized

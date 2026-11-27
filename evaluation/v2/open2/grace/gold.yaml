@@ -3,11 +3,11 @@
 # Номера строк — по evaluation/v2/open2/grace/source.md; для PDF/DOCX счётчик находит строки по тексту цитат.
 schema: bcc-v2-gold/1
 document: evaluation/v2/open2/grace/source.md
-sha256: c7cf0ef535c2c48452f3f18061be66baf74f6633b804d6b6ee846464c8a677d8
+sha256: 397a0dbbf41385df57f8e7bef35a72903db117d39e2feff288a968eecb01bebd
 case: grace
 variant: defects
 title: Льготный период по кредитной карте
-lines: 192
+lines: 193
 expected_verdict:
   development: 'no'
   testing: 'no'
@@ -165,7 +165,7 @@ items:
     groups:
     - lines: '123'
       quote: 6. Если карта не кредитная, вернуть 200 с `status` = `NOT_APPLICABLE`.
-    - lines: 166,186
+    - lines: 167,187
       quote: '**422.** Ответ в случае, если карта не является кредитной.'
   keywords:
     min: 2
@@ -225,7 +225,7 @@ items:
     groups:
     - lines: '155'
       quote: '| `paymentDueDate` | string | ДД.ММ.ГГГГ |'
-    - lines: '171'
+    - lines: '172'
       quote: '"paymentDueDate":"2026-03-25"'
   keywords:
     min: 2

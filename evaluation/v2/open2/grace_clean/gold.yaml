@@ -3,11 +3,11 @@
 # Номера строк — по evaluation/v2/open2/grace_clean/source.md; для PDF/DOCX счётчик находит строки по тексту цитат.
 schema: bcc-v2-gold/1
 document: evaluation/v2/open2/grace_clean/source.md
-sha256: 78a6c45ee9af94f2ebe55245dfa0f1bd869edc640caa10da780e710c6222ddf6
+sha256: 6f1d1441c7de2b6f543751bbb3ff97fd52789c170f4a584f0b0bf53ce4bf9db2
 case: grace_clean
 variant: clean
 title: Льготный период по кредитной карте
-lines: 211
+lines: 212
 expected_verdict:
   development: 'yes'
   testing: 'yes'

@@ -3,7 +3,7 @@
 # Номера строк — по evaluation/v2/open2/capital_clean/source.md; для PDF/DOCX счётчик находит строки по тексту цитат.
 schema: bcc-v2-gold/1
 document: evaluation/v2/open2/capital_clean/source.md
-sha256: e726297ec912ded803a60754a53e6b427ee30a5b0798cb9413fa96b712aa128a
+sha256: 52f890ec94a1042c7c2e3943ed54cf1916264b50428c8032a9057ca67dad45df
 case: capital_clean
 variant: clean
 title: Проценты по накопительному счёту
