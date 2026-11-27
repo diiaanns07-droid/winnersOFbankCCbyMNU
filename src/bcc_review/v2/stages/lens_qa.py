@@ -294,13 +294,39 @@ def _rule_forms(rules: list[str], index: Mapping[str, Mapping[str, Any]],
     return {"nom": f"правила {joined}", "gen": f"правил {joined}", "dat": f"правилам {joined}"}
 
 
+_CASE_BY_PREP = {"по": "строке", "в": "строке", "на": "строке", "из": "строки", "до": "строки", "от": "строки",
+                 "у": "строки", "для": "строки", "с": "строки"}
+
+
+def _line_refs(text: str) -> str:
+    """«L038» (номер строки из нумерованного документа) → «строка 38», после предлога — в нужном падеже."""
+    def sub(m: re.Match) -> str:
+        prep = m.group(1)
+        word = _CASE_BY_PREP.get(prep.lower().strip(), "строка") if prep else "строка"
+        return f"{prep or ''}{word} {int(m.group(2))}"
+    text = re.sub(r"\bL0*(\d{1,4})\s*[–-]\s*L?0*(\d{1,4})\b", lambda m: f"строки {m.group(1)}–{m.group(2)}",
+                  text or "")
+    return re.sub(r"\b((?:по|в|на|из|до|от|у|для|с)\s+)?L0*(\d{1,4})\b", sub, text, flags=re.I)
+
+
 def humanize_ids(text: str, index: Mapping[str, Mapping[str, Any]]) -> str:
     """ID нарезки в тексте модели («R-06») → собственный номер документа («Ф-2»), если он короткий;
     иначе ID остаётся (рендер делает его ссылкой на таблицу требований)."""
+    rows = [str(r.get("id")) for r in sorted((r for r in index.values() if r.get("kind") == "acceptance"),
+                                              key=lambda r: (_int(r.get("line_start")) or 0, str(r.get("id"))))]
+    # строка приёмки: «строка R-14», «критерий R-14» → «критерий приёмки №2»
+    text = re.sub(r"\b(?:строк[аеиуой]{1,2}|критери[йяюе]м?)\s+(?:приёмки\s+|приемки\s+)?(R-\d+)\b",
+                  lambda m: (("К" if m.group(0)[0].isupper() else "к") + f"ритерий приёмки №{rows.index(m.group(1)) + 1}"
+                             if m.group(1) in rows else m.group(0)),
+                  text or "", flags=re.I)
+
     def sub(m: re.Match) -> str:
+        if m.group(0) in rows:
+            return f"критерий приёмки №{rows.index(m.group(0)) + 1}"
         src = _s((index.get(m.group(0)) or {}).get("source_id"))
         return src if src and _DOC_ID.fullmatch(src) else m.group(0)
-    text = re.sub(r"\bR-\d+\b", sub, text or "")
+    text = re.sub(r"\bR-\d+\b", sub, text)
+    text = _line_refs(text)
     return re.sub(r"\b([A-Za-zА-Яа-яЁё]{1,6}-\d+) \(\1\)", r"\1", text)  # «Ф-2 (Ф-2)» после замены
 
 
@@ -525,6 +551,12 @@ def coverage_share(checks: list[Mapping[str, Any]], reqs: list[Mapping[str, Any]
     covered: set[str] = set()
     for c in checks:
         covered |= set(c.get("rule_requirement_ids") or [])
+        # и по строкам процитированных правил: модель перечисляет ID непостоянно (4 или 5 из 14 от прогона к
+        # прогону), а цитата решающей фразы правила — устойчивый след того, что строка приёмки его проверяет
+        for e in c.get("rule_evidence") or []:
+            n = _int(e.get("line"))
+            covered |= {r.get("id") for r in reqs if n and (_int(r.get("line_start")) or 0) <= n
+                        <= (_int(r.get("line_end")) or _int(r.get("line_start")) or 0)}
     return len(covered & functional), len(functional)
 
 
@@ -545,8 +577,11 @@ def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs:
             c.setdefault("severity_hint", c["severity"])
             c["severity"] = severity
         fact = f"Строки приёмки проверяют {done} из {total} функциональных требований."
-        if fact not in c["problem"]:
-            c["problem"] = f"{c['problem']} {fact}".strip()
+        if fact not in c["problem"]:  # факт — первым: судья видит problem обрезанным до 420 символов
+            c["problem"] = f"{fact} {c['problem']}".strip()
+        if severity == "major":  # заголовок называет объект и меру неполноты (рубрика понятности)
+            c.setdefault("model_title", c["title"])
+            c["title"] = f"Критерии приёмки проверяют {done} из {total} функциональных требований"
 
 
 # Норматив задан числом с единицей (время, доля, частота) — требование проверяемо, не хватает только условий
@@ -630,23 +665,31 @@ def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[s
         return None
     first = bad[0]
     src = _s((index.get(first["requirement_id"]) or {}).get("source_id"))
-    name = src if src and _DOC_ID.fullmatch(src) else (
-        f"Нефункциональное требование в строке {first['line']}" if first["line"] else "Нефункциональное требование")
+    where = f" (строка {first['line']})" if first["line"] else ""
+    if src and _DOC_ID.fullmatch(src):
+        name = src
+    elif first["metric"] and not first["vague_words"]:
+        name = f"Норматив «{first['metric']}»{where}"
+    else:
+        name = f"Нефункциональное требование{where}"
     names = dict(_NFR_FIELDS)
     missing = [names[k] for k in first["missing"]]
     more = f" (и ещё {len(bad) - 1})" if len(bad) > 1 else ""
     if first["vague_words"]:
-        title = f"{name}: «{first['vague_words']}» нельзя проверить тестом{more}"
+        words = [w.strip() for w in re.split(r"[;,]\s*|\s+и\s+", first["vague_words"]) if w.strip()][:2]
+        title = (f"{name}: " if src and _DOC_ID.fullmatch(src) else "") + \
+            f"{', '.join('«' + w + '»' for w in words)}{where if not (src and _DOC_ID.fullmatch(src)) else ''} " \
+            f"нельзя проверить тестом{more}"
         what = f"размытая оценка «{first['vague_words']}» вместо числа"
         scenario = (f"Замер показывает 3 с на 95-м перцентиле и 9 с на 99-м: по формулировке «{first['vague_words']}» "
                     "одна сторона считает требование выполненным, другая — нет.")
     else:
-        short = {"metric": "норматив", "start_end": "точки замера", "share": "доля событий", "load": "нагрузка"}
+        short = {"metric": "норматива", "start_end": "точек замера", "share": "доли событий", "load": "нагрузки"}
         gaps = [short[k] for k in first["missing"] if k in ("share", "load")] or [short[k] for k in first["missing"]]
-        title = f"{name} нельзя проверить: не заданы {' и '.join(gaps[:2])}{more}"
+        title = f"{name} нельзя проверить: нет {' и '.join(gaps[:2])}{more}"
         what = f"норматив «{first['metric']}» без условий замера" if first["metric"] else "нет числового норматива"
-        scenario = (f"Нагрузочный тест: 95 % событий укладываются в «{first['metric'] or 'норматив'}», 5 % — нет, "
-                    "нагрузка в документе не названа: по требованию нельзя решить, пройден ли тест.")
+        scenario = (f"Нагрузочный тест: 95 % событий уложились в норматив «{first['metric'] or '—'}», 5 % — нет; "
+                    "доля и нагрузка в документе не названы — нельзя решить, пройден ли тест.")
     rest = "; ".join(f"«{c['quote']}»" for c in bad[1:3])
     problem = (f"«{first['quote']}» — {what}"
                + (f"; не заданы: {', '.join(missing)}" if missing else "") + ". "
@@ -758,6 +801,15 @@ BATCH_ROWS = 10
 SHORT_INSTRUCTION = ("\n\n### Дополнительно\nПрошлый ответ не поместился в лимит вывода. Пиши короче: candidates — "
                      "не больше 4, test_cases — не больше 6, каждое текстовое поле — одно-два предложения.")
 NO_ROWS = " acceptance_checks — пустой список: строки приёмки исполнены отдельным запросом."
+EMPTY_INSTRUCTION = ("\n\n### Дополнительно\nВ прошлом ответе списки nfr_checks, candidates и test_cases пустые. "
+                     "Заполни их по документу, как сказано в шагах 1б, 2 и 3; acceptance_checks — пустой список: "
+                     "строки приёмки уже исполнены.")
+
+
+def _empty_answer(data: Mapping[str, Any]) -> bool:
+    """Слабая модель изредка возвращает только acceptance_checks (haiku: 1 из 16 прогонов, 22 тыс. токенов вывода):
+    без тест-кейсов и кандидатов ответ неполон — тест-кейсы есть на любом документе с требованиями."""
+    return not data.get("test_cases") and not data.get("candidates") and not data.get("nfr_checks")
 
 
 _TRUNC_TEXT = re.compile(r"output token|max_tokens|max output|обрез|не поместился", re.I)
@@ -815,6 +867,15 @@ def run(ctx: Any) -> dict:
             warnings.append(f"{STAGE}: короткий ответ тоже обрезан — кандидаты и тест-кейсы линзы не получены")
         if rows:
             data["acceptance_checks"] = []
+    if not partial and reqs and _empty_answer(data):
+        warnings.append(f"{STAGE}: в ответе только строки приёмки — кандидаты и тест-кейсы запрошены повторно")
+        try:
+            extra = dict(ctx.llm.ask(f"{STAGE}_rest", system, user + EMPTY_INSTRUCTION, SCHEMA,
+                                     max_output_tokens=MAX_OUTPUT_TOKENS) or {})
+            for key in ("nfr_checks", "candidates", "test_cases"):
+                data[key] = extra.get(key) or []
+        except Exception as exc:  # повтор — улучшение, а не условие работы линзы
+            warnings.append(f"{STAGE}: повторный запрос кандидатов не удался: {exc}")
     checks = [c for c in data.get("acceptance_checks") or [] if isinstance(c, Mapping)]
     step = BATCH_ROWS // 2 if partial else BATCH_ROWS
     for i in range(0, len(later), step):
