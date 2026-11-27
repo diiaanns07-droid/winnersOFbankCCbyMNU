@@ -196,6 +196,8 @@ def test_markdown_verdict_blockers_and_counts_checked(sample):
         "Требований выделено": re.sub(r"\| Требований выделено \| (\d+) \|",
                                       lambda m: f"| Требований выделено | {int(m.group(1)) + 1} |", md),
         "приложении Д": re.sub(r"найдено (\d+) возможн", lambda m: f"найдено {int(m.group(1)) + 3} возможн", md),
+        "Проверка каждого требования": re.sub(r"✅ Без замечаний \((\d+)\)",
+                                              lambda m: f"✅ Без замечаний ({int(m.group(1)) + 1})", md),
     }
     for word, text in tampered.items():
         assert text != md, word

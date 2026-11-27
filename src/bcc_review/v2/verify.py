@@ -204,6 +204,10 @@ def _check_markdown_more(report: dict, md: str, brief: str, s: dict) -> list[str
         m = re.search(rf"^\| {label} \| (\d[\d\s ]*) \|", summ, re.M)
         if m and int(re.sub(r"\D", "", m.group(1))) != s.get(key):
             errors.append(f"«Сводка»: «{label}» {m.group(1).strip()}, в JSON {s.get(key)}")
+    m = re.search(r"✅ Без замечаний \((\d+)\)", _section(md, "s3", "s4"))
+    if m and int(m.group(1)) != s.get("requirements_without_findings"):
+        errors.append(f"«3. Проверка каждого требования»: без замечаний {m.group(1)}, в JSON "
+                      f"{s.get('requirements_without_findings')}")
     m1 = re.search(r"найдено ([\d  ]+) возможн\w+ дефект", brief)
     m2 = re.search(r"Кандидатов в дефекты: ([\d  ]+)", _section(md, "pd", "pe"))
     if m1 and m2 and re.sub(r"\D", "", m1.group(1)) != re.sub(r"\D", "", m2.group(1)):
