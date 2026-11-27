@@ -61,15 +61,38 @@ def _py(*args: str, timeout: int = 900) -> subprocess.CompletedProcess:
                           text=True, timeout=timeout, env=env)
 
 
+
+
+
+def segmentation(c: dict) -> tuple[str, dict | None]:
+    """Нарезка для базового прогона: официальный — фикстура mock (модель); остальное — эвристика кода (так мерил
+    №06: строки приёмки она размечает так же, как модель). Без этого mock для чужого документа отдаёт нарезку
+    официального ТЗ (каталог фикстур по умолчанию)."""
+    if c["set"] == "official":
+        return "fixture", None
+    from bcc_review.v2 import docview
+    from bcc_review.v2.stages import segment
+    h = segment.heuristic_segment(docview.load(c["path"]))
+    return "heuristic", {"requirements": h.get("requirements") or [], "excluded": h.get("excluded") or []}
+
+
 def base_run(c: dict) -> Path:
     runs = OUT / "runs"
-    base_id = f"base_{c['id']}_{hashlib.sha256(Path(c['path']).read_bytes()).hexdigest()[:8]}"
+    tag, seg = segmentation(c)
+    base_id = f"base_{c['id']}_{hashlib.sha256(Path(c['path']).read_bytes()).hexdigest()[:8]}_{tag}"
     if not (runs / base_id / "stages").is_dir():
         args = [str(c["path"]), str(OUT / "base" / f"{c['id']}.md"), "--provider", "mock", "--runs-dir", str(runs),
                 "--run-id", base_id, "--no-html", "-q"]
         if c.get("mock"):
             args += ["--mock-dir", str(c["mock"])]
         _py(*args)
+        if seg is not None:
+            sf = runs / base_id / "stages" / "segment.json"
+            rec = json.loads(sf.read_text(encoding="utf-8"))
+            rec["output"] = {**(rec.get("output") or {}), **seg}
+            rec["status"] = "ok"
+            rec["segmentation"] = tag
+            sf.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
     return runs / base_id
 
 
