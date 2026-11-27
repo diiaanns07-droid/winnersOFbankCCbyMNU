@@ -420,3 +420,24 @@ def test_docx_cell_with_paragraphs_is_one_row():
     assert m is None or m["line_start"] == 4
     m2 = Q.verify_quote(view, "Счётчик не сбрасывается", 4)
     assert m2 and m2["line_start"] == 4
+
+
+# --------------------------------------------------------------------------- TXT с разметкой Markdown
+def test_markdown_saved_as_txt_reads_like_markdown(tmp_path):
+    """Жюри может дать .txt с Markdown внутри (переименованный .md): разделы, таблицы и номера строк — как у MD."""
+    txt = tmp_path / "requirements.txt"
+    txt.write_bytes(OFFICIAL_MD.read_bytes())
+    a, b = dv.load(OFFICIAL_MD), dv.load(txt)
+    assert b["format"] == "txt" and b["title"] == a["title"]
+    assert [(x["n"], x["text"], x["section"], x["kind"]) for x in a["lines"]] == \
+           [(x["n"], x["text"], x["section"], x["kind"]) for x in b["lines"]]
+    m = Q.verify_quote(b, "Месяц определяется по дате совершения покупки", 38)
+    assert m and m["line_start"] == 38 and m["section"].endswith("Функциональные требования")
+
+
+def test_plain_txt_not_treated_as_markdown(tmp_path):
+    p = tmp_path / "plain.txt"
+    p.write_text("ТЗ\n\n# не заголовок, а комментарий\n1. Общие положения\n1.1. Карта блокируется **сразу**.\n",
+                 encoding="utf-8")
+    v = dv.load(p)
+    assert [ln["text"] for ln in v["lines"] if ln["text"]][1] == "# не заголовок, а комментарий"

@@ -94,7 +94,10 @@ def load(path: str | Path) -> dict:
         pdf_fast_mode()
     try:
         from bcc_review.engine import read_document
-        doc = read_document(p)
+        if fmt == "txt" and _looks_markdown(_decode_text(data)):
+            doc = _read_as_markdown(p, data, read_document)
+        else:
+            doc = read_document(p)
     except Exception as exc:  # noqa: BLE001 — читатель v1 не должен ронять v2 на MD/TXT
         if fmt in ("pdf", "docx"):
             raise
@@ -132,6 +135,28 @@ def load(path: str | Path) -> dict:
 
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+
+
+_MD_HEAD_LINE = re.compile(r"^\s{0,3}#{1,6}\s+\S", re.M)
+_MD_BOLD = re.compile(r"\*\*[^*\n]+\*\*")
+
+
+def _looks_markdown(text: str) -> bool:
+    """TXT, внутри которого Markdown (переименованный .md, выгрузка из Confluence/GitLab): заголовки «## …»,
+    разделители таблиц «|---|», «**жирный**». Обычный текст с одним «#» или парой звёздочек — не Markdown."""
+    heads = len(_MD_HEAD_LINE.findall(text))
+    delims = sum(1 for ln in text.splitlines() if "|" in ln and _TABLE_DELIM.match(ln))
+    bold = len(_MD_BOLD.findall(text))
+    return heads >= 2 or delims >= 2 or (heads >= 1 and (delims >= 1 or bold >= 2))
+
+
+def _read_as_markdown(p: Path, data: bytes, read_document) -> dict:
+    """Прочитать TXT читателем Markdown v1 (копия с расширением .md во временном каталоге); строки — те же."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        md = Path(tmp) / (p.stem + ".md")
+        md.write_text(_decode_text(data), encoding="utf-8")
+        return read_document(md)
 
 
 def _docx_textboxes(data: bytes, lines: list[dict]) -> tuple[list[dict], int]:
