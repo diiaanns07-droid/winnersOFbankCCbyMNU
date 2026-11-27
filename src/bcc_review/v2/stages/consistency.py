@@ -286,7 +286,9 @@ def _req_index(requirements: Iterable[dict]) -> dict[str, dict]:
 
 def _clean_ids(ids: Any, known: dict[str, dict]) -> list[str]:
     out: list[str] = []
-    for x in ids or []:
+    if isinstance(ids, str):  # «R-04» строкой, а не списком — не перебирать буквы
+        ids = [x for x in re.split(r"[\s,;]+", ids) if x]
+    for x in ids if isinstance(ids, list) else []:
         x = _s(x)
         if x and (not known or x in known) and x not in out:
             out.append(x)
@@ -910,6 +912,8 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
     terms = []
     seen: set[str] = set()
     for t in g.get("terms") or []:
+        if not isinstance(t, dict):
+            continue
         term = _s(t.get("term"))
         if not term or _norm(term) in seen:
             continue
@@ -1167,7 +1171,7 @@ def _requirement_ids_for_lines(ev_list: list[dict], requirements: list[dict]) ->
 
 def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements: list[dict]) -> dict | None:
     evidence = [_evidence(view, _s(e.get("quote")), _int(e.get("line"))) for e in c.get("evidence") or []
-                if _s(e.get("quote"))]
+                if isinstance(e, dict) and _s(e.get("quote"))]
     if not evidence:
         return None
     cand = {
@@ -1352,7 +1356,11 @@ def mark_trace_conflicts(trace: list[dict], pairs: list[dict], known: dict[str, 
 
 def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     """Ответ модели → выход этапа по CONTRACT 2.3/2.5 (чистая функция, тестируется на записанных ответах)."""
-    data = data or {}
+    data = data if isinstance(data, dict) else {}
+    # Схему держат провайдер и llm.py; без неё (повтор из чужого кэша, mock) элемент не того типа пропускается,
+    # а не роняет этап (и с ним все противоречия набора).
+    data = {k: [x for x in v if isinstance(x, dict)] if isinstance(v, list) else [] for k, v in data.items()
+            if k in SCHEMA["properties"]}
     known = _req_index(requirements)
 
     pairs = [normalize_pair(p, view, known) for p in (data.get("pair_checks") or [])[:MAX_PAIRS * 2]]

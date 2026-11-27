@@ -223,3 +223,21 @@ def test_official_recorded_answers_keep_k():
         k += int(row["k"].split("/")[0])
         kcr += int(row["k"].split("cr ")[1].rstrip(")"))
     assert (k, kcr) >= (95, 82)
+
+
+# ---------------------------------------------------------------- ответ не по схеме (повтор из кэша, mock)
+
+@pytest.mark.parametrize("data", [
+    None, [], "текст",
+    {"pair_checks": ["x", None, 3], "glossary": ["g"], "candidates": ["y"], "trace": ["z"], "subjects": ["s"]},
+    {"glossary": [{"concept": "к", "terms": ["a", {"term": "Клиент", "line": 2}], "severity": "major"}]},
+    {"candidates": [{"title": "t", "kind": "incomplete", "evidence": ["строка", {"quote": "Клиент может", "line": 2}],
+                     "requirement_ids": "R-02, R-03"}]},
+    {"pair_checks": [{"quote_a": None, "line_a": "abc", "quote_b": 5, "verdict": "conflict", "same_subject": "да"}],
+     "trace": [{"requirement_id": None, "verified_by": "R-11"}]},
+])
+def test_malformed_answer_does_not_crash_stage(data):
+    out = C.postprocess(data, VIEW, REQS)
+    assert set(out) >= {"candidates", "pair_checks", "trace", "glossary"}
+    for c in out["candidates"]:
+        assert all(isinstance(x, str) and x.startswith("R-") for x in c["requirement_ids"])
