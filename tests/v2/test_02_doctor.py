@@ -223,3 +223,18 @@ def test_pipeline_auto_prefers_gemini_key_over_installed_claude(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY")
     llm2, name2 = pipeline.make_llm(opts, None)
     assert name2 == "claude_cli"
+
+
+@pytest.mark.parametrize("encoding,raw", [
+    ("utf-16 с BOM (PowerShell 5.1: echo … > .env)", "GEMINI_API_KEY=AIzaFAKE-1\r\n".encode("utf-16")),
+    ("utf-16-le без BOM", "GEMINI_API_KEY=AIzaFAKE-1\r\n".encode("utf-16-le")),
+    ("utf-8 с BOM (Блокнот)", b"\xef\xbb\xbfGEMINI_API_KEY=AIzaFAKE-1\r\n"),
+    ("cp1251 с русским комментарием", "# ключ Gemini\nGEMINI_API_KEY=AIzaFAKE-1\n".encode("cp1251")),
+])
+def test_dotenv_any_windows_encoding(tmp_path, encoding, raw):
+    from bcc_review.v2.providers.doctor import load_dotenv
+    f = tmp_path / ".env"
+    f.write_bytes(raw)
+    env: dict = {}
+    assert load_dotenv(f, env), encoding
+    assert env.get("GEMINI_API_KEY") == "AIzaFAKE-1", encoding
