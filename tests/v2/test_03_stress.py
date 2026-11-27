@@ -277,3 +277,41 @@ def test_docx_tracked_changes_final_text_and_warning():
     assert "100 000" not in _joined(v)
     assert any("непринятые исправления (вставок 1, удалений 1)" in w for w in v["warnings"])
     assert dv.load(S / "docx_merged.docx")["warnings"] == []
+
+
+def test_split_merged_pdf_headings_unit():
+    """Читатель PDF склеил два заголовка подряд в один блок (строки разного кегля) — делим и чиним разделы."""
+    def frag(s, e, rect, line):
+        return {"start": s, "end": e, "rect": rect, "line": line}
+    merged = "Требования к изменениям BPMN схема процесса"
+    blocks = [
+        {"id": "b1", "kind": "heading", "text": merged, "section": ["Док", "Часть A", merged],
+         "loc": {"page": 1, "level": 3, "bbox": [57, 509, 224, 533],
+                 "fragments": [frag(0, 23, [57, 509.5, 224, 520.5], 0), frag(24, 43, [57, 523.3, 185, 533.3], 1)]}},
+        {"id": "b2", "kind": "paragraph", "text": "Схема процесса.", "section": ["Док", "Часть A", merged],
+         "loc": {"page": 1, "bbox": [57, 540, 300, 550]}},
+        {"id": "b3", "kind": "heading", "text": "Функциональные требования", "section": ["Док", "Часть A", merged],
+         "loc": {"page": 1, "level": 4, "bbox": [57, 576, 229, 586]}},
+        {"id": "b4", "kind": "list_item", "text": "Ф-1. Текст.", "section": ["Док", "Часть A", merged,
+                                                                          "Функциональные требования"],
+         "loc": {"page": 1, "bbox": [57, 590, 400, 600]}},
+    ]
+    out = dv._split_merged_headings(blocks, {1: (595, 842)})
+    assert [b["text"] for b in out[:2]] == ["Требования к изменениям", "BPMN схема процесса"]
+    assert dv._level(out[1]) == 4
+    assert out[2]["section"] == ["Док", "Часть A", "Требования к изменениям", "BPMN схема процесса"]
+    assert out[3]["section"] == ["Док", "Часть A", "Требования к изменениям"]
+    assert out[4]["section"] == ["Док", "Часть A", "Требования к изменениям", "Функциональные требования"]
+    # длинный заголовок, перенесённый на вторую строку тем же кеглем и во всю ширину, не делится
+    long = {"id": "x", "kind": "heading", "text": "Очень длинный заголовок раздела " * 3, "section": [],
+            "loc": {"page": 1, "level": 2, "fragments": [frag(0, 60, [57, 100, 540, 112], 0),
+                                                         frag(61, 96, [57, 114, 300, 126], 1)]}}
+    assert len(dv._split_merged_headings([long], {1: (595, 842)})) == 1
+
+
+def test_quote_matches_word_broken_in_narrow_cell():
+    """Узкая ячейка PDF: слово разорвано без дефиса («integ er»); цитата «integer» находится на своей строке."""
+    v = dv.from_text("# Док\n\n| Поле | Тип |\n| --- | --- |\n| daysLeft | integ er |\n| reminderEna bled | boole an |\n")
+    m = Q.verify_quote(v, "daysLeft | integer", 5)
+    assert m and m["line_start"] == 5 and m["verified"] == "normalized" and m["text"] == "daysLeft | integ er"
+    assert Q.verify_quote(v, "reminderEnabled | boolean")["line_start"] == 6

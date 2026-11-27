@@ -342,6 +342,7 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                             "(сначала левая, затем правая).")
         before = len(blocks)
         blocks, dropped = _drop_running(blocks, sizes)
+        blocks = _split_merged_headings(blocks, sizes)
         blocks, glued = _glue_split_rows(blocks)
         if glued:
             warnings.append(f"Строки таблиц, разорванные переходом на новую страницу, склеены: {glued}.")
@@ -450,6 +451,56 @@ def _reorder_columns(blocks: list[dict], sizes: dict) -> tuple[list[dict], list[
             order[pos] = i
         two_col.append(pg)
     return [blocks[i] for i in order], sorted(two_col)
+
+
+def _split_merged_headings(blocks: list[dict], sizes: dict) -> list[dict]:
+    """Два заголовка подряд, которые читатель PDF склеил в один блок («Требования к изменениям BPMN схема процесса»):
+    строки блока разной высоты (разный кегль) или первая строка короткая — делим на два заголовка и чиним разделы."""
+    out: list[dict] = []
+    fixes: list[tuple[str, str, str, int]] = []  # (склеенный текст, первый, второй, уровень второго)
+    for b in blocks:
+        frags = (b.get("loc") or {}).get("fragments") or []
+        text = str(b.get("text") or "")
+        lines_idx = sorted({f.get("line") for f in frags if isinstance(f.get("line"), int)})
+        if b.get("kind") != "heading" or len(lines_idx) != 2 or _page_of(b) not in sizes:
+            out.append(b)
+            continue
+        l0 = [f for f in frags if f.get("line") == lines_idx[0]]
+        l1 = [f for f in frags if f.get("line") == lines_idx[1]]
+        h0 = max(f["rect"][3] - f["rect"][1] for f in l0)
+        h1 = max(f["rect"][3] - f["rect"][1] for f in l1)
+        right0 = max(f["rect"][2] for f in l0)
+        width = sizes[_page_of(b)][0]
+        cut = max(f["end"] for f in l0)
+        first, second = text[:cut].strip(), text[cut:].strip()
+        if not first or not second or not (abs(h0 - h1) > 0.4 or right0 < width * 0.45):
+            out.append(b)
+            continue
+        lvl = _level(b)
+        lvl2 = lvl + 1 if h1 < h0 - 0.4 else lvl
+        b1, b2 = dict(b), dict(b)
+        b1["text"], b2["text"] = first, second
+        b2["id"] = f"{b.get('id', '')}s"
+        b2["loc"] = {**(b.get("loc") or {}), "level": lvl2, "heading_level": lvl2}
+        parent = [x for x in (b.get("section") or []) if x != text]
+        b1["section"] = parent + [first]
+        b2["section"] = parent + ([first] if lvl2 > lvl else []) + [second]
+        out += [b1, b2]
+        fixes.append((text, first, second, lvl2))
+    for merged, first, second, lvl2 in fixes:
+        inside = False
+        for b in out:
+            if b.get("kind") == "heading" and b.get("text") in (first, second) and merged not in (b.get("section") or []):
+                inside = inside or b.get("text") == second
+                continue
+            sec = list(b.get("section") or [])
+            if merged not in sec:
+                continue
+            if inside and b.get("kind") == "heading" and _level(b) <= lvl2:
+                inside = False
+            i = sec.index(merged)
+            b["section"] = sec[:i] + ([first, second] if inside else [first]) + sec[i + 1:]
+    return out
 
 
 def _cells(text: str) -> list[str]:

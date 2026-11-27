@@ -69,6 +69,12 @@ def _find_prefix(view: dict, text: str, hint: int | None, near=()) -> dict | Non
         if m:
             m["verified"] = "prefix"
             return m
+    if len(words) <= 2 and len(text) >= 40:  # длинная строка без пробелов (JSON): начало по символам
+        for k in range(len(text) - 1, int(len(text) * 0.6) - 1, -5):
+            m = Q.verify_quote(view, text[:k], hint, near)
+            if m:
+                m["verified"] = "prefix"
+                return m
     return None
 
 
