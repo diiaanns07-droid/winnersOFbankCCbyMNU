@@ -310,3 +310,17 @@ def test_unparsed_question_line_is_warned():
     w: list[str] = []
     recheck.resolve_answers(QS, recheck.load_answers("Q-01 ответ без разделителя\n"), w)
     assert any("не разобрана" in x for x in w)
+
+
+@pytest.mark.parametrize("enc", ["utf-8", "utf-8-sig", "utf-16", "utf-16-le", "cp1251"])
+def test_answers_file_encodings(tmp_path, enc):
+    p = tmp_path / "answers.md"
+    p.write_bytes("Q-02 [Маршрут вызова между сервисами]: Через шлюз платежей.\r\n".encode(enc))
+    a = recheck.load_answers(str(p))["answers"]
+    assert a[0]["id"] == "Q-02" and a[0]["text"] == "Через шлюз платежей."
+
+
+def test_answers_json_file_in_utf16(tmp_path):
+    p = tmp_path / "answers.json"
+    p.write_bytes('{"Q-01": "B"}'.encode("utf-16"))
+    assert recheck.load_answers(str(p))["answers"][0]["choice"] == 1

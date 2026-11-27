@@ -248,6 +248,20 @@ def parse_answers_json(data: Any) -> dict:
     return {"answers": [a for a in answers if a["id"]], "decisions": decisions}
 
 
+def read_answers_file(path: Path) -> str:
+    """Текст файла ответов в любой из кодировок, в которых его сохраняют на Windows: UTF-8 (с BOM и без),
+    UTF-16 (``> answers.md`` в Windows PowerShell 5, «Юникод» в Блокноте), cp1251 («ANSI» в Блокноте)."""
+    raw = Path(path).read_bytes()
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return raw.decode("utf-16")
+    if len(raw) >= 4 and raw[1:2] == b"\x00" and raw[3:4] == b"\x00":  # UTF-16 LE без BOM
+        return raw.decode("utf-16-le", errors="replace")
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode("cp1251", errors="replace")
+
+
 def load_answers(source: Any) -> dict:
     """Путь к ``answers.md|json``, строка с текстом ответов или уже разобранный объект."""
     if isinstance(source, (dict, list)):
@@ -255,7 +269,7 @@ def load_answers(source: Any) -> dict:
     s = str(source or "")
     p = Path(s) if len(s) < 4096 and "\n" not in s else None
     if p is not None and p.exists():
-        text = p.read_text(encoding="utf-8-sig")
+        text = read_answers_file(p)
         if p.suffix.lower() == ".json":
             return parse_answers_json(json.loads(text))
     else:
