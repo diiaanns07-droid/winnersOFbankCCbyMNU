@@ -12,7 +12,8 @@
   Google, не на ключ) и 500 у ``gemini-3.5-flash-lite``; прогон — 9–10 запросов. Квоты по моделям
   независимы, поэтому четыре Flash в цепочке — около 8 прогонов в сутки на Flash, а не 2–4, прежде чем
   ключ уйдёт на Flash-Lite (у него на официальном документе К 3/5 против 5/5);
-* 503/500/504/перегрузка/тайм-аут — до 3 повторов с паузой 2, 5, 10 с, затем следующая модель;
+* 503/500/504/перегрузка/тайм-аут — до 3 повторов с паузой 2, 5, 10 с. Если времени осталось на один
+  запрос, сразу пробуем следующую доступную модель;
 * 404 (модель снята или недоступна ключу) и квота (дневная, нулевая) — сразу следующая модель,
   и до конца прогона эта модель больше не вызывается;
 * 429 (минутный лимит) — ждём Retry-After из ответа (не дольше ``GEMINI_MAX_RATE_WAIT_S``, 65 с),
@@ -507,7 +508,13 @@ class GeminiProvider:
                     if kind in TRANSIENT:
                         cooling = self._cooling.get(current, 0.0) > self._clock()
                         if transient < len(self.retry_delays) and not cooling:
-                            self._sleep(self.retry_delays[transient])
+                            delay = self.retry_delays[transient]
+                            # Если времени осталось лишь на один запрос, даём его следующей доступной модели.
+                            if deadline - self._clock() - delay <= per_call and any(
+                                model_id not in self._dead for model_id in chain[idx:]
+                            ):
+                                break
+                            self._sleep(delay)
                             transient += 1
                             continue
                         # повторы исчерпаны (или модель уже «остывает»): COOL_S секунд пробуем её один раз без пауз

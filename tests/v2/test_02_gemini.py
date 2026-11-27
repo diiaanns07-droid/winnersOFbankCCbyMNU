@@ -193,16 +193,19 @@ def test_explicit_model_goes_first():
 
 def test_deadline_stops_retries():
     now = [0.0]
-    script = Script({"gemini-3.8-flash": [err("overloaded", 503)] * 10})
+    fallback = "gemini-3.6-flash"
+    script = Script({model: [err("overloaded", 503)] for model in (DEFAULT_MODEL, fallback)})
 
     def sleep(s):
         now[0] += s
 
-    p = GeminiProvider(api_key="k", env={"GEMINI_TOTAL_TIMEOUT_S": "10"}, adapter_factory=script.factory,
+    p = GeminiProvider(api_key="k", env={"GEMINI_TOTAL_TIMEOUT_S": "10"}, fallback_models=[fallback],
+                       adapter_factory=script.factory,
                        sleep=sleep, clock=lambda: now[0])
     with pytest.raises(ProviderError) as e:
         p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
     assert e.value.kind == "overloaded"
+    assert script.calls[:2] == [DEFAULT_MODEL, fallback]
     assert len(script.calls) <= 3
 
 
@@ -278,6 +281,28 @@ def test_old_model_gets_small_limit_and_rejected_limit_is_lowered():
     assert s.last_max_tokens == 32768 and len(s.calls) == 3       # потолок запомнен для модели
 
 
+def test_slow_primary_timeout_leaves_time_for_a_working_fallback():
+    """doctor --live: первый 504 от основной модели пришёл через 118 с при таймауте 120 с."""
+    now = [0.0]
+    calls = []
+    fallback = "gemini-3.7-flash"
+
+    class SlowPrimary:
+        def invoke(self, *, model, timeout_s, **_):
+            calls.append(model)
+            if model == DEFAULT_MODEL:
+                now[0] += min(118.4, timeout_s)
+                raise err("timeout", 504)
+            return ok(model)
+
+    p = GeminiProvider(env={}, adapter_factory=lambda *_: SlowPrimary(), fallback_models=[fallback],
+                       sleep=lambda s: now.__setitem__(0, now[0] + s), clock=lambda: now[0])
+    result = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=120)
+    assert calls == [DEFAULT_MODEL, fallback]
+    assert result["meta"]["called_model"] == fallback
+    assert result["meta"]["physical_calls"] == 2
+
+
 def test_total_budget_is_call_timeout_plus_slack():
     """LLMClient ограничивает таймаут остатком лимита этапа — повторы провайдера не должны растянуть этап втрое."""
     now = [0.0]
@@ -291,11 +316,13 @@ def test_total_budget_is_call_timeout_plus_slack():
             now[0] += kw["timeout_s"]          # каждый запрос висит до своего таймаута
             return self.inner.invoke(**kw)
 
-    p = GeminiProvider(api_key="k", env={}, adapter_factory=lambda m, t, **k: SlowAdapter(script.factory(m, t)),
+    p = GeminiProvider(api_key="k", env={}, fallback_models=["gemini-3.6-flash"],
+                       adapter_factory=lambda m, t, **k: SlowAdapter(script.factory(m, t)),
                        sleep=lambda s: now.__setitem__(0, now[0] + s), clock=lambda: now[0])
     with pytest.raises(ProviderError) as e:
         p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=200)
     assert e.value.kind == "timeout"
+    assert script.calls == [DEFAULT_MODEL, "gemini-3.6-flash"]
     assert now[0] <= 200 + 120 + 10
 
 
