@@ -40,7 +40,7 @@
       "html": "src/bcc_review/v2/web/examples/mock/requirements.html",
       "md": "src/bcc_review/v2/web/examples/mock/requirements.md",
       "source": "release/input/requirements.md",
-      "notice": "Готовый отчёт «демо без модели»: ответы модели заранее записаны с живого прогона, сам анализ, сверка цитат и вердикт — настоящие."
+      "notice": "Готовый отчёт без модели: ответы модели записаны заранее, сверка цитат и вердикт — настоящие."
     }
   ],
   "documents": [

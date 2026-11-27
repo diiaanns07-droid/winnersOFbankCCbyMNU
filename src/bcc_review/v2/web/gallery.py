@@ -176,11 +176,11 @@ def _build_job(store: Any, jid: str, rec: dict[str, Any], meta: dict[str, Any]) 
         if k and isinstance(v, dict) and isinstance(v.get("seconds"), (int, float)):
             times[k] = round(float(v["seconds"]), 1)
     started = meta["started"] or time.time()
-    notice = rec.get("notice") or (f"Готовый отчёт: {meta['model']}, {meta['date']}. Открыт из файла — модель заново "
-                                   f"не вызывалась.")
+    notice = rec.get("notice") or f"Готовый отчёт: {meta['model']}, {meta['date']} — открыт из файла, модель не вызывалась."
     extra = R._notice(meta["report"])
     job = R.Job(id=jid, file_name=fname, input_path=str(final / "input" / fname),
-                provider=str(run.get("provider") or ""), model=", ".join(run.get("models_used") or []),
+                provider=str(run.get("provider") or ""),
+                model=", ".join(m for m in run.get("models_used") or [] if m != run.get("provider")),
                 created=started, state="done", started=started, finished=meta["finished"] or started,
                 stages=stages, stage_times=times,
                 files={k: n for k, n, _, _ in R.FILES if (tmp / "out" / n).is_file()},
