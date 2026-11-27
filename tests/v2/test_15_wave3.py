@@ -559,3 +559,28 @@ def test_corpus_background_splits_mutant_false_positives_by_origin():
     assert line.startswith("Ложные на мутантах (152) по происхождению") and "— 50 (33 %" in line
     assert cp._quote_close("Сумма списания не больше лимита", "сумма списания не больше лимита в сутки")
     assert not cp._quote_close("лимит", "лимит")  # меньше трёх слов — не место
+
+
+def test_quota_runs_are_not_saved_and_rerun_with_reuse(tmp_path):
+    """Прогон, упёршийся в лимит подписки (run.model_error), — не замер: --reuse его перезапускает, --save отказывает
+    (замер кандидата 868787d в 18:00: корпус — 23 из 33 кейсов «не измерено», ворота показали бы F1 от обрывков)."""
+    import json as _json
+
+    from evaluation.v2.common import quota_hit, quota_refusal, reusable_report
+
+    quota = {"run": {"status": "failed", "model_error": "Исчерпан лимит подписки Claude Code. Сброс лимита: 1:20pm (UTC)."}}
+    partial = {"run": {"status": "partial", "model_error": "Исчерпан лимит подписки Claude Code."}}
+    other = {"run": {"status": "failed", "model_error": "Ответ модели обрезан по лимиту выходных токенов."}}
+    ok = {"run": {"status": "complete", "model_error": None}}
+    assert quota_hit(quota) and quota_hit(partial) and not quota_hit(other) and not quota_hit(ok)
+    paths = {}
+    for name, rep in (("quota", quota), ("partial", partial), ("other", other), ("ok", ok)):
+        paths[name] = tmp_path / f"{name}.json"
+        paths[name].write_text(_json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "broken.json").write_text("{", encoding="utf-8")
+    assert [n for n in paths if reusable_report(paths[n])] == ["partial", "ok"][1:]  # упавшие и лимит — заново
+    assert not reusable_report(tmp_path / "broken.json") and not reusable_report(tmp_path / "missing.json")
+    rows = [{"quota": True}, {"quota": False}, {"quota": True}]
+    msg = quota_refusal(rows, "сводку корпуса")
+    assert msg.startswith("не сохраняю сводку корпуса: 2 из 3 прогонов упёрлись в лимит") and "--reuse" in msg
+    assert quota_refusal([{"quota": False}], "сводку") == ""

@@ -23,7 +23,8 @@ import sys
 import time
 from pathlib import Path
 
-from .common import ROOT, run_shell, sha256_file, shell_quote, source_owner, tokens
+from .common import ROOT, quota_hit, quota_refusal, reusable_report, run_shell, sha256_file, shell_quote, source_owner, \
+    tokens
 
 CORPUS = ROOT / "evaluation" / "dev" / "corpus"
 HARNESS_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
@@ -98,7 +99,7 @@ def run_one(case: dict, out: Path, cmd_tpl: str, provider: str, model: str, time
     report_md = d / "report.md"
     report_json = d / "report.json"
     meta = {"case_id": case["case_id"], "render_id": case["render_id"], "dir": d.name}
-    if reuse and report_json.exists():
+    if reuse and report_json.exists() and reusable_report(report_json):
         return {**meta, "rc": 0, "seconds": None, "reused": True}
     cmd = cmd_tpl.format(python=shell_quote(sys.executable), input=shell_quote(str(case["path"])),
                          output=shell_quote(str(report_md)), provider=provider, model=model)
@@ -141,7 +142,7 @@ def build_predictions(out: Path, cases: list[dict], mode: str) -> tuple[Path, li
         fs = rep.get("findings") or []
         v = rep.get("verdict") or {}
         run = rep.get("run") or {}
-        per_case.append({**_case_meta(c), "status": run.get("status"), "run_id": run.get("run_id"),
+        per_case.append({**_case_meta(c), "status": run.get("status"), "quota": quota_hit(rep), "run_id": run.get("run_id"),
                          "commit": run.get("commit"), "findings": len(fs),
                          "items": [{"id": f.get("id"), "severity": f.get("severity"), "kind": f.get("kind"),
                                     "title": str(f.get("title") or "")[:140], "sources": list(f.get("sources") or [])}
@@ -489,6 +490,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--label", default="")
         p.add_argument("--save", action="store_true",
                        help="сохранить сводку, метрики и предсказания в evaluation/v2/corpus_results/<метка>")
+        p.add_argument("--save-partial", action="store_true",
+                       help="сохранить, даже если часть прогонов упёрлась в лимит провайдера")
         if name == "run":
             p.add_argument("--provider", default="claude_cli")
             p.add_argument("--model", default="haiku")
@@ -496,7 +499,8 @@ def main(argv: list[str] | None = None) -> int:
                                                               "{provider} {model}")
             p.add_argument("--jobs", type=int, default=3)
             p.add_argument("--timeout", type=int, default=1800)
-            p.add_argument("--reuse", action="store_true", help="не перезапускать кейсы с готовым report.json")
+            p.add_argument("--reuse", action="store_true", help="не перезапускать кейсы с готовым report.json "
+                           "(упавшие и упёршиеся в лимит подписки — перезапустить)")
     p = sub.add_parser("adapt")
     p.add_argument("report")
     p.add_argument("source")
@@ -579,6 +583,10 @@ def main(argv: list[str] | None = None) -> int:
     text = render_summary(s, per_case, label)
     (out / "summary.md").write_text(text, encoding="utf-8")
     print(text)
+    refusal = quota_refusal(per_case, "сводку корпуса") if a.save and not a.save_partial else ""
+    if refusal:
+        print(refusal)
+        return 3
     if a.save:
         import shutil
 

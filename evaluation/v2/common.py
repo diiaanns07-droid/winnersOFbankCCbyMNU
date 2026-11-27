@@ -288,6 +288,35 @@ STAGE_OWNER = {"segment": "№04", "lens_analyst": "№05", "lens_qa": "№06", 
                "quotes": "№03", "report": "№13", "provider": "№02", "pipeline": "№01"}
 
 
+QUOTA_RE = re.compile(r"лимит подписки|usage limit|quota|rate.?limit", re.I)
+
+
+def quota_hit(rep: dict) -> bool:
+    """Агент упёрся в лимит провайдера (подписка Claude Code, квота API): фатальная ошибка модели в `run.model_error`.
+    Такой прогон — не замер качества: часть этапов не выполнена, а цифры (замечания, вердикт) — от обрывка."""
+    err = str((rep.get("run") or {}).get("model_error") or "")
+    return bool(err) and bool(QUOTA_RE.search(err))
+
+
+def reusable_report(path: Path) -> bool:
+    """Готовый report.json годится для `--reuse`: читается, прогон не упал и не упёрся в лимит."""
+    try:
+        rep = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return (rep.get("run") or {}).get("status") not in (None, "failed") and not quota_hit(rep)
+
+
+def quota_refusal(rows: list[dict], what: str) -> str:
+    """Почему не сохраняем сводку: прогоны, упёршиеся в лимит (пусто — сохранять можно)."""
+    hit = [r for r in rows if r.get("quota")]
+    if not hit:
+        return ""
+    return (f"не сохраняю {what}: {len(hit)} из {len(rows)} прогонов упёрлись в лимит провайдера (подписка Claude "
+            "Code или квота API) — цифры от обрывков. После сброса лимита повторите ту же команду с --reuse: "
+            "перезапустятся только они (--save-partial — сохранить как есть).")
+
+
 def source_owner(src: str) -> str:
     """Источник замечания (`lens:risk`, `consistency`, `rules:api.status_409`, …) → номер исполнителя."""
     s = str(src or "")

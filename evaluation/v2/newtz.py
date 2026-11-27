@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT, run_shell, shell_quote, source_owner
+from .common import ROOT, quota_hit, quota_refusal, reusable_report, run_shell, shell_quote, source_owner
 
 OPEN2 = ROOT / "evaluation" / "v2" / "open2"
 RESULTS_DIR = ROOT / "evaluation" / "v2" / "newtz_results"
@@ -85,7 +85,7 @@ def _key(c: dict) -> str:
 def run_one(c: dict, out: Path, cmd_tpl: str, provider: str, model: str, timeout: int, reuse: bool) -> dict:
     d = out / "reports" / _key(c)
     d.mkdir(parents=True, exist_ok=True)
-    if reuse and (d / "report.json").exists():
+    if reuse and (d / "report.json").exists() and reusable_report(d / "report.json"):
         return {"key": _key(c), "rc": 0, "seconds": None, "reused": True}
     cmd = cmd_tpl.format(python=shell_quote(sys.executable), input=shell_quote(c["doc"]),
                          output=shell_quote(str(d / "report.md")), provider=provider, model=model)
@@ -137,7 +137,8 @@ def score_case(c: dict, out: Path, arbiter: str) -> dict:
     run = rep.get("run") or {}
     fs = rep.get("findings") or []
     v = rep.get("verdict") or {}
-    row.update({"status": run.get("status"), "commit": run.get("commit"), "duration_s": run.get("duration_s"),
+    row.update({"status": run.get("status"), "quota": quota_hit(rep), "commit": run.get("commit"),
+                "duration_s": run.get("duration_s"),
                 "calls": (run.get("calls") or {}).get("total"), "cost_usd": run.get("cost_usd"),
                 "findings": len(fs), "by_severity": {s: sum(1 for f in fs if f.get("severity") == s)
                                                      for s in ("critical", "major", "minor")},
@@ -321,6 +322,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--label", default="")
         p.add_argument("--arbiter", default="off")
         p.add_argument("--save", action="store_true")
+        p.add_argument("--save-partial", action="store_true",
+                       help="сохранить, даже если часть прогонов упёрлась в лимит провайдера")
         if name == "run":
             p.add_argument("--provider", default="claude_cli")
             p.add_argument("--model", default="sonnet")
@@ -361,6 +364,10 @@ def main(argv: list[str] | None = None) -> int:
     text = render(s, rows, label)
     (out / "summary.md").write_text(text, encoding="utf-8")
     print(text)
+    refusal = quota_refusal(rows, "сводку") if a.save and not getattr(a, "save_partial", False) else ""
+    if refusal:
+        print(refusal)
+        return 3
     if a.save:
         from .measure import slugify
 
