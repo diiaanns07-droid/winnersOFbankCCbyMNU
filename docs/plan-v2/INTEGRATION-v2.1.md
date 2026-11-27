@@ -18,6 +18,7 @@
 | 2 | 17:05 | `origin/bcc/v2` (исправления релиза, F4 №11) | `d629aa0a` | `ddcc6b04` | — | — | — |
 | 3 | 17:05 | `claude/project-thread-v70qrh` (SARIF, GitLab Code Quality, ревью ТЗ в PR, «было → стало» правками Word) | `4db5abe9` | `725663df` | 1903 passed, 0 failed | OK 109/109; `--revise --export docx,sarif` пишет `.docx`, `.sarif` | чисто |
 | 4 | 17:10 | `v2/22-integrator` (№22: «не определено» при сбое этапа, `--replay`, `--runs N`, `--max-cost`) | `327cf31a` | `fd269abd` | 1921 passed, 0 failed (конфликт в справке `__main__.py` — обе строки) | OK 109/109; `--runs 3` OK | чисто |
+| 5 | 17:20 | `v2/22-integrator` (№22: `--interactive`; свежий `bcc/v2`) | `adec09c6`+ | `60da8178` | 1925 passed, 0 failed | OK 109/109 | чисто |
 
 ## Живой контроль (sonnet, официальный ТЗ, `--no-cache`, `claude_cli`)
 
