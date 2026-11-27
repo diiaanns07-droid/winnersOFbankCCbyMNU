@@ -1,0 +1,71 @@
+{
+  "_comment": "№43: готовые отчёты и примеры документов для главной веб-демо. Пути — от корня репозитория. Запись, у которой нет файла отчёта (json и html) или исходного документа, на главной не показывается. Отчёты руками не править: команды генерации — в README.md рядом.",
+  "reports": [
+    {
+      "id": "official",
+      "title": "Официальный ТЗ",
+      "json": "reports/requirements.json",
+      "html": "reports/requirements.html",
+      "md": "reports/requirements.md",
+      "source": "release/input/requirements.md"
+    },
+    {
+      "id": "official-pdf",
+      "title": "Официальный ТЗ из PDF",
+      "json": "reports/requirements_pdf.json",
+      "html": "reports/requirements_pdf.html",
+      "md": "reports/requirements_pdf.md",
+      "source": "release/input/requirements.pdf"
+    },
+    {
+      "id": "cashback",
+      "title": "Другая тема: кэшбэк",
+      "json": "reports/other_topic_cashback.json",
+      "html": "reports/other_topic_cashback.html",
+      "md": "reports/other_topic_cashback.md",
+      "source": "release/input/other_topic_cashback.md"
+    },
+    {
+      "id": "mock",
+      "title": "Официальный ТЗ · демо без модели",
+      "json": "src/bcc_review/v2/web/examples/mock/requirements.json",
+      "html": "src/bcc_review/v2/web/examples/mock/requirements.html",
+      "md": "src/bcc_review/v2/web/examples/mock/requirements.md",
+      "source": "release/input/requirements.md",
+      "notice": "Готовый отчёт «демо без модели»: ответы модели заранее записаны с живого прогона, сам анализ, сверка цитат и вердикт — настоящие."
+    }
+  ],
+  "documents": [
+    {
+      "id": "official",
+      "title": "Официальный ТЗ",
+      "kind": "Markdown",
+      "path": "release/input/requirements.md",
+      "no_key": "mock"
+    },
+    {
+      "id": "official-pdf",
+      "title": "Официальный ТЗ в PDF",
+      "kind": "PDF",
+      "path": "release/input/requirements.pdf",
+      "no_key": "mock"
+    },
+    {
+      "id": "cashback",
+      "title": "Другая тема: кэшбэк",
+      "kind": "Markdown",
+      "path": "evaluation/dev/corpus/cases/cashback.base/source.md",
+      "file_name": "cashback.md",
+      "no_key": "offline"
+    },
+    {
+      "id": "transfer-limit",
+      "title": "Чистый документ: лимит переводов",
+      "kind": "Markdown",
+      "path": "evaluation/dev/corpus/cases/transfer_limit.base/source.md",
+      "file_name": "transfer_limit.md",
+      "no_key": "offline",
+      "note": "без блокеров"
+    }
+  ]
+}
