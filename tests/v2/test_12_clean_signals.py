@@ -302,3 +302,25 @@ def test_several_in_condition_is_not_vague() -> None:
         (sec, "Ф-2. Перевод можно повторить несколькими способами, описанными в инструкции."),
     ]))
     assert [s["line"] for s in _sig(out, "language.indefinite")] == [2]
+
+
+def test_more_new_defect_documents_found() -> None:
+    ph = rules.run(fallback_load(STYLES / "wave3b_phone_defects.md"))
+    src = {c["source"].rsplit(".", 1)[0] if ".L" in c["source"] else c["source"] for c in ph["candidates"]}
+    assert {"rules:conflicts.range_acceptance", "rules:api.same_case.200-403"} <= src, src
+    ho = rules.run(fallback_load(STYLES / "wave3b_holiday_defects.md"))
+    src = {c["source"].rsplit(".", 1)[0] if ".L" in c["source"] else c["source"] for c in ho["candidates"]}
+    assert {"rules:units.day_kinds", "rules:conflicts.boundary_range",
+            "rules:api.get_mutation.holidays_applicationId_withdraw", "rules:language.open_list"} <= src, src
+
+
+def test_field_with_verb_like_head_is_not_a_method() -> None:
+    sec = "Часть A › Интеграция"
+    got = _named([
+        (sec, "Ответ содержит refundUntil — последний день возврата премии."),
+        (sec, "Операция возвращает transferDate и paymentAmount."),
+        (sec, "Метод `currentMode` возвращает способ выплаты."),
+    ])
+    assert got == set(), got
+    got = _named([(sec, "Приложение читает лимит методом getTransferLimit.")])
+    assert got == {"getTransferLimit"}, got

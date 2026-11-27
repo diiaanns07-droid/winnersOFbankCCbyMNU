@@ -265,7 +265,9 @@ class CMP:  # noqa: N801 — тот же интерфейс, что у re.Patter
                 continue
             res.append(_M(m.group(1), m.group(2), m.group(0), m.start(), m.end()))
         return sorted(res, key=lambda x: x.start())
-RANGE = re.compile(rf"\bот\s+({NUM})\s+до\s+({NUM})[^.;|]{{0,25}}?\bвключительно\b", re.I)
+# единица после числа («от 100 ₸ до 1 000 000 ₸ включительно», «от 1 до 6 месяцев включительно»)
+RANGE_UNIT = r"(?:\s*(?:₸|₽|\$|€|%|тенге|тиын\w*|руб\w*|коп\w*|сум\b))?"
+RANGE = re.compile(rf"\bот\s+({NUM}){RANGE_UNIT}\s+до\s+({NUM})[^.;|]{{0,25}}?\bвключительно\b", re.I)
 REJECT = re.compile(r"отклон\w*|\bне\s+выполня\w*|запрещ\w*|недопуст\w*|ошибк\w*|\b4\d\d\b|не\s+принима\w*", re.I)
 ALLOW = re.compile(r"(?<!не )\b(выполняется|выполняет|разрешается|допускается|проходит|принимается|"
                    r"пополняет|начисляется|списывает|отправляет|зачисляется)\b", re.I)
@@ -505,7 +507,7 @@ def rule_acceptance_bounds(doc: Doc, out: dict) -> None:
                     return
 
 
-BOUND_REASON = re.compile(r"превыша\w*|максим\w*|минимал\w*|меньше\s+минимал\w*|вне\s+диапазон\w*|"
+BOUND_REASON = re.compile(r"превыша\w*|превышен\w*|максим\w*|минимал\w*|меньше\s+минимал\w*|вне\s+диапазон\w*|"
                           r"больше\s+допустим\w*|за\s+пределами", re.I)
 
 

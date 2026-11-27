@@ -25,6 +25,7 @@ MUTATING_TOKENS = {
     "reset", "enable", "disable", "cancel", "confirm", "activate", "deactivate", "block", "unblock",
     "write", "insert", "upsert", "submit", "register", "assign", "apply", "approve", "reject", "store",
     "put", "post", "patch", "close", "lock", "unlock", "revoke", "transfer", "pay", "send",
+    "withdraw", "refund", "reissue", "renew", "extend", "accept", "decline", "order", "issue",
 }
 READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load", "view", "show", "query",
                "status", "info", "details", "history", "calc", "calculate", "compute", "estimate", "preview",
@@ -33,8 +34,10 @@ READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load"
 MUTATING_DESC = re.compile(
     r"^(сохранени|изменени|удалени|создани|обновлени|замен|установк|установлени|отключени|включени|"
     r"блокировк|разблокировк|отмен|добавлени|редактировани|запис|регистраци|подтверждени|перевод|списани|"
-    r"смен[аыуе]\b|заказ\b|подключени|оформлени|закрыти|открыти|привязк|отвязк|перевыпуск)",
+    r"смен[аыуе]\b|заказа?\b|подключени|оформлени|закрыти|открыти|привязк|отвязк|перевыпуск|отзыв|возврат)",
     re.I)
+# «Эндпоинт отзыва заявки», «Метод сохранения адреса»: слово-род перед описанием действия
+DESC_LEAD = re.compile(r"^(?:эндпоинт|endpoint|метод|операци\w*|запрос)\s+", re.I)
 # заголовок блока метода с описанием: «Метод 1. Смена PIN-кода», «Метод 2: заказ выписки»
 METHOD_TITLE = re.compile(r"^(?:метод|method|операция)\s*№?\s*\d+\s*[.:)—–-]\s*(.{3,80})$", re.I)
 
@@ -140,7 +143,7 @@ class Method:
                 toks = split_camel(segs[-1])
                 if toks and toks[0] in MUTATING_TOKENS:
                     return (f"путь {self.url}", self.url_line)
-        if self.desc and MUTATING_DESC.match(self.desc.strip()):
+        if self.desc and MUTATING_DESC.match(DESC_LEAD.sub("", self.desc.strip())):
             return (f"описание «{self.desc.split('.')[0].strip()}»", self.desc_line)
         return None
 
