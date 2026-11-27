@@ -1032,6 +1032,9 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
     tests = [normalize_test_case(x) for x in data.get("test_cases") or [] if isinstance(x, Mapping)]
     tests = [t for t in tests if t["title"] or t["then"]]
+    for t in tests:  # «(R-12: …)», «L064» в тексте кейса → номер документа и строка (рубрика, п. 7)
+        for k in ("title", "given", "when", "then", "gap"):
+            t[k] = humanize_ids(t[k], index)
     if len(tests) > MAX_TEST_CASES:
         warnings.append(f"{STAGE}: тест-кейсов {len(tests)}, оставлено {MAX_TEST_CASES}")
         tests = tests[:MAX_TEST_CASES]
