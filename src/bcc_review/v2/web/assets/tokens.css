@@ -100,6 +100,7 @@ html{-webkit-text-size-adjust:100%;color-scheme:dark;background:var(--b-desk)}
 .b-sheet ::selection{background:rgba(0,185,117,.22)}
 .b-sheet a{color:var(--b-green-ink)}
 .b-sheet.has-stamp{padding-top:132px}
+.b-sheet:not(.has-stamp) .b-sheet-head{right:64px}
 .b-sheet-head{position:absolute;top:42px;left:64px;right:330px;font:12px/1.5 var(--b-mono);color:var(--b-sheet-ln);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .b-line{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);align-items:baseline;
@@ -204,7 +205,7 @@ html{-webkit-text-size-adjust:100%;color-scheme:dark;background:var(--b-desk)}
   0 18px 44px rgba(0,0,0,.5);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .b-dock{background:rgba(17,26,43,.72);-webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%)}
+  .b-dock{background:rgba(17,26,43,.8);-webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%)}
 }
 .b-dock>a,.b-dock>button,.b-dock>label,.b-menu>summary{
   position:relative;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border:0;border-radius:10px;

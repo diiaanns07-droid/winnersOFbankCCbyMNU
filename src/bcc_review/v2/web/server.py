@@ -225,16 +225,13 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
                 f'<a href="{e(href)}#questions"><span>Вопросы<span class="long"> владельцу</span></span><b class="n">{q}</b></a>'
                 f'<a href="{e(href)}#revised"><span class="long">Исправленная редакция</span><span class="short">Редакция</span></a>'
                 f'<details class="b-menu"><summary>Выгрузить</summary><div class="b-menu-pop">{files}</div></details>')
+    elif app.sample:  # проверок ещё нет: на столе чистый лист примера — его и проверить
+        acts = (f'<span class="sep" aria-hidden="true"></span><button type="submit" name="sample" value="1" '
+                f'formnovalidate>Проверить этот лист</button>')
     cur = next((p for p in provs if p["id"] == sel), provs[0])
     err = f'<p class="dock-msg bad" id="dmsg" role="alert">{e(error)}</p>' if error else \
         '<p class="dock-msg" id="dmsg" role="status" hidden></p>'
-    body = f"""<div class="desk" id="desk">
-<aside class="desk-stack" aria-label="Стопка листов">{stack}</aside>
-<aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
-<main class="desk-sheet">{sheet.html if sheet else ''}</main>
-<div class="desk-notes" aria-hidden="true"></div>
-</div>
-<form class="b-dock" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
+    body = f"""<form class="b-dock" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
   {err}
   <label class="primary" id="pick"><input class="vh" type="file" name="file" id="file" accept=".pdf,.docx,.md,.markdown,.txt,.html,.htm" required>Свой документ</label>
   {acts}
@@ -249,8 +246,15 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
     </div>
   </details>
 </form>
+<div class="desk" id="desk">
+<aside class="desk-stack" aria-label="Стопка листов">{stack}</aside>
+<aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
+<main class="desk-sheet">{sheet.html if sheet else ''}</main>
+<div class="desk-notes" aria-hidden="true"></div>
+</div>
 <div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>лист ляжет на стол, и BCC AI начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
-    return _layout("BCC Review · Проверка требований", body, sub=(top or {}).get("name") or "")
+    sub = (top or {}).get("name") or (f"Пример: {app.sample.name}" if app.sample else "")
+    return _layout("BCC Review · Проверка требований", body, sub=sub)
 
 
 def job_page(job: Job) -> str:

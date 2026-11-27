@@ -106,6 +106,7 @@
         l.classList.toggle("on", !!on && (" " + (l.dataset.f || "") + " ").indexOf(" " + on + " ") >= 0);
       });
       notes.forEach(function (n) { n.classList.toggle("on", n.dataset.f === on); });
+      layout();
       var first = on && sheet.querySelector(".b-line.on");
       if (first) {
         var r = first.getBoundingClientRect();
