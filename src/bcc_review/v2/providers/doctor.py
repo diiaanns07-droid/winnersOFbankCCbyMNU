@@ -93,9 +93,10 @@ def _has(env: Mapping[str, str], *names: str) -> bool:
 
 
 def resolve_auto(env: Mapping[str, str] | None = None,
-                 which: Callable[[str], str | None] = shutil.which) -> tuple[str, str]:
+                 which: Callable[[str], str | None] | None = None) -> tuple[str, str]:
     """(имя провайдера, причина выбора) по правилу ``auto``."""
     env = os.environ if env is None else env
+    which = which or shutil.which
     if _has(env, "GEMINI_API_KEY", "GOOGLE_API_KEY"):
         return "gemini", "задан GEMINI_API_KEY" if _has(env, "GEMINI_API_KEY") else "задан GOOGLE_API_KEY"
     if _has(env, "ANTHROPIC_API_KEY"):

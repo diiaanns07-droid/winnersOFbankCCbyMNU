@@ -17,8 +17,10 @@ def test_sh_syntax_and_steps():
     text = (D / "jury_check.sh").read_text(encoding="utf-8")
     for step in ("doctor --live", "verify", "jury_summary.py", "--no-cache"):
         assert step in text
-    if shutil.which("bash"):
-        assert subprocess.run(["bash", "-n", str(D / "jury_check.sh")]).returncode == 0
+    bash = shutil.which("bash")
+    # На Windows «bash» в PATH бывает заглушкой WSL без дистрибутива (код 127 на любой команде) — проверять нечем
+    if bash and subprocess.run([bash, "-c", "true"], capture_output=True).returncode == 0:
+        assert subprocess.run([bash, "-n", str(D / "jury_check.sh")]).returncode == 0
 
 
 def test_ps1_has_bom_for_windows_powershell_5():
