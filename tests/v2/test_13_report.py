@@ -842,3 +842,20 @@ def test_mixed_verdict_sentence_reads_per_direction(sample):
     assert text.startswith("Критичных дефектов нет. Разработку можно начинать с условием параллельно исправить ")
     assert "; тестирование можно начинать — существенных, мешающих ему, нет." in text
     assert "разработку —" not in text
+
+
+def test_rewrite_of_new_rule_not_paired_with_fragment_or_example(sample):
+    """Новый метод чтения не «заменяет» пример ответа метода сохранения (общие только имена полей), новое правило о
+    повторе — не фрагмент «идентификатор операции» (F4, правка 3: правка удаляла действующий параметр)."""
+    r = copy.deepcopy(sample)
+    f = next(x for x in r["findings"] if x["id"] == "D-01")
+    f.pop("rewrite_line", None)
+    f["evidence"] = [{"quote": '{"result":"OK","amount":"50000","enabled":"1"}', "line_start": 167, "verified": "exact"}]
+    f["rewrite"] = 'GET /alerts/getLimit?cardId=... → 200 {"amount":"<уточнить: тип>","enabled":"0|1"}'
+    assert markdown._rewrite_from(f) is None
+    f["evidence"] = [{"quote": "идентификатор операции", "line_start": 49, "verified": "exact"}]
+    f["rewrite"] = "Повтор события с тем же идентификатором операции игнорируется: сумма не меняется."
+    assert markdown._rewrite_from(f) is None
+    f["evidence"] = [{"quote": "Prod: —", "line_start": 108, "verified": "exact"}]
+    f["rewrite"] = "Prod: <уточнить: значение>; Swagger: <уточнить: значение>"
+    assert markdown._rewrite_from(f)["line_start"] == 108

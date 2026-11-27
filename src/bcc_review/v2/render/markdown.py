@@ -1550,7 +1550,9 @@ def _rewrite_from(f: dict) -> dict | None:
             if a != b:
                 break
             pre += 1
-        sure = (cov >= 0.5 and (m >= 2 or (m == len(ql) and pre >= 1))) or pre >= 3
+        # короткая цитата (фрагмент строки, «Prod: —») — только если формулировка начинается так же, иначе
+        # «стало» подменило бы фрагмент целым новым правилом
+        sure = (cov >= 0.6 and m >= 2 and (len(ql) > 3 or pre >= 1)) or (m == len(ql) and pre >= 1) or pre >= 3
         key = (sure and pre >= 2, sure, cov, m, -i)
         if best_key is None or key > best_key:
             best, best_key = e, key
