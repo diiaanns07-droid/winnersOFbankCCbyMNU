@@ -398,3 +398,38 @@ def test_runs_unstable_refs_dropped_everywhere():
     assert rep["acceptance_checks"][0]["finding_ids"] == ["D-01"]
     assert rep["pair_checks"][0]["finding_id"] == ""
     assert rep["questions"][0]["finding_ids"] == [] and rep["verdict"]["fix_first"] == []
+
+
+def test_salvaged_whole_items_when_split_impossible():
+    """Патч №24 (``22_llm_salvage.patch``): ответ обрезан, делить пакет нечего — целые элементы из ``partial``
+    провайдера вместо потерянного этапа; без ``partial`` — по-прежнему ``Truncated``."""
+    import pytest
+    from bcc_review.contracts import ProviderError
+    from bcc_review.v2.llm import LLMClient, Truncated
+    schema = {"type": "object", "additionalProperties": False, "required": ["candidates"],
+              "properties": {"candidates": {"type": "array", "items": {"type": "string"}}}}
+
+    class Cut:
+        name, handles_retries = "gemini", True
+
+        def __init__(self, partial):
+            self.partial = partial
+
+        def invoke(self, **kw):
+            exc = ProviderError("truncated", "ответ обрезан по лимиту выходных токенов")
+            if self.partial is not None:
+                exc.partial = self.partial
+            raise exc
+
+    def run(partial):
+        llm = LLMClient(Cut(partial), model="m", provider_name="gemini", sleep=lambda s: None)
+        return llm, llm.ask_split("lens_analyst", lambda items: ("система", "запрос"), ["x"], schema,
+                                  merge=lambda parts: parts[0])
+
+    llm, out = run({"candidates": ["a", "b"]})
+    assert out == {"candidates": ["a", "b"]}
+    assert llm.stats["salvaged"] == 1 and llm.stats["by_stage"]["lens_analyst"]["salvaged"] == 1
+    with pytest.raises(Truncated):
+        run(None)
+    with pytest.raises(Truncated):
+        run({"candidates": "не массив"})  # целые элементы не проходят схему — не берём
