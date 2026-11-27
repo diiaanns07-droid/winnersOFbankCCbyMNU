@@ -167,7 +167,9 @@ def test_no_findings_no_call():
 
 def test_schema_options_bounds():
     item = clarify.SCHEMA["properties"]["questions"]["items"]
-    assert item["properties"]["options"]["minItems"] == 2 and item["properties"]["options"]["maxItems"] == 4
+    # схема шире того, что остаётся в отчёте: лишнее режет код (clean_options — до 4), без повторного вызова
+    assert item["properties"]["options"]["minItems"] == 2 and item["properties"]["options"]["maxItems"] >= 4
+    assert clarify.clean_options([f"Вариант номер {i}" for i in range(1, 7)]) == [f"Вариант номер {i}" for i in range(1, 5)]
     assert set(item["required"]) >= {"finding_ids", "to", "blocking", "question", "evidence", "options", "why"}
 
 
