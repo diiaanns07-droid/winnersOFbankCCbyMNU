@@ -349,23 +349,31 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
         m = _fuzzy(idx, needle, hint, points)
         if m:
             return m
-    # 6: модель экранировала разметку («limit\_kzt», «\*\*Ф-2.\*\*») или записала HTML-сущности («&laquo;»)
+    # 6: модель экранировала разметку («limit\_kzt», «\*\*Ф-2.\*\*»), записала HTML-сущности («&laquo;») или
+    # «тенге» вместо «₸»
     plain = _unescape(quote)
     if plain != quote:
-        return verify_quote(view, plain, line_hint, near_lines)
+        m = verify_quote(view, plain, line_hint, near_lines)
+        if m and m["verified"] == "exact":
+            m["verified"] = "normalized"  # модель писала не дословно — в документе другой текст
+        return m
     return None
 
 
 _MD_ESCAPE = re.compile(r"\\([\\`*_{}\[\]()#+\-.!|<>~\"'])")
 
 
+_TENGE_WORD = re.compile(r"(\d)\s*(?:тенге|тг\.?)(?![а-яё])", re.IGNORECASE)
+
+
 def _unescape(q: str) -> str:
-    """Цитата без экранирования Markdown и HTML-сущностей; если менять нечего — та же строка."""
+    """Цитата без экранирования Markdown и HTML-сущностей, «50 000 тенге» / «50 000 тг» → «50 000 ₸» (так в
+    документах банка); если менять нечего — та же строка."""
     out = _MD_ESCAPE.sub(r"\1", q) if "\\" in q else q
     if "&" in out and ";" in out:
         import html
         out = html.unescape(out)
-    return out
+    return _TENGE_WORD.sub(r"\1 ₸", out)
 
 
 def _same_words(idx: _Index, needle: str, hint: int | None, near: list[int]) -> dict | None:

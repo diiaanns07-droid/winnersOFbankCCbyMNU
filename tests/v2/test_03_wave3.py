@@ -343,9 +343,11 @@ def test_non_breaking_hyphen_from_word():
     (r"limit\_kzt", None, "limit_kzt"),
     (r"\*\*Ф-2.\*\* Месяц определяется", 38, "Ф-2. Месяц определяется"),
     ("&laquo;Порог, ₸&raquo;", None, "Порог, ₸"),
+    ("Февральский счётчик вырос на 4 000 тенге", None, "Февральский счётчик вырос на 4 000 ₸"),
+    ("Февральский счётчик вырос на 4000 тг.", None, "Февральский счётчик вырос на 4 000 ₸"),
 ])
 def test_markdown_escapes_and_html_entities(quote, line, text):
     view = dv.load(OFFICIAL_MD)
     m = Q.verify_quote(view, quote, line)
-    assert m and m["text"] == text
+    assert m and m["text"] == text and m["verified"] == "normalized"
     assert Q.verify_quote(view, r"совсем нет такого \_ текста") is None
