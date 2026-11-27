@@ -200,7 +200,7 @@ _LCASE = {**dict.fromkeys(("по", "к", "ко"), ("строке", "строка
 _LNOM = {"и", "или", "а", "но", "либо", "что", "где", "когда", "как", "также", "тогда", "это", "см", "т", "е", "есть",
          "вот", "здесь", "там", "даже", "только", "ни", "не", "хотя", "если", "однако", "поскольку", "причём", "причем",
          "зато", "тоже", "лишь", "уже", "ещё", "еще", "потом", "затем", "иначе", "поэтому", "значит", "именно",
-         "например", "далее", "ведь", "чтобы", "пока", "ибо", "тогда", "сначала", "сейчас", "так", "раз"}
+         "например", "далее", "ведь", "чтобы", "пока", "ибо", "сначала", "сейчас", "так", "раз"}
 
 
 _NOUN_TI = {"часть", "путь", "суть", "сеть", "треть", "смерть", "плоть", "нить", "рать", "мать", "гладь", "тетрадь"}
@@ -1546,7 +1546,7 @@ def _rewrite_from(f: dict) -> dict | None:
         m = len(set(ql) & rw)
         cov = m / len(ql)
         pre = 0
-        for a, b in zip(ql, rwl):
+        for a, b in zip(ql, rwl, strict=False):
             if a != b:
                 break
             pre += 1
@@ -2318,7 +2318,7 @@ def _clean_report(report) -> dict:
 
 _STR_KEYS = {"id", "title", "kind", "criterion", "severity", "blocks", "status", "problem", "scenario", "impact",
              "recommendation", "rewrite", "question", "quote", "section", "verified", "source_id", "reason", "source",
-             "candidate_id", "duplicate_of", "what", "item", "answer", "comment", "concept", "term", "problem", "to",
+             "candidate_id", "duplicate_of", "what", "item", "answer", "comment", "concept", "term", "to",
              "why", "given", "when", "then", "gap", "agent", "version", "commit", "provider", "model_requested",
              "file", "format", "sha256", "subject", "outcome_a", "outcome_b", "row_facts", "expected_by_rules",
              "stated", "requirement_id", "row_requirement_id", "a", "b", "note", "development", "testing",
