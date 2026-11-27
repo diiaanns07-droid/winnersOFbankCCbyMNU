@@ -3,63 +3,51 @@
   "use strict";
   var $ = function (s) { return document.querySelector(s); };
 
-  /* ── страница загрузки (№39) ── */
+  /* ── стол (№39): своя проверка — выбрать или бросить файл; меню модели ── */
   var form = $("#form");
-  if (form) {
-    var drop = $("#drop"), file = $("#file"), fname = $("#fname");
-    var pnote = $("#pnote"), model = $("#model"), models = $("#models"), pmore = $("#pmore");
+  if (form && form.classList.contains("b-dock")) {
+    var file = $("#file"), veil = $("#veil"), dmsg = $("#dmsg"), pnote = $("#pnote"), pcur = $("#pcur");
+    var model = $("#model"), models = $("#models");
     var radios = form.querySelectorAll('input[name="provider"]');
-    var note = function (html, bad) { pnote.innerHTML = html; pnote.classList.toggle("bad", !!bad); pnote.classList.remove("err"); };
-    var fail = function (text) { pnote.textContent = text; pnote.classList.remove("bad"); pnote.classList.add("err"); };
-    var showName = function () {
-      var f = file.files && file.files[0];
-      fname.textContent = f ? f.name : "";
-      drop.classList.toggle("has", !!f);
+    var say = function (text, bad) {
+      if (!dmsg) return;
+      dmsg.hidden = !text; dmsg.textContent = text || ""; dmsg.classList.toggle("bad", !!bad);
     };
-    file.addEventListener("change", showName);
-    var depth = 0;
-    drop.addEventListener("dragenter", function (ev) { ev.preventDefault(); depth++; drop.classList.add("over"); });
-    drop.addEventListener("dragover", function (ev) { ev.preventDefault(); });
-    drop.addEventListener("dragleave", function () { if (--depth <= 0) { depth = 0; drop.classList.remove("over"); } });
-    drop.addEventListener("drop", function (ev) {
-      ev.preventDefault(); depth = 0; drop.classList.remove("over");
-      if (ev.dataTransfer && ev.dataTransfer.files.length) { file.files = ev.dataTransfer.files; showName(); }
-    });
     var current = function () { return form.querySelector('input[name="provider"]:checked') || radios[0]; };
     var syncProv = function () {
       var o = current();
       if (!o) return;
-      note(o.dataset.note || "", o.dataset.ok !== "1");
+      pnote.innerHTML = o.dataset.note || "";
+      pnote.classList.toggle("bad", o.dataset.ok !== "1");
+      pcur.textContent = o.dataset.short || o.value;
       models.innerHTML = "";
       (o.dataset.models || "").split(",").filter(Boolean).forEach(function (m) {
         var x = document.createElement("option"); x.value = m; models.appendChild(x);
       });
       var off = !o.dataset.models && o.value !== "openai";
-      model.disabled = off;
+      model.disabled = off; model.hidden = off;
       if (off) model.value = "";
-      pmore.hidden = off;
     };
-    radios.forEach(function (r) { r.addEventListener("change", syncProv); });
+    radios.forEach(function (r) { r.addEventListener("change", function () { syncProv(); say(""); }); });
     syncProv();
-    var go = $("#go"), goText = go.textContent;
-    form.addEventListener("submit", function (ev) {
-      var sample = ev.submitter && ev.submitter.name === "sample";
-      if (!sample && !(file.files && file.files.length)) { ev.preventDefault(); fail("Выберите файл требований."); return; }
+    var check = function (f0) {
+      var ext = (f0.name.split(".").pop() || "").toLowerCase();
+      return f0.size > 20 * 1024 * 1024 ? "Файл " + (f0.size / 1048576).toFixed(1) + " МБ — больше 20 МБ. Сожмите PDF или загрузите только раздел требований."
+        : !f0.size ? "Файл пустой — в нём нет текста для проверки."
+        : ["pdf", "docx", "md", "markdown", "txt", "html", "htm"].indexOf(ext) < 0 ? "Формат ." + ext + " не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML."
+        : "";
+    };
+    var send = function (sample) {
       if (!sample) {
-        var f0 = file.files[0];
-        var ext = (f0.name.split(".").pop() || "").toLowerCase();
-        var bad = f0.size > 20 * 1024 * 1024 ? "Файл " + (f0.size / 1048576).toFixed(1) + " МБ — больше 20 МБ. Сожмите PDF или загрузите только раздел требований."
-          : !f0.size ? "Файл пустой — в нём нет текста для проверки."
-          : ["pdf", "docx", "md", "markdown", "txt", "html", "htm"].indexOf(ext) < 0 ? "Формат ." + ext + " не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML."
-          : "";
-        if (bad) { ev.preventDefault(); fail(bad); return; }
+        var f0 = file.files && file.files[0];
+        if (!f0) { say("Выберите файл требований.", true); return; }
+        var bad = check(f0);
+        if (bad) { say(bad, true); return; }
       }
-      ev.preventDefault();
       var fd = new FormData(form);
-      if (sample) fd.append("sample", "1");
-      var btns = form.querySelectorAll("button");
-      btns.forEach(function (b) { b.disabled = true; });
-      go.textContent = "Загружаем…";
+      if (sample) { fd.delete("file"); fd.append("sample", "1"); }
+      veil.hidden = false; veil.classList.add("busy");
+      veil.querySelector("b").textContent = "Загружаем…";
       fetch("/api/jobs", { method: "POST", body: fd, headers: { Accept: "application/json" } })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
         .then(function (res) {
@@ -67,13 +55,94 @@
           throw new Error(res.j.error || "Не удалось начать проверку");
         })
         .catch(function (err) {
-          btns.forEach(function (b) { b.disabled = false; });
-          go.textContent = goText;
-          var box = form.querySelector(".home-err");
-          if (!box) { box = document.createElement("p"); box.className = "home-err"; box.setAttribute("role", "alert"); form.querySelector(".home-act").before(box); }
-          box.textContent = err.message;
+          veil.hidden = true; veil.classList.remove("busy");
+          veil.querySelector("b").textContent = "Отпустите файл";
+          file.value = "";
+          say(err.message, true);
         });
+    };
+    file.addEventListener("change", function () { if (file.files && file.files.length) send(false); });
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      send(!!(ev.submitter && ev.submitter.name === "sample"));
     });
+    var depth = 0;
+    var hasFiles = function (ev) { return ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [], "Files") >= 0; };
+    window.addEventListener("dragenter", function (ev) { if (!hasFiles(ev)) return; ev.preventDefault(); depth++; veil.hidden = false; });
+    window.addEventListener("dragover", function (ev) { if (hasFiles(ev)) ev.preventDefault(); });
+    window.addEventListener("dragleave", function () { if (--depth <= 0) { depth = 0; if (!veil.classList.contains("busy")) veil.hidden = true; } });
+    window.addEventListener("drop", function (ev) {
+      if (!hasFiles(ev)) return;
+      ev.preventDefault(); depth = 0;
+      if (ev.dataTransfer.files.length) { file.files = ev.dataTransfer.files; send(false); }
+      else veil.hidden = true;
+    });
+    document.addEventListener("click", function (ev) {
+      document.querySelectorAll(".b-menu[open]").forEach(function (m) { if (!m.contains(ev.target)) m.open = false; });
+    });
+  }
+
+  /* ── лист (№39): заметки на полях, фокус, карта листа ── */
+  var sheet = $("#sheet");
+  if (sheet) {
+    var notes = Array.prototype.slice.call(sheet.querySelectorAll(".b-note"));
+    var layout = function () {
+      var wide = window.matchMedia("(min-width: 1241px)").matches;
+      var bottom = -1e9;
+      notes.forEach(function (n) {
+        n.style.removeProperty("--dy");
+        if (!wide) return;
+        var line = n.parentElement, top = line.offsetTop;
+        var dy = Math.max(0, bottom + 6 - top);
+        if (dy) n.style.setProperty("--dy", dy + "px");
+        bottom = top + dy + n.offsetHeight;
+      });
+    };
+    var focus = function (fid) {
+      var on = sheet.dataset.focus === fid ? "" : fid;
+      sheet.dataset.focus = on;
+      sheet.classList.toggle("is-focus", !!on);
+      sheet.querySelectorAll(".b-line").forEach(function (l) {
+        l.classList.toggle("on", !!on && (" " + (l.dataset.f || "") + " ").indexOf(" " + on + " ") >= 0);
+      });
+      notes.forEach(function (n) { n.classList.toggle("on", n.dataset.f === on); });
+      layout();
+      var first = on && sheet.querySelector(".b-line.on");
+      if (first) {
+        var r = first.getBoundingClientRect();
+        if (r.top < 70 || r.bottom > innerHeight - 90) window.scrollTo({ top: scrollY + r.top - innerHeight / 3, behavior: "smooth" });
+      }
+    };
+    sheet.addEventListener("click", function (ev) {
+      var t = ev.target.closest(".b-note, .b-hl");
+      if (t) focus((t.dataset.f || "").split(" ")[0]);
+      else if (sheet.dataset.focus) focus(sheet.dataset.focus);
+    });
+    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && sheet.dataset.focus) focus(sheet.dataset.focus); });
+    var map = $("#map"), view = $("#mapview");
+    var syncView = function () {
+      if (!map || !view) return;
+      var r = sheet.getBoundingClientRect(), h = Math.max(r.height, 1);
+      var a = Math.min(1, Math.max(0, -r.top / h)), b = Math.min(1, Math.max(0, (innerHeight - r.top) / h));
+      view.style.top = (a * 100) + "%"; view.style.height = Math.max(2, (b - a) * 100) + "%";
+    };
+    if (map) {
+      map.addEventListener("click", function (ev) {
+        var t = ev.target.closest("i[data-line]"), line;
+        if (t) line = document.getElementById("L" + t.dataset.line);
+        else {
+          var r = map.getBoundingClientRect(), y = (ev.clientY - r.top) / r.height;
+          line = document.getElementById("L" + Math.max(1, Math.round(y * (+sheet.dataset.lines || 1))));
+        }
+        if (line) window.scrollTo({ top: scrollY + line.getBoundingClientRect().top - innerHeight / 3, behavior: "smooth" });
+        if (t) { var n = line && line.querySelector(".b-note"); if (n && !n.classList.contains("on")) focus(n.dataset.f); }
+      });
+    }
+    var raf = 0;
+    window.addEventListener("scroll", function () { if (!raf) raf = requestAnimationFrame(function () { raf = 0; syncView(); }); }, { passive: true });
+    window.addEventListener("resize", function () { layout(); syncView(); });
+    layout(); syncView();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { layout(); syncView(); });
   }
 
   /* ── страница задания ── */
