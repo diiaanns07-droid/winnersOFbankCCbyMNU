@@ -556,7 +556,8 @@ def test_same_input_gives_same_markdown(tmp_path):
 
         lens.run_named = chained
         try:
-            _, written, _ = _review(tmp_path, OFFICIAL, name="det" + order[0], provider="mock")
+            # В паспорте отчёта есть имя файла. Сравниваем один и тот же файл в двух изолированных прогонах.
+            _, written, _ = _review(tmp_path / order[0], OFFICIAL, name="det", provider="mock")
         finally:
             lens.run_named = real
         md = Path(written["md"]).read_text(encoding="utf-8")
