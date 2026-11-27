@@ -776,7 +776,7 @@ def test_matrix_names_criteria_in_full(sample):
     m31 = md[md.find("### 3.1."):md.find("### 3.2.")]
     assert "| Требование | Итог | Нарушенные критерии | Дефекты |" in m31
     assert "Нб —" not in m31 and "| Од |" not in m31
-    assert re.search(r"\| 🔴 \| 🔴 согласованность", m31)
+    assert re.search(r"\| 🔴 \| 🔴 критичный: [^|\n]*согласованность", m31)
 
 
 def test_rejected_duplicate_points_to_kept_card(sample):
@@ -790,8 +790,8 @@ def test_rejected_duplicate_points_to_kept_card(sample):
                       "title": "Ложное", "reason": f"строка {line} описывает успешный повтор без ошибки", "line": line}]
     md = markdown.render(r)
     app = md[md.find('id="pd"'):md.find('id="pe"')]
-    assert f"зона тестировщика (дубль) → вошёл в [{kept['id']}](#{kept['id'].lower()})" in app
-    assert "успешный повтор без ошибки → вошёл" not in app
+    assert f"зона тестировщика (дубль) (по общим строкам см. [{kept['id']}](#{kept['id'].lower()}); связь" in app
+    assert "успешный повтор без ошибки (по общим строкам" not in app
 
 
 def test_code_spans_not_nested():

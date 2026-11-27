@@ -1493,10 +1493,11 @@ def _per_requirement(c: _Ctx) -> list[str]:
         if not fs:
             clean.append(q.get("id"))
             continue
-        rows.append([c.req_label(q.get("id")), crit_cell(fs),
+        label = c.req_named(q.get("id")) if c.level < 2 else c.req_label(q.get("id"))
+        rows.append([label, crit_cell(fs),
                      c.f_links(sorted({f["id"] for f in fs}, key=_id_num)), _worst(fs)])
     if doc_level:
-        rows.append(["документ в целом", crit_cell(doc_level), c.f_links([f["id"] for f in doc_level]),
+        rows.append(["весь документ", crit_cell(doc_level), c.f_links([f["id"] for f in doc_level]),
                      _worst(doc_level)])
     if rows and c.level >= 7:
         # очень большой документ: вместо матрицы — требования, сгруппированные по самой серьёзной находке
@@ -1507,8 +1508,9 @@ def _per_requirement(c: _Ctx) -> list[str]:
                            + "; ".join(f"{r[0]} — {r[2]}" for r in grp))
         out += ["", "Критерий каждого дефекта — в его карточке или строке таблицы ниже.", ""]
     elif rows:
-        out += table(["Требование", "Нарушенные критерии (по серьёзности)", "Дефекты"], [r[:3] for r in rows],
-                     [":---", ":---", ":---"])
+        out += table(["Требование", "Итог", "Нарушенные критерии", "Дефекты"],
+                     [[label, SEV_ICON.get(worst, ""), criteria, links] for label, criteria, links, worst in rows],
+                     [":---", ":---:", ":---", ":---"])
         out.append("")
     if clean:
         out += [f"✅ Без замечаний ({len(clean)}): " + ", ".join(c.req_label(r) for r in clean) + ".", ""]
@@ -2316,7 +2318,11 @@ def _appendix_how(c: _Ctx) -> list[str]:
                 fate = reason if re.match(r"снят", reason, re.I) else f"снят: {reason}"
                 if re.search(r"дубл|повтор", reason, re.I):
                     no_target += 1
-                    fate += " (карточка, в которую ушёл повтор, в `report.json` не указана)"
+                    related = _dup_target(c, r)
+                    if related:
+                        fate += f" (по общим строкам см. {c.f_link(related)}; связь в `report.json` не указана)"
+                    else:
+                        fate += " (карточка, в которую ушёл повтор, в `report.json` не указана)"
             line = r.get("line") if isinstance(r.get("line"), int) and r.get("line") else None
             rows.append([esc(cid) if cid else "ID не передан", esc(source_name(r.get("source"))),
                          cell(r.get("title")) + (f" (строка {line})" if line else ""), fate])

@@ -68,7 +68,7 @@ def test_duplicate_of_candidate_resolves_to_card(sample):
 def test_matrix_names_criteria_in_words(sample):
     md = markdown.render(sample)
     part = _section(md, "### 3.1.", "### 3.2.")
-    assert "| Требование | Нарушенные критерии (по серьёзности) | Дефекты |" in part
+    assert "| Требование | Итог | Нарушенные критерии | Дефекты |" in part
     assert "Как читать:" in part
     for short in ("| Од |", "| Пл |", "| Нб |", "| Рс |", "| · |"):
         assert short not in part
