@@ -20,7 +20,7 @@ CANON = ["segment", "rules", "lens_analyst", "lens_qa", "lens_architect", "lens_
          "judge", "clarify", "recheck"]
 
 # Поля паспорта, в которых разница между прогонами допустима: время и номер прогона.
-_TIME_KEYS = {"run_id", "started_at", "finished_at", "duration_s", "seconds"}
+_TIME_KEYS = {"run_id", "started_at", "finished_at", "duration_s", "seconds", "model_seconds"}  # model_seconds: 0.0/0.1 под нагрузкой
 
 # В Markdown: дата и время прогона, длительности этапов и всего прогона.
 _MD_TIME = [

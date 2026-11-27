@@ -587,8 +587,11 @@ class Pipeline:
                                    do_revise=bool(self.opts.get("revise")),
                                    report_path=self.opts.get("output") or None)
         except Exception as exc:  # noqa: BLE001
-            self.warnings.append(f"Режим --answers/--revise не выполнен: {type(exc).__name__}: {exc}")
+            msg = f"Режим --answers/--revise не выполнен: {type(exc).__name__}: {exc}"
+            self.warnings.append(msg)
             self.stages["recheck"] = "failed"
+            # отчёт уже собран: без этого сбой режима не видели ни отчёт, ни терминал (код выхода 0)
+            report.setdefault("run", {}).setdefault("warnings", []).append(msg)
             return
         self.stages["recheck"] = "ok"
         self.stage_stats["recheck"] = {"calls": 0, "seconds": round(time.monotonic() - t0, 2), "candidates": 0}
