@@ -226,3 +226,31 @@ def test_wish_scope_off_switch():
     res = judge.run(Ctx(FakeLLM(resp), requirements=reqs, options={"judge_check": False,
                                                                    "judge_wish_scope": False}), cs)
     assert len(res["findings"]) == 1
+
+
+def test_split_part_goes_to_finding_on_same_fragment():
+    """Выделенная часть идёт к дефекту, который уже разбирает тот же фрагмент документа (одна цитата содержит
+    другую, ≥ 30 знаков), а не становится вторым замечанием о том же месте."""
+    cs = _store_and_send() + [
+        _c("C-004", 43, "последние цифры карты и сумму", FLOW, source="lens:analyst", kind="ambiguity",
+           title="Не определено, какая сумма уходит клиенту", reqs=("R-09",))]
+    cs[3]["evidence"][0]["quote"] = "передать клиенту последние цифры карты и сумму"
+    resp = _merged()
+    resp["findings"].append(finding("F03", ["C-004"], kind="ambiguity", title="Какая сумма уходит клиенту"))
+    res = _run(resp, cs)
+    all_placed(res, ["C-001", "C-002", "C-003", "C-004"])
+    host = _by(res, "C-004")
+    assert host["candidate_ids"] == ["C-002", "C-004"] and host["title"] == "Какая сумма уходит клиенту"
+    assert _by(res, "C-001")["candidate_ids"] == ["C-001"]
+    assert len(res["findings"]) == 3
+    assert any("перенесён в дефект о том же месте" in w for w in res["warnings"])
+
+
+def test_short_shared_name_is_not_same_place():
+    """Общее имя компонента (короче 30 знаков) — не одно место: часть становится отдельным дефектом."""
+    cs = _store_and_send() + [
+        _c("C-004", 43, "последние цифры", FLOW, source="lens:analyst", kind="terminology", reqs=("R-09",))]
+    resp = _merged()
+    resp["findings"].append(finding("F03", ["C-004"], kind="terminology"))
+    res = _run(resp, cs)
+    assert _by(res, "C-002") is not _by(res, "C-004") and len(res["findings"]) == 4

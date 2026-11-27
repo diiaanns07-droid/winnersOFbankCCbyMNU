@@ -1577,6 +1577,7 @@ def _split_places(drafts: list[dict], by_id: dict[str, dict], ctx: Any, warnings
     дефектом со своими текстами. Не трогаются: critical (там законно сливаются следствия одного пропуска),
     перечни и таблицы одного раздела, части только из сигналов правил кода."""
     out: list[dict] = []
+    pending: list[tuple] = []
     for d in drafts:
         f = d["raw"]
         members = [by_id[x] for x in d["ids"]]
@@ -1611,20 +1612,51 @@ def _split_places(drafts: list[dict], by_id: dict[str, dict], ctx: Any, warnings
         out.append({"key": d["key"], "raw": raw, "ids": home_ids})
         sev_j = _s(f.get("severity")) if _s(f.get("severity")) in SEVERITIES else "major"
         for n, g in enumerate(apart, 1):
-            sub = min(g, key=lambda c: (SEV_RANK.get(_s(c.get("severity")), 3), -len(_lines_of(c)),
-                                        _cid_num(c["id"])))
-            sev_c = _s(sub.get("severity")) if _s(sub.get("severity")) in SEVERITIES else sev_j
-            sev = max(sev_j, sev_c, key=lambda s: SEV_RANK[s])  # не выше уровня, данного судьёй склейке
-            ids = [x for x in d["ids"] if x in {m["id"] for m in g}]
-            out.append({"key": f"{d['key']}#p{n}", "ids": ids, "raw": {
-                "key": f"{d['key']}#p{n}", "candidate_ids": ids, "base": sub["id"],
-                "kind": _s(sub.get("kind")), "criterion": _s(sub.get("criterion")), "severity": sev,
-                "blocks": _s(f.get("blocks")) if sev != "minor" else "none", "wish": False,
-                "severity_basis": _s(f.get("severity_basis")), "priority": 0, "requirement_ids": [],
-                "title": "", "problem": "", "scenario": ""}})
-            _warn(ctx, warnings, f"судья: из {_cut(_s(f.get('title')) or sub.get('title'), 60)!r} выделен отдельный "
-                                 f"дефект {_cut(sub.get('title'), 60)!r} — другое место документа, другая правка")
+            pending.append((d, f, n, g, sev_j))
+    for d, f, n, g, sev_j in pending:
+        sub = min(g, key=lambda c: (SEV_RANK.get(_s(c.get("severity")), 3), -len(_lines_of(c)), _cid_num(c["id"])))
+        ids = [x for x in d["ids"] if x in {m["id"] for m in g}]
+        host = _same_quote_host(g, out, d["key"], by_id)
+        if host is not None:  # то же место уже разбирает другой дефект судьи — туда, а не новым дефектом
+            host["ids"] = host["ids"] + ids
+            _warn(ctx, warnings, f"судья: из {_cut(_s(f.get('title')) or sub.get('title'), 60)!r} кандидат "
+                                 f"{_cut(sub.get('title'), 60)!r} перенесён в дефект о том же месте документа")
+            continue
+        sev_c = _s(sub.get("severity")) if _s(sub.get("severity")) in SEVERITIES else sev_j
+        sev = max(sev_j, sev_c, key=lambda s: SEV_RANK[s])  # не выше уровня, данного судьёй склейке
+        out.append({"key": f"{d['key']}#p{n}", "ids": ids, "raw": {
+            "key": f"{d['key']}#p{n}", "candidate_ids": ids, "base": sub["id"],
+            "kind": _s(sub.get("kind")), "criterion": _s(sub.get("criterion")), "severity": sev,
+            "blocks": _s(f.get("blocks")) if sev != "minor" else "none", "wish": False,
+            "severity_basis": _s(f.get("severity_basis")), "priority": 0, "requirement_ids": [],
+            "title": "", "problem": "", "scenario": ""}})
+        _warn(ctx, warnings, f"судья: из {_cut(_s(f.get('title')) or sub.get('title'), 60)!r} выделен отдельный "
+                             f"дефект {_cut(sub.get('title'), 60)!r} — другое место документа, другая правка")
     return out
+
+
+_HOST_QUOTE_MIN = 30  # общий фрагмент цитаты, а не имя компонента или поля
+
+
+def _same_quote_host(group: list[dict], drafts: list[dict], origin: str, by_id: dict[str, dict]) -> dict | None:
+    """Дефект судьи (не critical, не исходная склейка), чей кандидат цитирует тот же фрагмент документа, что и
+    выделенная часть (одна цитата содержит другую, от 30 знаков): то же место — та же правка."""
+    mine = {q for m in group for e in m.get("evidence") or [] if _ev_ok(e) for q in [_norm_q(e.get("quote"))] if q}
+    best, best_len = None, 0
+    for d in drafts:
+        if d["key"] == origin or _s(d["raw"].get("severity")) == "critical":
+            continue
+        members = [by_id[x] for x in d["ids"]]
+        if any(_s(m.get("severity")) == "critical" for m in members):
+            continue
+        for m in members:
+            for e in m.get("evidence") or []:
+                q = _norm_q(e.get("quote")) if _ev_ok(e) else ""
+                for x in mine:
+                    short = min(q, x, key=len)
+                    if len(short) >= _HOST_QUOTE_MIN and (short in q and short in x) and len(short) > best_len:
+                        best, best_len = d, len(short)
+    return best
 
 
 def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], *,
