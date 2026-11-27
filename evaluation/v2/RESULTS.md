@@ -133,6 +133,7 @@ python -m evaluation.v2.corpus run --out out/corpus --provider claude_cli --mode
 | v2 sonnet, 7d80df8, 12 кейсов (6 — лимит подписки) | 12 (6) | 4 | 82 | 0 | 1 | 0.047 | 1.000 | 0.089 | 0.750 | 29 | 2 | 0 / 12 | 0 | boundary_conflict 1/1, event_conflict 1/1, status_conflict 1/1, unit_mismatch 1/1 | 2.4 | 12.7 |
 | замер 08:30: 6d03683, haiku | 33 (20) | 10 | 100 | 1 | 2 | 0.091 | 0.909 | 0.165 | 1.000 | 31 | 4 | 0 / 18 | 0 | boundary_conflict 1/1, event_conflict 2/2, missing_element 3/3, status_conflict 2/2, unit_mismatch 2/3 | 2.8 | 10.1 |
 | корпус чистые, haiku 13:00 | 8 (0) | 0 | 55 | 0 | 0 | 0.000 | — | 0.000 | — | 55 | 8 | 1 / 25 | 1 |  | 2.2 | 8.4 |
+| v2 офлайн-правила (fda4d7ca) | 33 (0) | 27 | 0 | 1 | 0 | 1.000 | 0.964 | 0.982 | — | 0 | 0 | 0 / 0 | 0 | boundary_conflict 5/5, event_conflict 5/5, missing_element 5/6, status_conflict 6/6, unit_mismatch 6/6 | 0.0 | 0.0 |
 <!-- corpus:end -->
 
 Для сравнения, v1 (ветка `bcc/eval-independent`, `docs/plan-v2/ref/BCC-quality-08d3af5.md`): правила — 0 из 28
