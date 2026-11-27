@@ -67,7 +67,7 @@ def test_postprocess_drops_no_evidence_and_duplicates():
 
 def test_postprocess_caps_critical_and_count():
     pp = _load_stage().postprocess
-    cands = [_cand(f"K{i}", severity="critical", kind="event_conflict", lines=(i,)) for i in range(1, 5)]
+    cands = [_cand(f"K{i}", severity="critical", kind="event_conflict", lines=(i, 50 + i)) for i in range(1, 5)]
     cands += [_cand(f"M{i}", severity="minor", lines=(100 + i,)) for i in range(12)]
     out = pp(cands)
     assert len(out) == 12
@@ -95,10 +95,19 @@ def test_postprocess_critical_only_for_conflict_kinds():
     assert out == {"неоднозначность": "major", "пропуск": "major", "события": "critical", "единицы": "critical"}
 
 
+def test_conflict_needs_two_distinct_lines():
+    pp = _load_stage().postprocess
+    one_line = _cand("граница в одной строке", severity="critical", kind="boundary_conflict", lines=(40, 40))
+    two_lines = _cand("граница в двух местах", severity="critical", kind="boundary_conflict", lines=(40, 120))
+    out = {c["title"]: c["severity"] for c in pp([one_line, two_lines])}
+    assert out == {"граница в одной строке": "major", "граница в двух местах": "critical"}
+    assert [c["title"] for c in pp([one_line, two_lines], mature=True)] == ["граница в двух местах"]
+
+
 def test_postprocess_sorts_by_severity_keeps_model_order():
     pp = _load_stage().postprocess
     out = pp([_cand("m1", "minor", lines=(1,)), _cand("M1", "major", lines=(2,)),
-              _cand("K1", "critical", kind="boundary_conflict", lines=(3,)), _cand("M2", "major", lines=(4,))])
+              _cand("K1", "critical", kind="boundary_conflict", lines=(3, 30)), _cand("M2", "major", lines=(4,))])
     assert [c["title"] for c in out] == ["K1", "M1", "M2", "m1"]
 
 
