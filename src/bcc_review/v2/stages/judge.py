@@ -1204,6 +1204,53 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
     return out
 
 
+GOAL_MISMATCH_KINDS = CONFLICT_KINDS | {"other", "traceability", "incorrect"}
+
+
+def _absorb_goal_minors(findings: list[dict], req_kind_at: dict[int, str], ctx: Any,
+                        warnings: list[str]) -> list[dict]:
+    """Minor «цель документа расходится с требованием», когда то же требование (те же строки, кроме строк цели, и
+    те же ID требований) уже разбирает другой дефект, — не отдельное замечание, а ещё одно место этого дефекта.
+    Слабая модель держит их порознь, и читатель видит два замечания об одном требовании (на официальном haiku:
+    «цель — в момент события ↔ срок до минуты» рядом с «срок без доли событий»). Цель документа не нормативна
+    (шкала: её расхождение — minor), поэтому дефект-хозяин уровень не меняет."""
+    if not req_kind_at:
+        return findings
+    absorbed: set[int] = set()
+    for f in findings:
+        # только само расхождение (цель ↔ требование); свойство требования (непроверяемо, неоднозначно, неполно),
+        # процитированное вместе с целью, — отдельная находка
+        if f["severity"] != "minor" or not f["_members"] or f["kind"] not in GOAL_MISMATCH_KINDS:
+            continue
+        lines = {e["line_start"] for e in f["evidence"]}
+        goal = {n for n in lines if req_kind_at.get(n) == "goal"}
+        rest = lines - goal
+        if not goal or not rest:
+            continue
+        reqs = set(f["requirement_ids"])
+        hosts = [g for g in findings if g is not f and id(g) not in absorbed and id(f) not in absorbed
+                 and rest <= {e["line_start"] for e in g["evidence"]}
+                 and (not reqs or not g["requirement_ids"] or set(g["requirement_ids"]) & reqs)]
+        if not hosts:
+            continue
+        g = min(hosts, key=lambda h: (SEV_RANK[h["severity"]], h["_first_line"]))
+        g["candidate_ids"] = sorted(set(g["candidate_ids"]) | set(f["candidate_ids"]), key=_cid_num)
+        g["_members"] = g["_members"] + f["_members"]
+        g["requirement_ids"] = list(dict.fromkeys(g["requirement_ids"] + f["requirement_ids"]))
+        have = {e["line_start"] for e in g["evidence"]}
+        g["evidence"] = sorted(g["evidence"] + [e for e in f["evidence"] if e["line_start"] not in have],
+                               key=lambda e: e["line_start"])[:MAX_EVIDENCE + len(goal)]
+        g["sources"] = _sources(g["_members"])
+        g["_absorbed"] = [*(g.get("_absorbed") or []), f["key"], *(f.get("_absorbed") or [])]
+        tail = re.sub(r"[.;:\s]+$", "", _lc_first(f["title"]))
+        head = re.sub(r"[.;:\s]+$", "", _s(g["problem"]))  # той же фразой: число предложений проблемы не растёт
+        g["problem"] = _cut(f"{head}; кроме того, {tail} (строка {min(goal)}).", 900)
+        absorbed.add(id(f))
+        _warn(ctx, warnings, f"судья: {f['title'][:60]!r} (расхождение с целью) присоединён к "
+                             f"{g['title'][:50]!r} — то же требование")
+    return [f for f in findings if id(f) not in absorbed]
+
+
 def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
     crit = [f for f in findings if f["severity"] == "critical"]
     if len(crit) <= MAX_CRITICAL:
@@ -1536,6 +1583,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             f["evidence"].sort(key=lambda e: e["line_start"])
             f["sources"] = _sources(f["_members"])
             f["_first_line"] = f["evidence"][0]["line_start"]
+    if _option(ctx, "judge_absorb_goal", True):
+        findings = _absorb_goal_minors(findings, req_maps[0], ctx, warnings)
     _cap_critical(findings, ctx, warnings)
     if _option(ctx, "judge_confirm_majors", True):
         _confirm_majors(findings, candidates, max(run_sources, reviewer_stages(ctx)), ctx, warnings)
