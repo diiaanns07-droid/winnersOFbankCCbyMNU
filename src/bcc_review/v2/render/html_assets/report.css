@@ -245,7 +245,9 @@ button.tile:hover { background: var(--surface-2); }
 .cnt { font-size: 13px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .tab[aria-selected="true"] .cnt { color: var(--ink-2); }
 main { padding: 24px var(--px) 40px; }
-.panel { animation: rise 360ms var(--ease) both; }
+/* панель — только прозрачность: transform у предка сделал бы боковое окно (position: fixed) частью панели */
+.panel { animation: fade 360ms var(--ease) both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .panel > .ph { display: none; }
 .sub { font-size: 22px; font-weight: 650; letter-spacing: -.015em; margin: 32px 0 10px; }
