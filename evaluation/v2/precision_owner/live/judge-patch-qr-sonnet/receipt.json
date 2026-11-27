@@ -1,0 +1,28 @@
+{
+  "job": [
+    "judge",
+    "patch",
+    "qr",
+    "sonnet"
+  ],
+  "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+  "code": 0,
+  "at": "2026-11-27T20:01:34+05:00",
+  "duration_s": 26.6,
+  "status": "complete",
+  "models": [
+    "claude-sonnet-5-5"
+  ],
+  "failed_calls": 0,
+  "cache": 0,
+  "accepted": [
+    {
+      "ids": [
+        "C-049"
+      ],
+      "title": "Комиссия 20 ₸ из ответа Q-07 противоречит Ф-4",
+      "severity": "critical"
+    }
+  ],
+  "quota": false
+}

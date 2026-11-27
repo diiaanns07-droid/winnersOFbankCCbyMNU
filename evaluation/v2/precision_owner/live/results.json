@@ -19,7 +19,10 @@
     "calls": 1,
     "failed": 0,
     "cached": 0,
-    "tokens": null,
+    "tokens": {
+      "input": 19942,
+      "output": 1806
+    },
     "accepted": [],
     "rejected": [
       {
@@ -29,6 +32,46 @@
       {
         "ids": "C-023",
         "reason": "Расхождение заявлено с «Решением-3», которого в документе нет, а L025 («Сервис графиков владеет договорными датами и редакциями…») ни с одним другим местом текста не спорит."
+      }
+    ]
+  },
+  {
+    "kind": "judge",
+    "variant": "patch",
+    "case": "car-loan",
+    "model_requested": "haiku",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 37.3,
+    "verify": null,
+    "quota": false,
+    "candidates": [
+      "C-022",
+      "C-023"
+    ],
+    "actual": [
+      "claude-haiku-5-5"
+    ],
+    "calls": 1,
+    "failed": 0,
+    "cached": 0,
+    "tokens": {
+      "input": 20454,
+      "output": 6952
+    },
+    "accepted": [
+      {
+        "ids": [
+          "C-022"
+        ],
+        "severity": "major",
+        "title": "День 3 по Q-03 противоречит Д-2 и коду DAY_INVALID"
+      }
+    ],
+    "rejected": [
+      {
+        "ids": "C-023",
+        "reason": "L076: «Кредитный учёт хранит график, исполненные проводки и принятые заявки в одной транзакционной системе.» — совпадает с ответом Решение-3, который прямо заменяет владение редакцией в L025; старое правило устранено."
       }
     ]
   },
@@ -52,7 +95,10 @@
     "calls": 2,
     "failed": 0,
     "cached": 0,
-    "tokens": null,
+    "tokens": {
+      "input": 50256,
+      "output": 2710
+    },
     "accepted": [
       {
         "ids": [
@@ -67,6 +113,80 @@
         ],
         "severity": "major",
         "title": "Владелец графика и редакций: Решение-3 расходится с стр. 25"
+      }
+    ],
+    "rejected": []
+  },
+  {
+    "kind": "judge",
+    "variant": "patch",
+    "case": "official",
+    "model_requested": "sonnet",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 26.6,
+    "verify": null,
+    "quota": false,
+    "candidates": [
+      "C-060",
+      "C-061"
+    ],
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": 2,
+    "failed": 0,
+    "cached": 0,
+    "tokens": {
+      "input": 36185,
+      "output": 2654
+    },
+    "accepted": [
+      {
+        "ids": [
+          "C-060"
+        ],
+        "severity": "critical",
+        "title": "Ответ владельца Q-07 включает переводы, а Ф-2 и приёмка исключают"
+      }
+    ],
+    "rejected": [
+      {
+        "ids": "C-061",
+        "reason": "L049 «Хранить идентификатор карты, месяц, идентификатор операции…» не запрещает хранить иные данные, а ответ владельца лишь добавляет новую функцию без противоречия сохраняющему силу пункту."
+      }
+    ]
+  },
+  {
+    "kind": "judge",
+    "variant": "patch",
+    "case": "qr",
+    "model_requested": "sonnet",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 26.6,
+    "verify": null,
+    "quota": false,
+    "candidates": [
+      "C-049"
+    ],
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": 2,
+    "failed": 0,
+    "cached": 0,
+    "tokens": {
+      "input": 38351,
+      "output": 2389
+    },
+    "accepted": [
+      {
+        "ids": [
+          "C-049"
+        ],
+        "severity": "critical",
+        "title": "Комиссия 20 ₸ из ответа Q-07 противоречит Ф-4"
       }
     ],
     "rejected": []

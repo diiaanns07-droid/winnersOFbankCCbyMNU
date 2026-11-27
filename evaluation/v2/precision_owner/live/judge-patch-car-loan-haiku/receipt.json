@@ -1,0 +1,28 @@
+{
+  "job": [
+    "judge",
+    "patch",
+    "car-loan",
+    "haiku"
+  ],
+  "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+  "code": 0,
+  "at": "2026-11-27T20:02:00+05:00",
+  "duration_s": 37.3,
+  "status": "complete",
+  "models": [
+    "claude-haiku-5-5"
+  ],
+  "failed_calls": 0,
+  "cache": 0,
+  "accepted": [
+    {
+      "ids": [
+        "C-022"
+      ],
+      "title": "День 3 по Q-03 противоречит Д-2 и коду DAY_INVALID",
+      "severity": "major"
+    }
+  ],
+  "quota": false
+}
