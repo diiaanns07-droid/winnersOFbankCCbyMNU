@@ -84,6 +84,7 @@
 }
 @media (max-width:640px){
   .home{gap:20px;padding-top:24px}
+  .drop{min-height:156px;padding:18px}
   .home-how ol{grid-template-columns:1fr}
   .home-act .b-button{flex:1}
   .pv-seg{display:grid;grid-template-columns:1fr 1fr}
