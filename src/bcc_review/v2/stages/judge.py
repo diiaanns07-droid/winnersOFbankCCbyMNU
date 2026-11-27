@@ -1069,7 +1069,8 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
         return findings
     hits.sort(key=lambda f: f["_first_line"])
     members = [m for f in hits for m in f["_members"]]
-    items = [f"{re.sub(r'[.;:\s]+$', '', f['title'])} (строка {f['_first_line']})" for f in hits]
+    tail = re.compile(r"[.;:\s]+$")  # вне f-строки: обратная косая в выражении f-строки — только Python 3.12+
+    items = [f"{tail.sub('', f['title'])} (строка {f['_first_line']})" for f in hits]
     lead = spec["lead"]
     listed = "; ".join(_lc_first(x) for x in items[:10])
     rewrites = list(dict.fromkeys(_s(f.get("rewrite")) for f in hits if _s(f.get("rewrite"))))
@@ -1485,7 +1486,8 @@ _SIDE_RU = {"no": "нельзя начинать", "conditional": "можно н
 
 
 def _list_ids(fs: list[dict], n: int = 3) -> str:
-    return ", ".join(f"{f['id']} ({_lc_first(re.sub(r'[.;:\s]+$', '', f['title']))})" for f in fs[:n])
+    tail = re.compile(r"[.;:\s]+$")  # вне f-строки: обратная косая в выражении f-строки — только Python 3.12+
+    return ", ".join(f"{f['id']} ({_lc_first(tail.sub('', f['title']))})" for f in fs[:n])
 
 
 def verdict_text(findings: list[dict]) -> str:
