@@ -704,3 +704,20 @@ def test_clarity_rubric_flags_codes_latin_and_missing_fix():
                title="Проблема with the implementation")
     issues = " ".join(judge.clarity_issues(bad))
     assert "внутренний код" in issues and "латиница" in issues and "исправление" in issues and "последствие" in issues
+
+def test_critical_confirmed_by_other_reviewer_in_neighbour_finding():
+    """Судья разложил одну первопричину на два дефекта: подтверждение второго ревьюера по тем же строкам считается."""
+    cs = [cand("C-001", 23, "в момент покупки", kind="ambiguity", source="lens:risk", extra=[(38, "проведённые")]),
+          cand("C-002", 23, "в момент", kind="contradiction", source="consistency", extra=[(38, "проведённые покупки")]),
+          cand("C-003", 46, "в течение минуты", kind="unverifiable", source="lens:qa"),
+          cand("C-004", 90, "другое место", kind="ambiguity", source="lens:analyst", extra=[(91, "ещё")])]
+    fs = [finding("F01", ["C-001"], severity="critical", kind="ambiguity", criterion="unambiguous",
+                  scenario="s", impact="i", priority=1),
+          finding("F02", ["C-002"], severity="major", kind="contradiction", criterion="set_consistent"),
+          finding("F03", ["C-003"]),
+          finding("F04", ["C-004"], severity="critical", kind="ambiguity", criterion="unambiguous",
+                  scenario="s", impact="i", priority=2)]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert sev["C-001"] == "critical"     # те же строки 23 и 38 цитирует набор
+    assert sev["C-004"] == "major"        # никто больше эти места не цитирует

@@ -773,7 +773,25 @@ def _source_family(src: str) -> str:
     return "rules" if src.startswith("rules:") else src
 
 
-def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0) -> None:
+def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None) -> bool:
+    """Critical подтверждён двумя ревьюерами: два источника среди кандидатов дефекта или кандидат другого
+    источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект."""
+    fams = {_source_family(_s(m.get("source"))) for m in members}
+    if len(fams) >= 2 or any(_s(m.get("origin")) in STRUCTURED_ORIGINS for m in members):
+        return True
+    lines = {e["line_start"] for e in f["evidence"]}
+    need = min(2, len(lines))
+    member_ids = {m["id"] for m in members}
+    for c in all_cands or []:
+        if c["id"] in member_ids or _source_family(_s(c.get("source"))) in fams:
+            continue
+        if len(lines & set(_lines_of(c))) >= need:
+            return True
+    return False
+
+
+def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0,
+               all_cands: list[dict] | None = None) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
         # критерий у противоречия и пропуска — по виду: модель иногда ставит «conforming» и т. п.
@@ -795,9 +813,7 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "дефект ничего не блокирует"
         elif f["kind"] in CONFLICT_KINDS and len({e["line_start"] for e in f["evidence"]}) < 2:
             why = "противоречие подтверждено цитатой только одного места"
-        elif (run_sources >= MIN_SOURCES_FOR_CONSENSUS
-              and len({_source_family(_s(m.get("source"))) for m in members}) < 2
-              and not any(_s(m.get("origin")) in STRUCTURED_ORIGINS for m in members)):
+        elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed(f, members, all_cands):
             why = "critical подтвердил только один ревьюер"
         if why:
             f["severity"] = "major"
@@ -1106,7 +1122,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             "_first_line": evidence[0]["line_start"],
             "_wish": f.get("wish") is True,
         }
-        _calibrate(item, members, ctx, warnings, run_sources)
+        _calibrate(item, members, ctx, warnings, run_sources, candidates)
         findings.append(item)
 
     findings = _consolidate(findings, lambda f: bool(_NO_ID_RE.search(f["title"])) and (
