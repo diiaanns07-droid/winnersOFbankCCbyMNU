@@ -353,9 +353,12 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
         out[-1]["_src"] = rec_src
     if "clean_max_findings" in t:
         over = c.get("docs_over_1_finding")
+        total = c.get("findings")
+        sev = (f"; всего {total}: critical {c.get('critical', 0)}, major {c.get('major', 0)}, "
+               f"minor {total - (c.get('critical') or 0) - (c.get('major') or 0)}") if isinstance(total, int) else ""
         out.append(_check(f"{title}: на чистом ≤ {t['clean_max_findings']} замечания",
                           "0 документов сверх", "—" if over is None else
-                          f"{over} из {c['measured']} (максимум {c.get('max_findings')})",
+                          f"{over} из {c['measured']} (максимум {c.get('max_findings')}{sev})",
                           None if over is None else over == 0, _clean_owners(d)))
     out.append(_check(f"{title}: critical на чистых", "0", f"{c['critical']} (документов {c['docs_with_critical']})",
                       c["critical"] == 0, _clean_owners(d, "critical") + "; №10 (серьёзность)"))
