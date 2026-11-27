@@ -205,6 +205,14 @@ def test_apply_answers_changes_verdict(findings, questions, stub_judge):
     assert "| Начинать разработку | нельзя |" in md and "До уточнения" in md and "D-29" in md
 
 
+def test_question_closed_by_decision_is_not_unanswered(findings, questions, stub_judge):
+    q = next(x for x in questions if x["finding_ids"] == ["D-09"])
+    ctx = FakeCtx(FakeLLM(_resp([{"finding_id": "D-09", "status": "resolved", "reason": "общее решение"}])))
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    clar = recheck.apply_answers(ctx, report, "## Решения\n- Учитываются только покупки у торговцев.\n")["clarification"]
+    assert q["id"] in clar["closed_by_decisions"] and q["id"] not in clar["unanswered"]
+
+
 def test_general_decision_affects_major(findings, questions):
     ctx = FakeCtx(FakeLLM(_resp([{"finding_id": "D-09", "status": "resolved", "reason": "общее решение"}])))
     res = recheck.run(ctx, findings, "## Решения\n- Учитываются только покупки у торговцев.\n", questions)
