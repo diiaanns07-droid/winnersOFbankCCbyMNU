@@ -805,19 +805,21 @@ def _passport(c: _Ctx) -> list[str]:
 
 def _segmentation(c: _Ctx) -> list[str]:
     reqs = c.reqs
-    out = [h2("s2", "2. Нарезка требований"), "",
-           f"Выделено {len(reqs)} {plural(len(reqs), 'требование', 'требования', 'требований')}. ID R-… присвоены "
-           f"агентом в порядке документа; в столбце «ID в документе» — номер или пункт документа, если он есть. "
-           f"Дословная цитата каждого требования сохранена в `report.json`.", ""]
+    out = [h2("s2", "2. Нарезка: как агент нарезал требования"), "",
+           f"Выделено {len(reqs)} {plural(len(reqs), 'требование', 'требования', 'требований')}. Идентификаторы "
+           f"R-… присвоены агентом в порядке документа; «ID в документе» — номер или пункт документа, если он есть; "
+           f"для каждого требования сохранена цитата (полная — в `report.json`).", ""]
     if not reqs:
         why = ("нарезка выполняется моделью, в режиме без модели её нет; замечания правил привязаны к строкам "
                "документа" if c.offline else "этап нарезки не дал результата (приложение Д)")
         return out[:2] + [f"Требования не выделены: {why}.", ""]
     rows = []
+    qlen = 70 if c.level < 3 else 45
     for q in reqs:
         rows.append([f"<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}", cell(q.get("source_id") or "—"),
-                     REQ_KIND.get(q.get("kind"), cell(q.get("kind"))), cell(q.get("summary")), cell(place(q))])
-    out += table(["ID", "ID в документе", "Вид", "Кратко", "Где"], rows)
+                     REQ_KIND.get(q.get("kind"), cell(q.get("kind"))), cell(q.get("summary")),
+                     quote_md(q.get("quote"), qlen, in_table=True) if q.get("quote") else "—", cell(place(q))])
+    out += table(["ID в отчёте", "ID в документе", "Вид", "Краткая формулировка", "Цитата", "Где"], rows)
     exc = c.r.get("excluded") or []
     if exc and c.level >= 2:
         out += ["", f"**Не вошло в нарезку ({len(exc)}):** " + "; ".join(
@@ -1033,7 +1035,7 @@ def _card(c: _Ctx, f: dict) -> list[str]:
 
 
 def _set_check(c: _Ctx) -> list[str]:
-    out = [h2("s4", "4. Проверка набора требований"), "", "### 4.1. Критерии набора", ""]
+    out = [h2("s4", "4. Проверка всего набора требований"), "", "### 4.1. Критерии набора", ""]
     rows = []
     for k in SET_CRITERIA:
         fs = [f for f in c.findings if _set_bucket(f) == k]
@@ -1204,7 +1206,7 @@ def _summary(c: _Ctx) -> list[str]:
     qs = c.r.get("questions") or []
     ok, qt = s.get("quotes_verified", 0), s.get("quotes_total", s.get("quotes_verified", 0))
     rows = [["Требований выделено", num(nreq)], ["С нарушениями", num(nreq - clean)], ["Без замечаний", num(clean)],
-            ["Дефектов всего", f"{total}: " + " · ".join(f"{SEV_ICON[k]} {fs.get(k, 0)}" for k in SEV_ICON)],
+            ["Нарушений (дефектов)", f"{total}: " + " · ".join(f"{SEV_ICON[k]} {fs.get(k, 0)}" for k in SEV_ICON)],
             ["Цитат сверено программой", f"{ok} из {qt}"],
             ["Вопросов владельцу", f"{len(qs)}, из них блокирующих {sum(1 for q in qs if q.get('blocking'))}"]]
     out = [h2("s5", "5. Сводка"), ""] + table(["Показатель", "Значение"], rows) + [""]
@@ -1235,8 +1237,9 @@ def _summary(c: _Ctx) -> list[str]:
 def _conclusion(c: _Ctx) -> list[str]:
     v = c.verdict
     out = [h2("s6", "6. Итог"), ""]
-    out += table(["Работа", "Решение"], [["Разработка", f"**{READINESS.get(v.get('development'), '—')}**"],
-                                         ["Тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
+    out += table(["Можно ли по этому документу начинать", "Ответ"],
+                 [["разработку", f"**{READINESS.get(v.get('development'), '—')}**"],
+                  ["тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     reason = v.get("summary") or _auto_reason(c)
     out += [f"**Обоснование.** {prose(reason)}", ""]
     first = _fix_first(c)
@@ -1552,8 +1555,9 @@ def _clean(value, key: str = ""):
 
 def _sections():
     return [(None, _header), (None, _brief), ("1. Паспорт прогона", _passport),
-            ("2. Нарезка требований", _segmentation), ("3. Проверка каждого требования", _per_requirement),
-            ("4. Проверка набора требований", _set_check), ("5. Сводка", _summary), ("6. Итог", _conclusion),
+            ("2. Нарезка: как агент нарезал требования", _segmentation),
+            ("3. Проверка каждого требования", _per_requirement),
+            ("4. Проверка всего набора требований", _set_check), ("5. Сводка", _summary), ("6. Итог", _conclusion),
             ("Приложение А. Вопросы владельцу", _appendix_questions),
             ("Приложение Б. Черновик тест-кейсов", _appendix_tests),
             ("Приложение В. Чек-лист «Ревью требований», заполненный агентом", _appendix_checklist),
