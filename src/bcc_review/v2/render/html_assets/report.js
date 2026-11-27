@@ -185,6 +185,7 @@
 
   /* ── фильтры ── */
   var chips = $$(".sevchip");
+  var openOnly = $("#openonly");
   var q = $("#q"), fkind = $("#fkind"), fsrc = $("#fsrc"), fsort = $("#fsort"), fcount = $("#fcount");
   function applyFilters() {
     if (!cardsBox) return;
@@ -194,6 +195,7 @@
     var shown = 0;
     cards.forEach(function (c) {
       var ok = sev[c.dataset.sev] !== false;
+      if (ok && openOnly && openOnly.checked) ok = c.dataset.resolved !== "1";
       if (ok && fkind.value) ok = c.dataset.kind === fkind.value;
       if (ok && fsrc.value) ok = (" " + c.dataset.src + " ").indexOf(" " + fsrc.value + " ") >= 0;
       if (ok && words.length) {
@@ -222,6 +224,7 @@
   function resetFilters() {
     chips.forEach(function (c) { c.setAttribute("aria-pressed", "true"); });
     q.value = ""; fkind.value = ""; fsrc.value = "";
+    if (openOnly) openOnly.checked = false;
     applyFilters();
   }
   if (cardsBox) {
@@ -232,6 +235,7 @@
       });
     });
     q.addEventListener("input", applyFilters);
+    if (openOnly) openOnly.addEventListener("change", applyFilters);
     fkind.addEventListener("change", applyFilters);
     fsrc.addEventListener("change", applyFilters);
     fsort.addEventListener("change", sortCards);
@@ -239,6 +243,7 @@
     $$("[data-sevonly]").forEach(function (b) {
       b.addEventListener("click", function () {
         var s = b.dataset.sevonly;
+        if (openOnly) openOnly.checked = true;
         chips.forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.sev === s ? "true" : "false"); });
         showTab("findings"); applyFilters();
         var t = $(".tabs"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 60, behavior: "smooth" });
