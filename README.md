@@ -76,7 +76,8 @@ python -m bcc_review release/input/requirements.md reports/my/requirements.md
 
 Формат: `python -m bcc_review <файл требований> <файл отчёта.md>`. Вход — `.pdf`, `.docx`, `.md`, `.html` или
 `.txt`; каталог отчёта создаётся сам, на Windows пути можно писать через `\`. Модель — `gemini-3.8-flash`; если она
-перегружена или недоступна, агент сам переходит на `gemini-3.6-flash`, затем на `gemini-3.5-flash-lite`.
+перегружена или недоступна, агент сам переходит на следующие Flash (`gemini-3.7-flash`, `3.6-flash`,
+`3.5-flash`), затем на Flash-Lite (`gemini-3.5-flash-lite`, `3.1-flash-lite`).
 Прогон занимает 4–7 минут; в конце в терминале — вердикт, блокеры и пути к файлам отчёта.
 
 Проверить ключ заранее (10 секунд): `python -m bcc_review doctor --live`.
@@ -183,7 +184,7 @@ HTML: reports/my/requirements.html
 
 | `--provider` | Что нужно | Модель по умолчанию |
 | :--- | :--- | :--- |
-| `gemini` | `GEMINI_API_KEY` ([бесплатно](https://aistudio.google.com/apikey)) | `gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` |
+| `gemini` | `GEMINI_API_KEY` ([бесплатно](https://aistudio.google.com/apikey)) | `gemini-3.8-flash` → `3.7-flash` → `3.6-flash` → `3.5-flash` → `3.5-flash-lite` → `3.1-flash-lite` |
 | `claude_cli` | установленный и авторизованный [Claude Code](https://docs.claude.com/en/docs/claude-code), ключ не нужен | `opus` (`CLAUDE_CLI_MODEL`) |
 | `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-5-5` (`ANTHROPIC_MODEL`) |
 | `openai` | `OPENAI_BASE_URL`, `OPENAI_MODEL` | закрытый контур: Ollama, vLLM, LM Studio; также OpenRouter |

@@ -37,7 +37,7 @@
 | Куда положить ключ | README, шаг 2: `.env` в корне (шаблон [`.env.example`](.env.example) без ключа) |
 | Какой командой запустить | README, шаг 3 |
 | Куда ляжет отчёт | README, «Куда ложится отчёт»: `.md`, `.json`, `.html` рядом с указанным путём |
-| Модель указана в инструкции | `gemini-3.8-flash` с запасными `gemini-3.6-flash`, `gemini-3.5-flash-lite`; фактическая — в паспорте отчёта |
+| Модель указана в инструкции | `gemini-3.8-flash` с запасными `gemini-3.7-flash` → `3.6-flash` → `3.5-flash` → `3.5-flash-lite` → `3.1-flash-lite` (как `GEMINI_FALLBACK_MODELS` в `.env.example`); фактическая — в паспорте отчёта |
 | Секретов в репозитории нет | `.env` в `.gitignore`; тест `test_no_secrets_in_tracked_files`; аудит истории всех веток |
 
 ## Как жюри проверить за пять минут
