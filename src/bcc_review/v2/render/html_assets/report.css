@@ -475,6 +475,33 @@ table.ba { max-width: 720px; }
   .fixl { display: none; }
 }
 
+/* ── ответы владельца, следующий круг, устойчивость (№34) ───────── */
+.qbtns { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qbtns label.btn { cursor: pointer; }
+.qcount { font-size: 12.5px; color: var(--ink-3); }
+.qstate { margin-left: auto; font-size: 12px; font-weight: 650; border-radius: 5px; padding: 1px 7px; }
+.qstate:empty { display: none; }
+.qstate.q-done { background: var(--ok-soft); color: var(--ok); }
+.qstate.q-conflict { background: var(--crit-soft); color: var(--crit); }
+.qstate.q-todo { background: var(--major-soft); color: var(--major); }
+.qnote { margin: 8px 0 2px; padding: 7px 10px; border-radius: 8px; font-size: 13px; line-height: 1.45; }
+.qnote.qn-conflict { background: var(--crit-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--crit) 25%, var(--line)); }
+.qnote.qn-todo { background: var(--major-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--major) 25%, var(--line)); }
+.pickans { margin: 4px 6px 0 0; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); border-radius: 6px;
+  padding: 3px 8px; font-size: 12.5px; cursor: pointer; text-align: left; }
+.pickans:hover { border-color: var(--brand); }
+.ifno { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; }
+.own.decisions { margin-top: 16px; }
+.chip.stab { font-weight: 650; }
+.chip.stab-full { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
+.chip.stab-part { color: var(--major); background: var(--major-soft); border-color: transparent; }
+.chip.stab-low { color: var(--crit); background: var(--crit-soft); border-color: transparent; }
+.stabline { margin: 6px 0 0; font-size: 13px; color: var(--ink-2); }
+.warnh { color: var(--crit); }
+ul.sides { margin: 0; padding-left: 0; list-style: none; }
+ul.sides li { margin: 0 0 3px; }
+table.nextr code { white-space: pre-wrap; word-break: break-word; }
+
 /* ── печать ───────────────────────────────────────────────────── */
 @page { size: A4; margin: 14mm 12mm 16mm; }
 @media print {
@@ -487,7 +514,7 @@ table.ba { max-width: 720px; }
   }
   body { font-size: 10.5pt; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .top { position: static; backdrop-filter: none; background: #fff; height: auto; padding: 0 0 8px; }
-  .actions, .tabs, .filters, .docpane, .kbd, .copy, .qtools button, .own, .toast { display: none !important; }
+  .actions, .tabs, .filters, .docpane, .kbd, .copy, .qtools button, .qtools label, .qbtns, .pickans, .own, .toast { display: none !important; }
   .hero { padding: 10px 0; }
   .hero-grid { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: repeat(5, 1fr); }
