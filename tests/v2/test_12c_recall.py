@@ -255,3 +255,24 @@ def test_count_limit_per_period_without_boundaries_becomes_candidate():
     assert lens_analyst.period_probes(_view(doc), reqs, have) == []
     k2 = [{"title": "Противоречие ограничения в месяц и повторной реакции", "evidence": [{"line": 39, "quote": "x"}]}]
     assert len(lens_analyst.period_probes(_view(doc), reqs, k2)) == 1   # «в месяц» в заголовке — не о границе
+
+
+def test_wish_grouped_by_judge_is_not_merged_with_other_wishes_of_same_place():
+    cs = [cand("C-001", 38, "исключаются", kind="incomplete", reqs=("R-06",)),
+          cand("C-002", 38, "исключаются", kind="incomplete", reqs=("R-06",), source="lens:risk"),
+          cand("C-003", 39, "за календарный месяц", kind="ambiguity", reqs=("R-06", "R-07")),
+          cand("C-004", 38, "в Алматы", kind="ambiguity", reqs=("R-06",), source="lens:risk"),
+          cand("C-005", 38, "входят", kind="incomplete", reqs=("R-06",)),
+          cand("C-006", 38, "Возврат уменьшает", kind="incomplete", reqs=("R-06",))]
+    fs = [dict(finding("F01", ["C-001", "C-002"], severity="minor", title="Перечень исключённых операций открыт",
+                       reqs=("R-06",)), wish=True),
+          dict(finding("F02", ["C-003", "C-004"], severity="minor", title="Пояс и граница календарного месяца",
+                       reqs=("R-06", "R-07")), wish=True),
+          dict(finding("F03", ["C-005"], severity="minor", title="Операции в другой валюте", reqs=("R-06",)), wish=True),
+          dict(finding("F04", ["C-006"], severity="minor", title="Частичный возврат", reqs=("R-06",)), wish=True)]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    all_placed(res, [c["id"] for c in cs])
+    by_ids = {tuple(f["candidate_ids"]): f["title"] for f in res["findings"]}
+    assert by_ids[("C-001", "C-002")] == "Перечень исключённых операций открыт"     # темы, собранные судьёй, — как есть
+    assert by_ids[("C-003", "C-004")] == "Пояс и граница календарного месяца"
+    assert by_ids[("C-005", "C-006")].startswith("Документ не рассматривает ряд случаев")  # мелочи к месту — сводятся
