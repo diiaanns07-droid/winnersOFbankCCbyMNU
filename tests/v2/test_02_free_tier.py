@@ -151,7 +151,7 @@ def run_review(tmp_path, monkeypatch, provider) -> tuple[int, dict]:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(doctor, "make_provider", lambda name=None, **kw: provider)
     out = tmp_path / "report.md"
-    code = cli.main([str(DOC), str(out), "--provider", "gemini", "--no-cache", "-q", "--no-html"])
+    code = cli.main([str(DOC), str(out), "--provider", "gemini", "--no-cache", "-q", "--no-html", "--rpm", "0"])
     return code, json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
 
 
