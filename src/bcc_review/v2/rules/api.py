@@ -474,6 +474,8 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
         for m in MENTION.finditer(text):
             seq = m.group(1)
             base = m.start(1)
+            if NOT_USED.match(text[m.end(1):m.end(1) + 40]):
+                continue  # «Коды 201 и 403 не используются» — отказ от кода, а не неописанный код
             for cm in re.finditer(CODE, seq):
                 after = text[base + cm.end():]
                 if UNIT_AFTER.match(after):
@@ -485,6 +487,10 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
                 frag = text[s0:min(e1) + 1 if e1 and text[min(e1)] == "." else (min(e1) if e1 else len(text))]
                 mentions.append((code, x, frag.strip()))
     return decls, mentions
+
+
+NOT_USED = re.compile(r"^[\s,—–-]*(?:метод\w*\s+)?(?:не\s+(?:использу|применя|возвраща|предусмотрен|поддержива)\w*|"
+                      r"не\s+бывает|исключен\w*)", re.I)
 
 
 def _heading_sections(doc: Doc, decls: list[Status]) -> list[tuple[Status, list[Line]]]:
@@ -556,10 +562,17 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
         prev = line.joined[:k].rstrip() if k > 0 else ""
         prev_sent = re.split(r"(?<=[.;])\s+", prev)[-1] if prev else ""
         context = (prev_sent + " " + frag).strip()
+        # шаг с несколькими случаями («для чужой карты вернуть 404; для неактивной — 400»): условие — только часть
+        # шага с этим кодом
+        parts = [c for c in re.split(r";\s*", frag) if re.search(rf"\b{code}\b", c)]
+        if parts and len(parts[0]) < len(frag) and len(set(re.findall(r"\b[1-5]\d\d\b", frag))) >= 2:
+            context = parts[0] if COND_MARK.search(parts[0]) or re.search(r"\bдля\b", parts[0]) else context
         other = _same_case_decl(context, [d for d in decls if d.code != code and d.kind in ("table", "list")], code,
                                 method_of(methods, line.n), methods, any_class=True, min_overlap=need)
         if other is None or (code, other.code) in done:
             continue
+        if re.search(rf"\b{other.code}\b", frag):
+            continue  # тот же шаг сам разводит случаи по кодам {code} и {other.code} — расхождения нет
         own = [d for d in decls if d.code == code and d.kind in ("table", "list")]
         cst = _stems(re.sub(CODE, " ", context))
         if any(len(cst & _stems(re.sub(CODE, " ", d.text))) >= len(cst & _stems(re.sub(CODE, " ", other.text)))

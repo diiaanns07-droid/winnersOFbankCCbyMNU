@@ -324,3 +324,33 @@ def test_field_with_verb_like_head_is_not_a_method() -> None:
     assert got == set(), got
     got = _named([(sec, "Приложение читает лимит методом getTransferLimit.")])
     assert got == {"getTransferLimit"}, got
+
+
+# --- исправленное ТЗ (выход пересмотра, examples/v2/demo_answers): исправленное не всплывает снова ---
+REVISED = ROOT / "examples" / "v2" / "demo_answers" / "requirements.revised.md"
+
+
+def test_revised_official_no_false_status_candidates() -> None:
+    if not REVISED.exists():
+        pytest.skip("нет исправленного ТЗ")
+    out = rules.run(fallback_load(REVISED))
+    src = {c["source"] for c in out["candidates"] if c["severity"] != "minor"}
+    # «Коды 201 и 403 не используются» — не «код упомянут, но не описан»; шаг «404 для чужой карты; 400 для
+    # неактивной» — два случая, а не один случай с двумя кодами
+    assert not {s for s in src if s.startswith(("rules:api.status_", "rules:api.same_case"))}, src
+    assert "rules:units.currency_mix" in src  # пересчёт тиынов в тенге в исправленной версии так и не задан
+
+
+def test_codes_declared_unused_and_two_case_step() -> None:
+    sec = "Часть B › Логика"
+    out = rules.run(_view([
+        ("Часть B › Метод", "REST type | POST"),
+        ("Часть B › Метод", "Request URL | https://api.bank.local/x/save"),
+        (sec, "2. Проверить карту: для чужой карты вернуть 404; для неактивной карты вернуть 400 «Карта недоступна»."),
+        ("Часть B › Статусы", "Коды 201 и 403 не используются."),
+        ("Часть B › Статусы", "200. Успешно."),
+        ("Часть B › Статусы", "400. Карта недоступна или параметры неверны."),
+        ("Часть B › Статусы", "404. Карта не найдена."),
+    ]))
+    src = {c["source"] for c in out["candidates"]}
+    assert not {s for s in src if s.startswith(("rules:api.status_", "rules:api.same_case"))}, src
