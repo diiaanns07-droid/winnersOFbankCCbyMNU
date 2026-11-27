@@ -223,3 +223,16 @@ def test_promised_operation_silent_when_methods_described_elsewhere(tmp_path: Pa
     p = tmp_path / "elsewhere.md"
     p.write_text(text, encoding="utf-8")
     assert not _by_rule(_run(p), "promises.promised_ops")
+
+
+def test_user_story_style_clean_and_defects() -> None:
+    """Третий стиль: истории пользователя, Gherkin, коды ответа списком, журнал версий таблицей."""
+    clean = _run(STYLES / "wave3_stories_clean.md")
+    assert clean["candidates"] == [], [c["title"] for c in clean["candidates"]]
+    path = STYLES / "wave3_stories_defects.md"
+    out = _run(path)
+    src = {c["source"] for c in out["candidates"]}
+    assert src == {"rules:promises.promised_ops", "rules:units.field_unit.term", "rules:language.nfr_unverifiable"}
+    po = _by_rule(out, "promises.promised_ops")[0]
+    assert "отзывает заявку" in po["title"] and "создаёт" not in po["title"]
+    _quotes_ok(path, out)

@@ -172,10 +172,22 @@ def rule_approvals(doc: Doc, out: dict) -> None:
         return
 
 
+def _version_table(doc: Doc) -> bool:
+    """История изменений таблицей: столбец «Версия» / «Version» и строка с номером редакции («1.0», «2»)."""
+    for t in tables(doc):
+        i = t.col("версия", "version", "редакция", "ver")
+        if i is None:
+            continue
+        if any(r.cells and i < len(r.cells) and re.fullmatch(r"v?\.?\s?\d+(?:[.,]\d+)*", r.cells[i].strip(), re.I)
+               for r in t.rows):
+            return True
+    return False
+
+
 def rule_version(doc: Doc, out: dict) -> None:
     text = "\n".join(x.joined for x in doc.lines if x.text)
     has_version = bool(VERSION.search(text))
-    if has_version:
+    if has_version or _version_table(doc):
         return
     explicit = next((x for x in doc.lines if x.text and re.search(r"верси", x.text, re.I)
                      and NOT_FILLED.search(x.text) and not x.cells), None)

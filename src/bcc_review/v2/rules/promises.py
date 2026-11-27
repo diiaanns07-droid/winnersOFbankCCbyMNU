@@ -199,8 +199,11 @@ def _promised_ops(clause: str) -> list[dict]:
     return ops
 
 
-def _method_words(m: Method) -> list[str]:
+def _method_words(m: Method, shared: set[str] = frozenset()) -> list[str]:
     parts = [m.desc]
+    sec = (m.verb_line.section or "").split("›")[-1].strip() if m.verb_line is not None else ""
+    if sec and sec not in shared:
+        parts.append(sec)  # свой раздел метода: «7.3. Отзыв заявки»
     vl = m.verb_line
     if vl is not None and vl.cells and vl.n == m.start:
         parts.append(vl.cells[0])  # строка сводной таблицы: «2. Отмена QR-кода | DELETE /qr/{id}»
@@ -239,7 +242,9 @@ def rule_promised_ops(doc: Doc, methods: list[Method], out: dict) -> bool:
         return False
     if any(x.text and ELSEWHERE.search(x.joined) for x in doc.lines):
         return False  # часть методов описана в другом документе — по этому файлу полноту не судим
-    mwords = [(m, _method_words(m)) for m in methods]
+    secs = [(m.verb_line.section or "").split("›")[-1].strip() for m in methods]
+    shared = {x for x in secs if secs.count(x) > 1}
+    mwords = [(m, _method_words(m, shared)) for m in methods]
     for x in doc.lines:
         if not x.text or x.is_code or x.is_heading or x.cells is not None:
             continue
