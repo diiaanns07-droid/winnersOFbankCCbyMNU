@@ -608,8 +608,8 @@ class Pipeline:
             report["run"].update(llm.summary())
         report["run"]["duration_s"] = round(time.monotonic() - self.t0, 1)
         report["run"]["finished_at"] = now_iso()
-        report["run"]["stages"] = dict(self.stages)
-        report["run"]["stage_stats"] = dict(self.stage_stats)
+        report["run"]["stages"] = _in_stage_order(self.stages)
+        report["run"]["stage_stats"] = _in_stage_order(self.stage_stats)
 
     # ------------------------------------------------------------------ отчёт
 
@@ -634,7 +634,7 @@ class Pipeline:
                 "duration_s": round(time.monotonic() - self.t0, 1), "provider": self.provider_name,
                 "model_requested": self.opts.get("model") or "", "models_used": s["models_used"],
                 "calls": s["calls"], "tokens": s["tokens"], "cost_usd": s["cost_usd"], "status": status,
-                "stages": dict(self.stages), "stage_stats": dict(self.stage_stats),
+                "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
                 "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts}
 
     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
@@ -696,6 +696,16 @@ def _second_pass(ctx: Context) -> Context:
 
     c.llm = _Pass2()
     return c
+
+
+_STAGE_ORDER = ["segment", "rules"] + [f"lens_{x}" for x in LENSES] + ["consistency", "quotes", "judge", "clarify",
+                                                                     "recheck"]
+
+
+def _in_stage_order(d: dict) -> dict:
+    """Этапы в порядке конвейера, а не в порядке завершения параллельных линз: отчёт повторяем байт в байт."""
+    rank = {k: i for i, k in enumerate(_STAGE_ORDER)}
+    return {k: d[k] for k in sorted(d, key=lambda k: rank.get(k, len(rank)))}
 
 
 def _uniq(items: list[str]) -> list[str]:

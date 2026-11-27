@@ -247,6 +247,9 @@ class LLMClient:
             with self._lock:
                 self.stats["cached"] += 1
                 self._stage_stats(stage)["cached"] += 1
+                m = cached.get("model")
+                if m and m not in self.stats["models_used"]:
+                    self.stats["models_used"].append(m)
             self._emit({"stage": stage, "cached": True, "model": cached.get("model"), "key": key[:16]})
             self._record(stage, cached["data"])
             return cached["data"]
