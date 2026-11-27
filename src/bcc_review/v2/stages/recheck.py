@@ -188,6 +188,10 @@ def parse_answers_json(data: Any) -> dict:
     decisions: list[str] = []
 
     def add(qid: str, val: Any) -> None:
+        if isinstance(val, list):  # {"Q-02": ["422 …", "403 …"]} — реплики разных адресатов на один вопрос
+            for v in val:
+                add(qid, v)
+            return
         if isinstance(val, dict):
             choice = val.get("choice", val.get("option"))
             text = str(val.get("text") or val.get("answer") or "")

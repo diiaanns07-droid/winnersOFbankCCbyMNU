@@ -230,3 +230,17 @@ def test_other_number_on_taken_question_is_not_merged():
     r = recheck.resolve_answers(QS, recheck.load_answers(text))
     q1 = next(a for a in r["answered"] if a["question_id"] == "Q-01")
     assert len(q1["replies"]) == 1
+
+
+@pytest.mark.parametrize("data", [
+    {"answers": {"Q-01": ["на отказ возвращаем 422", {"text": "на отказ возвращаем 403"}]}},
+    [{"id": "Q-01", "text": "на отказ возвращаем 422"}, {"id": "Q-01", "text": "на отказ возвращаем 403"}],
+])
+def test_json_two_replies(data):
+    a = recheck.resolve_answers(QS, recheck.load_answers(data))["answered"][0]
+    assert [r["text"] for r in a["replies"]] == ["на отказ возвращаем 422", "на отказ возвращаем 403"]
+
+
+def test_json_soft_refusal():
+    r = recheck.resolve_answers(QS, recheck.load_answers({"Q-02": {"text": "пока не знаю, решим после встречи"}}))
+    assert r["answered"] == [] and r["postponed"][0]["question_id"] == "Q-02"
