@@ -195,3 +195,25 @@ def test_official_docx_parity():
     for r in seg["requirements"]:
         m = Q.verify_quote(dx, r["quote"], r["line_start"])
         assert m and r["line_start"] - 2 <= m["line_start"] <= r["line_end"] + 2, r["id"]
+
+
+@needs_pdf
+@needs_docx
+def test_long_document_docx_and_pdf_from_word():
+    """Длинное ТЗ в DOCX и PDF из Word (19 страниц): все строки MD на месте, повторяющаяся фраза — в своём разделе
+    (k-е вхождение), строки таблиц, разорванные переносом страницы, склеены, маркеров «•» в тексте нет."""
+    md = dv.load(S / "long_tz.md")
+    pdf = dv.load(S / "long_tz.pdf")
+    dx = dv.load(S / "long_tz.docx")
+    assert pdf["pages"] >= 15 and any("разорванные переходом" in w for w in pdf["warnings"])
+    for v in (pdf, dx):
+        assert [x["n"] for x in dv.nonempty(md) if not Q.verify_quote(v, x["text"])] == []
+        assert not any(x["text"].startswith("•") for x in v["lines"])
+        occ_md = [x for x in md["lines"] if x["text"] == "Журнал операций хранится 5 лет."]
+        occ = [x for x in v["lines"] if x["text"].strip() == "Журнал операций хранится 5 лет."]
+        assert len(occ) == 17
+        assert all(a["section"].split(" › ")[0] == b["section"].split(" › ")[0] for a, b in zip(occ_md, occ))
+        for a, b in zip(occ_md, occ):     # цитата с подсказкой — своё вхождение, не соседнее
+            m = Q.verify_quote(v, "Журнал операций хранится 5 лет", b["n"] + 1)
+            assert m["line_start"] == b["n"]
+    assert "Пользователь вошёл в «Профиль» | Операция 2 | Результат за 4 с" in _texts(pdf)

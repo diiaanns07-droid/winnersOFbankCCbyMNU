@@ -275,6 +275,9 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                             "(сначала левая, затем правая).")
         before = len(blocks)
         blocks, dropped = _drop_running(blocks, sizes)
+        blocks, glued = _glue_split_rows(blocks)
+        if glued:
+            warnings.append(f"Строки таблиц, разорванные переходом на новую страницу, склеены: {glued}.")
         if dropped:
             n = before - len(blocks)
             word = "строка" if n % 10 == 1 and n % 100 != 11 else (
@@ -291,7 +294,7 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
         label = _list_label(b)
         for i, part in enumerate(parts):
             t = part
-            if b.get("kind") == "list_item" and i == 0:
+            if i == 0 and (b.get("kind") == "list_item" or _BULLET_GLYPH.match(t.lstrip())):
                 t = _BULLET_GLYPH.sub("", t.lstrip())
                 if label and not t.startswith(label):
                     t = f"{label} {t}"
@@ -380,6 +383,37 @@ def _reorder_columns(blocks: list[dict], sizes: dict) -> tuple[list[dict], list[
             order[pos] = i
         two_col.append(pg)
     return [blocks[i] for i in order], sorted(two_col)
+
+
+def _cells(text: str) -> list[str]:
+    return [c.strip() for c in re.split(r" \| ", " " + text + " ")]
+
+
+def _glue_split_rows(blocks: list[dict]) -> tuple[list[dict], int]:
+    """Строка таблицы, которую перенос страницы разорвал на две: последняя строка таблицы на странице и первая
+    строка следующей страницы с тем же числом ячеек, часть из которых пуста, склеиваются по ячейкам."""
+    out: list[dict] = []
+    glued = 0
+    i = 0
+    while i < len(blocks):
+        b = blocks[i]
+        nb = blocks[i + 1] if i + 1 < len(blocks) else None
+        if (nb is not None and b.get("kind") in ("table_row", "table_header") and nb.get("kind") == "table_row"
+                and _page_of(b) is not None and _page_of(nb) == _page_of(b) + 1):
+            a, c = _cells(str(b.get("text") or "")), _cells(str(nb.get("text") or ""))
+            first_on_page = not any(_page_of(x) == _page_of(nb) for x in out)
+            filled = [k for k, x in enumerate(c) if x]
+            if (len(a) == len(c) > 1 and filled and len(filled) * 2 <= len(c) and all(a[k] for k in filled)
+                    and first_on_page):
+                merged = dict(b)
+                merged["text"] = " | ".join(" ".join(p for p in (x, y) if p) for x, y in zip(a, c))
+                out.append(merged)
+                glued += 1
+                i += 2
+                continue
+        out.append(b)
+        i += 1
+    return out, glued
 
 
 def _running_key(text: str) -> str:

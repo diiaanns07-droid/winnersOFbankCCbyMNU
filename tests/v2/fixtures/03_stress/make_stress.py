@@ -11,7 +11,8 @@
 * ``two_columns.pdf`` — PDF в две колонки (reportlab), 2 страницы;
 * ``scan_page.pdf`` — 2 страницы: текст и страница-скан (картинка без текстового слоя);
 * ``no_part_b.md`` — Markdown только с бизнес-частью, без спецификации API;
-* ``long_tz.md`` — длинное ТЗ на 600+ строк, с повторяющимися фразами в разных разделах;
+* ``long_tz.md`` — длинное ТЗ на 600+ строк, с повторяющимися фразами в разных разделах; ``long_tz.docx`` и
+  ``long_tz.pdf`` — оно же в Word и PDF из Word (многостраничные таблицы);
 * ``confluence.html`` — HTML-экспорт страницы Confluence: хлебные крошки, метаданные, оглавление, панели, код,
   таблицы confluenceTable, вложения и подвал.
 
@@ -437,6 +438,16 @@ def main() -> int:
     make_scan(HERE / "scan_page.pdf")
     (HERE / "no_part_b.md").write_text(NO_PART_B, encoding="utf-8")
     n = make_long_md(HERE / "long_tz.md")
+    # то же длинное ТЗ в DOCX (конвертер официального документа) и PDF из Word (LibreOffice)
+    sys.path.insert(0, str(HERE))
+    from make_official_docx import convert
+    convert(HERE / "long_tz.md", HERE / "long_tz.docx")
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(HERE / "long_tz.docx")],
+                           check=True, capture_output=True, timeout=300)
+            shutil.copy(Path(tmp) / "long_tz.pdf", HERE / "long_tz.pdf")
     (HERE / "confluence.html").write_text(CONFLUENCE, encoding="utf-8")
     print(f"готово: {HERE} (long_tz.md — {n} строк)")
     return 0
