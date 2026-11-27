@@ -1,5 +1,25 @@
 # BCC Review — ИИ-агент проверки требований
 
+<!-- quickstart -->
+**Запуск одной командой** — откроется браузер с BCC Review, ключ модели спросит сам интерфейс. Нужен Git; Python 3.11+
+скрипт найдёт сам (на Windows предложит поставить).
+
+macOS / Linux:
+```bash
+git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU bcc-review && cd bcc-review && ./start.sh
+```
+Windows (PowerShell):
+```powershell
+git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU bcc-review; cd bcc-review; .\START.cmd
+```
+Docker (откройте http://localhost:8014):
+```bash
+git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU bcc-review && cd bcc-review && docker compose up
+```
+Без git: **Code → Download ZIP**, распакуйте и дважды щёлкните `START.cmd` (Windows) или `start.command` (macOS;
+если не открывается — правый щелчок → «Открыть»).
+<!-- /quickstart -->
+
 Агент читает документ требований (PDF, DOCX, Markdown, HTML, TXT) и до начала разработки пишет отчёт на русском:
 какие в документе требования, что с каждым не так, где документ противоречит сам себе, чего не хватает и можно ли
 начинать разработку и тестирование. Решение кейса BCC-HUB × MNU FinTech Hackathon «ИИ-агент проверки требований»
