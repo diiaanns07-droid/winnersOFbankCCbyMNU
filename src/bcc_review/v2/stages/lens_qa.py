@@ -79,8 +79,24 @@ TEST_CASE_SCHEMA = _obj({
     "expected_defined": {"type": "boolean"},
 })
 
+# Проверка нефункциональных требований по элементам измеримости — по записи на каждое НФТ. Пустая строка —
+# элемент в тексте не назван. Кандидата и серьёзность строит код (nfr_candidate): слабая модель без этого
+# списка пропускала непроверяемое НФТ, а сильная ставила серьёзность по-разному.
+NFR_CHECK_SCHEMA = _obj({
+    "requirement_id": _S,
+    "quote": _S,
+    "line": _INT,
+    "metric": _S,
+    "start_end": _S,
+    "share": _S,
+    "load": _S,
+    "vague_words": _S,
+    "rewrite": _S,
+})
+
 SCHEMA = _obj({
     "acceptance_checks": {"type": "array", "items": ACCEPTANCE_CHECK_SCHEMA},
+    "nfr_checks": {"type": "array", "items": NFR_CHECK_SCHEMA},
     "candidates": {"type": "array", "items": CANDIDATE_SCHEMA},
     "test_cases": {"type": "array", "items": TEST_CASE_SCHEMA},
 })
@@ -339,7 +355,7 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
     stated = _s(c["stated"]).rstrip(".")
     explanation = f" {_sentence(humanize_ids(c['explanation'], index))}" if c["explanation"] else ""
     req_ids = _ids(([row] if row else []) + rules)
-    rule_ev = [dict(e) for e in c["rule_evidence"][:2]]
+    rule_ev = [dict(e) for e in c["rule_evidence"][:3]]  # решающая фраза правила бывает третьей
     rewrite, fix_is_rule = split_fix(humanize_ids(c["fix"], index))
     rule_line = next((e.get("line") for e in rule_ev if e.get("line")), None)
     rewrite_line = (rule_line if fix_is_rule else c["stated_line"]) if rewrite else None
@@ -538,7 +554,7 @@ def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs:
 _NUMERIC_TARGET = re.compile(r"\d[\d\s]*(?:[.,]\d+)?\s*(?:%|мс\b|с\b|сек|минут|мин\b|час|ч\b|сут|дн|раз\b|раза\b|запрос)",
                              re.I)
 _VAGUE = re.compile(r"быстр|мгновенн|моментальн|своевременн|оперативн|удобн|понятн|всегда|как можно|по возможности|"
-                    r"высок\w* нагрузк|надёжн|надежн", re.I)
+                    r"высок\w* нагрузк|надёжн|надежн|\bточно\b|без ошибок|круглосуточн", re.I)
 
 
 def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) -> None:
@@ -553,7 +569,7 @@ def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) ->
         return {r.get("kind") for r in reqs if line and (r.get("line_start") or 0) <= line <= (r.get("line_end") or 0)}
 
     for c in cands:
-        if c.get("kind") != "unverifiable" or c["severity"] == "minor":
+        if c.get("kind") != "unverifiable" or c["severity"] == "minor" or c.get("origin") == "nfr_check":
             continue
         ids = [i for i in c["requirement_ids"] if i in kinds]
         cited = set().union(*(kinds_at(e.get("line")) for e in c["evidence"])) if c["evidence"] else set()
@@ -566,6 +582,96 @@ def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) ->
         if only_goals or measured or functional_gap:
             c.setdefault("severity_hint", c["severity"])
             c["severity"] = "minor"
+
+
+# ---------------------------------------------------------------- нефункциональные требования
+
+_NFR_FIELDS = [("metric", "числовой норматив"), ("start_end", "точки начала и конца замера"),
+               ("share", "доля событий или запросов (перцентиль)"), ("load", "нагрузка")]
+_EMPTY = re.compile(r"^(?:-|—|<\s*уточнить|нет|отсутству\w*|не\s+(?:указ|зада|назван|определ|опис)\w*|n/?a)", re.I)
+
+
+def _given(x: Any) -> str:
+    """Элемент НФТ, если он назван; «не указано», «нет», «—» — не назван."""
+    v = _s(x)
+    return "" if not v or _EMPTY.match(v) else v
+
+
+def normalize_nfr_check(raw: Mapping[str, Any]) -> dict:
+    c = {k: _s(raw.get(k)) for k in ("requirement_id", "quote", "metric", "start_end", "share", "load",
+                                      "vague_words", "rewrite")}
+    c["line"] = _int(raw.get("line"))
+    for k in ("metric", "start_end", "share", "load", "vague_words"):
+        c[k] = _given(c[k])
+    # Размытая оценка — по словарю в цитате; слова модели — только если числа нет совсем (слабая модель пишет
+    # сюда обычные уточнения: «без учёта ручной проверки», «выдерживает»).
+    m = _VAGUE.search(c["quote"])
+    if m:
+        a = len(re.match(r"\w*", c["quote"][::-1][len(c["quote"]) - m.start():]).group(0))
+        b = len(re.match(r"\w*", c["quote"][m.end():]).group(0))
+        c["vague_words"] = c["vague_words"] or c["quote"][m.start() - a:m.end() + b]
+    elif c["metric"]:
+        c["vague_words"] = ""
+    c["missing"] = [k for k, _ in _NFR_FIELDS if not c[k]]
+    # Непроверяемо: размытая оценка, нет числового норматива или не названы ни доля событий, ни нагрузка (норматив
+    # без условий, при которых он выполняется). Процент в самом нормативе («доступность не ниже 99,9 %») — доля.
+    # Точки замера у времени ответа подразумеваются, одно недостающее условие — уточнение, а не дефект: так
+    # записаны НФТ аккуратных документов («не дольше 1 с для 95 % запросов»).
+    throughput = re.search(r"в\s+(?:секунду|минуту|час)|/\s*с\b|\brps\b|\btps\b", c["metric"], re.I)
+    no_conditions = not c["share"] and not c["load"] and "%" not in c["metric"] and not throughput
+    c["unverifiable"] = bool(c["quote"]) and (bool(c["vague_words"]) or not c["metric"] or no_conditions)
+    return c
+
+
+def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[str, Any]]) -> dict | None:
+    """Одно замечание о проверяемости на документ — по НФТ, которые нельзя проверить тестом (major)."""
+    bad = [c for c in checks if c.get("unverifiable")]
+    if not bad:
+        return None
+    first = bad[0]
+    src = _s((index.get(first["requirement_id"]) or {}).get("source_id"))
+    name = src if src and _DOC_ID.fullmatch(src) else (
+        f"Нефункциональное требование в строке {first['line']}" if first["line"] else "Нефункциональное требование")
+    names = dict(_NFR_FIELDS)
+    missing = [names[k] for k in first["missing"]]
+    more = f" (и ещё {len(bad) - 1})" if len(bad) > 1 else ""
+    if first["vague_words"]:
+        title = f"{name}: «{first['vague_words']}» нельзя проверить тестом{more}"
+        what = f"размытая оценка «{first['vague_words']}» вместо числа"
+        scenario = (f"Замер показывает 3 с на 95-м перцентиле и 9 с на 99-м: по формулировке «{first['vague_words']}» "
+                    "одна сторона считает требование выполненным, другая — нет.")
+    else:
+        short = {"metric": "норматив", "start_end": "точки замера", "share": "доля событий", "load": "нагрузка"}
+        gaps = [short[k] for k in first["missing"] if k in ("share", "load")] or [short[k] for k in first["missing"]]
+        title = f"{name} нельзя проверить: не заданы {' и '.join(gaps[:2])}{more}"
+        what = f"норматив «{first['metric']}» без условий замера" if first["metric"] else "нет числового норматива"
+        scenario = (f"Нагрузочный тест: 95 % событий укладываются в «{first['metric'] or 'норматив'}», 5 % — нет, "
+                    "нагрузка в документе не названа: по требованию нельзя решить, пройден ли тест.")
+    rest = "; ".join(f"«{c['quote']}»" for c in bad[1:3])
+    problem = (f"«{first['quote']}» — {what}"
+               + (f"; не заданы: {', '.join(missing)}" if missing else "") + ". "
+               + "Тест не может дать ответ «пройден» или «не пройден»."
+               + (f" То же: {rest}." if rest else ""))
+    return {
+        "title": title,
+        "kind": "unverifiable",
+        "criterion": "verifiable",
+        "severity": "major",
+        "requirement_ids": _ids(c["requirement_id"] for c in bad if not index or c["requirement_id"] in index),
+        "evidence": [{"quote": c["quote"], "line": c["line"]} for c in bad[:3]],
+        "problem": problem,
+        "scenario": scenario,
+        "impact": ("Тестировщик не напишет нагрузочный тест с критерием прохождения, приёмка требования превратится "
+                   "в спор, а деградацию под нагрузкой банк увидит только в эксплуатации."),
+        "recommendation": ("Записать норматив измеримо: значение с единицей, точку начала и конца замера, долю "
+                           "событий (перцентиль) и нагрузку, при которой он выполняется."),
+        "rewrite": _t(first["rewrite"]),
+        "rewrite_line": first["line"],
+        "question": "",
+        "blocks": "testing",
+        "source": SOURCE,
+        "origin": "nfr_check",
+    }
 
 
 def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None) -> dict:
@@ -607,7 +713,11 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
             candidates.append(cand)
             flagged.add(c["row_requirement_id"])
 
+    nfr_checks = [normalize_nfr_check(x) for x in data.get("nfr_checks") or [] if isinstance(x, Mapping)]
+    nfr = nfr_candidate(nfr_checks, index)
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
+    if nfr:  # вычисленное замечание о проверяемости — первым: модельное того же вида уйдёт в dropped
+        model_cands.insert(0, nfr)
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
     kept, dropped = limit_other_candidates(kept)
     calibrate_coverage(kept, checks, reqs)
@@ -628,7 +738,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     tests = [{"id": t["id"], **{k: v for k, v in t.items() if k != "id"}} for t in tests]
 
     return {"candidates": candidates, "acceptance_checks": checks, "test_cases": tests, "warnings": warnings,
-            "dropped": dropped}
+            "dropped": dropped, "nfr_checks": nfr_checks}
 
 
 def retry_instruction(missing: list[str]) -> str:

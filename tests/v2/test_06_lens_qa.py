@@ -55,7 +55,7 @@ def test_schema_reasoning_order():
     props = list(lens_qa.ACCEPTANCE_CHECK_SCHEMA["properties"])
     order = [props.index(k) for k in ("row_facts", "rule_requirement_ids", "expected_by_rules", "stated", "verdict")]
     assert order == sorted(order), "ожидаемый результат по правилам должен выводиться до заявленного"
-    assert lens_qa.SCHEMA["required"] == ["acceptance_checks", "candidates", "test_cases"]
+    assert lens_qa.SCHEMA["required"] == ["acceptance_checks", "nfr_checks", "candidates", "test_cases"]
     for name in ("row_requirement_id", "row_facts", "rule_requirement_ids", "expected_by_rules", "stated", "verdict"):
         assert name in props, f"поле CONTRACT 2.5 {name}"
 
@@ -65,6 +65,7 @@ def test_schema_is_valid_json_schema():
     jsonschema.Draft202012Validator.check_schema(lens_qa.SCHEMA)
     for f in sorted(QA.glob("*.json")):
         data = _json(f)
+        data.setdefault("nfr_checks", [])  # ответы записаны до шага nfr_checks (mock дописывает пустой список)
         for c in data["candidates"]:  # try_prompt.py дописывает найденную строку цитаты
             for e in c["evidence"]:
                 e.pop("verified_line", None)
@@ -500,3 +501,52 @@ def test_other_provider_errors_are_not_swallowed():
 
     with pytest.raises(LLMError):
         lens_qa.run(_Ctx(_Down([]), REQS))
+
+
+# ---------------------------------------------------------------- nfr_checks → замечание о проверяемости
+
+def _nfr(**kw) -> dict:
+    base = {"requirement_id": "R-05", "quote": "Сообщение передаётся в течение минуты после события", "line": 20,
+            "metric": "в течение минуты", "start_end": "от события до передачи", "share": "", "load": "",
+            "vague_words": "", "rewrite": "Сообщение передаётся не позднее 60 с для <уточнить: доля> событий."}
+    base.update(kw)
+    return base
+
+
+NFR_REQS = REQS + [{"id": "R-05", "source_id": "", "kind": "nonfunctional", "line_start": 20, "line_end": 20},
+                   {"id": "R-06", "source_id": "НФ-2", "kind": "nonfunctional", "line_start": 21, "line_end": 21}]
+
+
+def test_nfr_without_share_and_load_is_major_from_code():
+    model = {"title": "НФТ без метрики", "kind": "unverifiable", "criterion": "verifiable", "severity": "major",
+             "requirement_ids": ["R-05"], "evidence": [{"quote": "в течение минуты", "line": 20}], "problem": "p",
+             "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "testing"}
+    out = lens_qa.postprocess({"nfr_checks": [_nfr()], "candidates": [model]}, NFR_REQS)
+    [c] = out["candidates"]
+    assert c["origin"] == "nfr_check" and c["severity"] == "major" and c["kind"] == "unverifiable"
+    assert c["requirement_ids"] == ["R-05"] and c["evidence"][0]["line"] == 20
+    assert "доля" in c["title"] and "нагрузка" in c["problem"] and c["rewrite"].startswith("Сообщение")
+    assert [d["title"] for d in out["dropped"]] == ["НФТ без метрики"], "модельное того же вида — в dropped"
+
+
+def test_nfr_measurable_gives_no_finding_and_vague_is_major():
+    tidy = _nfr(quote="Метод отвечает не дольше 1 с для 95 % запросов", metric="не дольше 1 с",
+                start_end="не указано", share="95 % запросов", load="")
+    assert lens_qa.postprocess({"nfr_checks": [tidy]}, NFR_REQS)["candidates"] == []
+    vague = _nfr(requirement_id="R-06", line=21, quote="Расчёт выполняется мгновенно", metric="", start_end="",
+                 vague_words="")
+    [c] = lens_qa.postprocess({"nfr_checks": [tidy, vague]}, NFR_REQS)["candidates"]
+    assert c["severity"] == "major" and c["title"].startswith("НФ-2: «мгновенн")
+
+
+def test_nfr_model_vague_words_need_dictionary_or_missing_number():
+    """Слабая модель пишет в vague_words обычные уточнения: при числовом нормативе без слов словаря — не размыто;
+    пропускная способность («200 операций в секунду») — сама нагрузка; «<уточнить: …>» — элемент не назван."""
+    noisy = _nfr(quote="Операция выполняется не дольше 3 с для 95 % запросов без учёта ручной проверки",
+                 metric="не дольше 3 с", share="95 % запросов", vague_words="без учёта ручной проверки")
+    rate = _nfr(quote="Сервис выдерживает 200 операций в секунду", metric="200 операций в секунду", share="",
+                load="", vague_words="выдерживает")
+    assert lens_qa.postprocess({"nfr_checks": [noisy, rate]}, NFR_REQS)["candidates"] == []
+    vague = _nfr(quote="Сведения отображаются быстро", metric="", vague_words="")
+    assert lens_qa.normalize_nfr_check(vague)["vague_words"] == "быстро"
+    assert lens_qa.normalize_nfr_check(_nfr(start_end="<уточнить: от запроса до ответа>"))["start_end"] == ""
