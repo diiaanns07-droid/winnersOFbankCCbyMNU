@@ -1169,6 +1169,23 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
     return out
 
 
+CODE_QUESTION_ORIGINS = {"coverage", "state_check"}  # вопросы полноты, заданные кодом аналитика (№12)
+
+
+def _completeness_check(c: dict) -> bool:
+    """Кандидат-вопрос полноты от кода аналитика: пробел описи или проверка состояния, вид — неполнота."""
+    return _s(c.get("origin")) in CODE_QUESTION_ORIGINS and _s(c.get("kind")) in MISSING_KINDS
+
+
+def _kept_completeness(c: dict) -> dict:
+    """Черновик дефекта судьи из самого кандидата (minor): судья снял его неприменимым кодом."""
+    return {"title": _s(c.get("title")), "kind": _s(c.get("kind")), "criterion": _s(c.get("criterion")) or "complete",
+            "severity": "minor", "blocks": "none", "problem": _s(c.get("problem")),
+            "scenario": _s(c.get("scenario")), "impact": _s(c.get("impact")),
+            "recommendation": _s(c.get("recommendation")), "question": _s(c.get("question")),
+            "requirement_ids": list(c.get("requirement_ids") or [])}
+
+
 def _place_key(f: dict) -> str:
     """Место дефекта для сведения пожеланий: первое требование, иначе первая строка цитаты."""
     reqs = [r for r in f.get("requirement_ids") or [] if r]
@@ -1394,6 +1411,15 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             continue
         code = _s(r.get("reason_code"))
         code = code if code in REJECT_REASONS else "unrelated"
+        if code == "exact_sense" and _completeness_check(by_id[cid]):
+            # «слово в точном смысле» — ответ на кандидата о размытом слове; вопрос полноты, заданный кодом
+            # (опись, проверка состояния), этим кодом не снимается: остаётся отдельным minor-замечанием
+            key = f"KEEP-{cid}"
+            drafts.append({"key": key, "raw": _kept_completeness(by_id[cid]), "ids": [cid]})
+            placed[cid] = key
+            _warn(ctx, warnings, f"судья отклонил вопрос полноты {cid} кодом exact_sense (он для размытых слов); "
+                                 "оставлен minor-замечанием")
+            continue
         reason = _s(r.get("reason")) or REJECT_REASONS[code]
         line = r.get("line") if isinstance(r.get("line"), int) and r.get("line", 0) > 0 else 0
         rejected.append(_rejected_entry(by_id[cid], code, reason, line))

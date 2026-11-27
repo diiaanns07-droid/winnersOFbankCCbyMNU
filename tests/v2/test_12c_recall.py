@@ -216,3 +216,22 @@ def test_noted_context_appends_pass_note_to_task():
     noted = lens_analyst._NotedContext(base, lens_analyst.SECOND_PASS_NOTE)
     system, user = noted.prompt("lens_analyst")
     assert system == "sys" and user.startswith("задание") and "Т15 → Т1" in user and noted.llm == "L"
+
+
+def test_code_question_rejected_as_exact_sense_stays_minor_finding():
+    cs = [cand("C-001", 37, "Держатель активной карты задаёт значение", kind="incomplete", criterion="complete",
+               severity="minor", title="Определено ли состояние активной карты для доступа к функции?",
+               origin="coverage"),
+          cand("C-002", 46, "быстро", kind="ambiguity"),
+          cand("C-003", 29, "При ошибке ввода сообщение появляется под полем", kind="incomplete",
+               criterion="complete", origin="")]
+    rej = [{"candidate_id": "C-001", "reason_code": "exact_sense", "reason": "общепринятое понятие", "line": 37},
+           {"candidate_id": "C-002", "reason_code": "exact_sense", "reason": "есть число", "line": 46},
+           {"candidate_id": "C-003", "reason_code": "exact_sense", "reason": "понятно", "line": 29}]
+    res = judge.run(Ctx(FakeLLM(response([], rejected=rej))), cs)
+    all_placed(res, [c["id"] for c in cs])
+    kept = [f for f in res["findings"] if f["candidate_ids"] == ["C-001"]]
+    assert len(kept) == 1 and kept[0]["severity"] == "minor"
+    assert kept[0]["title"] == "Определено ли состояние активной карты для доступа к функции?"
+    # кандидат о размытом слове и вопрос модели (не кода) снимаются, как раньше
+    assert {r["candidate_id"] for r in res["rejected"]} == {"C-002", "C-003"}

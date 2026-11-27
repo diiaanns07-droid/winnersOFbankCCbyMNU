@@ -225,6 +225,15 @@ _STOP = frozenset("""если когда какой какая какое как
 требовани правило правила""".split())
 _SENT = re.compile(r"(?<=[.!?;])\s+")
 MAX_GAPS = 6
+# Чего не хватает в документе по теме описи — начало поля `problem` у кандидата кода (тема без подписи — общая фраза)
+_TOPIC_GAP = {
+    "Т3": "Событие не определено", "Т4": "Период не определён", "Т5": "Состояние не определено",
+    "Т6": "Противоположная ветка условия не описана", "Т7": "Изменение настройки не описано",
+    "Т8": "Состав сообщения или экрана не определён", "Т9": "Перечень не закрыт",
+    "Т10": "Возврат или отмена не описаны", "Т11": "Экран описан не полностью",
+    "Т12": "Участники названы по-разному или их права не определены", "Т13": "Единицы не согласованы",
+    "Т14": "Нефункциональное требование не измеримо", "Т15": "Шаг метода описан не полностью",
+}
 _CONFLICT_Q = re.compile(r"^\s*(совпада|согласован|противореч|расход|пересека|запрещает ли|разрешает ли)", re.I)
 
 
@@ -251,33 +260,30 @@ def coverage_gaps(cov: list[dict], candidates: list[dict], view: Any, *, limit: 
     Слабая модель (Flash) находит в описи 7–12 мест, где документ молчит, но пишет 5–6 кандидатов. Кандидат кода:
     заголовок — вопрос описи, цитата — фраза строки места, серьёзность `minor` (уровень решает судья).
     Не берутся: строки с ответом, темы Т1–Т2 (расхождение требует двух цитат и сценария), строки, у которых
-    есть кандидат на той же строке, в заголовке которого не меньше 40 % слов вопроса."""
+    есть кандидат или уже взятый пробел на той же строке, в заголовке которого не меньше 40 % слов вопроса (два
+    разных вопроса к одной фразе — два кандидата). `problem` начинается с того, чего не хватает по теме описи."""
     out: list[dict] = []
-    seen: set[tuple] = set()
     for row in cov or []:
         q, n = row.get("question", ""), row.get("line") or 0
-        if row.get("answer") or not q or n <= 0 or str(row.get("topic")).strip() in ("Т1", "Т2", "T1", "T2") \
-                or _CONFLICT_Q.search(q):
+        topic = str(row.get("topic") or "").strip().replace("T", "Т")
+        if row.get("answer") or not q or n <= 0 or topic in ("Т1", "Т2") or _CONFLICT_Q.search(q):
             continue
         qs = _stems(q)
         need = max(2, -(-len(qs) * 2 // 5))  # не меньше двух и 40 % слов вопроса: общие слова предмета не в счёт
         if any(n in {e.get("line_start", e.get("line")) for e in c.get("evidence") or []}
                and len(qs & _stems(str(c.get("title", "")))) >= need  # по заголовку: в problem цитаты строки
-               for c in candidates):
+               for c in candidates + out):  # и не повтор уже взятого пробела (второй проход спрашивает то же)
             continue
         text = _line_text(view, n)
         if not text.strip():
             continue
         quote = _best_sentence(text, q)
-        key = (n, quote)
-        if key in seen:
-            continue
-        seen.add(key)
         title = q.strip().rstrip("?").strip()
+        what = _TOPIC_GAP.get(topic, "Случай не описан")
         out.append({
             "title": title[:1].upper() + title[1:] + "?", "kind": "incomplete", "criterion": "complete",
             "severity": "minor", "requirement_ids": [], "evidence": [{"quote": quote, "line": n}],
-            "problem": f"Документ не отвечает на вопрос: {q.strip()}", "scenario": "", "impact": "",
+            "problem": f"{what}: документ не отвечает на вопрос «{q.strip()}».", "scenario": "", "impact": "",
             "recommendation": "Дописать ответ в требование или явно исключить случай из объёма.", "rewrite": "",
             "question": q.strip(), "blocks": "none", "origin": "coverage",
         })
@@ -367,7 +373,7 @@ def state_probes(view: Any, requirements: Any, candidates: list[dict], *, limit:
 PASSES_BY_FAMILY = {"gemini-flash": 2, "gemini-flash-lite": 2, "gemini": 2}
 SECOND_PASS_NOTE = ("\n\nЭто независимый второй проход линзы по тому же документу. Опись заполни, начиная с "
                     "последней темы и до первой (Т15 → Т1), затем кандидаты по тем же правилам.")
-MAX_PASS_GAPS = 8
+MAX_PASS_GAPS = 10
 
 
 def passes_for(ctx: Any) -> int:
