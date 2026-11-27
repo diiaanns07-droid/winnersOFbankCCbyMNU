@@ -25,7 +25,7 @@ git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU bc
 начинать разработку и тестирование. Решение кейса BCC-HUB × MNU FinTech Hackathon «ИИ-агент проверки требований»
 ([ТЗ](https://github.com/BCC-HUB/ai-requirements-validator-task)).
 
-**Видео-демо:** [`presentation/demo.mp4`](presentation/demo.mp4) (с субтитрами — [`demo_subtitled.mp4`](presentation/demo_subtitled.mp4)) · **Слайды:** [`presentation/deck.pdf`](presentation/deck.pdf) ·
+**Видео-демо:** [`presentation/demo.mp4`](presentation/demo.mp4) (с субтитрами — [`demo_subtitled.mp4`](presentation/demo_subtitled.mp4)) ·
 **Готовый отчёт по документу кейса:** [`reports/requirements.md`](reports/requirements.md)
 (интерактивный — [`reports/requirements.html`](reports/requirements.html)) · **Что сдаём:** [`SUBMISSION.md`](SUBMISSION.md)
 
@@ -48,7 +48,7 @@ git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU bc
 **Windows (PowerShell):**
 
 ```powershell
-git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
+git clone -b main https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
 cd winnersOFbankCCbyMNU
 py -3.12 -m venv .venv
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
@@ -59,7 +59,7 @@ python -m pip install -r requirements.txt -e .
 **macOS и Linux:**
 
 ```bash
-git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
+git clone -b main https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git
 cd winnersOFbankCCbyMNU
 python3.12 -m venv .venv
 source .venv/bin/activate
@@ -96,8 +96,10 @@ python -m bcc_review release/input/requirements.md reports/my/requirements.md
 
 Формат: `python -m bcc_review <файл требований> <файл отчёта.md>`. Вход — `.pdf`, `.docx`, `.md`, `.html` или
 `.txt`; каталог отчёта создаётся сам, на Windows пути можно писать через `\`. Модель — `gemini-3.8-flash`; если она
-перегружена или недоступна, агент сам переходит на `gemini-3.6-flash`, затем на `gemini-3.5-flash-lite`.
-Прогон занимает 4–7 минут; в конце в терминале — вердикт, блокеры и пути к файлам отчёта.
+перегружена или недоступна, агент сам переходит на следующие Flash (`gemini-3.7-flash`, `3.6-flash`,
+`3.5-flash`), затем на Flash-Lite (`gemini-3.5-flash-lite`, `3.1-flash-lite`).
+Прогон занимает несколько минут (на Sonnet — 2,5–4 мин по замерам 27.11); в конце в терминале — вердикт,
+блокеры и пути к файлам отчёта.
 
 Проверить ключ заранее (10 секунд): `python -m bcc_review doctor --live`.
 
@@ -125,7 +127,8 @@ scripts/run_official.sh
 | `out/report.md` | отчёт для чтения (GitHub, VS Code, любой просмотрщик Markdown) |
 | `out/report.json` | то же для программ: замечания, полные цитаты, паспорт прогона (схема `contracts/v2.json`) |
 | `out/report.html` | интерактивный отчёт одним файлом: документ с подсвеченными цитатами, фильтры, работает без интернета |
-| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf`: копия документа с комментариями на местах цитат |
+| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf` для входа DOCX / PDF: копия документа с комментариями (выделениями) на местах цитат |
+| `out/report.docx` | по `--export docx` для входа MD, TXT, HTML, PDF: Word-версия отчёта |
 | `out/report.jira.csv` | по `--export jira`: замечание — строка для импорта в Jira |
 | `out/report.revised.md` | по `--revise`: исправленная редакция ТЗ |
 | `runs/<id прогона>/` | журнал: вход и выход каждого этапа, каждое обращение к модели |
@@ -176,34 +179,36 @@ HTML: reports/my/requirements.html
 (`python -m evaluation.v2.score отчёт.json`). Корпус [`evaluation/dev`](evaluation/dev) — 4 банковские темы,
 24 документа с заложенными дефектами и 8 чистых, на которых агент не должен поднимать тревогу.
 
-<!-- числа №15: источник — evaluation/v2/RESULTS.md и docs/plan-v2/INTEGRATION.md («Сквозные прогоны») -->
-| Метрика | Цель | **Opus**, 27.11 07:02 | Sonnet, 3 прогона подряд, 08:27 | Haiku, профиль слабой модели, 08:03 | v1 (правила) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| К1–К5 найдены | 5 из 5 (на Gemini Flash ≥ 4) | **5 из 5**, все критичными | **5 из 5 в каждом** (критичными 4–5) | 5 из 5 (критичными 4) | 3 из 5 |
-| С1–С20 найдены | ≥ 16 из 20 | **20 из 20** | **19 из 20 в каждом** | 15 из 20 | 7 из 20 |
-| Ложных критичных | 0 | **0** | **0** | — | 0 |
-| Замечаний (крит./сущ./незн.) | 25–45 | 34 (5/16/13) | 29–31 | 27 (4/16/7) | 27 (2/11/14) |
-| Цитаты сверены программой | 100 % | **100 %** (87 из 87) | **100 %** (79–88) | — | 100 % (66 из 66) |
-| Статус, время, обращений к модели | полный, ≤ 15 мин (Gemini ≤ 6, Haiku ≤ 8), ≤ 12 | полный, 5 мин 57 с, 9 | полный, 3,3–3,9 мин, 9 | полный, 5 мин 28 с, 9 | — |
+<!-- числа: отчёты сдачи reports/ (код 0a30c67) и замер №31 на d013c123 (docs/JURY.md, раздел 3) -->
+**Отчёты сдачи** (`reports/`, код финальной сборки `0a30c67`, 27.11 22:12, Sonnet, без кэша, по одному прогону;
+пересчёт — `python -m evaluation.v2.score reports/requirements.json`):
 
-Тот же документ в другом формате (Sonnet): PDF — К 5 из 5, С 18 из 20 (4 мин 25 с); DOCX — К 5 из 5, все
-критичными, С 18 из 20 (4 мин 37 с).
+| Метрика | Цель | Официальный ТЗ, Markdown | Тот же ТЗ из PDF |
+| :--- | :--- | :--- | :--- |
+| К1–К5 найдены | 5 из 5 (на Gemini Flash ≥ 4) | **5 из 5**, все критичными | 5 из 5, все критичными |
+| С1–С20 найдены | ≥ 16 из 20 | **20 из 20** | 18 из 20 (нет С9, С14) |
+| Ложных критичных | 0 | **0** | 0 |
+| Замечаний / дублей | 25–45 / 0 | 33 / 2 | 32 / 2 |
+| Цитаты сверены программой | 100 % | **100 %** (83 из 83), `verify` OK | 100 % (87 из 87), `verify` OK |
+| Статус, время, обращений к модели | полный, ≤ 15 мин, ≤ 12 | полный, 2,8 мин, 9 | полный, 3,4 мин, 9 |
 
-Корпус [`evaluation/dev`](evaluation/dev), строгий счёт (находка засчитывается, только если её цитаты покрывают
-место дефекта; любое замечание на чистом документе — ложная тревога):
+**Один прогон — не гарантия: результат мигает.** Замер №31 на коде `d013c123` (за час до финальной сборки, без
+последних правок судьи и набора): Sonnet ×3 — К 5 из 5 все критичными во всех трёх, С 19, 20 и 18 из 20, ложных
+критичных 0, 2,5–3,8 мин; Haiku — К 5 из 5, С 18 из 20. Каждое число с каталогом прогона и командой пересчёта, худшие
+рядом с лучшими — [`docs/JURY.md`](docs/JURY.md). Для сравнения, v1 (правила без модели): К 3 из 5, С 7 из 20.
 
-* только правила, без модели: точность 0,80, полнота 0,43, **0 ложных тревог на 8 чистых документах**
-  (у v1 — тревоги на всех 8);
-* с моделью (Haiku, 27.11 05:20, до доработок второй волны): **полнота 0,93** (26 из 28 дефектов), но на 8 чистых
-  документах — 128 лишних замечаний (из них 4 критичных, вердикт «нельзя» на 4 документах). Доработки второй волны направлены на ложные
-  тревоги; повторный замер — в [`evaluation/v2/RESULTS.md`](evaluation/v2/RESULTS.md), там же стабильность и
-  сравнение моделей.
+**Чего ещё не достигли — ложные тревоги на чистых документах.** На 12 чистых ТЗ без заложенных дефектов (Haiku,
+`d013c123`) агент поставил critical и вердикт «нельзя» на 3 из 12; цель — 0. На корпусе
+[`evaluation/dev`](evaluation/dev) (Haiku, 33 документа) полнота 0,89, но лишних замечаний много (151), хотя на
+чистых документах корпуса critical нет. Чистый документ другой темы из сдачи — «Кэшбэк»
+([`reports/other_topic_cashback.md`](reports/other_topic_cashback.md)): critical 0, существенных 0, вердикт «можно».
+Это главный пункт v2.1.
 
 ## Модели и провайдеры
 
 | `--provider` | Что нужно | Модель по умолчанию |
 | :--- | :--- | :--- |
-| `gemini` | `GEMINI_API_KEY` ([бесплатно](https://aistudio.google.com/apikey)) | `gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` |
+| `gemini` | `GEMINI_API_KEY` ([бесплатно](https://aistudio.google.com/apikey)) | `gemini-3.8-flash` → `3.7-flash` → `3.6-flash` → `3.5-flash` → `3.5-flash-lite` → `3.1-flash-lite` |
 | `claude_cli` | установленный и авторизованный [Claude Code](https://docs.claude.com/en/docs/claude-code), ключ не нужен | `opus` (`CLAUDE_CLI_MODEL`) |
 | `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-5-5` (`ANTHROPIC_MODEL`) |
 | `openai` | `OPENAI_BASE_URL`, `OPENAI_MODEL` | закрытый контур: Ollama, vLLM, LM Studio; также OpenRouter |
@@ -314,8 +319,10 @@ docker run --rm --env-file .env -v "$(pwd)/reports:/app/reports" bcc-review rele
 * Модель может ошибаться. Цитаты и строки проверяет программа, но правоту замечания по существу решает человек;
   отклонённые кандидаты с причинами видны в приложении отчёта.
 * Качество зависит от модели. На слабой (Haiku) агент работает в профиле слабой модели — короче ответы,
-  лимит времени этапа — и находит все 5 критичных, но меньше существенных (15–17 из 20); на Gemini Flash цель — не меньше
-  4 из 5 критичных. Лучшее качество — `claude_cli` или `anthropic`.
+  лимит времени этапа; на официальном документе он находит все 5 критичных, но даёт больше дублей и чаще поднимает
+  ложную тревогу на чистых документах. На Gemini Flash цель — не меньше 4 из 5 критичных; на `gemini-3.8-flash` не
+  измерено: в замере 27.11 бесплатная квота кончилась на первом вызове, а запасные модели дали К 3–5 из 5 и С 8–9
+  из 20 ([`docs/JURY.md`](docs/JURY.md)). Лучшее качество — `claude_cli` или `anthropic`.
 * Сканированный PDF без текстового слоя не читается (нет OCR).
 * Бесплатный Gemini ограничивает запросы в минуту и в сутки: при 429 агент ждёт и повторяет; если суточная квота
   исчерпана, отчёт будет частичным — повторите позже, готовые ответы возьмутся из кэша.
@@ -345,6 +352,6 @@ docker run --rm --env-file .env -v "$(pwd)/reports:/app/reports" bcc-review rele
 | `reports/` | финальные отчёты агента и таблица прогонов |
 | `evaluation/` | эталон, корпус и счётчик качества |
 | `scripts/` | одна команда для запуска и проверки, финальные отчёты |
-| `presentation/` | слайды, видео-демо, скриншоты |
+| `presentation/` | видео-демо, скриншоты, исходники слайдов (сами слайды — к финалу) |
 | `tests/v2/` | тесты без сети: `python -m pytest tests/v2 -q` |
 | `docs/` | разбор задачи, план и контракт v2 |
