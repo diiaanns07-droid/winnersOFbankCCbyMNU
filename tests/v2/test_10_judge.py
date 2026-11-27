@@ -541,7 +541,7 @@ def test_user_texts_have_no_latin_severity_words():
     texts = [res["verdict_summary"], res["checklist"][0]["comment"], res["findings"][0]["title"]]
     for t in texts:
         assert not re.search(r"\b(critical|major|minor)\b", t, re.I), t
-    assert res["verdict_summary"].startswith("критичных дефектов нет")
+    assert res["verdict_summary"].startswith("Критичных дефектов нет")  # №26: с заглавной в начале фразы
 
 
 def test_plan_b_candidates_from_v1_report():

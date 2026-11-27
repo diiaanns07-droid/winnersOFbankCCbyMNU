@@ -36,7 +36,8 @@ def _is_v2_report(path: str) -> bool:
 def main(argv: list[str] | None = None) -> int:
     engine, argv = _engine(list(sys.argv[1:] if argv is None else argv))
     if argv and argv[0] == "verify" and len(argv) > 1 and engine != "v1":
-        engine = "v2" if _is_v2_report(argv[1]) else "v1"
+        # Отчёта нет — отвечает v2 по-русски («файл отчёта не найден»), а не «[Errno 2]» движка v1 (просьба №33).
+        engine = "v2" if not Path(argv[1]).exists() or _is_v2_report(argv[1]) else "v1"
     if argv and argv[0] == "contract":
         engine = "v1"
     if engine == "v1":

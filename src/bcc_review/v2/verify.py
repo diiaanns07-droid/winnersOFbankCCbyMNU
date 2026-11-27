@@ -368,6 +368,22 @@ def _utf8_console() -> None:
             pass
 
 
+def _plain_error(exc: BaseException) -> str:
+    """Причина сбоя чтения по-русски: без «[Errno 2] No such file or directory» и «Expecting value»."""
+    import errno
+
+    if isinstance(exc, json.JSONDecodeError):
+        return f"report.json не читается как JSON (строка {exc.lineno}, столбец {exc.colno})"
+    if isinstance(exc, UnicodeDecodeError):
+        return "файл не в кодировке UTF-8"
+    if isinstance(exc, OSError):
+        why = {errno.ENOENT: "файл не найден", errno.EACCES: "нет прав на чтение", errno.EISDIR: "это папка",
+               errno.EPERM: "нет прав на чтение"}.get(exc.errno or 0, "ошибка чтения файла")
+        return f"{why}: {exc.filename}" if exc.filename else why
+    text = str(exc)
+    return text if re.search(r"[А-Яа-яЁё]", text) else f"данные не по схеме ({type(exc).__name__})"
+
+
 def main(argv: list[str] | None = None) -> int:
     _utf8_console()
     p = argparse.ArgumentParser(prog="python -m bcc_review verify",
@@ -377,10 +393,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("source", help="исходный документ, по которому строился отчёт")
     p.add_argument("--json", action="store_true", help="вывести результат в JSON")
     args = p.parse_args(argv)
+    for path, what in ((Path(args.report), "файл отчёта"), (Path(args.source), "документ")):
+        if not path.exists():
+            print(f"verify: {what} не найден: {path}", file=sys.stderr)
+            return EXIT_VERIFY_FAILED
+        if path.is_dir():
+            print(f"verify: {what} — это папка, а нужен файл: {path}", file=sys.stderr)
+            return EXIT_VERIFY_FAILED
     try:
         result = verify_report(Path(args.report), Path(args.source))
     except (OSError, ValueError, RuntimeError, ImportError) as exc:
-        print(f"verify: не удалось прочитать вход: {exc}", file=sys.stderr)
+        print(f"verify: не удалось прочитать вход: {_plain_error(exc)}", file=sys.stderr)
         return EXIT_VERIFY_FAILED
     except (TypeError, AttributeError, KeyError) as exc:
         print(f"verify: report.json повреждён или не по схеме bcc-review/2 ({type(exc).__name__}: {exc})",
