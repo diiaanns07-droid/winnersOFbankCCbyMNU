@@ -32,7 +32,7 @@ DOC = [
     "* **У-3.** Сумма — от 10 000 ₸ до «остаток − 10 000 ₸» включительно.",                        # 9
     "* **У-4.** Ссылка действует 15 минут с момента выдачи.",                                      # 10
     "| Ссылка выдана в 12:00 | Скачать в 12:14 и в 12:15 | В 12:14 — файл; в 12:15 — ответ 410 |",  # 11
-    "Экран: таймер на срок котировки, запускаемый при получении ответа.",                          # 12
+    "Экран: таймер на срок котировки (У-5), запускаемый при получении ответа.",                    # 12
     "* **У-5.** Котировка действует 60 секунд от времени получения запроса.",                      # 13
     "3. Если выписка не сформирована, возвращаются сведения по предыдущему периоду.",              # 14
     "| daysLeft | integer | ≥ 0 | Дней до окончания периода |",                                    # 15
@@ -48,6 +48,7 @@ DOC = [
     "Цель: клиенту удобно управлять услугой.",                                                     # 25
     "Отправитель: экран подтверждения с именем получателя, суммой и картой списания.",             # 26
     "* **У-9.** Ссылка действует 15 минут включительно.",                                          # 27
+    "Экран: кнопка «Подтвердить» доступна 90 секунд после получения ответа.",                      # 28
 ]
 SECTIONS = {8: "Требования к тестированию › Тестирование требований", 11: "Критерии приемки"}
 VIEW = {"lines": [{"n": i, "text": t, "page": None, "section": SECTIONS.get(i, "Требования")}
@@ -55,7 +56,7 @@ VIEW = {"lines": [{"n": i, "text": t, "page": None, "section": SECTIONS.get(i, "
 KINDS = {2: "functional", 3: "api", 4: "api", 5: "functional", 6: "data", 7: "constraint", 8: "functional",
          9: "functional", 10: "functional", 11: "acceptance", 12: "ui", 13: "functional", 14: "constraint", 15: "api",
          16: "constraint", 17: "constraint", 18: "api", 19: "api", 20: "functional", 21: "acceptance",
-         22: "functional", 23: "functional", 24: "goal", 25: "goal", 26: "ui", 27: "functional"}
+         22: "functional", 23: "functional", 24: "goal", 25: "goal", 26: "ui", 27: "functional", 28: "ui"}
 REQS = [{"id": f"R-{n:02d}", "source_id": "", "kind": k, "line_start": n, "line_end": n,
          "section": SECTIONS.get(n, "Требования")} for n, k in KINDS.items()]
 
@@ -97,7 +98,7 @@ def one(p: dict) -> tuple[dict, list[dict]]:
     # строка приёмки задаёт конец срока «действует 15 минут»
     (pair(10, 11, kind="boundary_conflict"), "acceptance_duration", "compatible"),
     # таймер экрана против правила сервера
-    (pair(12, 13), "ui_display", "undefined"),
+    (pair(12, 13, qa="таймер на срок котировки (У-5), запускаемый при получении ответа"), "ui_display", "undefined"),
     # «граница» без значения у одной стороны
     (pair(14, 15, kind="boundary_conflict"), "no_value", "undefined"),
     # следствие ответа другой системы против ответа на запрос
@@ -118,6 +119,7 @@ def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
     (pair(22, 23, basis="limit_removed"), "event_conflict"),                                  # предел ↔ «всегда»
     (pair(22, 23, basis="same_condition"), "event_conflict"),                                 # право с пределом
     (pair(27, 11, kind="boundary_conflict"), "boundary_conflict"),                            # «включительно»
+    (pair(28, 13), "event_conflict"),                                                         # экран со своим числом
 ])
 def test_real_conflicts_stay_critical(p, kind):
     pc, cands = one(p)

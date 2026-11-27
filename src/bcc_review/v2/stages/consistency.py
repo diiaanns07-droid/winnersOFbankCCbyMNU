@@ -638,8 +638,11 @@ def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str
     # Пример: значение примера (дата, сумма) зависит от его входа; коды и форматы примера сверяет status/unit.
     if kind in ("event_conflict", "boundary_conflict") and any(_EXAMPLE.search(q) for q in quotes):
         return "example_value"
-    # Экран показывает (таймер, подпись), правило сервера решает: момент показа — не второй исход правила.
-    if kind == "event_conflict" and any(r.get("kind") == "ui" for _ev, _q, r in sides):
+    # Экран показывает (таймер, подпись), правило сервера решает: момент показа — не второй исход правила, если экран
+    # не задаёт своего значения, а ссылается на правило («таймер на срок котировки (Ф-7)»). Экран со своим числом
+    # («кнопка доступна 10 минут» против «5 минут») — настоящий конфликт.
+    if kind == "event_conflict" and any(r.get("kind") == "ui" and not re.search(r"\d", _BARE_ID.sub("", _ITEM_NO.sub("", q)))
+                                        for _ev, q, r in sides):
         return "ui_display"
     # Граница — значение у обеих сторон: без числа и без слова границы расхождение вывела модель, а не документ.
     if kind == "boundary_conflict" and not all(_BOUND.search(_ITEM_NO.sub("", q)) for q in quotes):
