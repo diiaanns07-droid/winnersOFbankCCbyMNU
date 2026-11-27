@@ -400,3 +400,15 @@ def test_change_request_old_new_table_is_not_conflict() -> None:
     out = rules.run(fallback_load(STYLES / "wave3b_change_defects.md"))
     src = {c["source"].split(".L")[0] for c in out["candidates"]}
     assert {"rules:conflicts.range_acceptance", "rules:api.status_400"} <= src, src
+
+
+def test_version_only_for_template_header() -> None:
+    """«Не указана версия» — только при шапке-шаблоне или явной пустой строке версии (фон М1 официального и open2);
+    у выдержки требований без шапки это лишняя карточка на чистом документе."""
+    sec = "Часть A › Функциональные требования"
+    out = rules.run(_view([("", "Расчёт стоимости услуги"), (sec, "Ф-1. Клиент выбирает тариф."),
+                           (sec, "Ф-2. Стоимость считается по тарифу на дату заказа.")]))
+    assert not [c for c in out["candidates"] if c["source"] == "rules:placeholder.version"]
+    for p in (OFFICIAL, OPEN2 / "qr_clean" / "source.md"):
+        out = rules.run(fallback_load(p))
+        assert [c for c in out["candidates"] if c["source"] == "rules:placeholder.version"], p
