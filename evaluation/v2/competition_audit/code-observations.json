@@ -1,0 +1,402 @@
+{
+  "source_heads": {
+    "yerassyl-sailaubay/bcc-case": "4e5fc8bc801deb3f0290596eafc24a914960b86b",
+    "Feruum/Darumleye": "23a788714a5ae8c7a6af99acbdf733087d24ba79",
+    "VllSunday/hackathon-fintech-bcc-hub": "aaaeae0acde82acb6dd0fe687facb7ac15899732",
+    "noncalan/QAIRU-larpers": "2a632d2b3405cf27936b43350cbd2835e4bd9be8"
+  },
+  "inputs": {
+    "aligned.md": "1afedacecd479c98a28e4a80b8aed067065cffbf5ad3a25cdd525d420b981b51",
+    "clash.md": "d296ea13471da1e5094ed8991a2eaf42bb4d41bc20b3f74d2a8ec85d3b534e9c"
+  },
+  "component_smoke": {
+    "aligned": {
+      "VllSunday_lexical": [
+        [
+          "R5",
+          "vague_quantity",
+          "Максимальная"
+        ]
+      ],
+      "Feruum_facts": [
+        [
+          "R5",
+          "quantity",
+          "1270000",
+          "KZT_minor",
+          "mentioned"
+        ],
+        [
+          "R7",
+          "quantity",
+          "2",
+          "second",
+          "mentioned"
+        ],
+        [
+          "R7",
+          "quantity",
+          "95",
+          "percent",
+          "mentioned"
+        ],
+        [
+          "R11",
+          "quantity",
+          "1270000",
+          "KZT_minor",
+          "mentioned"
+        ],
+        [
+          "R11",
+          "quantity",
+          "1270100",
+          "KZT_minor",
+          "mentioned"
+        ],
+        [
+          "R17",
+          "quantity",
+          "100",
+          "KZT_minor",
+          "lower_bound"
+        ],
+        [
+          "R17",
+          "quantity",
+          "1270000",
+          "KZT_minor",
+          "upper_bound"
+        ]
+      ],
+      "Feruum_candidates": [],
+      "yerassyl_unit_conversion": []
+    },
+    "clash": {
+      "VllSunday_lexical": [
+        [
+          "R5",
+          "vague_quantity",
+          "Максимальная"
+        ]
+      ],
+      "Feruum_facts": [
+        [
+          "R5",
+          "quantity",
+          "1270000",
+          "KZT_minor",
+          "mentioned"
+        ],
+        [
+          "R7",
+          "quantity",
+          "2",
+          "second",
+          "mentioned"
+        ],
+        [
+          "R7",
+          "quantity",
+          "95",
+          "percent",
+          "mentioned"
+        ],
+        [
+          "R11",
+          "quantity",
+          "1270000",
+          "KZT_minor",
+          "mentioned"
+        ],
+        [
+          "R11",
+          "quantity",
+          "1270100",
+          "KZT_minor",
+          "mentioned"
+        ],
+        [
+          "R17",
+          "quantity",
+          "100",
+          "KZT_minor",
+          "lower_bound"
+        ],
+        [
+          "R17",
+          "quantity",
+          "2450000",
+          "KZT_minor",
+          "upper_bound"
+        ]
+      ],
+      "Feruum_candidates": [],
+      "yerassyl_unit_conversion": []
+    }
+  },
+  "VllSunday_manually_bound_stage": {
+    "aligned": {
+      "stage_input_manually_bound": [
+        {
+          "line": 5,
+          "value": "12700"
+        },
+        {
+          "line": 17,
+          "value": "12700"
+        }
+      ],
+      "candidates": []
+    },
+    "clash": {
+      "stage_input_manually_bound": [
+        {
+          "line": 5,
+          "value": "12700"
+        },
+        {
+          "line": 17,
+          "value": "24500"
+        }
+      ],
+      "candidates": [
+        {
+          "kind": "different_values",
+          "entity": "transfer_limit",
+          "attribute": "value",
+          "fact_ids": [
+            "F5",
+            "F17"
+          ],
+          "summary": "верхняя граница перевода: разные значения «value»: «12 700» (F5); «24 500» (F17)"
+        }
+      ]
+    }
+  },
+  "VllSunday_question_fingerprints": {
+    "первый": "fa0d1b09",
+    "те же слова с пробелами": "fa0d1b09",
+    "перефразирован": "5630cab2"
+  },
+  "yerassyl": [
+    {
+      "method": "agent",
+      "file": "evals/holdout/access-a.md",
+      "runs": 3,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 2,
+      "findings": 3,
+      "seed_hits": 0
+    },
+    {
+      "method": "baseline",
+      "file": "evals/holdout/access-a.md",
+      "runs": 3,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 0,
+      "seed_hits": 0
+    },
+    {
+      "method": "agent",
+      "file": "evals/holdout/access-b.md",
+      "runs": 3,
+      "raw_blocker_runs": 3,
+      "raw_major_runs": 0,
+      "findings": 3,
+      "seed_hits": 3
+    },
+    {
+      "method": "baseline",
+      "file": "evals/holdout/access-b.md",
+      "runs": 3,
+      "raw_blocker_runs": 3,
+      "raw_major_runs": 0,
+      "findings": 3,
+      "seed_hits": 3
+    },
+    {
+      "method": "agent",
+      "file": "evals/holdout/parcel-a.md",
+      "runs": 3,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 1,
+      "findings": 1,
+      "seed_hits": 0
+    },
+    {
+      "method": "baseline",
+      "file": "evals/holdout/parcel-a.md",
+      "runs": 3,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 0,
+      "seed_hits": 0
+    },
+    {
+      "method": "agent",
+      "file": "evals/holdout/parcel-b.md",
+      "runs": 3,
+      "raw_blocker_runs": 1,
+      "raw_major_runs": 2,
+      "findings": 3,
+      "seed_hits": 3
+    },
+    {
+      "method": "baseline",
+      "file": "evals/holdout/parcel-b.md",
+      "runs": 3,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 3,
+      "findings": 3,
+      "seed_hits": 3
+    },
+    {
+      "method": "agent",
+      "file": "evals/holdout/refunds-a.md",
+      "runs": 3,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 0,
+      "seed_hits": 0
+    },
+    {
+      "method": "baseline",
+      "file": "evals/holdout/refunds-a.md",
+      "runs": 3,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 0,
+      "seed_hits": 0
+    },
+    {
+      "method": "agent",
+      "file": "evals/holdout/refunds-b.md",
+      "runs": 3,
+      "raw_blocker_runs": 3,
+      "raw_major_runs": 0,
+      "findings": 3,
+      "seed_hits": 3
+    },
+    {
+      "method": "baseline",
+      "file": "evals/holdout/refunds-b.md",
+      "runs": 3,
+      "raw_blocker_runs": 3,
+      "raw_major_runs": 0,
+      "findings": 3,
+      "seed_hits": 3
+    },
+    {
+      "method": "agent",
+      "file": "evals/arithmetic/capacity.md",
+      "runs": 1,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 0,
+      "seed_hits": 0
+    },
+    {
+      "method": "baseline",
+      "file": "evals/arithmetic/capacity.md",
+      "runs": 1,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 0,
+      "seed_hits": 0
+    },
+    {
+      "method": "agent",
+      "file": "evals/arithmetic/duration-a.md",
+      "runs": 1,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 1,
+      "seed_hits": 0
+    },
+    {
+      "method": "baseline",
+      "file": "evals/arithmetic/duration-a.md",
+      "runs": 1,
+      "raw_blocker_runs": 0,
+      "raw_major_runs": 0,
+      "findings": 0,
+      "seed_hits": 0
+    },
+    {
+      "method": "agent",
+      "file": "evals/arithmetic/duration-b.md",
+      "runs": 1,
+      "raw_blocker_runs": 1,
+      "raw_major_runs": 0,
+      "findings": 1,
+      "seed_hits": 1
+    },
+    {
+      "method": "baseline",
+      "file": "evals/arithmetic/duration-b.md",
+      "runs": 1,
+      "raw_blocker_runs": 1,
+      "raw_major_runs": 0,
+      "findings": 1,
+      "seed_hits": 1
+    }
+  ],
+  "Feruum_earlier_C": [
+    {
+      "case": "museum-catalog",
+      "report": 6,
+      "gold": 6,
+      "found": 6,
+      "statuses": {
+        "gold": 6
+      },
+      "severity": 2,
+      "verdict": "not_ready"
+    },
+    {
+      "case": "park-repair",
+      "report": 9,
+      "gold": 6,
+      "found": 6,
+      "statuses": {
+        "gold": 6,
+        "false_positive": 3
+      },
+      "severity": 1,
+      "verdict": "not_ready"
+    },
+    {
+      "case": "course-submissions",
+      "report": 8,
+      "gold": 6,
+      "found": 6,
+      "statuses": {
+        "duplicate": 1,
+        "gold": 6,
+        "valid_extra": 1
+      },
+      "severity": 1,
+      "verdict": "not_ready"
+    }
+  ],
+  "QAIRU": {
+    "mutations": 27,
+    "strict_caught": 14,
+    "place_only": 13,
+    "nonblind_about": 20,
+    "ten_report_lights": {
+      "c4-multi-1": "red",
+      "c4-multi-2": "red",
+      "c4-original": "red",
+      "req-multi-1": "red",
+      "req-multi-2": "red",
+      "req-multi-3": "red",
+      "req-multi-4": "red",
+      "req-original": "red",
+      "req-single-1": "red",
+      "req-single-2": "red"
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "refs": {
+    "bcc": "1933b20ca2fcde39ab59c3804a6ec4438c8ddd87",
+    "experiment": "786366da0be6fa2117028e70951c18a1a6939243",
+    "measurement": "05306ab55f5d08b0306e62ae283277e527881202",
+    "era": "4755c4558e1c80974b5a9c30550656f2c44e2743",
+    "az": "c704a9e2dffe59390c7c104a517aedfa10ae4ce8"
+  },
+  "quotes": {
+    "repeat": {
+      "ERA": [
+        2,
+        true,
+        100.0,
+        "Срок выдачи — два рабочих дня."
+      ],
+      "AZ": [
+        5,
+        true,
+        1.0,
+        "Срок выдачи — два рабочих дня."
+      ],
+      "BCC release": [
+        5,
+        "exact",
+        "Срок выдачи — два рабочих дня"
+      ],
+      "BCC candidate": [
+        5,
+        "exact",
+        "Срок выдачи — два рабочих дня"
+      ]
+    },
+    "absent": {
+      "ERA": [
+        5,
+        false,
+        0.0,
+        "Смена поколения спутника зависит от орбиты."
+      ],
+      "AZ": [
+        5,
+        true,
+        0.0,
+        "Срок выдачи — два рабочих дня."
+      ],
+      "BCC release": [
+        5,
+        "missing",
+        "Смена поколения спутника зависит от орбиты."
+      ],
+      "BCC candidate": [
+        5,
+        "missing",
+        "Смена поколения спутника зависит от орбиты."
+      ]
+    }
+  },
+  "rules": {
+    "aligned": {
+      "sha256": "1afedacecd479c98a28e4a80b8aed067065cffbf5ad3a25cdd525d420b981b51",
+      "ERA": 0,
+      "AZ": 0
+    },
+    "clash": {
+      "sha256": "d296ea13471da1e5094ed8991a2eaf42bb4d41bc20b3f74d2a8ec85d3b534e9c",
+      "ERA": 0,
+      "AZ": 0
+    }
+  },
+  "published": {
+    "BCC": {
+      "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+      "open": 29,
+      "evidence": 82,
+      "literal": 64,
+      "same_words": 82,
+      "score_zero": 0
+    },
+    "ERA": {
+      "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+      "open": 35,
+      "evidence": 61,
+      "literal": 43,
+      "same_words": 61,
+      "score_zero": 0
+    },
+    "AZ": {
+      "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+      "open": 95,
+      "evidence": 295,
+      "literal": 275,
+      "same_words": 295,
+      "score_zero": 0
+    }
+  }
+}
