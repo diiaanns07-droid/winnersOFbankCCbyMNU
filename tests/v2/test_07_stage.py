@@ -194,3 +194,55 @@ def test_run_adds_missing_branch_candidate(ctx):
     out = lens.run_named(local, "architect")
     assert any(c["title"].startswith("Ветка логики без ответа") and c["evidence"][0]["line"] == 121
                for c in out["candidates"])
+
+
+def test_empty_answer_is_retried_once(ctx):
+    """Пустой ответ (ни описи, ни кандидатов) на документе с API — сбой модели: один повтор с пометкой."""
+    answer = json.loads((MOCK / "lens_architect.json").read_text(encoding="utf-8"))
+    empty = {"inventory": lens_architect.empty_inventory(), "candidates": []}
+
+    class _EmptyFirst:
+        users: list = []
+
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            type(self).users.append(user)
+            return empty if len(type(self).users) == 1 else answer
+
+    local = Context(view=ctx.view, llm=_EmptyFirst(), requirements=ctx.requirements, signals=ctx.signals)
+    out = lens.run_named(local, "architect")
+    assert len(_EmptyFirst.users) == 2
+    assert _EmptyFirst.users[1] != _EmptyFirst.users[0]  # другой ключ кэша
+    assert out["candidates"] and any("пустой ответ" in w for w in local.warnings)
+
+
+def test_empty_answer_without_interface_is_not_retried():
+    """Документ без признаков интерфейса: пустой ответ — нормальный исход, повтора нет."""
+    view = {"lines": [{"n": 1, "text": "Клиент видит баланс счёта на главном экране."}]}
+
+    class _Empty:
+        calls = 0
+
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            type(self).calls += 1
+            return {"inventory": lens_architect.empty_inventory(), "candidates": []}
+
+    local = Context(view=view, llm=_Empty(), requirements=[{"id": "R-01", "kind": "ui"}])
+    out = lens.run_named(local, "architect")
+    assert _Empty.calls == 1 and out["candidates"] == []
+    assert lens_architect.is_empty_answer({"candidates": [], "inventory": {"codes": [{"code": "200"}]}}) is False
+
+
+def test_branch_candidates_skip_main_path_and_worded_outcome():
+    """Шаг основного пути и ветка, которая задаёт исход словами, — не «ветка без ответа» (ложные на №18)."""
+    view = {"lines": [{"n": 1, "text": "8. Выполнить списание и зачисление и вернуть результат."},
+                      {"n": 2, "text": "3. Если выписка ещё не сформирована, возвращаются сведения по предыдущему периоду."},
+                      {"n": 3, "text": "5. При отказе проверки вернуть прежние условия и признак ошибки."}]}
+    inv = {"branches": [{"operation": "m", "step": f"шаг {n}", "line": n, "outcome": ""} for n in (1, 2, 3)]}
+    out = lens_architect.branch_candidates(inv, view, [])
+    assert [c["evidence"][0]["line"] for c in out] == [3]
+
+
+def test_branch_candidate_not_duplicated_when_model_titles_it_differently(ctx):
+    inv = {"branches": [{"operation": "m", "step": "отказ по сумме", "line": 121, "outcome": ""}]}
+    model = [{"title": "Ветка «вернуть прежнее состояние» без поля в ответе", "evidence": [{"quote": "q", "line": 121}]}]
+    assert lens_architect.branch_candidates(inv, ctx.view, model) == []

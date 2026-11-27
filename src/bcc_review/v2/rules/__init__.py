@@ -22,6 +22,9 @@ __all__ = ["run", "format_signals", "signals_for"]
 SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2}
 # False — линзы получают пустой блок <сигналы> (замер вклада сигналов); кандидаты правил судье идут как обычно.
 SIGNALS_ENABLED = True
+# True — сигнал правила, которое само передало кандидата судье, помечается «уже у судьи»: линза его не дублирует,
+# а только дополняет (вторая сторона, последствие). Остальные сигналы — подсказки для проверки.
+MARK_COVERED = False
 AUDIENCES = ("analyst", "qa", "architect", "risk", "consistency")
 
 
@@ -90,6 +93,7 @@ def run(view: dict, requirements: Any = None) -> dict:
         ev_lines.setdefault(c["source"].split(":", 1)[1], sorted({e["line"] for e in c["evidence"]}))
     for i, s in enumerate(uniq, 1):
         s["id"] = f"S-{i:02d}"
+        s["covered"] = s["rule"] in ev_lines  # у правила есть свой кандидат для судьи
         # вид, удобный линзам (№07): все строки доказательств и пояснение
         s["lines"] = ev_lines.get(s["rule"]) or [s["line"]]
         s["note"] = s["message"]
@@ -116,8 +120,13 @@ def format_signals(signals: list[dict], audience: str | None = None, limit: int 
     if not items:
         return "Сигналов правил нет."
     lines = ["Подсказки детерминированных правил (проверь каждую по тексту; это не готовые дефекты):"]
+    if MARK_COVERED and any(s.get("covered") for s in items):
+        lines.append("Пометка «уже у судьи»: правило само передало это замечание судье. Отдельного кандидата о том же "
+                     "не пиши; пиши, только если добавляешь то, чего в сигнале нет (вторую сторону, другое место, "
+                     "сценарий с числами).")
     for s in items:
         q = s.get("quote", "")
         q = q if len(q) <= 90 else q[:87] + "…"
-        lines.append(f"{s.get('id', 'S-?')} · L{int(s.get('line') or 0):03d} · «{q}» — {s.get('message', '')}")
+        mark = "уже у судьи · " if MARK_COVERED and s.get("covered") else ""
+        lines.append(f"{s.get('id', 'S-?')} · L{int(s.get('line') or 0):03d} · {mark}«{q}» — {s.get('message', '')}")
     return "\n".join(lines)

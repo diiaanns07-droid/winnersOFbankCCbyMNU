@@ -31,13 +31,15 @@ else
 fi
 
 stamp="$(dirname "$(dirname "$PY")")/.bcc_requirements"
-if [ ! -f "$stamp" ] || ! cmp -s requirements.txt "$stamp" || ! "$PY" -c "import bcc_review" 2>/dev/null; then
+# метка установки — requirements.txt и constraints.txt вместе: изменился любой — ставим заново
+want="$(cat requirements.txt constraints.txt)"
+if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$want" ] || ! "$PY" -c "import bcc_review" 2>/dev/null; then
   echo "== установка зависимостей (1–2 минуты при первом запуске)"
   "$PY" -m pip install -q --disable-pip-version-check -r requirements.txt -e . || {
     echo "Установка не удалась — сообщение pip выше." >&2
     exit 1
   }
-  cp requirements.txt "$stamp"
+  printf '%s' "$want" > "$stamp"
 fi
 
 if [ ! -f .env ]; then

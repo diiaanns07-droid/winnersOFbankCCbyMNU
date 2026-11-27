@@ -1,0 +1,46 @@
+{
+ "label": "haiku_clean2_0835",
+ "provider": "claude_cli",
+ "model": "haiku",
+ "extra": [],
+ "commit": "e5ee8a0",
+ "finished": "2026-11-27 03:40",
+ "runs": [
+  {
+   "case": "capital_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 0.4,
+   "out": "out/open2/haiku_clean2_0835/capital_clean.md.md",
+   "tail": "01 Выбор карты выплаты: нет операции, которая отдаёт список карт клиента — блокирует разработку и тестирование\n  D-02 Время выплаты 31-го числа не задано: выплата может пройти до начисления за этот день — блокирует разработку и тестирование\n  D-03 Повтор выбора «На карту» при заблокированной карте: 200 или 400, порядок проверок не задан — блокирует разработку и тестирование\nПрогон завершён полностью: 0 с, 0 вызовов модели (+9 из кэша), Claude Code (claude -p); цитат сверено 55 из 55\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/capital_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/capital_clean.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/capital_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/capital_clean/source.md\n  segment: запуск\n  segment: готово за 0 с, вызовов 0\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 12\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_qa: готово за 0 с, вызовов 0, кандидатов 4\n  lens_analyst: готово за 0 с, вызовов 0, кандидатов 2\n  lens_risk: готово за 0 с, вызовов 0, кандидатов 4\n  lens_architect: готово за 0 с, вызовов 0, кандидатов 4\n  consistency: готово за 0 с, вызовов 0, кандидатов 12\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 38\n  judge: запуск\n  judge: готово за 0 с, вызовов 0\n  clarify: запуск\n  clarify: готово за 0 с, вызовов 0\n",
+   "run_id": "20261127-083906-999d"
+  },
+  {
+   "case": "grace_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 467.4,
+   "out": "out/open2/haiku_clean2_0835/grace_clean.md.md",
+   "tail": "зя\n  D-01 Событие покупки «отражение на счёте»: холд или проведение не определено — блокирует разработку и тестирование\n  D-02 Карточный процессинг указан в затронутых ИС, но не в архитектуре и sequence\n  D-03 Правило перехода в LOST не задано; после 25-го отдаётся прошедший период как ACTIVE\nПрогон завершён полностью: 7 мин 47 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 76 из 76\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/grace_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/grace_clean.md.json\n  ! clarify: вопрос «По какой годовой ставке, по какой формуле и до какой даты сч» отброшен…\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/grace_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/grace_clean/source.md\n  segment: запуск\n  segment: готово за 90 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 6\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: готово за 67 с, вызовов 1, кандидатов 6\n  lens_qa: готово за 75 с, вызовов 1, кандидатов 5\n  lens_analyst: готово за 76 с, вызовов 1, кандидатов 7\n  lens_risk: готово за 104 с, вызовов 1, кандидатов 11\n  consistency: готово за 137 с, вызовов 1, кандидатов 13\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 48\n  judge: запуск\n  judge: готово за 199 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 42 с, вызовов 1\n",
+   "run_id": "20261127-083306-afde"
+  },
+  {
+   "case": "insurance_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 465.2,
+   "out": "out/open2/haiku_clean2_0835/insurance_clean.md.md",
+   "tail": "граница 18 лет из Ф-6 не проверяется логикой метода подключения — блокирует разработку и тестирование\n  D-02 Возврат премии при полном погашении и отказе: повторный возврат и приоритет Ф-4/Ф-5 не…\n  D-03 Архитектура и последовательность расходятся: API кредитов вызывает сервис страхования…\nПрогон завершён полностью: 7 мин 45 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 68 из 68\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/insurance_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/insurance_clean.md.json\n  ! проверка серьёзности понизила 1 дефект(ов): critical→major 1, major→minor 0\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/insurance_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/insurance_clean/source.md\n  segment: запуск\n  segment: готово за 77 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 5\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_qa: готово за 44 с, вызовов 1, кандидатов 3\n  lens_risk: готово за 57 с, вызовов 1, кандидатов 6\n  lens_architect: готово за 84 с, вызовов 1, кандидатов 10\n  lens_analyst: готово за 108 с, вызовов 1, кандидатов 9\n  consistency: готово за 181 с, вызовов 1, кандидатов 13\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 46\n  judge: запуск\n  judge: готово за 159 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 48 с, вызовов 1\n",
+   "run_id": "20261127-083306-7cc2"
+  },
+  {
+   "case": "qr_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 359.4,
+   "out": "out/open2/haiku_clean2_0835/qr_clean.md.md",
+   "tail": " 32 дефекта (критичных 0, существенных 14, незначительных 18), вопросов 8\nРазработка: с условиями · тестирование: с условиями\n  D-01 Путь вызова перевода: последовательность минует сервис QR-кодов, архитектура и API требуют…\n  D-02 Активность и валюта карты получателя не проверяются при переводе (п. 3 логики)\n  D-03 Статусная модель QR не содержит состояния «в обработке» и возврата после REJECTED\nПрогон завершён полностью: 5 мин 59 с, 8 вызовов модели, claude-haiku-5-5; цитат сверено 76 из 76\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/qr_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/qr_clean.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_clean2_0835/qr_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/qr_clean/source.md\n  segment: запуск\n  segment: готово за 77 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 6\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  consistency: запуск\n  lens_risk: запуск\n  lens_analyst: готово за 37 с, вызовов 1, кандидатов 5\n  lens_qa: готово за 73 с, вызовов 1, кандидатов 4\n  lens_risk: готово за 84 с, вызовов 1, кандидатов 8\n  lens_architect: готово за 101 с, вызовов 1, кандидатов 7\n  consistency: готово за 102 с, вызовов 1, кандидатов 11\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 41\n  judge: запуск\n  judge: готово за 151 с, вызовов 1\n  clarify: запуск\n  clarify: готово за 30 с, вызовов 1\n",
+   "run_id": "20261127-083306-a9b8"
+  }
+ ]
+}
