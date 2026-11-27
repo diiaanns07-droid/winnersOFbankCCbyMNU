@@ -628,15 +628,21 @@ def _how_obtained(c: _Ctx) -> list[str]:
     total = accepted + len(rej)
     ok, qt = c.summary.get("quotes_verified", 0), c.summary.get("quotes_total", c.summary.get("quotes_verified", 0))
     parts = []
-    if roles or "rules" in {stage_key(k) for k in stats}:
-        who = (f"роли ({', '.join(roles)})" if roles else "") + (" и правила без модели" if any(
-            stage_key(k) == "rules" for k in c.run.get("stages") or {}) else "")
-        parts.append(f"{who.strip().capitalize()} предложили {num(total)} "
-                     f"{plural(total, 'кандидата', 'кандидатов', 'кандидатов')} в дефекты" if total else
-                     f"{who.strip().capitalize()} проверили документ")
-    if total:
+    stages = c.run.get("stages") or {}
+    has_rules = any(stage_key(k) == "rules" and v in ("ok", "partial") for k, v in stages.items())
+    who = " и ".join(x for x in ((f"роли ({', '.join(roles)})" if roles else ""),
+                                 ("правила без модели" if has_rules else "")) if x)
+    if who:
+        who = who[0].upper() + who[1:]
+        parts.append(f"{who} предложили {num(total)} {plural(total, 'кандидата', 'кандидатов', 'кандидатов')} в "
+                     f"дефекты" if total else f"{who} проверили документ")
+    judged = (c.run.get("stages") or {}).get("judge") in ("ok", "partial") and not c.offline
+    if total and judged:
         parts.append(f"судья объединил дубли и оставил {len(c.findings)} "
                      f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')}, отклонил {len(rej)}")
+    elif c.findings:
+        parts.append(f"в отчёт вошли {len(c.findings)} "
+                     f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')} без отбора судьёй")
     if qt:
         parts.append(f"каждая цитата найдена в документе программой ({ok} из {qt}), номер строки посчитан кодом")
     if not parts:
