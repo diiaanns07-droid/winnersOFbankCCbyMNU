@@ -114,7 +114,8 @@ def load(path: str | Path) -> dict:
             warnings.append(f"{what}: читатель счёл текстовый слой нечитаемым, текст восстановлен напрямую из PDF "
                             "(проверьте в исходнике).")
     if fmt in ("md", "txt"):
-        lines = _text_lines(_decode_text(data), doc)
+        text = _decode_text(data)
+        lines = _text_lines(text, doc, tab_cells=fmt == "txt" and not _looks_markdown(text))
     else:
         sizes = _page_sizes(p) if fmt == "pdf" else {}
         lines = _block_lines(doc or {}, sizes, warnings)
@@ -375,7 +376,7 @@ def nonempty(view: dict) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- MD / TXT
-def _text_lines(text: str, doc: dict | None) -> list[dict]:
+def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[dict]:
     """Строка view = строка файла. Текст берётся из блоков читателя v1 (он снимает разметку и экранирование),
     строка, не покрытая блоком, — пустая (разделители таблиц, ограждения кода, ``---``)."""
     raw = text.splitlines()
@@ -429,6 +430,12 @@ def _text_lines(text: str, doc: dict | None) -> list[dict]:
             t = "" if not src.strip() or _MD_RULE.match(src) or _TABLE_DELIM.match(src) else _strip_md(src, in_fence)
         else:
             t = _strip_md(src, in_fence)
+        if tab_cells and t and "\t" in src.strip():
+            # простой текст из Word («Сохранить как обычный текст»): ячейки таблицы через табуляцию
+            cells = [c.strip() for c in src.strip().split("\t")]
+            if sum(1 for c in cells if c) >= 2:
+                t = " | ".join(c for c in cells if c)
+                kinds[k] = "table_row"
         t = _clean(t)
         html_row = None if in_fence or _MD_FENCE.match(src) else _html_table_line(t)
         if html_row is not None:

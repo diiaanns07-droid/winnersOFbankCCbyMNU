@@ -459,3 +459,16 @@ def test_new_pdf_steps_survive_malformed_blocks():
     lines = dv._block_lines({"blocks": bad}, {1: (595.0, 842.0)}, [])
     assert [ln["text"] for ln in lines][:2] == ["Текст", "А Б"]
     assert dv._reorder_fragments({"text": "", "loc": {"fragments": "мусор"}}) is not None
+
+
+def test_plain_txt_tab_separated_table(tmp_path):
+    """«Обычный текст» из Word: ячейки таблицы через табуляцию → «ячейка | ячейка», а не слитно."""
+    p = tmp_path / "tabs.txt"
+    p.write_text("ТЗ: Лимит переводов\n\nПоле\tЗначение\nПродукт\tМобильный банк\nЛимит\t500 000 ₸ в сутки\n\n"
+                 "\tТ-1. Лимит действует с 00:00 по Астане.\n", encoding="utf-8")
+    v = dv.load(p)
+    texts = [ln["text"] for ln in v["lines"]]
+    assert "Продукт | Мобильный банк" in texts and "Лимит | 500 000 ₸ в сутки" in texts
+    assert "Т-1. Лимит действует с 00:00 по Астане." in texts  # табуляция в начале строки — не ячейка
+    row = next(ln for ln in v["lines"] if ln["text"].startswith("Продукт"))
+    assert row["kind"] == "table_row" and row["n"] == 4
