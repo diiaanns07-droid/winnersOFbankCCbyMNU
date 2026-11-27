@@ -1,0 +1,78 @@
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 1c8b47ec..db8411e2 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -50,6 +50,17 @@ FAST_START_MIN_REQUIREMENTS = 5
+ FAST_START_PROBE_S = 8.0
+ 
+ 
++# Названия этапов для хода выполнения в консоли (веб-демо разбирает и их, и внутренние имена).
++STAGE_TITLES = {"segment": "Нарезка требований", "rules": "Правила", "lens_analyst": "Аналитик",
++                "lens_qa": "Тестировщик", "lens_architect": "Архитектор", "lens_risk": "Риски",
++                "consistency": "Набор целиком", "quotes": "Сверка цитат кодом", "judge": "Судья",
++                "clarify": "Вопросы владельцу", "recheck": "Пересмотр по ответам", "revise": "Исправленное ТЗ"}
++
++
++def stage_title(name: str) -> str:
++    return STAGE_TITLES.get(name, name)
++
++
+ # --------------------------------------------------------------------------- вспомогательное
+ 
+ def explain(exc: BaseException, provider: str = "") -> str:
+@@ -221,14 +232,14 @@ class Pipeline:
+                 self.stage_stats[name] = {"calls": 0, "seconds": 0.0, "reused": True,
+                                           "candidates": len(rec["output"].get("candidates") or [])}
+                 self._save_stage(name, {**rec, "reused_from": str(self.reuse.path)})
+-                self.log(f"  {name}: взят из {self.reuse.run_id}")
++                self.log(f"  {stage_title(name)}: взят из {self.reuse.run_id}")
+                 return copy.deepcopy(rec["output"])
+         llm = self.ctx.llm if self.ctx else None
+         before = dict((llm.stats["by_stage"].get(name) or {})) if llm else {}
+         t0 = time.monotonic()
+         status, err = "ok", ""
+         warn_before = len(self.ctx.warnings) if self.ctx else 0
+-        self.log(f"  {name}: запуск")
++        self.log(f"  {stage_title(name)}: запуск")
+         try:
+             out = fn() or {}
+             if not isinstance(out, dict):
+@@ -250,7 +261,7 @@ class Pipeline:
+         if err:
+             msg = f"Этап {name} не выполнен: {err[:300]}"
+             self.warnings.append(msg)
+-            self.log(f"  {name}: СБОЙ — {err[:200]}")
++            self.log(f"  {stage_title(name)}: СБОЙ — {err[:200]}")
+         after = (llm.stats["by_stage"].get(name) or {}) if llm else {}
+         calls = int(after.get("calls", 0)) - int(before.get("calls", 0))
+         hit = (int(after.get("budget", 0)) - int(before.get("budget", 0))) + \
+@@ -267,7 +278,7 @@ class Pipeline:
+         self._save_stage(name, {"stage": name, "status": status, "seconds": seconds, "calls": calls,
+                                 "error": err, "input": inputs or {}, "output": out, "warnings": stage_warnings})
+         if status == "ok":
+-            self.log(f"  {name}: готово за {seconds:.0f} с, вызовов {calls}"
++            self.log(f"  {stage_title(name)}: готово за {seconds:.0f} с, вызовов {calls}"
+                      + (f", кандидатов {st['candidates']}" if st["candidates"] else ""))
+         if required and status == "failed":
+             raise _StageFailed(name, err)
+diff --git a/src/bcc_review/v2/web/runner.py b/src/bcc_review/v2/web/runner.py
+index 3d0f8855..85084dba 100644
+--- a/src/bcc_review/v2/web/runner.py
++++ b/src/bcc_review/v2/web/runner.py
+@@ -44,7 +44,7 @@ STAGE_ALIASES = {"lens:analyst": "lens_analyst", "lens:qa": "lens_qa", "lens:arc
+                  "lens:risk": "lens_risk", "analyst": "lens_analyst", "qa": "lens_qa", "architect": "lens_architect",
+                  "risk": "lens_risk", "render": "report", "verdict": "report", "answers": "recheck"}
+ STATE_OF = {"ok": "done", "partial": "done", "failed": "failed", "skipped": "skipped"}
+-_LOG_STAGE = re.compile(r"^\s+([a-z_:]+): (запуск|готово|СБОЙ|взят)")
++_LOG_STAGE = re.compile(r"^\s+([^:]+?): (запуск|готово|СБОЙ|взят)")  # «  Аналитик: запуск» и «  lens_qa: запуск»
+ 
+ ALLOWED_EXT = {".pdf", ".docx", ".md", ".markdown", ".txt", ".html", ".htm"}
+ MAX_UPLOAD = 20 * 1024 * 1024
+@@ -237,6 +237,7 @@ def safe_filename(name: str) -> str:
+ def _norm_stage(name: str) -> str | None:
+     name = name.strip()
+     name = STAGE_ALIASES.get(name, name)
++    name = next((k for k, title in STAGES if title == name), name)  # русское название этапа из журнала
+     return name if any(name == k for k, _ in STAGES) else None
+ 
+ 

@@ -107,13 +107,14 @@ def test_resolved_findings_do_not_count(sample):
     ([{"severity": "critical", "blocks": "both"}], "failed", ("none", "none")),
 ])
 def test_rule_verdict(findings, status, expected):
-    r = {"run": {"status": status}, "findings": findings}
+    r = {"run": {"status": status}, "findings": findings, "requirements": [{"id": "R-01"}]}
     v = jsonout.rule_verdict(r)
     assert (v["development"], v["testing"]) == expected
 
 
 def test_finalize_enforces_rule_verdict_and_fills_lists():
-    r = {"run": {"status": "complete"}, "findings": [], "requirements": [], "verdict": {"development": "no"}}
+    r = {"run": {"status": "complete"}, "findings": [], "requirements": [{"id": "R-01"}],
+         "verdict": {"development": "no"}}
     jsonout.finalize(r)
     assert r["verdict"]["development"] == "yes" and r["verdict"]["testing"] == "yes"
     assert any("пересчитан по правилу" in w for w in r["run"]["warnings"])
@@ -167,17 +168,19 @@ def test_first_screen(sample):
     brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
-    # все блокеры останавливают одно и то же — это сказано один раз в заголовке, строка блокера: что и где
-    assert "**Блокеры (5)** — каждый останавливает разработку и тестирование; что не так и где:" in brief
-    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+)\.$", brief, re.M)
+    # все блокеры останавливают одно и то же — это сказано один раз в заголовке; пункт блокера: что и где, под ним —
+    # что сделать; блокеры идут в порядке исправления и вторым списком не повторяются
+    assert ("**Блокеры (5)** — каждый останавливает разработку и тестирование; что не так, где и что сделать "
+            "(по порядку):") in brief
+    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+)\.  $", brief, re.M)
     assert len(blockers) == 5
-    assert all("строк" in where for where in blockers) and blockers[0] == "Ф-3 (строка 39), Ф-4 (строка 40)"
+    assert all("строк" in where for where in blockers) and "Ф-3 (строка 39), Ф-4 (строка 40)" in blockers
+    actions = re.findall(r"^   → (.+)$", brief, re.M)
+    assert len(actions) == 5  # у каждого блокера — что сделать
     assert "ещё 1 место" not in brief
-    assert "**Почему.**" in brief and "**Исправить первым**" in brief
-    fix = brief[brief.find("**Исправить первым**"):]
-    items = re.findall(r"^\d\. (\S+) \[(D-\d+)\]", fix, re.M)
-    assert 5 <= len(items) <= 5 and all(icon == "🔴" for icon, _ in items[:5])  # сначала блокеры, не больше 5
-    assert fix.count(" → ") >= 5  # у каждого пункта — что сделать
+    assert "**Почему.**" in brief and "**Исправить первым**" not in brief  # при 5 блокерах «затем» не нужно
+    ids = re.findall(r"^\d\. 🔴 \[(D-\d+)\]", brief, re.M)
+    assert len(ids) == len(set(ids)) == 5  # каждый блокер — один раз
     assert "на 5 нужен ответ до начала работы" in brief
     assert len(brief.split("\n")) <= 40
     text = re.sub(r"\]\(#[^)]*\)", "]", brief)
@@ -204,7 +207,12 @@ def test_tables_have_consistent_columns(sample):
 def test_card_quotes_are_short_and_located(sample):
     md = markdown.render(sample)
     cards = md[md.find("### 3.2."):md.find("### 3.3.")]
-    quotes = re.findall(r"^(?:- |\*\*Где:\*\* )(.+?), (?:с\. \d+, )?строк[аи] [\d–]+: «(.+?)»(?:;|$)", cards, re.M)
+    quotes = []  # цитаты одного пункта документа — одной строкой: «…» · «…»
+    for where, nums, tail in re.findall(r"^(?:- |\*\*Где:\*\* )(.+?), (?:с\. [\d, ]+, )?строк[аи] ([\d–, и]+): («.+)$",
+                                        cards, re.M):
+        for part in re.split(r"; (?=[^«»]+, (?:с\. \d+, )?строк)", tail):
+            qs = re.findall(r"«((?:[^«»]|«[^«»]*»)*)»", part)
+            quotes += [(where, q) for q in qs]
     assert len(quotes) >= 25
     assert all(len(q) <= markdown.CARD_QUOTE + 1 for _, q in quotes)
     # место — ID требования в документе («Ф-3»), пункт или раздел, но не внутренний R-…
@@ -389,7 +397,7 @@ def test_line_refs_from_model_text_become_russian():
     assert markdown.prose("по L151 и в L38-L40, из L7–L9; Сервер по L121") == \
         "по строке 151 и в строках 38–40, из строк 7–9; Сервер по строке 121"
     assert markdown.cell("a | L7") == "a \\| строка 7"
-    assert markdown.prose("Привести L045 к маршруту L136") == "Привести строки 45 к маршруту строки 136"
+    assert markdown.prose("Привести L045 к маршруту L136") == "Привести строку 45 к маршруту строки 136"
     assert markdown.prose("L038 и L064 расходятся") == "строки 38 и 64 расходятся"
     assert markdown.prose("убрать из L052 и L103") == "убрать из строк 52 и 103"
     assert markdown.prose("Строки L10-L12 описывают") == "Строки 10–12 описывают"
@@ -419,8 +427,11 @@ def test_revise_edits_rendered(sample):
 
 def test_stage_warnings_in_russian():
     assert markdown.warn_text("проверка серьёзности понизила 2 дефект(ов): critical→major 0, major→minor 2") == \
-        "проверка серьёзности понизила 2 дефект(ов): критичный→существенный 0, существенный→незначительный 2"
+        "проверка серьёзности понизила 2 дефекта: критичный→существенный 0, существенный→незначительный 2"
     assert markdown.warn_text("clarify: оставлено 10 вопросов из 11") == "Вопросы: оставлено 10 вопросов из 11"
+    assert markdown.warn_text("вторая проверка не удалась (LLMError); лимит подписки Claude Code, выберите "
+                              "(--model haiku)") == ("вторая проверка не удалась; лимит подписки «Claude Code», "
+                                                     "выберите (`--model haiku`)")
     assert markdown.prose("push при floor(расходы/100) ≥ порог") == "push при `floor(расходы/100)` ≥ порог"
 
 
@@ -443,7 +454,7 @@ def test_candidate_count_excludes_non_proposing_stages(sample):
     r = copy.deepcopy(sample)
     r["run"]["stage_stats"]["quotes"]["candidates"] = 45
     md = markdown.render(r)
-    assert "Кандидатов в дефекты: 45;" in md and "нашли 45 возможных дефектов" in md
+    assert "Кандидатов в дефекты: 45;" in md and "найдено 45 возможных дефектов" in md
     assert "в таблице этапов" not in md
 
 
@@ -553,3 +564,390 @@ def test_rubric_counts_cards_against_wave3(sample):
     r["questions"] = [q for q in r.get("questions") or [] if f["id"] not in q.get("finding_ids", [])]
     bad = markdown.rubric(r)["failed"][f["id"]]
     assert {"title", "codes", "fix"} <= set(bad), bad
+
+
+def test_empty_document_is_not_ready():
+    """Нет ни требований, ни дефектов (пустой документ): «можно» не выносится — «не определено» (№14, п. 1)."""
+    r = {"run": {"status": "complete", "provider": "mock"}, "findings": [], "requirements": []}
+    assert jsonout.rule_verdict(r) == {"development": "undetermined", "testing": "undetermined"}
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert "❔ не определено" in md and "не найдено ни одного требования" in md and "✅ можно" not in md
+
+
+def test_unreadable_input_report_names_the_cause():
+    """Сбой на нечитаемом входе: причина на первом экране, не «режим без модели» (№14, п. 7); схема проходит."""
+    r = {"schema": "bcc-review/2",
+         "run": {"agent": "BCC Review", "version": "2", "commit": "abcdef1", "provider": "", "status": "failed",
+                 "started_at": "2026-11-27T06:00:00Z", "finished_at": "2026-11-27T06:00:00Z", "duration_s": 0,
+                 "models_used": [], "calls": {"total": 0, "cached": 0, "failed": 0, "split": 0},
+                 "tokens": {"input": 0, "output": 0}, "stages": {},
+                 "warnings": ["Прогон прерван: PdfReadError: PDF fake.pdf повреждён и не открывается (FileDataError)."]},
+         "document": {"title": "fake.pdf", "file": "fake.pdf", "format": "", "sha256": "", "lines": 0, "pages": None},
+         "requirements": [], "findings": []}
+    jsonout.finalize(r)
+    assert r["verdict"]["development"] == "none" and jsonout.validate(r) == []
+    md = markdown.render(r)
+    head = md[:md.find('id="s1"')]
+    assert "Режим без модели" not in md and "повреждён и не открывается — откройте файл" in head
+    bad = copy.deepcopy(r)
+    bad["run"]["status"] = "complete"
+    assert any("sha256" in e for e in jsonout.validate(bad))  # пустой хеш допустим только у сбоя
+
+
+def test_why_never_contradicts_verdict_without_blockers(sample):
+    """Без блокеров вердикт в «Почему» называет код; фраза судьи с другим вердиктом не попадает на первый экран."""
+    r = copy.deepcopy(sample)
+    for f in r["findings"]:
+        if f["severity"] == "critical":
+            f["severity"] = "minor"
+        f["blocks"] = "none"
+    r["verdict"] = {"summary": "Разработку можно начинать только с условиями. Первым исправить D-01."}
+    jsonout.finalize(r)
+    assert r["verdict"]["development"] == "yes"
+    why = next(ln for ln in markdown.render(r).split("\n") if ln.startswith("**Почему.**"))
+    assert "с условиями" not in why and "начинать можно" in why and "Первым исправить [D-01](#d-01)." in why
+
+
+# ---------------------------------------------------------------- волна 3, вторая сессия №13
+
+def _card_of(md: str, fid: str) -> str:
+    a = md.find(f'<a id="{fid.lower()}"></a>')
+    b = md.find("\n#### ", a + 10)
+    return md[a:b if b > 0 else len(md)]
+
+
+def test_rewrite_is_paired_with_quote_only_when_text_shows_it(sample):
+    """«Было → стало» — только если новая формулировка повторяет цитату (или начинается так же); иначе это новая
+    формулировка, и выдавать её за замену первой попавшейся цитаты нельзя (на живом прогоне правило Ф-2
+    «заменялось» ожидаемым результатом критерия приёмки)."""
+    r = copy.deepcopy(sample)
+    f = next(x for x in r["findings"] if x["id"] == "D-01")
+    f.pop("rewrite_line", None)
+    f["evidence"] = [{"quote": "Месяц определяется по дате совершения покупки", "line_start": 38, "line_end": 38,
+                      "verified": "exact", "page": None},
+                     {"quote": "Провести 1 февраля в 00:03", "line_start": 64, "line_end": 64, "verified": "exact",
+                      "page": None}]
+    f["rewrite"] = "Январский счётчик вырос на 4 000 ₸, февральский не изменился."
+    card = _card_of(markdown.render(r), "D-01")
+    assert "**Было → стало" not in card
+    assert "**Предлагаемая формулировка.** «Январский счётчик вырос на 4 000 ₸, февральский не изменился.»" in card
+    # та же формулировка, что правит цитату, — «было → стало» со строкой
+    f["rewrite"] = "Месяц определяется по дате совершения покупки в часовом поясе UTC+5."
+    card = _card_of(markdown.render(r), "D-01")
+    assert "**Было → стало.** Строка 38: «Месяц определяется по дате совершения покупки» → «Месяц" in card
+    # короткая цитата-строка таблицы: начинается так же — она и заменяется, а не та, где больше общих слов
+    f["evidence"] = [{"quote": "REST type | GET", "line_start": 104, "verified": "exact"},
+                     {"quote": "Content-Type: application/json", "line_start": 147, "verified": "exact"}]
+    f["rewrite"] = "REST type: <уточнить: PUT или POST>. Параметры передаются в теле запроса (application/json)."
+    card = _card_of(markdown.render(r), "D-01")
+    assert "Строка 104: «REST type | GET» →" in card
+
+
+def test_rewrite_without_pair_goes_to_appendix_as_new_text(sample):
+    r = copy.deepcopy(sample)
+    minor = next(x for x in r["findings"] if x["severity"] == "minor")
+    minor.pop("rewrite_line", None)
+    minor["rewrite"] = "Добавить строку приёмки: порог 1 000 ₸ принимается, 999 ₸ — отказ."
+    md = markdown.render(r)
+    app = md[md.find('id="pg"'):md.find('id="pd"')]
+    row = next(ln for ln in app.splitlines() if minor["id"] in ln)
+    assert "— (новая формулировка)" in row and "| к " in row
+
+
+def test_card_groups_quotes_of_one_place(sample):
+    r = copy.deepcopy(sample)
+    f = next(x for x in r["findings"] if x["id"] == "D-01")
+    f["evidence"] = [{"quote": "Ф-3. При переходе", "line_start": 39, "verified": "exact"},
+                     {"quote": "максимум один", "line_start": 39, "verified": "exact"},
+                     {"quote": "Ф-4. При изменении порога", "line_start": 40, "verified": "exact"}]
+    card = _card_of(markdown.render(r), "D-01")
+    assert "- Ф-3, строка 39: «Ф-3. При переходе» · «максимум один»" in card
+    assert "- Ф-4, строка 40: «Ф-4. При изменении порога»" in card
+    assert card.count("\n- ") == 2
+
+
+def test_card_shows_owner_question_text(sample):
+    r = copy.deepcopy(sample)
+    q = r["questions"][0]
+    fid = q["finding_ids"][0]
+    f = next(x for x in r["findings"] if x["id"] == fid)
+    f["question"] = ""
+    q["question"] = "Какое событие считать покупкой? Сейчас в документе два варианта."
+    card = _card_of(markdown.render(r), fid)
+    assert f"**Вопрос владельцу.** Какое событие считать покупкой? → [{q['id']}](#{q['id'].lower()})" in card
+
+
+def test_first_screen_without_internal_ids_after_preposition(sample):
+    r = copy.deepcopy(sample)
+    req = next(q for q in r["requirements"] if not markdown.doc_label(q) and q.get("summary"))
+    blocker = next(f for f in r["findings"] if f["severity"] == "critical")
+    blocker["recommendation"] = f"Убрать обещание чтения из {req['id']} и описать метод."
+    md = markdown.render(r)
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
+    assert f"из требования «{markdown.shorten(req['summary'], 50).rstrip('.')}»" in brief
+    assert not re.search(r"\bR-\d", re.sub(r"\]\(#[^)]*\)", "]", brief))
+
+
+def test_how_obtained_without_pipeline_jargon(sample):
+    md = markdown.render(sample)
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
+    line = next(ln for ln in brief.splitlines() if ln.startswith("*Как получено:*"))
+    assert "глазами аналитика, тестировщика, архитектора и специалиста по рискам" in line
+    assert "судья" not in line and "роли" not in line and "кандидат" not in line
+    assert "повторы объединены в" in line
+
+
+def test_coverage_names_conflict_by_document_and_links_its_defect(sample):
+    r = copy.deepcopy(sample)
+    ids = [q["id"] for q in r["requirements"] if q.get("source_id") in ("Ф-3", "Ф-4")]
+    conflict = next(f for f in r["findings"] if set(ids) <= set(f.get("requirement_ids") or [])
+                    and markdown._category(f) == "contradictory")
+    r["trace"] = [{"requirement_id": ids[0], "verified_by": [], "conflicts_with": [ids[1]],
+                   "note": "противоречие: критерий приёмки, строка 2; Нет критерия на второй push", "finding_ids": []},
+                  {"requirement_id": ids[1], "verified_by": [], "note": "Нет критерия приёмки", "finding_ids": []}]
+    md = markdown.render(r)
+    cov = md[md.find("### 4.4."):md.find("### 4.5.")]
+    row = next(ln for ln in cov.splitlines() if ln.startswith("| [") and f"#{ids[0].lower()}" in ln.split("|")[1])
+    assert "противоречие с Ф-4; нет критерия на второй push" in row and f"[{conflict['id']}]" in row
+    assert "строка 2" not in row
+    assert "Без критерия приёмки — Нет критерия приёмки" not in cov
+    assert re.search(r"Без критерия приёмки \(\d+\): .*#" + ids[1].lower(), cov)
+
+
+def test_renderer_avoids_generic_phrase_and_code_literals():
+    r = {"schema": "bcc-review/v2", "document": {"file": "a.md", "format": "md"}, "run": {"provider": "mock"},
+         "requirements": [], "findings": [{"id": "D-01", "title": "Нет тела ответа", "severity": "major",
+                                           "kind": "api_contract", "criterion": "complete", "evidence": [],
+                                           "problem": "Клиент ждёт result и получает undefined.", "blocks": "none"}]}
+    md = markdown.render(r)
+    assert "в целом" not in md and "**Где:** весь документ" in md
+    assert "получает `undefined`" in md
+
+
+def test_line_after_infinitive_is_accusative():
+    assert markdown.prose("заменить L045 на «x»") == "заменить строку 45 на «x»"
+    assert markdown.prose("привести L025 и L136 к маршруту") == "привести строки 25 и 136 к маршруту"
+    assert markdown.prose("часть L040 описывает") == "часть строки 40 описывает"
+    assert markdown.prose("из L052 и L103") == "из строк 52 и 103"
+
+
+# ---------------------------------------------------------------- разбор GPT Pro (F4, `eval/blind-v2`, jury.md)
+
+def test_final_reason_lists_blockers_from_final_levels(sample):
+    """Правка 1: перечень блокеров — по финальным уровням, а не по тексту судьи (у судьи пять ID при счётчике
+    четыре). Фразы судьи о не-блокере остаются только как порядок работ («Затем …»)."""
+    r = copy.deepcopy(sample)
+    blockers = [f["id"] for f in r["findings"] if f["severity"] == "critical" and f.get("blocks") != "none"]
+    major = next(f["id"] for f in r["findings"] if f["severity"] == "major")
+    r["verdict"]["summary"] = (f"Начинать нельзя. Блокируют {', '.join(blockers)} и {major}. "
+                               f"{major}: метод чтения не описан. Затем описать метод чтения ({major}).")
+    md = markdown.render(r)
+    final = md[md.find('id="s6"'):md.find('id="pa"')]
+    reason = next(ln for ln in final.splitlines() if ln.startswith("**Обоснование.**"))
+    shown = re.findall(r"\[(D-\d+)\]", reason.split(". ")[0] + ". ")
+    assert shown == blockers, (shown, blockers)
+    assert f"Блокируют" not in reason and f"[{major}](#{major.lower()}): метод чтения" not in reason
+    assert f"Затем описать метод чтения ([{major}](#{major.lower()}))" in reason
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
+    why = next(ln for ln in brief.splitlines() if ln.startswith("**Почему.**"))
+    assert major not in why
+
+
+def test_tooltip_keeps_comparison_signs():
+    """Правка 7: в подсказке-названии требования знак «>» пропадал — «отказ в 65 лет» вместо «старше 65»."""
+    c = markdown._Ctx({"requirements": [{"id": "R-01", "summary": "Возраст > 65 лет — отказ, ≤ 18 — тоже"}]})
+    assert '"Возраст больше 65 лет — отказ, не больше 18 — тоже"' in c.req_label("R-01")
+
+
+def test_passport_commands_name_real_files(sample):
+    """Правка 5: в паспорте команды с настоящими именами файлов: проверка сохранённого отчёта и повтор анализа."""
+    md = markdown.render(sample, out_path="out/official.md")
+    passport = md[md.find('id="s1"'):md.find('id="s2"')]
+    assert "`python -m bcc_review verify out/official.json requirements.md`" in passport
+    assert "`python -m bcc_review requirements.md out/repeat.md --provider claude_cli --model" in passport
+    assert "--no-cache`" in passport and "`official.json`" in passport
+    assert "отчёт.json документ" not in passport
+
+
+def test_matrix_names_criteria_in_full(sample):
+    """Сравнение с ERA216 (F4): в 3.1 — нарушенные критерии полными названиями, без столбцов-сокращений."""
+    md = markdown.render(sample)
+    m31 = md[md.find("### 3.1."):md.find("### 3.2.")]
+    assert "| Требование | Итог | Нарушенные критерии | Дефекты |" in m31
+    assert "Нб —" not in m31 and "| Од |" not in m31
+    assert re.search(r"\| 🔴 \| 🔴 согласованность", m31)
+
+
+def test_rejected_duplicate_points_to_kept_card(sample):
+    """Сравнение с azekowka (F4): снятый как дубль кандидат ведёт к карточке, которая осталась."""
+    r = copy.deepcopy(sample)
+    kept = next(f for f in r["findings"] if f["severity"] == "critical")
+    line = kept["evidence"][0]["line_start"]
+    r["rejected"] = [{"candidate_id": "", "source": "lens:risk", "reason_code": "lens_dropped",
+                      "title": f"То же противоречие (строка {line})", "reason": "зона тестировщика (дубль)"},
+                     {"candidate_id": "C-099", "source": "rules:api", "reason_code": "misread",
+                      "title": "Ложное", "reason": f"строка {line} описывает успешный повтор без ошибки", "line": line}]
+    md = markdown.render(r)
+    app = md[md.find('id="pd"'):md.find('id="pe"')]
+    assert f"зона тестировщика (дубль) → вошёл в [{kept['id']}](#{kept['id'].lower()})" in app
+    assert "успешный повтор без ошибки → вошёл" not in app
+
+
+def test_code_spans_not_nested():
+    assert markdown.prose("GET /savings/{accountId}/interest описан") == "GET `/savings/{accountId}/interest` описан"
+
+
+def test_console_counts_all_blockers(sample):
+    """Терминал называет все блокеры числом и ID (раньше — первые три из fix_first при счётчике 4)."""
+    text = console.summary(sample, md_path="r.md", json_path="r.json")
+    blockers = [f["id"] for f in sample["findings"] if f["severity"] == "critical" and f.get("blocks") != "none"]
+    assert f"блокеров {len(blockers)}" in text
+    assert all(b in text for b in blockers) and len(text.split("\n")) <= 8
+    r = copy.deepcopy(sample)
+    for f in r["findings"]:
+        if f["severity"] == "critical":
+            f["severity"], f["blocks"] = "major", "none"
+    r["verdict"].update(development="conditional", testing="conditional")
+    text = console.summary(r)
+    assert "исправить первым:" in text and "блокер" not in text
+
+
+def test_action_not_cut_inside_placeholder():
+    rec = ("Добавить правило: премия возвращается один раз; при полном погашении до отказа возврат = премия минус уже "
+           "возвращённое. <уточнить: порядок при одновременном отказе и погашении, срок возврата и счёт зачисления>")
+    act = markdown._action({"recommendation": rec}, limit=120)
+    assert "<уточнить" not in act or act.count("<") == act.count(">")
+    rec2 = "Привести строки 25 и 45 к одной схеме: <уточнить: вызывает ли API кредитов сервис напрямую>; схему дополнить"
+    assert markdown._action({"recommendation": rec2}, limit=80).count("<") == markdown._action(
+        {"recommendation": rec2}, limit=80).count(">")
+
+
+def test_warning_counts_agree_with_number():
+    assert markdown.warn_text("судья: 2 замечаний сведены") == "судья: 2 дефекта сведены"
+    assert markdown.warn_text("понизила 1 дефект(ов): критичный→существенный 1") == \
+        "понизила 1 дефект: критичный→существенный 1"
+    assert console.plain_warn("судья: 5 замечаний (пожелания)") == "судья: 5 дефектов (пожелания)"
+
+
+def test_mixed_verdict_sentence_reads_per_direction(sample):
+    r = copy.deepcopy(sample)
+    for f in r["findings"]:
+        if f["severity"] == "critical":
+            f["severity"] = "major"
+        if f["severity"] == "major":
+            f["blocks"] = "development"
+    r["verdict"].update(development="conditional", testing="yes")
+    text = markdown._verdict_sentence(markdown._Ctx(r))
+    assert text.startswith("Критичных дефектов нет. Разработку можно начинать с условием параллельно исправить ")
+    assert "; тестирование можно начинать — существенных, мешающих ему, нет." in text
+    assert "разработку —" not in text
+
+
+def test_rewrite_of_new_rule_not_paired_with_fragment_or_example(sample):
+    """Новый метод чтения не «заменяет» пример ответа метода сохранения (общие только имена полей), новое правило о
+    повторе — не фрагмент «идентификатор операции» (F4, правка 3: правка удаляла действующий параметр)."""
+    r = copy.deepcopy(sample)
+    f = next(x for x in r["findings"] if x["id"] == "D-01")
+    f.pop("rewrite_line", None)
+    f["evidence"] = [{"quote": '{"result":"OK","amount":"50000","enabled":"1"}', "line_start": 167, "verified": "exact"}]
+    f["rewrite"] = 'GET /alerts/getLimit?cardId=... → 200 {"amount":"<уточнить: тип>","enabled":"0|1"}'
+    assert markdown._rewrite_from(f) is None
+    f["evidence"] = [{"quote": "идентификатор операции", "line_start": 49, "verified": "exact"}]
+    f["rewrite"] = "Повтор события с тем же идентификатором операции игнорируется: сумма не меняется."
+    assert markdown._rewrite_from(f) is None
+    f["evidence"] = [{"quote": "Prod: —", "line_start": 108, "verified": "exact"}]
+    f["rewrite"] = "Prod: <уточнить: значение>; Swagger: <уточнить: значение>"
+    assert markdown._rewrite_from(f)["line_start"] == 108
+
+
+def test_json_carries_code_verdict_texts(sample):
+    """`verdict.why` и `verdict.reason` — те же тексты, что «Почему» и «Обоснование» в Markdown (для HTML №14)."""
+    r = copy.deepcopy(sample)
+    jsonout.finalize(r)
+    assert r["verdict"]["why"] and r["verdict"]["reason"]
+    assert not jsonout.validate(r)
+    md = markdown.render(r)
+    assert markdown.prose(r["verdict"]["why"]) in md and markdown.prose(r["verdict"]["reason"]) in md
+
+
+def test_why_does_not_repeat_no_critical_statement(sample):
+    r = copy.deepcopy(sample)
+    r["findings"] = [f for f in r["findings"] if f["severity"] == "minor"][:3]
+    r["questions"] = []
+    r["verdict"] = {"development": "yes", "testing": "yes",
+                    "summary": "Документ готов: критичных и существенных нет. Стоит уточнить часовой пояс."}
+    r.pop("summary", None)
+    jsonout.finalize(r)
+    why = markdown._why(markdown._Ctx(r))
+    assert why == "Критичных дефектов нет и существенных нет — начинать можно. Стоит уточнить часовой пояс."
+
+
+def test_blockers_with_one_exception_named_once(sample):
+    """4 блокера останавливают и то и другое, один — только разработку: общий адресат — в заголовке, исключение
+    названо один раз (раньше «останавливает разработку и тестирование» повторялось в каждой строке)."""
+    r = copy.deepcopy(sample)
+    bl = [f for f in r["findings"] if f["severity"] == "critical"]
+    bl[-1]["blocks"] = "development"
+    md = markdown.render(r)
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
+    assert (f"**Блокеры ({len(bl)})** — останавливают разработку и тестирование, {bl[-1]['id']} — только разработку; "
+            "что не так, где и что сделать (по порядку):") in brief
+    assert brief.count("останавливает только разработку.") == 1
+    assert "; останавливает разработку и тестирование." not in brief
+    text = console.summary(r)
+    assert f"{bl[-1]['id']} — только разработку:" in text and len(text.split("\n")) <= 8
+
+
+def test_critical_card_shows_short_answer_options(sample):
+    """Рубрика, п. 6: у блокера — вопрос владельцу с вариантами прямо в карточке (коротко; полностью — в приложении А)."""
+    r = copy.deepcopy(sample)
+    q = r["questions"][0]
+    fid = q["finding_ids"][0]
+    f = next(x for x in r["findings"] if x["id"] == fid)
+    f["severity"], f["blocks"] = "critical", "both"
+    q["options"] = ["По дате совершения: покупка идёт в январь, критерий исправить",
+                    "По дате проведения: покупка идёт в февраль, правило исправить"]
+    card = _card_of(markdown.render(r), fid)
+    assert "**Варианты ответа:** A — по дате совершения; B — по дате проведения" in card
+    assert markdown._short_options(["Один push; если расходы уже выше, push сразу",
+                                    "Один push; если расходы уже выше, push не нужен"]) == \
+        ["один push; если расходы уже выше, push сразу", "один push; если расходы уже выше, push не нужен"]
+    assert markdown._short_options(["только один"]) == []
+
+
+def test_fuzz_corrupted_reports_never_crash(sample):
+    """Битый report.json (не тот тип в любом поле, пропавшие поля) — рендер, терминал, finalize и сверка Markdown не
+    падают (фазз 1000 порч на живых отчётах — 0 ошибок; здесь 120 детерминированных)."""
+    import random
+    from bcc_review.v2 import verify
+    bad = [None, "", "x", 0, 3.5, True, [], {}, [None], [1, "a"], {"a": None}, "L038 R-99 D-77", "> 65 <уточнить"]
+
+    def paths(obj, prefix=()):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                yield prefix + (k,)
+                yield from paths(v, prefix + (k,))
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj[:4]):
+                yield prefix + (i,)
+                yield from paths(v, prefix + (i,))
+
+    rnd = random.Random(13)
+    for _ in range(120):
+        r = copy.deepcopy(sample)
+        ps = list(paths(r))
+        for _ in range(rnd.randint(1, 5)):
+            p = rnd.choice(ps)
+            try:
+                obj = r
+                for k in p[:-1]:
+                    obj = obj[k]
+                obj[p[-1]] = rnd.choice(bad)
+            except (KeyError, IndexError, TypeError):
+                pass
+        markdown.render(copy.deepcopy(r))
+        console.summary(copy.deepcopy(r))
+        fin = jsonout.finalize(copy.deepcopy(r))
+        verify.check_markdown(fin, markdown.render(fin))
+        markdown.rubric(copy.deepcopy(r))
