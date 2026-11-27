@@ -12,7 +12,8 @@
 * ``503`` / ``500`` / ``504`` / ``404`` / ``401`` (неверный ключ) / ``400_schema`` («схема слишком сложная»);
 * ``drop`` — сервер закрывает соединение, не ответив; ``slow`` — ответ через ``delay`` с (тайм-аут клиента);
 * ``truncated_json`` — finishReason STOP, но JSON оборван; ``empty`` — кандидат без текста;
-* ``no_candidates`` — пустой список кандидатов; ``max_tokens`` — finishReason MAX_TOKENS;
+* ``no_candidates`` — пустой список кандидатов; ``max_tokens`` — finishReason MAX_TOKENS, JSON оборван на доле
+  ``cut``, в usage рассуждение ``thoughts`` токенов (по умолчанию 100);
 * ``403_proxy`` — 403 от прокси сети (HTML, не JSON Google); ``407`` — прокси требует пароль;
 * ``safety`` — promptFeedback.blockReason=SAFETY; ``finish_safety`` / ``finish_recitation`` / ``finish_spii`` —
   ответ остановлен фильтром на выходе (finishReason).
@@ -52,6 +53,15 @@ def _markers() -> list[tuple[str, str]]:
                 out.append((ln, stem))
                 break
     return out
+
+
+def _thinking(cfg: dict) -> Any:
+    """Уровень или бюджет рассуждения из запроса (SDK пишет поля и в camelCase, и в snake_case — API примет оба)."""
+    t = cfg.get("thinkingConfig") or cfg.get("thinking_config") or {}
+    for key in ("thinkingLevel", "thinking_level", "thinkingBudget", "thinking_budget"):
+        if t.get(key) is not None:
+            return t[key]
+    return None
 
 
 def _schema_after_hint(text: str) -> dict:
@@ -157,7 +167,8 @@ class FakeGemini:
         fault = self._fault(stage, model)
         kind = (fault or {}).get("kind", "ok")
         rec = {"t": time.monotonic(), "model": model, "stage": stage, "kind": kind,
-               "schema_mode": "native" if cfg.get("responseJsonSchema") else "text"}
+               "schema_mode": "native" if cfg.get("responseJsonSchema") else "text",
+               "thinking": _thinking(cfg)}
         with self.lock:
             self.log.append(rec)
         if kind == "drop":
@@ -202,12 +213,13 @@ class FakeGemini:
             payload = payload[: max(1, len(payload) // 2)]
         elif kind == "empty":
             payload = ""
-        elif kind == "max_tokens":
-            payload, finish = payload[: len(payload) // 2], "MAX_TOKENS"
+        elif kind == "max_tokens":   # обрезка по пределу ответа посреди массива (доля — ``cut``, по умолчанию 0,5)
+            payload, finish = payload[: int(len(payload) * float(fault.get("cut", 0.5)))], "MAX_TOKENS"
         elif kind.startswith("finish_"):   # finish_safety, finish_recitation, finish_spii
             payload, finish = "", kind[len("finish_"):].upper()
+        thoughts = int((fault or {}).get("thoughts", 100))   # рассуждение в ответе (для MAX_TOKENS — сколько «съело»)
         usage = {"promptTokenCount": len(text) // 3, "candidatesTokenCount": len(payload) // 3,
-                 "thoughtsTokenCount": 100, "totalTokenCount": len(text) // 3 + len(payload) // 3 + 100}
+                 "thoughtsTokenCount": thoughts, "totalTokenCount": len(text) // 3 + len(payload) // 3 + thoughts}
         if kind == "safety":
             return 200, {}, {"promptFeedback": {"blockReason": "SAFETY"}, "usageMetadata": usage}, kind
         cand = {"content": {"role": "model", "parts": [{"text": payload}] if payload else []},

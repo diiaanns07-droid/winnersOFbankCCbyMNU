@@ -201,3 +201,86 @@ def test_persistent_output_filter_stop_spends_at_most_three_requests(server):
         ask(provider())
     assert e.value.kind == "refusal" and "фильтр" in e.value.message
     assert len(fake.log) == 3      # не перебираем всю цепочку из шести моделей (у каждой 20 запросов в сутки)
+
+
+# ----------------------------------------------------------------------------- этап 2: обрезка ответа (MAX_TOKENS)
+
+LENS_MARK = next(m for m, s in fake_gemini._markers() if s == "lens_analyst")
+LENS_MESSAGES = [{"role": "system", "content": "Система"}, {"role": "user", "content": f"{LENS_MARK}\nДокумент."}]
+LENS_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["candidates", "note"],
+               "properties": {"candidates": {"type": "array", "items": {
+                   "type": "object", "additionalProperties": False, "required": ["title", "problem"],
+                   "properties": {"title": {"type": "string"}, "problem": {"type": "string"}}}},
+                   "note": {"type": "string"}}}
+
+
+def ask_lens(p):
+    return p.invoke(model=None, messages=LENS_MESSAGES, schema=LENS_SCHEMA, timeout_s=30, stage="lens_analyst")
+
+
+def test_truncated_by_thinking_retries_with_low_thinking(server):
+    """Рассуждение съело предел ответа (MAX_TOKENS, 60 тыс. из 65 тыс. — рассуждение): тот же запрос с «low»,
+    и следующий вызов этого этапа сразу с «low». Было: обрезка уходила наверх, этап делил пакет (+2 запроса)."""
+    fake = server([{"kind": "max_tokens", "thoughts": 60000}])
+    p = provider()
+    out = ask_lens(p)
+    assert len(out["data"]["candidates"]) == 11
+    assert [r["kind"] for r in fake.log] == ["max_tokens", "ok"]
+    assert [r["thinking"] for r in fake.log] == ["MEDIUM", "LOW"]
+    ask_lens(p)
+    assert fake.log[-1]["thinking"] == "LOW"
+    assert out["usage"]["attempts"]   # попытка видна в трассе
+
+
+def test_truncated_json_too_big_keeps_whole_elements(server):
+    """Мало рассуждения — велик сам JSON: обрезка наверх (этап поделит пакет), но с целыми элементами ответа."""
+    fake = server([{"kind": "max_tokens", "thoughts": 10, "cut": 0.6, "times": 9}])
+    with pytest.raises(ProviderError) as e:
+        ask_lens(provider())
+    assert e.value.kind == "truncated"
+    assert len(fake.log) == 1                       # без повтора: рассуждение тут ни при чём
+    partial, info = e.value.partial, e.value.salvage
+    full = fake.data_for("lens_analyst", LENS_SCHEMA)["candidates"]
+    kept = partial["candidates"]
+    assert 0 < len(kept) < len(full)
+    assert kept == full[:len(kept)]                 # только целые элементы, без недописанного хвоста
+    assert partial["note"] == "" and info["filled_empty"] == ["note"]
+    from bcc_review.v2.llm import schema_errors
+    assert not schema_errors(partial, LENS_SCHEMA)
+
+
+@pytest.mark.parametrize("text, expect", [
+    ('{"a": [1, 2, 3', {"a": [1, 2]}),             # число на обрезке может быть недописанным — не берём
+    ('{"a": [{"x": 1}, {"x": 2}, {"x"', {"a": [{"x": 1}, {"x": 2}]}),
+    ('{"a": [{"x": 1, "ids": ["R1", "R2"]}, {"x": 2, "ids": ["R3", "R4"', {"a": [{"x": 1, "ids": ["R1", "R2"]}]}),
+    ('{"a": [], "b": "текст с \\" кавычкой", "c": [["x", "y"], ["z"', {"a": [], "b": 'текст с " кавычкой', "c": [["x", "y"]]}),
+    ('```json\n{"a": [{"x": "}]"}, {"x": "q', {"a": [{"x": "}]"}]}),
+    ('{"a": "незакрытая строка', None),
+    ('не JSON', None),
+])
+def test_salvage_json_cases(text, expect):
+    got = gemini.salvage_json(text)
+    assert (got[0] if got else None) == expect
+
+
+def test_dead_model_and_window_shared_between_passes(server, monkeypatch):
+    """--runs N: каждый проход — новый провайдер. Квота основной модели и окно запросов — общие для ключа."""
+    fake = server([{"kind": "429_day", "model": "gemini-3.8-flash", "times": 99}])
+    first = gemini.GeminiProvider(env={"GEMINI_API_KEY": "fake-key-runs", "GEMINI_RPM": "0"}, sleep=lambda s: None)
+    assert ask(first)["model"] == "gemini-3.7-flash"
+    second = gemini.GeminiProvider(env={"GEMINI_API_KEY": "fake-key-runs", "GEMINI_RPM": "0"}, sleep=lambda s: None)
+    assert ask(second)["model"] == "gemini-3.7-flash"
+    # основная модель с исчерпанной суточной квотой второму проходу запросом не стоила
+    assert [m for m, _ in kinds(fake)] == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.7-flash"]
+    assert first._window is second._window
+    other = gemini.GeminiProvider(env={"GEMINI_API_KEY": "another-key", "GEMINI_RPM": "0"}, sleep=lambda s: None)
+    assert other._window is not first._window       # другой ключ — другой проект Google, свои квоты
+
+
+def test_daily_quota_memory_expires_at_reset():
+    dead = gemini._DeadModels()
+    exc = ProviderError("quota", "дневная квота")
+    exc.subkind = "per_day"
+    dead.put("m", exc, now=0.0)
+    assert dead.get("m", now=60.0) is exc
+    assert dead.get("m", now=gemini._seconds_to_daily_reset() + 120) is None   # после сброса — снова пробуем

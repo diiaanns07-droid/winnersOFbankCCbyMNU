@@ -142,3 +142,20 @@ def test_dead_provider_gives_rules_report_with_russian_reason(tmp_path, kind, wo
     # неверный ключ и сеть не перебирают всю цепочку на каждом этапе
     if kind in ("401", "drop"):
         assert len(log) <= 4, [(r["stage"], r["model"], r["kind"]) for r in log]
+
+
+def test_judge_truncated_by_thinking_recovers_on_low(tmp_path):
+    """Этап 2: судья упёрся в предел ответа из-за рассуждения — повтор с «low», прогон complete, «нельзя»."""
+    code, text, data, log = jury_run(tmp_path, [{"kind": "max_tokens", "stage": "judge", "thoughts": 60000}])
+    status, verdict = assert_honest(code, text, data)
+    assert status == "complete" and verdict["development"] == "no"
+    judge = [(r["kind"], r["thinking"]) for r in log if r["stage"] == "judge"]
+    assert judge == [("max_tokens", "MEDIUM"), ("ok", "LOW")]
+
+
+def test_lens_truncated_json_is_split_by_stage(tmp_path):
+    """Обрезан сам JSON (рассуждения мало): провайдер не повторяет вслепую, линза делит пакет — complete."""
+    code, text, data, log = jury_run(tmp_path, [{"kind": "max_tokens", "stage": "lens_analyst", "thoughts": 10}])
+    status, verdict = assert_honest(code, text, data)
+    assert status == "complete" and verdict["development"] == "no"
+    assert [r["kind"] for r in log if r["stage"] == "lens_analyst"] == ["max_tokens", "ok", "ok"]
