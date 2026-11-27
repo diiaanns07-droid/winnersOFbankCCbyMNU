@@ -88,8 +88,9 @@ def test_examples_json_paths_exist():
     assert len(set(d["id"] for d in raw["documents"])) == len(raw["documents"])
     assert all(i and i.replace("-", "").isalnum() for i in ids)
     for r in raw["reports"]:
-        for k in ("json", "html", "md", "source"):
-            assert not Path(r[k]).is_absolute() and ".." not in Path(r[k]).parts, r[k]
+        for k in ("json", "html", "md", "docx", "pdf", "csv", "source"):
+            if k in r:
+                assert not Path(r[k]).is_absolute() and ".." not in Path(r[k]).parts, r[k]
         assert (ROOT / r["source"]).is_file(), r["source"]
         # отчёт либо есть целиком (json и html), либо ещё не сделан (№36) — тогда карточки нет
         assert (ROOT / r["json"]).is_file() == (ROOT / r["html"]).is_file(), r["id"]
@@ -164,14 +165,16 @@ def test_ready_job_survives_restart_and_refreshes(tmp_path):
     shutil.copy2(MOCK / "requirements.json", tmp_path / "r.json")
     shutil.copy2(MOCK / "requirements.html", tmp_path / "r.html")
     shutil.copy2(ROOT / "release" / "input" / "requirements.md", tmp_path / "requirements.md")
-    reports = [{"id": "m", "title": "Мок", "json": "r.json", "html": "r.html", "md": "", "source": "requirements.md"}]
+    (tmp_path / "r.docx").write_bytes(b"PK\x03\x04")
+    reports = [{"id": "m", "title": "Мок", "json": "r.json", "html": "r.html", "md": "", "docx": "r.docx",
+                "pdf": "missing.pdf", "source": "requirements.md"}]
     exp = _examples(tmp_path, reports)
     app = _app(tmp_path)
     jid = G.ensure_ready(app, G.load_examples(exp, tmp_path))["m"]
     assert G.is_ready(jid) and S.JOB_PATH.match(f"/jobs/{jid}")
     job = app.store.get(jid)
     assert job.file_name == "requirements.md" and job.provider == "mock" and job.summary["critical"] == 5
-    assert {"html", "json"} <= set(job.files) and "md" not in job.files
+    assert {"html", "json", "docx"} <= set(job.files) and "md" not in job.files and "pdf" not in job.files
     assert job.notice.startswith("Готовый отчёт")
     # «Последние проверки» — только свои проверки пользователя
     own = app.store.create("my.md", b"# x\n", "offline", "")

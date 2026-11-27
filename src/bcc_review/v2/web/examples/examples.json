@@ -1,5 +1,5 @@
 {
-  "_comment": "№43: готовые отчёты и примеры документов для главной веб-демо. Пути — от корня репозитория. Запись, у которой нет файла отчёта (json и html) или исходного документа, на главной не показывается. Отчёты руками не править: команды генерации — в README.md рядом.",
+  "_comment": "№43: готовые отчёты и примеры документов для главной веб-демо. Пути — от корня репозитория. Запись отчёта показывается, только если есть json, html и source; md, docx, pdf, csv — необязательные выгрузки. Отчёты руками не править: команды генерации — в README.md рядом.",
   "reports": [
     {
       "id": "official",
@@ -7,6 +7,8 @@
       "json": "reports/requirements.json",
       "html": "reports/requirements.html",
       "md": "reports/requirements.md",
+      "docx": "reports/requirements.docx",
+      "csv": "reports/requirements.jira.csv",
       "source": "release/input/requirements.md"
     },
     {
@@ -15,6 +17,9 @@
       "json": "reports/requirements_pdf.json",
       "html": "reports/requirements_pdf.html",
       "md": "reports/requirements_pdf.md",
+      "docx": "reports/requirements_pdf.docx",
+      "pdf": "reports/requirements_pdf.pdf",
+      "csv": "reports/requirements_pdf.jira.csv",
       "source": "release/input/requirements.pdf"
     },
     {
@@ -23,7 +28,10 @@
       "json": "reports/other_topic_cashback.json",
       "html": "reports/other_topic_cashback.html",
       "md": "reports/other_topic_cashback.md",
-      "source": "release/input/other_topic_cashback.md"
+      "docx": "reports/other_topic_cashback.docx",
+      "csv": "reports/other_topic_cashback.jira.csv",
+      "source": "evaluation/dev/corpus/cases/cashback.base/source.md",
+      "file_name": "cashback.md"
     },
     {
       "id": "mock",
