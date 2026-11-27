@@ -512,6 +512,18 @@ def test_viewdiff_main_run_prompts_and_summary():
     assert not vd.same_input(res) and vd.summary_line(res).endswith("изменён: stages/judge.py")
 
 
+def test_viewdiff_counts_rules_code_as_main_run(monkeypatch):
+    """Правила (rules/) и сверка цитат (quotes.py) — этапы основного прогона без модели: их кандидаты идут судье,
+    правка там меняет вход модели (голова 3e7133c: rules/api.py, placeholders.py, promises.py)."""
+    from evaluation.v2 import viewdiff as vd
+
+    changed = ["src/bcc_review/v2/rules/api.py", "src/bcc_review/v2/rules/promises.py",
+               "src/bcc_review/v2/quotes.py", "src/bcc_review/v2/stages/recheck.py", "src/bcc_review/v2/stages/judge.py"]
+    monkeypatch.setattr(vd, "_git", lambda *args: "\n".join(changed))
+    got = vd.stage_code_changed("a", "b", vd.MAIN_STAGES)
+    assert got == ["quotes.py", "stages/judge.py", "rules/ (2 файла)"]  # recheck — режим --answers
+
+
 def test_viewdiff_same_commit_builds_view_from_exported_code():
     """Код коммита выгружается `git archive`, вид строит его же docview (не установленный пакет): HEAD → HEAD совпал."""
     from evaluation.v2 import viewdiff as vd

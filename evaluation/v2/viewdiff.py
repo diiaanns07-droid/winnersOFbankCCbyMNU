@@ -37,6 +37,8 @@ MAIN_STAGES = ("segment", "rules", "lens_analyst", "lens_qa", "lens_architect", 
 # Общий код, через который проходит вход каждого этапа основного прогона
 SHARED_CODE = ("src/bcc_review/v2/stages/lens.py", "src/bcc_review/v2/stages/__init__.py", "src/bcc_review/v2/llm.py",
                "src/bcc_review/v2/context.py", "src/bcc_review/v2/pipeline.py")
+# Этапы без модели, чей код лежит вне stages/: их кандидаты и цитаты идут судье — это тоже вход модели
+STAGE_CODE = {"rules": "src/bcc_review/v2/rules", "quotes": "src/bcc_review/v2/quotes.py"}
 
 # Код дочернего процесса: argv — каталог выгруженного src, затем пути документов; печатает JSON {путь: вид}.
 _CHILD = r"""
@@ -167,10 +169,19 @@ def _in_main(name: str, stages: tuple[str, ...]) -> bool:
 
 
 def stage_code_changed(a: str, b: str, stages: tuple[str, ...]) -> list[str]:
-    """Код этапов основного прогона и общий код их входа, который отличается между коммитами."""
-    out = _git("diff", "--name-only", a, b, "--", STAGES, *SHARED_CODE)
+    """Код этапов основного прогона (в т. ч. правил и сверки цитат) и общий код их входа, который отличается между
+    коммитами. Правила целиком — одной строкой «rules/ (N файлов)»."""
+    extra = [v for k, v in STAGE_CODE.items() if k in stages]
+    out = _git("diff", "--name-only", a, b, "--", STAGES, *SHARED_CODE, *extra)
     files = [p for p in out.splitlines() if p.strip()]
-    return [p[len("src/bcc_review/v2/"):] for p in files if p in SHARED_CODE or _in_main(p, stages)]
+    keep, rules = [], 0
+    for p in files:
+        if p.startswith(STAGE_CODE["rules"] + "/"):
+            rules += 1
+        elif p in SHARED_CODE or p == STAGE_CODE["quotes"] or _in_main(p, stages):
+            keep.append(p[len("src/bcc_review/v2/"):])
+    return keep + ([f"rules/ ({rules} {'файл' if rules == 1 else 'файла' if rules in (2, 3, 4) else 'файлов'})"]
+                   if rules else [])
 
 
 def evaluation_docs(all_formats: bool = False) -> list[str]:
