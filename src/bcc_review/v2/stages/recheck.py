@@ -611,8 +611,12 @@ def findings_after(rechecked: list[dict]) -> list[dict]:
     return out
 
 
-def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[str]) -> tuple[list[dict], list[dict]]:
-    """Новые кандидаты → судья (№10). Без судьи — кандидат становится дефектом как есть."""
+def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[str],
+               old: Iterable[dict] = ()) -> tuple[list[dict], list[dict]]:
+    """Новые кандидаты → судья (№10). Без судьи — кандидат становится дефектом как есть.
+
+    Судья может переписать кандидата в прежний дефект (на официальном haiku: «ключ повторной доставки не
+    задан» — его как раз закрыло общее решение): такой «новый» дефект — дубль, он отклоняется."""
     if not candidates:
         return [], []
     try:
@@ -631,6 +635,17 @@ def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[st
         rejected = []
     keep = _cl.doc_codes(getattr(ctx, "view", None))
     by_cand = {c["id"]: c for c in candidates}
+    old = list(old)
+    if old:
+        fresh = []
+        for f in found:
+            twin = duplicate_of(f.get("evidence") or [], old, str(f.get("title") or ""))
+            if twin:
+                rejected.append({"candidate_id": ", ".join(f.get("candidate_ids") or []), "title": f.get("title", ""),
+                                 "reason": f"повторяет дефект {twin}", "source": "recheck"})
+            else:
+                fresh.append(f)
+        found = fresh
     for i, f in enumerate(found):
         refs = [r["id"] for cid in f.get("candidate_ids") or [] for r in by_cand.get(cid, {}).get("answer_refs") or []]
         refs = list(dict.fromkeys(refs))
@@ -694,7 +709,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
     warnings = rc.get("warnings", [])
     remaining = findings_after(rc["findings"])
     max_d = max([int(m.group(1)) for f in findings for m in [re.match(r"D-(\d+)$", str(f.get("id", "")))] if m] or [0])
-    new_found, new_rejected = _judge_new(ctx, rc["new_candidates"], max_d + 1, warnings)
+    new_found, new_rejected = _judge_new(ctx, rc["new_candidates"], max_d + 1, warnings, findings)
     after = remaining + new_found
     before_v = report.get("verdict") or {}
     before_rule = shared_verdict(findings, status)

@@ -452,3 +452,19 @@ def test_judge_tail_about_missing_quote_is_dropped(findings, questions, monkeypa
     out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{questions[0]['id']}: A")
     new = [f for f in out["findings_after"] if f.get("status_after_answers") == "new"][0]
     assert new["problem"] == "После ответа Q-01: стр. 180 даёт тело 400 без поля result, а стр. 155 его требует."
+
+
+def test_judge_rewrite_into_old_defect_is_rejected(findings, questions, monkeypatch):
+    """Судья переписал кандидата в прежний дефект (тот же предмет на тех же строках) — это не новый конфликт."""
+    from bcc_review.v2.stages import judge
+    old = next(f for f in findings if len({e["line_start"] for e in f["evidence"]}) >= 2)
+
+    def rewrite(ctx, candidates):
+        res = _stub_judge(ctx, candidates)
+        res["findings"][0].update(title=old["title"], evidence=[dict(e) for e in old["evidence"]])
+        return res
+    monkeypatch.setattr(judge, "run", rewrite)
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{questions[0]['id']}: A")
+    assert out["clarification"]["new_findings"] == []
+    assert any(r["reason"] == f"повторяет дефект {old['id']}" for r in out["rejected_after"])
