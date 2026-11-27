@@ -101,6 +101,12 @@ def test_critical_is_never_dropped_by_topic_filter():
     assert [k["severity"] for k in kept] == ["critical"] and len(dropped) == 1
 
 
+def test_personal_data_transfer_is_security_not_compliance():
+    t = "Персональные данные и анкета передаются партнёру без согласия клиента"
+    kept, dropped = lens_risk.postprocess([_cand(t, "major", "security", "risk")], "Банк передаёт анкету партнёру.")
+    assert _sev(t, kept, dropped) == "major"
+
+
 def test_hook_in_document_keeps_topic():
     doc = "Реализация предусматривает схему отката решений. Хранить инициатора изменения."
     kept, _ = lens_risk.postprocess([_cand("Схема отката не описана", "minor", "ops_risk", "risk"),
@@ -322,3 +328,31 @@ def test_run_uses_common_lens_and_postprocess(monkeypatch):
     assert [c["title"] for c in out["candidates"]] == ["Ключевое событие не определено"]
     assert out["candidates"][0]["requirement_ids"] == ["R-01"]
     assert out["dropped"][0]["reject_reason"].startswith("тема")
+
+
+OPEN2 = FIXTURES / "open2"
+OPEN2_KEY_EVENT = {"qr": r"оплачен", "grace": r"внес[её]н|внесени", "insurance": r"14\s+дн|отказ"}
+
+
+def _open2_kept(path):
+    data = json.loads(path.read_text(encoding="utf-8"))
+    doc_id = path.name.split(".")[0]
+    doc = (ROOT / "evaluation" / "v2" / "open2" / doc_id / "source.md").read_text(encoding="utf-8")
+    reqs = data.get("requirements") or []
+    return doc_id, lens_risk.postprocess(data["candidates"], doc, [r["id"] for r in reqs],
+                                         [r["id"] for r in reqs if r.get("kind") == "acceptance"])[0]
+
+
+@pytest.mark.parametrize("path", sorted(OPEN2.glob("*.sonnet.json")) if OPEN2.exists() else [], ids=lambda p: p.stem)
+def test_open2_sonnet_answers(path):
+    """Новые ТЗ №18 (sonnet): ключевое событие в засеянных версиях находится; на чистых нет critical."""
+    if not (ROOT / "evaluation" / "v2" / "open2").exists():
+        pytest.skip("набор №18 не влит")
+    doc_id, kept = _open2_kept(path)
+    if doc_id.endswith("_clean"):
+        assert not [c for c in kept if c["severity"] == "critical"], [c["title"] for c in kept]
+        assert len(kept) <= 4
+    elif doc_id in OPEN2_KEY_EVENT:
+        rx = OPEN2_KEY_EVENT[doc_id]
+        hits = [c for c in kept if lens_risk._is_key_event(c) and re.search(rx, c["title"] + c["problem"], re.I)]
+        assert hits and hits[0]["severity"] in ("critical", "major"), [c["title"] for c in kept]
