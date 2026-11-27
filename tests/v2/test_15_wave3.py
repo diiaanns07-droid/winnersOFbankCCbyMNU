@@ -957,6 +957,28 @@ def test_cleantable_repeat_share_counts_last_run_complaints_seen_before(monkeypa
     assert gate._repeat_note("чистые ТЗ №20", {**d, "at": "2026-11-27 16:54"}) == ""  # ворота не на последнем прогоне
 
 
+def test_newtz_outside_items_carry_evidence_for_gold_owner():
+    """Замечание вне эталона несёт суть и цитаты из отчёта; список для №18 — по повторяющимся, с полем решения."""
+    from evaluation.v2 import newtz
+
+    res = {"outside": [{"finding": "D-09", "severity": "major", "kind": "incomplete", "sources": ["consistency"],
+                        "title": "Нижняя граница возраста 18 лет не проверяется в логике метода"}]}
+    rep = {"findings": [{"id": "D-09", "problem": "Ф-6 требует возраст от 18 лет, шаг 4 проверяет только 65.",
+                         "evidence": [{"quote": "Страхование доступно клиенту от 18 лет", "line_start": 42},
+                                      {"quote": "Если он больше 65 лет, вернуть 422", "line_start": 123}]}]}
+    x = newtz._outside_list(res, rep)[0]
+    assert x["where"] == ["L42 «Страхование доступно клиенту от 18 лет»", "L123 «Если он больше 65 лет, вернуть 422»"]
+    assert x["problem"].startswith("Ф-6 требует") and x["owners"] == ["№09"]
+    assert "where" not in newtz._outside_list(res)[0]  # без отчёта — только то, что есть в score.json
+    rec = {"kind": "sonnet", "runs": [("2026-11-27 16:23", "заморозка"), ("2026-11-27 16:39", "после заморозки")],
+           "last_total": 40, "last_recurring": 26,
+           "recurring": [{"case": "insurance", "runs": 2, "of": 2, "severity": "major", "title": x["title"],
+                          "sources": {"consistency": 2}, "owners": ["№09"], "members": [("16:39", x)]}]}
+    text = newtz.render_candidates(rec)
+    assert "## insurance — «Нижняя граница возраста 18 лет не проверяется в логике метода» (major, 2 из 2 прогонов)" in text
+    assert "Где: L42 «Страхование доступно клиенту от 18 лет»; L123" in text and "Решение №18: ☐ пункт эталона" in text
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final
