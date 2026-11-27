@@ -17,3 +17,18 @@
 По тому же ключу полный зачёт получили **19/33** реплик. По ним 16/29 адресных и 3/4 общих решений. В уведомлениях 8/11, в QR — 5/11, в автокредите — 6/11. [Разметка каждой реплики](ANSWERS.md).
 
 При новом независимом чтении без файла ответов ожидаемые «нельзя / нельзя» сохранились для **2/3** ТЗ. Уведомления дали 22 карточки и 59/59 цитат, QR — 24 и 59/59, автокредит — 11 и 31/31. В автокредите агент вновь разрешил и разработку, и тестирование при открытом выборе платы 0 или 1 500 ₸. Карточке о плате назначен minor (D-05). Строка 34 редакции расширила диапазон на лишнее 4-е число. В QR повторный отчёт уже видит оставшийся спор по окончательному отказу антифрода 422 или 403 (D-03). Все 149 цитат прошли штатную проверку. [Уведомления](official/reread.md) · [QR](qr/reread.md) · [Автокредит](car-loan/reread.md) · [Счётчики](reread-summary.json).
+
+## Как повторить
+
+В отдельной копии версии `d013c123` задайте `$f4` как абсолютный путь к этому аудиту. Требуются зависимости проекта и доступный Claude CLI. Пример воспроизводит пересмотр автокредита и независимое чтение его редакции.
+
+```powershell
+git apply "$f4/acceptance/owner-conflicts.patch" "$f4/acceptance/owner-judge-sources.patch" "$f4/acceptance/passport-paths.patch"
+$env:PYTHONPATH = (Resolve-Path src).Path
+$env:CLAUDE_CLI_FALLBACK_MODEL = 'off'
+$opt = @('--provider','claude_cli','--model','sonnet','--no-cache','--no-html')
+New-Item -ItemType Directory -Force out/f4-car | Out-Null
+python -m bcc_review "$f4/answers_exam/car-loan/source.md" out/f4-car/answered.md --answers "$f4/answers_exam/car-loan/answers.md" --revise @opt
+python -m bcc_review out/f4-car/answered.revised.md out/f4-car/reread.md @opt
+python -m bcc_review verify out/f4-car/reread.json out/f4-car/answered.revised.md
+```

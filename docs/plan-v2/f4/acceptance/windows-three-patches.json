@@ -1,0 +1,19 @@
+{
+  "base": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+  "platform": "Windows",
+  "python": "3.12.14",
+  "command": "python -m pytest tests/v2 -q",
+  "patches": {
+    "owner-conflicts.patch": "ff9d6a4b625eda74d13d74a9c59a1a0fbad1a06767a1a072265aad1a06d938f2",
+    "owner-judge-sources.patch": "999a40e83823c0d771b403293881c1b69278f301d5de46bd3bfb9caa58d75028",
+    "passport-paths.patch": "8af7650ff917b597ccdd00172682ded2b37e29ef1ee7f0fea151ad86ff87ccc9"
+  },
+  "collected": 2228,
+  "passed": 2213,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 5,
+  "xfailed": 3,
+  "xpassed": 7,
+  "seconds": 851.22
+}

@@ -1,0 +1,43 @@
+{
+  "base": "d013c123b984b3a2d519fa8b9c6c06871ed7e3eb",
+  "platform": "Windows",
+  "python": "3.12.14",
+  "suite": "tests/v2",
+  "collected": 2294,
+  "errors": 0,
+  "summary": {
+    "failed": 1,
+    "passed": 2278,
+    "skipped": 5,
+    "xfailed": 3,
+    "xpassed": 7
+  },
+  "seconds": 752.464,
+  "failures": [
+    {
+      "module": "tests.v2.test_02_wallclock",
+      "test": "test_fast_start_on_five_rpm_key_waits_for_window_instead_of_429",
+      "assertion": "AssertionError: ['200', '200', '200', '200', '200', '429', ...]\nassert ['200', '200'...', '429', ...] == ['200', '200'...', '200', ...]\n  \n  At index 5 diff: '429' != '200'\n  Left contains one more item: '200'\n  Use -v to get more diff"
+    }
+  ],
+  "patches": {
+    "owner-conflicts.patch": "ff9d6a4b625eda74d13d74a9c59a1a0fbad1a06767a1a072265aad1a06d938f2",
+    "owner-judge-sources.patch": "999a40e83823c0d771b403293881c1b69278f301d5de46bd3bfb9caa58d75028",
+    "passport-paths.patch": "8af7650ff917b597ccdd00172682ded2b37e29ef1ee7f0fea151ad86ff87ccc9",
+    "owner-option-text.patch": "25cc78183af56a5371b2bf26261e4982e3170697a66a46296efd7724ba0b1017"
+  },
+  "isolated_reruns": [
+    {
+      "variant": "pristine",
+      "node": "tests/v2/test_02_wallclock.py::test_fast_start_on_five_rpm_key_waits_for_window_instead_of_429",
+      "exit": 1,
+      "summary": "1 failed in 1.80s"
+    },
+    {
+      "variant": "four-patches",
+      "node": "tests/v2/test_02_wallclock.py::test_fast_start_on_five_rpm_key_waits_for_window_instead_of_429",
+      "exit": 1,
+      "summary": "1 failed in 1.85s"
+    }
+  ]
+}
