@@ -145,7 +145,7 @@ def check_markdown(report: dict, md: str) -> tuple[list[str], list[str]]:
     m = _MD_SUMMARY.search(md[md.find('id="s5"'):md.find('id="s6"')] if 'id="s5"' in md else md)
     if not m or [int(x) for x in m.groups()] != want:
         errors.append(f"«Сводка»: дефектов {list(m.groups()) if m else 'не найдено'}, в JSON {want}")
-    open_ids = {f.get("id") for f in jsonout.open_findings(report)}
+    open_ids = {jsonout._key(f.get("id")) for f in jsonout.open_findings(report)} - {None}
     anchors = re.findall(r'<a id="(d-\d+)"></a>', md)
     shown = {x.upper() for x in anchors}
     if shown != {str(i).upper() for i in open_ids}:
@@ -180,8 +180,8 @@ def _check_markdown_more(report: dict, md: str, brief: str, s: dict) -> list[str
     from .render import markdown as M
 
     errors: list[str] = []
-    v = report.get("verdict") or {}
-    want = [M.READINESS.get(v.get(k), "—") for k in ("development", "testing")]
+    v = report.get("verdict") if isinstance(report.get("verdict"), dict) else {}
+    want = [M.READINESS.get(v.get(k) if isinstance(v.get(k), str) else None, "—") for k in ("development", "testing")]
     m = re.search(r"\| \*\*(.+?)\*\* \| \*\*(.+?)\*\* \|", brief)
     if m and list(m.groups()) != want:
         errors.append(f"«Кратко»: вердикт {list(m.groups())}, в JSON {want}")

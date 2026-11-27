@@ -639,7 +639,8 @@ class _Ctx:
         if not hits:
             return None
         hits.sort(key=lambda q: (q.get("id") not in prefer, not doc_label(q),
-                                 (q.get("line_end") or q["line_start"]) - q["line_start"]))
+                                 (q["line_end"] if isinstance(q.get("line_end"), int) else q["line_start"])
+                                 - q["line_start"]))
         return hits[0]
 
     def ev_label(self, ev: dict, prefer=()) -> str:

@@ -73,14 +73,26 @@ def is_resolved(f: dict) -> bool:
 
 def open_findings(report: dict) -> list[dict]:
     """Действующие дефекты: снятые ответами владельца (resolved) не считаются."""
-    return [f for f in report.get("findings", []) or [] if isinstance(f, dict) and not is_resolved(f)]
+    return [f for f in _list(report.get("findings")) if isinstance(f, dict) and not is_resolved(f)]
+
+
+def _list(value) -> list:
+    """Список из поля отчёта: не список (None, строка, число из битого ответа) — пустой список."""
+    return value if isinstance(value, list) else []
+
+
+def _key(value):
+    """ID для множеств: строка или число; иное (dict, list из битого ответа) — None."""
+    return value if isinstance(value, (str, int)) and not isinstance(value, bool) else None
 
 
 def count_quotes(findings: Iterable[dict]) -> tuple[int, int]:
-    """(сверено, всего) по цитатам дефектов. «missing» — не сверена."""
+    """(сверено, всего) по цитатам дефектов. «missing» — не сверена. Не-цитаты (не dict) не считаются."""
     ok = total = 0
     for f in findings:
-        for ev in f.get("evidence", []):
+        for ev in _list(f.get("evidence")):
+            if not isinstance(ev, dict):
+                continue
             total += 1
             if ev.get("verified", "missing") != "missing":
                 ok += 1
@@ -93,16 +105,16 @@ def compute_summary(report: dict) -> dict:
     for f in findings:
         if f.get("severity") in by_sev:
             by_sev[f["severity"]] += 1
-    touched = {rid for f in findings for rid in f.get("requirement_ids", [])}
-    reqs = report.get("requirements", [])
+    touched = {_key(rid) for f in findings for rid in _list(f.get("requirement_ids"))} - {None}
+    reqs = [r for r in _list(report.get("requirements")) if isinstance(r, dict)]
     ok, total = count_quotes(findings)
     return {
         "requirements": len(reqs),
         "findings": by_sev,
-        "requirements_without_findings": sum(1 for r in reqs if r.get("id") not in touched),
+        "requirements_without_findings": sum(1 for r in reqs if _key(r.get("id")) not in touched),
         "quotes_verified": ok,
         "quotes_total": total,
-        "questions": len(report.get("questions", [])),
+        "questions": len(_list(report.get("questions"))),
     }
 
 
@@ -186,7 +198,13 @@ def finalize(report: dict) -> dict:
         report.setdefault(key, [])
     _restore_resolved(report)
     report["summary"] = compute_summary(report)
-    verdict = report.setdefault("verdict", {})
+    if not isinstance(report.get("verdict"), dict):
+        report["verdict"] = {}
+    if not isinstance(report.get("run"), dict):
+        report["run"] = {}
+    if not isinstance(report["run"].get("warnings"), list):
+        report["run"]["warnings"] = []
+    verdict = report["verdict"]
     rule = rule_verdict(report)
     changed = any(verdict.get(k) not in (None, rule[k]) for k in ("development", "testing"))
     for k in ("development", "testing"):
@@ -200,13 +218,15 @@ def finalize(report: dict) -> dict:
         report.setdefault("run", {}).setdefault("warnings", []).append(
             "вердикт конвейера расходился с правилом кода и пересчитан по правилу")
     verdict.setdefault("summary", "")
-    open_ids = {f.get("id") for f in open_findings(report)}
-    fix = [i for i in verdict.get("fix_first") or [] if i in open_ids]
+    open_ids = {_key(f.get("id")) for f in open_findings(report)} - {None}
+    fix = [i for i in _list(verdict.get("fix_first")) if _key(i) in open_ids]
     if not fix:
-        fix = [f["id"] for f in sorted((f for f in open_findings(report) if f.get("priority")),
+        fix = [f["id"] for f in sorted((f for f in open_findings(report) if isinstance(f.get("priority"), int)
+                                        and not isinstance(f.get("priority"), bool) and _key(f.get("id"))),
                                        key=lambda f: f["priority"])][:7]
     if not fix:
-        fix = [f["id"] for f in open_findings(report) if f.get("severity") in ("critical", "major")][:5]
+        fix = [f["id"] for f in open_findings(report) if f.get("severity") in ("critical", "major")
+               and _key(f.get("id"))][:5]
     verdict["fix_first"] = fix
     _verdict_texts(report)
     return report
