@@ -511,6 +511,7 @@ def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[di
     kinds: list[str] = [""] * (n_lines + 1)
     levels: list[int] = [0] * (n_lines + 1)
     covered: list[bool] = [False] * (n_lines + 1)
+    list_levels: dict[int, int] = {}
     if doc:
         for b in doc.get("blocks") or []:
             loc = b.get("loc") or {}
@@ -534,6 +535,9 @@ def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[di
                 if i == 0 and prefix:
                     part = prefix + part
                 texts[ln_no] = part if texts[ln_no] is None else f"{texts[ln_no]} {part}"
+                if i == 0 and b.get("kind") == "list_item" and isinstance(loc.get("list"), dict) \
+                        and isinstance(loc["list"].get("depth"), int):
+                    list_levels[ln_no] = loc["list"]["depth"]
                 sections[ln_no] = sec
                 block_ids[ln_no] = b.get("id", "")
                 kinds[ln_no] = str(b.get("kind") or "")
@@ -576,6 +580,8 @@ def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[di
         out.append({"n": k, "text": t, "page": None, "section": sections[k] or cur_section,
                     "src_line": k, "block_id": block_ids[k], "kind": kind,
                     "level": levels[k] if kind == "heading" else 0, "heading": kind == "heading"})
+        if k in list_levels and t:
+            out[-1]["list_level"] = list_levels[k]
     return out
 
 
@@ -689,14 +695,48 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                 t = _BULLET_GLYPH.sub("", t.lstrip())
                 if label and not t.startswith(label):
                     t = f"{label} {t}"
-            out.append({"n": len(out) + 1, "text": _clean(t), "page": page, "section": sec,
-                        "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
-                        "level": _level(b) if b.get("kind") == "heading" else 0,
-                        "heading": b.get("kind") == "heading"})
+            row = {"n": len(out) + 1, "text": _clean(t), "page": page, "section": sec,
+                   "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
+                   "level": _level(b) if b.get("kind") == "heading" else 0,
+                   "heading": b.get("kind") == "heading"}
+            if i == 0 and b.get("kind") == "list_item" and not sizes:
+                lst = loc.get("list") if isinstance(loc.get("list"), dict) else {}
+                lvl = lst.get("level", lst.get("depth"))
+                if isinstance(lvl, int):
+                    row["list_level"] = lvl
+            elif i == 0 and sizes and b.get("kind") in ("list_item", "paragraph") and _bbox(b):
+                row["_x0"] = _bbox(b)[0]
+            out.append(row)
+    if sizes:
+        _pdf_list_levels(out)
     out, toc = drop_toc(out)
     if toc:
         warnings.append(f"Оглавление убрано из текста ({toc} строк): оно повторяет заголовки разделов.")
     return out
+
+
+_ITEM_MARK = re.compile(r"^\s*(?:\d{1,2}(?:\.\d{1,2})*[.)]|[a-zа-я][.)])\s+\S", re.I)
+
+
+def _pdf_list_levels(lines: list[dict]) -> None:
+    """Уровень пункта нумерованного списка в PDF — по отступу: разные левые края пунктов с номером (допуск 6 pt),
+    слева направо — уровни 0, 1, 2. Без номера («•») и вне списков уровень не ставится."""
+    by_sec: dict[str, list[dict]] = {}
+    for ln in lines:
+        x = ln.get("_x0")
+        if x is not None and _ITEM_MARK.match(ln["text"]):
+            by_sec.setdefault(ln["section"], []).append(ln)
+    for group in by_sec.values():  # отступы сравниваются внутри раздела: у разделов разные поля и стили
+        marks: list[float] = []
+        for x in sorted(round(ln["_x0"], 1) for ln in group):
+            if not marks or x - marks[-1] > 6:
+                marks.append(x)
+        if len(marks) < 2:
+            continue  # один уровень — вложенности нет, пункты как были
+        for ln in group:
+            ln["list_level"] = max(k for k, m in enumerate(marks) if ln["_x0"] >= m - 6)
+    for ln in lines:
+        ln.pop("_x0", None)
 
 
 _TOC_ENTRY = re.compile(r"^(?P<title>.*?\S)(?:\s*(?:\.{2,}|…+|_{3,}|·{3,}))?\s*(?P<page>\d{1,4})\s*$")
@@ -881,7 +921,7 @@ def _wrap_vocab(blocks: list[dict]) -> dict:
     return {"words": words, "wraps": wraps}
 
 
-def _vocab_word_break(b: dict, f1: dict, f2: dict, text: str, vocab: dict | None) -> bool:
+def _vocab_word_break(b: dict, f1: dict, f2: dict, text: str, vocab: dict | None, carry: str = "") -> bool:
     """Слово разорвано переносом в узкой ячейке таблицы («проце нты», «a ccountId», «CAPI TALIZATION»,
     «страхов ания»): разрыв на переносе строки ячейки, склеенное слово встречается в документе целым, а вторая часть
     отдельным словом (вне таких переносов) — нигде. «Идентификатор / карты» не склеится: «идентификаторкарты» в
@@ -891,6 +931,10 @@ def _vocab_word_break(b: dict, f1: dict, f2: dict, text: str, vocab: dict | None
         return False
     w1, w2 = text[f1["start"]:f1["end"]], text[f2["start"]:f2["end"]]
     m1, m2 = re.search(r"\w+$", w1), _TOKEN.match(w2)
+    before = text[max(0, f1["start"] - 60):f1["end"]]
+    if m1 and w2[:1] in ")]}" and before.count("([{"[")]}".index(w2[0])]) > before.count(w2[0]):
+        # «{loanId» / «}/insurance»: закрывающая скобка у левого края следующей строки ячейки — то же слово
+        return _cell_edge(b, f1, f2, w1, w2)
     if not m1 or not m2:
         return False
     t1, t2 = m1.group(), m2.group()
@@ -898,25 +942,46 @@ def _vocab_word_break(b: dict, f1: dict, f2: dict, text: str, vocab: dict | None
     if t1.isdigit() and len(t1) <= 3 and t2.isdigit() and len(t2) == 3 and not re.match(r"[.,]\d", w2[m2.end():]):
         return False
     joined, tail = (t1 + t2).casefold(), t2.casefold()
+    if carry and t1 == w1:  # второй разрыв того же слова: словарь проверяет слово целиком
+        joined = (carry + t1 + t2).casefold()
     words, wraps = vocab["words"], vocab["wraps"]
     if words.get(joined, 0) >= 1 and words.get(tail, 0) - wraps.get(tail, 0) <= 0:
         return True
-    frags = _table_frags(b)
-    cells = ((b.get("loc") or {}).get("table") or {}).get("cells") or []
-    cell = next((c for c in cells if isinstance(c, dict) and c.get("rect")
-                 and c.get("start", 0) <= f1["start"] and f2["end"] <= c.get("end", -1)), None)
-    if cell is None or not all(isinstance(f.get("rect"), (list, tuple)) and len(f["rect"]) == 4 for f in frags) \
-            or not _edge_wrap(cell, frags, f1, f2, w1, w2):
+    if not _cell_edge(b, f1, f2, w1, w2):
         return False
     # у края ячейки: склеенное слово есть в документе — клеим; без словаря — только числа и латинские
-    # идентификаторы (camelCase, ЗАГЛАВНЫЕ): кириллицу без словаря не трогаем
+    # идентификаторы (camelCase, ЗАГЛАВНЫЕ): кириллицу — если в документе есть слово с той же основой
+    # («страхова / нии» при «страхования», «страхованием»), а хвост отдельным словом нигде не встречается
     if words.get(joined, 0) >= 1:
+        return True
+    if re.fullmatch(r"[а-яё]{3,}", t1, re.I) and re.fullmatch(r"[а-яё]{2,}", t2) \
+            and words.get(tail, 0) - wraps.get(tail, 0) <= 0 and _same_stem(joined, words):
         return True
     if t1[-1].isdigit() and t2[0].isdigit():
         return True
     if re.fullmatch(r"[A-Za-z_]+", t1) and re.fullmatch(r"[a-z][a-z0-9]*[A-Z][A-Za-z0-9_]*", t2):
         return True
     return bool(re.fullmatch(r"[A-Z_]+", t1) and re.fullmatch(r"[A-Z0-9_]+", t2))
+
+
+def _cell_edge(b: dict, f1: dict, f2: dict, w1: str, w2: str) -> bool:
+    """Разрыв у правого края ячейки таблицы, продолжение — у левого края следующей строки той же ячейки."""
+    frags = _table_frags(b)
+    cells = ((b.get("loc") or {}).get("table") or {}).get("cells") or []
+    cell = next((c for c in cells if isinstance(c, dict) and c.get("rect")
+                 and c.get("start", 0) <= f1["start"] and f2["end"] <= c.get("end", -1)), None)
+    if cell is None or not all(isinstance(f.get("rect"), (list, tuple)) and len(f["rect"]) == 4 for f in frags):
+        return False
+    return _edge_wrap(cell, frags, f1, f2, w1, w2)
+
+
+def _same_stem(joined: str, words: dict) -> bool:
+    """В документе есть слово с той же основой: общее начало ≥ 7 букв и не короче склейки без двух последних букв,
+    длина отличается не больше чем на 2 («страховании» ↔ «страхования»)."""
+    stem = joined[: max(7, len(joined) - 2)]
+    if len(joined) < 8:
+        return False
+    return any(w != joined and w.startswith(stem) and abs(len(w) - len(joined)) <= 2 for w in words)
 
 
 def _tight_text(b: dict, vocab: dict | None = None) -> str:
@@ -933,15 +998,22 @@ def _tight_text(b: dict, vocab: dict | None = None) -> str:
                     if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and f.get("rect")),
                    key=lambda f: f["start"])
     cut: list[int] = []
+    carry = ""  # начало слова, уже склеенного через перенос («нач|ислени|й»): разрыв может быть не один
     for f1, f2 in zip(frags, frags[1:]):
         if text[f1["end"]:f2["start"]] != " ":
+            carry = ""
             continue
         if f1.get("line") == f2.get("line"):
+            carry = ""
             h = max(f1["rect"][3] - f1["rect"][1], 1.0)
             if f2["rect"][0] - f1["rect"][2] < 0.08 * h:
                 cut.append(f1["end"])
-        elif _cell_word_break(b, frags, f1, f2, text) or _vocab_word_break(b, f1, f2, text, vocab):
+        elif _cell_word_break(b, frags, f1, f2, text) or _vocab_word_break(b, f1, f2, text, vocab, carry):
             cut.append(f1["end"])
+            w1 = text[f1["start"]:f1["end"]]
+            carry = carry + w1 if re.fullmatch(r"\w+", w1) else (re.search(r"\w*$", w1).group())
+        else:
+            carry = ""
     if not cut:
         return text
     out, prev = [], 0

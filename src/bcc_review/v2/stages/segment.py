@@ -191,13 +191,38 @@ def looks_like_heading(text: str) -> bool:
 # ---------------------------------------------------------------------------------------------------------
 # Сверка цитат
 
+_N_QUOTES = re.compile(r"[«»“”„\"']")
+_N_DASHES = re.compile(r"[—–‑−]")
+_N_LEAD = re.compile(r"^\s*(?:[*-]\s+|#+\s*)")
+_N_SPACE = re.compile(r"\s+")
+
+
 def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKC", s or "")
-    s = re.sub(r"[«»“”„\"']", '"', s)
-    s = re.sub(r"[—–‑−]", "-", s)
+    s = _N_QUOTES.sub('"', s)
+    s = _N_DASHES.sub("-", s)
     s = _MD_DECOR.sub("", s)
-    s = re.sub(r"^\s*(?:[*-]\s+|#+\s*)", "", s)
-    return re.sub(r"\s+", " ", s).strip().lower()
+    s = _N_LEAD.sub("", s)
+    return _N_SPACE.sub(" ", s).strip().lower()
+
+
+_HAY: dict[int, tuple[Any, int, str]] = {}
+
+
+def _doc_haystack(view: dict) -> str:
+    """Нормализованные тексты строк и названия разделов документа одной строкой (через перевод строки — его нет в
+    нормализованной фразе, поэтому «есть в строке» = «есть в этой строке»). Кэш на view: без него проверка каждого
+    требования проходила весь документ — O(требований × строк), 9 с нарезки на 150 страницах."""
+    raw = view.get("lines") or []
+    lines = list(raw)
+    hit = _HAY.get(id(view))
+    if hit and hit[0] is raw and hit[1] == len(lines):
+        return hit[2]
+    hay = "\n".join(f"{_norm(_text(x))}\n{_norm(str(x.get('section') or ''))}" for x in lines)
+    if len(_HAY) > 16:
+        _HAY.clear()
+    _HAY[id(view)] = (raw, len(lines), hay)
+    return hay
 
 
 def _simple_find(view: dict, quote: str, hint: int | None) -> int | None:
@@ -588,6 +613,41 @@ _HEAD_NUM = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?|[A-ZА-ЯЁ]\.|[IVXLC]+\.)\s+")
 _CODE_RE = re.compile(r"(?<![\d.,])(?<!\d\s)([1-5]\d\d)(?!\d)(?![.,]\d)(?!\s\d{3}\b)")
 
 
+_ITEM_TOKEN = re.compile(r"^\s*(?P<t>\d{1,2}|[a-zа-я])[.)]\s+\S", re.I)
+_ITEMS: dict[int, tuple[Any, dict[int, str]]] = {}
+
+
+def item_numbers(view: dict) -> dict[int, str]:
+    """Номер пункта вложенного списка с номерами родителей: «1.» внутри «2.» → «2.1», «а)» внутри него → «2.1.а».
+    Уровень — ``list_level`` строки (DOCX — уровень автонумерации, MD — вложенность, PDF — отступ). Только для
+    вложенных пунктов (уровень ≥ 1) с известным родителем; пункты верхнего уровня — как были («п. 2»). Без этого у
+    документа без собственных ID три разных пункта получали один source_id «…, п. 1»."""
+    raw = view.get("lines") or []
+    hit = _ITEMS.get(id(view))
+    if hit and hit[0] is raw:
+        return hit[1]
+    out: dict[int, str] = {}
+    stack: list[str] = []
+    sec = None
+    for ln in raw:
+        if ln.get("heading") or ln.get("section") != sec:
+            stack, sec = [], ln.get("section")
+        lvl = ln.get("list_level")
+        m = _ITEM_TOKEN.match(str(ln.get("text") or ""))
+        if not isinstance(lvl, int) or not m:
+            continue
+        if len(stack) < lvl:
+            stack = []  # родитель не найден (пункт начат в другом разделе) — номер не строим
+            continue
+        stack = stack[:lvl] + [m.group("t")]
+        if lvl >= 1:
+            out[int(ln["n"])] = ".".join(stack)
+    if len(_ITEMS) > 16:
+        _ITEMS.clear()
+    _ITEMS[id(view)] = (raw, out)
+    return out
+
+
 def _strip_num(s: str) -> str:
     return _HEAD_NUM.sub("", s or "").strip()
 
@@ -595,7 +655,7 @@ def _strip_num(s: str) -> str:
 def _in_doc(view: dict, text: str) -> bool:
     """Текст есть в документе: в строке или в названии раздела."""
     nt = _norm(text)
-    return bool(nt) and any(nt in _norm(_text(x)) or nt in _norm(str(x.get("section") or "")) for x in _lines(view))
+    return bool(nt) and nt in _doc_haystack(view)
 
 
 def _known_prefix(view: dict, pre: str, line_no: int, parts: list[str] | None = None) -> str:
@@ -607,7 +667,7 @@ def _known_prefix(view: dict, pre: str, line_no: int, parts: list[str] | None = 
     import difflib
     lines = _lines(view)
     np = _norm(pre)
-    if not np or any(np in _norm(_text(x)) or np in _norm(str(x.get("section") or "")) for x in lines):
+    if not np or np in _doc_haystack(view):
         return pre
     for head in reversed(parts or []):
         hn = _norm(_strip_num(head))
@@ -901,6 +961,9 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
                     pre = parts[-1]  # «Параметры ответа: result» — такой подписи в документе нет: раздел «Ответ»
             if sep in (", п. ", ", строка ") and rest.isdigit():
                 sep = ", строка " if _is_row(_text(first)) else ", п. "
+            nested = item_numbers(view).get(int(r["line_start"]))
+            if sep == ", п. " and nested and nested.rsplit(".", 1)[-1].lower() == rest.strip().rstrip(".").lower():
+                rest = nested  # пункт вложенного списка: «п. 2.1», а не третий «п. 1» раздела
             sid = f"{pre}{sep}{rest}"
             if (sep == ", п. " and fmt in ("md", "txt", "markdown") and first.get("kind") == "list_item"
                     and not re.match(r"^\s*\d{1,3}[.)]\s", _text(first))):
@@ -1705,6 +1768,8 @@ def heuristic_segment(view: dict) -> dict:
             sid = m.group("id")
         elif (m := _STATUS_RE.match(clean)):
             sid, kind = f"Статус {m.group('code')}", "api"
+        elif not is_row and n in item_numbers(view):
+            sid = f"{tail}, п. {item_numbers(view)[n]}" if tail else f"п. {item_numbers(view)[n]}"
         elif (m := _NUM_RE.match(clean)) and not is_row:
             under_caption = caption_line and caption_line < n and all(
                 is_trivial(_text(by_line.get(k) or {})) or _NUM_RE.match(re.sub(r"^\s*[-*•]\s+", "", _text(by_line[k])))
