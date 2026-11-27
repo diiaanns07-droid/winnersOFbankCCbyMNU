@@ -969,3 +969,10 @@ def test_refuted_report_rendered_in_russian(sample):
     assert "сняты повторной проверкой — 1" in md
     errors, _ = __import__("bcc_review.v2.verify", fromlist=["x"]).check_markdown(r, md)
     assert not errors, errors
+
+
+def test_quote_cut_inside_document_quotes_is_closed_and_joins_read_cleanly():
+    assert markdown.quote_md("кнопка «Сохранить") == "«кнопка «Сохранить»»"
+    assert markdown.quote_md("кнопка «Сохранить»") == "«кнопка «Сохранить»»"
+    assert markdown.prose("единые имена во всех схемах.; Порог настраивает") == \
+        "единые имена во всех схемах. Порог настраивает"
