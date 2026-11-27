@@ -414,6 +414,69 @@ def test_fast_start_reviewers_get_heuristic_table_and_segment_runs_in_parallel(t
                                           for f in report["findings"])
 
 
+def test_fast_start_probe_starts_reviewers_when_segment_is_slow(tmp_path, monkeypatch):
+    """По умолчанию (проба): нарезка идёт дольше пробы без фатальной ошибки — рецензенты стартуют по эвристике."""
+    import threading
+    from bcc_review.v2.stages import lens, segment
+
+    lens_started = threading.Event()
+    real_segment = segment.run
+
+    def slow_segment(ctx):
+        assert lens_started.wait(5), "рецензенты ждали нарезку"
+        return real_segment(ctx)
+
+    def fake_lens(ctx, name):
+        lens_started.set()
+        return {"candidates": []}
+
+    monkeypatch.setattr(pipeline, "FAST_START_PROBE_S", 0.2)
+    monkeypatch.setattr(segment, "run", slow_segment)
+    monkeypatch.setattr(lens, "run_named", fake_lens)
+    report, _, _ = _run(tmp_path)
+    assert report["run"]["fast_start"] is True
+    run_dir = tmp_path / "runs" / report["run"]["run_id"] / "stages"
+    lens_out = json.loads((run_dir / "lens_analyst.json").read_text(encoding="utf-8"))
+    assert lens_out["input"].get("requirements_source") == pipeline.HEURISTIC_TABLE
+
+
+def test_fast_start_probe_waits_when_segment_fails_fatally(tmp_path, monkeypatch):
+    """Проба: фатальный отказ модели на нарезке (ключ, квота, сеть) — рецензенты не шлют лишних запросов."""
+    from bcc_review.v2.stages import segment
+
+    calls = {"n": 0}
+
+    def fatal_segment(ctx):
+        calls["n"] += 1
+        err = pipeline.LLMError("segment", "auth", "ключ не принят")
+        ctx.llm.fatal = err
+        raise err
+
+    monkeypatch.setattr(segment, "run", fatal_segment)
+    report, _, _ = _run(tmp_path)
+    assert calls["n"] == 1 and report["run"]["fast_start"] is False
+    assert report["run"]["calls"]["total"] == 0  # рецензенты видят llm.fatal и модель не зовут
+
+
+def test_fast_start_probe_skipped_when_segment_is_fast(tmp_path):
+    """Проба: нарезка закончилась раньше пробы — обычный путь по таблице модели, без перевода ссылок."""
+    report, _, _ = _run(tmp_path)
+    assert report["run"]["fast_start"] is False
+    run_dir = tmp_path / "runs" / report["run"]["run_id"] / "stages"
+    lens_out = json.loads((run_dir / "lens_analyst.json").read_text(encoding="utf-8"))
+    assert "requirements_source" not in lens_out["input"]
+
+
+def test_fast_start_flags_default_probe_on_off():
+    import argparse
+    from bcc_review.v2 import __main__ as cli
+    parser = argparse.ArgumentParser()
+    cli._common(parser)
+    assert parser.parse_args([]).fast_start is None  # проба
+    assert parser.parse_args(["--fast-start"]).fast_start is True
+    assert parser.parse_args(["--no-fast-start"]).fast_start is False
+
+
 def test_fast_start_off_when_heuristic_finds_too_little(tmp_path, monkeypatch):
     from bcc_review.v2.stages import segment
     monkeypatch.setattr(segment, "heuristic_segment", lambda view: {"requirements": [_req("R-01", 1)], "excluded": []})
@@ -421,3 +484,76 @@ def test_fast_start_off_when_heuristic_finds_too_little(tmp_path, monkeypatch):
     run_dir = tmp_path / "runs" / report["run"]["run_id"] / "stages"
     lens_out = json.loads((run_dir / "lens_analyst.json").read_text(encoding="utf-8"))
     assert "requirements_source" not in lens_out["input"]
+
+
+def test_stage_rerun_after_fast_start_remaps_reused_reviewers(tmp_path, monkeypatch):
+    """stage после прогона с быстрым стартом: взятые из прогона выходы рецензентов переводятся на ID нарезки."""
+    from bcc_review.v2.stages import lens
+
+    def fake_lens(ctx, name):
+        last = ctx.requirements[-1]
+        return {"candidates": [{"title": "t", "kind": "ambiguity", "criterion": "unambiguous", "severity": "minor",
+                                "requirement_ids": [last["id"]],
+                                "evidence": [{"quote": "q", "line": last["line_start"]}], "problem": "p",
+                                "scenario": "", "impact": "", "recommendation": "", "rewrite": "", "question": "",
+                                "blocks": "none"}]}
+
+    monkeypatch.setattr(lens, "run_named", fake_lens)
+    from bcc_review.v2.stages import segment
+    real_h = segment.heuristic_segment
+
+    def heur_plus(view):  # эвристика = модели (40/40, №04); два лишних требования — R-42 снова только у эвристики
+        out = real_h(view)
+        last = out["requirements"][-1]
+        extra = [{**last, "id": f"R-{len(out['requirements']) + k:02d}"} for k in (1, 2)]
+        return {**out, "requirements": out["requirements"] + extra}
+
+    monkeypatch.setattr(segment, "heuristic_segment", heur_plus)
+    report, _, _ = _run(tmp_path, fast_start=True)
+    src = pipeline.RunDir(tmp_path / "runs" / report["run"]["run_id"], create=False)
+    saved = json.loads((src.path / "stages" / "lens_qa.json").read_text(encoding="utf-8"))["output"]
+    assert saved["requirements_source"] == "heuristic"
+    rep2, _ = pipeline.review(OFFICIAL, tmp_path / "again.md",
+                              {"provider": "mock", "runs_dir": str(tmp_path / "runs"), "html": False},
+                              reuse=src, rerun={"judge"})
+    model = rep2["requirements"]
+    assert saved["candidates"][0]["requirement_ids"][0] not in {r["id"] for r in model}  # R-42 эвристики
+    run2 = tmp_path / "runs" / rep2["run"]["run_id"] / "stages" / "quotes.json"
+    q = json.loads(run2.read_text(encoding="utf-8"))["output"]
+    cands = list(q["candidates"]) + list(q["rejected"])  # цитата «q» не находится — кандидаты линз в rejected
+    lens_cands = [c for c in cands if str(c.get("source", "")).startswith("lens:")]
+    assert lens_cands and all(c["requirement_ids"] == [model[-1]["id"]] for c in lens_cands)
+
+
+def test_clarify_starts_in_parallel_with_judge(tmp_path, monkeypatch):
+    """Ранний запуск вопросов №11: вызов вопросов идёт, пока работает судья (не после него)."""
+    import threading
+    from bcc_review.v2.stages import clarify, judge
+
+    started = threading.Event()
+    real_ask = clarify.ask_candidates
+
+    def ask(ctx, cands):
+        started.set()
+        return real_ask(ctx, cands)
+
+    real_judge = judge.run
+
+    def slow_judge(ctx, cands):
+        assert started.wait(5), "вопросы ждали судью"
+        return real_judge(ctx, cands)
+
+    monkeypatch.setattr(clarify, "ask_candidates", ask)
+    monkeypatch.setattr(judge, "run", slow_judge)
+    report, _, _ = _run(tmp_path)
+    assert report["questions"]
+    st = report["run"]["stage_stats"]["clarify"]
+    assert st.get("early") and st["calls"] >= 1
+    assert report["run"]["calls"]["total"] <= 12
+
+
+def test_clarify_early_off_keeps_late_call(tmp_path, monkeypatch):
+    from bcc_review.v2.stages import clarify
+    monkeypatch.setattr(clarify, "start", lambda ctx, kept: (_ for _ in ()).throw(AssertionError("ранний запуск")))
+    report, _, _ = _run(tmp_path, clarify_early=False)
+    assert report["questions"] and not report["run"]["stage_stats"]["clarify"].get("early")

@@ -39,6 +39,8 @@ from typing import Any, Callable, Mapping, Sequence
 
 from bcc_review.contracts import ProviderError
 
+from . import profiles
+
 __all__ = ["ClaudeCLIProvider", "classify_cli_result", "find_cli", "parse_cli_output"]
 
 PROVIDER = "claude_cli"
@@ -57,7 +59,7 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
-def find_cli(env: Mapping[str, str] | None = None, which: Callable[[str], str | None] = shutil.which) -> list[str] | None:
+def find_cli(env: Mapping[str, str] | None = None, which: Callable[[str], str | None] | None = None) -> list[str] | None:
     """Команда запуска CLI списком аргументов или ``None``, если CLI не найден.
 
     На Windows предпочитаем ``claude.exe`` (нативная установка). Для ``claude.cmd`` (установка через npm)
@@ -65,6 +67,7 @@ def find_cli(env: Mapping[str, str] | None = None, which: Callable[[str], str | 
     передаются ненадёжно.
     """
     env = os.environ if env is None else env
+    which = which or shutil.which  # поиск в момент вызова: подмена shutil.which в тестах действует
     explicit = (env.get("CLAUDE_CLI_BIN") or "").strip()
     if explicit:
         return [explicit]
@@ -280,14 +283,20 @@ class ClaudeCLIProvider:
             raw = "opus" if "sonnet" in model.lower() else "sonnet"
         return None if raw.lower() == model.lower() else raw
 
-    def build_command(self, model: str, schema: Mapping[str, Any], system_file: str | None) -> list[str]:
+    def effort_for(self, model: str, stage: str = "") -> str | None:
+        """``--effort``: явное (аргумент, ``CLAUDE_CLI_EFFORT``) важнее профиля модели и этапа (``profiles.py``)."""
+        return self.effort or profiles.claude_effort(model, stage)
+
+    def build_command(self, model: str, schema: Mapping[str, Any], system_file: str | None,
+                      stage: str = "") -> list[str]:
         cmd = self.command() + ["-p", "--output-format", "json", "--tools", "", "--model", model,
                                 "--json-schema", json.dumps(schema, ensure_ascii=False, separators=(",", ":")),
                                 "--no-session-persistence", "--strict-mcp-config"]
         if system_file:
             cmd += ["--system-prompt-file", system_file]
-        if self.effort:
-            cmd += ["--effort", self.effort]
+        effort = self.effort_for(model, stage)
+        if effort:
+            cmd += ["--effort", effort]
         fallback = self._fallback_for(model)
         if fallback:
             cmd += ["--fallback-model", fallback]
@@ -305,7 +314,7 @@ class ClaudeCLIProvider:
     # ------------------------------------------------------------------ public
 
     def invoke(self, *, model: str | None, messages: Sequence[Mapping[str, Any]], schema: Mapping[str, Any],
-               timeout_s: float, max_output_tokens: int | None = None, **_: Any) -> dict[str, Any]:
+               timeout_s: float, max_output_tokens: int | None = None, stage: str = "", **_: Any) -> dict[str, Any]:
         model = (model or self.default_model).strip()
         system = "\n\n".join(str(m.get("content") or "") for m in messages if m.get("role") == "system").strip()
         user = "\n\n".join(str(m.get("content") or "") for m in messages if m.get("role") != "system").strip()
@@ -323,7 +332,7 @@ class ClaudeCLIProvider:
             fd, tmp_path = tempfile.mkstemp(prefix="bcc_sys_", suffix=".md")
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(system)
-        cmd = self.build_command(model, schema, tmp_path)
+        cmd = self.build_command(model, schema, tmp_path, stage)
         started = time.monotonic()
         try:
             proc = self._runner(cmd, input=user, capture_output=True, text=True, encoding="utf-8",
@@ -365,6 +374,8 @@ class ClaudeCLIProvider:
 
         used = _models_used(out, model)
         usage = _usage(out)
+        if out.get("num_turns"):
+            usage["num_turns"] = int(out.get("num_turns") or 0)   # > 2 — CLI переспрашивал модель (ответ не по схеме)
         self._log({"model": used[0], "requested": model, "seconds": round(seconds, 1), "usage": usage,
                    "system_chars": len(system), "user_chars": len(user)})
         return {
@@ -376,7 +387,8 @@ class ClaudeCLIProvider:
             "cost_usd": usage.get("cost_usd"),
             "meta": {"provider": PROVIDER, "requested_model": model, "models_used": used,
                      "fallback_used": used[0] != model and model.lower() not in used[0].lower(),
-                     "seconds": round(seconds, 2), "num_turns": out.get("num_turns")},
+                     "seconds": round(seconds, 2), "num_turns": out.get("num_turns"),
+                     "effort": self.effort_for(model, stage)},
         }
 
     def check(self) -> dict[str, Any]:

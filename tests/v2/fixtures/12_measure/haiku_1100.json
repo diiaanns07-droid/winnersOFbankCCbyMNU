@@ -1,0 +1,2470 @@
+{
+ "12new_haiku": {
+  "capital_clean": {
+   "verdict": "conditional",
+   "counts": {
+    "critical": 0,
+    "major": 9,
+    "minor": 9
+   },
+   "critical_major": [
+    {
+     "severity": "major",
+     "title": "Проверка «счёт в тенге» из Ф-1 отсутствует в логике метода смены способа",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      36,
+      120
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Способ выплаты процентов при закрытии счёта не определён",
+     "sources": [
+      "consistency",
+      "lens:analyst"
+     ],
+     "lines": [
+      38,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Причина в push о закрытой карте не передаётся и не хранится",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      40,
+      44,
+      50
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Выбор карты в экране без метода получения списка карт клиента",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28,
+      199
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "accruedInterest показывает проценты за день, не начисляемый по Ф-4",
+     "sources": [
+      "lens:qa"
+     ],
+     "lines": [
+      39,
+      160
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Неясно, входит ли начисление текущих суток в показ процентов за месяц",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      28,
+      37,
+      160
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не определено, входит ли начисление последнего дня в выплату 31-го числа",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      37,
+      64
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Граница месяца: Ф-2 задана по Астане, шаг 4 метода без часового пояса",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      37,
+      122
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Тело ошибок 400 и 404 методов чтения не описано",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      197,
+      201,
+      202
+     ]
+    }
+   ]
+  },
+  "grace_clean": {
+   "verdict": "conditional",
+   "counts": {
+    "critical": 0,
+    "major": 12,
+    "minor": 11
+   },
+   "critical_major": [
+    {
+     "severity": "major",
+     "title": "Не задано, до какой даты начисляются проценты при частичном погашении",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      38,
+      64
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "База процентов при возврате до 25-го числа не определена",
+     "sources": [
+      "lens:qa"
+     ],
+     "lines": [
+      37,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Момент отправки напоминания: последовательность, метод и NFR расходятся",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      43,
+      46,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Переход статуса в LOST до конца платёжного периода не описан",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      49,
+      154
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Прогноз процентов не получает даты отражения покупок",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      120,
+      127,
+      158
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Квази-кэш не перечислен: пополнение кошелька и лотереи не классифицированы",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      37,
+      38
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Ф-3 не описывает полную оплату после окончания платёжного периода",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      38
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Метод 2 и переключатель не отражены в архитектуре, последовательности и процессе",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      25,
+      33,
+      43
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Кнопка «Пополнить» на экране без описания операции",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28,
+      52
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Возврат после окончания периода: судьба начисленных процентов не определена",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      38,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Момент проверки неполной оплаты для push не привязан к окну 10–12",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      39,
+      46
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Предыдущий период после 25-го числа противоречит неотрицательному daysLeft",
+     "sources": [
+      "lens:qa"
+     ],
+     "lines": [
+      128,
+      157
+     ]
+    }
+   ]
+  },
+  "insurance_clean": {
+   "verdict": "conditional",
+   "counts": {
+    "critical": 0,
+    "major": 11,
+    "minor": 8
+   },
+   "critical_major": [
+    {
+     "severity": "major",
+     "title": "Нижняя граница возраста 18 лет из Ф-6 не проверяется в логике метода",
+     "sources": [
+      "lens:analyst",
+      "consistency"
+     ],
+     "lines": [
+      42,
+      123
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Досрочное погашение в первые 14 дней: два правила возврата премии",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      40,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Срок отказа 14 дней не привязан к часовому поясу",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      40,
+      66
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отказ и последующее досрочное погашение: возврат премии не согласован",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      40,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Статусы полиса в методе 5 заданы только для действующего полиса",
+     "sources": [
+      "lens:architect",
+      "consistency"
+     ],
+     "lines": [
+      40,
+      41,
+      54,
+      159,
+      223
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отказ между подписанием заявки и выдачей кредита не описан",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      34,
+      222
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повторный вызов подключения без действующего страхования не описан",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      128,
+      129,
+      222
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Премия целая по типу, но формула Ф-2 даёт дробную сумму",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      38,
+      160
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Неполный месяц при досрочном погашении: не определено, как считать месяц",
+     "sources": [
+      "lens:qa"
+     ],
+     "lines": [
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Sequence и схема вызова метода 1 расходятся по участникам и ответам",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      45,
+      134
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Сумма и срок кредита не входят в хранимые данные, нужные для повтора",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      51,
+      128,
+      150
+     ]
+    }
+   ]
+  },
+  "qr_clean": {
+   "verdict": "no",
+   "counts": {
+    "critical": 2,
+    "major": 8,
+    "minor": 9
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Сумма перевода по QR с суммой: пункт 5 и пример ответа 200 расходятся",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      125,
+      176
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Повтор запроса с тем же requestId после оплаты QR с суммой: 200 или 410",
+     "sources": [
+      "lens:qa",
+      "consistency"
+     ],
+     "lines": [
+      54,
+      126,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Путь вызова перевода и компонент, принимающий запрос, не совпадают в трёх местах",
+     "sources": [
+      "lens:architect",
+      "consistency"
+     ],
+     "lines": [
+      25,
+      45,
+      136
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не определено, может ли отмена QR пройти после проверки оплаты, но до списания",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      38,
+      41,
+      124,
+      212
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "requestId не привязан к клиенту и телу: повтор вернёт чужой результат",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      54,
+      109,
+      132,
+      152
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Ключ идемпотентности и статус перевода не входят в перечень хранимых данных",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      51,
+      132,
+      152
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повтор requestId после ответа 500 без списания: результат не определён",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      128,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Маскированное имя получателя в ответах не имеет источника данных",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      51,
+      162,
+      211
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Недостаточный остаток на карте списания: код и статус отказа не заданы",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      122,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Тела ошибок без поля status, хотя поле задано без условия",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      159,
+      163,
+      181
+     ]
+    }
+   ]
+  }
+ },
+ "12new_haiku_def": {
+  "grace": {
+   "verdict": "no",
+   "counts": {
+    "critical": 4,
+    "major": 10,
+    "minor": 8
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Ф-3 и приёмка №1 дают противоположный исход для полного внесения 25 марта",
+     "sources": [
+      "consistency",
+      "lens:qa"
+     ],
+     "lines": [
+      36,
+      38,
+      63
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "База процентов при частичном погашении: вся задолженность или непогашенный остаток",
+     "sources": [
+      "consistency",
+      "lens:qa",
+      "lens:architect"
+     ],
+     "lines": [
+      38,
+      64,
+      127
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Некредитная карта: 200 NOT_APPLICABLE в логике метода и 422 в статусах",
+     "sources": [
+      "consistency",
+      "lens:qa",
+      "lens:architect",
+      "rules:api.same_case.200-422"
+     ],
+     "lines": [
+      123,
+      167
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Метод включения и выключения напоминания обещан, но не описан",
+     "sources": [
+      "consistency",
+      "rules:promises.promised_ops",
+      "lens:risk"
+     ],
+     "lines": [
+      28,
+      52,
+      104,
+      105,
+      106
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не определено, с какого события платёж считается внесённым: приём или зачисление",
+     "sources": [
+      "lens:risk",
+      "lens:analyst"
+     ],
+     "lines": [
+      38,
+      40,
+      63
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "daysLeft считается в рабочих днях, напоминание и срок периода — в календарных",
+     "sources": [
+      "lens:analyst",
+      "lens:qa",
+      "lens:architect",
+      "lens:risk",
+      "consistency",
+      "rules:units.day_kinds"
+     ],
+     "lines": [
+      28,
+      36,
+      39,
+      157
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не задано правило, если 25-е число — выходной или праздник",
+     "sources": [
+      "lens:analyst",
+      "lens:risk"
+     ],
+     "lines": [
+      36,
+      38
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не определено, в какой момент 25-го числа истекает платёжный период",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      36,
+      38,
+      63
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Часовой пояс для границ месяца и срока платежа не задан",
+     "sources": [
+      "lens:risk",
+      "lens:analyst"
+     ],
+     "lines": [
+      36,
+      63
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Перечень операций, исключаемых из суммы погашения, неполон",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      37
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отмена или возврат внесённого платежа не описаны",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      38,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Судьба переплаты не описана",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      40,
+      126
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Нефункциональное требование о скорости и актуальности не измеримо",
+     "sources": [
+      "lens:analyst",
+      "lens:qa",
+      "rules:language.nfr_unverifiable"
+     ],
+     "lines": [
+      46
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Формат paymentDueDate: ДД.ММ.ГГГГ в описании и 2026-03-25 в примере",
+     "sources": [
+      "rules:api.date_format.paymentDueDate",
+      "lens:architect"
+     ],
+     "lines": [
+      155,
+      172
+     ]
+    }
+   ]
+  },
+  "qr": {
+   "verdict": "no",
+   "counts": {
+    "critical": 4,
+    "major": 16,
+    "minor": 8
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Срок QR-кода без суммы: 15 минут (Ф-2) или до конца календарного дня (особое правило 1)",
+     "sources": [
+      "lens:analyst",
+      "lens:qa",
+      "lens:architect",
+      "lens:risk",
+      "consistency"
+     ],
+     "lines": [
+      38,
+      131
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Сумма 500 000 ₸: Ф-1 допускает QR на эту сумму, критерий приёмки отклоняет перевод",
+     "sources": [
+      "consistency",
+      "lens:analyst",
+      "lens:qa",
+      "rules:conflicts.range_acceptance.L37-67"
+     ],
+     "lines": [
+      37,
+      67,
+      125,
+      151
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Метод создания QR-кода обещан приложениям, но в части B (REST API) отсутствует",
+     "sources": [
+      "consistency",
+      "rules:promises.promised_ops"
+     ],
+     "lines": [
+      28,
+      54,
+      107
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Метод получения данных QR-кода до подтверждения обещан, но в API не описан",
+     "sources": [
+      "consistency",
+      "lens:architect"
+     ],
+     "lines": [
+      29,
+      39,
+      45,
+      54,
+      107
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не определено, при каком событии QR с суммой становится оплаченным и что делает отказ антифрода",
+     "sources": [
+      "lens:risk",
+      "lens:analyst"
+     ],
+     "lines": [
+      38,
+      127,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Единица ttl: минуты в требованиях к данным и секунды в шаге 4 метода",
+     "sources": [
+      "lens:architect",
+      "lens:analyst",
+      "lens:qa",
+      "consistency",
+      "rules:units.time_mix.ttl"
+     ],
+     "lines": [
+      51,
+      124
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Истёкший QR-код: шаг 4 возвращает 410, перечень статусов описывает 400",
+     "sources": [
+      "lens:architect",
+      "lens:qa",
+      "consistency",
+      "rules:api.same_case.410-400"
+     ],
+     "lines": [
+      124,
+      168,
+      171
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Схема вызова метода (L136) не содержит сервиса уведомлений и push",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      25,
+      34,
+      136
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Полный номер карты получателя закодирован в QR-коде, который виден на экране",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      28,
+      51
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отмена QR-кода обещана кнопкой и Ф-5, но метода отмены в части B нет",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Одна сущность «отправитель» названа тремя разными терминами",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      29,
+      109,
+      122
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повторная оплата QR с суммой: шаг 6 и таблица кодов не задают ответ",
+     "sources": [
+      "lens:architect",
+      "lens:qa"
+     ],
+     "lines": [
+      38,
+      68,
+      126,
+      168
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отмена получателем во время проверки антифродом: правила результата нет",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      41,
+      124,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Нефункциональные требования: «мгновенно» и «высокие нагрузки» без чисел не проверяются",
+     "sources": [
+      "lens:qa",
+      "lens:analyst",
+      "rules:language.nfr_unverifiable"
+     ],
+     "lines": [
+      48
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "requestId и debit_card_id не входят в хранимые данные, нужные для идемпотентности",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      51,
+      132,
+      152
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Плательщик не определён: владелец сессии или владелец карты списания",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      109,
+      122
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отказ по карте списания (шаг 2) не имеет кода ответа",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      122,
+      155
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Код 200 описан и как успех (L155), и как отказ антифрода REJECTED (L127)",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      127,
+      155
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "«Конец календарного дня» для QR без суммы без часового пояса",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      131
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Тела ошибок 400–500 не содержат поле status, которое обещано во всех ответах",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      159,
+      181
+     ]
+    }
+   ]
+  }
+ },
+ "12nosig_haiku": {
+  "capital_clean": {
+   "verdict": "conditional",
+   "counts": {
+    "critical": 0,
+    "major": 8,
+    "minor": 10
+   },
+   "critical_major": [
+    {
+     "severity": "major",
+     "title": "Сумма «на дату запроса» не определена для незавершённого дня",
+     "sources": [
+      "lens:qa",
+      "consistency"
+     ],
+     "lines": [
+      37,
+      160
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Push о капитализации: причина и состав события не заданы в данных",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      40,
+      44
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "История начислений возвращает способ по месяцам, но хранится только текущий",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      50,
+      202
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Список карт для выбора способа «На карту» не получается ни одним методом",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28,
+      53
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Закрытие счёта при способе «На карту»: не определено, куда уйдут проценты",
+     "sources": [
+      "lens:risk",
+      "lens:analyst"
+     ],
+     "lines": [
+      36,
+      40,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Граница месяца для смены способа без часового пояса, Ф-2 использует Астану",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      37,
+      122
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повтор способа CARD с другой картой не отнесён ни к повтору, ни к смене",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      126,
+      149
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Валюта счёта в тенге из Ф-1 не проверяется в логике метода 1",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      36,
+      120
+     ]
+    }
+   ]
+  },
+  "grace_clean": {
+   "verdict": "conditional",
+   "counts": {
+    "critical": 0,
+    "major": 14,
+    "minor": 8
+   },
+   "critical_major": [
+    {
+     "severity": "major",
+     "title": "Сумма для погашения: тиыны в API и тенге в критериях приёмки",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      63,
+      156
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Момент проверки переключателя в окне передачи 22-го числа не задан",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      39,
+      205
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Покупка в день выписки может попасть в два расчётных периода",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      36,
+      37,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Проценты по возвращённой покупке после начисления не описаны",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      38,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Код ответа для чужой некредитной карты: 404 или 422, порядок не задан",
+     "sources": [
+      "lens:qa",
+      "consistency"
+     ],
+     "lines": [
+      119,
+      123,
+      166
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Признак сохранения в данных и статус ACTIVE/LOST в API: разные типы",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      49,
+      154
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Компоненты API в архитектуре и в схеме метода не совпадают",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      25,
+      43,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Кнопка «Пополнить» на экране без описания операции",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Платёж до формирования выписки: период не определён, метод отдаёт закрытый период",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      36,
+      40,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Платёж за услуги не классифицирован относительно льготного периода",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      36,
+      37
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Перечень операций квази-кэш не задан",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      37
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Включение напоминания после окна передачи не описано",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      39,
+      46
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Судьба переплаты не описана: показ нуля без учёта излишка",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      40,
+      126
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Прогноз процентов не имеет источника покупок текущего периода",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      120,
+      127
+     ]
+    }
+   ]
+  },
+  "insurance_clean": {
+   "verdict": "no",
+   "counts": {
+    "critical": 1,
+    "major": 13,
+    "minor": 13
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Повтор вызова при отказе страховщика: 200 по особым правилам и 422 по шагу 6",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      125,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повтор подключения на подписанной заявке: по особому правилу 200, по шагу 2 и коду 409 — отказ",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      121,
+      128,
+      169
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "После отказа и полного погашения премия может быть возвращена дважды (Ф-4 и Ф-5)",
+     "sources": [
+      "lens:risk",
+      "consistency"
+     ],
+     "lines": [
+      40,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не сказано, уменьшается ли сумма выдачи на величину премии",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      38
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Формула возврата премии при досрочном погашении и отсчёт месяцев не заданы",
+     "sources": [
+      "lens:analyst",
+      "lens:risk"
+     ],
+     "lines": [
+      41,
+      68
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Для возврата при погашении нет даты полного погашения и источника этого события",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      41,
+      51,
+      68
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Идентификатор кредита не отдаётся методом подключения, а нужен для отказа и сведений о полисе",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      29,
+      176,
+      221,
+      223
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Архитектура, последовательность, процесс и API расходятся по составу связей и шагов",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      25,
+      34,
+      45,
+      54,
+      134
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Полное погашение в первые 14 дней без отказа: сумма возврата не определена",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      40,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отказ от страхования по кредиту без страхования: ответ не описан",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      40,
+      221
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Граница 14 календарных дней не привязана к дню и часовому поясу",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Нижний возраст 18 лет из Ф-6 не проверяется в шаге 4 метода",
+     "sources": [
+      "lens:analyst",
+      "lens:architect"
+     ],
+     "lines": [
+      42,
+      123
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Выпуск полиса: вызов страховщика за номером полиса не показан в последовательности",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      45,
+      54
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Перечень значений status после отказа и погашения не задан",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      221,
+      223
+     ]
+    }
+   ]
+  },
+  "qr_clean": {
+   "verdict": "no",
+   "counts": {
+    "critical": 1,
+    "major": 7,
+    "minor": 12
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Повтор запроса с тем же requestId после оплаты QR с суммой: 200 и 410",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      126,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Статус QR с суммой после ответа 500 не определён",
+     "sources": [
+      "lens:analyst",
+      "consistency"
+     ],
+     "lines": [
+      38,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повтор requestId после 500 или REJECTED: исход не определён",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      38,
+      127,
+      128,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отмена QR во время перевода в обработке не согласована с логикой метода",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      41,
+      124,
+      127,
+      212
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Статус перевода «в обработке» не хранится, а проверка по нему есть",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      41,
+      51
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Путь вызова перевода: прямой вызов в последовательности и через сервис QR в архитектуре и схеме",
+     "sources": [
+      "lens:architect",
+      "consistency"
+     ],
+     "lines": [
+      25,
+      45,
+      136
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Тела ошибок метода перевода не содержат полей, обязательных по таблице ответа",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      159,
+      161,
+      162,
+      181,
+      196
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Бизнес-процесс не содержит ветвей отказа, отмены и ошибки",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      34
+     ]
+    }
+   ]
+  }
+ },
+ "12old_haiku": {
+  "capital_clean": {
+   "verdict": "conditional",
+   "counts": {
+    "critical": 0,
+    "major": 7,
+    "minor": 8
+   },
+   "critical_major": [
+    {
+     "severity": "major",
+     "title": "Судьба способа «На карту» после капитализации из-за закрытой карты не определена",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      36,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Способ выплаты процентов и остатка при закрытии счёта не определён",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      41,
+      121
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Следующий способ выплаты (next_payout_mode) не входит в требования к данным",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      50,
+      157
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Экран выбора карты не подкреплён методом получения списка карт",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28,
+      99,
+      201
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Код ответа для несуществующей карты не определён однозначно",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      165,
+      167,
+      187
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Метод условий и процентов не описывает ответ для закрытого счёта",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      167,
+      201
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Доступность 99,9 % не привязана к сервисам, недоступности и периоду",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      47
+     ]
+    }
+   ]
+  },
+  "grace_clean": {
+   "verdict": "conditional",
+   "counts": {
+    "critical": 0,
+    "major": 10,
+    "minor": 9
+   },
+   "critical_major": [
+    {
+     "severity": "major",
+     "title": "Момент проверки невнесённой суммы для напоминания не определён",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      39,
+      46,
+      65
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Возврат после утраты периода не определяет судьбу начисленных процентов",
+     "sources": [
+      "lens:analyst",
+      "lens:risk"
+     ],
+     "lines": [
+      38,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Прогноз процентов: «при частичном погашении» против «если не внесена»",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      122,
+      127,
+      158
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Платёж, зачисленный в дату выписки, может учитываться по-разному",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      36,
+      40,
+      120
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Кнопка «Пополнить» показана, но операция пополнения не описана",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28,
+      98
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Sequence-диаграмма вызывает уведомления при чтении, логика метода этого не делает",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      43,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Выключение и повторное включение напоминания посреди периода не описаны",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      39,
+      205
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Часовой пояс границы расчётного периода не задан",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      36,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Квази-кэш не определён, исключаемые операции нельзя перечислить",
+     "sources": [
+      "lens:qa"
+     ],
+     "lines": [
+      37
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Платёж, зачисленный менее чем за 5 минут до запроса, учитывается по-разному",
+     "sources": [
+      "lens:qa"
+     ],
+     "lines": [
+      40,
+      46
+     ]
+    }
+   ]
+  },
+  "insurance_clean": {
+   "verdict": "no",
+   "counts": {
+    "critical": 1,
+    "major": 11,
+    "minor": 8
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Повтор вызова на подписанной заявке: 200 с условиями или 409",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      128,
+      169
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Граница 14 дней без часового пояса и правила отсчёта дней",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Полное погашение в первые 14 дней и последующий отказ: возврат по Ф-4 или Ф-5",
+     "sources": [
+      "lens:analyst",
+      "consistency"
+     ],
+     "lines": [
+      40,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Сумма и срок не сохраняются, хотя повторный вызов сравнивает их",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      51,
+      128,
+      152
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Момент досрочного погашения и отсчёт полных месяцев возврата не определены",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      41,
+      68
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Нижняя граница возраста 18 лет из Ф-6 не проверяется в логике метода",
+     "sources": [
+      "lens:architect",
+      "lens:analyst"
+     ],
+     "lines": [
+      42,
+      123
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Тело ответов 400 и 422 описывает одну из нескольких причин",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      166,
+      170,
+      181,
+      201
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Процесс и sequence без снятия страхования и досрочного погашения",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      34,
+      41,
+      222
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Срок возврата премии 7 рабочих дней не привязан к моменту отсчёта",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "refundUntil в ответе отказа не хранится и не выводится из правил",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      40,
+      51,
+      221
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Метод отказа не проверяет, подключено ли страхование по кредиту",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      40,
+      221
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повторное подключение после отказа: исход и ставка не определены",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      128,
+      130
+     ]
+    }
+   ]
+  },
+  "qr_clean": {
+   "verdict": "no",
+   "counts": {
+    "critical": 1,
+    "major": 9,
+    "minor": 9
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Повтор requestId оплаченного QR с суммой: особое правило даёт 200, пункт 6 даёт 410",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      126,
+      132
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Последовательность вызова перевода обходит сервис QR-кодов, архитектура и схема API — нет",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      25,
+      45,
+      136
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Модель данных не хранит requestId, карту списания и признак перевода в обработке",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      51,
+      132,
+      152
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Повтор requestId во время выполнения и после ответа 500 не определён",
+     "sources": [
+      "lens:analyst",
+      "lens:risk"
+     ],
+     "lines": [
+      54,
+      128,
+      132,
+      152
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Статус QR с суммой после ответа 500 не определён: оплачен или нет",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      38,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Неактивная карта получателя при оплате не покрыта проверкой пункта 3",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      37,
+      123
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Карта списания на экране подтверждения не определена при нескольких картах",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      29
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отмена QR без суммы при переводе в обработке: скобка Ф-5 допускает два толкования",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      41,
+      212
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Требование нагрузки не назвало сервис и не задало порог задержки и доли успеха",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      48
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Поле status в таблице ответа без условия, в телах ошибок отсутствует",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      159,
+      181
+     ]
+    }
+   ]
+  }
+ },
+ "12old_haiku_def": {
+  "grace": {
+   "verdict": "no",
+   "counts": {
+    "critical": 3,
+    "major": 11,
+    "minor": 6
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Обещанное включение и выключение напоминания через API не описано",
+     "sources": [
+      "rules:promises.promised_ops",
+      "consistency",
+      "lens:risk"
+     ],
+     "lines": [
+      28,
+      52,
+      104,
+      105,
+      106
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Некредитная карта: ответ 200 NOT_APPLICABLE или ошибка 422",
+     "sources": [
+      "lens:architect",
+      "lens:qa",
+      "rules:api.same_case.200-422"
+     ],
+     "lines": [
+      119,
+      123,
+      167,
+      185
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Критерий приёмки №1 противоречит Ф-3 при полной оплате 25-го числа",
+     "sources": [
+      "lens:qa",
+      "consistency"
+     ],
+     "lines": [
+      36,
+      38,
+      63
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Возврат после выписки: Ф-5 уменьшает сумму, Ф-2 фиксирует её на дату выписки",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      37,
+      40
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "База прогноза процентов: вся задолженность (Ф-3) или остаток (правило 2)",
+     "sources": [
+      "lens:qa",
+      "lens:architect",
+      "consistency"
+     ],
+     "lines": [
+      38,
+      127,
+      158
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "daysLeft считает рабочие дни, напоминание Ф-4 — календарные",
+     "sources": [
+      "lens:analyst",
+      "lens:qa",
+      "lens:architect",
+      "lens:risk",
+      "consistency"
+     ],
+     "lines": [
+      39,
+      157,
+      172
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "totalDebt: поле ответа без источника данных в логике метода",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      120,
+      159
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Границы расчётного месяца и платёжного периода без часового пояса",
+     "sources": [
+      "lens:analyst",
+      "lens:risk"
+     ],
+     "lines": [
+      36,
+      38,
+      63
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Срок оплаты 25-го числа при выходном или празднике не определён",
+     "sources": [
+      "lens:risk",
+      "lens:analyst"
+     ],
+     "lines": [
+      36,
+      38
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Дата начала процентов «даты каждой покупки» не определена",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      37,
+      38
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Список операций, исключаемых из льготного периода, неполный",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      37,
+      66
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Включение напоминания после 22-го числа: push сразу или нет, не определено",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      39,
+      52
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Нефункциональные требования «быстро», «актуальны», «своевременно» не измеримы",
+     "sources": [
+      "lens:qa",
+      "lens:analyst",
+      "rules:language.nfr_unverifiable"
+     ],
+     "lines": [
+      46
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "paymentDueDate: формат ДД.ММ.ГГГГ в таблице, ISO в примере",
+     "sources": [
+      "lens:architect",
+      "rules:api.date_format.paymentDueDate"
+     ],
+     "lines": [
+      155,
+      172
+     ]
+    }
+   ]
+  },
+  "qr": {
+   "verdict": "no",
+   "counts": {
+    "critical": 3,
+    "major": 17,
+    "minor": 5
+   },
+   "critical_major": [
+    {
+     "severity": "critical",
+     "title": "Методы создания QR-кода и получения его данных не описаны в API",
+     "sources": [
+      "rules:promises.promised_ops",
+      "consistency"
+     ],
+     "lines": [
+      28,
+      29,
+      45,
+      54,
+      107
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Срок QR без суммы: 15 минут (Ф-2) против конца дня (особое правило 1)",
+     "sources": [
+      "consistency",
+      "lens:analyst",
+      "lens:qa",
+      "lens:architect",
+      "lens:risk"
+     ],
+     "lines": [
+      38,
+      124,
+      131
+     ]
+    },
+    {
+     "severity": "critical",
+     "title": "Сумма 500 000 ₸: Ф-1 допускает, критерий приёмки №3 отклоняет",
+     "sources": [
+      "consistency",
+      "lens:qa",
+      "lens:analyst",
+      "rules:conflicts.range_acceptance.L37-67"
+     ],
+     "lines": [
+      37,
+      67,
+      125
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Единица ttl: минуты в данных и секунды в логике метода",
+     "sources": [
+      "lens:qa",
+      "lens:analyst",
+      "lens:architect",
+      "consistency",
+      "rules:units.time_mix.ttl"
+     ],
+     "lines": [
+      51,
+      124
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Статус QR после отказа антифрода и событие «оплачен» не определены",
+     "sources": [
+      "consistency",
+      "lens:analyst",
+      "lens:risk"
+     ],
+     "lines": [
+      34,
+      38,
+      51,
+      126,
+      127
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отмена QR-кода получателем не имеет метода API и вызова",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      28,
+      41,
+      51
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Истёкший QR: код 410 в логике метода и код 400 в статусах",
+     "sources": [
+      "lens:architect",
+      "lens:qa",
+      "consistency",
+      "rules:api.same_case.410-400"
+     ],
+     "lines": [
+      124,
+      168,
+      171
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Push-уведомление: схема API и архитектура расходятся по вызову",
+     "sources": [
+      "consistency"
+     ],
+     "lines": [
+      25,
+      34,
+      136
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Термин «плательщик» не определён: проверка прав карты неоднозначна",
+     "sources": [
+      "lens:risk",
+      "consistency"
+     ],
+     "lines": [
+      29,
+      109,
+      121,
+      122
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Число оплат QR без суммы и статус «оплачен» не заданы",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      38,
+      41
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Ответ на повторную оплату QR с суммой не определён",
+     "sources": [
+      "lens:architect",
+      "lens:qa"
+     ],
+     "lines": [
+      38,
+      41,
+      68,
+      126
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Отмена получателем между проверкой срока и списанием не описана",
+     "sources": [
+      "consistency",
+      "lens:risk"
+     ],
+     "lines": [
+      41,
+      124,
+      127,
+      128
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Нефункциональные требования «мгновенно» и «высокие нагрузки» не проверяемы",
+     "sources": [
+      "lens:qa",
+      "lens:analyst",
+      "rules:language.nfr_unverifiable"
+     ],
+     "lines": [
+      48
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "requestId и debit_card_id не входят в хранимые данные",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      51,
+      152
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Номер карты получателя в QR-коде не маскируется",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      51
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Текст ошибки истёкшего QR расходится с критерием приёмки",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      66,
+      181
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Ветка провала проверки карты списания без кода ответа",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      122,
+      168
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Не описано поведение, если amount не передан для QR без суммы",
+     "sources": [
+      "lens:analyst"
+     ],
+     "lines": [
+      125
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Конец календарного дня для QR без суммы без часового пояса",
+     "sources": [
+      "lens:risk"
+     ],
+     "lines": [
+      131
+     ]
+    },
+    {
+     "severity": "major",
+     "title": "Тела ошибок 400–500 не содержат обязательных полей status и amount",
+     "sources": [
+      "lens:architect"
+     ],
+     "lines": [
+      159,
+      181
+     ]
+    }
+   ]
+  }
+ }
+}

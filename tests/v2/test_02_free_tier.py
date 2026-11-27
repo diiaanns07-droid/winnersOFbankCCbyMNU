@@ -139,7 +139,8 @@ def make_sim(tier: FreeTier, clock: SimClock) -> SimGemini:
         adapter._client = Client()
         return adapter
 
-    p = SimGemini(api_key="sim-key", env={}, adapter_factory=factory, sleep=clock.sleep, clock=clock.now)
+    p = SimGemini(api_key="sim-key", env={"GEMINI_FALLBACK_MODELS": f"{SECOND},{LITE}", "GEMINI_RESERVE_MODELS": "off"},
+                  adapter_factory=factory, sleep=clock.sleep, clock=clock.now)
     holder["p"] = p
     return p
 

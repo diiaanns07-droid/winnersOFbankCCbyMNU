@@ -124,10 +124,10 @@ def render_and_check(folder: Path, text: str, gold: dict, title: str) -> list[st
     return problems
 
 
-def build(check_only: bool = False) -> int:
+def build(check_only: bool = False, bases: tuple[str, ...] = BASES) -> int:
     problems: list[str] = []
     summary = []
-    for base in BASES:
+    for base in bases:
         bdir = HERE / base
         spec_path = bdir / "spec.yaml"
         if not spec_path.exists():
@@ -176,8 +176,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.open2.build", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="только сверить собранные source.md со сборкой")
+    ap.add_argument("--bases", default=",".join(BASES), help="кейсы через запятую (по умолчанию — открытый набор)")
     a = ap.parse_args(argv)
-    return build(check_only=a.check)
+    return build(check_only=a.check, bases=tuple(x for x in a.bases.split(",") if x))
 
 
 if __name__ == "__main__":

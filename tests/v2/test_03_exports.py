@@ -110,7 +110,7 @@ def test_word_report_for_markdown_input(tmp_path):
     text = "\n".join(p.text for p in d.paragraphs)
     assert "Ревью требований: Уведомление о расходах по карте" in text
     assert "нельзя начинать" in text and "D-01. Критерий приёмки №2" in text
-    assert "«Февральский счётчик вырос на 4 000 ₸» — Часть A. Новый функционал › Критерии приемки, строка 64" in text
+    assert "«Февральский счётчик вырос на 4 000 ₸» — Часть A › Критерии приемки, строка 64" in text
     # из Markdown-отчёта, если он передан
     md = "# Отчёт\n\n**Вердикт:** нельзя\n\n| ID | Суть |\n| :--- | :--- |\n| D-01 | Конфликт `месяца` |\n\n* пункт\n"
     res2 = E.write_docx(report, view, OFFICIAL_MD, tmp_path / "r2", markdown=md)

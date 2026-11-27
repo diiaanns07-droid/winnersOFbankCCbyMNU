@@ -64,3 +64,25 @@ def test_console_output_survives_cp1252_pipe(tmp_path):
     proc = _run([str(SOURCE), str(out), "--provider", "mock", "--no-cache"], tmp_path, "cp1252")
     assert proc.returncode == 0, _tail(proc)
     assert out.exists() and out.with_suffix(".json").exists()
+
+
+def test_dotenv_written_by_windows_powershell_is_read(tmp_path):
+    """`echo GEMINI_API_KEY=… > .env` в Windows PowerShell 5.1 пишет UTF-16 с BOM: ключ всё равно должен читаться."""
+    from bcc_review.v2.providers import doctor
+
+    env_file = tmp_path / ".env"
+    env_file.write_bytes("GEMINI_API_KEY=AIzaFAKE-utf16\r\n".encode("utf-16"))
+    env: dict[str, str] = {}
+    assert doctor.load_dotenv(env_file, env)
+    assert env.get("GEMINI_API_KEY") == "AIzaFAKE-utf16"
+
+
+def test_dotenv_from_notepad_with_bom_and_crlf_is_read(tmp_path):
+    """Блокнот Windows: UTF-8 с BOM и CRLF; пробелы и кавычки вокруг значения — ключ читается без них."""
+    from bcc_review.v2.providers import doctor
+
+    env_file = tmp_path / ".env"
+    env_file.write_bytes(b"\xef\xbb\xbf# comment\r\nGEMINI_API_KEY = \"AIzaFAKE-notepad\"\r\n")
+    env: dict[str, str] = {}
+    assert doctor.load_dotenv(env_file, env)
+    assert env.get("GEMINI_API_KEY") == "AIzaFAKE-notepad"

@@ -1,0 +1,101 @@
+{
+ "_note": "haiku 27.11 12:40 (волна 3, сессия 2, №04): TXT с заголовками «2. Требования к …» без разметки — модель их пропускает, код звал дозапрос",
+ "requirements": [
+  {
+   "source_id": "1.1",
+   "kind": "goal",
+   "summary": "Описание доработки сервиса автоплатежей",
+   "line_start": 5,
+   "line_end": 5
+  },
+  {
+   "source_id": "1.2",
+   "kind": "constraint",
+   "summary": "Срок реализации доработки — второй квартал",
+   "line_start": 6,
+   "line_end": 6
+  },
+  {
+   "source_id": "2.1",
+   "kind": "functional",
+   "summary": "Подключение автоплатежа на номер поддерживаемого оператора",
+   "line_start": 9,
+   "line_end": 9
+  },
+  {
+   "source_id": "2.2",
+   "kind": "constraint",
+   "summary": "Срабатывание при балансе ниже клиентского порога",
+   "line_start": 10,
+   "line_end": 10
+  },
+  {
+   "source_id": "2.3",
+   "kind": "constraint",
+   "summary": "Сумма пополнения, задаваемая клиентом",
+   "line_start": 11,
+   "line_end": 11
+  },
+  {
+   "source_id": "2.4",
+   "kind": "constraint",
+   "summary": "Суточный лимит автоплатежей на один номер",
+   "line_start": 12,
+   "line_end": 12
+  },
+  {
+   "source_id": "2.5",
+   "kind": "functional",
+   "summary": "Отказ при недостатке средств и push-уведомление",
+   "line_start": 13,
+   "line_end": 13
+  },
+  {
+   "source_id": "3.1",
+   "kind": "integration",
+   "summary": "Частота запроса баланса у оператора",
+   "line_start": 16,
+   "line_end": 16
+  },
+  {
+   "source_id": "3.2",
+   "kind": "integration",
+   "summary": "Повторы запроса при недоступности оператора",
+   "line_start": 17,
+   "line_end": 17
+  },
+  {
+   "source_id": "4.1",
+   "kind": "nonfunctional",
+   "summary": "Подтверждение подключения одноразовым SMS-кодом",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "source_id": "5.1",
+   "kind": "acceptance",
+   "summary": "Приёмка на тестовом стенде с эмулятором оператора",
+   "line_start": 23,
+   "line_end": 23
+  },
+  {
+   "source_id": "5.2",
+   "kind": "acceptance",
+   "summary": "Оформление результатов приёмки протоколом",
+   "line_start": 24,
+   "line_end": 24
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Название документа и подзаголовок («ТЕХНИЧЕСКОЕ ЗАДАНИЕ», «на доработку сервиса автоплатежей за мобильную связь»)",
+   "line_start": 1,
+   "line_end": 2,
+   "reason": "Название документа, не требование"
+  }
+ ],
+ "followup": {
+  "requirements": [],
+  "excluded": []
+ }
+}

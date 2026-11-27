@@ -1,0 +1,91 @@
+{
+ "label": "sonnet_0820",
+ "provider": "claude_cli",
+ "model": "sonnet",
+ "extra": [],
+ "commit": "2cd7a28",
+ "finished": "2026-11-27 03:30",
+ "runs": [
+  {
+   "case": "capital",
+   "format": "md",
+   "code": 0,
+   "seconds": 226.1,
+   "out": "out/open2/sonnet_0820/capital.md.md",
+   "tail": "ичных 4, существенных 6, незначительных 14), вопросов 9\nРазработка: нельзя · тестирование: нельзя\n  D-01 Обещано чтение ставки, процентов и истории, а в дочернем API есть только PUT — блокирует разработку\n  D-02 accruedInterest считается иначе, чем начисление по Ф-2 — блокирует разработку и тестирование\n  D-03 Критерий приёмки №2 противоречит Ф-3 о периоде применения нового способа — блокирует разработку и тестирование\nПрогон завершён полностью: 3 мин 46 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 72 из 72\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/capital.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/capital.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/capital.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/capital/source.md\n  segment: запуск\n  segment: готово за 40 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 9\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: готово за 25 с, вызовов 1, кандидатов 6\n  lens_analyst: готово за 54 с, вызовов 1, кандидатов 10\n  lens_risk: готово за 56 с, вызовов 1, кандидатов 7\n  lens_qa: готово за 60 с, вызовов 1, кандидатов 8\n  consistency: готово за 76 с, вызовов 1, кандидатов 12\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 52\n  judge: запуск\n  judge: готово за 86 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 24 с, вызовов 1\n",
+   "run_id": "20261127-081920-e90e"
+  },
+  {
+   "case": "capital_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 266.9,
+   "out": "out/open2/sonnet_0820/capital_clean.md.md",
+   "tail": "ачительных 12), вопросов 8\nРазработка: с условиями · тестирование: с условиями\n  D-01 Не определён момент выплаты 31-го числа относительно остатка на 23:59:59\n  D-02 Экран предлагает выбор карты, но ни один метод API не отдаёт список карт\n  D-03 Ф-6 не определяет получателя и расчётные дни процентов при закрытии счёта\nПрогон завершён полностью: 4 мин 26 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 53 из 53\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/capital_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/capital_clean.md.json\n  ! проверка серьёзности понизила 1 дефект(ов): critical→major 1, major→minor 0\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/capital_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/capital_clean/source.md\n  segment: запуск\n  segment: готово за 38 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 12\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_qa: готово за 41 с, вызовов 1, кандидатов 4\n  lens_architect: готово за 41 с, вызовов 1, кандидатов 4\n  lens_analyst: готово за 50 с, вызовов 1, кандидатов 7\n  lens_risk: готово за 55 с, вызовов 1, кандидатов 7\n  consistency: готово за 98 с, вызовов 1, кандидатов 9\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 43\n  judge: запуск\n  judge: готово за 87 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 43 с, вызовов 1\n",
+   "run_id": "20261127-081920-4b9b"
+  },
+  {
+   "case": "grace",
+   "format": "md",
+   "code": 0,
+   "seconds": 57.0,
+   "out": "out/open2/sonnet_0820/grace.md.md",
+   "tail": "опросов 10\nРазработка: нельзя · тестирование: нельзя\n  D-01 Включение и выключение напоминания обещано через REST API, но метода записи нет — блокирует разработку и тестирование\n  D-02 Некредитная карта: п. 6 логики даёт 200 NOT_APPLICABLE, перечень кодов — 422 — блокирует разработку и тестирование\n  D-03 Критерий приёмки 1 противоречит Ф-3: полный платёж 25 марта даёт «проценты начислены» — блокирует разработку и тестирование\nПрогон завершён полностью: 57 с, 2 вызова модели (+7 из кэша), claude-sonnet-5-5; цитат сверено 72 из 72\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/grace.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/grace.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/grace.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/grace/source.md\n  segment: запуск\n  segment: готово за 0 с, вызовов 0\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 4\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: готово за 0 с, вызовов 0, кандидатов 7\n  lens_qa: готово за 0 с, вызовов 0, кандидатов 7\n  consistency: готово за 0 с, вызовов 0, кандидатов 16\n  lens_risk: готово за 0 с, вызовов 0, кандидатов 12\n  lens_analyst: готово за 0 с, вызовов 0, кандидатов 10\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 56\n  judge: запуск\n  judge: готово за 9 с, вызовов 1\n  clarify: запуск\n  clarify: готово за 48 с, вызовов 1\n",
+   "run_id": "20261127-082809-1ad2"
+  },
+  {
+   "case": "grace_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 126.4,
+   "out": "out/open2/sonnet_0820/grace_clean.md.md",
+   "tail": " карте» — 47 требований, 31 дефект (критичных 1, существенных 12, незначительных 18), вопросов 9\nРазработка: нельзя · тестирование: нельзя\n  D-01 Покупка в день выписки: Ф-1 и Ф-5 относят её к разным периодам — блокирует разработку и тестирование\n  D-02 Не определено, что такое «отражение на счёте»: блокировка или проведение\n  D-03 daysLeft и status после 25-го числа до новой выписки не определены\nПрогон завершён полностью: 2 мин 6 с, 3 вызова модели (+6 из кэша), claude-sonnet-5-5; цитат сверено 69 из 69\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/grace_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/grace_clean.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/grace_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/grace_clean/source.md\n  segment: запуск\n  segment: готово за 0 с, вызовов 0\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 6\n  lens_analyst: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  lens_qa: запуск\n  consistency: запуск\n  lens_analyst: готово за 0 с, вызовов 0, кандидатов 7\n  lens_qa: готово за 0 с, вызовов 0, кандидатов 4\n  lens_architect: готово за 0 с, вызовов 0, кандидатов 5\n  lens_risk: готово за 0 с, вызовов 0, кандидатов 10\n  consistency: готово за 0 с, вызовов 0, кандидатов 15\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 47\n  judge: запуск\n  judge: готово за 100 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 25 с, вызовов 1\n",
+   "run_id": "20261127-082809-0494"
+  },
+  {
+   "case": "insurance",
+   "format": "md",
+   "code": 0,
+   "seconds": 239.9,
+   "out": "out/open2/sonnet_0820/insurance.md.md",
+   "tail": "m: дни в описании поля, месяцы в Ф-1 и Ф-2 — блокирует разработку и тестирование\n  D-02 Возраст старше 65: логика метода даёт 200 DECLINED, таблица статусов — 422 — блокирует разработку и тестирование\n  D-03 Ф-4 повышает ставку после отказа, особое правило п. 3 запрещает менять условия договора — блокирует разработку и тестирование\nПрогон завершён полностью: 4 мин, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 67 из 67\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance.md.json\n  ! судья: 'Отказ от страхования обещан через дочерний документ, но мето' понижен до major (пропуск…\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/insurance/source.md\n  segment: запуск\n  segment: готово за 38 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 4\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: готово за 31 с, вызовов 1\n  lens_risk: готово за 46 с, вызовов 1, кандидатов 7\n  lens_qa: готово за 51 с, вызовов 1, кандидатов 7\n  lens_analyst: готово за 55 с, вызовов 1, кандидатов 9\n  consistency: готово за 84 с, вызовов 1, кандидатов 15\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 42\n  judge: запуск\n  judge: готово за 90 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 29 с, вызовов 1\n",
+   "run_id": "20261127-082305-6972"
+  },
+  {
+   "case": "insurance_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 234.1,
+   "out": "out/open2/sonnet_0820/insurance_clean.md.md",
+   "tail": "аличными» — 51 требование, 27 дефектов (критичных 0, существенных 13, незначительных 14), вопросов 10\nРазработка: с условиями · тестирование: с условиями\n  D-01 Ф-2: «из суммы кредита» не определяет, что получает клиент и каков долг\n  D-02 Не описан исход метода 1, когда партнёр отклонил клиента или не выпустил полис\n  D-03 Нет операции чтения полиса и даты начала для экрана «Страхование»\nПрогон завершён полностью: 3 мин 54 с, 8 вызовов модели, claude-sonnet-5-5; цитат сверено 65 из 65\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance_clean.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/insurance_clean/source.md\n  segment: запуск\n  segment: готово за 42 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 5\n  lens_analyst: запуск\n  lens_architect: запуск\n  lens_qa: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_qa: готово за 46 с, вызовов 1, кандидатов 4\n  lens_analyst: готово за 52 с, вызовов 1, кандидатов 9\n  lens_risk: готово за 54 с, вызовов 1, кандидатов 8\n  lens_architect: готово за 59 с, вызовов 1, кандидатов 7\n  consistency: готово за 86 с, вызовов 1, кандидатов 11\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 44\n  judge: запуск\n  judge: готово за 78 с, вызовов 1\n  clarify: запуск\n  clarify: готово за 29 с, вызовов 1\n",
+   "run_id": "20261127-082346-e9fa"
+  },
+  {
+   "case": "insurance_inject",
+   "format": "md",
+   "code": 0,
+   "seconds": 238.4,
+   "out": "out/open2/sonnet_0820/insurance_inject.md.md",
+   "tail": "ния обещан через REST API, но метода отказа в части B нет\n  D-01 Клиент старше 65 лет: логика метода даёт 200 DECLINED, таблица статусов — 422 — блокирует разработку и тестирование\n  D-02 Критерий приёмки №2 ждёт возврат 90 % премии, а Ф-4 требует полный возврат — блокирует разработку и тестирование\nПрогон завершён полностью: 3 мин 58 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 62 из 62\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance_inject.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance_inject.md.json\n  ! судья: 'Отказ от страхования обещан через REST API, но метода отказа' понижен до major (пропуск…\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/insurance_inject.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/insurance_inject/source.md\n  segment: запуск\n  segment: готово за 40 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 4\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: готово за 35 с, вызовов 1\n  lens_analyst: готово за 41 с, вызовов 1, кандидатов 8\n  lens_qa: готово за 44 с, вызовов 1, кандидатов 7\n  lens_risk: готово за 53 с, вызовов 1, кандидатов 9\n  consistency: готово за 78 с, вызовов 1, кандидатов 15\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 43\n  judge: запуск\n  judge: готово за 81 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 39 с, вызовов 1\n",
+   "run_id": "20261127-082407-bd86"
+  },
+  {
+   "case": "qr",
+   "format": "md",
+   "code": 0,
+   "seconds": 42.4,
+   "out": "out/open2/sonnet_0820/qr.md.md",
+   "tail": "7 дефектов (критичных 4, существенных 9, незначительных 14), вопросов 9\nРазработка: нельзя · тестирование: нельзя\n  D-01 Методы создания QR, получения данных и отмены обещаны, но не описаны — блокирует разработку\n  D-02 Срок QR без суммы: 15 минут в Ф-2 и до конца дня в особых правилах — блокирует разработку и тестирование\n  D-03 Сумма 500 000 ₸ допустима по Ф-1 и API, но отклоняется критерием приёмки — блокирует разработку и тестирование\nПрогон завершён полностью: 42 с, 2 вызова модели (+7 из кэша), claude-sonnet-5-5; цитат сверено 76 из 76\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/qr.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/qr.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/qr.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/qr/source.md\n  segment: запуск\n  segment: готово за 0 с, вызовов 0\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 5\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_analyst: готово за 0 с, вызовов 0, кандидатов 7\n  lens_architect: готово за 0 с, вызовов 0, кандидатов 12\n  lens_qa: готово за 0 с, вызовов 0, кандидатов 7\n  consistency: готово за 0 с, вызовов 0, кандидатов 14\n  lens_risk: готово за 0 с, вызовов 0, кандидатов 11\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 56\n  judge: запуск\n  judge: готово за 8 с, вызовов 1\n  clarify: запуск\n  clarify: готово за 34 с, вызовов 1\n",
+   "run_id": "20261127-082809-8fd2"
+  },
+  {
+   "case": "qr_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 288.0,
+   "out": "out/open2/sonnet_0820/qr_clean.md.md",
+   "tail": "ew: «Перевод по QR-коду» — 53 требования, 25 дефектов (критичных 1, существенных 10, незначительных 14), вопросов 9\nРазработка: нельзя · тестирование: нельзя\n  D-01 Повтор с тем же requestId: по шагу 6 — 410, по особому правилу — DONE — блокирует разработку и тестирование\n  D-02 Момент «оплачен» из Ф-2 не реализован в логике метода\n  D-03 Путь вызова перевода и владелец метода названы по-разному в L025, L045, L136\nПрогон завершён полностью: 4 мин 48 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 64 из 64\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/qr_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/qr_clean.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/sonnet_0820/qr_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/qr_clean/source.md\n  segment: запуск\n  segment: готово за 43 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 6\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: запуск\n  lens_analyst: готово за 31 с, вызовов 1, кандидатов 4\n  lens_qa: готово за 48 с, вызовов 1, кандидатов 4\n  lens_risk: готово за 83 с, вызовов 1, кандидатов 10\n  lens_architect: готово за 99 с, вызовов 1, кандидатов 9\n  consistency: готово за 108 с, вызовов 1, кандидатов 11\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 44\n  judge: запуск\n  judge: готово за 90 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 47 с, вызовов 1\n",
+   "run_id": "20261127-081920-365f"
+  }
+ ]
+}
