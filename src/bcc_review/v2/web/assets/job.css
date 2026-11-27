@@ -118,7 +118,8 @@ body:has(main.jb.done) { overflow: hidden; }
   /* №54: как на главной — панель в две строки с короткими подписями, без прокрутки вбок */
   .jb-dock { bottom: 10px; flex-wrap: wrap; justify-content: center; overflow: visible; }
   .jb-dock .jb-sep { display: none; }
-  .jb-d { padding: 0 13px; font-size: 14.5px; }
+  .jb-dock { gap: 0; padding: 5px; }
+  .jb-dock > .jb-d { padding: 0 9px; font-size: 14px; }
   .jb-menu, .jb-toast { bottom: 120px; }
 }
 @media (prefers-reduced-motion: reduce) {
