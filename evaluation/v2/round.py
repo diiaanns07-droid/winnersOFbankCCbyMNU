@@ -98,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
             dest = ROOT / "evaluation" / "v2" / "stability" / f"{slugify(a.name)}_{m}.json"
             subprocess.run([py, "-m", "evaluation.v2.aggregate", "stability", *paths, "--json", str(dest),
                             "--label", f"{a.name}: {sha}, {m} ×{len(paths)}"], cwd=str(ROOT))
+    subprocess.run([py, "-m", "evaluation.v2.aggregate", "models", "--auto", "--write"], cwd=str(ROOT))
     subprocess.run([py, "-m", "evaluation.v2.gate", "--save"], cwd=str(ROOT))
     (logs / "round.json").write_text(json.dumps({"name": a.name, "commit": sha, "rc": rcs,
                                                  "minutes": round((time.monotonic() - t0) / 60, 1)},

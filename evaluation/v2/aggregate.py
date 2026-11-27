@@ -5,6 +5,8 @@
         [--json evaluation/v2/stability/opus.json] [--label "Opus, 1a2b3c4"]
     # сравнение моделей: метка=score.json
     python -m evaluation.v2.aggregate models opus=m/opus_1/score.json sonnet=m/sonnet/score.json haiku=m/haiku/score.json
+    # то же по последним замерам каждой модели из history.jsonl; --write — в RESULTS.md
+    python -m evaluation.v2.aggregate models --auto [--write]
 
 Вход — score.json от `python -m evaluation.v2.score` / `measure`. Вывод — Markdown (для RESULTS.md) в stdout;
 `--json` — то же для `python -m evaluation.v2.gate` (ворота «К1–К5 в 3 прогонах из 3»).
@@ -109,8 +111,40 @@ def models(pairs: list[str]) -> str:
                  f"{p['outside_real']}/{p['outside_false']} | {_pct(p['precision_useful'])} | "
                  f"{_pct(r['severity']['accuracy_ok'])} | {len(r['severity']['critical_false'])} | "
                  f"{r['quotes']['missing']}/{r['quotes']['total']} | {'—' if dur is None else f'{dur / 60:.1f}'} | "
-                 f"{calls.get('total', '—')} | {rep.get('cost_usd') if rep.get('cost_usd') is not None else '—'} |")
+                 f"{calls.get('total', '—')} | {'—' if rep.get('cost_usd') is None else f'{rep['cost_usd']:.2f}'} |")
     return "\n".join(L) + "\n"
+
+
+def models_auto() -> str:
+    """Последний замер официального документа каждой модели (история measure) → таблица сравнения."""
+    from .gate import HISTORY, _read_jsonl, _score_for, model_kind
+
+    latest: dict[str, tuple[dict, str]] = {}
+    for r in _read_jsonl(HISTORY):
+        if r.get("version") != "v2":
+            continue
+        k = model_kind(r.get("provider"), r.get("model"))
+        sj = _score_for(r)
+        if sj is not None:
+            from .measure import slugify
+
+            d = Path(r["dir"]) if r.get("dir") else Path("evaluation/v2/measurements") / slugify(r["label"])
+            latest[k] = (r, str(d / "score.json"))
+    order = [k for k in ("opus", "sonnet", "haiku", "gemini", "other") if k in latest]
+    pairs = [f"{k} — {latest[k][0]['label']}={latest[k][1]}" for k in order]
+    return models(pairs) if pairs else "Замеров нет.\n"
+
+
+def write_models_section(results: Path | None = None) -> None:
+    import re
+
+    results = results or Path(__file__).resolve().parent / "RESULTS.md"
+    text = results.read_text(encoding="utf-8")
+    st, en = "<!-- models:start -->", "<!-- models:end -->"
+    if st in text and en in text:
+        table = models_auto()
+        text = re.sub(re.escape(st) + r".*?" + re.escape(en), lambda m: f"{st}\n{table}{en}", text, flags=re.S)
+        results.write_text(text, encoding="utf-8")
 
 
 def _pct(x) -> str:
@@ -124,7 +158,12 @@ def main(argv: list[str] | None = None) -> int:
         print(__doc__)
         return 2
     if args[0] == "models":
-        print(models(args[1:]))
+        if args[1:] in (["--auto"], ["--auto", "--write"], ["--write", "--auto"]):
+            if "--write" in args:
+                write_models_section()
+            print(models_auto())
+        else:
+            print(models(args[1:]))
         return 0
     js, label, paths = None, "", []
     it = iter(args[1:])
