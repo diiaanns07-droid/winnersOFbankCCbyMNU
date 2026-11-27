@@ -1,0 +1,642 @@
+{
+ "schema": "bcc-v2-score/1",
+ "gold": {
+  "path": "evaluation/v2/open2/qr_clean/gold.yaml",
+  "document": "evaluation/v2/open2/qr_clean/source.md",
+  "sha256": "ee686d6bf0670b8faa3e20492888de7460ab82bbe40953f714afa02a6f282a18"
+ },
+ "report": {
+  "version": "v2",
+  "same_doc": true,
+  "document": {
+   "file": "source.md",
+   "format": "md",
+   "sha256": "ee686d6bf0670b8faa3e20492888de7460ab82bbe40953f714afa02a6f282a18",
+   "lines": 212
+  },
+  "status": "complete",
+  "provider": "claude_cli",
+  "model": "sonnet",
+  "models_used": [
+   "claude-sonnet-5-5"
+  ],
+  "commit": "2cd7a28",
+  "duration_s": 287.5,
+  "calls": {
+   "total": 9,
+   "cached": 0,
+   "failed": 0,
+   "split": 0
+  },
+  "tokens": {
+   "input": 296562,
+   "output": 83643
+  },
+  "cost_usd": 1.5616
+ },
+ "counts": {
+  "findings": 25,
+  "by_severity": {
+   "critical": 1,
+   "major": 10,
+   "minor": 14
+  },
+  "duplicates": 0,
+  "outside_gold": {
+   "total": 23,
+   "real": 0,
+   "partial": 0,
+   "false": 0,
+   "duplicate": 0,
+   "gold": 0,
+   "unknown": 23
+  },
+  "report_md_lines": 708
+ },
+ "recall": {
+  "critical": {
+   "found": [],
+   "n": 0,
+   "of": 5,
+   "as_critical": [],
+   "lenient": []
+  },
+  "major": {
+   "found": [],
+   "n": 0,
+   "of": 20,
+   "lenient": []
+  },
+  "minor": {
+   "found_parents": [
+    "М1",
+    "М2"
+   ],
+   "of": 4,
+   "parts_found": [
+    "М1",
+    "М2"
+   ]
+  },
+  "key_25": {
+   "n": 0,
+   "of": 25,
+   "lenient": 0,
+   "loose_any_edge": 0
+  },
+  "all_items": {
+   "n": 2,
+   "of": 4
+  },
+  "parents": {
+   "n": 2,
+   "of": 4
+  }
+ },
+ "precision": {
+  "matched": 2,
+  "duplicates": 0,
+  "outside_real": 0,
+  "outside_false": 0,
+  "outside_unknown": 23,
+  "outside_partial": 0,
+  "precision_useful": 0.08,
+  "precision_gold": 0.08
+ },
+ "severity": {
+  "pairs": 2,
+  "ok": 2,
+  "exact": 2,
+  "accuracy_ok": 1.0,
+  "accuracy_exact": 1.0,
+  "critical_false": [
+   {
+    "finding": "D-01",
+    "title": "Повтор с тем же requestId: по шагу 6 — 410, по особому правилу — DONE",
+    "reason": "вне эталона"
+   }
+  ],
+  "rows": [
+   {
+    "gold": "М1",
+    "level": "minor",
+    "finding": "D-14",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М2",
+    "level": "minor",
+    "finding": "D-20",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   }
+  ]
+ },
+ "quotes": {
+  "total": 64,
+  "missing": 0,
+  "fuzzy": 0,
+  "line_mismatch": 0,
+  "verified_field_missing": 0,
+  "findings_without_evidence": [],
+  "missing_list": []
+ },
+ "language": {
+  "generic": [],
+  "english": [
+   {
+    "finding": "Q-02",
+    "field": "options",
+    "word": "PENDING"
+   }
+  ],
+  "english_report_md": [
+   "PENDING"
+  ]
+ },
+ "report_sections": {
+  "паспорт прогона": true,
+  "нарезка требований": true,
+  "проверка каждого требования": true,
+  "проверка набора": true,
+  "сводка": true,
+  "итог": true
+ },
+ "verdict": {
+  "got": {
+   "development": "no",
+   "testing": "no"
+  },
+  "expected": {
+   "development": "yes",
+   "testing": "yes"
+  }
+ },
+ "assignment": [
+  {
+   "gold": "М1",
+   "finding": "D-14",
+   "title": "Не указаны версия и дата, у требований нет ID и приоритетов",
+   "severity": "minor",
+   "sources": [
+    "consistency",
+    "rules:placeholder.version"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М2",
+   "finding": "D-20",
+   "title": "Разделы тестирования, чек-лист ревью и блок согласующих не заполнены",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.tbd",
+    "rules:placeholder.checklist",
+    "rules:placeholder.approvals"
+   ],
+   "how": "детерминированно"
+  }
+ ],
+ "duplicates": [],
+ "outside": [
+  {
+   "finding": "D-01",
+   "severity": "critical",
+   "kind": "status_conflict",
+   "title": "Повтор с тем же requestId: по шагу 6 — 410, по особому правилу — DONE",
+   "sources": [
+    "consistency",
+    "lens:architect",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-02",
+   "severity": "major",
+   "kind": "event_conflict",
+   "title": "Момент «оплачен» из Ф-2 не реализован в логике метода",
+   "sources": [
+    "lens:architect",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-03",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "Путь вызова перевода и владелец метода названы по-разному в L025, L045, L136",
+   "sources": [
+    "consistency",
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-04",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "QR содержит «только идентификатор», но создание возвращает qrPayload с префиксом",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-05",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Поля request_id и debit_card_id есть в API, но не входят в хранимые данные",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-06",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Ручная проверка антифродом упомянута, но статуса ожидания и исхода для клиента нет",
+   "sources": [
+    "consistency",
+    "lens:risk",
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-07",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Состояние карты зачисления не проверяется при оплате, хотя Ф-1 требует активную карту",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-08",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "«Несколько раз» для QR-кода без суммы не задаёт число оплат",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-09",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Не определено, можно ли отменить QR-код без суммы после состоявшегося перевода",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-10",
+   "severity": "major",
+   "kind": "api_contract",
+   "title": "Для провала проверок карты списания и суммы не задан код ответа",
+   "sources": [
+    "lens:qa",
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-11",
+   "severity": "major",
+   "kind": "status_conflict",
+   "title": "Ответ 200 со status = REJECTED назван успешным по правилу L155",
+   "sources": [
+    "lens:architect",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-12",
+   "severity": "minor",
+   "kind": "unverifiable",
+   "title": "Цель «Снизить число» ошибочных переводов не имеет базы и целевого значения",
+   "sources": [
+    "lens:analyst",
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-13",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "BPMN-схема линейна и не содержит ветвей отмены, истечения и отказа антифрода",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-15",
+   "severity": "minor",
+   "kind": "non_singular",
+   "title": "Ф-2 и Ф-5 объединяют по несколько независимых правил",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-16",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Критерии приёмки не покрывают границы, отказы и повторы",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-17",
+   "severity": "minor",
+   "kind": "duplicate",
+   "title": "Срок 15 минут записан в Ф-2 и дублируется в особых правилах метода",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-18",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Источник маскированного имени отправителя для push не задан",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-19",
+   "severity": "minor",
+   "kind": "unverifiable",
+   "title": "НФТ по времени отклика и нагрузке без точек замера и условий",
+   "sources": [
+    "lens:analyst",
+    "lens:risk",
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-21",
+   "severity": "minor",
+   "kind": "ops_risk",
+   "title": "Для функции с движением денег нет схемы отката и отключения",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-22",
+   "severity": "minor",
+   "kind": "ambiguity",
+   "title": "Пояс текущего времени при проверке срока не задан",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-23",
+   "severity": "minor",
+   "kind": "ops_risk",
+   "title": "Нет исхода при списании без зачисления",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-24",
+   "severity": "minor",
+   "kind": "security",
+   "title": "Формат qrId не задан, перебор идентификаторов раскрывает имена",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-25",
+   "severity": "minor",
+   "kind": "api_contract",
+   "title": "Тела ошибок не содержат status, а таблица ответа его не ограничивает",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  }
+ ],
+ "misses": [
+  {
+   "gold": "М3",
+   "level": "minor",
+   "title": "Раздел «Тестирование требований» — заглушка",
+   "where": "найден кандидатом (rules:placeholder.tbd), судья не взял",
+   "owners": [
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-20",
+     "status": "match",
+     "score": 3.6,
+     "arbiter": ""
+    },
+    {
+     "finding": "D-14",
+     "status": "disputed",
+     "score": 1.0,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": [
+    {
+     "source": "rules:placeholder.tbd",
+     "id": "rules#3",
+     "title": "Раздел документа оставлен заглушкой: «заполняются тестировщиками»",
+     "reason": ""
+    }
+   ]
+  },
+  {
+   "gold": "М4",
+   "level": "minor",
+   "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+   "where": "найден кандидатом (consistency), судья не взял",
+   "owners": [
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-14",
+     "status": "match",
+     "score": 3.9,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": [
+    {
+     "source": "consistency",
+     "id": "consistency#10",
+     "title": "У требований нет приоритета и признака стабильности",
+     "reason": ""
+    }
+   ]
+  }
+ ],
+ "stage_recall": {
+  "consistency": {
+   "candidates": 12,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:analyst": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:architect": {
+   "candidates": 9,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:qa": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:risk": {
+   "candidates": 10,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "rules": {
+   "candidates": 8,
+   "K": [],
+   "C": [],
+   "only_here": []
+  }
+ },
+ "gates": [
+  {
+   "metric": "К1–К5 найдены",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "из них критичными",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "С1–С20 найдены",
+   "value": "0/20",
+   "ok": true
+  },
+  {
+   "metric": "критичных ложных",
+   "value": "1",
+   "ok": false
+  },
+  {
+   "metric": "всего замечаний",
+   "value": "25",
+   "ok": true
+  },
+  {
+   "metric": "цитаты найдены в документе",
+   "value": "64/64",
+   "ok": true
+  },
+  {
+   "metric": "строк отчёта",
+   "value": "708",
+   "ok": true
+  },
+  {
+   "metric": "разделы п. 6 ТЗ",
+   "value": "6/6",
+   "ok": true
+  },
+  {
+   "metric": "общие фразы",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "английские слова",
+   "value": "2",
+   "ok": false
+  },
+  {
+   "metric": "вердикт разработка/тестирование",
+   "value": "no/no",
+   "ok": false
+  },
+  {
+   "metric": "время, мин",
+   "value": "4.8",
+   "ok": true
+  },
+  {
+   "metric": "вызовов модели",
+   "value": "9",
+   "ok": true
+  }
+ ],
+ "arbiter": {
+  "mode": "off",
+  "calls": 0,
+  "seconds": 0.0,
+  "cost_usd": 0.0,
+  "pending": 24,
+  "model": ""
+ },
+ "seconds": 0.03
+}

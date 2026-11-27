@@ -3,7 +3,7 @@
 # Номера строк — по evaluation/v2/open2/qr_clean/source.md; для PDF/DOCX счётчик находит строки по тексту цитат.
 schema: bcc-v2-gold/1
 document: evaluation/v2/open2/qr_clean/source.md
-sha256: ee686d6bf0670b8faa3e20492888de7460ab82bbe40953f714afa02a6f282a18
+sha256: ad68feaac6b4ea87be2655aebe7d53b8193f008fa43b46689093dec2315ad765
 case: qr_clean
 variant: clean
 title: Перевод по QR-коду

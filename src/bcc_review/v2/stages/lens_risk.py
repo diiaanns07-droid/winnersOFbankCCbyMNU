@@ -126,6 +126,8 @@ def major_without_hook(candidate: dict, doc_text: str) -> str | None:
     if candidate.get("severity") != "major" or _is_key_event(candidate):
         return None  # неопределённое ключевое событие не понижается из-за попутных слов («сбой», «повтор»)
     title = str(candidate.get("title", ""))
+    if is_injection(candidate) or is_pd_transfer(candidate):
+        return None  # зацепка — сам текст документа (вставка, перечень передаваемых данных)
     if candidate.get("kind") == "security" and not SECURITY_MAJOR_RE.search(title):
         return "риск ИБ без опоры на описанный интерфейс"
     matched = [topic for topic, rx in _MAJOR_RES.items() if rx.search(title)]
@@ -216,10 +218,84 @@ _CANCEL_DURING_RE = re.compile(
     r"|(во\s+время|одновременн|в\s+процессе)\w*.{0,60}отмен", re.I)
 _ACCEPTANCE_RE = re.compile(r"критери\w*\s+приёмк|критери\w*\s+приемк", re.I)
 
+# Этап проведения назван прямо («отражение на счёте», «зачисление на счёт», «списание со счёта»): событие определено.
+# Неоднозначность «авторизация или проведение» с такой зацепкой — перенос шаблона, а не дефект документа.
+_POSTING_RE = re.compile(r"отраж[её]н\w*|отражени\w*|зачислени\w*\s+на\s+сч|зачисл\w+\s+на\s+сч|списани\w*\s+со\s+сч"
+                         r"|списан\w*\s+со\s+сч", re.I)
+# Передача персональных данных третьей стороне и особые категории (здоровье): документ сам говорит о передаче —
+# риск ИБ уровня major с текстовой зацепкой, а не «вопрос о чём документ молчит».
+_PD_RE = re.compile(r"персональн\w*\s+данн|\bИИН\b|анкет\w*\s+здоров|здоровь|медицинск|паспортн\w*\s+данн", re.I)
+_THIRD_PARTY_RE = re.compile(r"страхов|партн[её]р|третьей\s+сторон|третьим\s+лиц|третьему\s+лиц|оператор|передач"
+                             r"|переда[её]т|передава|согласи", re.I)
+# Согласие на передачу описано в документе — замечание «передача без согласия» неверно.
+_CONSENT_DOC_RE = re.compile(r"согласи\w*\s+(\w+\s+){0,2}на\s+(передач|обработк)|consent", re.I)
+# Указание модели или проверяющему внутри документа (системный промпт, правило 7) — риск, а не вопрос.
+_INJECTION_RE = re.compile(r"ИИ-?\s*ассистент|\bдля\s+ИИ\b|нейросет|языков\w+\s+модел|вставк\w*|инструкци\w*\s+(для\s+)?"
+                           r"(ИИ|модел|проверяющ)|указани\w*\s+(\w+\s+)?(проверяющ|модел|ИИ)|не\s+формировать\s+замечани",
+                           re.I)
+# Отложенная выплата на закрытую или заблокированную карту/счёт: дефект, только если клиент заранее выбирает, куда
+# придут деньги (и документ молчит о закрытии к моменту выплаты). Выплата на тот же продукт, по которому шли операции,
+# — общий вопрос жизненного цикла карты (как перевыпуск), не замечание.
+_PAYOUT_CLOSED_RE = re.compile(r"(закрыт|заблокирован|блокировк)\w*", re.I)
+_PAYOUT_RE = re.compile(r"выплат|выплач|зачисл|перечисл|возврат\w*\s+(преми|средств|денег)", re.I)
+_DEST_CHOICE_RE = re.compile(r"(выбор|выбира\w*|выбран\w*|выбер\w*|указыва\w*|указан\w*)\s+(\w+\s+){0,2}(карт|сч[её]т)\w*"
+                             r"\s+(для|на|зачислени|выплат|перечислени)|карт\w*\s+для\s+(выплат|зачислени|перечислени)"
+                             r"|сч[её]т\w*\s+для\s+(выплат|зачислени|перечислени)", re.I)
+_DEST_DEFINED_RE = re.compile(r"карт\w*(\s+для\s+\w+)?\s+(\w+\s+)?(закрыт|заблокирован)|(закрыт|заблокирован)\w*\s+карт"
+                              r"|сч[её]т\w*\s+для\s+\w+\s+(\w+\s+)?(закрыт|заблокирован)", re.I)
+
 
 def _is_key_event(c: dict) -> bool:
     title = str(c.get("title", ""))
     return bool(_KEY_EVENT_RE.search(title)) and not _ACCEPTANCE_RE.search(title)
+
+
+def _quotes(c: dict) -> list[str]:
+    return [str(ev.get("quote", "")) for ev in c.get("evidence") or [] if isinstance(ev, dict)]
+
+
+def is_injection(c: dict) -> bool:
+    """Замечание о вставке-указании для модели или проверяющего в тексте документа."""
+    return bool(_INJECTION_RE.search(str(c.get("title", ""))))
+
+
+def is_pd_transfer(c: dict) -> bool:
+    """Замечание о передаче персональных данных (или сведений о здоровье) третьей стороне."""
+    title = str(c.get("title", ""))
+    return bool(_PD_RE.search(title)) and bool(_THIRD_PARTY_RE.search(title))
+
+
+def posting_key_event(c: dict) -> bool:
+    """«Авторизация или проведение?» при зацепке, которая сама называет этап проведения (отражение на счёте,
+    зачисление на счёт): событие определено документом — снимается как перенос шаблона."""
+    if not _is_key_event(c) or c.get("kind") not in VAGUE_KINDS:
+        return False
+    quotes = _quotes(c)
+    return bool(quotes) and bool(_POSTING_RE.search(quotes[0]))
+
+
+def payout_closed_question(c: dict, doc_text: str) -> str | None:
+    """Причина снять замечание «выплата на закрытую/заблокированную карту или счёт», или None.
+
+    Замечание остаётся (major), если клиент заранее выбирает карту или счёт для выплаты и документ не говорит, что
+    делать, если они закрыты к моменту выплаты. Снимается, если документ это уже определяет или если выплата идёт на
+    тот же продукт, по которому шли операции (вопрос жизненного цикла карты, как перевыпуск)."""
+    if c.get("severity") == "critical" or _is_key_event(c):
+        return None
+    title = str(c.get("title", ""))
+    if not (_PAYOUT_CLOSED_RE.search(title) and _PAYOUT_RE.search(title)):
+        return None
+    if not re.search(r"карт|сч[её]т", title, re.I):
+        return None
+    lines = doc_text.splitlines()
+    if any(_DEST_DEFINED_RE.search(ln) and _PAYOUT_RE.search(ln) for ln in lines):
+        return "случай закрытой карты или счёта для выплаты описан в документе"
+    if not _DEST_CHOICE_RE.search(doc_text):
+        return "выплата на тот же продукт: закрытие карты — вопрос жизненного цикла, не замечание линзы"
+    return None
+
+
+_REPEAT_CRIT_RE = re.compile(r"повтор|дедуплик|дубл[ья]|идемпотент", re.I)
 
 
 def calibrate(candidate: dict) -> dict:
@@ -238,6 +314,11 @@ def calibrate(candidate: dict) -> dict:
     if c.get("kind") == "terminology" and _ROLE_RE.search(str(c.get("title", ""))):
         # расхождение ролей — риск доступа (дополнительная карта), а не оформление терминов
         c["kind"], c["criterion"] = "security", "risk"
+    if is_injection(c) or is_pd_transfer(c):
+        # вставка-указание для модели; передача персональных данных третьей стороне — риск с зацепкой в тексте
+        c["kind"], c["criterion"] = "security", "risk"
+        if c.get("severity") in ("minor", "critical", None, ""):
+            c["severity"] = "major"
     sev = c.get("severity")
     if sev not in SEVERITY_ORDER:
         c["severity"] = sev = "major"
@@ -245,7 +326,10 @@ def calibrate(candidate: dict) -> dict:
         is_risk_only = c.get("kind") in ("security", "ops_risk") and c.get("criterion") == "risk"
         weak = not str(c.get("scenario", "")).strip() or not str(c.get("impact", "")).strip() \
             or c.get("blocks") in (None, "", "none")
-        if is_risk_only or weak:
+        # обработка повторов (ответ на повтор, ключ повтора) — эксплуатация: основную функцию можно построить,
+        # не выбрав исход повтора, поэтому не выше major (шкала линзы), даже если два места расходятся
+        repeat = not _is_key_event(c) and _REPEAT_CRIT_RE.search(str(c.get("title", "")))
+        if is_risk_only or weak or repeat:
             c["severity"] = "major"
     if c["severity"] in ("critical", "major") and c.get("blocks") in (None, ""):
         c["blocks"] = "development"
@@ -301,6 +385,16 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
             continue
         if acceptance_conflict(c, accept):
             dropped.append(_drop(c, "противоречие с критерием приёмки — зона тестировщика (дубль)"))
+            continue
+        if posting_key_event(c):
+            dropped.append(_drop(c, "этап операции назван в документе (отражение, зачисление или списание по счёту)"))
+            continue
+        if doc and is_pd_transfer(c) and _CONSENT_DOC_RE.search(doc):
+            dropped.append(_drop(c, "согласие на передачу персональных данных описано в документе"))
+            continue
+        why = payout_closed_question(c, doc) if doc else None
+        if why:
+            dropped.append(_drop(c, why))
             continue
         ev_lines = _evidence_lines(c)
         if defined and ev_lines and (all(n in defined for n in ev_lines)

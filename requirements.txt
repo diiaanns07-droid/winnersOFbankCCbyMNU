@@ -3,6 +3,9 @@
 #
 # Установка вместе с самим агентом (из корня репозитория):
 #   python -m pip install -r requirements.txt -e .
+#
+# Версии всего, что эти пакеты тянут за собой, — в constraints.txt (подключён строкой ниже).
+-c constraints.txt
 
 # Проверка JSON-ответов модели по схеме
 jsonschema==4.26.0
