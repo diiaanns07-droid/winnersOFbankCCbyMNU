@@ -15,7 +15,7 @@ from .markdown import BLOCKS, STATUS, _clean_report, duration, plural, shorten
 def plain_warn(text) -> str:
     """Предупреждение этапа для терминала: «Этап consistency не выполнен» → «Этап «Набор целиком» не выполнен»,
     critical → критичный, «линза» → «роль»; без разметки Markdown."""
-    s = _md.dejargon(" ".join(str(text or "").split()))
+    s = _md.warn_quotes(_md.dejargon(" ".join(str(text or "").split())))
     m = _md._STAGE_PREFIX.match(s)
     if m and _md.stage_key(m.group(1)) in _md.STAGES:
         s = f"{_md.STAGES[_md.stage_key(m.group(1))][0]}: " + s[m.end():]
