@@ -8,7 +8,11 @@
   Читатель v1 (PyMuPDF без нейросети вёрстки, как у жюри по ``requirements.txt``) отдаёт таблицу колонками, а знаки
   препинания уносит в конец строки. Проверяет ``docview``: таблица собирается по строкам, знаки на месте.
 
-Нужны pandoc и LibreOffice (``soffice``). Текст — вымышленное банковское ТЗ, не официальный документ хакатона.
+* ``textbox.docx`` — Word: требование в надписи (текстовом поле, ``w:txbxContent`` с запасной копией VML),
+  вложенная таблица, комментарий рецензента, гиперссылка. Читатель v1 надписи не видит — ``docview`` их добавляет.
+
+Нужны pandoc и LibreOffice (``soffice``), python-docx. Тексты — вымышленные банковские ТЗ, не официальный документ
+хакатона.
 """
 
 from __future__ import annotations
@@ -57,7 +61,58 @@ BORDERLESS = """# Кредитные каникулы по кредитной к
 """
 
 
+_TEXTBOX = (
+    '<w:p {ns} xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '
+    'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:v="urn:schemas-microsoft-com:vml">'
+    '<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" '
+    'simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" '
+    'y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV '
+    'relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="3000000" cy="500000"/>'
+    '<wp:wrapSquare wrapText="bothSides"/><wp:docPr id="1" name="TextBox 1"/><a:graphic><a:graphicData '
+    'uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:spPr><a:xfrm><a:off x="0" '
+    'y="0"/><a:ext cx="3000000" cy="500000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr>'
+    '<wps:txbx><w:txbxContent><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr/>'
+    '</wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice><mc:Fallback><w:pict><v:shape>'
+    '<v:textbox><w:txbxContent><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict>'
+    '</mc:Fallback></mc:AlternateContent></w:r></w:p>')
+
+
+def make_textbox_docx(path: Path) -> None:
+    from docx import Document
+    from docx.oxml import OxmlElement, parse_xml
+    from docx.oxml.ns import nsdecls, qn
+    d = Document()
+    d.add_heading("ТЗ: Перевыпуск карты", 0)
+    d.add_heading("1. Часть A. Бизнес-требования", 1)
+    p = d.add_paragraph("Ф-1. Клиент заказывает перевыпуск в приложении; стоимость — 1 000 ₸.")
+    d.add_comment(p.runs, text="Уточнить стоимость для премиальных карт", author="Рецензент")
+    p2 = d.add_paragraph("Ф-2. Срок изготовления — 5 рабочих дней.")
+    p2._p.addnext(parse_xml(_TEXTBOX.format(ns=nsdecls("w", "wp", "a"),
+                                           text="Ф-3. Старая карта блокируется после активации новой.")))
+    d.add_heading("2. Часть B. API", 1)
+    t = d.add_table(rows=3, cols=2)
+    t.style = "Table Grid"
+    t.cell(0, 0).text, t.cell(0, 1).text = "Поле", "Описание"
+    t.cell(1, 0).text, t.cell(1, 1).text = "cardId", "Идентификатор карты"
+    t.cell(2, 0).text = "delivery"
+    inner = t.cell(2, 1).add_table(rows=2, cols=2)
+    inner.cell(0, 0).text, inner.cell(0, 1).text = "COURIER", "Курьер, 1–3 дня"
+    inner.cell(1, 0).text, inner.cell(1, 1).text = "BRANCH", "Отделение, 5 дней"
+    d.add_paragraph("Ответ 200 — заказ принят; 409 — перевыпуск уже заказан.")
+    par = d.add_paragraph("Документация: ")
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), d.part.relate_to("https://example.org/api", "http://schemas.openxmlformats.org/"
+                                          "officeDocument/2006/relationships/hyperlink", is_external=True))
+    run, txt = OxmlElement("w:r"), OxmlElement("w:t")
+    txt.text = "описание API"
+    run.append(txt)
+    link.append(run)
+    par._p.append(link)
+    d.save(path)
+
+
 def main() -> int:
+    make_textbox_docx(HERE / "textbox.docx")
     md = HERE / "borderless.md"
     md.write_text(BORDERLESS, encoding="utf-8")
     pandoc = shutil.which("pandoc")

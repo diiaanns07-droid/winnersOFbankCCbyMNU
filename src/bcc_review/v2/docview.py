@@ -120,10 +120,98 @@ def load(path: str | Path) -> dict:
     warnings += _doc_warnings(doc)
     if fmt == "docx":
         warnings += _docx_revisions(data)
+        lines, boxes = _docx_textboxes(data, lines)
+        if boxes:
+            warnings.append(f"Текст из надписей Word (текстовых полей) добавлен после абзаца, к которому они "
+                            f"привязаны: {boxes} абз.")
     if not any(ln["text"].strip() for ln in lines) and not warnings:
         warnings.append("В документе нет текста: проверять нечего.")
     return {"title": title, "file": p.name, "format": fmt, "sha256": sha, "lines": lines,
             "pages": pages, "warnings": _dedup(warnings)}
+
+
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+
+
+def _docx_textboxes(data: bytes, lines: list[dict]) -> tuple[list[dict], int]:
+    """Надписи Word (текстовые поля, ``w:txbxContent``) читатель v1 не видит — требование в надписи пропадало бы.
+    Абзацы надписи вставляются после строки абзаца, к которому надпись привязана (или после предыдущего непустого
+    абзаца); запасная копия VML внутри ``mc:Fallback`` не дублируется. Возвращает строки и число добавленных абзацев."""
+    import io
+    import xml.etree.ElementTree as ET
+    import zipfile
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            xml = z.read("word/document.xml")
+        if b"txbxContent" not in xml:
+            return lines, 0
+        body = ET.fromstring(xml).find(f"{_W}body")
+    except Exception:  # noqa: BLE001 — повреждённый DOCX уже прочитан читателем v1, надписи не обязательны
+        return lines, 0
+    if body is None:
+        return lines, 0
+
+    def walk(el, in_box: bool, own: list[str], boxes: list[list[str]]) -> None:
+        for ch in el:
+            if ch.tag == _MC_FALLBACK:
+                continue
+            if ch.tag == f"{_W}txbxContent":
+                paras = ["".join(t.text or "" for t in p.iter(f"{_W}t")).strip() for p in ch.iter(f"{_W}p")]
+                boxes.append([x for x in paras if x])
+                continue
+            if ch.tag == f"{_W}t" and not in_box:
+                own.append(ch.text or "")
+            walk(ch, in_box, own, boxes)
+
+    plan: list[tuple[str, list[str]]] = []   # (текст абзаца-якоря или предыдущего, абзацы надписи)
+    prev = ""
+    for el in body:
+        own: list[str] = []
+        boxes: list[list[str]] = []
+        walk(el, False, own, boxes)
+        text = " ".join("".join(own).split())
+        anchor = text or prev
+        for box in boxes:
+            if box:
+                plan.append((anchor, box))
+        if text:
+            prev = text
+    if not plan:
+        return lines, 0
+    have = {_norm_key(ln["text"]) for ln in lines if ln["text"].strip()}
+    out = list(lines)
+    pos = 0
+    added = 0
+    for anchor, box in plan:
+        box = [t for t in box if _norm_key(t) not in have]   # уже есть в тексте (читатель увидел) — не дублируем
+        if not box:
+            continue
+        key = _norm_key(anchor)[:60]
+        at = None
+        for k in range(pos, len(out)):
+            if key and key in _norm_key(out[k]["text"]):
+                at = k
+                break
+        if at is None:
+            at = len(out) - 1 if out else -1
+        while at + 1 < len(out) and at >= 0 and out[at + 1].get("block_id") == out[at].get("block_id") \
+                and out[at].get("block_id"):
+            at += 1  # после последней строки того же блока
+        base = out[at] if at >= 0 else {"section": "", "page": None}
+        new = [{"n": 0, "text": _clean(t), "page": base.get("page"), "section": base.get("section", ""),
+                "src_line": None, "block_id": f"txbx{added + i + 1}", "kind": "paragraph", "level": 0,
+                "heading": False} for i, t in enumerate(box)]
+        out[at + 1:at + 1] = new
+        pos = at + 1 + len(new)
+        added += len(new)
+    for i, ln in enumerate(out, 1):
+        ln["n"] = i
+    return out, added
+
+
+def _norm_key(t: str) -> str:
+    return " ".join(str(t or "").split()).casefold()
 
 
 def _docx_revisions(data: bytes) -> list[str]:

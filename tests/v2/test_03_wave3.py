@@ -307,3 +307,22 @@ def test_google_docs_comments_not_in_text(tmp_path):
     texts = [ln["text"] for ln in dv.load(p)["lines"]]
     assert "Ф-1. Кэшбэк начисляется за покупки." in texts
     assert not any("Рецензент" in t or "[a]" in t for t in texts)
+
+
+# --------------------------------------------------------------------------- DOCX: надпись, вложенная таблица, комментарий
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_textbox_requirement_not_lost():
+    """Требование в надписи Word читатель v1 не видел; docview ставит его после абзаца-якоря, без дубля из VML."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/textbox.docx")
+    texts = [ln["text"] for ln in view["lines"]]
+    k = texts.index("Ф-2. Срок изготовления — 5 рабочих дней.")
+    assert texts[k + 1] == "Ф-3. Старая карта блокируется после активации новой."
+    assert texts.count("Ф-3. Старая карта блокируется после активации новой.") == 1
+    assert view["lines"][k + 1]["section"] == view["lines"][k]["section"]
+    assert [ln["n"] for ln in view["lines"]] == list(range(1, len(texts) + 1))
+    assert any("надписей Word" in w for w in view["warnings"])
+    # вложенная таблица и гиперссылка — в тексте; комментарий рецензента — нет
+    assert "COURIER | Курьер, 1–3 дня" in texts and "Документация: описание API" in texts
+    assert not any("премиальных" in t for t in texts)
+    m = Q.verify_quote(view, "Старая карта блокируется после активации новой", 5)
+    assert m and m["line_start"] == k + 2
