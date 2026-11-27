@@ -3,12 +3,43 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import shlex
+import subprocess
 import unicodedata
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def shell_quote(arg: object) -> str:
+    """Аргумент для строки команды с `shell=True`: на Windows её разбирает cmd.exe (двойные кавычки,
+    `subprocess.list2cmdline`), иначе POSIX sh (`shlex.quote`). Одинарные кавычки shlex cmd.exe не понимает —
+    путь с пробелом или кириллицей ломал `newtz run`/`corpus run`/`measure` на Windows (просьба №20)."""
+    s = str(arg)
+    return subprocess.list2cmdline([s]) if os.name == "nt" else shlex.quote(s)
+
+
+def put_results_block(path: Path, name: str, body: str, title: str) -> None:
+    """Блок `<!-- name:start -->…<!-- name:end -->` в Markdown-файле (RESULTS.md): заменить на месте, а если блока
+    ещё нет — вставить новым разделом `## title` сразу после шапки документа (первым)."""
+    res = path.read_text(encoding="utf-8")
+    start, end = f"<!-- {name}:start -->", f"<!-- {name}:end -->"
+    block = f"{start}\n{body}{end}"
+    if start in res and end in res:
+        res = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: block, res, flags=re.S)
+    else:
+        head, sep, rest = res.partition("\n## ")
+        res = head.rstrip() + f"\n\n## {title}\n\n" + block + "\n" + sep + rest
+    path.write_text(res, encoding="utf-8")
+
+
+def run_shell(cmd: str, timeout: int, env: dict) -> subprocess.CompletedProcess:
+    """Запуск агента строкой команды: вывод читается как UTF-8 (дочернему Python — PYTHONIOENCODING), чтобы
+    русский текст в stderr не ронял харнес на Windows с кодовой страницей cp1251/cp866."""
+    return subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          timeout=timeout, cwd=str(ROOT), env={**env, "PYTHONIOENCODING": "utf-8"})
 
 MD_DECOR = re.compile(r"\*\*|__|`")
 _QUOTES = re.compile(r"[«»“”„\"'‘’]")
@@ -210,7 +241,7 @@ GENERIC_PHRASES = [
 _GENERIC_RE = [re.compile(p, re.I) for p in GENERIC_PHRASES]
 
 LATIN_ALLOW = {
-    "iso", "iec", "ieee", "rfc", "http", "https", "api", "rest", "json", "url", "uri", "ui", "ux", "sla", "bpmn",
+    "iso", "iec", "ieee", "rfc", "iana", "tz", "http", "https", "api", "rest", "json", "url", "uri", "ui", "ux", "sla", "bpmn",
     "kzt", "utc", "gmt", "get", "post", "put", "patch", "delete", "head", "pdf", "docx", "md", "html", "jira",
     "swagger", "openapi", "id", "ids", "sms", "push", "jwt", "bearer", "oauth", "tls", "pci", "dss", "gdpr",
     "asia", "almaty", "content", "type", "true", "false", "null", "ok", "error", "nfr", "crud", "csv", "uuid",

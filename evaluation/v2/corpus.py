@@ -18,13 +18,12 @@ import concurrent.futures as cf
 import hashlib
 import json
 import os
-import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from .common import ROOT, sha256_file, source_owner
+from .common import ROOT, run_shell, sha256_file, shell_quote, source_owner
 
 CORPUS = ROOT / "evaluation" / "dev" / "corpus"
 HARNESS_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
@@ -101,12 +100,12 @@ def run_one(case: dict, out: Path, cmd_tpl: str, provider: str, model: str, time
     meta = {"case_id": case["case_id"], "render_id": case["render_id"], "dir": d.name}
     if reuse and report_json.exists():
         return {**meta, "rc": 0, "seconds": None, "reused": True}
-    cmd = cmd_tpl.format(python=shlex.quote(sys.executable), input=shlex.quote(str(case["path"])),
-                         output=shlex.quote(str(report_md)), provider=provider, model=model)
+    cmd = cmd_tpl.format(python=shell_quote(sys.executable), input=shell_quote(str(case["path"])),
+                         output=shell_quote(str(report_md)), provider=provider, model=model)
     t0 = time.monotonic()
     env = dict(os.environ, PYTHONPATH=str(ROOT / "src") + os.pathsep + os.environ.get("PYTHONPATH", ""))
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, cwd=str(ROOT), env=env)
+        r = run_shell(cmd, timeout, env)
         rc, tail = r.returncode, (r.stderr or r.stdout)[-800:]
     except subprocess.TimeoutExpired:
         rc, tail = -9, f"таймаут {timeout} с"
@@ -245,7 +244,10 @@ def harness_score(out: Path, preds: Path, fmt: str, sub: str = "harness") -> dic
     hd = out / sub
     cmd = [sys.executable, "-m", "evaluation.harness", "--gold", str(CORPUS / "labels.jsonl"), "--pred", str(preds),
            "--manifest", str(CORPUS / "manifest.json"), "--out-dir", str(hd), "--render-format", fmt]
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
+    # счётчик печатает русский текст: на Windows (cp1251/cp866) без UTF-8 падал на «₸» и подобных (просьба №16);
+    # код evaluation/harness не трогаем — его SHA-256 записан в протоколе (HANDOFF.md, controls/SELFCHECK.md)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     (out / f"{sub.replace('/', '_')}.log").write_text(r.stdout + r.stderr, encoding="utf-8")
     mp = hd / "metrics.json"
     if r.returncode != 0 or not mp.exists():

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -82,10 +83,13 @@ def _finding_block(f: dict) -> str:
 
 
 def call_claude(system: str, user: str, schema: dict, model: str, timeout: int = 900) -> tuple[dict, dict]:
-    cmd = ["claude", "-p", "--output-format", "json", "--tools", "", "--model", model,
+    # shutil.which: на Windows claude — это claude.cmd/claude.exe, без полного пути CreateProcess его не находит
+    cmd = [shutil.which("claude") or "claude", "-p", "--output-format", "json", "--tools", "", "--model", model,
            "--json-schema", json.dumps(schema, ensure_ascii=False), "--system-prompt", system]
     t0 = time.monotonic()
-    r = subprocess.run(cmd, input=user, capture_output=True, text=True, timeout=timeout)
+    # вопрос арбитру — русский текст: на Windows без encoding он уходил бы в stdin в cp1251, а CLI читает UTF-8
+    r = subprocess.run(cmd, input=user, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       timeout=timeout)
     try:
         out = json.loads(r.stdout)
     except json.JSONDecodeError as exc:

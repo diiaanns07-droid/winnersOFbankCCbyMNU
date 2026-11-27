@@ -84,6 +84,7 @@ items:
         - {lines: "165-171", quote: "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"}
     keywords:
       min: 2
+      required: [0]  # тема пункта — статус 400 (просьба №07: «прежнее состояние» на строке 121 — это С15, не К3)
       groups:
         - '\b400\b|bad request'
         - '\b200\b|created|\b201\b'
@@ -107,6 +108,7 @@ items:
         - {lines: "103", quote: "Сохранение порога. Функциональные требования: чтение порога"}
     keywords:
       min: 2
+      required: [0]  # тема пункта — чтение настроек (просьба №08: без неё «нет … операции» на строке 52 — не К4)
       groups:
         - 'чтени|читае|получени|получить|загрузк|отобра|показ|get-метод|метод.{0,20}(чтени|получени)'
         - 'нет|отсутств|не описан|не определ|только (метод )?сохранени|не предусмотр|единственн'
@@ -383,7 +385,7 @@ items:
     keywords:
       min: 2
       groups:
-        - 'цифр|содержани|текст\w* (уведомл|push|сообщ)|состав\w* (уведомл|push|сообщ)|содержим|шаблон\w* (уведомл|сообщ)'
+        - 'цифр|содерж\w*|текст\w* (уведомл|push|сообщ)|состав\w* (уведомл|push|сообщ)|шаблон\w* (уведомл|сообщ)'
         - 'сумм|карт|хран|данн|какую|какая|откуда'
     kinds: [incomplete, ambiguity, missing_element, api_contract]
     owners: [analyst, architect]
@@ -445,7 +447,7 @@ items:
     keywords:
       min: 1
       groups:
-        - 'прежн\w* состояни|вернуть прежн|enabled ?= ?0|enabled ?равн\w* 0|неверн\w* enabled|некоррект\w* enabled|недопустим\w* enabled|mandatory|обязательн\w* (пол|парамет|amount)|amount.{0,40}(обязат|enabled ?= ?0)|(enabled ?= ?0|выключени\w* уведомлени).{0,60}amount'
+        - 'прежн\w* (состояни|порог|значени|сумм|настройк)|вернуть прежн|возвраща\w* прежн|amount.{0,40}(только )?при успехе|error.{0,40}amount|enabled ?= ?0|enabled ?равн\w* 0|неверн\w* enabled|некоррект\w* enabled|недопустим\w* enabled|mandatory|обязательн\w* (пол|парамет|amount)|amount.{0,40}(обязат|enabled ?= ?0)|(enabled ?= ?0|выключени\w* уведомлени).{0,60}amount'
     kinds: [ambiguity, incomplete, api_contract, contradiction, missing_element]
     owners: [architect]
     related: [К3, С3]

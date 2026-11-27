@@ -13,7 +13,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -21,7 +20,7 @@ import time
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT
+from .common import ROOT, run_shell, shell_quote
 
 MEAS = ROOT / "evaluation" / "v2" / "measurements"
 HISTORY = ROOT / "evaluation" / "v2" / "history.jsonl"
@@ -39,12 +38,12 @@ def slugify(label: str) -> str:
 
 def run_agent(inp: Path, out_dir: Path, cmd_tpl: str, provider: str, model: str, timeout: int) -> tuple[int, str, float]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    cmd = cmd_tpl.format(python=shlex.quote(sys.executable), input=shlex.quote(str(inp)),
-                         output=shlex.quote(str(out_dir / "report.md")), provider=provider, model=model)
+    cmd = cmd_tpl.format(python=shell_quote(sys.executable), input=shell_quote(str(inp)),
+                         output=shell_quote(str(out_dir / "report.md")), provider=provider, model=model)
     env = dict(os.environ, PYTHONPATH=str(ROOT / "src") + os.pathsep + os.environ.get("PYTHONPATH", ""))
     t0 = time.monotonic()
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, cwd=str(ROOT), env=env)
+        r = run_shell(cmd, timeout, env)
         rc, log = r.returncode, f"$ {cmd}\nrc={r.returncode}\n--- stdout\n{r.stdout[-6000:]}\n--- stderr\n{r.stderr[-6000:]}"
     except subprocess.TimeoutExpired:
         rc, log = -9, f"$ {cmd}\nтаймаут {timeout} с"
@@ -125,8 +124,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--table", action="store_true", help="только пересобрать таблицу истории в RESULTS.md")
     ap.add_argument("--no-cache", action="store_true", help="агент мимо кэша ответов модели (стабильность)")
     ap.add_argument("--extra", default="", help="доп. аргументы агента, например «--runs-dir out/runs»")
+    ap.add_argument("--rescore", nargs="+", metavar="DIR",
+                    help="пересчитать score.json/score.md сохранённых замеров текущим счётчиком (арбитр — только "
+                         "кэш, без модели и без новой строки истории)")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
+    if a.rescore:
+        return rescore(a.rescore)
     if a.table:
         update_results()
         print(results_table())
@@ -181,6 +185,44 @@ def main(argv: list[str] | None = None) -> int:
         update_results()
     print(f"сохранено: {dest.relative_to(ROOT)}")
     return 0
+
+
+def rescore(dirs: list[str]) -> int:
+    """Пересчёт готовых замеров (`evaluation/v2/measurements/<метка>`) после правки счётчика или эталона: те же
+    report.json, решения арбитра — из кэша. Печатает, что изменилось в К, С и рубрике понятности."""
+    gold = sc.load_gold(sc.DEFAULT_GOLD)
+    rc = 0
+    for d in dirs:
+        dest = Path(d) if Path(d).is_absolute() else ROOT / d
+        rp = dest / "report.json"
+        if not rp.exists():
+            print(f"{d}: нет report.json")
+            rc = 1
+            continue
+        old = json.loads((dest / "score.json").read_text(encoding="utf-8")) if (dest / "score.json").exists() else {}
+        report = sc.as_report(json.loads(rp.read_text(encoding="utf-8")), gold)
+        md = dest / "report.md"
+        run_dir = old.get("run_dir")
+        res = sc.score_report(report, gold, report_md=str(md) if md.exists() else None,
+                              run_dir=run_dir if run_dir and Path(run_dir).is_dir() else None, arbiter="off")
+        res["run_dir"] = run_dir
+        res["rescored_at"] = sc.astana_now()
+        (dest / "score.json").write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
+        label = dest.name
+        if HISTORY.exists():  # метка замера — из истории (в score.json её нет)
+            rel = str(dest.relative_to(ROOT)) if dest.is_relative_to(ROOT) else str(dest)
+            for line in HISTORY.read_text(encoding="utf-8").splitlines():
+                row = json.loads(line) if line.strip() else {}
+                if row.get("dir") == rel and row.get("label"):
+                    label = row["label"]
+        (dest / "score.md").write_text(sc.render_md(res, label), encoding="utf-8")
+
+        def brief(x: dict) -> str:
+            r, cl = x.get("recall") or {}, x.get("clarity") or {}
+            return (f"К {len((r.get('critical') or {}).get('found') or [])}/5, С {(r.get('major') or {}).get('n')}/20, "
+                    f"рубрика {cl.get('passed')}/{cl.get('n')}")
+        print(f"{dest.name}: {brief(old) if old else '—'} → {brief(res)}")
+    return rc
 
 
 if __name__ == "__main__":
