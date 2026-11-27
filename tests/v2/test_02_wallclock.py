@@ -39,10 +39,11 @@ SCHEMA = {"type": "object", "required": ["ok"], "properties": {"ok": {"type": "b
 
 class ScaledClock:
     def __init__(self, scale: float = SCALE):
-        self.scale, self.t0 = scale, time.monotonic()
+        # Python 3.12 на Windows: 15,625 мс у monotonic превращаются почти в 4 с при SCALE=250.
+        self.scale, self.t0 = scale, time.perf_counter()
 
     def now(self) -> float:
-        return (time.monotonic() - self.t0) * self.scale
+        return (time.perf_counter() - self.t0) * self.scale
 
     def sleep(self, seconds: float) -> None:
         if seconds > 0:
