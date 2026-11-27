@@ -1,0 +1,18 @@
+{
+  "code": "3e7133c2",
+  "patches": [
+    "owner-conflicts.patch",
+    "passport-paths.patch"
+  ],
+  "os": "Windows",
+  "python": "3.12.14",
+  "command": "python -m pytest tests/v2 -q",
+  "stdout_summary": "2211 passed, 5 skipped, 3 xfailed, 7 xpassed in 552.15s (0:09:12)",
+  "junit": {
+    "tests": "2226",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "8",
+    "time": "552.105"
+  }
+}
