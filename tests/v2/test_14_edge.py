@@ -645,3 +645,14 @@ def test_console_progress_is_russian(tmp_path, capsys):
     err = capsys.readouterr().err
     codes = re.findall(r"\b(segment|lens_\w+|consistency|judge|clarify|quotes|rules)\b", err)
     assert not codes, sorted(set(codes))
+
+
+@_bug("01", "быстрый старт: сбой перевода ссылок R-ID (_remap_reviewers, pipeline.py:324 — вне try) роняет весь "
+            "прогон в «Прогон прерван», хотя это не этап модели")
+def test_fast_start_remap_error_does_not_abort_run(tmp_path, monkeypatch):
+    def boom(*a, **kw):
+        raise ValueError("строка цитаты не число")
+
+    monkeypatch.setattr(pipeline, "remap_output", boom)
+    report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", fast_start=True)
+    assert report["run"]["status"] != "failed" and report["findings"]

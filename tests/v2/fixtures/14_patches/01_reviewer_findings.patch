@@ -102,7 +102,7 @@ index 7e5b61e9..5351d95b 100644
  MAX_TIMEOUT_RETRIES = 1
  MAX_OUTPUT_CEILING = 32000  # выше лимит ответа не поднимаем: дальше — деление пакета  # таймаут claude -p — минуты; повторяем один раз
 diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
-index 322988ff..b6549b53 100644
+index 322988ff..4fc978b8 100644
 --- a/src/bcc_review/v2/pipeline.py
 +++ b/src/bcc_review/v2/pipeline.py
 @@ -188,12 +188,19 @@ class Pipeline:
@@ -141,7 +141,19 @@ index 322988ff..b6549b53 100644
          try:
              llm, self.provider_name = make_llm(opts, self.run, self.input)
          except Exception as exc:  # noqa: BLE001 — нет ключа / не тот провайдер: отчёт правилами + объяснение
-@@ -458,6 +472,10 @@ class Pipeline:
+@@ -321,7 +335,10 @@ class Pipeline:
+             ctx.excluded = seg.get("excluded") or []
+             rules_out = self.stage("rules", lambda: self._rules(view, seg), empty={"signals": [], "candidates": []})
+             ctx.signals = rules_out.get("signals") or []
+-            self._remap_reviewers(outs, rctx.requirements, ctx.requirements)
++            try:
++                self._remap_reviewers(outs, rctx.requirements, ctx.requirements)
++            except Exception as exc:  # noqa: BLE001 — перевод ссылок не этап модели: прогон не роняет
++                self.warnings.append(f"Ссылки рецензентов на таблицу эвристики не переведены: {type(exc).__name__}: {exc}")
+         else:
+             # 1. нарезка (при сбое — эвристика кода, прогон partial)
+             seg = self.stage("segment", lambda: self._segment(ctx), inputs={"lines": len(view.get("lines") or [])},
+@@ -458,6 +475,10 @@ class Pipeline:
          if self.opts.get("consistency", True):
              jobs["consistency"] = lambda: self._consistency(ctx)
          names = list(self.opts.get("lenses") or LENSES)
@@ -152,7 +164,7 @@ index 322988ff..b6549b53 100644
          for name in sorted(names, key=lambda n: (LONGEST_FIRST.index(n) if n in LONGEST_FIRST else 99)):
              jobs[f"lens_{name}"] = (lambda n=name: self._lens(ctx, n))
          for name in [f"lens_{x}" for x in LENSES] + ["consistency"]:
-@@ -615,8 +633,13 @@ class Pipeline:
+@@ -615,8 +636,13 @@ class Pipeline:
                                     do_revise=bool(self.opts.get("revise")),
                                     report_path=self.opts.get("output") or None)
          except Exception as exc:  # noqa: BLE001
@@ -167,7 +179,7 @@ index 322988ff..b6549b53 100644
              return
          self.stages["recheck"] = "ok"
          self.stage_stats["recheck"] = {"calls": 0, "seconds": round(time.monotonic() - t0, 2), "candidates": 0}
-@@ -663,7 +686,8 @@ class Pipeline:
+@@ -663,7 +689,8 @@ class Pipeline:
                  "model_requested": self.opts.get("model") or "", "models_used": s["models_used"],
                  "calls": s["calls"], "tokens": s["tokens"], "cost_usd": s["cost_usd"], "status": status,
                  "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
@@ -177,7 +189,7 @@ index 322988ff..b6549b53 100644
  
      def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
                  questions: list, qstats: dict) -> dict:
-@@ -925,6 +949,17 @@ def fallback_markdown(report: dict) -> str:
+@@ -925,6 +952,17 @@ def fallback_markdown(report: dict) -> str:
      return "\n".join(lines) + "\n"
  
  
@@ -195,7 +207,7 @@ index 322988ff..b6549b53 100644
  def review(input_path: str | Path, output_md: str | Path, opts: dict | None = None, *,
             reuse: RunDir | None = None, rerun: set[str] = frozenset(),
             log: Callable[[str], None] | None = None) -> tuple[dict, dict]:
-@@ -936,8 +971,7 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
+@@ -936,8 +974,7 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
      except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
          p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
          p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
