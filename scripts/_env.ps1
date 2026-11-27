@@ -7,12 +7,15 @@ $ErrorActionPreference = "Continue"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 $env:PYTHONUTF8 = "1"
 $env:PYMUPDF_SUGGEST_LAYOUT_ANALYZER = "0"
+# код агента — из этой копии, даже если активно окружение другой копии (editable-установка другого каталога)
+$src = Join-Path (Get-Location) "src"
+if ($env:PYTHONPATH) { $env:PYTHONPATH = "$src;$($env:PYTHONPATH)" } else { $env:PYTHONPATH = $src }
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 
 function Test-PythonVersion([string[]]$Command) {
     $exe = $Command[0]
     $pre = @($Command | Select-Object -Skip 1)
-    & $exe @pre -c "import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 14) else 1)" *> $null
+    & $exe @pre -c "import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 16) else 1)" *> $null
     return ($LASTEXITCODE -eq 0)
 }
 
@@ -23,7 +26,7 @@ if ($env:VIRTUAL_ENV -and (Test-Path (Join-Path $env:VIRTUAL_ENV "Scripts\python
 if (-not (Test-Path $Py)) {
     $base = $null
     if (Get-Command py -ErrorAction SilentlyContinue) {
-        foreach ($v in @("-3.12", "-3.13", "-3.11")) {
+        foreach ($v in @("-3.12", "-3.13", "-3.11", "-3.14", "-3.15")) {  # 3.14 и 3.15 проверены
             if (Test-PythonVersion @("py", $v)) { $base = @("py", $v); break }
         }
     }
@@ -31,7 +34,7 @@ if (-not (Test-Path $Py)) {
         if (Test-PythonVersion @("python")) { $base = @("python") }
     }
     if (-not $base) {
-        Write-Host "Нужен Python 3.11, 3.12 или 3.13: https://www.python.org/downloads/ (при установке отметьте «Add python.exe to PATH»)." -ForegroundColor Red
+        Write-Host "Нужен Python 3.11–3.15 (лучше 3.12): https://www.python.org/downloads/ (при установке отметьте «Add python.exe to PATH»)." -ForegroundColor Red
         exit 1
     }
     Write-Host "== создаю окружение .venv ($($base -join ' '))"
@@ -45,7 +48,8 @@ if (-not (Test-Path $Py)) {
 }
 
 $stamp = Join-Path (Split-Path -Parent (Split-Path -Parent $Py)) ".bcc_requirements"
-$want = (Get-FileHash requirements.txt -Algorithm SHA256).Hash
+# метка установки — requirements.txt и constraints.txt вместе: изменился любой — ставим заново
+$want = ((Get-FileHash requirements.txt -Algorithm SHA256).Hash + (Get-FileHash constraints.txt -Algorithm SHA256).Hash)
 $have = if (Test-Path $stamp) { (Get-Content $stamp -Raw).Trim() } else { "" }
 & $Py -c "import bcc_review" *> $null
 if ($have -ne $want -or $LASTEXITCODE -ne 0) {

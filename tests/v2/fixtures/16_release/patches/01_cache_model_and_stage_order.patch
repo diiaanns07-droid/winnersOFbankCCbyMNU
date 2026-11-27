@@ -1,0 +1,55 @@
+diff --git a/src/bcc_review/v2/llm.py b/src/bcc_review/v2/llm.py
+index 402203d..89308c6 100644
+--- a/src/bcc_review/v2/llm.py
++++ b/src/bcc_review/v2/llm.py
+@@ -236,6 +236,9 @@ class LLMClient:
+             with self._lock:
+                 self.stats["cached"] += 1
+                 self._stage_stats(stage)["cached"] += 1
++                m = cached.get("model")
++                if m and m not in self.stats["models_used"]:
++                    self.stats["models_used"].append(m)
+             self._emit({"stage": stage, "cached": True, "model": cached.get("model"), "key": key[:16]})
+             self._record(stage, cached["data"])
+             return cached["data"]
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 587554a..4031376 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -514,8 +514,8 @@ class Pipeline:
+             report["run"].update(llm.summary())
+         report["run"]["duration_s"] = round(time.monotonic() - self.t0, 1)
+         report["run"]["finished_at"] = now_iso()
+-        report["run"]["stages"] = dict(self.stages)
+-        report["run"]["stage_stats"] = dict(self.stage_stats)
++        report["run"]["stages"] = _in_stage_order(self.stages)
++        report["run"]["stage_stats"] = _in_stage_order(self.stage_stats)
+ 
+     # ------------------------------------------------------------------ отчёт
+ 
+@@ -540,7 +540,7 @@ class Pipeline:
+                 "duration_s": round(time.monotonic() - self.t0, 1), "provider": self.provider_name,
+                 "model_requested": self.opts.get("model") or "", "models_used": s["models_used"],
+                 "calls": s["calls"], "tokens": s["tokens"], "cost_usd": s["cost_usd"], "status": status,
+-                "stages": dict(self.stages), "stage_stats": dict(self.stage_stats),
++                "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
+                 "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts}
+ 
+     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
+@@ -604,6 +604,16 @@ def _second_pass(ctx: Context) -> Context:
+     return c
+ 
+ 
++_STAGE_ORDER = ["segment", "rules"] + [f"lens_{x}" for x in LENSES] + ["consistency", "quotes", "judge", "clarify",
++                                                                     "recheck"]
++
++
++def _in_stage_order(d: dict) -> dict:
++    """Этапы в порядке конвейера, а не в порядке завершения параллельных линз: отчёт повторяем байт в байт."""
++    rank = {k: i for i, k in enumerate(_STAGE_ORDER)}
++    return {k: d[k] for k in sorted(d, key=lambda k: rank.get(k, len(rank)))}
++
++
+ def _uniq(items: list[str]) -> list[str]:
+     seen, out = set(), []
+     for x in items:

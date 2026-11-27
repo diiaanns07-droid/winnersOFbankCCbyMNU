@@ -129,7 +129,7 @@ def rule_events(doc: Doc, out: dict) -> None:
             if sa == sb and va == vb and na != nb and mark(a, b):
                 pos, neg = (a, b) if nb else (b, a)
                 _emit(out, "conflicts.event_negation", "event_conflict", pos, pos.text, neg, neg.text,
-                      title=f"Одно и то же правило с противоположным исходом: «{sa} {va}» и «{sa} не {va}»",
+                      title=f"Противоположные исходы одного правила: «{sa} {va}» и «не {va}»",
                       problem=(f"В одном месте {quoted(pos.body)}, в другом — {quoted(neg.body)}. Для одного и того же "
                                "случая документ даёт противоположные исходы."),
                       scenario=(f"Происходит событие «{sa}»: по одному месту документа «{va}» выполняется, по "
@@ -444,7 +444,7 @@ def rule_acceptance_bounds(doc: Doc, out: dict) -> None:
     for s, op, bound, subj, m in rules:
         bnum = _num(bound)
         for r, cells in rows:
-            pre, act, res = " ".join(cells[:-1]), cells[-2], cells[-1]
+            act, res = cells[-2], cells[-1]
             vals_all = _values(" ".join(cells[:-1]))
             vals_res = _values(res)
             subj_key = next((_stem(w) for w in reversed(subj) if _stem(w) in vals_all or _stem(w) in vals_res), None)

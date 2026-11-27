@@ -4,6 +4,8 @@
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 export PYTHONUTF8=1 PYMUPDF_SUGGEST_LAYOUT_ANALYZER=0
+# код агента — из этой копии, даже если активно окружение другой копии (editable-установка другого каталога)
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
   PY="$VIRTUAL_ENV/bin/python"   # уже активированное окружение (шаг 1 README)
@@ -11,15 +13,16 @@ elif [ -x .venv/bin/python ]; then
   PY=.venv/bin/python
 else
   base=""
-  for candidate in python3.12 python3.13 python3.11 python3 python; do
+  # 3.14 и 3.15 проверены (установка, mock, PDF, verify, tests/v2); предпочтение — 3.12
+  for candidate in python3.12 python3.13 python3.11 python3.14 python3.15 python3 python; do
     if command -v "$candidate" >/dev/null 2>&1 &&
-       "$candidate" -c 'import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 14) else 1)' 2>/dev/null; then
+       "$candidate" -c 'import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 16) else 1)' 2>/dev/null; then
       base="$candidate"
       break
     fi
   done
   if [ -z "$base" ]; then
-    echo "Нужен Python 3.11, 3.12 или 3.13: https://www.python.org/downloads/" >&2
+    echo "Нужен Python 3.11–3.15 (лучше 3.12): https://www.python.org/downloads/" >&2
     exit 1
   fi
   echo "== создаю окружение .venv ($("$base" --version))"
@@ -31,13 +34,15 @@ else
 fi
 
 stamp="$(dirname "$(dirname "$PY")")/.bcc_requirements"
-if [ ! -f "$stamp" ] || ! cmp -s requirements.txt "$stamp" || ! "$PY" -c "import bcc_review" 2>/dev/null; then
+# метка установки — requirements.txt и constraints.txt вместе: изменился любой — ставим заново
+want="$(cat requirements.txt constraints.txt)"
+if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$want" ] || ! "$PY" -c "import bcc_review" 2>/dev/null; then
   echo "== установка зависимостей (1–2 минуты при первом запуске)"
   "$PY" -m pip install -q --disable-pip-version-check -r requirements.txt -e . || {
     echo "Установка не удалась — сообщение pip выше." >&2
     exit 1
   }
-  cp requirements.txt "$stamp"
+  printf '%s' "$want" > "$stamp"
 fi
 
 if [ ! -f .env ]; then

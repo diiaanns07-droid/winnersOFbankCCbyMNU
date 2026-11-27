@@ -259,7 +259,7 @@ def render(s: dict, rows: list[dict], label: str) -> str:
         L.append(f"| {r['case']} | {r['variant']} | {r.get('status')} | {fnd} | {r.get('findings')} "
                  f"({bs.get('critical', '-')}/{bs.get('major', '-')}/{bs.get('minor', '-')}) | "
                  f"{v.get('development', '—')}/{v.get('testing', '—')} | "
-                 f"{'—' if r.get('duration_s') is None else f'{r['duration_s'] / 60:.1f}'} | {r.get('calls', '—')} |")
+                 f"{'—' if r.get('duration_s') is None else format(r['duration_s'] / 60, '.1f')} | {r.get('calls', '—')} |")
     miss = [(r["case"], m) for r in rows for m in r.get("misses") or []]
     if miss:
         L += ["", "Пропуски:", "", "| Кейс | Пункт | Уровень | Тип | Где потерян | Владельцы |",
@@ -291,7 +291,7 @@ def results_table() -> str:
         h, c, lv = d["harness"], d["clean"], d["by_level"]
         n = max(1, d["runs"] - d["failed"])
         L.append(f"| {d['label']} | {d['cases']} / {d['runs']} ({d['failed']}) | "
-                 f"{'—' if h['recall'] is None else f'{100 * h['recall']:.0f} %'} ({h['tp']}/{h['support']}) | "
+                 f"{'—' if h['recall'] is None else format(100 * h['recall'], '.0f') + ' %'} ({h['tp']}/{h['support']}) | "
                  f"{lv['critical']['n']}/{lv['critical']['of']} | {lv['major']['n']}/{lv['major']['of']} | {h['fp']} | "
                  f"{h['critical_false']} | {c['n']} | {c.get('false_alarms', c['findings'])} ({c['critical']}) | {c['docs_over_1_finding']} | "
                  f"{d['injection']['flagged']}/{d['injection']['n']} | {d['time']['total_s'] / 60 / n:.1f} |")
