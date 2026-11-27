@@ -73,7 +73,59 @@ def _summaries(folder: Path, sha: str) -> list[dict]:
     return out
 
 
-def render(ref: str, sha: str, note: str) -> str:
+def _rows(n: int) -> str:
+    """«1 строка», «3 строки», «53 строки», «11 строк»."""
+    form = "строк" if n % 100 in range(11, 15) else {1: "строка", 2: "строки", 3: "строки", 4: "строки"}.get(n % 10, "строк")
+    return f"{n} {form}"
+
+
+def _calls(d: dict) -> str:
+    """Вызовы модели и цена набора; 0 вызовов при прогнанных документах — ответы взяты из кэша (повтор, не выборка)."""
+    t = d.get("time") or {}
+    if "calls" not in t:
+        return "—"
+    if not t["calls"] and (d.get("runs") or d.get("cases")):
+        return "0 — повтор из кэша"
+    return f"{t['calls']}, ${t.get('cost_usd') or 0:.2f}"
+
+
+def gate_lines(sha: str, checks: list[dict] | None = None) -> list[str]:
+    """Ворота сейчас: сколько строк измерено на этом коде и что в них красное; строки на другом коде — по источникам."""
+    if checks is None:
+        try:
+            from . import gate
+
+            checks = gate.collect()
+        except Exception as e:  # noqa: BLE001 — ворота дополняют цифры выше, а не заменяют их
+            return ["", f"Ворота не собрались: {type(e).__name__}: {e}."]
+    checks = [c for c in checks if not c.get("info")]
+    on = [c for c in checks if sha in str(c.get("source") or "")]
+    other = [c for c in checks if c.get("source") and sha not in str(c["source"])]
+
+    def score(cs: list[dict]) -> str:
+        return (f"✅ {sum(1 for c in cs if c['ok'])}, ❌ {sum(1 for c in cs if c['ok'] is False)}, "
+                f"⏳ {sum(1 for c in cs if c['ok'] is None)}")
+
+    L = ["", f"**Ворота WAVE3 сейчас** ({_rows(len(checks))}, `python -m evaluation.v2.gate`): на этом коде "
+         f"{len(on)} — {score(on)}; на другом коде {len(other)} — {score(other)}; "
+         f"без замера {len(checks) - len(on) - len(other)}."]
+    red = [c for c in on if c["ok"] is False]
+    if red:
+        L += ["", "| Красное на этом коде | Факт (цель) | Кому |", "| :--- | :--- | :--- |"]
+        for c in red:
+            owners = str(c.get("owners") or "").replace("|", "/")
+            L.append(f"| {c['name']} | {c['fact']} ({c['target']}) | "
+                     f"{owners if len(owners) <= 160 else owners[:157] + '…'} |")
+    if other:
+        srcs: dict[str, list[dict]] = {}
+        for c in other:
+            srcs.setdefault(str(c["source"]), []).append(c)
+        L += ["", "Не на этом коде (последний замер другого коммита): " + "; ".join(
+            f"{s} — {len(cs)} ({score(cs)})" for s, cs in srcs.items()) + "."]
+    return L
+
+
+def render(ref: str, sha: str, note: str, checks: list[dict] | None = None) -> str:
     L = [f"Код: `{sha}`" + (f" ({note})" if note else "") + ". Все числа — из готовых замеров с этим коммитом в "
          "метке; пересчитать — `python -m evaluation.v2.final --commit " + ref + " --write`.", ""]
     off = official(sha)
@@ -108,19 +160,21 @@ def render(ref: str, sha: str, note: str) -> str:
     if corp:
         L += ["", "**Корпус `evaluation/dev`** (строгий счётчик `evaluation/harness`):", "",
               "| Прогон | Модель | Кейсов (не измерено) | TP | FP | FN | Precision | Recall | F1 | critical на чистых | "
-              "«нельзя» на чистых |", "| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
+              "«нельзя» на чистых | Вызовов, $ |",
+              "| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |"]
         for d in corp:
             h, c = d.get("harness") or {}, d.get("clean") or {}
             f = (lambda v: "—" if v is None else f"{v:.2f}")
             L.append(f"| {d.get('label')} | {d.get('model')} | {d.get('cases')} ({d.get('failed') or 0}) | "
                      f"{h.get('tp')} | {h.get('fp')} | {h.get('fn')} | {f(h.get('precision'))} | {f(h.get('recall'))} | "
-                     f"{f(h.get('f1'))} | {c.get('critical')} | {c.get('verdict_no')} из {c.get('measured')} |")
+                     f"{f(h.get('f1'))} | {c.get('critical')} | {c.get('verdict_no')} из {c.get('measured')} | "
+                     f"{_calls(d)} |")
     nz = _summaries(V2 / "newtz_results", sha)
     if nz:
         L += ["", "**Новые ТЗ №18 и чистые наборы:**", "",
               "| Прогон | Модель | Документов (сбоев) | Recall по эталону | Precision | Чистых: critical / major / «нельзя» "
-              "| Вставка для модели замечена |",
-              "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |"]
+              "| Вставка для модели замечена | Вызовов, $ |",
+              "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"]
         for d in nz:
             h, c, inj = d.get("harness") or {}, d.get("clean") or {}, d.get("injection") or {}
             tp, fp = h.get("tp") or 0, h.get("fp") or 0
@@ -130,9 +184,11 @@ def render(ref: str, sha: str, note: str) -> str:
                   if c.get("n") else "—")
             ij = f"{inj.get('flagged')} из {inj.get('n')}" if inj.get("n") else "—"
             L.append(f"| {d.get('label')} | {d.get('model')} | {d.get('runs', d.get('cases'))} ({d.get('failed') or 0}) | "
-                     f"{rec} | {prec} | {cl} | {ij} |")
+                     f"{rec} | {prec} | {cl} | {ij} | {_calls(d)} |")
     if not (off or corp or nz):
         L += ["", f"Замеров с `{sha}` в метке нет — `python -m evaluation.v2.round … --label-commit {sha}`."]
+    else:
+        L += gate_lines(sha, checks)
     return "\n".join(L) + "\n"
 
 

@@ -287,6 +287,30 @@ def test_final_numbers_collects_runs_by_commit(tmp_path, monkeypatch):
     (v2 / "history.jsonl").write_text("\n".join(_json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
     monkeypatch.setattr(final, "V2", v2)
     monkeypatch.setattr(final, "ROOT", tmp_path)
-    text = final.render("abc1234", "abc1234", "")
+    text = final.render("abc1234", "abc1234", "", checks=[])
     assert "| sonnet | 2 | 2 | 5/5 | 4–5 | 18–19 | 29–31 | 0–1 | 0 | 2.8–3.0 | 9 | 90 % | 0.70–0.80 |" in text
     assert "sonnet — С15 (1 из 2), С17 (2 из 2)" in text and "haiku" not in text
+
+
+def test_final_marks_cache_replay_and_splits_gate_by_code():
+    """Набор без вызовов модели — «повтор из кэша», а не выборка; ворота — сколько строк на коде релиза и что в них красное."""
+    from evaluation.v2 import final
+
+    assert final._calls({"runs": 8, "time": {"calls": 0, "cost_usd": 0}}) == "0 — повтор из кэша"
+    assert final._calls({"cases": 33, "time": {"calls": 278, "cost_usd": 1.813}}) == "278, $1.81"
+    assert final._calls({"runs": 4}) == "—"
+    assert [final._rows(n) for n in (1, 3, 11, 21, 53, 112)] == [
+        "1 строка", "3 строки", "11 строк", "21 строка", "53 строки", "112 строк"]
+    checks = [{"name": "Официальный, sonnet: время", "ok": False, "fact": "3.1 мин", "target": "≤ 3 мин",
+               "owners": "№10", "source": "релиз: abc1234, sonnet (16:15)"},
+              {"name": "Официальный, sonnet: К1–К5", "ok": True, "fact": "5/5", "target": "≥ 5/5",
+               "source": "релиз: abc1234, sonnet (16:15)"},
+              {"name": "Официальный, Opus: дубли", "ok": False, "fact": "7", "target": "0",
+               "source": "стабильность Opus: e2f2cba, opus #1"},
+              {"name": "Официальный, Gemini: замер", "ok": None, "fact": "нет замера", "target": "есть", "source": None},
+              {"name": "справка", "ok": True, "info": True, "source": "релиз: abc1234"}]
+    text = "\n".join(final.gate_lines("abc1234", checks))
+    assert "(4 строки," in text and "на этом коде 2 — ✅ 1, ❌ 1, ⏳ 0" in text and "без замера 1" in text
+    assert "| Официальный, sonnet: время | 3.1 мин (≤ 3 мин) | №10 |" in text
+    assert "стабильность Opus: e2f2cba, opus #1 — 1 (✅ 0, ❌ 1, ⏳ 0)" in text
+    assert "Opus: дубли |" not in text  # красное чужого кода — не в таблице релиза

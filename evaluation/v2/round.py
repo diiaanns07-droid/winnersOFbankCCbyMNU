@@ -5,6 +5,11 @@
     python -m evaluation.v2.round --name "замер 11:00" --official sonnet haiku opus --no-corpus
     python -m evaluation.v2.round --name "стабильность sonnet" --official sonnet sonnet sonnet --no-cache \\
         --no-corpus --no-newtz                                                 # 3 прогона без кэша + сводка
+    python -m evaluation.v2.round --name "свежие чистые" --official --no-corpus --no-newtz --clean20 haiku \
+        --no-cache-sets                                                        # чистые наборы мимо кэша
+
+Без `--no-cache-sets` корпус, новые ТЗ и чистые наборы берут ответы модели из кэша: если промпты не менялись,
+это повтор старых ответов через новый код (0 вызовов), а не новая выборка — `final` помечает такие строки.
 
 Метки замеров: «<name>: <коммит>, <модель>» (повтор модели — «… #2»). Логи — `out/round/<slug>/*.log`.
 """
@@ -25,6 +30,12 @@ from .measure import MEAS, slugify
 def _commit() -> str:
     return subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
                           cwd=str(ROOT)).stdout.strip() or "?"
+
+
+def _agent_tpl(runs: Path, no_cache: bool = False) -> str:
+    """Шаблон команды агента для corpus/newtz: свой --runs-dir, по желанию мимо кэша ответов модели."""
+    return ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
+            f"--runs-dir {shell_quote(runs)}" + (" --no-cache" if no_cache else ""))
 
 
 def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]:
@@ -51,8 +62,7 @@ def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]
             print("набора evaluation/v2/clean нет (№20 не влит?) — пропускаю")
     for name, model, root, cases, title in sets:
         o = logs / name
-        cmd_tpl = ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
-                   f"--runs-dir {shell_quote(o / 'runs')}")
+        cmd_tpl = _agent_tpl(o / "runs", getattr(a, "no_cache_sets", False))
         out.append((name, [py, "-m", "evaluation.v2.newtz", "run", "--out", str(o), "--root", str(root),
                            "--cases", *cases, "--provider", "claude_cli", "--model", model, "--cmd", cmd_tpl,
                            "--jobs", str(getattr(a, "clean_jobs", 2)), "--label", f"{a.name}: {title}, {sha}, {model}",
@@ -77,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--clean-jobs", type=int, default=2, help="параллельных документов в чистых наборах")
     ap.add_argument("--label-commit", help="коммит в метках вместо HEAD (замер на коммите интеграции)")
     ap.add_argument("--no-cache", action="store_true", help="официальный документ мимо кэша (стабильность)")
+    ap.add_argument("--no-cache-sets", action="store_true",
+                    help="корпус, новые ТЗ и чистые наборы мимо кэша — новая выборка ответов, а не повтор")
     ap.add_argument("--arbiter", default="sonnet")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
@@ -101,8 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         jobs.append((f"official_{m}_{seen[m]}", cmd))
     if not a.no_corpus:
         out = logs / "corpus"
-        cmd_tpl = ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
-                   f"--runs-dir {shell_quote(out / 'runs')}")
+        cmd_tpl = _agent_tpl(out / "runs", a.no_cache_sets)
         jobs.append(("corpus", [py, "-m", "evaluation.v2.corpus", "run", "--out", str(out), "--provider", "claude_cli",
                                 "--model", a.corpus_model, "--cmd", cmd_tpl, "--jobs", str(a.corpus_jobs),
                                 "--label", f"{a.name}: {sha}, {a.corpus_model}", "--save"]))
@@ -111,8 +122,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if [c for c in discover(OPEN2) if c["variant"] != "error"]:
             out = logs / "newtz"
-            cmd_tpl = ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
-                       f"--runs-dir {shell_quote(out / 'runs')}")
+            cmd_tpl = _agent_tpl(out / "runs", a.no_cache_sets)
             jobs.append(("newtz", [py, "-m", "evaluation.v2.newtz", "run", "--out", str(out), "--provider", "claude_cli",
                                    "--model", a.newtz_model, "--cmd", cmd_tpl, "--jobs", "2",
                                    "--label", f"{a.name}: {sha}, {a.newtz_model}", "--save"]))
