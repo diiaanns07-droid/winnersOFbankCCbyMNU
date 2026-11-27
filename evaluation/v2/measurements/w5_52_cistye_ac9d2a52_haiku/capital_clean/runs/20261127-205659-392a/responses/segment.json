@@ -1,0 +1,438 @@
+[
+  {
+    "requirements": [
+      {
+        "source_id": "",
+        "kind": "goal",
+        "summary": "Клиентский выбор способа выплаты процентов",
+        "line_start": 22,
+        "line_end": 22
+      },
+      {
+        "source_id": "",
+        "kind": "architecture",
+        "summary": "Связь приложения, API, модуля и уведомлений",
+        "line_start": 25,
+        "line_end": 25
+      },
+      {
+        "source_id": "",
+        "kind": "ui",
+        "summary": "Экран «Проценты» и выбор способа выплаты",
+        "line_start": 28,
+        "line_end": 28
+      },
+      {
+        "source_id": "",
+        "kind": "process",
+        "summary": "Процесс начисления и выплаты процентов",
+        "line_start": 33,
+        "line_end": 33
+      },
+      {
+        "source_id": "Ф-1",
+        "kind": "functional",
+        "summary": "Способ выплаты и значение по умолчанию",
+        "line_start": 36,
+        "line_end": 36
+      },
+      {
+        "source_id": "Ф-2",
+        "kind": "functional",
+        "summary": "Ежедневное начисление процентов на остаток",
+        "line_start": 37,
+        "line_end": 37
+      },
+      {
+        "source_id": "Ф-3",
+        "kind": "functional",
+        "summary": "Смена способа выплаты с следующего месяца",
+        "line_start": 38,
+        "line_end": 38
+      },
+      {
+        "source_id": "Ф-4",
+        "kind": "functional",
+        "summary": "Нет начисления при остатке ниже порога",
+        "line_start": 39,
+        "line_end": 39
+      },
+      {
+        "source_id": "Ф-5",
+        "kind": "functional",
+        "summary": "Push после выплаты и капитализация при сбое карты",
+        "line_start": 40,
+        "line_end": 40
+      },
+      {
+        "source_id": "Ф-6",
+        "kind": "functional",
+        "summary": "Выплата процентов при закрытии счёта",
+        "line_start": 41,
+        "line_end": 41
+      },
+      {
+        "source_id": "",
+        "kind": "process",
+        "summary": "Последовательность вызовов при смене способа",
+        "line_start": 44,
+        "line_end": 44
+      },
+      {
+        "source_id": "",
+        "kind": "nonfunctional",
+        "summary": "Округление, время ответа и доступность API",
+        "line_start": 47,
+        "line_end": 47
+      },
+      {
+        "source_id": "",
+        "kind": "data",
+        "summary": "Хранимые данные о выплатах процентов",
+        "line_start": 50,
+        "line_end": 50
+      },
+      {
+        "source_id": "",
+        "kind": "integration",
+        "summary": "Интеграция приложения с REST API сбережений",
+        "line_start": 53,
+        "line_end": 53
+      },
+      {
+        "source_id": "Критерии приемки, строка 1",
+        "kind": "acceptance",
+        "summary": "Начисление и капитализация процентов за месяц",
+        "line_start": 64,
+        "line_end": 64
+      },
+      {
+        "source_id": "Критерии приемки, строка 2",
+        "kind": "acceptance",
+        "summary": "Смена способа в середине месяца",
+        "line_start": 65,
+        "line_end": 65
+      },
+      {
+        "source_id": "Критерии приемки, строка 3",
+        "kind": "acceptance",
+        "summary": "Нет начисления при остатке ниже 1 000 ₸",
+        "line_start": 66,
+        "line_end": 66
+      },
+      {
+        "source_id": "Критерии приемки, строка 4",
+        "kind": "acceptance",
+        "summary": "Перечисление процентов на карту и push",
+        "line_start": 67,
+        "line_end": 67
+      },
+      {
+        "source_id": "Общие параметры",
+        "kind": "api",
+        "summary": "Метод 1: изменение способа выплаты, PUT",
+        "line_start": 105,
+        "line_end": 116
+      },
+      {
+        "source_id": "Логика работы метода, п. 1",
+        "kind": "functional",
+        "summary": "Проверка сессии клиента",
+        "line_start": 119,
+        "line_end": 119
+      },
+      {
+        "source_id": "Логика работы метода, п. 2",
+        "kind": "functional",
+        "summary": "Проверка принадлежности и статуса счёта",
+        "line_start": 120,
+        "line_end": 120
+      },
+      {
+        "source_id": "Логика работы метода, п. 3",
+        "kind": "functional",
+        "summary": "Проверка карты при способе CARD",
+        "line_start": 121,
+        "line_end": 121
+      },
+      {
+        "source_id": "Логика работы метода, п. 4",
+        "kind": "functional",
+        "summary": "Сохранение способа с датой начала действия",
+        "line_start": 122,
+        "line_end": 122
+      },
+      {
+        "source_id": "Логика работы метода, п. 5",
+        "kind": "functional",
+        "summary": "Возврат текущих условий и процентов",
+        "line_start": 123,
+        "line_end": 123
+      },
+      {
+        "source_id": "Особые правила, п. 1",
+        "kind": "functional",
+        "summary": "Повторная установка способа возвращает 200",
+        "line_start": 126,
+        "line_end": 126
+      },
+      {
+        "source_id": "Особые правила, п. 2",
+        "kind": "functional",
+        "summary": "Несколько смен в месяце: действует последний",
+        "line_start": 127,
+        "line_end": 127
+      },
+      {
+        "source_id": "Особые правила, п. 3",
+        "kind": "constraint",
+        "summary": "Для CAPITALIZATION cardId не сохраняется",
+        "line_start": 128,
+        "line_end": 128
+      },
+      {
+        "source_id": "",
+        "kind": "architecture",
+        "summary": "Схема вызова метода через депозитный модуль",
+        "line_start": 132,
+        "line_end": 132
+      },
+      {
+        "source_id": "Path-параметры: accountId",
+        "kind": "api",
+        "summary": "Идентификатор счёта, обязательный",
+        "line_start": 141,
+        "line_end": 141
+      },
+      {
+        "source_id": "",
+        "kind": "api",
+        "summary": "Тип содержимого тела запроса JSON",
+        "line_start": 143,
+        "line_end": 144
+      },
+      {
+        "source_id": "Request body: mode",
+        "kind": "api",
+        "summary": "Способ выплаты, обязательный",
+        "line_start": 148,
+        "line_end": 148
+      },
+      {
+        "source_id": "Request body: cardId",
+        "kind": "api",
+        "summary": "Карта для выплаты, обязательна для CARD",
+        "line_start": 149,
+        "line_end": 149
+      },
+      {
+        "source_id": "",
+        "kind": "api",
+        "summary": "Правило успешного и неуспешного ответа",
+        "line_start": 152,
+        "line_end": 152
+      },
+      {
+        "source_id": "Ответ: currentMode",
+        "kind": "api",
+        "summary": "Способ выплаты в текущем месяце",
+        "line_start": 156,
+        "line_end": 156
+      },
+      {
+        "source_id": "Ответ: nextMode",
+        "kind": "api",
+        "summary": "Способ выплаты с 1-го числа следующего месяца",
+        "line_start": 157,
+        "line_end": 157
+      },
+      {
+        "source_id": "Ответ: effectiveFrom",
+        "kind": "api",
+        "summary": "Дата начала действия нового способа",
+        "line_start": 158,
+        "line_end": 158
+      },
+      {
+        "source_id": "Ответ: rate",
+        "kind": "api",
+        "summary": "Годовая ставка, %",
+        "line_start": 159,
+        "line_end": 159
+      },
+      {
+        "source_id": "Ответ: accruedInterest",
+        "kind": "api",
+        "summary": "Проценты за текущий месяц на дату запроса",
+        "line_start": 160,
+        "line_end": 160
+      },
+      {
+        "source_id": "Статус 200",
+        "kind": "api",
+        "summary": "Успешное выполнение метода",
+        "line_start": 164,
+        "line_end": 164
+      },
+      {
+        "source_id": "Статус 400",
+        "kind": "api",
+        "summary": "Ошибка неверного запроса к смене способа",
+        "line_start": 165,
+        "line_end": 165
+      },
+      {
+        "source_id": "Статус 401",
+        "kind": "api",
+        "summary": "Запрос без необходимой авторизации",
+        "line_start": 166,
+        "line_end": 166
+      },
+      {
+        "source_id": "Статус 404",
+        "kind": "api",
+        "summary": "Счёт или карта не найдены либо чужие",
+        "line_start": 167,
+        "line_end": 167
+      },
+      {
+        "source_id": "Статус 500",
+        "kind": "api",
+        "summary": "Внутренняя ошибка сервера",
+        "line_start": 168,
+        "line_end": 168
+      },
+      {
+        "source_id": "",
+        "kind": "api",
+        "summary": "Общие правила методов чтения 2 и 3",
+        "line_start": 197,
+        "line_end": 197
+      },
+      {
+        "source_id": "Методы чтения, строка 1",
+        "kind": "api",
+        "summary": "Метод 2: условия и проценты по счёту",
+        "line_start": 201,
+        "line_end": 201
+      },
+      {
+        "source_id": "Методы чтения, строка 2",
+        "kind": "api",
+        "summary": "Метод 3: история начислений за период",
+        "line_start": 202,
+        "line_end": 202
+      }
+    ],
+    "excluded": [
+      {
+        "what": "Название документа",
+        "line_start": 1,
+        "line_end": 1,
+        "reason": "Название документа, не требование"
+      },
+      {
+        "what": "Служебное пояснение о составе комплекта",
+        "line_start": 3,
+        "line_end": 3,
+        "reason": "Пояснение о самом документе (состав комплекта), не требование"
+      },
+      {
+        "what": "Таблица общих сведений и её шапка",
+        "line_start": 11,
+        "line_end": 19,
+        "reason": "Метаданные: наименование, продукт, роли, процесс, тип работы, затронутые системы, ссылка на JIRA; шапка «Поле | Значение»"
+      },
+      {
+        "what": "Заглушка раздела тестирования",
+        "line_start": 58,
+        "line_end": 58,
+        "reason": "Заглушка «заполняются тестировщиками», содержания нет"
+      },
+      {
+        "what": "Шапка таблицы критериев приёмки",
+        "line_start": 62,
+        "line_end": 62,
+        "reason": "Строка-шапка таблицы"
+      },
+      {
+        "what": "Шаблон чек-листа ревью",
+        "line_start": 70,
+        "line_end": 87,
+        "reason": "Шаблон чек-листа ревью, процессный шаблон; отметки и версия не проставлены; включает строку-шапку L072"
+      },
+      {
+        "what": "Блок согласующих",
+        "line_start": 91,
+        "line_end": 96,
+        "reason": "Шаблон блока согласования: шапка и пустые строки, подписи не заполнены"
+      },
+      {
+        "what": "Служебное пояснение о дочернем документе",
+        "line_start": 99,
+        "line_end": 99,
+        "reason": "Пояснение о том, чей это дочерний документ и где описаны методы 2 и 3; не требование"
+      },
+      {
+        "what": "Шапка таблицы общих параметров метода 1",
+        "line_start": 103,
+        "line_end": 103,
+        "reason": "Строка-шапка таблицы «Поле | Значение»"
+      },
+      {
+        "what": "Шапка таблицы Path-параметры",
+        "line_start": 139,
+        "line_end": 139,
+        "reason": "Строка-шапка таблицы"
+      },
+      {
+        "what": "Шапка таблицы тела запроса",
+        "line_start": 146,
+        "line_end": 146,
+        "reason": "Строка-шапка таблицы"
+      },
+      {
+        "what": "Шапка таблицы параметров ответа",
+        "line_start": 154,
+        "line_end": 154,
+        "reason": "Строка-шапка таблицы"
+      },
+      {
+        "what": "Пример тела ответа 200",
+        "line_start": 170,
+        "line_end": 172,
+        "reason": "Пример тела к коду «Статус 200» (L164), отдельного требования не даёт"
+      },
+      {
+        "what": "Пример тела ответа 400",
+        "line_start": 175,
+        "line_end": 177,
+        "reason": "Пример тела к коду «Статус 400» (L165), отдельного требования не даёт"
+      },
+      {
+        "what": "Пример тела ответа 401",
+        "line_start": 180,
+        "line_end": 182,
+        "reason": "Пример тела к коду «Статус 401» (L166), отдельного требования не даёт"
+      },
+      {
+        "what": "Пример тела ответа 404",
+        "line_start": 185,
+        "line_end": 187,
+        "reason": "Пример тела к коду «Статус 404» (L167), отдельного требования не даёт"
+      },
+      {
+        "what": "Пример тела ответа 500",
+        "line_start": 190,
+        "line_end": 192,
+        "reason": "Пример тела к коду «Статус 500» (L168), отдельного требования не даёт"
+      },
+      {
+        "what": "Шапка таблицы методов чтения",
+        "line_start": 199,
+        "line_end": 199,
+        "reason": "Строка-шапка таблицы"
+      }
+    ]
+  }
+]

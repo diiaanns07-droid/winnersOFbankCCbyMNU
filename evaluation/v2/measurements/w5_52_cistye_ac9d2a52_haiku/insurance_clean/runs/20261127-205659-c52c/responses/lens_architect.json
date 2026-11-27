@@ -1,0 +1,475 @@
+[
+  {
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /loans/applications/{applicationId}/insurance",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 111
+        },
+        {
+          "name": "GET /loans/insurance/quote",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 220
+        },
+        {
+          "name": "POST /loans/{loanId}/insurance/refusal",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 221
+        },
+        {
+          "name": "DELETE /loans/applications/{applicationId}/insurance",
+          "method": "DELETE",
+          "purpose": "удаление",
+          "line": 222
+        },
+        {
+          "name": "GET /loans/{loanId}/insurance",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 223
+        },
+        {
+          "name": "Кредитный конвейер → сервис страхования: выпустить полис",
+          "method": "вызов",
+          "purpose": "уведомление",
+          "line": 45
+        },
+        {
+          "name": "Сервис страхования → страховая компания-партнёр: предварительная проверка",
+          "method": "вызов",
+          "purpose": "чтение",
+          "line": 45
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать стоимость страхования и ставки до включения флажка",
+          "line": 48,
+          "operation": "GET /loans/insurance/quote"
+        },
+        {
+          "what": "показать стоимость страхования и ставки с страхованием и без него на экране условий",
+          "line": 28,
+          "operation": "GET /loans/insurance/quote"
+        },
+        {
+          "what": "подключить страхование к заявке",
+          "line": 54,
+          "operation": "POST /loans/applications/{applicationId}/insurance"
+        },
+        {
+          "what": "снять страхование с заявки до подписания",
+          "line": 54,
+          "operation": "DELETE /loans/applications/{applicationId}/insurance"
+        },
+        {
+          "what": "показать сведения о полисе",
+          "line": 54,
+          "operation": "GET /loans/{loanId}/insurance"
+        },
+        {
+          "what": "показать номер полиса и дату начала действия",
+          "line": 29,
+          "operation": "GET /loans/{loanId}/insurance"
+        },
+        {
+          "what": "оформить отказ от страхования",
+          "line": 54,
+          "operation": "POST /loans/{loanId}/insurance/refusal"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            165,
+            176,
+            216
+          ],
+          "described": true,
+          "note": "успех, тело с status, premium, rate у метода 1"
+        },
+        {
+          "code": "400",
+          "lines": [
+            123,
+            125,
+            166,
+            181,
+            220
+          ],
+          "described": true,
+          "note": "сумма, срок или отсутствие согласия; также quote"
+        },
+        {
+          "code": "401",
+          "lines": [
+            167,
+            186,
+            216
+          ],
+          "described": true,
+          "note": "для всех методов"
+        },
+        {
+          "code": "404",
+          "lines": [
+            121,
+            168,
+            191,
+            221,
+            222,
+            223
+          ],
+          "described": true,
+          "note": "заявка или кредит не найден или чужой"
+        },
+        {
+          "code": "409",
+          "lines": [
+            121,
+            169,
+            196,
+            221,
+            222
+          ],
+          "described": true,
+          "note": "заявка подписана; для отказа также больше 14 дней или отказ оформлен"
+        },
+        {
+          "code": "422",
+          "lines": [
+            123,
+            170,
+            199,
+            201
+          ],
+          "described": true,
+          "note": "тело-пример только для возраста; для отказа страховщика тела нет"
+        },
+        {
+          "code": "500",
+          "lines": [
+            171,
+            206,
+            216
+          ],
+          "described": true,
+          "note": "внутренняя ошибка"
+        },
+        {
+          "code": "502",
+          "lines": [
+            172,
+            211
+          ],
+          "described": true,
+          "note": "страховая компания не ответила; в логике метода не упомянут"
+        }
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "places": "L150 integer 32 bit обязательный 300 000–5 000 000 loan_amount; L220 integer query обязательный"
+        },
+        {
+          "name": "term",
+          "places": "L151 integer 1–2 знака обязательный 6–60 loan_term; L220 integer query обязательный"
+        },
+        {
+          "name": "consentPd",
+          "places": "L152 boolean обязательный true pd_consent_at"
+        },
+        {
+          "name": "status",
+          "places": "L159 string CONNECTED; L222 REMOVED; L223 ACTIVE"
+        },
+        {
+          "name": "premium",
+          "places": "L160 integer ≥0 premium_kzt; L176 36000; L220 integer"
+        },
+        {
+          "name": "rate",
+          "places": "L161 number; L176 24.0; L222 27.0"
+        },
+        {
+          "name": "applicationId",
+          "places": "path string 1–64 application_id"
+        },
+        {
+          "name": "loanId",
+          "places": "path string 1–64 в методах 3 и 5"
+        },
+        {
+          "name": "policyNumber",
+          "places": "L223 строка, до выпуска null"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "проверить сессию клиента",
+          "line": 120,
+          "outcome": "401"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "заявка не принадлежит клиенту или не найдена",
+          "line": 121,
+          "outcome": "404"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "заявка уже подписана",
+          "line": 121,
+          "outcome": "409"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "сумма или срок вне диапазона",
+          "line": 122,
+          "outcome": "400"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "возраст старше 65 лет",
+          "line": 123,
+          "outcome": "422"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "расчёт премии и ставки",
+          "line": 124,
+          "outcome": ""
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "consentPd не равно true",
+          "line": 125,
+          "outcome": "400"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "страховая компания отказала при предварительной проверке",
+          "line": 125,
+          "outcome": "422"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "повторный вызов с теми же суммой и сроком",
+          "line": 128,
+          "outcome": "словами: действующие условия страхования"
+        },
+        {
+          "operation": "GET /loans/insurance/quote",
+          "step": "amount или term вне диапазона",
+          "line": 220,
+          "outcome": "400"
+        },
+        {
+          "operation": "POST /loans/{loanId}/insurance/refusal",
+          "step": "кредит не найден или чужой",
+          "line": 221,
+          "outcome": "404"
+        },
+        {
+          "operation": "POST /loans/{loanId}/insurance/refusal",
+          "step": "прошло больше 14 дней или отказ уже оформлен",
+          "line": 221,
+          "outcome": "409"
+        },
+        {
+          "operation": "DELETE /loans/applications/{applicationId}/insurance",
+          "step": "заявка не найдена или чужая",
+          "line": 222,
+          "outcome": "404"
+        },
+        {
+          "operation": "DELETE /loans/applications/{applicationId}/insurance",
+          "step": "заявка уже подписана",
+          "line": 222,
+          "outcome": "409"
+        },
+        {
+          "operation": "GET /loans/{loanId}/insurance",
+          "step": "кредит не найден или чужой",
+          "line": 223,
+          "outcome": "404"
+        }
+      ]
+    },
+    "candidates": [
+      {
+        "title": "Источник суммы и срока в методе подключения: тело запроса или заявка",
+        "kind": "api_contract",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-22",
+          "R-32",
+          "R-24"
+        ],
+        "evidence": [
+          {
+            "line": 122,
+            "quote": "3. Проверить сумму кредита (300 000 – 5 000 000 ₸) и срок term (6–60)."
+          },
+          {
+            "line": 150,
+            "quote": "amount | integer | 32 bit | Да | 300 000–5 000 000 | Сумма кредита в тенге | loan_amount"
+          }
+        ],
+        "problem": "Шаг 3 проверяет «сумму кредита» и срок, но не указано, берутся ли они из тела запроса или из заявки. Тело передаётся клиентом и может расходиться с заявкой.",
+        "scenario": "Заявка на 1 000 000 ₸ на 24 месяца. Приложение передаёт в теле amount 2 000 000. По шагу 3 проверка может пройти по телу, а премия по шагу 5 будет посчитана по другой сумме, чем в заявке.",
+        "impact": "Разные разработчики реализуют разные источники данных, и премия и сохранённое подключение разойдутся с кредитом.",
+        "recommendation": "Указать, что сумма и срок берутся из заявки, либо что тело должно совпадать с заявкой, и задать код и сообщение при расхождении.",
+        "rewrite": "Шаг 3: сумма и срок берутся из заявки; если amount или term из тела не совпадают с заявкой — <уточнить: код и текст ответа>.",
+        "question": "Должна ли сумма в теле метода совпадать с заявкой, и какой ответ при расхождении?",
+        "blocks": "both"
+      },
+      {
+        "title": "Премия целочисленная, а формула даёт дробные значения без округления",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-06",
+          "R-37"
+        ],
+        "evidence": [
+          {
+            "line": 38,
+            "quote": "Ф-2. Страховая премия равна сумме кредита × 0,15 % × срок кредита в месяцах."
+          },
+          {
+            "line": 160,
+            "quote": "premium | integer | ≥ 0 | Страховая премия, ₸ | premium_kzt"
+          }
+        ],
+        "problem": "Формула даёт дробное значение при суммах, не кратных 1000 ₸ (например, 300 001 × 0,15 % × 6 = 2700,009), а тип premium в ответе — integer. Правило округления не задано.",
+        "scenario": "Сумма 300 001 ₸ на 6 месяцев: формула даёт 2700,009. Поле integer не может вернуть это значение, и разные реализации округлят по-разному.",
+        "impact": "Клиенту покажут разную премию в приложении, в ответе API и при возврате, и возникнет спор о сумме.",
+        "recommendation": "Указать правило округления премии до тенге и применить его в формуле и в ответе.",
+        "rewrite": "premium | integer | ≥ 0 | Страховая премия, ₸, округляется <уточнить: вверх, вниз или до ближайшего> до целого тенге.",
+        "question": "Какое правило округления премии до тенге?",
+        "blocks": "both"
+      },
+      {
+        "title": "Значения status и состояние после отказа не определены",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-36",
+          "R-49",
+          "R-51"
+        ],
+        "evidence": [
+          {
+            "line": 159,
+            "quote": "status | string | CONNECTED | Результат подключения | insurance_status"
+          },
+          {
+            "line": 223,
+            "quote": "{\"status\":\"ACTIVE\",\"policyNumber\":\"LI-2026-000123\",\"startDate\":\"2026-03-01\"}"
+          },
+          {
+            "line": 221,
+            "quote": "{\"refund\":36000,\"refundUntil\":\"2026-03-19\",\"newRate\":27.0}"
+          }
+        ],
+        "problem": "Перечень значений status описан только примерами CONNECTED, ACTIVE, REMOVED. Ответ отказа не содержит status, а состояние после отказа в методе 5 не описано.",
+        "scenario": "Клиент отказался от страхования, затем приложение вызывает GET /loans/{loanId}/insurance. Документ не говорит, какой status вернуть и вернётся ли полис.",
+        "impact": "Клиентское приложение не сможет корректно отрисовать экран «Страхование» после отказа.",
+        "recommendation": "Перечислить все значения status для методов 1, 4 и 5 и указать значение после отказа.",
+        "rewrite": "status в ответе метода 5 принимает значения <уточнить: полный перечень значений и значение после отказа>.",
+        "question": "Какие значения status допустимы в методе 5 и каким будет состояние после отказа?",
+        "blocks": "both"
+      },
+      {
+        "title": "Проверка возраста не учитывает нижнюю границу 18 лет",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-10",
+          "R-23"
+        ],
+        "evidence": [
+          {
+            "line": 42,
+            "quote": "Ф-6. Страхование доступно клиенту от 18 лет, которому на дату окончания кредита будет не больше 65 лет."
+          },
+          {
+            "line": 123,
+            "quote": "4. Проверить возраст клиента на дату окончания кредита. Если он больше 65 лет, вернуть 422."
+          }
+        ],
+        "problem": "Ф-6 задаёт нижнюю границу 18 лет, но шаг 4 проверяет только верхнюю границу 65 лет.",
+        "scenario": "Клиенту 17 лет, кредит на 12 месяцев. Шаг 4 не возвращает 422, и премия оформляется.",
+        "impact": "Страхование может быть подключено клиенту младше 18 лет вопреки Ф-6.",
+        "recommendation": "Добавить в шаг 4 проверку нижней границы и код ответа для неё.",
+        "rewrite": "4. Проверить возраст клиента на дату окончания кредита: если меньше 18 или больше 65 лет, вернуть 422 с сообщением <уточнить: текст сообщения>.",
+        "question": "Какой текст ответа при возрасте младше 18 лет?",
+        "blocks": "development"
+      },
+      {
+        "title": "Поля интерфейса пишутся в хранилище, но их нет в перечне данных",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-13",
+          "R-34"
+        ],
+        "evidence": [
+          {
+            "line": 51,
+            "quote": "Хранить идентификатор заявки и кредита, признак подключения страхования"
+          },
+          {
+            "line": 152,
+            "quote": "consentPd | boolean | — | Да | true | Согласие клиента на передачу персональных данных страховой компании-партнёру | pd_consent_at"
+          }
+        ],
+        "problem": "В перечне хранимых данных нет момента согласия pd_consent_at, а также loan_amount и loan_term, хотя их DB-поля указаны в параметрах запроса.",
+        "scenario": "Проверка согласия на передачу ПДн по данным хранения: в перечне нет поля, в котором фиксируется согласие.",
+        "impact": "Разработчик не знает, какие поля создавать в таблице, и подтвердить согласие клиента в аудите будет нечем.",
+        "recommendation": "Добавить в перечень хранимых данных момент согласия, сумму и срок кредита.",
+        "rewrite": "Требования к данным: добавить сумму кредита (loan_amount), срок кредита (loan_term) и момент согласия на передачу ПДн (pd_consent_at).",
+        "question": "",
+        "blocks": "development"
+      },
+      {
+        "title": "Ответ 422 для отказа страховщика не имеет тела с причиной",
+        "kind": "api_contract",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-44"
+        ],
+        "evidence": [
+          {
+            "line": 170,
+            "quote": "422. Ответ в случае, если клиент не подходит по возрасту или страховая компания-партнёр отказала по результатам предварительной проверки."
+          },
+          {
+            "line": 201,
+            "quote": "{\"message\":\"Страхование недоступно по возрасту\"}"
+          }
+        ],
+        "problem": "Одним кодом 422 описаны два разных отказа, а пример тела только для возраста. Текст для отказа страховщика не задан.",
+        "scenario": "Страховая компания отказала по предварительной проверке. Клиент получает 422 и тот же текст «Страхование недоступно по возрасту», хотя причина другая.",
+        "impact": "Приложение покажет клиенту неверную причину отказа.",
+        "recommendation": "Добавить пример тела 422 для отказа страховщика или отдельный код.",
+        "rewrite": "422 (отказ страховщика): {\"message\":\"<уточнить: текст для отказа страховой компании>\"}",
+        "question": "Какой текст показывать при отказе страховщика?",
+        "blocks": "both"
+      }
+    ]
+  }
+]

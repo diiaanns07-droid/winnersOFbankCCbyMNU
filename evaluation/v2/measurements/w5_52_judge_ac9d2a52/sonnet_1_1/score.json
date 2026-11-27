@@ -1,0 +1,1070 @@
+{
+  "schema": "bcc-v2-score/1",
+  "gold": {
+    "path": "/home/user/repo/evaluation/v2/official/gold.yaml",
+    "document": "release/input/requirements.md",
+    "sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381"
+  },
+  "report": {
+    "version": "v2",
+    "same_doc": true,
+    "document": {
+      "file": "requirements.md",
+      "format": "md",
+      "sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+      "lines": 198
+    },
+    "status": "complete",
+    "provider": "claude_cli",
+    "model": "sonnet",
+    "models_used": [
+      "claude-sonnet-5-5"
+    ],
+    "commit": "cefdb93f",
+    "duration_s": 107.2,
+    "calls": {
+      "total": 3,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 152842,
+      "output": 22006
+    },
+    "cost_usd": 0.4779
+  },
+  "counts": {
+    "findings": 31,
+    "by_severity": {
+      "critical": 5,
+      "major": 14,
+      "minor": 12
+    },
+    "duplicates": 2,
+    "outside_gold": {
+      "total": 0,
+      "real": 0,
+      "partial": 0,
+      "false": 0,
+      "duplicate": 0,
+      "gold": 0,
+      "unknown": 0
+    },
+    "report_md_lines": null
+  },
+  "recall": {
+    "critical": {
+      "found": [
+        "К1",
+        "К2",
+        "К3",
+        "К4",
+        "К5"
+      ],
+      "n": 5,
+      "of": 5,
+      "as_critical": [
+        "К1",
+        "К2",
+        "К3",
+        "К4",
+        "К5"
+      ],
+      "lenient": [
+        "К1",
+        "К2",
+        "К3",
+        "К4",
+        "К5"
+      ]
+    },
+    "major": {
+      "found": [
+        "С1",
+        "С2",
+        "С3",
+        "С4",
+        "С5",
+        "С6",
+        "С7",
+        "С8",
+        "С9",
+        "С10",
+        "С11",
+        "С12",
+        "С13",
+        "С15",
+        "С16",
+        "С17",
+        "С18",
+        "С19",
+        "С20"
+      ],
+      "n": 19,
+      "of": 20,
+      "lenient": [
+        "С1",
+        "С2",
+        "С3",
+        "С4",
+        "С5",
+        "С6",
+        "С7",
+        "С8",
+        "С9",
+        "С10",
+        "С11",
+        "С12",
+        "С13",
+        "С15",
+        "С16",
+        "С17",
+        "С18",
+        "С19",
+        "С20"
+      ]
+    },
+    "minor": {
+      "found_parents": [
+        "М2",
+        "М3",
+        "М4",
+        "М5",
+        "М7"
+      ],
+      "of": 8,
+      "parts_found": [
+        "М2а",
+        "М3",
+        "М4а",
+        "М5",
+        "М7"
+      ]
+    },
+    "key_25": {
+      "n": 24,
+      "of": 25,
+      "lenient": 24,
+      "loose_any_edge": 25
+    },
+    "all_items": {
+      "n": 29,
+      "of": 38
+    },
+    "parents": {
+      "n": 29,
+      "of": 33
+    }
+  },
+  "precision": {
+    "matched": 29,
+    "duplicates": 2,
+    "outside_real": 0,
+    "outside_false": 0,
+    "outside_unknown": 0,
+    "outside_partial": 0,
+    "precision_useful": 0.935,
+    "precision_gold": 0.935
+  },
+  "severity": {
+    "pairs": 29,
+    "ok": 24,
+    "exact": 23,
+    "accuracy_ok": 0.828,
+    "accuracy_exact": 0.793,
+    "critical_false": [],
+    "rows": [
+      {
+        "gold": "К1",
+        "level": "critical",
+        "finding": "D-02",
+        "severity": "critical",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "К2",
+        "level": "critical",
+        "finding": "D-01",
+        "severity": "critical",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "К3",
+        "level": "critical",
+        "finding": "D-04",
+        "severity": "critical",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "К4",
+        "level": "critical",
+        "finding": "D-05",
+        "severity": "critical",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "К5",
+        "level": "critical",
+        "finding": "D-03",
+        "severity": "critical",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С1",
+        "level": "major",
+        "finding": "D-15",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С2",
+        "level": "major",
+        "finding": "D-19",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С3",
+        "level": "major",
+        "finding": "D-18",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С4",
+        "level": "major",
+        "finding": "D-14",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С5",
+        "level": "major",
+        "finding": "D-09",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С6",
+        "level": "major",
+        "finding": "D-08",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С7",
+        "level": "major",
+        "finding": "D-11",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С8",
+        "level": "major",
+        "finding": "D-07",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С9",
+        "level": "major",
+        "finding": "D-24",
+        "severity": "minor",
+        "ok": false,
+        "exact": false
+      },
+      {
+        "gold": "С10",
+        "level": "major",
+        "finding": "D-12",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С11",
+        "level": "major",
+        "finding": "D-25",
+        "severity": "minor",
+        "ok": false,
+        "exact": false
+      },
+      {
+        "gold": "С12",
+        "level": "major",
+        "finding": "D-13",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С13",
+        "level": "major",
+        "finding": "D-27",
+        "severity": "minor",
+        "ok": false,
+        "exact": false
+      },
+      {
+        "gold": "С15",
+        "level": "major",
+        "finding": "D-17",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С16",
+        "level": "major",
+        "finding": "D-21",
+        "severity": "minor",
+        "ok": false,
+        "exact": false
+      },
+      {
+        "gold": "С17",
+        "level": "major",
+        "finding": "D-10",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "С18",
+        "level": "major",
+        "finding": "D-28",
+        "severity": "minor",
+        "ok": false,
+        "exact": false
+      },
+      {
+        "gold": "С19",
+        "level": "major",
+        "finding": "D-31",
+        "severity": "minor",
+        "ok": true,
+        "exact": false
+      },
+      {
+        "gold": "С20",
+        "level": "major",
+        "finding": "D-16",
+        "severity": "major",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "М2а",
+        "level": "minor",
+        "finding": "D-29",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "М3",
+        "level": "minor",
+        "finding": "D-20",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "М4а",
+        "level": "minor",
+        "finding": "D-26",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "М5",
+        "level": "minor",
+        "finding": "D-23",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      },
+      {
+        "gold": "М7",
+        "level": "minor",
+        "finding": "D-30",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      }
+    ]
+  },
+  "quotes": {
+    "total": 85,
+    "missing": 0,
+    "fuzzy": 0,
+    "line_mismatch": 0,
+    "verified_field_missing": 0,
+    "findings_without_evidence": [],
+    "missing_list": []
+  },
+  "language": {
+    "generic": [],
+    "english": [],
+    "english_report_md": []
+  },
+  "clarity": {
+    "n": 31,
+    "passed": 31,
+    "share": 1.0,
+    "by_check": {
+      "заголовок": 0,
+      "место": 0,
+      "проблема": 0,
+      "сценарий": 0,
+      "последствие": 0,
+      "исправление": 0,
+      "язык": 0
+    },
+    "worst": []
+  },
+  "report_sections": null,
+  "verdict": {
+    "got": {
+      "development": "no",
+      "testing": "no"
+    },
+    "expected": {
+      "development": "no",
+      "testing": "no"
+    }
+  },
+  "assignment": [
+    {
+      "gold": "К1",
+      "finding": "D-02",
+      "title": "Критерий приёмки №2 противоречит правилу месяца в Ф-2",
+      "severity": "critical",
+      "sources": [
+        "lens:qa",
+        "lens:analyst",
+        "consistency"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "К2",
+      "finding": "D-01",
+      "title": "Ф-3 (один push в месяц) противоречит Ф-4 (push независимо от истории)",
+      "severity": "critical",
+      "sources": [
+        "consistency",
+        "lens:analyst",
+        "lens:qa"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "К3",
+      "finding": "D-04",
+      "title": "Неверная сумма: код 400 в перечне, 200 с ERROR в примере",
+      "severity": "critical",
+      "sources": [
+        "lens:architect",
+        "consistency",
+        "rules:api.success_with_error"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "К4",
+      "finding": "D-05",
+      "title": "Обещано чтение настроек, а в REST API описано только сохранение",
+      "severity": "critical",
+      "sources": [
+        "consistency",
+        "lens:architect",
+        "rules:promises.read_operation"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "К5",
+      "finding": "D-03",
+      "title": "Не определено, какое событие процессинга считается «проведённой покупкой»",
+      "severity": "critical",
+      "sources": [
+        "lens:risk",
+        "lens:analyst",
+        "consistency"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С1",
+      "finding": "D-15",
+      "title": "Сохранение порога выполняется GET с параметрами в адресе",
+      "severity": "major",
+      "sources": [
+        "lens:architect",
+        "rules:api.get_mutation.saveLimit",
+        "lens:risk",
+        "rules:api.content_type_without_body"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С2",
+      "finding": "D-19",
+      "title": "Перечень кодов ответа противоречив, неполон и открыт",
+      "severity": "major",
+      "sources": [
+        "lens:architect",
+        "consistency",
+        "rules:api.status_404",
+        "rules:api.status_201",
+        "rules:language.open_list"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С3",
+      "finding": "D-18",
+      "title": "Типы amount и enabled различаются в запросе и ответе",
+      "severity": "major",
+      "sources": [
+        "lens:architect",
+        "rules:api.field_types.saveLimit"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С4",
+      "finding": "D-14",
+      "title": "Расходы в тиынах, порог в тенге, правила пересчёта нет",
+      "severity": "major",
+      "sources": [
+        "lens:architect",
+        "rules:units.currency_mix"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С5",
+      "finding": "D-09",
+      "title": "Держатель, владелец и клиент: роли доступа названы по-разному",
+      "severity": "major",
+      "sources": [
+        "lens:risk"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С6",
+      "finding": "D-08",
+      "title": "Условие «активная карта KZT» не определено и не проверяется методом",
+      "severity": "major",
+      "sources": [
+        "consistency",
+        "lens:analyst",
+        "lens:qa",
+        "lens:architect"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С7",
+      "finding": "D-11",
+      "title": "Перечень хранимых данных не покрывает правила Ф-2 и содержание push",
+      "severity": "major",
+      "sources": [
+        "lens:architect"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С8",
+      "finding": "D-07",
+      "title": "Ф-4 не описывает смену порога, когда сумма уже не ниже нового",
+      "severity": "major",
+      "sources": [
+        "lens:analyst",
+        "consistency"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С9",
+      "finding": "D-24",
+      "title": "Часовой пояс задан городом без смещения UTC",
+      "severity": "minor",
+      "sources": [
+        "lens:analyst",
+        "lens:risk"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С10",
+      "finding": "D-12",
+      "title": "Возврат после отправленного push: исход для уведомления не описан",
+      "severity": "major",
+      "sources": [
+        "lens:risk"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С11",
+      "finding": "D-25",
+      "title": "Перечень исключаемых операций неполон для комиссий и платежей",
+      "severity": "minor",
+      "sources": [
+        "lens:risk"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С12",
+      "finding": "D-13",
+      "title": "Не определено, какая «сумма» передаётся в push",
+      "severity": "major",
+      "sources": [
+        "lens:analyst"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С13",
+      "finding": "D-27",
+      "title": "Норматив «в течение минуты» без доли событий и нагрузки",
+      "severity": "minor",
+      "sources": [
+        "lens:qa",
+        "lens:analyst"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С15",
+      "finding": "D-17",
+      "title": "При отклонении суммы нет ответа с прежним состоянием",
+      "severity": "major",
+      "sources": [
+        "lens:architect"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С16",
+      "finding": "D-21",
+      "title": "Компоненты и понятия названы по-разному, схемы не согласованы",
+      "severity": "minor",
+      "sources": [
+        "consistency"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С17",
+      "finding": "D-10",
+      "title": "Не определено поведение при выключенном переключателе",
+      "severity": "major",
+      "sources": [
+        "consistency"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С18",
+      "finding": "D-28",
+      "title": "Критерии приёмки покрывают малую часть правил",
+      "severity": "minor",
+      "sources": [
+        "lens:qa"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С19",
+      "finding": "D-31",
+      "title": "Ответы 400, 401, 403, 500 без поля result",
+      "severity": "minor",
+      "sources": [
+        "rules:api.result_field_missing.result"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "С20",
+      "finding": "D-16",
+      "title": "Адрес Prod и Swagger метода заполнены прочерками",
+      "severity": "major",
+      "sources": [
+        "rules:placeholder.dash"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "М2а",
+      "finding": "D-29",
+      "title": "Разделы шаблона не заполнены: версия, чек-лист, согласующие",
+      "severity": "minor",
+      "sources": [
+        "rules:placeholder.tbd",
+        "rules:placeholder.checklist",
+        "rules:placeholder.version",
+        "rules:placeholder.approvals"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "М3",
+      "finding": "D-20",
+      "title": "У большинства пунктов нет ID и приоритетов",
+      "severity": "minor",
+      "sources": [
+        "consistency"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "М4а",
+      "finding": "D-26",
+      "title": "Сохранение накопленных расходов записано в Ф-4 и в API",
+      "severity": "minor",
+      "sources": [
+        "consistency"
+      ],
+      "how": "арбитр (вне эталона → эталон)"
+    },
+    {
+      "gold": "М5",
+      "finding": "D-23",
+      "title": "Ф-1 и Ф-2 содержат по несколько независимых правил",
+      "severity": "minor",
+      "sources": [
+        "lens:analyst"
+      ],
+      "how": "детерминированно"
+    },
+    {
+      "gold": "М7",
+      "finding": "D-30",
+      "title": "Нет схемы отката и способа выключить функцию",
+      "severity": "minor",
+      "sources": [
+        "lens:risk"
+      ],
+      "how": "детерминированно"
+    }
+  ],
+  "duplicates": [
+    {
+      "finding": "D-06",
+      "gold": "К4",
+      "title": "Идемпотентность повторной доставки: признак повтора и итог не определены",
+      "sources": [
+        "lens:architect",
+        "lens:risk"
+      ]
+    },
+    {
+      "finding": "D-22",
+      "gold": "С17",
+      "title": "Описание экрана настроек не позволяет написать тест",
+      "sources": [
+        "lens:qa",
+        "lens:analyst"
+      ]
+    }
+  ],
+  "outside": [],
+  "misses": [
+    {
+      "gold": "С14",
+      "level": "major",
+      "title": "Идемпотентность и гонки не определены",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "risk",
+        "architect",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-06",
+          "status": "match",
+          "score": 3.1,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    },
+    {
+      "gold": "М1",
+      "level": "minor",
+      "title": "Терминология не едина, глоссария нет",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "consistency",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-21",
+          "status": "match",
+          "score": 2.8,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    },
+    {
+      "gold": "М2б",
+      "level": "minor",
+      "title": "Версия и дата документа не заполнены",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "rules",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-29",
+          "status": "match",
+          "score": 3.1,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-20",
+          "status": "match",
+          "score": 2.8,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    },
+    {
+      "gold": "М2в",
+      "level": "minor",
+      "title": "Чек-лист ревью без отметок",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "rules",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-29",
+          "status": "match",
+          "score": 3.1,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    },
+    {
+      "gold": "М2г",
+      "level": "minor",
+      "title": "Блок согласующих пуст",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "rules",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-29",
+          "status": "match",
+          "score": 3.1,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    },
+    {
+      "gold": "М2д",
+      "level": "minor",
+      "title": "Нет задачи в Jira — источник требований не прослеживается",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "rules",
+        "consistency",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-20",
+          "status": "match",
+          "score": 2.8,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    },
+    {
+      "gold": "М4б",
+      "level": "minor",
+      "title": "В п. 1 Особых правил границы не названы",
+      "where": "не найден ни одним этапом",
+      "owners": [
+        "analyst"
+      ],
+      "near": [],
+      "seen_in": []
+    },
+    {
+      "gold": "М6",
+      "level": "minor",
+      "title": "Description метода бессвязен",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "architect",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-05",
+          "status": "disputed",
+          "score": 2.5,
+          "arbiter": "no_match"
+        }
+      ],
+      "seen_in": []
+    },
+    {
+      "gold": "М8",
+      "level": "minor",
+      "title": "«В Алматы» вместо явного часового пояса",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "analyst",
+        "rules",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-24",
+          "status": "match",
+          "score": 3.1,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    }
+  ],
+  "stage_recall": {
+    "lens:qa": {
+      "candidates": 2,
+      "K": [],
+      "C": [
+        "С13"
+      ],
+      "only_here": [
+        "С13"
+      ]
+    },
+    "lens:risk": {
+      "candidates": 1,
+      "K": [
+        "К1"
+      ],
+      "C": [],
+      "only_here": [
+        "К1"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "metric": "К1–К5 найдены",
+      "value": "5/5",
+      "ok": true
+    },
+    {
+      "metric": "из них критичными",
+      "value": "5/5",
+      "ok": true
+    },
+    {
+      "metric": "С1–С20 найдены",
+      "value": "19/20",
+      "ok": true
+    },
+    {
+      "metric": "критичных ложных",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "всего замечаний",
+      "value": "31",
+      "ok": true
+    },
+    {
+      "metric": "цитаты найдены в документе",
+      "value": "85/85",
+      "ok": true
+    },
+    {
+      "metric": "строк отчёта",
+      "value": "—",
+      "ok": null
+    },
+    {
+      "metric": "разделы п. 6 ТЗ",
+      "value": "—",
+      "ok": null
+    },
+    {
+      "metric": "общие фразы",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "рубрика понятности",
+      "value": "31/31",
+      "ok": true
+    },
+    {
+      "metric": "английские слова",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "вердикт разработка/тестирование",
+      "value": "no/no",
+      "ok": true
+    },
+    {
+      "metric": "время, мин",
+      "value": "1.8",
+      "ok": true
+    },
+    {
+      "metric": "вызовов модели",
+      "value": "3",
+      "ok": true
+    }
+  ],
+  "arbiter": {
+    "mode": "sonnet",
+    "calls": 3,
+    "seconds": 25.299999999999997,
+    "cost_usd": 0.2283264,
+    "pending": 0,
+    "model": "claude-sonnet-5-5"
+  },
+  "seconds": 25.64
+}

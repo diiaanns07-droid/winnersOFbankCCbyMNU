@@ -1,0 +1,311 @@
+[
+  {
+    "inventory": {
+      "operations": [
+        {
+          "name": "PUT /savings/{accountId}/payout-mode",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 110
+        },
+        {
+          "name": "GET /savings/{accountId}/interest",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 201
+        },
+        {
+          "name": "GET /savings/{accountId}/interest/history",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 202
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать ставку и проценты за текущий месяц на экране «Проценты»",
+          "line": 28,
+          "operation": "GET /savings/{accountId}/interest"
+        },
+        {
+          "what": "сохранить способ выплаты процентов по переключателю «Капитализация / На карту»",
+          "line": 28,
+          "operation": "PUT /savings/{accountId}/payout-mode"
+        },
+        {
+          "what": "показать историю начислений по кнопке «История начислений»",
+          "line": 28,
+          "operation": "GET /savings/{accountId}/interest/history"
+        },
+        {
+          "what": "показать сумму процентов за текущий месяц",
+          "line": 22,
+          "operation": "GET /savings/{accountId}/interest"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            152,
+            164,
+            172
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "400",
+          "lines": [
+            152,
+            165,
+            177,
+            202
+          ],
+          "described": true,
+          "note": "для метода 3 тело ответа не задано"
+        },
+        {
+          "code": "401",
+          "lines": [
+            152,
+            166,
+            182,
+            197
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404",
+          "lines": [
+            152,
+            167,
+            187,
+            201,
+            202
+          ],
+          "described": true,
+          "note": "для метода 2 не упомянут закрытый счёт"
+        },
+        {
+          "code": "500",
+          "lines": [
+            152,
+            168,
+            192,
+            197
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "accountId",
+          "places": "path, string 1–64, обязательный (строки 141, 201, 202)"
+        },
+        {
+          "name": "mode",
+          "places": "request body, string, CAPITALIZATION / CARD, обязательный (строка 148)"
+        },
+        {
+          "name": "cardId",
+          "places": "request body, string 1–64, для CARD (строка 149)"
+        },
+        {
+          "name": "currentMode",
+          "places": "ответ методов 1 и 2, string (строки 156, 172, 201)"
+        },
+        {
+          "name": "nextMode",
+          "places": "ответ методов 1 и 2, string (строки 157, 172, 201)"
+        },
+        {
+          "name": "effectiveFrom",
+          "places": "ответ метода 1, string ГГГГ-ММ-ДД (строки 158, 172)"
+        },
+        {
+          "name": "rate",
+          "places": "ответ методов 1 и 2, number, % годовых (строки 159, 172, 201)"
+        },
+        {
+          "name": "accruedInterest",
+          "places": "ответ методов 1 и 2, number, ₸ (строки 160, 172, 201)"
+        },
+        {
+          "name": "payoutCardId",
+          "places": "ответ метода 2, null в примере (строка 201)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "PUT payout-mode",
+          "step": "проверить сессию клиента",
+          "line": 119,
+          "outcome": "401, {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "PUT payout-mode",
+          "step": "проверить принадлежность и открытость счёта",
+          "line": 120,
+          "outcome": "404, {\"message\":\"Счёт или карта не найдены\"}"
+        },
+        {
+          "operation": "PUT payout-mode",
+          "step": "при mode = CARD проверить карту: принадлежность, активность, тенге",
+          "line": 121,
+          "outcome": "400, {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "operation": "PUT payout-mode",
+          "step": "сохранить способ с 1-го числа следующего месяца",
+          "line": 122,
+          "outcome": "200 (строка 164)"
+        },
+        {
+          "operation": "PUT payout-mode",
+          "step": "вернуть условия текущего и следующего месяца",
+          "line": 123,
+          "outcome": "200, тело строка 172"
+        },
+        {
+          "operation": "PUT payout-mode",
+          "step": "повторная установка выбранного способа",
+          "line": 126,
+          "outcome": "200 с текущими условиями"
+        },
+        {
+          "operation": "PUT payout-mode",
+          "step": "несколько смен в месяце: действует последний",
+          "line": 127,
+          "outcome": ""
+        },
+        {
+          "operation": "PUT payout-mode",
+          "step": "CAPITALIZATION: cardId не сохраняется",
+          "line": 128,
+          "outcome": ""
+        },
+        {
+          "operation": "GET history",
+          "step": "период больше 12 месяцев или from позже to",
+          "line": 202,
+          "outcome": "400, тело не задано"
+        }
+      ]
+    },
+    "candidates": [
+      {
+        "title": "Поле next_payout_mode не описано в перечне хранимых данных",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-13",
+          "R-35",
+          "R-23"
+        ],
+        "evidence": [
+          {
+            "line": 157,
+            "quote": "nextMode | string | CAPITALIZATION / CARD | Способ выплаты с 1-го числа следующего месяца | next_payout_mode"
+          },
+          {
+            "line": 50,
+            "quote": "Хранить идентификатор счёта, способ выплаты, карту для выплаты, дату начала действия нового способа"
+          }
+        ],
+        "problem": "Метод 1 записывает новый способ в поле next_payout_mode и возвращает его как nextMode, но перечень хранимых данных знает только один «способ выплаты». Текущий и следующий способ не разделены.",
+        "scenario": "Клиент в марте выбрал «На карту». Запрос метода 2 должен вернуть currentMode CAPITALIZATION и nextMode CARD. Если хранится один способ, система не может показать оба значения и применить правило Ф-3 к марту.",
+        "impact": "Без отдельного хранимого следующего способа нельзя вернуть nextMode или выплатить текущий месяц прежним способом.",
+        "recommendation": "Добавить в перечень хранимых данных отдельное поле следующего способа выплаты и связать его с next_payout_mode.",
+        "rewrite": "Хранить: текущий способ выплаты (payout_mode), следующий способ выплаты (next_payout_mode), карту для выплаты (payout_card_id), дату начала действия нового способа (next_mode_from).",
+        "question": "",
+        "blocks": "both"
+      },
+      {
+        "title": "Поле payoutCardId: неясно, какая карта возвращается",
+        "kind": "api_contract",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-32",
+          "R-45",
+          "R-35"
+        ],
+        "evidence": [
+          {
+            "line": 149,
+            "quote": "cardId | string | 1–64 | Для CARD | Карта клиента в тенге | Карта для выплаты процентов | payout_card_id"
+          },
+          {
+            "line": 201,
+            "quote": "{\"currentMode\":\"CAPITALIZATION\",\"nextMode\":\"CAPITALIZATION\",\"payoutCardId\":null,\"rate\":14.0,\"accruedInterest\":5753.40}"
+          }
+        ],
+        "problem": "Метод 1 принимает cardId для будущего способа CARD, а метод 2 отдаёт payoutCardId без пояснения, текущая это карта или следующая. Метод 1 карту в ответе не возвращает.",
+        "scenario": "Клиент в марте выбрал карту c-2001 с 1 апреля и открыл экран. Метод 2 вернёт payoutCardId: null или c-2001. Документ не говорит, какое из двух значений верно при nextMode CARD.",
+        "impact": "Экран «выбор карты» покажет пустую или неверную карту, и разработчики выберут разные значения.",
+        "recommendation": "Описать payoutCardId в методе 2 и согласовать с полем cardId метода 1.",
+        "rewrite": "payoutCardId — карта, которая будет использоваться с 1-го числа следующего месяца при nextMode CARD, иначе null; <уточнить: нужна ли отдельная карта текущего месяца>.",
+        "question": "Возвращается ли в методе 2 карта текущего или следующего месяца?",
+        "blocks": "both"
+      },
+      {
+        "title": "Метод 3: ответ 400 без тела",
+        "kind": "api_contract",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-46",
+          "R-44"
+        ],
+        "evidence": [
+          {
+            "line": 202,
+            "quote": "400 — период больше 12 месяцев или from позже to; 404 — как у метода 2"
+          },
+          {
+            "line": 197,
+            "quote": "ответы 401 и 500 — как у метода 1"
+          }
+        ],
+        "problem": "Для метода 3 задано условие 400, но тело ответа не задано. Общая фраза упоминает только 401 и 500, а 400 метода 1 имеет тело, которое сюда не переносится.",
+        "scenario": "Запрос истории с from 2026-05 и to 2026-01 вернёт 400. Клиент не знает, какой JSON разбирать.",
+        "impact": "Клиентское приложение не разберёт текст ошибки метода 3 и не покажет причину отказа.",
+        "recommendation": "Указать тело 400 для метода 3 явно.",
+        "rewrite": "400 (метод 3): {\"message\":\"Некорректный запрос\"}.",
+        "question": "",
+        "blocks": "both"
+      },
+      {
+        "title": "Метод 2: отказ для закрытого счёта не описан",
+        "kind": "api_contract",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-42",
+          "R-45"
+        ],
+        "evidence": [
+          {
+            "line": 167,
+            "quote": "404. Ответ в случае, если счёт не найден или закрыт либо счёт или карта принадлежат другому клиенту."
+          },
+          {
+            "line": 201,
+            "quote": "404 — счёт не найден или принадлежит другому клиенту"
+          }
+        ],
+        "problem": "Метод 1 возвращает 404 для закрытого счёта, а описание метода 2 такого условия не содержит.",
+        "scenario": "После закрытия счёта (Ф-6) приложение запрашивает условия по счёту. Документ не говорит, вернётся ли 404 или 200.",
+        "impact": "Разные разработчики могут вернуть разный ответ для одного и того же закрытого счёта.",
+        "recommendation": "Указать в методе 2 отказ для закрытого счёта по тому же правилу, что в методе 1.",
+        "rewrite": "404 — счёт не найден, закрыт или принадлежит другому клиенту (метод 2).",
+        "question": "",
+        "blocks": "testing"
+      }
+    ]
+  }
+]

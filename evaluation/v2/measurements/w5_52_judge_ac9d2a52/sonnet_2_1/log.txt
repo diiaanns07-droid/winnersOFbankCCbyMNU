@@ -1,0 +1,26 @@
+Документ: release/input/requirements.md
+  segment: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  consistency: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_architect: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_analyst: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_qa: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  lens_risk: взят из reliz_w4_19_50_md_d013c12_sonnet_2
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 62
+  judge: запуск
+  judge: готово за 113 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
+Этап judge: ok, вызовов 2, 112.6 с, кандидатов 0
+Выход этапа: runs/20261127-205804-1d3e/stages/judge.json
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 32 дефекта (критичных 5, существенных 14, незначительных 13), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, каждый останавливает разработку и тестирование:
+  D-01 Обещано чтение настроек и суммы, метода чтения нет
+  D-02 Не определено, какое событие процессинга считается «проведена»
+  D-03 Ф-3 разрешает один push в месяц, Ф-4 допускает повторный
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 1 мин 53 с, 3 вызова модели, claude-sonnet-5-5; цитат сверено 86 из 86
+Отчёт: evaluation/v2/measurements/w5_52_judge_ac9d2a52/sonnet_2_1/report.json и evaluation/v2/measurements/w5_52_judge_ac9d2a52/sonnet_2_1/report.json
+HTML: evaluation/v2/measurements/w5_52_judge_ac9d2a52/sonnet_2_1/report.html
