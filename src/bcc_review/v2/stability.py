@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 KEEP_FIELDS = ("k", "n", "passes")
+STATUS_RU = {"complete": "полностью", "partial": "частично", "failed": "сбой"}
 
 
 def _lines(f: dict, first: int | None = None) -> set[int]:
@@ -155,7 +156,8 @@ def merge(base: dict, others: list[dict], n_requested: int) -> dict:
         "rule": f"в реестре — дефекты, найденные не меньше чем в {thr} из {n} проходов",
         "passes": [{"pass": i + 1, "run_id": (r.get("run") or {}).get("run_id"),
                     "status": (r.get("run") or {}).get("status"), "findings": len(r.get("findings") or [])
-                    if i else len(base_ids), "calls": int(((r.get("run") or {}).get("calls") or {}).get("total") or 0)}
+                    if i else len(base_ids), "calls": int(((r.get("run") or {}).get("calls") or {}).get("total") or 0),
+                    "models_used": [str(m) for m in (r.get("run") or {}).get("models_used") or []]}
                    for i, r in enumerate(reps)],
         "kept": len(kept), "unstable": len(unstable), "added_from_other_passes": added,
         "calls_total": calls, "cost_usd_total": round(cost, 4), "tokens_total": {"input": tok_in, "output": tok_out},
@@ -169,6 +171,12 @@ def merge(base: dict, others: list[dict], n_requested: int) -> dict:
         run["cost_limit"]["hit"] = bool(run["cost_limit"].get("hit")) or any(
             ((r.get("run") or {}).get("cost_limit") or {}).get("hit") for r in others)
     failed = [p["pass"] for p in report["stability"]["passes"] if p["status"] == "failed"]
+    counted = [p for p in report["stability"]["passes"] if p["status"] != "failed" and p["models_used"]]
+    if len({tuple(p["models_used"]) for p in counted}) > 1:
+        # бесплатный ключ Gemini: суточная квота кончается посреди проходов — остаток идёт на запасной модели (№24)
+        run.setdefault("warnings", []).append(
+            "Проходы шли на разных моделях (" + "; ".join(f"{p['pass']}: {', '.join(p['models_used'])}" for p in counted)
+            + "): устойчивость k/N сравнивает разные модели, а не повторы одной")
     if failed:
         run.setdefault("warnings", []).append(
             f"Проходы {', '.join(map(str, failed))} из {n_requested} не удались и в устойчивость не считаются "
@@ -213,9 +221,11 @@ def markdown(report: dict) -> str:
              f"Проверка выполнена {st.get('runs_requested')} раз(а) независимо (засчитано проходов: {n}). "
              f"В реестре — дефекты, найденные не меньше чем в {thr} из {n} проходов; у каждого в JSON — "
              f"`stability.k` из `stability.n`. Вызовов модели всего: {st.get('calls_total')}.", "",
-             "| Проход | Статус | Дефектов |", "| ---: | :--- | ---: |"]
+             "| Проход | Выполнен | Модель | Дефектов |", "| ---: | :--- | :--- | ---: |"]
     for p in st.get("passes") or []:
-        lines.append(f"| {p.get('pass')} | {p.get('status')} | {p.get('findings')} |")
+        models = ", ".join(p.get("models_used") or []) or "—"
+        lines.append(f"| {p.get('pass')} | {STATUS_RU.get(p.get('status'), p.get('status'))} | {models} | "
+                     f"{p.get('findings')} |")
     kept = report.get("findings") or []
     lines += ["", "| Дефект | Найден в проходах |", "| :--- | :--- |"]
     for f in kept:
