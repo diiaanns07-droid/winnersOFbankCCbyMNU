@@ -192,6 +192,15 @@ def score(lens: str, label: str, rep: str) -> str:
     for k, d in data.items():
         if k.endswith("_clean"):
             L.append(f"* {k}: {len(d['candidates'])} ({_sev(d['candidates'])})")
+        elif k in ("grace", "qr", "capital", "insurance"):
+            from evaluation.v2 import score as sc
+            gold = sc.load_gold(OPEN2 / k / "gold.yaml")
+            res = sc.score_report(sc.as_report({"candidates": d["candidates"]}, gold), gold, arbiter="off",
+                                  cache_path=OPEN2 / k / "arbiter_cache.jsonl")
+            found = sorted({a["gold"] for a in res["assignment"]})
+            acc = [f"{c.get('row_line')}:{c.get('verdict')}" for c in d.get("acceptance_checks") or []]
+            L.append(f"* {k}: {len(d['candidates'])} ({_sev(d['candidates'])}); в эталоне: {', '.join(found) or '—'}; "
+                     f"строки приёмки: {', '.join(acc) or '—'}")
     cf_ = corpus_fp(data)
     if cf_:
         L.append(f"* корпус: чистых {cf_['clean_docs']}, замечаний на чистых {cf_['fp_clean']}; TP {cf_['tp']}, "
