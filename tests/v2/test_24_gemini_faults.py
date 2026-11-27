@@ -105,12 +105,13 @@ def test_persistent_fault_on_primary_goes_to_next_model(server, kind, max_same):
 
 
 def test_client_timeout_is_retried(server):
-    fake = server([{"kind": "slow", "delay": 8}])
+    # тайм-аут клиента не короче 10 с — меньше Gemini отвергает (400 «Minimum allowed deadline is 10s», №31)
+    fake = server([{"kind": "slow", "delay": 14}])
     t0 = time.monotonic()
     out = ask(provider(), timeout_s=5)
     assert isinstance(out["data"]["questions"], list)
     assert [k for _, k in kinds(fake)] == ["slow", "ok"]
-    assert time.monotonic() - t0 < 15   # тайм-аут клиента сработал, ответ через 8 с не ждали до конца
+    assert time.monotonic() - t0 < 20   # тайм-аут клиента сработал, ответ через 14 с не ждали до конца
 
 
 def test_schema_too_large_switches_to_schema_as_text(server):

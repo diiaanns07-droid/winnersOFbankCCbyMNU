@@ -57,7 +57,9 @@ def test_live_diagnosis_is_fast_and_russian(faults, key, words):
     code, text, seconds = doctor_live(faults, key)
     assert "Traceback" not in text, text[-2000:]
     assert code != 0
-    assert seconds <= 10.0, (seconds, text[-1500:])
+    # зависшее соединение ждёт минимальный тайм-аут Gemini — 10 с (короче API отвергает: 400 «Minimum allowed
+    # deadline is 10s», живой ключ 27.11, №31); диагноз — за ≤ 12 с
+    assert seconds <= 12.0, (seconds, text[-1500:])
     for w in words:
         assert w in text, (w, text[-2000:])
 
