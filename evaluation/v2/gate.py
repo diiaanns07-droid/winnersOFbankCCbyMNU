@@ -326,7 +326,9 @@ def stability_gates(gold: dict) -> list[dict]:
         best = None
         for p in files:
             d = json.loads(p.read_text(encoding="utf-8"))
-            if model_kind(None, " ".join(d.get("models") or [])) == kind and (not best or d["at"] > best["at"]):
+            # последняя сводка; в одну минуту — с большим числом прогонов (×3 по двум раундам после ×2 раунда)
+            if model_kind(None, " ".join(d.get("models") or [])) == kind and (
+                    not best or (d["at"], d.get("n") or 0) > (best["at"], best.get("n") or 0)):
                 best = d
         title = f"Стабильность, {'Opus' if kind == 'opus' else kind}"
         if not best:

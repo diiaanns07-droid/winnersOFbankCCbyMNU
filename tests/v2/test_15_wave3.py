@@ -314,3 +314,23 @@ def test_final_marks_cache_replay_and_splits_gate_by_code():
     assert "| Официальный, sonnet: время | 3.1 мин (≤ 3 мин) | №10 |" in text
     assert "стабильность Opus: e2f2cba, opus #1 — 1 (✅ 0, ❌ 1, ⏳ 0)" in text
     assert "Opus: дубли |" not in text  # красное чужого кода — не в таблице релиза
+
+
+def test_stability_gate_prefers_more_runs_within_same_minute(tmp_path, monkeypatch):
+    """Сводка ×3 по двум раундам и ×2 раунда записаны в одну минуту — ворота берут ×3, а не первую в glob."""
+    import json as _json
+
+    from evaluation.v2 import gate
+
+    st = tmp_path / "stability"
+    st.mkdir()
+    for name, n in (("a_x2.json", 2), ("b_x3.json", 3), ("c_old.json", 4)):
+        d = {"at": "2026-11-27 16:55" if name != "c_old.json" else "2026-11-27 08:00", "n": n, "models": ["sonnet"],
+             "label": f"sonnet ×{n}", "K_all_runs": ["К1", "К2", "К3", "К4", "К5"],
+             "per_item": {k: {"found": n, "owners": []} for k in ("К1", "К2", "К3", "К4", "К5")},
+             "findings": {"min": 27, "max": 30, "mean": 29.0}}
+        (st / name).write_text(_json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(gate, "V2", tmp_path)
+    rows = [c for c in gate.stability_gates({}) if c["name"].startswith("Стабильность, sonnet")]
+    assert rows and all(c["source"] == "sonnet ×3" for c in rows)
+    assert rows[0]["name"].endswith("в 3 из 3") and rows[0]["ok"] is True
