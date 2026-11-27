@@ -636,13 +636,16 @@ def _how_obtained(c: _Ctx) -> list[str]:
         who = who[0].upper() + who[1:]
         parts.append(f"{who} предложили {num(total)} {plural(total, 'кандидата', 'кандидатов', 'кандидатов')} в "
                      f"дефекты" if total else f"{who} проверили документ")
-    judged = (c.run.get("stages") or {}).get("judge") in ("ok", "partial") and not c.offline
+    judge_down = any("судья недоступен" in str(w) or "реестр собран кодом" in str(w)
+                     for w in c.run.get("warnings") or [])
+    judged = (c.run.get("stages") or {}).get("judge") in ("ok", "partial") and not c.offline and not judge_down
     if total and judged:
         parts.append(f"судья объединил дубли и оставил {len(c.findings)} "
                      f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')}, отклонил {len(rej)}")
     elif c.findings:
         parts.append(f"в отчёт вошли {len(c.findings)} "
-                     f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')} без отбора судьёй")
+                     f"{plural(len(c.findings), 'дефект', 'дефекта', 'дефектов')} без отбора судьёй"
+                     + (" (судья не ответил, дубли объединены кодом)" if judge_down else ""))
     if qt:
         parts.append(f"каждая цитата найдена в документе программой ({ok} из {qt}), номер строки посчитан кодом")
     if not parts:
