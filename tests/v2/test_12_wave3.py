@@ -236,3 +236,26 @@ def test_user_story_style_clean_and_defects() -> None:
     po = _by_rule(out, "promises.promised_ops")[0]
     assert "отзывает заявку" in po["title"] and "создаёт" not in po["title"]
     _quotes_ok(path, out)
+
+
+def test_table_style_inline_endpoints_and_adjacent_tables() -> None:
+    """Четвёртый стиль: требования таблицей с ID, «Эндпоинт сохранения: PUT /…» в строке, таблица кодов
+    сразу после таблицы полей (через пустую строку)."""
+    clean = _run(STYLES / "wave3_table_clean.md")
+    assert clean["candidates"] == [], [c["title"] for c in clean["candidates"]]
+    path = STYLES / "wave3_table_defects.md"
+    out = _run(path)
+    src = {c["source"].rsplit(".", 1)[0] if c["source"].count(".") > 1 else c["source"] for c in out["candidates"]}
+    assert {"rules:promises.read_operation", "rules:api.status_409", "rules:api.get_mutation",
+            "rules:api.field_types"} <= src, src
+    _quotes_ok(path, out)
+
+
+@pytest.mark.parametrize("case", ["insurance", "capital", "grace", "insurance_clean"])
+def test_rules_same_in_md_pdf_docx(case: str) -> None:
+    """Паритет форматов: те же правила в MD, PDF и DOCX (в PDF объявление статуса переносится на строку)."""
+    from bcc_review.v2 import docview
+    base = ROOT / "evaluation" / "v2" / "open2" / case / "source"
+    res = {ext: {c["source"] for c in rules.run(docview.load(f"{base}.{ext}"))["candidates"]}
+           for ext in ("md", "pdf", "docx")}
+    assert res["pdf"] == res["md"] and res["docx"] == res["md"], res

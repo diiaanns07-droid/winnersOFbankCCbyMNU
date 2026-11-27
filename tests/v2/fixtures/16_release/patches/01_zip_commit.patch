@@ -1,0 +1,48 @@
+diff --git a/.gitattributes b/.gitattributes
+index 2056818..c03977f 100644
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -9,3 +9,6 @@ tests/**/fixtures/** -text
+ *.docx binary
+ *.png binary
+ release/input/** -text
++
++# Архив GitHub («Download ZIP», git archive): git вписывает в этот файл хеш коммита — паспорт отчёта без .git
++src/bcc_review/v2/COMMIT export-subst
+diff --git a/src/bcc_review/v2/COMMIT b/src/bcc_review/v2/COMMIT
+new file mode 100644
+index 0000000..6828f88
+--- /dev/null
++++ b/src/bcc_review/v2/COMMIT
+@@ -0,0 +1 @@
++$Format:%H$
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 1dc71ed..377471b 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -14,6 +14,7 @@ import concurrent.futures as cf
+ import copy
+ import hashlib
+ import os
++import re
+ import subprocess
+ import time
+ import traceback
+@@ -62,7 +63,16 @@ def git_commit() -> tuple[str, bool]:
+                                     capture_output=True, text=True, timeout=10).stdout.strip())
+     except (OSError, subprocess.SubprocessError):
+         sha, dirty = "", False
+-    return (sha or env or "unknown"), dirty
++    return (sha or env or _archive_commit() or "unknown"), dirty
++
++
++def _archive_commit() -> str:
++    """Хеш из архива GitHub (export-subst в .gitattributes); в клоне в файле шаблон «$Format:%H$» — пусто."""
++    try:
++        value = (Path(__file__).with_name("COMMIT")).read_text(encoding="utf-8").strip()
++    except OSError:
++        return ""
++    return value if re.fullmatch(r"[0-9a-f]{7,40}", value) else ""
+ 
+ 
+ def load_view(path: str | Path) -> dict:

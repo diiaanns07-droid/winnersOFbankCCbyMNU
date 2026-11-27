@@ -224,3 +224,130 @@ def test_export_text_has_no_internal_line_codes(tmp_path):
     assert "строка 38 относит покупку" in text and "(строка 22)" in text and "в строках 38–40" in text
     assert "Часть A › Функциональные требования, строка 38" in text  # место — как в отчёте
     assert report["findings"][0]["problem"].startswith("L038")  # исходный отчёт не меняется
+
+
+# --------------------------------------------------------------------------- PDF: таблица без линеек, знаки другим шрифтом
+BORDERLESS_PDF = ROOT / "tests/v2/fixtures/03_stress/borderless.pdf"
+
+
+@pytest.fixture(scope="module")
+def borderless():
+    return dv.load(BORDERLESS_PDF)
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_key_value_table_rows(borderless):
+    """Таблица без линеек (PDF из Word, PyMuPDF как у жюри): «поле | значение» в одной строке, а не колонками."""
+    texts = [ln["text"] for ln in borderless["lines"]]
+    for row in ("Поле | Значение", "Наименование задачи | Кредитные каникулы по кредитной карте",
+                "Продукт | Мобильный банк, кредитные карты",
+                "Бизнес-процесс | Обслуживание держателя кредитной карты с просроченной задолженностью",
+                "Владелец | Управление розничного кредитования"):
+        assert row in texts, row
+    assert any("собрана по строкам" in w for w in borderless["warnings"])
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_acceptance_table_three_columns(borderless):
+    texts = [ln["text"] for ln in borderless["lines"]]
+    assert "Исходные условия | Действие | Ожидаемый результат" in texts
+    assert ("Каникулы уже брались 10 марта | Оформить повторно 1 июня того же года | "
+            "Отказ с текстом «Каникулы доступны раз в год»") in texts
+    assert "Просрочка 5 дней | Оформить каникулы | Отказ, кнопка недоступна" in texts
+    row = next(ln for ln in borderless["lines"] if ln["text"].startswith("Просрочки нет"))
+    assert row["kind"] == "table_row" and row["page"] == 1 and row["section"].endswith("Критерии приемки")
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_punctuation_in_other_font_stays_in_place(borderless):
+    """Знаки, набранные другим шрифтом, читатель уносил в конец строки: «нулю проценты; начисляются»."""
+    texts = [ln["text"] for ln in borderless["lines"]]
+    assert "К-2. На время каникул минимальный платёж равен нулю; проценты начисляются по ставке договора." in texts
+    assert "Документ подготовлен для проверки чтения PDF. Таблицы в нём — без линеек." in texts
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_bullets_become_list_items(borderless):
+    items = [ln for ln in borderless["lines"] if ln["section"].endswith("Логика метода") and not ln["heading"]]
+    assert [ln["text"] for ln in items] == ["Проверить сессию клиента.", "Проверить отсутствие просрочки.",
+                                            "Сохранить срок каникул и вернуть дату окончания."]
+    assert all(ln["kind"] == "list_item" for ln in items)
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_borderless_quotes_and_two_columns_untouched(borderless):
+    m = Q.verify_quote(borderless, "Продукт: Мобильный банк, кредитные карты")
+    assert m and m["text"] == "Продукт | Мобильный банк, кредитные карты"
+    # вёрстка в две колонки — не таблица: порядок по колонкам, как раньше
+    two = dv.load(ROOT / "tests/v2/fixtures/03_stress/two_columns.pdf")
+    assert not any(" | " in ln["text"] for ln in two["lines"])
+    assert not any("собрана по строкам" in w for w in two["warnings"])
+
+
+# --------------------------------------------------------------------------- MD с HTML-таблицей, HTML из Google Docs
+def test_html_table_inside_markdown():
+    view = dv.from_text("# ТЗ\n\nФ-1. Порог задаёт клиент.\n\n<table>\n<tr><th>Параметр</th><th>Значение</th></tr>\n"
+                        "<tr><td>Порог баланса</td><td><b>100</b> ₸</td></tr>\n</table>\n")
+    texts = [ln["text"] for ln in view["lines"]]
+    assert "Параметр | Значение" in texts and "Порог баланса | 100 ₸" in texts
+    assert not any("<" in t for t in texts)
+    row = next(ln for ln in view["lines"] if ln["text"] == "Порог баланса | 100 ₸")
+    assert row["n"] == 7 and row["kind"] == "table_row"  # номер строки = строка файла
+    m = Q.verify_quote(view, "Порог баланса — 100 ₸")
+    assert m and m["line_start"] == 7
+
+
+def test_google_docs_comments_not_in_text(tmp_path):
+    html = ('<html><head><meta charset="utf-8"></head><body><h1>Часть A</h1>'
+            '<p><span>Ф-1. Кэшбэк начисляется за покупки.</span><sup><a href="#cmnt1" id="cmnt_ref1">[a]</a></sup></p>'
+            '<div><p><a href="#cmnt_ref1" id="cmnt1">[a]</a><span>Рецензент: уточнить лимит</span></p></div>'
+            '</body></html>')
+    p = tmp_path / "gdocs.html"
+    p.write_text(html, encoding="utf-8")
+    texts = [ln["text"] for ln in dv.load(p)["lines"]]
+    assert "Ф-1. Кэшбэк начисляется за покупки." in texts
+    assert not any("Рецензент" in t or "[a]" in t for t in texts)
+
+
+# --------------------------------------------------------------------------- DOCX: надпись, вложенная таблица, комментарий
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_textbox_requirement_not_lost():
+    """Требование в надписи Word читатель v1 не видел; docview ставит его после абзаца-якоря, без дубля из VML."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/textbox.docx")
+    texts = [ln["text"] for ln in view["lines"]]
+    k = texts.index("Ф-2. Срок изготовления — 5 рабочих дней.")
+    assert texts[k + 1] == "Ф-3. Старая карта блокируется после активации новой."
+    assert texts.count("Ф-3. Старая карта блокируется после активации новой.") == 1
+    assert view["lines"][k + 1]["section"] == view["lines"][k]["section"]
+    assert [ln["n"] for ln in view["lines"]] == list(range(1, len(texts) + 1))
+    assert any("надписей Word" in w for w in view["warnings"])
+    # вложенная таблица и гиперссылка — в тексте; комментарий рецензента — нет
+    assert "COURIER | Курьер, 1–3 дня" in texts and "Документация: описание API" in texts
+    assert not any("премиальных" in t for t in texts)
+    m = Q.verify_quote(view, "Старая карта блокируется после активации новой", 5)
+    assert m and m["line_start"] == k + 2
+
+
+# --------------------------------------------------------------------------- отклонения моделей при цитировании
+def test_non_breaking_hyphen_from_word():
+    """NFKC превращает неразрывный дефис Word (U+2011) в U+2010 — он тоже тире: «Ф‑2» = «Ф-2» в обе стороны."""
+    view = dv.load(OFFICIAL_MD)
+    m = Q.verify_quote(view, "Ф‑2. Месяц определяется", 38)
+    assert m and m["line_start"] == 38
+    word = dv.from_text("# ТЗ\n\nФ‑2. Месяц определяется по дате покупки.\n")
+    m2 = Q.verify_quote(word, "Ф-2. Месяц определяется", 3)
+    assert m2 and m2["line_start"] == 3 and m2["text"].startswith("Ф‑2")
+
+
+@pytest.mark.parametrize("quote, line, text", [
+    (r"limit\_kzt", None, "limit_kzt"),
+    (r"\*\*Ф-2.\*\* Месяц определяется", 38, "Ф-2. Месяц определяется"),
+    ("&laquo;Порог, ₸&raquo;", None, "Порог, ₸"),
+    ("Февральский счётчик вырос на 4 000 тенге", None, "Февральский счётчик вырос на 4 000 ₸"),
+    ("Февральский счётчик вырос на 4000 тг.", None, "Февральский счётчик вырос на 4 000 ₸"),
+])
+def test_markdown_escapes_and_html_entities(quote, line, text):
+    view = dv.load(OFFICIAL_MD)
+    m = Q.verify_quote(view, quote, line)
+    assert m and m["text"] == text and m["verified"] == "normalized"
+    assert Q.verify_quote(view, r"совсем нет такого \_ текста") is None

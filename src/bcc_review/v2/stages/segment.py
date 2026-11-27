@@ -217,37 +217,64 @@ def _doc_vocab(view: dict) -> set[str]:
     return vocab
 
 
-def fix_mixed_script(text: str, vocab: set[str] | None = None) -> tuple[str, bool]:
-    """Чинит слова, где русские буквы смешаны с латинскими или буквами с диакритикой («порогe», «напоминání»).
+# остальные латинские буквы внутри русского слова — по звучанию («лимite» → «лимите»)
+_LAT_SOUND = {"a": "а", "b": "б", "c": "к", "d": "д", "e": "е", "f": "ф", "g": "г", "h": "х", "i": "и", "j": "й",
+              "k": "к", "l": "л", "m": "м", "n": "н", "o": "о", "p": "п", "q": "к", "r": "р", "s": "с", "t": "т",
+              "u": "у", "v": "в", "w": "в", "x": "кс", "y": "ы", "z": "з"}
 
-    Латинский двойник русской буквы заменяется русской; слово, которое так не чинится, заменяется ближайшим
-    словом документа. Возвращает (текст, всё ли починено). Слова целиком латиницей (имена из документа) не трогает.
+
+def _to_cyr(word: str, table: dict) -> str:
+    out = []
+    for ch in word:
+        if _CYR_CH.match(ch):
+            out.append(ch)
+            continue
+        base = unicodedata.normalize("NFD", ch)[0]
+        rep = table.get(base) or _LAT_SOUND.get(base.lower())
+        if rep and base.isupper() and table is not _LAT2CYR:
+            rep = rep.upper()
+        out.append(rep or ch)
+    return "".join(out)
+
+
+def fix_mixed_script(text: str, vocab: set[str] | None = None) -> tuple[str, bool]:
+    """Чинит слова, где русские буквы смешаны с латинскими или буквами с диакритикой («порогe», «лимite»,
+    «напоминání»).
+
+    Сначала латинский двойник русской буквы (e → е), остальное — по звучанию (t → т); если в документе есть
+    близкое слово, берётся оно. Возвращает (текст, всё ли починено). Слова целиком латиницей (имена из документа)
+    не трогает.
     """
     import difflib
     ok = True
+    words = sorted(vocab or ())
 
     def fix(m: re.Match) -> str:
         nonlocal ok
         w = m.group(0)
         if not _CYR_CH.search(w) or all(_CYR_CH.match(ch) for ch in w):
             return w
-        out = []
-        for ch in w:
-            if _CYR_CH.match(ch):
-                out.append(ch)
-                continue
-            base = unicodedata.normalize("NFD", ch)[0]
-            out.append(_LAT2CYR.get(base, ch))
-        w2 = "".join(out)
-        if all(_CYR_CH.match(ch) for ch in w2):
-            return w2
-        best = difflib.get_close_matches(w2.lower(), sorted(vocab or ()), n=1, cutoff=0.7)
-        if best:
-            return best[0].capitalize() if w2[:1].isupper() else best[0]
+        cands = []
+        for c in (_to_cyr(w, _LAT2CYR), _to_cyr(w, {})):
+            if c not in cands:
+                cands.append(c)
+        for c in cands:
+            if c.lower() in (vocab or ()):
+                return c
+        for c in cands:
+            best = difflib.get_close_matches(c.lower(), words, n=1, cutoff=0.8)
+            if best:
+                return best[0].capitalize() if c[:1].isupper() else best[0]
+        if all(_CYR_CH.match(ch) for ch in cands[0]):
+            return cands[0]
         ok = False
         return w
 
     return _WORD.sub(fix, text or ""), ok
+
+
+def _has_mixed(text: str) -> bool:
+    return any(_CYR_CH.search(w) and not all(_CYR_CH.match(ch) for ch in w) for w in _WORD.findall(text or ""))
 
 
 def clean_summary(summary: str, fallback: str, vocab: set[str] | None = None) -> str:
@@ -317,8 +344,7 @@ def normalize_requirement(view: dict, r: dict) -> dict | None:
     section = str(first.get("section") or "") or str(r.get("section") or "")
     pages = [by_n[n].get("page") for n in range(a, b + 1) if n in by_n and by_n[n].get("page") is not None]
     summary = re.sub(r"\s+", " ", str(r.get("summary") or "")).strip() or _short_quote(quote)[:80]
-    summary, ok = fix_mixed_script(summary)
-    if not ok:  # латиница внутри русского слова, которую не починить заменой букв: ищем слово в документе
+    if _has_mixed(summary):  # латиница внутри русского слова: чиним по словам документа
         summary = clean_summary(summary, quote, _doc_vocab(view))
     sid = re.sub(r"\s+", " ", str(r.get("source_id") or "")).strip()
     if "<" in sid or "уточнить" in sid.lower() or sid in ("—", "-", "нет"):
@@ -433,7 +459,7 @@ def _known_prefix(view: dict, pre: str, line_no: int, parts: list[str] | None = 
 
 
 # собственный номер пункта в документе: «Ф-1», «ФТ-2.2.3.1», «НФТ-3», «2.3.1»
-_OWN_SID = re.compile(r"[A-Za-zА-Яа-яЁё]{1,10}[-‑–]?\d+(?:[.\-]\d+)*[a-zа-я]?|\d+(?:\.\d+)+\.?")
+_OWN_SID = re.compile(r"[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё]{0,9}\d{0,3}[-‑–_]?\d+(?:[.\-]\d+)*[a-zа-я]?|\d+(?:\.\d+)+\.?")
 _LEAD_CODE = re.compile(r"^(?:(?:статус|код(?:\s+ответа)?|http)\s*[:№]?\s*)?([1-5]\d\d)(?=\s*(?:[.:|)—–]|-\s|$))", re.I)
 # «Ответ 200: {…}» — описание тела ответа метода, а не перечень кодов: собственного номера у абзаца нет
 _RESPONSE_PARA = re.compile(r"^ответ\s+[1-5]\d\d\b", re.I)
@@ -461,6 +487,9 @@ def _strip_heading_prefix(sid: str, parts: list[str], heads: list[str]) -> str:
     «Метод A, ответ 200: x» → «ответ 200: x» (ближайший заголовок вернёт канонизация). Неоднозначный ID
     («Метод A: Статус 200» при двух методах) снова уточнит `uniquify_source_ids` — одинаково при любой модели."""
     sid = re.sub(r"\s+", " ", sid or "").strip()
+    m = re.fullmatch(r"(?P<core>.+?)\s*\((?P<q>[^()]+)\)", sid)
+    if m and any(m.group("q").strip().lower() == h.lower() for h in heads):
+        sid = m.group("core")  # «Статус 200 (Метод A)» — уточнение разделом в скобках снимается, вернёт uniquify
     for _ in range(3):
         low = sid.lower()
         rest = None
@@ -504,7 +533,12 @@ def _lead_status_code(view: dict, r: dict) -> str | None:
     return m.group(1) if set(_CODE_RE.findall(text)) <= {m.group(1)} else None
 
 
-_OWN_LEAD = re.compile(r"^(?P<id>[A-ZА-ЯЁ]{1,8}[-‑–]\d+(?:\.\d+)*)(?:[.):]\s*|\s+[—–]\s+|\s+(?=[A-ZА-ЯЁ«\"])|$)")
+# номер пункта: «Ф-1», «ФТ-2.2.3.1», «НФТ-3», «Т01-1», «REQ_001», «BR-12a»
+ITEM_ID = r"[A-ZА-ЯЁ]{1,8}\d{0,3}[-‑–_]\d+(?:\.\d+)*[a-zа-я]?"
+# номер пункта по ГОСТ 34: «3.1.1.», «4.2.1.3» — не меньше двух уровней (одноуровневый «1.» — пункт списка)
+NUM_ITEM_ID = r"\d{1,2}(?:\.\d{1,3}){1,5}(?!\d)"
+_OWN_LEAD = re.compile(r"^(?P<id>" + ITEM_ID + r")(?:[.):]\s*|\s+[—–]\s+|\s+(?=[A-ZА-ЯЁ«\"])|$)"
+                       r"|^(?P<num>" + NUM_ITEM_ID + r")(?:\.?\s+(?=[A-ZА-ЯЁ«\"]))")
 _GLOSSARY_WORDS = ("термин", "глоссар", "определени", "понят", "сокращени", "словар")
 
 
@@ -517,9 +551,9 @@ def _own_id(view: dict, r: dict) -> str | None:
     t = re.sub(r"^\s*(?:[-*•]\s+|\|\s*)", "", t)
     if _is_row(t):
         cell = t.split(" | ")[0].strip().rstrip(".")
-        return cell if re.fullmatch(r"[A-ZА-ЯЁ]{1,8}[-‑–]\d+(?:\.\d+)*", cell) else None
+        return cell if re.fullmatch(ITEM_ID, cell) else None
     m = _OWN_LEAD.match(t)
-    return m.group("id") if m else None
+    return (m.group("id") or m.group("num")) if m else None
 
 
 def _paragraph_section_prefix(view: dict, first: dict, sid: str, parts: list[str]) -> bool:
@@ -535,6 +569,28 @@ def _paragraph_section_prefix(view: dict, first: dict, sid: str, parts: list[str
         return False
     pre = _strip_num(m.group("pre")).lower()
     return any(pre == _strip_num(p).lower() for p in parts)
+
+
+def _numbered_row_name(first: dict) -> str | None:
+    """Первая ячейка строки таблицы, если документ сам пронумеровал строку: «2. Создание QR-кода»."""
+    t = _MD_DECOR.sub("", _text(first)).strip().strip("|").strip()
+    if not _is_row(_text(first)):
+        return None
+    cell = t.split(" | ")[0].strip()
+    return cell if re.match(r"^\d{1,3}[.)]\s+\S", cell) and len(cell) <= 60 else None
+
+
+def _drop_method_qualifier(sid: str, parts: list[str]) -> str:
+    """«Ответ 200, getTransferLimit: limit» → «Ответ 200: limit»: уточнение именем метода из заголовка выше
+    модель дописывает не всегда; если ID без него не уникален, его вернёт `uniquify_source_ids`."""
+    m = re.fullmatch(r"(?P<h>[^,:]+), (?P<q>[^,:]+): (?P<rest>.+)", sid or "")
+    if not m or not parts:
+        return sid
+    h, q = m.group("h").strip(), m.group("q").strip().lower()
+    if any(_strip_num(h).lower() == _strip_num(p).lower() for p in parts) and \
+            any(q in p.lower() for p in parts if _strip_num(p).lower() != _strip_num(h).lower()):
+        return f"{h}: {m.group('rest')}"
+    return sid
 
 
 def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
@@ -556,14 +612,19 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
         if own_id:
             r["source_id"] = own_id  # номер пункта в документе — ровно как в документе, при любой модели
             continue
+        row_name = _numbered_row_name(first)
+        if row_name and parts:
+            r["source_id"] = f"{parts[-1]}: {row_name}"  # строка «2. Создание QR-кода | …» — как назвал её документ
+            continue
         sid = _strip_heading_prefix(r.get("source_id") or "", parts, doc_heads)
+        sid = _drop_method_qualifier(sid, parts)
         if _paragraph_section_prefix(view, first, sid, parts):
             sid = ""
         code = _lead_status_code(view, r)
         if code and not _OWN_SID.fullmatch(sid):
             sid = f"Статус {code}"  # пункт или строка начинается с кода ответа: одно оформление при любой модели
         elif (_RESPONSE_PARA.match(_MD_DECOR.sub("", _text(first)).strip()) and not _is_row(_text(first))
-              and re.search(r"(?:ответ|статус|код)\s+[1-5]\d\d$", sid, re.I)):
+              and re.search(r"(?:ответ|статус|код)\s+[1-5]\d\d\b", sid, re.I)):
             sid = ""
         if not sid:
             r["source_id"] = ""
@@ -655,6 +716,50 @@ def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
     return out
 
 
+# пункт перечня кодов внутри одной строки: «200. Ответ в случае… 400. Ответ в случае…» (DOCX/PDF склеили строки)
+_CODE_ITEM = re.compile(r"(?:^|(?<=[.;!?]\s))\**([1-5]\d\d)\.?\**\s*[.:—–-]\s+(?=\S)")
+
+
+def split_status_lists(view: dict, requirements: list[dict]) -> list[dict]:
+    """Перечень кодов ответа, который читатель DOCX/PDF отдал одной строкой («200. Ответ… 400. Ответ…» — в MD это
+    отдельные строки), — по требованию «Статус N» на каждый код, как в MD: на одной строке несколько требований
+    со своими цитатами. Строка таблицы и пункт, где код один, не меняются."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    out: list[dict] = []
+    for r in requirements:
+        a, b = int(r["line_start"]), int(r["line_end"])
+        text = " ".join(_MD_DECOR.sub("", _text(by_n[n])).strip() for n in range(a, b + 1) if n in by_n)
+        items = list(_CODE_ITEM.finditer(text)) if not _is_row(text) else []
+        codes = [m.group(1) for m in items]
+        if len(items) < 2 or len(set(codes)) != len(codes) or items[0].start() != 0 \
+                or any(x is not r and int(x["line_start"]) <= b and a <= int(x["line_end"]) for x in requirements):
+            # модель уже разделила перечень (несколько требований на этих строках) — оставляем как есть
+            out.append(r)
+            continue
+        for i, m in enumerate(items):
+            seg = text[m.start():items[i + 1].start() if i + 1 < len(items) else len(text)].strip()
+            body = text[m.end():items[i + 1].start() if i + 1 < len(items) else len(text)].strip().rstrip(".")
+            body = re.sub(r"^ответ\s+в\s+случае,?\s*(?:если\s+)?", "", body, flags=re.I)
+            words = body.split()
+            summary = f"Код {m.group(1)} — " + " ".join(words[:7]) + ("…" if len(words) > 7 else "")
+            out.append({**r, "source_id": f"Статус {m.group(1)}", "kind": "api", "summary": summary,
+                        "quote": _short_quote(seg), "line_start": a, "line_end": b})
+    return out
+
+
+def code_in_summary(requirements: list[dict]) -> list[dict]:
+    """Краткая формулировка кода ответа называет код: в карточке замечания видно «R-36 (Код 400 — неверные
+    параметры)», а не «R-36 (Запрос выполнен)» — ID «Статус N» отчёт рядом не показывает."""
+    for r in requirements:
+        m = re.fullmatch(r"(?:.+: )?Статус ([1-5]\d\d)", r.get("source_id") or "")
+        summary = str(r.get("summary") or "").strip()
+        if not m or not summary or m.group(1) in summary:
+            continue
+        head = summary[:1].lower() if summary[1:2].islower() else summary[:1]
+        r["summary"] = f"Код {m.group(1)} — {head}{summary[1:]}"
+    return requirements
+
+
 def uniquify_source_ids(requirements: list[dict]) -> list[dict]:
     """Повторяющийся непустой source_id уточняется разделом, которым повторы различаются: «Метод A: Статус 200» и
     «Метод B: Статус 200» (два раздела «Статусы» под разными методами), «Статусы: Статус 200»."""
@@ -720,7 +825,7 @@ def fill_gaps(view: dict, requirements: list[dict], excluded: list[dict], uncove
     new_r, new_e = [], []
     for n in uncovered:
         t = _text(by_n[n])
-        if _CODEISH.match(t):
+        if _CODEISH.match(t) and not _is_row(t):
             new_e.append({"what": "Пример или фрагмент кода", "line_start": n, "line_end": n,
                           "reason": "Не разобран моделью; похоже на пример данных или кода"})
             continue
@@ -758,14 +863,18 @@ def table_header_lines(view: dict) -> set[int]:
     return out
 
 
+# подпись по ГОСТ: «Таблица 1 – Параметры заявки», «Рисунок 2 — Схема»
+_TABLE_CAPTION = re.compile(r"^(?:таблица|табл\.|рисунок|рис\.)\s+[\dА-ЯA-Z][\w.]*\s*[–—-]\s*\S", re.I)
+
+
 def _is_caption(view: dict, n: int) -> bool:
     """Короткая строка с двоеточием в конце, за которой идёт таблица, список или пример."""
     lines = _lines(view)
     idx = next((i for i, x in enumerate(lines) if int(x["n"]) == n), None)
     if idx is None:
         return False
-    t = _text(lines[idx]).strip()
-    if not t.endswith(":") or len(t) > 80 or _is_row(t):
+    t = _MD_DECOR.sub("", _text(lines[idx])).strip()
+    if not (t.endswith(":") or _TABLE_CAPTION.match(t)) or len(t) > 100 or _is_row(t):
         return False
     nxt = next((x for x in lines[idx + 1:] if _text(x).strip()), None)
     if nxt is None:
@@ -1016,13 +1125,14 @@ def _warn(ctx: Any, msg: str) -> None:
 # ---------------------------------------------------------------------------------------------------------
 # Эвристическая нарезка (без модели)
 
-_ID_RE = re.compile(r"^(?P<id>[A-ZА-ЯЁ]{1,8}[-‑–]\d+(?:\.\d+)*)\.?\s+")
+_ID_RE = re.compile(r"^(?P<id>" + ITEM_ID + r"|" + NUM_ITEM_ID + r"(?=\.?\s+[A-ZА-ЯЁ«\"]))\.?\s+")
 _NUM_RE = re.compile(r"^(?P<n>\d{1,2})[.)]\s+")
 _STATUS_RE = re.compile(r"^(?P<code>[1-5]\d\d)\b")
 _SKIP_SECTIONS = ("общие сведения", "ревью требований", "чек-лист", "согласующ", "лист согласования",
                   "история изменений", "история версий")
 _GLOSSARY = {"термины", "глоссарий", "определения", "термины и определения", "словарь терминов"}
-_PLACEHOLDER = re.compile(r"^(не используется|не используются|не применяется|tbd|заполняются? .*)\.?$", re.I)
+_PLACEHOLDER = re.compile(r"^(не используется|не используются|не применяется|не предъявляю?тся|не требуется|"
+                          r"tbd|заполняются? .*)\.?$", re.I)
 
 
 def heuristic_segment(view: dict) -> dict:
@@ -1034,6 +1144,9 @@ def heuristic_segment(view: dict) -> dict:
     row_no = 0
     # вводный текст до первого раздела — пояснение о самом документе (если разделы в документе вообще есть)
     first_sectioned = next((int(x["n"]) for x in lines if x.get("section")), 0)
+    by_line = {int(x["n"]): x for x in lines}
+    fmt_src = str(view.get("format") or "").lower() in ("md", "txt", "markdown")
+    caption, caption_line, table_name = "", 0, ""
     for i, ln in enumerate(lines):
         n, t = int(ln["n"]), _text(ln).strip()
         if (n in headings and re.fullmatch(r"[1-5]\d\d\.?", t) and reqs and t[:3] in reqs[-1]["quote"]
@@ -1041,6 +1154,7 @@ def heuristic_segment(view: dict) -> dict:
             reqs[-1]["line_end"] = n  # голый код ответа, который читатель PDF принял за заголовок
             if not reqs[-1]["source_id"]:
                 reqs[-1]["source_id"], reqs[-1]["kind"] = f"Статус {t[:3]}", "api"
+            reqs[-1]["_bare"] = True
             continue
         if n in headings:
             prev_table_row = False
@@ -1050,12 +1164,12 @@ def heuristic_segment(view: dict) -> dict:
         section = str(ln.get("section") or "")
         low_sec = section.lower()
         is_row = " | " in t or t.startswith("|")
-        if any(k in low_sec for k in _SKIP_SECTIONS):
+        if any(k in low_sec for k in _SKIP_SECTIONS) or _strip_num(_section_tail(ln)).lower().startswith("согласован"):
             excl.append({"what": f"Раздел «{_section_tail(ln) or section}»", "line_start": n, "line_end": n,
                          "reason": "Метаданные или шаблон процесса, не требование"})
             prev_table_row = is_row
             continue
-        if not section and n < first_sectioned:
+        if (not section and n < first_sectioned) or _DOC_NOTE.match(t):
             excl.append({"what": "Служебное пояснение", "line_start": n, "line_end": n,
                          "reason": "Пояснение о самом документе"})
             continue
@@ -1063,13 +1177,26 @@ def heuristic_segment(view: dict) -> dict:
             excl.append({"what": "Шапка таблицы", "line_start": n, "line_end": n, "reason": "Строка-шапка таблицы"})
             prev_table_row = True
             row_no = 0
+            table_name = caption if caption_line and n - caption_line <= 3 else ""
+            continue
+        if not is_row:
+            table_name = ""
+        if not is_row and _is_caption(view, n) and not _ID_RE.match(re.sub(r"^\s*[-*•]\s+", "", t)):
+            excl.append({"what": "Подпись к таблице или списку", "line_start": n, "line_end": n,
+                         "reason": "Подводка к следующей таблице, списку или примеру, своего обязательства нет"})
+            caption, caption_line = t.rstrip(":").strip(), n
+            prev_table_row = False
             continue
         prev_table_row = is_row
         row_no = row_no + 1 if is_row else 0
-        if _PLACEHOLDER.match(t):
+        if _PLACEHOLDER.match(t) or re.fullmatch(r"нет\.?", t, re.I):
             excl.append({"what": "Заглушка", "line_start": n, "line_end": n, "reason": "Пустой раздел или «не используется»"})
             continue
-        if _CODEISH.match(t):
+        if _CODEISH.match(t) and not is_row:
+            if (reqs and reqs[-1].get("_bare") and n - reqs[-1]["line_end"] <= 2
+                    and all(is_trivial(_text(by_line.get(k) or {})) for k in range(reqs[-1]["line_end"] + 1, n))):
+                reqs[-1]["line_end"] = n  # «…возвращается 404» + «404» + тело ответа — одно описание кода
+                continue
             excl.append({"what": "Пример", "line_start": n, "line_end": n, "reason": "Пример данных или кода"})
             continue
         if re.fullmatch(r"(или|либо|or)\.?", t, re.I):
@@ -1079,30 +1206,46 @@ def heuristic_segment(view: dict) -> dict:
             reqs[-1]["line_end"] = n  # голый код ответа под строкой, где он уже назван
             if not reqs[-1]["source_id"]:
                 reqs[-1]["source_id"], reqs[-1]["kind"] = f"Статус {t[:3]}", "api"
+            reqs[-1]["_bare"] = True
+            continue
+        if (not is_row and reqs and re.search(r"request body|тело запроса", _strip_num(_section_tail(ln)).lower())
+                and reqs[-1]["section"] == section and not _is_row(_text(by_line.get(reqs[-1]["line_start"]) or {}))
+                and n - reqs[-1]["line_end"] <= 2):
+            reqs[-1]["line_end"] = n  # «Content-Type: …» и «Тело не используется» — одно описание тела запроса
             continue
         bid = ln.get("block_id") or ""
         starts_item = bool(is_row or _ID_RE.match(t) or _STATUS_RE.match(t) or _NUM_RE.match(t))
-        if bid and not starts_item and reqs and reqs[-1].get("_block") == bid and n - reqs[-1]["line_end"] <= 2:
+        prev_end = _text(by_line.get(reqs[-1]["line_end"]) or {}).rstrip() if reqs else ""
+        wrapped = not (fmt_src and _SENT_END.search(prev_end))  # в MD строка, кончающаяся точкой, — не перенос
+        if (bid and not starts_item and wrapped and reqs and reqs[-1].get("_block") == bid
+                and n - reqs[-1]["line_end"] <= 2):
             reqs[-1]["line_end"] = n  # продолжение того же абзаца или пункта (перенос строки в HTML/PDF/DOCX)
             continue
         tail = _section_tail(ln)
         clean = re.sub(r"^\s*[-*•]\s+", "", t)
         sid, kind = "", _guess_kind(low_sec, clean, is_row)
-        if tail.lower() in _GLOSSARY and re.search(r"\s[—–-]\s", clean) and not is_row:
+        if (_strip_num(tail).lower() in _GLOSSARY or any(w in _strip_num(tail).lower() for w in _GLOSSARY_WORDS)) \
+                and re.search(r"\s[—–-]\s", clean) and not is_row:
             term = re.split(r"\s[—–-]\s", clean, maxsplit=1)[0].strip()
             sid, kind = (f"{tail}: {term}", "other") if len(term) <= 60 else ("", "other")
         elif (m := _ID_RE.match(clean)):
             sid = m.group("id")
         elif (m := _STATUS_RE.match(clean)):
             sid, kind = f"Статус {m.group('code')}", "api"
-        elif (m := _NUM_RE.match(clean)):
+        elif (m := _NUM_RE.match(clean)) and not is_row:
             sid = f"{tail}, п. {m.group('n')}" if tail else f"п. {m.group('n')}"
         elif is_row:
-            first_cell = clean.strip("| ").split(" | ")[0].strip()
-            if re.fullmatch(r"[\w.{}/\[\]-]{1,40}", first_cell):
-                sid = f"{tail}: {first_cell}" if tail else first_cell  # имя параметра
+            cells = [c.strip() for c in clean.strip("| ").split(" | ")]
+            first_cell = cells[0]
+            if first_cell.isdigit() and len(cells) > 1 and re.fullmatch(r"[A-Za-z_][\w.{}\[\]-]{0,39}", cells[1]):
+                first_cell = cells[1]  # столбец «№», затем имя параметра
+            tname = table_name or tail
+            pm = re.match(r"^([A-Za-z_][\w.{}/\[\]-]{0,39})(?:\s*\([^)]*\))?$", first_cell)
+            if not first_cell.isdigit() and (pm or re.fullmatch(r"[\w.{}/\[\]-]{1,40}", first_cell)):
+                name = pm.group(1) if pm else first_cell  # «cardId (path)» → cardId
+                sid = f"{tname}: {name}" if tname else name  # имя параметра
             else:
-                sid = f"{tail}, строка {row_no}" if tail else f"строка {row_no}"
+                sid = f"{tname}, строка {row_no}" if tname else f"строка {row_no}"
         r = normalize_requirement(view, {"source_id": sid, "kind": kind, "section": section,
                                          "summary": _short_quote(clean)[:90], "quote": _short_quote(clean),
                                          "line_start": n, "line_end": n})
@@ -1111,9 +1254,18 @@ def heuristic_segment(view: dict) -> dict:
             reqs.append(r)
     for r in reqs:
         r.pop("_block", None)
+        r.pop("_bare", None)
     reqs = _collapse_key_value_tables(view, reqs)
     reqs, excl = merge_items(reqs, excl)
-    return {"requirements": assign_ids(uniquify_source_ids(canonical_source_ids(view, reqs))), "excluded": excl}
+    reqs, excl = demote_examples(view, reqs, excl)
+    reqs = split_status_lists(view, reqs)
+    reqs = canonical_source_ids(view, reqs)
+    return {"requirements": assign_ids(uniquify_source_ids(code_in_summary(reqs))), "excluded": excl}
+
+
+# пояснение о самом документе: «Дочерний документ части A: …», «Комплект из двух документов», «Документ подготовлен…»
+_DOC_NOTE = re.compile(r"^(?:дочерний документ|комплект из|настоящий документ|документ подготовлен|текст требований "
+                       r"не вычитывался|документ \(версия)", re.I)
 
 
 _KV_HEADER = re.compile(r"^(поле|параметр|атрибут|field|name|key)\s*\|\s*(значение|value|описание)$", re.I)
@@ -1149,20 +1301,39 @@ def _collapse_key_value_tables(view: dict, reqs: list[dict]) -> list[dict]:
 
 def _guess_kind(section: str, text: str, is_row: bool) -> str:
     tail = section.split("›")[-1].strip().lower()
+    if re.match(r"^(?:[\d.]+\s+)?(?:get|post|put|delete|patch)\s+/", tail):
+        return "api"  # раздел — сам метод API («5.1 POST /items»)
     for s in (tail, section.lower()):
         kind = _kind_by_words(s)
         if kind:
             return kind
-    return "api" if is_row else "other"
+    if is_row:
+        return "api"
+    if re.search(r"\bограничен", text, re.I):
+        return "constraint"
+    if "требован" in tail:
+        return "functional"  # раздел «1.2 Требования» без уточнения — функциональные пункты
+    if re.search(r"предназнач|обеспечивает .* для|^цель", text, re.I):
+        return "goal"
+    return "functional" if _OBLIGATION.search(text) or re.search(
+        r"(?:^|\s)(?:система|сервис|клиент|банк|приложение|модуль|сотрудник)\b", text, re.I) else "other"
 
 
 def _kind_by_words(s: str) -> str:
-    pairs = [("цел", "goal"), ("нефункцион", "nonfunctional"), ("функцион", "functional"), ("данн", "data"),
-             ("интеграц", "integration"), ("ui", "ui"), ("интерфейс", "ui"), ("дизайн", "ui"),
+    pairs = [("цел", "goal"), ("назначени", "goal"),
+             ("нефункцион", "nonfunctional"), ("надёжн", "nonfunctional"), ("надежн", "nonfunctional"),
+             ("производительн", "nonfunctional"), ("защит", "nonfunctional"), ("безопасн", "nonfunctional"),
+             ("доступност", "nonfunctional"),
+             ("приемк", "acceptance"), ("приёмк", "acceptance"), ("как провер", "acceptance"),
+             ("испытан", "acceptance"), ("сценари", "acceptance"),
+             ("функци", "functional"), ("данн", "data"), ("информационн", "integration"), ("обмен", "integration"),
+             ("интеграц", "integration"), ("взаимодейств", "integration"),
+             ("ui", "ui"), ("интерфейс", "ui"), ("дизайн", "ui"), ("экран", "ui"), ("видит", "ui"),
              ("архитектур", "architecture"), ("sequence", "process"), ("bpmn", "process"), ("процесс", "process"),
-             ("приемк", "acceptance"), ("приёмк", "acceptance"), ("логика", "functional"), ("правил", "constraint"),
+             ("порядок", "process"), ("содержание работ", "process"),
+             ("логика", "functional"), ("правил", "constraint"), ("огранич", "constraint"),
              ("параметр", "api"), ("ответ", "api"), ("статус", "api"), ("rest", "api"), ("метод", "api"),
-             ("термин", "other")]
+             ("api", "api"), ("термин", "other")]
     for key, kind in pairs:
         if key in s:
             return kind
@@ -1236,6 +1407,66 @@ def _trim_edges(r: dict, view: dict, headings: set[int]) -> dict:
     return out
 
 
+_RESPONSE_BODY = re.compile(r"^ответ\s+([1-5]\d\d)\s*[:—–-]\s*.*\{", re.I)
+
+
+def promote_response_bodies(view: dict, requirements: list[dict],
+                            excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Абзац «Ответ 200: {…}» — описание ответа метода (часто единственное), а не пример к другому требованию:
+    всегда требование без номера. Модели решают это по-разному (haiku исключает, sonnet выделяет)."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    covered = _covered(requirements)
+    new = []
+    for e in excluded:
+        for n in range(int(e["line_start"]), int(e["line_end"]) + 1):
+            t = _MD_DECOR.sub("", _text(by_n.get(n) or {})).strip()
+            m = _RESPONSE_BODY.match(t)
+            if n in covered or not m or _is_row(t):
+                continue
+            keys = re.findall(r'"([A-Za-z_][\w]*)"\s*:', t)
+            summary = f"Тело ответа {m.group(1)}" + (": " + ", ".join(keys[:4]) if keys else "")
+            r = normalize_requirement(view, {"source_id": "", "kind": "api", "summary": summary,
+                                             "line_start": n, "line_end": n})
+            if r:
+                new.append(r)
+                covered.add(n)
+    if not new:
+        return requirements, excluded
+    return merge_items(requirements + new, excluded)
+
+
+_OBLIGATION = re.compile(r"долж|обязан|обеспечива|необходимо|не допуска|запрещ|разреш|позволя|возвраща|выполня",
+                         re.I)
+
+
+def demote_non_requirements(view: dict, requirements: list[dict],
+                            excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+    """То, что модели то выделяют, то исключают, код решает одинаково: заглушка («Не предъявляются.») и пункт
+    раздела «Общие сведения» без обязательства (наименование системы, основание, сроки) — в excluded."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    keep, moved = [], []
+    for r in requirements:
+        a, b = int(r["line_start"]), int(r["line_end"])
+        body = [_MD_DECOR.sub("", _text(by_n[n])).strip() for n in range(a, b + 1)
+                if n in by_n and not is_trivial(_text(by_n[n]))]
+        text = " ".join(body)
+        own = _OWN_LEAD.match(text)
+        bare = text[own.end():].strip() if own else text
+        sec = str((by_n.get(a) or {}).get("section") or "").lower()
+        if body and all(_PLACEHOLDER.match(re.sub(r"^\s*[-*•]\s+", "", t)) for t in [bare]):
+            moved.append({"what": "Заглушка", "line_start": a, "line_end": b,
+                          "reason": "Раздел без содержания: «не используется», «не предъявляются» или «заполняется позже»"})
+            continue
+        if "общие сведения" in sec and not _OBLIGATION.search(text) and r.get("kind") not in ("goal",):
+            moved.append({"what": "Общие сведения", "line_start": a, "line_end": b,
+                          "reason": "Сведения о документе и работах (наименование, основание, сроки), не требование"})
+            continue
+        keep.append(r)
+    if not moved:
+        return requirements, excluded
+    return merge_items(keep, excluded + moved)
+
+
 def demote_examples(view: dict, requirements: list[dict], excluded: list[dict]) -> tuple[list[dict], list[dict]]:
     """Абзац «Пример ответа: {…}» при уже выделенных строках того же раздела (таблица полей ответа) — пример к ним,
     а не требование: в excluded. Единственное описание ответа (других требований в разделе нет) остаётся."""
@@ -1265,6 +1496,8 @@ def _heading_only(r: dict, view: dict, headings: set[int]) -> bool:
     """
     a, b = _int(r.get("line_start"), 0), _int(r.get("line_end"), 0)
     by_n = {int(x["n"]): x for x in _lines(view)}
+    # номера строк от модели — не дальше документа: line_end = 10**9 иначе даёт миллиард итераций (минуты)
+    a, b = max(a, min(by_n, default=1)), min(b, max(by_n, default=0))
     content = [n for n in range(a, b + 1) if not is_trivial(_text(by_n.get(n) or {}))]
     if not content or not all(n in headings for n in content):
         return False
@@ -1321,10 +1554,14 @@ def segment_from_response(view: dict, raw: dict,
         auto = len(reqs) - before
     for r in reqs:
         r.pop("auto", None)
+    reqs, excl = promote_response_bodies(view, reqs, excl)
     reqs, excl = demote_examples(view, reqs, excl)
+    reqs, excl = demote_non_requirements(view, reqs, excl)
     reqs = merge_bare_codes(view, reqs)
     reqs = merge_same_source_ids(reqs, view)
+    reqs = split_status_lists(view, reqs)
     canonical_source_ids(view, reqs)
+    code_in_summary(reqs)
     uniquify_source_ids(reqs)
     assign_ids(reqs)
     return {"requirements": reqs, "excluded": excl,

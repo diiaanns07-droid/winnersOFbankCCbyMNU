@@ -4,6 +4,8 @@
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 export PYTHONUTF8=1 PYMUPDF_SUGGEST_LAYOUT_ANALYZER=0
+# код агента — из этой копии, даже если активно окружение другой копии (editable-установка другого каталога)
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
   PY="$VIRTUAL_ENV/bin/python"   # уже активированное окружение (шаг 1 README)
