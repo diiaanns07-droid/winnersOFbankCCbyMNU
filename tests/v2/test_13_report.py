@@ -253,8 +253,10 @@ def test_templates_are_russian(sample):
 
 def test_minimal_offline_report_has_all_sections():
     md = markdown.render(minimal())
+    offline_empty = ("Приложение А.", "Приложение Б.", "Приложение В.")  # без модели всегда пусты (№12)
     for h in REQUIRED_HEADINGS:
-        assert h in md, h
+        assert (h in md) != any(x in h for x in offline_empty), h
+    assert "(#pa)" not in md and "(#pb)" not in md and "(#pv)" not in md  # и в содержании их нет
     assert "Режим без модели" in md and "Дефектов не найдено" in md
     assert "❔ не определено" in md and "✅ можно начинать" not in md
 

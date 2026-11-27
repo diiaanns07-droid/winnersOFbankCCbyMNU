@@ -756,7 +756,8 @@ def _header(c: _Ctx) -> list[str]:
                else "как подключить модель — в инструкции «README», раздел о ключе")
         out += [">", "> Режим без модели: работали только детерминированные правила. Поиск противоречий, "
                      f"проверка критериев приёмки и вопросы владельцу требуют модели ({how})."]
-    out += ["", "**Содержание:** [Кратко](#s0) · " + " · ".join(f"[{name}](#{a})" for a, name in NAV)]
+    skip = getattr(c, "skip_nav", set())
+    out += ["", "**Содержание:** [Кратко](#s0) · " + " · ".join(f"[{name}](#{a})" for a, name in NAV if a not in skip)]
     return out + [""]
 
 
@@ -1957,8 +1958,16 @@ def _render_level(report: dict, level: int) -> str:
     _REQ_LABELS.clear()
     _REQ_LABELS.update({str(q.get("id")): (doc_label(q), str(q.get("source_id") or "")) for q in c.reqs
                         if doc_label(q)})
+    # офлайн: приложения, которые без модели всегда пусты (вопросы, тест-кейсы, чек-лист), не печатаются (№12)
+    c.skip = {fn for fn, key, anchor_id in ((_appendix_questions, "questions", "pa"), (_appendix_tests, "test_cases", "pb"),
+                                            (_appendix_checklist, "checklist", "pv"))
+              if c.offline and not c.r.get(key)}
+    c.skip_nav = {a for fn, key, a in ((_appendix_questions, "questions", "pa"), (_appendix_tests, "test_cases", "pb"),
+                                       (_appendix_checklist, "checklist", "pv")) if fn in c.skip}
     parts = []
     for title, fn in _sections():
+        if fn in c.skip:
+            continue
         try:
             parts.append(fn(c))
         except Exception as exc:  # noqa: BLE001 — один сломанный раздел не должен лишить аналитика отчёта
