@@ -74,14 +74,23 @@ def _emit(out: dict, rule: str, kind: str, a: Sent | Line, qa: str, b: Sent | Li
         qb = b.body
     extra = out.pop("_extra_ev", [])
     # у каждой пары свой source: судья №10 склеивает кандидатов одного правила в один кластер
+    base = rule
     rule = f"{rule}.L{min(la.n, lb.n)}-{max(la.n, lb.n)}"
     out["candidates"].append(candidate(
-        rule, title=title, kind=kind, criterion="set_consistent", severity="major", blocks="both",
+        rule, title=title, kind=kind, criterion="set_consistent", severity=CRITICAL_RULES.get(base, "major"),
+        blocks="both",
         evidence=[ev(la, qa), ev(lb, qb)] + extra, problem=problem, scenario=scenario,
         impact=("Разработчик реализует одно правило, тестировщик проверяет другое; исход для клиента зависит от "
                 "того, какое место документа прочитали."),
         recommendation=recommendation, question=question, conflict=True,
     ))
+
+
+# CONTRACT §5 (а): одно событие — два несовместимых исхода по двум правилам — critical (корпус event_conflict 5 из 5,
+# К2 открытого набора). Границы (правило ↔ код API, приёмка на границе) — major, как в корпусе range_boundary;
+# судья поднимает их по контексту.
+CRITICAL_RULES = {"conflicts.event_negation": "critical", "conflicts.event_condition": "critical",
+                  "conflicts.event_quantity": "critical", "conflicts.event_effective": "critical"}
 
 
 # --- event_conflict -------------------------------------------------------------------------------

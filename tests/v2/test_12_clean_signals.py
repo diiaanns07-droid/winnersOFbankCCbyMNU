@@ -377,3 +377,12 @@ def test_injection_hidden_in_html_and_docx(tmp_path: Path) -> None:
     out = rules.run(docview.load(tmp_path / "tz.docx"))
     got = [c for c in out["candidates"] if c["source"] == "rules:injection.prompt"]
     assert got and len(got[0]["evidence"]) == 2
+
+
+def test_event_conflict_is_critical() -> None:
+    """CONTRACT §5 (а): одно событие — два несовместимых исхода по двум правилам (корпус event_conflict — critical)."""
+    out = rules.run(fallback_load(CORPUS / "transfer_limit.event_conflict.cancel_no_restore" / "source.md"))
+    ev_c = [c for c in out["candidates"] if c["source"].startswith("rules:conflicts.event_")]
+    assert ev_c and all(c["severity"] == "critical" for c in ev_c)
+    out = rules.run(fallback_load(CORPUS / "cashback.range_boundary.cap_strict" / "source.md"))
+    assert all(c["severity"] == "major" for c in out["candidates"] if "boundary" in c["source"] or "range" in c["source"])
