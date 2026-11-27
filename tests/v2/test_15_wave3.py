@@ -722,6 +722,12 @@ def test_viewdiff_rules_on_clean_docs_summary():
     line = vd.rules_line(s)
     assert line.startswith("Правила без модели на 4 чистых документах: critical 2 → 0, major 4 → 5")
     assert "лучше — fx" in line and "**хуже — qr**" in line and "не прогнались — 1" in line
+    off = {"official": [{"findings": 15, "K": ["К3", "К4"], "C": ["С1", "С19"]},
+                        {"findings": 14, "K": ["К3"], "C": ["С1", "С19", "С20"]}]}
+    ol = vd.official_rules_line(off)
+    assert ol.startswith("На официальном правила без модели находят: К3, К4, С1, С19 → К3, С1, С19, С20")
+    assert "**потеряны: К4**" in ol and "новые: С20" in ol
+    assert vd.official_rules_line({"official": [{"error": "x"}, {}]}) == ""
     docs = vd.clean_docs()
     assert len(docs) == 20 and "evaluation/v2/clean/fx/source.md" in docs
     assert all("edge.empty" not in d for d in docs) and any(d.endswith("autopay.base/source.md") for d in docs)
