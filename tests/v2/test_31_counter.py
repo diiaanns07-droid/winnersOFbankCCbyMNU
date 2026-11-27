@@ -44,3 +44,13 @@ def test_displaced_needs_same_kind():
 def test_counter_deterministic():
     a, b = _score("w4_07_zamorozka_c6aa9b5_haiku", True), _score("w4_07_zamorozka_c6aa9b5_haiku", True)
     assert a["assignment"] == b["assignment"] and a["duplicates"] == b["duplicates"]
+
+
+@pytest.mark.skipif(not (MEAS / "zamer_13_00_9bd5954_haiku").exists(), reason="нет сохранённого замера")
+def test_counterdiff_three_counters():
+    from evaluation.v2 import counterdiff as cd
+
+    (row,) = cd.compute([MEAS / "zamer_13_00_9bd5954_haiku"])
+    assert row["before"]["K"] == row["c14"]["K"] == row["now"]["K"] == 5
+    assert row["before"]["C"] <= row["c14"]["C"] <= row["now"]["C"]
+    assert "С14" in row["now"]["C_found"] and "С14" not in row["before"]["C_found"]
