@@ -294,13 +294,39 @@ def _rule_forms(rules: list[str], index: Mapping[str, Mapping[str, Any]],
     return {"nom": f"правила {joined}", "gen": f"правил {joined}", "dat": f"правилам {joined}"}
 
 
+_CASE_BY_PREP = {"по": "строке", "в": "строке", "на": "строке", "из": "строки", "до": "строки", "от": "строки",
+                 "у": "строки", "для": "строки", "с": "строки"}
+
+
+def _line_refs(text: str) -> str:
+    """«L038» (номер строки из нумерованного документа) → «строка 38», после предлога — в нужном падеже."""
+    def sub(m: re.Match) -> str:
+        prep = m.group(1)
+        word = _CASE_BY_PREP.get(prep.lower().strip(), "строка") if prep else "строка"
+        return f"{prep or ''}{word} {int(m.group(2))}"
+    text = re.sub(r"\bL0*(\d{1,4})\s*[–-]\s*L?0*(\d{1,4})\b", lambda m: f"строки {m.group(1)}–{m.group(2)}",
+                  text or "")
+    return re.sub(r"\b((?:по|в|на|из|до|от|у|для|с)\s+)?L0*(\d{1,4})\b", sub, text, flags=re.I)
+
+
 def humanize_ids(text: str, index: Mapping[str, Mapping[str, Any]]) -> str:
     """ID нарезки в тексте модели («R-06») → собственный номер документа («Ф-2»), если он короткий;
     иначе ID остаётся (рендер делает его ссылкой на таблицу требований)."""
+    rows = [str(r.get("id")) for r in sorted((r for r in index.values() if r.get("kind") == "acceptance"),
+                                              key=lambda r: (_int(r.get("line_start")) or 0, str(r.get("id"))))]
+    # строка приёмки: «строка R-14», «критерий R-14» → «критерий приёмки №2»
+    text = re.sub(r"\b(?:строк[аеиуой]{1,2}|критери[йяюе]м?)\s+(?:приёмки\s+|приемки\s+)?(R-\d+)\b",
+                  lambda m: (("К" if m.group(0)[0].isupper() else "к") + f"ритерий приёмки №{rows.index(m.group(1)) + 1}"
+                             if m.group(1) in rows else m.group(0)),
+                  text or "", flags=re.I)
+
     def sub(m: re.Match) -> str:
+        if m.group(0) in rows:
+            return f"критерий приёмки №{rows.index(m.group(0)) + 1}"
         src = _s((index.get(m.group(0)) or {}).get("source_id"))
         return src if src and _DOC_ID.fullmatch(src) else m.group(0)
-    text = re.sub(r"\bR-\d+\b", sub, text or "")
+    text = re.sub(r"\bR-\d+\b", sub, text)
+    text = _line_refs(text)
     return re.sub(r"\b([A-Za-zА-Яа-яЁё]{1,6}-\d+) \(\1\)", r"\1", text)  # «Ф-2 (Ф-2)» после замены
 
 
@@ -630,23 +656,31 @@ def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[s
         return None
     first = bad[0]
     src = _s((index.get(first["requirement_id"]) or {}).get("source_id"))
-    name = src if src and _DOC_ID.fullmatch(src) else (
-        f"Нефункциональное требование в строке {first['line']}" if first["line"] else "Нефункциональное требование")
+    where = f" (строка {first['line']})" if first["line"] else ""
+    if src and _DOC_ID.fullmatch(src):
+        name = src
+    elif first["metric"] and not first["vague_words"]:
+        name = f"Норматив «{first['metric']}»{where}"
+    else:
+        name = f"Нефункциональное требование{where}"
     names = dict(_NFR_FIELDS)
     missing = [names[k] for k in first["missing"]]
     more = f" (и ещё {len(bad) - 1})" if len(bad) > 1 else ""
     if first["vague_words"]:
-        title = f"{name}: «{first['vague_words']}» нельзя проверить тестом{more}"
+        words = [w.strip() for w in re.split(r"[;,]\s*|\s+и\s+", first["vague_words"]) if w.strip()][:2]
+        title = (f"{name}: " if src and _DOC_ID.fullmatch(src) else "") + \
+            f"{', '.join('«' + w + '»' for w in words)}{where if not (src and _DOC_ID.fullmatch(src)) else ''} " \
+            f"нельзя проверить тестом{more}"
         what = f"размытая оценка «{first['vague_words']}» вместо числа"
         scenario = (f"Замер показывает 3 с на 95-м перцентиле и 9 с на 99-м: по формулировке «{first['vague_words']}» "
                     "одна сторона считает требование выполненным, другая — нет.")
     else:
-        short = {"metric": "норматив", "start_end": "точки замера", "share": "доля событий", "load": "нагрузка"}
+        short = {"metric": "норматива", "start_end": "точек замера", "share": "доли событий", "load": "нагрузки"}
         gaps = [short[k] for k in first["missing"] if k in ("share", "load")] or [short[k] for k in first["missing"]]
-        title = f"{name} нельзя проверить: не заданы {' и '.join(gaps[:2])}{more}"
+        title = f"{name} нельзя проверить: нет {' и '.join(gaps[:2])}{more}"
         what = f"норматив «{first['metric']}» без условий замера" if first["metric"] else "нет числового норматива"
-        scenario = (f"Нагрузочный тест: 95 % событий укладываются в «{first['metric'] or 'норматив'}», 5 % — нет, "
-                    "нагрузка в документе не названа: по требованию нельзя решить, пройден ли тест.")
+        scenario = (f"Нагрузочный тест: 95 % событий уложились в норматив «{first['metric'] or '—'}», 5 % — нет; "
+                    "доля и нагрузка в документе не названы — нельзя решить, пройден ли тест.")
     rest = "; ".join(f"«{c['quote']}»" for c in bad[1:3])
     problem = (f"«{first['quote']}» — {what}"
                + (f"; не заданы: {', '.join(missing)}" if missing else "") + ". "

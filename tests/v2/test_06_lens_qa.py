@@ -525,7 +525,8 @@ def test_nfr_without_share_and_load_is_major_from_code():
     [c] = out["candidates"]
     assert c["origin"] == "nfr_check" and c["severity"] == "major" and c["kind"] == "unverifiable"
     assert c["requirement_ids"] == ["R-05"] and c["evidence"][0]["line"] == 20
-    assert "доля" in c["title"] and "нагрузка" in c["problem"] and c["rewrite"].startswith("Сообщение")
+    assert c["title"] == "Норматив «в течение минуты» (строка 20) нельзя проверить: нет доли событий и нагрузки"
+    assert "нагрузка" in c["problem"] and c["rewrite"].startswith("Сообщение")
     assert [d["title"] for d in out["dropped"]] == ["НФТ без метрики"], "модельное того же вида — в dropped"
 
 
@@ -550,3 +551,10 @@ def test_nfr_model_vague_words_need_dictionary_or_missing_number():
     vague = _nfr(quote="Сведения отображаются быстро", metric="", vague_words="")
     assert lens_qa.normalize_nfr_check(vague)["vague_words"] == "быстро"
     assert lens_qa.normalize_nfr_check(_nfr(start_end="<уточнить: от запроса до ответа>"))["start_end"] == ""
+
+
+def test_model_texts_use_document_names_not_internal_ids():
+    """Рубрика понятности: в текстах модели ID нарезки и «L038» → номер документа и «строка 38»."""
+    idx = {r["id"]: r for r in REQS}
+    text = lens_qa.humanize_ids("Строка R-03 противоречит R-01 (L010); код по L163 или L165–L171.", idx)
+    assert text == "Критерий приёмки №1 противоречит П-1 (строка 10); код по строке 163 или строки 165–171."
