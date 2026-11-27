@@ -1,0 +1,56 @@
+diff --git a/src/bcc_review/v2/stages/judge.py b/src/bcc_review/v2/stages/judge.py
+index 59d89cdf..4eb85d3a 100644
+--- a/src/bcc_review/v2/stages/judge.py
++++ b/src/bcc_review/v2/stages/judge.py
+@@ -699,6 +699,20 @@ def _call_judge(ctx: Any, cands: list[dict], clusters: list[list[str]], checklis
+     compact = len(cands) > COMPACT_THRESHOLD
+     block = render_candidates(cands, clusters, compact)
+     system, user = _build_messages(ctx, block, checklist, len(cands), compact, part)
++    owner_answers = [
++        {"candidate": c["id"], "answer": ref["id"], "text": ref["text"]}
++        for c in cands if c.get("source") == "recheck"
++        for ref in c.get("answer_refs") or []
++        if isinstance(ref, dict) and ref.get("id") and isinstance(ref.get("text"), str) and ref["text"].strip()
++    ]
++    if owner_answers:
++        system += ("\nРежим пересмотра. Проверяй помеченные кандидаты по двум источникам: исходное ТЗ и файл ответов владельца. "
++                   "Второй источник передан как данные с номером ответа и номером кандидата. Сверяй утверждение "
++                   "кандидата с самим ответом. Для противоречия нужны несовместимые исходы для одного условия: "
++                   "один подтверждён ответом, другой — продолжающим действовать пунктом ТЗ. Ответ не обязан встречаться "
++                   "в исходном ТЗ. Согласованный ответ или явная замена единственного прежнего правила не образуют "
++                   "коллизию. Само новое пожелание не доказывает противоречия. Цитаты со строками бери из ТЗ.")
++        user += "\n\nОтветы владельца к указанным кандидатам (JSON)\n" + json.dumps(owner_answers, ensure_ascii=False)
+     try:
+         return [_ask(ctx, system, user, response_schema())]
+     except Exception as exc:  # noqa: BLE001
+diff --git a/tests/v2/test_10_judge.py b/tests/v2/test_10_judge.py
+index 210503b3..b90bce52 100644
+--- a/tests/v2/test_10_judge.py
++++ b/tests/v2/test_10_judge.py
+@@ -792,3 +792,26 @@ def test_latin_terms_in_final_texts():
+ def test_summary_minors_have_owner_question():
+     for spec in (judge._NO_IDS, judge._NONSINGULAR, judge._DUPLICATES, judge._PLACEHOLDERS):
+         assert spec["question"].endswith("?")
++
++
++def test_owner_answer_is_a_separate_judge_source(monkeypatch):
++    captured = []
++    monkeypatch.setattr(judge, "_ask", lambda ctx, system, user, schema: captured.append((system, user)))
++    sample = cand("C-007", 20, "Обычный срок указан в регламенте.", source="recheck")
++    decision = "Новый срок при закрытии составляет восемнадцать дней."
++    sample["answer_refs"] = [{"id": "Q-09", "text": decision}]
++    judge._call_judge(Ctx(), [sample], [["C-007"]], "", [])
++    system, user = captured[0]
++    assert "файл ответов владельца" in system and decision not in system
++    assert '"Q-09"' in user and decision in user and '"C-007"' in user
++
++
++def test_initial_judge_cannot_use_candidate_text_as_owner_input(monkeypatch):
++    captured = []
++    monkeypatch.setattr(judge, "_ask", lambda ctx, system, user, schema: captured.append((system, user)))
++    sample = cand("C-008", 20, "Обычный срок указан в регламенте.")
++    sample["answer_refs"] = [{"id": "Q-21", "text": "Сторонняя версия ответа."}]
++    judge._call_judge(Ctx(), [sample], [["C-008"]], "", [])
++    system, user = captured[0]
++    assert "файл ответов владельца" not in system
++    assert "Сторонняя версия ответа." not in user

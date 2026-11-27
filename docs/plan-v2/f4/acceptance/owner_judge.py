@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--inputs", type=Path, help="Use a separate set of archived candidates or controls")
     parser.add_argument("--document", choices=("official", "qr", "car-loan"), required=True)
     args = parser.parse_args()
     repo, output = args.repo.resolve(), args.out.resolve()
@@ -30,7 +31,8 @@ def main():
     from bcc_review.v2.stages.recheck import _judge_new, duplicate_of
 
     case = args.document
-    inputs = read(here / "owner-judge-inputs.json")[case]
+    input_file = args.inputs or here / "owner-judge-inputs.json"
+    inputs = read(input_file)[case]
     report = read(exam / "merged" / case / "answered.json")
     source = {"official": repo / "release/input/requirements.md",
               "qr": repo / "evaluation/v2/open2/qr/source.md",
@@ -52,6 +54,8 @@ def main():
             "archived_run": report["run"]["run_id"],
             "code_base": subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip(),
             "recheck_py_sha256": sha256((repo / "src/bcc_review/v2/stages/recheck.py").read_bytes()).hexdigest(),
+            "judge_py_sha256": sha256((repo / "src/bcc_review/v2/stages/judge.py").read_bytes()).hexdigest(),
+            "candidate_input_sha256": sha256(input_file.read_bytes()).hexdigest(),
             "provider": provider, "model_requested": opts["model"], "models_used": stats["models_used"],
             "calls": {k: stats[k] for k in ("calls","cached","failed")}, "inputs": [c["id"] for c in inputs],
             "warnings": warnings + ctx.warnings, "findings": found, "rejected": rejected,

@@ -1,0 +1,107 @@
+{
+  "filter": {
+    "official": {
+      "target": "C-062",
+      "accepted": false,
+      "finding": null,
+      "calls": {
+        "calls": 1,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/filter/official.json"
+    },
+    "qr": {
+      "target": "C-050",
+      "accepted": false,
+      "finding": null,
+      "calls": {
+        "calls": 1,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/filter/qr.json"
+    },
+    "car-loan": {
+      "target": "C-024",
+      "accepted": false,
+      "finding": null,
+      "calls": {
+        "calls": 1,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/filter/car-loan.json"
+    }
+  },
+  "two-sources": {
+    "official": {
+      "target": "C-062",
+      "accepted": true,
+      "finding": "D-28",
+      "calls": {
+        "calls": 2,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/two-sources/official.json"
+    },
+    "qr": {
+      "target": "C-050",
+      "accepted": true,
+      "finding": "D-22",
+      "calls": {
+        "calls": 2,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/two-sources/qr.json"
+    },
+    "car-loan": {
+      "target": "C-024",
+      "accepted": true,
+      "finding": "D-11",
+      "calls": {
+        "calls": 2,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/two-sources/car-loan.json"
+    }
+  },
+  "agreeing-control": {
+    "official": {
+      "target": "C-062",
+      "accepted": false,
+      "finding": null,
+      "calls": {
+        "calls": 1,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/agreeing-control/official.json"
+    },
+    "qr": {
+      "target": "C-050",
+      "accepted": false,
+      "finding": null,
+      "calls": {
+        "calls": 1,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/agreeing-control/qr.json"
+    },
+    "car-loan": {
+      "target": "C-024",
+      "accepted": false,
+      "finding": null,
+      "calls": {
+        "calls": 1,
+        "cached": 0,
+        "failed": 0
+      },
+      "file": "owner-judge-reports/agreeing-control/car-loan.json"
+    }
+  }
+}
