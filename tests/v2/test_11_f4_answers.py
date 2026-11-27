@@ -411,3 +411,23 @@ def test_conflict_shows_reply_texts():
     assert "422" in texts["Q-01.1"] and "403" in texts["Q-01.2"]
     md = recheck.render_markdown(clar)
     assert "Q-01.1 «Команда рисков: на отказ антифрода возвращаем 422" in md and "↔ Q-01.2 «Владелец API" in md
+
+
+@pytest.mark.parametrize("soft", ["Решение пока не принято.", "Пока неизвестно.", "Вопрос на согласовании у юристов.",
+                                  "В процессе согласования с процессингом.", "Ждём решения от рисков.",
+                                  "Как обычно.", "По ситуации."])
+def test_more_soft_refusals(soft):
+    r = recheck.resolve_answers(QS, recheck.load_answers(f"Q-02 [Маршрут вызова между сервисами]: {soft}\n"))
+    assert "Q-02" in r["unanswered"] and not r["answered"]
+
+
+def test_vague_sentence_keeps_rule_part():
+    text = "Q-03 [Срок хранения идентификатора запроса]: Храним 48 часов с первого запроса. Остальное как обычно.\n"
+    a = recheck.resolve_answers(QS, recheck.load_answers(text))["answered"][0]
+    assert a["answer"] == "Храним 48 часов с первого запроса." and a["deferred"] == ["Остальное как обычно."]
+
+
+@pytest.mark.parametrize("rule", ["Ждём подтверждения эмитента 30 секунд, затем отказ 504.",
+                                  "Статус платежа неизвестен — возвращаем 202 и опрашиваем процессинг."])
+def test_rules_near_soft_words_stay(rule):
+    assert recheck.split_deferred(rule) == (rule, [])

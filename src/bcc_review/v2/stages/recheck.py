@@ -107,10 +107,17 @@ _DEFER = re.compile(
     r"|\b(?:решим|обсудим|уточним|договоримся|согласуем|определимся|вернёмся|вернемся|примем|разберёмся"
     r"|разберемся|подумаем)\b[^.!?;]*?\b(?:позже|потом|отдельно|после|завтра|следующ\w*)\b"
     r"|\b(?:позже|потом|отдельно)\s+(?:решим|обсудим|уточним|договоримся|согласуем|определимся|скажем)\b"
-    r"|\bоткрыт\w*\s+вопрос|\bвопрос\s+(?:пока\s+|ещё\s+|еще\s+)?открыт|\bна\s+обсуждении\b|\btbd\b|\btodo\b)",
+    r"|\bоткрыт\w*\s+вопрос|\bвопрос\s+(?:пока\s+|ещё\s+|еще\s+)?открыт|\bна\s+обсуждении\b|\btbd\b|\btodo\b"
+    r"|\bрешени\w*\s+(?:пока\s+|ещё\s+|еще\s+)?не\s+принят\w*|\b(?:пока|ещё|еще)\s+неизвестн\w*"
+    r"|\bна\s+согласовании\b|\bв\s+процессе\s+согласовани\w*|\bжд[её]м\s+(?:решени|согласовани)\w*)",
     re.I)
 _SENT = re.compile(r"(?<=[.!?;])\s+")
 _BUT = re.compile(r",?\s+(?:но|однако|а)\s+(?=[а-яё])", re.I)
+
+
+def _soft(part: str) -> bool:
+    """Предложение не задаёт правила: откладывает решение или отсылает к «как обычно», «по ситуации»."""
+    return bool(_DEFER.search(part) or _VAGUE.search(part))
 
 
 def split_deferred(text: str) -> tuple[str, list[str]]:
@@ -124,14 +131,14 @@ def split_deferred(text: str) -> tuple[str, list[str]]:
         part = part.strip()
         if not part:
             continue
-        if not _DEFER.search(part):
+        if not _soft(part):
             rule.append(part)
             continue
         # «Порог 100 ₸, но формат уточним позже»: правило до «но» остаётся, отложенная часть — отдельно
         for clause in _BUT.split(part):
             clause = clause.strip(" ,")
             if clause:
-                (deferred if _DEFER.search(clause) or len(_tokens(clause)) < 3 else rule).append(clause)
+                (deferred if _soft(clause) or len(_tokens(clause)) < 3 else rule).append(clause)
     body = " ".join(rule).strip()
     if deferred and len(_tokens(body)) < 3:  # «Хороший вопрос. Решим позже.» — правила в остатке нет
         deferred, body = [*rule, *deferred], ""
@@ -437,7 +444,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         else:
             text, deferred = split_deferred(a.get("text", ""))
             label = ""
-        if not text or _VAGUE.search(text) or len(text) < 3:
+        # свой текст уже разобран по предложениям (split_deferred); «как обычно» в варианте модели — не правило
+        if not text or (label and _VAGUE.search(text)) or len(text) < 3:
             why = "откладывает решение" if deferred else "не задаёт правила"
             warnings.append(f"recheck: ответ на {q['id']} {why} — вопрос остаётся открытым")
             if deferred:
