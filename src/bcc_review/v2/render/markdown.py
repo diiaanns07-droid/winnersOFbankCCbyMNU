@@ -1076,8 +1076,12 @@ def _action(f: dict, limit: int = 190) -> str:
     части предложения («;», «:»), а не посреди слова."""
     sent = first_sentence(_plain_ids(" ".join(str(f.get("recommendation") or "").split())), 10 ** 4).rstrip(".")
     if len(sent) > limit:
-        cut = max(sent.rfind("; ", 0, limit), sent.rfind(": ", 0, limit), sent.rfind(" — ", 0, limit))
-        sent = sent[:cut] if cut > limit * 0.5 else shorten(sent, limit)
+        cuts = [i for i in (sent.rfind("; ", 0, limit), sent.rfind(": ", 0, limit), sent.rfind(" — ", 0, limit))
+                if i > limit * 0.5 and sent.rfind("<", 0, i) <= sent.rfind(">", 0, i)]  # не внутри «<уточнить: …>»
+        sent = sent[:max(cuts)] if cuts else shorten(sent, limit)
+        open_ph = sent.rfind("<")
+        if open_ph > sent.rfind(">"):  # обрезка пришлась на «<уточнить: …» — место убираем целиком
+            sent = sent[:open_ph].rstrip(" ,;:—.") + "…"
     rec = sent.rstrip(" ,;:—")
     if len(rec) > 1 and rec[0].isupper() and rec[1].islower():
         rec = rec[0].lower() + rec[1:]

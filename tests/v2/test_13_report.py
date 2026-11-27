@@ -811,3 +811,13 @@ def test_console_counts_all_blockers(sample):
     r["verdict"].update(development="conditional", testing="conditional")
     text = console.summary(r)
     assert "исправить первым:" in text and "блокер" not in text
+
+
+def test_action_not_cut_inside_placeholder():
+    rec = ("Добавить правило: премия возвращается один раз; при полном погашении до отказа возврат = премия минус уже "
+           "возвращённое. <уточнить: порядок при одновременном отказе и погашении, срок возврата и счёт зачисления>")
+    act = markdown._action({"recommendation": rec}, limit=120)
+    assert "<уточнить" not in act or act.count("<") == act.count(">")
+    rec2 = "Привести строки 25 и 45 к одной схеме: <уточнить: вызывает ли API кредитов сервис напрямую>; схему дополнить"
+    assert markdown._action({"recommendation": rec2}, limit=80).count("<") == markdown._action(
+        {"recommendation": rec2}, limit=80).count(">")
