@@ -448,13 +448,15 @@ def _stems(text: str) -> set[str]:
 
 
 def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method | None" = None,
-                    methods: "list[Method] | None" = None, any_class: bool = False) -> Status | None:
+                    methods: "list[Method] | None" = None, any_class: bool = False,
+                    min_overlap: int = 2) -> Status | None:
     """Объявленный статус с тем же условием, что у упомянутого кода (≥ 2 общих значимых основы).
     Строка перечня, отнесённая к другому методу («createX: …»), — не тот же случай."""
     cond = re.sub(CODE, " ", frag)
     st = _stems(cond)
     best, score = None, 1
     names = {m.name.lower() for m in methods or [] if m.name}
+    score = min_overlap - 1
     for d in decls:
         if d.code == code or (not any_class and (d.code // 100) != (code // 100)):
             continue
@@ -480,12 +482,15 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
     for code, line, frag in mentions:
         if code not in declared or line.n in decl_lines or line.n in in_sections:
             continue
-        if not COND_MARK.search(frag) or not re.search(r"возвра|верн", frag, re.I):
+        if not re.search(r"возвра|верн", frag, re.I):
             continue
         if 200 <= code < 300 and ERROR_WORD.search(frag):
             continue  # «200 с ERROR» — это правило api.success_with_error
+        # «Если C, вернуть X» — хватит двух общих основ; утверждение без «если» («Повторная операция … возвращает X»)
+        # — только при сильном совпадении предмета (≥ 3 основы)
+        need = 2 if COND_MARK.search(frag) else 3
         other = _same_case_decl(frag, [d for d in decls if d.code != code and d.kind in ("table", "list")], code,
-                                method_of(methods, line.n), methods, any_class=True)
+                                method_of(methods, line.n), methods, any_class=True, min_overlap=need)
         if other is None or (code, other.code) in done:
             continue
         done.add((code, other.code))
