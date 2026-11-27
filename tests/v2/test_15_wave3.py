@@ -147,3 +147,12 @@ def test_cleantable_external_rows_from_status(tmp_path):
     assert rows[0]["case"] == "qr_clean" and rows[0]["major"] == 2 and rows[0]["model"] == "sonnet"
     assert "| qr_clean | №18: чистые версии (2-я редакция) | sonnet | 0 | 2 | 12 | можно / можно |" in ct.render(ct.latest(rows))
     assert ct._external_rows(tmp_path / "нет.json") == []
+
+
+def test_cleantable_verdict_table():
+    from evaluation.v2 import cleantable as ct
+
+    rows = [ct._row("чистые ТЗ №20", "haiku", "р", "2026-11-27 15:00", c, {"critical": cr}, {"development": v, "testing": v})
+            for c, cr, v in (("fx", 1, "no"), ("qr_v2", 0, "conditional"), ("roundup", 0, "yes"))]
+    text = ct.render_verdicts(ct.latest(rows))
+    assert "| чистые ТЗ №20 | haiku | р (15:00) | 1 | 1 | 1 из 3 | 1 | fx |" in text

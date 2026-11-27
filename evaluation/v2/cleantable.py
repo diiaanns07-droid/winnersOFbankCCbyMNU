@@ -130,6 +130,26 @@ def _verdict(v: dict) -> str:
     return f"{ru.get(v.get('development'), v.get('development'))} / {ru.get(v.get('testing'), v.get('testing'))}"
 
 
+def render_verdicts(groups: dict[tuple, list[dict]]) -> str:
+    """«Вердикт на исправленных ТЗ» (таблица №01): по каждому набору — сколько чистых документов получили
+    «можно», «с условиями», «нельзя» (по разработке) в последнем прогоне модели; цель — «нельзя» 0."""
+    order = ["чистые ТЗ №20", "№18: чистые версии (2-я редакция)", "№18: чистые версии (1-я редакция)",
+             "корпус: базы и перефразы", "прочие чистые"]
+    keys = sorted((k for k in groups if not k[1].startswith("офлайн")),
+                  key=lambda k: (order.index(k[0]) if k[0] in order else 9, k[1]))
+    L = ["### Вердикт на исправленных ТЗ (цель: «нельзя» 0, critical 0)", "",
+         "| Набор | Модель | Прогон | «можно» | «с условиями» | «нельзя» | critical | Документы с «нельзя» |",
+         "| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- |"]
+    for k in keys:
+        rs = groups[k]
+        dev = [(r["verdict"] or {}).get("development") for r in rs]
+        no_docs = [r["case"] for r in rs if "no" in (r["verdict"] or {}).values()]
+        L.append(f"| {k[0]} | {k[1]} | {rs[0]['label']} ({rs[0]['at'][11:16] or rs[0]['at']}) | "
+                 f"{dev.count('yes')} | {dev.count('conditional')} | {len(no_docs)} из {len(rs)} | "
+                 f"{sum(r['critical'] for r in rs)} | {', '.join(sorted(no_docs)) or '—'} |")
+    return "\n".join(L) + "\n\n"
+
+
 def render(groups: dict[tuple, list[dict]]) -> str:
     order = ["чистые ТЗ №20", "№18: чистые версии (2-я редакция)", "№18: чистые версии (1-я редакция)",
              "корпус: базы и перефразы", "прочие чистые"]
@@ -178,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     groups = latest(_corpus_rows() + _newtz_rows() + _open2_rows() + _external_rows())
-    text = render(groups)
+    text = render_verdicts(groups) + render(groups)
     print(text)
     if a.write:
         write_results(text)
