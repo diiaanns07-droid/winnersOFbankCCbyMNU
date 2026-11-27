@@ -1114,6 +1114,28 @@ def uniquify_source_ids(requirements: list[dict]) -> list[dict]:
     return requirements
 
 
+_NFR_ID = re.compile(r"^(?:NFR|НФТ|НФ|QR|NF)[-_]?\d", re.I)
+_GOAL_SECTION = re.compile(r"цел|назначени|контекст|обоснован|предпосылк|описание\s+(?:изменени|задач)|введени|бизнес-?задач",
+                           re.I)
+
+
+def settle_kinds(view: dict, requirements: list[dict]) -> list[dict]:
+    """Вид требования там, где его однозначно задаёт сам документ, — одинаковый при любой модели (от вида зависит
+    серьёзность у набора №09: цель и нефункциональное — «мягкие»):
+    * раздел «Нефункциональные требования» или номер NFR-/НФТ- — nonfunctional (haiku давал data, constraint);
+    * «цель» у пункта со своим номером вне раздела цели («US-1. Как клиент, я хочу…») — functional."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    for r in requirements:
+        first = by_n.get(int(r["line_start"])) or {}
+        tail = _strip_num(_section_tail(first)).lower()
+        sid = str(r.get("source_id") or "")
+        if "нефункцион" in tail or _NFR_ID.match(sid):
+            r["kind"] = "nonfunctional"
+        elif r.get("kind") == "goal" and re.fullmatch(ITEM_ID, sid) and not _GOAL_SECTION.search(tail):
+            r["kind"] = "functional"
+    return requirements
+
+
 def assign_ids(requirements: list[dict]) -> list[dict]:
     width = 3 if len(requirements) >= 100 else 2
     for i, r in enumerate(requirements, 1):
@@ -1621,7 +1643,8 @@ def heuristic_segment(view: dict) -> dict:
     reqs, excl = demote_open_questions(view, reqs, excl)
     reqs = split_status_lists(view, reqs)
     reqs = status_item_quotes(view, canonical_source_ids(view, reqs))
-    return {"requirements": assign_ids(uniquify_source_ids(code_in_summary(reqs))), "excluded": excl}
+    reqs = settle_kinds(view, uniquify_source_ids(code_in_summary(reqs)))
+    return {"requirements": assign_ids(reqs), "excluded": excl}
 
 
 # пояснение о самом документе: «Дочерний документ части A: …», «Комплект из двух документов», «Документ подготовлен…»
@@ -2051,6 +2074,7 @@ def segment_from_response(view: dict, raw: dict,
     status_item_quotes(view, reqs)
     code_in_summary(reqs)
     uniquify_source_ids(reqs)
+    settle_kinds(view, reqs)
     assign_ids(reqs)
     return {"requirements": reqs, "excluded": excl,
             "coverage": {"lines": len(_lines(view)), "uncovered_after_model": first_uncovered,

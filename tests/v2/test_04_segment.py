@@ -1103,3 +1103,18 @@ def test_summary_enumeration_after_colon_trimmed():
             "Экран условий: флажок, стоимость"]
     for s in keep:
         assert sg.trim_enumeration(s) == s
+
+
+def test_kind_fixed_where_document_defines_it():
+    """Вид, от которого зависит серьёзность у набора №09 («мягкие» цель и нефункциональное), не зависит от модели:
+    NFR-2 «Запись хранится 3 года» — haiku data, sonnet nonfunctional → nonfunctional; история US-1 — haiku goal,
+    sonnet functional → functional (цель — только в разделе цели)."""
+    view = sg.load_view(str(STRUCT / "stories.md"))
+    raw = json.loads((ANSWERS / "stories.haiku.json").read_text(encoding="utf-8"))
+    out = {r["source_id"]: r["kind"] for r in sg.segment_from_response(view, raw)["requirements"] if r["source_id"]}
+    assert out["NFR-2"] == "nonfunctional" and out["US-1"] == "functional"
+    heur = {r["source_id"]: r["kind"] for r in sg.heuristic_segment(view)["requirements"] if r["source_id"]}
+    assert heur["NFR-2"] == "nonfunctional" and heur["US-1"] == "functional"
+    off = sg.segment_from_response(sg.load_view(str(OFFICIAL_MD)),
+                                   json.loads((ANSWERS / "official.haiku.json").read_text(encoding="utf-8")))
+    assert off["requirements"][0]["kind"] == "goal"  # цель в разделе цели остаётся целью
