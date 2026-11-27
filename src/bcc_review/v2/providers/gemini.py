@@ -72,6 +72,9 @@ DEFAULT_FALLBACKS = ("gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
 DEFAULT_MAX_OUTPUT_TOKENS = 32000
 DEFAULT_THINKING_LEVEL = "medium"   # Gemini 3.x
 DEFAULT_THINKING_BUDGET = 4096      # Gemini 2.x
+# Gemini отвергает запрос с тайм-аутом короче 10 с (400 INVALID_ARGUMENT «Minimum allowed deadline is 10s»):
+# doctor --live с бюджетом 9 с падал на рабочем ключе
+MIN_DEADLINE_S = 10.0
 RETRY_DELAYS_S = (2.0, 5.0, 10.0)   # 503/500/504/overloaded/timeout
 NETWORK_DELAYS_S = (2.0, 5.0)
 RATE_WAITS = 2
@@ -481,7 +484,7 @@ class GeminiProvider:
                         started = self._clock()
                         remaining = deadline - started
                         result = adapter.invoke(model=current, messages=sent, schema=schema,
-                                                timeout_s=max(5.0, min(per_call, remaining)),
+                                                timeout_s=max(MIN_DEADLINE_S, min(per_call, remaining)),
                                                 max_output_tokens=max_tokens)
                 except ProviderError as exc:
                     last = exc
