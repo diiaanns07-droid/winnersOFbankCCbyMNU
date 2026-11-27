@@ -157,6 +157,10 @@ def test_audit_repeated_phrase_outside_requirement():
            "findings": [{"id": "D-01", "requirement_ids": ["R-02"], "evidence": [ev]}]}
     res = Q.audit_report(rep, view)
     assert not res["ok"] and "фраза встречается" in res["problems"][0]["what"]
+    # эту строку указала сама модель — её выбор, не ошибка сверки
+    stages = {"consistency": {"candidates": [{"requirement_ids": ["R-02"],
+                                              "evidence": [{"quote": "Сумма в тенге", "line": first}]}]}}
+    assert Q.audit_report(rep, view, stages)["ok"]
     ok = Q.audit_report({**rep, "findings": [{"id": "D-01", "requirement_ids": ["R-02"],
                                               "evidence": [_ev(view, "Сумма в тенге", second)]}]}, view)
     assert ok["ok"]
@@ -198,3 +202,25 @@ def test_audit_cli_on_run_dir(tmp_path, capsys):
     p = tmp_path / "bad.json"
     p.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
     assert Q.main(["audit", str(p), "--doc", str(OFFICIAL_MD)]) == 4
+
+
+# --------------------------------------------------------------------------- экспорт для читателя
+def test_export_text_has_no_internal_line_codes(tmp_path):
+    """В Jira, Word и PDF текст модели «L025 … (L022)» читается как «строка 25 … (строка 22)», как в отчёте №13."""
+    import csv
+
+    from bcc_review.v2.render import exports as E
+    view = dv.load(OFFICIAL_MD)
+    ev = _ev(view, "Месяц определяется по дате совершения покупки", 38)
+    report = {"document": {"title": "ТЗ"}, "questions": [{"id": "Q-01", "finding_ids": ["D-01"],
+                                                          "question": "Что верно в L038?", "options": ["как в L64"]}],
+              "findings": [{"id": "D-01", "title": "Критерий L064 против L038", "severity": "critical",
+                            "problem": "L038 относит покупку к январю, а учёт (L022) — к февралю; в L38–L40 то же.",
+                            "evidence": [ev]}]}
+    res = E.export(report, view, OFFICIAL_MD, tmp_path / "r.md", ["jira"])[0]
+    rows = list(csv.DictReader(open(res["path"], encoding="utf-8-sig")))
+    text = rows[0]["Summary"] + rows[0]["Description"]
+    assert "L038" not in text and "L022" not in text and "L064" not in text
+    assert "строка 38 относит покупку" in text and "(строка 22)" in text and "в строках 38–40" in text
+    assert "Часть A › Функциональные требования, строка 38" in text  # место — как в отчёте
+    assert report["findings"][0]["problem"].startswith("L038")  # исходный отчёт не меняется

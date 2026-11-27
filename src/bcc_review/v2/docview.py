@@ -240,13 +240,13 @@ def page_of(view: dict, n: int) -> int | None:
 
 
 def place(view: dict, start: int, end: int | None = None) -> str:
-    """Человекочитаемое место: «строки 38–40», для PDF «с. 2, строка 25»."""
+    """Человекочитаемое место, как в отчёте: «строки 38–40», для PDF «строка 25, стр. 2»."""
     end = start if end is None else end
     rng = f"строка {start}" if end == start else f"строки {start}–{end}"
     p1, p2 = page_of(view, start), page_of(view, end)
     if p1:
-        pg = f"с. {p1}" if not p2 or p2 == p1 else f"с. {p1}–{p2}"
-        return f"{pg}, {rng}"
+        pg = f"стр. {p1}" if not p2 or p2 == p1 else f"стр. {p1}–{p2}"
+        return f"{rng}, {pg}"
     return rng
 
 

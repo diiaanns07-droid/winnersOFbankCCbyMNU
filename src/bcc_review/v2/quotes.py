@@ -589,7 +589,8 @@ def audit_report(report: dict, view: dict, stages: dict | None = None) -> dict:
     * каждое доказательство дефекта: сверено (не ``missing``), текст есть на указанных строках, страница и раздел
       совпадают со строкой документа;
     * повторяющаяся фраза: если цитата встречается в документе несколько раз, взятое вхождение должно лежать в
-      строках требований дефекта (или рядом), когда такое вхождение есть;
+      строках требований дефекта (или рядом), когда такое вхождение есть, — если только эту строку не указала сама
+      модель (видно по ``stages``);
     * цитаты нарезки — в пределах строк требования (±2);
     * ``stages`` (выходы этапов из ``runs/<id>/stages``): номер строки, который написала модель, против найденного
       кодом, и кандидаты, потерянные сверкой («цитата не найдена»).
@@ -600,6 +601,41 @@ def audit_report(report: dict, view: dict, stages: dict | None = None) -> dict:
     lines = view.get("lines") or []
     by_no = {ln["n"]: ln for ln in lines}
     reqs = {r.get("id"): r for r in report.get("requirements") or []}
+    # строки, на которые указала сама модель (выходы этапов): повтор фразы там — её выбор, а не ошибка сверки
+    pointed: set[tuple[str, int]] = set()
+    hints = {"total": 0, "same_line": 0, "within_2": 0, "far": 0, "far_list": []}
+    lost: list[dict] = []
+    req_lines = requirement_lines(report.get("requirements"))
+    for name, out in (stages or {}).items():
+        if name == "quotes":
+            for c in (out or {}).get("rejected") or []:
+                lost.append({"source": c.get("source", ""), "title": str(c.get("title") or "")[:90],
+                             "quotes": [str(e.get("quote") or "")[:90] for e in c.get("evidence") or []]})
+            continue
+        if name not in _HINT_STAGES:
+            continue
+        for c in (out or {}).get("candidates") or []:
+            near = [req_lines[r] for r in c.get("requirement_ids") or [] if r in req_lines]
+            for ev in c.get("evidence") or []:
+                h = _as_int(ev.get("line"))
+                if h is None:
+                    continue
+                m = verify_quote(view, ev.get("quote"), h, near)
+                if not m:
+                    continue
+                hints["total"] += 1
+                if m["line_start"] - HINT_RADIUS <= h <= m["line_end"] + HINT_RADIUS:
+                    pointed.add((_clean_quote(m["text"]), m["line_start"]))
+                d = 0 if m["line_start"] <= h <= m["line_end"] else min(abs(h - m["line_start"]), abs(h - m["line_end"]))
+                if d == 0:
+                    hints["same_line"] += 1
+                elif d <= HINT_RADIUS:
+                    hints["within_2"] += 1
+                else:
+                    hints["far"] += 1
+                    hints["far_list"].append({"stage": name, "hint": h, "found": m["line_start"],
+                                              "repeats": _line_hits(view, ev.get("quote") or "")[:6],
+                                              "quote": str(ev.get("quote") or "")[:80]})
     problems: list[dict] = []
     by_verified: dict[str, int] = {}
     n_ev = 0
@@ -631,7 +667,7 @@ def audit_report(report: dict, view: dict, stages: dict | None = None) -> dict:
             if (ev.get("section") or "") != (ln.get("section") or "") and ln.get("section"):
                 problems.append({"where": where, "what": f"раздел «{ev.get('section')}», у строки {ls} — «{ln.get('section')}»"})
             hits = _line_hits(view, q)
-            if len(hits) > 1 and ranges:
+            if len(hits) > 1 and ranges and (_clean_quote(q), ls) not in pointed:
                 inside = [h for h in hits if any(a - HINT_RADIUS <= h <= b + HINT_RADIUS for a, b in ranges)]
                 if inside and not any(a - HINT_RADIUS <= ls <= b + HINT_RADIUS for a, b in ranges):
                     problems.append({"where": where, "what": f"фраза встречается в строках {hits[:6]}; взята {ls}, "
@@ -646,37 +682,6 @@ def audit_report(report: dict, view: dict, stages: dict | None = None) -> dict:
         if not m or not a or not (a - HINT_RADIUS <= m["line_start"] <= (b or a) + HINT_RADIUS):
             req_bad.append({"id": r.get("id"), "quote": q[:80], "lines": f"{a}–{b}",
                             "found": m["line_start"] if m else None})
-    hints = {"total": 0, "same_line": 0, "within_2": 0, "far": 0, "far_list": []}
-    lost: list[dict] = []
-    req_lines = requirement_lines(report.get("requirements"))
-    for name, out in (stages or {}).items():
-        if name == "quotes":
-            for c in (out or {}).get("rejected") or []:
-                lost.append({"source": c.get("source", ""), "title": str(c.get("title") or "")[:90],
-                             "quotes": [str(e.get("quote") or "")[:90] for e in c.get("evidence") or []]})
-            continue
-        if name not in _HINT_STAGES:
-            continue
-        for c in (out or {}).get("candidates") or []:
-            near = [req_lines[r] for r in c.get("requirement_ids") or [] if r in req_lines]
-            for ev in c.get("evidence") or []:
-                h = _as_int(ev.get("line"))
-                if h is None:
-                    continue
-                m = verify_quote(view, ev.get("quote"), h, near)
-                if not m:
-                    continue
-                hints["total"] += 1
-                d = 0 if m["line_start"] <= h <= m["line_end"] else min(abs(h - m["line_start"]), abs(h - m["line_end"]))
-                if d == 0:
-                    hints["same_line"] += 1
-                elif d <= HINT_RADIUS:
-                    hints["within_2"] += 1
-                else:
-                    hints["far"] += 1
-                    hints["far_list"].append({"stage": name, "hint": h, "found": m["line_start"],
-                                              "repeats": _line_hits(view, ev.get("quote") or "")[:6],
-                                              "quote": str(ev.get("quote") or "")[:80]})
     return {"ok": not problems and not lost, "evidence": n_ev, "by_verified": by_verified, "problems": problems,
             "requirements": {"total": sum(1 for r in report.get("requirements") or [] if r.get("quote")),
                              "outside": req_bad},
