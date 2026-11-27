@@ -340,6 +340,36 @@ def normalize_test_case(raw: Mapping[str, Any]) -> dict:
 
 # ---------------------------------------------------------------- сборка
 
+MAX_OTHER_CANDIDATES = 2
+
+
+def _other_rank(c: Mapping[str, Any]) -> int:
+    """Порядок замечаний модели вне противоречий: покрытие приёмкой, проверяемость, остальное."""
+    if c.get("kind") == "missing_element" and c.get("criterion") == "set_validatable":
+        return 0
+    if c.get("kind") == "unverifiable":
+        return 1
+    return 2
+
+
+def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Противоречия модели (два места — два исхода) остаются все; прочих замечаний — не больше
+    :data:`MAX_OTHER_CANDIDATES`: одно о покрытии приёмкой и одно о проверяемости раньше остальных.
+
+    На чистых документах корпуса haiku давал 3–5 major (неоднозначности одного места, контракт API, доставка
+    сообщений) — это зона аналитика и архитектора; линза тестировщика держит свои два вида. Снятые идут в
+    ``dropped`` (в отчёте — «отклонено линзой»), не теряются.
+    """
+    conflicts = [c for c in cands if c.get("kind") in _CONFLICT_FAMILY]
+    others = sorted((c for c in cands if c.get("kind") not in _CONFLICT_FAMILY),
+                    key=lambda c: (_other_rank(c), {"critical": 0, "major": 1, "minor": 2}.get(c.get("severity"), 3)))
+    keep_ids = {id(c) for c in conflicts + others[:MAX_OTHER_CANDIDATES]}
+    kept = [c for c in cands if id(c) in keep_ids]
+    reason = f"сверх лимита линзы тестировщика: не больше {MAX_OTHER_CANDIDATES} замечаний вне противоречий"
+    dropped = [{**c, "reason": reason} for c in others[MAX_OTHER_CANDIDATES:]]
+    return kept, dropped
+
+
 def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None) -> dict:
     """Ответ модели → ``{"candidates", "acceptance_checks", "test_cases", "warnings"}``.
 
@@ -381,6 +411,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
 
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
+    kept, dropped = limit_other_candidates(kept)
     if len(kept) > MAX_MODEL_CANDIDATES:
         warnings.append(f"{STAGE}: кандидатов модели {len(kept)}, оставлено {MAX_MODEL_CANDIDATES}")
         rank = {"critical": 0, "major": 1, "minor": 2}
@@ -396,7 +427,8 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
         t["id"] = f"T-{i:02d}"
     tests = [{"id": t["id"], **{k: v for k, v in t.items() if k != "id"}} for t in tests]
 
-    return {"candidates": candidates, "acceptance_checks": checks, "test_cases": tests, "warnings": warnings}
+    return {"candidates": candidates, "acceptance_checks": checks, "test_cases": tests, "warnings": warnings,
+            "dropped": dropped}
 
 
 def retry_instruction(missing: list[str]) -> str:

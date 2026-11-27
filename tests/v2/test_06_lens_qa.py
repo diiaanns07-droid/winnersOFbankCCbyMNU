@@ -191,6 +191,23 @@ def test_non_conflict_critical_from_model_is_demoted():
     assert sev["Два исхода"] == ("critical", "testing")
 
 
+def test_other_candidates_limited_conflicts_kept():
+    """Противоречия модели остаются все; прочих замечаний — два: покрытие приёмкой и проверяемость первыми."""
+    base = {"requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
+            "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "testing",
+            "severity": "major"}
+    raw = [dict(base, title="Неоднозначность", kind="ambiguity", criterion="unambiguous"),
+           dict(base, title="Контракт", kind="api_contract", criterion="complete"),
+           dict(base, title="Два исхода", kind="contradiction", criterion="set_consistent", severity="critical"),
+           dict(base, title="Метрика", kind="unverifiable", criterion="verifiable"),
+           dict(base, title="Коды", kind="status_conflict", criterion="set_consistent"),
+           dict(base, title="Покрытие", kind="missing_element", criterion="set_validatable")]
+    out = lens_qa.postprocess({"candidates": raw}, REQS)
+    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие"]
+    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт"}
+    assert all("не больше 2" in d["reason"] for d in out["dropped"])
+
+
 # ---------------------------------------------------------------- тест-кейсы
 
 def test_test_cases_numbered_capped_and_undefined_marked():
