@@ -397,7 +397,7 @@ def build_app(data_dir: Path, *, provider: str = "auto", fixture: Path | None = 
 
 PORTS = (8014, 8030)  # №42: порт по умолчанию и последний, который пробуем, если предыдущие заняты
 # №42: --check проверяет установку — эти модули должны импортироваться из окружения (requirements.txt)
-_CHECK_MODULES = ("jsonschema", "google.genai", "anthropic", "fitz", "docx", "yaml")
+_CHECK_MODULES = ("jsonschema", "google.genai", "anthropic", "pymupdf", "docx", "yaml")
 
 
 def _shown_host(host: str) -> str:
