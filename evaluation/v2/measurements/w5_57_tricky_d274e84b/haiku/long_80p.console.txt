@@ -1,0 +1,8 @@
+Документ: evaluation/v2/measurements/w5_57_tricky_d274e84b/input/long_80p.md
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  lens_architect: готово за 111 с, вызовов 1, кандидатов 7

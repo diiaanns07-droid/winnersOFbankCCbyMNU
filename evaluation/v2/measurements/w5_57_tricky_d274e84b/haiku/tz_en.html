@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Разработка: Нельзя; тестирование: Нельзя; критичных 1, существенных 6, незначительных 7.">
+<meta name="generator" content="BCC Review 2.0.0-dev">
+<title>Ревью: Notification service requirements</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7C55'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem("bccr-theme");if(t)document.documentElement.dataset.theme=t}catch(_){}</script>
+<style>
+/* HTML-отчёт v2 (№14): один файл, без внешних шрифтов и библиотек. */
+:root {
+  color-scheme: light;
+  --bg: #F4F6F8;
+  --surface: #FFFFFF;
+  --surface-2: #F1F3F6;
+  --surface-3: #E8ECF1;
+  --ink: #131820;
+  --ink-2: #44505F;
+  --ink-3: #6E7887;
+  --line: #DFE4EA;
+  --line-2: #CBD2DB;
+  --brand: #0E7C55;
+  --brand-2: #0B6545;
+  --brand-ink: #FFFFFF;
+  --brand-soft: #E3F3EC;
+  --gold: #A9781F;
+  --gold-soft: #FBF1DE;
+  --crit: #C42B2B;
+  --crit-soft: #FCE9E9;
+  --crit-mark: rgba(214, 48, 48, .22);
+  --major: #C25E00;
+  --major-soft: #FDF0E2;
+  --major-mark: rgba(230, 126, 20, .24);
+  --minor: #8A6E00;
+  --minor-soft: #FBF5D9;
+  --minor-mark: rgba(214, 178, 20, .28);
+  --ok: #1E7F45;
+  --ok-soft: #E4F4EA;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
+  --shadow-lg: 0 6px 24px rgba(16, 24, 40, .10);
+  --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --top-h: 60px;
+  --tabs-h: 46px;
+  --r: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0D1117;
+    --surface: #151B23;
+    --surface-2: #1B222C;
+    --surface-3: #232B36;
+    --ink: #E6EAF0;
+    --ink-2: #B0B9C6;
+    --ink-3: #828C9A;
+    --line: #29313C;
+    --line-2: #36404D;
+    --brand: #2FB37E;
+    --brand-2: #4CC593;
+    --brand-ink: #06130D;
+    --brand-soft: rgba(47, 179, 126, .14);
+    --gold: #E0B15E;
+    --gold-soft: rgba(224, 177, 94, .14);
+    --crit: #FF7272;
+    --crit-soft: rgba(255, 114, 114, .13);
+    --crit-mark: rgba(255, 99, 99, .30);
+    --major: #FFAA55;
+    --major-soft: rgba(255, 170, 85, .12);
+    --major-mark: rgba(255, 160, 60, .28);
+    --minor: #E8CF5A;
+    --minor-soft: rgba(232, 207, 90, .11);
+    --minor-mark: rgba(232, 207, 90, .26);
+    --ok: #4CC98A;
+    --ok-soft: rgba(76, 201, 138, .13);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, .45);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0D1117;
+  --surface: #151B23;
+  --surface-2: #1B222C;
+  --surface-3: #232B36;
+  --ink: #E6EAF0;
+  --ink-2: #B0B9C6;
+  --ink-3: #828C9A;
+  --line: #29313C;
+  --line-2: #36404D;
+  --brand: #2FB37E;
+  --brand-2: #4CC593;
+  --brand-ink: #06130D;
+  --brand-soft: rgba(47, 179, 126, .14);
+  --gold: #E0B15E;
+  --gold-soft: rgba(224, 177, 94, .14);
+  --crit: #FF7272;
+  --crit-soft: rgba(255, 114, 114, .13);
+  --crit-mark: rgba(255, 99, 99, .30);
+  --major: #FFAA55;
+  --major-soft: rgba(255, 170, 85, .12);
+  --major-mark: rgba(255, 160, 60, .28);
+  --minor: #E8CF5A;
+  --minor-soft: rgba(232, 207, 90, .11);
+  --minor-mark: rgba(232, 207, 90, .26);
+  --ok: #4CC98A;
+  --ok-soft: rgba(76, 201, 138, .13);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, .45);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-padding-top: calc(var(--top-h) + var(--tabs-h) + 12px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14.5px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+h1, h2, h3 { margin: 0; line-height: 1.25; }
+.muted { color: var(--ink-3); }
+
+/* ── верхняя панель ───────────────────────────────────────────── */
+.top {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--top-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 clamp(16px, 3vw, 32px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo {
+  flex: none; width: 34px; height: 34px; border-radius: 9px;
+  background: var(--brand);
+  position: relative;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15);
+}
+.logo::after {
+  content: ""; position: absolute; left: 10px; top: 8px; width: 9px; height: 15px;
+  border: solid var(--brand-ink); border-width: 0 3px 3px 0; transform: rotate(45deg);
+}
+.bname { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.dname { font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw; }
+.actions { display: flex; gap: 8px; flex: none; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--brand); background: var(--brand); color: var(--brand-ink);
+  font-weight: 600; font-size: 13.5px; cursor: pointer;
+  transition: background .15s, border-color .15s, transform .05s;
+}
+.btn:hover { background: var(--brand-2); border-color: var(--brand-2); }
+.btn:active { transform: translateY(1px); }
+.btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+.i-theme { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor;
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ── итог ─────────────────────────────────────────────────────── */
+.hero { padding: 22px clamp(16px, 3vw, 32px) 18px; }
+.banner { border-radius: var(--r); padding: 10px 14px; margin-bottom: 16px; font-weight: 500; }
+.banner.info { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line-2); }
+.banner.warn { background: var(--major-soft); color: var(--major); border: 1px solid color-mix(in srgb, var(--major) 35%, transparent); }
+.hero-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 18px; }
+.eyebrow { font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; margin-bottom: 8px; }
+.vcards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vcard {
+  border-radius: 12px; padding: 14px 16px 13px; border: 1px solid var(--line);
+  background: var(--surface); box-shadow: var(--shadow); position: relative; overflow: hidden;
+}
+.vcard::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--ink-3); }
+.vcard.v-no::before { background: var(--crit); }
+.vcard.v-cond::before { background: var(--major); }
+.vcard.v-yes::before { background: var(--ok); }
+.vlabel { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.vword { font-size: 28px; font-weight: 750; letter-spacing: -.01em; margin: 2px 0 1px; }
+.v-no .vword { color: var(--crit); }
+.v-cond .vword { color: var(--major); }
+.v-yes .vword { color: var(--ok); }
+.vhint { font-size: 12.5px; color: var(--ink-3); }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface);
+  box-shadow: var(--shadow); min-height: 92px;
+}
+button.tile { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+button.tile:hover { border-color: var(--line-2); box-shadow: var(--shadow-lg); }
+.tnum { font-size: 30px; font-weight: 750; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.tlab { font-size: 12.5px; color: var(--ink-2); font-weight: 550; line-height: 1.3; }
+.tlab small { display: block; color: var(--ink-3); font-weight: 450; font-size: 11.5px; margin-top: 2px; }
+.t-critical .tnum { color: var(--crit); }
+.t-major .tnum { color: var(--major); }
+.t-minor .tnum { color: var(--minor); }
+.t-ok .tnum { color: var(--ok); }
+.hero-text { margin-top: 16px; }
+.vsummary { margin: 0; font-size: 16px; line-height: 1.55; max-width: 110ch; color: var(--ink); }
+.runmeta { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.fixfirst { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 8px; box-shadow: var(--shadow); }
+.fixfirst h2 { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.fixfirst ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); column-gap: 18px; }
+.fix { display: flex; align-items: baseline; gap: 8px; padding: 5px 6px; border-radius: 7px; text-decoration: none; min-width: 0; }
+.fix:hover { background: var(--surface-2); }
+.fixn { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); font-size: 11.5px; font-weight: 700; display: inline-grid; place-items: center; transform: translateY(-1px); }
+.fix .dot { flex: none; }
+.fix .fid { flex: none; }
+.fixt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.fixl { flex: none; color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.sev-critical .dot, .sev-critical.dot { background: var(--crit); }
+.sev-major .dot, .sev-major.dot { background: var(--major); }
+.sev-minor .dot, .sev-minor.dot { background: var(--minor); }
+.fid { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+
+/* ── вкладки ──────────────────────────────────────────────────── */
+.tabs {
+  position: sticky; top: var(--top-h); z-index: 25;
+  display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none;
+  padding: 0 clamp(16px, 3vw, 32px); height: var(--tabs-h); align-items: flex-end;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none; height: 38px; padding: 0 14px; border: 0; background: none; cursor: pointer;
+  color: var(--ink-2); font-weight: 600; font-size: 13.5px; border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--brand); }
+.cnt { font-size: 11.5px; font-weight: 650; background: var(--surface-3); color: var(--ink-2); border-radius: 10px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
+.tab[aria-selected="true"] .cnt { background: var(--brand-soft); color: var(--brand); }
+main { padding: 16px clamp(16px, 3vw, 32px) 32px; }
+.panel > .ph { display: none; }
+.sub { font-size: 15px; margin: 22px 0 8px; }
+.panel > .sub:first-child, .panel > .ph + .sub { margin-top: 4px; }
+.lead { color: var(--ink-2); margin: 0 0 12px; max-width: 100ch; }
+.none { color: var(--ink-3); padding: 24px 0; }
+
+/* ── документ + карточки ──────────────────────────────────────── */
+.split { display: grid; grid-template-columns: minmax(380px, 46fr) minmax(400px, 54fr); gap: 18px; align-items: start; }
+.docpane {
+  position: sticky; top: calc(var(--top-h) + var(--tabs-h) + 12px);
+  height: calc(100vh - var(--top-h) - var(--tabs-h) - 28px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.dochead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.doctitle { font-weight: 650; font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doctitle small { color: var(--ink-3); font-weight: 450; margin-left: 8px; }
+.doctools { display: flex; gap: 12px; flex: none; }
+.tg { font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+.tg input { accent-color: var(--brand); margin: 0; }
+.docbody { flex: 1; min-height: 0; display: flex; position: relative; }
+.minimap { flex: none; width: 12px; position: relative; border-left: 1px solid var(--line); background: var(--surface-2); }
+.minimap i { position: absolute; left: 2px; right: 2px; min-height: 3px; border-radius: 1px; cursor: pointer; background: var(--ink-3); }
+.minimap i.sev-critical { background: var(--crit); }
+.minimap i.sev-major { background: var(--major); }
+.minimap i.sev-minor { background: var(--minor); }
+.minimap .vw { position: absolute; left: 0; right: 0; border: 1px solid var(--line-2); background: color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: none; }
+.doc { flex: 1; overflow: auto; padding: 6px 0 24px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; scroll-behavior: smooth; }
+.doc-empty { padding: 24px; color: var(--ink-3); font-family: var(--sans); font-size: 14px; }
+.ln { display: grid; grid-template-columns: 46px 1fr auto; align-items: start; padding: 0 10px 0 0; border-left: 3px solid transparent; position: relative; }
+.ln .no { text-align: right; padding-right: 12px; color: var(--ink-3); user-select: none; font-size: 11.5px; line-height: 20px; opacity: .8; }
+.ln .tx { white-space: pre-wrap; word-break: break-word; min-height: 20px; color: var(--ink); }
+.ln.blank { min-height: 10px; }
+.ln.blank .tx, .ln.blank .no { min-height: 10px; line-height: 10px; font-size: 0; }
+.ln.h .tx { font-weight: 700; font-family: var(--sans); font-size: 13.5px; color: var(--ink); }
+.ln.hl { cursor: pointer; }
+.ln.hl.sev-critical { background: var(--crit-soft); border-left-color: var(--crit); }
+.ln.hl.sev-major { background: var(--major-soft); border-left-color: var(--major); }
+.ln.hl.sev-minor { background: var(--minor-soft); border-left-color: var(--minor); }
+mark.q { color: inherit; border-radius: 3px; padding: 1px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+mark.q.sev-critical { background: var(--crit-mark); box-shadow: inset 0 -2px 0 var(--crit); }
+mark.q.sev-major { background: var(--major-mark); box-shadow: inset 0 -2px 0 var(--major); }
+mark.q.sev-minor { background: var(--minor-mark); box-shadow: inset 0 -2px 0 var(--minor); }
+mark.q.on { outline: 2px solid var(--brand); outline-offset: 1px; }
+.fms { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; padding: 2px 0 2px 8px; max-width: 150px; }
+.fm {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700; line-height: 16px; padding: 0 5px; border-radius: 4px;
+  text-decoration: none; color: #fff; background: var(--ink-3); white-space: nowrap;
+}
+.fm.sev-critical { background: var(--crit); }
+.fm.sev-major { background: var(--major); }
+.fm.sev-minor { background: var(--minor); color: #1d1600; }
+:root[data-theme="dark"] .fm, :root[data-theme="dark"] .fm.sev-major { color: #160b00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fm { color: #160b00; } }
+.fms .fm:nth-child(n+4) { display: none; }
+.fmore { font: 700 10.5px/16px var(--mono); padding: 0 5px; border-radius: 4px; color: var(--ink-2); background: var(--surface-3); }
+.ln:hover .fms .fm, .ln.sel .fms .fm { display: inline; }
+.ln:hover .fmore, .ln.sel .fmore { display: none; }
+.ln.sel { outline: 2px solid var(--brand); outline-offset: -2px; z-index: 1; }
+/* фокус: выбран дефект — остальная подсветка гаснет, видно только его цитаты */
+.doc.focus .ln.hl:not(.sel) { background: transparent; border-left-color: transparent; }
+.doc.focus mark.q:not(.on) { background: transparent; box-shadow: inset 0 -1px 0 var(--line-2); }
+.doc.focus .ln.hl:not(.sel) .fm { opacity: .35; }
+.doc.focus mark.q.on { box-shadow: none; }
+.ln.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { 0% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--brand) 30%, transparent); } 100% { box-shadow: inset 0 0 0 999px transparent; } }
+.ln.rqsel { background: var(--brand-soft); border-left-color: var(--brand); }
+.rtag { display: none; font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border-radius: 4px; padding: 0 5px; margin-right: 6px; }
+.doc.showreq .rtag { display: inline-block; }
+.doc.showreq .ln.ex { opacity: .5; background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--surface-3) 6px 7px); }
+.doc.onlyhl .ln:not(.hl):not(.h) { display: none; }
+.doc.onlyhl .ln.h { opacity: .7; }
+.pgbreak { margin: 10px 12px 6px 46px; padding-top: 4px; border-top: 1px dashed var(--line-2); color: var(--ink-3); font-family: var(--sans); font-size: 11.5px; }
+.legend { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-3); background: var(--surface-2); }
+.lg { width: 10px; height: 10px; border-radius: 2px; margin-left: 8px; }
+.lg:first-child { margin-left: 0; }
+.lg.sev-critical { background: var(--crit); }
+.lg.sev-major { background: var(--major); }
+.lg.sev-minor { background: var(--minor); }
+
+.filters {
+  position: sticky; top: calc(var(--top-h) + var(--tabs-h)); z-index: 10;
+  background: var(--bg); padding: 0 0 10px; margin-bottom: 2px;
+}
+.frow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.frow:first-child { margin-top: 0; padding-top: 12px; }
+.frow.small { font-size: 12.5px; color: var(--ink-3); gap: 14px; }
+.sevchip {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 16px;
+  border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 550; color: var(--ink-2);
+}
+.sevchip b { font-variant-numeric: tabular-nums; color: var(--ink); }
+.sevchip[aria-pressed="false"] { opacity: .5; background: transparent; }
+.sevchip[aria-pressed="false"] .dot { background: var(--line-2); }
+.sevchip.sev-critical[aria-pressed="true"] { border-color: color-mix(in srgb, var(--crit) 50%, var(--line)); background: var(--crit-soft); }
+.sevchip.sev-major[aria-pressed="true"] { border-color: color-mix(in srgb, var(--major) 50%, var(--line)); background: var(--major-soft); }
+.sevchip.sev-minor[aria-pressed="true"] { border-color: color-mix(in srgb, var(--minor) 50%, var(--line)); background: var(--minor-soft); }
+#q { flex: 1 1 220px; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); min-width: 0; }
+select { height: 34px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; max-width: 210px; }
+.sortl { display: inline-flex; align-items: center; gap: 6px; }
+select.mini { height: 26px; font-size: 12.5px; padding: 0 22px 0 6px; border-radius: 6px; color: var(--ink-2); }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--brand); cursor: pointer; font-weight: 600; font-size: inherit; }
+.linkbtn:hover { text-decoration: underline; }
+.kbd { margin-left: auto; }
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.empty { padding: 28px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line-2); border-radius: 12px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--ink-3);
+  border-radius: 12px; padding: 13px 16px 12px; box-shadow: var(--shadow); cursor: pointer;
+  transition: box-shadow .15s, border-color .15s; scroll-margin-top: calc(var(--top-h) + var(--tabs-h) + 130px);
+}
+.card:hover { box-shadow: var(--shadow-lg); }
+.card.sev-critical { border-left-color: var(--crit); }
+.card.sev-major { border-left-color: var(--major); }
+.card.sev-minor { border-left-color: var(--minor); }
+.card.active { box-shadow: 0 0 0 2px var(--brand), var(--shadow-lg); }
+.ch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 2px 7px; }
+.badge.sev-critical { background: var(--crit-soft); color: var(--crit); }
+.badge.sev-major { background: var(--major-soft); color: var(--major); }
+.badge.sev-minor { background: var(--minor-soft); color: var(--minor); }
+.prio { margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--gold); background: var(--gold-soft); border-radius: 5px; padding: 2px 8px; }
+.ct { font-size: 15.5px; font-weight: 650; margin: 7px 0 6px; line-height: 1.35; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip { font-size: 12px; border-radius: 6px; padding: 2px 8px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.chip.blk { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 30%, var(--line)); background: transparent; }
+.evs { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ev {
+  width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer;
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2);
+  font-size: 13.5px; line-height: 1.45;
+}
+.ev:hover { border-color: var(--line-2); background: var(--surface-3); }
+.evl { flex: none; font-size: 12px; font-weight: 650; color: var(--ink-2); min-width: 74px; white-space: nowrap; }
+.ev q { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12.5px; color: var(--ink); quotes: "«" "»"; }
+.vf { flex: none; font-weight: 800; font-size: 13px; }
+.vf.ok { color: var(--ok); }
+.vf.fuzzy { color: var(--major); }
+.vf.miss { color: var(--crit); }
+.problem { margin: 0 0 6px; color: var(--ink); }
+.more { margin: 4px 0 6px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.more summary { cursor: pointer; color: var(--brand); font-weight: 600; font-size: 13px; list-style: none; padding: 2px 0; }
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .15s; }
+.more[open] summary::before { transform: rotate(90deg); }
+.dl { margin-top: 8px; }
+.dt { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+.dd { margin-top: 2px; white-space: pre-wrap; }
+.dl.rw .dd { background: var(--brand-soft); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: 8px; padding: 8px 11px; font-family: var(--mono); font-size: 12.5px; }
+.dl.qq .dd { font-style: italic; }
+.copy { border: 1px solid var(--line-2); background: var(--surface); border-radius: 5px; font-size: 11px; padding: 0 6px; cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--ink-2); }
+.cf { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-3); margin-top: 6px; }
+.cf b { color: var(--ink-2); font-weight: 600; margin-right: 3px; }
+.rref, .fref, .lnref {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 650; text-decoration: none; border-radius: 4px; padding: 0 4px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap;
+}
+.rref:hover, .fref:hover, .lnref:hover { border-color: var(--brand); color: var(--brand); }
+.fref.sev-critical { color: var(--crit); }
+.fref.sev-major { color: var(--major); }
+.fref.sev-minor { color: var(--minor); }
+
+/* ── таблицы и прочие вкладки ─────────────────────────────────── */
+.tw { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+thead th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 700; background: var(--surface-2); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.ans { display: inline-block; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.a-yes { background: var(--ok-soft); color: var(--ok); }
+.a-no { background: var(--crit-soft); color: var(--crit); }
+.a-part { background: var(--major-soft); color: var(--major); }
+.a-na { background: var(--surface-3); color: var(--ink-2); }
+.deriv { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+.warnmark { display: inline-block; font-weight: 650; color: var(--major); }
+table.tc td:nth-child(3) { min-width: 160px; }
+table.cl td:first-child { width: 42%; }
+table.kv th { width: 210px; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink-2); background: var(--surface-2); position: static; }
+.hash { word-break: break-all; font-size: 12px; }
+.pgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); gap: 20px; align-items: start; }
+.stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.st { display: flex; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.st b { font-size: 12px; }
+.st small { display: block; color: var(--ink-3); font-size: 11.5px; }
+.st-ok b { color: var(--ok); }
+.st-partial b { color: var(--major); }
+.st-failed b { color: var(--crit); }
+.st-skipped b { color: var(--ink-3); }
+.warns { margin: 0; padding-left: 18px; color: var(--ink-2); }
+.qtools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.qtools p { margin: 0; color: var(--ink-2); }
+.qlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
+.qcard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; box-shadow: var(--shadow); }
+.qcard .to { font-size: 12.5px; color: var(--ink-3); }
+.qcard .to b { color: var(--ink-2); }
+.qlinks { margin-left: auto; display: flex; gap: 4px; }
+.opts { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.opts label { display: flex; align-items: flex-start; gap: 9px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--surface-2); }
+.opts label:hover { border-color: var(--line-2); }
+.opts input { margin: 3px 0 0; accent-color: var(--brand); }
+.opts label:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.ol { flex: none; font-weight: 700; color: var(--brand); min-width: 14px; }
+.own { display: block; font-size: 12px; color: var(--ink-3); font-weight: 600; margin-top: 4px; }
+.own textarea { display: block; width: 100%; margin-top: 3px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--surface); resize: vertical; font-weight: 400; font-size: 13.5px; }
+.topic { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--brand); margin-top: 8px; }
+.qcard .evs { margin-top: 8px; }
+.was { font-family: var(--mono); font-size: 12.5px; background: var(--crit-soft); border-radius: 6px; padding: 4px 7px; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--crit) 60%, transparent); white-space: pre-wrap; }
+.became { font-family: var(--mono); font-size: 12.5px; background: var(--ok-soft); border-radius: 6px; padding: 4px 7px; white-space: pre-wrap; }
+table.rw td:nth-child(4), table.rw td:nth-child(5) { min-width: 240px; }
+table.ba { max-width: 720px; }
+.why { margin: 8px 0 0; color: var(--ink-2); font-size: 13.5px; }
+.foot { padding: 18px clamp(16px, 3vw, 32px) 28px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 50; box-shadow: var(--shadow-lg); }
+
+/* ── узкие экраны ─────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hero-grid { grid-template-columns: 1fr; }
+}
+.split > *, .hero-grid > *, .pgrid > * { min-width: 0; }
+@media (max-width: 960px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .docpane { position: relative; top: 0; height: 52vh; }
+  .filters { top: calc(var(--top-h) + var(--tabs-h)); }
+  .pgrid { grid-template-columns: 1fr; }
+  .fixfirst ol { grid-template-columns: minmax(0, 1fr); }
+  .kbd { display: none; }
+}
+@media (max-width: 600px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vword { font-size: 22px; }
+  .brand { flex: 1; }
+  .dname { max-width: none; font-size: 15px; }
+  #dljson, #print { display: none; }
+  .ev { flex-wrap: wrap; gap: 2px 10px; }
+  .ev q { flex-basis: 100%; }
+  #q { flex-basis: 100%; }
+  .qlist { grid-template-columns: 1fr; }
+  .fixl { display: none; }
+}
+
+/* ── печать ───────────────────────────────────────────────────── */
+@page { size: A4; margin: 14mm 12mm 16mm; }
+@media print {
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --bg: #fff; --surface: #fff; --surface-2: #F4F5F7; --surface-3: #ECEEF1; --ink: #111; --ink-2: #333; --ink-3: #666;
+    --line: #D5DAE0; --line-2: #C3C9D1; --brand: #0E7C55; --brand-soft: #E7F4EE; --gold: #8A5F10; --gold-soft: #F8EED8;
+    --crit: #B42020; --crit-soft: #FBEAEA; --major: #A85000; --major-soft: #FCEFE2; --minor: #7A6200; --minor-soft: #FAF4D8;
+    --ok: #1B6E3D; --ok-soft: #E4F2E9; --shadow: none; --shadow-lg: none;
+  }
+  body { font-size: 10.5pt; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .top { position: static; backdrop-filter: none; background: #fff; height: auto; padding: 0 0 8px; }
+  .actions, .tabs, .filters, .docpane, .kbd, .copy, .qtools button, .own, .toast { display: none !important; }
+  .hero { padding: 10px 0; }
+  .hero-grid { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(5, 1fr); }
+  .tile { min-height: 0; }
+  main { padding: 0; }
+  .panel { display: block !important; margin-top: 14px; }
+  .panel > .ph { display: block; font-size: 15pt; margin: 6px 0 10px; padding-bottom: 4px; border-bottom: 2px solid var(--ink); break-after: avoid; }
+  #p-questions, #p-checklist, #p-passport { break-before: page; }
+  .split, .flist, .cards, .evs, .meta, .ch, .cf { display: block; }
+  .meta .chip, .ch > *, .cf .fl { display: inline-block; margin: 0 6px 3px 0; }
+  .ev { display: flex; }
+  .card, .qcard, .vcard, .fixfirst, tr, .foot { break-inside: avoid; }
+  .foot { padding: 10px 0 0; }
+  .card { cursor: default; margin-bottom: 8px; }
+  .card.active { box-shadow: none; }
+  .more summary { display: none; }
+  .ev { border: 0; padding: 2px 0; background: none; }
+  .qlist { display: block; }
+  .qcard { margin-bottom: 8px; }
+  .opts label { background: none; }
+  .opts input { display: none; }
+  .tw { overflow: visible; border-radius: 0; }
+  thead th { position: static; }
+  table { font-size: 9.5pt; }
+  .fixfirst ol { grid-template-columns: minmax(0, 1fr); }
+  a { text-decoration: none; }
+}
+
+</style>
+</head>
+<body data-file="tz_en">
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span><div><div class="bname">Ревью требований</div>
+  <h1 class="dname" title="Notification service requirements">Notification service requirements</h1></div></div>
+  <div class="actions">
+    <button type="button" class="btn ghost" id="theme" title="Светлая или тёмная тема" aria-label="Сменить тему"><span class="i-theme"></span></button>
+    <button type="button" class="btn ghost" id="dljson" title="Скачать report.json">JSON</button>
+    <button type="button" class="btn" id="print" title="Печать или сохранение в PDF">PDF / печать</button>
+  </div>
+</header>
+
+<section class="hero" aria-label="Итог ревью">
+  
+  <div class="hero-grid">
+    <div class="verdict">
+      <h2 class="eyebrow">Можно ли начинать</h2>
+      <div class="vcards"><div class="vcard v-no"><div class="vlabel">Разработка</div><div class="vword">Нельзя</div><div class="vhint">есть блокирующие дефекты</div></div><div class="vcard v-no"><div class="vlabel">Тестирование</div><div class="vword">Нельзя</div><div class="vhint">есть блокирующие дефекты</div></div></div>
+    </div>
+    <div class="stats">
+      <h2 class="eyebrow">Замечания</h2>
+      <div class="tiles"><button class="tile t-critical" data-sevonly="critical" title="Показать только: критичные"><span class="tnum">1</span><span class="tlab">Критичных</span></button><button class="tile t-major" data-sevonly="major" title="Показать только: существенные"><span class="tnum">6</span><span class="tlab">Существенных</span></button><button class="tile t-minor" data-sevonly="minor" title="Показать только: незначительные"><span class="tnum">7</span><span class="tlab">Незначительных</span></button><div class="tile t-neutral"><span class="tnum">6</span><span class="tlab">требований<small>0 без замечаний</small></span></div><div class="tile t-ok" title="Каждая цитата найдена в документе программой, номер строки посчитан кодом"><span class="tnum">100 %</span><span class="tlab">цитат сверено кодом<small>27 из 27 цитат</small></span></div></div>
+    </div>
+  </div>
+  <div class="hero-text">
+    <p class="vsummary">Разработку начинать нельзя: критичный дефект D-01 — в строке 9 «within 5 seconds of a debit» не определено, является ли «debit» авторизацией или проведением списания, а строка 19 «API POST /notify accepts client_id, amount, currency» не называет источник события, поэтому срок в 5 секунд невозможно привязать к конкретному моменту. Тестирование также нельзя начинать, так как проверку срока без определения события написать невозможно. Существенный дефект D-02 (строка 9 «The system shall send a push notification to the customer within 5 seconds of a debit» против строки 15 «The customer may disable notifications in profile settings») нужно закрыть явным правилом поведения при отключённых уведомлениях. Первым исправляется D-01, затем D-02, D-03 (срок 5 с против повтора через минуту) и D-04 (запускает ли POST /notify отправку).</p>
+    <p class="runmeta">модель claude-haiku-5-5 · время 2 мин 14 с · 9 вызовов модели · 2026-11-27 21:19</p>
+  </div>
+  <div class="fixfirst"><h2>Исправить первым</h2><ol><li><a href="#D-02" data-goto="D-02" class="fix sev-major"><span class="fixn">1</span><span class="dot"></span><span class="fid">D-02</span><span class="fixt">FR-1 требует push, FR-4 допускает отключение: исход при отключении не определён</span><span class="fixl">строка 9</span></a></li><li><a href="#D-01" data-goto="D-01" class="fix sev-critical"><span class="fixn">2</span><span class="dot"></span><span class="fid">D-01</span><span class="fixt">Событие «debit» не определено: авторизация или проведение списания</span><span class="fixl">строка 9</span></a></li><li><a href="#D-03" data-goto="D-03" class="fix sev-major"><span class="fixn">3</span><span class="dot"></span><span class="fid">D-03</span><span class="fixt">Срок 5 секунд из FR-1 противоречит повтору через минуту из FR-3</span><span class="fixl">строка 9</span></a></li><li><a href="#D-04" data-goto="D-04" class="fix sev-major"><span class="fixn">4</span><span class="dot"></span><span class="fid">D-04</span><span class="fixt">Не сказано, запускает ли вызов POST /notify отправку push</span><span class="fixl">строка 9</span></a></li><li><a href="#D-05" data-goto="D-05" class="fix sev-major"><span class="fixn">5</span><span class="dot"></span><span class="fid">D-05</span><span class="fixt">Статус failed: момент установки относительно повторов не определён</span><span class="fixl">строка 11</span></a></li><li><a href="#D-06" data-goto="D-06" class="fix sev-major"><span class="fixn">6</span><span class="dot"></span><span class="fid">D-06</span><span class="fixt">После трёх неудачных повторов уведомление клиенту не обработано</span><span class="fixl">строка 11</span></a></li><li><a href="#D-07" data-goto="D-07" class="fix sev-major"><span class="fixn">7</span><span class="dot"></span><span class="fid">D-07</span><span class="fixt">Статус доставки обещан оператору, метода его получения нет</span><span class="fixl">строка 11</span></a></li></ol></div>
+</section>
+<nav class="tabs" role="tablist" aria-label="Разделы отчёта"><button type="button" role="tab" class="tab" id="t-findings" aria-controls="p-findings" aria-selected="true" data-tab="findings">Замечания<span class=cnt>14</span></button><button type="button" role="tab" class="tab" id="t-questions" aria-controls="p-questions" aria-selected="false" data-tab="questions">Вопросы<span class=cnt>4</span></button><button type="button" role="tab" class="tab" id="t-tests" aria-controls="p-tests" aria-selected="false" data-tab="tests">Тест-кейсы<span class=cnt>10</span></button><button type="button" role="tab" class="tab" id="t-checklist" aria-controls="p-checklist" aria-selected="false" data-tab="checklist">Чек-лист банка<span class=cnt>14</span></button><button type="button" role="tab" class="tab" id="t-checks" aria-controls="p-checks" aria-selected="false" data-tab="checks">Проверки<span class=cnt>2</span></button><button type="button" role="tab" class="tab" id="t-segment" aria-controls="p-segment" aria-selected="false" data-tab="segment">Нарезка<span class=cnt>6</span></button><button type="button" role="tab" class="tab" id="t-rejected" aria-controls="p-rejected" aria-selected="false" data-tab="rejected">Отклонённые<span class=cnt>2</span></button><button type="button" role="tab" class="tab" id="t-passport" aria-controls="p-passport" aria-selected="false" data-tab="passport">Паспорт</button></nav>
+<main><section class="panel" role="tabpanel" id="p-findings" aria-labelledby="t-findings"><h2 class="ph">Замечания</h2>
+<div class="split">
+  <aside class="docpane" aria-label="Документ">
+    <div class="dochead">
+      <div class="doctitle" title="Notification service requirements">Notification service requirements<small>19 строк</small></div>
+      <div class="doctools">
+        <label class="tg"><input type="checkbox" id="onlyhl"> только с замечаниями</label>
+        <label class="tg"><input type="checkbox" id="showreq"> нарезка</label>
+      </div>
+    </div>
+    <div class="docbody"><div class="doc" id="doc" tabindex="0"><div class="ln h hl sev-minor" id="L1" data-n="1" data-f="D-08"><span class="no">1</span><span class="tx"><mark class="q sev-minor" data-f="D-08">Notification service requirements</mark></span><span class="fms"><a class="fm sev-minor" href="#D-08" data-goto="D-08">D-08</a></span></div>
+<div class="ln blank" id="L2" data-n="2"><span class="no">2</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L3" data-n="3"><span class="no">3</span><span class="tx">1. Roles</span></div>
+<div class="ln blank" id="L4" data-n="4"><span class="no">4</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-minor rq" id="L5" data-n="5" data-f="D-09" data-r="R-01"><span class="no">5</span><span class="tx"><span class="rtag">R-01</span><mark class="q sev-minor" data-f="D-09">Customer, operator</mark>.</span><span class="fms"><a class="fm sev-minor" href="#D-09" data-goto="D-09">D-09</a></span></div>
+<div class="ln blank" id="L6" data-n="6"><span class="no">6</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L7" data-n="7"><span class="no">7</span><span class="tx">2. Requirements</span></div>
+<div class="ln blank" id="L8" data-n="8"><span class="no">8</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-critical rq" id="L9" data-n="9" data-f="D-01 D-02 D-03 D-04 D-08 D-10" data-r="R-02"><span class="no">9</span><span class="tx"><span class="rtag">R-02</span><mark class="q sev-minor" data-f="D-08">FR-1. </mark><mark class="q sev-major" data-f="D-02 D-04 D-08">The system shall send a push notification to the customer </mark><mark class="q sev-critical" data-f="D-01 D-02 D-03 D-04 D-08 D-10">within 5 seconds of a debit</mark>.</span><span class="fms"><a class="fm sev-critical" href="#D-01" data-goto="D-01">D-01</a><a class="fm sev-major" href="#D-02" data-goto="D-02">D-02</a><a class="fm sev-major" href="#D-03" data-goto="D-03">D-03</a><a class="fm sev-major" href="#D-04" data-goto="D-04">D-04</a><a class="fm sev-minor" href="#D-08" data-goto="D-08">D-08</a><a class="fm sev-minor" href="#D-10" data-goto="D-10">D-10</a><span class="fmore" title="D-04 D-08 D-10">+3</span></span></div>
+<div class="ln blank" id="L10" data-n="10"><span class="no">10</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L11" data-n="11" data-f="D-05 D-06 D-07 D-11" data-r="R-03"><span class="no">11</span><span class="tx"><span class="rtag">R-03</span><mark class="q sev-minor" data-f="D-11">FR-2. </mark><mark class="q sev-major" data-f="D-05 D-06 D-07 D-11">The operator shall see the delivery status: sent, delivered, failed</mark>.</span><span class="fms"><a class="fm sev-major" href="#D-05" data-goto="D-05">D-05</a><a class="fm sev-major" href="#D-06" data-goto="D-06">D-06</a><a class="fm sev-major" href="#D-07" data-goto="D-07">D-07</a><a class="fm sev-minor" href="#D-11" data-goto="D-11">D-11</a><span class="fmore" title="D-11">+1</span></span></div>
+<div class="ln blank" id="L12" data-n="12"><span class="no">12</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L13" data-n="13" data-f="D-03 D-05 D-06 D-12 D-13" data-r="R-04"><span class="no">13</span><span class="tx"><span class="rtag">R-04</span><mark class="q sev-minor" data-f="D-13">FR-3. </mark><mark class="q sev-major" data-f="D-03 D-05 D-06 D-12 D-13">On failure the system retries up to 3 times every minute</mark>.</span><span class="fms"><a class="fm sev-major" href="#D-03" data-goto="D-03">D-03</a><a class="fm sev-major" href="#D-05" data-goto="D-05">D-05</a><a class="fm sev-major" href="#D-06" data-goto="D-06">D-06</a><a class="fm sev-minor" href="#D-12" data-goto="D-12">D-12</a><a class="fm sev-minor" href="#D-13" data-goto="D-13">D-13</a><span class="fmore" title="D-12 D-13">+2</span></span></div>
+<div class="ln blank" id="L14" data-n="14"><span class="no">14</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-major rq" id="L15" data-n="15" data-f="D-02 D-11 D-14" data-r="R-05"><span class="no">15</span><span class="tx"><span class="rtag">R-05</span><mark class="q sev-minor" data-f="D-11">FR-4. </mark><mark class="q sev-major" data-f="D-02 D-11 D-14">The customer may disable notifications in profile settings</mark>.</span><span class="fms"><a class="fm sev-major" href="#D-02" data-goto="D-02">D-02</a><a class="fm sev-minor" href="#D-11" data-goto="D-11">D-11</a><a class="fm sev-minor" href="#D-14" data-goto="D-14">D-14</a></span></div>
+<div class="ln blank" id="L16" data-n="16"><span class="no">16</span><span class="tx">&#8203;</span></div>
+<div class="ln h hl sev-minor" id="L17" data-n="17" data-f="D-13"><span class="no">17</span><span class="tx"><mark class="q sev-minor" data-f="D-13">3. Interfaces</mark></span><span class="fms"><a class="fm sev-minor" href="#D-13" data-goto="D-13">D-13</a></span></div>
+<div class="ln blank" id="L18" data-n="18"><span class="no">18</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-critical rq" id="L19" data-n="19" data-f="D-01 D-04 D-07 D-09 D-10 D-11" data-r="R-06"><span class="no">19</span><span class="tx"><span class="rtag">R-06</span><mark class="q sev-critical" data-f="D-01 D-04 D-07 D-09 D-10 D-11">API POST /notify accepts client_id, amount, currency</mark>.</span><span class="fms"><a class="fm sev-critical" href="#D-01" data-goto="D-01">D-01</a><a class="fm sev-major" href="#D-04" data-goto="D-04">D-04</a><a class="fm sev-major" href="#D-07" data-goto="D-07">D-07</a><a class="fm sev-minor" href="#D-09" data-goto="D-09">D-09</a><a class="fm sev-minor" href="#D-10" data-goto="D-10">D-10</a><a class="fm sev-minor" href="#D-11" data-goto="D-11">D-11</a><span class="fmore" title="D-09 D-10 D-11">+3</span></span></div></div><div class="minimap" id="minimap" aria-hidden="true"></div></div>
+    <div class="legend"><span class="lg sev-critical"></span>критичный<span class="lg sev-major"></span>существенный<span class="lg sev-minor"></span>незначительный</div>
+  </aside>
+  <div class="flist">
+    <div class="filters" role="search">
+      <div class="frow"><button type="button" class="sevchip sev-critical" aria-pressed="true" data-sev="critical"><span class="dot"></span>Критичные <b>1</b></button><button type="button" class="sevchip sev-major" aria-pressed="true" data-sev="major"><span class="dot"></span>Существенные <b>6</b></button><button type="button" class="sevchip sev-minor" aria-pressed="true" data-sev="minor"><span class="dot"></span>Незначительные <b>7</b></button></div>
+      <div class="frow">
+        <input type="search" id="q" placeholder="Поиск по замечаниям, цитатам, ID…" aria-label="Поиск">
+        <select id="fkind" aria-label="Вид дефекта"><option value="">Все виды</option><option value="ambiguity">Неоднозначность</option><option value="incomplete">Неполнота</option><option value="missing_element">Обещанное не описано</option><option value="contradiction">Противоречие</option><option value="other">Прочее</option><option value="terminology">Терминология</option></select>
+        <select id="fsrc" aria-label="Кто нашёл"><option value="">Все линзы</option><option value="lens:analyst">Аналитик</option><option value="lens:qa">Тестировщик</option><option value="lens:architect">Архитектор</option><option value="lens:risk">Риски</option><option value="consistency">Набор целиком</option></select>
+      </div>
+      <div class="frow small"><span id="fcount" aria-live="polite"></span>
+        <label class="sortl">Порядок <select id="fsort" class="mini"><option value="prio">по приоритету</option><option value="line">по месту в документе</option><option value="sev">по серьёзности</option></select></label>
+        <button type="button" class="linkbtn" id="toggleall">Развернуть все</button><span class="kbd" title="Клавиши">↑ ↓ — по карточкам</span></div>
+    </div>
+    <div class="cards" id="cards"><article class="card sev-major" id="D-02" tabindex="0" data-idx="0" data-sev="major"
+ data-rank="2" data-prio="1" data-line="9" data-kind="contradiction"
+ data-src="consistency lens:analyst lens:qa" data-blocks="both" data-lines="9 15" data-search="d-02 fr-1 требует push, fr-4 допускает отключение: исход при отключении не определён fr-1 (строка 9) безусловно требует push после каждого списания. fr-4 (строка 15) разрешает клиенту отключить уведомления, но не говорит, отменяет ли это fr-1. начальное состояние настройки не задано. клиент отключил уведомления в профиле, затем с его счёта списано 5 000 единиц валюты. по толкованию a (fr-1 важнее) push отправляется в течение 5 секунд. по толкованию b push не отправляется, оператор видит статус без попытки доставки. разработчик и тестировщик получат разные ожидаемые результаты для одного и того же списания, а клиент может получить уведомление, которое отключил, или не получить обязательное. указать, отключает ли настройка push-уведомление после списания, и задать начальное значение настройки. fr-4. клиент может отключить push-уведомления о списаниях в настройках профиля; по умолчанию уведомления &lt;уточнить: включены или выключены&gt;. при отключении система не отправляет push-уведомление по fr-1. должна ли настройка отключения блокировать push-уведомление о каждом списании, и каким по умолчанию будет её значение: включено или выключено? the system shall send a push notification to the customer within 5 seconds of a debit the customer may disable notifications in profile settings r-02 r-05 противоречие">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-02</span><span class="prio" title="Порядок исправления">Исправить №1</span></header>
+  <h3 class="ct">FR-1 требует push, FR-4 допускает отключение: исход при отключении не определён</h3>
+  <div class="meta"><span class="chip kind">Противоречие</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.4">Согласованность</span><span class="chip blk">Блокирует разработку и тестирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>The system shall send a push notification to the customer within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>The customer may disable notifications in profile settings</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-1 (строка 9) безусловно требует push после каждого списания. FR-4 (строка 15) разрешает клиенту отключить уведомления, но не говорит, отменяет ли это FR-1. Начальное состояние настройки не задано.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Клиент отключил уведомления в профиле, затем с его счёта списано 5 000 единиц валюты. По толкованию A (FR-1 важнее) push отправляется в течение 5 секунд. По толкованию B push не отправляется, оператор видит статус без попытки доставки.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Разработчик и тестировщик получат разные ожидаемые результаты для одного и того же списания, а клиент может получить уведомление, которое отключил, или не получить обязательное.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Указать, отключает ли настройка push-уведомление после списания, и задать начальное значение настройки.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">FR-4. Клиент может отключить push-уведомления о списаниях в настройках профиля; по умолчанию уведомления &lt;уточнить: включены или выключены&gt;. При отключении система не отправляет push-уведомление по FR-1.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Должна ли настройка отключения блокировать push-уведомление о каждом списании, и каким по умолчанию будет её значение: включено или выключено?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.4</span><span class="fl"><b>Нашли</b> Аналитик, Тестировщик, Набор целиком</span></footer>
+</article>
+<article class="card sev-critical" id="D-01" tabindex="0" data-idx="1" data-sev="critical"
+ data-rank="3" data-prio="2" data-line="9" data-kind="ambiguity"
+ data-src="lens:risk" data-blocks="both" data-lines="9 19" data-search="d-01 событие «debit» не определено: авторизация или проведение списания fr-1 (строка 9) запускает push по «debit» с отправкой в течение 5 секунд. не сказано, это авторизация (холд) или проведение, которое приходит через 1–3 дня. источник события (процессинг или вызов post /notify, строка 19) не назван. покупка 26.11 в 23:59 utc+5 авторизована и проведена 28.11. толкование а: push уходит 26.11 в 23:59:05. толкование б: push уходит 28.11, и 5-секундный срок выполнить нельзя. клиент получает уведомление о списании либо с задержкой в дни, либо не получает его вовсе, если авторизация отменена; разработка и тестирование выбирают событие наугад, приёмка спорна. указать в fr-1 этап процессинга, который запускает уведомление, и источник этого события. система отправляет push-уведомление клиенту в течение 5 секунд после получения события &lt;уточнить: авторизация или проведение&gt; по карте клиента от процессинга. какой этап операции считается списанием для уведомления: авторизация (холд) или проведение, и допустима ли задержка больше 5 секунд? within 5 seconds of a debit api post /notify accepts client_id, amount, currency r-02 r-06 неоднозначность">
+  <header class="ch"><span class="badge sev-critical">Критичный</span><span class="fid">D-01</span><span class="prio" title="Порядок исправления">Исправить №2</span></header>
+  <h3 class="ct">Событие «debit» не определено: авторизация или проведение списания</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span><span class="chip blk">Блокирует разработку и тестирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-1 (строка 9) запускает push по «debit» с отправкой в течение 5 секунд. Не сказано, это авторизация (холд) или проведение, которое приходит через 1–3 дня. Источник события (процессинг или вызов POST /notify, строка 19) не назван.</p>
+  <details class="more" open><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Покупка 26.11 в 23:59 UTC+5 авторизована и проведена 28.11. Толкование А: push уходит 26.11 в 23:59:05. Толкование Б: push уходит 28.11, и 5-секундный срок выполнить нельзя.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Клиент получает уведомление о списании либо с задержкой в дни, либо не получает его вовсе, если авторизация отменена; разработка и тестирование выбирают событие наугад, приёмка спорна.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Указать в FR-1 этап процессинга, который запускает уведомление, и источник этого события.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Система отправляет push-уведомление клиенту в течение 5 секунд после получения события &lt;уточнить: авторизация или проведение&gt; по карте клиента от процессинга.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Какой этап операции считается списанием для уведомления: авторизация (холд) или проведение, и допустима ли задержка больше 5 секунд?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> <a class="rref" href="#L19" data-req="R-06" data-ls="19" data-le="19" title="Метод POST /notify принимает данные для уведомления">R-06</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Риски</span></footer>
+</article>
+<article class="card sev-major" id="D-03" tabindex="0" data-idx="2" data-sev="major"
+ data-rank="2" data-prio="3" data-line="9" data-kind="contradiction"
+ data-src="lens:risk" data-blocks="both" data-lines="9 13" data-search="d-03 срок 5 секунд из fr-1 противоречит повтору через минуту из fr-3 fr-1 (строка 9) требует отправку в течение 5 секунд после списания. fr-3 (строка 13) при сбое повторяет попытку раз в минуту. для одного уведомления два места задают разный срок. списание в 10:00:00 utc+5, первая попытка отправки падает. по fr-3 повтор в 10:01:00, что нарушает 5-секундный срок fr-1. по fr-1 срок уже нарушен на первой попытке, правило повтора неясно. клиент получает уведомление с опозданием, а приёмка не может подтвердить ни соблюдение 5 секунд, ни выполнение повторов. сформулировать отдельно срок первой попытки и интервал повторов, с явным исходом, если срок нарушен. первая попытка push выполняется в течение 5 секунд после события; при сбое повторы выполняются через &lt;уточнить: интервал&gt; секунд, до 3 раз, а срок 5 секунд на повторы не распространяется. должен ли срок 5 секунд действовать на повторные попытки, или он только на первую отправку? within 5 seconds of a debit on failure the system retries up to 3 times every minute r-02 r-04 противоречие">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-03</span><span class="prio" title="Порядок исправления">Исправить №3</span></header>
+  <h3 class="ct">Срок 5 секунд из FR-1 противоречит повтору через минуту из FR-3</h3>
+  <div class="meta"><span class="chip kind">Противоречие</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.4">Согласованность</span><span class="chip blk">Блокирует разработку и тестирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>On failure the system retries up to 3 times every minute</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-1 (строка 9) требует отправку в течение 5 секунд после списания. FR-3 (строка 13) при сбое повторяет попытку раз в минуту. Для одного уведомления два места задают разный срок.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Списание в 10:00:00 UTC+5, первая попытка отправки падает. По FR-3 повтор в 10:01:00, что нарушает 5-секундный срок FR-1. По FR-1 срок уже нарушен на первой попытке, правило повтора неясно.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Клиент получает уведомление с опозданием, а приёмка не может подтвердить ни соблюдение 5 секунд, ни выполнение повторов.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Сформулировать отдельно срок первой попытки и интервал повторов, с явным исходом, если срок нарушен.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Первая попытка push выполняется в течение 5 секунд после события; при сбое повторы выполняются через &lt;уточнить: интервал&gt; секунд, до 3 раз, а срок 5 секунд на повторы не распространяется.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Должен ли срок 5 секунд действовать на повторные попытки, или он только на первую отправку?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.4</span><span class="fl"><b>Нашли</b> Риски</span></footer>
+</article>
+<article class="card sev-major" id="D-04" tabindex="0" data-idx="3" data-sev="major"
+ data-rank="2" data-prio="4" data-line="9" data-kind="ambiguity"
+ data-src="lens:analyst" data-blocks="development" data-lines="9 19" data-search="d-04 не сказано, запускает ли вызов post /notify отправку push fr-1 (строка 9) связывает push со списанием. api (строка 19) принимает данные для уведомления. документ не говорит, отправляет ли вызов /notify push сам или отправка идёт только по списанию. списание прошло, но вызов /notify не был сделан. по толкованию a push отправляется по списанию. по толкованию b push не отправляется без вызова /notify. разработчик может построить отправку только на вызове api, и уведомления по списаниям без вызова не придут. указать, что запускает отправку push: списание или вызов post /notify. что запускает отправку push-уведомления: событие списания или вызов post /notify? the system shall send a push notification to the customer within 5 seconds of a debit api post /notify accepts client_id, amount, currency r-06 r-02 неоднозначность">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-04</span><span class="prio" title="Порядок исправления">Исправить №4</span></header>
+  <h3 class="ct">Не сказано, запускает ли вызов POST /notify отправку push</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span><span class="chip blk">Блокирует разработку</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>The system shall send a push notification to the customer within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-1 (строка 9) связывает push со списанием. API (строка 19) принимает данные для уведомления. Документ не говорит, отправляет ли вызов /notify push сам или отправка идёт только по списанию.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Списание прошло, но вызов /notify не был сделан. По толкованию A push отправляется по списанию. По толкованию B push не отправляется без вызова /notify.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Разработчик может построить отправку только на вызове API, и уведомления по списаниям без вызова не придут.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Указать, что запускает отправку push: списание или вызов POST /notify.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Что запускает отправку push-уведомления: событие списания или вызов POST /notify?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L19" data-req="R-06" data-ls="19" data-le="19" title="Метод POST /notify принимает данные для уведомления">R-06</a> <a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик</span></footer>
+</article>
+<article class="card sev-major" id="D-05" tabindex="0" data-idx="4" data-sev="major"
+ data-rank="2" data-prio="5" data-line="11" data-kind="ambiguity"
+ data-src="consistency lens:analyst lens:qa" data-blocks="both" data-lines="11 13" data-search="d-05 статус failed: момент установки относительно повторов не определён fr-2 (строка 11) задаёт статус failed, fr-3 (строка 13) задаёт повторы. не сказано, ставится ли failed при первом сбое, после исчерпания повторов или не ставится при успешном повторе. первая отправка в 10:00:00 не удалась; повторы в 10:01, 10:02, 10:03 тоже не удались. по толкованию a оператор видит failed с 10:00:00. по толкованию b failed только после 10:03:00. если повтор в 10:01 успешен, статус может остаться failed. оператор получит разный статус в одном и том же сбое, а тестировщик не сможет проверить момент перехода в failed. добавить в fr-3, когда присваивается статус failed. on failure the system retries up to 3 times every minute; the status failed is set only after the last retry fails. должен ли оператор видеть статус failed сразу после первого сбоя или только после исчерпания всех повторов? the operator shall see the delivery status: sent, delivered, failed on failure the system retries up to 3 times every minute r-03 r-04 неоднозначность">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-05</span><span class="prio" title="Порядок исправления">Исправить №5</span></header>
+  <h3 class="ct">Статус failed: момент установки относительно повторов не определён</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span><span class="chip blk">Блокирует разработку и тестирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>The operator shall see the delivery status: sent, delivered, failed</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>On failure the system retries up to 3 times every minute</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-2 (строка 11) задаёт статус failed, FR-3 (строка 13) задаёт повторы. Не сказано, ставится ли failed при первом сбое, после исчерпания повторов или не ставится при успешном повторе.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Первая отправка в 10:00:00 не удалась; повторы в 10:01, 10:02, 10:03 тоже не удались. По толкованию A оператор видит failed с 10:00:00. По толкованию B failed только после 10:03:00. Если повтор в 10:01 успешен, статус может остаться failed.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Оператор получит разный статус в одном и том же сбое, а тестировщик не сможет проверить момент перехода в failed.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить в FR-3, когда присваивается статус failed.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">On failure the system retries up to 3 times every minute; the status failed is set only after the last retry fails.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Должен ли оператор видеть статус failed сразу после первого сбоя или только после исчерпания всех повторов?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик, Тестировщик, Набор целиком</span></footer>
+</article>
+<article class="card sev-major" id="D-06" tabindex="0" data-idx="5" data-sev="major"
+ data-rank="2" data-prio="6" data-line="11" data-kind="incomplete"
+ data-src="lens:risk" data-blocks="development" data-lines="11 13" data-search="d-06 после трёх неудачных повторов уведомление клиенту не обработано fr-3 (строка 13) задаёт три повтора и не описывает исход, если все попытки неудачны. fr-2 (строка 11) показывает оператору failed, но клиенту не сказано, будет ли уведомление доставлено позже. списание 27.11 в 12:00 utc+5 получает статус failed после трёх повторов. клиент не знает о списании. при поздней доставке он получит уведомление о старом списании. клиент не узнаёт о списании по карте, что ведёт к жалобе и звонкам в поддержку; оператор видит failed без действия по нему. описать, что происходит с уведомлением после последнего неудачного повтора: окончательный статус, повторная отправка или передача оператору. после трёх неудачных попыток уведомление получает статус failed и ставится в очередь &lt;уточнить: ручная отправка оператором или автоматическая отправка позже&gt;; клиенту при этом &lt;уточнить: отправляется ли уведомление о списании позже&gt;. что делать с уведомлением о списании, если все три повтора не удались: оставить failed, передать оператору или отправить позже? the operator shall see the delivery status: sent, delivered, failed on failure the system retries up to 3 times every minute r-02 r-03 r-04 неполнота">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-06</span><span class="prio" title="Порядок исправления">Исправить №6</span></header>
+  <h3 class="ct">После трёх неудачных повторов уведомление клиенту не обработано</h3>
+  <div class="meta"><span class="chip kind">Неполнота</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3">Полнота требования</span><span class="chip blk">Блокирует разработку</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>The operator shall see the delivery status: sent, delivered, failed</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>On failure the system retries up to 3 times every minute</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-3 (строка 13) задаёт три повтора и не описывает исход, если все попытки неудачны. FR-2 (строка 11) показывает оператору failed, но клиенту не сказано, будет ли уведомление доставлено позже.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Списание 27.11 в 12:00 UTC+5 получает статус failed после трёх повторов. Клиент не знает о списании. При поздней доставке он получит уведомление о старом списании.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Клиент не узнаёт о списании по карте, что ведёт к жалобе и звонкам в поддержку; оператор видит failed без действия по нему.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Описать, что происходит с уведомлением после последнего неудачного повтора: окончательный статус, повторная отправка или передача оператору.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">После трёх неудачных попыток уведомление получает статус failed и ставится в очередь &lt;уточнить: ручная отправка оператором или автоматическая отправка позже&gt;; клиенту при этом &lt;уточнить: отправляется ли уведомление о списании позже&gt;.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Что делать с уведомлением о списании, если все три повтора не удались: оставить failed, передать оператору или отправить позже?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> <a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Риски</span></footer>
+</article>
+<article class="card sev-major" id="D-07" tabindex="0" data-idx="6" data-sev="major"
+ data-rank="2" data-prio="7" data-line="11" data-kind="missing_element"
+ data-src="consistency" data-blocks="development" data-lines="11 19" data-search="d-07 статус доставки обещан оператору, метода его получения нет fr-2 (строка 11) обещает оператору видеть статус sent/delivered/failed. интерфейс (строка 19) описывает только post /notify, который статус не возвращает. оператор открывает экран статусов уведомлений клиента. экран не к чему подключить: метода получения статуса в документе нет. экран оператора не к чему подключить; fr-2 не реализуем по описанию. добавить в интерфейс метод чтения статуса доставки. &lt;уточнить: метод api, возвращающий статус доставки оператору: sent, delivered, failed&gt; каким методом оператор получает статус доставки? the operator shall see the delivery status: sent, delivered, failed api post /notify accepts client_id, amount, currency r-03 r-06 обещанное не описано">
+  <header class="ch"><span class="badge sev-major">Существенный</span><span class="fid">D-07</span><span class="prio" title="Порядок исправления">Исправить №7</span></header>
+  <h3 class="ct">Статус доставки обещан оператору, метода его получения нет</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3">Полнота требования</span><span class="chip blk">Блокирует разработку</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>The operator shall see the delivery status: sent, delivered, failed</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-2 (строка 11) обещает оператору видеть статус sent/delivered/failed. Интерфейс (строка 19) описывает только POST /notify, который статус не возвращает.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Оператор открывает экран статусов уведомлений клиента. Экран не к чему подключить: метода получения статуса в документе нет.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Экран оператора не к чему подключить; FR-2 не реализуем по описанию.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить в интерфейс метод чтения статуса доставки.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">&lt;уточнить: метод API, возвращающий статус доставки оператору: sent, delivered, failed&gt;</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Каким методом оператор получает статус доставки?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> <a class="rref" href="#L19" data-req="R-06" data-ls="19" data-le="19" title="Метод POST /notify принимает данные для уведомления">R-06</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-08" tabindex="0" data-idx="7" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="1" data-kind="other"
+ data-src="consistency" data-blocks="none" data-lines="1 9" data-search="d-08 нет id, приоритетов, версии и задачи у требований пункты fr-1…fr-4 (строки 9–15) не имеют приоритета. заголовок (строка 1) «notification service requirements» не содержит версии, задачи или источника требований. команда выбирает, что делать первым при нехватке времени. порядок реализации и приёмки не определён. добавить приоритет к каждому fr. какие id и приоритеты присвоить перечисленным требованиям? notification service requirements fr-1. the system shall send a push notification to the customer within 5 seconds of a debit r-01 r-02 r-03 r-04 r-05 r-06 прочее">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-08</span></header>
+  <h3 class="ct">Нет ID, приоритетов, версии и задачи у требований</h3>
+  <div class="meta"><span class="chip kind">Прочее</span><span class="chip crit" title="IEEE 830-1998 п. 4.3.8">Прослеживаемость</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="1" data-le="1" title="Показать в документе"><span class="evl">строка 1</span><q>Notification service requirements</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>FR-1. The system shall send a push notification to the customer within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Пункты FR-1…FR-4 (строки 9–15) не имеют приоритета. Заголовок (строка 1) «Notification service requirements» не содержит версии, задачи или источника требований.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Команда выбирает, что делать первым при нехватке времени.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Порядок реализации и приёмки не определён.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить приоритет к каждому FR.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Какие ID и приоритеты присвоить перечисленным требованиям?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L5" data-req="R-01" data-ls="5" data-le="5" title="Роли участников: клиент и оператор">R-01</a> <a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> <a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a> <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a> <a class="rref" href="#L19" data-req="R-06" data-ls="19" data-le="19" title="Метод POST /notify принимает данные для уведомления">R-06</a></span><span class="fl"><b>Стандарт</b> IEEE 830-1998 п. 4.3.8</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-09" tabindex="0" data-idx="8" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="5" data-kind="terminology"
+ data-src="consistency lens:analyst" data-blocks="none" data-lines="5 19" data-search="d-09 клиент назван customer и client_id без указания, что это один участник роль названа «customer» (строка 5), в api поле «client_id» (строка 19). документ не связывает их и не даёт глоссария. разработчик может принять client_id за объект другой системы. разработчик может решить, что client_id ссылается на клиента банка, а может на другой объект, например клиента в другой системе. может возникнуть спор о том, какой идентификатор передавать для получателя уведомления. указать соответствие роли customer полю client_id. api post /notify accepts client_id (идентификатор клиента, роль customer), amount, currency. customer, operator api post /notify accepts client_id, amount, currency r-01 r-06 терминология">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-09</span></header>
+  <h3 class="ct">Клиент назван customer и client_id без указания, что это один участник</h3>
+  <div class="meta"><span class="chip kind">Терминология</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="5" data-le="5" title="Показать в документе"><span class="evl">строка 5</span><q>Customer, operator</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Роль названа «Customer» (строка 5), в API поле «client_id» (строка 19). Документ не связывает их и не даёт глоссария. Разработчик может принять client_id за объект другой системы.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Разработчик может решить, что client_id ссылается на клиента банка, а может на другой объект, например клиента в другой системе.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Может возникнуть спор о том, какой идентификатор передавать для получателя уведомления.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Указать соответствие роли customer полю client_id.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">API POST /notify accepts client_id (идентификатор клиента, роль customer), amount, currency.</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L5" data-req="R-01" data-ls="5" data-le="5" title="Роли участников: клиент и оператор">R-01</a> <a class="rref" href="#L19" data-req="R-06" data-ls="19" data-le="19" title="Метод POST /notify принимает данные для уведомления">R-06</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик, Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-10" tabindex="0" data-idx="9" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="9" data-kind="missing_element"
+ data-src="lens:qa" data-blocks="none" data-lines="9 19" data-search="d-10 нет критериев приёмки: проверяемы 0 из 4 функциональных требований в документе нет раздела критериев приёмки. не проверяются граница 5 с, выключенные уведомления, повтор на второй попытке, исчерпание трёх повторов, связь post /notify с отправкой push. ни одна строка приёмки не проверяет отправку через 5,1 с, отключение и повторную попытку на 2-й раз. ветки останутся без проверки, а дефекты выявятся на эксплуатации. непокрытые ветки закрывают тест-кейсы t-01–t-10 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки. добавить критерии приёмки для: границы 5 с; отключённых уведомлений; успеха на 2-й попытке; исчерпания 3 повторов; post /notify. within 5 seconds of a debit api post /notify accepts client_id, amount, currency r-02 r-03 r-04 r-05 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-10</span></header>
+  <h3 class="ct">Нет критериев приёмки: проверяемы 0 из 4 функциональных требований</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.6">Проверяемость</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">В документе нет раздела критериев приёмки. Не проверяются граница 5 с, выключенные уведомления, повтор на второй попытке, исчерпание трёх повторов, связь POST /notify с отправкой push.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Ни одна строка приёмки не проверяет отправку через 5,1 с, отключение и повторную попытку на 2-й раз.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Ветки останутся без проверки, а дефекты выявятся на эксплуатации.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Непокрытые ветки закрывают тест-кейсы T-01–T-10 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Добавить критерии приёмки для: границы 5 с; отключённых уведомлений; успеха на 2-й попытке; исчерпания 3 повторов; POST /notify.</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> <a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a> <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.6</span><span class="fl"><b>Нашли</b> Тестировщик</span></footer>
+</article>
+<article class="card sev-minor" id="D-11" tabindex="0" data-idx="10" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="11" data-kind="missing_element"
+ data-src="lens:architect" data-blocks="none" data-lines="11 15 19" data-search="d-11 настройка отключения уведомлений в профиле не имеет описанного интерфейса fr-4 (строка 15) говорит о настройке в профиле. в разделе интерфейсов (строка 19) единственный метод post /notify не принимает признак отключения. статус оператора см. в d-07. разработчик клиентского приложения и оператора не знает, откуда брать статус доставки и куда отправлять признак отключения уведомлений (строка 11, строка 15 против строки 19). оба экрана (статус оператора и настройка клиента) нельзя реализовать по тексту, и их нельзя проверить на интерфейсном уровне. добавить в раздел интерфейсов операции чтения статуса доставки и изменения признака отключения уведомлений либо явно указать, что эти данные получаются существующими методами. метод &lt;уточнить: метод и путь&gt; возвращает статус уведомления: sent | delivered | failed; метод &lt;уточнить: метод и путь&gt; сохраняет признак отключения уведомлений клиента. fr-2. the operator shall see the delivery status: sent, delivered, failed fr-4. the customer may disable notifications in profile settings api post /notify accepts client_id, amount, currency r-05 r-06 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-11</span></header>
+  <h3 class="ct">Настройка отключения уведомлений в профиле не имеет описанного интерфейса</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3">Полнота требования</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>FR-2. The operator shall see the delivery status: sent, delivered, failed</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>FR-4. The customer may disable notifications in profile settings</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-4 (строка 15) говорит о настройке в профиле. В разделе интерфейсов (строка 19) единственный метод POST /notify не принимает признак отключения. Статус оператора см. в D-07.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Разработчик клиентского приложения и оператора не знает, откуда брать статус доставки и куда отправлять признак отключения уведомлений (строка 11, строка 15 против строки 19).</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Оба экрана (статус оператора и настройка клиента) нельзя реализовать по тексту, и их нельзя проверить на интерфейсном уровне.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить в раздел интерфейсов операции чтения статуса доставки и изменения признака отключения уведомлений либо явно указать, что эти данные получаются существующими методами.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Метод &lt;уточнить: метод и путь&gt; возвращает статус уведомления: sent | delivered | failed; метод &lt;уточнить: метод и путь&gt; сохраняет признак отключения уведомлений клиента.</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a> <a class="rref" href="#L19" data-req="R-06" data-ls="19" data-le="19" title="Метод POST /notify принимает данные для уведомления">R-06</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Архитектор</span></footer>
+</article>
+<article class="card sev-minor" id="D-12" tabindex="0" data-idx="11" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="13" data-kind="ambiguity"
+ data-src="lens:analyst" data-blocks="none" data-lines="13" data-search="d-12 не сказано, входит ли первая отправка в три попытки фраза «up to 3 times» (строка 13) не говорит, всего 3 отправки или первая отправка плюс 3 повтора. первая отправка не удалась. по толкованию a всего 3 отправки. по толкованию b всего 4 отправки. разработчик и тестировщик по-разному посчитают число отправок при сбое. уточнить, что означает число 3: общее число попыток или число повторов после первой. on failure the system retries &lt;уточнить: 2 или 3&gt; more times every minute. считать ли 3 общим числом попыток отправки или числом повторов после первой неудачной попытки? on failure the system retries up to 3 times every minute r-04 неоднозначность">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-12</span></header>
+  <h3 class="ct">Не сказано, входит ли первая отправка в три попытки</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>On failure the system retries up to 3 times every minute</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Фраза «up to 3 times» (строка 13) не говорит, всего 3 отправки или первая отправка плюс 3 повтора.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Первая отправка не удалась. По толкованию A всего 3 отправки. По толкованию B всего 4 отправки.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Разработчик и тестировщик по-разному посчитают число отправок при сбое.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Уточнить, что означает число 3: общее число попыток или число повторов после первой.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">On failure the system retries &lt;уточнить: 2 или 3&gt; more times every minute.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Считать ли 3 общим числом попыток отправки или числом повторов после первой неудачной попытки?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик</span></footer>
+</article>
+<article class="card sev-minor" id="D-13" tabindex="0" data-idx="12" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="13" data-kind="missing_element"
+ data-src="lens:architect" data-blocks="none" data-lines="13 17" data-search="d-13 не определено, где хранятся счётчик попыток, статус и настройка fr-3 (строка 13) вводит счётчик повторов, fr-2 (строка 11) статус, fr-4 (строка 15) признак отключения. раздела с данными нет: 3. interfaces (строка 17) — последний раздел документа. при сбое отправки система должна сделать не более 3 повторов (строка 13), но не знает, где хранится счётчик попыток; оператор не получит статус sent/delivered/failed, потому что нет поля, в котором он хранится. ограничение 3 повторов и показ статуса оператору нельзя реализовать и проверить без догадок о хранилище. добавить раздел «модель данных» с полями уведомления: статус доставки, число попыток отправки, признак отключения уведомлений клиента. модель данных: статус доставки уведомления (sent | delivered | failed); число попыток отправки (целое, 0–3); признак отключения уведомлений клиента (да | нет); &lt;уточнить: остальные поля уведомления&gt;. fr-3. on failure the system retries up to 3 times every minute 3. interfaces r-03 r-04 r-05 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-13</span></header>
+  <h3 class="ct">Не определено, где хранятся счётчик попыток, статус и настройка</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3">Полнота требования</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>FR-3. On failure the system retries up to 3 times every minute</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="17" data-le="17" title="Показать в документе"><span class="evl">строка 17</span><q>3. Interfaces</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-3 (строка 13) вводит счётчик повторов, FR-2 (строка 11) статус, FR-4 (строка 15) признак отключения. Раздела с данными нет: 3. Interfaces (строка 17) — последний раздел документа.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">При сбое отправки система должна сделать не более 3 повторов (строка 13), но не знает, где хранится счётчик попыток; оператор не получит статус sent/delivered/failed, потому что нет поля, в котором он хранится.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Ограничение 3 повторов и показ статуса оператору нельзя реализовать и проверить без догадок о хранилище.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить раздел «Модель данных» с полями уведомления: статус доставки, число попыток отправки, признак отключения уведомлений клиента.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Модель данных: статус доставки уведомления (sent | delivered | failed); число попыток отправки (целое, 0–3); признак отключения уведомлений клиента (да | нет); &lt;уточнить: остальные поля уведомления&gt;.</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a> <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Архитектор</span></footer>
+</article>
+<article class="card sev-minor" id="D-14" tabindex="0" data-idx="13" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="15" data-kind="incomplete"
+ data-src="consistency" data-blocks="none" data-lines="15" data-search="d-14 не описано включение уведомлений обратно и начальное состояние настройки fr-4 (строка 15) описывает только отключение. не сказано о включении обратно, о влиянии смены настройки на идущие повторы и о начальном состоянии настройки. клиент отключил уведомления, затем включил их снова при активном повторе. разные реализации по-разному обработают включение; тесты не покрывают сценарий. добавить требование о повторном включении и правилах для повторов. &lt;уточнить: поведение при повторном включении уведомлений и для запланированных повторов&gt; что происходит с уведомлениями при повторном включении? the customer may disable notifications in profile settings r-05 неполнота">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-14</span></header>
+  <h3 class="ct">Не описано включение уведомлений обратно и начальное состояние настройки</h3>
+  <div class="meta"><span class="chip kind">Неполнота</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3">Полнота требования</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>The customer may disable notifications in profile settings</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">FR-4 (строка 15) описывает только отключение. Не сказано о включении обратно, о влиянии смены настройки на идущие повторы и о начальном состоянии настройки.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Клиент отключил уведомления, затем включил их снова при активном повторе.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Разные реализации по-разному обработают включение; тесты не покрывают сценарий.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить требование о повторном включении и правилах для повторов.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">&lt;уточнить: поведение при повторном включении уведомлений и для запланированных повторов&gt;</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Что происходит с уведомлениями при повторном включении?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article><div class="empty" hidden>Под фильтр не попало ни одного замечания. <button type="button" class="linkbtn" data-reset>Сбросить фильтры</button></div></div>
+  </div>
+</div></section><section class="panel" role="tabpanel" id="p-questions" aria-labelledby="t-questions" hidden><h2 class="ph">Вопросы</h2><div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p><button type="button" class="btn" id="dlanswers">Скачать ответы</button></div><div class="qlist"><article class="qcard" data-q="Q-01" data-topic="Момент списания для уведомления">
+  <header class="ch"><span class="fid">Q-01</span><span class="badge sev-critical">Блокирует</span><span class="to">Кому: <b>Владелец продукта</b></span><span class="qlinks"><a class="fref sev-critical" href="#D-01" data-goto="D-01" title="Событие «debit» не определено: авторизация или проведение списания">D-01</a></span></header>
+  <div class="topic">Момент списания для уведомления</div><h3 class="ct">Какой этап операции считается списанием, после которого запускается push-уведомление с обещанным сроком в 5 секунд: авторизация (холд) или проведение?</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-01" value="0"><span class="ol">A</span>Списание — авторизация (холд). Push отправляется в течение 5 секунд после получения авторизации, проведение push не запускает.</label></li><li><label><input type="radio" name="Q-01" value="1"><span class="ol">B</span>Списание — проведение. Push отправляется в течение 5 секунд после проведения, авторизация push не запускает.</label></li><li><label><input type="radio" name="Q-01" value="2"><span class="ol">C</span>Списание — авторизация, и push отправляется по ней. Проведение push не запускает. Срок 5 секунд отсчитывается от получения вызова POST /notify.</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-01" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Если «debit» понимать как авторизацию, а разработчик и тестировщик примут проведение, push придёт в разные моменты времени и тесты на срок 5 секунд дадут разный результат.</p>
+</article><article class="qcard" data-q="Q-02" data-topic="Срок 5 секунд и интервал повторов">
+  <header class="ch"><span class="fid">Q-02</span><span class="to">Кому: <b>Аналитик</b></span><span class="qlinks"><a class="fref sev-major" href="#D-03" data-goto="D-03" title="Срок 5 секунд из FR-1 противоречит повтору через минуту из FR-3">D-03</a></span></header>
+  <div class="topic">Срок 5 секунд и интервал повторов</div><h3 class="ct">Срок 5 секунд относится только к первой отправке push или также к повторным попыткам, которые по правилу повторов выполняются раз в минуту?</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="9" data-le="9" title="Показать в документе"><span class="evl">строка 9</span><q>within 5 seconds of a debit</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>On failure the system retries up to 3 times every minute</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-02" value="0"><span class="ol">A</span>Срок 5 секунд относится только к первой попытке. Повторы выполняются с интервалом 1 минута, до 3 раз.</label></li><li><label><input type="radio" name="Q-02" value="1"><span class="ol">B</span>Срок 5 секунд относится к каждой попытке. Повторы выполняются с интервалом 5 секунд, до 3 раз; правило «раз в минуту» отменяется.</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-02" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Для повторной отправки без ответа тест может ожидать push через 5 секунд или через минуту, и результат приёмки будет разным.</p>
+</article><article class="qcard" data-q="Q-03" data-topic="Исход после трёх неудачных повторов">
+  <header class="ch"><span class="fid">Q-03</span><span class="to">Кому: <b>Владелец продукта</b></span><span class="qlinks"><a class="fref sev-major" href="#D-06" data-goto="D-06" title="После трёх неудачных повторов уведомление клиенту не обработано">D-06</a></span></header>
+  <div class="topic">Исход после трёх неудачных повторов</div><h3 class="ct">Что происходит с уведомлением о списании, если все три повтора не удались: остаётся ли оно в статусе failed без дальнейших попыток или отправка продолжается позже?</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="13" data-le="13" title="Показать в документе"><span class="evl">строка 13</span><q>On failure the system retries up to 3 times every minute</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>The operator shall see the delivery status: sent, delivered, failed</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-03" value="0"><span class="ol">A</span>Статус failed сохраняется, дальнейшие попытки не выполняются. Клиент уведомление не получает.</label></li><li><label><input type="radio" name="Q-03" value="1"><span class="ol">B</span>Статус failed сохраняется, отправка продолжается раз в 1 час, но не дольше 24 часов после списания.</label></li><li><label><input type="radio" name="Q-03" value="2"><span class="ol">C</span>Статус failed сохраняется, и уведомление ставится в очередь на ручную повторную отправку оператором.</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-03" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Без ответа команды по-разному реализуют поведение после третьего сбоя, и тест «все попытки неуспешны» не сможет проверить итоговое состояние уведомления.</p>
+</article><article class="qcard" data-q="Q-04" data-topic="Метод получения статуса оператором">
+  <header class="ch"><span class="fid">Q-04</span><span class="to">Кому: <b>Архитектор</b></span><span class="qlinks"><a class="fref sev-major" href="#D-07" data-goto="D-07" title="Статус доставки обещан оператору, метода его получения нет">D-07</a></span></header>
+  <div class="topic">Метод получения статуса оператором</div><h3 class="ct">Каким методом оператор получает статус доставки уведомления, если описан только метод отправки уведомления, который статус не возвращает?</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="11" data-le="11" title="Показать в документе"><span class="evl">строка 11</span><q>The operator shall see the delivery status: sent, delivered, failed</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="19" data-le="19" title="Показать в документе"><span class="evl">строка 19</span><q>API POST /notify accepts client_id, amount, currency</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-04" value="0"><span class="ol">A</span>Отдельный метод получения статуса по идентификатору уведомления, который возвращает значение sent, delivered или failed.</label></li><li><label><input type="radio" name="Q-04" value="1"><span class="ol">B</span>Оператор получает статус событием обратного вызова в свою систему при каждом изменении статуса; отдельного метода получения статуса нет.</label></li><li><label><input type="radio" name="Q-04" value="2"><span class="ol">C</span>Статус оператор видит только в интерфейсе, данные для которого читаются напрямую из хранилища без API.</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-04" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Без метода контракта нельзя написать ни интеграционный тест, ни экран оператора, и разработчики заложат разные способы получения статуса.</p>
+</article></div></section><section class="panel" role="tabpanel" id="p-tests" aria-labelledby="t-tests" hidden><h2 class="ph">Тест-кейсы</h2><p class="lead">Черновик для раздела «Тестирование требований»: проверки, которых не хватает в критериях приёмки. Где ожидаемый результат нельзя вывести из текста, это отмечено.</p><div class="tw"><table class="tc"><thead><tr><th>ID</th><th>Требования</th><th>Проверка</th><th>Дано</th><th>Когда</th><th>Тогда</th><th>Чего нет в приёмке</th></tr></thead><tbody><tr><td><span class="fid">T-01</span></td><td><a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a></td><td><b>Push после списания при включённых уведомлениях</b></td><td>Клиент не отключал уведомления; списание произошло в момент T0</td><td>Система обрабатывает списание</td><td>Push-уведомление отправлено клиенту не позднее T0 + 5 с</td><td>Основной сценарий; в документе нет критериев приёмки</td></tr><tr><td><span class="fid">T-02</span></td><td><a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a></td><td><b>Граница: push ровно через 5,0 с</b></td><td>Клиент не отключал уведомления; списание в T0</td><td>Push-уведомление отправлено в T0 + 5,0 с</td><td>Соответствует требованию: «within 5 seconds» включает значение 5 с</td><td>Граница диапазона 5 с не покрыта приёмкой</td></tr><tr><td><span class="fid">T-03</span></td><td><a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a></td><td><b>За границей: push через 5,1 с нарушает требование</b></td><td>Клиент не отключал уведомления; списание в T0</td><td>Push-уведомление отправлено в T0 + 5,1 с</td><td>Нарушение FR-1: отправка позже 5 с после списания</td><td>Значение сразу за границей 5 с не покрыто приёмкой</td></tr><tr><td><span class="fid">T-04</span></td><td><a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a></td><td><b>Списание при отключённых уведомлениях</b></td><td>Клиент отключил уведомления в настройках профиля</td><td>Происходит списание</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: FR-1 требует отправку, FR-4 допускает отключение, но не говорит, отменяет ли отключение FR-1 (см. кандидат о противоречии)</td><td>Ветка выключенной функции не покрыта приёмкой</td></tr><tr><td><span class="fid">T-05</span></td><td><a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></td><td><b>Ровно 3 повторные попытки при сбое</b></td><td>Первая попытка отправки завершилась сбоем; все повторные попытки тоже завершаются сбоем</td><td>Система выполняет повторные попытки</td><td>Выполнено ровно 3 повторные попытки; четвёртой попытки нет</td><td>Граница «up to 3 times» и значение сверх неё не покрыты приёмкой</td></tr><tr><td><span class="fid">T-06</span></td><td><a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></td><td><b>Интервал повторов в 1 минуту</b></td><td>Первая попытка отправки завершилась сбоем в момент S</td><td>Система выполняет повторные попытки</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: точка отсчёта интервала «every minute» (от момента сбоя или от предыдущей попытки); при этом интервал 1 мин задан</td><td>Интервал повторов не покрыт приёмкой</td></tr><tr><td><span class="fid">T-07</span></td><td><a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></td><td><b>Успех на второй попытке останавливает повторы</b></td><td>Первая попытка завершилась сбоем, вторая попытка через 1 мин успешна</td><td>Система получает успешный результат второй попытки</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями однозначно. По тексту требований: повторные попытки прекращаются; статус после успеха не определён требованиями (sent или delivered)</td><td>Ветка успешного повтора не покрыта приёмкой</td></tr><tr><td><span class="fid">T-08</span></td><td><a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></td><td><b>Статус оператора после исчерпания повторов</b></td><td>Все 3 повторные попытки завершились сбоем</td><td>Оператор смотрит статус уведомления</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: признак сбоя и момент присвоения статуса failed (см. кандидат о статусе failed)</td><td>Ветка исчерпания повторов не покрыта приёмкой</td></tr><tr><td><span class="fid">T-09</span></td><td><a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a></td><td><b>Оператор видит статус доставки</b></td><td>Уведомление отправлено клиенту</td><td>Оператор открывает уведомление</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: место отображения статуса и признаки sent, delivered, failed</td><td>Проверка интерфейса оператора не описана</td></tr><tr><td><span class="fid">T-10</span></td><td><a class="rref" href="#L19" data-req="R-06" data-ls="19" data-le="19" title="Метод POST /notify принимает данные для уведомления">R-06</a></td><td><b>Связь POST /notify с отправкой push</b></td><td>Вызов POST /notify с client_id, amount, currency</td><td>Система принимает запрос</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: вызывает ли запрос push-уведомление по FR-1 и как связан с событием списания</td><td>Ветка API не покрыта приёмкой</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checklist" aria-labelledby="t-checklist" hidden><h2 class="ph">Чек-лист банка</h2><p class="lead">Чек-лист «Ревью требований» банка, заполненный по результатам проверки.</p><div class="tw"><table class="cl"><thead><tr><th>Проверка</th><th>Ответ</th><th>Комментарий</th><th>Замечания</th></tr></thead><tbody><tr><td>Техническое требование зафиксировано и покрывает бизнес-требование</td><td><span class="ans a-no">Нет</span></td><td>Противоречие FR-1 (строка 9) и FR-4 (строка 15) при отключении уведомлений: требование не покрыто однозначно.</td><td><a class="fref sev-major" href="#D-02" data-goto="D-02" title="FR-1 требует push, FR-4 допускает отключение: исход при отключении не определён">D-02</a></td></tr><tr><td>Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)</td><td><span class="ans a-part">Частично</span></td><td>Разделы 1–3 есть (строки 3, 7, 17), но таблицы критериев приёмки и структуры по шаблону нет.</td><td><a class="fref sev-minor" href="#D-10" data-goto="D-10" title="Нет критериев приёмки: проверяемы 0 из 4 функциональных требований">D-10</a></td></tr><tr><td>Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений</td><td><span class="ans a-no">Нет</span></td><td>Диаграмм нет; взаимодействие с внешним источником debit и вызов POST /notify (строка 19) не описаны.</td><td><a class="fref sev-critical" href="#D-01" data-goto="D-01" title="Событие «debit» не определено: авторизация или проведение списания">D-01</a> <a class="fref sev-major" href="#D-04" data-goto="D-04" title="Не сказано, запускает ли вызов POST /notify отправку push">D-04</a></td></tr><tr><td>Требование покрывает спецификацию UX/UI дизайна</td><td><span class="ans a-no">Нет</span></td><td>Экран оператора (строка 11) и настройка в профиле (строка 15) не имеют описанного интерфейса.</td><td><a class="fref sev-major" href="#D-07" data-goto="D-07" title="Статус доставки обещан оператору, метода его получения нет">D-07</a> <a class="fref sev-minor" href="#D-11" data-goto="D-11" title="Настройка отключения уведомлений в профиле не имеет описанного интерфейса">D-11</a></td></tr><tr><td>Реализация задачи/проекта предусматривает схему отката решений</td><td><span class="ans a-part">Частично</span></td><td>Схемы отката нет; только незначительное замечание, без ущерба основной функции.</td><td></td></tr><tr><td>Требование может быть протестировано</td><td><span class="ans a-no">Нет</span></td><td>Порог 5 с и исход повторов (строки 9, 13) не проверяемы по тексту, критерии приёмки отсутствуют.</td><td><a class="fref sev-major" href="#D-05" data-goto="D-05" title="Статус failed: момент установки относительно повторов не определён">D-05</a> <a class="fref sev-major" href="#D-03" data-goto="D-03" title="Срок 5 секунд из FR-1 противоречит повтору через минуту из FR-3">D-03</a> <a class="fref sev-minor" href="#D-12" data-goto="D-12" title="Не сказано, входит ли первая отправка в три попытки">D-12</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10" title="Нет критериев приёмки: проверяемы 0 из 4 функциональных требований">D-10</a></td></tr><tr><td>Требование предусматривает модель данных или поток, содержит описание</td><td><span class="ans a-part">Частично</span></td><td>Модель данных не описана (строки 11, 13, 15); незначительное замечание.</td><td><a class="fref sev-minor" href="#D-13" data-goto="D-13" title="Не определено, где хранятся счётчик попыток, статус и настройка">D-13</a></td></tr><tr><td>Требование не имеет противоречий или явных показателей операционных рисков</td><td><span class="ans a-no">Нет</span></td><td>Противоречие сроков (строка 9 против строки 13) и неопределённое событие debit (строка 9).</td><td><a class="fref sev-major" href="#D-02" data-goto="D-02" title="FR-1 требует push, FR-4 допускает отключение: исход при отключении не определён">D-02</a> <a class="fref sev-critical" href="#D-01" data-goto="D-01" title="Событие «debit» не определено: авторизация или проведение списания">D-01</a> <a class="fref sev-major" href="#D-03" data-goto="D-03" title="Срок 5 секунд из FR-1 противоречит повтору через минуту из FR-3">D-03</a></td></tr><tr><td>Требование содержит архитектуру и согласовано с архитекторами</td><td><span class="ans a-no">Нет</span></td><td>Архитектура в документе не описана; вызов /notify и источник события не согласованы с отправкой push.</td><td><a class="fref sev-major" href="#D-04" data-goto="D-04" title="Не сказано, запускает ли вызов POST /notify отправку push">D-04</a> <a class="fref sev-major" href="#D-07" data-goto="D-07" title="Статус доставки обещан оператору, метода его получения нет">D-07</a></td></tr><tr><td>Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами</td><td><span class="ans a-part">Частично</span></td><td>Внешний источник debit и провайдер не названы (строка 9); согласований не указано.</td><td><a class="fref sev-critical" href="#D-01" data-goto="D-01" title="Событие «debit» не определено: авторизация или проведение списания">D-01</a></td></tr><tr><td>Структура требований не несёт изменений и рисков информационной безопасности</td><td><span class="ans a-yes">Да</span></td><td>Риска ИБ, видимого из текста, нет; значимых замечаний по безопасности не выявлено.</td><td></td></tr><tr><td>В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки</td><td><span class="ans a-no">Нет</span></td><td>Схемы бизнес-процесса нет; ветка после трёх неудачных повторов (строка 13) не описана.</td><td><a class="fref sev-major" href="#D-06" data-goto="D-06" title="После трёх неудачных повторов уведомление клиенту не обработано">D-06</a> <a class="fref sev-major" href="#D-02" data-goto="D-02" title="FR-1 требует push, FR-4 допускает отключение: исход при отключении не определён">D-02</a></td></tr><tr><td>Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия</td><td><span class="ans a-no">Нет</span></td><td>POST /notify (строка 19) без ответа и кодов; статус оператору не возвращается.</td><td><a class="fref sev-major" href="#D-07" data-goto="D-07" title="Статус доставки обещан оператору, метода его получения нет">D-07</a> <a class="fref sev-major" href="#D-04" data-goto="D-04" title="Не сказано, запускает ли вызов POST /notify отправку push">D-04</a></td></tr><tr><td>Поддерживается версионность документа / зафиксирована</td><td><span class="ans a-part">Частично</span></td><td>Версии и задачи в заголовке (строка 1) нет; замечание незначительное.</td><td><a class="fref sev-minor" href="#D-08" data-goto="D-08" title="Нет ID, приоритетов, версии и задачи у требований">D-08</a></td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checks" aria-labelledby="t-checks" hidden><h2 class="ph">Проверки</h2><h3 class="sub">Попарная сверка требований</h3><div class="tw"><table class=""><thead><tr><th>Пара</th><th>Общий предмет</th><th>Сценарий</th><th>Исход A</th><th>Исход B</th><th>Итог</th></tr></thead><tbody><tr><td><a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a> ↔ <a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a></td><td>Push после списания при отключенных уведомлениях</td><td>Клиент отключил уведомления в настройках; происходит списание.</td><td>Push обязан уйти клиенту в течение 5 секунд.</td><td>Не сказано, отправляется ли push при отключённых уведомлениях.</td><td><span class="ans a-part">Не определено</span></td></tr><tr><td><a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a> ↔ <a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></td><td>Статус доставки во время и после повторных попыток</td><td>Первая отправка не удалась; вторая попытка через минуту успешна.</td><td>Оператор видит статус failed или sent/delivered; правило выбора не задано.</td><td>Система повторяет отправку до трёх раз с интервалом в минуту.</td><td><span class="ans a-part">Не определено</span></td></tr></tbody></table></div><h3 class="sub">Трассировка</h3><div class="tw"><table class=""><thead><tr><th>Требование</th><th>Проверяется</th><th>Реализуется</th><th>Примечание</th></tr></thead><tbody><tr><td><a class="rref" href="#L9" data-req="R-02" data-ls="9" data-le="9" title="FR-1 · Push-уведомление клиенту после списания">R-02</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критериев приёмки; не связано с POST /notify</td></tr><tr><td><a class="rref" href="#L11" data-req="R-03" data-ls="11" data-le="11" title="FR-2 · Оператор видит статус доставки уведомления">R-03</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет метода чтения статуса доставки</td></tr><tr><td><a class="rref" href="#L13" data-req="R-04" data-ls="13" data-le="13" title="FR-3 · Повторные попытки при сбое отправки уведомления">R-04</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критериев приёмки; не сказано про первую попытку</td></tr><tr><td><a class="rref" href="#L15" data-req="R-05" data-ls="15" data-le="15" title="FR-4 · Клиент может отключить уведомления в настройках">R-05</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критериев; нет поля настройки отключения</td></tr></tbody></table></div><h3 class="sub">Глоссарий: один смысл — разные слова</h3><div class="tw"><table class=""><thead><tr><th>Понятие</th><th>Термины в документе</th><th>Проблема</th></tr></thead><tbody><tr><td><b>Участник-клиент</b></td><td>Customer <a class="lnref" href="#L5" data-line="5">строка 5</a>, client_id <a class="lnref" href="#L19" data-line="19">строка 19</a></td><td>Роль названа customer, в API — client_id; неясно, один ли это участник.</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-segment" aria-labelledby="t-segment" hidden><h2 class="ph">Нарезка</h2><p class="lead">Агент выделил 6 требований и присвоил им ID; номер строки — по исходному документу.</p><div class="tw"><table class="seg"><thead><tr><th>ID</th><th>В документе</th><th>Вид</th><th>Кратко</th><th>Строки</th><th>Замечания</th></tr></thead><tbody><tr><td><span class="fid">R-01</span></td><td></td><td>Прочее</td><td>Роли участников: клиент и оператор</td><td><a class="lnref" href="#L5" data-line="5" data-le="5">5</a></td><td><a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a> <a class="fref sev-minor" href="#D-09" data-goto="D-09">D-09</a></td></tr><tr><td><span class="fid">R-02</span></td><td>FR-1</td><td>Функциональное</td><td>Push-уведомление клиенту после списания</td><td><a class="lnref" href="#L9" data-line="9" data-le="9">9</a></td><td><a class="fref sev-critical" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-major" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-major" href="#D-03" data-goto="D-03">D-03</a> <a class="fref sev-major" href="#D-04" data-goto="D-04">D-04</a> <a class="fref sev-major" href="#D-06" data-goto="D-06">D-06</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10">D-10</a></td></tr><tr><td><span class="fid">R-03</span></td><td>FR-2</td><td>Функциональное</td><td>Оператор видит статус доставки уведомления</td><td><a class="lnref" href="#L11" data-line="11" data-le="11">11</a></td><td><a class="fref sev-major" href="#D-05" data-goto="D-05">D-05</a> <a class="fref sev-major" href="#D-06" data-goto="D-06">D-06</a> <a class="fref sev-major" href="#D-07" data-goto="D-07">D-07</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10">D-10</a> <a class="fref sev-minor" href="#D-13" data-goto="D-13">D-13</a></td></tr><tr><td><span class="fid">R-04</span></td><td>FR-3</td><td>Функциональное</td><td>Повторные попытки при сбое отправки уведомления</td><td><a class="lnref" href="#L13" data-line="13" data-le="13">13</a></td><td><a class="fref sev-major" href="#D-03" data-goto="D-03">D-03</a> <a class="fref sev-major" href="#D-05" data-goto="D-05">D-05</a> <a class="fref sev-major" href="#D-06" data-goto="D-06">D-06</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10">D-10</a> <a class="fref sev-minor" href="#D-12" data-goto="D-12">D-12</a> <a class="fref sev-minor" href="#D-13" data-goto="D-13">D-13</a></td></tr><tr><td><span class="fid">R-05</span></td><td>FR-4</td><td>Функциональное</td><td>Клиент может отключить уведомления в настройках</td><td><a class="lnref" href="#L15" data-line="15" data-le="15">15</a></td><td><a class="fref sev-major" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a> <a class="fref sev-minor" href="#D-10" data-goto="D-10">D-10</a> <a class="fref sev-minor" href="#D-11" data-goto="D-11">D-11</a> <a class="fref sev-minor" href="#D-13" data-goto="D-13">D-13</a> <a class="fref sev-minor" href="#D-14" data-goto="D-14">D-14</a></td></tr><tr><td><span class="fid">R-06</span></td><td></td><td>API</td><td>Метод POST /notify принимает данные для уведомления</td><td><a class="lnref" href="#L19" data-line="19" data-le="19">19</a></td><td><a class="fref sev-critical" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-major" href="#D-04" data-goto="D-04">D-04</a> <a class="fref sev-major" href="#D-07" data-goto="D-07">D-07</a> <a class="fref sev-minor" href="#D-08" data-goto="D-08">D-08</a> <a class="fref sev-minor" href="#D-09" data-goto="D-09">D-09</a> <a class="fref sev-minor" href="#D-11" data-goto="D-11">D-11</a></td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-rejected" aria-labelledby="t-rejected" hidden><h2 class="ph">Отклонённые</h2><p class="lead">Кандидаты, которые линзы предложили, а судья не включил в отчёт, — с причиной. Так видно, что точность важнее количества.</p><div class="tw"><table class=""><thead><tr><th>Кандидат</th><th>Что предлагалось</th><th>Кто</th><th>Где</th><th>Почему отклонено</th></tr></thead><tbody><tr><td><span class="fid"></span></td><td>Статус оператора и условия перехода не определены</td><td>Тестировщик</td><td>строка 11</td><td>снято линзой тестировщика: результат функции не описан — это неполнота (зона аналитика), а не непроверяемость</td></tr><tr><td><span class="fid"></span></td><td>POST /notify не описывает проверку вызывающей стороны, позволяя подделать списание</td><td>Риски</td><td>строка 19, строка 9</td><td>вопрос предметной области без текстовой зацепки — не замечание линзы</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-passport" aria-labelledby="t-passport" hidden><h2 class="ph">Паспорт</h2><div class="pgrid"><div class="tw"><table class="kv"><tr><th>Агент</th><td>BCC Review 2.0.0-dev</td></tr><tr><th>Коммит</th><td>90cd1e56 (есть незакоммиченные правки)</td></tr><tr><th>Статус прогона</th><td>полный</td></tr><tr><th>Начало / конец</th><td>2026-11-27 21:17:23+05:00 — 2026-11-27 21:19:37+05:00</td></tr><tr><th>Длительность</th><td>2 мин 14 с</td></tr><tr><th>Провайдер</th><td>claude_cli</td></tr><tr><th>Модель (запрошена)</th><td>haiku</td></tr><tr><th>Модели (фактически)</th><td>claude-haiku-5-5</td></tr><tr><th>Вызовы модели</th><td>9 всего · 0 из кэша · 0 с ошибкой · 0 делений пакета</td></tr><tr><th>Токены</th><td>156 592 на входе · 62 335 на выходе</td></tr><tr><th>Сверка цитат кодом</th><td>37 из 37 цитат всех кандидатов найдены в документе <span class="muted">(дословно 37)</span></td></tr><tr><th>Кандидаты</th><td>20 от ревьюеров → 20 с найденными цитатами → судье; отклонено 0</td></tr><tr><th>Стоимость</th><td>$0.05</td></tr><tr><th>Документ</th><td>Notification service requirements <span class="muted">(tz_en.md, md)</span></td></tr><tr><th>Строк / страниц</th><td>19 / —</td></tr><tr><th>SHA-256 документа</th><td><code class="hash">58dd87b24992825edc5565018514a4fa38c856ba6c5bdd964d9771105d7a9944</code></td></tr><tr><th>Схема отчёта</th><td>bcc-review/2</td></tr></table></div><div><h3 class="sub">Этапы</h3><ul class="stages"><li class="st st-ok"><span>Нарезка требований<small>7 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Правила<small>&lt; 1 с</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Аналитик»<small>33 с · 1 вызов · 5 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Тестировщик»<small>51 с · 1 вызов · 3 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Архитектор»<small>37 с · 1 вызов · 2 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Риски»<small>42 с · 1 вызов · 3 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Набор целиком<small>42 с · 1 вызов · 7 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Сверка цитат<small>&lt; 1 с · 20 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Судья<small>1 мин 16 с · 2 вызова</small></span><b>готово</b></li><li class="st st-ok"><span>Вопросы<small>&lt; 1 с · 1 вызов</small></span><b>готово</b></li></ul><h3 class="sub">Предупреждения</h3><ul class="warns"><li>проверка серьёзности понизила 1 дефект(ов): критичный→существенный 1, существенный→незначительный 0</li><li>clarify: вопрос 1 отброшен — нет связи с дефектами отчёта</li><li>clarify: вопрос 4 отброшен — нет связи с дефектами отчёта</li><li>clarify: вопрос «Какие данные хранятся для каждого уведомления и где хранится» отброшен — касается только незначительных дефектов</li></ul><h3 class="sub">Как проверить отчёт</h3><p class="lead">Каждая цитата в замечаниях найдена в документе программой, номер строки посчитан кодом, а не моделью. Повторная сверка: <code>python -m bcc_review.v2.verify report.json документ</code>.</p></div></div></section></main>
+<footer class="foot">Сформировано агентом BCC Review 2.0.0-dev · статическое ревью по ISO/IEC/IEEE 29148:2018 и IEEE 830-1998 ·
+цитаты сверены с документом программой</footer>
+<script type="application/json" id="report-data">{"schema": "bcc-review/2", "run": {"agent": "BCC Review", "version": "2.0.0-dev", "commit": "90cd1e56", "dirty": true, "run_id": "20261127-211723-edd3", "started_at": "2026-11-27T21:17:23+05:00", "finished_at": "2026-11-27T21:19:37+05:00", "duration_s": 134.4, "provider": "claude_cli", "model_requested": "haiku", "models_used": ["claude-haiku-5-5"], "calls": {"total": 9, "cached": 0, "failed": 0, "split": 0}, "tokens": {"input": 156592, "output": 62335}, "cost_usd": 0.0518, "status": "complete", "stages": {"segment": "ok", "rules": "ok", "lens_analyst": "ok", "lens_qa": "ok", "lens_architect": "ok", "lens_risk": "ok", "consistency": "ok", "quotes": "ok", "judge": "ok", "clarify": "ok"}, "stage_stats": {"segment": {"calls": 1, "seconds": 6.92, "candidates": 0}, "rules": {"calls": 0, "seconds": 0.0, "candidates": 0}, "lens_analyst": {"calls": 1, "seconds": 32.7, "candidates": 5}, "lens_qa": {"calls": 1, "seconds": 50.94, "candidates": 3}, "lens_architect": {"calls": 1, "seconds": 36.87, "candidates": 2}, "lens_risk": {"calls": 1, "seconds": 41.89, "candidates": 3}, "consistency": {"calls": 1, "seconds": 42.01, "candidates": 7}, "quotes": {"calls": 0, "seconds": 0.0, "candidates": 20}, "judge": {"calls": 2, "seconds": 76.12, "candidates": 0}, "clarify": {"calls": 1, "seconds": 0.0, "candidates": 0, "early": true, "model_seconds": 26.0}}, "warnings": ["проверка серьёзности понизила 1 дефект(ов): critical→major 1, major→minor 0", "clarify: вопрос 1 отброшен — нет связи с дефектами отчёта", "clarify: вопрос 4 отброшен — нет связи с дефектами отчёта", "clarify: вопрос «Какие данные хранятся для каждого уведомления и где хранится» отброшен — касается только незначительных дефектов"], "options": {"max_calls": 16, "passes": 1, "lenses": ["analyst", "qa", "architect", "risk"], "export": [], "revise": false, "answers": false}, "fast_start": false}, "document": {"title": "Notification service requirements", "file": "tz_en.md", "format": "md", "sha256": "58dd87b24992825edc5565018514a4fa38c856ba6c5bdd964d9771105d7a9944", "lines": 19, "pages": null, "warnings": []}, "requirements": [{"id": "R-01", "source_id": "", "kind": "other", "section": "1. Roles", "summary": "Роли участников: клиент и оператор", "quote": "Customer, operator.", "line_start": 5, "line_end": 5, "page": null}, {"id": "R-02", "source_id": "FR-1", "kind": "functional", "section": "2. Requirements", "summary": "Push-уведомление клиенту после списания", "quote": "FR-1. The system shall send a push notification to the customer within 5 seconds of a debit.", "line_start": 9, "line_end": 9, "page": null}, {"id": "R-03", "source_id": "FR-2", "kind": "functional", "section": "2. Requirements", "summary": "Оператор видит статус доставки уведомления", "quote": "FR-2. The operator shall see the delivery status: sent, delivered, failed.", "line_start": 11, "line_end": 11, "page": null}, {"id": "R-04", "source_id": "FR-3", "kind": "functional", "section": "2. Requirements", "summary": "Повторные попытки при сбое отправки уведомления", "quote": "FR-3. On failure the system retries up to 3 times every minute.", "line_start": 13, "line_end": 13, "page": null}, {"id": "R-05", "source_id": "FR-4", "kind": "functional", "section": "2. Requirements", "summary": "Клиент может отключить уведомления в настройках", "quote": "FR-4. The customer may disable notifications in profile settings.", "line_start": 15, "line_end": 15, "page": null}, {"id": "R-06", "source_id": "", "kind": "api", "section": "3. Interfaces", "summary": "Метод POST /notify принимает данные для уведомления", "quote": "API POST /notify accepts client_id, amount, currency.", "line_start": 19, "line_end": 19, "page": null}], "excluded": [], "findings": [{"id": "D-01", "candidate_ids": ["C-011"], "title": "Событие «debit» не определено: авторизация или проведение списания", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "critical", "requirement_ids": ["R-02", "R-06"], "evidence": [{"quote": "within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "problem": "FR-1 (строка 9) запускает push по «debit» с отправкой в течение 5 секунд. Не сказано, это авторизация (холд) или проведение, которое приходит через 1–3 дня. Источник события (процессинг или вызов POST /notify, строка 19) не назван.", "scenario": "Покупка 26.11 в 23:59 UTC+5 авторизована и проведена 28.11. Толкование А: push уходит 26.11 в 23:59:05. Толкование Б: push уходит 28.11, и 5-секундный срок выполнить нельзя.", "impact": "Клиент получает уведомление о списании либо с задержкой в дни, либо не получает его вовсе, если авторизация отменена; разработка и тестирование выбирают событие наугад, приёмка спорна.", "recommendation": "Указать в FR-1 этап процессинга, который запускает уведомление, и источник этого события.", "rewrite": "Система отправляет push-уведомление клиенту в течение 5 секунд после получения события \u003cуточнить: авторизация или проведение\u003e по карте клиента от процессинга.", "question": "Какой этап операции считается списанием для уведомления: авторизация (холд) или проведение, и допустима ли задержка больше 5 секунд?", "blocks": "both", "priority": 2, "sources": ["lens:risk"]}, {"id": "D-02", "candidate_ids": ["C-001", "C-006", "C-014"], "title": "FR-1 требует push, FR-4 допускает отключение: исход при отключении не определён", "kind": "contradiction", "criterion": "set_consistent", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.4"], "severity": "major", "requirement_ids": ["R-02", "R-05"], "evidence": [{"quote": "The system shall send a push notification to the customer within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "The customer may disable notifications in profile settings", "line_start": 15, "line_end": 15, "page": null, "section": "2. Requirements", "verified": "exact"}], "problem": "FR-1 (строка 9) безусловно требует push после каждого списания. FR-4 (строка 15) разрешает клиенту отключить уведомления, но не говорит, отменяет ли это FR-1. Начальное состояние настройки не задано.", "scenario": "Клиент отключил уведомления в профиле, затем с его счёта списано 5 000 единиц валюты. По толкованию A (FR-1 важнее) push отправляется в течение 5 секунд. По толкованию B push не отправляется, оператор видит статус без попытки доставки.", "impact": "Разработчик и тестировщик получат разные ожидаемые результаты для одного и того же списания, а клиент может получить уведомление, которое отключил, или не получить обязательное.", "recommendation": "Указать, отключает ли настройка push-уведомление после списания, и задать начальное значение настройки.", "rewrite": "FR-4. Клиент может отключить push-уведомления о списаниях в настройках профиля; по умолчанию уведомления \u003cуточнить: включены или выключены\u003e. При отключении система не отправляет push-уведомление по FR-1.", "question": "Должна ли настройка отключения блокировать push-уведомление о каждом списании, и каким по умолчанию будет её значение: включено или выключено?", "blocks": "both", "priority": 1, "sources": ["lens:analyst", "lens:qa", "consistency"]}, {"id": "D-03", "candidate_ids": ["C-012"], "title": "Срок 5 секунд из FR-1 противоречит повтору через минуту из FR-3", "kind": "contradiction", "criterion": "set_consistent", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.4"], "severity": "major", "requirement_ids": ["R-02", "R-04"], "evidence": [{"quote": "within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "On failure the system retries up to 3 times every minute", "line_start": 13, "line_end": 13, "page": null, "section": "2. Requirements", "verified": "exact"}], "problem": "FR-1 (строка 9) требует отправку в течение 5 секунд после списания. FR-3 (строка 13) при сбое повторяет попытку раз в минуту. Для одного уведомления два места задают разный срок.", "scenario": "Списание в 10:00:00 UTC+5, первая попытка отправки падает. По FR-3 повтор в 10:01:00, что нарушает 5-секундный срок FR-1. По FR-1 срок уже нарушен на первой попытке, правило повтора неясно.", "impact": "Клиент получает уведомление с опозданием, а приёмка не может подтвердить ни соблюдение 5 секунд, ни выполнение повторов.", "recommendation": "Сформулировать отдельно срок первой попытки и интервал повторов, с явным исходом, если срок нарушен.", "rewrite": "Первая попытка push выполняется в течение 5 секунд после события; при сбое повторы выполняются через \u003cуточнить: интервал\u003e секунд, до 3 раз, а срок 5 секунд на повторы не распространяется.", "question": "Должен ли срок 5 секунд действовать на повторные попытки, или он только на первую отправку?", "blocks": "both", "priority": 3, "sources": ["lens:risk"]}, {"id": "D-04", "candidate_ids": ["C-005"], "title": "Не сказано, запускает ли вызов POST /notify отправку push", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "major", "requirement_ids": ["R-06", "R-02"], "evidence": [{"quote": "The system shall send a push notification to the customer within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "problem": "FR-1 (строка 9) связывает push со списанием. API (строка 19) принимает данные для уведомления. Документ не говорит, отправляет ли вызов /notify push сам или отправка идёт только по списанию.", "scenario": "Списание прошло, но вызов /notify не был сделан. По толкованию A push отправляется по списанию. По толкованию B push не отправляется без вызова /notify.", "impact": "Разработчик может построить отправку только на вызове API, и уведомления по списаниям без вызова не придут.", "recommendation": "Указать, что запускает отправку push: списание или вызов POST /notify.", "rewrite": "", "question": "Что запускает отправку push-уведомления: событие списания или вызов POST /notify?", "blocks": "development", "priority": 4, "sources": ["lens:analyst"]}, {"id": "D-05", "candidate_ids": ["C-002", "C-007", "C-015"], "title": "Статус failed: момент установки относительно повторов не определён", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "major", "requirement_ids": ["R-03", "R-04"], "evidence": [{"quote": "The operator shall see the delivery status: sent, delivered, failed", "line_start": 11, "line_end": 11, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "On failure the system retries up to 3 times every minute", "line_start": 13, "line_end": 13, "page": null, "section": "2. Requirements", "verified": "exact"}], "problem": "FR-2 (строка 11) задаёт статус failed, FR-3 (строка 13) задаёт повторы. Не сказано, ставится ли failed при первом сбое, после исчерпания повторов или не ставится при успешном повторе.", "scenario": "Первая отправка в 10:00:00 не удалась; повторы в 10:01, 10:02, 10:03 тоже не удались. По толкованию A оператор видит failed с 10:00:00. По толкованию B failed только после 10:03:00. Если повтор в 10:01 успешен, статус может остаться failed.", "impact": "Оператор получит разный статус в одном и том же сбое, а тестировщик не сможет проверить момент перехода в failed.", "recommendation": "Добавить в FR-3, когда присваивается статус failed.", "rewrite": "On failure the system retries up to 3 times every minute; the status failed is set only after the last retry fails.", "question": "Должен ли оператор видеть статус failed сразу после первого сбоя или только после исчерпания всех повторов?", "blocks": "both", "priority": 5, "sources": ["lens:analyst", "lens:qa", "consistency"]}, {"id": "D-06", "candidate_ids": ["C-013"], "title": "После трёх неудачных повторов уведомление клиенту не обработано", "kind": "incomplete", "criterion": "complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.3"], "severity": "major", "requirement_ids": ["R-02", "R-03", "R-04"], "evidence": [{"quote": "The operator shall see the delivery status: sent, delivered, failed", "line_start": 11, "line_end": 11, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "On failure the system retries up to 3 times every minute", "line_start": 13, "line_end": 13, "page": null, "section": "2. Requirements", "verified": "exact"}], "problem": "FR-3 (строка 13) задаёт три повтора и не описывает исход, если все попытки неудачны. FR-2 (строка 11) показывает оператору failed, но клиенту не сказано, будет ли уведомление доставлено позже.", "scenario": "Списание 27.11 в 12:00 UTC+5 получает статус failed после трёх повторов. Клиент не знает о списании. При поздней доставке он получит уведомление о старом списании.", "impact": "Клиент не узнаёт о списании по карте, что ведёт к жалобе и звонкам в поддержку; оператор видит failed без действия по нему.", "recommendation": "Описать, что происходит с уведомлением после последнего неудачного повтора: окончательный статус, повторная отправка или передача оператору.", "rewrite": "После трёх неудачных попыток уведомление получает статус failed и ставится в очередь \u003cуточнить: ручная отправка оператором или автоматическая отправка позже\u003e; клиенту при этом \u003cуточнить: отправляется ли уведомление о списании позже\u003e.", "question": "Что делать с уведомлением о списании, если все три повтора не удались: оставить failed, передать оператору или отправить позже?", "blocks": "development", "priority": 6, "sources": ["lens:risk"]}, {"id": "D-07", "candidate_ids": ["C-017"], "title": "Статус доставки обещан оператору, метода его получения нет", "kind": "missing_element", "criterion": "complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.3"], "severity": "major", "requirement_ids": ["R-03", "R-06"], "evidence": [{"quote": "The operator shall see the delivery status: sent, delivered, failed", "line_start": 11, "line_end": 11, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "problem": "FR-2 (строка 11) обещает оператору видеть статус sent/delivered/failed. Интерфейс (строка 19) описывает только POST /notify, который статус не возвращает.", "scenario": "Оператор открывает экран статусов уведомлений клиента. Экран не к чему подключить: метода получения статуса в документе нет.", "impact": "Экран оператора не к чему подключить; FR-2 не реализуем по описанию.", "recommendation": "Добавить в интерфейс метод чтения статуса доставки.", "rewrite": "\u003cуточнить: метод API, возвращающий статус доставки оператору: sent, delivered, failed\u003e", "question": "Каким методом оператор получает статус доставки?", "blocks": "development", "priority": 7, "sources": ["consistency"]}, {"id": "D-08", "candidate_ids": ["C-019", "C-020"], "title": "Нет ID, приоритетов, версии и задачи у требований", "kind": "other", "criterion": "traceable", "standard_refs": ["IEEE 830-1998 п. 4.3.8"], "severity": "minor", "requirement_ids": ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], "evidence": [{"quote": "Notification service requirements", "line_start": 1, "line_end": 1, "page": null, "section": "", "verified": "exact"}, {"quote": "FR-1. The system shall send a push notification to the customer within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}], "problem": "Пункты FR-1…FR-4 (строки 9–15) не имеют приоритета. Заголовок (строка 1) «Notification service requirements» не содержит версии, задачи или источника требований.", "scenario": "Команда выбирает, что делать первым при нехватке времени.", "impact": "Порядок реализации и приёмки не определён.", "recommendation": "Добавить приоритет к каждому FR.", "rewrite": "", "question": "Какие ID и приоритеты присвоить перечисленным требованиям?", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-09", "candidate_ids": ["C-004", "C-016"], "title": "Клиент назван customer и client_id без указания, что это один участник", "kind": "terminology", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-01", "R-06"], "evidence": [{"quote": "Customer, operator", "line_start": 5, "line_end": 5, "page": null, "section": "1. Roles", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "problem": "Роль названа «Customer» (строка 5), в API поле «client_id» (строка 19). Документ не связывает их и не даёт глоссария. Разработчик может принять client_id за объект другой системы.", "scenario": "Разработчик может решить, что client_id ссылается на клиента банка, а может на другой объект, например клиента в другой системе.", "impact": "Может возникнуть спор о том, какой идентификатор передавать для получателя уведомления.", "recommendation": "Указать соответствие роли customer полю client_id.", "rewrite": "API POST /notify accepts client_id (идентификатор клиента, роль customer), amount, currency.", "question": "", "blocks": "none", "priority": 0, "sources": ["lens:analyst", "consistency"]}, {"id": "D-10", "candidate_ids": ["C-008"], "title": "Нет критериев приёмки: проверяемы 0 из 4 функциональных требований", "kind": "missing_element", "criterion": "verifiable", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.6"], "severity": "minor", "requirement_ids": ["R-02", "R-03", "R-04", "R-05"], "evidence": [{"quote": "within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "problem": "В документе нет раздела критериев приёмки. Не проверяются граница 5 с, выключенные уведомления, повтор на второй попытке, исчерпание трёх повторов, связь POST /notify с отправкой push.", "scenario": "Ни одна строка приёмки не проверяет отправку через 5,1 с, отключение и повторную попытку на 2-й раз.", "impact": "Ветки останутся без проверки, а дефекты выявятся на эксплуатации.", "recommendation": "Непокрытые ветки закрывают тест-кейсы T-01–T-10 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки.", "rewrite": "Добавить критерии приёмки для: границы 5 с; отключённых уведомлений; успеха на 2-й попытке; исчерпания 3 повторов; POST /notify.", "question": "", "blocks": "none", "priority": 0, "sources": ["lens:qa"]}, {"id": "D-11", "candidate_ids": ["C-010"], "title": "Настройка отключения уведомлений в профиле не имеет описанного интерфейса", "kind": "missing_element", "criterion": "complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.3"], "severity": "minor", "requirement_ids": ["R-05", "R-06"], "evidence": [{"quote": "FR-2. The operator shall see the delivery status: sent, delivered, failed", "line_start": 11, "line_end": 11, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "FR-4. The customer may disable notifications in profile settings", "line_start": 15, "line_end": 15, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "problem": "FR-4 (строка 15) говорит о настройке в профиле. В разделе интерфейсов (строка 19) единственный метод POST /notify не принимает признак отключения. Статус оператора см. в D-07.", "scenario": "Разработчик клиентского приложения и оператора не знает, откуда брать статус доставки и куда отправлять признак отключения уведомлений (строка 11, строка 15 против строки 19).", "impact": "Оба экрана (статус оператора и настройка клиента) нельзя реализовать по тексту, и их нельзя проверить на интерфейсном уровне.", "recommendation": "Добавить в раздел интерфейсов операции чтения статуса доставки и изменения признака отключения уведомлений либо явно указать, что эти данные получаются существующими методами.", "rewrite": "Метод \u003cуточнить: метод и путь\u003e возвращает статус уведомления: sent | delivered | failed; метод \u003cуточнить: метод и путь\u003e сохраняет признак отключения уведомлений клиента.", "question": "", "blocks": "none", "priority": 0, "sources": ["lens:architect"]}, {"id": "D-12", "candidate_ids": ["C-003"], "title": "Не сказано, входит ли первая отправка в три попытки", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-04"], "evidence": [{"quote": "On failure the system retries up to 3 times every minute", "line_start": 13, "line_end": 13, "page": null, "section": "2. Requirements", "verified": "exact"}], "problem": "Фраза «up to 3 times» (строка 13) не говорит, всего 3 отправки или первая отправка плюс 3 повтора.", "scenario": "Первая отправка не удалась. По толкованию A всего 3 отправки. По толкованию B всего 4 отправки.", "impact": "Разработчик и тестировщик по-разному посчитают число отправок при сбое.", "recommendation": "Уточнить, что означает число 3: общее число попыток или число повторов после первой.", "rewrite": "On failure the system retries \u003cуточнить: 2 или 3\u003e more times every minute.", "question": "Считать ли 3 общим числом попыток отправки или числом повторов после первой неудачной попытки?", "blocks": "none", "priority": 0, "sources": ["lens:analyst"]}, {"id": "D-13", "candidate_ids": ["C-009"], "title": "Не определено, где хранятся счётчик попыток, статус и настройка", "kind": "missing_element", "criterion": "complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.3"], "severity": "minor", "requirement_ids": ["R-03", "R-04", "R-05"], "evidence": [{"quote": "FR-3. On failure the system retries up to 3 times every minute", "line_start": 13, "line_end": 13, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "3. Interfaces", "line_start": 17, "line_end": 17, "page": null, "section": "3. Interfaces", "verified": "exact"}], "problem": "FR-3 (строка 13) вводит счётчик повторов, FR-2 (строка 11) статус, FR-4 (строка 15) признак отключения. Раздела с данными нет: 3. Interfaces (строка 17) — последний раздел документа.", "scenario": "При сбое отправки система должна сделать не более 3 повторов (строка 13), но не знает, где хранится счётчик попыток; оператор не получит статус sent/delivered/failed, потому что нет поля, в котором он хранится.", "impact": "Ограничение 3 повторов и показ статуса оператору нельзя реализовать и проверить без догадок о хранилище.", "recommendation": "Добавить раздел «Модель данных» с полями уведомления: статус доставки, число попыток отправки, признак отключения уведомлений клиента.", "rewrite": "Модель данных: статус доставки уведомления (sent | delivered | failed); число попыток отправки (целое, 0–3); признак отключения уведомлений клиента (да | нет); \u003cуточнить: остальные поля уведомления\u003e.", "question": "", "blocks": "none", "priority": 0, "sources": ["lens:architect"]}, {"id": "D-14", "candidate_ids": ["C-018"], "title": "Не описано включение уведомлений обратно и начальное состояние настройки", "kind": "incomplete", "criterion": "complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.3"], "severity": "minor", "requirement_ids": ["R-05"], "evidence": [{"quote": "The customer may disable notifications in profile settings", "line_start": 15, "line_end": 15, "page": null, "section": "2. Requirements", "verified": "exact"}], "problem": "FR-4 (строка 15) описывает только отключение. Не сказано о включении обратно, о влиянии смены настройки на идущие повторы и о начальном состоянии настройки.", "scenario": "Клиент отключил уведомления, затем включил их снова при активном повторе.", "impact": "Разные реализации по-разному обработают включение; тесты не покрывают сценарий.", "recommendation": "Добавить требование о повторном включении и правилах для повторов.", "rewrite": "\u003cуточнить: поведение при повторном включении уведомлений и для запланированных повторов\u003e", "question": "Что происходит с уведомлениями при повторном включении?", "blocks": "none", "priority": 0, "sources": ["consistency"]}], "rejected": [{"candidate_id": "", "title": "Статус оператора и условия перехода не определены", "source": "lens:qa", "reason_code": "lens_dropped", "reason": "снято линзой тестировщика: результат функции не описан — это неполнота (зона аналитика), а не непроверяемость", "line": 11, "severity": "major", "kind": "unverifiable", "problem": "Документ не задаёт, где оператор видит статус (экран, отчёт, API), какой статус получает уведомление при каждом исходе и что считается «delivered» (подтверждение от провайдера или устройства). Проверить «оператор видит статус» нельзя без этих признаков.", "evidence": [{"quote": "The operator shall see the delivery status: sent, delivered, failed.", "line": 11}]}, {"candidate_id": "", "title": "POST /notify не описывает проверку вызывающей стороны, позволяя подделать списание", "source": "lens:risk", "reason_code": "lens_dropped", "reason": "вопрос предметной области без текстовой зацепки — не замечание линзы", "line": 19, "severity": "minor", "kind": "security", "problem": "Метод POST /notify принимает client_id и amount, по которым клиенту уходит push о списании, но в документе не описано, кто может его вызывать и как проверяется вызывающая сторона.", "evidence": [{"line": 19, "quote": "API POST /notify accepts client_id, amount, currency."}, {"line": 9, "quote": "send a push notification to the customer within 5 seconds of a debit."}]}], "acceptance_checks": [], "test_cases": [{"id": "T-01", "requirement_ids": ["R-02"], "title": "Push после списания при включённых уведомлениях", "given": "Клиент не отключал уведомления; списание произошло в момент T0", "when": "Система обрабатывает списание", "then": "Push-уведомление отправлено клиенту не позднее T0 + 5 с", "gap": "Основной сценарий; в документе нет критериев приёмки", "expected_defined": true}, {"id": "T-02", "requirement_ids": ["R-02"], "title": "Граница: push ровно через 5,0 с", "given": "Клиент не отключал уведомления; списание в T0", "when": "Push-уведомление отправлено в T0 + 5,0 с", "then": "Соответствует требованию: «within 5 seconds» включает значение 5 с", "gap": "Граница диапазона 5 с не покрыта приёмкой", "expected_defined": true}, {"id": "T-03", "requirement_ids": ["R-02"], "title": "За границей: push через 5,1 с нарушает требование", "given": "Клиент не отключал уведомления; списание в T0", "when": "Push-уведомление отправлено в T0 + 5,1 с", "then": "Нарушение FR-1: отправка позже 5 с после списания", "gap": "Значение сразу за границей 5 с не покрыто приёмкой", "expected_defined": true}, {"id": "T-04", "requirement_ids": ["R-02", "R-05"], "title": "Списание при отключённых уведомлениях", "given": "Клиент отключил уведомления в настройках профиля", "when": "Происходит списание", "then": "Не определено требованиями: FR-1 требует отправку, FR-4 допускает отключение, но не говорит, отменяет ли отключение FR-1 (см. кандидат о противоречии)", "gap": "Ветка выключенной функции не покрыта приёмкой", "expected_defined": false}, {"id": "T-05", "requirement_ids": ["R-04"], "title": "Ровно 3 повторные попытки при сбое", "given": "Первая попытка отправки завершилась сбоем; все повторные попытки тоже завершаются сбоем", "when": "Система выполняет повторные попытки", "then": "Выполнено ровно 3 повторные попытки; четвёртой попытки нет", "gap": "Граница «up to 3 times» и значение сверх неё не покрыты приёмкой", "expected_defined": true}, {"id": "T-06", "requirement_ids": ["R-04"], "title": "Интервал повторов в 1 минуту", "given": "Первая попытка отправки завершилась сбоем в момент S", "when": "Система выполняет повторные попытки", "then": "Не определено требованиями: точка отсчёта интервала «every minute» (от момента сбоя или от предыдущей попытки); при этом интервал 1 мин задан", "gap": "Интервал повторов не покрыт приёмкой", "expected_defined": false}, {"id": "T-07", "requirement_ids": ["R-04"], "title": "Успех на второй попытке останавливает повторы", "given": "Первая попытка завершилась сбоем, вторая попытка через 1 мин успешна", "when": "Система получает успешный результат второй попытки", "then": "Не определено требованиями однозначно. По тексту требований: повторные попытки прекращаются; статус после успеха не определён требованиями (sent или delivered)", "gap": "Ветка успешного повтора не покрыта приёмкой", "expected_defined": false}, {"id": "T-08", "requirement_ids": ["R-03", "R-04"], "title": "Статус оператора после исчерпания повторов", "given": "Все 3 повторные попытки завершились сбоем", "when": "Оператор смотрит статус уведомления", "then": "Не определено требованиями: признак сбоя и момент присвоения статуса failed (см. кандидат о статусе failed)", "gap": "Ветка исчерпания повторов не покрыта приёмкой", "expected_defined": false}, {"id": "T-09", "requirement_ids": ["R-03"], "title": "Оператор видит статус доставки", "given": "Уведомление отправлено клиенту", "when": "Оператор открывает уведомление", "then": "Не определено требованиями: место отображения статуса и признаки sent, delivered, failed", "gap": "Проверка интерфейса оператора не описана", "expected_defined": false}, {"id": "T-10", "requirement_ids": ["R-06"], "title": "Связь POST /notify с отправкой push", "given": "Вызов POST /notify с client_id, amount, currency", "when": "Система принимает запрос", "then": "Не определено требованиями: вызывает ли запрос push-уведомление по FR-1 и как связан с событием списания", "gap": "Ветка API не покрыта приёмкой", "expected_defined": false}], "pair_checks": [{"a": "R-02", "b": "R-05", "subject": "Push после списания при отключенных уведомлениях", "same_subject": true, "quote_a": "The system shall send a push notification to the customer within 5 seconds of a debit.", "line_a": 9, "quote_b": "The customer may disable notifications in profile settings.", "line_b": 15, "scenario": "Клиент отключил уведомления в настройках; происходит списание.", "outcome_a": "Push обязан уйти клиенту в течение 5 секунд.", "outcome_b": "Не сказано, отправляется ли push при отключённых уведомлениях.", "one_condition": true, "verdict": "undefined", "basis": "none", "kind": "incomplete", "title": "FR-1 и FR-4: push при отключённых уведомлениях (пункты 1 и 4)", "impact": "Разработчик и тестировщик по-разному поймут, отправлять ли push отключившему клиенту; приёмка спорна.", "recommendation": "Зафиксировать, что при отключении push не отправляется, и правило для уже запланированных повторов.", "question": "Должен ли push отправляться клиенту, отключившему уведомления, и что делать с запланированными повторами?", "verified_a": "exact", "verified_b": "exact", "id": "P-01", "finding_ids": ["D-02"]}, {"a": "R-03", "b": "R-04", "subject": "Статус доставки во время и после повторных попыток", "same_subject": true, "quote_a": "The operator shall see the delivery status: sent, delivered, failed.", "line_a": 11, "quote_b": "On failure the system retries up to 3 times every minute.", "line_b": 13, "scenario": "Первая отправка не удалась; вторая попытка через минуту успешна.", "outcome_a": "Оператор видит статус failed или sent/delivered; правило выбора не задано.", "outcome_b": "Система повторяет отправку до трёх раз с интервалом в минуту.", "one_condition": true, "verdict": "undefined", "basis": "none", "kind": "ambiguity", "title": "FR-2 и FR-3: статус 'failed' во время повторов (пункты 2 и 3)", "impact": "Оператор может увидеть failed при успешной повторной отправке; тест статуса не однозначен.", "recommendation": "Определить, какой статус показывается между попытками и после успешного повтора.", "question": "Какой статус видит оператор, пока повторы ещё идут и после успешного повтора?", "verified_a": "exact", "verified_b": "exact", "id": "P-02", "finding_ids": ["D-05"]}], "trace": [{"requirement_id": "R-02", "verified_by": [], "implemented_by": [], "note": "нет критериев приёмки; не связано с POST /notify"}, {"requirement_id": "R-03", "verified_by": [], "implemented_by": [], "note": "нет метода чтения статуса доставки"}, {"requirement_id": "R-04", "verified_by": [], "implemented_by": [], "note": "нет критериев приёмки; не сказано про первую попытку"}, {"requirement_id": "R-05", "verified_by": [], "implemented_by": [], "note": "нет критериев; нет поля настройки отключения"}], "glossary": [{"id": "G-01", "concept": "Участник-клиент", "terms": [{"term": "Customer", "line": 5}, {"term": "client_id", "line": 19}], "problem": "Роль названа customer, в API — client_id; неясно, один ли это участник.", "severity": "minor", "finding_ids": ["D-09"]}], "questions": [{"id": "Q-01", "topic": "Момент списания для уведомления", "finding_ids": ["D-01"], "to": "Владелец продукта", "blocking": true, "question": "Какой этап операции считается списанием, после которого запускается push-уведомление с обещанным сроком в 5 секунд: авторизация (холд) или проведение?", "evidence": [{"quote": "within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "options": ["Списание — авторизация (холд). Push отправляется в течение 5 секунд после получения авторизации, проведение push не запускает.", "Списание — проведение. Push отправляется в течение 5 секунд после проведения, авторизация push не запускает.", "Списание — авторизация, и push отправляется по ней. Проведение push не запускает. Срок 5 секунд отсчитывается от получения вызова POST /notify."], "why": "Если «debit» понимать как авторизацию, а разработчик и тестировщик примут проведение, push придёт в разные моменты времени и тесты на срок 5 секунд дадут разный результат."}, {"id": "Q-02", "topic": "Срок 5 секунд и интервал повторов", "finding_ids": ["D-03"], "to": "Аналитик", "blocking": false, "question": "Срок 5 секунд относится только к первой отправке push или также к повторным попыткам, которые по правилу повторов выполняются раз в минуту?", "evidence": [{"quote": "within 5 seconds of a debit", "line_start": 9, "line_end": 9, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "On failure the system retries up to 3 times every minute", "line_start": 13, "line_end": 13, "page": null, "section": "2. Requirements", "verified": "exact"}], "options": ["Срок 5 секунд относится только к первой попытке. Повторы выполняются с интервалом 1 минута, до 3 раз.", "Срок 5 секунд относится к каждой попытке. Повторы выполняются с интервалом 5 секунд, до 3 раз; правило «раз в минуту» отменяется."], "why": "Для повторной отправки без ответа тест может ожидать push через 5 секунд или через минуту, и результат приёмки будет разным."}, {"id": "Q-03", "topic": "Исход после трёх неудачных повторов", "finding_ids": ["D-06"], "to": "Владелец продукта", "blocking": false, "question": "Что происходит с уведомлением о списании, если все три повтора не удались: остаётся ли оно в статусе failed без дальнейших попыток или отправка продолжается позже?", "evidence": [{"quote": "On failure the system retries up to 3 times every minute", "line_start": 13, "line_end": 13, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "The operator shall see the delivery status: sent, delivered, failed", "line_start": 11, "line_end": 11, "page": null, "section": "2. Requirements", "verified": "exact"}], "options": ["Статус failed сохраняется, дальнейшие попытки не выполняются. Клиент уведомление не получает.", "Статус failed сохраняется, отправка продолжается раз в 1 час, но не дольше 24 часов после списания.", "Статус failed сохраняется, и уведомление ставится в очередь на ручную повторную отправку оператором."], "why": "Без ответа команды по-разному реализуют поведение после третьего сбоя, и тест «все попытки неуспешны» не сможет проверить итоговое состояние уведомления."}, {"id": "Q-04", "topic": "Метод получения статуса оператором", "finding_ids": ["D-07"], "to": "Архитектор", "blocking": false, "question": "Каким методом оператор получает статус доставки уведомления, если описан только метод отправки уведомления, который статус не возвращает?", "evidence": [{"quote": "The operator shall see the delivery status: sent, delivered, failed", "line_start": 11, "line_end": 11, "page": null, "section": "2. Requirements", "verified": "exact"}, {"quote": "API POST /notify accepts client_id, amount, currency", "line_start": 19, "line_end": 19, "page": null, "section": "3. Interfaces", "verified": "exact"}], "options": ["Отдельный метод получения статуса по идентификатору уведомления, который возвращает значение sent, delivered или failed.", "Оператор получает статус событием обратного вызова в свою систему при каждом изменении статуса; отдельного метода получения статуса нет.", "Статус оператор видит только в интерфейсе, данные для которого читаются напрямую из хранилища без API."], "why": "Без метода контракта нельзя написать ни интеграционный тест, ни экран оператора, и разработчики заложат разные способы получения статуса."}], "checklist": [{"item": "Техническое требование зафиксировано и покрывает бизнес-требование", "answer": "Нет", "comment": "Противоречие FR-1 (строка 9) и FR-4 (строка 15) при отключении уведомлений: требование не покрыто однозначно.", "finding_ids": ["D-02"]}, {"item": "Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)", "answer": "Частично", "comment": "Разделы 1–3 есть (строки 3, 7, 17), но таблицы критериев приёмки и структуры по шаблону нет.", "finding_ids": ["D-10"]}, {"item": "Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений", "answer": "Нет", "comment": "Диаграмм нет; взаимодействие с внешним источником debit и вызов POST /notify (строка 19) не описаны.", "finding_ids": ["D-01", "D-04"]}, {"item": "Требование покрывает спецификацию UX/UI дизайна", "answer": "Нет", "comment": "Экран оператора (строка 11) и настройка в профиле (строка 15) не имеют описанного интерфейса.", "finding_ids": ["D-07", "D-11"]}, {"item": "Реализация задачи/проекта предусматривает схему отката решений", "answer": "Частично", "comment": "Схемы отката нет; только незначительное замечание, без ущерба основной функции.", "finding_ids": []}, {"item": "Требование может быть протестировано", "answer": "Нет", "comment": "Порог 5 с и исход повторов (строки 9, 13) не проверяемы по тексту, критерии приёмки отсутствуют.", "finding_ids": ["D-05", "D-03", "D-12", "D-10"]}, {"item": "Требование предусматривает модель данных или поток, содержит описание", "answer": "Частично", "comment": "Модель данных не описана (строки 11, 13, 15); незначительное замечание.", "finding_ids": ["D-13"]}, {"item": "Требование не имеет противоречий или явных показателей операционных рисков", "answer": "Нет", "comment": "Противоречие сроков (строка 9 против строки 13) и неопределённое событие debit (строка 9).", "finding_ids": ["D-02", "D-01", "D-03"]}, {"item": "Требование содержит архитектуру и согласовано с архитекторами", "answer": "Нет", "comment": "Архитектура в документе не описана; вызов /notify и источник события не согласованы с отправкой push.", "finding_ids": ["D-04", "D-07"]}, {"item": "Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами", "answer": "Частично", "comment": "Внешний источник debit и провайдер не названы (строка 9); согласований не указано.", "finding_ids": ["D-01"]}, {"item": "Структура требований не несёт изменений и рисков информационной безопасности", "answer": "Да", "comment": "Риска ИБ, видимого из текста, нет; значимых замечаний по безопасности не выявлено.", "finding_ids": []}, {"item": "В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки", "answer": "Нет", "comment": "Схемы бизнес-процесса нет; ветка после трёх неудачных повторов (строка 13) не описана.", "finding_ids": ["D-06", "D-02"]}, {"item": "Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия", "answer": "Нет", "comment": "POST /notify (строка 19) без ответа и кодов; статус оператору не возвращается.", "finding_ids": ["D-07", "D-04"]}, {"item": "Поддерживается версионность документа / зафиксирована", "answer": "Частично", "comment": "Версии и задачи в заголовке (строка 1) нет; замечание незначительное.", "finding_ids": ["D-08"]}], "verdict": {"development": "no", "testing": "no", "summary": "Разработку начинать нельзя: критичный дефект D-01 — в L009 «within 5 seconds of a debit» не определено, является ли «debit» авторизацией или проведением списания, а L019 «API POST /notify accepts client_id, amount, currency» не называет источник события, поэтому срок в 5 секунд невозможно привязать к конкретному моменту. Тестирование также нельзя начинать, так как проверку срока без определения события написать невозможно. Существенный дефект D-02 (L009 «The system shall send a push notification to the customer within 5 seconds of a debit» против L015 «The customer may disable notifications in profile settings») нужно закрыть явным правилом поведения при отключённых уведомлениях. Первым исправляется D-01, затем D-02, D-03 (срок 5 с против повтора через минуту) и D-04 (запускает ли POST /notify отправку).", "fix_first": ["D-02", "D-01", "D-03", "D-04", "D-05", "D-06", "D-07"], "why": "1 критичный дефект блокирует разработку и тестирование: 1 неоднозначное ключевое правило — список ниже.", "reason": "1 критичный дефект блокирует разработку и тестирование: 1 неоднозначное ключевое правило — D-01."}, "checklist_source": "bank", "quote_stats": {"quotes": 37, "verified": 37, "exact": 37, "normalized": 0, "fuzzy": 0, "missing": 0, "candidates_in": 20, "candidates_kept": 20, "candidates_rejected": 0, "share_verified": 1.0}, "summary": {"requirements": 6, "findings": {"critical": 1, "major": 6, "minor": 7}, "requirements_without_findings": 0, "quotes_verified": 27, "quotes_total": 27, "questions": 4}}</script>
+<script>
+/* HTML-отчёт v2 (№14): фильтры, подсветка, вкладки, тема, печать. Без библиотек. */
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var root = document.documentElement;
+  var doc = $("#doc");
+  var cardsBox = $("#cards");
+  var cards = $$(".card", cardsBox || document);
+
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; }
+    return null;
+  }
+
+  function toast(msg) {
+    var t = document.createElement("div");
+    t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 1800);
+  }
+
+  /* ── тема ── */
+  function currentTheme() {
+    if (root.dataset.theme) return root.dataset.theme;
+    return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  $("#theme").addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    root.dataset.theme = next; store("bccr-theme", next);
+  });
+
+  /* ── вкладки ── */
+  var tabs = $$(".tab");
+  function showTab(name, focus) {
+    tabs.forEach(function (t) {
+      var on = t.dataset.tab === name;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      $("#p-" + t.dataset.tab).hidden = !on;
+      if (on && focus) t.focus();
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () {
+      showTab(t.dataset.tab);
+      history.replaceState(null, "", "#" + t.dataset.tab);
+      var y = $(".tabs").getBoundingClientRect().top + window.scrollY - parseInt(getComputedStyle(root).getPropertyValue("--top-h"), 10);
+      if (window.scrollY > y) window.scrollTo({ top: y });
+    });
+    t.addEventListener("keydown", function (ev) {
+      var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+      if (d) { ev.preventDefault(); showTab(tabs[(i + d + tabs.length) % tabs.length].dataset.tab, true); }
+    });
+  });
+
+  /* ── документ: прокрутка и подсветка ── */
+  function lineEl(n) { return doc ? doc.querySelector('.ln[data-n="' + n + '"]') : null; }
+  function scrollDocTo(n, n2) {
+    if (!doc) return;
+    var el = lineEl(n);
+    if (!el) return;
+    if (doc.classList.contains("onlyhl") && !el.classList.contains("hl")) { $("#onlyhl").checked = false; doc.classList.remove("onlyhl"); }
+    var top = el.offsetTop - doc.clientHeight / 3;
+    doc.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    var last = parseInt(n2 || n, 10);
+    for (var k = parseInt(n, 10); k <= last; k++) {
+      var x = lineEl(k);
+      if (x) { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); }
+    }
+    if (window.matchMedia("(max-width: 960px)").matches) {
+      var pane = $(".docpane");
+      if (pane) pane.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+  function clearSel() {
+    $$(".ln.sel, .ln.rqsel, mark.q.on").forEach(function (x) { x.classList.remove("sel", "rqsel", "on"); });
+    $$(".card.active").forEach(function (x) { x.classList.remove("active"); });
+    if (doc) doc.classList.remove("focus");
+  }
+
+  function selectFinding(id, opts) {
+    opts = opts || {};
+    var card = document.getElementById(id);
+    if (!card || !card.classList.contains("card")) return;
+    showTab("findings");
+    clearSel();
+    card.classList.add("active");
+    if (doc) doc.classList.add("focus");
+    if (card.hidden) { resetFilters(); }
+    var lines = (card.dataset.lines || "").split(" ").filter(Boolean);
+    if (doc) {
+      $$('.ln[data-f]', doc).forEach(function (x) {
+        if ((" " + x.dataset.f + " ").indexOf(" " + id + " ") >= 0) x.classList.add("sel");
+      });
+      $$("mark.q", doc).forEach(function (m) {
+        if ((" " + m.dataset.f + " ").indexOf(" " + id + " ") >= 0) m.classList.add("on");
+      });
+    }
+    if (lines.length && !opts.noDocScroll) scrollDocTo(lines[0]);
+    if (opts.scrollCard) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", "#" + id);
+  }
+
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest("[data-goto]");
+    if (a) { ev.preventDefault(); selectFinding(a.dataset.goto, { scrollCard: true }); return; }
+    var evb = ev.target.closest(".ev");
+    if (evb) {
+      var c = evb.closest(".card");
+      if (c) selectFinding(c.id, { noDocScroll: true });
+      scrollDocTo(evb.dataset.ls, evb.dataset.le);
+      return;
+    }
+    var r = ev.target.closest("[data-req]");
+    if (r) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var k = +r.dataset.ls; k <= +(r.dataset.le || r.dataset.ls); k++) { var x = lineEl(k); if (x) x.classList.add("rqsel"); }
+      scrollDocTo(r.dataset.ls, r.dataset.le);
+      return;
+    }
+    var l = ev.target.closest("[data-line]");
+    if (l && !l.closest(".card")) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var m = +l.dataset.line; m <= +(l.dataset.le || l.dataset.line); m++) { var y = lineEl(m); if (y) y.classList.add("rqsel"); }
+      scrollDocTo(l.dataset.line, l.dataset.le);
+      return;
+    }
+    var cp = ev.target.closest("[data-copy]");
+    if (cp) {
+      var txt = cp.closest(".dl").querySelector(".dd").textContent;
+      try { navigator.clipboard.writeText(txt).then(function () { toast("Формулировка скопирована"); }); } catch (_) { toast("Не удалось скопировать"); }
+      return;
+    }
+    var card = ev.target.closest(".card");
+    if (card && !ev.target.closest("a, button, summary, input, select, textarea") && !String(window.getSelection())) {
+      selectFinding(card.id);
+      return;
+    }
+    var ln = ev.target.closest(".ln.hl");
+    if (ln && !ev.target.closest("a")) {
+      var ids = ln.dataset.f.split(" ");
+      var cur = $(".card.active");
+      var i = cur ? ids.indexOf(cur.id) : -1;
+      selectFinding(ids[(i + 1) % ids.length], { scrollCard: true, noDocScroll: true });
+    }
+  });
+
+  if (doc) {
+    $("#onlyhl").addEventListener("change", function (ev) { doc.classList.toggle("onlyhl", ev.target.checked); });
+    $("#showreq").addEventListener("change", function (ev) { doc.classList.toggle("showreq", ev.target.checked); });
+    $$(".ln.ex", doc).forEach(function (x) { x.title = "Не требование — " + x.dataset.ex; });
+  }
+
+  /* ── мини-карта: где в документе замечания ── */
+  var mm = $("#minimap");
+  function drawMap() {
+    if (!doc || !mm || !doc.scrollHeight) return;
+    mm.innerHTML = "";
+    var H = doc.scrollHeight, h = mm.clientHeight;
+    $$(".ln.hl", doc).forEach(function (x) {
+      if (!x.offsetHeight) return;
+      var t = document.createElement("i");
+      t.className = (x.className.match(/sev-\w+/) || [""])[0];
+      t.style.top = (x.offsetTop / H * h) + "px";
+      t.style.height = Math.max(3, x.offsetHeight / H * h) + "px";
+      t.title = "Строка " + x.dataset.n + ": " + x.dataset.f;
+      t.addEventListener("click", function () { selectFinding(x.dataset.f.split(" ")[0], { scrollCard: true }); });
+      mm.appendChild(t);
+    });
+    var vw = document.createElement("div");
+    vw.className = "vw";
+    mm.appendChild(vw);
+    var upd = function () {
+      vw.style.top = (doc.scrollTop / H * h) + "px";
+      vw.style.height = Math.max(8, doc.clientHeight / H * h) + "px";
+    };
+    upd();
+    doc.onscroll = upd;
+  }
+  if (doc && mm) {
+    setTimeout(drawMap, 60);
+    addEventListener("resize", function () { clearTimeout(drawMap.t); drawMap.t = setTimeout(drawMap, 150); });
+    ["onlyhl", "showreq"].forEach(function (k) { $("#" + k).addEventListener("change", function () { setTimeout(drawMap, 30); }); });
+  }
+
+  /* ── фильтры ── */
+  var chips = $$(".sevchip");
+  var q = $("#q"), fkind = $("#fkind"), fsrc = $("#fsrc"), fsort = $("#fsort"), fcount = $("#fcount");
+  function applyFilters() {
+    if (!cardsBox) return;
+    var sev = {};
+    chips.forEach(function (c) { sev[c.dataset.sev] = c.getAttribute("aria-pressed") === "true"; });
+    var words = (q.value || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = sev[c.dataset.sev] !== false;
+      if (ok && fkind.value) ok = c.dataset.kind === fkind.value;
+      if (ok && fsrc.value) ok = (" " + c.dataset.src + " ").indexOf(" " + fsrc.value + " ") >= 0;
+      if (ok && words.length) {
+        var s = c.dataset.search;
+        ok = words.every(function (w) { return s.indexOf(w) >= 0; });
+      }
+      c.hidden = !ok;
+      if (ok) shown++;
+    });
+    fcount.textContent = "Показано " + shown + " из " + cards.length;
+    var empty = $(".empty[hidden], .empty", cardsBox);
+    if (empty && cards.length) empty.hidden = shown !== 0;
+  }
+  function sortCards() {
+    var key = fsort.value;
+    var sorted = cards.slice().sort(function (a, b) {
+      var A = a.dataset, B = b.dataset;
+      if (key === "line") return (+A.line - +B.line) || (+B.rank - +A.rank);
+      if (key === "sev") return (+B.rank - +A.rank) || (+A.line - +B.line);
+      var pa = +A.prio || 999, pb = +B.prio || 999;
+      return (pa - pb) || (+B.rank - +A.rank) || (+A.line - +B.line);
+    });
+    var empty = $(".empty", cardsBox);
+    sorted.forEach(function (c) { cardsBox.insertBefore(c, empty); });
+  }
+  function resetFilters() {
+    chips.forEach(function (c) { c.setAttribute("aria-pressed", "true"); });
+    q.value = ""; fkind.value = ""; fsrc.value = "";
+    applyFilters();
+  }
+  if (cardsBox) {
+    chips.forEach(function (c) {
+      c.addEventListener("click", function () {
+        c.setAttribute("aria-pressed", c.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        applyFilters();
+      });
+    });
+    q.addEventListener("input", applyFilters);
+    fkind.addEventListener("change", applyFilters);
+    fsrc.addEventListener("change", applyFilters);
+    fsort.addEventListener("change", sortCards);
+    $$("[data-reset]").forEach(function (b) { b.addEventListener("click", resetFilters); });
+    $$("[data-sevonly]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var s = b.dataset.sevonly;
+        chips.forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.sev === s ? "true" : "false"); });
+        showTab("findings"); applyFilters();
+        var t = $(".tabs"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 60, behavior: "smooth" });
+      });
+    });
+    var allOpen = false;
+    $("#toggleall").addEventListener("click", function (ev) {
+      allOpen = !allOpen;
+      $$(".card .more").forEach(function (d) { d.open = allOpen; });
+      ev.target.textContent = allOpen ? "Свернуть все" : "Развернуть все";
+    });
+    applyFilters();
+  }
+
+  /* ── клавиатура: ↑/↓ или j/k по карточкам ── */
+  document.addEventListener("keydown", function (ev) {
+    if (ev.target.closest("input, textarea, select") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key === "Escape") { clearSel(); history.replaceState(null, "", location.pathname); return; }
+    var d = (ev.key === "ArrowDown" || ev.key === "j") ? 1 : (ev.key === "ArrowUp" || ev.key === "k") ? -1 : 0;
+    if (!d || $("#p-findings").hidden || ev.target.closest(".doc")) return;
+    var vis = $$(".card", cardsBox).filter(function (c) { return !c.hidden; });
+    if (!vis.length) return;
+    ev.preventDefault();
+    var cur = $(".card.active");
+    var i = cur ? vis.indexOf(cur) : -1;
+    var next = vis[Math.min(vis.length - 1, Math.max(0, i + d))];
+    selectFinding(next.id, { scrollCard: true });
+  });
+
+  /* ── печать и скачивание ── */
+  var opened = [];
+  window.addEventListener("beforeprint", function () {
+    opened = $$("details").filter(function (d) { return !d.open; });
+    opened.forEach(function (d) { d.open = true; });
+  });
+  window.addEventListener("afterprint", function () { opened.forEach(function (d) { d.open = false; }); opened = []; });
+  $("#print").addEventListener("click", function () { window.print(); });
+
+  function download(name, text, type) {
+    var blob = new Blob([text], { type: type });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  var base = document.body.dataset.file || "report";
+  $("#dljson").addEventListener("click", function () {
+    download(base + ".report.json", $("#report-data").textContent, "application/json");
+  });
+
+  var dla = $("#dlanswers");
+  if (dla) {
+    dla.addEventListener("click", function () {
+      var data = JSON.parse($("#report-data").textContent);
+      var LET = "ABCDEFGH";
+      var md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
+        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.",
+        "> Передайте файл агенту: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers этот_файл.md", ""];
+      var n = 0;
+      (data.questions || []).forEach(function (qq) {
+        var pick = $('input[name="' + qq.id + '"]:checked');
+        var own = $('textarea[data-own="' + qq.id + '"]');
+        var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
+        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
+        if (!val) return;
+        n++;
+        md.push(qq.id + (qq.topic ? " [" + qq.topic + "]" : "") + ": " + val);
+      });
+      if (!n) { toast("Отметьте хотя бы один ответ"); return; }
+      download(base + ".answers.md", md.join("\n") + "\n", "text/markdown");
+      toast("Ответов в файле: " + n);
+    });
+  }
+
+  /* ── адрес страницы: #D-02 или #questions ── */
+  function fromHash() {
+    var h = decodeURIComponent(location.hash.slice(1));
+    if (!h) return;
+    if (document.getElementById("p-" + h)) { showTab(h); return; }
+    var el = document.getElementById(h);
+    if (el && el.classList.contains("card")) selectFinding(h, { scrollCard: true });
+    else if (/^L\d+$/.test(h)) { showTab("findings"); scrollDocTo(h.slice(1)); }
+  }
+  window.addEventListener("hashchange", fromHash);
+  fromHash();
+})();
+
+</script>
+</body>
+</html>

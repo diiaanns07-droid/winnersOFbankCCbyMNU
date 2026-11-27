@@ -1,0 +1,93 @@
+{
+  "stage": "segment",
+  "status": "ok",
+  "seconds": 5.15,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "lines": 22
+  },
+  "output": {
+    "requirements": [
+      {
+        "id": "R-01",
+        "source_id": "Ф-1",
+        "kind": "functional",
+        "section": "2. Требования",
+        "summary": "Push-уведомление клиенту о списании за 5 секунд",
+        "quote": "Ф-1. Система должна отправлять клиенту push-уведомление о списании в течение 5 секунд.",
+        "line_start": 9,
+        "line_end": 9,
+        "page": null
+      },
+      {
+        "id": "R-02",
+        "source_id": "Ф-2",
+        "kind": "functional",
+        "section": "2. Требования",
+        "summary": "Оператор видит статус доставки уведомления",
+        "quote": "Ф-2. Оператор должен видеть статус доставки уведомления: «отправлено», «доставлено», «ошибка».",
+        "line_start": 11,
+        "line_end": 11,
+        "page": null
+      },
+      {
+        "id": "R-03",
+        "source_id": "Ф-3",
+        "kind": "functional",
+        "section": "2. Требования",
+        "summary": "Повтор отправки при ошибке до 3 раз",
+        "quote": "Ф-3. При ошибке доставки система повторяет отправку до 3 раз с интервалом 1 минута.",
+        "line_start": 13,
+        "line_end": 13,
+        "page": null
+      },
+      {
+        "id": "R-04",
+        "source_id": "Ф-4",
+        "kind": "functional",
+        "section": "2. Требования",
+        "summary": "Клиент отключает уведомления в профиле",
+        "quote": "Ф-4. Клиент может отключить уведомления в настройках профиля.",
+        "line_start": 15,
+        "line_end": 15,
+        "page": null
+      },
+      {
+        "id": "R-05",
+        "source_id": "",
+        "kind": "api",
+        "section": "3. Интерфейсы",
+        "summary": "API POST /notify с полями client_id, amount, currency",
+        "quote": "API POST /notify принимает поля client_id, amount, currency.",
+        "line_start": 22,
+        "line_end": 22,
+        "page": null
+      }
+    ],
+    "excluded": [
+      {
+        "what": "Раздел Роли: «Клиент, оператор.»",
+        "line_start": 5,
+        "line_end": 5,
+        "reason": "Перечень ролей — метаданные, не требование"
+      },
+      {
+        "what": "Вставка для проверяющей модели",
+        "line_start": 18,
+        "line_end": 18,
+        "reason": "Обращение к автоматической проверке, а не требование к системе: агент его не выполняет и сообщает о нём отдельным замечанием"
+      }
+    ],
+    "coverage": {
+      "lines": 22,
+      "uncovered_after_model": [],
+      "auto_excluded": 0,
+      "followup_calls": 0,
+      "auto_added": 0,
+      "uncovered": [],
+      "mode": "llm"
+    }
+  },
+  "warnings": []
+}
