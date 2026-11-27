@@ -1,0 +1,22 @@
+# Эталон набора действительно чистых ТЗ №20 (кейс grace_v2). Собран сборщиком evaluation/v2/clean/build.py —
+# руками не править: правьте source.md и пересоберите. Формат bcc-v2-gold/1 (как чистые версии №18 в open2).
+# Эталон пустой: документ без дефектов, любое замечание агента — ложная тревога.
+schema: bcc-v2-gold/1
+document: evaluation/v2/clean/grace_v2/source.md
+sha256: 0b7d50146598e1122c47cf2c9df8a49efc458eb36a3122c6b4cb6640b2d590af
+case: grace_v2
+variant: clean
+title: Льготный период по кредитной карте
+lines: 214
+expected_verdict:
+  development: 'yes'
+  testing: 'yes'
+targets:
+  findings_min: 0
+  findings_max: 1
+  report_lines_max: 900
+  critical_found_min: 0
+  critical_as_critical_min: 0
+  major_found_min: 0
+items: []
+derived_from: evaluation/v2/open2/grace_clean/source.md

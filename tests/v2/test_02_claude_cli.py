@@ -266,3 +266,35 @@ def test_five_hour_limit_is_quota_with_reset_time():
                                                                     timeout_s=30)
     assert e.value.kind == "quota" and not e.value.transient
     assert "Сброс лимита: 9am (Asia/Almaty)" in e.value.message
+
+
+def test_empty_stdout_with_exit_zero_is_invalid_output_not_unknown():
+    """Пустой вывод при коде 0 — ответ не по формату (LLMClient переспросит один раз), а не «неизвестная ошибка»."""
+    with pytest.raises(ProviderError) as e:
+        provider(FakeRunner("", returncode=0)).invoke(model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30)
+    assert e.value.kind == "invalid_output" and "пустой вывод" in e.value.message
+
+
+def test_structured_output_as_json_string_is_parsed():
+    out = dict(OK_OUT, structured_output='{"answer": "строкой"}')
+    r = provider(FakeRunner(json.dumps(out))).invoke(model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30)
+    assert r["data"] == {"answer": "строкой"}
+
+
+def test_empty_stdout_is_repaired_once_through_llmclient():
+    """Сквозь LLMClient: первый запуск CLI — пустой вывод, второй — ответ; этап получает ответ за 2 вызова."""
+    from bcc_review.v2.llm import LLMClient
+
+    class Seq:
+        def __init__(self):
+            self.n = 0
+
+        def __call__(self, cmd, **kw):
+            self.n += 1
+            body = "" if self.n == 1 else json.dumps(OK_OUT)
+            return subprocess.CompletedProcess(cmd, 0, body, "")
+
+    seq = Seq()
+    llm = LLMClient(provider(seq), model="opus", provider_name="claude_cli", sleep=lambda s: None)
+    assert llm.ask("segment", "S", "U", SCHEMA) == {"answer": "да"}
+    assert seq.n == 2 and llm.stats["repaired"] == 1
