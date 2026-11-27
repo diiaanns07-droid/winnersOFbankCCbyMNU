@@ -1,0 +1,136 @@
+{
+ "_note": "sonnet 27.11 12:40 (волна 3, сессия 2, №04): истории US-N с ID в заголовке, критерии «Дано/Когда/Тогда», открытые вопросы",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Онлайн-запись на время из приложения",
+   "line_start": 7,
+   "line_end": 7
+  },
+  {
+   "source_id": "US-1",
+   "kind": "functional",
+   "summary": "Клиент выбирает отделение, услугу и слот",
+   "line_start": 12,
+   "line_end": 12
+  },
+  {
+   "source_id": "US-1, критерий 1",
+   "kind": "acceptance",
+   "summary": "Отображаются слоты по 15 минут в рабочие часы",
+   "line_start": 15,
+   "line_end": 15
+  },
+  {
+   "source_id": "US-1, критерий 2",
+   "kind": "acceptance",
+   "summary": "Подтверждение блокирует слот и шлёт push",
+   "line_start": 16,
+   "line_end": 16
+  },
+  {
+   "source_id": "US-2",
+   "kind": "functional",
+   "summary": "Перенос или отмена записи за 2 часа",
+   "line_start": 19,
+   "line_end": 19
+  },
+  {
+   "source_id": "US-2, критерий 1",
+   "kind": "acceptance",
+   "summary": "Отмена более чем за 2 часа освобождает слот",
+   "line_start": 22,
+   "line_end": 22
+  },
+  {
+   "source_id": "US-2, критерий 2",
+   "kind": "acceptance",
+   "summary": "Перенос менее чем за 2 часа недоступен",
+   "line_start": 23,
+   "line_end": 23
+  },
+  {
+   "source_id": "US-3",
+   "kind": "functional",
+   "summary": "Сотрудник видит список записанных на день",
+   "line_start": 26,
+   "line_end": 26
+  },
+  {
+   "source_id": "NFR-1",
+   "kind": "nonfunctional",
+   "summary": "Загрузка слотов до 2 секунд при нагрузке",
+   "line_start": 32,
+   "line_end": 32
+  },
+  {
+   "source_id": "NFR-2",
+   "kind": "nonfunctional",
+   "summary": "Хранение записи 3 года после визита",
+   "line_start": 33,
+   "line_end": 33
+  },
+  {
+   "source_id": "NFR-3",
+   "kind": "nonfunctional",
+   "summary": "ПДн не передаются в отделение открыто",
+   "line_start": 34,
+   "line_end": 34
+  },
+  {
+   "source_id": "Вне рамок, п. 1",
+   "kind": "constraint",
+   "summary": "Запись юридических лиц вне рамок",
+   "line_start": 38,
+   "line_end": 38
+  },
+  {
+   "source_id": "Вне рамок, п. 2",
+   "kind": "constraint",
+   "summary": "Оплата услуг при записи вне рамок",
+   "line_start": 39,
+   "line_end": 39
+  },
+  {
+   "source_id": "Открытые вопросы, строка 1",
+   "kind": "other",
+   "summary": "Вопрос про SMS-напоминание за день",
+   "line_start": 45,
+   "line_end": 45
+  },
+  {
+   "source_id": "Открытые вопросы, строка 2",
+   "kind": "other",
+   "summary": "Вопрос про лимит записей клиента",
+   "line_start": 46,
+   "line_end": 46
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Название документа",
+   "line_start": 1,
+   "line_end": 1,
+   "reason": "Название документа"
+  },
+  {
+   "what": "Версия и автор",
+   "line_start": 3,
+   "line_end": 3,
+   "reason": "Метаданные: версия, автор, пояснение о документе"
+  },
+  {
+   "what": "Шапка таблицы NFR",
+   "line_start": 30,
+   "line_end": 30,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы вопросов",
+   "line_start": 43,
+   "line_end": 43,
+   "reason": "Строка-шапка таблицы"
+  }
+ ]
+}
