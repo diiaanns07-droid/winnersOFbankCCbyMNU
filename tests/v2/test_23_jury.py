@@ -88,7 +88,6 @@ def test_empty_file_says_no_text(tmp_path, capsys):
     _no_trace(out)
 
 
-@pytest.mark.xfail(strict=True, reason="№23 → №22: пустой документ даёт код 0; бриф жюри — код ≠ 0 (просьба в статусе 23)")
 def test_empty_file_nonzero_exit(tmp_path, capsys):
     src = tmp_path / "empty.md"
     src.write_bytes(b"")
