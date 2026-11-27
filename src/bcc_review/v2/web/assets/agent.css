@@ -1,0 +1,52 @@
+/* BCC AI — маскот (№40). Плитка как иконка приложения, реплика — стеклянное облачко (bcc-ui.md, разделы 2 и 7). */
+.bcc-agent{
+  --bcc-agent-size:96px;
+  display:inline-flex; align-items:center; gap:16px; vertical-align:middle; max-width:100%;
+}
+.bcc-agent__tile{
+  position:relative; flex:0 0 auto; display:block;
+  width:var(--bcc-agent-size); height:var(--bcc-agent-size);
+  border-radius:calc(var(--bcc-agent-size) * .28);
+  background:#0F2841 radial-gradient(circle at 50% 38%, #20395A 0%, #070B16 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 0 2px 6px rgba(15,40,65,.10), 0 12px 28px rgba(15,40,65,.16);
+  overflow:hidden;
+}
+.bcc-agent--small .bcc-agent__tile{ box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 0 1px 3px rgba(15,40,65,.14) }
+.bcc-agent__cv{
+  position:absolute; inset:0; width:100%; height:100%; display:block;
+  image-rendering:pixelated; image-rendering:crisp-edges;
+}
+.bcc-agent__say{
+  position:relative; display:block; max-width:34ch; min-height:1.5em;
+  padding:14px 18px; border-radius:var(--b-r-lg,22px);
+  font:500 17px/1.45 var(--b-font,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif);
+  color:var(--b-ink,#0F2841); cursor:default;
+  background:linear-gradient(180deg, rgba(255,255,255,.76), rgba(255,255,255,.56));
+  -webkit-backdrop-filter:blur(24px) saturate(175%); backdrop-filter:blur(24px) saturate(175%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95), 0 0 0 1px rgba(15,40,65,.06),
+    var(--b-shadow-2,0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10));
+  animation:bcc-agent-in var(--b-slow,360ms) var(--b-ease,cubic-bezier(.2,.8,.2,1)) both;
+}
+.bcc-agent__say[hidden]{ display:none }
+.bcc-agent__say.is-typing{ cursor:pointer }
+.bcc-agent__say::before{          /* хвостик облачка к плитке */
+  content:""; position:absolute; left:-6px; top:50%; width:12px; height:12px; margin-top:-6px;
+  background:rgba(255,255,255,.7); transform:rotate(45deg); border-radius:2px;
+  box-shadow:-1px 1px 0 rgba(15,40,65,.05);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .bcc-agent__say{ background:rgba(255,255,255,.92) }
+}
+@keyframes bcc-agent-in{ from{ opacity:0; transform:translateY(8px) } to{ opacity:1; transform:none } }
+
+/* Облачко под плиткой: на узком экране или по желанию страницы */
+.bcc-agent--stack{ flex-direction:column; text-align:center }
+.bcc-agent--stack .bcc-agent__say::before{ left:50%; top:-6px; margin:0 0 0 -6px }
+@media (max-width:560px){
+  .bcc-agent{ flex-direction:column; text-align:center }
+  .bcc-agent .bcc-agent__say::before{ left:50%; top:-6px; margin:0 0 0 -6px }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .bcc-agent__say{ animation:none }
+}
