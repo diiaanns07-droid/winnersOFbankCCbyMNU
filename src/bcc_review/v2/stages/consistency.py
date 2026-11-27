@@ -276,6 +276,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         pair["line_b"] = ev_b["line"]
     pair["verified_a"], pair["verified_b"] = ev_a["verified"], ev_b["verified"]
     pair["_ev"] = (ev_a, ev_b)
+    pair["_extra_ev"] = []
     # Разные предметы не сравниваются: конфликта между ними быть не может.
     if not pair["same_subject"]:
         pair["verdict"] = "compatible"
@@ -301,7 +302,56 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     elif (pair["verdict"] == "undefined" and pair["same_subject"] and pair["one_condition"] and _found(ev_a) and _found(ev_b)
           and not _overlap(ev_a, ev_b) and _removes_limit(pair["quote_a"], pair["quote_b"])):
         pair.update(verdict="conflict", basis="limit_removed", kind="event_conflict")
+    if pair["verdict"] == "conflict" and pair["kind"] == "status_conflict":
+        ex = status_example_evidence(view, pair)
+        if ex:
+            pair["_extra_ev"] = [ex]
+            pair["example_line"] = ex["line"]
     return pair
+
+
+_STATUS_LINE = re.compile(r"^\W*([1-5]\d\d)\.(?:\s|$)")
+_TOKEN = re.compile(r"(?<![A-Za-z_])[A-Z][A-Z_]{2,}(?![A-Za-z_])")
+STATUS_BLOCK_LINES = 15
+
+
+def _status_of_line(lines: list[dict], idx: int) -> str | None:
+    """Код статуса, в блоке которого стоит строка: ближайшая строка выше вида «200. …» (не дальше 15 строк)."""
+    for j in range(idx, max(-1, idx - STATUS_BLOCK_LINES), -1):
+        m = _STATUS_LINE.match(_s(lines[j].get("text")))
+        if m:
+            return m.group(1)
+    return None
+
+
+def status_example_evidence(view: Any, pair: dict) -> dict | None:
+    """«Один вход — два кода», где одна сторона — шаг логики без кода («вернуть результат ERROR»), а второй код виден
+    только по примеру ответа в блоке другого статуса. Ищем строку примера с тем же значением (ERROR, REJECTED …) в
+    блоке статуса, которого нет во второй цитате, — это цитата второго кода. Без неё пара держится на догадке."""
+    qa, qb = pair["quote_a"], pair["quote_b"]
+    ca, cb = set(_CODE.findall(qa)), set(_CODE.findall(qb))
+    if bool(ca) == bool(cb):
+        return None
+    bare, coded, out_bare = (qb, ca, pair["outcome_b"]) if ca else (qa, cb, pair["outcome_a"])
+    tokens = set(_TOKEN.findall(bare))
+    if not tokens:
+        return None
+    hint = set(_CODE.findall(out_bare)) - coded
+    lines = _lines(view)
+    bare_n = {pair["line_a"], pair["line_b"]}
+    for i, x in enumerate(lines):
+        text = _s(x.get("text"))
+        if x.get("n") in bare_n or not any(re.search(rf"(?<![A-Za-z_]){t}(?![A-Za-z_])", text) for t in tokens):
+            continue
+        if _STATUS_LINE.match(text):
+            continue  # сама строка статуса — не пример
+        code = _status_of_line(lines, i)
+        if not code or code in coded or (hint and code not in hint):
+            continue
+        ev = _evidence(view, text, x.get("n"))
+        if _found(ev):
+            return ev
+    return None
 
 
 _PERMISSION = re.compile(r"(?<![а-яё])(?:может|могут|можно|вправе|разрешен\w*|доступн\w*)(?![а-яё])[^.;]{0,80}?"
@@ -419,7 +469,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     if not pair["same_subject"] or pair["verdict"] == "compatible":
         return None
     ev_a, ev_b = pair["_ev"]
-    evidence = [e for e in (ev_a, ev_b) if e.get("quote")]
+    evidence = [e for e in (ev_a, ev_b) if e.get("quote")] + list(pair.get("_extra_ev") or [])
     if not any(_found(e) for e in evidence):
         return None  # ни одной найденной цитаты: судье нечего показать
     two_places = _found(ev_a) and _found(ev_b) and not _overlap(ev_a, ev_b)
