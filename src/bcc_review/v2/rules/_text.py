@@ -166,7 +166,14 @@ def tables(doc: Doc) -> list[Table]:
             elif y.is_sep:
                 pass
             elif not y.text and j + 1 < len(L) and (L[j + 1].cells is not None or L[j + 1].is_sep):
-                pass  # пустая строка таблицы («| | |») в очищенном виде
+                # пустая строка таблицы («| | |») или разделитель «| :--- |» в очищенном виде; но строка с другим
+                # числом ячеек после пустой — заголовок новой таблицы (две таблицы подряд через пустую строку)
+                nxt = L[j + 1]
+                after = L[j + 2] if j + 2 < len(L) else None
+                if nxt.cells is not None and after is not None and (
+                        after.is_sep or (not after.text and len(nxt.cells) != len(header.cells or [])
+                                         and j + 3 < len(L) and L[j + 3].cells is not None)):
+                    break
             else:
                 break
             j += 1
