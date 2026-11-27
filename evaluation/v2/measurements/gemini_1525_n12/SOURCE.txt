@@ -1,0 +1,5 @@
+Прогоны №12 27.11 (Астана): официальный документ release/input/requirements.md, --provider gemini --no-cache,
+цепочка из .env.example ветки claude/project-thread-jw6k0b (GEMINI_MODEL=gemini-3.6-flash, затем 3.8, 3.7, 3.5 Flash,
+3.5 и 3.1 Flash-Lite). Ключи — три разных проекта Google, в файлы не попали (проверено поиском значения ключа).
+c1 15:25 — код cb73d88, ключ 1; c2 15:53 — код 4d7b3dad, ключ 2; c3 16:01 — 4d7b3dad + GEMINI_STAGE_MODELS=segment=gemini-3.5-flash-lite, ключ 3.
+Сводка и разбор — docs/plan-v2/status/02b-gemini.md. Отчёты агента руками не правились.
