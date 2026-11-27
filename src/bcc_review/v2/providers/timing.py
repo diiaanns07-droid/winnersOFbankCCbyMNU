@@ -82,10 +82,18 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     clarify_parallel = bool(spans.get("clarify") and spans.get("judge") and spans["clarify"][0] < spans["judge"][1]
                             and spans["judge"][0] < spans["clarify"][1])
     tail = max(crit["judge"], crit["clarify"]) if clarify_parallel else crit["judge"] + crit["clarify"]
+    # быстрый старт (№01, по умолчанию с 929df20): рецензенты стартуют, не дожидаясь нарезки — на пути не нарезка,
+    # а их задержка старта (проба ~8 с), если только нарезка не дольше самого долгого рецензента
+    par_starts = [spans[s][0] for s in PARALLEL if s in spans]
+    fast_start = bool(spans.get("segment") and par_starts and min(par_starts) < spans["segment"][1] - 1.0)
+    head = crit["segment"] + par
+    if fast_start:
+        crit["start_delay"] = round(max(0.0, min(par_starts) - spans["segment"][0]), 1)
+        head = max(crit["segment"], crit["start_delay"] + par)
     events = [r for r in rows if r.get("event")]
     wall = (max(e for _, e in spans.values()) - min(b for b, _ in spans.values())) if spans else 0.0
-    return {"calls": cs, "stages": by_stage, "critical_path_s": round(crit["segment"] + par + tail, 1), "critical": crit,
-            "clarify_parallel": clarify_parallel, "model_wall_s": round(wall, 1),
+    return {"calls": cs, "stages": by_stage, "critical_path_s": round(head + tail, 1), "critical": crit,
+            "clarify_parallel": clarify_parallel, "fast_start": fast_start, "model_wall_s": round(wall, 1),
             "events": [{k: v for k, v in e.items() if k != "t"} for e in events],
             "tokens_out": sum(c.get("out", 0) for c in cs), "thinking": sum(c.get("thinking", 0) for c in cs),
             "errors": sum(1 for c in cs if c.get("error"))}
@@ -134,8 +142,10 @@ def render(run_dir: Path, s: dict[str, Any]) -> str:
     cr = s["critical"]
     tail = (f"max(судья {cr['judge']:.0f}, вопросы {cr['clarify']:.0f} — параллельно)" if s.get("clarify_parallel")
             else f"судья {cr['judge']:.0f} + вопросы {cr['clarify']:.0f}")
-    lines += ["", f"Критический путь: {s['critical_path_s']:.0f} с = нарезка {cr['segment']:.0f} + параллельные "
-                  f"(самый долгий) {cr['parallel']:.0f} + {tail}",
+    head = (f"max(нарезка {cr['segment']:.0f}, старт рецензентов {cr.get('start_delay', 0):.0f} + параллельные "
+            f"(самый долгий) {cr['parallel']:.0f}) — быстрый старт" if s.get("fast_start")
+            else f"нарезка {cr['segment']:.0f} + параллельные (самый долгий) {cr['parallel']:.0f}")
+    lines += ["", f"Критический путь: {s['critical_path_s']:.0f} с = {head} + {tail}",
               f"От первого до последнего вызова модели (по меткам трассы): {s.get('model_wall_s', 0):.0f} с",
               f"Выход всего: {s['tokens_out']} ток., из них рассуждения {s['thinking']}; ошибок вызова: {s['errors']}"]
     shown = [e for e in s["events"] if e.get("event") in ("split", "expand_output", "fallback_model", "rpm_wait")]

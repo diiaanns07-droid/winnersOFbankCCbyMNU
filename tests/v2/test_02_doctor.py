@@ -179,7 +179,7 @@ def wrapped(kind, message, **kw):
      ["недоступны этому ключу", "python -m bcc_review doctor", "GEMINI_MODEL"]),
     ("network", "Нет соединения с generativelanguage.googleapis.com: ConnectError.",
      ["Нет соединения с Google Gemini", "HTTPS_PROXY"]),
-    ("rate_limit", "Превышен лимит запросов к модели gemini-3.8-flash (429).", ["лимит запросов в минуту", "GEMINI_RPM=5"]),
+    ("rate_limit", "Превышен лимит запросов к модели gemini-3.8-flash (429).", ["лимит запросов в минуту", "GEMINI_RPM=3"]),
     ("overloaded", "Все модели Gemini из цепочки недоступны (… перегружена ×4).", ["Gemini перегружен"]),
 ])
 def test_headline_for_jury_scenarios(kind, message, expect):
@@ -227,3 +227,21 @@ def test_pipeline_auto_prefers_gemini_key_over_installed_claude(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY")
     llm2, name2 = pipeline.make_llm(opts, None)
     assert name2 == "claude_cli"
+
+
+def test_claude_cli_subscription_limit_headline_keeps_reset_time_once():
+    """Лимит подписки Claude Code: первая строка — что случилось и когда сброс, без повтора «исчерпан… исчерпан»."""
+    import re as _re
+    from bcc_review.v2.llm import LLMError
+    from bcc_review.v2.providers.claude_cli import classify_cli_result
+    e = classify_cli_result({"is_error": True, "result": "You've hit your 5-hour limit · resets 8:50am (UTC)"},
+                            returncode=1, stderr="", model="sonnet")
+    line = doctor.headline(LLMError("judge_check", e.kind, e.message), "claude_cli")
+    assert line.startswith("Исчерпан лимит подписки Claude Code. Сброс лимита: 8:50am (UTC)."), line
+    assert line.count("исчерпан") + line.count("Исчерпан") == 1, line
+    assert "--model haiku" in line and "--provider gemini" in line
+    import time as _time
+    e2 = classify_cli_result({"is_error": True, "result": f"Claude AI usage limit reached|{int(_time.time()) + 3600}"},
+                             returncode=1, stderr="", model="sonnet")
+    line2 = doctor.headline(e2, "claude_cli")
+    assert _re.search(r"Сброс лимита около \d\d:\d\d по местному времени", line2), line2

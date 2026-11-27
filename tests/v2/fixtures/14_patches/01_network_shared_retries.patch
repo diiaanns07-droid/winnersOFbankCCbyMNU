@@ -1,0 +1,39 @@
+diff --git a/src/bcc_review/v2/llm.py b/src/bcc_review/v2/llm.py
+index 5351d95b..9286926b 100644
+--- a/src/bcc_review/v2/llm.py
++++ b/src/bcc_review/v2/llm.py
+@@ -126,6 +126,7 @@ class LLMClient:
+                                       "retries": 0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
+                                       "models_used": [], "seconds": 0.0, "by_stage": {}}
+         self.fatal: LLMError | None = None  # первая фатальная ошибка провайдера (ключ, настройка, квота)
++        self._net_failures = 0  # сетевые сбои всех этапов: у параллельных этапов общий запас повторов
+         self.responses: dict[str, list] = {}  # сырые ответы по этапам в порядке вызовов — для mock-фикстур
+ 
+     def _record(self, stage: str, data: Any) -> None:
+@@ -306,6 +307,8 @@ class LLMClient:
+         repaired = False
+         cur_user = user
+         while True:
++            if attempt and self.fatal is not None:  # пока этот этап ждал повтора, другой признал ошибку фатальной
++                raise LLMError(stage, self.fatal.kind, "модель недоступна в этом прогоне: " + self.fatal.message)
+             self._take_call(stage)
+             t0 = self._clock()
+             try:
+@@ -327,8 +330,16 @@ class LLMClient:
+                         self.stats["repaired"] += 1
+                     cur_user = user + REPAIR_NOTE.format(errors=str(msg)[:300])
+                     continue
++                if kind == "network":
++                    # нет сети — общий запас повторов на весь прогон: иначе 6 параллельных этапов (быстрый старт)
++                    # повторяют каждый своё и сжигают бюджет вызовов раньше, чем ошибка станет фатальной
++                    with self._lock:
++                        self._net_failures += 1
++                        if self._net_failures > self.max_retries and self.fatal is None:
++                            self.fatal = LLMError(stage, kind, str(msg))
+                 retry = (kind in TRANSIENT and not handles_retries and attempt < self.max_retries
+-                         and not (kind == "timeout" and timeouts >= MAX_TIMEOUT_RETRIES))
++                         and not (kind == "timeout" and timeouts >= MAX_TIMEOUT_RETRIES)
++                         and not (kind == "network" and self.fatal is not None))
+                 if retry:
+                     timeouts += kind == "timeout"
+                     delay = getattr(exc, "retry_after_s", None) or BACKOFF[min(attempt, len(BACKOFF) - 1)]

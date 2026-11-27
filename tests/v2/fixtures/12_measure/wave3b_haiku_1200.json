@@ -1,0 +1,1031 @@
+{
+ "wave3b_holiday_clean": {
+  "commit": "f887b14",
+  "seconds": 123.6,
+  "calls": 8,
+  "verdict": [
+   "yes",
+   "yes"
+  ],
+  "counts": {
+   "critical": 0,
+   "major": 2,
+   "minor": 5
+  },
+  "critical_major": [
+   {
+    "severity": "major",
+    "title": "Граница ровно 12 месяцев: КК-3 допускает подачу, код 409 может её отклонить",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     16,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Отзыв заявки не проверяет владельца: чужую заявку можно отозвать",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     48,
+     49,
+     52
+    ]
+   }
+  ]
+ },
+ "wave3b_holiday_defects": {
+  "commit": "f887b14",
+  "seconds": 160.6,
+  "calls": 9,
+  "verdict": [
+   "no",
+   "no"
+  ],
+  "counts": {
+   "critical": 1,
+   "major": 7,
+   "minor": 5
+  },
+  "critical_major": [
+   {
+    "severity": "critical",
+    "title": "Срок 6 месяцев: КК-2 и критерий 1 разрешают, код 400 в API отклоняет",
+    "sources": [
+     "lens:analyst",
+     "lens:qa",
+     "lens:architect",
+     "consistency",
+     "rules:conflicts.boundary_range.L15-46"
+    ],
+    "lines": [
+     15,
+     37,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Срок решения: рабочие дни в КК-4 и календарные дни в разделе API",
+    "sources": [
+     "lens:analyst",
+     "lens:qa",
+     "lens:architect",
+     "consistency",
+     "rules:units.day_kinds"
+    ],
+    "lines": [
+     17,
+     52
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Метод отзыва заявки меняет состояние, но объявлен как GET с идентификатором в URL",
+    "sources": [
+     "lens:risk",
+     "rules:api.get_mutation.holidays_applicationId_withdraw"
+    ],
+    "lines": [
+     48
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Отзыв заявки не описывает проверку владельца заявки и ответ для чужой заявки",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     46,
+     49,
+     53
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Ветка отказа по заявке не описана: нет критерия приёмки и состава push",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     17,
+     21,
+     23
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не определено, блокируют ли поданные и не начавшиеся каникулы окно 12 месяцев",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     16,
+     39,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Граница 12 месяцев и опорная дата для кода 409 не совпадают",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     16,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Перечень типов кредитов для заявки открыт: «и т. п.» в КК-1",
+    "sources": [
+     "rules:language.open_list"
+    ],
+    "lines": [
+     14
+    ]
+   }
+  ]
+ },
+ "wave3b_phone_clean": {
+  "commit": "f887b14",
+  "seconds": 199.0,
+  "calls": 9,
+  "verdict": [
+   "no",
+   "no"
+  ],
+  "counts": {
+   "critical": 1,
+   "major": 13,
+   "minor": 5
+  },
+  "critical_major": [
+   {
+    "severity": "critical",
+    "title": "Не определено, какие переводы входят в суточный лимит 3 000 000 ₸",
+    "sources": [
+     "lens:risk",
+     "lens:architect"
+    ],
+    "lines": [
+     23,
+     25,
+     33,
+     87
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Номер в query-строке без правила кодирования знака «+»",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     55,
+     59
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Метод перевода не проверяет принадлежность карты отправителя сессии",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     82,
+     85,
+     90
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Метод поиска получателя не описывает имя поля ответа",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     61,
+     100
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Метод перевода не проверяет формат phone и не задаёт код для него",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     80,
+     88
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не определено, какая карта получателя считается основной",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     21,
+     90
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Суточный лимит задан на отправителя, а в данных хранятся только карты",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     33,
+     87
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Антифрод назван по-разному: компонент, текст отказа и статус 403",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     18,
+     25,
+     96
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Показанное имя получателя не сверяется с получателем перевода",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     22,
+     80,
+     88
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Пункт 3 метода 2 не задаёт часовой пояс суток, Ф-3 задаёт Астану",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     23,
+     87
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не определено, от какого события отсчитываются 30 дней оспаривания",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     26,
+     33
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Спор по переводу не имеет правила возврата денег",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     26
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Номер телефона получателя передаётся в адресе GET-запроса",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     30,
+     55
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Поиск по номеру раскрывает ФИО клиентов банка при переборе номеров",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     60,
+     61
+    ]
+   }
+  ]
+ },
+ "wave3b_phone_defects": {
+  "commit": "f887b14",
+  "seconds": 191.6,
+  "calls": 9,
+  "verdict": [
+   "no",
+   "no"
+  ],
+  "counts": {
+   "critical": 3,
+   "major": 7,
+   "minor": 4
+  },
+  "critical_major": [
+   {
+    "severity": "critical",
+    "title": "Суточный лимит Ф-3 и часовой лимит п. 3 метода Перевод дают разный исход одного перевода",
+    "sources": [
+     "lens:analyst",
+     "lens:qa",
+     "lens:architect",
+     "consistency"
+    ],
+    "lines": [
+     23,
+     86,
+     97
+    ]
+   },
+   {
+    "severity": "critical",
+    "title": "Критерий приёмки №1 отклоняет 1 000 000 ₸, которое Ф-3 и п. 2 метода допускают",
+    "sources": [
+     "lens:analyst",
+     "lens:qa",
+     "consistency",
+     "rules:conflicts.range_acceptance.L23-41"
+    ],
+    "lines": [
+     23,
+     41,
+     80,
+     85
+    ]
+   },
+   {
+    "severity": "critical",
+    "title": "Отказ антифрода: 200 со status=REJECTED в логике против 403 в перечне статусов",
+    "sources": [
+     "lens:qa",
+     "lens:architect",
+     "consistency",
+     "rules:api.same_case.200-403"
+    ],
+    "lines": [
+     88,
+     95
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не определено, входят ли отклонённые антифродом переводы в суточный счётчик",
+    "sources": [
+     "lens:analyst",
+     "lens:risk"
+    ],
+    "lines": [
+     23,
+     88
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Поле status, которое п. 5 возвращает при отказе антифрода, не описано в ответе",
+    "sources": [
+     "lens:architect",
+     "consistency"
+    ],
+    "lines": [
+     88,
+     102
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не проверяется, что карта cardId принадлежит владельцу сессии",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     81,
+     84
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Телефон получателя передаётся в query-параметре GET-запроса",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     30,
+     54
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Текст «Превышена сумма перевода» не описан ни в одном перечне ответов API",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     23,
+     41
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не определено, от какого события отсчитываются 30 дней на оспаривание",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     26
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Исход признанного спора (возврат денег) не описан",
+    "sources": [
+     "lens:risk",
+     "consistency"
+    ],
+    "lines": [
+     26
+    ]
+   }
+  ]
+ },
+ "wave3b_pin_clean": {
+  "commit": "f887b14",
+  "seconds": 145.5,
+  "calls": 8,
+  "verdict": [
+   "conditional",
+   "conditional"
+  ],
+  "counts": {
+   "critical": 0,
+   "major": 5,
+   "minor": 4
+  },
+  "critical_major": [
+   {
+    "severity": "major",
+    "title": "Запрос SMS-кода для подтверждения смены PIN-кода не описан",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     28,
+     72
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Ключ идемпотентности requestId и результат первого запроса не хранятся",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     39,
+     93
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Ответ на третью неверную SMS-попытку: 400 или 429",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     89,
+     101
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Засчитывается ли в лимит смен неуспешная смена с 502",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     88,
+     90
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Критерий приёмки №2 задаёт результат, не выводимый из требований",
+    "sources": [
+     "lens:qa"
+    ],
+    "lines": [
+     23,
+     27,
+     48
+    ]
+   }
+  ]
+ },
+ "wave3b_pin_defects": {
+  "commit": "f887b14",
+  "seconds": 183.7,
+  "calls": 8,
+  "verdict": [
+   "conditional",
+   "conditional"
+  ],
+  "counts": {
+   "critical": 0,
+   "major": 11,
+   "minor": 7
+  },
+  "critical_major": [
+   {
+    "severity": "major",
+    "title": "Срок блокировки после трёх неверных SMS-кодов: 24 часа в Ф-3 и lockPeriod в минутах",
+    "sources": [
+     "lens:analyst",
+     "consistency",
+     "lens:risk",
+     "lens:architect"
+    ],
+    "lines": [
+     28,
+     83,
+     90
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Смена PIN-кода задана методом GET, параметры в адресе, тело JSON не определено",
+    "sources": [
+     "rules:api.get_mutation.cards_cardId_pin",
+     "lens:risk",
+     "lens:architect"
+    ],
+    "lines": [
+     67,
+     71,
+     72,
+     74,
+     80
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Карта не в статусе «Активна»: в шаге 3 код 423, в перечне статусов 409",
+    "sources": [
+     "rules:api.status_423",
+     "consistency"
+    ],
+    "lines": [
+     88,
+     101
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Третья неверная SMS-попытка: шаг 5 даёт 400 и 429",
+    "sources": [
+     "lens:architect",
+     "consistency"
+    ],
+    "lines": [
+     90,
+     102
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Push о смене не включён в логику метода после ответа процессинга",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     42,
+     91
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Просроченный верный SMS-код: шаг 5 не проверяет срок действия",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     28,
+     90
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Данные для срока SMS-кода и ключа requestId не входят в перечень хранимых данных",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     28,
+     39,
+     94
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Критерий приёмки №2 задаёт реакцию интерфейса, которой нет в требованиях",
+    "sources": [
+     "lens:qa"
+    ],
+    "lines": [
+     23,
+     27,
+     48
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Порядок отправки SMS-кода не описан, хотя код обещан",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     28,
+     67
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не определено, когда обнуляется счётчик неверных SMS-кодов",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     39,
+     90
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Ответ 502 не сообщает, выполнена ли смена на процессинге",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     91,
+     94,
+     103
+    ]
+   }
+  ]
+ },
+ "wave3b_statement_clean": {
+  "commit": "f887b14",
+  "seconds": 192.0,
+  "calls": 9,
+  "verdict": [
+   "no",
+   "no"
+  ],
+  "counts": {
+   "critical": 1,
+   "major": 13,
+   "minor": 4
+  },
+  "critical_major": [
+   {
+    "severity": "critical",
+    "title": "Состав выписки: «проведённые» операции трактуются двумя способами",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     27
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Срок показа заказа: от заказа в Ф-4 и методе 2 или от «Готова»",
+    "sources": [
+     "lens:risk",
+     "lens:qa"
+    ],
+    "lines": [
+     23,
+     29,
+     103
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "В POST-методе заказа не указано, как передаются dateFrom и dateTo",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     70,
+     76,
+     77
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Метод 3 не проверяет срок хранения 30 дней, Ф-4 удаляет файл",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     29,
+     121
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Право на ссылку: владелец счёта в НФ-2 и автор заказа в методе 3",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     26,
+     35,
+     119
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Статус «Ошибка» и «Формируется»: нет события перехода и срока",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     28
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Выписка за текущий день: снимок операций не задан",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     26,
+     27
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Цель «по счёту» шире Ф-1, где только текущий счёт",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     17,
+     26
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Метод заказа не проверяет тип счёта «текущий» из Ф-1",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     26,
+     81
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Статус «Ошибка»: не сказано, считается ли заказ в лимите и можно ли повторить",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     28,
+     30
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "НФ-1: 31 день попадает в обе ветки срока",
+    "sources": [
+     "lens:analyst"
+    ],
+    "lines": [
+     34,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Критерий «через 60 с» противоречит допуску 5 % в НФ-1",
+    "sources": [
+     "lens:analyst"
+    ],
+    "lines": [
+     34,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Владелец счёта в НФ-2 и клиент в методах названы по-разному",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     35,
+     81
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Тело ответа 202 не описано: нет имени и формата поля заказа",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     84,
+     87
+    ]
+   }
+  ]
+ },
+ "wave3b_statement_defects": {
+  "commit": "f887b14",
+  "seconds": 174.9,
+  "calls": 9,
+  "verdict": [
+   "no",
+   "no"
+  ],
+  "counts": {
+   "critical": 2,
+   "major": 10,
+   "minor": 4
+  },
+  "critical_major": [
+   {
+    "severity": "critical",
+    "title": "Лимит 10 заказов в Ф-5 и отказ 429 уже при 9 заказах в пункте 4",
+    "sources": [
+     "consistency",
+     "lens:analyst",
+     "lens:qa",
+     "lens:architect"
+    ],
+    "lines": [
+     30,
+     48,
+     83
+    ]
+   },
+   {
+    "severity": "critical",
+    "title": "Не готовая выписка: в логике метода 200 с ERROR, в перечне кодов 409",
+    "sources": [
+     "lens:architect",
+     "consistency",
+     "rules:api.success_with_error"
+    ],
+    "lines": [
+     88,
+     120,
+     127
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Файл хранится 30 рабочих дней, список показывает заказы за 30 календарных дней",
+    "sources": [
+     "lens:architect",
+     "lens:analyst",
+     "lens:qa",
+     "consistency",
+     "rules:units.day_kinds"
+    ],
+    "lines": [
+     23,
+     29,
+     103
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Ссылка на файл выписки не привязана к владельцу, хотя НФ-2 требует доступа только владельцу",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     35,
+     121
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Момент фиксации операций в выписке при дате окончания сегодня не определён",
+    "sources": [
+     "lens:risk"
+    ],
+    "lines": [
+     26,
+     27
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Не сказано, учитываются ли отменённые и заказы с ошибкой в лимите Ф-5",
+    "sources": [
+     "consistency"
+    ],
+    "lines": [
+     30,
+     41
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Отмена заказа обещана в интеграции, но не описана методом, статусом и правилами",
+    "sources": [
+     "rules:promises.promised_ops",
+     "lens:risk",
+     "consistency"
+    ],
+    "lines": [
+     28,
+     41,
+     64,
+     84,
+     93
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Критерий приёмки №1 задаёт «Готова через 60 с» без доли 95 % из НФ-1",
+    "sources": [
+     "lens:qa"
+    ],
+    "lines": [
+     26,
+     28,
+     34,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Условия и срок перехода заказа в статус «Ошибка» не заданы",
+    "sources": [
+     "lens:qa"
+    ],
+    "lines": [
+     28
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Граница «до 31 дня» в НФ-1 не определена относительно критерия приёмки",
+    "sources": [
+     "lens:analyst"
+    ],
+    "lines": [
+     34,
+     46
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "Место передачи dateFrom и dateTo в запросе заказа не указано",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     70,
+     75
+    ]
+   },
+   {
+    "severity": "major",
+    "title": "dateFrom и dateTo в одном запросе заданы в разных форматах дат",
+    "sources": [
+     "lens:architect"
+    ],
+    "lines": [
+     76,
+     77
+    ]
+   }
+  ]
+ }
+}

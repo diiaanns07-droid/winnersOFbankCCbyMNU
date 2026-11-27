@@ -1,0 +1,21 @@
+# Эталон набора действительно чистых ТЗ №20 (кейс statement). Собран сборщиком evaluation/v2/clean/build.py —
+# руками не править: правьте source.md и пересоберите. Формат bcc-v2-gold/1 (как чистые версии №18 в open2).
+# Эталон пустой: документ без дефектов, любое замечание агента — ложная тревога.
+schema: bcc-v2-gold/1
+document: evaluation/v2/clean/statement/source.md
+sha256: b00162f6c787b20dbc80596556e1bd9d81a5bd4b5ea3fed14b99f0ca90d14688
+case: statement
+variant: clean
+title: Заказ выписки по счёту в PDF
+lines: 199
+expected_verdict:
+  development: 'yes'
+  testing: 'yes'
+targets:
+  findings_min: 0
+  findings_max: 1
+  report_lines_max: 900
+  critical_found_min: 0
+  critical_as_critical_min: 0
+  major_found_min: 0
+items: []

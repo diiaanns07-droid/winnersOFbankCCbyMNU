@@ -296,17 +296,26 @@ def parse_answers_json(data: Any) -> dict:
 
 
 def read_answers_file(path: Path) -> str:
-    """Текст файла ответов в любой из кодировок, в которых его сохраняют на Windows: UTF-8 (с BOM и без),
-    UTF-16 (``> answers.md`` в Windows PowerShell 5, «Юникод» в Блокноте), cp1251 («ANSI» в Блокноте)."""
-    raw = Path(path).read_bytes()
-    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
-        return raw.decode("utf-16")
-    if len(raw) >= 4 and raw[1:2] == b"\x00" and raw[3:4] == b"\x00":  # UTF-16 LE без BOM
-        return raw.decode("utf-16-le", errors="replace")
+    """Текст файла ответов в любой кодировке, в которой его сохраняют на Windows.
+
+    UTF-8 (с BOM и без) → UTF-16 с BOM («Юникод» в Блокноте) или без BOM (``> answers.md`` в Windows
+    PowerShell 5) → cp1251 («ANSI» русской Windows). Раньше файл в ANSI давал UnicodeDecodeError, и режим
+    --answers молча не выполнялся (код выхода 0, без предупреждения). Слито: Max (67e048d) и №11 (36e7ffc).
+    """
+    data = Path(path).read_bytes()
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16")
+    if len(data) >= 4 and data[1:2] == b"\x00" and data[3:4] == b"\x00":  # UTF-16 LE без BOM
+        return data.decode("utf-16-le", errors="replace")
     try:
-        return raw.decode("utf-8-sig")
+        return data.decode("utf-8-sig")
     except UnicodeDecodeError:
-        return raw.decode("cp1251", errors="replace")
+        pass
+    try:
+        return data.decode("cp1251")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"файл ответов {Path(path).name} не в UTF-8: откройте его в Блокноте и сохраните "
+                         f"с кодировкой UTF-8") from exc
 
 
 def load_answers(source: Any) -> dict:

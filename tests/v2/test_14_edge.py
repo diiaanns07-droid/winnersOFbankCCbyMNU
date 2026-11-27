@@ -136,8 +136,6 @@ def test_unreadable_input_gives_failed_report_with_reason(tmp_path, name, capsys
     assert "Traceback" not in out.read_text(encoding="utf-8")
 
 
-@_bug("01", "отчёт о нечитаемом входе нарушает contracts/v2.json: document.format = '' и sha256 = '' "
-            "(pipeline.review, запасной отчёт)")
 @pytest.mark.parametrize("name", ["fake.pdf", "doc.xyz"])
 def test_unreadable_input_report_matches_contract(tmp_path, name):
     doc = _unreadable_inputs(tmp_path)[name]
@@ -145,7 +143,6 @@ def test_unreadable_input_report_matches_contract(tmp_path, name):
     assert not _schema_errors(json.loads(Path(written["json"]).read_text(encoding="utf-8")))
 
 
-@_bug("01", "пустой документ получает вердикт «можно начинать» и тратит вызовы модели")
 @pytest.mark.parametrize("name", ["empty.md", "blank.md", "empty.html"])
 def test_empty_document_is_not_ready_and_costs_no_calls(tmp_path, name):
     doc = _odd_inputs(tmp_path)[name]
@@ -157,10 +154,9 @@ def test_empty_document_is_not_ready_and_costs_no_calls(tmp_path, name):
 
 
 @needs_pdf
-@_bug("03", "предупреждения документа (скан, нечитаемые страницы, правки Word) не попадают в отчёт: "
-            "docview.summary не переносит view.warnings")
-def test_document_warnings_reach_report(tmp_path):
-    report, written, out = _review(tmp_path, STRESS / "scan_page.pdf", provider="offline")
+@pytest.mark.parametrize("provider", ["offline", "mock"])
+def test_document_warnings_reach_report(tmp_path, provider):
+    report, written, out = _review(tmp_path, STRESS / "scan_page.pdf", provider=provider)
     warns = " ".join((report.get("document") or {}).get("warnings") or []) + " ".join(report["run"]["warnings"])
     assert "Страница 2" in warns and "скан" in warns
     assert "скан" in out.read_text(encoding="utf-8")
@@ -218,8 +214,6 @@ def test_network_down_gives_failed_report_not_traceback(tmp_path, monkeypatch):
     assert report["run"]["calls"]["total"] <= 16
 
 
-@_bug("01", "нет сети: первая строка предупреждений — «выполнен частично / исчерпан бюджет», а не «нет соединения»; "
-            "повторы network съедают бюджет вызовов следующих этапов (run.model_error пуст)")
 def test_network_down_is_explained_first(tmp_path, monkeypatch):
     report, _, _ = _faulty_run(tmp_path, monkeypatch, lambda s, k: ProviderError("network", "нет соединения"))
     first = report["run"]["warnings"][0].lower()
@@ -466,8 +460,6 @@ def test_empty_title_candidate_still_gives_valid_report(tmp_path):
     assert res["ok"], res["errors"][:3]
 
 
-@_bug("01", "неизвестное имя линзы (--lenses foo, опечатка) даёт «Прогон завершён полностью» без единой линзы "
-            "(__main__.py:61 не проверяет имена, стадия lens_foo — ok)")
 def test_unknown_lens_name_is_not_a_complete_run(tmp_path):
     report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", lenses=["foo"])
     assert report["run"]["status"] != "complete"
@@ -489,8 +481,6 @@ def test_answers_file_in_cp1251_is_read(tmp_path):
     assert (len(answers) if isinstance(answers, list) else int(answers or 0)) >= 1
 
 
-@_bug("01", "сбой режима --answers/--revise теряется: предупреждение и статус recheck=failed пишутся в self.*, "
-            "а report.run уже собран (pipeline.py:495–498; успешная ветка обновляет run в 512–518)")
 def test_answers_mode_failure_is_reported(tmp_path, monkeypatch):
     from bcc_review.v2.stages import revise
 
@@ -505,7 +495,6 @@ def test_answers_mode_failure_is_reported(tmp_path, monkeypatch):
     assert any("--answers" in w for w in report["run"]["warnings"])
 
 
-@_bug("01", "несуществующий файл ответов (--answers опечатка.md) молча считается «ответов 0»: код 0, без предупреждения")
 def test_missing_answers_file_is_an_error(tmp_path, capsys):
     from bcc_review.v2.__main__ import main
     out = tmp_path / "r.md"
@@ -525,8 +514,6 @@ def test_answers_utf8_file_changes_report(tmp_path):
     assert report.get("clarification") and report["run"]["stages"].get("recheck") == "ok"
 
 
-@_bug("01", "каталог прогонов нельзя создать (запуск из каталога только для чтения, Docker под обычным "
-            "пользователем) — трейсбэк вместо отчёта: RunDir создаётся в Pipeline.__init__ вне try (pipeline.py:174)")
 def test_unwritable_runs_dir_still_gives_report(tmp_path):
     blocker = tmp_path / "runs_is_a_file"
     blocker.write_text("", encoding="utf-8")
@@ -577,8 +564,6 @@ def test_same_input_gives_same_markdown(tmp_path):
     assert texts[0] == texts[1]
 
 
-@_bug("01", "фатальная ошибка посреди прогона (квота, ключ отклонён) не попадает в run.model_error: stage() пишет "
-            "self.model_error, а _run_block его не выносит — код выхода не 3, консоль молчит о причине")
 def test_fatal_error_mid_run_sets_model_error(tmp_path, monkeypatch):
     report, _, _ = _faulty_run(tmp_path, monkeypatch,
                                lambda s, k: ProviderError("quota", "дневная квота исчерпана") if s == "lens_risk" else None)
@@ -616,9 +601,6 @@ def test_transient_stage_file_write_error_does_not_abort_run(tmp_path, monkeypat
     assert report["run"]["status"] != "failed" and report["findings"]
 
 
-@_bug("01", "справка и ошибки командной строки на английском (argparse): «usage:», «positional arguments», "
-            "«options», «show this help message and exit», «error: the following arguments are required: output», "
-            "«unrecognized arguments», «invalid int value» (__main__.py)")
 @pytest.mark.parametrize("argv", [["вход.md"], ["вход.md", "отчёт.md", "--bogus"], ["вход.md", "o.md", "--max-calls", "x"],
                                   ["--help"]])
 def test_cli_messages_are_russian(argv, capsys):
@@ -647,8 +629,6 @@ def test_console_progress_is_russian(tmp_path, capsys):
     assert not codes, sorted(set(codes))
 
 
-@_bug("01", "быстрый старт: сбой перевода ссылок R-ID (_remap_reviewers, pipeline.py:324 — вне try) роняет весь "
-            "прогон в «Прогон прерван», хотя это не этап модели")
 def test_fast_start_remap_error_does_not_abort_run(tmp_path, monkeypatch):
     def boom(*a, **kw):
         raise ValueError("строка цитаты не число")
@@ -656,3 +636,77 @@ def test_fast_start_remap_error_does_not_abort_run(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "remap_output", boom)
     report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", fast_start=True)
     assert report["run"]["status"] != "failed" and report["findings"]
+
+
+@_bug("01", "быстрый старт + нет сети: нарезка и 5 рецензентов повторяют network параллельно и сжигают все 16 вызовов, "
+            "не замечая, что ошибка уже признана фатальной (llm._ask_model не проверяет self.fatal перед повтором)")
+def test_network_down_with_fast_start_stops_retries(tmp_path, monkeypatch):
+    report, _, _ = _faulty_run(tmp_path, monkeypatch, lambda s, k: ProviderError("network", "нет соединения"),
+                               fast_start=True)
+    assert report["run"]["status"] == "failed"
+    assert not any("исчерпан бюджет" in w for w in report["run"]["warnings"]), report["run"]["warnings"][:4]
+    assert report["run"]["calls"]["total"] < 16
+
+
+@_bug("06", "пустой тест-кейс модели (без названия, «когда» и «тогда», expected_defined=false) попадает в отчёт строкой "
+            "«| T-01 | R-1 |  |  |  | ❔ Не определено требованиями. |»: normalize_test_case сам пишет «Не определено» в then, "
+            "и фильтр «title or then» его пропускает (stages/lens_qa.py:853); ID «R-1» не существует")
+def test_empty_test_cases_are_dropped(tmp_path):
+    from bcc_review.v2.stages import lens_qa
+    props = lens_qa.SCHEMA["properties"]
+    qa = {k: [] for k in props}
+    tc_props = props["test_cases"]["items"]["properties"]
+    tc = {k: ([] if v.get("type") == "array" else (False if v.get("type") == "boolean" else ""))
+          for k, v in tc_props.items()}
+    tc["requirement_ids"] = ["R-1"]
+    qa["test_cases"] = [tc, tc]
+    report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", mock_dir=str(_mock_dir(tmp_path, lens_qa=qa)))
+    assert all(t.get("title") or t.get("when") for t in report["test_cases"]), report["test_cases"][:2]
+
+
+def test_hostile_judge_answer_is_sanitized(tmp_path):
+    """Враждебный, но валидный по схеме ответ судьи: дубли ключей, кандидат и в дефекте, и в отклонённых, ссылки на
+    несуществующих кандидатов, приоритеты −3 и 99, critical без сценария или с blocks=none, чек-лист с n=0 и 999.
+    Код должен всё поправить: каждый кандидат ровно в одном месте, verify проходит."""
+    from bcc_review.v2 import verify
+    from bcc_review.v2.stages import judge as J
+    q = {"A": ("Месяц определяется по дате совершения покупки в Алматы", 38),
+         "B": ("Возврат уменьшает расходы месяца исходной покупки", 38),
+         "C": ("Февральский счётчик вырос на 4 000", 64), "D": ("По умолчанию уведомление выключено", 37)}
+    lens = {"candidates": [_cand(title=k, evidence=[{"quote": v[0], "line": v[1]}],
+                                 severity="critical" if k == "C" else "major") for k, v in q.items()]}
+    schema = J.response_schema()["properties"]["findings"]["items"]["properties"]
+
+    def f(key, ids, **kw):
+        base = {k: ("" if v.get("type") == "string" else 0 if v.get("type") == "integer" else False
+                    if v.get("type") == "boolean" else []) for k, v in schema.items()}
+        if "enum" in schema.get("kind", {}):
+            base["kind"] = "ambiguity"
+        if "enum" in schema.get("criterion", {}):
+            base["criterion"] = "unambiguous"
+        base.update(key=key, candidate_ids=ids, base=ids[0] if ids else "", title="T" + key, severity="major",
+                    blocks="both", priority=0)
+        base.update(kw)
+        return {k: v for k, v in base.items() if k in schema}
+
+    code = J._MODEL_REJECT_CODES[0]
+    judge_ans = {"findings": [f("K1", ["C-001", "C-002"], priority=1), f("K1", ["C-001"], priority=1),
+                              f("K2", ["C-003"], severity="critical", priority=-3), f("K3", [], title="", priority=99),
+                              f("K4", ["C-404"], severity="critical"),
+                              f("K5", ["C-004"], severity="critical", scenario="s", blocks="none")],
+                 "rejected": [{"candidate_id": "C-002", "reason_code": code, "reason": "ложный", "line": 38},
+                              {"candidate_id": "C-777", "reason_code": code, "reason": "?", "line": -1}],
+                 "checklist": [], "verdict_summary": ""}
+    mock = _mock_dir(tmp_path, lens_analyst=lens, judge=judge_ans)
+    report, written, _ = _review(tmp_path, OFFICIAL, provider="mock", mock_dir=str(mock), judge_check=False,
+                                 clarify=False)
+    warns = " ".join(report["run"]["warnings"])
+    assert "C-404" in warns and "судья недоступен" not in warns, warns[:300]   # ответ судьи принят, а не запасной
+    cids = [c for x in report["findings"] for c in x["candidate_ids"]]
+    assert len(cids) == len(set(cids)), cids
+    assert all(x["evidence"] and x["title"] for x in report["findings"])
+    assert all(0 <= int(x.get("priority") or 0) <= 7 for x in report["findings"])
+    crit = [x for x in report["findings"] if x["severity"] == "critical"]
+    assert all(x.get("blocks") not in ("", "none") for x in crit)
+    res = verify.verify_report(Path(written["json"]), OFFICIAL)
+    assert res["ok"], res["errors"][:3]

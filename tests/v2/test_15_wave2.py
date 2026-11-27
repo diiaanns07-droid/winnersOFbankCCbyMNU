@@ -145,9 +145,11 @@ def test_gate_official_checks_and_owners(tmp_path, monkeypatch):
     row.update({"provider": "claude_cli", "model": "haiku", "status": "complete", "dir": str(Path(sj).parent)})
     checks = gate.official_gates("haiku", row, GOLD)
     by = {c["name"].split(": ")[1]: c for c in checks}
-    assert by["К1–К5"]["ok"] is True  # 4/5 ≥ 4
+    # ворота WAVE3: haiku (замена Gemini) — К 5/5, время ≤ 8 мин, вызовов ≤ 10
+    assert by["К1–К5"]["ok"] is False and by["К1–К5"]["owners"].startswith("К2 (")
     assert by["время"]["ok"] is False and by["время"]["owners"]
-    assert by["вызовов"]["ok"] is True
+    assert by["вызовов"]["ok"] is (row["calls"] <= 10) if row.get("calls") is not None else by["вызовов"]["ok"] is None
+    assert by["verify"]["ok"] is None  # нет report.json прогона — не красное
     opus = gate.official_gates("opus", row, GOLD)
     k = next(c for c in opus if c["name"].endswith("К1–К5"))
     assert k["ok"] is False and k["owners"].startswith("К2 (")
@@ -157,13 +159,14 @@ def test_gate_official_checks_and_owners(tmp_path, monkeypatch):
 
 
 def test_gate_corpus_clean_rules():
-    d = {"label": "т", "at": "2026-11-27 07:00", "harness": {"recall": 0.7, "tp": 7, "support": 10},
+    d = {"label": "т", "at": "2026-11-27 07:00", "harness": {"recall": 0.7, "tp": 7, "support": 10, "f1": 0.8,
+                                                         "precision": 0.9},
          "clean": {"n": 8, "measured": 8, "critical": 0, "docs_with_critical": 0, "docs_over_1_finding": 2,
                    "max_findings": 5, "verdict_no": 0},
          "details": {"fp": [{"clean": True, "owners": ["№08"]}, {"clean": True, "owners": ["№08", "№05"]}]},
          "per_issue_type": {}, "failed": 0, "cases": 33}
     ch = {c["name"].split(": ")[1]: c for c in gate.corpus_gates("Корпус, haiku", d, gate.CORPUS, "№15")}
-    assert ch["recall (строгий)"]["ok"] is True
+    assert ch["F1 (строгий)"]["ok"] is True  # WAVE3: F1 ≥ 0,75 вместо recall ≥ 60 %
     over = next(v for k, v in ch.items() if k.startswith("на чистом"))
     assert over["ok"] is False and over["owners"].startswith("№08 (2)")
     assert ch["critical на чистых"]["ok"] is True
