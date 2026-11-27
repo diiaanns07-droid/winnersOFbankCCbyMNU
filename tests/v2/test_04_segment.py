@@ -1033,6 +1033,8 @@ def test_reader_text_has_no_english_or_internal_codes():
     assert sg.ru_reader_text("Вставка в документ; передаётся как риск (criterion = risk)", view) == \
         "Вставка в документ; передаётся как риск"
     assert sg.ru_reader_text("Header таблицы, placeholder", view) == "Шапка таблицы, заглушка"
+    assert sg.ru_reader_text("Пример к коду 200; блок вынесен в excluded", view) == \
+        "Пример к коду 200; блок вынесен в «не вошло»"
     # имена из документа остаются
     assert sg.ru_reader_text("Поле cardId и push", view) == "Поле cardId и push"
     raw = {"requirements": [{"source_id": "", "kind": "api", "summary": "Field cardId, required",
@@ -1101,3 +1103,82 @@ def test_summary_enumeration_after_colon_trimmed():
             "Экран условий: флажок, стоимость"]
     for s in keep:
         assert sg.trim_enumeration(s) == s
+
+
+def test_kind_fixed_where_document_defines_it():
+    """Вид, от которого зависит серьёзность у набора №09 («мягкие» цель и нефункциональное), не зависит от модели:
+    NFR-2 «Запись хранится 3 года» — haiku data, sonnet nonfunctional → nonfunctional; история US-1 — haiku goal,
+    sonnet functional → functional (цель — только в разделе цели)."""
+    view = sg.load_view(str(STRUCT / "stories.md"))
+    raw = json.loads((ANSWERS / "stories.haiku.json").read_text(encoding="utf-8"))
+    out = {r["source_id"]: r["kind"] for r in sg.segment_from_response(view, raw)["requirements"] if r["source_id"]}
+    assert out["NFR-2"] == "nonfunctional" and out["US-1"] == "functional"
+    heur = {r["source_id"]: r["kind"] for r in sg.heuristic_segment(view)["requirements"] if r["source_id"]}
+    assert heur["NFR-2"] == "nonfunctional" and heur["US-1"] == "functional"
+    off = sg.segment_from_response(sg.load_view(str(OFFICIAL_MD)),
+                                   json.loads((ANSWERS / "official.haiku.json").read_text(encoding="utf-8")))
+    assert off["requirements"][0]["kind"] == "goal"  # цель в разделе цели остаётся целью
+
+
+def test_acceptance_row_summary_is_the_documents_expected_result():
+    """Строка приёмки — место противоречий (К1 официального): пересказ модели «Покупка 31 января учитывается в
+    январе» к строке «… | Февральский счётчик вырос на 4 000 ₸» противоречил самому документу. Краткая
+    формулировка — ячейка «Ожидаемый результат» дословно, с действием, если влезает в 48 знаков."""
+    view = sg.load_view(str(OFFICIAL_MD))
+    raw = json.loads((ANSWERS / "official.haiku.json").read_text(encoding="utf-8"))
+    for r in raw["requirements"]:
+        if r["line_start"] == 64:
+            r["summary"] = "Покупка 31 января учитывается в январе"
+    out = {r["line_start"]: r["summary"] for r in sg.segment_from_response(view, raw)["requirements"]}
+    assert out[63] == "Итог 50 000 ₸ и один push"
+    assert out[64] == "Февральский счётчик вырос на 4 000 ₸"
+    assert out[65] == "Перевести 500 ₸ → счётчик показывает 19 900 ₸"
+    heur = {r["line_start"]: r["summary"] for r in sg.heuristic_segment(view)["requirements"]}
+    assert heur[64] == out[64]
+    # таблица без столбца ожидаемого результата и длинная ячейка — формулировка модели остаётся
+    v2 = _view(["| Код | Описание |", "", "| 1 | Ответ при ошибке |"])
+    raw2 = {"requirements": [{"source_id": "", "kind": "api", "summary": "Код ошибки", "line_start": 3,
+                              "line_end": 3}], "excluded": []}
+    assert sg.segment_from_response(v2, raw2)["requirements"][0]["summary"] == "Код ошибки"
+
+
+def test_bare_parameter_id_gets_table_prefix():
+    """haiku в одном ответе назвал строки таблицы ответа «Метод getCashback: category» и «accrued» (без таблицы):
+    обе — «Ответ 200: …», как в офлайн-нарезке (корпус: офлайн = модели на 32 из 32 кейсов)."""
+    view = sg.load_view(str(CORPUS / "cashback.event_conflict.category_effective_now" / "source.md"))
+    raw = json.loads((ANSWERS / "cashback.event_conflict.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw)
+    assert _keys(out["requirements"]) == _keys(sg.heuristic_segment(view)["requirements"])
+    sids = {r["line_start"]: r["source_id"] for r in out["requirements"]}
+    assert sids[66] == "Ответ 200: category" and sids[67] == "Ответ 200: accrued"
+
+
+STRESS = FIX / "03_stress"
+
+
+@pytest.mark.parametrize("doc", ["api_narrow.pdf", "docx_merged.docx", "two_columns.pdf", "word_export.docx"])
+def test_stress_formats_offline_equals_model(doc):
+    """Стресс-набор №03 (выгрузки Word, PDF в две колонки, узкая таблица API): офлайн-нарезка (быстрый старт) =
+    нарезке haiku по ID и строкам. Было: блоки «200. Successful» + тело без перечня кодов офлайн шли в примеры
+    (модель — «Статус N»); вводная фраза «Метод возвращает…» до первого раздела — в пояснения; подсписок под
+    «Уточнения к пункту 2:» получал дубли «Функциональные требования, п. 1»; «Документ описывает …» посреди
+    выгрузки — требование; у абзацев критериев без номера в PDF модель выдумывала «Критерии приёмки, п. N»."""
+    view = sg.load_view(str(STRESS / doc))
+    raw = json.loads((ANSWERS / f"stress_{doc.replace('.', '_')}.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw, sg._replay_followup(raw))
+    heur = sg.heuristic_segment(view)
+    assert _keys(out["requirements"]) == _keys(heur["requirements"])
+    assert out["coverage"]["uncovered"] == []
+    sids = [r["source_id"] for r in out["requirements"] if r["source_id"]]
+    assert len(sids) == len(set(sids))  # без дублей ID
+
+
+def test_status_blocks_without_code_list_are_requirements_only_then():
+    """Блок «404. Unsuccessful — Not found» + тело — требование «Статус 404», только если перечня кодов нет
+    (официальный: перечень есть — блоки остаются примерами, 40 требований = фикстуре)."""
+    out = sg.heuristic_segment(sg.load_view(str(STRESS / "api_narrow.pdf")))
+    codes = [r["source_id"] for r in out["requirements"] if r["source_id"].startswith("Статус")]
+    assert codes == ["Статус 200", "Статус 400", "Статус 401", "Статус 404", "Статус 410", "Статус 500"]
+    off = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
+    ref = json.loads((FIX / "official" / "segment.json").read_text(encoding="utf-8"))["requirements"]
+    assert _keys(off) == _keys(ref)
