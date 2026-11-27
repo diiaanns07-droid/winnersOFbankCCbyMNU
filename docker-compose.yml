@@ -1,0 +1,34 @@
+# BCC Review в Docker одной командой (№42):
+#   docker compose up        → откройте http://localhost:8014  (остановить: Ctrl+C, затем docker compose down)
+# Ключ модели — в файле .env рядом (cp .env.example .env) или прямо в браузере; без .env тоже запускается.
+# Наружу порт открыт только на этом компьютере (127.0.0.1), внутри контейнера сервер слушает 0.0.0.0.
+services:
+  web:
+    build: .
+    image: bcc-review
+    # тот же образ, что для CLI (Dockerfile), но запускаем веб; коммит агента — как в ENTRYPOINT образа
+    entrypoint:
+      - sh
+      - -c
+      - BCC_AGENT_COMMIT="$${BCC_AGENT_COMMIT:-$$(cat /app/AGENT_COMMIT)}" exec python -m bcc_review.v2.web "$$@"
+      - bcc-review-web
+    command: ["--host", "0.0.0.0", "--port", "8014", "--data-dir", "/app/.bcc_web"]
+    ports:
+      - "127.0.0.1:8014:8014"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - bcc_web:/app/.bcc_web
+      # готовые отчёты и примеры для галереи на главной (в образ не входят: .dockerignore)
+      - ./reports:/app/reports:ro
+      - ./evaluation/dev/corpus/cases:/app/evaluation/dev/corpus/cases:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8014/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  bcc_web:
