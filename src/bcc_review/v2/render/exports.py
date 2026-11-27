@@ -335,6 +335,10 @@ def evidence_offsets(ev: dict, view: dict, blocks: dict[str, dict]) -> dict | No
     text = str(block.get("text") or "")
     off = _block_offset(block, ln, view)
     quote = str(ev.get("quote") or "").strip()
+    if not text.startswith(quote[:3]):
+        # номер пункта автонумерации Word («5. При отклонении…») — в строке view, но не в тексте абзаца v1
+        quote = re.sub(r"^(?:\d{1,2}(?:\.\d{1,2})*[.)]|[a-zа-я][.)]|•)\s+", "", quote, flags=re.I) \
+            if text.find(quote) < 0 else quote
     pieces = [p.strip() for p in quote.split(" … ")] if " … " in quote else [quote]
     for piece in pieces:
         if not piece:
@@ -558,9 +562,14 @@ def _md_to_docx(d: Any, md: str) -> None:
                 ncol = max(len(r) for r in rows)
                 t = d.add_table(rows=len(rows), cols=ncol)
                 t.style = "Table Grid"
+                # t.cell() каждый раз строит сетку всей таблицы — на длинном отчёте это минуты; сетку берём один раз
+                # (таблица только что создана, объединённых ячеек нет — индекс ri * ncol + ci точный)
+                grid = list(t._cells)
+                if len(grid) != len(rows) * ncol:
+                    grid = [t.cell(ri, ci) for ri in range(len(rows)) for ci in range(ncol)]
                 for ri, row in enumerate(rows):
                     for ci in range(ncol):
-                        cell = t.cell(ri, ci)
+                        cell = grid[ri * ncol + ci]
                         cell.text = ""
                         _add_inline(cell.paragraphs[0], row[ci] if ci < len(row) else "")
                         if ri == 0:
