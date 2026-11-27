@@ -18,7 +18,7 @@ def test_analyst_schema_asks_for_coverage_before_candidates():
     item = lens_analyst.SCHEMA["properties"]["coverage"]["items"]
     assert set(item["required"]) == {"topic", "line", "question", "answer"}
     text = (ROOT / "src/bcc_review/v2/prompts/lens_analyst.md").read_text(encoding="utf-8")
-    for n in range(1, 15):
+    for n in range(1, 16):
         assert f"**Т{n}." in text
     assert '{"coverage": [...], "candidates": [...]}' in text
 
@@ -118,3 +118,101 @@ def test_mature_document_gets_no_coverage_gaps():
     raw = {"lines": [{"n": 2, "text": "Экран: сообщение при ошибке ввода."}]}
     out = lens_analyst.run(type("C", (), {"view": raw})(), lens_run=fake)
     assert len(out["candidates"]) == 1 and out["coverage_gaps"] == 1
+
+
+# ─────────── проверка состояния кодом и несколько проходов на слабой модели ───────────
+
+_DOC = {37: "Ф. Владелец активной карты KZT задаёт значение от 1 до 9. По умолчанию функция выключена.",
+        117: "1. Проверить пользовательскую сессию.",
+        118: "2. Проверить принадлежность карты клиенту.",
+        119: "3. Проверить значение и переключатель."}
+_REQS = [{"id": "R-01", "kind": "functional", "section": "Часть A › Функциональные требования",
+          "line_start": 37, "line_end": 37},
+         *[{"id": f"R-{n}", "kind": "functional", "section": "Часть B. REST API › Логика работы метода",
+            "line_start": n, "line_end": n} for n in (117, 118, 119)]]
+
+
+def test_state_from_requirement_missing_in_method_logic_becomes_candidate():
+    view = _view(_DOC)
+    out = lens_analyst.state_probes(view, _REQS, [])
+    assert len(out) == 1
+    c = out[0]
+    assert c["title"] == "Условие «активной карты KZT» не определено и не проверяется в логике метода"
+    assert [e["line"] for e in c["evidence"]] == [37, 118]          # требование и шаг логики о том же объекте
+    assert c["evidence"][1]["quote"] == "Проверить принадлежность карты клиенту."
+    assert "валюта" in c["problem"] and c["origin"] == "state_check" and c["severity"] == "major"
+
+
+def test_state_check_is_silent_when_logic_checks_it_or_model_has_it():
+    checked = {**_DOC, 118: "2. Проверить, что карта принадлежит клиенту, активна и открыта в тенге."}
+    assert lens_analyst.state_probes(_view(checked), _REQS, []) == []
+    assert lens_analyst.state_probes(_view(_DOC), _REQS[:1], []) == []      # нет логики метода — сверять не с чем
+    have = [{"title": "Не определено, что такое активная карта", "evidence": [{"line": 37, "quote": "x"}]}]
+    assert lens_analyst.state_probes(_view(_DOC), _REQS, have) == []
+
+
+def test_passes_by_model_family_and_override(monkeypatch):
+    monkeypatch.delenv("BCC_ANALYST_PASSES", raising=False)
+    def ctx(provider, model, options=None):
+        llm = type("L", (), {"provider_name": provider, "model": model})()
+        return type("C", (), {"llm": llm, "options": options or {}})()
+    assert lens_analyst.passes_for(ctx("gemini", "gemini-3.6-flash")) == 2
+    assert lens_analyst.passes_for(ctx("gemini", "gemini-3.5-flash-lite")) == 2
+    assert lens_analyst.passes_for(ctx("claude_cli", "haiku")) == 1
+    assert lens_analyst.passes_for(ctx("mock", None)) == 1
+    assert lens_analyst.passes_for(ctx("claude_cli", "haiku", {"analyst_passes": 2})) == 2
+    monkeypatch.setenv("BCC_ANALYST_PASSES", "1")
+    assert lens_analyst.passes_for(ctx("gemini", "gemini-3.6-flash")) == 1
+
+
+def _pass(cands, cov):
+    return {"candidates": cands, "coverage": cov}
+
+
+def test_two_passes_are_merged_without_repeats(monkeypatch):
+    monkeypatch.setenv("BCC_ANALYST_PASSES", "2")
+    a = _pass([{"title": "Не определено событие учёта операции", "kind": "ambiguity", "severity": "major",
+                "evidence": [{"quote": "Учитываются покупки.", "line": 38}], "problem": "p"}],
+              [{"topic": "Т3", "line": 38, "question": "Какое событие включает операцию в учёт?", "answer": ""}])
+    b = _pass([{"title": "Событие учёта операции не определено", "kind": "incomplete", "severity": "major",
+                "evidence": [{"quote": "Учитываются покупки.", "line": 38}], "problem": "p"},
+               {"title": "Перечень исключённых операций открыт", "kind": "incomplete", "severity": "major",
+                "evidence": [{"quote": "Переводы исключаются.", "line": 38}], "problem": "p"}],
+              [{"topic": "Т3", "line": 38, "question": "Какое событие включает операцию в учёт?", "answer": ""},
+               {"topic": "Т11", "line": 29, "question": "Какое сообщение видит клиент при ошибке сервера?",
+                "answer": ""}])
+    seen = []
+
+    def fake(ctx, name):
+        noted = isinstance(ctx, lens_analyst._NotedContext)
+        seen.append(noted)
+        return b if noted else a
+    view = _view({29: "При ошибке ввода сообщение появляется под полем.", 38: "Учитываются покупки. Переводы исключаются."})
+    out = lens_analyst.run(type("C", (), {"view": view, "requirements": []})(), lens_run=fake)
+    assert sorted(seen) == [False, True] and out["passes"] == 2
+    titles = [c["title"] for c in out["candidates"]]
+    assert titles[:2] == ["Не определено событие учёта операции", "Перечень исключённых операций открыт"]
+    assert len(out["coverage"]) == 2                                   # одинаковая строка описи — один раз
+    assert "Какое сообщение видит клиент при ошибке сервера?" in titles   # пробел описи второго прохода
+
+
+def test_failed_second_pass_keeps_first(monkeypatch):
+    monkeypatch.setenv("BCC_ANALYST_PASSES", "2")
+    warnings = []
+
+    def fake(ctx, name):
+        if isinstance(ctx, lens_analyst._NotedContext):
+            raise TimeoutError("медленно")
+        return _pass([{"title": "Перечень исключённых операций открыт", "kind": "incomplete", "severity": "major",
+                       "evidence": [{"quote": "q", "line": 38}], "problem": "p"}], [])
+    ctx = type("C", (), {"view": None, "requirements": [], "warn": lambda self, m: warnings.append(m)})()
+    out = lens_analyst.run(ctx, lens_run=fake)
+    assert out["passes"] == 1 and len(out["candidates"]) == 1
+    assert warnings and "проход 2 из 2 не удался" in warnings[0]
+
+
+def test_noted_context_appends_pass_note_to_task():
+    base = type("C", (), {"prompt": lambda self, name, **kw: ("sys", "задание"), "llm": "L"})()
+    noted = lens_analyst._NotedContext(base, lens_analyst.SECOND_PASS_NOTE)
+    system, user = noted.prompt("lens_analyst")
+    assert system == "sys" and user.startswith("задание") and "Т15 → Т1" in user and noted.llm == "L"

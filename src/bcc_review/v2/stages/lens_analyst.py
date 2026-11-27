@@ -29,6 +29,15 @@
 Замер (официальный документ, по одному запросу на сохранённых входах): без описи Flash давал 4–6 кандидатов
 и 2–4 существенных из эталона, haiku — 8 и 6.
 
+**Проверка состояния кодом** (`state_probes`, №12, 27.11): состояние объекта из функционального требования
+(«активная», «открытый», «подтверждённый» …), которого нет в шагах логики метода, — кандидат с двумя цитатами
+(требование и шаг логики). На корпусе open2 не срабатывает ни на одном документе: в вычитанных ТЗ шаг проверки
+состояния есть всегда.
+
+**Несколько проходов на слабой модели** (`passes_for`, `merge_passes`): на Gemini Flash линза отвечает дважды
+(второй проход идёт по темам описи в обратном порядке), кандидаты и опись объединяются без повторов. Один запрос
+сверх девяти: на бесплатном ключе это всё те же два прогона в сутки.
+
 Признаки зрелости считаются кодом по тексту документа, без модели: есть раздел терминов, указана версия,
 явный часовой пояс (UTC/GMT), нет заглушек («заполняются…», «TBD», неотмеченное «Да / Нет», прочерк
 вместо значения). Зрелый — 3 признака из 4.
@@ -199,15 +208,15 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
     return [kept[i] for i in order][:max_candidates]
 
 
-def coverage(items: Any) -> list[dict]:
-    """Опись вопросов полноты из ответа модели: только строки-объекты с темой, не больше `MAX_COVERAGE`."""
+def coverage(items: Any, *, limit: int = MAX_COVERAGE) -> list[dict]:
+    """Опись вопросов полноты из ответа модели: только строки-объекты с темой, не больше `limit`."""
     out = []
     for it in items or []:
         if isinstance(it, dict) and str(it.get("topic") or "").strip():
             out.append({"topic": str(it.get("topic")).strip(), "line": it.get("line") if isinstance(it.get("line"), int)
                         else 0, "question": str(it.get("question") or "").strip(),
                         "answer": str(it.get("answer") or "").strip()})
-    return out[:MAX_COVERAGE]
+    return out[:limit]
 
 
 _WORD = re.compile(r"[а-яёa-z0-9]{4,}", re.I)
@@ -277,19 +286,210 @@ def coverage_gaps(cov: list[dict], candidates: list[dict], view: Any, *, limit: 
     return out
 
 
+# ─────────────── проверка кодом: состояние из требования не проверяется в логике метода ───────────────
+# Требование допускает действие только для объекта в определённом состоянии («активная карта», «открытый счёт»),
+# а шаги логики метода этого состояния не проверяют: не сказано, что это за состояние и что вернуть, если его нет.
+# В вычитанных ТЗ корпуса шаг проверки есть всегда («проверить, что карта … активна и открыта в тенге»).
+_STATE = re.compile(r"(?<![а-яё])(активн|действующ|открыт|заблокирован|разблокирован|подтвержд[её]нн|верифицированн"
+                    r"|идентифицированн)[а-яё]*\s+([а-яё]{3,})(?:\s+([A-Z]{3})(?![A-Za-z]))?", re.I)
+_LOGIC_SECTION = re.compile(r"логик", re.I)
+_BUSINESS_SECTION_SKIP = re.compile(r"логик|особ\w* правил|rest|api|статус|ответ|параметр", re.I)
+_CURRENCY_WORDS = re.compile(r"\b[A-Z]{3}\b|тенге|валют", re.I)
+MAX_STATE_PROBES = 2
+
+
+def _req_lines(requirements: Any, want) -> list[int]:
+    out: list[int] = []
+    for r in requirements or []:
+        if not isinstance(r, dict):
+            continue
+        a = r.get("line_start")
+        b = r.get("line_end") or a
+        if isinstance(a, int) and isinstance(b, int) and want(r):
+            out.extend(range(a, b + 1))
+    return sorted(set(out))
+
+
+def state_probes(view: Any, requirements: Any, candidates: list[dict], *, limit: int = MAX_STATE_PROBES) -> list[dict]:
+    """Кандидаты кода: состояние объекта из функционального требования, которого нет в шагах логики метода.
+
+    Не срабатывает, если в документе нет раздела логики метода (сверять не с чем), если шаги логики называют то же
+    состояние, или если у модели уже есть кандидат на той же строке со словом этого состояния в заголовке."""
+    logic = _req_lines(requirements, lambda r: _LOGIC_SECTION.search(str(r.get("section") or "")))
+    if not logic:
+        return []
+    logic_text = {n: _line_text(view, n) for n in logic}
+    business = _req_lines(requirements, lambda r: r.get("kind") == "functional"
+                          and not _BUSINESS_SECTION_SKIP.search(str(r.get("section") or "")))
+    out: list[dict] = []
+    seen: set[str] = set()
+    for n in business:
+        text = _line_text(view, n)
+        for m in _STATE.finditer(text):
+            stem = m.group(1).lower()[:5]
+            if stem in seen or any(stem in t.lower() for t in logic_text.values()):
+                continue
+            noun = m.group(2).lower()
+            if any(n in {e.get("line_start", e.get("line")) for e in c.get("evidence") or []}
+                   and stem in str(c.get("title", "")).lower() for c in candidates):
+                continue
+            seen.add(stem)
+            phrase = m.group(0).strip()
+            currency = m.group(3)
+            unchecked_currency = bool(currency) and not any(_CURRENCY_WORDS.search(t) for t in logic_text.values())
+            step = next((k for k, t in logic_text.items() if noun[:4] in t.lower()), logic[0])
+            what = "состояние и валюта" if unchecked_currency else "состояние"
+            out.append({
+                "title": f"Условие «{phrase}» не определено и не проверяется в логике метода",
+                "kind": "incomplete", "criterion": "complete", "severity": "major", "requirement_ids": [],
+                "evidence": [{"quote": _best_sentence(text, phrase), "line": n},
+                             {"quote": _best_sentence(logic_text[step], noun), "line": step}],
+                "problem": f"Требование ставит условие «{phrase}», но шаги логики метода {what} не проверяют: "
+                           "не определено, что это условие означает и какой ответ вернуть, если оно не выполнено.",
+                "scenario": f"Запрос приходит для объекта, который не отвечает условию «{phrase}»: по шагам логики "
+                            "метода он обрабатывается как обычный.",
+                "impact": "Разработчик и тестировщик по-разному решат, отклонять ли такой запрос и каким ответом.",
+                "recommendation": f"Определить условие «{phrase}» и добавить в логику метода шаг его проверки "
+                                  "с ответом при невыполнении.",
+                "rewrite": "", "question": f"Что считается «{phrase}» и какой ответ вернуть, если условие не выполнено?",
+                "blocks": "development", "origin": "state_check",
+            })
+            if len(out) >= limit:
+                return out
+    return out
+
+
+# ─────────────── несколько независимых проходов линзы (слабые модели) ───────────────
+# Flash от прохода к проходу находит разные пробелы описи (замер 27.11, 9 сохранённых ответов 3.6 Flash на
+# официальном документе: С из эталона на уровне кандидатов — один проход 18,0 / 18,2 / 16,6 на входах c1 / c2 / c3,
+# объединение двух — 19,4 / 19,4 / 17,8). Второй проход идёт по темам описи в обратном порядке: у длинного
+# промпта слабая модель внимательнее к первым темам.
+PASSES_BY_FAMILY = {"gemini-flash": 2, "gemini-flash-lite": 2, "gemini": 2}
+SECOND_PASS_NOTE = ("\n\nЭто независимый второй проход линзы по тому же документу. Опись заполни, начиная с "
+                    "последней темы и до первой (Т15 → Т1), затем кандидаты по тем же правилам.")
+MAX_PASS_GAPS = 8
+
+
+def passes_for(ctx: Any) -> int:
+    """Сколько проходов: опция `analyst_passes` / переменная `BCC_ANALYST_PASSES`, иначе по семейству модели."""
+    import os
+    opts = getattr(ctx, "options", None)
+    val = opts.get("analyst_passes") if isinstance(opts, dict) else getattr(opts, "analyst_passes", None)
+    val = val if val is not None else os.environ.get("BCC_ANALYST_PASSES")
+    if val not in (None, ""):
+        try:
+            return max(1, min(3, int(val)))
+        except (TypeError, ValueError):
+            pass
+    llm = getattr(ctx, "llm", None)
+    model = getattr(llm, "model", None) or getattr(getattr(llm, "provider", None), "default_model", None)
+    if not model or str(getattr(llm, "provider_name", "")) not in ("gemini", ""):
+        return 1
+    try:
+        from bcc_review.v2.providers import profiles
+    except ImportError:  # pragma: no cover
+        return 1
+    return PASSES_BY_FAMILY.get(profiles.family(str(model)), 1)
+
+
+class _NotedContext:
+    """Контекст этапа, у которого к заданию промпта дописана заметка прохода (второй вызов не попадает в кэш
+    первого и идёт по темам в другом порядке)."""
+
+    def __init__(self, ctx: Any, note: str):
+        self._ctx, self._note = ctx, note
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._ctx, name)
+
+    def prompt(self, name: str, **variables: Any) -> tuple[str, str]:
+        system, user = self._ctx.prompt(name, **variables)
+        return system, user + self._note
+
+
+def _near_duplicate(c: dict, kept: list[dict]) -> bool:
+    """Тот же дефект из другого прохода: общая строка цитаты и не меньше 40 % слов заголовка."""
+    lines = {e.get("line_start", e.get("line")) for e in c.get("evidence") or []}
+    ts = _stems(str(c.get("title", "")))
+    for k in kept:
+        if not lines & {e.get("line_start", e.get("line")) for e in k.get("evidence") or []}:
+            continue
+        ks = _stems(str(k.get("title", "")))
+        need = max(2, -(-min(len(ts), len(ks)) * 2 // 5))
+        if len(ts & ks) >= need:
+            return True
+    return False
+
+
+def merge_passes(outs: list[dict]) -> dict:
+    """Ответы нескольких проходов → один: кандидаты первого прохода, затем новые кандидаты следующих (повтор —
+    общая строка и 40 % слов заголовка), опись — все строки, кроме повторов (та же строка и тот же вопрос)."""
+    if len(outs) == 1:
+        return dict(outs[0])
+    merged = dict(outs[0])
+    cands: list[dict] = [c for c in outs[0].get("candidates") or [] if isinstance(c, dict)]
+    cov: list = list(outs[0].get("coverage") or [])
+    for o in outs[1:]:
+        for c in o.get("candidates") or []:
+            if isinstance(c, dict) and not _near_duplicate(c, cands):
+                cands.append(c)
+        have = {(r.get("line"), frozenset(_stems(str(r.get("question", ""))))) for r in cov if isinstance(r, dict)}
+        for r in o.get("coverage") or []:
+            if isinstance(r, dict) and (r.get("line"), frozenset(_stems(str(r.get("question", ""))))) not in have:
+                cov.append(r)
+    merged["candidates"], merged["coverage"] = cands, cov
+    return merged
+
+
+def _run_passes(ctx: Any, lens_run, n: int) -> tuple[list[dict], list[str]]:
+    """`n` проходов параллельно; упавший проход не роняет этап, если удался хотя бы один."""
+    if n <= 1:
+        return [dict(lens_run(ctx, "analyst"))], []
+    import concurrent.futures as cf
+    contexts = [ctx] + [_NotedContext(ctx, SECOND_PASS_NOTE if i == 1 else SECOND_PASS_NOTE + f" Проход {i + 1}.")
+                        for i in range(1, n)]
+    results: list[Any] = [None] * n
+    with cf.ThreadPoolExecutor(max_workers=n) as ex:
+        futs = {ex.submit(lens_run, c, "analyst"): i for i, c in enumerate(contexts)}
+        for f in cf.as_completed(futs):
+            i = futs[f]
+            try:
+                results[i] = dict(f.result())
+            except Exception as exc:  # noqa: BLE001 — разбирается ниже
+                results[i] = exc
+    ok = [r for r in results if isinstance(r, dict)]
+    if not ok:
+        raise next(r for r in results if isinstance(r, BaseException))
+    notes = [f"Аналитик: проход {i + 1} из {n} не удался ({type(r).__name__}); взяты остальные"
+             for i, r in enumerate(results) if isinstance(r, BaseException)]
+    return ok, notes
+
+
 def run(ctx, lens_run=None) -> dict:
     """Запуск линзы с постобработкой. `lens_run(ctx, name)` — общий запуск из `stages/lens.py` (№01);
-    он сам берёт `MAX_OUTPUT_TOKENS` из этого модуля."""
+    он сам берёт `MAX_OUTPUT_TOKENS` из этого модуля. На слабых моделях (см. `passes_for`) — несколько
+    независимых проходов, объединённых `merge_passes`."""
     if lens_run is None:
         from . import lens as _lens  # каркас №01
         lens_run = _lens.run
     m = maturity(getattr(ctx, "view", None))
-    out = dict(lens_run(ctx, "analyst"))
+    n = passes_for(ctx)
+    outs, notes = _run_passes(ctx, lens_run, n)
+    for note in notes:
+        warn = getattr(ctx, "warn", None)
+        if callable(warn):
+            warn(note)
+    out = merge_passes(outs)
+    view = getattr(ctx, "view", None)
     out["candidates"] = postprocess(out.get("candidates") or [], mature=m["mature"])
-    out["coverage"] = coverage(out.get("coverage"))
+    out["coverage"] = coverage(out.get("coverage"), limit=MAX_COVERAGE * len(outs))
     if not m["mature"]:  # вычитанный документ — только расхождения (см. `postprocess`), пробелы описи не добираем
-        gaps = coverage_gaps(out["coverage"], out["candidates"], getattr(ctx, "view", None))
-        out["candidates"] += gaps
+        probes = state_probes(view, getattr(ctx, "requirements", None), out["candidates"])
+        gaps = coverage_gaps(out["coverage"], out["candidates"] + probes, view,
+                             limit=MAX_GAPS if len(outs) == 1 else MAX_PASS_GAPS)
+        out["candidates"] += probes + gaps
         out["coverage_gaps"] = len(gaps)
+        out["state_checks"] = len(probes)
+    out["passes"] = len(outs)
     out["document_maturity"] = m
     return out
