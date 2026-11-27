@@ -351,3 +351,58 @@ def test_markdown_escapes_and_html_entities(quote, line, text):
     m = Q.verify_quote(view, quote, line)
     assert m and m["text"] == text and m["verified"] == "normalized"
     assert Q.verify_quote(view, r"совсем нет такого \_ текста") is None
+
+
+# --------------------------------------------------------------------------- живые цитаты моделей
+LIVE = json.loads((ROOT / "tests/v2/fixtures/03_live_quotes.json").read_text(encoding="utf-8"))["quotes"]
+
+
+@pytest.fixture(scope="module")
+def live_views():
+    if not _has("pymupdf") or not _has("docx"):
+        pytest.skip("нужны PyMuPDF и python-docx")
+    return {d: dv.load(ROOT / d) for d in sorted({x["doc"] for x in LIVE})}
+
+
+def _live_check(views, transform, use_hint=True):
+    ok = tot = 0
+    for x in LIVE:
+        q = transform(x["quote"])
+        if not q:
+            continue
+        tot += 1
+        m = Q.verify_quote(views[x["doc"]], q, x["line"] if use_hint else None)
+        ok += bool(m and m["line_start"] <= x["found"] <= m["line_end"])
+    return ok, tot
+
+
+def test_live_quotes_on_model_line(live_views):
+    """410 цитат линз из 6 живых прогонов haiku (официальный PDF/DOCX, open2 PDF/DOCX): все — на своей строке."""
+    ok, tot = _live_check(live_views, lambda q: q)
+    assert tot == len(LIVE) >= 400 and ok == tot
+    assert sum(1 for x in LIVE if x["found"] == x["line"]) >= tot - 1  # строка модели совпала с найденной
+
+
+@pytest.mark.parametrize("sep", [": ", " ", " — "])
+def test_live_table_rows_with_other_separator(live_views, sep):
+    """Строки таблиц (34), переписанные моделью с другим разделителем ячеек, — на своей строке (было 14/37 для «:»)."""
+    ok, tot = _live_check(live_views, lambda q: q.replace(" | ", sep) if " | " in q else None)
+    assert tot >= 30 and ok == tot
+
+
+def test_live_quotes_with_bracket_ellipsis_and_prefix(live_views):
+    cut = _live_check(live_views, lambda q: (lambda w: " ".join(w[:3]) + " [...] " + " ".join(w[-3:]))(q.split())
+                      if len(q.split()) >= 9 else None)
+    pref = _live_check(live_views, lambda q: "L012| [с.3] " + q)
+    assert cut[0] == cut[1] >= 100 and pref[0] == pref[1]
+
+
+def test_short_term_needs_model_line():
+    view = dv.load(ROOT / "evaluation/v2/open2/insurance/source.docx") if _has("docx") else None
+    if view is None:
+        pytest.skip("нет python-docx")
+    k = next(ln["n"] for ln in view["lines"] if " СК " in f" {ln['text']} ")
+    m = Q.verify_quote(view, "СК", k)
+    assert m and m["line_start"] == k and m["text"] == "СК"
+    assert Q.verify_quote(view, "СК") is None or len([ln for ln in view["lines"] if " СК " in f" {ln['text']} "]) == 1
+    assert Q.verify_quote(view, "К", k) is None
