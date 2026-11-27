@@ -83,10 +83,37 @@ def find_cli(env: Mapping[str, str] | None = None, which: Callable[[str], str | 
         return None
     base = Path(cmd).parent
     script = base / "node_modules" / "@anthropic-ai" / "claude-code" / "cli.js"
-    node = which("node") or str(base / "node.exe")
+    node = which("node") or (str(base / "node.exe") if (base / "node.exe").exists() else None)
     if script.exists() and node:
         return [node, str(script)]
+    # Другие менеджеры (pnpm, yarn, nvm-windows, своя папка npm prefix): цель — в тексте шима .cmd
+    target = _shim_target(Path(cmd))
+    if target is not None:
+        if target.suffix.lower() == ".exe":
+            return [str(target)]
+        if node:
+            return [node, str(target)]
     return [cmd]
+
+
+_SHIM_PATH = re.compile(r'%~?dp0%?\\?([^"%\r\n]+?\.(?:js|cjs|mjs|exe))"', re.I)
+
+
+def _shim_target(cmd: Path) -> Path | None:
+    """Файл, который запускает шим ``claude.cmd`` (``"%dp0%\\node_modules\\…\\cli.js"``), если он существует.
+
+    Через cmd.exe запуск ненадёжен: пустой аргумент и кавычки JSON-схемы, предел строки 8191 знак, а при
+    тайм-ауте Windows убивает только cmd.exe — node остаётся жить и держит канал вывода.
+    """
+    try:
+        text = cmd.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return None
+    for rel in _SHIM_PATH.findall(text):
+        path = (cmd.parent / rel.replace("\\", "/").lstrip("/")).resolve()
+        if path.is_file() and "claude" in rel.lower():
+            return path
+    return None
 
 
 def _strip_fence(text: str) -> str:
