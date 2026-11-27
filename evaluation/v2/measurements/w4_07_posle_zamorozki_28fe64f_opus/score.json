@@ -41,7 +41,8 @@
       "major": 15,
       "minor": 14
     },
-    "duplicates": 3,
+    "duplicates": 1,
+    "parts": 2,
     "outside_gold": {
       "total": 1,
       "real": 1,
@@ -160,12 +161,13 @@
   },
   "precision": {
     "matched": 30,
-    "duplicates": 3,
+    "duplicates": 1,
+    "parts": 2,
     "outside_real": 1,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.912,
+    "precision_useful": 0.971,
     "precision_gold": 0.882
   },
   "severity": {
@@ -823,10 +825,16 @@
       "sources": [
         "lens:architect"
       ]
-    },
+    }
+  ],
+  "parts": [
     {
       "finding": "D-23",
       "gold": "С16",
+      "parts": [
+        "компоненты названы по-разному"
+      ],
+      "credited": "D-22",
       "title": "Одни и те же понятия названы разными терминами",
       "sources": [
         "consistency"
@@ -835,6 +843,10 @@
     {
       "finding": "D-30",
       "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-31",
       "title": "Не определено, какая сумма передаётся в push",
       "sources": [
         "lens:analyst"
@@ -1230,13 +1242,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 41.300000000000004,
-    "cost_usd": 0.30486759999999996,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 41.94,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_posle_zamorozki/runs/20261127-163017-358c"
+  "seconds": 0.58,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_posle_zamorozki/runs/20261127-163017-358c",
+  "rescored_at": "2026-11-27 17:26"
 }

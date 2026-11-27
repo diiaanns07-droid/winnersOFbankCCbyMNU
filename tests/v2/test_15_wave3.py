@@ -344,10 +344,10 @@ def test_final_code_note_flags_runs_on_other_code(monkeypatch):
     same = {"aaa1111": True, "bbb2222": True, "ccc3333": False, "ddd4444": None}
     monkeypatch.setattr(final, "same_code", lambda c, sha: same[c])
     ok = final.code_note("abc1234", [[{"commit": "aaa1111"}], [{"commit": ["aaa1111", "bbb2222"]}], []])
-    assert ok.startswith("Код прогонов сверен: 2 из 2") and "⚠" not in ok
+    assert ok.startswith("Код прогонов сверен по git (коммитов прогонов: 2, сверено 2)") and "⚠" not in ok
     bad = final.code_note("abc1234", [[{"commit": "aaa1111"}, {"commit": "ccc3333"}]])
     assert bad.startswith("⚠") and "`ccc3333`" in bad and "aaa1111" not in bad
-    assert "git не знает: ddd4444" in final.code_note("abc1234", [[{"commit": "ddd4444"}, {"commit": "aaa1111"}]])
+    assert "; git не знает: ddd4444" in final.code_note("abc1234", [[{"commit": "ddd4444"}, {"commit": "aaa1111"}]])
     assert final.code_note("abc1234", [[{"label": "без коммита"}]]) == ""
 
 
@@ -370,3 +370,111 @@ def test_gate_history_line_and_codes():
     assert gate.history_line(rows[:1]) == ""
     text = gate.render_summary([{"name": "a", "ok": True}], "Ворота WAVE3, 16:55", rows)
     assert "Ворота за день" in text and text.index("Ворота за день") > text.index("зелёных 1")
+
+
+def test_final_code_diff_lists_changed_files(monkeypatch):
+    """Код тега не тот, что мерили, — видно, какие файлы: задевает ли разница основной прогон."""
+    import subprocess as _sp
+
+    from evaluation.v2 import final
+
+    out = "12\t0\tsrc/bcc_review/v2/prompts/recheck.md\n533\t64\tsrc/bcc_review/v2/stages/recheck.py\n1\t1\tpyproject.toml\n"
+    monkeypatch.setattr(final, "_git", lambda *a: _sp.CompletedProcess(a, 0, stdout=out, stderr=""))
+    assert final.code_diff("a", "b") == ("`prompts/recheck.md` (+12/−0), `stages/recheck.py` (+533/−64), "
+                                         "`pyproject.toml` (+1/−1)")
+    assert final.code_diff("a", "b", limit=1).endswith("и ещё 2")
+    monkeypatch.setattr(final, "_git", lambda *a: _sp.CompletedProcess(a, 128, stdout="", stderr="bad"))
+    assert final.code_diff("a", "b") == ""
+
+
+def test_final_newer_code_section(monkeypatch):
+    """--newer: официальный документ на более новом коде отдельной таблицей и чем код отличается от кода релиза."""
+    from evaluation.v2 import final
+
+    rows = {"new1234": [{"label": "голова: new1234, sonnet", "model": "sonnet", "status": "complete", "K": 5,
+                         "K_as_critical": 5, "C": 17, "findings": 27, "duplicates": 0, "critical_false": 0,
+                         "duration_s": 150, "calls": 9, "cost_usd": 0.78, "clarity": {}, "commit": "abcdef1"}]}
+    monkeypatch.setattr(final, "resolve", lambda ref: (ref, ""))
+    monkeypatch.setattr(final, "official", lambda sha: rows.get(sha, []))
+    monkeypatch.setattr(final, "same_code", lambda a, b: a == b or (a, b) == ("abcdef1", "new1234"))
+    monkeypatch.setattr(final, "code_diff", lambda a, b: "`stages/recheck.py` (+533/−64)")
+    text = "\n".join(final.newer_lines("old1234", ["new1234", "none999"]))
+    assert "**Проверка на более новом коде `new1234`**" in text and "`stages/recheck.py` (+533/−64)" in text
+    assert "| sonnet | 1 | 1 | 5/5 | 5 | 17 | 27 | 0 | 0 | 2.5 | 9 |" in text
+    assert "Код прогонов сверен по git" in text and "На `none999` замеров официального документа нет." in text
+
+
+def test_composite_item_parts_are_not_duplicates():
+    """Эталон свёл разные дефекты в один пункт (С2: 403↔404; 201 не описан; «и далее») — три замечания о трёх частях
+    не дубли; второе о той же части — дубль; С считается один раз (живой отчёт haiku W4-07 на c6aa9b5)."""
+    import json as _json
+
+    from evaluation.v2 import score as sc
+    from evaluation.v2.common import ROOT
+
+    gold = sc.load_gold(sc.DEFAULT_GOLD)
+    rep = _json.loads((ROOT / "evaluation/v2/measurements/w4_07_zamorozka_c6aa9b5_haiku/report.json")
+                      .read_text(encoding="utf-8"))
+    res = sc.score_report(rep, gold, arbiter="off")
+    parts = {p["finding"]: (p["gold"], p["parts"]) for p in res["parts"]}
+    assert parts["D-18"] == ("С2", ["201 не описан"])            # засчитан D-20 «403 или 404 в разных местах»
+    assert parts["D-32"] == ("С2", ["открытый перечень «400, 401 и далее»"])
+    assert parts["D-22"][0] == "С16" and parts["D-11"][0] == "С12"
+    dups = {d["finding"]: d["gold"] for d in res["duplicates"]}
+    assert dups.get("D-31") == "С1"  # Content-Type: засчитанное за С1 уже о нём — настоящий дубль
+    assert res["precision"]["duplicates"] == 2 and res["precision"]["parts"] == 4
+    assert res["recall"]["major"]["n"] == 17 and "С2" in res["recall"]["major"]["found"]
+
+
+def test_split_parts_needs_disjoint_parts_and_keeps_second_same_part_a_duplicate():
+    import re
+
+    from evaluation.v2 import score as sc
+
+    item = {"id": "С9", "_parts": [("a", re.compile("сумм", re.I)), ("b", re.compile("цифр", re.I))]}
+    plain = {"id": "С8"}
+    by_id = {"С9": item, "С8": plain}
+    fmap = {fid: {"id": fid, "title": t, "_title": t, "fields": {"problem": ""}, "_text": t}
+            for fid, t in (("D-1", "Какие цифры карты"), ("D-2", "Какая сумма в сообщении"),
+                           ("D-3", "Сумма в сообщении не задана"), ("D-4", "Что-то общее"), ("D-5", "Цифры и сумма"))}
+    edges = {("С9", f): 2.0 for f in fmap} | {("С8", "D-4"): 2.5}
+    dups = {"D-2": "С9", "D-3": "С9", "D-4": "С8", "D-5": "С9"}
+    out = sc.split_parts({"С9": "D-1", "С8": "D-9"}, dups, edges, by_id, fmap)
+    assert out == {"D-2": ("С9", ["a"])}         # другая часть — не дубль
+    assert dups == {"D-3": "С9", "D-4": "С8", "D-5": "С9"}  # та же часть, без частей, пересечение — дубли
+
+
+def test_rescore_rewrites_history_rows_in_place(tmp_path, monkeypatch):
+    """Пересчёт оценок обновляет и строки истории (по `dir`): время и метка замера прежние, метрики — новые."""
+    import json as _json
+
+    from evaluation.v2 import measure
+
+    hist = tmp_path / "history.jsonl"
+    rows = [{"at": "2026-11-27 16:15", "label": "замер: abc1234, sonnet", "dir": "m/a", "duplicates": 2, "C": 18},
+            {"at": "2026-11-27 16:20", "label": "другой", "dir": "m/b", "duplicates": 5}]
+    hist.write_text("\n".join(_json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8")
+    monkeypatch.setattr(measure, "HISTORY", hist)
+    n = measure._rewrite_history({"m/a": {"at": "сейчас", "label": "чужая", "dir": "m/a", "duplicates": 0, "parts": 2,
+                                          "C": 18}})
+    got = [_json.loads(x) for x in hist.read_text(encoding="utf-8").splitlines()]
+    assert n == 1 and len(got) == 2 and got[1] == rows[1]
+    assert got[0]["at"] == "2026-11-27 16:15" and got[0]["label"] == "замер: abc1234, sonnet"
+    assert got[0]["duplicates"] == 0 and got[0]["parts"] == 2 and "rescored_at" in got[0]
+    assert measure._rewrite_history({}) == 0
+
+
+def test_part_candidate_may_be_outside_focus():
+    """Перечень кодов «201 не описан, «и далее»» ближе к К3 по строкам L151/L165, но по заголовку — другая часть С2,
+    чем засчитанное «403 или 404»: часть, а не дубль К3 (живой отчёт sonnet на 747364c)."""
+    import json as _json
+
+    from evaluation.v2 import score as sc
+    from evaluation.v2.common import ROOT
+
+    gold = sc.load_gold(sc.DEFAULT_GOLD)
+    rep = _json.loads((ROOT / "evaluation/v2/measurements/w4_07_golova_17_25_747364c_sonnet/report.json")
+                      .read_text(encoding="utf-8"))
+    res = sc.score_report(rep, gold, arbiter="off")
+    assert {p["finding"]: p["gold"] for p in res["parts"]} == {"D-16": "С2"}
+    assert res["precision"]["duplicates"] == 0 and res["recall"]["major"]["n"] == 17

@@ -42,6 +42,7 @@
       "minor": 12
     },
     "duplicates": 0,
+    "parts": 0,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -161,6 +162,7 @@
   "precision": {
     "matched": 30,
     "duplicates": 0,
+    "parts": 0,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
@@ -812,6 +814,7 @@
     }
   ],
   "duplicates": [],
+  "parts": [],
   "outside": [],
   "misses": [
     {
@@ -1209,13 +1212,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 30.700000000000003,
-    "cost_usd": 0.2516316,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 31.11,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_posle_zamorozki/runs/20261127-162858-0911"
+  "seconds": 0.46,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_posle_zamorozki/runs/20261127-162858-0911",
+  "rescored_at": "2026-11-27 17:26"
 }

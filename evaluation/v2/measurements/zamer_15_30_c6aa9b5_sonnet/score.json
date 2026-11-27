@@ -41,7 +41,8 @@
       "major": 13,
       "minor": 11
     },
-    "duplicates": 1,
+    "duplicates": 0,
+    "parts": 1,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -157,12 +158,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 1,
+    "duplicates": 0,
+    "parts": 1,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.966,
+    "precision_useful": 1.0,
     "precision_gold": 0.966
   },
   "severity": {
@@ -767,10 +769,15 @@
       "how": "детерминированно"
     }
   ],
-  "duplicates": [
+  "duplicates": [],
+  "parts": [
     {
       "finding": "D-18",
       "gold": "С2",
+      "parts": [
+        "403 ↔ 404, чужая карта"
+      ],
+      "credited": "D-17",
       "title": "Для чужой карты код ответа 403 или 404",
       "sources": [
         "consistency",
@@ -1200,7 +1207,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.43,
+  "seconds": 0.44,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-dfad",
-  "rescored_at": "2026-11-27 16:25"
+  "rescored_at": "2026-11-27 17:26"
 }

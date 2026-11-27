@@ -41,7 +41,8 @@
       "major": 17,
       "minor": 11
     },
-    "duplicates": 4,
+    "duplicates": 2,
+    "parts": 2,
     "outside_gold": {
       "total": 1,
       "real": 1,
@@ -153,12 +154,13 @@
   },
   "precision": {
     "matched": 27,
-    "duplicates": 4,
+    "duplicates": 2,
+    "parts": 2,
     "outside_real": 1,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.875,
+    "precision_useful": 0.938,
     "precision_gold": 0.844
   },
   "severity": {
@@ -780,26 +782,6 @@
   ],
   "duplicates": [
     {
-      "finding": "D-05",
-      "gold": "С2",
-      "title": "Чужая карта: 403 по описанию статусов и 404 по разделу ответа",
-      "sources": [
-        "consistency",
-        "lens:qa",
-        "lens:architect",
-        "rules:api.status_404"
-      ]
-    },
-    {
-      "finding": "D-07",
-      "gold": "С16",
-      "title": "Чтение порога из сервиса расходов есть в последовательности, но не в архитектуре",
-      "sources": [
-        "lens:architect",
-        "consistency"
-      ]
-    },
-    {
       "finding": "D-25",
       "gold": "С5",
       "title": "Участник называется «держатель», «клиент» и «владелец» карты без глоссария",
@@ -814,6 +796,36 @@
       "title": "«Исходный итог» при повторной доставке не определён",
       "sources": [
         "lens:analyst"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-05",
+      "gold": "С2",
+      "parts": [
+        "403 ↔ 404, чужая карта"
+      ],
+      "credited": "D-20",
+      "title": "Чужая карта: 403 по описанию статусов и 404 по разделу ответа",
+      "sources": [
+        "consistency",
+        "lens:qa",
+        "lens:architect",
+        "rules:api.status_404"
+      ]
+    },
+    {
+      "finding": "D-07",
+      "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-23",
+      "title": "Чтение порога из сервиса расходов есть в последовательности, но не в архитектуре",
+      "sources": [
+        "lens:architect",
+        "consistency"
       ]
     }
   ],
@@ -855,8 +867,9 @@
       "gold": "С18",
       "level": "major",
       "title": "Критерии приёмки неполны",
-      "where": "найден кандидатом (consistency, lens:qa, lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "qa",
         "judge"
       ],
       "near": [
@@ -879,26 +892,7 @@
           "arbiter": "match"
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#2",
-          "title": "Покупка 31 января: Ф-2 относит к января, приёмка к февралю",
-          "reason": ""
-        },
-        {
-          "source": "lens:qa",
-          "id": "lens:qa#1",
-          "title": "Критерий приёмки №2 противоречит правилу Ф-2",
-          "reason": ""
-        },
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#8",
-          "title": "Город Алматы назван как пояс без смещения UTC",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М1",
@@ -915,7 +909,7 @@
       "gold": "М2в",
       "level": "minor",
       "title": "Чек-лист ревью без отметок",
-      "where": "найден кандидатом (lens:risk, rules:placeholder.checklist), судья не взял",
+      "where": "найден кандидатом (rules:placeholder.checklist), судья не взял",
       "owners": [
         "judge"
       ],
@@ -928,12 +922,6 @@
         }
       ],
       "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#7",
-          "title": "Схема отката решения не описана при пункте шаблона о ней",
-          "reason": ""
-        },
         {
           "source": "rules:placeholder.checklist",
           "id": "rules#11",
@@ -971,19 +959,13 @@
       "gold": "М2д",
       "level": "minor",
       "title": "Нет задачи в Jira — источник требований не прослеживается",
-      "where": "найден кандидатом (consistency), судья не взял",
+      "where": "не найден ни одним этапом",
       "owners": [
-        "judge"
+        "rules",
+        "consistency"
       ],
       "near": [],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#12",
-          "title": "Нет идентификаторов и версии документа",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М3",
@@ -1041,7 +1023,7 @@
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (lens:analyst, lens:risk), судья не взял",
+      "where": "найден кандидатом (lens:analyst), судья не взял",
       "owners": [
         "judge"
       ],
@@ -1064,18 +1046,6 @@
           "source": "lens:analyst",
           "id": "lens:analyst#4",
           "title": "Часовой пояс задан названием города без UTC",
-          "reason": ""
-        },
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#1",
-          "title": "Не определено, какое событие считается «проведённой» покупкой: авторизация или проведение",
-          "reason": ""
-        },
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#8",
-          "title": "Город Алматы назван как пояс без смещения UTC",
           "reason": ""
         }
       ]
@@ -1266,13 +1236,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 29.200000000000003,
-    "cost_usd": 0.2733309,
-    "pending": 1,
-    "model": "claude-sonnet-5-5"
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 2,
+    "model": ""
   },
-  "seconds": 29.61,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_haiku/runs/20261127-143807-9f59"
+  "seconds": 0.54,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_haiku/runs/20261127-143807-9f59",
+  "rescored_at": "2026-11-27 17:26"
 }

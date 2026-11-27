@@ -41,7 +41,8 @@
       "major": 16,
       "minor": 9
     },
-    "duplicates": 2,
+    "duplicates": 1,
+    "parts": 1,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -156,12 +157,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 2,
+    "duplicates": 1,
+    "parts": 1,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.933,
+    "precision_useful": 0.967,
     "precision_gold": 0.933
   },
   "severity": {
@@ -833,20 +835,26 @@
   ],
   "duplicates": [
     {
-      "finding": "D-08",
-      "gold": "С16",
-      "title": "Вызов настроек из сервиса расходов нет в архитектуре",
-      "sources": [
-        "lens:architect",
-        "consistency"
-      ]
-    },
-    {
       "finding": "D-14",
       "gold": "К5",
       "title": "Ключ повтора события процессинга и его поля не заданы",
       "sources": [
         "lens:architect"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-08",
+      "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-09",
+      "title": "Вызов настроек из сервиса расходов нет в архитектуре",
+      "sources": [
+        "lens:architect",
+        "consistency"
       ]
     }
   ],
@@ -1266,7 +1274,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.49,
+  "seconds": 0.47,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-9a4d",
-  "rescored_at": "2026-11-27 16:25"
+  "rescored_at": "2026-11-27 17:26"
 }

@@ -41,7 +41,8 @@
       "major": 20,
       "minor": 10
     },
-    "duplicates": 6,
+    "duplicates": 2,
+    "parts": 4,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -156,12 +157,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 6,
+    "duplicates": 2,
+    "parts": 4,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.824,
+    "precision_useful": 0.941,
     "precision_gold": 0.824
   },
   "severity": {
@@ -789,22 +791,6 @@
   ],
   "duplicates": [
     {
-      "finding": "D-08",
-      "gold": "С16",
-      "title": "Архитектура не связывает учёт расходов с настройками",
-      "sources": [
-        "lens:architect"
-      ]
-    },
-    {
-      "finding": "D-10",
-      "gold": "С17",
-      "title": "Не задан момент начала подсчёта расходов после включения",
-      "sources": [
-        "lens:analyst"
-      ]
-    },
-    {
       "finding": "D-11",
       "gold": "К4",
       "title": "Сумма за месяц на экране не имеет источника данных",
@@ -814,8 +800,46 @@
       ]
     },
     {
+      "finding": "D-26",
+      "gold": "К5",
+      "title": "Цель «в момент покупки» не согласована с минутной задержкой",
+      "sources": [
+        "consistency"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-08",
+      "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-09",
+      "title": "Архитектура не связывает учёт расходов с настройками",
+      "sources": [
+        "lens:architect"
+      ]
+    },
+    {
+      "finding": "D-10",
+      "gold": "С17",
+      "parts": [
+        "сумма за месяц: с начала месяца или с включения"
+      ],
+      "credited": "D-27",
+      "title": "Не задан момент начала подсчёта расходов после включения",
+      "sources": [
+        "lens:analyst"
+      ]
+    },
+    {
       "finding": "D-15",
       "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-16",
       "title": "В push не указано, какая сумма передаётся",
       "sources": [
         "lens:analyst"
@@ -824,19 +848,15 @@
     {
       "finding": "D-24",
       "gold": "С2",
+      "parts": [
+        "403 ↔ 404, чужая карта"
+      ],
+      "credited": "D-22",
       "title": "Чужая карта: код 403 или 404",
       "sources": [
         "consistency",
         "lens:architect",
         "rules:api.status_404"
-      ]
-    },
-    {
-      "finding": "D-26",
-      "gold": "К5",
-      "title": "Цель «в момент покупки» не согласована с минутной задержкой",
-      "sources": [
-        "consistency"
       ]
     }
   ],
@@ -1237,13 +1257,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 32.900000000000006,
-    "cost_usd": 0.2591096,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 33.38,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_posle_zamorozki/runs/20261127-162858-9c2a"
+  "seconds": 0.53,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_posle_zamorozki/runs/20261127-162858-9c2a",
+  "rescored_at": "2026-11-27 17:26"
 }

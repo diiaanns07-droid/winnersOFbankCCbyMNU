@@ -41,7 +41,8 @@
       "major": 13,
       "minor": 12
     },
-    "duplicates": 2,
+    "duplicates": 0,
+    "parts": 2,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -156,12 +157,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 2,
+    "duplicates": 0,
+    "parts": 2,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.933,
+    "precision_useful": 1.0,
     "precision_gold": 0.933
   },
   "severity": {
@@ -781,10 +783,15 @@
       "how": "детерминированно"
     }
   ],
-  "duplicates": [
+  "duplicates": [],
+  "parts": [
     {
       "finding": "D-08",
       "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-20",
       "title": "Связь расходов с настройками есть в sequence, нет в архитектуре",
       "sources": [
         "lens:architect",
@@ -794,6 +801,10 @@
     {
       "finding": "D-13",
       "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-14",
       "title": "Не определено, какая сумма передаётся в push",
       "sources": [
         "lens:analyst"
@@ -1239,13 +1250,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 41.2,
-    "cost_usd": 0.2782656,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 41.77,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_vyborka_2/runs/20261127-163448-9161"
+  "seconds": 0.43,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_vyborka_2/runs/20261127-163448-9161",
+  "rescored_at": "2026-11-27 17:26"
 }

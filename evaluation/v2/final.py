@@ -42,6 +42,17 @@ def same_code(a: str, b: str) -> bool | None:
     return {0: True, 1: False}.get(r.returncode)
 
 
+def code_diff(a: str, b: str, limit: int = 8) -> str:
+    """Чем код двух коммитов отличается: файлы `src/` и `pyproject.toml` с числом строк (+/−) — чтобы читатель
+    видел, задевает ли разница основной прогон (линзы, судья) или, например, только режим `--answers`."""
+    r = _git("diff", "--numstat", a, b, "--", "src", "pyproject.toml")
+    rows = [x.split("\t") for x in r.stdout.splitlines() if x.count("\t") >= 2] if r.returncode == 0 else []
+    if not rows:
+        return ""
+    short = [f"`{path.removeprefix('src/bcc_review/v2/')}` (+{add}/−{rem})" for add, rem, path in rows[:limit]]
+    return ", ".join(short) + (f" и ещё {len(rows) - limit}" if len(rows) > limit else "")
+
+
 def code_note(sha: str, groups: list[list[dict]]) -> str:
     """Метка говорит «на `sha`» — сверить, что у каждого прогона (`commit` в истории и сводках) тот же `src/`."""
     commits = sorted({c for rows in groups for r in rows
@@ -54,8 +65,8 @@ def code_note(sha: str, groups: list[list[dict]]) -> str:
     if bad:
         return (f"⚠ **Код прогонов не совпадает с `{sha}`:** " + ", ".join(f"`{c}`" for c in bad)
                 + " — метка говорит одно, а `src/` у прогона другой; эти цифры не про этот код.")
-    return (f"Код прогонов сверен: {len(commits) - len(unknown)} из {len(commits)} коммитов прогонов — `src/` и "
-            f"`pyproject.toml` как у `{sha}`" + (f", git не знает: {', '.join(unknown)}" if unknown else "") + ".")
+    return (f"Код прогонов сверен по git (коммитов прогонов: {len(commits)}, сверено {len(commits) - len(unknown)}) — "
+            f"`src/` и `pyproject.toml` как у `{sha}`" + (f"; git не знает: {', '.join(unknown)}" if unknown else "") + ".")
 
 
 def _span(vals: list, digits: int = 1) -> str:
@@ -142,16 +153,16 @@ def gate_lines(sha: str, checks: list[dict] | None = None) -> list[str]:
     return L
 
 
-def render(ref: str, sha: str, note: str, checks: list[dict] | None = None) -> str:
-    L = [f"Код: `{sha}`" + (f" ({note})" if note else "") + ". Все числа — из готовых замеров с этим коммитом в "
-         "метке; пересчитать — `python -m evaluation.v2.final --commit " + ref + " --write`.", ""]
-    off = official(sha)
-    L += ["**Официальный документ** (каждая модель — все прогоны на этом коде, разброс min–max):", "",
-          "| Модель | Прогонов | complete | К найдено | К критичными | С из 20 | Замечаний | Дубли | Ложных critical "
-          "| Время, мин | Вызовов | Рубрика | $ за прогон |",
-          "| :--- | ---: | ---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"]
-    for m in sorted({r.get("model") for r in off}, key=lambda x: ("sonnet", "haiku", "opus").index(x)
-                    if x in ("sonnet", "haiku", "opus") else 9):
+_ORDER = ("sonnet", "haiku", "opus")
+
+
+def official_table(off: list[dict]) -> list[str]:
+    """Официальный документ по моделям: все прогоны, разброс min–max; промахи С — в скольких прогонах модели."""
+    L = ["| Модель | Прогонов | complete | К найдено | К критичными | С из 20 | Замечаний | Дубли | Ложных critical "
+         "| Время, мин | Вызовов | Рубрика | $ за прогон |",
+         "| :--- | ---: | ---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"]
+    models = sorted({r.get("model") for r in off}, key=lambda x: _ORDER.index(x) if x in _ORDER else 9)
+    for m in models:
         rs = [r for r in off if r.get("model") == m]
         cl = [round(100 * r["clarity"]["passed"] / r["clarity"]["n"]) for r in rs if (r["clarity"] or {}).get("n")]
         L.append(f"| {m} | {len(rs)} | {sum(1 for r in rs if r.get('status') == 'complete')} | "
@@ -164,7 +175,7 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None) -> s
     if not off:
         L.append("| — | 0 | | | | | | | | | | | |")
     parts = []
-    for m in sorted({r.get("model") for r in off}):
+    for m in sorted(models):
         rs = [r for r in off if r.get("model") == m]
         missed = sorted({g for r in rs for g in r.get("C_missed") or []},
                         key=lambda g: int(g[1:]) if g[1:].isdigit() else 99)
@@ -173,6 +184,34 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None) -> s
                 f"{g} ({sum(1 for r in rs if g in (r.get('C_missed') or []))} из {len(rs)})" for g in missed))
     if parts:
         L += ["", "Промахи С (в скольких прогонах модели): " + "; ".join(parts) + "."]
+    return L
+
+
+def newer_lines(sha: str, newer: list[str]) -> list[str]:
+    """Официальный документ на более новом коде (после замера релиза) — с тем, чем код отличается от `sha`."""
+    L: list[str] = []
+    for ref in newer:
+        nsha, _ = resolve(ref)
+        rows = official(nsha)
+        if not rows:
+            L += ["", f"На `{nsha}` замеров официального документа нет."]
+            continue
+        diff = code_diff(sha, nsha) if same_code(sha, nsha) is False else ""
+        L += ["", f"**Проверка на более новом коде `{nsha}`** — официальный документ"
+              + (f"; код отличается от `{sha}`: {diff}" if diff else "; `src/` тот же") + ":", ""]
+        L += official_table(rows)
+        note_code = code_note(nsha, [rows])
+        L += ["", note_code] if note_code else []
+    return L
+
+
+def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newer: list[str] | None = None) -> str:
+    L = [f"Код: `{sha}`" + (f" ({note})" if note else "") + ". Все числа — из готовых замеров с этим коммитом в "
+         "метке; пересчитать — `python -m evaluation.v2.final --commit " + ref
+         + "".join(f" --newer {n}" for n in newer or []) + " --write`.", ""]
+    off = official(sha)
+    L += ["**Официальный документ** (каждая модель — все прогоны на этом коде, разброс min–max):", ""]
+    L += official_table(off)
     corp = _summaries(V2 / "corpus_results", sha)
     if corp:
         L += ["", "**Корпус `evaluation/dev`** (строгий счётчик `evaluation/harness`):", "",
@@ -208,6 +247,7 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None) -> s
         note_code = code_note(sha, [off, corp, nz])
         if note_code:
             L[1:1] = ["", note_code]
+        L += newer_lines(sha, newer or [])
         L += gate_lines(sha, checks)
     return "\n".join(L) + "\n"
 
@@ -217,6 +257,8 @@ def main(argv: list[str] | None = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--commit", required=True, help="коммит замеров или тег релиза (v2.0.0)")
     ap.add_argument("--code", help="коммит, на котором мерили, если --commit — тег (по умолчанию — сам тег)")
+    ap.add_argument("--newer", action="append", default=[], metavar="SHA",
+                    help="ещё и официальный документ на более новом коде (исправления после замера), с разницей кода")
     ap.add_argument("--write", action="store_true", help="записать блок «Финальные цифры» в RESULTS.md")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
@@ -226,7 +268,9 @@ def main(argv: list[str] | None = None) -> int:
         same = same_code(tag_sha, sha)
         note = (f"тег `{a.commit}` = `{tag_sha}`, код " + {True: "совпадает", False: "**не совпадает**",
                                                          None: "не сверен"}[same] + f" с `{sha}`")
-    text = render(a.commit, sha, note)
+        if same is False:
+            note += f": отличаются {code_diff(sha, tag_sha)}"
+    text = render(a.commit, sha, note, newer=a.newer)
     print(text)
     if a.write:
         put_results_block(RESULTS, "final", text, "Финальные цифры релиза (W4-07)")

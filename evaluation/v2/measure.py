@@ -177,14 +177,40 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     if not a.no_history:
         with HISTORY.open("a", encoding="utf-8") as fh:
-            row = sc.history_row(res, a.label)
-            row["dir"] = str(dest.relative_to(ROOT))
-            row["K_missed"] = [g for g in ("К1", "К2", "К3", "К4", "К5") if g not in res["recall"]["critical"]["found"]]
-            row["C_missed"] = [m["gold"] for m in res["misses"] if m.get("level") == "major"]
-            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+            fh.write(json.dumps(_row(res, a.label, str(dest.relative_to(ROOT))), ensure_ascii=False) + "\n")
         update_results()
     print(f"сохранено: {dest.relative_to(ROOT)}")
     return 0
+
+
+def _row(res: dict, label: str, rel_dir: str) -> dict:
+    """Строка history.jsonl по оценке: метрики счётчика, каталог замера, промахи К и С."""
+    row = sc.history_row(res, label)
+    row["dir"] = rel_dir
+    row["K_missed"] = [g for g in ("К1", "К2", "К3", "К4", "К5") if g not in res["recall"]["critical"]["found"]]
+    row["C_missed"] = [m["gold"] for m in res["misses"] if m.get("level") == "major"]
+    return row
+
+
+def _rewrite_history(updates: dict[str, dict]) -> int:
+    """Заменить строки истории с теми же `dir` пересчитанными (время и метка замера — прежние, плюс `rescored_at`).
+    Запись — через временный файл: история общая для замеров, частично записанной её не оставляем."""
+    if not updates or not HISTORY.exists():
+        return 0
+    out, n = [], 0
+    for line in HISTORY.read_text(encoding="utf-8").splitlines():
+        row = json.loads(line) if line.strip() else None
+        if row is None:
+            continue
+        new = updates.get(str(row.get("dir")))
+        if new:
+            row = {**row, **{k: v for k, v in new.items() if k not in ("at", "label")}, "rescored_at": sc.astana_now()}
+            n += 1
+        out.append(json.dumps(row, ensure_ascii=False))
+    tmp = HISTORY.with_suffix(".jsonl.tmp")
+    tmp.write_text("\n".join(out) + "\n", encoding="utf-8")
+    tmp.replace(HISTORY)
+    return n
 
 
 def rescore(dirs: list[str]) -> int:
@@ -192,6 +218,7 @@ def rescore(dirs: list[str]) -> int:
     report.json, решения арбитра — из кэша. Печатает, что изменилось в К, С и рубрике понятности."""
     gold = sc.load_gold(sc.DEFAULT_GOLD)
     rc = 0
+    updates: dict[str, dict] = {}
     for d in dirs:
         dest = Path(d) if Path(d).is_absolute() else ROOT / d
         rp = dest / "report.json"
@@ -220,8 +247,14 @@ def rescore(dirs: list[str]) -> int:
         def brief(x: dict) -> str:
             r, cl = x.get("recall") or {}, x.get("clarity") or {}
             return (f"К {len((r.get('critical') or {}).get('found') or [])}/5, С {(r.get('major') or {}).get('n')}/20, "
-                    f"рубрика {cl.get('passed')}/{cl.get('n')}")
+                    f"рубрика {cl.get('passed')}/{cl.get('n')}, дублей {(x.get('precision') or {}).get('duplicates')}")
         print(f"{dest.name}: {brief(old) if old else '—'} → {brief(res)}")
+        rel = str(dest.relative_to(ROOT)) if dest.is_relative_to(ROOT) else str(dest)
+        updates[rel] = _row(res, label, rel)
+    n = _rewrite_history(updates)
+    if n:
+        print(f"история: пересчитано строк {n}")
+        update_results()
     return rc
 
 
