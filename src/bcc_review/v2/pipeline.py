@@ -34,8 +34,10 @@ DEFAULTS: dict[str, Any] = {
     "timeout": 600.0, "max_retries": 5, "cache": True, "cache_dir": None, "runs_dir": "runs", "run_id": None,
     "export": [], "html": True, "answers": None, "revise": False, "passes": 1, "parallel": 5,
     "mock_dir": None, "lenses": list(LENSES), "consistency": True, "clarify": True, "judge_check": True,
-    "quiet": False,
+    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None,
 }
+# Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
+DEFAULT_RPM = {"gemini": 10}
 
 
 # --------------------------------------------------------------------------- вспомогательное
@@ -122,6 +124,12 @@ def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = Non
         if pname == "offline":
             return None, "offline"
         kw = {"model": opts["model"]} if opts.get("model") else {}
+        if pname == "claude_cli":
+            effort = opts.get("effort") or weak_profile_effort(opts.get("model"))
+            if effort and not os.environ.get("CLAUDE_CLI_EFFORT"):
+                kw["effort"] = effort
+            if opts.get("stage_timeout"):
+                kw["timeout_floor_s"] = min(600.0, float(opts["stage_timeout"]))
         provider = doctor.make_provider(pname, **kw)
     cache_dir = None
     if opts.get("cache") and pname != "mock":
@@ -129,8 +137,16 @@ def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = Non
     llm = LLMClient(provider, model=opts.get("model"), provider_name=pname,
                     fallback_models=opts.get("fallback_models") or [], max_calls=opts["max_calls"],
                     max_seconds=opts["max_seconds"], max_retries=opts["max_retries"], timeout_s=opts["timeout"],
-                    cache_dir=cache_dir, trace=run.trace if run else None)
+                    cache_dir=cache_dir, trace=run.trace if run else None,
+                    stage_timeout_s=float(opts.get("stage_timeout") or 0),
+                    rpm=float(opts["rpm"]) if opts.get("rpm") is not None else DEFAULT_RPM.get(pname, 0))
     return llm, pname
+
+
+def weak_profile_effort(model: str | None) -> str | None:
+    """Профиль слабой модели: у haiku рассуждения — 70 % вывода и 2–4 мин на вызов; effort=low вдвое быстрее
+    при том же качестве (замер 05:05: линза архитектора 232 → 108 с, судья 259 → 119 с, К и С те же)."""
+    return "low" if model and "haiku" in str(model).lower() else None
 
 
 def _mock_dir_for(input_path: str | Path | None) -> Path:
@@ -208,9 +224,14 @@ class Pipeline:
             msg = f"Этап {name} не выполнен: {err[:300]}"
             self.warnings.append(msg)
             self.log(f"  {name}: СБОЙ — {err[:200]}")
-        self.stages[name] = status
         after = (llm.stats["by_stage"].get(name) or {}) if llm else {}
         calls = int(after.get("calls", 0)) - int(before.get("calls", 0))
+        hit = (int(after.get("budget", 0)) - int(before.get("budget", 0))) + \
+              (int(after.get("failed", 0)) - int(before.get("failed", 0)))
+        if status == "ok" and hit > 0:
+            status = "partial"
+            self.warnings.append(f"Этап {name} выполнен частично: часть вызовов модели не удалась или упёрлась в бюджет")
+        self.stages[name] = status
         st = {"calls": calls, "seconds": seconds, "candidates": len(out.get("candidates") or [])}
         if after.get("split", 0) - before.get("split", 0):
             st["split"] = after["split"] - before.get("split", 0)

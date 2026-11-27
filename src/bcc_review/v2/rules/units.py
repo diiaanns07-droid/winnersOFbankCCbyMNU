@@ -75,17 +75,24 @@ def rule_currency(doc: Doc, out: dict) -> None:
                 frag = f"{subj} {tail[:60].split('|')[0]}".strip() if subj else tail[:60].split("|")[0].strip()
                 if frag not in x.joined:
                     frag = x.joined
+                evidence = [ev(x, frag)]
+                field = next((c for c in (x.cells or []) if re.fullmatch(r"[A-Za-z_]\w*", c)), "")
+                if field:  # пример значения этого поля (JSON) — вторая сторона расхождения
+                    ex = next((y for y in doc.lines if y is not x and f'"{field}"' in y.joined), None)
+                    if ex is not None:
+                        jm = re.search(r"\{[^{}]*\}", ex.joined)
+                        evidence.append(ev(ex, jm.group(0) if jm else ex.joined))
                 out["candidates"].append(candidate(
                     "units.minor_fraction",
                     title=f"Величина в минорных единицах ({MN[0]}) описана с дробной частью",
                     kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
-                    evidence=[ev(x, frag)],
+                    evidence=evidence,
                     problem=(f"{quoted(frag)}: {MN[0]} — наименьшая единица валюты, дробной части у неё нет. "
                              f"Похоже, имелись в виду {MJ[0]}; значение примера и правила расходятся в 100 раз."),
                     scenario=f"В ответе приходит «100.00»: по описанию это 100 {MN[2]}, по смыслу — 100 {MJ[2]}.",
                     impact="Клиент покажет сумму в 100 раз меньше или больше; тест не определит правильное значение.",
                     recommendation=f"Указать одну единицу: целое число {MN[2]} либо сумму в {MJ[1]} с двумя знаками.",
-                    conflict=False,
+                    conflict=len(evidence) >= 2,
                 ))
                 break
         if not minors or not (majors or _has_major_values(doc, major)):
@@ -93,9 +100,22 @@ def rule_currency(doc: Doc, out: dict) -> None:
         conv = _conversion(doc, major, minor)
         if conv is not None:
             continue
-        # пара: сначала по одной и той же величине, затем любая
+        # пара: сначала те же числа в основной единице, затем одна и та же величина, затем любая
         pair = None
         for a in minors:
+            nums = _numbers(a[0].joined)
+            if len(nums) < 2:
+                continue
+            rx_val = re.compile(rf"\d\s*(?:{major})(?!\w)|{DENOM}(?:{major})(?!\w)", re.I)
+            for y in doc.lines:
+                if y is a[0] or not y.text or y.is_code or not rx_val.search(y.joined):
+                    continue
+                if len(nums & _numbers(y.joined)) >= 2:
+                    pair = (a, (y, "", _number_clause(y.joined, nums)), True)
+                    break
+            if pair:
+                break
+        for a in minors if pair is None else []:
             for b in majors:
                 if _stem(a[1]) and _stem(a[1]) == _stem(b[1]) and a[0].n != b[0].n:
                     pair = (a, b, True)
@@ -111,6 +131,11 @@ def rule_currency(doc: Doc, out: dict) -> None:
         a, b, same = pair
         qa = f"{a[1]} {a[2]}".strip()
         qb = f"{b[1]} {b[2]}".strip()
+        if a[0].cells and b[1] == "":  # строка таблицы: диапазон и единица из соседних ячеек
+            cells = a[0].cells
+            idx = [i for i, c in enumerate(cells) if _numbers(c) or a[2].split()[-1] in c]
+            if idx:
+                qa = " | ".join(cells[min(idx):max(idx) + 1])
         if qa not in a[0].joined:
             qa = a[2]
         if qb not in b[0].joined:
@@ -136,6 +161,27 @@ def rule_currency(doc: Doc, out: dict) -> None:
         out["signals"].append(signal("units.currency_mix", a[0], qa,
                                      f"Разные денежные единицы без пересчёта: {quoted(qa)} и {quoted(qb)}.",
                                      ("analyst", "risk", "consistency"), "unit_mismatch"))
+
+
+def _numbers(text: str) -> set[int]:
+    """Числа строки (≥ 100), «10 000» и «3 000 000» — одно число."""
+    res = set()
+    for m in re.finditer(r"\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+", text):
+        try:
+            v = int(re.sub(r"\D", "", m.group(0)))
+        except ValueError:
+            continue
+        if v >= 100:
+            res.add(v)
+    return res
+
+
+def _number_clause(text: str, nums: set[int]) -> str:
+    """Предложение строки, где стоят эти числа."""
+    for part in re.split(r"(?<=[.;])\s+|\s\|\s", text):
+        if len(_numbers(part) & nums) >= 2:
+            return part.strip()
+    return text
 
 
 def _has_major_values(doc: Doc, major: str) -> bool:

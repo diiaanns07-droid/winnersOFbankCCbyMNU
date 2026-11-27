@@ -409,7 +409,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         return system, user
 
     try:
-        raw = _cl.ask_items(ctx, STAGE, affected, build, SCHEMA, max_output_tokens=12000)
+        raw = _cl.ask_items(ctx, STAGE, affected, build, SCHEMA, max_output_tokens=32000)
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"recheck: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); дефекты оставлены открытыми")
         for g in out_findings:
@@ -537,10 +537,17 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
                         "question_ids": r["question_ids"], "title_after": r.get("title_after", "")})
     order = {"resolved": 0, "changed": 1, "open": 2}
     changes.sort(key=lambda c: (order.get(c["status"], 3), SEVERITIES.index(c["severity_before"] or "minor")))
+    # вопрос без прямого ответа, все дефекты которого сняты общими решениями, — не «без ответа»
+    status_by_id = {c["finding_id"]: c["status"] for c in changes}
+    q_by_id = {q.get("id"): q for q in report.get("questions") or []}
+    closed = [qid for qid in rc["answers"]["unanswered"]
+              if rc["answers"]["decisions"] and q_by_id.get(qid, {}).get("finding_ids")
+              and all(status_by_id.get(fid) == "resolved" for fid in q_by_id[qid]["finding_ids"])]
     clar = {
         "answers": rc["answers"]["answered"],
         "decisions": rc["answers"]["decisions"],
-        "unanswered": rc["answers"]["unanswered"],
+        "unanswered": [q for q in rc["answers"]["unanswered"] if q not in closed],
+        "closed_by_decisions": closed,
         "changes": changes,
         "new_findings": [f["id"] for f in new_found],
         "before": {"verdict": v_before, "findings": severity_counts(findings)},
@@ -568,6 +575,7 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
     b, a = clar["before"], clar["after"]
     lines = ["## Уточнение: до и после ответов владельца", "",
              f"Ответов на вопросы: {len(clar['answers'])}, общих решений: {len(clar['decisions'])}, "
+             f"закрыто общими решениями: {len(clar.get('closed_by_decisions') or [])}, "
              f"без ответа: {len(clar['unanswered'])}. Оценка «после» предполагает, что ответы внесены в документ "
              f"(см. исправленную редакцию).", "",
              "| Показатель | До уточнения | После уточнения |", "| :--- | :--- | :--- |",
