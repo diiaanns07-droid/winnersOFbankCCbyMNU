@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import re
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any, Iterable
 
 STAGE = "judge"
@@ -159,8 +160,9 @@ _CHECK_HINTS: list[tuple[re.Pattern, tuple[str, ...], tuple[str, ...]]] = [
 ]
 
 _NO_ID_RE = re.compile(
-    r"(без|нет|отсутств\w*|не (?:имеют|имеет|присвоен\w*))\s+(?:\w+\s+){0,2}"
-    r"(ID|идентификатор\w*|номер\w*|нумерац\w*)|не пронумерован|сквозн\w+ нумерац",
+    r"(без|нет|отсутств\w*|не (?:имеют|имеет|присвоен\w*|указан\w*|задан\w*))\s+(?:\w+\s+){0,3}"
+    r"(ID|идентификатор\w*|номер\w*|нумерац\w*|приоритет\w*)|не пронумерован|сквозн\w+ нумерац|"
+    r"приоритет\w*(?: \S+){0,4} не (?:указан|задан|определ)\w*",
     re.I)
 
 # --- схема ответа модели -----------------------------------------------------------------------
@@ -736,11 +738,96 @@ def _add_named_sides(item: dict, view: dict) -> int:
     return added
 
 
-def _text(f: dict, base: dict | None, field: str, limit: int) -> str:
+def _text(f: dict, base: dict | None, field: str, limit: int, members: list[dict] | None = None) -> str:
+    """Текст поля: судья → базовый кандидат → лучший другой кандидат дефекта (тот же вид, затем самый
+    подробный). Так у объединённого дефекта не теряются сценарий, последствия и готовая правка."""
     val = _s(f.get(field))
     if not val and base is not None:
         val = _s(base.get(field))
-    return _cut(val, limit)
+    if not val and members:
+        kind = _s(f.get("kind")) or _s((base or {}).get("kind"))
+        others = [m for m in members if m is not base and _s(m.get(field))]
+        others.sort(key=lambda m: (_s(m.get("kind")) != kind, -min(len(_s(m.get(field))), limit), _cid_num(m["id"])))
+        if others:
+            val = _s(others[0].get(field))
+    return _cut(_tidy(val), limit)
+
+
+def _tidy(text: str) -> str:
+    """Мелкая чистка текста для читателя: двойные точки, пробел перед знаком, «..»."""
+    text = re.sub(r"(?<!\.)\.\.(?!\.)", ".", _s(text))
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    return text
+
+
+_DOC_ID_RE = re.compile(r"^[A-ZА-ЯЁ]{1,5}-?\d{1,3}(?:\.\d{1,2})?$")
+
+
+def _req_names(requirements: list[dict] | None) -> tuple[dict[str, str], dict[str, str]]:
+    """R-xx → ID требования в документе («Ф-2», «НФ-1»), если он короткий и однозначный; и R-xx → любая
+    подпись места в документе («Критерии приемки, строка 2»)."""
+    short: dict[str, str] = {}
+    labels: dict[str, str] = {}
+    seen: dict[str, int] = {}
+    for r in requirements or []:
+        sid = _s(r.get("source_id"))
+        if _DOC_ID_RE.match(sid):
+            seen[sid] = seen.get(sid, 0) + 1
+    for r in requirements or []:
+        rid, sid = _s(r.get("id")), _s(r.get("source_id"))
+        if not rid or not sid:
+            continue
+        labels[rid] = sid
+        if _DOC_ID_RE.match(sid) and seen.get(sid) == 1:
+            short[rid] = sid
+    return short, labels
+
+
+def _doc_ids(text: str, names: tuple[dict[str, str], dict[str, str]] | None) -> str:
+    """Внутренние R-xx в тексте → ID документа: «R-06 (Ф-2)» → «Ф-2», «R-06» → «Ф-2»,
+    «R-14 (Критерии приемки, строка 2)» → «Критерии приемки, строка 2»; прочие R-xx остаются
+    (отчёт делает их ссылками на таблицу требований)."""
+    if not text or not names:
+        return text
+    short, labels = names
+
+    def paren(m: re.Match) -> str:
+        rid, inner = m.group(1), m.group(2).strip()
+        sid, lab = short.get(rid), labels.get(rid, "")
+        if sid:
+            return sid if inner.startswith(sid) else f"{sid} ({inner})"
+        if lab and _norm_q(inner).startswith(_norm_q(lab)[:12]):
+            return f"«{inner}»"
+        return m.group(0)
+
+    def bare(m: re.Match) -> str:
+        rid = m.group(1)
+        return short.get(rid) or (f"«{labels[rid]}»" if rid in labels else rid)
+
+    text = re.sub(r"\b(R-\d{2,3})\s*\(([^()]{1,60})\)", paren, text)
+    return re.sub(r"\b(R-\d{2,3})\b(?!\s*\()", bare, text)
+
+
+_TITLE_MAX_WORDS = 12
+
+
+def _nwords(text: str) -> int:
+    """Слова заголовка: токены с буквами (числа и коды статусов не считаются)."""
+    return sum(1 for w in _s(text).split() if re.search(r"[A-Za-zА-Яа-яЁё]", w))
+
+
+def _short_title(title: str, members: list[dict]) -> str:
+    """Заголовок до 12 слов: длинный режется по разделителю «:» или «—», если первая часть сама называет
+    объект и проблему (5–12 слов); иначе остаётся как есть (длину задаёт промпт)."""
+    title = _tidy(title)
+    if _nwords(title) <= _TITLE_MAX_WORDS:
+        return title
+    for sep in (": ", " — "):
+        if sep in title:
+            head = title.split(sep)[0]
+            if 5 <= _nwords(head) <= _TITLE_MAX_WORDS:
+                return head
+    return title
 
 
 def _sources(members: list[dict]) -> list[str]:
@@ -757,19 +844,27 @@ def _source_family(src: str) -> str:
 
 
 def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
-               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS) -> bool:
+               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS, strict: bool = False,
+               skip_ids: set[str] | frozenset[str] = frozenset()) -> bool:
     """Critical подтверждён двумя ревьюерами: два источника среди кандидатов дефекта или кандидат другого
     источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект.
-    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам."""
+    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам.
+    ``strict`` (для major): сосед — того же вида и с ≥ 2 общими строками; кандидаты из ``skip_ids`` (они сами
+    образуют другой major) не подтверждают: два major по одним строкам не держат друг друга; ревьюер, сам
+    предложивший minor, major не подтверждает."""
     fams = {_source_family(_s(m.get("source"))) for m in members}
-    if len(fams) >= 2 or any(_s(m.get("origin")) in structured for m in members):
+    voters = {_source_family(_s(m.get("source"))) for m in members
+              if not (strict and _s(m.get("severity")) == "minor")}
+    if len(voters) >= 2 or any(_s(m.get("origin")) in structured for m in members):
         return True
     lines = {e["line_start"] for e in f["evidence"]}
-    need = min(2, len(lines))
+    need = 2 if strict else min(2, len(lines))
     member_ids = {m["id"] for m in members}
     for c in all_cands or []:
-        if c["id"] in member_ids or _source_family(_s(c.get("source"))) in fams:
+        if c["id"] in member_ids or c["id"] in skip_ids or _source_family(_s(c.get("source"))) in fams:
             continue
+        if strict and (_s(c.get("kind")) != f["kind"] or _s(c.get("severity")) == "minor"):
+            continue  # соседний дефект другого вида или сам minor — не подтверждение
         if len(lines & set(_lines_of(c))) >= need:
             return True
     return False
@@ -850,8 +945,22 @@ def _req_maps(requirements: list[dict] | None) -> tuple[dict[int, str], dict[str
     return at, by_id
 
 
+def _critical_support(members: list[dict], run_has_critical: bool = True) -> bool:
+    """Итоговый critical допустим только с опорой: (а) хотя бы один ревьюер сам предложил critical, или
+    (б) кандидат исполнил строку критерия приёмки, или (в) дефект нашли не меньше трёх разных ревьюеров.
+    Страховка для слабых моделей: если во всём прогоне никто не предложил critical, хватает двух ревьюеров
+    (один — никогда). Ложные critical на чистых ТЗ были подъёмом major → critical от 1–2 ревьюеров."""
+    if any(_s(m.get("severity")) == "critical" for m in members):
+        return True
+    if any(_s(m.get("origin")) in MAJOR_STRUCTURED_ORIGINS for m in members):
+        return True
+    fams = len({_source_family(_s(m.get("source"))) for m in members if _s(m.get("source"))})
+    return fams >= 3 or (not run_has_critical and fams >= 2)
+
+
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0,
-               all_cands: list[dict] | None = None, req_maps: tuple[dict, dict] | None = None) -> None:
+               all_cands: list[dict] | None = None, req_maps: tuple[dict, dict] | None = None,
+               run_has_critical: bool = True, critical_support: bool = False) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
         # критерий у противоречия и пропуска — по виду: модель иногда ставит «conforming» и т. п.
@@ -875,6 +984,9 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "противоречие подтверждено цитатой только одного места"
         elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed(f, members, all_cands):
             why = "critical подтвердил только один ревьюер"
+        elif critical_support and not _critical_support(members, run_has_critical):
+            why = "подъём до critical без опоры: ни один ревьюер не предложил critical, нет строки приёмки, " \
+                  "ревьюеров меньше трёх"
         else:
             why = verify_critical(f, *(req_maps or ({}, {})))
         if why:
@@ -887,36 +999,53 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
         f["blocks"] = "none"
 
 
-def _merge_no_id(findings: list[dict], ctx: Any, warnings: list[str]) -> list[dict]:
-    """«Нет ID у пунктов» — одно minor на документ: такие дефекты сливаются в один."""
-    hits = [f for f in findings if f["criterion"] in {"conforming", "ranked", "traceable"}
-            and _NO_ID_RE.search(f["title"])]
-    if len(hits) < 2:
-        return findings
-    main = hits[0]
-    for f in hits[1:]:
-        main["candidate_ids"] += [x for x in f["candidate_ids"] if x not in main["candidate_ids"]]
-        main["_members"] += f["_members"]
-        main["requirement_ids"] = list(dict.fromkeys(main["requirement_ids"] + f["requirement_ids"]))
-    main["severity"] = "minor"
-    _warn(ctx, warnings, f"судья: {len(hits)} замечания об отсутствии ID сведены в одно")
-    drop = {id(f) for f in hits[1:]}
-    return [f for f in findings if id(f) not in drop]
-
-
 _WISHES = {
     "title": "Документ не рассматривает ряд случаев",
     "lead": "Документ не говорит, что происходит в случаях: ",
     "impact": "Без решения владельца продукта поведение в этих случаях выберут разработчики, и его нечем проверить.",
     "recommendation": "Решить с владельцем продукта, какие из перечисленных случаев описать в требованиях, а какие "
                       "явно исключить из объёма доработки.",
+    "question": "Какие из перечисленных случаев описать в требованиях, а какие явно исключить из объёма доработки?",
     "kind": "incomplete", "criterion": "set_complete", "warn": "пожелания полноты",
+}
+_NO_IDS = {
+    "title": "Не у всех требований есть ID и приоритет",
+    "lead": "Требования не пронумерованы или не ранжированы: ",
+    "impact": "На пункты без ID нельзя сослаться из тестов и задач, без приоритета не видно, что делать первым.",
+    "recommendation": "Присвоить каждому требованию уникальный ID и приоритет (обязательно, желательно, можно позже).",
+    "question": "Какие ID и приоритеты присвоить перечисленным требованиям?",
+    "kind": "other", "criterion": "ranked", "warn": "нет ID и приоритетов",
+}
+_TERMS = {
+    "title": "Одни и те же понятия названы разными терминами",
+    "lead": "Разные названия одного понятия: ",
+    "impact": "Читатель не уверен, одно это понятие или разные; в коде и тестах появятся разные сущности.",
+    "recommendation": "Выбрать для каждого понятия один термин, внести его в раздел терминов и заменить остальные.",
+    "question": "Какой термин оставить для каждого из перечисленных понятий?",
+    "kind": "terminology", "criterion": "set_comprehensible", "warn": "терминология",
+}
+_NONSINGULAR = {
+    "title": "Несколько независимых правил записаны в одном пункте",
+    "lead": "Пункты объединяют несколько правил: ",
+    "impact": "На каждое правило нельзя сослаться отдельно из теста и задачи; частичное выполнение пункта не видно.",
+    "recommendation": "Разделить перечисленные пункты на отдельные требования, по одному правилу в каждом.",
+    "question": "Можно ли разделить перечисленные пункты на отдельные требования, по одному правилу в каждом?",
+    "kind": "non_singular", "criterion": "singular", "warn": "неатомарные пункты",
+}
+_DUPLICATES = {
+    "title": "Одно и то же правило записано в документе несколько раз",
+    "lead": "Повторы правил: ",
+    "impact": "При изменении одного места второе останется прежним, и документ начнёт противоречить сам себе.",
+    "recommendation": "Оставить правило в одном месте, во втором — ссылку на него.",
+    "question": "В каком месте документа оставить каждое из повторённых правил?",
+    "kind": "duplicate", "criterion": "modifiable", "warn": "повторы",
 }
 _PLACEHOLDERS = {
     "title": "Не заполнены поля и разделы шаблона документа",
     "lead": "Оставлены незаполненными или заглушкой: ",
     "impact": "Документ нельзя считать согласованным и прослеживаемым: не видно версии, ответственных и источников.",
     "recommendation": "Заполнить перечисленные поля и разделы шаблона или явно указать «не применимо» с причиной.",
+    "question": "Кто и когда заполнит перечисленные поля шаблона, или какие из них не применимы к документу?",
     "kind": "placeholder", "criterion": "conforming", "warn": "незаполненные поля шаблона",
 }
 
@@ -935,12 +1064,15 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
         return findings
     if len(hits) == 1:
         hits[0]["severity"], hits[0]["blocks"], hits[0]["priority"] = "minor", "none", 0
+        if not (_s(hits[0].get("rewrite")) or _s(hits[0].get("question"))) and spec.get("question"):
+            hits[0]["question"] = spec["question"]
         return findings
     hits.sort(key=lambda f: f["_first_line"])
     members = [m for f in hits for m in f["_members"]]
-    items = [re.sub(r"[.;:\s]+$", "", f["title"]) for f in hits]
+    items = [f"{re.sub(r'[.;:\s]+$', '', f['title'])} (строка {f['_first_line']})" for f in hits]
     lead = spec["lead"]
     listed = "; ".join(_lc_first(x) for x in items[:10])
+    rewrites = list(dict.fromkeys(_s(f.get("rewrite")) for f in hits if _s(f.get("rewrite"))))
     main = dict(hits[0])
     main.update({
         "candidate_ids": sorted({c for f in hits for c in f["candidate_ids"]}, key=_cid_num),
@@ -952,7 +1084,7 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
         "evidence": _pick_evidence(members, None),
         "problem": _cut(lead + listed + ".", 900),
         "scenario": "", "impact": spec["impact"], "recommendation": spec["recommendation"],
-        "rewrite": "", "question": "",
+        "rewrite": _cut("; ".join(rewrites[:3]), 700), "question": "" if rewrites else spec.get("question", ""),
         "sources": _sources(members), "_members": members, "_wish": False,
     })
     main["_first_line"] = main["evidence"][0]["line_start"] if main["evidence"] else hits[0]["_first_line"]
@@ -975,6 +1107,31 @@ def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
                          f"{len(crit) - MAX_CRITICAL} наименее приоритетных понижены до major")
 
 
+REVIEWER_STAGE_RE = re.compile(r"^(lens_\w+|consistency|rules)$")
+
+
+def reviewer_stages(ctx: Any) -> int:
+    """Число реально отработавших этапов-рецензентов по ``run_dir/stages/*.json``: линза, вернувшая ноль
+    кандидатов, тоже ревьюер (иначе на документах, где 3 из 5 линз ничего не нашли, правило не срабатывает)."""
+    run_dir = getattr(ctx, "run_dir", None)
+    if not run_dir:
+        return 0
+    n = 0
+    try:
+        for p in (Path(run_dir) / "stages").glob("*.json"):
+            if not REVIEWER_STAGE_RE.match(p.stem):
+                continue
+            try:
+                rec = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(rec, dict) and rec.get("status") in ("ok", "partial"):
+                n += 1
+    except OSError:
+        return n
+    return n
+
+
 def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: int, ctx: Any,
                     warnings: list[str]) -> None:
     """В документе без критичных дефектов существенные дефекты решают вердикт («можно» или «с условиями»),
@@ -985,8 +1142,10 @@ def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: i
     if run_sources < MIN_SOURCES_FOR_CONSENSUS or any(f["severity"] == "critical" for f in findings):
         return
     lowered = 0
+    own_major = {cid for g in findings if g["severity"] == "major" for cid in g["candidate_ids"]}
     for f in findings:
-        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS):
+        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS,
+                                                  strict=True, skip_ids=own_major):
             continue
         f["severity"], f["blocks"], f["priority"] = "minor", "none", 0
         lowered += 1
@@ -1056,6 +1215,15 @@ _TERMS_RU = [
     (re.compile(r"\bfeature[- ]flag\w*", re.I), "флаг включения функции"),
     (re.compile(r"\bevent[ _-]?id\b", re.I), "идентификатор события"),
     (re.compile(r"\bNFR\b"), "НФТ"),
+    (re.compile(r"\bMust\b"), "обязательно"),
+    (re.compile(r"\bShould\b"), "желательно"),
+    (re.compile(r"\bCould\b"), "возможно"),
+    (re.compile(r"\bWon[’']t\b"), "не будет"),
+    (re.compile(r"\brps\b", re.I), "запросов в секунду"),
+    # падеж не ломаем: только в начале фразы или после слова «диаграмма»
+    (re.compile(r"(?:(?<=^)|(?<=[.!?]\s))Sequence[- ]?[Dd]iagram\b"), "Диаграмма последовательности"),
+    (re.compile(r"\b([Дд]иаграмм[а-яё]*)\s+(?:Sequence(?:[- ]?[Dd]iagram)?|«Sequence(?:[- ]?[Dd]iagram)?»)(?![A-Za-z])"),
+     r"\1 последовательности"),
 ]
 
 
@@ -1088,6 +1256,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     cluster_of = {cid: gi for gi, g in enumerate(clusters) for cid in g}
     placed: dict[str, str] = {}  # C-id → ключ дефекта или "rejected"
     run_sources = len({_source_family(_s(c.get("source"))) for c in candidates if _s(c.get("source"))})
+    run_has_critical = any(_s(c.get("severity")) == "critical" for c in candidates)
     req_maps = _req_maps(requirements)
     view = _view_of(ctx)
 
@@ -1168,19 +1337,20 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         item = {
             "key": d["key"],
             "candidate_ids": sorted(d["ids"], key=_cid_num),
-            "title": _cut(_s(f.get("title")) or _s(base.get("title")) or _fallback_title(f, base), 180),
+            "title": _cut(_short_title(_s(f.get("title")) or _s(base.get("title")) or _fallback_title(f, base),
+                                       members), 180),
             "kind": kind,
             "criterion": crit,
             "standard_refs": list(STANDARD_REFS.get(crit, [])),
             "severity": sev,
             "requirement_ids": reqs,
             "evidence": evidence,
-            "problem": _text(f, base, "problem", 900),
-            "scenario": _text(f, base, "scenario", 700),
-            "impact": _text(f, base, "impact", 500),
-            "recommendation": _text(f, base, "recommendation", 600),
-            "rewrite": _text(f, base, "rewrite", 700),
-            "question": _text(f, base, "question", 400),
+            "problem": _text(f, base, "problem", 900, members),
+            "scenario": _text(f, base, "scenario", 700, members),
+            "impact": _text(f, base, "impact", 500, members),
+            "recommendation": _text(f, base, "recommendation", 600, members),
+            "rewrite": _text(f, base, "rewrite", 700, members),
+            "question": _text(f, base, "question", 400, members),
             "blocks": blocks,
             "priority": prio,
             "sources": _sources(members),
@@ -1194,11 +1364,16 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         }
         if _add_named_sides(item, view):
             _warn(ctx, warnings, f"судья: к {item['title'][:50]!r} добавлена цитата места, названного в тексте")
-        _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps)
+        _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps, run_has_critical,
+                   bool(_option(ctx, "judge_critical_support", False)))
         findings.append(item)
 
-    findings = _merge_no_id(findings, ctx, warnings)
+    findings = _consolidate(findings, lambda f: bool(_NO_ID_RE.search(f["title"])) and (
+        f["severity"] == "minor" or f["criterion"] in {"conforming", "ranked", "traceable"}), _NO_IDS, ctx, warnings)
     findings = _consolidate(findings, lambda f: f["_wish"] and f["severity"] != "critical", _WISHES, ctx, warnings)
+    for kind, spec in (("terminology", _TERMS), ("non_singular", _NONSINGULAR), ("duplicate", _DUPLICATES)):
+        findings = _consolidate(findings, lambda f, k=kind: f["kind"] == k and f["severity"] == "minor",
+                                spec, ctx, warnings)
     findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] == "minor",
                             _PLACEHOLDERS, ctx, warnings)  # major-заглушки (параметры спецификации) — отдельно
     for f in findings:  # после слияния — доказательства и источники заново
@@ -1211,7 +1386,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             f["_first_line"] = f["evidence"][0]["line_start"]
     _cap_critical(findings, ctx, warnings)
     if _option(ctx, "judge_confirm_majors", True):
-        _confirm_majors(findings, candidates, run_sources, ctx, warnings)
+        _confirm_majors(findings, candidates, max(run_sources, reviewer_stages(ctx)), ctx, warnings)
     _assign_priorities(findings)
 
     # 5. номера D-xx: серьёзность → приоритет → строка
@@ -1256,10 +1431,15 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     code_summary = bool(summary) and bool(clean) and (_code_changed_verdict(findings)
                                                       or _text_contradicts(summary, clean))
 
-    # 7. ссылки на ключи в текстах дефектов → D-xx
+    # 7. ссылки на ключи и кандидатов в текстах дефектов → D-xx, внутренние R-xx → ID документа
+    names = _req_names(requirements)
     for f in clean:
+        own = set(f["candidate_ids"])
+        refs = {k: v for k, v in key_map.items() if not (k.startswith("C-") and k in own)}
         for field in ("title", "problem", "scenario", "impact", "recommendation", "question"):
-            f[field] = _ru_levels(_replace_keys(f[field], {k: v for k, v in key_map.items() if not k.startswith("C-")}))
+            f[field] = _doc_ids(_ru_levels(_replace_keys(f[field], refs)), names)
+            f[field] = re.sub(r"\bC-\d{2,4}\b", "это замечание", f[field])  # ссылка на себя
+        f["rewrite"] = _doc_ids(f["rewrite"], names)
 
     if code_summary:  # после замены ключей: в заголовках уже D-xx
         summary = verdict_text(clean)
@@ -1690,6 +1870,118 @@ def _finish(result: dict, source: str) -> dict:
 
 def dumps(result: dict) -> str:  # удобство отладки
     return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+# --- рубрика понятности (WAVE3): самопроверка текстов реестра ------------------------------------
+
+_GENERIC = re.compile(
+    r"недостаточно (?:детализ|подробн|четк)|рекомендуется уточнить|повысить качество|улучшить качество|"
+    r"требует (?:доработки|дополнительной проработки)|нуждается в (?:доработке|уточнении)|необходимо доработать|"
+    r"следует доработать|может привести к проблемам|может вызвать проблемы|возможны проблемы|по возможности|"
+    r"при необходимости|и т\. ?[дп]\.|и прочее|в целом|(?:соответствующ|надлежащ|оптимальн)\w+ образом|"
+    r"best practice|лучши\w+ практик", re.I)
+_INTERNAL = re.compile(
+    r"\bC-\d{2,4}\b|\blens[:_]\w+|\brules:[\w.]+|\bconsistency\b|\bsame_subject\b|\bpair_check\b|"
+    r"\bacceptance_check\b|\b(?:event|status|boundary)_conflict\b|\bunit_mismatch\b|\bmissing_element\b|"
+    r"\bapi_contract\b|\bF\d{2}\b|\bG\d{2}\b|\bset_(?:consistent|complete)\b|\bseverity\b|\bblocks\b")
+_LATIN_OK = {
+    "iso", "iec", "ieee", "rfc", "http", "https", "api", "rest", "json", "url", "uri", "ui", "ux", "sla", "bpmn",
+    "kzt", "utc", "gmt", "get", "post", "put", "patch", "delete", "pdf", "docx", "html", "jira", "swagger",
+    "openapi", "id", "sms", "push", "jwt", "bearer", "oauth", "tls", "pci", "dss", "asia", "almaty", "true",
+    "false", "null", "ok", "error", "uuid", "sql", "cvv", "pan", "otp", "pin", "iban", "qr", "ttl", "ios",
+    "android", "email", "not", "found", "forbidden", "unauthorized", "created", "bad", "request", "internal",
+    "server", "conflict", "unprocessable", "entity", "content", "type", "successful", "string", "integer",
+    "boolean", "mandatory", "query", "body", "header", "path", "prod", "test", "dev", "base", "moscow"}
+_LATIN_WORD = re.compile(r"(?<![A-Za-z0-9_$./{-])[A-Za-z][A-Za-z]{2,}(?![A-Za-z0-9_(])")
+_CODE_WORD = re.compile(r"[a-z]+[A-Z]\w*|\w*_\w+|[A-Z0-9_]{2,}")
+SCENARIO_KINDS = CONFLICT_KINDS | {"ambiguity", "missing_element", "incomplete"}
+
+
+def doc_vocab(view: dict | None) -> set[str]:
+    """Латинские слова документа (имена полей, методов, статусов) — их в тексте замечаний можно."""
+    vocab: set[str] = set()
+    for ln in (view or {}).get("lines") or []:
+        for w in re.findall(r"[A-Za-z][A-Za-z0-9_]*", _s(ln.get("text"))):
+            vocab.add(w.lower())
+            vocab.update(p.lower() for p in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])", w))
+    return vocab
+
+
+def latin_words(text: str, vocab: set[str]) -> list[str]:
+    return [w for w in _LATIN_WORD.findall(text or "")
+            if w.lower() not in _LATIN_OK and w.lower() not in vocab and not _CODE_WORD.fullmatch(w)]
+
+
+def _sentences(text: str) -> int:
+    return len([x for x in re.split(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z«])", _s(text)) if x.strip()])
+
+
+def clarity_issues(f: dict, vocab: set[str] | None = None) -> list[str]:
+    """Пункты рубрики понятности WAVE3, которые замечание не проходит (пусто — проходит).
+    Проверка кодом, приближённая: длина и состав заголовка, место, проблема 1–3 предложения, сценарий с числами
+    у противоречий и неполноты (critical и major), последствие, исправление (формулировка или вопрос), чистота языка."""
+    vocab = vocab or set()
+    out: list[str] = []
+    title = _s(f.get("title"))
+    words = _nwords(title)
+    if not 3 <= words <= 12:
+        out.append(f"заголовок: {words} слов")
+    if not f.get("evidence") or not any(_ev_line(e) for e in f.get("evidence") or []):
+        out.append("место: нет строки")
+    prob = _s(f.get("problem"))
+    if len(prob) < 25 or _sentences(prob) > 3 or len(prob) > 450:
+        out.append(f"проблема: {len(prob)} симв., {_sentences(prob)} предл.")
+    if f.get("severity") in ("critical", "major") and f.get("kind") in SCENARIO_KINDS:
+        sc = _s(f.get("scenario"))
+        if len(sc) < 30 or (f.get("kind") in CONFLICT_KINDS | {"ambiguity"} and not re.search(r"\d", sc)):
+            out.append("сценарий: нет конкретного входа")
+    if len(_s(f.get("impact"))) < 20:
+        out.append("последствие: нет")
+    if not (_s(f.get("rewrite")) or _s(f.get("question"))):
+        out.append("исправление: нет формулировки и вопроса")
+    texts = " ".join(_s(f.get(k)) for k in ("title", "problem", "scenario", "impact", "recommendation",
+                                            "rewrite", "question"))
+    if _INTERNAL.search(texts):
+        out.append(f"внутренний код: {_INTERNAL.search(texts).group(0)}")
+    if _GENERIC.search(texts):
+        out.append(f"общая фраза: {_GENERIC.search(texts).group(0)}")
+    lat = latin_words(re.sub(r"`[^`]*`|\{[^{}]*\}|\"[A-Za-z_]+\"", " ", texts), vocab)  # код и JSON — не текст
+    if lat:
+        out.append("латиница: " + ", ".join(dict.fromkeys(lat[:4])))
+    return out
+
+
+def clarity_report(findings: list[dict], view: dict | None = None) -> dict:
+    """Сводка рубрики по реестру: доля прошедших и причины по каждому замечанию."""
+    vocab = doc_vocab(view)
+    rows = [{"id": f.get("id"), "severity": f.get("severity"), "title": _s(f.get("title")),
+             "issues": clarity_issues(f, vocab)} for f in findings]
+    ok = sum(1 for r in rows if not r["issues"])
+    return {"total": len(rows), "passed": ok, "share": round(ok / len(rows), 3) if rows else 1.0, "rows": rows}
+
+
+def _main(argv: list[str] | None = None) -> int:
+    """``python -m bcc_review.v2.stages.judge rubric report.json [исходный файл]`` — рубрика понятности отчёта."""
+    import sys
+    args = list(sys.argv[1:] if argv is None else argv)
+    if len(args) < 2 or args[0] != "rubric":
+        print(_main.__doc__)
+        return 2
+    rep = json.loads(open(args[1], encoding="utf-8").read())
+    view = None
+    if len(args) > 2:
+        from bcc_review.v2 import docview
+        view = docview.load(args[2])
+    res = clarity_report(rep.get("findings") or [], view)
+    print(f"Рубрика понятности: {res['passed']}/{res['total']} ({res['share']:.0%})")
+    for r in res["rows"]:
+        if r["issues"]:
+            print(f"  {r['id']} [{r['severity']}] {r['title'][:70]} — " + "; ".join(r["issues"]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
 
 
 __all__ = ["run", "assemble", "candidates_from_v1", "precluster", "render_candidates", "find_checklist", "checklist_items",
