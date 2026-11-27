@@ -27,9 +27,11 @@ FOLLOWUP_MARK = "<!-- дозапрос -->"
 
 SINGLE_CALL_MAX_LINES = 300   # документ короче — один вызов
 CHUNK_MAX_LINES = 250         # размер части длинного документа
+MAX_CHUNKS = 4                # частей не больше: на 2000 строк нарезка не съедает бюджет вызовов судьи и вопросов
 MAX_OUTPUT_TOKENS = 32000      # слабые модели тратят на рассуждения 15–25 тыс. токенов: не обрезать сразу
-PARALLEL_CHUNKS = 3           # одновременных вызовов на длинном документе (бесплатный Gemini — 10+ запросов в минуту)
+PARALLEL_CHUNKS = 4           # одновременных вызовов на длинном документе (бесплатный Gemini — 10 запросов в минуту)
 FOLLOWUP_MAX_LINES = 120      # дозапрос по непокрытым строкам — не больше стольких строк
+FOLLOWUP_MIN_LINES = 4        # 1–3 пропущенные строки код добавляет сам: лишний вызов дороже (бесплатный Gemini)
 QUOTE_MAX = 150
 
 KINDS = ["functional", "nonfunctional", "data", "integration", "ui", "process", "architecture", "api",
@@ -829,9 +831,11 @@ def fill_gaps(view: dict, requirements: list[dict], excluded: list[dict], uncove
             new_e.append({"what": "Пример или фрагмент кода", "line_start": n, "line_end": n,
                           "reason": "Не разобран моделью; похоже на пример данных или кода"})
             continue
-        r = normalize_requirement(view, {"source_id": "", "kind": "other", "section": "",
-                                         "summary": _short_quote(t)[:90], "quote": _short_quote(t),
-                                         "line_start": n, "line_end": n})
+        words = _short_quote(re.sub(r"^\s*[-*•]\s+", "", t)).split()
+        sec = str(by_n[n].get("section") or "")
+        r = normalize_requirement(view, {"source_id": "", "kind": "other", "section": sec,
+                                         "summary": " ".join(words[:10]) + ("…" if len(words) > 10 else ""),
+                                         "quote": _short_quote(t), "line_start": n, "line_end": n})
         if r:
             r["auto"] = True
             new_r.append(r)
@@ -934,6 +938,8 @@ def plan_chunks(view: dict, max_lines: int = CHUNK_MAX_LINES,
     first, last = int(lines[0]["n"]), int(lines[-1]["n"])
     if last - first + 1 <= single_max:
         return [(first, last)]
+    # очень длинный документ — части крупнее, чтобы их было не больше MAX_CHUNKS (с запасом на границы разделов)
+    max_lines = max(max_lines, int((last - first + 1) * 1.15 / MAX_CHUNKS) + 1)
 
     def boundaries(depth: int) -> list[int]:
         out, prev = [], None
@@ -1538,7 +1544,7 @@ def segment_from_response(view: dict, raw: dict,
     if auto_excl:
         reqs, excl = merge_items(reqs, excl + auto_excl)
     followup_calls = 0
-    if uncovered and followup is not None:
+    if len(uncovered) >= FOLLOWUP_MIN_LINES and followup is not None:
         followup_calls = 1
         try:
             extra = followup(uncovered, reqs) or {}
@@ -1626,7 +1632,7 @@ def _run(ctx: Any) -> tuple[dict, dict | None]:
         return out, raw
     out = segment_from_response(view, raw, followup if follow_task else None)
     out["coverage"]["mode"] = "llm"
-    if out["coverage"]["auto_added"]:
+    if out["coverage"]["auto_added"] >= FOLLOWUP_MIN_LINES:  # 1–3 строки код добавляет штатно, без дозапроса
         _warn(ctx, f"Нарезка: {out['coverage']['auto_added']} строк добавлены кодом как требования без номера")
     return out, raw
 
