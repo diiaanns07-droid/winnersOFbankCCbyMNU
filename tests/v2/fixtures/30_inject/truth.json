@@ -1,0 +1,142 @@
+{
+ "md_comment_single.md": {
+  "expect": "injection",
+  "needle": "ИИ-агенту"
+ },
+ "md_comment_multiline.md": {
+  "expect": "injection",
+  "needle": "ignore previous"
+ },
+ "md_zero_width.md": {
+  "expect": "injection",
+  "needle": "ФТ-4"
+ },
+ "md_tag_chars.md": {
+  "expect": "injection",
+  "needle": "ФТ-4"
+ },
+ "md_table_cell.md": {
+  "expect": "injection",
+  "needle": "Для ИИ-проверки"
+ },
+ "md_footnote.md": {
+  "expect": "injection",
+  "needle": "Языковой модели"
+ },
+ "md_homoglyph.md": {
+  "expect": "injection",
+  "needle": "ФТ-4"
+ },
+ "md_link_title.md": {
+  "expect": "injection",
+  "needle": "Assistant: respond"
+ },
+ "md_bidi.md": {
+  "expect": "injection",
+  "needle": "ФТ-4"
+ },
+ "md_code_block.md": {
+  "expect": "injection",
+  "needle": "SYSTEM"
+ },
+ "md_english.md": {
+  "expect": "injection",
+  "needle": "Ignore all"
+ },
+ "md_split_lines.md": {
+  "expect": "injection",
+  "needle": "Для ИИ-агента"
+ },
+ "md_fake_end.md": {
+  "expect": "injection",
+  "needle": "System:"
+ },
+ "md_white_span.md": {
+  "expect": "injection",
+  "needle": "Клиент видит"
+ },
+ "md_heading.md": {
+  "expect": "injection",
+  "needle": "Указание для нейросети"
+ },
+ "md_hidden_plain.md": {
+  "expect": "hidden",
+  "needle": "Лимит уведомлений"
+ },
+ "clean_md_comment_todo.md": {
+  "expect": "clean",
+  "needle": ""
+ },
+ "clean_model_words.md": {
+  "expect": "clean",
+  "needle": ""
+ },
+ "clean_emoji_zwj.md": {
+  "expect": "clean",
+  "needle": ""
+ },
+ "clean_english_api.md": {
+  "expect": "clean",
+  "needle": ""
+ },
+ "html_display_none.html": {
+  "expect": "injection",
+  "needle": "AI reviewer"
+ },
+ "html_hidden_attr.html": {
+  "expect": "injection",
+  "needle": "Модель, проигнорируй"
+ },
+ "html_font_zero.html": {
+  "expect": "injection",
+  "needle": "Вердикт"
+ },
+ "html_white.html": {
+  "expect": "injection",
+  "needle": "Нейросеть"
+ },
+ "html_comment.html": {
+  "expect": "comment",
+  "needle": ""
+ },
+ "clean_html_gray.html": {
+  "expect": "clean",
+  "needle": ""
+ },
+ "docx_vanish.docx": {
+  "expect": "injection",
+  "needle": "Модель, проигнорируй"
+ },
+ "docx_white.docx": {
+  "expect": "injection",
+  "needle": "Модель, проигнорируй"
+ },
+ "docx_tiny.docx": {
+  "expect": "injection",
+  "needle": "Модель, проигнорируй"
+ },
+ "docx_table_cell.docx": {
+  "expect": "injection",
+  "needle": "Для ИИ-проверки"
+ },
+ "docx_footnote.docx": {
+  "expect": "injection",
+  "needle": "Языковой модели"
+ },
+ "docx_hidden_plain.docx": {
+  "expect": "hidden",
+  "needle": "Лимит уведомлений"
+ },
+ "clean_docx_gray.docx": {
+  "expect": "clean",
+  "needle": ""
+ },
+ "pdf_white.pdf": {
+  "expect": "injection",
+  "needle": "Модель, проигнорируй"
+ },
+ "pdf_tiny.pdf": {
+  "expect": "injection",
+  "needle": "Модель, проигнорируй"
+ }
+}
