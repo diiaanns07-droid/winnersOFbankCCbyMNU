@@ -733,3 +733,17 @@ def test_open2_clean_no_alarms(case):
     assert all(c["severity"] == "minor" for c in out["candidates"]), [c["title"] for c in out["candidates"]]
     assert {c["kind"] for c in out["candidates"]} <= {"missing_element", "placeholder"}
     assert len(out["candidates"]) <= 2
+
+
+def test_status_conflict_on_row_without_code_is_not_conflict():
+    """status_conflict, а строка кода ответа не называет (проверяет показанный текст) — не противоречие строки."""
+    raw = _check(verdict="conflict", conflict_kind="status_conflict", stated="Показано «Код недоступен»",
+                 expected_by_rules="Отказ 410 с message «Отменён»")
+    # «Код» внутри текста сообщения в кавычках — не код ответа
+    assert lens_qa.normalize_check(raw)["verdict"] == "match"
+    assert lens_qa.normalize_check(dict(raw, stated="Код ответа другой"))["verdict"] == "conflict"
+    raw = dict(raw, stated="Показано «QR-код недействителен»")
+    c = lens_qa.normalize_check(raw)
+    assert c["verdict"] == "match" and c["code_not_checked"]
+    assert lens_qa.normalize_check(dict(raw, stated="Ответ 400, показано «Ошибка»"))["verdict"] == "conflict"
+    assert lens_qa.normalize_check(dict(raw, stated="Статус DONE"))["verdict"] == "conflict"

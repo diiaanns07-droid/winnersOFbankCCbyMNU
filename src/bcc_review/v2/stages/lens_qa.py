@@ -249,6 +249,7 @@ def near_amount_only(expected: str, stated: str) -> tuple[float, float] | None:
     return pairs[0]
 
 
+_HTTP_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)|(?i:\bкод\w*|\bстатус\w*)|\b[A-Z]{3,}(?:_[A-Z]+)*\b")
 _NEG_BEFORE = re.compile(r"(?:\bне|\bнет|\bбез|\bни)\s*$")
 
 
@@ -298,7 +299,14 @@ def normalize_check(raw: Mapping[str, Any]) -> dict:
         # «показано «QR-код недействителен»» выводится, код ответа 400/410 — нет; это пункт другого замечания).
         c["verdict"] = "match"
         c["partial_match"] = True
-    near =near_amount_only(c["expected_by_rules"], c["stated"]) if c["verdict"] == "conflict" else None
+    if c["verdict"] == "conflict" and c["conflict_kind"] == "status_conflict" and not _HTTP_CODE.search(
+            re.sub(r"«[^»]*»|\"[^\"]*\"", " ", c["stated"])):  # текст сообщения в кавычках — не код («QR-код …»)
+        # Строка не называет код ответа — расхождение кодов или тела ответа интерфейса её не опровергает (haiku на
+        # qr сверял «показано «QR-код недействителен»» по Ф-5 с телом ответа 410 «QR-код отменён»). Само
+        # расхождение кодов — отдельное замечание о контракте, если оно есть.
+        c["verdict"] = "match"
+        c["code_not_checked"] = True
+    near = near_amount_only(c["expected_by_rules"], c["stated"]) if c["verdict"] == "conflict" else None
     if near:
         # Расхождение только в копейках вычисленной суммы: шаг 1 промпта велит считать это совпадением, а слабая и
         # сильная модель всё же дают conflict (sonnet на чистом ТЗ: 11 903,07 против верных 11 890,36 ₸).
