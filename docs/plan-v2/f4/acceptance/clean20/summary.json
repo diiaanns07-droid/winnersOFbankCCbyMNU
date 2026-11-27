@@ -1,0 +1,179 @@
+{
+  "cases": [
+    {
+      "case": "capital_v2",
+      "run_id": "f4-full-clean8-d013-capital_v2",
+      "code": "d013c123",
+      "source_sha256": "ff27cc133bdb5209d9392ddc712ba616905206538a3d18c1fcf42f56d590a760",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 15,
+      "critical": 1,
+      "major": 6,
+      "minor": 8,
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 9,
+      "seconds": 301.2
+    },
+    {
+      "case": "fx",
+      "run_id": "f4-full-clean8-d013-fx",
+      "code": "d013c123",
+      "source_sha256": "799b8696893a03b07f0a7993340ab324a0166fda62f4b227464f1650fdaf0d83",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 8,
+      "critical": 0,
+      "major": 0,
+      "minor": 8,
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 10,
+      "seconds": 319.6
+    },
+    {
+      "case": "grace_v2",
+      "run_id": "f4-full-clean8-d013-grace_v2",
+      "code": "d013c123",
+      "source_sha256": "0b7d50146598e1122c47cf2c9df8a49efc458eb36a3122c6b4cb6640b2d590af",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 18,
+      "critical": 1,
+      "major": 8,
+      "minor": 9,
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 9,
+      "seconds": 265.5
+    },
+    {
+      "case": "insurance_v2",
+      "run_id": "f4-full-clean8-d013-insurance_v2",
+      "code": "d013c123",
+      "source_sha256": "c4468d556c821968f0f303a77f41e22118e877aa3e914c4cecb2b43e62207708",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 18,
+      "critical": 1,
+      "major": 7,
+      "minor": 10,
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 9,
+      "seconds": 279.7
+    },
+    {
+      "case": "qr_v2",
+      "run_id": "f4-full-clean8-d013-qr_v2",
+      "code": "d013c123",
+      "source_sha256": "b28ee44494c76f571bcb3a9973052af55cd6029960df61c065d414265b5a13f2",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 17,
+      "critical": 0,
+      "major": 0,
+      "minor": 17,
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 8,
+      "seconds": 285.5
+    },
+    {
+      "case": "repay",
+      "run_id": "f4-full-clean8-d013-repay",
+      "code": "d013c123",
+      "source_sha256": "9dd9436071ff21e10587fca71a2516722aed5d271805a220ee66c239ba9bf94d",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 15,
+      "critical": 1,
+      "major": 5,
+      "minor": 9,
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 11,
+      "seconds": 360.5
+    },
+    {
+      "case": "roundup",
+      "run_id": "f4-full-clean8-d013-roundup",
+      "code": "d013c123",
+      "source_sha256": "25177b791f7b4d85bee3eaa2f28fe311d8731a63677eafcc48ab704a726ea480",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 13,
+      "critical": 0,
+      "major": 0,
+      "minor": 13,
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 10,
+      "seconds": 340.0
+    },
+    {
+      "case": "statement",
+      "run_id": "f4-full-clean8-d013-statement",
+      "code": "d013c123",
+      "source_sha256": "b00162f6c787b20dbc80596556e1bd9d81a5bd4b5ea3fed14b99f0ca90d14688",
+      "model": "claude-haiku-5-5",
+      "findings_outside_empty_gold": 14,
+      "critical": 1,
+      "major": 5,
+      "minor": 8,
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "expected": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "model_calls": 11,
+      "seconds": 323.7
+    }
+  ],
+  "total_findings": 118,
+  "total_critical": 5,
+  "total_major": 31,
+  "total_minor": 82,
+  "documents_without_findings": 0,
+  "documents_over_one": 8,
+  "both_verdicts_match": 3
+}
