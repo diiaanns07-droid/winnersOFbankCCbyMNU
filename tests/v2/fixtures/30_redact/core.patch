@@ -1,0 +1,105 @@
+diff --git a/src/bcc_review/v2/__main__.py b/src/bcc_review/v2/__main__.py
+index 39c8014d..f757b215 100644
+--- a/src/bcc_review/v2/__main__.py
++++ b/src/bcc_review/v2/__main__.py
+@@ -101,6 +101,8 @@ def _common(p: argparse.ArgumentParser) -> None:
+     p.add_argument("--no-fast-start", dest="fast_start", action="store_false",
+                    help="рецензенты ждут нарезку моделью")
+     p.add_argument("-q", "--quiet", action="store_true", help="без хода выполнения в консоли")
++    p.add_argument("--redact", action="store_true",
++                   help="скрыть персональные данные (карты, ИИН, телефоны, почта) до отправки модели и в отчёте")
+ 
+ 
+ def _opts(a: argparse.Namespace) -> dict:
+@@ -113,6 +115,7 @@ def _opts(a: argparse.Namespace) -> dict:
+         "export": [x.strip().lower() for x in (a.export or "").split(",") if x.strip()], "html": not a.no_html,
+         "passes": a.passes, "lenses": [x.strip() for x in a.lenses.split(",") if x.strip()],
+         "consistency": not a.no_consistency, "clarify": not a.no_clarify, "quiet": a.quiet,
++        "redact": bool(getattr(a, "redact", False)),
+         "fast_start": getattr(a, "fast_start", None),
+         "answers": getattr(a, "answers", None), "revise": getattr(a, "revise", False),
+     }
+diff --git a/src/bcc_review/v2/llm.py b/src/bcc_review/v2/llm.py
+index 9286926b..776c6316 100644
+--- a/src/bcc_review/v2/llm.py
++++ b/src/bcc_review/v2/llm.py
+@@ -162,6 +162,12 @@ class LLMClient:
+     def _cache_put(self, key: str, payload: dict) -> None:
+         if not self.cache_dir:
+             return
++        try:  # ответ с персональными данными в кэш не кладём (закрытый контур банка): без кэша, зато без ПДн на диске
++            from .rules import redact
++            if redact.mask_obj(payload) != payload:
++                return
++        except Exception:  # noqa: BLE001
++            pass
+         try:
+             self.cache_dir.mkdir(parents=True, exist_ok=True)
+             tmp = self.cache_dir / f"{key}.tmp{threading.get_ident()}"
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 2ffe3d03..943e44a8 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -293,6 +293,11 @@ class Pipeline:
+         opts = self.opts
+         self.log(f"Документ: {self.input}")
+         view = load_view(self.input)
++        if opts.get("redact"):  # --redact: персональные данные скрыты до модели — в отчёте, кэше и runs/ их нет
++            from .rules import redact
++            view, pd_stats = redact.mask_view(view)
++            if pd_stats:
++                self.warnings.append(redact.summary(pd_stats) + " (--redact): в модель и отчёт они не попали.")
+         if not any(str(ln.get("text") or "").strip() for ln in view.get("lines") or []):
+             # пустой документ: модель не зовём (нечего проверять), вердикт «можно» невозможен — отчёт правилами
+             self.warnings.insert(0, "В документе нет текста: проверять нечего. Модель не вызывалась, вердикт не "
+@@ -1042,12 +1047,15 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
+             p.run.write_json(f"responses/{stage}.json", items)
+         except OSError:
+             pass
++    from .rules import redact
++    if opts.get("redact"):  # --redact: и то, что модель могла написать сама, в отчёт без ПДн
++        report = redact.mask_obj(report)
+     written = write_outputs(report, view, Path(input_path), Path(output_md), opts, log or (lambda m: None))
+     for fmt in ("json", "md", "html"):
+         if fmt in written:
+-            try:
+-                import shutil
+-                shutil.copy2(written[fmt], p.run.path / f"report.{fmt}")
++            try:  # копия отчёта в runs/ — без персональных данных в открытом виде
++                text = Path(written[fmt]).read_text(encoding="utf-8")
++                (p.run.path / f"report.{fmt}").write_text(redact.mask(text), encoding="utf-8")
+             except OSError:
+                 pass
+     return report, written
+diff --git a/src/bcc_review/v2/runs.py b/src/bcc_review/v2/runs.py
+index 34fbf4a6..d6c7c032 100644
+--- a/src/bcc_review/v2/runs.py
++++ b/src/bcc_review/v2/runs.py
+@@ -25,8 +25,17 @@ def new_run_id() -> str:
+     return datetime.now(ASTANA).strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
+ 
+ 
++def _mask(obj: Any) -> Any:
++    """Персональные данные (карты, ИИН, телефоны, почта) на диск не пишем в открытом виде — закрытый контур банка."""
++    try:
++        from .rules import redact
++        return redact.mask_obj(obj)
++    except Exception:  # noqa: BLE001 — маскирование не роняет прогон
++        return obj
++
++
+ def _dump(obj: Any) -> str:
+-    return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
++    return json.dumps(_mask(obj), ensure_ascii=False, indent=2, default=str)
+ 
+ 
+ class RunDir:
+@@ -80,7 +89,7 @@ class RunDir:
+     # ------------------------------------------------------------------ трасса и прочее
+ 
+     def trace(self, record: dict) -> None:
+-        rec = {"t": now_iso(), **record}
++        rec = _mask({"t": now_iso(), **record})
+         line = json.dumps(rec, ensure_ascii=False, default=str)
+         with self._lock:
+             with open(self.path / "trace.jsonl", "a", encoding="utf-8") as fh:

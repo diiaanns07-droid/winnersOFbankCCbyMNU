@@ -90,7 +90,8 @@ def _emit(out: dict, rule: str, kind: str, a: Sent | Line, qa: str, b: Sent | Li
 # К2 открытого набора). Границы (правило ↔ код API, приёмка на границе) — major, как в корпусе range_boundary;
 # судья поднимает их по контексту.
 CRITICAL_RULES = {"conflicts.event_negation": "critical", "conflicts.event_condition": "critical",
-                  "conflicts.event_quantity": "critical", "conflicts.event_effective": "critical"}
+                  "conflicts.event_quantity": "critical", "conflicts.event_effective": "critical",
+                  "conflicts.period_attribution": "critical"}
 
 
 # --- event_conflict -------------------------------------------------------------------------------
@@ -114,6 +115,25 @@ COND = re.compile(r"^\s*(?:если|при условии,? что|в случа
 NEG_PHRASE = re.compile(r"\b([а-яё]+)\s+не\s+([а-яё]+)|\bне\s+([а-яё]+)", re.I)
 UNLIMITED = re.compile(r"\bбез\s+ограничени\w*", re.I)
 LIMITED = re.compile(r"\bне\s+чаще\b|\bне\s+более\b|\bне\s+больше\b|\bмаксимум\b|\bне\s+свыше\b", re.I)
+# ограничение числом за период: «максимум один X за календарный месяц», «не более 3 раз в сутки», «не чаще раза в день»
+PERIOD_CAP = re.compile(
+    r"\b(?:максимум|не\s+более|не\s+больше|не\s+свыше)\s+(?:\d+|од(?:ин|ного|ну|на|но)|дв[ау]х?|тр[её]х?)\s+"
+    r"(?:так\w+\s+|эт\w+\s+)?(?P<obj>[а-яёa-z]+)\b[^.;]{0,40}?\b(?:за|в|на)\s+(?:календарн\w+\s+|текущ\w+\s+|"
+    r"один\s+|одн\w+\s+)?(?:месяц|сутки|день|неделю|год|час|период|квартал)\b", re.I)
+# повтор при каждом наступлении условия: «независимо от истории / предыдущих / ранее отправленных»
+REGARDLESS = re.compile(r"\bнезависимо\s+от\s+(?:истори\w*|предыдущ\w*|прежн\w*|ранее\b|того,?\s+(?:был|бы|отправ|"
+                        r"приход|получ)\w*|количеств\w*\s+(?:предыдущ|прежн|ранее))", re.I)
+OBJ_STOP = {"клиент", "клиен", "сумма", "суммы", "сумму", "карта", "карту", "карты", "котор", "такой", "такая", "такое",
+            "этого", "этот", "месяц", "сутки", "период", "календ", "следу", "истор", "незав", "преды", "настр",
+            "максим", "более", "больше", "только", "получ", "прихо", "вызыв"}
+
+
+def _obj_stems(text: str) -> set[str]:
+    """Значимые основы (от 3 букв, включая латиницу: «SMS», «email»): предмет действия."""
+    return {_stem(_norm(w)) for w in WORD.findall(text) if len(w) >= 3 and _stem(_norm(w)) not in OBJ_STOP
+            and not w.isdigit()} - {""}
+
+
 EFFECT = re.compile(r"\b(действует|применяется|вступает\s+в\s+силу|начинает\s+действовать)\b(.*)$", re.I)
 EFFECT_TIME = re.compile(r"\b(?:с|со|начиная\s+с|начиная\s+со)\s+((?:момента|первого|следующ|начала|даты|дня|"
                          r"сегодняшн|текущ)\w*(?:\s+[а-яё]+){0,3})|\b(сразу|немедленно)\b", re.I)
@@ -201,6 +221,38 @@ def rule_events(doc: Doc, out: dict) -> None:
                   recommendation="Оставить одно правило; если ограничение нужно — указать число, период и реакцию "
                                  "на превышение.",
                   question="Есть ли ограничение на число повторов и какое?")
+    # 5. «не больше N за период» ↔ «… независимо от истории / предыдущих»: одно и то же действие и ограничено числом за
+    # период, и повторяется при каждом наступлении условия. Предмет — слово сразу после числа («один такой X») и то же
+    # слово прямо перед «независимо от» («вызывает X независимо от …»)
+    caps = [(s, m) for s in sents for m in [PERIOD_CAP.search(s.body)] if m and m.group("obj")]
+    frees = [(s, m) for s in sents for m in [REGARDLESS.search(s.body)] if m]
+    found_cap = False
+    for a, cm in caps:
+        if found_cap:
+            break  # одна пара на документ: в отчётах, цитирующих документ, те же фразы повторяются
+        obj = _stem(_norm(cm.group("obj")))
+        if obj in OBJ_STOP or len(cm.group("obj")) < 3:
+            continue
+        for b, rm in frees:
+            if b.line.n == a.line.n:
+                continue
+            before = WORD.findall(b.body[:rm.start()])[-4:]
+            hit = next((w for w in before if _stem(_norm(w)) == obj), None)
+            if not hit or not mark(a, b):
+                continue
+            found_cap = True
+            what = cm.group("obj")
+            _emit(out, "conflicts.event_quantity", "event_conflict", a, a.text, b, b.text,
+                  title=f"Ограничение за период и повтор «независимо от истории» для одного действия: {quoted(what)}",
+                  problem=(f"{quoted(a.body)} ограничивает действие числом за период, а {quoted(b.body)} требует его "
+                           "независимо от того, что было раньше. Для повторного случая в том же периоде документ даёт "
+                           "два исхода."),
+                  scenario=(f"В одном периоде условие наступает второй раз: по первому месту {quoted(what)} уже не "
+                            "положен (лимит исчерпан), по второму — положен независимо от истории."),
+                  recommendation=("Указать, действует ли ограничение за период и в этом случае (например, «… но не "
+                                  "больше одного раза за период») и добавить критерий приёмки на повтор."),
+                  question=f"Сколько раз за период возможен {quoted(what)}, если условие наступило повторно?")
+            break
     # 4. то же действие вступает в силу в разное время
     effects = []
     for s in sents:
@@ -561,8 +613,90 @@ def rule_range_acceptance(doc: Doc, out: dict) -> None:
             return
 
 
+# --- отнесение к периоду на его границе -----------------------------------------------------------------------
+
+# «Месяц определяется по дате совершения покупки», «Сутки и месяц операции определяются по времени её проведения»
+PERIOD_ATTR = re.compile(r"\b(?:месяц|сутки)\w*(?:\s+и\s+(?:месяц|сутки)\w*)?(?:\s+[а-яё]+)?\s+(?:определя|счита|относ)\w*"
+                         r"\s+по\s+(?:дате|времени|моменту|дню)\s+(?P<ev>(?:[а-яё]+\s+){0,2}[а-яё]+)", re.I)
+MONTHS = ("январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр")
+DATE_WORD = re.compile(r"\b(\d{1,2})\s+(январ|феврал|март|апрел|ма[яй]|июн|июл|август|сентябр|октябр|ноябр|декабр)\w*",
+                       re.I)
+DATE_NUM = re.compile(r"\b(\d{1,2})\.(\d{2})(?:\.(?:\d{4}|\d{2}))?\b")
+MONTH_ADJ = re.compile(r"\b(январ|феврал|март|апрел|ма|июн|июл|август|сентябр|октябр|ноябр|декабр)(?:ь?ск|овск|йск)\w*|"
+                       r"\b(?:за|в\s+сч[её]т)\s+(январ|феврал|март|апрел|ма[яй]|июн|июл|август|сентябр|октябр|ноябр|"
+                       r"декабр)\w*", re.I)
+EV_STOP = {"её", "ее", "его", "их", "этой", "этого", "данной", "данного"}
+
+
+def _month_of(word: str) -> int:
+    w = word.lower()
+    for i, m in enumerate(MONTHS, 1):
+        if w.startswith(m) if m != "ма" else w.startswith(("мая", "май", "майск", "ма")) and not w.startswith("март"):
+            return i
+    return 0
+
+
+def _cell_months(cell: str) -> set[int]:
+    res = {_month_of(m.group(2)) for m in DATE_WORD.finditer(cell)}
+    res |= {int(m.group(2)) for m in DATE_NUM.finditer(cell) if 1 <= int(m.group(2)) <= 12}
+    return res - {0}
+
+
+def rule_period_attribution(doc: Doc, out: dict) -> None:
+    """Правило «месяц — по дате события A» ↔ строка приёмки: событие A в одном месяце, а результат отнесён к месяцу
+    другой даты той же строки («Покупка 31 января … | Провести 1 февраля … | Февральский счётчик вырос»)."""
+    attr = None
+    for x in doc.lines:
+        if x.text and x.cells is None and not x.is_code:
+            m = PERIOD_ATTR.search(x.joined)
+            if m:
+                attr = (x, m)
+                break
+    if attr is None:
+        return
+    x0, m0 = attr
+    ev_stems = {_stem(_norm(w)) for w in WORD.findall(m0.group("ev")) if len(w) >= 5 and _norm(w) not in EV_STOP}
+    if not ev_stems:
+        return
+    for row, cells in _acceptance_rows(doc):
+        conds, res = cells[:-1], cells[-1]
+        scored = []
+        for i, c in enumerate(conds):
+            months = _cell_months(c)
+            hit = len(ev_stems & {_stem(_norm(w)) for w in WORD.findall(c)})
+            if months:
+                scored.append((hit, i, months))
+        if len(scored) < 2:
+            continue
+        scored.sort(key=lambda t: -t[0])
+        if scored[0][0] == 0 or scored[0][0] == scored[1][0] or len(scored[0][2]) != 1:
+            continue
+        ev_month = next(iter(scored[0][2]))
+        other = set().union(*(t[2] for t in scored[1:])) - {ev_month}
+        rm = MONTH_ADJ.search(res)
+        if not rm or not other:
+            continue
+        res_month = _month_of(rm.group(1) or rm.group(2))
+        if res_month == ev_month or res_month not in other:
+            continue
+        frag = _clause(res, rm.group(0))
+        _emit(out, "conflicts.period_attribution", "event_conflict", x0, _clause(x0.joined, m0.group(0)), row,
+              " | ".join(cells),
+              title="Критерий приёмки относит событие к другому периоду, чем требование",
+              problem=(f"Требование: {quoted(_clause(x0.joined, m0.group(0)))}. В строке приёмки событие "
+                       f"{quoted(m0.group('ev'))} приходится на один месяц, а результат {quoted(frag)} — на месяц "
+                       "другой даты той же строки. Требование и тест дают разные исходы для одной операции."),
+              scenario=(f"Операция на границе месяцев: {quoted(cells[scored[0][1]])}, затем {quoted(cells[scored[1][1]])}. "
+                        "По требованию она учитывается в первом месяце, по критерию приёмки — во втором."),
+              recommendation=("Выбрать одно правило отнесения к периоду (по дате какого события) и привести к нему "
+                              "требование и строку приёмки."),
+              question="По дате какого события операция относится к месяцу — и какой результат верен в этой строке?")
+        return
+
+
 def run(doc: Doc, out: dict) -> None:
     rule_events(doc, out)
+    rule_period_attribution(doc, out)
     rule_ranges(doc, out)
     rule_noun_bounds(doc, out)
     rule_acceptance_bounds(doc, out)

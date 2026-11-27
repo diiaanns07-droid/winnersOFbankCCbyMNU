@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import api, conflicts, injection, language, placeholders, promises, terms, units
+from . import api, conflicts, injection, language, ops, placeholders, promises, terms, units
 from ._text import Doc, build_doc
 
 __all__ = ["run", "format_signals", "signals_for"]
@@ -56,6 +56,19 @@ def _req_ids(evidence: list[dict], reqs: list[dict] | None) -> list[str]:
     return ids
 
 
+def _hidden(view: dict) -> list[dict]:
+    """Скрытый текст исходного файла: `view["hidden"]` (docview зовёт `rules.hidden.scan_bytes`); для Markdown и TXT
+    без него — по строкам документа (комментарии и инлайн-HTML в разметке видны и в строках)."""
+    if isinstance(view.get("hidden"), list):
+        return view["hidden"]
+    if str(view.get("format") or "").lower() in ("md", "markdown", "txt", ""):
+        from . import hidden as _hid
+
+        raw = "\n".join(str(ln.get("text", "") if isinstance(ln, dict) else ln) for ln in view.get("lines") or [])
+        return _hid.scan_bytes(raw.encode("utf-8"), "md")
+    return []
+
+
 def run(view: dict, requirements: Any = None) -> dict:
     """Все правила по документу. `requirements` — список требований или выход segment целиком."""
     doc: Doc = build_doc(view)
@@ -65,8 +78,9 @@ def run(view: dict, requirements: Any = None) -> dict:
                      ("promises", lambda: promises.run(doc, out)),
                      ("units", lambda: units.run(doc, out)),
                      ("conflicts", lambda: conflicts.run(doc, out)),
-                     ("injection", lambda: injection.run(doc, out)),
+                     ("injection", lambda: injection.run(doc, out, _hidden(view))),
                      ("placeholders", lambda: placeholders.run(doc, out)),
+                     ("ops", lambda: ops.run(doc, out)),
                      ("language", lambda: language.run(doc, out, reqs, excluded)),
                      ("terms", lambda: terms.run(doc, out))):
         try:
