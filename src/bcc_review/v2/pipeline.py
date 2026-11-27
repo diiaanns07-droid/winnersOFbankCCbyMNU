@@ -39,6 +39,8 @@ DEFAULTS: dict[str, Any] = {
     "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": None,
     "clarify_early": True,
 }
+STAGE_RU = {"lens_analyst": "«Аналитик»", "lens_qa": "«Тестировщик»", "lens_architect": "«Архитектор»",
+            "lens_risk": "«Риски»", "consistency": "«Набор целиком»", "judge": "«Судья»"}
 # Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
 DEFAULT_RPM = {"gemini": 10}
 # Линзы от самой долгой к самой короткой (замер 27.11 09:00: haiku architect 102 с, analyst 66, risk 51, qa 50).
@@ -110,8 +112,18 @@ def document_summary(view: dict) -> dict:
                 "warnings": list(view.get("warnings") or [])}
 
 
-def verdict_rule(findings: list[dict], status: str) -> dict:
-    """CONTRACT.md, раздел 5. ``failed`` — вердикта нет; ``partial`` — не выше ``conditional``."""
+# Этапы, без которых «можно» и «с условиями» — ложный вердикт: дефекты, которые нашёл бы упавший этап, не видны.
+VERDICT_STAGES = [f"lens_{x}" for x in LENSES] + ["consistency", "judge"]
+
+
+def incomplete_stages(stages: dict) -> list[str]:
+    """Упавшие (``failed``) линзы, набор целиком и судья — при них вердикт кроме «нельзя» не определён."""
+    return [s for s in VERDICT_STAGES if stages.get(s) == "failed"]
+
+
+def verdict_rule(findings: list[dict], status: str, incomplete: list[str] | None = None) -> dict:
+    """CONTRACT.md, раздел 5. ``failed`` — вердикта нет; ``partial`` — не выше ``conditional``; упал рецензент
+    или судья (``incomplete``) — «нельзя», если блокер уже найден, иначе «не определено» (``undetermined``)."""
     if status == "failed":
         return {"development": "none", "testing": "none"}
     open_f = [f for f in findings if f.get("status") not in ("resolved", "rejected")]
@@ -125,6 +137,8 @@ def verdict_rule(findings: list[dict], status: str) -> dict:
             value = "yes"
         if status == "partial" and value == "yes":
             value = "conditional"
+        if incomplete and value != "no":
+            value = "undetermined"
         out[target] = value
     return out
 
@@ -132,6 +146,14 @@ def verdict_rule(findings: list[dict], status: str) -> dict:
 def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = None) -> tuple[Any, str]:
     """(LLMClient или None для offline, имя провайдера)."""
     name = (opts.get("provider") or "auto").strip().lower()
+    if opts.get("replay"):
+        # --replay runs/<id> (№22): ответы модели — только записанные тем прогоном, без сети, ключа и кэша
+        from .providers.mock import ReplayProvider
+        provider = ReplayProvider(fixtures_dir=Path(opts["replay"]) / "responses")
+        llm = LLMClient(provider, model=None, provider_name="replay", max_calls=opts["max_calls"],
+                        max_seconds=opts["max_seconds"], max_retries=0, timeout_s=opts["timeout"], cache_dir=None,
+                        trace=run.trace if run else None)
+        return llm, "replay"
     if name == "mock":
         from .providers.mock import MockProvider
         mdir = opts.get("mock_dir") or _mock_dir_for(input_path)
@@ -159,7 +181,10 @@ def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = Non
                     max_seconds=opts["max_seconds"], max_retries=opts["max_retries"], timeout_s=opts["timeout"],
                     cache_dir=cache_dir, trace=run.trace if run else None,
                     stage_timeout_s=float(opts.get("stage_timeout") or 0),
-                    rpm=float(opts["rpm"]) if opts.get("rpm") is not None else DEFAULT_RPM.get(pname, 0))
+                    rpm=float(opts["rpm"]) if opts.get("rpm") is not None else DEFAULT_RPM.get(pname, 0),
+                    max_cost_usd=float(opts.get("max_cost_usd") or 0), max_tokens=int(opts.get("max_tokens") or 0))
+    if int(opts.get("pass_index") or 1) > 1:
+        llm.salt = f"\n\n<!-- независимый проход {int(opts['pass_index'])} -->"
     return llm, pname
 
 
@@ -208,6 +233,31 @@ class Pipeline:
         self.provider_name = ""
         self.model_error = ""
         self.fast_start_used = False
+        self.replay: dict | None = None
+        if self.opts.get("replay"):
+            self._setup_replay(Path(self.opts["replay"]))
+
+    def _setup_replay(self, src: Path) -> None:
+        """``--replay``: все этапы модели — из файлов этапов ``src``, код (правила, цитаты, вердикт, отчёт) — заново."""
+        self.reuse = RunDir(src, create=False)
+        self.rerun = set()
+        orig: dict = {}
+        try:
+            orig = json.loads((src / "report.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        run0 = orig.get("run") if isinstance(orig.get("run"), dict) else {}
+        self.replay = {"from": str(src), "run_id": run0.get("run_id") or src.name,
+                       "provider": run0.get("provider") or "", "models_used": list(run0.get("models_used") or []),
+                       "model_requested": run0.get("model_requested") or "", "commit": run0.get("commit") or "",
+                       "document_sha256": ((orig.get("document") or {}).get("sha256") or ""),
+                       "stages": sorted(p.stem for p in self.reuse.stages.glob("*.json"))}
+        try:
+            import shutil
+            if (src / "responses").is_dir():
+                shutil.copytree(src / "responses", self.run.path / "responses", dirs_exist_ok=True)
+        except OSError:
+            pass
 
     # ------------------------------------------------------------------ один этап
 
@@ -293,6 +343,12 @@ class Pipeline:
         opts = self.opts
         self.log(f"Документ: {self.input}")
         view = load_view(self.input)
+        if self.replay and self.replay.get("document_sha256") and \
+                self.replay["document_sha256"] != view.get("sha256"):
+            self.warnings.insert(0, "Повтор прогона: документ изменился после исходного прогона (SHA-256 "
+                                    f"{str(self.replay['document_sha256'])[:12]}… → {str(view.get('sha256'))[:12]}…). "
+                                    "Цитаты сверяются с новым текстом; для отчёта по новой редакции запустите "
+                                    "обычную проверку.")
         if not any(str(ln.get("text") or "").strip() for ln in view.get("lines") or []):
             # пустой документ: модель не зовём (нечего проверять), вердикт «можно» невозможен — отчёт правилами
             self.warnings.insert(0, "В документе нет текста: проверять нечего. Модель не вызывалась, вердикт не "
@@ -726,6 +782,9 @@ class Pipeline:
         llm_ok = [s for s in LLM_STAGES if self.stages.get(s) in ("ok", "partial")]
         reviewers = [s for s in [f"lens_{x}" for x in LENSES] + ["consistency"] if self.stages.get(s) != "skipped"]
         if not any(self.stages.get(s) in ("ok", "partial") for s in reviewers) or not llm_ok:
+            # упёрлись в --max-cost: это решение пользователя, а не сбой — частичный отчёт (вердикт — без «можно»)
+            if getattr(self.ctx.llm if self.ctx else None, "cost_hit", "") and self.stages.get("rules") == "ok":
+                return "partial"
             return "failed"
         if any(v in ("failed", "partial") for v in self.stages.values()):
             return "partial"
@@ -746,12 +805,51 @@ class Pipeline:
                 "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
                 "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts,
                 "fast_start": self.fast_start_used,
+                **(self._replay_block(s) if self.replay else {}),
+                **({"incomplete_stages": incomplete_stages(self.stages)} if incomplete_stages(self.stages) else {}),
+                **self._cost_block(llm, s),
                 **({"model_error": self.model_error} if self.model_error else {})}
+
+    def _cost_block(self, llm: Any, s: dict) -> dict:
+        """Паспорт стоимости (``--max-cost``): потолок, потрачено, упёрлись ли."""
+        usd, tok = float(self.opts.get("max_cost_usd") or 0), int(self.opts.get("max_tokens") or 0)
+        if not usd and not tok:
+            return {"cost_estimated": True} if s.get("cost_estimated") else {}
+        hit = str(getattr(llm, "cost_hit", "") or "")
+        block = {"max_cost_usd": usd or None, "max_tokens": tok or None, "spent_usd": s.get("cost_usd", 0.0),
+                 "spent_tokens": int((s.get("tokens") or {}).get("input", 0)) + int((s.get("tokens") or {}).get(
+                     "output", 0)), "hit": bool(hit)}
+        if s.get("cost_estimated"):
+            block["estimated"] = True
+        out = {"cost_limit": block}
+        if s.get("cost_estimated"):
+            out["cost_estimated"] = True
+        return out
+
+    def _replay_block(self, s: dict) -> dict:
+        """Паспорт повтора: провайдер и модели — исходного прогона, живых вызовов — ноль."""
+        r = self.replay or {}
+        return {"provider": r.get("provider") or "replay",
+                "models_used": r.get("models_used") or s.get("models_used") or [],
+                "model_requested": r.get("model_requested") or self.opts.get("model") or "",
+                "replay": {"from": r.get("from"), "run_id": r.get("run_id"), "commit": r.get("commit"),
+                           "calls_replayed": int((s.get("calls") or {}).get("total") or 0), "calls_live": 0}}
 
     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
                 questions: list, qstats: dict) -> dict:
         status = self._status()
-        verdict = verdict_rule(findings, status)
+        hit = str(getattr(self.ctx.llm if self.ctx else None, "cost_hit", "") or "")
+        if hit:
+            self.warnings.insert(0, f"Прогон остановлен по --max-cost: {hit}. Отчёт частичный — этапы после "
+                                    "потолка не выполнялись; поднимите потолок, чтобы проверить документ целиком.")
+        incomplete = incomplete_stages(self.stages)
+        if incomplete and status != "failed":
+            # первым остаётся объяснение отказа модели (model_error), если оно есть
+            self.warnings.insert(1 if self.model_error and self.warnings[:1] == [self.model_error] else 0,
+                                 "Вердикт «можно» не выносится: не выполнены этапы " + ", ".join(
+                STAGE_RU.get(x, x) for x in incomplete) + ". Дефекты, которые они нашли бы, в отчёте не видны — "
+                "повторите прогон (уже готовые этапы возьмутся из кэша).")
+        verdict = verdict_rule(findings, status, incomplete)
         verdict["summary"] = jd.get("verdict_summary") or ""
         verdict["fix_first"] = list(jd.get("fix_first") or [f["id"] for f in sorted(
             (f for f in findings if f.get("priority")), key=lambda f: f["priority"])][:7])
@@ -957,6 +1055,12 @@ def write_outputs(report: dict, view: dict | None, input_path: Path, out_md: Pat
         extra = report.get("extra_markdown") or []
         if extra:
             md_text = md_text.rstrip() + "\n\n" + "\n\n".join(x.strip() for x in extra if x) + "\n"
+    if report.get("stability"):
+        try:
+            from . import stability
+            md_text = md_text.rstrip() + "\n\n" + stability.markdown(report)
+        except Exception as exc:  # noqa: BLE001
+            warnings.append(f"Раздел устойчивости не записан: {type(exc).__name__}: {exc}")
     out_md.write_text(md_text, encoding="utf-8")
     written["md"] = str(out_md)
     out_json = out_md.with_suffix(".json")
@@ -1019,21 +1123,30 @@ def _unread_view(path: Path) -> dict:
     return {"title": path.name, "file": path.name or "input", "format": fmt, "sha256": sha, "lines": []}
 
 
+def _execute(p: "Pipeline", input_path: str | Path) -> dict:
+    try:
+        return p.execute()
+    except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
+        p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
+        p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
+        view = p.ctx.view if p.ctx else _unread_view(Path(input_path))
+        return {"schema": "bcc-review/2", "run": p._run_block("failed"), "document": document_summary(view),
+                "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
+                                                                 "summary": "", "fix_first": []}}
+
+
 def review(input_path: str | Path, output_md: str | Path, opts: dict | None = None, *,
            reuse: RunDir | None = None, rerun: set[str] = frozenset(),
            log: Callable[[str], None] | None = None) -> tuple[dict, dict]:
     """Полный прогон: (report, {формат: путь}). Никогда не бросает исключение из-за этапа."""
     opts = {**DEFAULTS, **(opts or {}), "output": str(output_md)}
     p = Pipeline(input_path, opts, reuse=reuse, rerun=rerun, log=log)
-    try:
-        report = p.execute()
-    except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
-        p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
-        p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
-        view = p.ctx.view if p.ctx else _unread_view(Path(input_path))
-        report = {"schema": "bcc-review/2", "run": p._run_block("failed"), "document": document_summary(view),
-                  "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
-                                                                   "summary": "", "fix_first": []}}
+    report = _execute(p, input_path)
+    n_runs = int(opts.get("runs") or 1)
+    if n_runs > 1 and not opts.get("replay") and report["run"].get("status") != "failed" \
+            and report["run"].get("provider") != "offline":
+        from . import stability
+        report = stability.repeat(report, p, input_path, opts, n_runs, log or (lambda m: None))
     view = p.ctx.view if p.ctx else None
     llm = p.ctx.llm if p.ctx else None
     for stage, items in (getattr(llm, "responses", None) or {}).items():
