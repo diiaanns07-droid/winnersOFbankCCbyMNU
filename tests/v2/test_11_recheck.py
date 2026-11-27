@@ -297,7 +297,9 @@ def test_conflicting_answers_keep_defect_open(findings, questions, stub_judge):
     clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), report, answers)["clarification"]
     ch = next(c for c in clar["changes"] if c["finding_id"] == fid)
     assert ch["status"] == "open" and "противоречат" in ch["reason"]
-    assert clar["answer_conflicts"] == [{"finding_id": fid, "answers": [q1["id"], "Решение-1"], "reason": ch["reason"]}]
+    assert [{k: v for k, v in c.items() if k != "texts"} for c in clar["answer_conflicts"]] == \
+        [{"finding_id": fid, "answers": [q1["id"], "Решение-1"], "reason": ch["reason"]}]
+    assert clar["answer_conflicts"][0]["texts"]["Решение-1"] == "Противоположное правило."
     assert "противоречат друг другу" in recheck.render_markdown(clar)
 
 

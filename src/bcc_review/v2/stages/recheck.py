@@ -1002,6 +1002,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
     closed = [qid for qid in rc["answers"]["unanswered"]
               if rc["answers"]["decisions"] and q_by_id.get(qid, {}).get("finding_ids")
               and all(status_by_id.get(fid) == "resolved" for fid in q_by_id[qid]["finding_ids"])]
+    texts = answer_text_map(rc["answers"])
     clar = {
         "answers": rc["answers"]["answered"],
         "decisions": rc["answers"]["decisions"],
@@ -1010,7 +1011,9 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "postponed": list(rc["answers"].get("postponed") or []),
         "changes": changes,
         "new_findings": [f["id"] for f in new_found],
-        "answer_conflicts": [{"finding_id": c["finding_id"], "answers": c["answer_conflict"], "reason": c["reason"]}
+        # тексты спорящих ответов — чтобы владелец видел, из чего выбирать, а не только метки «Q-02.1 ↔ Q-02.2»
+        "answer_conflicts": [{"finding_id": c["finding_id"], "answers": c["answer_conflict"], "reason": c["reason"],
+                              "texts": {x: texts.get(x, "") for x in c["answer_conflict"]}}
                              for c in changes if c.get("answer_conflict")],
         "before": {"verdict": v_before, "findings": severity_counts(findings)},
         "after": {"verdict": {"development": after_rule["development"], "testing": after_rule["testing"],
@@ -1030,6 +1033,11 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
 _V = {"no": "нельзя", "conditional": "можно с условиями", "yes": "можно", "": "—"}
 _S = {"critical": "критичный", "major": "существенный", "minor": "незначительный", "": "—"}
 _ST = {"resolved": "закрыт", "changed": "изменён", "open": "открыт", "new": "новый"}
+
+
+def _short(text: str, limit: int = 160) -> str:
+    text = " ".join(str(text or "").split()).replace("|", "/")
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
 
 def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str:
@@ -1060,7 +1068,9 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
     if clar.get("answer_conflicts"):
         lines.append("Ответы, которые противоречат друг другу (выберите один):")
         for c in clar["answer_conflicts"]:
-            lines.append(f"* {' ↔ '.join(c['answers'])} — {c['finding_id']}: {c['reason']}")
+            texts = c.get("texts") or {}
+            sides = " ↔ ".join(f"{x} «{_short(texts[x])}»" if texts.get(x) else x for x in c["answers"])
+            lines.append(f"* {sides} — {c['finding_id']}: {c['reason']}")
         lines.append("")
     if clar.get("postponed"):
         lines.append("Владелец отложил решение — это не ответ, дефект по этой части остаётся открытым:")

@@ -402,3 +402,12 @@ def test_question_ids_in_other_format_bind_and_label():
     clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), rep, "Q-01: A\nQ-01: B\n")["clarification"]
     ch = next(c for c in clar["changes"] if c["finding_id"] == "D-01")
     assert ch["status"] == "open" and ch["answer_conflict"] == ["Q-1.1", "Q-1.2"]  # разные буквы — конфликт
+
+
+def test_conflict_shows_reply_texts():
+    resp = _resp([{"finding_id": "D-01", "conflicting_answers": ["Q-01"], "reason": "ответы расходятся"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), TWO)["clarification"]
+    texts = clar["answer_conflicts"][0]["texts"]
+    assert "422" in texts["Q-01.1"] and "403" in texts["Q-01.2"]
+    md = recheck.render_markdown(clar)
+    assert "Q-01.1 «Команда рисков: на отказ антифрода возвращаем 422" in md and "↔ Q-01.2 «Владелец API" in md
