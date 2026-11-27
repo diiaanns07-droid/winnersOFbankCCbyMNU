@@ -114,3 +114,15 @@ def test_section_at_bounds():
     assert lens_qa.section_at(view, 0) == lens_qa.section_at(view, 5) == lens_qa.section_at(None, 1) == ""
     assert not lens_qa._FUNCTIONAL_SECTION.search("Нефункциональные требования")
     assert lens_qa._FUNCTIONAL_SECTION.search("Функциональные требования")
+
+
+@pytest.mark.parametrize("case", ["autopay.range_boundary.trigger_at_threshold", "cardblock.range_boundary.days_400_at_30",
+                                  "cashback.range_boundary.cap_strict", "transfer_limit.range_boundary.reaching_rejects"])
+def test_corpus_mutant_keeps_acceptance_conflict(case):
+    """Мутант корпуса (заложена граница в строке приёмки, ответы sonnet): противоречие строки приёмки остаётся
+    critical, а лишнее замечание о покрытии на вычитанном документе уходит."""
+    view = _corpus_view(case)
+    seg = _json(QA / "segments" / f"{case.split('.')[0]}.base.json")["requirements"]
+    out = lens_qa.postprocess(_json(QA / f"{case}.sonnet.json"), seg, view)
+    assert [c["severity"] for c in out["candidates"]] == ["critical"]
+    assert out["candidates"][0]["origin"] == "acceptance_check"
