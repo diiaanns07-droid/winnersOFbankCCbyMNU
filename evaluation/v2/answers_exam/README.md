@@ -7,5 +7,7 @@
 | ТЗ | Отчёт | Статус агента | Фактическая модель | Этапы прогона | Проверка артефактов |
 |---|---|---|---|---|---|
 | car-loan | [baseline](car-loan/baseline.md) | complete | claude-sonnet-5-5 | [20261127-151203-084f](car-loan/runs/20261127-151203-084f/stages/) | [OK](car-loan/baseline.verify.txt) |
+| official | [answered](official/answered.md) | complete | claude-sonnet-5-5 | [20261127-151551-bf95](official/runs/20261127-151551-bf95/stages/) | [OK](official/answered.verify.txt) |
+| official | [reread](official/reread.md) | complete | claude-sonnet-5-5 | [20261127-152128-e743](official/runs/20261127-152128-e743/stages/) | [OK](official/reread.verify.txt) |
 
-27.11.2026 15:21:05 по Астане. Выполняется official/answered.
+27.11.2026 15:26:04 по Астане. Выполняется qr/answered.
