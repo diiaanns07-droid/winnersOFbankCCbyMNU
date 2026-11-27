@@ -44,7 +44,7 @@ SKELETON_MIN = 10      # «те же слова, другие знаки меж�
 REASON_MISSING = "цитата не найдена"
 
 _QUOTES = set("«»“”„‟\"'‘’‚‛`´ʹʺ〝〞＂")
-_DASHES = set("—–‑‒―−⁃﹘﹣－")
+_DASHES = set("—–‑‐‒―−⁃﹘﹣－")  # ‐ (U+2010): в него NFKC превращает неразрывный дефис Word (U+2011)
 _ZERO = set("\u200b\u200c\u200d\u2060\ufeff\u00ad")
 _ELLIPSIS = re.compile(r"\.{3,}")
 _LEAD = re.compile(r"^(?:\s|[#*•|>]|-(?=\s))+")
@@ -349,7 +349,23 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
         m = _fuzzy(idx, needle, hint, points)
         if m:
             return m
+    # 6: модель экранировала разметку («limit\_kzt», «\*\*Ф-2.\*\*») или записала HTML-сущности («&laquo;»)
+    plain = _unescape(quote)
+    if plain != quote:
+        return verify_quote(view, plain, line_hint, near_lines)
     return None
+
+
+_MD_ESCAPE = re.compile(r"\\([\\`*_{}\[\]()#+\-.!|<>~\"'])")
+
+
+def _unescape(q: str) -> str:
+    """Цитата без экранирования Markdown и HTML-сущностей; если менять нечего — та же строка."""
+    out = _MD_ESCAPE.sub(r"\1", q) if "\\" in q else q
+    if "&" in out and ";" in out:
+        import html
+        out = html.unescape(out)
+    return out
 
 
 def _same_words(idx: _Index, needle: str, hint: int | None, near: list[int]) -> dict | None:

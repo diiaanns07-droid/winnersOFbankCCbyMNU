@@ -326,3 +326,26 @@ def test_docx_textbox_requirement_not_lost():
     assert not any("премиальных" in t for t in texts)
     m = Q.verify_quote(view, "Старая карта блокируется после активации новой", 5)
     assert m and m["line_start"] == k + 2
+
+
+# --------------------------------------------------------------------------- отклонения моделей при цитировании
+def test_non_breaking_hyphen_from_word():
+    """NFKC превращает неразрывный дефис Word (U+2011) в U+2010 — он тоже тире: «Ф‑2» = «Ф-2» в обе стороны."""
+    view = dv.load(OFFICIAL_MD)
+    m = Q.verify_quote(view, "Ф‑2. Месяц определяется", 38)
+    assert m and m["line_start"] == 38
+    word = dv.from_text("# ТЗ\n\nФ‑2. Месяц определяется по дате покупки.\n")
+    m2 = Q.verify_quote(word, "Ф-2. Месяц определяется", 3)
+    assert m2 and m2["line_start"] == 3 and m2["text"].startswith("Ф‑2")
+
+
+@pytest.mark.parametrize("quote, line, text", [
+    (r"limit\_kzt", None, "limit_kzt"),
+    (r"\*\*Ф-2.\*\* Месяц определяется", 38, "Ф-2. Месяц определяется"),
+    ("&laquo;Порог, ₸&raquo;", None, "Порог, ₸"),
+])
+def test_markdown_escapes_and_html_entities(quote, line, text):
+    view = dv.load(OFFICIAL_MD)
+    m = Q.verify_quote(view, quote, line)
+    assert m and m["text"] == text
+    assert Q.verify_quote(view, r"совсем нет такого \_ текста") is None
