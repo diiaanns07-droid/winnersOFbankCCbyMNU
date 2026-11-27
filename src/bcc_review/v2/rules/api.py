@@ -57,6 +57,7 @@ MENTION = re.compile(
 DECL_LIST = re.compile(rf"^(?:HTTP\s+)?({CODE})(?:\s*[.:)]\s*\S|\s+[A-Za-z][A-Za-z \-]{{1,30}}?\s*[—–:\-]\s*\S|\s*[—–]\s*\S)")
 DECL_OTVET = re.compile(rf"^(?:ответ|response)\s+({CODE})\b", re.I)
 BARE_CODE = re.compile(rf"^({CODE})\.?$")
+DECL_INLINE = re.compile(rf"\b(?:Ответ|Статус|Код\s+ответа)\s+({CODE})\s*[—–:\-]\s*\S", re.I)
 ERROR_JSON = re.compile(
     r'"(?:result|status|state)"\s*:\s*"(error|fail\w*|err|failure|declined|rejected)"|"error"\s*:|'
     r'"success"\s*:\s*false', re.I)
@@ -151,6 +152,7 @@ VERB_PATH = re.compile(r"^(GET|HEAD|POST|PUT|PATCH|DELETE)\s+(/\S*)")
 def find_methods(doc: Doc) -> list[Method]:
     L = doc.lines
     methods: list[Method] = []
+    row_methods: list[Method] = []
     for idx, x in enumerate(L):
         if not x.text or x.is_code:
             continue
@@ -164,6 +166,19 @@ def find_methods(doc: Doc) -> list[Method]:
             m = VERB_PATH.match(x.text)
             if m and x.cells is None and not x.is_code:
                 verb = m.group(1).upper()
+        if verb is None and x.cells:
+            # сводная таблица методов: «| 3. Данные QR | GET `/qr/{id}` | … |»
+            for ci, cell in enumerate(x.cells):
+                cm = VERB_PATH.match(cell.strip())
+                if cm and ci > 0:
+                    meth = Method(verb=cm.group(1).upper(), verb_line=x, start=x.n, end=x.n, url=cm.group(2),
+                                  url_line=x, desc=re.sub(r"^\d+[.)]\s*", "", x.cells[0]), desc_line=x)
+                    nm = re.search(r"\b([a-z]+[A-Z]\w*)\b", x.cells[0])
+                    if nm:
+                        meth.name, meth.name_line = nm.group(1), x
+                    row_methods.append(meth)
+                    break
+            continue
         if verb is None:
             continue
         # начало блока: заголовок «Метод X» выше (до 10 строк) или начало таблицы
@@ -198,6 +213,11 @@ def find_methods(doc: Doc) -> list[Method]:
     methods.sort(key=lambda m: m.start)
     for a, b in zip(methods, methods[1:]):
         a.end = b.start - 1
+    if row_methods:  # блок метода из текста заканчивается перед сводной таблицей методов
+        first_row = min(r.start for r in row_methods)
+        for m in methods:
+            if m.start < first_row:
+                m.end = min(m.end, first_row - 1)
     last = L[-1].n if L else 0
     for m in methods:
         m.end = min(m.end, last)
@@ -222,7 +242,9 @@ def find_methods(doc: Doc) -> list[Method]:
             segs = [s for s in m.url.split("/") if s and not s.startswith("{")]
             if segs and re.match(r"^[a-z]+[A-Z]\w*$", segs[-1]):
                 m.name, m.name_line = segs[-1], m.url_line
-    return methods
+    for m in row_methods:
+        m.lines = [m.verb_line]
+    return methods + row_methods
 
 
 def method_of(methods: list[Method], n: int) -> Method | None:
@@ -365,6 +387,9 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
         m = DECL_OTVET.match(x.text)
         if m:
             decls.append(Status(int(m.group(1)), x, "otvet"))
+        for m in DECL_INLINE.finditer(x.text):  # «… Ответ 400 — поле отсутствует: {…}» внутри строки
+            if m.start() > 0:
+                decls.append(Status(int(m.group(1)), x, "inline"))
     mentions: list[tuple[int, Line, str]] = []
     for x in doc.lines:
         if not x.text or x.is_code:

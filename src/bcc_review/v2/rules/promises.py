@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from ._text import Doc, Line, candidate, ev, fmt_list, quoted, signal
-from .api import READ_TOKENS, Method, split_camel
+from .api import MUTATING_TOKENS, READ_TOKENS, Method, split_camel
 
 METHOD_NAME = re.compile(r"\b([a-z]{2,}[A-Z][A-Za-z0-9]*)\b")
 METHOD_CTX = re.compile(r"метод\w*|операци\w*|endpoint|вызов\w*|api", re.I)
@@ -48,6 +48,11 @@ def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
             name = mm.group(1)
             toks = split_camel(name)
             if len(toks) < 2 or name.lower() in defined:
+                continue
+            # имя метода, а не поле: «методом X», «Методы X и Y», «вызов X» рядом или глагол в начале имени
+            before = " ".join(re.findall(r"[\wА-Яа-яЁё]+", t[:mm.start()])[-3:])
+            if not (re.search(r"метод\w*|вызов\w*|endpoint|операци\w*", before, re.I)
+                    or toks[0] in READ_TOKENS or toks[0] in MUTATING_TOKENS):
                 continue
             if any(name.lower() == (m.name or "").lower() for m in methods):
                 continue
