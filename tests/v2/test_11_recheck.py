@@ -380,3 +380,27 @@ def test_topic_binding_uses_answer_text():
     res = recheck.resolve_answers(qs, recheck.load_answers(text))
     got = {a["question_id"]: a["answer"] for a in res["answered"]}
     assert got["Q-02"].startswith("Возврат покупки") and got["Q-01"].startswith("Не более одного")
+
+
+def test_empty_reason_is_filled_by_status(findings, questions):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "changed", "by": [q1["id"]], "reason": "", "severity": "major"}])
+    rc = {g["id"]: g["recheck"] for g in recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q1['id']}: A\n",
+                                                     questions)["findings"]}[fid]
+    assert rc["status"] == "changed" and rc["reason"] == f"частично снят ответом {q1['id']}"
+
+
+def test_answer_clash_from_reason_only(findings, questions, stub_judge):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "open", "by": [], "conflicting_answers": [],
+                   "reason": f"{q1['id']} задаёт одно значение, а Решение-1 — другое: ответы противоречат друг другу."}])
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), report,
+                                 f"{q1['id']}: A\n\n## Решения\n- Другое правило.\n")["clarification"]
+    assert [c["finding_id"] for c in clar["answer_conflicts"]] == [fid]
+    # «противоречит документу» с одним ответом — не противоречие ответов
+    resp2 = _resp([{"finding_id": fid, "status": "open", "by": [], "reason": f"{q1['id']} противоречит пункту документа."}])
+    clar2 = recheck.apply_answers(FakeCtx(FakeLLM(resp2)), report, f"{q1['id']}: A\n")["clarification"]
+    assert clar2["answer_conflicts"] == []

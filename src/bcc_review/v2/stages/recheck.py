@@ -363,6 +363,7 @@ def answer_labels(resolved: dict) -> set[str]:
         {f"Решение-{i}" for i in range(1, len(resolved["decisions"]) + 1)}
 
 
+_CLASH = re.compile(r"противореч|расходятся|несовместим|взаимоисключ|разн\w* исход", re.I)
 _LABEL = re.compile(r"(Q\s*-?\s*\d{1,3})|(Решени\w*\s*-?\s*\d{1,3})", re.I)
 
 
@@ -468,6 +469,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         rc["status"], rc["reason"] = status, _plain_reason(str(d.get("reason", "")).strip(), keep)
         # два ответа противоречат друг другу — дефект остаётся открытым, владелец выбирает один ответ
         clash = norm_labels(list(d.get("conflicting_answers") or []), valid)
+        if len(clash) < 2 and _CLASH.search(rc["reason"]):  # модель описала противоречие ответов только в причине
+            clash = norm_labels([rc["reason"]], valid)
         if len(clash) >= 2:
             rc["answer_conflict"] = clash
             if status != "open":
@@ -498,8 +501,16 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         elif status == "resolved":
             rc["severity_after"] = ""
     for g in out_findings:
-        if g["recheck"]["affected"] and not g["recheck"]["reason"]:
-            g["recheck"]["reason"] = "модель не оценила дефект — оставлен открытым"
+        rc = g["recheck"]
+        if not rc["affected"] or rc["reason"]:
+            continue
+        names = ", ".join(rc.get("answer_ids") or [])
+        if rc["status"] == "resolved" and names:
+            rc["reason"] = f"снят ответом {names}"
+        elif rc["status"] == "changed" and names:
+            rc["reason"] = f"частично снят ответом {names}"
+        else:
+            rc["status"], rc["reason"] = "open", "модель не оценила дефект — оставлен открытым"
 
     n = _next_candidate_number(report, findings)
     for c in raw.get("candidates") or []:
