@@ -1016,6 +1016,7 @@ def mature_document(view: Any) -> bool:
     return bool(maturity(view).get("mature"))
 
 
+NO_QUOTE_REASON = "снято линзой тестировщика: нет ни одной цитаты документа"
 COVERAGE_MATURE_REASON = ("снято линзой тестировщика: документ вычитан (термины, версия, явный часовой пояс, нет "
                           "заглушек) — таблица приёмки в нём сознательная выборка ключевых сценариев; непокрытые "
                           "ветки — в черновике тест-кейсов отчёта, а не дефект требований")
@@ -1068,6 +1069,10 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     flagged: set[str] = set()
     for c in checks:
         cand = check_to_candidate(c, index)
+        if cand and not any(_s(e.get("quote")) for e in cand["evidence"]):
+            warnings.append(f"{STAGE}: строка приёмки {c['row_requirement_id'] or c['row_line'] or '?'} без цитат "
+                            "строки и правила — замечание не построено")
+            continue
         if cand:
             candidates.append(cand)
             flagged.add(c["row_requirement_id"])
@@ -1078,6 +1083,9 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     calibrate_nfr_checks(nfr_checks, reqs, view)
     nfr = nfr_candidate(nfr_checks, index)
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
+    # Без единой цитаты замечание не доказано: в dropped линзы с понятной причиной, а не в «цитата не найдена» сверки.
+    no_quote = [c for c in model_cands if not c["evidence"]]
+    model_cands = [c for c in model_cands if c["evidence"]]
     for c in model_cands:  # тексты для читателя: «L040» → «строка 40», ID нарезки → номер документа (рубрика, п. 7)
         for k in ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question"):
             c[k] = humanize_ids(c[k], index)
@@ -1102,6 +1110,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     tests = [{"id": t["id"], **{k: v for k, v in t.items() if k != "id"}} for t in tests]
 
     kept, dropped = limit_other_candidates(kept)
+    dropped = [{**c, "reason": NO_QUOTE_REASON} for c in no_quote] + dropped
     calibrate_coverage(kept, checks, reqs, tests)
     if mature_document(view):
         dropped += drop_coverage_on_mature(kept)

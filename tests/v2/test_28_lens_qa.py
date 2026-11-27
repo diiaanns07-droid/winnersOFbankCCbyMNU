@@ -114,3 +114,35 @@ def test_section_at_bounds():
     assert lens_qa.section_at(view, 0) == lens_qa.section_at(view, 5) == lens_qa.section_at(None, 1) == ""
     assert not lens_qa._FUNCTIONAL_SECTION.search("Нефункциональные требования")
     assert lens_qa._FUNCTIONAL_SECTION.search("Функциональные требования")
+
+
+@pytest.mark.parametrize("case", ["autopay.range_boundary.trigger_at_threshold", "cardblock.range_boundary.days_400_at_30",
+                                  "cashback.range_boundary.cap_strict", "transfer_limit.range_boundary.reaching_rejects"])
+def test_corpus_mutant_keeps_acceptance_conflict(case):
+    """Мутант корпуса (заложена граница в строке приёмки, ответы sonnet): противоречие строки приёмки остаётся
+    critical, а лишнее замечание о покрытии на вычитанном документе уходит."""
+    view = _corpus_view(case)
+    seg = _json(QA / "segments" / f"{case.split('.')[0]}.base.json")["requirements"]
+    out = lens_qa.postprocess(_json(QA / f"{case}.sonnet.json"), seg, view)
+    assert [c["severity"] for c in out["candidates"]] == ["critical"]
+    assert out["candidates"][0]["origin"] == "acceptance_check"
+
+
+def test_model_candidate_without_quote_goes_to_dropped():
+    """Кандидат модели без цитаты — в dropped линзы с причиной (раньше доходил до сверки и отклонялся там)."""
+    cand = {"title": "Покрытие", "kind": "missing_element", "criterion": "set_validatable", "severity": "minor",
+            "requirement_ids": [], "evidence": [{"quote": " ", "line": 3}], "problem": "п", "scenario": "", "impact": "",
+            "recommendation": "", "rewrite": "", "question": "", "blocks": "testing"}
+    out = lens_qa.postprocess({"candidates": [cand]}, [])
+    assert out["candidates"] == []
+    assert [d["reason"] for d in out["dropped"]] == [lens_qa.NO_QUOTE_REASON]
+
+
+def test_acceptance_row_without_quotes_builds_no_candidate():
+    """Строка приёмки `undefined` без цитат строки, заявленного и правила: замечание не строится, только предупреждение."""
+    check = {"row_requirement_id": "", "row_quote": "", "row_line": 0, "row_facts": "ф", "assumptions": "",
+             "rule_requirement_ids": [], "rule_evidence": [], "derivation": "", "expected_by_rules": "не определено",
+             "stated": "", "stated_line": 0, "verdict": "undefined", "conflict_kind": "none", "explanation": "", "fix": ""}
+    out = lens_qa.postprocess({"acceptance_checks": [check]}, [])
+    assert out["candidates"] == [] and len(out["acceptance_checks"]) == 1
+    assert any("без цитат" in w for w in out["warnings"])

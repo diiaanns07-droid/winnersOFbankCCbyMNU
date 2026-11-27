@@ -61,15 +61,38 @@ def _py(*args: str, timeout: int = 900) -> subprocess.CompletedProcess:
                           text=True, timeout=timeout, env=env)
 
 
+
+
+
+def segmentation(c: dict) -> tuple[str, dict | None]:
+    """Нарезка для базового прогона: официальный — фикстура mock (модель); остальное — эвристика кода (так мерил
+    №06: строки приёмки она размечает так же, как модель). Без этого mock для чужого документа отдаёт нарезку
+    официального ТЗ (каталог фикстур по умолчанию)."""
+    if c["set"] == "official":
+        return "fixture", None
+    from bcc_review.v2 import docview
+    from bcc_review.v2.stages import segment
+    h = segment.heuristic_segment(docview.load(c["path"]))
+    return "heuristic", {"requirements": h.get("requirements") or [], "excluded": h.get("excluded") or []}
+
+
 def base_run(c: dict) -> Path:
     runs = OUT / "runs"
-    base_id = f"base_{c['id']}_{hashlib.sha256(Path(c['path']).read_bytes()).hexdigest()[:8]}"
+    tag, seg = segmentation(c)
+    base_id = f"base_{c['id']}_{hashlib.sha256(Path(c['path']).read_bytes()).hexdigest()[:8]}_{tag}"
     if not (runs / base_id / "stages").is_dir():
         args = [str(c["path"]), str(OUT / "base" / f"{c['id']}.md"), "--provider", "mock", "--runs-dir", str(runs),
                 "--run-id", base_id, "--no-html", "-q"]
         if c.get("mock"):
             args += ["--mock-dir", str(c["mock"])]
         _py(*args)
+        if seg is not None:
+            sf = runs / base_id / "stages" / "segment.json"
+            rec = json.loads(sf.read_text(encoding="utf-8"))
+            rec["output"] = {**(rec.get("output") or {}), **seg}
+            rec["status"] = "ok"
+            rec["segmentation"] = tag
+            sf.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
     return runs / base_id
 
 
@@ -169,6 +192,15 @@ def score(lens: str, label: str, rep: str) -> str:
     for k, d in data.items():
         if k.endswith("_clean"):
             L.append(f"* {k}: {len(d['candidates'])} ({_sev(d['candidates'])})")
+        elif k in ("grace", "qr", "capital", "insurance"):
+            from evaluation.v2 import score as sc
+            gold = sc.load_gold(OPEN2 / k / "gold.yaml")
+            res = sc.score_report(sc.as_report({"candidates": d["candidates"]}, gold), gold, arbiter="off",
+                                  cache_path=OPEN2 / k / "arbiter_cache.jsonl")
+            found = sorted({a["gold"] for a in res["assignment"]})
+            acc = [f"{c.get('row_line')}:{c.get('verdict')}" for c in d.get("acceptance_checks") or []]
+            L.append(f"* {k}: {len(d['candidates'])} ({_sev(d['candidates'])}); в эталоне: {', '.join(found) or '—'}; "
+                     f"строки приёмки: {', '.join(acc) or '—'}")
     cf_ = corpus_fp(data)
     if cf_:
         L.append(f"* корпус: чистых {cf_['clean_docs']}, замечаний на чистых {cf_['fp_clean']}; TP {cf_['tp']}, "
