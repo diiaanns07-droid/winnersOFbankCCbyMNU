@@ -79,10 +79,19 @@ def is_formatting(f: dict) -> bool:
 
 # Варианты, которые не являются решением: их программа выбрасывает.
 _BANNED_OPTION = re.compile(
-    r"остав\w*\s+(как\s+есть|без\s+изменени)|на\s+усмотрени|как\s+сочт|по\s+ситуации|решить\s+позже|"
+    r"на\s+усмотрени|как\s+сочт|по\s+ситуации|решить\s+позже|"
     r"реши\w*\s+(позже|потом)|отлож\w*\s+решени|^друго[ей]\b|^иное\b|^прочее\b|не\s+знаю",
     re.I,
 )
+# «Оставить как есть» — не решение, только если это и есть весь вариант. Внутри решения это часть правки:
+# «правило Ф-2 переписать под дату проведения, пример оставить как есть» (на официальном haiku терял так
+# вопрос по критичному противоречию — вариантов оставалось меньше двух).
+_KEEP_AS_IS = re.compile(r"^\W*(?:(?:\w+\W+){0,2}?остав\w*\s+(?:вс[её]\s+)?(?:как\s+есть|без\s+изменени)|"
+                         r"ничего\s+не\s+(?:менять|меняем|изменять))", re.I)
+
+
+def banned_option(text: str) -> bool:
+    return bool(_BANNED_OPTION.search(text) or _KEEP_AS_IS.search(text))
 _LEADING_LABEL = re.compile(r"^\s*(?:[A-DА-Г]|[1-4])\s*[).:\-—–]\s+", re.I)
 
 
@@ -298,7 +307,7 @@ def clean_options(options: Iterable[str]) -> list[str]:
                 if not soft:
                     continue
                 text = soften_placeholder(text)
-            if len(text) < 3 or _BANNED_OPTION.search(text):
+            if len(text) < 3 or banned_option(text):
                 continue
             key = _norm(text)
             if key in seen:
