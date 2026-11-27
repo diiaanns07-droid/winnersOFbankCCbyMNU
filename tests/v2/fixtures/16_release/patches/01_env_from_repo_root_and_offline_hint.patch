@@ -1,0 +1,29 @@
+diff --git a/src/bcc_review/v2/__main__.py b/src/bcc_review/v2/__main__.py
+index 1cf9ff1..bac6107 100644
+--- a/src/bcc_review/v2/__main__.py
++++ b/src/bcc_review/v2/__main__.py
+@@ -32,7 +32,9 @@ def _utf8_console() -> None:
+ def _load_env() -> None:
+     try:
+         from .providers import doctor
+-        doctor.load_dotenv(".env")
++        if not doctor.load_dotenv(".env"):
++            # запуск не из корня репозитория: .env в корне (src/bcc_review/v2/__main__.py → четыре уровня вверх)
++            doctor.load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+     except Exception:  # noqa: BLE001
+         pass
+ 
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 37a8c1a..6c59ef4 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -660,6 +660,9 @@ class Pipeline:
+ 
+     def _offline(self, view: dict) -> dict:
+         self.log("Модель не настроена: предварительная проверка правилами (offline)")
++        if (self.opts.get("provider") or "auto") == "auto":
++            self.log("Для полного отчёта впишите ключ в .env в корне репозитория: GEMINI_API_KEY=<ключ> (бесплатно: "
++                     "https://aistudio.google.com/apikey) и запустите снова; проверка — python -m bcc_review doctor")
+         from .rules import offline
+         report = offline.build(view, None)
+         run = report.setdefault("run", {})
