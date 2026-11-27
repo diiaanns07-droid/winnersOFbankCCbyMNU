@@ -1423,6 +1423,152 @@ def next_answers_path(report_path: str | Path) -> Path:
     return p.with_name(p.stem + ".answers-next.md") if p.suffix else p.with_name(p.name + ".answers-next.md")
 
 
+def answers_path(report_path: str | Path) -> Path:
+    """``<отчёт>.answers.md`` — файл ответов, записанный в консоли (``--interactive``)."""
+    p = Path(report_path)
+    return p.with_name(p.stem + ".answers.md") if p.suffix else p.with_name(p.name + ".answers.md")
+
+
+# --------------------------------------------------------------------------- ответы в консоли (--interactive, №22)
+STOP_WORDS = {"стоп", "выход", "хватит"}
+
+
+def reply_line(q: dict, reply: str) -> dict:
+    """Ввод владельца на один вопрос → строка файла ответов в формате ``parse_answers_text``.
+
+    Возвращает ``{"line", "echo", "error", "skip"}``: ``line`` — «Q-01 [тема]: B — текст варианта» (буква с текстом
+    варианта: если вопросы перегенерируют и варианты переставятся, ответ сверят по тексту), «Q-01 [тема]: B — оговорка»
+    или «Q-01 [тема]: свой текст»; Enter, «?», «не знаю» — «Q-01 [тема]: ?» (нет ответа). ``echo`` — как ответ понят,
+    по-русски; ``error`` — переспросить (варианта с такой буквой нет)."""
+    qid = str(q.get("id") or "")
+    head = _head(qid, q.get("topic", ""))
+    reply = _one_line(unhide(str(reply or ""))[0])
+    parsed = _parse_value(reply)
+    opts = [str(o) for o in q.get("options") or []]
+    if parsed["choice"] is None and not parsed["text"]:
+        return {"line": head + "?", "echo": "без ответа — вопрос останется открытым", "error": "", "skip": True}
+    if parsed["choice"] is not None:
+        idx = parsed["choice"]
+        if idx >= len(opts):
+            last = _cl.option_label(len(opts) - 1) if opts else ""
+            hint = f"варианты {_cl.option_label(0)}–{last}" if len(opts) > 1 else "своим текстом"
+            return {"line": head + "?", "echo": "", "skip": True,
+                    "error": f"варианта {_cl.option_label(idx)} нет — ответьте: {hint}, свой текст или Enter"}
+        label, comment = _cl.option_label(idx), _one_line(parsed["comment"])
+        body, later = split_deferred(comment) if comment else ("", [])
+        line = head + f"{label} — " + (comment if comment and _opt_key(comment) != _opt_key(opts[idx]) else opts[idx])
+        echo = f"вариант {label}: «{_short(opts[idx], 100)}»" + (f", оговорка: «{_short(comment, 80)}»"
+                                                               if comment and _opt_key(comment) != _opt_key(opts[idx]) else "")
+        if parsed.get("ambiguous_letter") and len(opts) >= 3:
+            echo += "; русская «В» понята как B — если имели в виду третий вариант, введите C"
+        if later and not body:
+            echo += "; оговорка откладывает решение — эта часть останется открытой"
+        return {"line": line, "echo": echo, "error": "", "skip": False}
+    text = _one_line(parsed["text"])
+    body, later = split_deferred(text)
+    pick = _option_index(text, opts)
+    if pick is not None:
+        echo = f"текст варианта {_cl.option_label(pick)} — засчитан как этот вариант"
+    elif not body and later:
+        echo = "ответ откладывает решение — вопрос останется открытым"
+    else:
+        echo = "свой ответ" + (f"; отложенная часть «{_short(' '.join(later), 60)}» останется открытой" if later else "")
+    return {"line": head + text, "echo": echo, "error": "", "skip": False}
+
+
+def format_question(q: dict, n: int = 0, total: int = 0) -> str:
+    """Вопрос для консоли: номер, тема, блокер, кому, текст, варианты буквами и «если ответа не будет»."""
+    meta = [f"{q.get('id', '')} [{_one_line(q.get('topic', ''))}]" if q.get("topic") else str(q.get("id", ""))]
+    if q.get("blocking"):
+        meta.append("блокер")
+    if q.get("to"):
+        meta.append(f"кому: {_one_line(q['to'])}")
+    if q.get("finding_ids"):
+        meta.append("дефекты " + ", ".join(q["finding_ids"]))
+    lines = [(f"Вопрос {n} из {total} · " if n and total else "") + " · ".join(meta), _one_line(q.get("question"))]
+    lines += [f"  {_cl.option_label(i)} — {_one_line(o)}" for i, o in enumerate(q.get("options") or [])]
+    if q.get("if_no_answer"):
+        lines.append(f"  Если ответа не будет: {_one_line(q['if_no_answer'])}")
+    return "\n".join(lines)
+
+
+def answers_file_text(questions: list[dict], replies: dict[str, str] | None = None, *, document: str = "",
+                      sha256: str = "", decisions: Iterable[str] = (), report: str = "") -> str:
+    """Вопросы и ответы владельца (сырой ввод по номеру вопроса) → текст файла ответов для ``--answers``.
+
+    Каждый вопрос — строкой «Q-01 [тема]: …» (без ответа — «?»), над ней пояснение «>» с текстом вопроса; в шапке —
+    документ и его SHA-256 (``answers_header``), в конце — «## Решения» владельца. Файл читает ``parse_answers_text``;
+    его можно дописать в редакторе и запустить ещё раз."""
+    replies = {(_qid(str(k)) or str(k)): v for k, v in (replies or {}).items()}
+    lines = ["# Ответы владельца", "", *answers_header(document, sha256),
+             "> Ответ — буква варианта, свой текст или «?» (нет ответа). Строки «>» — пояснения, их не разбирают."]
+    if document or report:
+        lines.append(f"> Запуск: python -m bcc_review {document or 'ДОКУМЕНТ'} {report or 'ОТЧЁТ.md'} --answers ЭТОТ_ФАЙЛ")
+    lines.append("")
+    for q in questions or []:
+        if not isinstance(q, dict) or not _qid(str(q.get("id") or "")):
+            continue
+        r = reply_line(q, replies.get(_qid(str(q["id"])), ""))
+        ids = ", ".join(q.get("finding_ids") or [])
+        lines += [f"> {q['id']}" + (f" ({ids})" if ids else "") + f": {_one_line(q.get('question'))}",
+                  r["line"] if not r["error"] else _head(str(q["id"]), q.get("topic", "")) + "?", ""]
+    decided = [_one_line(d) for d in decisions or [] if _one_line(d)]
+    if decided:
+        lines += ["## Решения", "", *[f"- {d}" for d in decided], ""]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def console_answers(questions: list[dict], *, ask: Any = input, say: Any = print, document: str = "",
+                    sha256: str = "", report: str = "", ask_decisions: bool = True) -> dict:
+    """Вопросы по одному в консоли → ``{"text", "replies", "decisions", "answered", "stopped"}``.
+
+    ``ask(prompt) -> str`` и ``say(text)`` — ввод и вывод (по умолчанию ``input``/``print``; в тестах — подмена).
+    На каждый вопрос: буква, свой текст или Enter — пропустить; «стоп» — закончить, остальные без ответа; варианта
+    с такой буквой нет — переспросить (до трёх раз). Конец ввода (Ctrl+D / Ctrl+Z, ввод из канала) — как «стоп».
+    Затем общие решения без вопроса, по строке, пустая строка — конец. ``text`` записывайте в ``answers_path``
+    и передавайте в ``--answers``: формат тот же, что у файла ответов."""
+    qs = [q for q in questions or [] if isinstance(q, dict) and _qid(str(q.get("id") or ""))]
+    replies: dict[str, str] = {}
+    decisions: list[str] = []
+    stopped = False
+
+    def read(prompt: str) -> str | None:
+        try:
+            return str(ask(prompt) or "")
+        except EOFError:
+            return None
+
+    for n, q in enumerate(qs, 1):
+        say("")
+        say(format_question(q, n, len(qs)))
+        for _ in range(3):
+            raw = read("Ответ — буква, свой текст или Enter, чтобы пропустить: ")
+            if raw is None or raw.strip().lower() in STOP_WORDS:
+                stopped = True
+                break
+            r = reply_line(q, raw)
+            if r["error"]:
+                say("  " + r["error"])
+                continue
+            say("  → " + r["echo"])
+            if not r["skip"]:
+                replies[q["id"]] = raw
+            break
+        if stopped:
+            say(f"Остановлено: вопросов без ответа — {len(qs) - len(replies)}; их можно дописать в файл ответов.")
+            break
+    if ask_decisions and not stopped:
+        say("")
+        say("Общие решения без вопроса — по одному в строке; пустая строка — закончить.")
+        while True:
+            raw = read("Решение: ")
+            if raw is None or not raw.strip() or raw.strip().lower() in STOP_WORDS:
+                break
+            decisions.append(_one_line(raw))
+    text = answers_file_text(qs, replies, document=document, sha256=sha256, decisions=decisions, report=report)
+    return {"text": text, "replies": replies, "decisions": decisions, "answered": len(replies), "stopped": stopped}
+
+
 # --------------------------------------------------------------------------- Markdown-раздел (для №13)
 _V = {"no": "нельзя", "conditional": "можно с условиями", "yes": "можно", "": "—"}
 _S = {"critical": "критичный", "major": "существенный", "minor": "незначительный", "": "—"}
