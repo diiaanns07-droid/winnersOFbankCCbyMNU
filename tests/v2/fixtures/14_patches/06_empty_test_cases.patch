@@ -1,8 +1,8 @@
 diff --git a/src/bcc_review/v2/stages/lens_qa.py b/src/bcc_review/v2/stages/lens_qa.py
-index a7e81ef8..8cdedf23 100644
+index d5e1a176..0e2eaf2d 100644
 --- a/src/bcc_review/v2/stages/lens_qa.py
 +++ b/src/bcc_review/v2/stages/lens_qa.py
-@@ -850,7 +850,12 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
+@@ -1031,7 +1031,12 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
          model_cands.insert(0, nfr)
      kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
      tests = [normalize_test_case(x) for x in data.get("test_cases") or [] if isinstance(x, Mapping)]
@@ -13,6 +13,6 @@ index a7e81ef8..8cdedf23 100644
 +    if known:
 +        for t in tests:
 +            t["requirement_ids"] = [x for x in t["requirement_ids"] if x in known]
-     if len(tests) > MAX_TEST_CASES:
-         warnings.append(f"{STAGE}: тест-кейсов {len(tests)}, оставлено {MAX_TEST_CASES}")
-         tests = tests[:MAX_TEST_CASES]
+     for t in tests:  # «(R-12: …)», «L064» в тексте кейса → номер документа и строка (рубрика, п. 7)
+         for k in ("title", "given", "when", "then", "gap"):
+             t[k] = humanize_ids(t[k], index)
