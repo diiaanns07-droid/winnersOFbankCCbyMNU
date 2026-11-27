@@ -612,3 +612,16 @@ def test_single_reviewer_critical_is_major_unless_structured():
     sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
     assert sev["C-001"] == "major" and sev["C-003"] == "major"        # один ревьюер
     assert sev["C-002"] == "critical"                                  # попарная сверка по сценарию
+
+
+def test_conflict_critical_with_odd_criterion_keeps_level():
+    cs = [cand("C-001", 39, "максимум один", kind="contradiction", criterion="conforming", source="lens:qa",
+               extra=[(40, "независимо от истории")]),
+          cand("C-002", 39, "максимум один такой", kind="contradiction", criterion="conforming", source="lens:analyst",
+               extra=[(40, "следующее достижение")])]
+    f = finding("F01", ["C-001", "C-002"], severity="critical", kind="contradiction", criterion="conforming",
+                scenario="Вход: два исхода.", impact="Две реализации.", priority=1)
+    res = judge.run(Ctx(FakeLLM(response([f]))), cs)
+    d = res["findings"][0]
+    assert d["severity"] == "critical" and d["criterion"] == "set_consistent"
+    assert d["standard_refs"] == ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.4"]

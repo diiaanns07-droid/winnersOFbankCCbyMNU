@@ -690,6 +690,14 @@ def _source_family(src: str) -> str:
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
+        # критерий у противоречия и пропуска — по виду: модель иногда ставит «conforming» и т. п.
+        if f["kind"] in CONFLICT_KINDS and f["criterion"] in NEVER_CRITICAL_CRITERIA:
+            f["criterion"] = "set_consistent"
+        elif f["kind"] in MISSING_KINDS and f["criterion"] in NEVER_CRITICAL_CRITERIA:
+            f["criterion"] = "set_complete"
+        elif f["kind"] == "ambiguity" and f["criterion"] in NEVER_CRITICAL_CRITERIA:
+            f["criterion"] = "unambiguous"
+        f["standard_refs"] = list(STANDARD_REFS.get(f["criterion"], []))
         why = ""
         if f["kind"] in NEVER_CRITICAL_KINDS:
             why = f"вид {f['kind']} по шкале не бывает critical"
