@@ -31,8 +31,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, TextIO
 
 # ─────────────────────────────── кадры AIshka ───────────────────────────────
-# Сетка 96×96 из agent.js без пустых полей (x 9…88, y 10…81): 80×72 px. На экран — вдвое меньше: 40×36 px,
-# 18 строк полублоков «▀»; в тесном окне — ещё вдвое.
+# Сетка 96×96 из agent.js без пустых полей (x 9…88, y 10…81): 80×72 px. На экран — вдвое меньше и с контуром:
+# 42×38 px, 19 строк полублоков «▀»; в тесном окне — ещё вдвое.
 _W, _H = 80, 72
 _PALETTE = (
     "#161E31", "#1F2E4A", "#21A049", "#9C7136", "#34D36A", "#CAA166", "#E6BD74", "#F58DA8",
@@ -202,6 +202,7 @@ _FRAMES_Z = {
     ),
 }
 
+MASCOT = "aishka"                        # №42: свой AIshka уже здесь, подменять render не нужно
 _cache: dict[str, list[list[int]]] = {}
 _sleep = time.sleep                      # тесты подменяют, чтобы не ждать анимацию
 _OUTLINE = _PALETTE.index("#161E31") + 1
@@ -234,6 +235,19 @@ def compact(rows: list[list[int]]) -> list[list[int]]:
         out.append(line)
     if len(out) % 2:
         out.append([0] * len(out[0]))
+    return out
+
+
+def outline(rows: list[list[int]]) -> list[list[int]]:
+    """Поле в 1 px и контур снаружи силуэта, как у оригинала: без него белый корпус тонет в светлом терминале."""
+    w = len(rows[0]) + 2
+    pad = [[0] * w] + [[0] + r + [0] for r in rows] + [[0] * w]
+    out = [r[:] for r in pad]
+    for y, r in enumerate(pad):
+        for x, c in enumerate(r):
+            if not c and any(0 <= y + dy < len(pad) and 0 <= x + dx < w and pad[y + dy][x + dx]
+                             for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                out[y][x] = _OUTLINE
     return out
 
 
@@ -327,9 +341,10 @@ def render(name: str, mode: str, *, small: bool = False, indent: int = 2) -> lis
     """Строки терминала с AIshka: полублок «▀» — верхний пиксель цветом текста, нижний — фоном."""
     if mode == "ascii":
         return ascii_drone(name)
-    rows = compact(frame(name))          # вдвое: 40×36 px → 18 строк
+    rows = compact(frame(name))          # вдвое: 40×36 px
     if small:
         rows = compact(rows)                # тесное окно: ещё вдвое
+    rows = outline(rows)                    # + контур: 42×38 px → 19 строк полублоков (в тесном окне 10)
     lines = []
     pad = " " * indent
     for y in range(0, len(rows), 2):

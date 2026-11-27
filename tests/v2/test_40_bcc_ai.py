@@ -366,9 +366,10 @@ def test_greet_ascii_and_256(tty):
     assert r == "offline" and "\x1b" not in text and "/ oo \\" in text
     lines = T.render("idle", "256")
     assert any("38;5;" in ln for ln in lines) and not any("38;2;" in ln for ln in lines)
-    # AIshka без пустых полей, вдвое меньше: 18 строк полублоков (в тесном окне — 9), не шире 40 колонок
-    assert len(T.render("idle", "truecolor")) == 18 and len(T.render("idle", "truecolor", small=True)) == 9
-    assert max(len(T._ANSI.sub("", ln)) for ln in T.render("analyzing0", "truecolor")) <= 2 + 40
+    # AIshka без пустых полей, вдвое меньше и с контуром: 19 строк полублоков (в тесном окне — 10), не шире 42 колонок
+    assert len(T.render("idle", "truecolor")) == 19 and len(T.render("idle", "truecolor", small=True)) == 10
+    assert max(len(T._ANSI.sub("", ln)) for ln in T.render("analyzing0", "truecolor")) <= 2 + 42
+    assert T.MASCOT == "aishka"                               # №42 не подменяет render: AIshka уже свой
 
 
 def test_color_mode_detection():
