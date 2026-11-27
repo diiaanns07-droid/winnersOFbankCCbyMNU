@@ -304,10 +304,23 @@ _STAGE_WORD = re.compile(r"`?\b(?:lens[_:])?(segment|analyst|qa|architect|risk|c
 _EXC = re.compile(r"\b[A-Z][A-Za-z]*(?:Error|Exceeded|Exception|Timeout)\b:\s*(?:[a-z_]+:\s*)*")
 
 
+_LENS_CASE = {"линза": "роль", "линзы": "роли", "линзе": "роли", "линзу": "роль", "линзой": "ролью", "линз": "ролей",
+              "линзам": "ролям", "линзами": "ролями", "линзах": "ролях"}
+_LENS = re.compile(r"\b([Лл])(инз(?:а|ы|е|у|ой|ам|ами|ах)?)\b")
+
+
+def dejargon(text: str) -> str:
+    """Служебное слово конвейера «линза» → «роль» (аналитик, тестировщик, архитектор, риски)."""
+    def sub(m: re.Match) -> str:
+        w = _LENS_CASE.get("л" + m.group(2), "роль")
+        return w.capitalize() if m.group(1) == "Л" else w
+    return _LENS.sub(sub, text)
+
+
 def warn_text(text) -> str:
     """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», «lens_risk» → «Риски», critical → критичный;
     служебные префиксы исключений («BudgetExceeded: judge: budget:») убираются."""
-    s = " ".join(str(text or "").split())
+    s = dejargon(" ".join(str(text or "").split()))
     m = _STAGE_PREFIX.match(s)
     if m and stage_key(m.group(1)) in STAGES:
         s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
@@ -524,7 +537,7 @@ class _Ctx:
             label = f"{rid} / {sid}"
         if not (link and q):
             return label
-        tip = shorten(q.get("summary") or "", 120).replace('"', "'").replace("\\", "/")
+        tip = shorten(_LREF.sub(_lref, " ".join(str(q.get("summary") or "").split())), 120).replace('"', "'").replace("\\", "/")
         tip = re.sub(r"[\[\]()<>`*|]", "", tip)
         return f'[{label}](#{anchor(rid)} "{tip}")' if tip else f"[{label}](#{anchor(rid)})"
 
@@ -1316,7 +1329,7 @@ def _card(c: _Ctx, f: dict) -> list[str]:
                 body.append(f"**Было → стало.** Строка {e['line']}: {quote_md(e['before'])} → "
                             + (f"«{prose(e['after'])}»" if e["after"] else "удалить"))
     elif src is not None:
-        body.append(f"**Было → стало.** {lines_word(src.get('line_start'), src.get('line_end')).capitalize()}: "
+        body.append(f"**Было → стало.** {_cap(_page_line(src.get('page'), src.get('line_start'), src.get('line_end')))}: "
                     f"{quote_md(src.get('quote'), CARD_QUOTE)} → «{prose(f.get('rewrite'))}»")
     qids = c.q_by_finding.get(f["id"], [])
     if f.get("question"):
@@ -1745,14 +1758,14 @@ def _appendix_how(c: _Ctx) -> list[str]:
         out += ["**Отклонённые кандидаты**", ""]
         rows = []
         limit = MAX_REJECTED_ROWS if c.level < 1 else 10
-        for r in rej[:limit]:
-            reason = esc(r.get("reason"))
+        for i, r in enumerate(rej[:limit], 1):
+            reason = cell(dejargon(str(r.get("reason") or "")))
             if r.get("duplicate_of"):
                 reason += f" → {c.f_link(r['duplicate_of'])}"
             line = r.get("line") if isinstance(r.get("line"), int) and r.get("line") else None
-            rows.append([esc(r.get("id") or r.get("candidate_id") or "—"), esc(source_name(r.get("source"))),
-                         cell(r.get("title")) + (f" (строка {line})" if line else ""), reason.replace("|", "\\|")])
-        out += table(["Кандидат", "Источник", "Что предлагалось", "Почему отклонён"], rows)
+            rows.append([str(i), esc(source_name(r.get("source"))),
+                         cell(r.get("title")) + (f" (строка {line})" if line else ""), reason])
+        out += table(["№", "Кто предложил", "Что предлагалось", "Почему отклонён"], rows, [":---:", ":---", ":---", ":---"])
         if len(rej) > limit:
             out += ["", f"Ещё {len(rej) - limit} — в `report.json`, поле `rejected`."]
         out.append("")
