@@ -39,6 +39,10 @@ def load_gold(path: str | Path) -> dict:
     for it in g["items"]:
         it["_groups"] = [parse_lines(gr["lines"]) for gr in it["anchors"]["groups"]]
         it["_kw"] = [re.compile(k.replace("ё", "е"), re.I) for k in it["keywords"]["groups"]]
+        # parts — разные дефекты, которые эталон свёл в один пункт (С1: GET; параметры в URL; Content-Type без тела):
+        # замечание о другой части, чем засчитанное, — не дубль; пункт по-прежнему считается один раз
+        it["_parts"] = [(str(pt["name"]), re.compile(str(pt["any"]).replace("ё", "е"), re.I))
+                        for pt in it.get("parts") or []]
         it.setdefault("parent", it["id"])
         it.setdefault("owners", [])
         it.setdefault("related", [])
@@ -144,6 +148,45 @@ def pair_info(item: dict, f: dict) -> dict:
     score = line_score + 0.5 * n_kw + 0.3 * n_title + (0.3 if kind_ok else 0)
     return {"status": status, "score": round(score, 3), "groups_hit": groups_hit, "kw_hits": n_kw,
             "kw_total": len(kw_hits), "kind_ok": kind_ok, "title_hits": n_title}
+
+
+def parts_hit(item: dict, text: str) -> set[str]:
+    """Какие части составного пункта (`parts` эталона) называет текст."""
+    return {name for name, rx in item.get("_parts") or [] if rx.search(text)}
+
+
+def _statement(f: dict) -> str:
+    """Что утверждает замечание: заголовок и «проблема» (без сценария, последствия и исправления, где другие части
+    пункта упоминаются мимоходом)."""
+    return (str(f.get("title") or "") + " " + str((f.get("fields") or {}).get("problem") or "")).replace(
+        "ё", "е").replace("Ё", "Е")
+
+
+def split_parts(assign: dict[str, str], dups: dict[str, str], edges: dict[tuple[str, str], float],
+                by_id: dict[str, dict], fmap: dict[str, dict]) -> dict[str, tuple[str, list[str]]]:
+    """Дубли, которые на деле — другая часть составного пункта: у пункта есть `parts`, засчитанное замечание
+    (заголовок и «проблема») называет одни части, а это (заголовок; если в нём частей нет — и «проблема») — другие, без
+    пересечения. Такие замечания убираются из `dups` (на месте) и возвращаются {finding: (gold, [части])}. Пункт
+    засчитан один раз, как и был; второе замечание о той же части — по-прежнему дубль. Пункты-кандидаты — все с
+    допустимым ребром, по убыванию оценки."""
+    covered = {gid: parts_hit(by_id[gid], _statement(fmap[fid])) for gid, fid in assign.items()
+               if by_id[gid].get("_parts")}
+    out: dict[str, tuple[str, list[str]]] = {}
+    order = sorted(dups, key=lambda fid: (-max(sc for (g, f), sc in edges.items() if f == fid), fid))
+    for fid in order:
+        f = fmap[fid]
+        cands = sorted(((sc, gid) for (gid, ff), sc in edges.items() if ff == fid), key=lambda x: (-x[0], x[1]))
+        for _, gid in cands:
+            if gid not in covered:
+                continue
+            mine = parts_hit(by_id[gid], f["_title"]) or parts_hit(by_id[gid], _statement(f))
+            if mine and not mine & covered[gid]:
+                out[fid] = (gid, sorted(mine))
+                covered[gid] |= mine
+                break
+    for fid in out:
+        dups.pop(fid, None)
+    return out
 
 
 def max_matching(items: list[dict], findings: list[dict], edges: dict[tuple[str, str], float]) -> dict[str, str]:
@@ -371,7 +414,8 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         if cand:
             cand.sort(key=lambda x: (-x[0], x[1]))
             dups[f["id"]] = cand[0][1]
-    outside = [f for f in findings if f["id"] not in f2g and f["id"] not in dups]
+    part_of = split_parts(assign, dups, edges, by_id, fmap)
+    outside = [f for f in findings if f["id"] not in f2g and f["id"] not in dups and f["id"] not in part_of]
 
     # ─── метрики ───
     def found(level: str | None, assignment: dict[str, str]) -> list[str]:
@@ -396,13 +440,16 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
             continue
         if f["id"] in dups and "critical" in by_id[dups[f["id"]]].get("severity_ok", []):
             continue  # дубль критичного — считаем в дублях, не в ложных
+        if f["id"] in part_of and "critical" in by_id[part_of[f["id"]][0]].get("severity_ok", []):
+            continue  # часть пункта, где critical допустим (С1, С2)
         v = extra_verdict.get(f["id"], {}).get("verdict")
-        if gid is None and f["id"] not in dups and v == "real":
+        near = gid or dups.get(f["id"]) or (part_of.get(f["id"]) or ("",))[0]
+        if not near and v == "real":
             reason = "вне эталона (настоящий дефект), но не критичен по эталону"
-        elif gid is None and f["id"] not in dups:
+        elif not near:
             reason = "вне эталона" + (f", арбитр: {v}" if v else "")
         else:
-            reason = f"эталон {gid or dups.get(f['id'])} не критичный"
+            reason = f"эталон {near} не критичный"
         crit_false.append({"finding": f["id"], "title": f["title"], "reason": reason})
 
     out_stats = {"total": len(outside), "real": 0, "partial": 0, "false": 0, "duplicate": 0, "gold": 0, "unknown": 0}
@@ -579,7 +626,7 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                    "commit": run.get("commit") or run.get("agent_commit"),
                    "duration_s": duration, "calls": calls, "tokens": run.get("tokens"),
                    "cost_usd": run.get("cost_usd")},
-        "counts": {"findings": n_findings, "by_severity": sev_counts, "duplicates": len(dups),
+        "counts": {"findings": n_findings, "by_severity": sev_counts, "duplicates": len(dups), "parts": len(part_of),
                    "outside_gold": out_stats, "report_md_lines": md_lines},
         "recall": {
             "critical": {"found": k_found, "n": len(k_found), "of": 5, "as_critical": k_as_crit,
@@ -594,11 +641,12 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
             "parents": {"n": len(parents_found(assign)), "of": len({it["parent"] for it in items})},
         },
         "precision": {
-            "matched": len(assign), "duplicates": len(dups) + out_stats["duplicate"],
+            "matched": len(assign), "duplicates": len(dups) + out_stats["duplicate"], "parts": len(part_of),
             "outside_real": out_stats["real"],
             "outside_false": out_stats["false"], "outside_unknown": out_stats["unknown"],
             "outside_partial": out_stats["partial"],
-            "precision_useful": _ratio(len(assign) + out_stats["real"] + out_stats["partial"], n_findings),
+            "precision_useful": _ratio(len(assign) + len(part_of) + out_stats["real"] + out_stats["partial"],
+                                       n_findings),
             "precision_gold": _ratio(len(assign), n_findings),
         },
         "severity": {"pairs": len(sev_rows), "ok": sum(r["ok"] for r in sev_rows),
@@ -617,6 +665,9 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                        for gid, fid in sorted(assign.items(), key=lambda x: _gold_order(items, x[0]))],
         "duplicates": [{"finding": fid, "gold": gid, "title": fmap[fid]["title"], "sources": fmap[fid]["sources"]}
                        for fid, gid in sorted(dups.items())],
+        "parts": [{"finding": fid, "gold": gid, "parts": names, "credited": assign[gid],
+                   "title": fmap[fid]["title"], "sources": fmap[fid]["sources"]}
+                  for fid, (gid, names) in sorted(part_of.items())],
         "outside": out_rows,
         "misses": misses,
         "stage_recall": stage_recall_out,
@@ -792,6 +843,10 @@ def render_md(res: dict, label: str = "") -> str:
                      f"{', '.join(v['only_here']) or '—'} |")
     L += ["", "## Дубли", ""]
     L += [f"* {d['finding']} → {d['gold']}: {_cut(d['title'])} ({', '.join(d['sources'])})" for d in res["duplicates"]] or ["* нет"]
+    if res.get("parts"):
+        L += ["", "## Другие части составных пунктов (не дубли)", ""]
+        L += [f"* {d['finding']} → {d['gold']} «{'; '.join(d['parts'])}» (засчитано {d['credited']}): {_cut(d['title'])} "
+              f"({', '.join(d['sources'])})" for d in res["parts"]]
     L += ["", "## Вне эталона", ""]
     L += [f"* {o['finding']} [{o['severity']}] {_cut(o['title'])} — **{o['verdict']}** ({', '.join(o['sources'])})"
           + (f": {o['reason']}" if o["reason"] else "") for o in res["outside"]] or ["* нет"]
@@ -865,7 +920,7 @@ def history_row(res: dict, label: str) -> dict:
             "K": rc["critical"]["n"], "K_as_critical": len(rc["critical"]["as_critical"]), "C": rc["major"]["n"],
             "key25": rc["key_25"]["n"], "key25_lenient": rc["key_25"]["lenient"],
             "M": len(rc["minor"]["found_parents"]), "findings": res["counts"]["findings"],
-            "by_severity": res["counts"]["by_severity"], "duplicates": p["duplicates"],
+            "by_severity": res["counts"]["by_severity"], "duplicates": p["duplicates"], "parts": p.get("parts", 0),
             "outside_real": p["outside_real"], "outside_false": p["outside_false"],
             "outside_unknown": p["outside_unknown"], "precision_useful": p["precision_useful"],
             "severity_ok": res["severity"]["accuracy_ok"], "critical_false": len(res["severity"]["critical_false"]),
