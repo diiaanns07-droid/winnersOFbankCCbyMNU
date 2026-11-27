@@ -248,3 +248,25 @@ def test_pdf_highlight_when_spans_out_of_order(tmp_path):
                     d[0].get_textbox(pymupdf.Quad(v[i:i + 4]).rect).strip() for i in range(0, len(v), 4))
     assert got["D-01"].replace(" ", "") == "ВК-1.Выпускбесплатный"
     assert got["D-02"].replace(" ", "") == "Картавыпущеназа10секунд"
+
+
+@needs_docx
+def test_word_report_clean_text_and_toc(tmp_path):
+    """Word-версия отчёта (№13): без HTML-якорей и экранирования Markdown, оглавление — поле TOC с обновлением при
+    открытии, в сообщении — «дефекты»."""
+    import json
+    import zipfile
+    import docx
+    rep = json.loads((ROOT / "tests/v2/fixtures/13_report_sample.json").read_text(encoding="utf-8"))
+    md = (ROOT / "tests/v2/fixtures/13_report_sample.md").read_text(encoding="utf-8")
+    view = dv.load(OFFICIAL_MD)
+    res = E.write_docx(rep, view, OFFICIAL_MD, tmp_path / "r", markdown=md)
+    assert res["status"] == "written" and "дефект" in res["message"] and "замечан" not in res["message"]
+    d = docx.Document(res["path"])
+    text = "\n".join(p.text for p in d.paragraphs) + "\n".join(
+        c.text for t in d.tables for row in t.rows for c in row.cells)
+    assert "<a id" not in text and "\\|" not in text
+    assert d.paragraphs[1].text == "Содержание"
+    with zipfile.ZipFile(res["path"]) as z:
+        assert 'TOC \\o "1-3"' in z.read("word/document.xml").decode()
+        assert "updateFields" in z.read("word/settings.xml").decode()

@@ -337,3 +337,22 @@ def test_toc_detector_does_not_eat_normal_lines():
         ("Лимит", "heading"), ("Лимит 5", "paragraph")])]
     out, n = dv.drop_toc(lines)
     assert n == 0 and out == lines
+
+
+@needs_pdf
+def test_api_pdf_narrow_cells_and_latin_status_page():
+    """Спецификация API из reportlab: длинные слова в узких ячейках режутся без дефиса («strin g», «Mandat ory») —
+    в тексте они целые; последнюю страницу статусов (почти целиком латиница) читатель v1 выбрасывает как
+    «нечитаемый шрифт» — текст восстановлен напрямую из PDF с предупреждением."""
+    v = dv.load(S / "api_narrow.pdf")
+    t = _texts(v)
+    assert "Parameter | Format | Mandatory | Description" in t
+    assert "accountId | string | Да | Идентификатор счёта" in t
+    assert "includeHolds | boolean | Нет | Показывать заблокированные суммы" in t
+    assert "pageSize | integer | Нет | Число операций на странице" in t
+    assert "410. Unsuccessful — Gone" in t and "500. Unsuccessful — Internal server error" in t
+    assert '{"message":"Счёт закрыт"}' in t and "400. Unsuccessful — Bad request" in t
+    assert all(ln["page"] == 2 for ln in v["lines"] if ln["text"].startswith("410."))
+    assert any("Страница 2: читатель счёл текстовый слой нечитаемым" in w for w in v["warnings"])
+    assert not any("не прочитаны" in w.lower() or "не полностью" in w.lower() for w in v["warnings"])
+    assert dv.line(v, t.index("410. Unsuccessful — Gone") + 1)["kind"] == "heading"
