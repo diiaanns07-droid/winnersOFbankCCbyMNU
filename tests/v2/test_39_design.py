@@ -100,7 +100,7 @@ def test_tokens_and_fonts_served(srv):
         assert cls in css, cls
     assert "prefers-reduced-motion" in css
     # светло и мало цветов: ни тёмного стола, ни волнистых и синих отметок, ни печатей
-    for gone in ("#0B1220", "wavy", ".b-stamp", "PT Serif"):
+    for gone in ("#0B1220", "wavy", ".b-stamp", "PT Serif", "--b-blue"):  # тёмного стола, печатей и синего нет
         assert gone not in css, gone
     total = 0
     for name in FONTS:
