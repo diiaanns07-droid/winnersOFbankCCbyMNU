@@ -45,6 +45,27 @@ def pdf_fast_mode() -> None:
         return
     if hasattr(pymupdf, "_layout_enabled"):
         pymupdf._layout_enabled = False
+    _no_tesseract_probe(pymupdf)
+
+
+_WIN_TESSDATA = (r"C:\Program Files\Tesseract-OCR\tessdata", r"C:\Program Files (x86)\Tesseract-OCR\tessdata")
+
+
+def _no_tesseract_probe(pymupdf) -> None:
+    """Читатель v1 на каждом PDF спрашивает ``pymupdf.get_tessdata()``, а тот без tesseract запускает
+    ``tesseract --list-langs`` и ``where tesseract`` через ``cmd``: на Windows ответ в cp866 при ``PYTHONUTF8=1`` даёт два
+    трейсбэка ``UnicodeDecodeError`` в консоли жюри (находка №02). На Windows без tesseract в PATH и в стандартной
+    папке установки OCR недоступен — отвечаем «данных нет», не запуская процессы. На других системах проверка
+    PyMuPDF тихая и остаётся как есть."""
+    import shutil
+    import sys
+    if getattr(pymupdf, "_bcc_no_tess", False) or sys.platform != "win32" or shutil.which("tesseract") \
+            or any(Path(d).is_dir() for d in _WIN_TESSDATA):
+        return
+    if callable(getattr(pymupdf, "get_tessdata", None)):
+        pymupdf._bcc_orig_get_tessdata = pymupdf.get_tessdata
+        pymupdf.get_tessdata = lambda *a, **k: None
+        pymupdf._bcc_no_tess = True
 
 
 SECTION_SEP = " › "

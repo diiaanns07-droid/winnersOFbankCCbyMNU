@@ -540,3 +540,25 @@ def test_words_broken_in_narrow_cells_are_glued():
     assert "60 000 ₸" in tl and "60000 ₸" not in tl
     off = [ln["text"] for ln in dv.load(OFFICIAL_PDF)["lines"]]
     assert len(off) == 128  # официальный PDF не меняется
+
+
+# --------------------------------------------------------------------------- PDF: без tesseract — без лишних процессов
+def test_tesseract_probe_skipped_on_windows_without_tesseract(monkeypatch):
+    """Читатель v1 на каждом PDF спрашивал pymupdf.get_tessdata(): без tesseract — 3 процесса, на Windows через cmd
+    и с трейсбэками UnicodeDecodeError в консоли жюри (находка №02). На Windows без tesseract — «данных нет» без
+    процессов; с tesseract в PATH и на других системах — как раньше."""
+    import shutil
+    import sys
+    import types
+    fake = types.SimpleNamespace(get_tessdata=lambda: "/usr/share/tessdata")
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(shutil, "which", lambda *a, **k: None)
+    dv._no_tesseract_probe(fake)
+    assert fake.get_tessdata() == "/usr/share/tessdata"          # не Windows — не трогаем
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(shutil, "which", lambda *a, **k: r"C:\\Tesseract-OCR\\tesseract.exe")
+    dv._no_tesseract_probe(fake)
+    assert fake.get_tessdata() == "/usr/share/tessdata"          # tesseract есть — OCR как раньше
+    monkeypatch.setattr(shutil, "which", lambda *a, **k: None)
+    dv._no_tesseract_probe(fake)
+    assert fake.get_tessdata() is None and fake._bcc_no_tess    # Windows без tesseract — без процессов
