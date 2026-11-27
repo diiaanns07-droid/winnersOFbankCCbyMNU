@@ -99,3 +99,18 @@ def test_competitors_adapter_keeps_active_and_maps_fields():
            "verdict": {"development": "not_ready", "testing": "not_ready"}}
     rep = cp.adapt("azekowka", azk, gold)
     assert [f["kind"] for f in rep["findings"]] == ["ambiguity"] and rep["verdict"]["testing"] == "no"
+
+
+def test_cleantable_latest_and_p1_rule():
+    from evaluation.v2 import cleantable as ct
+
+    old = ct._row("чистые ТЗ №20", "haiku", "старый", "2026-11-27 09:00", "fx", {"critical": 2, "major": 9}, {"development": "no"})
+    new_ok = ct._row("чистые ТЗ №20", "haiku", "новый", "2026-11-27 13:00", "fx", {"critical": 0, "major": 2, "minor": 5},
+                     {"development": "conditional", "testing": "conditional"})
+    new_bad = ct._row("чистые ТЗ №20", "haiku", "новый", "2026-11-27 13:00", "qr_v2", {"critical": 0, "major": 4},
+                      {"development": "conditional", "testing": "conditional"})
+    groups = ct.latest([old, new_ok, new_bad])
+    assert [r["case"] for r in groups[("чистые ТЗ №20", "haiku")]] == ["fx", "qr_v2"]
+    text = ct.render(groups)
+    assert "| чистые ТЗ №20 | haiku | новый" in text and "❌" in text  # qr_v2: major 4 > 3
+    assert "qr_v2 ❗" in text and "| fx |" in text
