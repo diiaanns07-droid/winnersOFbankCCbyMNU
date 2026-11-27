@@ -862,6 +862,58 @@ def test_gate_clean_rows_say_which_documents_fail_in_every_run(monkeypatch):
     assert gate._runs_note(d, "no") == "; по всем прогонам haiku: repay 3 из 3 — систематика"
 
 
+def test_newtz_outside_backfill_and_recurring_across_runs(tmp_path, monkeypatch):
+    """Замечания вне эталона: досчёт списка в сохранённую сводку из score.json прогона (число должно совпасть),
+    повтор той же жалобы в прошлом прогоне модели — кандидат в эталон или систематика; в воротах precision — строка."""
+    import json as _json
+
+    import pytest
+
+    from evaluation.v2 import newtz
+
+    res_dir = tmp_path / "results"
+    monkeypatch.setattr(newtz, "RESULTS_DIR", res_dir)
+
+    def outside(*titles):
+        return [{"finding": f"D-{i:02d}", "severity": "major" if "возраст" in t else "minor", "kind": "other",
+                 "title": t, "sources": ["consistency"], "verdict": "unknown"} for i, t in enumerate(titles, 1)]
+
+    runs = (("2026-11-27 16:23", "заморозка: c6aa9b5, sonnet", outside("У требований нет приоритетов",
+                                                                         "Нижняя граница возраста 18 лет не проверяется")),
+            ("2026-11-27 16:39", "после заморозки: 28fe64f, sonnet", outside("У требований Ф-1…Ф-5 нет приоритетов",
+                                                                               "Логика не проверяет нижнюю границу возраста 18 лет",
+                                                                               "Схема отката не описана")))
+    for at, label, outs in runs:
+        out = tmp_path / label.split(":")[0]
+        (out / "reports" / "insurance__defects").mkdir(parents=True)
+        (out / "reports" / "insurance__defects" / "score.json").write_text(_json.dumps({"outside": outs}), encoding="utf-8")
+        summ = {"label": label, "at": at, "model": "sonnet", "harness": {"tp": 53, "fp": len(outs), "support": 70},
+                "details": {"fp": []}, "rows": [{"case": "insurance", "variant": "defects", "items": 18,
+                                                  "outside": len(outs)}]}
+        (out / "summary.json").write_text(_json.dumps(summ), encoding="utf-8")
+        dest = res_dir / label.split(":")[0]
+        dest.mkdir(parents=True)
+        (dest / "summary.json").write_text(_json.dumps(summ), encoding="utf-8")
+        assert newtz.backfill_outside(out) == dest / "summary.json"
+    saved = _json.loads((res_dir / "после заморозки" / "summary.json").read_text(encoding="utf-8"))
+    assert [o["title"] for o in saved["details"]["outside"]][2] == "Схема отката не описана"
+    assert saved["details"]["outside"][0]["owners"] == ["№09"] and saved["details"]["outside"][0]["case_id"] == "insurance"
+    rec = newtz.outside_recurring("sonnet")
+    assert (rec["last_total"], rec["last_recurring"]) == (3, 2)
+    assert [(g["runs"], g["severity"]) for g in rec["recurring"]] == [(2, "major"), (2, "minor")]
+    assert "в последнем прогоне 3 вне эталона, из них 2 — та же жалоба и в прошлых" in newtz.render_outside(rec)
+    d = _json.loads((res_dir / "после заморозки" / "summary.json").read_text(encoding="utf-8"))
+    assert gate._outside_note(d, 53, 3) == ("; вне эталона 3: та же жалоба и в прошлых прогонах sonnet — 2 (кандидаты в "
+                                            "эталон → №18 или систематика линз, `RESULTS.md`), только здесь — 1; "
+                                            "если они настоящие — precision 98 %")
+    # прогон пересчитан (в score.json другое число) — досчёт отказывает, а не подменяет
+    out = tmp_path / "после заморозки"
+    (out / "reports" / "insurance__defects" / "score.json").write_text(_json.dumps({"outside": outside("одно")}),
+                                                                       encoding="utf-8")
+    with pytest.raises(SystemExit, match="досчёт не годится"):
+        newtz.backfill_outside(out)
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final

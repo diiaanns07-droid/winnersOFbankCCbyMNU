@@ -503,7 +503,8 @@ def newtz_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list
         prec = tp / (tp + fp) if tp + fp else None
         out.append(_check(f"{title}: precision", f"≥ {100 * t['precision']:.0f} %",
                           "—" if prec is None else f"{100 * prec:.0f} % (вне эталона {fp})",
-                          None if prec is None else prec >= t["precision"], "№10 (отсев), линзы — по источникам"))
+                          None if prec is None else prec >= t["precision"],
+                          "№10 (отсев), линзы — по источникам" + _outside_note(d, tp, fp)))
     if c.get("n"):
         out.append(_check(f"{title}: critical на чистых", "0", f"{c.get('critical', 0)} (документов "
                           f"{c.get('docs_with_critical', 0)} из {c['n']})", c.get("critical", 0) == 0,
@@ -519,6 +520,25 @@ def newtz_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list
     for x in out:
         x["source"] = src
     return out
+
+
+def _outside_note(d: dict, tp: int, fp: int) -> str:
+    """«; вне эталона 40: в прошлых прогонах sonnet та же жалоба у 26 (кандидаты в эталон → №18 или систематика
+    линз), только здесь — 14; если 26 настоящие — precision 85 %» — `newtz.outside_recurring` по последнему прогону."""
+    from . import cleantable as ct
+    from . import newtz
+
+    kind = ct._kind(d.get("model"), d.get("label"))
+    try:
+        rec = newtz.outside_recurring(kind)
+    except (OSError, ValueError):
+        return ""
+    if not rec or not rec["runs"] or rec["runs"][-1][0] != d.get("at") or not rec["last_total"]:
+        return ""
+    k = rec["last_recurring"]
+    alt = f"; если они настоящие — precision {100 * (tp + k) / (tp + fp):.0f} %" if tp + fp else ""
+    return (f"; вне эталона {rec['last_total']}: та же жалоба и в прошлых прогонах {kind} — {k} (кандидаты в эталон → "
+            f"№18 или систематика линз, `RESULTS.md`), только здесь — {rec['last_total'] - k}{alt}")
 
 
 def _runs_note(d: dict, what: str) -> str:

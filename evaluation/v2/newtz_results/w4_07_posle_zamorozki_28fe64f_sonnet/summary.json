@@ -938,6 +938,538 @@
         "case_id": "qr_clean",
         "clean": true
       }
+    ],
+    "outside": [
+      {
+        "id": "D-07",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "При закрытии счёта не определён способ выплаты процентов",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "capital"
+      },
+      {
+        "id": "D-08",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Условие «счёт в тенге» из Ф-1 не проверяется методом",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "capital"
+      },
+      {
+        "id": "D-10",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Неясно, с каким способом сравнивается выбор: текущим или следующим",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "capital"
+      },
+      {
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У требований нет приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "capital"
+      },
+      {
+        "id": "D-18",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки не покрывают границы, ошибки и повторы",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "capital"
+      },
+      {
+        "id": "D-20",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Не описана схема отката и отключения функции",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "capital"
+      },
+      {
+        "id": "D-07",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Не определён ответ после 25-го до новой выписки",
+        "sources": [
+          "lens:analyst",
+          "consistency",
+          "lens:qa"
+        ],
+        "owners": [
+          "№05",
+          "№06",
+          "№09"
+        ],
+        "case_id": "grace"
+      },
+      {
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Ф-2 и Ф-4 объединяют по несколько правил",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "grace"
+      },
+      {
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Поля API не покрыты перечнем хранимых данных",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "grace"
+      },
+      {
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У требований Ф-1…Ф-5 нет приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "grace"
+      },
+      {
+        "id": "D-16",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают малую часть требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "grace"
+      },
+      {
+        "id": "D-18",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Схема отката и выключения функции не описана",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "grace"
+      },
+      {
+        "id": "D-08",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Архитектура, sequence и схема API задают разные цепочки вызовов",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-09",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Нижняя граница возраста 18 лет не проверяется в логике метода",
+        "sources": [
+          "consistency",
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Ф-1 и Ф-4 объединяют много независимых правил",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У требований нет приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-16",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки не покрывают границы и ошибки",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-18",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Поля БД из API не перечислены в требованиях к данным",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-20",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Схема отката и выключения функции страхования не описана",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-21",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Поле message в ответах об ошибках не описано в таблице",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance"
+      },
+      {
+        "id": "D-07",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Анкета здоровья передаётся в СК, но нигде не вводится",
+        "sources": [
+          "lens:analyst",
+          "lens:architect"
+        ],
+        "owners": [
+          "№05",
+          "№07"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-08",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Схемы архитектуры, последовательности и API по-разному связывают системы",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-10",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Логика метода не проверяет нижнюю границу возраста 18 лет",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-13",
+        "severity": "major",
+        "kind": "security",
+        "title": "В документе есть указание проверяющему не формировать замечания",
+        "sources": [
+          "lens:risk",
+          "rules:injection.prompt"
+        ],
+        "owners": [
+          "№08",
+          "№12"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не едина, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-16",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Ф-1 и Ф-4 содержат по нескольку отдельных правил",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-17",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Не задано округление премии до целого тенге",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-18",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Ставка 27 % задана в двух пунктах",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-21",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Возраст 65 лет: не определён способ подсчёта на границе",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-22",
+        "severity": "minor",
+        "kind": "traceability",
+        "title": "Нет ID и приоритетов у большинства пунктов требований",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-23",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Поля API пишутся в БД, но отсутствуют в данных",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-25",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают малую часть требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-26",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Не описана схема отката или скрытия функции страхования",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "insurance_inject"
+      },
+      {
+        "id": "D-07",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Sequence-диаграмма расходится со схемами архитектуры и API",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr"
+      },
+      {
+        "id": "D-13",
+        "severity": "major",
+        "kind": "api_contract",
+        "title": "Не задан ответ при неверной карте списания",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "qr"
+      },
+      {
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У требований нет приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr"
+      },
+      {
+        "id": "D-17",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают малую часть требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "qr"
+      },
+      {
+        "id": "D-18",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Идемпотентность описана в двух местах разными словами",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr"
+      },
+      {
+        "id": "D-20",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Нет схемы отката и способа отключить функцию",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "qr"
+      },
+      {
+        "id": "D-21",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Тела ошибок не содержат полей status и amount",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "qr"
+      }
     ]
   },
   "time": {
@@ -1130,7 +1662,81 @@
         "rules": {
           "found": null
         }
-      }
+      },
+      "outside_list": [
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "При закрытии счёта не определён способ выплаты процентов",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Условие «счёт в тенге» из Ф-1 не проверяется методом",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Неясно, с каким способом сравнивается выбор: текущим или следующим",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У требований нет приоритетов",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-18",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки не покрывают границы, ошибки и повторы",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-20",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Не описана схема отката и отключения функции",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        }
+      ]
     },
     {
       "case": "capital_clean",
@@ -1570,7 +2176,85 @@
         "rules": {
           "found": null
         }
-      }
+      },
+      "outside_list": [
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Не определён ответ после 25-го до новой выписки",
+          "sources": [
+            "lens:analyst",
+            "consistency",
+            "lens:qa"
+          ],
+          "owners": [
+            "№05",
+            "№06",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Ф-2 и Ф-4 объединяют по несколько правил",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Поля API не покрыты перечнем хранимых данных",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У требований Ф-1…Ф-5 нет приоритетов",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-16",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают малую часть требований",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-18",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Схема отката и выключения функции не описана",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        }
+      ]
     },
     {
       "case": "grace_clean",
@@ -1939,7 +2623,107 @@
         "rules": {
           "found": null
         }
-      }
+      },
+      "outside_list": [
+        {
+          "id": "D-08",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Архитектура, sequence и схема API задают разные цепочки вызовов",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Нижняя граница возраста 18 лет не проверяется в логике метода",
+          "sources": [
+            "consistency",
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Ф-1 и Ф-4 объединяют много независимых правил",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У требований нет приоритетов",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-16",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки не покрывают границы и ошибки",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-18",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Поля БД из API не перечислены в требованиях к данным",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-20",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Схема отката и выключения функции страхования не описана",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        },
+        {
+          "id": "D-21",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Поле message в ответах об ошибках не описано в таблице",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        }
+      ]
     },
     {
       "case": "insurance_clean",
@@ -2348,7 +3132,169 @@
         "rules": {
           "found": null
         }
-      }
+      },
+      "outside_list": [
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Анкета здоровья передаётся в СК, но нигде не вводится",
+          "sources": [
+            "lens:analyst",
+            "lens:architect"
+          ],
+          "owners": [
+            "№05",
+            "№07"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Схемы архитектуры, последовательности и API по-разному связывают системы",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Логика метода не проверяет нижнюю границу возраста 18 лет",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "major",
+          "kind": "security",
+          "title": "В документе есть указание проверяющему не формировать замечания",
+          "sources": [
+            "lens:risk",
+            "rules:injection.prompt"
+          ],
+          "owners": [
+            "№08",
+            "№12"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не едина, глоссария нет",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-16",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Ф-1 и Ф-4 содержат по нескольку отдельных правил",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-17",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Не задано округление премии до целого тенге",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-18",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Ставка 27 % задана в двух пунктах",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-21",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Возраст 65 лет: не определён способ подсчёта на границе",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-22",
+          "severity": "minor",
+          "kind": "traceability",
+          "title": "Нет ID и приоритетов у большинства пунктов требований",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-23",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Поля API пишутся в БД, но отсутствуют в данных",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-25",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают малую часть требований",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-26",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Не описана схема отката или скрытия функции страхования",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        }
+      ]
     },
     {
       "case": "qr",
@@ -2558,7 +3504,93 @@
         "rules": {
           "found": null
         }
-      }
+      },
+      "outside_list": [
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Sequence-диаграмма расходится со схемами архитектуры и API",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "major",
+          "kind": "api_contract",
+          "title": "Не задан ответ при неверной карте списания",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У требований нет приоритетов",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-17",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают малую часть требований",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-18",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Идемпотентность описана в двух местах разными словами",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-20",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Нет схемы отката и способа отключить функцию",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        },
+        {
+          "id": "D-21",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Тела ошибок не содержат полей status и amount",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        }
+      ]
     },
     {
       "case": "qr_clean",

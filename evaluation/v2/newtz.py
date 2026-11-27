@@ -27,7 +27,8 @@ import time
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT, quota_hit, quota_refusal, reusable_report, run_shell, shell_quote, source_owner
+from .common import ROOT, cluster_by_title, quota_hit, quota_refusal, reusable_report, run_shell, shell_quote, \
+    source_owner
 
 OPEN2 = ROOT / "evaluation" / "v2" / "open2"
 RESULTS_DIR = ROOT / "evaluation" / "v2" / "newtz_results"
@@ -287,6 +288,91 @@ def render(s: dict, rows: list[dict], label: str) -> str:
     return "\n".join(L) + "\n"
 
 
+def backfill_outside(out: Path) -> Path:
+    """`details.outside` (и `outside_list` строк) в сохранённую сводку прогона — из `score.json` его каталога `out`.
+    Сводки до 27.11 19:30 хранили только число замечаний вне эталона. Сводка ищется по метке и времени прогона;
+    число вне эталона в `score.json` должно совпасть со сводкой (иначе прогон пересчитан — досчёт не годится)."""
+    s = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    dest = None
+    for p in RESULTS_DIR.glob("*/summary.json"):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        if d.get("label") == s.get("label") and d.get("at") == s.get("at"):
+            dest = p
+            break
+    if not dest:
+        raise SystemExit(f"нет сохранённой сводки «{s.get('label')}» ({s.get('at')}) в {RESULTS_DIR.relative_to(ROOT)}")
+    for r in d.get("rows") or []:
+        if r.get("variant") not in ("defects", "injection") or not r.get("items"):
+            continue
+        sj = out / "reports" / f"{r['case']}__{r['variant']}" / "score.json"
+        if not sj.exists():
+            raise SystemExit(f"нет {sj}")
+        lst = _outside_list(json.loads(sj.read_text(encoding="utf-8")))
+        if len(lst) != (r.get("outside") or 0):
+            raise SystemExit(f"{r['case']}: вне эталона в score.json {len(lst)}, в сводке {r.get('outside')} — "
+                             "прогон пересчитан, досчёт не годится")
+        r["outside_list"] = lst
+    d.setdefault("details", {})["outside"] = [{**o, "case_id": r["case"]} for r in d["rows"]
+                                              for o in r.get("outside_list") or []]
+    dest.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+    return dest
+
+
+def outside_recurring(kind: str = "sonnet", min_runs: int = 2) -> dict:
+    """Замечания вне эталона на новых ТЗ, повторяющиеся в прогонах модели (та же жалоба — `cluster_by_title`).
+    Повтор в каждом прогоне — либо настоящий дефект, которого нет в эталоне (→ №18: дополнить эталон), либо
+    систематика линзы (→ владелец источника); только в одном прогоне — шум модели. Берутся сохранённые сводки
+    с `details.outside`, по времени; итог — по последнему прогону."""
+    runs = []
+    for p in RESULTS_DIR.glob("*/summary.json"):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        if kind in str(d.get("model") or d.get("label") or "").lower() and "outside" in (d.get("details") or {}):
+            runs.append(d)
+    runs.sort(key=lambda d: d.get("at", ""))
+    if len(runs) < min_runs:
+        return {}
+    last = len(runs) - 1
+    groups = []
+    for case in sorted({o["case_id"] for d in runs for o in d["details"]["outside"]}):
+        items = [(i, o) for i, d in enumerate(runs) for o in d["details"]["outside"] if o["case_id"] == case]
+        for c in cluster_by_title(items):
+            ri = sorted({i for i, _ in c})
+            src: dict[str, int] = {}
+            for i in ri:
+                for x in sorted({x for j, o in c if j == i for x in o.get("sources") or []}):
+                    src[x] = src.get(x, 0) + 1
+            groups.append({"case": case, "runs": len(ri), "of": len(runs), "last": last in ri,
+                           "in_last": sum(1 for j, _ in c if j == last),
+                           "severity": max((o.get("severity") or "minor" for _, o in c),
+                                           key=lambda v: ("minor", "major", "critical").index(v)
+                                           if v in ("minor", "major", "critical") else 0),
+                           "title": next((o.get("title") for j, o in reversed(c) if j == last), c[-1][1].get("title")),
+                           "sources": src, "owners": sorted({w for _, o in c for w in o.get("owners") or []})})
+    in_last = [g for g in groups if g["last"]]
+    rep = [g for g in in_last if g["runs"] >= min_runs]
+    return {"kind": kind, "runs": [(d.get("at"), d.get("label")) for d in runs],
+            "last_total": sum(g["in_last"] for g in in_last), "last_recurring": sum(g["in_last"] for g in rep),
+            "recurring": sorted((g for g in groups if g["runs"] >= min_runs),
+                                key=lambda g: (-g["runs"], ("critical", "major", "minor").index(g["severity"])
+                                               if g["severity"] in ("critical", "major", "minor") else 3, g["case"]))}
+
+
+def render_outside(rec: dict) -> str:
+    if not rec:
+        return ""
+    runs = ", ".join(f"{str(at)[11:16]} — {lb}" for at, lb in rec["runs"])
+    L = ["", f"**Вне эталона, повторяются ({rec['kind']}, прогонов {len(rec['runs'])}: {runs}):** в последнем "
+         f"прогоне {rec['last_total']} вне эталона, из них {rec['last_recurring']} — та же жалоба и в прошлых "
+         "(кандидаты в эталон → №18 или систематика линзы → владелец источника), остальные — только в нём (шум).", "",
+         "| Кейс | Прогонов | Серьёзность (макс.) | Замечание (последняя формулировка) | В последнем | Источники (прогонов) | "
+         "Владельцы |", "| :--- | ---: | :--- | :--- | :---: | :--- | :--- |"]
+    for g in rec["recurring"]:
+        src = ", ".join(f"{k.replace('lens:', '')} {v}" for k, v in sorted(g["sources"].items(), key=lambda kv: (-kv[1], kv[0])))
+        L.append(f"| {g['case']} | {g['runs']} из {g['of']} | {g['severity']} | {str(g['title']).replace('|', '/')} | "
+                 f"{'да' if g['last'] else 'нет'} | {src} | {', '.join(g['owners'])} |")
+    return "\n".join(L)
+
+
 def results_table() -> str:
     rows = []
     for p in sorted(RESULTS_DIR.glob("*/summary.json")):
@@ -310,7 +396,7 @@ def update_results() -> None:
     res = ROOT / "evaluation" / "v2" / "RESULTS.md"
     text = res.read_text(encoding="utf-8")
     st, en = "<!-- newtz:start -->", "<!-- newtz:end -->"
-    table = results_table()
+    table = results_table() + render_outside(outside_recurring("sonnet"))
     if st in text and en in text:
         text = re.sub(re.escape(st) + r".*?" + re.escape(en), lambda m: st + "\n" + table + "\n" + en, text, flags=re.S)
         res.write_text(text, encoding="utf-8")
@@ -322,6 +408,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="action", required=True)
     pl = sub.add_parser("list")
     pl.add_argument("--root", default=str(OPEN2))
+    po = sub.add_parser("outside", help="досчитать замечания вне эталона в сохранённую сводку из score.json прогона")
+    po.add_argument("--out", required=True, help="каталог прогона (с summary.json и reports/*/score.json)")
     for name in ("run", "score"):
         p = sub.add_parser(name)
         p.add_argument("--out", required=True)
@@ -341,6 +429,12 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--reuse", action="store_true")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
+    if a.action == "outside":
+        dest = backfill_outside(Path(a.out))
+        update_results()
+        print(f"досчитано: {dest.relative_to(ROOT)}")
+        print(render_outside(outside_recurring("sonnet")))
+        return 0
     cases = discover(Path(a.root))
     if a.action == "list":
         for c in cases:
