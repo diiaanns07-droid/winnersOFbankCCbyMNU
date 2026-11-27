@@ -619,8 +619,36 @@ def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
             continue  # несогласованные реплики — не источник значения правки
         for fid in a.get("finding_ids", []):
             by_finding.setdefault(fid, []).append(a.get("question_id"))
-    rows += [f"Общее решение владельца: {d}" for d in decisions]
+    disputed = _disputed_labels(answers)
+    for i, d in enumerate(decisions, 1):
+        if f"Решение-{i}" in disputed:  # спорящие реплики адресатов: решение не принято — только маркер
+            rows.append(f"Общее решение владельца (Решение-{i}) расходится с другим ответом — значение не вписывай, "
+                        f"поставь маркер <уточнить: …> с обоими вариантами: {d}")
+        else:
+            rows.append(f"Общее решение владельца: {d}")
     return ("\n".join(rows) or "—"), by_finding
+
+
+def _disputed_labels(answers: Any) -> set[str]:
+    """Метки ответов, которые спорят с другими (``answer_conflicts``), — «Q-02.1», «Решение-2»."""
+    return {str(x) for c in (answers or {}).get("answer_conflicts") or [] for x in c.get("answers") or []}
+
+
+def disputed_values(answers: Any) -> dict[str, list[str]]:
+    """Число → метки ответов, у которых оно своё в споре (у другой стороны его нет): «422» → [«Решение-2»].
+
+    Правка, которая вписывает такое число вне маркера <уточнить>, выбирает за владельца одну сторону."""
+    out: dict[str, list[str]] = {}
+    for c in (answers or {}).get("answer_conflicts") or []:
+        texts = c.get("texts") or {}
+        sides = {str(x): _nums(texts.get(x)) for x in c.get("answers") or [] if texts.get(x)}
+        if len(sides) < 2:
+            continue
+        for lab, vals in sides.items():
+            others = set().union(*(v for k, v in sides.items() if k != lab))
+            for n in sorted(vals - others):
+                out.setdefault(n, []).append(lab)
+    return out
 
 
 def decision_targets(answers: Any) -> list[dict]:
@@ -729,8 +757,22 @@ def check_values(rewrites: list[dict], answers: Any, lines: list[str], by_id: di
     for d in (answers or {}).get("decisions") or []:
         known |= _nums(d)
     by_q = {a.get("question_id"): a for a in answered}
+    disputed = disputed_values(answers)
     out = []
     for r in rewrites:
+        if disputed:  # значение одной стороны спора вне маркера — выбор за владельца, в любой правке
+            kept = []
+            for e in r["edits"]:
+                hit = sorted((_nums(e.get("new")) - _nums(e.get("old"))) & set(disputed))
+                if hit:
+                    who = ", ".join(dict.fromkeys(x for n in hit for x in disputed[n]))
+                    warnings.append(f"revise: {r['finding_id']} — правка вписывает {', '.join(hit)} из ответа {who}, "
+                                    f"а ответы адресатов расходятся; правка не внесена — нужен маркер <уточнить: …>")
+                    continue
+                kept.append(e)
+            if not kept:
+                continue
+            r = dict(r, edits=kept)
         if not r.get("answer_ids"):  # без ответа владельца сверять не с чем — правило 1 держит промпт
             out.append(r)
             continue
@@ -867,7 +909,10 @@ def run(ctx: Any, findings: list[dict], answers: Any = None, requirements: list[
                       "with_rewrite": len(rewrites),
                       "without_rewrite": missing, "check_fixes": len(check.get("fixes", [])),
                       "check_edits": check.get("stats", {}).get("replaced", 0) + check.get("stats", {}).get("inserted", 0),
-                      "not_applied_edits": skipped}}
+                      "not_applied_edits": skipped,
+                      # что код не внёс или пометил (отвергнутое значение, выбор стороны спора, выдуманное число):
+                      # предупреждения этапа идут после сборки run.warnings — без этого поля их нет в отчёте
+                      "warnings": list(dict.fromkeys(warnings))}}
 
 
 def _changed_lines(md_lines: list[str]) -> list[str]:
@@ -1038,7 +1083,9 @@ def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = 
                 doc = (report.get("document") or {}).get("file") or (report.get("document") or {}).get("name") or ""
                 path = recheck.next_answers_path(report_path)
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(recheck.render_next_answers(clar, str(doc), Path(report_path).name), encoding="utf-8")
+                sha = str((report.get("document") or {}).get("sha256") or "")
+                path.write_text(recheck.render_next_answers(clar, str(doc), Path(report_path).name, sha),
+                                encoding="utf-8")
                 clar["next_answers_file"] = str(path)
                 if clar.get("next_round"):
                     _cl._warn(ctx, f"recheck: осталось решить {len(clar['next_round'])} — строки для следующего круга "
