@@ -201,8 +201,15 @@ def test_single_reviewer_major_confirmed_by_structured_origin_or_same_lines():
     by_title = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
     assert by_title["C-003"] == "major"  # строка приёмки исполнена линзой
     assert by_title["C-006"] == "minor"
-    # F02 подтверждён кандидатом другого ревьюера на тех же строках в соседнем дефекте
-    assert by_title["C-004"] == "major"
+    # №10-Б: одной общей строки мало — соседний кандидат подтверждает major при ≥ 2 общих строках и том же виде
+    assert by_title["C-004"] == "minor"
+    cs = _three_sources()
+    cs[3] = {**cs[3], "evidence": cs[3]["evidence"] + [{**cs[3]["evidence"][0], "line": 31, "line_start": 31,
+                                                         "line_end": 31, "quote": "Код ответа"}]}
+    cs.append({**cs[3], "id": "C-005", "source": "lens:risk"})
+    res, _ = run([finding("F01", ["C-003"], severity="major"), finding("F02", ["C-004"], severity="major"),
+                  finding("F03", ["C-005"], severity="minor")], cs)
+    assert {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}["C-004"] == "major"
 
 
 def test_major_rule_needs_three_sources_and_can_be_switched_off():
@@ -270,3 +277,35 @@ def test_side_named_in_text_with_line_becomes_evidence():
     assert [e["line_start"] for e in d["evidence"]] == [10, 20]
     assert d["evidence"][0]["quote"] == "Начисление выполняется по дате зачисления платежа"  # как в документе
     assert d["evidence"][0]["section"] == "Правила" and d["severity"] == "critical"
+
+
+def test_two_single_reviewer_majors_on_same_lines_do_not_confirm_each_other():
+    """№10-Б: два major одного вида по одним строкам от разных ревьюеров судья счёл разными дефектами —
+    друг друга они не подтверждают (insurance_clean: «сумма возврата» и «момент погашения», строки 41 и 68)."""
+    cs = _three_sources()
+    two = [{"quote": "Сумма возврата", "line": 41, "line_start": 41, "line_end": 41, "page": None,
+            "section": "Раздел", "verified": "exact"},
+           {"quote": "Досрочное погашение", "line": 68, "line_start": 68, "line_end": 68, "page": None,
+            "section": "Раздел", "verified": "exact"}]
+    cs.append({**cand("C-005", 41, "Сумма возврата", source="lens:analyst"), "evidence": two})
+    cs.append({**cand("C-006", 41, "Сумма возврата", source="lens:risk"), "evidence": two})
+    res, _ = run([finding("F01", ["C-005"], severity="major"), finding("F02", ["C-006"], severity="major"),
+                  finding("F03", ["C-001", "C-002"], severity="major")], cs)
+    by = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert by["C-005"] == "minor" and by["C-006"] == "minor"
+    assert by["C-001"] == "major"   # два ревьюера в самом дефекте
+    # сосед, который сам не major (отклонён или minor), по-прежнему подтверждает
+    res, _ = run([finding("F01", ["C-005"], severity="major"), finding("F02", ["C-006"], severity="minor")], cs)
+    assert {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}["C-005"] == "major"
+
+
+def test_reviewer_who_proposed_minor_does_not_confirm_major():
+    cs = [cand("C-001", 10, "Правило начисления", source="lens:analyst"),
+          {**cand("C-002", 10, "Правило начисления", source="consistency"), "severity": "minor"},
+          cand("C-003", 20, "Платёж от 31-го", source="lens:architect"),
+          cand("C-004", 20, "Платёж от 31-го", source="lens:qa")]
+    res, _ = run([finding("F01", ["C-001", "C-002"], severity="major"),
+                  finding("F02", ["C-003", "C-004"], severity="major")], cs)
+    by = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert by["C-001"] == "minor"   # второй ревьюер сам счёл мелочью
+    assert by["C-003"] == "major"
