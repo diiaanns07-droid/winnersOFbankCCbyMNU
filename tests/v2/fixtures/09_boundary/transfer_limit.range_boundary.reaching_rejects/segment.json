@@ -1,0 +1,290 @@
+{
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "section": "Часть A. Бизнес-требования › Цели",
+   "summary": "Клиент ограничивает сумму исходящих переводов по номеру телефона за су",
+   "quote": "Клиент ограничивает сумму исходящих переводов по номеру телефона за сутки.",
+   "line_start": 17,
+   "line_end": 17,
+   "page": null,
+   "id": "R-01"
+  },
+  {
+   "source_id": "",
+   "kind": "other",
+   "section": "Часть A. Бизнес-требования › Термины",
+   "summary": "Сутки — интервал с 00:00:00 до 23:59:59 по времени UTC+5 (Asia/Almaty)",
+   "quote": "Сутки — интервал с 00:00:00 до 23:59:59 по времени UTC+5 (Asia/Almaty).",
+   "line_start": 20,
+   "line_end": 20,
+   "page": null,
+   "id": "R-02"
+  },
+  {
+   "source_id": "",
+   "kind": "other",
+   "section": "Часть A. Бизнес-требования › Термины",
+   "summary": "Использовано — сумма выполненных за текущие сутки переводов по номеру ",
+   "quote": "Использовано — сумма выполненных за текущие сутки переводов по номеру телефона в тенге.",
+   "line_start": 21,
+   "line_end": 21,
+   "page": null,
+   "id": "R-03"
+  },
+  {
+   "source_id": "ЛП-1",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "ЛП-1. Клиент задаёт лимит целым числом от 10 000 до 3 000 000 ₸ включи",
+   "quote": "ЛП-1. Клиент задаёт лимит целым числом от 10 000 до 3 000 000 ₸ включительно. Лимит по умолчанию — 1 000 000 ₸.",
+   "line_start": 24,
+   "line_end": 24,
+   "page": null,
+   "id": "R-04"
+  },
+  {
+   "source_id": "ЛП-2",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "ЛП-2. Перевод выполняется, если после него использованная сумма не пре",
+   "quote": "ЛП-2. Перевод выполняется, если после него использованная сумма не превысит лимит.",
+   "line_start": 25,
+   "line_end": 25,
+   "page": null,
+   "id": "R-05"
+  },
+  {
+   "source_id": "ЛП-3",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "ЛП-3. Перевод, после которого использованная сумма достигла бы лимита ",
+   "quote": "ЛП-3. Перевод, после которого использованная сумма достигла бы лимита или превысила бы его, отклоняется с сообщением «Пр",
+   "line_start": 26,
+   "line_end": 26,
+   "page": null,
+   "id": "R-06"
+  },
+  {
+   "source_id": "ЛП-4",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "ЛП-4. Отменённый перевод уменьшает использованную сумму суток, в котор",
+   "quote": "ЛП-4. Отменённый перевод уменьшает использованную сумму суток, в которые он был выполнен.",
+   "line_start": 27,
+   "line_end": 27,
+   "page": null,
+   "id": "R-07"
+  },
+  {
+   "source_id": "ЛП-5",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "ЛП-5. Новый лимит действует начиная со следующего перевода.",
+   "quote": "ЛП-5. Новый лимит действует начиная со следующего перевода.",
+   "line_start": 28,
+   "line_end": 28,
+   "page": null,
+   "id": "R-08"
+  },
+  {
+   "source_id": "ЛП-6",
+   "kind": "functional",
+   "section": "Часть A. Бизнес-требования › Функциональные требования",
+   "summary": "ЛП-6. Приложение показывает лимит и остаток лимита на текущие сутки.",
+   "quote": "ЛП-6. Приложение показывает лимит и остаток лимита на текущие сутки.",
+   "line_start": 29,
+   "line_end": 29,
+   "page": null,
+   "id": "R-09"
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "section": "Часть A. Бизнес-требования › Требования к данным",
+   "summary": "Хранить идентификатор клиента, дату суток по UTC+5, лимит в тенге и ис",
+   "quote": "Хранить идентификатор клиента, дату суток по UTC+5, лимит в тенге и использованную сумму в тенге с точностью до тиына.",
+   "line_start": 32,
+   "line_end": 32,
+   "page": null,
+   "id": "R-10"
+  },
+  {
+   "source_id": "",
+   "kind": "integration",
+   "section": "Часть A. Бизнес-требования › Требования к интеграции",
+   "summary": "Приложение читает лимит и использованную сумму методом getTransferLimi",
+   "quote": "Приложение читает лимит и использованную сумму методом getTransferLimit и меняет лимит методом setTransferLimit. Методы ",
+   "line_start": 35,
+   "line_end": 35,
+   "page": null,
+   "id": "R-11"
+  },
+  {
+   "source_id": "",
+   "kind": "acceptance",
+   "section": "Часть A. Бизнес-требования › Критерии приёмки",
+   "summary": "| Лимит 100 000 ₸, использовано 60 000 ₸ | Перевести 40 000 ₸ | Перево",
+   "quote": "| Лимит 100 000 ₸, использовано 60 000 ₸ | Перевести 40 000 ₸ | Перевод выполнен, остаток 0 ₸ |",
+   "line_start": 41,
+   "line_end": 41,
+   "page": null,
+   "id": "R-12"
+  },
+  {
+   "source_id": "",
+   "kind": "acceptance",
+   "section": "Часть A. Бизнес-требования › Критерии приёмки",
+   "summary": "| Лимит 100 000 ₸, использовано 60 000 ₸ | Перевести 40 000,01 ₸ | Пер",
+   "quote": "| Лимит 100 000 ₸, использовано 60 000 ₸ | Перевести 40 000,01 ₸ | Перевод отклонён с сообщением «Превышен суточный лими",
+   "line_start": 42,
+   "line_end": 42,
+   "page": null,
+   "id": "R-13"
+  },
+  {
+   "source_id": "",
+   "kind": "acceptance",
+   "section": "Часть A. Бизнес-требования › Критерии приёмки",
+   "summary": "| Использовано 100 000 ₸ при лимите 100 000 ₸ в 23:59 | Перевести 10 0",
+   "quote": "| Использовано 100 000 ₸ при лимите 100 000 ₸ в 23:59 | Перевести 10 000 ₸ в 00:01 следующих суток | Перевод выполнен |",
+   "line_start": 43,
+   "line_end": 43,
+   "page": null,
+   "id": "R-14"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод getTransferLimit",
+   "summary": "| REST type | GET |",
+   "quote": "| REST type | GET |",
+   "line_start": 51,
+   "line_end": 51,
+   "page": null,
+   "id": "R-15"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод getTransferLimit",
+   "summary": "| Request URL | /limits/phone-transfers |",
+   "quote": "| Request URL | /limits/phone-transfers |",
+   "line_start": 52,
+   "line_end": 52,
+   "page": null,
+   "id": "R-16"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод getTransferLimit",
+   "summary": "| Authorization | Bearer, сессия клиента |",
+   "quote": "| Authorization | Bearer, сессия клиента |",
+   "line_start": 53,
+   "line_end": 53,
+   "page": null,
+   "id": "R-17"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод setTransferLimit",
+   "summary": "| REST type | PUT |",
+   "quote": "| REST type | PUT |",
+   "line_start": 68,
+   "line_end": 68,
+   "page": null,
+   "id": "R-18"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод setTransferLimit",
+   "summary": "| Request URL | /limits/phone-transfers |",
+   "quote": "| Request URL | /limits/phone-transfers |",
+   "line_start": 69,
+   "line_end": 69,
+   "page": null,
+   "id": "R-19"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод setTransferLimit",
+   "summary": "| Authorization | Bearer, сессия клиента |",
+   "quote": "| Authorization | Bearer, сессия клиента |",
+   "line_start": 70,
+   "line_end": 70,
+   "page": null,
+   "id": "R-20"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод setTransferLimit",
+   "summary": "| Content-Type | application/json |",
+   "quote": "| Content-Type | application/json |",
+   "line_start": 71,
+   "line_end": 71,
+   "page": null,
+   "id": "R-21"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Метод setTransferLimit › Тело запроса",
+   "summary": "| limit | integer | Да | от 10 000 до 3 000 000 включительно | Лимит в",
+   "quote": "| limit | integer | Да | от 10 000 до 3 000 000 включительно | Лимит в тенге |",
+   "line_start": 77,
+   "line_end": 77,
+   "page": null,
+   "id": "R-22"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "| 200 | Запрос выполнен | Описано в разделе метода; для setTransferLim",
+   "quote": "| 200 | Запрос выполнен | Описано в разделе метода; для setTransferLimit тело пустое |",
+   "line_start": 83,
+   "line_end": 83,
+   "page": null,
+   "id": "R-23"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "| 400 | Лимит вне диапазона от 10 000 до 3 000 000 или не целое число ",
+   "quote": "| 400 | Лимит вне диапазона от 10 000 до 3 000 000 или не целое число | {\"message\":\"Проверьте лимит\"} |",
+   "line_start": 84,
+   "line_end": 84,
+   "page": null,
+   "id": "R-24"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "| 401 | Нет действующей сессии | {\"message\":\"Требуется вход\"} |",
+   "quote": "| 401 | Нет действующей сессии | {\"message\":\"Требуется вход\"} |",
+   "line_start": 85,
+   "line_end": 85,
+   "page": null,
+   "id": "R-25"
+  },
+  {
+   "source_id": "",
+   "kind": "api",
+   "section": "Часть B. REST API › Статусы",
+   "summary": "| 500 | Внутренняя ошибка сервиса | {\"message\":\"Ошибка сервиса\"} |",
+   "quote": "| 500 | Внутренняя ошибка сервиса | {\"message\":\"Ошибка сервиса\"} |",
+   "line_start": 86,
+   "line_end": 86,
+   "page": null,
+   "id": "R-26"
+  }
+ ]
+}

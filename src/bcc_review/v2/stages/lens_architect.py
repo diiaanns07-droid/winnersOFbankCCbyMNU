@@ -55,6 +55,7 @@ INVENTORY_SCHEMA = _obj({
     "codes": {"type": "array", "items": _obj({
         "code": _S, "lines": {"type": "array", "items": _INT}, "described": {"type": "boolean"}, "note": _S})},
     "fields": {"type": "array", "items": _obj({"name": _S, "places": _S})},
+    "branches": {"type": "array", "items": _obj({"operation": _S, "step": _S, "line": _INT, "outcome": _S})},
 })
 
 
@@ -68,12 +69,17 @@ SCHEMA = schema()
 
 
 def empty_inventory() -> dict:
-    return {"operations": [], "promises": [], "codes": [], "fields": []}
+    return {"operations": [], "promises": [], "codes": [], "fields": [], "branches": []}
 
 
 def _evidence_key(c: dict) -> tuple:
     lines = sorted({int(e.get("line") or 0) for e in c.get("evidence") or []})
     return (c.get("kind", ""), tuple(lines))
+
+
+def undefined_branches(inventory: dict) -> list[dict]:
+    """Ветки логики, для которых документ не задаёт ответа (для отчёта и проверки полноты)."""
+    return [b for b in (inventory or {}).get("branches") or [] if not str(b.get("outcome") or "").strip()]
 
 
 def unfulfilled_promises(inventory: dict) -> list[dict]:

@@ -28,6 +28,7 @@ _SKIP_CLASSES = ("breadcrumb", "page-metadata", "toc-macro", "pagesection", "foo
 _SKIP_ROLES = {"navigation", "contentinfo", "search", "complementary", "banner"}
 _HEAD = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
 _VOID = {"br", "hr", "img", "input", "meta", "link", "wbr", "col", "area", "base", "source", "track", "embed"}
+_BR = "\u2028"  # маркер <br> внутри блока (обычный перевод строки в HTML — пробел)
 _WS = re.compile(r"[ \t\r\n\f\v    ]+")
 
 
@@ -60,12 +61,15 @@ class _Parser(HTMLParser):
             return
         raw = "".join(cur["parts"])
         if cur["kind"] == "code":
-            lines = [ln.rstrip() for ln in raw.strip("\n").split("\n")]
+            lines = [ln.rstrip() for ln in raw.replace(_BR, "\n").strip("\n").split("\n")]
         else:
-            lines = [_WS.sub(" ", ln).strip() for ln in raw.split("\n")]
+            # перевод строки в исходном HTML — просто пробел; новую строку даёт только <br>
+            lines = [_WS.sub(" ", ln).strip() for ln in raw.split(_BR)]
         lines = [ln for ln in lines if ln.strip()] if cur["kind"] != "code" else lines
         if not any(ln.strip() for ln in lines):
             return
+        if cur.get("prefix"):  # номер пункта <ol> — к первой строке пункта (<li><p>…</p></li> — тот же пункт)
+            lines[0] = cur["prefix"] + lines[0]
         self.blocks.append({"kind": cur["kind"], "lines": lines, "src_line": cur["src_line"], "level": cur["level"]})
 
     def _text(self, data: str) -> None:
@@ -135,12 +139,12 @@ class _Parser(HTMLParser):
                 self._lists[-1]["n"] += 1
                 prefix = f"{self._lists[-1]['n']}. "
             self._flush()
-            self._cur = {"kind": "list_item", "parts": [prefix] if prefix else [], "src_line": self.getpos()[0],
+            self._cur = {"kind": "list_item", "parts": [], "prefix": prefix, "src_line": self.getpos()[0],
                          "level": len(self._lists)}
             return
         if tag == "br":
             if self._cur is not None:
-                self._cur["parts"].append("\n")
+                self._cur["parts"].append(_BR)
             return
         if tag == "hr":
             self._flush()

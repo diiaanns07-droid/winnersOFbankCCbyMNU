@@ -40,7 +40,7 @@ def sent_schemas(tmp_path_factory):
     mp.chdir(tmp)
     mp.setattr(doctor, "make_provider", lambda name=None, **kw: rec)
     try:
-        cli.main([str(DOC), str(tmp / "r.md"), "--provider", "gemini", "--no-cache", "-q", "--no-html"])
+        cli.main([str(DOC), str(tmp / "r.md"), "--provider", "gemini", "--no-cache", "-q", "--no-html", "--rpm", "0"])
     finally:
         mp.undo()
     assert rec.schemas, "pipeline не вызвал модель"

@@ -1,0 +1,35 @@
+$ /usr/local/bin/python -m bcc_review /home/user/winnersOFbankCCbyMNU/release/input/requirements.md /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/zamer_0_7d80df8_haiku/report.md --provider claude_cli --model haiku
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 37 дефектов (критичных 4, существенных 21, незначительных 12), вопросов 10
+Разработка: нельзя · тестирование: нельзя
+  D-01 Месяц покупки: Ф-2 относит по дате совершения, критерий приёмки и BPMN — по проведению — блокирует разработку и тестирование
+  D-02 Операция чтения настроек и суммы за месяц не описана; единственный метод только сохраняет — блокирует разработку и тестирование
+  D-03 Ф-3 (один push в месяц) и Ф-4 (push при достижении после смены порога) дают разное число… — блокирует разработку и тестирование
+Прогон завершён полностью: 22 мин 46 с, 12 вызовов модели, claude-haiku-5-5; цитат сверено 104 из 104
+Отчёт: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/zamer_0_7d80df8_haiku/report.md и /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/zamer_0_7d80df8_haiku/report.json
+  ! проверка серьёзности понизила 1 дефект(ов): critical→major 1, major→minor 0
+HTML: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/zamer_0_7d80df8_haiku/report.html
+
+--- stderr
+Документ: /home/user/winnersOFbankCCbyMNU/release/input/requirements.md
+  segment: запуск
+  segment: готово за 348 с, вызовов 2
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  lens_analyst: запуск
+  lens_qa: запуск
+  lens_architect: запуск
+  lens_risk: запуск
+  consistency: запуск
+  lens_architect: готово за 109 с, вызовов 1, кандидатов 12
+  lens_analyst: готово за 128 с, вызовов 1, кандидатов 12
+  lens_qa: готово за 133 с, вызовов 1, кандидатов 7
+  consistency: готово за 405 с, вызовов 1, кандидатов 15
+  lens_risk: готово за 420 с, вызовов 2, кандидатов 11
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 72
+  judge: запуск
+  judge: готово за 298 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 299 с, вызовов 2

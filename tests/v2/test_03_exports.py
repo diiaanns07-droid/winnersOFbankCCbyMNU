@@ -200,3 +200,73 @@ def test_export_never_raises(tmp_path):
     assert res[0]["status"] == "written"
     assert res[1]["status"] == "failed" and res[2]["status"] == "skipped"
     assert E.plural(1, "а", "б", "в") == "а" and E.plural(3, "а", "б", "в") == "б" and E.plural(11, "а", "б", "в") == "в"
+
+
+SAMPLES = ROOT / "tests/v2/fixtures/03_export_samples"
+
+
+@needs_docx
+@needs_pdf
+def test_demo_samples_open():
+    """Образцы для демо (make_samples.py) открываются и содержат комментарии, выделения и задачи."""
+    import docx
+    import pymupdf
+    d = docx.Document(str(SAMPLES / "official.annotated.docx"))
+    comments = list(d.comments)
+    assert len(comments) >= 30 and any(c.text.startswith("Сводка ревью ТЗ") for c in comments)
+    assert all("подтверждено" not in c.text.splitlines()[0] for c in comments)
+    with pymupdf.open(str(SAMPLES / "official.annotated.pdf")) as p:
+        hl = [a for pg in p for a in pg.annots() if a.type[0] == pymupdf.PDF_ANNOT_HIGHLIGHT]
+        assert len(hl) >= 30 and all(a.info["content"].startswith("[D-") for a in hl)
+        assert all(abs(a.opacity - 0.45) < 0.01 for a in hl)
+    rows = list(csv.DictReader((SAMPLES / "official.jira.csv").open(encoding="utf-8-sig", newline="")))
+    assert len(rows) >= 20 and rows[0]["Priority"] == "Highest"
+    assert len(list((SAMPLES / "png").glob("*.png"))) >= 3
+
+
+@needs_pdf
+def test_pdf_highlight_when_spans_out_of_order(tmp_path):
+    """PDF из LibreOffice: «10» и «-1.» лежат отдельными фрагментами не по порядку, search_for не находит фразу —
+    выделение ставится по словам в рамке блока."""
+    import pymupdf
+    src = ROOT / "tests/v2/fixtures/03_stress/toc.pdf"
+    view = dv.load(src)
+    cands = [{"id": "D-01", "title": "Выпуск", "severity": "major",
+              "evidence": [{"quote": "ВК-1. Выпуск бесплатный", "line": 7}]},
+             {"id": "D-02", "title": "Срок", "severity": "minor",
+              "evidence": [{"quote": "Карта выпущена за 10 секунд", "line": 9}]}]
+    res = Q.verify_candidates(view, cands)
+    report = {"document": dv.summary(view), "findings": res["candidates"], "verdict": {}}
+    out = E.export(report, view, src, tmp_path / "r", ["pdf"])[0]
+    assert out["status"] == "written" and out["anchored"] == 2
+    with pymupdf.open(out["path"]) as d:
+        got = {}
+        for a in d[0].annots():
+            if a.type[0] == pymupdf.PDF_ANNOT_HIGHLIGHT:
+                v = a.vertices
+                got[a.info["subject"][:4]] = " ".join(
+                    d[0].get_textbox(pymupdf.Quad(v[i:i + 4]).rect).strip() for i in range(0, len(v), 4))
+    assert got["D-01"].replace(" ", "") == "ВК-1.Выпускбесплатный"
+    assert got["D-02"].replace(" ", "") == "Картавыпущеназа10секунд"
+
+
+@needs_docx
+def test_word_report_clean_text_and_toc(tmp_path):
+    """Word-версия отчёта (№13): без HTML-якорей и экранирования Markdown, оглавление — поле TOC с обновлением при
+    открытии, в сообщении — «дефекты»."""
+    import json
+    import zipfile
+    import docx
+    rep = json.loads((ROOT / "tests/v2/fixtures/13_report_sample.json").read_text(encoding="utf-8"))
+    md = (ROOT / "tests/v2/fixtures/13_report_sample.md").read_text(encoding="utf-8")
+    view = dv.load(OFFICIAL_MD)
+    res = E.write_docx(rep, view, OFFICIAL_MD, tmp_path / "r", markdown=md)
+    assert res["status"] == "written" and "дефект" in res["message"] and "замечан" not in res["message"]
+    d = docx.Document(res["path"])
+    text = "\n".join(p.text for p in d.paragraphs) + "\n".join(
+        c.text for t in d.tables for row in t.rows for c in row.cells)
+    assert "<a id" not in text and "\\|" not in text
+    assert d.paragraphs[1].text == "Содержание"
+    with zipfile.ZipFile(res["path"]) as z:
+        assert 'TOC \\o "1-3"' in z.read("word/document.xml").decode()
+        assert "updateFields" in z.read("word/settings.xml").decode()

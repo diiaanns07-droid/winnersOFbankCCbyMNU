@@ -98,7 +98,7 @@ def rule_currency(doc: Doc, out: dict) -> None:
         if not minors or not (majors or _has_major_values(doc, major)):
             continue
         conv = _conversion(doc, major, minor)
-        if conv is not None:
+        if conv is not None or _implicit_conversion(doc, minors, major):
             continue
         # пара: сначала те же числа в основной единице, затем одна и та же величина, затем любая
         pair = None
@@ -161,6 +161,21 @@ def rule_currency(doc: Doc, out: dict) -> None:
         out["signals"].append(signal("units.currency_mix", a[0], qa,
                                      f"Разные денежные единицы без пересчёта: {quoted(qa)} и {quoted(qb)}.",
                                      ("analyst", "risk", "consistency"), "unit_mismatch"))
+
+
+def _implicit_conversion(doc: Doc, minors: list, major: str) -> bool:
+    """Значения в минорных единицах ровно в 100 раз больше тех же значений в основных — пересчёт согласован."""
+    rx_val = re.compile(rf"\d\s*(?:{major})(?!\w)|{DENOM}(?:{major})(?!\w)", re.I)
+    for a in minors:
+        na = _numbers(a[0].joined)
+        if len(na) < 2:
+            continue
+        for y in doc.lines:
+            if y is a[0] or not y.text or not rx_val.search(y.joined):
+                continue
+            if len({v * 100 for v in _numbers(y.joined)} & na) >= 2:
+                return True
+    return False
 
 
 def _numbers(text: str) -> set[int]:
@@ -367,7 +382,103 @@ def rule_time_without_zone(doc: Doc, out: dict) -> None:
                 "и месяца исход зависит от пояса.", ("qa", "consistency"), "unit_mismatch"))
 
 
+TIME_UNIT = re.compile(r"\b([a-z][A-Za-z_]{1,30})\b\s*(?:\)|,)?\s*(?:в|—|-|:)?\s*"
+                       r"(секунд\w*|минут\w*|час(?:ах|ов|а)?\b|сутк\w*|суток|дн(?:ях|ей|я)\b|миллисекунд\w*|мс\b)",
+                       re.I)
+UNIT_NORM = {"секу": "секунды", "мину": "минуты", "час": "часы", "сутк": "сутки", "суто": "сутки", "дн": "дни",
+             "милл": "миллисекунды", "мс": "миллисекунды"}
+# счётные сроки: «55 календарных дней», «количество рабочих дней» (не «операционный день» как дата)
+DAY_KIND = re.compile(r"(?:\d+|количеств\w*|числ\w*|сколько)\s+(календарн|рабоч|банковск)\w*\s+(?:дн(?:ей|я|и|ях)|сут\w*)",
+                      re.I)
+
+
+def _unit(word: str) -> str:
+    w = word.lower()
+    for k, v in UNIT_NORM.items():
+        if w.startswith(k):
+            return v
+    return w
+
+
+def rule_time_units(doc: Doc, out: dict) -> None:
+    """Одно поле (идентификатор) в разных единицах времени: «`ttl` в минутах» ↔ «`ttl` секунд»."""
+    seen: dict[str, tuple[str, Line, str]] = {}
+    for x in doc.lines:
+        if not x.text or x.is_code:
+            continue
+        for m in TIME_UNIT.finditer(x.joined):
+            name, unit = m.group(1), _unit(m.group(2))
+            if name.lower() in ("from", "to", "in", "at", "per", "max", "min"):
+                continue
+            prev = seen.get(name)
+            if prev is None:
+                seen[name] = (unit, x, m.group(0).strip())
+                continue
+            if prev[0] != unit and prev[1] is not x:
+                qa, qb = prev[2], m.group(0).strip()
+                out["candidates"].append(candidate(
+                    f"units.time_mix.{name}",
+                    title=f"Поле {name} в разных единицах времени: {prev[0]} и {unit}",
+                    kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
+                    evidence=[ev(prev[1], qa), ev(x, qb)],
+                    problem=(f"{quoted(qa)} и {quoted(qb)}: одно и то же поле {name} задано в {prev[0]} и в {unit}."),
+                    scenario=f"{name} = 15: по одному месту это 15 {prev[0]}, по другому — 15 {unit}.",
+                    impact="Срок или интервал отличается в десятки раз; поведение системы и тесты расходятся.",
+                    recommendation=f"Указать одну единицу для {name} во всех разделах.",
+                    conflict=True,
+                ))
+                return
+
+
+def rule_day_kinds(doc: Doc, out: dict) -> None:
+    """Календарные и рабочие дни для одной и той же величины (общий предмет в обеих фразах)."""
+    found: dict[str, list[tuple[Line, str, str]]] = {}
+    for x in doc.lines:
+        if not x.text or x.is_code:
+            continue
+        t = x.joined
+        for m in DAY_KIND.finditer(t):
+            # предмет срока — только своя клауза: от границы предложения или ячейки до следующей
+            a = max(t.rfind(".", 0, m.start()), t.rfind(";", 0, m.start()), t.rfind("|", 0, m.start())) + 1
+            ends = [p for p in (t.find(".", m.end()), t.find(";", m.end()), t.find("|", m.end())) if p != -1]
+            clause = t[a:min(ends) if ends else len(t)]
+            found.setdefault(m.group(1).lower()[:5], []).append((x, m.group(0), clause))
+    kinds = list(found)
+    if len(kinds) < 2:
+        return
+    generic = {"сумма", "сумму", "клиен", "карты", "карта", "банка", "течен", "дней", "сутки", "срока", "колич",
+               "числа", "число", "сколь"}
+
+    def stems(t: str) -> set[str]:
+        return {w.lower()[:5] for w in re.findall(r"[А-Яа-яЁё]{5,}", t)} - generic - {k for k in kinds}
+
+    for i, ka in enumerate(kinds):
+        for kb in kinds[i + 1:]:
+            for xa, qa, ca in found[ka]:
+                for xb, qb, cb in found[kb]:
+                    if xa is xb and ca == cb:
+                        continue
+                    common = stems(ca) & stems(cb)
+                    if not common:
+                        continue
+                    out["candidates"].append(candidate(
+                        "units.day_kinds",
+                        title=f"Одна величина в разных днях: {quoted(qa)} и {quoted(qb)}",
+                        kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
+                        evidence=[ev(xa, qa), ev(xb, qb)],
+                        problem=(f"{quoted(xa.joined[:160])} и {quoted(xb.joined[:160])}: срок считается в разных днях "
+                                 f"({qa} и {qb})."),
+                        scenario="Период включает выходные: по одному месту остаётся 5 дней, по другому — 3.",
+                        impact="Клиенту показывают неверный срок; расчёт и тесты расходятся на выходных и праздниках.",
+                        recommendation="Указать один вид дней для этого срока во всех разделах.",
+                        conflict=True,
+                    ))
+                    return
+
+
 def run(doc: Doc, out: dict) -> None:
+    rule_time_units(doc, out)
+    rule_day_kinds(doc, out)
     rule_currency(doc, out)
     rule_timezone(doc, out)
     rule_period(doc, out)

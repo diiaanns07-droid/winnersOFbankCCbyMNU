@@ -28,6 +28,7 @@ FOLLOWUP_MARK = "<!-- дозапрос -->"
 SINGLE_CALL_MAX_LINES = 300   # документ короче — один вызов
 CHUNK_MAX_LINES = 250         # размер части длинного документа
 MAX_OUTPUT_TOKENS = 32000      # слабые модели тратят на рассуждения 15–25 тыс. токенов: не обрезать сразу
+PARALLEL_CHUNKS = 3           # одновременных вызовов на длинном документе (бесплатный Gemini — 10+ запросов в минуту)
 FOLLOWUP_MAX_LINES = 120      # дозапрос по непокрытым строкам — не больше стольких строк
 QUOTE_MAX = 150
 
@@ -42,9 +43,11 @@ def _obj(props: dict, required: list | None = None) -> dict:
 
 _S = {"type": "string"}
 _I = {"type": "integer"}
-SCHEMA: dict = _obj({  # section модель не пишет: раздел строки известен коду из `view`
+# section и quote модель не пишет: раздел строки известен из `view`, цитату код берёт из первой строки требования.
+# Без цитаты ответ на треть короче (haiku: 52 с вместо 78, 13 тыс. токенов вместо 21 тыс. при том же результате).
+SCHEMA: dict = _obj({
     "requirements": {"type": "array", "items": _obj({
-        "source_id": _S, "kind": {"type": "string", "enum": KINDS}, "summary": _S, "quote": _S,
+        "source_id": _S, "kind": {"type": "string", "enum": KINDS}, "summary": _S,
         "line_start": _I, "line_end": _I})},
     "excluded": {"type": "array", "items": _obj({
         "what": _S, "line_start": _I, "line_end": _I, "reason": _S})},
@@ -283,7 +286,11 @@ def merge_items(requirements: list[dict], excluded: list[dict]) -> tuple[list[di
     reqs = sorted(requirements, key=lambda r: (r["line_start"], -(r["line_end"] - r["line_start"])))
     kept: list[dict] = []
     for r in reqs:
-        dup = next((k for k in kept if (k["line_start"], k["line_end"]) == (r["line_start"], r["line_end"])), None)
+        dup = next((k for k in kept if (k["line_start"], k["line_end"]) == (r["line_start"], r["line_end"])
+                    and (not k["source_id"] or not r["source_id"] or k["source_id"] == r["source_id"]
+                         or _norm(k["quote"]) == _norm(r["quote"]))), None)
+        # одна строка view может нести несколько пунктов (абзац с переносами в DOCX/PDF): разные source_id и
+        # цитаты на одном диапазоне — разные требования
         if dup is not None:
             if not dup["source_id"] and r["source_id"]:
                 dup["source_id"] = r["source_id"]
@@ -319,6 +326,154 @@ def merge_items(requirements: list[dict], excluded: list[dict]) -> tuple[list[di
             seen.add(key)
             excl.append({**e, "line_start": run[0], "line_end": run[-1]})
     return kept, excl
+
+
+_HEAD_NUM = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?|[A-ZА-ЯЁ]\.|[IVXLC]+\.)\s+")
+_CODE_RE = re.compile(r"(?<![\d.,])([1-5]\d\d)(?![\d.,]\d)")
+
+
+def _strip_num(s: str) -> str:
+    return _HEAD_NUM.sub("", s or "").strip()
+
+
+def _known_prefix(view: dict, pre: str, line_no: int) -> str:
+    """Префикс source_id, которого нет в тексте документа (опечатка модели), заменяется ближайшим похожим заголовком
+    или подписью строк выше требования; совсем непохожий оставляется как есть."""
+    import difflib
+    lines = _lines(view)
+    np = _norm(pre)
+    if not np or any(np in _norm(_text(x)) or np in _norm(str(x.get("section") or "")) for x in lines):
+        return pre
+    best, score = pre, 0.0
+    for x in lines:
+        n = int(x["n"])
+        if not (line_no - 40 <= n <= line_no):
+            continue
+        cand = _text(x).strip().rstrip(":").strip()
+        if not cand or len(cand) > 80 or _is_row(cand):
+            continue
+        s = difflib.SequenceMatcher(None, np, _norm(cand)).ratio()
+        if s > score:
+            best, score = cand, s
+    return best if score >= 0.8 else pre
+
+
+def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
+    """Одно оформление source_id при любом прогоне и любой модели.
+
+    * префикс-раздел пишется как заголовок документа, с его номером («Данные: x» → «4. Данные: x»);
+    * у строки таблицы — «…, строка N», у пункта списка или абзаца — «…, п. N»;
+    * «Статус N» снимается, если требование описывает несколько кодов ответа.
+    """
+    from collections import Counter
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    fmt = str(view.get("format") or "").lower()
+    starts = Counter(int(r["line_start"]) for r in requirements)
+    for r in requirements:
+        sid = r.get("source_id") or ""
+        if not sid:
+            continue
+        first = by_n.get(int(r["line_start"])) or {}
+        parts = [p.strip() for p in str(first.get("section") or "").split("›") if p.strip()]
+        for head in reversed(parts):  # source_id — само название раздела: допустимо только у таблицы (паспорт метода)
+            if _strip_num(sid).lower() == _strip_num(head).lower():
+                sid = head if _is_row(_text(first)) else ""
+                break
+        if not sid:
+            r["source_id"] = ""
+            continue
+        m = re.match(r"^(?P<pre>.+?)(?P<sep>: |, п\. |, строка |, )(?P<rest>.+)$", sid)
+        own = _ID_RE.match(re.sub(r"^\s*[-*•]\s+", "", _text(first)))
+        if m and own and m.group("rest").strip().rstrip(".") == own.group("id"):
+            sid, m = own.group("id"), None  # «Функциональные требования, Ф-1» → собственный номер пункта «Ф-1»
+        if m and m.group("sep") == ", ":
+            m = None  # запятая без «п.»/«строка» — часть самого идентификатора
+        if m:
+            pre = _known_prefix(view, m.group("pre").strip(), int(r["line_start"]))
+            if parts and any(_strip_num(pre).lower() == _strip_num(h).lower() for h in parts):
+                pre = parts[-1]  # префикс — всегда ближайший заголовок (таблица под «A › B» → «B: …»)
+            sep, rest = m.group("sep"), m.group("rest")
+            if sep in (", п. ", ", строка ") and rest.isdigit():
+                sep = ", строка " if _is_row(_text(first)) else ", п. "
+            sid = f"{pre}{sep}{rest}"
+            if (sep == ", п. " and fmt in ("md", "txt", "markdown") and first.get("kind") == "list_item"
+                    and not re.match(r"^\s*\d{1,3}[.)]\s", _text(first))):
+                sid = ""  # пункт маркированного списка: своего номера в документе нет
+        if re.fullmatch(r"Статус [1-5]\d\d", sid) and starts[int(r["line_start"])] == 1:
+            # один пункт на абзац с несколькими кодами — это не описание одного кода
+            text = " ".join(_text(by_n[n]) for n in range(int(r["line_start"]), int(r["line_end"]) + 1) if n in by_n)
+            if len(set(_CODE_RE.findall(text))) >= 2 and not _is_row(_text(first)):
+                sid = ""
+        r["source_id"] = sid
+    return requirements
+
+
+def extend_table_requirements(view: dict, requirements: list[dict], uncovered: list[int]) -> tuple[list[dict], list[int]]:
+    """Непокрытая строка таблицы сразу под многострочным требованием-таблицей (паспорт метода) — его хвост."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    rest = []
+    for n in sorted(uncovered):
+        if not _is_row(_text(by_n.get(n) or {})):
+            rest.append(n)
+            continue
+        host = next((r for r in requirements if r["line_end"] < n and r["line_end"] > r["line_start"]
+                     and _is_row(_text(by_n.get(r["line_start"]) or {}))
+                     and all(is_trivial(_text(by_n.get(k) or {})) or _is_row(_text(by_n.get(k) or {}))
+                             for k in range(r["line_start"], r["line_end"] + 1))
+                     and all(is_trivial(_text(by_n.get(k) or {})) for k in range(r["line_end"] + 1, n))), None)
+        if host is None:
+            rest.append(n)
+        else:
+            host["line_end"] = n
+    return requirements, rest
+
+
+def merge_same_source_ids(requirements: list[dict], view: dict) -> list[dict]:
+    """Соседние требования с одним непустым source_id (часть пункта пришла из дозапроса) — одно требование."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    out: list[dict] = []
+    for r in sorted(requirements, key=lambda x: (x["line_start"], x["line_end"])):
+        prev = out[-1] if out else None
+        if (prev is not None and r["source_id"] and r["source_id"] == prev["source_id"]
+                and r["line_start"] > prev["line_end"]
+                and all(is_trivial(_text(by_n.get(k) or {})) for k in range(prev["line_end"] + 1, r["line_start"]))):
+            prev["line_end"] = r["line_end"]
+            continue
+        out.append(r)
+    return out
+
+
+def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
+    """Требование из голого кода ответа («404» под фразой «…возвращается 404…») склеивается с соседом выше."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    out: list[dict] = []
+    for r in sorted(requirements, key=lambda x: (x["line_start"], x["line_end"])):
+        code = _text(by_n.get(int(r["line_start"])) or {}).strip().strip("*").strip().rstrip(".")
+        prev = out[-1] if out else None
+        prev_text = " ".join(_text(by_n[n]) for n in range(prev["line_start"], prev["line_end"] + 1)
+                             if n in by_n) if prev else ""
+        if (prev is not None and re.fullmatch(r"[1-5]\d\d", code) and 0 < r["line_start"] - prev["line_end"] <= 2
+                and code in prev_text and (not prev["source_id"] or prev["source_id"] == f"Статус {code}")
+                and (not r["source_id"] or r["source_id"] == f"Статус {code}")):
+            prev["line_end"] = max(prev["line_end"], r["line_end"])
+            prev["source_id"], prev["kind"] = f"Статус {code}", "api"
+            continue
+        out.append(r)
+    return out
+
+
+def uniquify_source_ids(requirements: list[dict]) -> list[dict]:
+    """Повторяющийся непустой source_id уточняется разделом: «1.3.2 Коды ответа: Статус 200»."""
+    from collections import Counter
+    counts = Counter(r["source_id"] for r in requirements if r.get("source_id"))
+    for r in requirements:
+        sid = r.get("source_id") or ""
+        if counts.get(sid, 0) < 2:
+            continue
+        tail = str(r.get("section") or "").split("›")[-1].strip()
+        if tail and _strip_num(tail).lower() not in sid.lower():
+            r["source_id"] = f"{tail}: {sid}"
+    return requirements
 
 
 def assign_ids(requirements: list[dict]) -> list[dict]:
@@ -478,7 +633,7 @@ def plan_chunks(view: dict, max_lines: int = CHUNK_MAX_LINES,
             prev = key
         return out
 
-    cuts = sorted(set(boundaries(1)) | set(boundaries(2)))
+    top, second = sorted(set(boundaries(1))), sorted(set(boundaries(2)))
     blank = [int(x["n"]) for x in lines if not _text(x).strip()]
     chunks: list[tuple[int, int]] = []
     start = first
@@ -487,7 +642,10 @@ def plan_chunks(view: dict, max_lines: int = CHUNK_MAX_LINES,
         if limit >= last:
             chunks.append((start, last))
             break
-        cand = [c for c in cuts if start + max_lines // 3 <= c <= limit + 1]
+        # сначала граница раздела верхнего уровня (модуль целиком в одной части), потом второго, потом пустая строка
+        cand = [c for c in top if start + max_lines // 3 <= c <= limit + 1]
+        if not cand:
+            cand = [c for c in second if start + max_lines // 3 <= c <= limit + 1]
         if not cand:
             cand = [b + 1 for b in blank if start + max_lines // 2 <= b <= limit]
         cut = max(cand) if cand else limit + 1
@@ -671,6 +829,8 @@ def heuristic_segment(view: dict) -> dict:
     reqs, excl = [], []
     prev_table_row = False
     row_no = 0
+    # вводный текст до первого раздела — пояснение о самом документе (если разделы в документе вообще есть)
+    first_sectioned = next((int(x["n"]) for x in lines if x.get("section")), 0)
     for i, ln in enumerate(lines):
         n, t = int(ln["n"]), _text(ln).strip()
         if (n in headings and re.fullmatch(r"[1-5]\d\d\.?", t) and reqs and t[:3] in reqs[-1]["quote"]
@@ -692,7 +852,7 @@ def heuristic_segment(view: dict) -> dict:
                          "reason": "Метаданные или шаблон процесса, не требование"})
             prev_table_row = is_row
             continue
-        if not section and n <= 5:
+        if not section and n < first_sectioned:
             excl.append({"what": "Служебное пояснение", "line_start": n, "line_end": n,
                          "reason": "Пояснение о самом документе"})
             continue
@@ -717,6 +877,11 @@ def heuristic_segment(view: dict) -> dict:
             if not reqs[-1]["source_id"]:
                 reqs[-1]["source_id"], reqs[-1]["kind"] = f"Статус {t[:3]}", "api"
             continue
+        bid = ln.get("block_id") or ""
+        starts_item = bool(is_row or _ID_RE.match(t) or _STATUS_RE.match(t) or _NUM_RE.match(t))
+        if bid and not starts_item and reqs and reqs[-1].get("_block") == bid and n - reqs[-1]["line_end"] <= 2:
+            reqs[-1]["line_end"] = n  # продолжение того же абзаца или пункта (перенос строки в HTML/PDF/DOCX)
+            continue
         tail = _section_tail(ln)
         clean = re.sub(r"^\s*[-*•]\s+", "", t)
         sid, kind = "", _guess_kind(low_sec, clean, is_row)
@@ -739,10 +904,13 @@ def heuristic_segment(view: dict) -> dict:
                                          "summary": _short_quote(clean)[:90], "quote": _short_quote(clean),
                                          "line_start": n, "line_end": n})
         if r:
+            r["_block"] = bid
             reqs.append(r)
+    for r in reqs:
+        r.pop("_block", None)
     reqs = _collapse_key_value_tables(view, reqs)
     reqs, excl = merge_items(reqs, excl)
-    return {"requirements": assign_ids(reqs), "excluded": excl}
+    return {"requirements": assign_ids(uniquify_source_ids(canonical_source_ids(view, reqs))), "excluded": excl}
 
 
 _KV_HEADER = re.compile(r"^(поле|параметр|атрибут|field|name|key)\s*\|\s*(значение|value|описание)$", re.I)
@@ -801,8 +969,23 @@ def _kind_by_words(s: str) -> str:
 # ---------------------------------------------------------------------------------------------------------
 # Запуск этапа
 
+def _skip_leading_headings(r: dict, headings: set[int]) -> dict:
+    """Требование не начинается с заголовка: ведущие строки-заголовки срезаются (если после них есть текст)."""
+    a, b = _int(r.get("line_start"), 0), _int(r.get("line_end"), 0)
+    if not headings or a <= 0 or b <= a:
+        return r
+    while a < b and a in headings:
+        a += 1
+    if a == _int(r.get("line_start"), 0):
+        return r
+    out = {**r, "line_start": a}
+    out.pop("quote", None)  # цитата могла указывать на срезанный заголовок — код возьмёт новую первую строку
+    return out
+
+
 def finalize(view: dict, raw: dict, headings: set[int] | None = None) -> tuple[list[dict], list[dict]]:
-    reqs = [x for x in (normalize_requirement(view, r) for r in raw.get("requirements") or []) if x]
+    items = [_skip_leading_headings(r, headings or set()) for r in raw.get("requirements") or []]
+    reqs = [x for x in (normalize_requirement(view, r) for r in items) if x]
     excl = [x for x in (normalize_excluded(view, e) for e in raw.get("excluded") or []) if x]
     reqs, excl = merge_items(reqs, excl)
     if headings:
@@ -820,6 +1003,7 @@ def segment_from_response(view: dict, raw: dict,
     reqs, excl = finalize(view, raw, headings)
     uncovered = uncovered_lines(view, reqs, excl, headings)
     first_uncovered = list(uncovered)
+    reqs, uncovered = extend_table_requirements(view, reqs, uncovered)
     auto_excl, uncovered = auto_exclude(view, uncovered)
     if auto_excl:
         reqs, excl = merge_items(reqs, excl + auto_excl)
@@ -840,6 +1024,10 @@ def segment_from_response(view: dict, raw: dict,
         auto = len(reqs) - before
     for r in reqs:
         r.pop("auto", None)
+    reqs = merge_bare_codes(view, reqs)
+    reqs = merge_same_source_ids(reqs, view)
+    canonical_source_ids(view, reqs)
+    uniquify_source_ids(reqs)
     assign_ids(reqs)
     return {"requirements": reqs, "excluded": excl,
             "coverage": {"lines": len(_lines(view)), "uncovered_after_model": first_uncovered,
@@ -865,13 +1053,24 @@ def run(ctx: Any) -> dict:
     total = int(lines[-1]["n"])
     raw = {"requirements": [], "excluded": []}
     failed = False
-    for start, end in plan_chunks(view):
+    chunks = plan_chunks(view)
+
+    def one(rng: tuple[int, int]) -> dict | None:
+        start, end = rng
         try:
-            part = _ask_range(ctx, system, task, start, end, total)
-            raw = _merge_results([raw, part])
+            return _ask_range(ctx, system, task, start, end, total)
         except Exception as exc:  # noqa: BLE001 — часть не нарезана: её строки закроет дозапрос/эвристика
-            failed = True
             _warn(ctx, f"Нарезка строк {start}–{end} не удалась: {exc}")
+            return None
+
+    if len(chunks) > 1:  # части независимы: параллельно, порядок восстановит код
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(PARALLEL_CHUNKS, len(chunks))) as pool:
+            parts = list(pool.map(one, chunks))
+    else:
+        parts = [one(chunks[0])] if chunks else []
+    failed = any(p is None for p in parts)
+    raw = _merge_results([raw] + [p for p in parts if p is not None])
 
     def followup(uncovered: list[int], done: list[dict]) -> dict:
         user = build_user(view, int(lines[0]["n"]), total, followup_task(task, follow_task, view, uncovered, done))

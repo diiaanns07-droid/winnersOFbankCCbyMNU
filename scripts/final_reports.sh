@@ -11,7 +11,7 @@ set -euo pipefail
 PROVIDER="${1:-claude_cli}"
 MODEL="${2:-}"
 [ -z "$MODEL" ] && [ "$PROVIDER" = "claude_cli" ] && MODEL=opus
-EXPORT="${EXPORT:-jira}"
+EXPORT="${EXPORT:-jira,docx}"
 SECOND_DOC="${SECOND_DOC:-release/input/other_topic_cashback.md}"
 SECOND_NAME="${SECOND_NAME:-$(basename "${SECOND_DOC%.*}")}"
 OUT="${OUT:-reports}"
