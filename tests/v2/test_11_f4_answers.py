@@ -701,3 +701,54 @@ def test_numbers_normalized():
     assert revise._nums("100 000 ₸, 23:59:59, 0,5 %, R-07, 3 попытки") == {"100000", "23:59:59", "0.5"}
     assert revise._nums("## 4.3 Повторная отправка\n| 12 | 410 |") == {"410"}
     assert revise._nums("<уточнить: 24 или 48 часов> 72 часа") == {"72"}
+
+
+# --------------------------------------------------------------------------- следующий круг ответов
+def _round(answers_text, decisions):
+    return recheck.apply_answers(FakeCtx(FakeLLM(_resp(decisions))), _report(), answers_text)["clarification"]
+
+
+def test_next_round_conflict_gives_one_line_per_reply_and_round_trips():
+    clar = _round(TWO, [{"finding_id": "D-01", "conflicting_answers": ["Q-01.1", "Q-01.2"], "reason": "расходятся"}])
+    n = clar["next_round"]
+    assert [x["kind"] for x in n] == ["conflict"] and n[0]["finding_id"] == "D-01" and len(n[0]["lines"]) == 2
+    assert all(x.startswith("Q-01 [Код ответа при отказе антифрода]: ") for x in n[0]["lines"])
+    text = recheck.render_next_answers(clar)
+    both = recheck.resolve_answers(QS, recheck.load_answers(text))
+    assert len(both["answered"][0]["replies"]) == 2  # оставил обе строки — расхождение остаётся
+    one = text.replace(n[0]["lines"][1] + "\n", "")
+    r = recheck.resolve_answers(QS, recheck.load_answers(one))
+    assert len(r["answered"][0]["replies"]) == 1 and "422" in r["answered"][0]["answer"]
+
+
+def test_next_round_partial_placeholder_is_not_an_answer_until_filled():
+    clar = _round(PARTIAL, [{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "снят Q-03"}])
+    n = clar["next_round"]
+    assert [x["kind"] for x in n] == ["partial"] and "<решите: Что делать после истечения срока" in n[0]["lines"][0]
+    text = recheck.render_next_answers(clar)
+    r = recheck.resolve_answers(QS, recheck.load_answers(text))
+    assert "48 часов" in r["answered"][0]["answer"] and "решите" not in r["answered"][0]["answer"]
+    assert r["postponed"] and r["postponed"][0]["partial"]
+    filled = text.replace(n[0]["lines"][0], "Q-03 [Срок хранения идентификатора запроса]: Храним 48 часов с первого "
+                                            "запроса. После истечения срока возвращаем 410.")
+    r = recheck.resolve_answers(QS, recheck.load_answers(filled))
+    assert "410" in r["answered"][0]["answer"] and not r["postponed"]
+
+
+def test_next_answers_file_keeps_agreed_answers_and_decisions():
+    clar = _round("Q-03: B\nQ-02: Через шлюз, без прямых вызовов.\n\n## Решения\n- Храним журнал 90 дней.\n",
+                  [{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "снят Q-03"}])
+    assert clar["next_round"] == []
+    r = recheck.resolve_answers(QS, recheck.load_answers(recheck.render_next_answers(clar, "spec.md", "out.md")))
+    got = {a["question_id"]: (a["choice"], a["answer"]) for a in r["answered"]}
+    assert got["Q-03"] == ("B", "48 часов") and got["Q-02"] == ("", "Через шлюз, без прямых вызовов.")
+    assert r["decisions"] == ["Храним журнал 90 дней."] and "Q-01" in r["unanswered"]
+
+
+def test_run_modes_writes_next_answers_file(tmp_path):
+    out = revise.run_modes(FakeCtx(FakeLLM(_resp([{"finding_id": "D-01", "conflicting_answers": ["Q-01.1", "Q-01.2"],
+                                                   "reason": "расходятся"}]))), _report(), answers=TWO,
+                           report_path=tmp_path / "rep.md")
+    path = tmp_path / "rep.answers-next.md"
+    assert path.exists() and out["clarification"]["next_answers_file"] == str(path)
+    assert "## Что решить" in path.read_text(encoding="utf-8")

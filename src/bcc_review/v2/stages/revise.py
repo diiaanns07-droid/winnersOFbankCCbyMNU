@@ -782,6 +782,18 @@ def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = 
         clar = a["clarification"]
         out.update(clarification=clar, findings_after=a["findings_after"], rejected_after=a["rejected_after"])
         out["markdown_sections"].append(recheck.render_markdown(clar, a["findings_after"]))
+        if report_path:  # файл ответов следующего круга: что решить + уже согласованное
+            try:
+                doc = (report.get("document") or {}).get("file") or (report.get("document") or {}).get("name") or ""
+                path = recheck.next_answers_path(report_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(recheck.render_next_answers(clar, str(doc), Path(report_path).name), encoding="utf-8")
+                clar["next_answers_file"] = str(path)
+                if clar.get("next_round"):
+                    _cl._warn(ctx, f"recheck: осталось решить {len(clar['next_round'])} — строки для следующего круга "
+                                   f"в {path.name} (там же уже согласованные ответы)")
+            except OSError as exc:
+                _cl._warn(ctx, f"recheck: файл ответов следующего круга не записан ({exc})")
     if do_revise:
         try:
             r = run(ctx, list(report.get("findings") or []), clar)
