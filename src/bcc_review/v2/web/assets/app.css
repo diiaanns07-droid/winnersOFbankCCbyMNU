@@ -9,6 +9,7 @@
 .desk-stack{position:sticky;top:96px;min-width:0}
 .desk-map{align-self:stretch}
 .desk-sheet{position:relative;min-width:0}
+.desk-aishka{position:absolute;top:5px;right:30px;width:96px;height:96px;pointer-events:none}  /* №54: AIshka на листе */
 .desk-notes{align-self:stretch;min-height:100%}
 
 /* ── панель: меню модели и строка сообщения ── */
@@ -63,6 +64,7 @@
   .b-stack>.b-leaf{flex:0 0 220px}
 }
 @media (max-width:760px){
+  .desk-aishka{display:none}
   .desk{display:block;padding:16px 10px 150px}
   .desk-stack{padding:0 0 16px}
   .desk-map{display:none}

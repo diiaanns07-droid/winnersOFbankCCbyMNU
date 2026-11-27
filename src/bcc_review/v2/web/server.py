@@ -147,6 +147,10 @@ def _job_files(app: App, job: Job) -> list[tuple[str, str]]:
             if k not in ("json",) and (out / n).is_file()]
 
 
+# №54 (правка 49): AIshka 96 стоит на раскрытом листе главной, у строки вердикта — как над листом проверки
+_DESK_AISHKA = '<div class="desk-aishka" data-bcc-agent data-size="96" data-mood="idle" aria-hidden="true"></div>'
+
+
 def _top_sheet(app: App) -> dict[str, Any] | None:
     """Раскрытый лист на столе: своя последняя готовая проверка, иначе первый готовый отчёт №43."""
     for j in app.store.recent():
@@ -263,7 +267,7 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
 <div class="desk" id="desk">
 <aside class="desk-stack" aria-label="Готовые листы">{stack}</aside>
 <aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
-<main class="desk-sheet">{sheet.html if sheet else ''}</main>
+<main class="desk-sheet">{sheet.html if sheet else ''}{_DESK_AISHKA if sheet else ''}</main>
 <div class="desk-notes{' b-margin' if sheet and sheet.notes else ''}">{_margin_head(top["report"]) if top and sheet and sheet.notes else ''}</div>
 </div>
 <div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>BCC AI сразу начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
