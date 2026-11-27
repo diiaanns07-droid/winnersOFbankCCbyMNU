@@ -19,7 +19,7 @@ from bcc_review.v2.render import console, jsonout, markdown  # noqa: E402
 SAMPLE = ROOT / "tests" / "v2" / "fixtures" / "13_report_sample.json"
 
 REQUIRED_HEADINGS = [
-    "## Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
+    "></a>Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
     "></a>4. Проверка набора требований", "></a>5. Сводка", "></a>6. Итог", "></a>Приложение А. Вопросы владельцу",
     "></a>Приложение Б. Черновик тест-кейсов", "></a>Приложение В. Чек-лист", "></a>Приложение Г. Было → стало",
     "></a>Приложение Д. Как работал агент", "></a>Приложение Е. Методика",
@@ -160,7 +160,7 @@ def test_header_says_generated_and_verified(sample):
 
 def test_first_screen(sample):
     md = markdown.render(sample)
-    brief = md[md.find("## Кратко"):md.find("></a>1. Паспорт")]
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
     assert brief.count("| 🔴 [D-") == 5  # таблица блокеров
@@ -170,7 +170,7 @@ def test_first_screen(sample):
 
 def test_every_link_has_anchor(sample):
     md = markdown.render(sample)
-    links = set(re.findall(r"\]\(#([\w-]+)\)", md))
+    links = set(re.findall(r"\]\(#([\w-]+)(?: \"[^\"]*\")?\)", md))
     anchors = set(re.findall(r'<a id="([\w-]+)"></a>', md))
     assert links and links <= anchors, links - anchors
 
@@ -196,7 +196,7 @@ def test_card_quotes_are_short_and_located(sample):
 
 def test_ids_of_document_shown_next_to_report_ids(sample):
     md = markdown.render(sample)
-    assert "[R-07 / Ф-3](#r-07)" in md and "[R-30](#r-30)" in md  # «Query-параметры: cardId» — не ID
+    assert "[R-07 / Ф-3](#r-07 " in md and "[R-30](#r-30 " in md  # «Query-параметры: cardId» — не ID
 
 
 def test_no_internal_jargon(sample):
@@ -227,9 +227,12 @@ def test_partial_and_failed_status_banners():
     md = markdown.render(minimal(status="partial", stages={"segment": "ok", "judge": "failed"}, provider="gemini",
                                  models_used=["gemini-x"]))
     assert "Прогон завершён частично" in md and "Судья" in md
-    r = minimal(status="failed")
+    r = minimal(status="failed", stages={"segment": "ok", "lens_qa": "failed"}, provider="gemini",
+                models_used=["gemini-x"])
     jsonout.finalize(r)
-    assert "вердикт не вынесен" in markdown.render(r)
+    md = markdown.render(r)
+    assert "вердикт не вынесен" in md and "Проверка не завершена: сбой этапов Тестировщик" in md
+    assert "Блокирующих дефектов не найдено" not in md
 
 
 def test_before_after_block(sample):
@@ -258,6 +261,7 @@ def test_before_after_block(sample):
     assert "D-01 (снят)" in md
     assert '<a id="d-01">' not in md  # снятый дефект не показывается карточкой
     assert "· уточнён после ответов" in md
+    assert "**Сняты ответами блокеры (1):**" in md and "D-01 (снят) Ф-3 и Ф-4 — [Q-01](#q-01): лимит действует всегда" in md
     assert r["summary"]["findings"]["critical"] == 4
 
 
@@ -332,7 +336,7 @@ def _mutations(report: dict):
 def test_render_never_crashes_on_broken_data(sample):
     for name, r in _mutations(sample):
         md = markdown.render(r)
-        assert "## Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
+        assert "></a>Кратко" in md and ("></a>6. Итог" in md or "## 6. Итог" in md), name
         assert "BCC Review" in console.summary(r), name
 
 
@@ -401,3 +405,46 @@ def test_identifiers_in_model_text_become_code():
     assert markdown.prose("поле limit_kzt и `уже код` и 1.5 и т.е.") == "поле `limit_kzt` и `уже код` и 1.5 и т.е."
     assert markdown.prose("путь /alerts/saveLimit. Дальше") == "путь `/alerts/saveLimit`. Дальше"
     assert markdown.prose("сумма 50 000 ₸, Ф-2, push, API") == "сумма 50 000 ₸, Ф-2, push, API"
+
+
+def test_stage_failure_warnings_readable():
+    assert markdown.warn_text("Этап lens_architect не выполнен: исчерпан бюджет вызовов модели (16)") == \
+        "Этап «Архитектор» не выполнен: исчерпан бюджет вызовов модели (16)"
+    assert markdown.warn_text("судья недоступен (BudgetExceeded: judge: budget: исчерпан бюджет вызовов модели (16)); "
+                              "реестр собран кодом") == \
+        "судья недоступен (исчерпан бюджет вызовов модели (16)); реестр собран кодом"
+
+
+def test_sixty_plus_findings_fit_budget(sample):
+    r = copy.deepcopy(sample)
+    base = list(r["findings"])
+    while len(r["findings"]) < 66:
+        f = copy.deepcopy(base[len(r["findings"]) % len(base)])
+        f["id"] = f"D-{len(r['findings']) + 1:02d}"
+        f["severity"] = "major" if f["severity"] == "critical" else f["severity"]
+        r["findings"].append(f)
+    del r["summary"]
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert md.count("\n") <= 900
+    for h in REQUIRED_HEADINGS:
+        assert h in md, h
+    assert md.count('<a id="d-') == 66  # у каждого дефекта есть якорь, даже в сжатом виде
+
+
+def test_export_text_for_word(sample, tmp_path):
+    md = markdown.render(sample)
+    ex = markdown.export_text(md)
+    assert "<a id=" not in ex and "\\|" not in ex and "\\*" not in ex
+    assert "## 1. Паспорт прогона" in ex and "| R-07 / Ф-3 |" not in ex  # ссылки остаются ссылками
+    assert ex.count("\n") == md.count("\n")
+    exports = pytest.importorskip("bcc_review.v2.render.exports")
+    pytest.importorskip("docx")
+    import docx
+    res = exports.report_docx(sample, tmp_path / "r.docx", markdown=ex)
+    assert res["status"] == "written"
+    d = docx.Document(str(tmp_path / "r.docx"))
+    texts = [p.text for p in d.paragraphs] + [c.text for t in d.tables for row in t.rows for c in row.cells]
+    assert not [t for t in texts if "<a id" in t or "\\|" in t]
+    heads = [p.text for p in d.paragraphs if p.style.name.startswith("Heading")]
+    assert "1. Паспорт прогона" in heads and "Кратко" in heads

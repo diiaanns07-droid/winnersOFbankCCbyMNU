@@ -194,3 +194,44 @@ def test_scan_reads_pipeline_run_dir(tmp_path):
     assert [s["id"] for s in job.public()["stage_list"]].count("recheck") == 0
     cmd = r.command(job, d / "out" / "report.md", d / "runs")
     assert cmd[cmd.index("--export") + 1] == "jira,docx,pdf" and cmd[cmd.index("--run-id") + 1] == job.id
+
+
+def test_notice_and_fatal_from_report():
+    """Отчёт есть, но модель подвела → показываем отчёт с предупреждением; документ не прочитан → ошибка."""
+    ok = {"run": {"status": "failed", "warnings": ["Этап lens_qa не выполнен: исчерпан бюджет вызовов модели (16)"]},
+          "document": {"lines": 198}, "findings": [], "verdict": {}}
+    assert R._notice(ok).startswith("Модель не ответила") and not R._summary(ok)["fatal"]
+    err = {"run": {"status": "failed", "model_error": "Провайдер Gemini: неверный ключ\nЧто сделать: …"},
+           "document": {"lines": 198}}
+    assert "только правилами" in R._notice(err) and "неверный ключ" in R._notice(err)
+    broken = {"run": {"status": "failed", "warnings": ["Прогон прерван: PdfReadError: PDF a.pdf повреждён"]},
+              "document": {"lines": 0}}
+    assert R._summary(broken)["fatal"] and R._notice(broken).startswith("Документ не удалось прочитать")
+    assert R._notice({"run": {"status": "complete"}}) == ""
+
+
+def test_pace_reveals_stages_in_order(tmp_path):
+    store = R.JobStore(tmp_path)
+    job = store.create("a.md", b"# x\n", "mock", "")
+    shadow = R.Job(**{**job.__dict__, "stages": {k: "done" for k, _ in R.STAGES}})
+    r = R.PipelineRunner(store, pace=0.05)
+    r._last_reveal = 0.0
+    shown = []
+    while r._reveal(job, shadow):
+        shown.append([k for k, v in job.stages.items() if v == "done"])
+        time.sleep(0.02)
+    r._reveal(job, shadow, force=True)
+    assert shown[0] == ["docview"] and len(shown) >= 8           # по шагу, а не всё сразу
+    assert all(job.stages[k] == "done" for k, _ in R.STAGES)
+    cmd = r.command(job, tmp_path / "o.md", tmp_path / "runs")
+    assert "--cache-dir" not in cmd
+    cmd = R.PipelineRunner(store, cache_dir=tmp_path / "c").command(job, tmp_path / "o.md", tmp_path / "runs")
+    assert cmd[cmd.index("--cache-dir") + 1].endswith("c")
+
+
+def test_openai_needs_model_and_offline_notice(monkeypatch):
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://127.0.0.1:11434/v1")
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    assert "не указана модель" in R.check_provider("openai")
+    assert R.check_provider("openai", "qwen3:8b") == ""
+    assert R._notice({"run": {"provider": "offline", "status": "complete"}}).startswith("Проверка без модели")
