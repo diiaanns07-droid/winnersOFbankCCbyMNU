@@ -112,6 +112,8 @@ body:has(main.jb.done) { overflow: hidden; }
   .jb-say { min-width: 0; align-items: flex-end; padding: 6px 12px; border-radius: 14px; background: rgba(255, 255, 255, .94); box-shadow: var(--shadow-1); }
 }
 @media (max-width: 720px) {
+  /* №54: таблицы ТЗ — ячейки друг под другом */
+  .jb-sheet .ln.trow .tx { display: block; } .jb-sheet .ln.trow .td { display: block; } .jb-sheet .ln.trow .td:first-child { font-weight: 600; }
   .jb { padding: 16px 12px 110px; }
   .jb-sheet { padding: 24px 16px 48px 0; font-size: 16.5px; }
   .jb-sheet .ln { grid-template-columns: 40px minmax(0, 1fr); }

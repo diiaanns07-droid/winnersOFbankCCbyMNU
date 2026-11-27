@@ -36,7 +36,7 @@ EXAMPLES = HERE / "examples" / "examples.json"
 REPO = HERE.parents[3]  # src/bcc_review/v2/web → корень репозитория
 PREFIX = "00000000-000043-"  # номер готового задания: проходит JOB_PATH сервера и не путается с настоящими
 NO_MODEL = ("mock", "offline")
-VIEW = "light-49.2"  # №54: вид HTML готового отчёта; сменился — готовое задание собирается заново
+VIEW = "light-49.3"  # №54: вид HTML готового отчёта; сменился — готовое задание собирается заново
 
 _VERDICT = {"no": ("нельзя", "crit"), "conditional": ("с условиями", "major"), "yes": ("можно", "ok")}
 _NO_KEY = {"mock": "демо без модели", "offline": "только правила"}

@@ -418,6 +418,8 @@ table.rw td:nth-child(4), table.rw td:nth-child(5) { min-width: 220px; }
   :root[data-embed] .perch { left: auto; right: 10px; top: -74px; max-width: 86vw; flex-direction: row-reverse; }
 }
 @media (max-width: 600px) {
+  /* таблицы ТЗ (№54): на телефоне ячейки друг под другом — слова не рвутся */
+  .ln.trow .tx { display: block; } .ln.trow .td { display: block; } .ln.trow .td:first-child { font-weight: 600; }
   .dname { display: none; }
   .tab { padding: 0 12px; font-size: 14px; }
   .ev { flex-wrap: wrap; gap: 2px 10px; }
