@@ -20,6 +20,8 @@ from ._text import Doc, build_doc
 __all__ = ["run", "format_signals", "signals_for"]
 
 SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2}
+# False — линзы получают пустой блок <сигналы> (замер вклада сигналов); кандидаты правил судье идут как обычно.
+SIGNALS_ENABLED = True
 AUDIENCES = ("analyst", "qa", "architect", "risk", "consistency")
 
 
@@ -108,9 +110,7 @@ def format_signals(signals: list[dict], audience: str | None = None, limit: int 
 
     Сигналы — подсказки правил, а не готовые дефекты: модель проверяет их по документу сама.
     """
-    import os
-
-    if os.environ.get("BCC_RULES_SIGNALS", "1").strip().lower() in ("0", "no", "off", "false"):
+    if not SIGNALS_ENABLED:
         return "Сигналов правил нет."  # замер вклада сигналов: линзы без блока <сигналы>, кандидаты правил остаются
     items = signals_for(signals, audience)[:limit]
     if not items:
