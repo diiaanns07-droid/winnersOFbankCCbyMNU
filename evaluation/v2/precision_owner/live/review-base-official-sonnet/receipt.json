@@ -1,0 +1,22 @@
+{
+  "job": [
+    "review",
+    "base",
+    "official",
+    "sonnet"
+  ],
+  "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+  "code": 0,
+  "at": "2026-11-27T20:14:16+05:00",
+  "duration_s": 158.0,
+  "status": "complete",
+  "models": [
+    "claude-sonnet-5-5"
+  ],
+  "cache": 0,
+  "critical": 5,
+  "development": "no",
+  "testing": "no",
+  "verify": 0,
+  "quota": false
+}
