@@ -1119,6 +1119,49 @@ _GOAL_SECTION = re.compile(r"цел|назначени|контекст|обос
                            re.I)
 
 
+_EXPECTED_HEAD = re.compile(r"ожидаем|^результат|expected", re.I)
+ACCEPT_SUMMARY_MAX = 60
+ACCEPT_BOTH_MAX = 48
+_ACTION_HEAD = re.compile(r"^действи|^шаг|^сценари|^action", re.I)
+
+
+def _cells(text: str) -> list[str]:
+    return [c.strip() for c in _MD_DECOR.sub("", text).strip().strip("|").split(" | ")]
+
+
+def acceptance_summaries(view: dict, requirements: list[dict]) -> list[dict]:
+    """Строка таблицы приёмки «условия | действие | ожидаемый результат»: краткая формулировка — ячейка
+    ожидаемого результата дословно («Февральский счётчик вырос на 4 000 ₸»), с действием, если влезает в карточку
+    замечания («Перевести 500 ₸ → счётчик показывает 19 900 ₸»). Пересказ модели здесь опасен: haiku
+    написал «Покупка 31 января учитывается в январе» к строке, где счётчик растёт в феврале, — а строка приёмки
+    чаще всего и есть место противоречия. Длинная ячейка (> 60 знаков) — формулировка модели остаётся."""
+    lines = _lines(view)
+    by_n = {int(x["n"]): x for x in lines}
+    heads = sorted(table_header_lines(view))
+    for r in requirements:
+        a = int(r["line_start"])
+        first = _text(by_n.get(a) or {})
+        if not _is_row(first) or int(r["line_end"]) != a:
+            continue
+        head = next((h for h in reversed(heads) if h < a), None)
+        if head is None or any(not _is_row(_text(by_n[n])) and _text(by_n[n]).strip()
+                               for n in range(head + 1, a) if n in by_n):
+            continue  # шапка другой таблицы: между ними текст
+        hcells, cells = _cells(_text(by_n[head])), _cells(first)
+        col = next((i for i, c in enumerate(hcells) if _EXPECTED_HEAD.search(c)), None)
+        if col is None or len(cells) != len(hcells) or col >= len(cells):
+            continue
+        exp = re.sub(r"\s+", " ", cells[col]).strip().rstrip(".")
+        if not (3 <= len(exp) <= ACCEPT_SUMMARY_MAX and len(exp.split()) >= 2):
+            continue
+        act_col = next((i for i, c in enumerate(hcells) if _ACTION_HEAD.search(c)), None)
+        act = re.sub(r"\s+", " ", cells[act_col]).strip().rstrip(".") if act_col is not None else ""
+        both = f"{act} → {exp[:1].lower() + exp[1:]}" if act else ""
+        # действие + результат, если влезает в карточку замечания (48 знаков), иначе только результат
+        r["summary"] = both if both and len(both) <= ACCEPT_BOTH_MAX else exp[:1].upper() + exp[1:]
+    return requirements
+
+
 def settle_kinds(view: dict, requirements: list[dict]) -> list[dict]:
     """Вид требования там, где его однозначно задаёт сам документ, — одинаковый при любой модели (от вида зависит
     серьёзность у набора №09: цель и нефункциональное — «мягкие»):
@@ -1643,7 +1686,7 @@ def heuristic_segment(view: dict) -> dict:
     reqs, excl = demote_open_questions(view, reqs, excl)
     reqs = split_status_lists(view, reqs)
     reqs = status_item_quotes(view, canonical_source_ids(view, reqs))
-    reqs = settle_kinds(view, uniquify_source_ids(code_in_summary(reqs)))
+    reqs = acceptance_summaries(view, settle_kinds(view, uniquify_source_ids(code_in_summary(reqs))))
     return {"requirements": assign_ids(reqs), "excluded": excl}
 
 
@@ -2075,6 +2118,7 @@ def segment_from_response(view: dict, raw: dict,
     code_in_summary(reqs)
     uniquify_source_ids(reqs)
     settle_kinds(view, reqs)
+    acceptance_summaries(view, reqs)
     assign_ids(reqs)
     return {"requirements": reqs, "excluded": excl,
             "coverage": {"lines": len(_lines(view)), "uncovered_after_model": first_uncovered,

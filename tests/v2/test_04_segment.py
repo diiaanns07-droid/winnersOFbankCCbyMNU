@@ -1118,3 +1118,25 @@ def test_kind_fixed_where_document_defines_it():
     off = sg.segment_from_response(sg.load_view(str(OFFICIAL_MD)),
                                    json.loads((ANSWERS / "official.haiku.json").read_text(encoding="utf-8")))
     assert off["requirements"][0]["kind"] == "goal"  # цель в разделе цели остаётся целью
+
+
+def test_acceptance_row_summary_is_the_documents_expected_result():
+    """Строка приёмки — место противоречий (К1 официального): пересказ модели «Покупка 31 января учитывается в
+    январе» к строке «… | Февральский счётчик вырос на 4 000 ₸» противоречил самому документу. Краткая
+    формулировка — ячейка «Ожидаемый результат» дословно, с действием, если влезает в 48 знаков."""
+    view = sg.load_view(str(OFFICIAL_MD))
+    raw = json.loads((ANSWERS / "official.haiku.json").read_text(encoding="utf-8"))
+    for r in raw["requirements"]:
+        if r["line_start"] == 64:
+            r["summary"] = "Покупка 31 января учитывается в январе"
+    out = {r["line_start"]: r["summary"] for r in sg.segment_from_response(view, raw)["requirements"]}
+    assert out[63] == "Итог 50 000 ₸ и один push"
+    assert out[64] == "Февральский счётчик вырос на 4 000 ₸"
+    assert out[65] == "Перевести 500 ₸ → счётчик показывает 19 900 ₸"
+    heur = {r["line_start"]: r["summary"] for r in sg.heuristic_segment(view)["requirements"]}
+    assert heur[64] == out[64]
+    # таблица без столбца ожидаемого результата и длинная ячейка — формулировка модели остаётся
+    v2 = _view(["| Код | Описание |", "", "| 1 | Ответ при ошибке |"])
+    raw2 = {"requirements": [{"source_id": "", "kind": "api", "summary": "Код ошибки", "line_start": 3,
+                              "line_end": 3}], "excluded": []}
+    assert sg.segment_from_response(v2, raw2)["requirements"][0]["summary"] == "Код ошибки"
