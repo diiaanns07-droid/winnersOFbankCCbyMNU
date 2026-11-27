@@ -714,3 +714,49 @@ def test_open2_pdf_status_line_split(case):
     out = sg.segment_from_response(view, raw)
     sids = [r["source_id"] for r in out["requirements"] if r["line_start"] == n]
     assert len(sids) >= 5 and all(s.startswith("Статус ") for s in sids)
+
+
+# ---- офлайн-нарезка (эвристика) = нарезке модели: её таблицу видят рецензенты в «быстром старте» №01 ----------
+
+@pytest.mark.parametrize("doc", ["release/input/requirements.md", "release/input/requirements.pdf",
+                                 "release/input/requirements.docx"])
+def test_offline_official_equals_model_fixture(doc):
+    view = sg.load_view(str(ROOT / doc))
+    h = sg.heuristic_segment(view)["requirements"]
+    fx = "official_pdf" if doc.endswith(".pdf") else "official"
+    ref = json.loads((FIX / fx / "segment.json").read_text(encoding="utf-8"))["requirements"]
+    if doc.endswith(".docx"):  # строки DOCX нумеруются иначе — сравниваем ID по порядку
+        assert [r["source_id"] for r in h] == [r["source_id"] for r in ref]
+    else:
+        assert _keys(h) == _keys(ref)
+
+
+def test_offline_structures_match_model_conventions():
+    nested = sg.heuristic_segment(sg.load_view(str(STRUCT / "nested_ids.md")))
+    sids = {r["source_id"] for r in nested["requirements"]}
+    assert {"1.2 Термины: Копилка", "1.2 Термины: Шаг округления", "6. Критерии приёмки, строка 1"} <= sids
+    assert not any(s.startswith("8. Согласование") for s in sids)  # блок согласования — шаблон
+    un = sg.heuristic_segment(sg.load_view(str(STRUCT / "unnumbered.md")))
+    sids = {r["source_id"] for r in un["requirements"]}
+    assert "Ответ метода списка устройств: deviceId" in sids  # подпись над таблицей — имя таблицы
+    assert not any("Подписи согласующих" in r["quote"] for r in un["requirements"])
+    assert len(un["requirements"]) == 31
+
+
+def test_item_ids_with_digits_before_dash():
+    view = _view(["Модуль", "Т01-1. Подсистема выполняет операцию 1.", "REQ_002 Система хранит журнал."],
+                 sections=["Модуль"] * 3)
+    reqs = [{"source_id": "", "line_start": 2, "line_end": 2}, {"source_id": "", "line_start": 3, "line_end": 3}]
+    assert [r["source_id"] for r in sg.canonical_source_ids(view, reqs)] == ["Т01-1", "REQ_002"]
+    # имя поля с подчёркиванием — не номер пункта
+    assert not sg._OWN_SID.fullmatch("кредиты_1")
+
+
+def test_numbered_table_row_and_method_qualifier_canonical():
+    lines = ["Методы чтения", "Метод | URL", "", "2. Условия | GET /a", "Метод getX", "Ответ 200", "limit | string"]
+    sec = ["Методы чтения"] * 4 + ["Метод getX", "Метод getX › Ответ 200", "Метод getX › Ответ 200"]
+    view = _view(lines, sections=sec)
+    reqs = [{"source_id": "Методы чтения, строка 1", "line_start": 4, "line_end": 4},
+            {"source_id": "Ответ 200, getX: limit", "line_start": 7, "line_end": 7}]
+    assert [r["source_id"] for r in sg.canonical_source_ids(view, reqs)] == ["Методы чтения: 2. Условия",
+                                                                              "Ответ 200: limit"]
