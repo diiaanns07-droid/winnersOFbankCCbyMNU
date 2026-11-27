@@ -363,6 +363,13 @@ def answer_labels(resolved: dict) -> set[str]:
         {f"Решение-{i}" for i in range(1, len(resolved["decisions"]) + 1)}
 
 
+def answer_text_map(resolved: dict) -> dict[str, str]:
+    """ID ответа → текст решения владельца (для судьи новых конфликтов: вторая сторона — сам ответ)."""
+    out = {a["question_id"]: str(a.get("answer") or "") for a in resolved["answered"]}
+    out.update({f"Решение-{i}": str(d or "") for i, d in enumerate(resolved["decisions"], 1)})
+    return out
+
+
 _CLASH = re.compile(r"противореч|расходятся|несовместим|взаимоисключ|разн\w* исход", re.I)
 _LABEL = re.compile(r"(Q\s*-?\s*\d{1,3})|(Решени\w*\s*-?\s*\d{1,3})", re.I)
 
@@ -513,6 +520,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             rc["status"], rc["reason"] = "open", "модель не оценила дефект — оставлен открытым"
 
     n = _next_candidate_number(report, findings)
+    answer_texts = answer_text_map(resolved)
     for c in raw.get("candidates") or []:
         lines = [x for f in affected for x in _cl.finding_lines(f)]
         ev = _cl.verified_evidence(ctx.view, c.get("evidence") or [], lines)
@@ -529,6 +537,13 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             result["rejected"].append({"candidate_id": cand["id"], "title": cand.get("title", ""),
                                        "reason": f"повторяет дефект {twin}", "source": "recheck"})
             continue
+        # новый конфликт — это ответ против места документа: без названного ответа проверить его нельзя
+        refs = norm_labels([str(cand.get(k) or "") for k in ("problem", "scenario", "title", "impact")], valid)
+        if not refs:
+            result["rejected"].append({"candidate_id": cand["id"], "title": cand.get("title", ""),
+                                       "reason": "не назван ответ, с которым расходится документ", "source": "recheck"})
+            continue
+        cand["answer_refs"] = [{"id": r, "text": answer_texts.get(r, "")} for r in refs]
         cand["evidence"] = ev
         cand["line_start"], cand["line_end"] = ev[0]["line_start"], ev[0]["line_end"]
         result["new_candidates"].append(cand)
@@ -596,13 +611,17 @@ def findings_after(rechecked: list[dict]) -> list[dict]:
     return out
 
 
-def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[str]) -> tuple[list[dict], list[dict]]:
-    """Новые кандидаты → судья (№10). Без судьи — кандидат становится дефектом как есть."""
+def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[str],
+               old: Iterable[dict] = ()) -> tuple[list[dict], list[dict]]:
+    """Новые кандидаты → судья (№10). Без судьи — кандидат становится дефектом как есть.
+
+    Судья может переписать кандидата в прежний дефект (на официальном haiku: «ключ повторной доставки не
+    задан» — его как раз закрыло общее решение): такой «новый» дефект — дубль, он отклоняется."""
     if not candidates:
         return [], []
     try:
         from bcc_review.v2.stages import judge  # type: ignore
-        res = judge.run(ctx, candidates) or {}
+        res = judge.run(ctx, [for_judge(c) for c in candidates]) or {}
         found, rejected = list(res.get("findings") or []), list(res.get("rejected") or [])
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"recheck: судья недоступен для новых кандидатов ({type(exc).__name__}); приняты как есть")
@@ -615,16 +634,66 @@ def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[st
                   "priority": 0, "sources": ["recheck"]} for c in candidates]
         rejected = []
     keep = _cl.doc_codes(getattr(ctx, "view", None))
+    by_cand = {c["id"]: c for c in candidates}
+    old = list(old)
+    if old:
+        fresh = []
+        for f in found:
+            twin = duplicate_of(f.get("evidence") or [], old, str(f.get("title") or ""))
+            if twin:
+                rejected.append({"candidate_id": ", ".join(f.get("candidate_ids") or []), "title": f.get("title", ""),
+                                 "reason": f"повторяет дефект {twin}", "source": "recheck"})
+            else:
+                fresh.append(f)
+        found = fresh
     for i, f in enumerate(found):
+        refs = [r["id"] for cid in f.get("candidate_ids") or [] for r in by_cand.get(cid, {}).get("answer_refs") or []]
+        refs = list(dict.fromkeys(refs))
+        if HINT in str(f.get("problem") or ""):  # судья повторил подсказку — владельцу нужен исходный текст
+            orig = next((by_cand[c] for c in f.get("candidate_ids") or [] if c in by_cand), {})
+            f["problem"] = str(orig.get("problem") or "")
         for key in ("title", "problem", "scenario", "impact", "recommendation", "question"):
-            if isinstance(f.get(key), str):
-                f[key] = _cl.plain_text(f[key], keep)
+            if isinstance(f.get(key), str):  # ссылки на ответы (Q-…) — не внутренние коды, их владелец видит
+                f[key] = _cl.plain_text(f[key], keep | set(refs))
+        # служебные хвосты судьи о ненайденной ссылке («Ссылка «» в документе не найдена») владельцу не нужны
+        if isinstance(f.get("problem"), str) and "«»" in f["problem"]:
+            f["problem"] = " ".join(x for x in re.split(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z])", f["problem"]) if "«»" not in x).strip()
+        if refs:
+            # владелец видит, какой его ответ породил конфликт
+            f["answer_ids"] = refs
+            if not any(r in str(f.get("problem") or "") for r in refs):
+                f["problem"] = f"После ответа {', '.join(refs)}: {f.get('problem') or ''}".strip()
         f["id"] = f"D-{start_n + i:02d}"
         f.setdefault("sources", ["recheck"])
         if "recheck" not in f["sources"]:
             f["sources"] = list(f["sources"]) + ["recheck"]
         f["status_after_answers"] = "new"
     return found, rejected
+
+
+ANSWER_QUOTE_CHARS = 240
+HINT = "Решение владельца, которое будет вписано в документ"
+
+
+def for_judge(c: dict) -> dict:
+    """Кандидат нового конфликта для судьи: одна сторона — цитата документа, вторая — решение владельца.
+    Судья видит только документ, поэтому без текста ответа отклонял настоящий конфликт как «не подтверждён»;
+    текст ответа идёт первым в ``problem`` (судья показывает его первые 420 знаков)."""
+    refs = c.get("answer_refs") or []
+    if not refs:
+        return c
+    said = "; ".join(f"{r['id']} — «{_cut(r.get('text', ''), ANSWER_QUOTE_CHARS)}»" for r in refs if r.get("text"))
+    if not said:
+        return c
+    out = dict(c)
+    out["problem"] = (f"{HINT}: {said}. С ним расходится место документа в цитате, которое ответ не меняет. "
+                      f"{c.get('problem') or ''}").strip()
+    return out
+
+
+def _cut(text: str, n: int) -> str:
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    return t if len(t) <= n else t[: n - 1].rstrip() + "…"
 
 
 def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
@@ -640,7 +709,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
     warnings = rc.get("warnings", [])
     remaining = findings_after(rc["findings"])
     max_d = max([int(m.group(1)) for f in findings for m in [re.match(r"D-(\d+)$", str(f.get("id", "")))] if m] or [0])
-    new_found, new_rejected = _judge_new(ctx, rc["new_candidates"], max_d + 1, warnings)
+    new_found, new_rejected = _judge_new(ctx, rc["new_candidates"], max_d + 1, warnings, findings)
     after = remaining + new_found
     before_v = report.get("verdict") or {}
     before_rule = shared_verdict(findings, status)
