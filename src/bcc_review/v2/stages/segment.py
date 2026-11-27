@@ -575,6 +575,12 @@ def _strip_num(s: str) -> str:
     return _HEAD_NUM.sub("", s or "").strip()
 
 
+def _in_doc(view: dict, text: str) -> bool:
+    """Текст есть в документе: в строке или в названии раздела."""
+    nt = _norm(text)
+    return bool(nt) and any(nt in _norm(_text(x)) or nt in _norm(str(x.get("section") or "")) for x in _lines(view))
+
+
 def _known_prefix(view: dict, pre: str, line_no: int, parts: list[str] | None = None) -> str:
     """Префикс source_id, которого нет в тексте документа (опечатка модели), заменяется ближайшим похожим заголовком
     или подписью строк выше требования; совсем непохожий оставляется как есть.
@@ -860,6 +866,8 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
             sep, rest = m.group("sep"), m.group("rest")
             if sep == ": " and _is_row(_text(first)):
                 rest = _param_name(first, rest)
+                if parts and not _in_doc(view, pre):
+                    pre = parts[-1]  # «Параметры ответа: result» — такой подписи в документе нет: раздел «Ответ»
             if sep in (", п. ", ", строка ") and rest.isdigit():
                 sep = ", строка " if _is_row(_text(first)) else ", п. "
             sid = f"{pre}{sep}{rest}"

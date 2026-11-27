@@ -954,11 +954,13 @@ OPEN2_DIR = ROOT / "evaluation" / "v2" / "open2"
     ("release/input/requirements.pdf", "official.pdf.haiku_404head.json", "official_pdf"),
     ("release/input/requirements.md", "official.sonnet_passport.json", "official"),
     ("release/input/requirements.md", "official.sonnet_passport_empty.json", "official"),
+    ("release/input/requirements.md", "official.sonnet_table_prefix.json", "official"),
 ])
 def test_model_variants_give_reference_segmentation(doc, answer, fixture):
     """Ответы, на которых 6 прогонов расходились, код приводит к эталону: «404» в PDF стал заголовком раздела и
     блок «404 + тело» ушёл в excluded отдельно от «…возвращается 404»; паспорт метода с ID «Часть B. REST API»
-    или без ID — ID = раздел, в котором стоит таблица («Общие параметры»)."""
+    или без ID — ID = раздел, в котором стоит таблица («Общие параметры»); строка параметров с придуманной
+    подписью таблицы («Параметры ответа: result») — ближайший заголовок («Ответ: result»)."""
     view = sg.load_view(str(ROOT / doc))
     raw = json.loads((ANSWERS / answer).read_text(encoding="utf-8"))
     out = sg.segment_from_response(view, raw, sg._replay_followup(raw))
@@ -1086,3 +1088,16 @@ def test_open_questions_excluded_only_in_question_section():
     out = sg.segment_from_response(view, raw)
     assert [r["line_start"] for r in out["requirements"]] == [2]
     assert out["excluded"][0]["what"] == "Открытый вопрос" and out["excluded"][0]["reason"]
+
+
+def test_summary_enumeration_after_colon_trimmed():
+    """«Предмет: a, b, c, d» длиннее 56 знаков — пересказ: остаётся предмет (от трёх слов); «Условие: исход» без
+    перечня, «Код 400 — …» и короткий предмет («Цепочка систем») не трогаются."""
+    assert sg.trim_enumeration("Получение сведений о льготном периоде: GET, Bearer, адреса и пример вызова") == \
+        "Получение сведений о льготном периоде"
+    keep = ["Частичный платёж до 25-го: проценты на всю задолженность по покупкам",
+            "Цепочка систем: приложение, API, кредитный модуль, сервис уведомлений",
+            "Код 400: неизвестный режим, нет карты, карта неактивна или не в тенге",
+            "Экран условий: флажок, стоимость"]
+    for s in keep:
+        assert sg.trim_enumeration(s) == s
