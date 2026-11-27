@@ -1,0 +1,9 @@
+Этап judge: ok, вызовов 2, 47.69 с, кандидатов 0
+Выход этапа: /tmp/w/runs/20261127-210402-18f6/stages/judge.json
+BCC Review: «Заказ выписки по счёту в PDF» — 97 требований, 16 дефектов (критичных 1, существенных 2, незначительных 13), вопросов 5
+Разработка: нельзя · тестирование: нельзя — блокер 1, останавливает разработку и тестирование:
+  D-01 Критерий приёмки №22 противоречит сроку ссылки в Ф-6 и методе 4
+Прогон завершён полностью: 49 с, 2 вызова модели, claude-sonnet-5-5; цитат сверено 34 из 34
+Отчёт: /home/claude/repo/evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_sonnet/statement/report.md и /home/claude/repo/evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_sonnet/statement/report.json
+  ! судья: 'Не описано скачивание выписки при закрытии счёта после заказ' — не пожелание: случай…
+HTML: /home/claude/repo/evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_sonnet/statement/report.html
