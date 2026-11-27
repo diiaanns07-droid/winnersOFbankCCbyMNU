@@ -6,9 +6,9 @@
 1. кандидат без единой цитаты отбрасывается;
 2. дубли (тот же тип и тот же набор строк-цитат) схлопываются в первого;
 3. неединичность (`non_singular`) не бывает выше `minor`;
-4. `critical` без сценария, последствий, с `blocks = none` или с типом, который не означает расхождения
-   двух мест документа (`ambiguity`, `incomplete`…), понижается до `major`: critical у этой линзы — только
-   когда другое место документа прямо поддерживает иное толкование;
+4. `critical` без сценария, последствий, с `blocks = none` или без расхождения двух мест документа (тип не из
+   расхождений — `ambiguity`, `incomplete`…, или все цитаты из одной строки) понижается до `major`:
+   critical у этой линзы — только когда другое место документа прямо поддерживает иное толкование;
 5. `critical` больше двух — лишние понижаются до `major`;
 6. **зрелый документ** (см. `maturity`) — строгий режим: остаются только расхождения двух мест документа
    (единицы, границы, события, противоречие правил) — `MATURE_MAX_OTHER_MAJOR = 0` прочих `major`, `minor` нет.
@@ -76,6 +76,14 @@ def _has_evidence(c: dict) -> bool:
     return any(str(ev.get("quote", "")).strip() for ev in c.get("evidence") or [])
 
 
+def _is_conflict(c: dict) -> bool:
+    """Расхождение двух мест: тип расхождения и цитаты хотя бы из двух разных строк."""
+    if c.get("kind") not in _CONFLICT_KINDS:
+        return False
+    lines = {ev.get("line_start", ev.get("line")) for ev in c.get("evidence") or []}
+    return len({n for n in lines if isinstance(n, int)}) >= 2
+
+
 def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_candidates: int = MAX_CANDIDATES,
                 max_critical: int = MAX_CRITICAL) -> list[dict[str, Any]]:
     """Применить правила линзы к ответу модели. Не меняет входной список."""
@@ -92,7 +100,7 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
         sev = c.get("severity") if c.get("severity") in _RANK else "major"
         if c.get("kind") in _MINOR_ONLY_KINDS:
             sev = "minor"
-        if sev == "critical" and (c.get("kind") not in _CRITICAL_KINDS
+        if sev == "critical" and (not _is_conflict(c)
                                   or not str(c.get("scenario", "")).strip()
                                   or not str(c.get("impact", "")).strip()
                                   or c.get("blocks", "none") == "none"):
@@ -112,7 +120,7 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
         for c in kept:
             if c["severity"] == "minor":
                 continue
-            if c["severity"] == "major" and c.get("kind") not in _CONFLICT_KINDS:
+            if c["severity"] == "major" and not _is_conflict(c):
                 other += 1
                 if other > MATURE_MAX_OTHER_MAJOR:
                     continue
