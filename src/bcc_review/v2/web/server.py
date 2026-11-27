@@ -353,8 +353,12 @@ def result_html(job: Job, f: dict, *, agent: bool = True) -> str:
     say = (f'Готово. {f["critical"]} {_plural(f["critical"], "блокер", "блокера", "блокеров")} — начните с {first}.'
            if first else "Готово. Блокеров нет.")
     mood = "alert" if f["critical"] else "verified"
-    return (f'<iframe class="jb-report" id="rframe" title="Правка документа" data-src="/jobs/{jid}/files/report.html?inline=1" '
-            f'data-mood="{mood}" data-say="{e(say)}"></iframe>\n' + _dock_html(job, f))
+    parent = (f'<p class="jb-parent jb-parent-done">Повторная проверка с ответами владельца — '
+              f'<a href="/jobs/{e(job.parent)}">исходная правка</a>.</p>' if job.parent else "")
+    # панель — раньше листа: Tab попадает сначала в панель, потом в лист
+    return (_dock_html(job, f) + parent +
+            f'\n<iframe class="jb-report" id="rframe" title="Правка документа" data-src="/jobs/{jid}/files/report.html?inline=1" '
+            f'data-mood="{mood}" data-say="{e(say)}"></iframe>')
 
 
 def job_page(job: Job, app: App | None = None) -> str:
