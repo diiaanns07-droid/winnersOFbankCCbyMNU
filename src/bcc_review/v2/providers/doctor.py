@@ -320,6 +320,38 @@ def _cli_version(cmd: list[str]) -> str:
         return f"не запускается: {exc}"
 
 
+FREE_TIER_NOTE = ("Бесплатный ключ: 20 запросов в сутки на каждую модель Flash и 500 на Flash-Lite (квота на проект "
+                  "Google, не на ключ); прогон — 9–10 запросов, поэтому цепочка идёт по всем Flash, затем Flash-Lite.")
+
+
+def _attempt_lines(attempts: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Неудачные попытки пробного вызова Gemini по-русски: почему ответила не основная модель."""
+    from bcc_review.v2.providers.gemini import daily_reset_local
+    lines: list[str] = []
+    seen: set[str] = set()
+    for a in attempts:
+        model, kind = str(a.get("model") or "?"), str(a.get("kind") or a.get("skipped") or "")
+        if not kind or model in seen:
+            continue
+        seen.add(model)
+        if kind == "quota" and a.get("subkind") == "limit_zero":
+            why = "на бесплатном тарифе квота модели нулевая"
+        elif kind == "quota":
+            limit = a.get("quota_limit")
+            why = ("исчерпана дневная квота" + (f" ({limit} запросов в сутки на модель)" if limit else "")
+                   + f"; восстановится около {daily_reset_local()}")
+        elif kind == "not_found":
+            why = "модель недоступна этому ключу (404)"
+        elif kind == "rate_limit":
+            why = "лимит запросов в минуту (429), агент подождал"
+        elif kind in ("overloaded", "server", "timeout"):
+            why = "модель перегружена (503) или не ответила вовремя"
+        else:
+            why = kind
+        lines.append(f"  {WARN} {model}: {why}")
+    return lines
+
+
 def run_doctor(*, live: bool = False, provider: str | None = None, model: str | None = None, timeout_s: float = 120.0,
                env: Mapping[str, str] | None = None, out: Callable[[str], None] = print,
                which: Callable[[str], str | None] = shutil.which,
@@ -410,6 +442,7 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
                 flash = [i for i in ids if "flash" in i][:12]
                 if flash:
                     out(f"  Доступные модели Flash: {', '.join(flash)}")
+        out(f"  {WARN} {FREE_TIER_NOTE}")
 
     code = 0 if not problems else 1
     if live and instance is not None:
@@ -426,6 +459,8 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
             dt = time.monotonic() - started
             u = r.get("usage") or {}
             meta = r.get("meta") or {}
+            for line in _attempt_lines(meta.get("attempts") or []):
+                out(line)
             out(f"{OK} Модель ответила за {dt:.1f} с: {r.get('model')}"
                 + (" (запасная)" if meta.get("fallback_used") else "")
                 + f", токенов {u.get('input_tokens', '?')} -> {u.get('output_tokens', '?')}")
