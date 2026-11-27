@@ -1,0 +1,365 @@
+{
+  "commit": "42ded75204b5091db08dce0e8ab3ec0495a6255b",
+  "stage": {
+    "h5": [
+      {
+        "case": "autopay.base",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "autopay.paraphrase.nfr",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "cardblock.base",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "cardblock.paraphrase.keep_authorizations",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "cashback.base",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "cashback.paraphrase.rate",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "clean20.capital_v2",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "clean20.fx",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "clean20.grace_v2",
+        "critical": 0,
+        "major": 1
+      },
+      {
+        "case": "clean20.insurance_v2",
+        "critical": 0,
+        "major": 1
+      },
+      {
+        "case": "clean20.qr_v2",
+        "critical": 0,
+        "major": 1
+      },
+      {
+        "case": "clean20.repay",
+        "critical": 0,
+        "major": 1
+      },
+      {
+        "case": "clean20.roundup",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "clean20.statement",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "open2.capital_clean",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "open2.grace_clean",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "open2.insurance_clean",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "open2.qr_clean",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "transfer_limit.base",
+        "critical": 0,
+        "major": 0
+      },
+      {
+        "case": "transfer_limit.paraphrase.new_limit",
+        "critical": 0,
+        "major": 1
+      }
+    ],
+    "c0": [
+      {
+        "case": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "critical": 0,
+        "major": 1,
+        "found": [
+          "unit_mismatch",
+          "missing_element"
+        ]
+      },
+      {
+        "case": "autopay.event_conflict.insufficient_funds_credit",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "event_conflict!"
+        ]
+      },
+      {
+        "case": "autopay.range_boundary.trigger_at_threshold",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "boundary_conflict!"
+        ]
+      },
+      {
+        "case": "autopay.two_statuses.range_422",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "status_conflict!"
+        ]
+      },
+      {
+        "case": "autopay.unit_change.limit_per_hour",
+        "critical": 0,
+        "major": 1,
+        "found": [
+          "unit_mismatch"
+        ]
+      },
+      {
+        "case": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+        "critical": 1,
+        "major": 1,
+        "found": [
+          "unit_mismatch",
+          "status_conflict!"
+        ]
+      },
+      {
+        "case": "cardblock.event_conflict.unblock_daily_limit",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "event_conflict!"
+        ]
+      },
+      {
+        "case": "cardblock.range_boundary.days_400_at_30",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "boundary_conflict!"
+        ]
+      },
+      {
+        "case": "cardblock.two_statuses.reblock_200",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "status_conflict!"
+        ]
+      },
+      {
+        "case": "cardblock.unit_change.blocked_at_utc",
+        "critical": 0,
+        "major": 1,
+        "found": [
+          "unit_mismatch"
+        ]
+      },
+      {
+        "case": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "critical": 2,
+        "major": 0,
+        "found": [
+          "event_conflict!",
+          "boundary_conflict!"
+        ]
+      },
+      {
+        "case": "cashback.event_conflict.category_effective_now",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "event_conflict!"
+        ]
+      },
+      {
+        "case": "cashback.range_boundary.cap_strict",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "boundary_conflict!"
+        ]
+      },
+      {
+        "case": "cashback.two_statuses.bad_category_200",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "status_conflict!"
+        ]
+      },
+      {
+        "case": "cashback.unit_change.accrued_in_tiyn",
+        "critical": 0,
+        "major": 1,
+        "found": []
+      },
+      {
+        "case": "official",
+        "critical": 5,
+        "major": 4,
+        "found": [
+          "К1!",
+          "К2!",
+          "К3!",
+          "К4!",
+          "С2",
+          "С5",
+          "С16",
+          "С17"
+        ]
+      },
+      {
+        "case": "open2.capital",
+        "critical": 3,
+        "major": 2,
+        "found": [
+          "К1!",
+          "К2",
+          "К3!",
+          "С1",
+          "С2",
+          "С5"
+        ]
+      },
+      {
+        "case": "open2.grace",
+        "critical": 4,
+        "major": 1,
+        "found": [
+          "К1!",
+          "К2!",
+          "К3!",
+          "С1",
+          "С2",
+          "С4"
+        ]
+      },
+      {
+        "case": "open2.insurance",
+        "critical": 3,
+        "major": 2,
+        "found": [
+          "К1!",
+          "К3!",
+          "К4",
+          "С1",
+          "С2"
+        ]
+      },
+      {
+        "case": "open2.qr",
+        "critical": 5,
+        "major": 2,
+        "found": [
+          "К1!",
+          "К2!",
+          "К3!",
+          "К4",
+          "С1",
+          "С2"
+        ]
+      },
+      {
+        "case": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+        "critical": 2,
+        "major": 0,
+        "found": [
+          "status_conflict!",
+          "missing_element!"
+        ]
+      },
+      {
+        "case": "transfer_limit.event_conflict.cancel_no_restore",
+        "critical": 1,
+        "major": 1,
+        "found": [
+          "event_conflict!"
+        ]
+      },
+      {
+        "case": "transfer_limit.range_boundary.reaching_rejects",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "boundary_conflict!"
+        ]
+      },
+      {
+        "case": "transfer_limit.two_statuses.range_200_error",
+        "critical": 1,
+        "major": 0,
+        "found": [
+          "status_conflict!"
+        ]
+      },
+      {
+        "case": "transfer_limit.unit_change.api_limit_in_tiyn",
+        "critical": 0,
+        "major": 1,
+        "found": [
+          "unit_mismatch"
+        ]
+      }
+    ]
+  },
+  "owner": {
+    "official": [
+      {
+        "title": "Q-07 включает переводы в счётчик, а Ф-2 и приёмка их исключают",
+        "duplicate_of": ""
+      },
+      {
+        "title": "Решение-1: история изменений порога не обеспечена данными и API",
+        "duplicate_of": ""
+      }
+    ],
+    "qr": [
+      {
+        "title": "Комиссия 20 ₸ из Q-07 противоречит «Без комиссии»",
+        "duplicate_of": ""
+      }
+    ],
+    "car-loan": [
+      {
+        "title": "Выбор 3-го числа по Q-03 противоречит диапазону дней 5–25 и коду DAY_INVALID",
+        "duplicate_of": ""
+      },
+      {
+        "title": "Владелец графика и редакций: Решение-3 расходится с разделом о терминах",
+        "duplicate_of": ""
+      }
+    ]
+  }
+}
