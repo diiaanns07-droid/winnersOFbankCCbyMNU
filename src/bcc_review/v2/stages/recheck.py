@@ -557,6 +557,7 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     answered: dict[str, dict] = {}
     extra: list[str] = []
     postponed: list[dict] = []  # вопросы, где владелец отложил решение целиком (для отчёта)
+    orphans: dict[tuple, list[dict]] = {}  # ответы на вопросы, которых нет в прогоне, по номеру и теме
     def clean(text: str, where: str) -> str:
         kept, cut = strip_injection(text)
         if cut:
@@ -643,6 +644,10 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                     warnings.append(f"recheck: {a['id']}: ответ откладывает решение — не учтён")
                     continue
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
+                # реплики одного номера и одной темы — ответы адресатов на один вопрос, даже если в этом прогоне
+                # его нет: запоминаем вместе, чтобы сверить их между собой (общими решениями порознь не сверить)
+                orphans.setdefault((a.get("id"), " ".join(sorted(_tokens(hint)))), []).append(
+                    {"label": f"Решение-{len(extra)}", "text": a["text"], "topic": hint, "id": a.get("id")})
                 why = "тема не совпала ни с одним вопросом прогона" if hint else "такого вопроса нет в прогоне"
                 warnings.append(f"recheck: {a['id']}: {why} — ответ учтён как общее решение")
             else:
@@ -718,7 +723,39 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     postponed = [p for p in postponed if p["question_id"] not in answered] + \
         [{"question_id": a["question_id"], "text": x, "partial": True} for a in answered.values()
          for x in a.get("deferred") or []]
-    return {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
+    out = {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
+    clashes = decision_clashes(orphans)
+    for c in clashes:
+        warnings.append(f"recheck: {c['question_id']} [{c['topic']}]: ответы адресатов расходятся в значениях "
+                        f"({' ↔ '.join(c['answers'])}), а вопроса с этой темой в прогоне нет — ни одно значение не "
+                        f"вносится, выберите одно в файле следующего круга")
+    if clashes:
+        out["decision_conflicts"] = clashes
+    return out
+
+
+def _values(text: str) -> set[str]:
+    """Числа ответа: «100 000» = «100000», «0,5» = «0.5»; одна цифра («1 раз», «шаг 2») — не значение."""
+    s = re.sub(r"(?<=\d)[\s  ](?=\d{3}(?!\d))", "", str(text or ""))
+    return {n.replace(",", ".") for n in re.findall(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])", s) if len(n) >= 2}
+
+
+def decision_clashes(orphans: dict) -> list[dict]:
+    """Реплики разных адресатов на один вопрос (номер и тема), которого нет в прогоне, с разными значениями — конфликт.
+
+    Расхождение кодом — только по числам (коды, сроки, суммы): у каждой стороны есть число, которого нет у другой
+    («422» ↔ «403»). Реплики, где одна дополняет другую («48 часов» и «48 часов, затем 409»), — не конфликт."""
+    out = []
+    for (qid, _topic), items in orphans.items():
+        if len(items) < 2:
+            continue
+        vals = [_values(x["text"]) for x in items]
+        clash = [x for i, x in enumerate(items)
+                 if any(vals[i] - vals[j] and vals[j] - vals[i] for j in range(len(items)) if j != i)]
+        if len(clash) >= 2:
+            out.append({"question_id": qid or "", "topic": clash[0]["topic"], "answers": [x["label"] for x in clash],
+                        "texts": {x["label"]: x["text"] for x in clash}})
+    return out
 
 
 def severity_counts(findings: Iterable[dict]) -> dict:
@@ -804,6 +841,25 @@ def _expand(labels: list[str], resolved: dict) -> list[str]:
         for x in multi.get(lab, [lab]):
             if x not in out:
                 out.append(x)
+    return out
+
+
+def _orphan_conflicts(resolved: dict, conflicts: list[dict]) -> list[dict]:
+    """Спорящие реплики на вопрос, которого нет в прогоне (``decision_conflicts``), — в ``answer_conflicts``.
+
+    Дефект, который модель закрыла одной из реплик, уже там (код вернул его в open): ему — номер и тема вопроса и
+    тексты реплик без темы. Реплики без дефекта — отдельной записью с пустым ``finding_id``. По номеру и теме
+    следующий круг пишет строки «Q-02 [тема]: …», из которых владелец оставляет одну."""
+    out = [dict(c) for c in conflicts]
+    for d in resolved.get("decision_conflicts") or []:
+        extra = {"question_id": d.get("question_id", ""), "topic": d.get("topic", ""), "texts": dict(d.get("texts") or {})}
+        hit = [c for c in out if set(c.get("answers") or []) == set(d["answers"])]
+        for c in hit:
+            c.update(extra)
+        if not hit:
+            out.append({"finding_id": "", "answers": list(d["answers"]), **extra,
+                        "reason": f"адресаты по-разному ответили на «{d.get('topic') or d.get('question_id')}», а такого "
+                                  f"вопроса в этом прогоне нет — ни одно значение не внесено, выберите одно"})
     return out
 
 
@@ -1124,6 +1180,19 @@ def _force_choice_conflicts(result: dict) -> None:
                 rc.pop("title_after", None)
                 rc.pop("problem_after", None)
                 rc["reason"] = f"ответы {' и '.join(clash)} выбирают разные варианты одного вопроса — выберите один"
+    # общее решение из спорящих реплик (вопроса в прогоне нет) не снимает дефект: значение не согласовано
+    for c in result["answers"].get("decision_conflicts") or []:
+        labels = set(c["answers"])
+        for g in result["findings"]:
+            rc = g["recheck"]
+            if rc["status"] == "open" or not labels & set(rc.get("answer_ids") or []):
+                continue
+            rc["status"], rc["severity_after"] = "open", g.get("severity")
+            rc["answer_conflict"] = list(dict.fromkeys(list(rc.get("answer_conflict") or []) + c["answers"]))
+            for k in ("answer_ids", "title_after", "problem_after"):
+                rc.pop(k, None)
+            rc["reason"] = (f"ответы адресатов на «{c['topic']}» расходятся ({' и '.join(c['answers'])}) — "
+                            f"выберите одно значение")
 
 
 def _finish(ctx: Any, result: dict) -> dict:
@@ -1298,6 +1367,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         # SHA-256 документа из шапки файла ответов против проверенного: match False — ответы к другой редакции
         "answers_document": rc.get("document_check") or {"answers_sha256": "", "document_sha256": "", "match": None},
     }
+    clar["answer_conflicts"] = _orphan_conflicts(rc["answers"], clar["answer_conflicts"])
     clar["next_round"] = next_round(clar, report.get("questions") or [])
     return {"clarification": clar, "findings_after": after,
             "rejected_after": list(rc.get("rejected") or []) + new_rejected}
@@ -1326,9 +1396,15 @@ def next_round(clar: dict, questions: list[dict]) -> list[dict]:
     for c in clar.get("answer_conflicts") or []:
         texts = c.get("texts") or {}
         qids = list(dict.fromkeys(x.split(".")[0] for x in c["answers"] if str(x).startswith("Q-")))
+        # спорящие реплики на вопрос, которого нет в прогоне: номер и тема — их собственные (под тем же номером в
+        # этом прогоне может быть другой вопрос), привязка в следующем круге пойдёт по теме
+        own = not qids and bool(c.get("question_id"))
+        if own:
+            qids = [c["question_id"]]
         sides = [_one_line(texts.get(x)) for x in c["answers"] if _one_line(texts.get(x))]
         if qids:
-            lines = list(dict.fromkeys(_head(qids[0], topic.get(qids[0], "")) + t for t in sides))
+            head = _head(qids[0], c.get("topic", "") if own else topic.get(qids[0], ""))
+            lines = list(dict.fromkeys(head + t for t in sides))
         else:  # спорят общие решения: в разделе «## Решения» остаётся одно
             lines = list(dict.fromkeys(f"- {t}" for t in sides))
         if len(lines) >= 2:
@@ -1392,7 +1468,8 @@ def render_next_answers(clar: dict, document: str = "", report: str = "", sha256
                 continue
             what = {"conflict": "ответы расходятся, оставьте одну строку",
                     "partial": "решена только часть, допишите решение"}.get(n["kind"], "решение отложено, впишите его")
-            lines += [f"> {n.get('question_id') or 'Общие решения'} ({n['finding_id']}): {what}", *n["lines"], ""]
+            fid = f" ({n['finding_id']})" if n.get("finding_id") else ""
+            lines += [f"> {n.get('question_id') or 'Общие решения'}{fid}: {what}", *n["lines"], ""]
     agreed = []
     for a in clar.get("answers") or []:
         if a["question_id"] in busy:
@@ -1407,7 +1484,10 @@ def render_next_answers(clar: dict, document: str = "", report: str = "", sha256
             agreed.append(head + _one_line(a.get("answer")))
     if agreed:
         lines += ["## Уже согласовано", "", *agreed, ""]
-    decided = [d for d in clar.get("decisions") or [] if _one_line(d)]
+    # спорящие решения уже стоят строками выбора в «Что решить»: в «Решения» их не повторяем — иначе оба
+    # останутся и в следующем круге, сколько бы строк владелец ни удалил выше
+    disputed = {str(x) for c in clar.get("answer_conflicts") or [] for x in c.get("answers") or []}
+    decided = [d for i, d in enumerate(clar.get("decisions") or [], 1) if _one_line(d) and f"Решение-{i}" not in disputed]
     if decided:
         lines += ["## Решения", "", *[f"- {_one_line(d)}" for d in decided], ""]
     rest = [q for q in clar.get("unanswered") or [] if q not in busy
@@ -1615,7 +1695,8 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
         for c in clar["answer_conflicts"]:
             texts = c.get("texts") or {}
             sides = " ↔ ".join(f"{x} «{_short(texts[x])}»" if texts.get(x) else x for x in c["answers"])
-            lines.append(f"* {sides} — {c['finding_id']}: {c['reason']}")
+            where = c.get("finding_id") or (f"{c['question_id']} [{c.get('topic', '')}]" if c.get("question_id") else "")
+            lines.append(f"* {sides} — {where}: {c['reason']}" if where else f"* {sides} — {c['reason']}")
         lines.append("")
     if clar.get("postponed"):
         lines.append("Владелец отложил решение — это не ответ, дефект по этой части остаётся открытым:")
