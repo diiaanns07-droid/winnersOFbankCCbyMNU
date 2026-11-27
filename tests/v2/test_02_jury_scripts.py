@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -17,8 +18,20 @@ def test_sh_syntax_and_steps():
     text = (D / "jury_check.sh").read_text(encoding="utf-8")
     for step in ("doctor --live", "verify", "jury_summary.py", "--no-cache"):
         assert step in text
-    if shutil.which("bash"):
-        assert subprocess.run(["bash", "-n", str(D / "jury_check.sh")]).returncode == 0
+    script = (D / "jury_check.sh").as_posix()  # Git Bash на Windows не открывает «C:\…» (код 127)
+    if _bash_can_read(script):
+        assert subprocess.run(["bash", "-n", script]).returncode == 0
+
+
+def _bash_can_read(path: str) -> bool:
+    """Есть ли bash, который видит этот файл. На Windows `bash` бывает заглушкой WSL: без дистрибутива она
+    не запускается, с дистрибутивом не видит путь «C:/…» — тогда синтаксис проверять нечем (тест на Linux/CI)."""
+    if not shutil.which("bash"):
+        return False
+    try:
+        return subprocess.run(["bash", "-c", 'test -r "$1"', "_", path], capture_output=True, timeout=20).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
 
 
 def test_ps1_has_bom_for_windows_powershell_5():
@@ -38,10 +51,9 @@ def test_summary_prints_russian_passport(tmp_path, status, vcode, ok):
               "verdict": {"development": "no", "testing": "conditional"}}
     path = tmp_path / "r.json"
     path.write_text(json.dumps(report), encoding="utf-8")
-    import os
+    # как в scripts/_env.ps1: PYTHONUTF8=1, иначе на Windows дочерний Python пишет в канал в cp1251
     r = subprocess.run([sys.executable, str(D / "jury_summary.py"), str(path), "281", "0", str(vcode)],
-                       capture_output=True, text=True, encoding="utf-8",
-                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})   # Windows без UTF-8 (просьба №16)
+                       capture_output=True, text=True, encoding="utf-8", env={**os.environ, "PYTHONUTF8": "1"})
     assert (r.returncode == 0) is ok
     out = r.stdout
     assert "gemini-3.8-flash-001" in out and "Вызовов модели:   9" in out

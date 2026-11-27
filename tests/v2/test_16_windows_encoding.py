@@ -66,9 +66,6 @@ def test_console_output_survives_cp1252_pipe(tmp_path):
     assert out.exists() and out.with_suffix(".json").exists()
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №02 (статус №16, «Волна 3»): load_dotenv читает .env только как "
-                                        "UTF-8 — файл из PowerShell 5.1 (UTF-16) роняет doctor трейсбэком, а прогон "
-                                        "молча уходит в режим без модели")
 def test_dotenv_written_by_windows_powershell_is_read(tmp_path):
     """`echo GEMINI_API_KEY=… > .env` в Windows PowerShell 5.1 пишет UTF-16 с BOM: ключ всё равно должен читаться."""
     from bcc_review.v2.providers import doctor

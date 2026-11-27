@@ -141,3 +141,27 @@ def test_official_half_specified_condition_is_reported_as_undefined(model):
     """С8: Ф-4 задаёт исход только для «накопленная сумма ниже нового порога»; другая ветвь не определена."""
     out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
     assert any(c["severity"] == "major" and c["origin"] == "pair_check" and 40 in lines_of(c) for c in out["candidates"])
+
+
+@pytest.mark.parametrize("model", ["haiku_w2_2", "haiku_w2_12", "haiku_w2_13", "haiku_w3_2"])
+def test_official_status_pair_gets_example_line_of_second_code(model):
+    """К3 строго: модель процитировала шаг логики («вернуть результат ERROR») против статуса 400, а код 200 назвала
+    только в исходе. Код добавляет строку примера из блока статуса 200 — у пары две стороны с разными кодами."""
+    out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
+    crit = [c for c in out["candidates"] if c["severity"] == "critical" and c["kind"] == "status_conflict"]
+    assert any(lines_of(c) & set(range(165, 172)) and lines_of(c) & {121, 151, 162, 163} for c in crit)
+
+
+def test_status_example_is_searched_only_in_block_of_other_code():
+    view = {"lines": [{"n": 1, "text": "400. Ответ, если параметры неверны.", "page": None, "section": ""},
+                      {"n": 2, "text": "При отказе вернуть результат FAILED.", "page": None, "section": ""},
+                      {"n": 3, "text": "400. Unsuccessful", "page": None, "section": ""},
+                      {"n": 4, "text": '{"result":"FAILED"}', "page": None, "section": ""},
+                      {"n": 5, "text": "200. Successful", "page": None, "section": ""},
+                      {"n": 6, "text": '{"result":"FAILED","message":"x"}', "page": None, "section": ""}]}
+    pair = {"quote_a": "400. Ответ, если параметры неверны.", "quote_b": "При отказе вернуть результат FAILED.",
+            "line_a": 1, "line_b": 2, "outcome_a": "400", "outcome_b": "ответ 200 с FAILED"}
+    ev = C.status_example_evidence(view, pair)
+    assert ev and ev["line"] == 6  # не строка 4: она в блоке того же кода 400
+    pair["quote_b"] = "При отказе вернуть отказ."  # нет значения, по которому искать пример
+    assert C.status_example_evidence(view, pair) is None
