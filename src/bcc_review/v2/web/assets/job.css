@@ -136,9 +136,10 @@ a.jb-row:hover .jb-go{opacity:1;transform:translateX(2px) rotate(45deg)}
   .jb-verdict .sep{display:none}
   .jb-verdict .v{display:block}
   .jb-hact{width:100%}
-  .jb-row{flex-wrap:wrap;gap:4px 12px}
-  .jb-row .jb-t{flex-basis:calc(100% - 64px)}
-  .jb-row .jb-where{max-width:none;text-align:left;margin-left:62px}
+  .jb-row{display:grid;grid-template-columns:50px minmax(0,1fr);column-gap:10px;row-gap:4px;align-items:baseline}
+  .jb-row>*:not(.jb-id){grid-column:2}
+  .jb-row .jb-only{justify-self:start}
+  .jb-row .jb-where{max-width:none;text-align:left;white-space:normal}
   .jb-row .jb-go{display:none}
   .jb-tabbar{top:8px}
   .jb-extra{margin-left:0}

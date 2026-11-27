@@ -189,6 +189,12 @@
     function rdoc() { try { return fr.contentDocument; } catch (_) { return null; } }
     function rtab(name) { var d = rdoc(), t = d && d.getElementById("t-" + name); if (t) t.click(); return !!t; }
     function closeDrawer() { var d = rdoc(); if (d && d.body) d.body.dispatchEvent(new d.defaultView.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }
+    /* страница встаёт так, чтобы вкладки были сверху, а рамка — сразу под ними (без вложенной прокрутки к ней) */
+    function toFrame() {
+      var bar = $(".jb-tabbar");
+      var y = bar.getBoundingClientRect().top + window.scrollY - 12;
+      if (Math.abs(window.scrollY - y) > 4) window.scrollTo({ top: y, behavior: "smooth" });
+    }
     function setView(v, rt) {
       view = v;
       document.querySelectorAll("#tabs [data-view]").forEach(function (b) { b.setAttribute("aria-selected", b.dataset.view === v ? "true" : "false"); });
@@ -253,9 +259,13 @@
         if (!d) return;
         ev.preventDefault();
         setView("findings");
-        box.scrollIntoView({ behavior: "smooth", block: "start" });
+        toFrame();
         var c = d.getElementById(a.dataset.goto);
-        if (c) { c.click(); c.scrollIntoView({ behavior: "smooth", block: "start" }); }
+        if (c) {
+          c.click();
+          var w = d.defaultView, f = d.querySelector(".filters");
+          w.scrollTo({ top: Math.max(0, c.getBoundingClientRect().top + w.scrollY - (f ? f.offsetHeight : 0) - 12), behavior: "smooth" });
+        }
       });
     });
     /* ответы владельца: скачать (из отчёта в рамке) и загрузить → повторная проверка */
