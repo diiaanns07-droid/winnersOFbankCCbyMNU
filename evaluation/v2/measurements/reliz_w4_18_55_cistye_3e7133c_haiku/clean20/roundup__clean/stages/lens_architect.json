@@ -1,0 +1,286 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 57.9,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 75,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Клиент не знает, как обрабатывать 400, 401 и 404 при сохранении копилки",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-17",
+          "R-61",
+          "R-70",
+          "R-71",
+          "R-72"
+        ],
+        "evidence": [
+          {
+            "line": 27,
+            "quote": "Текст message ответа 422 показывается под полем"
+          },
+          {
+            "line": 27,
+            "quote": "При ответе 500 показывается"
+          },
+          {
+            "line": 193,
+            "quote": "401. Нет действующей сессии клиента."
+          }
+        ],
+        "problem": "Экран описывает показ текста для 422 и 500, а ответы 400, 401 и 404 метода 1 клиентом не разобраны. При истёкшей сессии (401) или при карте другого клиента (404) приложение не знает, показать ли message под полем, перейти на вход или скрыть экран.",
+        "scenario": "Клиент сохраняет копилку с истёкшей сессией: метод 1 возвращает 401 с message «Требуется вход». Спецификация экрана молчит о 401, и разработчики клиента и тестировщик по-разному трактуют исход.",
+        "impact": "Разные реализации мобильного клиента дают разное поведение при 400, 401 и 404, проверка приёмки не может однозначно сверить результат.",
+        "recommendation": "Добавить в раздел «Дизайн процесса UI» правило обработки 400, 401 и 404 метода 1 и 404 метода 2: что показывается и куда ведёт пользователь.",
+        "rewrite": "При ответе 401 приложение переводит клиента на вход и сохранённые настройки не меняет; при ответе 404 и 400 показывается message в общем сообщении над кнопкой «Сохранить» (<уточнить: переход или текст>).",
+        "question": "Какой экран или сообщение показывается клиенту при 401, 404 и 400?",
+        "blocks": "both",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "PUT /roundup/v1/cards/{cardId}/settings",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 137
+        },
+        {
+          "name": "GET /roundup/v1/cards/{cardId}/settings",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "card.operations.posted",
+          "method": "событие",
+          "purpose": "уведомление",
+          "line": 54
+        },
+        {
+          "name": "GET /processing/v1/cards/{cardId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "GET /accounts/v1/clients/me/accounts?type=SAVINGS&currency=KZT",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "GET /accounts/v1/accounts/{accountId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "POST /transfers/v1/internal",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 54
+        },
+        {
+          "name": "POST /notifications/v1/push",
+          "method": "POST",
+          "purpose": "уведомление",
+          "line": 54
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать накопленную сумму за сутки («Накоплено сегодня»)",
+          "line": 27,
+          "operation": "GET /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "показать сумму, переведённую за месяц («Переведено в этом месяце»)",
+          "line": 27,
+          "operation": "GET /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "показать остаток месячного предела («Осталось до предела»)",
+          "line": 27,
+          "operation": "GET /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "показать список сберегательных счетов клиента",
+          "line": 27,
+          "operation": "GET /accounts/v1/clients/me/accounts?type=SAVINGS&currency=KZT"
+        },
+        {
+          "what": "получать и сохранять настройки копилки методами 2 и 1",
+          "line": 54,
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            150,
+            191,
+            199
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "400",
+          "lines": [
+            147,
+            178,
+            192
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "401",
+          "lines": [
+            146,
+            178,
+            193,
+            199
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404",
+          "lines": [
+            148,
+            178,
+            194,
+            199
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422",
+          "lines": [
+            149,
+            178,
+            195
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "500",
+          "lines": [
+            148,
+            149,
+            178,
+            196,
+            199
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "503",
+          "lines": [
+            54,
+            81
+          ],
+          "described": false,
+          "note": "код ответа сервиса переводов, не код метода API; в перечне статусов метода нет"
+        }
+      ],
+      "fields": [
+        {
+          "name": "enabled",
+          "places": "запрос boolean, обязательное; ответ boolean; is_enabled"
+        },
+        {
+          "name": "roundingStep",
+          "places": "запрос integer, обязательное при enabled=true; ответ integer или null; rounding_step"
+        },
+        {
+          "name": "savingsAccountId",
+          "places": "запрос string 1–64, обязательное при enabled=true; ответ string или null; savings_account_id"
+        },
+        {
+          "name": "monthlyLimit",
+          "places": "запрос integer, обязательное при enabled=true; ответ integer или null; monthly_limit"
+        },
+        {
+          "name": "accruedToday",
+          "places": "ответ number, два знака; расчёт по roundup_purchase"
+        },
+        {
+          "name": "transferredThisMonth",
+          "places": "ответ number, два знака; расчёт по roundup_transfer"
+        },
+        {
+          "name": "limitRemaining",
+          "places": "ответ number, два знака или null; расчёт"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "проверка сессии клиента",
+          "line": 146,
+          "outcome": "401; тело message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "проверка тела по схеме",
+          "line": 147,
+          "outcome": "400; тело message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "карта не найдена или чужая",
+          "line": 148,
+          "outcome": "404; тело message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "карточный процессинг не ответил",
+          "line": 148,
+          "outcome": "500; тело message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "бизнес-проверки шага 4 не пройдены",
+          "line": 149,
+          "outcome": "422; тело errorCode и message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "сервис счетов не ответил",
+          "line": 149,
+          "outcome": "500; тело message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "сохранение значений и возврат состояния",
+          "line": 150,
+          "outcome": "200; состояние копилки"
+        },
+        {
+          "operation": "GET /roundup/v1/cards/{cardId}/settings",
+          "step": "ошибки как у метода 1",
+          "line": 199,
+          "outcome": "401, 404, 500; тело message"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

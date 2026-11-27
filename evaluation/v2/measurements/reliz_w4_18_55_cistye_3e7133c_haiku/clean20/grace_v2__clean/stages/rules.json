@@ -1,0 +1,63 @@
+{
+  "stage": "rules",
+  "status": "ok",
+  "seconds": 0.04,
+  "calls": 0,
+  "error": "",
+  "input": {},
+  "output": {
+    "signals": [
+      {
+        "rule": "promises.read",
+        "kind": "inventory",
+        "line": 46,
+        "quote": "Метод получения сведений о льготном периоде отвечает не дольше 1 с для 95 % запросов при нагрузке до 300 запросов в секунду.",
+        "message": "Справка для описи, не дефект: обещанный показ данных читают операции /cards/{cardId}/grace.",
+        "audience": [
+          "architect"
+        ],
+        "id": "S-01",
+        "covered": false,
+        "lines": [
+          46
+        ],
+        "note": "Справка для описи, не дефект: обещанный показ данных читают операции /cards/{cardId}/grace."
+      },
+      {
+        "rule": "api.methods",
+        "kind": "inventory",
+        "line": 108,
+        "quote": "REST type | GET",
+        "message": "Описанные методы API: /cards/{cardId}/grace (GET, чтение); /cards/{cardId}/grace/reminder (PUT, изменение).",
+        "audience": [
+          "architect"
+        ],
+        "id": "S-02",
+        "covered": false,
+        "lines": [
+          108
+        ],
+        "note": "Описанные методы API: /cards/{cardId}/grace (GET, чтение); /cards/{cardId}/grace/reminder (PUT, изменение)."
+      },
+      {
+        "rule": "api.status_inventory",
+        "kind": "inventory",
+        "line": 166,
+        "quote": "200. Ответ в случае успешного выполнения метода.",
+        "message": "Перечень статусов: 200, 400, 401, 404, 422 и 500; упомянуты в тексте: 200, 400, 401, 404, 422 и 500.",
+        "audience": [
+          "architect",
+          "qa"
+        ],
+        "id": "S-03",
+        "covered": false,
+        "lines": [
+          166
+        ],
+        "note": "Перечень статусов: 200, 400, 401, 404, 422 и 500; упомянуты в тексте: 200, 400, 401, 404, 422 и 500."
+      }
+    ],
+    "candidates": []
+  },
+  "warnings": []
+}

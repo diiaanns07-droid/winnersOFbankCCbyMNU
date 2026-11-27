@@ -1,0 +1,776 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 141.59,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 100,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "После 422 повтор возвращает 200 при «проведена» (ответ 422 окончательный)",
+        "kind": "status_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-067",
+          "R-061"
+        ],
+        "evidence": [
+          {
+            "quote": "При кодах 400, 401, 404, 409 и 422 погашение по этому запросу не проведено.",
+            "line": 158,
+            "line_start": 158,
+            "line_end": 158,
+            "page": null,
+            "section": "Часть B. REST API › Ответ",
+            "verified": "exact"
+          },
+          {
+            "quote": "«проведена» — 200 с результатом этой операции",
+            "line": 139,
+            "line_start": 139,
+            "line_end": 139,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«описание API, строка 158» и «Особые правила, п. 2» по-разному решают один случай — исход повтора после 422 при статусе АБС «проведена». Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Запрос с ключом K получил 422 SOURCE_UNAVAILABLE; повтор с тем же ключом, АБС показывает «проведена». Описание API, строка 158: погашение по запросу не проведено; 422 окончательный. Особые правила, п. 2: ответ 200 с результатом проведённой операции.",
+        "impact": "Клиент видит 422 «не проведено», а при повторе 200 с суммой; тест не знает, какой код ожидать.",
+        "recommendation": "Указать, что после 422 при «проведена» возвращается 200, и исключить это в тексте про 422, либо убрать ветку.",
+        "rewrite": "",
+        "question": "Что верно: «погашение по запросу не проведено; 422 окончательный» (как в «описание API, строка 158») или «ответ 200 с результатом проведённой операции» (как в «Особые правила, п. 2»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-02"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Мобильное приложение (клиентский компонент)», «Сервис досрочного погашения», «Ключ идемпотентности»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "Мобильное приложение",
+            "line": 20,
+            "verified": "normalized"
+          },
+          {
+            "quote": "Приложение",
+            "line": 42,
+            "verified": "normalized"
+          },
+          {
+            "quote": "сервис досрочного погашения",
+            "line": 20,
+            "verified": "normalized"
+          },
+          {
+            "quote": "EarlyRepaymentController",
+            "line": 120,
+            "verified": "normalized"
+          },
+          {
+            "quote": "Idempotency-Key",
+            "line": 118,
+            "verified": "normalized"
+          },
+          {
+            "quote": "ключ идемпотентности",
+            "line": 139,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Мобильное приложение (клиентский компонент): «Мобильное приложение» (строка 20), «Приложение» (строка 42); Сервис досрочного погашения: «сервис досрочного погашения» (строка 20), «EarlyRepaymentController» (строка 120); Ключ идемпотентности: «Idempotency-Key» (строка 118), «ключ идемпотентности» (строка 139).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02",
+          "G-03"
+        ]
+      },
+      {
+        "title": "Дата выдачи кредита нужна для первого погашения, но АБС её не отдаёт",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-012",
+          "R-024"
+        ],
+        "evidence": [
+          {
+            "quote": "а если погашений не было — дата выдачи кредита",
+            "line": 34,
+            "line_start": 34,
+            "line_end": 34,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "дата предыдущего погашения, дата очередного платежа",
+            "line": 50,
+            "line_start": 50,
+            "line_end": 50,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-3 берёт дату выдачи при отсутствии погашений, но в списке полей АБС её нет.",
+        "scenario": "Кредит выдан 05.02.2027 без погашений; досрочное погашение 15.03.2027: сумма процентов по дню выдачи не вычисляется.",
+        "impact": "Первый расчёт по кредиту невозможен; часть критериев приёмки для нового кредита не проверить.",
+        "recommendation": "Добавить в GET /abs/loans/{loanId} поле дату выдачи кредита.",
+        "rewrite": "АБС: GET /abs/loans/{loanId} дополнительно возвращает loanIssueDate (YYYY-MM-DD), используется, если предыдущего погашения не было.",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Требование «доработка АБС не требуется» не подтверждено описанием операций",
+        "kind": "unverifiable",
+        "criterion": "set_feasible",
+        "severity": "major",
+        "requirement_ids": [
+          "R-022",
+          "R-024"
+        ],
+        "evidence": [
+          {
+            "quote": "доработка АБС не требуется",
+            "line": 48,
+            "line_start": 48,
+            "line_end": 48,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          },
+          {
+            "quote": "GET /abs/prepayments/{operationId} — статус операции",
+            "line": 50,
+            "line_start": 50,
+            "line_end": 50,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Утверждено, что АБС не меняется, но операционный идентификатор, повтор по нему и статус операции в АБС не отмечены как существующие.",
+        "scenario": "Команда АБС не подтвердит наличие operationId-идемпотентности и статуса: сверка с UNKNOWN не реализуется.",
+        "impact": "Сроки и объём работ АБС неизвестны; сверка и повтор 500 без неё не работают.",
+        "recommendation": "Подтвердить в контракте АБС, что эти методы существуют, либо перечислить их как доработку.",
+        "rewrite": "",
+        "question": "Существуют ли в АБС сейчас operationId-идемпотентность и GET /abs/prepayments/{operationId}?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Процесс не показывает ветвь сверки UNKNOWN",
+        "kind": "other",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-008",
+          "R-059"
+        ],
+        "evidence": [
+          {
+            "quote": "Проверка не пройдена → сообщение клиенту на текущем экране",
+            "line": 29,
+            "line_start": 29,
+            "line_end": 29,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › BPMN схема процесса",
+            "verified": "exact"
+          },
+          {
+            "quote": "Операции в статусе UNKNOWN сверяет с АБС",
+            "line": 48,
+            "verified": "missing"
+          }
+        ],
+        "problem": "BPMN не содержит ветви 500 и сверки, которую требуют интеграционные требования.",
+        "scenario": "Ответ 500 и операция UNKNOWN в процессе не отражены.",
+        "impact": "Тестировщик по схеме не проверит путь сверки.",
+        "recommendation": "Добавить в BPMN ветку «500 → UNKNOWN → сверка каждые 5 минут».",
+        "rewrite": "",
+        "question": "",
+        "blocks": "testing",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Приоритеты требований не указаны",
+        "kind": "other",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-009",
+          "R-010",
+          "R-011"
+        ],
+        "evidence": [
+          {
+            "quote": "Поле | Значение",
+            "line": 7,
+            "line_start": 7,
+            "line_end": 7,
+            "page": null,
+            "section": "Часть A. Новый функционал › Общие сведения",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ни в шапке, ни в таблице требований нет поля приоритета.",
+        "scenario": "",
+        "impact": "Нет порядка реализации и отсечения при нехватке времени.",
+        "recommendation": "Добавить колонку приоритета (MoSCoW) в таблицу требований.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Большинство НФТ, данных и интеграции без идентификаторов",
+        "kind": "traceability",
+        "criterion": "traceable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-020",
+          "R-021",
+          "R-022"
+        ],
+        "evidence": [
+          {
+            "quote": "Время ответа на сервере",
+            "line": 44,
+            "line_start": 44,
+            "line_end": 44,
+            "page": null,
+            "section": "Часть A. Новый функционал › Нефункциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Расчёт (хранится 30 дней)",
+            "line": 46,
+            "line_start": 46,
+            "line_end": 46,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к данным",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Пункты НФТ, данных и интеграции не имеют ID, хотя функциональные Ф-1–Ф-9 имеют.",
+        "scenario": "",
+        "impact": "Сложно ссылаться на пункты в тестах и изменениях.",
+        "recommendation": "Присвоить ID всем пунктам части A.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Цель про 50 % в мобильном банке не опирается на данные",
+        "kind": "unverifiable",
+        "criterion": "set_feasible",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-001"
+        ],
+        "evidence": [
+          {
+            "quote": "Через 6 месяцев после запуска не менее 50 %",
+            "line": 18,
+            "line_start": 18,
+            "line_end": 18,
+            "page": null,
+            "section": "Часть A. Новый функционал › Цели",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Цель измеряет долю каналов, но ни одно требование не описывает сбор этой статистики.",
+        "scenario": "",
+        "impact": "Цель не проверяется после запуска.",
+        "recommendation": "Указать источник данных для метрики каналов.",
+        "rewrite": "",
+        "question": "Из какой системы берётся статистика по каналу погашения?",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-049",
+        "b": "R-050",
+        "subject": "Повтор после 500 при статусе АБС «не найдена» после истечения расчёта",
+        "same_subject": true,
+        "quote_a": "«не найдена» — погашение проводится с тем же operationId",
+        "line_a": 80,
+        "quote_b": "«не найдена» — запрос обрабатывается заново с тем же operationId",
+        "line_b": 139,
+        "scenario": "500 в 10:00:00 (расчёт до 10:30:00); повтор в 10:31:00, АБС показывает «не найдена».",
+        "outcome_a": "Погашение проводится с тем же operationId.",
+        "outcome_b": "Запрос обрабатывается заново по шагам, включая проверку Ф-7 и 422 CALCULATION_OUTDATED.",
+        "one_condition": true,
+        "verdict": "compatible",
+        "basis": "none",
+        "kind": "event_conflict",
+        "title": "Повтор после 500 при «не найдена»: проведение или 422 (пп. 2, Ф-7)",
+        "impact": "Разработчик и тестировщик получат разный исход повтора с просроченным расчётом.",
+        "recommendation": "Зафиксировать, что повтор с «не найдена» проверяет Ф-7 и при просрочке возвращает 422 CALCULATION_OUTDATED, либо наоборот.",
+        "question": "Должен ли повтор после 500 проводить погашение по просроченному расчёту, если АБС его не провела?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "resolved_by": "acceptance_no_moment",
+        "id": "P-01"
+      },
+      {
+        "a": "R-067",
+        "b": "R-061",
+        "subject": "Исход повтора после 422 при статусе АБС «проведена»",
+        "same_subject": true,
+        "quote_a": "При кодах 400, 401, 404, 409 и 422 погашение по этому запросу не проведено.",
+        "line_a": 158,
+        "quote_b": "«проведена» — 200 с результатом этой операции",
+        "line_b": 139,
+        "scenario": "Запрос с ключом K получил 422 SOURCE_UNAVAILABLE; повтор с тем же ключом, АБС показывает «проведена».",
+        "outcome_a": "Погашение по запросу не проведено; 422 окончательный.",
+        "outcome_b": "Ответ 200 с результатом проведённой операции.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "same_condition",
+        "kind": "status_conflict",
+        "title": "После 422 повтор возвращает 200 при «проведена» (ответ 422 окончательный)",
+        "impact": "Клиент видит 422 «не проведено», а при повторе 200 с суммой; тест не знает, какой код ожидать.",
+        "recommendation": "Указать, что после 422 при «проведена» возвращается 200, и исключить это в тексте про 422, либо убрать ветку.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-02"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-009",
+        "verified_by": [],
+        "implemented_by": [
+          "R-069"
+        ],
+        "note": "нет критерия на формат сумм в API"
+      },
+      {
+        "requirement_id": "R-010",
+        "verified_by": [
+          "R-037",
+          "R-038",
+          "R-039"
+        ],
+        "implemented_by": [
+          "R-052",
+          "R-057"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-011",
+        "verified_by": [
+          "R-030",
+          "R-031"
+        ],
+        "implemented_by": [
+          "R-100"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-012",
+        "verified_by": [
+          "R-028"
+        ],
+        "implemented_by": [
+          "R-024",
+          "R-100"
+        ],
+        "note": "нет источника даты выдачи в АБС"
+      },
+      {
+        "requirement_id": "R-013",
+        "verified_by": [
+          "R-032",
+          "R-033",
+          "R-035",
+          "R-036"
+        ],
+        "implemented_by": [
+          "R-100",
+          "R-093"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-014",
+        "verified_by": [
+          "R-030",
+          "R-031"
+        ],
+        "implemented_by": [
+          "R-024"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-015",
+        "verified_by": [],
+        "implemented_by": [
+          "R-024"
+        ],
+        "note": "нет критерия на округление 0,5"
+      },
+      {
+        "requirement_id": "R-016",
+        "verified_by": [
+          "R-041",
+          "R-042"
+        ],
+        "implemented_by": [
+          "R-056",
+          "R-095"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-017",
+        "verified_by": [
+          "R-043",
+          "R-044"
+        ],
+        "implemented_by": [
+          "R-058",
+          "R-096"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-018",
+        "verified_by": [
+          "R-029",
+          "R-045"
+        ],
+        "implemented_by": [
+          "R-059",
+          "R-025"
+        ],
+        "note": "нет критерия на срок push"
+      },
+      {
+        "requirement_id": "R-020",
+        "verified_by": [],
+        "implemented_by": [
+          "R-081"
+        ],
+        "note": "нет критерия на время ответа"
+      },
+      {
+        "requirement_id": "R-021",
+        "verified_by": [],
+        "implemented_by": [
+          "R-065"
+        ],
+        "note": "нет критерия на срок хранения"
+      },
+      {
+        "requirement_id": "R-022",
+        "verified_by": [
+          "R-049"
+        ],
+        "implemented_by": [
+          "R-099",
+          "R-100"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-023",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-024",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-025",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-026",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-052",
+        "verified_by": [],
+        "implemented_by": [
+          "R-083"
+        ],
+        "note": "нет критерия на 401"
+      },
+      {
+        "requirement_id": "R-053",
+        "verified_by": [],
+        "implemented_by": [
+          "R-082"
+        ],
+        "note": "нет критерия на UUID заголовка"
+      },
+      {
+        "requirement_id": "R-054",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-055",
+        "verified_by": [
+          "R-045",
+          "R-047"
+        ],
+        "implemented_by": [
+          "R-085"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-056",
+        "verified_by": [
+          "R-046"
+        ],
+        "implemented_by": [
+          "R-094",
+          "R-095"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-057",
+        "verified_by": [
+          "R-038",
+          "R-039"
+        ],
+        "implemented_by": [
+          "R-088",
+          "R-089"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-058",
+        "verified_by": [
+          "R-044"
+        ],
+        "implemented_by": [
+          "R-096",
+          "R-097"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-059",
+        "verified_by": [
+          "R-045"
+        ],
+        "implemented_by": [
+          "R-081"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-060",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-061",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "противоречие: описание API, строка 158; трассировка не построена",
+        "conflicts_with": [
+          "R-067"
+        ]
+      },
+      {
+        "requirement_id": "R-062",
+        "verified_by": [
+          "R-048"
+        ],
+        "implemented_by": [],
+        "note": "нет механизма очереди в описании"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Мобильное приложение (клиентский компонент)",
+        "terms": [
+          {
+            "term": "Мобильное приложение",
+            "line": 20
+          },
+          {
+            "term": "Приложение",
+            "line": 42
+          }
+        ],
+        "problem": "Одно и то же название клиентского компонента; по тексту это один компонент, но написание разное.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Сервис досрочного погашения",
+        "terms": [
+          {
+            "term": "сервис досрочного погашения",
+            "line": 20
+          },
+          {
+            "term": "EarlyRepaymentController",
+            "line": 120
+          }
+        ],
+        "problem": "Компонент назван и бизнес-именем, и именем контроллера; связь не задана явно.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-03",
+        "concept": "Ключ идемпотентности",
+        "terms": [
+          {
+            "term": "Idempotency-Key",
+            "line": 118
+          },
+          {
+            "term": "ключ идемпотентности",
+            "line": 139
+          }
+        ],
+        "problem": "Два названия одного поля; документ не приравнивает их явно.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Срок действия расчёта (Ф-7, 30 минут)",
+        "places": [
+          "R-016",
+          "R-041",
+          "R-042",
+          "R-047"
+        ]
+      },
+      {
+        "subject": "Повтор после 500 и сверка статуса в АБС",
+        "places": [
+          "R-049",
+          "R-050",
+          "R-061",
+          "R-087"
+        ]
+      },
+      {
+        "subject": "Ответ 422 и статус операции в АБС при повторе",
+        "places": [
+          "R-061",
+          "R-067",
+          "R-086"
+        ]
+      },
+      {
+        "subject": "Дата предыдущего погашения и дата выдачи кредита",
+        "places": [
+          "R-012",
+          "R-024"
+        ]
+      },
+      {
+        "subject": "Push после проведения и сверки",
+        "places": [
+          "R-018",
+          "R-020",
+          "R-050",
+          "R-059"
+        ]
+      },
+      {
+        "subject": "Ключ идемпотентности: срок 30 дней и повторы",
+        "places": [
+          "R-055",
+          "R-061",
+          "R-045"
+        ]
+      },
+      {
+        "subject": "Отказ АБС: источник и остаток",
+        "places": [
+          "R-058",
+          "R-096",
+          "R-097"
+        ]
+      },
+      {
+        "subject": "Границы частичного погашения (minPartialAmount, maxPartialAmount, 20 000 ₸)",
+        "places": [
+          "R-013",
+          "R-035",
+          "R-036",
+          "R-092",
+          "R-093"
+        ]
+      },
+      {
+        "subject": "Правила Ф-3–Ф-6 и расчёт АБС",
+        "places": [
+          "R-022",
+          "R-024",
+          "R-063"
+        ]
+      },
+      {
+        "subject": "Допуск к ABS-методам без доработки",
+        "places": [
+          "R-022",
+          "R-024"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

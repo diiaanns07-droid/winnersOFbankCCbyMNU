@@ -117,11 +117,12 @@ def models(pairs: list[str]) -> str:
 
 def models_auto() -> str:
     """Последний замер официального документа каждой модели (история measure) → таблица сравнения."""
+    from .common import other_format
     from .gate import HISTORY, _read_jsonl, _score_for, model_kind
 
     latest: dict[str, tuple[dict, str]] = {}
     for r in _read_jsonl(HISTORY):
-        if r.get("version") != "v2":
+        if r.get("version") != "v2" or other_format(r.get("label")):
             continue
         k = model_kind(r.get("provider"), r.get("model"))
         sj = _score_for(r)

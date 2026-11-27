@@ -1,0 +1,382 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 111.37,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 52,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Статус перевода «в обработке» не хранится, а метод его проверяет",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-09",
+          "R-13",
+          "R-52"
+        ],
+        "evidence": [
+          {
+            "line": 212,
+            "quote": "по QR-коду есть перевод в обработке, QR-код уже отменён или срок истёк"
+          },
+          {
+            "line": 51,
+            "quote": "статус (активен, оплачен, отменён, истёк) и идентификаторы переводов"
+          }
+        ],
+        "problem": "Отмена по DELETE должна вернуть 410, если по QR-коду есть перевод в обработке. В перечне данных есть только статус QR-кода и идентификаторы переводов, без состояния перевода.",
+        "scenario": "Получатель отменяет QR-код без суммы, по которому перевод уже принят в обработку. Система не знает состояние перевода и не может выбрать между 410 и 200 CANCELLED.",
+        "impact": "Отмена может пройти по переводу, который уже выполняется, либо будет ложно отклонена.",
+        "recommendation": "Добавить в перечень хранимых данных состояние каждого перевода и описать его значения.",
+        "rewrite": "Хранить идентификатор QR-кода, идентификатор клиента-получателя, карту зачисления, сумму в тенге, время создания, срок действия ttl в минутах, статус (активен, оплачен, отменён, истёк), идентификаторы переводов и статус каждого перевода (в обработке, DONE, REJECTED).",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Хранимые данные не содержат ключ requestId и карту списания",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-13",
+          "R-30",
+          "R-36"
+        ],
+        "evidence": [
+          {
+            "line": 152,
+            "quote": "requestId | string | 36 | Да | UUID | Ключ идемпотентности | request_id"
+          },
+          {
+            "line": 51,
+            "quote": "Хранить идентификатор QR-кода, идентификатор клиента-получателя, карту зачисления"
+          },
+          {
+            "line": 150,
+            "quote": "cardId | string | 1–64 | Да | Карта отправителя | Карта списания | debit_card_id"
+          }
+        ],
+        "problem": "requestId пишется в поле request_id, но перечень хранимых данных его не содержит; карта списания пишется в debit_card_id и тоже не в перечне. Правило идемпотентности не на чем построить.",
+        "scenario": "Тот же requestId приходит повторно через несколько минут. По перечню данных ключ не сохранён, поиск первого перевода невозможен, и второй перевод может быть создан.",
+        "impact": "Повторный запрос может списать деньги дважды, а проверка идемпотентности нереализуема по тексту.",
+        "recommendation": "Добавить в перечень хранимых данных requestId перевода и карту списания.",
+        "rewrite": "Хранить идентификатор QR-кода, идентификатор клиента-получателя, карту зачисления, сумму в тенге, время создания, срок действия ttl в минутах, статус, идентификаторы переводов, requestId перевода (ключ идемпотентности) и карту списания (debit_card_id).",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Шаги логики метода перевода не содержат проверку requestId",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-21",
+          "R-30"
+        ],
+        "evidence": [
+          {
+            "line": 121,
+            "quote": "1. Проверить сессию отправителя."
+          },
+          {
+            "line": 132,
+            "quote": "2. Повторный запрос с тем же requestId возвращает результат первого запроса."
+          }
+        ],
+        "problem": "Особое правило задаёт возврат результата первого запроса, но ни один из шагов 1–8 не показывает, где проверяется ключ.",
+        "scenario": "Повтор с тем же requestId после истечения сессии: шаг 1 даёт 401, а особое правило требует результат первого запроса. Порядок не определён.",
+        "impact": "Тестировщик и разработчик выберут разный порядок, и ответы на повтор разойдутся.",
+        "recommendation": "Указать в логике метода шаг проверки requestId и его место относительно шага 1.",
+        "rewrite": "0. Найти результат по requestId; если он есть, вернуть его без повторного выполнения шагов 1–8.",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Тело ошибок содержит только message, а поле status без условия",
+        "kind": "api_contract",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-38",
+          "R-41",
+          "R-43"
+        ],
+        "evidence": [
+          {
+            "line": 159,
+            "quote": "status | string | DONE / REJECTED | Результат перевода | status"
+          },
+          {
+            "line": 181,
+            "quote": "{\"message\":\"Некорректный запрос\"}"
+          }
+        ],
+        "problem": "Поле status описано без условия, то есть во всех ответах, но в примерах ошибок его нет. Клиент не знает, разбирать ли status в ошибке.",
+        "scenario": "Клиент получает 400 и ищет поле status для разбора результата, а пример показывает только message.",
+        "impact": "Разный разбор ответов в клиентских приложениях.",
+        "recommendation": "Явно указать состав тела ошибок.",
+        "rewrite": "Тело ошибок 400, 401, 404, 410, 500 содержит только поле message; тело 200 содержит status, transferId (при DONE), amount, recipientName и message (при REJECTED).",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "/qr/transfer",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 107
+        },
+        {
+          "name": "/qr",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 210
+        },
+        {
+          "name": "/qr/{qrId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 211
+        },
+        {
+          "name": "/qr/{qrId}",
+          "method": "DELETE",
+          "purpose": "изменение",
+          "line": 212
+        }
+      ],
+      "promises": [
+        {
+          "what": "создать QR-код",
+          "line": 54,
+          "operation": "/qr"
+        },
+        {
+          "what": "получить данные QR-кода перед подтверждением",
+          "line": 54,
+          "operation": "/qr/{qrId}"
+        },
+        {
+          "what": "отменить QR-код",
+          "line": 54,
+          "operation": "/qr/{qrId}"
+        },
+        {
+          "what": "выполнить перевод по QR-коду",
+          "line": 54,
+          "operation": "/qr/transfer"
+        },
+        {
+          "what": "показать отправителю маскированное имя получателя и сумму",
+          "line": 29,
+          "operation": "/qr/{qrId}"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            127,
+            155,
+            167,
+            176
+          ],
+          "described": true,
+          "note": "REJECTED внутри 200; пример тела только DONE"
+        },
+        {
+          "code": "400",
+          "lines": [
+            122,
+            125,
+            155,
+            168,
+            181,
+            210
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "401",
+          "lines": [
+            155,
+            169,
+            186,
+            206
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404",
+          "lines": [
+            123,
+            155,
+            170,
+            191,
+            210,
+            212
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "410",
+          "lines": [
+            123,
+            124,
+            126,
+            155,
+            171,
+            196,
+            211,
+            212
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "500",
+          "lines": [
+            128,
+            155,
+            172,
+            201,
+            206
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "qrId",
+          "places": "string 1–36 (L149 body, L211 path)"
+        },
+        {
+          "name": "cardId",
+          "places": "string 1–64 (L150 body, L210 body)"
+        },
+        {
+          "name": "amount",
+          "places": "integer 32 bit, 100–500 000 тенге (L151 body, L210 body); в ответе L211 integer или null"
+        },
+        {
+          "name": "requestId",
+          "places": "string 36, UUID (L152 body)"
+        },
+        {
+          "name": "status",
+          "places": "string DONE/REJECTED (L159); CANCELLED (L212)"
+        },
+        {
+          "name": "expiresAt",
+          "places": "строка с +05:00 (L210, L211)"
+        },
+        {
+          "name": "recipientName",
+          "places": "строка «Имя Ф.» (L162, L211)"
+        },
+        {
+          "name": "message",
+          "places": "string, при REJECTED или ошибке (L163)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "/qr/transfer",
+          "step": "проверка сессии отправителя",
+          "line": 121,
+          "outcome": "401 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "карта списания не принадлежит, не активна или не в тенге",
+          "line": 122,
+          "outcome": "400 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "QR-код не найден",
+          "line": 123,
+          "outcome": "404 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "карта зачисления закрыта или заблокирована",
+          "line": 123,
+          "outcome": "410 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "срок истёк или QR-код отменён",
+          "line": 124,
+          "outcome": "410 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "amount вне 100–500 000 при отсутствии суммы в QR-коде",
+          "line": 125,
+          "outcome": "400 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "QR-код с суммой уже оплачен",
+          "line": 126,
+          "outcome": "410 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "отказ антифрода",
+          "line": 127,
+          "outcome": "200 status REJECTED, message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "сбой списания или зачисления",
+          "line": 128,
+          "outcome": "500 с message"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "повтор с тем же requestId",
+          "line": 132,
+          "outcome": "результат первого запроса"
+        },
+        {
+          "operation": "/qr",
+          "step": "сумма вне диапазона, карта не активна или не в тенге",
+          "line": 210,
+          "outcome": "400"
+        },
+        {
+          "operation": "/qr/{qrId}",
+          "step": "QR-код с суммой оплачен или срок истёк",
+          "line": 211,
+          "outcome": "410"
+        },
+        {
+          "operation": "/qr/{qrId}",
+          "step": "отмена получателем",
+          "line": 212,
+          "outcome": "200 status CANCELLED или 404/410"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

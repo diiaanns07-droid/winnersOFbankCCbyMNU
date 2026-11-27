@@ -1,0 +1,338 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 78.91,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 46,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Дата нового способа не возвращается методом чтения условий",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-11",
+          "R-14",
+          "R-36",
+          "R-37"
+        ],
+        "evidence": [
+          {
+            "line": 28,
+            "quote": "После сохранения под переключателем показывается дата, с которой действует новый способ."
+          },
+          {
+            "line": 201,
+            "quote": "{\"currentMode\":\"CAPITALIZATION\",\"nextMode\":\"CAPITALIZATION\",\"payoutCardId\":null,\"rate\":14.0,\"accruedInterest\":5753.40}"
+          }
+        ],
+        "problem": "Экран после сохранения показывает дату effectiveFrom, но её возвращает только PUT. Метод чтения условий (GET) отдаёт nextMode без даты, а история даты не содержит.",
+        "scenario": "Клиент сохранил «На карту» 15 марта, закрыл экран и открыл его 20 марта. Приложение вызывает GET /savings/{accountId}/interest, получает nextMode=CARD без даты и не может вывести, с какого числа действует новый способ.",
+        "impact": "Экран не может показать дату действия нового способа после повторного открытия, а клиент видит неверное или пустое состояние.",
+        "recommendation": "Добавить в ответ метода 2 поле effectiveFrom с тем же описанием, что в методе 1, и описать значение, если смены способа нет.",
+        "rewrite": "GET /savings/{accountId}/interest, 200: добавить effectiveFrom | string | ГГГГ-ММ-ДД | Дата начала действия nextMode | при отсутствии смены — <уточнить: null или текущая дата>",
+        "question": "Какое значение effectiveFrom возвращать, если смены способа на следующий месяц нет?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Поле payoutCardId в ответе метода 2 не описано и не сопоставлено с cardId",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-32",
+          "R-45"
+        ],
+        "evidence": [
+          {
+            "line": 149,
+            "quote": "cardId | string | 1–64 | Для CARD | Карта клиента в тенге | Карта для выплаты процентов | payout_card_id"
+          },
+          {
+            "line": 201,
+            "quote": "{\"currentMode\":\"CAPITALIZATION\",\"nextMode\":\"CAPITALIZATION\",\"payoutCardId\":null,\"rate\":14.0,\"accruedInterest\":5753.40}"
+          }
+        ],
+        "problem": "payoutCardId встречается только в примере ответа метода 2 без таблицы полей: тип, формат и смысл не заданы. Не сказано, это карта текущего месяца или следующего, хотя currentMode и nextMode могут различаться.",
+        "scenario": "Текущий способ CAPITALIZATION, следующий CARD с картой c-2. Метод 2 возвращает payoutCardId=null или c-2; клиент не знает, какую карту показать как «карту для выплаты» в текущем месяце.",
+        "impact": "Разработчики приложения по-разному трактуют поле, экран выбора карты показывает неверную карту или ничего.",
+        "recommendation": "Добавить таблицу ответа метода 2 с полем payoutCardId и правилом: карта, на которую будут выплачены проценты, с указанием месяца; имя поля согласовать с cardId из запроса.",
+        "rewrite": "GET /savings/{accountId}/interest, 200, поле payoutCardId | string | 1–64 или null | <уточнить: карта текущего или следующего месяца, при nextMode=CAPITALIZATION и currentMode=CAPITALIZATION>",
+        "question": "Какая карта возвращается в payoutCardId: текущая, следующая или обе (отдельными полями)?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Одно поле карты не хранит карту текущего и следующего месяца",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-07",
+          "R-13",
+          "R-23",
+          "R-32"
+        ],
+        "evidence": [
+          {
+            "line": 38,
+            "quote": "Ф-3. Новый способ выплаты применяется начиная со следующего календарного месяца; проценты текущего месяца выплачиваются прежним способом."
+          },
+          {
+            "line": 50,
+            "quote": "Хранить идентификатор счёта, способ выплаты, карту для выплаты, дату начала действия нового способа"
+          },
+          {
+            "line": 122,
+            "quote": "4. Сохранить способ выплаты с датой начала действия — 1-е число следующего месяца."
+          }
+        ],
+        "problem": "Хранится одна карта (payout_card_id). Смена карты на следующий месяц перезаписывает карту текущего месяца, хотя Ф-3 требует выплатить текущий месяц прежним способом и картой.",
+        "scenario": "Способ CARD с картой c-1. 15 марта клиент выбирает CARD с картой c-2 (PUT с cardId=c-2). Поле payout_card_id становится c-2, и проценты за март уходят на c-2, хотя действовать должна c-1.",
+        "impact": "Проценты текущего месяца могут уйти на карту, которую клиент не выбирал для этого месяца, и спор при приёмке.",
+        "recommendation": "Хранить карту следующего месяца отдельно от карты текущего и описать, какое поле пишет PUT и какое читается при выплате.",
+        "rewrite": "Хранить: карта текущего месяца payout_card_id и карта следующего месяца next_payout_card_id | <уточнить: имя поля next_payout_card_id и правило, когда карта текущего месяца переходит в следующую>",
+        "question": "Нужна ли отдельная карта для следующего месяца или карта меняется только с 1-го числа?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Предусловие «счёт в тенге» не проверяется логикой метода",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-05",
+          "R-21"
+        ],
+        "evidence": [
+          {
+            "line": 36,
+            "quote": "Ф-1. Владелец накопительного счёта в тенге выбирает способ выплаты процентов"
+          },
+          {
+            "line": 120,
+            "quote": "2. Проверить, что накопительный счёт принадлежит клиенту и открыт."
+          }
+        ],
+        "problem": "Ф-1 относит выбор способа к счёту в тенге, но шаг 2 проверяет только принадлежность и открытость. Для счёта в другой валюте метод не даёт ни ответа, ни проверки.",
+        "scenario": "Клиент вызывает PUT для накопительного счёта в валюте, не тенге; проверка шага 2 проходит, и способ сохраняется.",
+        "impact": "Способ выплаты сохраняется для счёта, на который правило не распространяется.",
+        "recommendation": "Добавить в шаг 2 проверку валюты счёта и код отказа для этого случая.",
+        "rewrite": "2. Проверить, что накопительный счёт принадлежит клиенту, открыт и ведётся в тенге; иначе 404 или 400 — <уточнить: какой код>.",
+        "question": "Какой код возвращать, если счёт открыт, но не в тенге?",
+        "blocks": "testing",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "PUT /savings/{accountId}/payout-mode",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 110
+        },
+        {
+          "name": "GET /savings/{accountId}/interest",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 201
+        },
+        {
+          "name": "GET /savings/{accountId}/interest/history",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 202
+        }
+      ],
+      "promises": [
+        {
+          "what": "сохранить способ выплаты через метод изменения",
+          "line": 53,
+          "operation": "PUT /savings/{accountId}/payout-mode"
+        },
+        {
+          "what": "получить ставку и проценты за текущий месяц",
+          "line": 53,
+          "operation": "GET /savings/{accountId}/interest"
+        },
+        {
+          "what": "получить историю начислений",
+          "line": 53,
+          "operation": "GET /savings/{accountId}/interest/history"
+        },
+        {
+          "what": "показать после сохранения дату, с которой действует новый способ",
+          "line": 28,
+          "operation": "PUT /savings/{accountId}/payout-mode"
+        },
+        {
+          "what": "показать карту для выплаты при выборе «На карту»",
+          "line": 28,
+          "operation": ""
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            152,
+            164,
+            170
+          ],
+          "described": true,
+          "note": "условие и тело заданы в методе 1; методы 2 и 3 — тело в примере"
+        },
+        {
+          "code": "400",
+          "lines": [
+            152,
+            165,
+            175
+          ],
+          "described": true,
+          "note": "метод 1 и метод 3 (период, from позже to)"
+        },
+        {
+          "code": "401",
+          "lines": [
+            152,
+            166,
+            180
+          ],
+          "described": true,
+          "note": "общее для методов 2 и 3 через строку 197"
+        },
+        {
+          "code": "404",
+          "lines": [
+            152,
+            167,
+            185,
+            201,
+            202
+          ],
+          "described": true,
+          "note": "метод 1 и методы 2 и 3"
+        },
+        {
+          "code": "500",
+          "lines": [
+            152,
+            168,
+            190
+          ],
+          "described": true,
+          "note": "общее для методов 2 и 3 через строку 197"
+        }
+      ],
+      "fields": [
+        {
+          "name": "accountId",
+          "places": "path, string, 1–64, обязательный (строки 141, 201, 202); account_id"
+        },
+        {
+          "name": "mode",
+          "places": "request, string, CAPITALIZATION / CARD, обязательный (строка 148); payout_mode"
+        },
+        {
+          "name": "cardId",
+          "places": "request, string, 1–64, для CARD (строка 149); payout_card_id"
+        },
+        {
+          "name": "currentMode",
+          "places": "response метода 1, string (строка 156); пример метода 2 (строка 201)"
+        },
+        {
+          "name": "nextMode",
+          "places": "response метода 1, string (строка 157); пример метода 2 (строка 201)"
+        },
+        {
+          "name": "effectiveFrom",
+          "places": "response метода 1, string ГГГГ-ММ-ДД (строка 158); в ответе метода 2 отсутствует"
+        },
+        {
+          "name": "rate",
+          "places": "response метода 1, number, % (строка 159); пример метода 2 (строка 201)"
+        },
+        {
+          "name": "accruedInterest",
+          "places": "response метода 1, number ≥ 0, ₸ (строка 160); пример метода 2 (строка 201)"
+        },
+        {
+          "name": "payoutCardId",
+          "places": "только пример ответа метода 2, null (строка 201); типа и смысла нет"
+        },
+        {
+          "name": "from/to",
+          "places": "query методов 3, string ГГГГ-ММ, обязательные (строка 202)"
+        },
+        {
+          "name": "month/amount/mode",
+          "places": "items метода 3 (строка 202): ГГГГ-ММ, number ₸, CAPITALIZATION"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "проверить сессию клиента",
+          "line": 119,
+          "outcome": "401 {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "счёт не принадлежит клиенту или закрыт",
+          "line": 120,
+          "outcome": "404 {\"message\":\"Счёт или карта не найдены\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "mode = CARD: карта не принадлежит клиенту",
+          "line": 121,
+          "outcome": "404 {\"message\":\"Счёт или карта не найдены\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "mode = CARD: карта не активна или не в тенге",
+          "line": 121,
+          "outcome": "400 {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "сохранить способ с датой 1-го числа следующего месяца",
+          "line": 122,
+          "outcome": ""
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "вернуть способ выплаты текущего и следующего месяца, ставку и проценты",
+          "line": 123,
+          "outcome": "200 с полями метода 1"
+        },
+        {
+          "operation": "GET /savings/{accountId}/interest",
+          "step": "счёт не найден или принадлежит другому клиенту",
+          "line": 201,
+          "outcome": "404"
+        },
+        {
+          "operation": "GET /savings/{accountId}/interest/history",
+          "step": "период больше 12 месяцев или from позже to",
+          "line": 202,
+          "outcome": "400"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": [
+    "lens_qa: тест-кейсов 13, оставлено 12"
+  ]
+}

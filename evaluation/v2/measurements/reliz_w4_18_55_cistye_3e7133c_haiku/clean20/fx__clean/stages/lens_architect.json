@@ -1,0 +1,475 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 124.47,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 86,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Отмена проводки: 500 возвращается до или после подтверждения отмены",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-57",
+          "R-30"
+        ],
+        "evidence": [
+          {
+            "line": 145,
+            "quote": "Ответ 500 возвращается после первой отправки отмены."
+          },
+          {
+            "line": 76,
+            "quote": "500 INTERNAL_ERROR: отмена проводки отправлена, после её подтверждения остатки равны исходным"
+          }
+        ],
+        "problem": "Особое правило 2 задаёт, что 500 отдаётся после первой отправки отмены, не дожидаясь подтверждения. Строка 76 описывает ответ 500 как наступающий после подтверждения отмены. Код один, а момент и состояние ответа разные.",
+        "scenario": "АБС не отвечает на проводку дольше 10 с. По правилу 2 клиент получает 500 сразу после первой отправки отмены, пока отмена может быть не подтверждена. По строке 76 тестировщик ждёт 500 только после подтверждения отмены.",
+        "impact": "Клиент и тест расходятся в том, в каком состоянии остатков и котировки находится система в момент получения 500.",
+        "recommendation": "Согласовать момент ответа 500: либо в строке 145 заменить на «после подтверждения отмены», либо в строке 76 убрать «после её подтверждения» и описать состояние отдельно.",
+        "rewrite": "Метод 1, таймаут проводки: ответ 500 INTERNAL_ERROR отдаётся <уточнить: после первой отправки отмены или после её подтверждения>; состояние остатков и котировки описывается отдельно.",
+        "question": "Что клиент должен получить при таймауте: ответ сразу после первой отмены или после её подтверждения?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Ответ отмены проводки описан только как «отменено»",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-18",
+          "R-57"
+        ],
+        "evidence": [
+          {
+            "line": 56,
+            "quote": "POST /abs/v1/fx-postings/{exchangeId}/cancel (отмена проводки, результат «отменено»)"
+          },
+          {
+            "line": 145,
+            "quote": "повторяет её каждые 30 с до подтверждения"
+          }
+        ],
+        "problem": "Интеграция описывает единственный результат отмены «отменено». Другие ответы АБС на отмену (отмена уже выполнена, проводка не найдена, отказ отмены) не описаны, а особое правило 2 повторяет отмену до подтверждения без условия выхода.",
+        "scenario": "АБС на отмену по exchangeId отвечает «не найдено». Документ не говорит, считать ли отмену подтверждённой, повторять ли её и что сохранить в обмене. Реализация либо повторяет отмену бесконечно, либо закрывает её без основания.",
+        "impact": "Повтор отмены может не завершиться, а обмен и остатки остаются без определённого итога.",
+        "recommendation": "Перечислить все ответы АБС на отмену, для каждого указать считать ли отмену подтверждённой и нужен ли повтор.",
+        "rewrite": "POST /abs/v1/fx-postings/{exchangeId}/cancel: результат «отменено» — подтверждение; любой другой результат — <уточнить: поведение и условие остановки повтора>.",
+        "question": "Какие ответы АБС на отмену возможны кроме «отменено» и что с ними делать?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Повтор push без ключа может дать дубль уведомления",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-14",
+          "R-18"
+        ],
+        "evidence": [
+          {
+            "line": 56,
+            "quote": "при ответе сервиса уведомлений с ошибкой передача повторяется до 2 раз с интервалом 10 с"
+          },
+          {
+            "line": 56,
+            "quote": "сервис уведомлений POST /notifications/v1/push (clientId, text)"
+          }
+        ],
+        "problem": "Документ задаёт повтор push при ответе с ошибкой, но тело push (clientId, text) не содержит ключа, по которому сервис уведомлений мог бы распознать повтор. Документ не описывает, что происходит, если первая передача дошла, а ответ с ошибкой пришёл.",
+        "scenario": "Сервис уведомлений сохранил push, но вернул ошибку. Сервис обмена повторяет передачу, и клиент получает два одинаковых сообщения «Обмен выполнен» по одному обмену.",
+        "impact": "Клиент получает дубль уведомления о списании, что создаёт спор и вопросы в поддержке.",
+        "recommendation": "Добавить в тело push идентификатор обмена (exchangeId) и описать, что сервис уведомлений при повторе с тем же exchangeId не отправляет второй push, либо явно признать дубль допустимым.",
+        "rewrite": "POST /notifications/v1/push (clientId, text, <уточнить: имя поля для exchangeId>); повтор с тем же exchangeId не порождает второе уведомление <уточнить: подтвердить с сервисом уведомлений>.",
+        "question": "Поддерживает ли сервис уведомлений ключ повтора, и допустим ли дубль push при ошибке ответа?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Тело проводки АБС не описано, только результаты",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-50",
+          "R-18"
+        ],
+        "evidence": [
+          {
+            "line": 56,
+            "quote": "POST /abs/v1/fx-postings (проводка одной транзакцией с ключом exchangeId; результат «проведено», «недостаточно средств», «счёт недоступен» или «отказ»)"
+          },
+          {
+            "line": 135,
+            "quote": "передать в АБС проводку по счетам и суммам котировки с ключом exchangeId"
+          }
+        ],
+        "problem": "Шаг 4 передаёт в АБС счета и суммы котировки, но набор полей запроса проводки и формат ответа АБС в документе не перечислены; ссылки на документ АБС нет.",
+        "scenario": "Разработчик сервиса обмена должен передать в АБС счёт списания, счёт зачисления, суммы, валюты и exchangeId, но по тексту не видит имён полей.",
+        "impact": "Интегратор догадывается о формате, что может привести к ошибке при первом подключении.",
+        "recommendation": "Указать в И-2 состав полей проводки и ответа либо ссылку на существующую спецификацию АБС.",
+        "rewrite": "POST /abs/v1/fx-postings: тело — <уточнить: поля счетов, сумм, валют и exchangeId>; ответ — <уточнить: поле результата и его значения>.",
+        "question": "Где описан формат запроса и ответа существующего метода проводки АБС?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Параметр currency курса не определён: какая валюта передаётся",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-18",
+          "R-10"
+        ],
+        "evidence": [
+          {
+            "line": 56,
+            "quote": "сервис курсов GET /rates/v1/retail?currency={currency}&rateType={rateType} (buyRate, sellRate)"
+          },
+          {
+            "line": 40,
+            "quote": "для обмена из KZT — курс продажи (банк продаёт иностранную валюту)"
+          }
+        ],
+        "problem": "В параметре currency не сказано, передаётся ли иностранная валюта пары или валюта счёта списания; при обмене USD → KZT значение может быть USD или KZT.",
+        "scenario": "Для обмена USD → KZT сервис обмена отправит currency=KZT, и сервис курсов вернёт курс другой валюты или ошибку.",
+        "impact": "Неверный курс или ошибка интеграции при первом вызове.",
+        "recommendation": "Указать, что в currency передаётся иностранная валюта пары (не KZT), и как sellRate и buyRate соотносятся с курсами из Ф-6.",
+        "rewrite": "GET /rates/v1/retail?currency={иностранная валюта пары, <уточнить: подтвердить с Казначейством>}&rateType={WORKING|NON_WORKING}.",
+        "question": "Какая валюта передаётся в currency для каждой из шести пар?",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /fx/v1/exchanges (метод 1, обмен по котировке)",
+          "method": "POST",
+          "purpose": "создание и изменение (обмен, проводка)",
+          "line": 122
+        },
+        {
+          "name": "POST /fx/v1/quotes (метод 2, создание котировки)",
+          "method": "POST",
+          "purpose": "создание (котировка)",
+          "line": 122
+        },
+        {
+          "name": "GET /accounts/v1/accounts",
+          "method": "GET",
+          "purpose": "чтение (список счетов)",
+          "line": 56
+        },
+        {
+          "name": "GET /accounts/v1/accounts/{accountId}",
+          "method": "GET",
+          "purpose": "чтение (данные счёта)",
+          "line": 56
+        },
+        {
+          "name": "GET /abs/v1/calendar/{date}",
+          "method": "GET",
+          "purpose": "чтение (признак рабочего дня)",
+          "line": 56
+        },
+        {
+          "name": "POST /abs/v1/fx-postings",
+          "method": "POST",
+          "purpose": "создание (проводка)",
+          "line": 56
+        },
+        {
+          "name": "POST /abs/v1/fx-postings/{exchangeId}/cancel",
+          "method": "POST",
+          "purpose": "изменение (отмена проводки)",
+          "line": 56
+        },
+        {
+          "name": "GET /rates/v1/retail",
+          "method": "GET",
+          "purpose": "чтение (курсы)",
+          "line": 56
+        },
+        {
+          "name": "POST /notifications/v1/push",
+          "method": "POST",
+          "purpose": "уведомление",
+          "line": 56
+        }
+      ],
+      "promises": [
+        {
+          "what": "получить список счетов клиента с остатками",
+          "line": 56,
+          "operation": "GET /accounts/v1/accounts"
+        },
+        {
+          "what": "проверить доступный остаток счёта списания",
+          "line": 38,
+          "operation": "GET /accounts/v1/accounts/{accountId}"
+        },
+        {
+          "what": "получить курсы покупки и продажи",
+          "line": 39,
+          "operation": "GET /rates/v1/retail"
+        },
+        {
+          "what": "определить рабочий день по производственному календарю АБС",
+          "line": 39,
+          "operation": "GET /abs/v1/calendar/{date}"
+        },
+        {
+          "what": "показать курс и сумму зачисления котировки",
+          "line": 28,
+          "operation": "POST /fx/v1/quotes"
+        },
+        {
+          "what": "показать результат обмена с executedAt",
+          "line": 28,
+          "operation": "POST /fx/v1/exchanges (метод 1)"
+        },
+        {
+          "what": "провести обмен в АБС",
+          "line": 43,
+          "operation": "POST /abs/v1/fx-postings"
+        },
+        {
+          "what": "отменить проводку при таймауте",
+          "line": 43,
+          "operation": "POST /abs/v1/fx-postings/{exchangeId}/cancel"
+        },
+        {
+          "what": "отправить push клиенту",
+          "line": 44,
+          "operation": "POST /notifications/v1/push"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200 OK",
+          "lines": [
+            76,
+            184
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "400 VALIDATION_ERROR",
+          "lines": [
+            132,
+            139,
+            185
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "401 UNAUTHORIZED",
+          "lines": [
+            132,
+            139,
+            186
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404 ACCOUNT_NOT_FOUND",
+          "lines": [
+            140,
+            187
+          ],
+          "described": true,
+          "note": "пример тела в строке 187 показывает QUOTE_NOT_FOUND"
+        },
+        {
+          "code": "404 QUOTE_NOT_FOUND",
+          "lines": [
+            134,
+            187
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 PAIR_NOT_SUPPORTED",
+          "lines": [
+            140,
+            188
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 ACCOUNT_NOT_AVAILABLE",
+          "lines": [
+            135,
+            140,
+            189
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 AMOUNT_OUT_OF_LIMITS",
+          "lines": [
+            140,
+            190
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 INSUFFICIENT_FUNDS",
+          "lines": [
+            135,
+            140,
+            191
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 QUOTE_ALREADY_USED",
+          "lines": [
+            134,
+            192
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 QUOTE_EXPIRED",
+          "lines": [
+            134,
+            193
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "500 INTERNAL_ERROR",
+          "lines": [
+            135,
+            138,
+            194
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "quoteId",
+          "places": "строка 158 запрос метода 1, string 36, UUID, обязательно; строка 170 ответ метода 2, string UUID"
+        },
+        {
+          "name": "requestId",
+          "places": "строка 159 запрос метода 1, string 36, UUID, обязательно"
+        },
+        {
+          "name": "debitAmount",
+          "places": "строка 162 запрос метода 2, string 4–15, маска ^\\d{1,12}\\.\\d{2}$; строка 171 ответ, та же маска"
+        },
+        {
+          "name": "debitCurrency",
+          "places": "строка 172 ответ, string 3, KZT/USD/EUR/RUB"
+        },
+        {
+          "name": "creditAmount",
+          "places": "строка 173 ответ, маска ^\\d{1,12}\\.\\d{2}$"
+        },
+        {
+          "name": "rate",
+          "places": "строка 175 ответ, маска ^\\d{1,6}\\.\\d{2}$; строка 053 Д-4 numeric(8,2)"
+        },
+        {
+          "name": "rateType",
+          "places": "строка 176 ответ, WORKING / NON_WORKING"
+        },
+        {
+          "name": "createdAt / expiresAt",
+          "places": "строки 177–178 ответ метода 2, ISO 8601"
+        },
+        {
+          "name": "executedAt",
+          "places": "строка 179 ответ метода 1, ISO 8601"
+        },
+        {
+          "name": "exchangeId",
+          "places": "строка 169 ответ метода 1, string UUID"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /fx/v1/exchanges (метод 1)",
+          "step": "проверка сессии и тела: нет сессии, нарушение формата",
+          "line": 132,
+          "outcome": "401 UNAUTHORIZED; 400 VALIDATION_ERROR (тело: errorCode, message)"
+        },
+        {
+          "operation": "POST /fx/v1/exchanges (метод 1)",
+          "step": "найден сохранённый ответ 200 по ключу клиент+quoteId+requestId",
+          "line": 133,
+          "outcome": "вернуть сохранённое тело 200"
+        },
+        {
+          "operation": "POST /fx/v1/exchanges (метод 1)",
+          "step": "котировка не найдена среди котировок клиента",
+          "line": 134,
+          "outcome": "404 QUOTE_NOT_FOUND"
+        },
+        {
+          "operation": "POST /fx/v1/exchanges (метод 1)",
+          "step": "котировка USED или запрос позже expiresAt",
+          "line": 134,
+          "outcome": "422 QUOTE_ALREADY_USED; 422 QUOTE_EXPIRED"
+        },
+        {
+          "operation": "POST /fx/v1/exchanges (метод 1)",
+          "step": "ответ АБС недостаточно средств, счёт недоступен, отказ, таймаут без результата",
+          "line": 135,
+          "outcome": "422 INSUFFICIENT_FUNDS; 422 ACCOUNT_NOT_AVAILABLE; 500 INTERNAL_ERROR; таймаут — 500 INTERNAL_ERROR с отменой"
+        },
+        {
+          "operation": "POST /fx/v1/exchanges (метод 1)",
+          "step": "ответ АБС проведено",
+          "line": 136,
+          "outcome": "200 с телом обмена"
+        },
+        {
+          "operation": "POST /fx/v1/quotes (метод 2)",
+          "step": "нет сессии; тело не соответствует таблице",
+          "line": 139,
+          "outcome": "401 UNAUTHORIZED; 400 VALIDATION_ERROR"
+        },
+        {
+          "operation": "POST /fx/v1/quotes (метод 2)",
+          "step": "счёт не найден, пара не поддерживается, счёт не текущий или не OPEN, сумма вне лимита, сумма больше остатка",
+          "line": 140,
+          "outcome": "404 ACCOUNT_NOT_FOUND; 422 PAIR_NOT_SUPPORTED; 422 ACCOUNT_NOT_AVAILABLE; 422 AMOUNT_OUT_OF_LIMITS; 422 INSUFFICIENT_FUNDS"
+        },
+        {
+          "operation": "POST /fx/v1/quotes (метод 2)",
+          "step": "определить тип курса, получить курс, рассчитать сумму, сохранить котировку",
+          "line": 141,
+          "outcome": "200 с телом котировки; ошибки сервисов — 500 INTERNAL_ERROR (строка 138)"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

@@ -1,0 +1,722 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 102.62,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 97,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Ф-6 и «критерий приёмки, строка 22» дают разный результат: доступность ссылки и",
+        "kind": "boundary_conflict",
+        "criterion": "unambiguous",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-13",
+          "R-46"
+        ],
+        "evidence": [
+          {
+            "quote": "Ссылка на скачивание действует 15 минут с момента выдачи, но не дольше fileExpiresAt",
+            "line": 36,
+            "line_start": 36,
+            "line_end": 36,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "В 12:14 — файл выписки; в 12:15 — ответ 410 LINK_EXPIRED",
+            "line": 79,
+            "line_start": 79,
+            "line_end": 79,
+            "page": null,
+            "section": "Часть A. Новый функционал › Критерии приемки",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-6 и «критерий приёмки, строка 22» по-разному решают один случай — доступность ссылки и файла при fileExpiresAt раньше 15 минут после выдачи. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "FileExpiresAt 15.03 12:00, ссылка выдана в 12:00; скачивание в 12:14 по ссылке. Ф-6: ссылка не дольше fileExpiresAt: в 12:14 ссылка истекла, ответ 410. Критерий приёмки, строка 22: В 12:14 файл выписки отдаётся.",
+        "impact": "Тест строка 79 падает или реализация отдаёт файл после окончания срока; приёмка расходится.",
+        "recommendation": "Привести строка 79 к правилу: ссылка и файл недоступны с 12:00 при fileExpiresAt 12:00.",
+        "rewrite": "",
+        "question": "Что верно: «ссылка не дольше fileExpiresAt: в 12:14 ссылка истекла, ответ 410» (как в Ф-6) или «В 12:14 файл выписки отдаётся» (как в «критерий приёмки, строка 22»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-01"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Компонент выписок: сервис выписок и контроллер», «Ссылка на скачивание»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "сервис выписок",
+            "line": 20,
+            "verified": "normalized"
+          },
+          {
+            "quote": "StatementOrderController",
+            "line": 123,
+            "verified": "normalized"
+          },
+          {
+            "quote": "ссылки на скачивание",
+            "line": 36,
+            "verified": "normalized"
+          },
+          {
+            "quote": "downloadUrl",
+            "line": 198,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Компонент выписок: сервис выписок и контроллер: «сервис выписок» (строка 20), «StatementOrderController» (строка 123); Ссылка на скачивание: «ссылки на скачивание» (строка 36), «downloadUrl» (строка 198).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02"
+        ]
+      },
+      {
+        "title": "Схема части B обходит API-шлюз, часть A требует вызовов только через него",
+        "kind": "incomplete",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-16",
+          "R-63"
+        ],
+        "evidence": [
+          {
+            "quote": "Все вызовы приложения проходят через API-шлюз",
+            "line": 40,
+            "line_start": 40,
+            "line_end": 40,
+            "page": null,
+            "section": "Часть A. Новый функционал › Sequence Diagram",
+            "verified": "exact"
+          },
+          {
+            "quote": "Приложение → StatementOrderController → сервис счетов",
+            "line": 146,
+            "line_start": 146,
+            "line_end": 146,
+            "page": null,
+            "section": "Часть B. REST API › Схема",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Схема API связывает приложение с контроллером напрямую, минуя API-шлюз, который требует часть A.",
+        "scenario": "",
+        "impact": "Реализация может открыть контроллер напрямую, обходя авторизацию и маршрутизацию шлюза",
+        "recommendation": "Добавить API-шлюз в схему части B между приложением и StatementOrderController",
+        "rewrite": "Приложение → API-шлюз → StatementOrderController → сервис счетов",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Выключение флага statement_pdf не описано для заказов в процессе",
+        "kind": "incomplete",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-12",
+          "R-13"
+        ],
+        "evidence": [
+          {
+            "quote": "Пункт «Выписка в PDF» скрывается флагом функционала statement_pdf",
+            "line": 94,
+            "line_start": 94,
+            "line_end": 94,
+            "page": null,
+            "section": "Часть A. Новый функционал › Ревью требований",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Откат скрывает пункт, но не сказано, что с заказами IN_PROGRESS, READY и с действующими ссылками.",
+        "scenario": "Флаг выключен, когда заказ IN_PROGRESS или файл READY ещё доступен в «Мои выписки»",
+        "impact": "Клиент теряет доступ к оплаченной выписке или заказ зависает без обработки",
+        "recommendation": "Описать поведение заказов и ссылок при выключении флага statement_pdf",
+        "rewrite": "При выключении statement_pdf заказы и файлы доступны в «Мои выписки» до истечения своего срока; <уточнить: доступность новых заказов>",
+        "question": "Должны ли клиенты скачивать уже готовые выписки при выключенном флаге?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Цель по снижению обращений не связана ни с одним требованием",
+        "kind": "unverifiable",
+        "criterion": "set_feasible",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-01"
+        ],
+        "evidence": [
+          {
+            "quote": "Снизить число обращений за выпиской в отделения и контакт-центр на 30 %",
+            "line": 18,
+            "line_start": 18,
+            "line_end": 18,
+            "page": null,
+            "section": "Часть A. Новый функционал › Цели",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Цель задаёт метрику, которую ни одно требование не измеряет и не фиксирует.",
+        "scenario": "",
+        "impact": "После запуска нельзя подтвердить достижение цели; спор при приёмке",
+        "recommendation": "Добавить требование на сбор числа обращений или снять метрику из цели",
+        "rewrite": "<уточнить: источник данных и порядок сбора обращений за три месяца до и после запуска>",
+        "question": "Кто отвечает за измерение снижения обращений?",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Правило периода 366 дней записано в трёх местах",
+        "kind": "duplicate",
+        "criterion": "modifiable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-09",
+          "R-61",
+          "R-67"
+        ],
+        "evidence": [
+          {
+            "quote": "период — не длиннее 366 дней включительно",
+            "line": 32,
+            "line_start": 32,
+            "line_end": 32,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "от 1 до 366",
+            "line": 142,
+            "line_start": 142,
+            "line_end": 142,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          },
+          {
+            "quote": "период — не длиннее 366 дней",
+            "line": 157,
+            "line_start": 157,
+            "line_end": 157,
+            "page": null,
+            "section": "Часть B. REST API › Параметры запроса › Request body",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Одно правило про длину периода повторено в бизнес-части и двух API-местах; при изменении одно расходится.",
+        "scenario": "",
+        "impact": "Изменение лимита обновят не везде; API и приложение разойдутся",
+        "recommendation": "Оставить правило в Ф-2 и ссылаться на него из API",
+        "rewrite": "Длина периода — по Ф-2; в API указать ссылку на Ф-2",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Приоритеты требований не указаны",
+        "kind": "incomplete",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "Тип работы | Новый функционал",
+            "line": 13,
+            "line_start": 13,
+            "line_end": 13,
+            "page": null,
+            "section": "Часть A. Новый функционал › Общие сведения",
+            "verified": "exact"
+          }
+        ],
+        "problem": "В документе нет приоритета и признака стабильности у требований.",
+        "scenario": "",
+        "impact": "При нехватке времени неясно, какие требования снимать первыми",
+        "recommendation": "Добавить приоритет (MoSCoW) к Ф-1 — Ф-8 и НФТ",
+        "rewrite": "Ф-1 — приоритет: <уточнить>",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нефункциональные и интеграционные пункты без идентификаторов",
+        "kind": "incomplete",
+        "criterion": "traceable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-17",
+          "R-18",
+          "R-20"
+        ],
+        "evidence": [
+          {
+            "quote": "Методы 1–4 части B отвечают не дольше 500 мс для 95 % запросов",
+            "line": 42,
+            "line_start": 42,
+            "line_end": 42,
+            "page": null,
+            "section": "Часть A. Новый функционал › Нефункциональные требования",
+            "verified": "exact"
+          }
+        ],
+        "problem": "НФТ, данные и интеграция не имеют ID, поэтому их нельзя сослаться в тестах и изменениях.",
+        "scenario": "",
+        "impact": "Трассировка к критериям приёмки и задачам MB-2417 неполная",
+        "recommendation": "Присвоить ID NF-01… и DATA-01… пунктам раздела",
+        "rewrite": "NF-01: Методы 1–4 части B отвечают не дольше 500 мс для 95 % запросов",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-13",
+        "b": "R-46",
+        "subject": "Доступность ссылки и файла при fileExpiresAt раньше 15 минут после выдачи",
+        "same_subject": true,
+        "quote_a": "Ссылка на скачивание действует 15 минут с момента выдачи, но не дольше fileExpiresAt",
+        "line_a": 36,
+        "quote_b": "В 12:14 — файл выписки; в 12:15 — ответ 410 LINK_EXPIRED",
+        "line_b": 79,
+        "scenario": "fileExpiresAt 15.03 12:00, ссылка выдана в 12:00; скачивание в 12:14 по ссылке",
+        "outcome_a": "Ссылка не дольше fileExpiresAt: в 12:14 ссылка истекла, ответ 410",
+        "outcome_b": "В 12:14 файл выписки отдаётся",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "boundary_conflict",
+        "title": "Ссылка по Ф-6 не дольше fileExpiresAt, критерий L079 даёт доступ в 12:14",
+        "impact": "Тест L079 падает или реализация отдаёт файл после окончания срока; приёмка расходится",
+        "recommendation": "Привести L079 к правилу: ссылка и файл недоступны с 12:00 при fileExpiresAt 12:00",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-08",
+        "verified_by": [
+          "R-33",
+          "R-34"
+        ],
+        "implemented_by": [
+          "R-56",
+          "R-65"
+        ],
+        "note": "Нет критерия на клиента-физлицо без доступа в мобильный банк"
+      },
+      {
+        "requirement_id": "R-09",
+        "verified_by": [
+          "R-26",
+          "R-27",
+          "R-28",
+          "R-29",
+          "R-30",
+          "R-31",
+          "R-32"
+        ],
+        "implemented_by": [
+          "R-57",
+          "R-66",
+          "R-67",
+          "R-88",
+          "R-90"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-10",
+        "verified_by": [
+          "R-45"
+        ],
+        "implemented_by": [
+          "R-68",
+          "R-75"
+        ],
+        "note": "Нет критерия для русского и казахского языка выписки"
+      },
+      {
+        "requirement_id": "R-11",
+        "verified_by": [
+          "R-43",
+          "R-44"
+        ],
+        "implemented_by": [],
+        "note": "Нет критерия на состав полей ФИО, IBAN и orderId на страницах"
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [
+          "R-25",
+          "R-41",
+          "R-42"
+        ],
+        "implemented_by": [
+          "R-59"
+        ],
+        "note": "Нет критерия на 30-минутный таймаут при частичной готовности"
+      },
+      {
+        "requirement_id": "R-13",
+        "verified_by": [
+          "R-46",
+          "R-47",
+          "R-48",
+          "R-49"
+        ],
+        "implemented_by": [
+          "R-78",
+          "R-96",
+          "R-97"
+        ],
+        "note": "противоречие: критерий приёмки, строка 22",
+        "conflicts_with": [
+          "R-46"
+        ]
+      },
+      {
+        "requirement_id": "R-14",
+        "verified_by": [
+          "R-36",
+          "R-37",
+          "R-38"
+        ],
+        "implemented_by": [
+          "R-58",
+          "R-92"
+        ],
+        "note": "Нет критерия на заказ сверх предела после перехода в FAILED"
+      },
+      {
+        "requirement_id": "R-15",
+        "verified_by": [
+          "R-51"
+        ],
+        "implemented_by": [
+          "R-94",
+          "R-95",
+          "R-96"
+        ],
+        "note": "Нет критерия на удаление записи через 30 суток"
+      },
+      {
+        "requirement_id": "R-17",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия приёмки на время ответа методов 1–4"
+      },
+      {
+        "requirement_id": "R-18",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Поля client_id и file_key не отражены в API"
+      },
+      {
+        "requirement_id": "R-19",
+        "verified_by": [],
+        "implemented_by": [
+          "R-63",
+          "R-94",
+          "R-95",
+          "R-96",
+          "R-97"
+        ],
+        "note": "Нет критерия на список и статус через API"
+      },
+      {
+        "requirement_id": "R-20",
+        "verified_by": [],
+        "implemented_by": [
+          "R-63"
+        ],
+        "note": "Нет критерия на контракт существующих методов"
+      },
+      {
+        "requirement_id": "R-21",
+        "verified_by": [
+          "R-39",
+          "R-40"
+        ],
+        "implemented_by": [
+          "R-55",
+          "R-62"
+        ],
+        "note": "Нет критерия на два повтора при таймауте"
+      },
+      {
+        "requirement_id": "R-22",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия на тестовые часы сервиса выписок"
+      },
+      {
+        "requirement_id": "R-23",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия приёмки для НФТ, только нагрузочный тест"
+      },
+      {
+        "requirement_id": "R-53",
+        "verified_by": [],
+        "implemented_by": [
+          "R-82"
+        ],
+        "note": "Нет критерия на 401 при создании заказа"
+      },
+      {
+        "requirement_id": "R-54",
+        "verified_by": [],
+        "implemented_by": [
+          "R-81"
+        ],
+        "note": "Нет критерия на Idempotency-Key не UUID"
+      },
+      {
+        "requirement_id": "R-55",
+        "verified_by": [
+          "R-39",
+          "R-40"
+        ],
+        "implemented_by": [
+          "R-84"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-56",
+        "verified_by": [
+          "R-33",
+          "R-34"
+        ],
+        "implemented_by": [
+          "R-83"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-57",
+        "verified_by": [
+          "R-27",
+          "R-28",
+          "R-29",
+          "R-30",
+          "R-32"
+        ],
+        "implemented_by": [
+          "R-85"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-58",
+        "verified_by": [
+          "R-35",
+          "R-36",
+          "R-37"
+        ],
+        "implemented_by": [
+          "R-92"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-59",
+        "verified_by": [
+          "R-25"
+        ],
+        "implemented_by": [
+          "R-80"
+        ],
+        "note": "Нет критерия на сбой очереди заданий"
+      },
+      {
+        "requirement_id": "R-60",
+        "verified_by": [
+          "R-31",
+          "R-38"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-61",
+        "verified_by": [
+          "R-27"
+        ],
+        "implemented_by": [
+          "R-91"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-62",
+        "verified_by": [
+          "R-39",
+          "R-40"
+        ],
+        "implemented_by": [],
+        "note": "Нет критерия на хранение ключа 30 суток"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Компонент выписок: сервис выписок и контроллер",
+        "terms": [
+          {
+            "term": "сервис выписок",
+            "line": 20
+          },
+          {
+            "term": "StatementOrderController",
+            "line": 123
+          }
+        ],
+        "problem": "Компонент назван по-разному; при реализации неясно, один ли это модуль",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Ссылка на скачивание",
+        "terms": [
+          {
+            "term": "ссылки на скачивание",
+            "line": 36
+          },
+          {
+            "term": "downloadUrl",
+            "line": 198
+          }
+        ],
+        "problem": "Одно понятие под разными именами в бизнес-части и API; поиск по документу затруднён",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Срок действия ссылки и файла (fileExpiresAt, urlExpiresAt)",
+        "places": [
+          "R-13",
+          "R-46",
+          "R-47",
+          "R-78",
+          "R-96",
+          "R-97"
+        ]
+      },
+      {
+        "subject": "Статус заказа и его отображение",
+        "places": [
+          "R-04",
+          "R-05",
+          "R-06",
+          "R-12",
+          "R-76"
+        ]
+      },
+      {
+        "subject": "Суточный предел заказов и учёт FAILED",
+        "places": [
+          "R-14",
+          "R-36",
+          "R-58",
+          "R-92"
+        ]
+      },
+      {
+        "subject": "Период и дата окончания (вчерашний день)",
+        "places": [
+          "R-09",
+          "R-31",
+          "R-32",
+          "R-57",
+          "R-61",
+          "R-67",
+          "R-89"
+        ]
+      },
+      {
+        "subject": "Срок хранения заказа 30 суток и код 404",
+        "places": [
+          "R-15",
+          "R-51",
+          "R-95",
+          "R-96"
+        ]
+      },
+      {
+        "subject": "Идемпотентность: ключ, повтор и код 409",
+        "places": [
+          "R-21",
+          "R-40",
+          "R-55",
+          "R-62",
+          "R-84"
+        ]
+      },
+      {
+        "subject": "Таймаут формирования и повторы АБС",
+        "places": [
+          "R-12",
+          "R-41",
+          "R-42",
+          "R-59"
+        ]
+      },
+      {
+        "subject": "Путь вызовов через API-шлюз",
+        "places": [
+          "R-16",
+          "R-63",
+          "R-02"
+        ]
+      },
+      {
+        "subject": "Формат периода и длина периода",
+        "places": [
+          "R-09",
+          "R-61",
+          "R-66",
+          "R-67"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

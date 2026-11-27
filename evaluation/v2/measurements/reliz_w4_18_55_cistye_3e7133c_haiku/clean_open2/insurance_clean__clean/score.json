@@ -1,0 +1,615 @@
+{
+  "schema": "bcc-v2-score/1",
+  "gold": {
+    "path": "/home/user/repo/evaluation/v2/open2/insurance_clean/gold.yaml",
+    "document": "evaluation/v2/open2/insurance_clean/source.md",
+    "sha256": "99197c1e9c6936089e9a13a8ab449fef99f29815afe7a28a85cf9895c120d9db"
+  },
+  "report": {
+    "version": "v2",
+    "same_doc": true,
+    "document": {
+      "file": "source.md",
+      "format": "md",
+      "sha256": "99197c1e9c6936089e9a13a8ab449fef99f29815afe7a28a85cf9895c120d9db",
+      "lines": 223
+    },
+    "status": "complete",
+    "provider": "claude_cli",
+    "model": "haiku",
+    "models_used": [
+      "claude-haiku-5-5"
+    ],
+    "commit": "e581c306",
+    "duration_s": 259.5,
+    "calls": {
+      "total": 9,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 557059,
+      "output": 160695
+    },
+    "cost_usd": 0.1335
+  },
+  "counts": {
+    "findings": 20,
+    "by_severity": {
+      "critical": 1,
+      "major": 8,
+      "minor": 11
+    },
+    "duplicates": 0,
+    "outside_gold": {
+      "total": 19,
+      "real": 0,
+      "partial": 0,
+      "false": 0,
+      "duplicate": 0,
+      "gold": 0,
+      "unknown": 19
+    },
+    "report_md_lines": 602
+  },
+  "recall": {
+    "critical": {
+      "found": [],
+      "n": 0,
+      "of": 5,
+      "as_critical": [],
+      "lenient": []
+    },
+    "major": {
+      "found": [],
+      "n": 0,
+      "of": 20,
+      "lenient": []
+    },
+    "minor": {
+      "found_parents": [
+        "М1"
+      ],
+      "of": 4,
+      "parts_found": [
+        "М1"
+      ]
+    },
+    "key_25": {
+      "n": 0,
+      "of": 25,
+      "lenient": 0,
+      "loose_any_edge": 0
+    },
+    "all_items": {
+      "n": 1,
+      "of": 4
+    },
+    "parents": {
+      "n": 1,
+      "of": 4
+    }
+  },
+  "precision": {
+    "matched": 1,
+    "duplicates": 0,
+    "outside_real": 0,
+    "outside_false": 0,
+    "outside_unknown": 19,
+    "outside_partial": 0,
+    "precision_useful": 0.05,
+    "precision_gold": 0.05
+  },
+  "severity": {
+    "pairs": 1,
+    "ok": 1,
+    "exact": 1,
+    "accuracy_ok": 1.0,
+    "accuracy_exact": 1.0,
+    "critical_false": [
+      {
+        "finding": "D-01",
+        "title": "Возврат премии при досрочном погашении и отказе",
+        "reason": "вне эталона"
+      }
+    ],
+    "rows": [
+      {
+        "gold": "М1",
+        "level": "minor",
+        "finding": "D-18",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      }
+    ]
+  },
+  "quotes": {
+    "total": 49,
+    "missing": 0,
+    "fuzzy": 0,
+    "line_mismatch": 0,
+    "verified_field_missing": 0,
+    "findings_without_evidence": [],
+    "missing_list": []
+  },
+  "language": {
+    "generic": [],
+    "english": [],
+    "english_report_md": []
+  },
+  "clarity": {
+    "n": 20,
+    "passed": 20,
+    "share": 1.0,
+    "by_check": {
+      "заголовок": 0,
+      "место": 0,
+      "проблема": 0,
+      "сценарий": 0,
+      "последствие": 0,
+      "исправление": 0,
+      "язык": 0
+    },
+    "worst": []
+  },
+  "report_sections": {
+    "паспорт прогона": true,
+    "нарезка требований": true,
+    "проверка каждого требования": true,
+    "проверка набора": true,
+    "сводка": true,
+    "итог": true
+  },
+  "verdict": {
+    "got": {
+      "development": "no",
+      "testing": "no"
+    },
+    "expected": {
+      "development": "yes",
+      "testing": "yes"
+    }
+  },
+  "assignment": [
+    {
+      "gold": "М1",
+      "finding": "D-18",
+      "title": "Не заполнены версия, чек-лист, согласующие, раздел тестирования",
+      "severity": "minor",
+      "sources": [
+        "consistency",
+        "rules:placeholder.tbd",
+        "rules:placeholder.checklist",
+        "rules:placeholder.version",
+        "rules:placeholder.approvals"
+      ],
+      "how": "детерминированно"
+    }
+  ],
+  "duplicates": [],
+  "outside": [
+    {
+      "finding": "D-01",
+      "severity": "critical",
+      "kind": "contradiction",
+      "title": "Возврат премии при досрочном погашении и отказе",
+      "sources": [
+        "lens:risk",
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-02",
+      "severity": "major",
+      "kind": "missing_element",
+      "title": "Статус полиса после отказа и погашения в API не описан",
+      "sources": [
+        "lens:architect",
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-03",
+      "severity": "major",
+      "kind": "contradiction",
+      "title": "Маршрут вызова страхования: архитектура и последовательность расходятся",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-04",
+      "severity": "major",
+      "kind": "incomplete",
+      "title": "Минимальный возраст 18 лет не проверяется в логике метода",
+      "sources": [
+        "lens:analyst",
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-05",
+      "severity": "major",
+      "kind": "missing_element",
+      "title": "Выпуск полиса и номер от партнёра не отражены в последовательности",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-06",
+      "severity": "major",
+      "kind": "incomplete",
+      "title": "Ошибка выдачи после подписания не описана, снятие страхования невозможно",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-07",
+      "severity": "major",
+      "kind": "ambiguity",
+      "title": "Округление премии до тенге не задано",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-08",
+      "severity": "major",
+      "kind": "contradiction",
+      "title": "Повторный вызов для подписанной заявки: успех или 409",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-09",
+      "severity": "major",
+      "kind": "api_contract",
+      "title": "Тела ответов 400 и 422 не совпадают с перечнем причин кодов",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-10",
+      "severity": "minor",
+      "kind": "terminology",
+      "title": "Одни и те же объекты названы разными терминами",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-11",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Функциональные требования Ф-1…Ф-6 без приоритета",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-12",
+      "severity": "minor",
+      "kind": "unverifiable",
+      "title": "Цель «без жалоб» не имеет показателя и требования",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-13",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Не сказано, входит ли день выдачи в 14-дневный срок отказа",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-14",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Полное погашение в первые 14 дней без заявления: сумма не задана",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-15",
+      "severity": "minor",
+      "kind": "non_singular",
+      "title": "Ф-4 объединяет пять самостоятельных правил в одном пункте",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-16",
+      "severity": "minor",
+      "kind": "duplicate",
+      "title": "Ставка после отказа записана в двух местах",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-17",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Сумма, срок и согласие не перечислены в хранимых данных",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-19",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Критерии приёмки покрывают малую часть правил и границ",
+      "sources": [
+        "lens:qa"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-20",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Схема отката и выключения функции не описана",
+      "sources": [
+        "lens:risk"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    }
+  ],
+  "misses": [
+    {
+      "gold": "М2",
+      "level": "minor",
+      "title": "Блок согласующих пуст",
+      "where": "найден кандидатом (rules:placeholder.approvals), судья не взял",
+      "owners": [
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-18",
+          "status": "match",
+          "score": 3.9,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": [
+        {
+          "source": "rules:placeholder.approvals",
+          "id": "rules#4",
+          "title": "Блок согласующих пуст: нет ни одного согласующего",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "gold": "М3",
+      "level": "minor",
+      "title": "Раздел «Тестирование требований» — заглушка",
+      "where": "найден кандидатом (lens:qa, rules:placeholder.tbd), судья не взял",
+      "owners": [
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-18",
+          "status": "match",
+          "score": 3.6,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-13",
+          "status": "disputed",
+          "score": 1.0,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": [
+        {
+          "source": "lens:qa",
+          "id": "rejected#4",
+          "title": "Раздел тестирования не заполнен",
+          "reason": "снято линзой тестировщика: вне зоны линзы тестировщика (неоднозначность, неполнота, контракт — у аналитика и архитектора); вне противоречий — не больше 3 замеча"
+        },
+        {
+          "source": "rules:placeholder.tbd",
+          "id": "rules#1",
+          "title": "Раздел документа оставлен заглушкой: «заполняются тестировщиками»",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "gold": "М4",
+      "level": "minor",
+      "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "rules",
+        "analyst",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-11",
+          "status": "disputed",
+          "score": 1.6,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-18",
+          "status": "disputed",
+          "score": 1.3,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    }
+  ],
+  "stage_recall": {
+    "consistency": {
+      "candidates": 11,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:analyst": {
+      "candidates": 5,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:architect": {
+      "candidates": 6,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:qa": {
+      "candidates": 6,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:risk": {
+      "candidates": 2,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "rules": {
+      "candidates": 4,
+      "K": [],
+      "C": [],
+      "only_here": []
+    }
+  },
+  "gates": [
+    {
+      "metric": "К1–К5 найдены",
+      "value": "0/5",
+      "ok": true
+    },
+    {
+      "metric": "из них критичными",
+      "value": "0/5",
+      "ok": true
+    },
+    {
+      "metric": "С1–С20 найдены",
+      "value": "0/20",
+      "ok": true
+    },
+    {
+      "metric": "критичных ложных",
+      "value": "1",
+      "ok": false
+    },
+    {
+      "metric": "всего замечаний",
+      "value": "20",
+      "ok": true
+    },
+    {
+      "metric": "цитаты найдены в документе",
+      "value": "49/49",
+      "ok": true
+    },
+    {
+      "metric": "строк отчёта",
+      "value": "602",
+      "ok": true
+    },
+    {
+      "metric": "разделы п. 6 ТЗ",
+      "value": "6/6",
+      "ok": true
+    },
+    {
+      "metric": "общие фразы",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "рубрика понятности",
+      "value": "20/20",
+      "ok": true
+    },
+    {
+      "metric": "английские слова",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "вердикт разработка/тестирование",
+      "value": "no/no",
+      "ok": false
+    },
+    {
+      "metric": "время, мин",
+      "value": "4.3",
+      "ok": true
+    },
+    {
+      "metric": "вызовов модели",
+      "value": "9",
+      "ok": true
+    }
+  ],
+  "arbiter": {
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 22,
+    "model": ""
+  },
+  "seconds": 0.04
+}

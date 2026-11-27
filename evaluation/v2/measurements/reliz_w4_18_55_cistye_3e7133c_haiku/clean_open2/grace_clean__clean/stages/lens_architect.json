@@ -1,0 +1,260 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 64.77,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 48,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "interestForecast: частичное погашение или неуплата дают разное условие",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-23",
+          "R-36",
+          "R-26"
+        ],
+        "evidence": [
+          {
+            "quote": "5. Вернуть сведения о льготном периоде и прогноз процентов на случай частичного погашения.",
+            "line": 122
+          },
+          {
+            "quote": "Прогноз процентов, если оставшаяся сумма не будет внесена до окончания платёжного периода, тиыны",
+            "line": 158
+          }
+        ],
+        "problem": "Шаг 5 логики метода 1 задаёт прогноз процентов «на случай частичного погашения», а описание поля interestForecast — «если оставшаяся сумма не будет внесена». Это два разных условия для одного поля.",
+        "scenario": "Остаток 30 000 ₸ внесён частично (часть суммы уже внесена). По шагу 5 прогноз считается для частичного погашения, по описанию поля — для полной неуплаты остатка. Разработчик не знает, какую сумму вернуть в interestForecast, тестировщик не знает ожидаемое значение.",
+        "impact": "Разные значения interestForecast для одного и того же состояния счёта; приложение покажет клиенту неверный прогноз процентов.",
+        "recommendation": "Привести шаг 5 и описание поля к одному условию и указать, на какую сумму считается прогноз при частичной оплате.",
+        "rewrite": "interestForecast | integer | ≥ 0 | Прогноз процентов, если оставшаяся сумма для погашения не будет внесена до окончания платёжного периода; при частичной оплате: <уточнить: прогноз на всю задолженность по покупкам или на остаток>, тиыны",
+        "question": "Прогноз при частичной оплате считается на всю задолженность по покупкам или на остаток после частичного платежа?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Суммы в критериях приёмки в тенге, в API в тиынах без правила пересчёта",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-14",
+          "R-34"
+        ],
+        "evidence": [
+          {
+            "quote": "Оставшаяся сумма для погашения без процентов, тиыны",
+            "line": 156
+          },
+          {
+            "quote": "Внести 120 000 ₸ 25 марта в 14:00",
+            "line": 63
+          }
+        ],
+        "problem": "Поле graceAmount описано в тиынах, а критерий приёмки задаёт ту же величину в тенге (₸). Правила пересчёта в документе нет.",
+        "scenario": "Тестировщик вносит 120 000 ₸ и ожидает graceAmount = 120000; разработчик возвращает 12000000 тиын по описанию поля. Одна и та же проверка даёт расхождение в приёмке.",
+        "impact": "Спор при приёмке и ложные дефекты в тестах сумм.",
+        "recommendation": "Добавить в критерии приёмки пересчёт тенге в тиыны или правило единиц в описании API.",
+        "rewrite": "graceAmount | integer | ≥ 0 | Оставшаяся сумма для погашения без процентов, тиыны (1 ₸ = 100 тиын); в критериях приёмки 120 000 ₸ соответствует graceAmount = 12000000",
+        "question": "",
+        "blocks": "testing",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Статус льготного периода: признак в данных и состояние ACTIVE/LOST в API",
+        "kind": "contradiction",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-12",
+          "R-32"
+        ],
+        "evidence": [
+          {
+            "quote": "признак сохранения льготного периода и признак включения напоминания",
+            "line": 49
+          },
+          {
+            "quote": "status | string | ACTIVE / LOST | Состояние льготного периода | grace_status",
+            "line": 154
+          }
+        ],
+        "problem": "В требованиях к данным сохранённое состояние льготного периода названо признаком (логическим значением), а в ответе API поле grace_status отдано как строка ACTIVE / LOST.",
+        "scenario": "Разработчик хранения сохранит булев признак, а разработчик API будет отдавать строку; маппинг между ними не описан.",
+        "impact": "Неоднозначный тип хранимого поля; возможна ошибка маппинга.",
+        "recommendation": "Уточнить в требованиях к данным тип хранимого поля grace_status.",
+        "rewrite": "grace_status — строка ACTIVE / LOST (признак сохранения льготного периода хранится как это значение)",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "/cards/{cardId}/grace",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 105
+        },
+        {
+          "name": "/cards/{cardId}/grace/reminder",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 200
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать дату окончания платёжного периода и сумму для погашения без процентов",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "включить или выключить переключатель «Напоминать о платеже»",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace/reminder"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            150,
+            164,
+            172
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "400",
+          "lines": [
+            212
+          ],
+          "described": true,
+          "note": "описан только для метода 2"
+        },
+        {
+          "code": "401",
+          "lines": [
+            150,
+            165,
+            177
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404",
+          "lines": [
+            150,
+            166,
+            182
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422",
+          "lines": [
+            150,
+            167,
+            187
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "500",
+          "lines": [
+            150,
+            168,
+            192
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "cardId",
+          "places": "path, string 1–64, обязательно (L141, L209)"
+        },
+        {
+          "name": "status",
+          "places": "ответ, string, ACTIVE / LOST (L154); хранится как grace_status"
+        },
+        {
+          "name": "paymentDueDate",
+          "places": "ответ, string, ГГГГ-ММ-ДД (L155)"
+        },
+        {
+          "name": "graceAmount",
+          "places": "ответ, integer ≥ 0, тиыны (L156)"
+        },
+        {
+          "name": "daysLeft",
+          "places": "ответ, integer ≥ 0, календарные дни (L157)"
+        },
+        {
+          "name": "interestForecast",
+          "places": "ответ, integer ≥ 0, тиыны (L158)"
+        },
+        {
+          "name": "totalDebt",
+          "places": "ответ, integer ≥ 0, тиыны (L159)"
+        },
+        {
+          "name": "reminderEnabled",
+          "places": "ответ, boolean (L160, L212)"
+        },
+        {
+          "name": "enabled",
+          "places": "тело запроса метода 2, boolean, обязательно (L210)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "Проверить сессию клиента (401)",
+          "line": 118,
+          "outcome": "401 с телом {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "Проверить принадлежность карты и что она кредитная (404)",
+          "line": 119,
+          "outcome": "404 с телом {\"message\":\"Карта не найдена\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "Если карта не кредитная, вернуть 422",
+          "line": 123,
+          "outcome": "422 с телом {\"message\":\"Для этой карты льготный период не предусмотрен\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "Сумма для погашения отрицательна — переплата",
+          "line": 126,
+          "outcome": "отвечает 0 в graceAmount"
+        },
+        {
+          "operation": "/cards/{cardId}/grace/reminder",
+          "step": "enabled отсутствует или не boolean",
+          "line": 212,
+          "outcome": "400 с телом {\"message\":\"Некорректный запрос\"}"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

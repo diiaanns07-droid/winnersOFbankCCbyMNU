@@ -1,0 +1,311 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 47.68,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 48,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Суммы в API в тиынах, в критериях приёмки в тенге без правила пересчёта",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-34",
+          "R-37",
+          "R-15",
+          "R-16",
+          "R-17"
+        ],
+        "evidence": [
+          {
+            "line": 161,
+            "quote": "totalDebt | integer | ≥ 0 | Общая задолженность по карте на дату запроса, тиыны | total_debt"
+          },
+          {
+            "line": 63,
+            "quote": "Задолженность по покупкам февраля 120 000 ₸, выписка от 1 марта"
+          }
+        ],
+        "problem": "Поля graceAmount и totalDebt описаны в тиынах, а критерии приёмки задают суммы в ₸ (120 000 ₸, 30 000 ₸). Правила пересчёта в документе нет.",
+        "scenario": "Тестировщик вносит 120 000 ₸ и ожидает graceAmount 120000; сервер по строке 161 вернёт 12000000 тиынов. Без правила пересчёта сравнение с критерием неоднозначно.",
+        "impact": "Тест или интегратор может сравнить тиыны с тенге и получить ложное расхождение или пропустить ошибку в 100 раз.",
+        "recommendation": "Добавить в требования к данным и в описание API правило: все суммы API и хранения в тиынах (1 ₸ = 100 тиынов), в критериях приёмки указывать эквивалент в тиынах или правило пересчёта.",
+        "rewrite": "Суммы в критериях приёмки указывать в тиынах: 120 000 ₸ = 12000000 тиынов; правило пересчёта 1 ₸ = 100 тиынов, без округления.",
+        "question": "Подтвердить, что критерии приёмки выражены в тенге только для читаемости и что API работает в тиынах.",
+        "blocks": "testing",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Компонент назван «API кредитных карт» и «GraceController» без связи между именами",
+        "kind": "terminology",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-02",
+          "R-10",
+          "R-19",
+          "R-28"
+        ],
+        "evidence": [
+          {
+            "line": 25,
+            "quote": "Мобильное приложение → API кредитных карт → кредитный модуль."
+          },
+          {
+            "line": 134,
+            "quote": "Приложение → GraceController → кредитный модуль → GraceController → приложение."
+          }
+        ],
+        "problem": "Архитектура и последовательность называют точку входа «API кредитных карт», схема метода — «GraceController». Из текста не видно, один ли это компонент.",
+        "scenario": "Разработчик, читающий архитектуру, не может однозначно сопоставить GraceController с API кредитных карт и не знает, куда относятся endpoints /cards/{cardId}/grace.",
+        "impact": "Неясно, где размещать контроллер и какой компонент отвечает за интерфейс.",
+        "recommendation": "Указать в архитектуре, что API кредитных карт реализован контроллером GraceController, либо использовать одно имя во всех разделах.",
+        "rewrite": "Во всех схемах: «API кредитных карт (контроллер GraceController)».",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "/cards/{cardId}/grace",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 112
+        },
+        {
+          "name": "/cards/{cardId}/grace/reminder",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 204
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать дату окончания платёжного периода",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "показать оставшуюся сумму для погашения без процентов",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "показать количество дней до окончания платёжного периода",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "показать состояние переключателя «Напоминать о платеже»",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "показать общую сумму задолженности при утрате льготного периода",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "получить сведения о льготном периоде",
+          "line": 52,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "включить или выключить напоминание",
+          "line": 52,
+          "operation": "/cards/{cardId}/grace/reminder"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            152,
+            166,
+            174,
+            214
+          ],
+          "described": true,
+          "note": "успех в обоих методах; метод 2 — тело {\"reminderEnabled\":false}"
+        },
+        {
+          "code": "400",
+          "lines": [
+            214
+          ],
+          "described": true,
+          "note": "только метод 2: enabled отсутствует или не boolean; в общем перечне кодов метода 1 отсутствует"
+        },
+        {
+          "code": "401",
+          "lines": [
+            152,
+            167,
+            177,
+            179,
+            214
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "404",
+          "lines": [
+            122,
+            152,
+            168,
+            182,
+            184
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "422",
+          "lines": [
+            122,
+            152,
+            169,
+            187,
+            189
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "500",
+          "lines": [
+            152,
+            170,
+            192,
+            194
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        }
+      ],
+      "fields": [
+        {
+          "name": "cardId",
+          "places": "path, string, 1–64, обязательно; строки 143, 211; card_id"
+        },
+        {
+          "name": "status",
+          "places": "ответ, string, ACTIVE / LOST; строка 156; grace_status"
+        },
+        {
+          "name": "paymentDueDate",
+          "places": "ответ, string, ГГГГ-ММ-ДД; строка 157; due_date"
+        },
+        {
+          "name": "graceAmount",
+          "places": "ответ, integer ≥ 0, тиыны; строка 158; grace_amount"
+        },
+        {
+          "name": "daysLeft",
+          "places": "ответ, integer ≥ 0; строка 159"
+        },
+        {
+          "name": "interestForecast",
+          "places": "ответ, integer ≥ 0, тиыны; строка 160"
+        },
+        {
+          "name": "totalDebt",
+          "places": "ответ, integer ≥ 0, тиыны; строка 161; total_debt"
+        },
+        {
+          "name": "reminderEnabled",
+          "places": "ответ, boolean; строки 162, 214; reminder_enabled"
+        },
+        {
+          "name": "enabled",
+          "places": "body метода 2, boolean, обязательно; строка 212; reminder_enabled"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "проверить сессию клиента",
+          "line": 121,
+          "outcome": "401 {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "карта не принадлежит клиенту",
+          "line": 122,
+          "outcome": "404 {\"message\":\"Карта не найдена\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "карта не кредитная",
+          "line": 122,
+          "outcome": "422 {\"message\":\"Для этой карты льготный период не предусмотрен\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "получить выписку, платежи и возвраты из кредитного модуля",
+          "line": 123,
+          "outcome": "500 {\"message\":\"Ошибка сервиса\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "рассчитать сумму и дни",
+          "line": 124,
+          "outcome": ""
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "вернуть сведения и прогноз процентов",
+          "line": 125,
+          "outcome": "200 с полями таблицы ответа"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "переплата: сумма не может быть отрицательной",
+          "line": 128,
+          "outcome": "показывается 0"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "выписка не сформирована",
+          "line": 130,
+          "outcome": "возвращаются сведения по предыдущему платёжному периоду"
+        },
+        {
+          "operation": "/cards/{cardId}/grace/reminder",
+          "step": "проверить сессию, принадлежность карты, кредитность",
+          "line": 207,
+          "outcome": "401, 404, 422 как у метода 1"
+        },
+        {
+          "operation": "/cards/{cardId}/grace/reminder",
+          "step": "сохранить признак enabled и вернуть сохранённое значение",
+          "line": 207,
+          "outcome": "200 {\"reminderEnabled\":false}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace/reminder",
+          "step": "enabled отсутствует или не boolean",
+          "line": 214,
+          "outcome": "400 {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace/reminder",
+          "step": "ошибка сохранения признака",
+          "line": 207,
+          "outcome": "500 описан в таблице метода 1"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

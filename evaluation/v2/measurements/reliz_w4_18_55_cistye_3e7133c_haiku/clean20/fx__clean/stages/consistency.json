@@ -1,0 +1,678 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 183.97,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 86,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "«описание экрана, строка 28» и Ф-7 дают разный результат: момент истечения котировки",
+        "kind": "event_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-03",
+          "R-11"
+        ],
+        "evidence": [
+          {
+            "quote": "запускаемый при получении ответа",
+            "line": 28,
+            "line_start": 28,
+            "line_end": 28,
+            "page": null,
+            "section": "Часть A. Новый функционал › Дизайн процесса UI",
+            "verified": "exact"
+          },
+          {
+            "quote": "expiresAt = createdAt + 60 с, где createdAt — время получения запроса котировки",
+            "line": 41,
+            "line_start": 41,
+            "line_end": 41,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«описание экрана, строка 28» и Ф-7 по-разному решают один случай — момент истечения котировки. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Запрос дошёл до сервиса в 11:00:00.000, ответ до приложения в 11:00:02.000 (задержка 2 с). Описание экрана, строка 28: таймер идёт 60 с от приёма ответа, до 11:01:02; «Подтвердить» доступно до 11:01:02. Ф-7: expiresAt = 11:01:00.000; запрос в 11:01:00.500 отклоняется 422 QUOTE_EXPIRED.",
+        "impact": "Приложение показывает «Подтвердить» после expiresAt; клиент получает 422 QUOTE_EXPIRED; тест таймера даст разный результат.",
+        "recommendation": "Запускать таймер от expiresAt, возвращённого методом 2, а не от времени приёма ответа.",
+        "rewrite": "",
+        "question": "Что верно: «таймер идёт 60 с от приёма ответа, до 11:01:02; «Подтвердить» доступно до 11:01:02» (как в «описание экрана, строка 28») или «expiresAt = 11:01:00.000; запрос в 11:01:00.500 отклоняется 422 QUOTE_EXPIRED» (как в Ф-7)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-01"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Проводка в АБС»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "проводкой АБС",
+            "line": 43,
+            "verified": "normalized"
+          },
+          {
+            "quote": "проводка одной транзакцией",
+            "line": 56,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Проводка в АБС: «проводкой АБС» (строка 43), «проводка одной транзакцией» (строка 56).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-02"
+        ]
+      },
+      {
+        "title": "Отключение пункта «Обменять валюту» не описано для активных котировок и обменов",
+        "kind": "incomplete",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "Пункт «Обменять валюту» выключается в существующей админ-панели меню приложения",
+            "line": 88,
+            "line_start": 88,
+            "line_end": 88,
+            "page": null,
+            "section": "Часть A. Новый функционал › Ревью требований",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Откат описан только как выключение пункта; не сказано, что делать с котировкой ACTIVE и обменом PROCESSING.",
+        "scenario": "Пункт выключен, пока клиент на экране котировки с ACTIVE-котировкой; обмен в PROCESSING.",
+        "impact": "Клиент может получить непредсказуемый исход: push или отказ без правила.",
+        "recommendation": "Добавить требование на поведение при выключении пункта для ACTIVE и PROCESSING.",
+        "rewrite": "При выключении пункта «Обменять валюту» новые котировки не создаются; ACTIVE-котировки и PROCESSING-обмены завершаются по Ф-7…Ф-9 <уточнить: до expiresAt или отказ>.",
+        "question": "Что происходит с ACTIVE-котировкой и PROCESSING-обменом при выключении пункта?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Вывод об отсутствии доработки АБС не подтверждён требованиями на отмену и ключ",
+        "kind": "unverifiable",
+        "criterion": "set_feasible",
+        "severity": "major",
+        "requirement_ids": [
+          "R-18",
+          "R-50",
+          "R-57"
+        ],
+        "evidence": [
+          {
+            "quote": "вызываются существующие методы, доработка не требуется",
+            "line": 16,
+            "line_start": 16,
+            "line_end": 16,
+            "page": null,
+            "section": "Часть A. Новый функционал › Общие сведения",
+            "verified": "exact"
+          },
+          {
+            "quote": "отмена невыполненной запрещает её выполнение",
+            "line": 145,
+            "line_start": 145,
+            "line_end": 145,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Заявлено, что АБС не дорабатывается, но требуются ключ exchangeId и запрет проводки после отмены.",
+        "scenario": "Отмена проводки приходит раньше проводки; АБС выполнит проводку без доработки.",
+        "impact": "Двойное списание или незапрещённая проводка, если АБС не поддерживает требуемое поведение.",
+        "recommendation": "Подтвердить у Департамента АБС поддержку ключа exchangeId и запрета проводки после отмены.",
+        "rewrite": "",
+        "question": "Поддерживает ли существующий метод АБС ключ exchangeId и запрет проводки после отмены?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нет ветви ошибки метода 2 и отмены проводки в процессе",
+        "kind": "incomplete",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-04",
+          "R-52"
+        ],
+        "evidence": [
+          {
+            "quote": "→ создание котировки (метод 2) [проверки не пройдены → сообщение message на экране обмена]",
+            "line": 32,
+            "line_start": 32,
+            "line_end": 32,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › BPMN схема процесса",
+            "verified": "exact"
+          },
+          {
+            "quote": "котировка не создаётся",
+            "line": 138,
+            "line_start": 138,
+            "line_end": 138,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          }
+        ],
+        "problem": "BPMN не показывает ветку 500 метода 2 и отмену проводки, которые есть в логике метода.",
+        "scenario": "Курс не получен за 3 с; клиент видит ошибку.",
+        "impact": "Схема не совпадает с логикой метода при разборе.",
+        "recommendation": "Добавить ветки 500 метода 2 и отмены проводки в BPMN.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Цель 60 % в приложении не измеряется полями требований",
+        "kind": "unverifiable",
+        "criterion": "set_feasible",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-01",
+          "R-17"
+        ],
+        "evidence": [
+          {
+            "quote": "не менее 60 % обменов физических лиц между своими счетами выполняется в приложении",
+            "line": 22,
+            "line_start": 22,
+            "line_end": 22,
+            "page": null,
+            "section": "Часть A. Новый функционал › Цели",
+            "verified": "exact"
+          },
+          {
+            "quote": "exchange_id (UUID), quote_id, client_id",
+            "line": 53,
+            "line_start": 53,
+            "line_end": 53,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к данным",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Показатель по каналу не выводится: в Д-2 и проводке АБС нет признака канала.",
+        "scenario": "Через 6 месяцев измеряют долю обменов из приложения по данным АБС.",
+        "impact": "Цель нельзя подтвердить по данным.",
+        "recommendation": "Добавить признак канала в проводку или Д-2 либо определить источник данных.",
+        "rewrite": "",
+        "question": "По какому признаку АБС отличать обмены из приложения?",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Срок хранения ключа идемпотентности задан в двух местах по-разному",
+        "kind": "duplicate",
+        "criterion": "modifiable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-17",
+          "R-56"
+        ],
+        "evidence": [
+          {
+            "quote": "запись хранится 24 часа",
+            "line": 53,
+            "line_start": 53,
+            "line_end": 53,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к данным",
+            "verified": "exact"
+          },
+          {
+            "quote": "на 24 часа с момента ответа",
+            "line": 144,
+            "line_start": 144,
+            "line_end": 144,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Д-3 отсчитывает от created_at, особое правило от момента ответа; при правке одно место разойдётся.",
+        "scenario": "Изменили срок в Д-3, а в особом правиле остался старый.",
+        "impact": "Расхождение реализации и тестов.",
+        "recommendation": "Оставить срок только в особом правиле 1, в Д-3 ссылаться на него.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-03",
+        "b": "R-11",
+        "subject": "Момент истечения котировки",
+        "same_subject": true,
+        "quote_a": "запускаемый при получении ответа",
+        "line_a": 28,
+        "quote_b": "expiresAt = createdAt + 60 с, где createdAt — время получения запроса котировки",
+        "line_b": 41,
+        "scenario": "Запрос дошёл до сервиса в 11:00:00.000, ответ до приложения в 11:00:02.000 (задержка 2 с).",
+        "outcome_a": "Таймер идёт 60 с от приёма ответа, до 11:01:02; «Подтвердить» доступно до 11:01:02.",
+        "outcome_b": "expiresAt = 11:01:00.000; запрос в 11:01:00.500 отклоняется 422 QUOTE_EXPIRED.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "event_conflict",
+        "title": "Истечение котировки: таймер от приёма ответа и expiresAt (пп. 2 и 3 п. Ф-7)",
+        "impact": "Приложение показывает «Подтвердить» после expiresAt; клиент получает 422 QUOTE_EXPIRED; тест таймера даст разный результат.",
+        "recommendation": "Запускать таймер от expiresAt, возвращённого методом 2, а не от времени приёма ответа.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      },
+      {
+        "a": "R-16",
+        "b": "R-18",
+        "subject": "Срок передачи push при ошибке сервиса уведомлений",
+        "same_subject": true,
+        "quote_a": "Push передаётся в сервис уведомлений не позднее 5 с после проводки для 99 % обменов за сутки",
+        "line_a": 50,
+        "quote_b": "при ответе сервиса уведомлений с ошибкой передача повторяется до 2 раз с интервалом 10 с",
+        "line_b": 56,
+        "scenario": "Первая передача push получает ошибку сервиса уведомлений через 1 с после проводки; повтор через 10 с, то есть на 11 с.",
+        "outcome_a": "Не позднее 5 с для 99 % обменов; неясно, учитываются ли повторы.",
+        "outcome_b": "Повтор через 10 с после ошибки, всего до 2 повторов.",
+        "one_condition": true,
+        "verdict": "compatible",
+        "basis": "none",
+        "kind": "ambiguity",
+        "title": "НФ-4 (5 с) не сказано, учитываются ли повторы по И-4",
+        "impact": "Мониторинг НФ-4 и тест push дадут разные выводы по сценарию ошибки.",
+        "recommendation": "Уточнить в НФ-4, что 5 с относится к первой передаче, либо включить повторы.",
+        "question": "Считать ли повторные передачи push по И-4 нарушением НФ-4?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-02"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-05",
+        "verified_by": [
+          "R-29"
+        ],
+        "implemented_by": [
+          "R-54",
+          "R-80"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-06",
+        "verified_by": [
+          "R-27"
+        ],
+        "implemented_by": [
+          "R-61",
+          "R-63"
+        ],
+        "note": "нет проверки, что поле суммы зачисления не принимается"
+      },
+      {
+        "requirement_id": "R-07",
+        "verified_by": [
+          "R-27"
+        ],
+        "implemented_by": [
+          "R-63",
+          "R-82"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-08",
+        "verified_by": [
+          "R-28"
+        ],
+        "implemented_by": [
+          "R-50",
+          "R-83"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-09",
+        "verified_by": [
+          "R-23"
+        ],
+        "implemented_by": [
+          "R-55",
+          "R-72"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-10",
+        "verified_by": [
+          "R-21",
+          "R-22",
+          "R-27"
+        ],
+        "implemented_by": [
+          "R-55",
+          "R-69",
+          "R-71"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-11",
+        "verified_by": [
+          "R-21",
+          "R-25",
+          "R-26"
+        ],
+        "implemented_by": [
+          "R-49",
+          "R-74"
+        ],
+        "note": "противоречие: описание экрана, строка 28; нет критерия на таймер экрана котировки",
+        "conflicts_with": [
+          "R-03"
+        ]
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [
+          "R-31",
+          "R-32"
+        ],
+        "implemented_by": [
+          "R-48",
+          "R-56"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-13",
+        "verified_by": [
+          "R-24",
+          "R-28",
+          "R-30"
+        ],
+        "implemented_by": [
+          "R-50",
+          "R-57"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-14",
+        "verified_by": [
+          "R-24"
+        ],
+        "implemented_by": [
+          "R-18",
+          "R-51"
+        ],
+        "note": "нет критерия на сбой отправки push"
+      },
+      {
+        "requirement_id": "R-16",
+        "verified_by": [],
+        "implemented_by": [
+          "R-47",
+          "R-58"
+        ],
+        "note": "нет критериев времени ответа и нагрузки в приёмке"
+      },
+      {
+        "requirement_id": "R-17",
+        "verified_by": [
+          "R-24",
+          "R-25"
+        ],
+        "implemented_by": [
+          "R-59",
+          "R-65"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-18",
+        "verified_by": [
+          "R-30"
+        ],
+        "implemented_by": [
+          "R-35",
+          "R-40"
+        ],
+        "note": "нет критерия на повтор И-3 с тем же requestId"
+      },
+      {
+        "requirement_id": "R-19",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "стенд — не требование к реализации; нет критериев на его состав"
+      },
+      {
+        "requirement_id": "R-46",
+        "verified_by": [
+          "R-33"
+        ],
+        "implemented_by": [
+          "R-47",
+          "R-53"
+        ],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-47",
+        "verified_by": [
+          "R-33"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-48",
+        "verified_by": [
+          "R-31"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-49",
+        "verified_by": [
+          "R-25"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-50",
+        "verified_by": [
+          "R-28",
+          "R-30"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-51",
+        "verified_by": [
+          "R-24"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-52",
+        "verified_by": [
+          "R-30"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-53",
+        "verified_by": [
+          "R-33"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-54",
+        "verified_by": [
+          "R-29"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-55",
+        "verified_by": [
+          "R-21",
+          "R-22",
+          "R-23"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-56",
+        "verified_by": [
+          "R-31",
+          "R-32"
+        ],
+        "implemented_by": [],
+        "note": ""
+      },
+      {
+        "requirement_id": "R-57",
+        "verified_by": [
+          "R-30"
+        ],
+        "implemented_by": [],
+        "note": "нет критерия: отмена до проводки запрещает её выполнение"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Компонент обмена",
+        "terms": [
+          {
+            "term": "сервис обмена",
+            "line": 25
+          },
+          {
+            "term": "FxController (сервис обмена",
+            "line": 120
+          }
+        ],
+        "problem": "Названия равны по определению в L120; разночтений нет.",
+        "severity": "none"
+      },
+      {
+        "id": "G-02",
+        "concept": "Проводка в АБС",
+        "terms": [
+          {
+            "term": "проводкой АБС",
+            "line": 43
+          },
+          {
+            "term": "проводка одной транзакцией",
+            "line": 56
+          }
+        ],
+        "problem": "Одна операция под двумя названиями; при чтении трудно связать Ф-9 и И-2.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Момент истечения котировки (expiresAt)",
+        "places": [
+          "R-03",
+          "R-11",
+          "R-49",
+          "R-74"
+        ]
+      },
+      {
+        "subject": "Передача push и повторы",
+        "places": [
+          "R-14",
+          "R-16",
+          "R-18"
+        ]
+      },
+      {
+        "subject": "Срок хранения ключа идемпотентности",
+        "places": [
+          "R-12",
+          "R-17",
+          "R-56"
+        ]
+      },
+      {
+        "subject": "Код 422 QUOTE_EXPIRED",
+        "places": [
+          "R-11",
+          "R-49",
+          "R-85"
+        ]
+      },
+      {
+        "subject": "Отмена проводки АБС",
+        "places": [
+          "R-13",
+          "R-50",
+          "R-57"
+        ]
+      },
+      {
+        "subject": "Тип курса по времени запроса",
+        "places": [
+          "R-09",
+          "R-55"
+        ]
+      },
+      {
+        "subject": "Отключение пункта меню обмена",
+        "places": [
+          "R-03"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

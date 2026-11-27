@@ -1,0 +1,24 @@
+{
+  "stage": "lens_analyst",
+  "status": "ok",
+  "seconds": 54.36,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 86,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [],
+    "document_maturity": {
+      "terms": false,
+      "version": true,
+      "timezone": true,
+      "no_placeholders": true,
+      "score": 3,
+      "mature": true
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

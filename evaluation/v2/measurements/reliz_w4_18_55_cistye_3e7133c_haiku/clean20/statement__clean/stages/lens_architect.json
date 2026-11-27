@@ -1,0 +1,345 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 103.72,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 97,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Передача статуса READY/FAILED от генератора к сервису выписок не отражена в архитектуре",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-02",
+          "R-16",
+          "R-63"
+        ],
+        "evidence": [
+          {
+            "quote": "Генератор PDF → файловое хранилище.",
+            "line": 20
+          },
+          {
+            "quote": "генератор PDF → сервис выписок: READY или FAILED",
+            "line": 40
+          },
+          {
+            "quote": "генератор PDF → StatementOrderController (READY или FAILED)",
+            "line": 146
+          }
+        ],
+        "problem": "В архитектуре (строка 20) путь от генератора PDF к сервису выписок отсутствует: стрелка идёт только от очереди к генератору и от генератора к хранилищу. Последовательность (строка 40) и схема метода (строка 146) содержат вызов генератора, возвращающий READY или FAILED.",
+        "scenario": "Разработчик по архитектуре не заложит канал, по которому генератор сообщает READY или FAILED: заказ останется в IN_PROGRESS, а клиент будет видеть статус формирования по методу 3 до 30-минутного таймаута.",
+        "impact": "Неясно, как результат генерации доходит до статуса заказа, и реализация расходится с последовательностью.",
+        "recommendation": "Добавить в архитектуру связь «Генератор PDF → сервис выписок» с ответом READY или FAILED и указать способ вызова (метод или событие очереди) в последовательности и схеме метода.",
+        "rewrite": "Генератор PDF → сервис выписок: уведомление о результате по orderId, значения READY или FAILED; способ передачи <уточнить: вызов или событие очереди, формат сообщения>.",
+        "question": "Какой механизм передачи результата генератора в сервис выписок — прямой вызов или событие очереди заданий?",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /statements/orders",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 125
+        },
+        {
+          "name": "GET /statements/orders",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 196
+        },
+        {
+          "name": "GET /statements/orders/{orderId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 197
+        },
+        {
+          "name": "POST /statements/orders/{orderId}/link",
+          "method": "POST",
+          "purpose": "создание (выдача ссылки)",
+          "line": 198
+        },
+        {
+          "name": "GET /statements/files/{token}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "GET /accounts",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 47
+        },
+        {
+          "name": "GET /accounts/{accountId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 136
+        },
+        {
+          "name": "GET /abs/v1/accounts/{accountId}/turnovers",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 47
+        },
+        {
+          "name": "Генератор PDF → сервис выписок (READY или FAILED)",
+          "method": "вызов",
+          "purpose": "уведомление",
+          "line": 40
+        },
+        {
+          "name": "Сервис выписок → очередь заданий (задание на формирование)",
+          "method": "событие",
+          "purpose": "создание",
+          "line": 40
+        }
+      ],
+      "promises": [
+        {
+          "what": "получает список заказов клиента методом 2",
+          "line": 46,
+          "operation": "GET /statements/orders"
+        },
+        {
+          "what": "показывает счёт, период, язык, дату и время создания и статус заказа на экране заказа",
+          "line": 23,
+          "operation": "GET /statements/orders/{orderId}"
+        },
+        {
+          "what": "запрашивает статус заказа каждые 5 секунд",
+          "line": 24,
+          "operation": "GET /statements/orders/{orderId}"
+        },
+        {
+          "what": "показывает срок «Доступна до» по значению fileExpiresAt",
+          "line": 25,
+          "operation": "GET /statements/orders/{orderId}"
+        },
+        {
+          "what": "запрашивает новую ссылку на скачивание при каждом нажатии «Скачать»",
+          "line": 25,
+          "operation": "POST /statements/orders/{orderId}/link"
+        },
+        {
+          "what": "открывает файл выписки по ссылке",
+          "line": 25,
+          "operation": "GET /statements/files/{token}"
+        },
+        {
+          "what": "показывает список счетов клиента для выбора в форме",
+          "line": 22,
+          "operation": "GET /accounts"
+        },
+        {
+          "what": "получает данные счёта (владелец, статус, дата открытия, IBAN) при создании заказа",
+          "line": 47,
+          "operation": "GET /accounts/{accountId}"
+        },
+        {
+          "what": "генератор получает данные счёта, операции и остатки из АБС",
+          "line": 47,
+          "operation": "GET /abs/v1/accounts/{accountId}/turnovers"
+        }
+      ],
+      "codes": [
+        {
+          "code": "202",
+          "lines": [
+            80,
+            133,
+            139,
+            175
+          ],
+          "described": true,
+          "note": "условие и тело заданы в строке 175"
+        },
+        {
+          "code": "400",
+          "lines": [
+            134,
+            176
+          ],
+          "described": true,
+          "note": "VALIDATION_ERROR, тело как у метода 1"
+        },
+        {
+          "code": "401",
+          "lines": [
+            133,
+            177,
+            192
+          ],
+          "described": true,
+          "note": "UNAUTHORIZED"
+        },
+        {
+          "code": "404",
+          "lines": [
+            136,
+            178,
+            197,
+            198,
+            199
+          ],
+          "described": true,
+          "note": "ACCOUNT_NOT_FOUND, ORDER_NOT_FOUND, LINK_NOT_FOUND"
+        },
+        {
+          "code": "409",
+          "lines": [
+            135,
+            179
+          ],
+          "described": true,
+          "note": "IDEMPOTENCY_KEY_CONFLICT"
+        },
+        {
+          "code": "410",
+          "lines": [
+            198,
+            199
+          ],
+          "described": true,
+          "note": "FILE_EXPIRED у метода 4, LINK_EXPIRED у метода 5"
+        },
+        {
+          "code": "422",
+          "lines": [
+            136,
+            137,
+            180,
+            198
+          ],
+          "described": true,
+          "note": "errorCode из таблицы; ORDER_NOT_READY у метода 4"
+        },
+        {
+          "code": "500",
+          "lines": [
+            181,
+            192
+          ],
+          "described": true,
+          "note": "INTERNAL_ERROR"
+        }
+      ],
+      "fields": [
+        {
+          "name": "accountId",
+          "places": "запрос метода 1, строка 155: string 1–64; ответ, строка 165: string"
+        },
+        {
+          "name": "dateFrom",
+          "places": "запрос, строка 156: string (date, YYYY-MM-DD); ответ, строка 167: string (date)"
+        },
+        {
+          "name": "dateTo",
+          "places": "запрос, строка 157: string (date, YYYY-MM-DD); ответ, строка 168: string (date)"
+        },
+        {
+          "name": "language",
+          "places": "запрос, строка 158: string, ru/kk/en; ответ, строка 169: string"
+        },
+        {
+          "name": "status",
+          "places": "ответ, строка 170: IN_PROGRESS/READY/FAILED/EXPIRED"
+        },
+        {
+          "name": "fileExpiresAt",
+          "places": "ответ, строка 172: string (date-time) или null"
+        },
+        {
+          "name": "createdAt",
+          "places": "ответ, строка 171: string (date-time), ISO 8601, +05:00"
+        },
+        {
+          "name": "orderId",
+          "places": "ответ, строка 164: string (UUID); путь методов 3 и 4, строка 197–198"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /statements/orders",
+          "step": "сессия отсутствует или истекла",
+          "line": 133,
+          "outcome": "401 UNAUTHORIZED, тело errorCode/message"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "Idempotency-Key или тело не соответствует формату",
+          "line": 134,
+          "outcome": "400 VALIDATION_ERROR"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "ключ уже есть у клиента: совпали параметры — 202, иначе 409",
+          "line": 135,
+          "outcome": "202 с заказом или 409 IDEMPOTENCY_KEY_CONFLICT"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "счёт не найден или чужой — 404; счёт CLOSED — 422",
+          "line": 136,
+          "outcome": "404 ACCOUNT_NOT_FOUND или 422 ACCOUNT_CLOSED"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "нарушение периода по порядку проверок",
+          "line": 137,
+          "outcome": "422 с кодом нарушения"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "10 заказов не в FAILED за сутки",
+          "line": 138,
+          "outcome": "422 DAILY_LIMIT_EXCEEDED"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "создание заказа, постановка задания, 202",
+          "line": 139,
+          "outcome": "202 с объектом заказа"
+        },
+        {
+          "operation": "POST /statements/orders/{orderId}/link",
+          "step": "статус EXPIRED",
+          "line": 198,
+          "outcome": "410 FILE_EXPIRED"
+        },
+        {
+          "operation": "POST /statements/orders/{orderId}/link",
+          "step": "статус IN_PROGRESS или FAILED",
+          "line": 198,
+          "outcome": "422 ORDER_NOT_READY"
+        },
+        {
+          "operation": "GET /statements/files/{token}",
+          "step": "подпись неверна или токен повреждён",
+          "line": 199,
+          "outcome": "404 LINK_NOT_FOUND"
+        },
+        {
+          "operation": "GET /statements/files/{token}",
+          "step": "текущее время не меньше urlExpiresAt",
+          "line": 199,
+          "outcome": "410 LINK_EXPIRED"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}
