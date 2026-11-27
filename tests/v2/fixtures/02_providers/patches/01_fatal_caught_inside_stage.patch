@@ -1,0 +1,17 @@
+diff --git a/src/bcc_review/v2/pipeline.py b/src/bcc_review/v2/pipeline.py
+index 1c8b47e..7a42aa9 100644
+--- a/src/bcc_review/v2/pipeline.py
++++ b/src/bcc_review/v2/pipeline.py
+@@ -251,6 +251,12 @@ class Pipeline:
+             msg = f"Этап {name} не выполнен: {err[:300]}"
+             self.warnings.append(msg)
+             self.log(f"  {name}: СБОЙ — {err[:200]}")
++        # Этап мог сам поймать фатальную ошибку провайдера (судья — у второй проверки серьёзности): причину
++        # (лимит подписки, квота, ключ) всё равно показываем первой строкой, иначе partial «без причины»
++        fatal = getattr(llm, "fatal", None) if llm else None
++        if fatal is not None and not self.model_error:
++            self.model_error = explain(fatal, self.provider_name)
++            self.warnings.insert(0, self.model_error)
+         after = (llm.stats["by_stage"].get(name) or {}) if llm else {}
+         calls = int(after.get("calls", 0)) - int(before.get("calls", 0))
+         hit = (int(after.get("budget", 0)) - int(before.get("budget", 0))) + \
