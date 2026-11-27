@@ -1207,6 +1207,28 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
 GOAL_MISMATCH_KINDS = CONFLICT_KINDS | {"other", "traceability", "incorrect"}
 
 
+# Вопрос владельцу, если ни судья, ни кандидаты не дали ни готовой формулировки, ни вопроса (пункт рубрики
+# «исправление»): по виду замечания и предмету заголовка. Только для повторяющихся типов, где вопрос однозначен.
+_DEFAULT_QUESTIONS = [
+    (re.compile(r"критери\w* приё?е?мк|приё?е?мочн", re.I), None,
+     "Какие случаи — границы значений, отказы, повторы — добавить в критерии приёмки, чтобы по ним можно было "
+     "принять или отклонить реализацию?"),
+    (None, {"terminology"}, "Какое одно название закрепить за этим понятием во всех разделах документа?"),
+    (None, {"placeholder"}, "Кто и к какому сроку заполнит эти поля и разделы?"),
+    (re.compile(r"откат|выключ|отключ", re.I), None,
+     "Как выключить функцию или откатить изменение без выпуска новой версии, если после запуска найдётся ошибка?"),
+]
+
+
+def _default_question(f: dict) -> str:
+    if _s(f.get("rewrite")) or _s(f.get("question")):
+        return ""
+    for title_re, kinds, q in _DEFAULT_QUESTIONS:
+        if (title_re is None or title_re.search(_s(f.get("title")))) and (kinds is None or f.get("kind") in kinds):
+            return q
+    return ""
+
+
 def _absorb_goal_minors(findings: list[dict], req_kind_at: dict[int, str], ctx: Any,
                         warnings: list[str]) -> list[dict]:
     """Minor «цель документа расходится с требованием», когда то же требование (те же строки, кроме строк цели, и
@@ -1585,6 +1607,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             f["_first_line"] = f["evidence"][0]["line_start"]
     if _option(ctx, "judge_absorb_goal", True):
         findings = _absorb_goal_minors(findings, req_maps[0], ctx, warnings)
+    for f in findings:
+        f["question"] = _s(f.get("question")) or _default_question(f)
     _cap_critical(findings, ctx, warnings)
     if _option(ctx, "judge_confirm_majors", True):
         _confirm_majors(findings, candidates, max(run_sources, reviewer_stages(ctx)), ctx, warnings)

@@ -63,3 +63,23 @@ def test_goal_rule_off_switch():
     res = judge.run(Ctx(FakeLLM(_resp("other")), requirements=REQS,
                         options={"judge_check": False, "judge_absorb_goal": False}), _cands("other"))
     assert len(res["findings"]) == 3
+
+
+def test_default_owner_question_only_when_nothing_given():
+    """Нет ни формулировки, ни вопроса — у повторяющихся типов (покрытие приёмки, термин, заглушка, откат)
+    появляется конкретный вопрос владельцу; данный кандидатом вопрос не заменяется."""
+    cs = [cand("C-001", 63, "Исходные условия | Действие | Ожидаемый результат", kind="incomplete",
+               severity="minor", title="Критерии приёмки покрывают малую часть требований"),
+          cand("C-002", 90, "Удобный интерфейс", kind="ambiguity")]
+    cs[1]["question"] = "Что считать удобным?"
+    resp = response([finding("F01", ["C-001"], kind="incomplete", severity="minor",
+                             title="Критерии приёмки покрывают малую часть требований"),
+                     finding("F02", ["C-002"], title="Размытое «удобный интерфейс»")])
+    res = judge.run(Ctx(FakeLLM(resp)), cs)
+    q1 = next(f for f in res["findings"] if f["candidate_ids"] == ["C-001"])["question"]
+    q2 = next(f for f in res["findings"] if f["candidate_ids"] == ["C-002"])["question"]
+    assert q1.startswith("Какие случаи") and "критерии приёмки" in q1
+    assert q2 == "Что считать удобным?"
+    assert judge._default_question({"title": "Нет схемы отката", "kind": "missing_element"}).startswith("Как выключить")
+    assert judge._default_question({"title": "Что-то", "kind": "ambiguity"}) == ""
+    assert judge._default_question({"title": "Термины", "kind": "terminology", "rewrite": "Готово"}) == ""
