@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "tests" / "v2"))
 sys.path.insert(0, str(ROOT / "src"))
 
 from bcc_review.v2.stages import judge  # noqa: E402
-from test_10_judge import Ctx, FakeLLM, all_placed, cand, finding, response, simple_view  # noqa: E402
+from test_10_judge import Ctx, FakeLLM, Truncated, all_placed, cand, finding, response, simple_view  # noqa: E402
 
 FX = ROOT / "tests" / "v2" / "fixtures" / "10_judge"
 DOC = ROOT / "release" / "input" / "requirements.md"
@@ -227,3 +227,24 @@ def test_document_ids_like_model_keys_untouched():
     res = judge.run(Ctx(FakeLLM(resp), view=view, requirements=[]), _three())
     rej = next(r for r in res["rejected"] if r["candidate_id"] == "C-003")
     assert rej["reason"] == "Требование F02 уже задаёт это."
+
+
+def test_split_batch_keys_in_texts_follow_parts():
+    """Обрезанный ответ → две части; F01 второй части в её тексте и в причине отклонения — дефект второй части."""
+    cs = [cand(f"C-{i:03d}", ln, q, kind=k) for i, (ln, q, k) in enumerate([
+        (38, "Месяц определяется по дате совершения покупки", "contradiction"),
+        (64, "Февральский счётчик вырос", "ambiguity"),
+        (90, "Удобный интерфейс", "incomplete"),
+        (120, "Ответ при ошибке", "api_contract")], 1)]
+    part1 = response([finding("F01", ["C-001"], kind="contradiction")], checklist=[], summary="Часть 1.")
+    part2 = response([{**finding("F01", ["C-003"], kind="incomplete"), "problem": "Следствие F01: экран пуст."}],
+                     rejected=[{"candidate_id": "C-004", "reason_code": "resolved_elsewhere",
+                                "reason": "Уже покрыт F01.", "line": 0}], checklist=[], summary="Часть 2.")
+    first = {"findings": [finding("F01", ["C-001"])], "rejected": [], "checklist": [], "verdict_summary": ""}
+    llm = FakeLLM(Truncated("обрезан"), part1, part2, first)
+    res = judge.run(Ctx(llm), cs)
+    d2 = next(f for f in res["findings"] if "C-003" in f["candidate_ids"])
+    rej = next(r for r in res["rejected"] if r["candidate_id"] == "C-004")
+    assert rej["reason"] == f"Уже покрыт {d2['id']}."
+    assert d2["problem"].startswith(f"Следствие {d2['id']}") or "F01" not in d2["problem"]
+    assert not any(_KEY_RE.search(t) for t in _texts(res))

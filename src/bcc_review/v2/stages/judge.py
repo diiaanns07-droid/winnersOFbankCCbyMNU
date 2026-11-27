@@ -739,11 +739,19 @@ def _merge_responses(parts: list[dict]) -> dict:
     order = {"Нет": 0, "Частично": 1, "Да": 2, "Не требуется": 3}
     for pi, resp in enumerate(parts, 1):
         remap: dict[str, str] = {}
+        own = []
         for f in resp.get("findings") or []:
-            key = f"P{pi}{_s(f.get('key')) or len(findings) + 1}"
-            remap[_s(f.get("key"))] = key
-            findings.append({**f, "key": key})
-        rejected += list(resp.get("rejected") or [])
+            key = f"P{pi}{_s(f.get('key')) or len(findings) + len(own) + 1}"
+            if _s(f.get("key")):
+                remap[_s(f.get("key"))] = key
+            own.append({**f, "key": key})
+        for f in own:  # ссылки на дефекты своей части в текстах — на новые ключи
+            for field in ("title", "problem", "scenario"):
+                if _s(f.get(field)):
+                    f[field] = _replace_keys(_s(f[field]), remap)
+        findings += own
+        rejected += [dict(r, reason=_replace_keys(_s(r.get("reason")), remap)) if isinstance(r, dict) else r
+                     for r in resp.get("rejected") or []]
         for ch in resp.get("checklist") or []:
             n = ch.get("n")
             ch = {**ch, "finding_keys": [remap.get(k, k) for k in ch.get("finding_keys") or []],
