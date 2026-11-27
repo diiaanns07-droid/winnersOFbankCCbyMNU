@@ -35,6 +35,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
+from bcc_review.v2.rules.units import CURRENCIES, DUR_UNIT
 from bcc_review.v2.stages import clarify as _cl
 
 STAGE = "recheck"
@@ -628,7 +629,7 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         hint = a.get("topic_hint") or ""
         q = by_id.get(a["id"])
         unknown_choice = hint and k not in bound and a.get("choice") is not None
-        if k in ambiguous or unknown_choice or (document_changed and not hint):
+        if k in ambiguous or unknown_choice or (document_changed and k not in bound):
             text = str(a.get("text") or "").strip()
             if a.get("choice") is not None:
                 text = " ".join(filter(None, [_cl.option_label(a["choice"]), text, a.get("comment")])).strip()
@@ -739,10 +740,37 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     return out
 
 
-def _values(text: str) -> set[str]:
-    """Числа ответа: «100 000» = «100000», «0,5» = «0.5»; одна цифра («1 раз», «шаг 2») — не значение."""
-    s = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d{3}(?!\d))", "", str(text or ""))
-    return {n.replace(",", ".") for n in re.findall(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])", s) if len(n) >= 2}
+_ANSWER_NUMBER = re.compile(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])")
+_CURRENCY_UNITS = "|".join(pattern for major, minor, *_ in CURRENCIES for pattern in (major, minor))
+_MONEY_AFTER = re.compile(rf"(?:{_CURRENCY_UNITS})(?!\w)", re.I)
+_DURATION_AFTER = re.compile(DUR_UNIT, re.I)
+
+
+def _measurements(text: str) -> tuple[set[str], set[str]]:
+    """Числа и явно указанные величины. Пустой вид означает, что единица не названа."""
+    text = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d{3}(?!\d))", "", str(text or ""))
+    values, units = set(), set()
+    for match in _ANSWER_NUMBER.finditer(text):
+        value = match.group()
+        if len(value) < 2:
+            continue
+        values.add(value.replace(",", "."))
+        tail = text[match.end():].lstrip()
+        if _MONEY_AFTER.match(tail):
+            units.add("money")
+        elif _DURATION_AFTER.match(tail):
+            units.add("duration")
+        else:
+            units.add("")
+    return values, units
+
+
+def _values_clash(left: tuple[set[str], set[str]], right: tuple[set[str], set[str]]) -> bool:
+    a, kinds_a = left
+    b, kinds_b = right
+    if "" not in kinds_a | kinds_b and kinds_a.isdisjoint(kinds_b):
+        return False  # Например, одна реплика задаёт срок, другая — сумму.
+    return bool(a - b and b - a)
 
 
 def decision_clashes(orphans: dict) -> list[dict]:
@@ -754,9 +782,9 @@ def decision_clashes(orphans: dict) -> list[dict]:
     for (qid, _topic), items in orphans.items():
         if len(items) < 2:
             continue
-        vals = [_values(x["text"]) for x in items]
+        vals = [_measurements(x["text"]) for x in items]
         clash = [x for i, x in enumerate(items)
-                 if any(vals[i] - vals[j] and vals[j] - vals[i] for j in range(len(items)) if j != i)]
+                 if any(_values_clash(vals[i], other) for other in vals)]
         if len(clash) >= 2:
             out.append({"question_id": qid or "", "topic": clash[0]["topic"], "answers": [x["label"] for x in clash],
                         "texts": {x["label"]: x["text"] for x in clash}})

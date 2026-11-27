@@ -90,7 +90,24 @@ def test_questions_from_another_revision_cannot_be_answered_by_number_alone():
     assert result["answers"] == [] and result["decisions"] == []
     assert result["answers_document"]["match"] is False
     assert result["needs_confirmation"][0]["text"] == "B"
+    stale_text = changed.replace("Q-01: B", "Q-01 [Складская логистика]: Груз складируем на терминале.")
+    unbound = recheck.apply_answers(FakeCtx(FakeLLM({})), report, stale_text)["clarification"]
+    assert unbound["decisions"] == [] and unbound["needs_confirmation"][0]["topic"] == "Складская логистика"
+    by_topic = changed.replace("Q-01: B", "Q-05 [Выбор канала]: Личный кабинет.")
+    linked = recheck.apply_answers(FakeCtx(FakeLLM({})), report, by_topic)["clarification"]
+    assert linked["answers"][0]["question_id"] == "Q-01"
     same = changed.replace("b" * 64, "a" * 64)
     matched = recheck.apply_answers(FakeCtx(FakeLLM({})), report, same)["clarification"]
     assert matched["answers_document"]["match"] is True
     assert matched["answers"][0]["answer"] == "Экран карты"
+
+
+def test_distinct_units_in_orphan_replies_do_not_create_a_conflict():
+    def replies(left, right):
+        return {("Q-19", "Порядок возврата"): [
+            {"label": "Решение-1", "topic": "Порядок возврата", "text": left},
+            {"label": "Решение-2", "topic": "Порядок возврата", "text": right},
+        ]}
+    assert recheck.decision_clashes(replies("Возвращаем 200 тенге.", "Срок возврата 48 часов.")) == []
+    assert recheck.decision_clashes(replies("Возвращаем 200 тенге.", "Возвращаем 350 тенге."))
+    assert recheck.decision_clashes(replies("Возвращаем 423 при блокировке.", "Возвращаем 409 при блокировке."))
