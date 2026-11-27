@@ -284,8 +284,11 @@ def render_brief(report: dict) -> str:
                 out.append(f"* {_place(e)}: «{e.get('quote', '')}»")
             out += ["", f"**Почему это проблема.** {_md(_first_sentence(x.get('problem', ''), 480))}", "",
                     f"**Что сделать.** {_md(_first_sentence(x.get('recommendation', ''), 320))}", ""]
-    sig = [g for g in report.get("signals") or [] if g.get("kind") not in ("inventory",)
-           and not str(g.get("rule", "")).startswith(("api.status_", "api.get_mutation", "api.field_types"))]
+    # подсказки для человека: без сводок, без служебных указаний модели и без дублей замечаний
+    noted = {str(x.get("sources", [""])[0]).split(":", 1)[-1] for x in f}
+    sig = [g for g in report.get("signals") or [] if g.get("kind") not in ("inventory", "security")
+           and not str(g.get("rule", "")).startswith(("api.", "injection.", "promises."))
+           and g.get("rule") not in noted]
     if sig:
         out += ["## Подсказки для ручной проверки", "", "Места, на которые правила обращают внимание; это не замечания.", ""]
         for g in sig[:10]:

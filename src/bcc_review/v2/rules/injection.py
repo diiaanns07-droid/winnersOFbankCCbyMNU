@@ -94,7 +94,8 @@ def run(doc: Doc, out: dict) -> None:
     first = hits[0]
     out["candidates"].append(candidate(
         "injection.prompt",
-        title=f"В тексте требований — указание для модели или проверяющего: {quoted(first[1][:80])}",
+        title=(f"В тексте требований — указание для ИИ-проверки, а не требование (строка {first[0].n}"
+               + (f" и ещё {len(hits) - 1}" if len(hits) > 1 else "") + ")"),
         kind="security", criterion="risk", severity="major", blocks="none",
         evidence=[ev(h[0], h[1]) for h in hits[:3]],
         problem=(f"Строка {first[0].n} — не требование, а {first[2]}: {quoted(first[1])}. Такой текст пытается повлиять "
