@@ -1,0 +1,24 @@
+Документ: evaluation/v2/open2/insurance_clean/source.md
+  segment: взят из insurance_clean__clean
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 4
+  lens_analyst: запуск
+  consistency: взят из insurance_clean__clean
+  lens_architect: взят из insurance_clean__clean
+  lens_risk: взят из insurance_clean__clean
+  lens_qa: взят из insurance_clean__clean
+  lens_analyst: готово за 68 с, вызовов 1, кандидатов 6
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 32
+  judge: взят из insurance_clean__clean
+  clarify: взят из insurance_clean__clean
+Этап lens_analyst: ok, вызовов 1, 68.05 с, кандидатов 6
+Выход этапа: runs/20261127-205534-1e77/stages/lens_analyst.json
+BCC Review: «Страхование жизни при оформлении кредита наличными» — 51 требование, 22 дефекта (критичных 0, существенных 0, незначительных 22), вопросов 5
+Разработка: можно · тестирование: можно — исправить первым:
+  D-01 Требования не имеют приоритетов и признаков важности
+  D-02 Цель «без жалоб» без числа не проверяется требованиями
+  D-03 Одни понятия названы разными терминами, глоссария нет
+Прогон завершён полностью: 1 мин 8 с, 1 вызов модели, claude-haiku-5-5; цитат сверено 51 из 51
+Отчёт: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-insurance_clean__clean/lens_analyst.json и evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-insurance_clean__clean/lens_analyst.json
+HTML: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-insurance_clean__clean/lens_analyst.html

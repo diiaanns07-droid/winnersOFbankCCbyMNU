@@ -1,0 +1,22 @@
+Документ: evaluation/v2/open2/qr_clean/source.md
+  segment: взят из qr_clean__clean
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 4
+  lens_analyst: запуск
+  lens_risk: взят из qr_clean__clean
+  lens_architect: взят из qr_clean__clean
+  consistency: взят из qr_clean__clean
+  lens_qa: взят из qr_clean__clean
+  lens_analyst: готово за 58 с, вызовов 1, кандидатов 6
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 29
+  judge: взят из qr_clean__clean
+  clarify: взят из qr_clean__clean
+Этап lens_analyst: ok, вызовов 1, 57.68 с, кандидатов 6
+Выход этапа: runs/20261127-205538-51dd/stages/lens_analyst.json
+BCC Review: «Перевод по QR-коду» — 52 требования, 20 дефектов (критичных 0, существенных 1, незначительных 19), вопросов 1
+Разработка: можно · тестирование: можно — исправить первым:
+  D-01 Маршрут перевода QR: через сервис QR-кодов или напрямую в сервис переводов
+Прогон завершён полностью: 58 с, 1 вызов модели, claude-haiku-5-5; цитат сверено 44 из 44
+Отчёт: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-qr_clean__clean/lens_analyst.json и evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-qr_clean__clean/lens_analyst.json
+HTML: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-qr_clean__clean/lens_analyst.html
