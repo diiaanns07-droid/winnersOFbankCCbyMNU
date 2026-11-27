@@ -102,6 +102,8 @@ def one(p: dict) -> tuple[dict, list[dict]]:
     (pair(14, 15, kind="boundary_conflict"), "no_value", "undefined"),
     # следствие ответа другой системы против ответа на запрос
     (pair(16, 17, kind="status_conflict", basis="same_condition"), "two_phase", "undefined"),
+    # две цитаты из одной строки — не два места
+    (pair(22, 22, qa="Вклад можно пополнять", qb="не более трёх раз в квартал"), "same_place", "undefined"),
 ])
 def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
     pc, cands = one(p)

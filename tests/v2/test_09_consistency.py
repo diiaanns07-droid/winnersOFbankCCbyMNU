@@ -93,10 +93,11 @@ def test_compatible_pair_gives_no_candidate():
     assert out["candidates"] == []
 
 
-def test_conflict_with_one_missing_quote_is_downgraded_to_major():
+def test_conflict_with_one_missing_quote_is_not_conflict():
     out = C.postprocess(answer(pair_checks=[pair(quote_b="Этой фразы в документе нет")]), VIEW, REQS)
     [c] = out["candidates"]
-    assert c["severity"] == "major"
+    # №27: конфликт держится на двух цитатах из разных мест; одна не найдена — неопределённость, minor
+    assert c["severity"] == "minor" and out["pair_checks"][0]["gate"] == "same_place"
     assert out["pair_checks"][0]["verified_b"] == "missing"
 
 

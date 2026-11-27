@@ -567,6 +567,7 @@ GATE_RU = {
     "ui_display": "одна сторона — показ на экране, а не исход правила",
     "no_value": "у одной стороны нет ни значения, ни слова границы (ни кода, ни статуса)",
     "two_phase": "одна сторона — следствие ответа другой системы, а не ответ на тот же запрос",
+    "same_place": "цитаты не найдены в двух разных местах документа",
 }
 
 
@@ -605,6 +606,9 @@ def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str
     """Проверка конфликта кодом: пустая строка — конфликт держится на цитатах; иначе — причина (ключ ``GATE_RU``)."""
     kind, qa, qb = pair["kind"], pair["quote_a"], pair["quote_b"]
     quotes = (qa, qb)
+    # Две цитаты из разных мест: обе найдены в документе и не на одних строках.
+    if not (_found(ev_a) and _found(ev_b)) or _overlap(ev_a, ev_b):
+        return "same_place"
     sides = [(ev, q, _req_of(ev, known) or (known or {}).get(rid, {})) for ev, q, rid in
              ((ev_a, qa, pair["a"]), (ev_b, qb, pair["b"]))]
     # Нормативные места: методика тестирования и согласование документа поведение системы не задают.

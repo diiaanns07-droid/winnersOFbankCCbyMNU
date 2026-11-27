@@ -212,13 +212,12 @@ def test_tiyn_with_decimals_against_tenge_row_stays_conflict():
              kind="unit_mismatch", basis="value_mismatch", outcome_a="120 000 ₸", outcome_b="12 000 000 тиынов")
     assert run(p)["candidates"] == []
     p2 = dict(p, quote_b="Сумма в тиынах с двумя знаками после точки")
-    doc_line = VIEW["lines"][10]
-    old = doc_line["text"]
-    doc_line["text"] = "amount | integer | Сумма в тиынах с двумя знаками после точки"
-    try:
-        assert len(run(p2)["candidates"]) == 1
-    finally:
-        doc_line["text"] = old
+    # №27: отдельная копия документа — сверка цитат кэширует строки, правка общего VIEW на месте её не видит
+    view = {"lines": [dict(x) for x in VIEW["lines"]]}
+    view["lines"][10]["text"] = "amount | integer | Сумма в тиынах с двумя знаками после точки"
+    out = C.postprocess(answer(pair_checks=[p2]), view, REQS)
+    assert out["pair_checks"][0]["verified_b"] != "missing"
+    assert len(out["candidates"]) == 1
 
 
 def test_degenerate_answer_gives_warning():
