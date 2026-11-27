@@ -573,3 +573,16 @@ def test_conditional_permission_against_prohibition_of_other_state_is_not_confli
     out = C.postprocess(answer(pair_checks=[p]), view, reqs)
     assert out["pair_checks"][0]["verdict"] == "undefined"
     assert [c["severity"] for c in out["candidates"]] == ["major"]
+
+
+def test_major_glossary_entries_on_the_same_two_lines_merge_into_one_remark():
+    def g(gid, concept, terms):
+        return C.glossary_to_candidate({"id": gid, "concept": concept, "severity": "major", "problem": "",
+                                        "terms": [{"term": t, "line": n, "verified": "exact"} for t, n in terms]})
+    a = g("G-01", "Компонент настроек", [("сервис настроек", 26), ("настройки", 43), ("хранилище", 130)])
+    b = g("G-02", "Компонент расходов", [("учёт расходов", 26), ("сервис расходов", 43)])
+    c = g("G-03", "Владелец", [("держатель", 37), ("владелец", 105)])
+    out = C.merge_glossary([a, b, c])
+    assert len(out) == 2
+    assert out[0]["glossary_ids"] == ["G-01", "G-02"] and "учёт расходов" in out[0]["title"]
+    assert out[1]["glossary_ids"] == ["G-03"]
