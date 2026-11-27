@@ -170,7 +170,9 @@ class JobStore:
     """Задания в памяти + `job.json` на диске (чтобы список переживал перезапуск сервера)."""
 
     def __init__(self, root: Path):
-        self.root = Path(root)
+        # абсолютный корень: анализ идёт дочерним процессом с cwd = папка задания, и относительные пути
+        # (по умолчанию --data-dir .bcc_web) там не находятся — «Файл не найден: .bcc_web\jobs\…\input\…»
+        self.root = Path(root).resolve()
         (self.root / "jobs").mkdir(parents=True, exist_ok=True)
         gi = self.root / ".gitignore"
         if not gi.exists():

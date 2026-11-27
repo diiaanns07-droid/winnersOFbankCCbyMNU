@@ -19,10 +19,10 @@ def plain_warn(text) -> str:
     m = _md._STAGE_PREFIX.match(s)
     if m and _md.stage_key(m.group(1)) in _md.STAGES:
         s = f"{_md.STAGES[_md.stage_key(m.group(1))][0]}: " + s[m.end():]
-    s = _md._EXC.sub("", s)
+    s = _md._EXC_PAREN.sub("", _md._EXC.sub("", s))
     s = _md._STAGE_WORD.sub(lambda m: f"«{_md.STAGES[m.group(1)][0]}»", s)
     s = _md._SEV_WORD.sub(lambda m: _md.SEV_NAME[m.group(1)], s)
-    return _md._LREF.sub(_md._lref, s)
+    return _md.count_words(_md._LREF.sub(_md._lref, s))
 
 READY = {"no": "нельзя", "conditional": "с условиями", "yes": "можно", "undetermined": "не определено",
          "none": "не вынесен"}
@@ -53,16 +53,37 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
         f"BCC Review: «{doc.get('title') or doc.get('file') or 'документ'}» — {reqs}, {total} "
         f"{plural(total, 'дефект', 'дефекта', 'дефектов')} (критичных {fs.get('critical', 0)}, существенных "
         f"{fs.get('major', 0)}, незначительных {fs.get('minor', 0)}), вопросов {nq}",
-        f"Разработка: {READY.get(v.get('development'), '—')} · тестирование: {READY.get(v.get('testing'), '—')}",
     ]
-    by_id = {f.get("id"): f for f in report.get("findings") or []}
-    first = [by_id[i] for i in v.get("fix_first") or [] if i in by_id][:3]
-    if not first:
-        first = [f for f in report.get("findings") or [] if f.get("severity") == "critical"][:3]
-    for f in first:
-        lines.append(f"  {f['id']} {shorten(f.get('title'), width - 8)}"
-                     + (f" — блокирует {BLOCKS[f['blocks']]}" if f.get("severity") == "critical"
-                        and f.get("blocks") in BLOCKS and f.get("blocks") != "none" else ""))
+    verdict = f"Разработка: {READY.get(v.get('development'), '—')} · тестирование: {READY.get(v.get('testing'), '—')}"
+    # те же блокеры и тот же порядок, что на первом экране отчёта; число блокеров — всегда полное (раньше терминал
+    # показывал 3 блокера при счётчике 4); без блокеров — три пункта «исправить первым»
+    ctx = _md._Ctx(report)
+    blockers = _md._blockers(ctx)
+    order = _md._first_screen_fix(ctx, blockers)
+    shown = [f for f in order if f in blockers] + [f for f in blockers if f not in order]
+    if blockers:
+        common = _md._common_block(blockers)
+        odd = {f["id"] for f in blockers if f.get("blocks") != common}
+        n = len(blockers)
+        lines.append(verdict + (f" — блокер 1, останавливает {BLOCKS.get(blockers[0].get('blocks'), '—')}:" if n == 1
+                                else f" — блокеров {n}, " + ("каждый останавливает" if not odd else "останавливают")
+                                + f" {BLOCKS.get(common, '—')}"
+                                + "".join(f", {f['id']} — только {BLOCKS.get(f.get('blocks'), '—')}"
+                                          for f in blockers if f["id"] in odd) + ":"))
+        top = shown[:3] if n > 4 else shown
+        for f in top:
+            tail = ""
+            lines.append(f"  {f['id']} {shorten(f.get('title'), width - 8 - len(tail))}{tail}")
+        if len(shown) > len(top):
+            rest = shown[len(top):]
+            lines.append(f"  и ещё {len(rest)}: " + ", ".join(f["id"] for f in rest) + " — в отчёте, раздел «Кратко»")
+    else:
+        lines.append(verdict)
+        first = order[:3]
+        if first:
+            lines[-1] += " — исправить первым:"
+        for f in first:
+            lines.append(f"  {f['id']} {shorten(f.get('title'), width - 8)}")
     calls = (run.get("calls") or {}).get("total", 0)
     model = ", ".join(run.get("models_used") or []) or PLAIN_PROVIDERS.get(run.get("provider"), run.get("provider") or "—")
     cached = (run.get("calls") or {}).get("cached", 0)
