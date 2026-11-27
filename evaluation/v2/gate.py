@@ -224,12 +224,19 @@ def report_quality(row: dict | None) -> list[dict]:
     return out
 
 
-def _latest_summary(folder: Path, kind: str) -> dict | None:
+def _latest_summary(folder: Path, kind: str, with_defects: bool = False) -> dict | None:
+    """Последний прогон модели; with_defects — только прогон, где были кейсы с дефектами (support > 0).
+
+    Прогон только по чистым документам (например, «корпус чистые 13:00») не даёт recall и F1: в нём нет
+    ни одного заложенного дефекта, F1 = 0 там — не промах, а отсутствие замера.
+    """
     best = None
     for p in folder.glob("*/summary.json"):
         d = json.loads(p.read_text(encoding="utf-8"))
         k = model_kind(d.get("provider"), d.get("model") or d.get("label"))
         if k != kind:
+            continue
+        if with_defects and not ((d.get("harness") or {}).get("support") or 0):
             continue
         if not best or d.get("at", "") > best.get("at", ""):
             best = {**d, "_path": str(p.relative_to(ROOT))}
@@ -262,24 +269,34 @@ def _recall_owners(d: dict) -> str:
     return "; ".join(parts)
 
 
-def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list[dict]:
+def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
+                 d_rec: dict | None = None) -> list[dict]:
+    """Ворота корпуса. Чистые — по последнему прогону `d`; recall и F1 — по последнему прогону с дефектами
+    `d_rec` (если не передан — тот же `d`; прогон без дефектов даёт ⏳, а не F1 = 0)."""
     if not d:
         return [_check(f"{title}: замер", "есть", "нет замера", None, missing_owner)]
-    h, c = d["harness"], d["clean"]
+    c = d["clean"]
     src = f"{d.get('label')} ({str(d.get('at', ''))[11:16]})"
+    if d_rec is None:
+        d_rec = d
+    h = d_rec["harness"] if (d_rec.get("harness") or {}).get("support") else {}
+    rec_src = f"{d_rec.get('label')} ({str(d_rec.get('at', ''))[11:16]})" if h else src
     rec, f1 = h.get("recall"), h.get("f1")
     out = []
     if "recall" in t:
         out.append(_check(f"{title}: recall (строгий)", f"≥ {100 * t['recall']:.0f} %",
                           "—" if rec is None else f"{100 * rec:.0f} % ({h.get('tp')}/{h.get('support')})",
-                          None if rec is None else rec >= t["recall"], _recall_owners(d)))
+                          None if rec is None else rec >= t["recall"], _recall_owners(d_rec) if h else missing_owner))
+        out[-1]["_src"] = rec_src
     if "f1" in t:
         prec = h.get("precision")
         out.append(_check(f"{title}: F1 (строгий)", f"≥ {t['f1']:.2f}",
                           "—" if f1 is None else f"{f1:.2f} (P {prec or 0:.2f}, R {rec or 0:.2f})",
                           None if f1 is None else f1 >= t["f1"],
-                          (_recall_owners(d) + "; " if rec is not None and rec < 0.9 else "")
-                          + "ложные на мутантах и чистых → " + _clean_owners(d)))
+                          ((_recall_owners(d_rec) + "; " if rec is not None and rec < 0.9 else "")
+                           + "ложные на мутантах и чистых → " + _clean_owners(d_rec)) if h
+                          else f"{missing_owner}: нет прогона корпуса с дефектами"))
+        out[-1]["_src"] = rec_src
     if "clean_max_findings" in t:
         over = c.get("docs_over_1_finding")
         out.append(_check(f"{title}: на чистом ≤ {t['clean_max_findings']} замечания",
@@ -295,7 +312,7 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> lis
         out.append(_check(f"{title}: прогон", "все кейсы измерены", f"не измерено {d['failed']} из {d['cases']}",
                           False, "№01, №02"))
     for x in out:
-        x["source"] = src
+        x["source"] = x.pop("_src", src)
     return out
 
 
@@ -468,7 +485,8 @@ def collect(runs: list[str] | None = None, with_tests: bool = False) -> list[dic
             continue
         checks += official_gates(kind, latest.get(kind), gold)
     checks += stability_gates(gold)
-    checks += corpus_gates("Корпус, haiku", _latest_summary(V2 / "corpus_results", "haiku"), CORPUS, "№15")
+    checks += corpus_gates("Корпус, haiku", _latest_summary(V2 / "corpus_results", "haiku"), CORPUS, "№15",
+                           _latest_summary(V2 / "corpus_results", "haiku", with_defects=True))
     for kind in ("sonnet", "haiku", "gemini"):
         d = _latest_newtz(kind, clean_only=False)
         if d or kind == "sonnet":

@@ -114,3 +114,20 @@ def test_cleantable_latest_and_p1_rule():
     text = ct.render(groups)
     assert "| чистые ТЗ №20 | haiku | новый" in text and "❌" in text  # qr_v2: major 4 > 3
     assert "qr_v2 ❗" in text and "| fx |" in text
+
+
+def test_corpus_gates_clean_only_run_takes_f1_from_run_with_defects():
+    """Прогон корпуса только по чистым (support = 0) не даёт F1 = 0: recall и F1 — из последнего прогона с дефектами."""
+    clean_only = {"label": "чистые 13:00", "at": "2026-11-27 13:00",
+                  "harness": {"recall": 0.0, "tp": 0, "support": 0, "f1": 0.0, "precision": 0.0},
+                  "clean": {"n": 8, "measured": 8, "critical": 0, "docs_with_critical": 0, "docs_over_1_finding": 0,
+                            "max_findings": 1, "verdict_no": 0},
+                  "details": {"fp": []}, "per_issue_type": {}, "failed": 0, "cases": 8}
+    full = {"label": "полный 08:30", "at": "2026-11-27 08:30",
+            "harness": {"recall": 0.9, "tp": 9, "support": 10, "f1": 0.8, "precision": 0.7},
+            "clean": clean_only["clean"], "details": {"fp": []}, "per_issue_type": {}, "failed": 0, "cases": 33}
+    ch = {c["name"].split(": ")[1]: c for c in gate.corpus_gates("Корпус", clean_only, gate.CORPUS, "№15", full)}
+    assert ch["F1 (строгий)"]["ok"] is True and ch["F1 (строгий)"]["source"].startswith("полный 08:30")
+    assert ch["critical на чистых"]["source"].startswith("чистые 13:00")
+    alone = {c["name"].split(": ")[1]: c for c in gate.corpus_gates("Корпус", clean_only, gate.CORPUS, "№15")}
+    assert alone["F1 (строгий)"]["ok"] is None  # ⏳, а не ❌ F1 = 0
