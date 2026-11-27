@@ -1,0 +1,6 @@
+# В сгенерированных отчётах два пробела в конце строки задают перенос Markdown.
+**/baseline.md whitespace=-blank-at-eol
+**/answered.md whitespace=-blank-at-eol
+**/reread.md whitespace=-blank-at-eol
+# Паспорт повторной проверки хранит хеш исходных байтов этой редакции.
+**/answered.revised.md -text whitespace=-blank-at-eol,cr-at-eol
