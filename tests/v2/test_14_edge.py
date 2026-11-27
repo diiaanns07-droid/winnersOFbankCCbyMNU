@@ -525,3 +525,13 @@ def test_answers_utf8_file_changes_report(tmp_path):
     ans.write_text(ANSWERS, encoding="utf-8")
     report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", answers=str(ans))
     assert report.get("clarification") and report["run"]["stages"].get("recheck") == "ok"
+
+
+@_bug("01", "каталог прогонов нельзя создать (запуск из каталога только для чтения, Docker под обычным "
+            "пользователем) — трейсбэк вместо отчёта: RunDir создаётся в Pipeline.__init__ вне try (pipeline.py:174)")
+def test_unwritable_runs_dir_still_gives_report(tmp_path):
+    blocker = tmp_path / "runs_is_a_file"
+    blocker.write_text("", encoding="utf-8")
+    out = tmp_path / "out" / "r.md"
+    report, written = pipeline.review(OFFICIAL, out, {"provider": "offline", "runs_dir": str(blocker), "html": False})
+    assert out.is_file() and report["findings"]
