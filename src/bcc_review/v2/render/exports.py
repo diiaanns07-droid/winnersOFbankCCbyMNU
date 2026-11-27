@@ -254,6 +254,10 @@ def write_jira_csv(report: dict, path: str | Path, **options: Any) -> dict:
 # --------------------------------------------------------------------------- координаты для экспорта v1
 def _v1_document(input_path: Path) -> dict:
     from bcc_review.engine import read_document
+
+    from .. import docview
+    if Path(input_path).suffix.lower() == ".pdf":
+        docview.pdf_fast_mode()  # без нейросетевого анализа вёрстки PyMuPDF 2.x — в 10 раз быстрее (как в docview)
     return read_document(input_path)
 
 
