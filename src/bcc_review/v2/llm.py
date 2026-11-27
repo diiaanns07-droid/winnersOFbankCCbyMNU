@@ -29,7 +29,9 @@ except Exception:  # pragma: no cover - v1 всегда рядом, но v2 не
 
 TRANSIENT = {"rate_limit", "overloaded", "server", "timeout", "network"}
 NEXT_MODEL = {"not_found", "overloaded", "quota"}
-FATAL = {"auth", "not_configured", "quota"}  # после такой ошибки модель в этом прогоне больше не зовём  # после повторов — следующая модель цепочки
+# После такой ошибки модель в этом прогоне больше не зовём. Сеть — тоже: сюда она доходит только после всех
+# повторов (2+4+8+16+32 с), и иначе каждый следующий этап тратил бы бюджет вызовов на те же повторы.
+FATAL = {"auth", "not_configured", "quota", "network"}
 BACKOFF = (2, 4, 8, 16, 32)
 MAX_TIMEOUT_RETRIES = 1
 MAX_OUTPUT_CEILING = 32000  # выше лимит ответа не поднимаем: дальше — деление пакета  # таймаут claude -p — минуты; повторяем один раз
