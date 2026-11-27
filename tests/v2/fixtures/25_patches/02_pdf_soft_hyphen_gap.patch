@@ -1,0 +1,13 @@
+diff --git a/src/bcc_review/readers/pdf.py b/src/bcc_review/readers/pdf.py
+index b038f5d6..ad6f087b 100644
+--- a/src/bcc_review/readers/pdf.py
++++ b/src/bcc_review/readers/pdf.py
+@@ -416,6 +416,8 @@ class _Composer:
+         prev: Char | None = None
+         for ch in chars:
+             if ch.c == '\u00ad':
++                if prev is not None:
++                    prev = ch               # невидим, но занимает место: зазор до следующей буквы — от его края
+                 continue                    # мягкий перенос внутри строки невидим
+             if ch.c == ' ':
+                 self.space()

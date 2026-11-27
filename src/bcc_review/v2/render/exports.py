@@ -342,6 +342,10 @@ def evidence_offsets(ev: dict, view: dict, blocks: dict[str, dict]) -> dict | No
     text = str(block.get("text") or "")
     off = _block_offset(block, ln, view)
     quote = str(ev.get("quote") or "").strip()
+    if not text.startswith(quote[:3]):
+        # номер пункта автонумерации Word («5. При отклонении…») — в строке view, но не в тексте абзаца v1
+        quote = re.sub(r"^(?:\d{1,2}(?:\.\d{1,2})*[.)]|[a-zа-я][.)]|•)\s+", "", quote, flags=re.I) \
+            if text.find(quote) < 0 else quote
     pieces = [p.strip() for p in quote.split(" … ")] if " … " in quote else [quote]
     for piece in pieces:
         if not piece:
