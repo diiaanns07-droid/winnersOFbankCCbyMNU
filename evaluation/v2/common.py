@@ -218,6 +218,9 @@ LATIN_ALLOW = {
     "boolean", "int", "bit", "db", "sql", "cvv", "pan", "otp", "pin", "kyc", "aml", "p95", "p99",
     "csrf", "xss", "cors", "origin", "usd", "eur", "rub", "kzt", "iban", "swift", "sms", "email", "mvp", "fifo",
     "rpo", "rto", "dto", "dlq", "kafka", "redis", "postgresql", "ttl", "etag", "nfc", "qr", "ios", "android",
+    # фразы статусов HTTP (RFC 9110) — в переписанных строках ответа API, и метод приоритизации MoSCoW
+    "not", "found", "forbidden", "unauthorized", "created", "bad", "request", "internal", "server", "conflict",
+    "unprocessable", "entity", "content", "unsuccessful", "successful", "gateway", "unavailable", "moscow",
 }
 _CODE_ID = re.compile(r"[a-z]+[A-Z]\w*|\w*_\w+")  # camelCase и snake_case — имена полей и методов, не английский текст
 _LATIN_WORD = re.compile(r"(?<![A-Za-z0-9_$./-])[A-Za-z][A-Za-z]{2,}(?![A-Za-z0-9_])")

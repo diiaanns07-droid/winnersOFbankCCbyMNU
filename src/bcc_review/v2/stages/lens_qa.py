@@ -9,7 +9,8 @@
 
 Код (:func:`postprocess`) превращает ``conflict`` в critical-кандидата с цитатами правила и строки,
 ``undefined`` — в major, убирает дубли модели по тем же строкам, нумерует тест-кейсы ``T-01…`` и
-отмечает строки приёмки, которые модель пропустила.
+отмечает строки приёмки, которые модель пропустила. Серьёзность замечаний о покрытии приёмкой и о
+проверяемости код уточняет по фактам (доля проверенных функциональных требований; числовой норматив в цитате).
 """
 from __future__ import annotations
 
@@ -331,6 +332,9 @@ def normalize_candidate(raw: Mapping[str, Any]) -> dict:
     if c["severity"] == "critical":
         c["severity"] = "major"
         c["severity_hint"] = "critical"  # модель считала critical: подсказка судье, в вердикт не идёт
+    if c["kind"] == "placeholder" and c["severity"] != "minor":
+        c.setdefault("severity_hint", c["severity"])
+        c["severity"] = "minor"  # пустой раздел шаблона не мешает ни разработке, ни тестам по правилам
     if c["blocks"] == "none" and c["kind"] in _CONFLICT_FAMILY:
         c["blocks"] = "testing"
     c["source"] = SOURCE
@@ -357,21 +361,26 @@ def normalize_test_case(raw: Mapping[str, Any]) -> dict:
 
 # ---------------------------------------------------------------- сборка
 
-MAX_OTHER_CANDIDATES = 2  # одно о покрытии приёмкой + одно о проверяемости
+MAX_OTHER_CANDIDATES = 3  # одно о покрытии приёмкой, одно о проверяемости, одно о пустом разделе тестирования
+_OTHER = 3  # ранг «прочее» — снимается
 
 
 def _other_rank(c: Mapping[str, Any]) -> int:
-    """Вид замечания модели вне противоречий: 0 — покрытие приёмкой, 1 — проверяемость, 2 — прочее."""
+    """Вид замечания модели вне противоречий: 0 — покрытие приёмкой, 1 — проверяемость, 2 — пустой раздел
+    (заглушка раздела тестирования), 3 — прочее."""
     if c.get("kind") == "missing_element" and c.get("criterion") == "set_validatable":
         return 0
     if c.get("kind") == "unverifiable":
         return 1
-    return 2
+    if c.get("kind") == "placeholder":
+        return 2
+    return _OTHER
 
 
 def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
     """Противоречия модели (два места — два исхода) остаются все; вне противоречий линза держит только свои
-    два вида — не больше одного замечания о покрытии приёмкой и одного о проверяемости. Прочее (неоднозначность
+    виды — не больше одного замечания о покрытии приёмкой, одного о проверяемости и одного о пустом разделе
+    (заглушка «заполняется тестировщиками» — minor). Прочее (неоднозначность
     одного места, неполнота, контракт API, доставка сообщений) — зона аналитика и архитектора: на чистых
     документах корпуса и №18 это был основной шум линзы. Снятые идут в ``dropped`` (отчёт: «отклонено линзой»).
     """
@@ -381,7 +390,7 @@ def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
         if c.get("kind") in _CONFLICT_FAMILY:
             continue
         r = _other_rank(c)
-        if r < 2 and (r not in best or sev.get(c.get("severity"), 3) < sev.get(best[r].get("severity"), 3)):
+        if r < _OTHER and (r not in best or sev.get(c.get("severity"), 3) < sev.get(best[r].get("severity"), 3)):
             best[r] = c
     keep = {id(c) for c in best.values()}
     kept, dropped = [], []
@@ -389,11 +398,75 @@ def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
         if c.get("kind") in _CONFLICT_FAMILY or id(c) in keep:
             kept.append(c)
         else:
-            why = ("второе замечание того же вида" if _other_rank(c) < 2
+            why = ("второе замечание того же вида" if _other_rank(c) < _OTHER
                    else "вне зоны линзы тестировщика (неоднозначность, неполнота, контракт — у аналитика и архитектора)")
             dropped.append({**c, "reason": f"снято линзой тестировщика: {why}; вне противоречий — не больше "
-                                          f"{MAX_OTHER_CANDIDATES} замечаний (покрытие приёмкой, проверяемость)"})
+                                          f"{MAX_OTHER_CANDIDATES} замечаний (покрытие приёмкой, проверяемость, "
+                                          "пустой раздел)"})
     return kept, dropped
+
+
+COVERAGE_MAJOR_SHARE = 1 / 3  # приёмка проверяет меньше трети функциональных требований — набор неполон
+
+
+def coverage_share(checks: list[Mapping[str, Any]], reqs: list[Mapping[str, Any]]) -> tuple[int, int]:
+    """Сколько функциональных требований проверяет хотя бы одна строка приёмки: (проверено, всего)."""
+    functional = {r.get("id") for r in reqs if r.get("kind") == "functional" and r.get("id")}
+    covered: set[str] = set()
+    for c in checks:
+        covered |= set(c.get("rule_requirement_ids") or [])
+    return len(covered & functional), len(functional)
+
+
+def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs: list[Mapping[str, Any]]) -> None:
+    """Серьёзность замечания о покрытии приёмкой — по доле функциональных требований, которые проверяет
+    приёмка, а не по мнению модели. Меньше трети — набор критериев неполон, major (тест готовности функции
+    написать не по чему). Иначе не покрытые границы и ветки — дополнение набора, minor: модель пишет это
+    замечание на каждом документе, и на чистом тоже. Без нарезки (нет функциональных требований) — как есть.
+    """
+    done, total = coverage_share(checks, reqs)
+    if not total:
+        return
+    severity = "major" if done < COVERAGE_MAJOR_SHARE * total else "minor"
+    for c in cands:
+        if _other_rank(c) != 0 or c.get("kind") in _CONFLICT_FAMILY:
+            continue
+        if c["severity"] != severity:
+            c.setdefault("severity_hint", c["severity"])
+            c["severity"] = severity
+        fact = f"Строки приёмки проверяют {done} из {total} функциональных требований."
+        if fact not in c["problem"]:
+            c["problem"] = f"{c['problem']} {fact}".strip()
+
+
+# Норматив задан числом с единицей (время, доля, частота) — требование проверяемо, не хватает только условий
+# замера (нагрузка, точка отсчёта, окно выборки): это уточнение, minor. Размытые слова без числа — major.
+_NUMERIC_TARGET = re.compile(r"\d[\d\s]*(?:[.,]\d+)?\s*(?:%|мс\b|с\b|сек|минут|мин\b|час|ч\b|сут|дн|раз\b|раза\b|запрос)",
+                             re.I)
+_VAGUE = re.compile(r"быстр|мгновенн|моментальн|своевременн|оперативн|удобн|понятн|всегда|как можно|по возможности|"
+                    r"высок\w* нагрузк|надёжн|надежн", re.I)
+
+
+def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) -> None:
+    """Серьёзность замечания о проверяемости: ``minor``, если (а) оно только о целях продукта (цель не
+    тестируется напрямую — её проверяют через требования), или (б) в цитатах есть числовой норматив и нет
+    размытых слов — тест написать можно, не хватает условий замера. Иначе — как у модели (major)."""
+    kinds = {r.get("id"): r.get("kind") for r in reqs}
+
+    def kinds_at(line: int | None) -> set:
+        return {r.get("kind") for r in reqs if line and (r.get("line_start") or 0) <= line <= (r.get("line_end") or 0)}
+
+    for c in cands:
+        if c.get("kind") != "unverifiable" or c["severity"] == "minor":
+            continue
+        ids = [i for i in c["requirement_ids"] if i in kinds]
+        cited = set().union(*(kinds_at(e.get("line")) for e in c["evidence"])) if c["evidence"] else set()
+        only_goals = bool(ids) and all(kinds[i] == "goal" for i in ids) and cited <= {"goal"}
+        quotes = [e["quote"] for e in c["evidence"]]
+        measured = any(_NUMERIC_TARGET.search(q) for q in quotes) and not any(_VAGUE.search(q) for q in quotes)
+        if only_goals or measured:
+            c.setdefault("severity_hint", c["severity"])
+            c["severity"] = "minor"
 
 
 def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None) -> dict:
@@ -438,6 +511,8 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
     kept, dropped = limit_other_candidates(kept)
+    calibrate_coverage(kept, checks, reqs)
+    calibrate_verifiability(kept, reqs)
     if len(kept) > MAX_MODEL_CANDIDATES:
         warnings.append(f"{STAGE}: кандидатов модели {len(kept)}, оставлено {MAX_MODEL_CANDIDATES}")
         rank = {"critical": 0, "major": 1, "minor": 2}
