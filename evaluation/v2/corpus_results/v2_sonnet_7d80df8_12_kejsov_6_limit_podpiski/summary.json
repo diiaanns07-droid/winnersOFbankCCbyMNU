@@ -1,0 +1,2806 @@
+{
+  "label": "v2 sonnet, 7d80df8, 12 кейсов (6 — лимит подписки)",
+  "at": "2026-11-27 08:23",
+  "harness": {
+    "tp": 4,
+    "fp": 82,
+    "fn": 0,
+    "duplicates": 1,
+    "precision": 0.046511627906976744,
+    "recall": 1.0,
+    "f1": 0.08888888888888889,
+    "precision_strict": 0.04597701149425287,
+    "support": 4,
+    "predicted": 87,
+    "clean_false_alarms": 29,
+    "fp_background": 13,
+    "tp_parent_level": 0,
+    "pending_adjudication": 0
+  },
+  "per_issue_type": {
+    "ambiguity": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 12,
+      "recall": null
+    },
+    "api_contract": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 4,
+      "recall": null
+    },
+    "boundary_conflict": {
+      "tp": 1,
+      "fn": 0,
+      "fp": 0,
+      "recall": 1.0
+    },
+    "contradiction": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 5,
+      "recall": null
+    },
+    "event_conflict": {
+      "tp": 1,
+      "fn": 0,
+      "fp": 0,
+      "recall": 1.0
+    },
+    "incomplete": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 13,
+      "recall": null
+    },
+    "missing_element": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 21,
+      "recall": null
+    },
+    "non_singular": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 4,
+      "recall": null
+    },
+    "other": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 9,
+      "recall": null
+    },
+    "status_conflict": {
+      "tp": 1,
+      "fn": 0,
+      "fp": 1,
+      "recall": 1.0
+    },
+    "terminology": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 7,
+      "recall": null
+    },
+    "unit_mismatch": {
+      "tp": 1,
+      "fn": 0,
+      "fp": 0,
+      "recall": 1.0
+    },
+    "unverifiable": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 6,
+      "recall": null
+    }
+  },
+  "missing_measurements": 6,
+  "not_run": 21,
+  "cases": 12,
+  "failed": 6,
+  "clean": {
+    "n": 4,
+    "measured": 2,
+    "findings": 29,
+    "critical": 0,
+    "major": 12,
+    "docs_with_critical": 0,
+    "docs_over_1_major": 2,
+    "docs_over_1_finding": 2,
+    "max_findings": 15,
+    "verdict_no": 0
+  },
+  "time": {
+    "total_s": 864.5,
+    "calls": 76,
+    "cost_usd": 3.056
+  },
+  "details": {
+    "fp": [
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Гонка параллельных уведомлений у лимита трёх пополнений и при отключении",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки не покрывают границы, повторы, отключение и коды ошибок",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "api_contract",
+        "title": "Тело успешного ответа createAutopay не описано, хотя таблица отсылает к методу",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приём уведомления оператора и способ пополнения номера не описаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Шаги 1–2 createAutopay не называют коды отказа и порядок проверок",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «баланс не опускается ниже порога» не обеспечивается требованиями",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "security",
+        "title": "Подлинность уведомления оператора, запускающего списание, не определена",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Не описан сбой пополнения номера после списания с карты",
+        "sources": [
+          "lens:risk",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№08",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "АП-5: не определено, к каким суткам и какие попытки считаются в лимите",
+        "sources": [
+          "lens:qa",
+          "lens:analyst",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№06",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У требований нет идентификаторов приоритета",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Разные термины: «отключение» и «удаляет», «автопополнение» и «настройка»",
+        "sources": [
+          "lens:analyst",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-01",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "АП-1 и шаг 3 createAutopay: уникальность по номеру или по карте не определена",
+        "sources": [
+          "lens:analyst",
+          "lens:qa",
+          "consistency",
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№06",
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Валюта карты KZT из АП-1 не проверяется в логике createAutopay",
+        "sources": [
+          "lens:risk",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№08",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "НФ-1: не определены конец интервала, нагрузка и период расчёта 99 %",
+        "sources": [
+          "lens:analyst",
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Пункты АП-1, АП-6 и интеграции содержат несколько независимых правил",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приём уведомления оператора, запускающего автопополнение, не описан",
+        "sources": [
+          "consistency",
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Не определён сбой пополнения после списания и изменение настройки",
+        "sources": [
+          "lens:risk",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "НФ-1: не определены конец замера 5 минут и условия измерения",
+        "sources": [
+          "lens:qa",
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определено, к каким суткам относится пополнение для лимита АП-5",
+        "sources": [
+          "lens:qa",
+          "lens:analyst",
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№06",
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Тело ответа createAutopay и логика deleteAutopay не описаны",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Ограничение «карта KZT» из АП-1 не проверяется в логике createAutopay",
+        "sources": [
+          "lens:risk",
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не едина: отключение и удаление, автопополнение и настройка",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель обещает баланс выше порога, требования этого не гарантируют",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Уникальность настройки: АП-1 про «один номер», createAutopay проверяет только карту",
+        "sources": [
+          "lens:architect",
+          "consistency",
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№08",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки не покрывают границы, ошибки API, повторы и отключение",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "other",
+        "title": "У требований нет приоритетов и признаков стабильности",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "unverifiable",
+        "title": "НФ-1: не определён конец 5-минутного срока и условия измерения",
+        "sources": [
+          "lens:analyst",
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Ограничение «один номер» из АП-1 не проверяется: уникальность только по карте",
+        "sources": [
+          "lens:architect",
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "other",
+        "title": "У требований АП-1…АП-7 и НФ-1 нет приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-06",
+        "severity": "major",
+        "kind": "api_contract",
+        "title": "Тело успешного ответа createAutopay не описано",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определено, к каким суткам относится пополнение в лимите АП-5",
+        "sources": [
+          "lens:analyst",
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Нет изменения настройки и правил учёта суток при повторном создании",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приёмка не покрывает границы, ошибки API и повторные уведомления",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Не описан итог при списании без успешного пополнения номера",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Условие «карты KZT» из АП-1 не проверяется в логике createAutopay",
+        "sources": [
+          "lens:risk",
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приём уведомления оператора и вызов пополнения у оператора не описаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не едина: автопополнение/настройка, порог/threshold",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Гонка уведомлений с разными идентификаторами событий не покрыта",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «не ниже порога» не обеспечивается лимитом, задержкой и отказом по средствам",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "«Отключение» не сопоставлено с deleteAutopay, момент прекращения не задан",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Несколько независимых правил в одном пункте БК-2",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Ответ getCardStatus описан только для BLOCKED_BY_CLIENT; смысл days и бессрочной блокировки не задан",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У требований нет приоритетов и признаков важности",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не едина, глоссария нет: «Владелец карты, который блокирует карту», «Срок блокировки»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Автоматическое снятие блокировки по сроку не описано",
+        "sources": [
+          "lens:analyst",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определён момент блокировки: запрос, ответ 200 или конец окна в 10 секунд",
+        "sources": [
+          "lens:analyst",
+          "lens:risk",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№08",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-01",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определено, как отсчитываются сутки срока блокировки и когда он заканчивается",
+        "sources": [
+          "lens:analyst",
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Момент окончания срока блокировки в сутках не определён: от времени блокировки или до конца суток по UTC+5",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-06",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Push о блокировке обещан, но канал и событие отправки нигде не описаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Автоматический возврат в ACTIVE по окончании срока не учитывает другие состояния карты (перевыпуск, закрытие)",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "unverifiable",
+        "title": "Push БК-7 не проверяем: нет срока и фиксации",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-07",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Приёмка не покрывает границы days, ошибки и разблокировку",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Окно до 10 с после ответа 200 противоречит правилу отклонения при статусе BLOCKED",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-08",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "R-22 и R-25: порядок проверок параметра и статуса не определён",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-07",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Ответ getCardStatus для ACTIVE и бессрочной блокировки не описан",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Судьба клиринга ранее одобренных авторизаций и возвратов на заблокированную карту не определена",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Нет описания взаимодействия с процессингом, который должен отклонять авторизации",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Не определено хранение и значение срока для бессрочной блокировки и значения инициатора",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-06",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Push из БК-7 не обеспечен ни одним методом, данными или интеграцией",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Пункты БК-1 и БК-2 объединяют несколько независимых правил",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-16",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Пример ответа getCardStatus дан только для состояния BLOCKED_BY_CLIENT",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Приёмка не покрывает границы, ошибки, разблокировку, срок и push",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определён момент окончания срока блокировки и кто возвращает ACTIVE",
+        "sources": [
+          "lens:analyst",
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У требований нет приоритета и признака стабильности",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не едина, глоссария нет: «Срок блокировки»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Не определено, какое событие запускает push: ответ 200 или вступление блокировки в силу",
+        "sources": [
+          "lens:analyst",
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-02",
+        "severity": "critical",
+        "kind": "status_conflict",
+        "title": "Код 400 отклоняет days=30, хотя 30 суток допустимо",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-17",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Повтор blockCard после потери ответа или 500 даёт 409 и не показывает клиенту результат первой попытки",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Окончание срока блокировки не имеет описанного механизма и сценариев",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Срок блокировки истекает без заданного механизма: автоматический возврат в ACTIVE не учитывает другие причины блокировки",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "Требование БК-5 «не позднее 10 секунд»: не названы место измерения и доля случаев",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Ответ getCardStatus описан одним примером для BLOCKED_BY_CLIENT",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-01",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определено, как считаются сутки срока блокировки и от какого момента",
+        "sources": [
+          "lens:analyst",
+          "lens:qa",
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№06",
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не едина, глоссария нет: «Срок блокировки»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "unverifiable",
+        "title": "Push о блокировке не проверяем системно",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Приёмка не покрывает границы, ошибки и разблокировку",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Процессинг и push обещаны, но не описаны в интеграции",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Судьба операций по ранее одобренной авторизации и возвратов на заблокированную карту не определена",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Несколько независимых правил в одном пункте",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Push из БК-7 не описан: механизм, сбой доставки и разблокировка",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Нет приоритетов и признаков важности требований",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определён момент «до блокировки» для сохранения одобренных авторизаций",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05"
+        ]
+      }
+    ],
+    "fn": [],
+    "dup": 1,
+    "by_source": {
+      "consistency": {
+        "tp": 4,
+        "fp": 34,
+        "fp_clean": 14
+      },
+      "lens:analyst": {
+        "tp": 2,
+        "fp": 24,
+        "fp_clean": 9
+      },
+      "lens:architect": {
+        "tp": 3,
+        "fp": 13,
+        "fp_clean": 5
+      },
+      "lens:qa": {
+        "tp": 3,
+        "fp": 19,
+        "fp_clean": 7
+      },
+      "lens:risk": {
+        "tp": 0,
+        "fp": 21,
+        "fp_clean": 7
+      },
+      "rules": {
+        "tp": 2,
+        "fp": 0,
+        "fp_clean": 0
+      }
+    }
+  },
+  "provider": "claude_cli",
+  "model": "sonnet",
+  "wall_s": 289.9,
+  "commit": [
+    "34d27a1",
+    "6fe7b63",
+    "d101b2f"
+  ],
+  "candidates": {
+    "tp": 6,
+    "fn": 2,
+    "recall": 0.75,
+    "per_issue_type": {
+      "ambiguity": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "api_contract": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "boundary_conflict": {
+        "tp": 1,
+        "fn": 1,
+        "recall": 0.5
+      },
+      "contradiction": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "event_conflict": {
+        "tp": 1,
+        "fn": 1,
+        "recall": 0.5
+      },
+      "incomplete": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "missing_element": {
+        "tp": 1,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "non_singular": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "other": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "status_conflict": {
+        "tp": 2,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "terminology": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "unit_mismatch": {
+        "tp": 1,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "unverifiable": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      }
+    }
+  },
+  "per_case": [
+    {
+      "case_id": "autopay.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "run_id": "20261127-052408-78cf",
+      "commit": "34d27a1",
+      "findings": 15,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "АП-1 и шаг 3 createAutopay: уникальность по номеру или по карте не определена",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "consistency",
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "АП-5: не определено, к каким суткам и какие попытки считаются в лимите",
+          "sources": [
+            "lens:qa",
+            "lens:analyst",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Валюта карты KZT из АП-1 не проверяется в логике createAutopay",
+          "sources": [
+            "lens:risk",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "api_contract",
+          "title": "Тело успешного ответа createAutopay не описано, хотя таблица отсылает к методу",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «баланс не опускается ниже порога» не обеспечивается требованиями",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "security",
+          "title": "Подлинность уведомления оператора, запускающего списание, не определена",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приём уведомления оператора и способ пополнения номера не описаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У требований нет идентификаторов приоритета",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Разные термины: «отключение» и «удаляет», «автопополнение» и «настройка»",
+          "sources": [
+            "lens:analyst",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Пункты АП-1, АП-6 и интеграции содержат несколько независимых правил",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Не описан сбой пополнения номера после списания с карты",
+          "sources": [
+            "lens:risk",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Гонка параллельных уведомлений у лимита трёх пополнений и при отключении",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки не покрывают границы, повторы, отключение и коды ошибок",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "НФ-1: не определены конец интервала, нагрузка и период расчёта 99 %",
+          "sources": [
+            "lens:analyst",
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Шаги 1–2 createAutopay не называют коды отказа и порядок проверок",
+          "sources": [
+            "lens:architect"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 4,
+        "minor": 11
+      },
+      "verdict": {
+        "development": "conditional",
+        "testing": "conditional"
+      },
+      "duration_s": 121.3,
+      "calls": 7,
+      "cost_usd": 0.5272
+    },
+    {
+      "case_id": "autopay.event_conflict.insufficient_funds_credit",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-052408-b3a0",
+      "commit": "d101b2f",
+      "findings": 12,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "event_conflict",
+          "title": "АП-6 и АП-8 дают противоположный исход при нехватке средств на карте",
+          "sources": [
+            "consistency",
+            "lens:architect",
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Уникальность настройки: АП-1 про «один номер», createAutopay проверяет только карту",
+          "sources": [
+            "lens:architect",
+            "consistency",
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определено, к каким суткам относится пополнение для лимита АП-5",
+          "sources": [
+            "lens:qa",
+            "lens:analyst",
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Ограничение «карта KZT» из АП-1 не проверяется в логике createAutopay",
+          "sources": [
+            "lens:risk",
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Тело ответа createAutopay и логика deleteAutopay не описаны",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель обещает баланс выше порога, требования этого не гарантируют",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приём уведомления оператора, запускающего автопополнение, не описан",
+          "sources": [
+            "consistency",
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "other",
+          "title": "У требований нет приоритетов и признаков стабильности",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не едина: отключение и удаление, автопополнение и настройка",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки не покрывают границы, ошибки API, повторы и отключение",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Не определён сбой пополнения после списания и изменение настройки",
+          "sources": [
+            "lens:risk",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "НФ-1: не определены конец замера 5 минут и условия измерения",
+          "sources": [
+            "lens:qa",
+            "lens:analyst"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 4,
+        "minor": 7
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 104.2,
+      "calls": 8,
+      "cost_usd": 0.5189
+    },
+    {
+      "case_id": "autopay.two_statuses.range_422",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-052408-36cb",
+      "commit": "34d27a1",
+      "findings": 15,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "status_conflict",
+          "title": "Порог или сумма вне диапазона: 422 в логике, 400 в таблице статусов",
+          "sources": [
+            "lens:architect",
+            "lens:qa",
+            "consistency",
+            "rules:api.status_422"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определено, к каким суткам относится пополнение в лимите АП-5",
+          "sources": [
+            "lens:analyst",
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Условие «карты KZT» из АП-1 не проверяется в логике createAutopay",
+          "sources": [
+            "lens:risk",
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Ограничение «один номер» из АП-1 не проверяется: уникальность только по карте",
+          "sources": [
+            "lens:architect",
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "unverifiable",
+          "title": "НФ-1: не определён конец 5-минутного срока и условия измерения",
+          "sources": [
+            "lens:analyst",
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "major",
+          "kind": "api_contract",
+          "title": "Тело успешного ответа createAutopay не описано",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «не ниже порога» не обеспечивается лимитом, задержкой и отказом по средствам",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приём уведомления оператора и вызов пополнения у оператора не описаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не едина: автопополнение/настройка, порог/threshold",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "other",
+          "title": "У требований АП-1…АП-7 и НФ-1 нет приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Не описан итог при списании без успешного пополнения номера",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Гонка уведомлений с разными идентификаторами событий не покрыта",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "«Отключение» не сопоставлено с deleteAutopay, момент прекращения не задан",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Нет изменения настройки и правил учёта суток при повторном создании",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приёмка не покрывает границы, ошибки API и повторные уведомления",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 6,
+        "minor": 9
+      },
+      "verdict": {
+        "development": "conditional",
+        "testing": "conditional"
+      },
+      "duration_s": 114.0,
+      "calls": 7,
+      "cost_usd": 0.477
+    },
+    {
+      "case_id": "cardblock.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "run_id": "20261127-052552-cd10",
+      "commit": "6fe7b63",
+      "findings": 14,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определено, как отсчитываются сутки срока блокировки и когда он заканчивается",
+          "sources": [
+            "lens:analyst",
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Автоматическое снятие блокировки по сроку не описано",
+          "sources": [
+            "lens:analyst",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определён момент блокировки: запрос, ответ 200 или конец окна в 10 секунд",
+          "sources": [
+            "lens:analyst",
+            "lens:risk",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Окно до 10 с после ответа 200 противоречит правилу отклонения при статусе BLOCKED",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "unverifiable",
+          "title": "Push БК-7 не проверяем: нет срока и фиксации",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Push о блокировке обещан, но канал и событие отправки нигде не описаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Приёмка не покрывает границы days, ошибки и разблокировку",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "R-22 и R-25: порядок проверок параметра и статуса не определён",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Автоматический возврат в ACTIVE по окончании срока не учитывает другие состояния карты (перевыпуск, закрытие)",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У требований нет приоритетов и признаков важности",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Несколько независимых правил в одном пункте БК-2",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не едина, глоссария нет: «Владелец карты, который блокирует карту», «Срок блокировки»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Момент окончания срока блокировки в сутках не определён: от времени блокировки или до конца суток по UTC+5",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Ответ getCardStatus описан только для BLOCKED_BY_CLIENT; смысл days и бессрочной блокировки не задан",
+          "sources": [
+            "lens:architect"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 8,
+        "minor": 6
+      },
+      "verdict": {
+        "development": "conditional",
+        "testing": "conditional"
+      },
+      "duration_s": 177.0,
+      "calls": 16,
+      "cost_usd": 0.4849
+    },
+    {
+      "case_id": "cardblock.range_boundary.days_400_at_30",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-052602-1e41",
+      "commit": "6fe7b63",
+      "findings": 17,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "boundary_conflict",
+          "title": "Ожидаемый результат критерия приёмки R-13 (Критерии приёмки, строка 1) противоречит R-05 (БК-2), R-17 (Тело запроса: days), R-22 (Статус 400",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "critical",
+          "kind": "status_conflict",
+          "title": "Код 400 отклоняет days=30, хотя 30 суток допустимо",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определён момент окончания срока блокировки и кто возвращает ACTIVE",
+          "sources": [
+            "lens:analyst",
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Нет описания взаимодействия с процессингом, который должен отклонять авторизации",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Приёмка не покрывает границы, ошибки, разблокировку, срок и push",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Push из БК-7 не обеспечен ни одним методом, данными или интеграцией",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Ответ getCardStatus для ACTIVE и бессрочной блокировки не описан",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Срок блокировки истекает без заданного механизма: автоматический возврат в ACTIVE не учитывает другие причины блокировки",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У требований нет приоритета и признака стабильности",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Пункты БК-1 и БК-2 объединяют несколько независимых правил",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Окончание срока блокировки не имеет описанного механизма и сценариев",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Судьба клиринга ранее одобренных авторизаций и возвратов на заблокированную карту не определена",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Не определено, какое событие запускает push: ответ 200 или вступление блокировки в силу",
+          "sources": [
+            "lens:analyst",
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Не определено хранение и значение срока для бессрочной блокировки и значения инициатора",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не едина, глоссария нет: «Срок блокировки»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-16",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Пример ответа getCardStatus дан только для состояния BLOCKED_BY_CLIENT",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-17",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Повтор blockCard после потери ответа или 500 даёт 409 и не показывает клиенту результат первой попытки",
+          "sources": [
+            "lens:risk"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 2,
+        "major": 5,
+        "minor": 10
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 171.9,
+      "calls": 16,
+      "cost_usd": 0.5352
+    },
+    {
+      "case_id": "cardblock.unit_change.blocked_at_utc",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-052609-f01e",
+      "commit": "6fe7b63",
+      "findings": 14,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определено, как считаются сутки срока блокировки и от какого момента",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Приёмка не покрывает границы, ошибки и разблокировку",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Процессинг и push обещаны, но не описаны в интеграции",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определён момент «до блокировки» для сохранения одобренных авторизаций",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "unverifiable",
+          "title": "Push о блокировке не проверяем системно",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "major",
+          "kind": "unit_mismatch",
+          "title": "Время блокировки: UTC+5 (R-11) против UTC в описании blockedAt (R-20), а пример показывает +05:00",
+          "sources": [
+            "lens:analyst",
+            "lens:architect",
+            "consistency",
+            "rules:units.timezone_mix"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Время блокировки: в тексте UTC, в примере и данных — UTC+5",
+          "sources": [
+            "lens:qa",
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Несколько независимых правил в одном пункте",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не едина, глоссария нет: «Срок блокировки»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Судьба операций по ранее одобренной авторизации и возвратов на заблокированную карту не определена",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "Требование БК-5 «не позднее 10 секунд»: не названы место измерения и доля случаев",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Нет приоритетов и признаков важности требований",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Push из БК-7 не описан: механизм, сбой доставки и разблокировка",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Ответ getCardStatus описан одним примером для BLOCKED_BY_CLIENT",
+          "sources": [
+            "lens:architect"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 7,
+        "minor": 7
+      },
+      "verdict": {
+        "development": "conditional",
+        "testing": "conditional"
+      },
+      "duration_s": 166.7,
+      "calls": 16,
+      "cost_usd": 0.5126
+    },
+    {
+      "case_id": "cashback.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "failed",
+      "run_id": "20261127-052849-1251",
+      "commit": "6fe7b63",
+      "findings": 0,
+      "items": [],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "none",
+        "testing": "none"
+      },
+      "duration_s": 1.7,
+      "calls": 1,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.drop_promised.no_read_method",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "failed",
+      "run_id": "20261127-052851-eb62",
+      "commit": "6fe7b63",
+      "findings": 1,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "missing_element",
+          "title": "Метод getCashback упомянут, но не описан в спецификации API",
+          "sources": [
+            "rules:promises.named_method.getCashback"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "none",
+        "testing": "none"
+      },
+      "duration_s": 1.6,
+      "calls": 1,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "cashback.event_conflict.category_effective_now",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "failed",
+      "run_id": "20261127-052853-1193",
+      "commit": "6fe7b63",
+      "findings": 0,
+      "items": [],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "none",
+        "testing": "none"
+      },
+      "duration_s": 1.6,
+      "calls": 1,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "failed",
+      "run_id": "20261127-052854-e213",
+      "commit": "6fe7b63",
+      "findings": 0,
+      "items": [],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "none",
+        "testing": "none"
+      },
+      "duration_s": 1.6,
+      "calls": 1,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.range_boundary.reaching_rejects",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "failed",
+      "run_id": "20261127-052855-6cb2",
+      "commit": "6fe7b63",
+      "findings": 0,
+      "items": [],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "none",
+        "testing": "none"
+      },
+      "duration_s": 1.4,
+      "calls": 1,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.two_statuses.range_200_error",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "failed",
+      "run_id": "20261127-052856-81cd",
+      "commit": "6fe7b63",
+      "findings": 1,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "status_conflict",
+          "title": "Ответ 200 описывает ошибку, хотя для неверного запроса предусмотрен код 400",
+          "sources": [
+            "rules:api.success_with_error"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "none",
+        "testing": "none"
+      },
+      "duration_s": 1.5,
+      "calls": 1,
+      "cost_usd": 0.0
+    }
+  ]
+}

@@ -207,7 +207,7 @@ def test_schema_field_names_in_texts_become_russian():
 
 
 def test_other_candidates_limited_conflicts_kept():
-    """Противоречия модели остаются все; прочих замечаний — два: покрытие приёмкой и проверяемость первыми."""
+    """Противоречия модели остаются все; прочих — по одному: покрытие приёмкой, проверяемость, пустой раздел."""
     base = {"requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
             "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "testing",
             "severity": "major"}
@@ -218,13 +218,61 @@ def test_other_candidates_limited_conflicts_kept():
            dict(base, title="Коды", kind="status_conflict", criterion="set_consistent"),
            dict(base, title="Покрытие", kind="missing_element", criterion="set_validatable")]
     raw.append(dict(base, title="Покрытие-2", kind="missing_element", criterion="set_validatable", severity="minor"))
+    raw.append(dict(base, title="Заглушка", kind="placeholder", criterion="complete", requirement_ids=[]))
+    raw.append(dict(base, title="Заглушка-2", kind="placeholder", criterion="complete", severity="minor"))
     out = lens_qa.postprocess({"candidates": raw}, REQS)
-    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие"]
-    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт", "Покрытие-2"}
-    assert all("не больше 2" in d["reason"] for d in out["dropped"])
+    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие", "Заглушка"]
+    assert out["candidates"][-1]["severity"] == "minor"  # пустой раздел тестирования — minor
+    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт", "Покрытие-2", "Заглушка-2"}
+    assert all("не больше 3" in d["reason"] for d in out["dropped"])
     # неоднозначность одного места без своих видов — тоже снимается: это зона аналитика
     only = lens_qa.postprocess({"candidates": [raw[0]]}, REQS)
     assert only["candidates"] == [] and [d["title"] for d in only["dropped"]] == ["Неоднозначность"]
+
+
+def test_coverage_severity_from_share_of_checked_requirements():
+    """Покрытие приёмкой: major, если строки приёмки проверяют меньше трети функциональных требований, иначе minor."""
+    cover = {"requirement_ids": ["R-03"], "evidence": [{"quote": "x", "line": 30}], "title": "Покрытие",
+             "problem": "Не покрыты границы.", "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "",
+             "question": "", "blocks": "testing", "severity": "major", "kind": "missing_element",
+             "criterion": "set_validatable"}
+    half = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match")], "candidates": [cover]}, REQS)
+    c = half["candidates"][0]
+    assert c["severity"] == "minor" and c["severity_hint"] == "major"
+    assert c["problem"].endswith("Строки приёмки проверяют 1 из 2 функциональных требований.")
+    none = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match", rule_requirement_ids=[])],
+                                "candidates": [dict(cover, severity="minor")]}, REQS)
+    assert none["candidates"][0]["severity"] == "major"
+    # без нарезки доли не посчитать — серьёзность модели
+    assert lens_qa.postprocess({"candidates": [cover]})["candidates"][0]["severity"] == "major"
+
+
+def test_verifiability_severity_numeric_target_and_goals():
+    """Проверяемость: числовой норматив без условий замера и цель продукта — minor; размытые слова — major."""
+    reqs = [{"id": "R-01", "kind": "goal", "line_start": 5, "line_end": 5},
+            {"id": "R-02", "kind": "nonfunctional", "line_start": 20, "line_end": 20}]
+    base = {"title": "НФТ", "problem": "p", "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "",
+            "question": "", "blocks": "testing", "severity": "major", "kind": "unverifiable", "criterion": "verifiable",
+            "requirement_ids": ["R-02"]}
+
+    def sev(quote, line=20, ids=("R-02",)):
+        c = dict(base, evidence=[{"quote": quote, "line": line}], requirement_ids=list(ids))
+        return lens_qa.postprocess({"candidates": [c]}, reqs)["candidates"][0]["severity"]
+
+    assert sev("Методы отвечают не дольше 2 с для 95 % запросов.") == "minor"
+    assert sev("Ответ приходит мгновенно.") == "major"
+    assert sev("Ответ быстрый, доступность 99,9 %.") == "major"  # размытое слово рядом с числом
+    assert sev("Сообщение отправляется в течение минуты после события.") == "major"
+    assert sev("Снизить число ошибок.", line=5, ids=("R-01",)) == "minor"  # цель продукта
+    assert sev("Снизить число ошибок.", line=20, ids=("R-01",)) == "major"  # цитата из НФТ — не только цель
+
+
+@pytest.mark.parametrize("model", ["sonnet", "haiku"])
+def test_official_coverage_stays_major(model):
+    """Официальный документ: 3 строки приёмки на 11 функциональных требований — набор неполон, major."""
+    out = lens_qa.postprocess(_json(QA / f"official.{model}.json"), _segment("official"))
+    cover = [c for c in out["candidates"] if c["kind"] == "missing_element" and c["criterion"] == "set_validatable"]
+    assert len(cover) == 1 and cover[0]["severity"] == "major"
 
 
 # ---------------------------------------------------------------- тест-кейсы
@@ -284,6 +332,9 @@ def test_clean_bases_have_no_conflicts(case):
     assert all(c["verdict"] == "match" for c in out["acceptance_checks"])
     assert not lens_qa.missing_rows(out["acceptance_checks"], reqs)
     assert all(c["severity"] != "critical" for c in out["candidates"])
+    # приёмка проверяет половину правил и больше — непокрытые ветки на чистом документе только minor
+    assert all(c["severity"] == "minor" for c in out["candidates"]
+               if c["kind"] == "missing_element" and c["criterion"] == "set_validatable")
 
 
 @pytest.mark.parametrize("case,line", [("autopay.range_boundary.trigger_at_threshold", 46),
