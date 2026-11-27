@@ -43,6 +43,7 @@ def pair(**kw):
             "quote_a": "Вклад можно пополнять не более трёх раз в квартал.", "line_a": 3,
             "quote_b": "Пополнение через кассу доступно всегда", "line_b": 4,
             "scenario": "В квартале три пополнения онлайн, клиент пополняет в кассе.",
+            "one_condition": True,
             "outcome_a": "четвёртое пополнение запрещено", "outcome_b": "пополнение разрешено",
             "verdict": "conflict", "basis": "limit_removed", "kind": "event_conflict", "title": "", "impact": "",
             "recommendation": "",
@@ -254,7 +255,7 @@ def test_prompt_has_no_words_of_official_document():
 def test_prompt_is_russian():
     text = PROMPT.read_text(encoding="utf-8")
     words = re.findall(r"[A-Za-z][A-Za-z_]{3,}", text)
-    allowed = {"subjects", "places", "subject", "pair_checks", "same_subject", "quote_a", "line_a", "quote_b",
+    allowed = {"one_condition", "subjects", "places", "subject", "pair_checks", "same_subject", "quote_a", "line_a", "quote_b",
                "line_b", "scenario", "outcome_a", "outcome_b", "verdict", "conflict", "compatible", "undefined",
                "kind", "event_conflict", "status_conflict", "boundary_conflict", "unit_mismatch", "contradiction",
                "ambiguity", "incomplete", "title", "impact", "recommendation", "question", "glossary", "concept",
@@ -313,10 +314,12 @@ def test_term_in_other_case_is_found_and_quoted_as_in_document():
     assert out["candidates"][0]["evidence"][1]["quote"] == "держатель счёта"
 
 
-def test_conflict_with_goal_or_nonfunctional_is_major():
+def test_event_pair_with_goal_or_nonfunctional_gives_no_candidate_value_pair_is_major():
     p = pair(a="R-01", quote_a="клиент видит доход по вкладу сразу после пополнения", line_a=2,
              b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7)
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"] and out["candidates"] == []  # цель ↔ требования — п. 1 шага 5, не пара
+    out = C.postprocess(answer(pair_checks=[dict(p, kind="boundary_conflict", basis="value_mismatch")]), VIEW, REQS)
     assert out["candidates"][0]["severity"] == "major"
 
 
@@ -407,3 +410,166 @@ def test_link_findings_maps_pairs_and_glossary_to_final_defects():
     C.link_findings(out["pair_checks"], out["glossary"], cands, findings)
     assert out["pair_checks"][0]["finding_ids"] == ["D-01"] and out["pair_checks"][1]["finding_ids"] == ["D-01"]
     assert out["glossary"][0]["finding_ids"] == ["D-02"]
+
+
+def test_pair_conflict_kind_is_always_specific():
+    out = C.postprocess(answer(pair_checks=[pair(kind="contradiction")]), VIEW, REQS)
+    assert out["pair_checks"][0]["kind"] == "event_conflict"
+    assert out["candidates"][0]["kind"] == "event_conflict"
+    assert "contradiction" not in C.PAIR_SCHEMA["properties"]["kind"]["enum"]
+
+
+def test_rule_against_acceptance_row_at_boundary_is_critical_conflict():
+    p = pair(a="R-05", b="R-07", subject="минимальная сумма пополнения, ровно 1 000",
+             quote_a="Минимальная сумма пополнения — 1 000.", line_a=6,
+             quote_b="| Сумма 10 000 | Пополнить на 1 000 | Сумма 11 000 |", line_b=8,
+             verdict="conflict", basis="value_mismatch", kind="boundary_conflict")
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    c = out["candidates"][0]
+    assert c["severity"] == "critical" and c["kind"] == "boundary_conflict"
+    assert {e["line"] for e in c["evidence"]} == {6, 8}
+
+
+DOC_API = [
+    "# Лимит",                                                                      # 1
+    "Приложение читает лимит методом getLimit и меняет его методом setLimit.",      # 2
+    "Методы описаны в части B.",                                                    # 3
+    "Часть B",                                                                      # 4
+    "Метод getLimit",                                                               # 5
+    "REST type | GET",                                                              # 6
+    "Метод setLimit",                                                               # 7
+    "REST type | PUT",                                                              # 8
+    "Перевод сверх лимита отклоняется.",                                            # 9
+]
+HEADS = {1, 4, 5, 7}
+VIEW_API = {"lines": [{"n": i, "text": t, "page": None, "section": "", "heading": i in HEADS,
+                       "kind": "heading" if i in HEADS else ""} for i, t in enumerate(DOC_API, 1)]}
+
+
+def _missing(quotes):
+    return {"title": "Операция не описана", "kind": "missing_element", "criterion": "set_complete",
+            "severity": "critical", "requirement_ids": [], "problem": "п", "scenario": "с", "impact": "и",
+            "recommendation": "р", "rewrite": "", "question": "", "blocks": "development",
+            "evidence": [{"quote": q, "line": n} for q, n in quotes]}
+
+
+def test_promised_but_missing_stays_critical_when_named_method_has_no_section():
+    view = {"lines": [x for x in VIEW_API["lines"] if x["n"] not in (5, 6)]}  # раздела getLimit нет
+    out = C.postprocess(answer(candidates=[_missing([("читает лимит методом getLimit", 2), ("Метод setLimit", 7)])]),
+                        view, [])
+    assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_promised_but_missing_is_major_when_every_named_method_is_described():
+    out = C.postprocess(answer(candidates=[_missing([("Перевод сверх лимита отклоняется.", 9),
+                                                     ("Методы описаны в части B.", 3), ("Метод setLimit", 7)])]),
+                        VIEW_API, [])
+    assert out["candidates"][0]["severity"] == "major"
+
+
+def test_promise_without_identifiers_keeps_model_severity():
+    view = {"lines": [dict(x, text=x["text"].replace("методом getLimit", "").replace("методом setLimit", ""))
+                      for x in VIEW_API["lines"]]}
+    out = C.postprocess(answer(candidates=[_missing([("Приложение читает лимит", 2)])]), view, [])
+    assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_missing_element_without_promise_verb_in_quotes_is_major():
+    # экран с элементом или перечень систем — не обещание операции словами
+    out = C.postprocess(answer(candidates=[_missing([("Методы описаны в части B.", 3), ("Часть B", 4)])]),
+                        VIEW_API, [])
+    assert out["candidates"][0]["severity"] == "major"
+
+
+def test_link_trace_points_rows_to_findings_about_the_requirement():
+    trace = [{"requirement_id": "R-02", "verified_by": [], "implemented_by": [], "note": "нет критерия"},
+             {"requirement_id": "R-04", "verified_by": [], "implemented_by": [], "note": ""}]
+    findings = [{"id": "D-02", "severity": "major", "requirement_ids": ["R-02"]},
+                {"id": "D-01", "severity": "critical", "requirement_ids": ["R-02", "R-03"]},
+                {"id": "D-09", "severity": "minor", "requirement_ids": [f"R-0{i}" for i in range(1, 9)]}]
+    C.link_findings([], [], [], findings, trace)
+    assert trace[0]["finding_ids"] == ["D-01", "D-02"]  # критичный первым, дефект «обо всём» не ссылается
+    assert "finding_ids" not in trace[1]
+
+
+def test_undefined_pair_where_one_side_removes_the_other_limit_becomes_conflict():
+    p = pair(verdict="undefined", basis="none", kind="ambiguity",
+             quote_a="Вклад можно пополнять не более трёх раз в квартал.",
+             quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"][0]["verdict"] == "conflict" and out["pair_checks"][0]["basis"] == "limit_removed"
+    c = out["candidates"][0]
+    assert c["severity"] == "critical" and c["kind"] == "event_conflict"
+
+
+def test_undefined_pair_without_limit_words_stays_undefined():
+    p = pair(verdict="undefined", basis="none", kind="incomplete",
+             quote_a="Минимальная сумма вклада — 10 000.", line_a=5,
+             quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"][0]["verdict"] == "undefined"
+    assert out["candidates"][0]["severity"] == "major"
+
+
+def test_undefined_pair_with_acceptance_row_gives_no_candidate():
+    p = pair(b="R-07", verdict="undefined", basis="none", kind="incomplete",
+             quote_b="| Сумма 10 000 | Пополнить на 1 000 | Сумма 11 000 |", line_b=8)
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"] and out["candidates"] == []
+
+
+def test_status_conflict_about_meaning_of_one_code_is_major():
+    doc = ["Если результат 200 — успешный, 400 — неуспешный.", "При отказе проверки вернуть 200 со статусом ОТКАЗ.",
+           "404 — объект не найден.", "Для чужого объекта вернуть 403."]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    reqs = [{"id": f"R-0{i}", "source_id": "", "kind": "api", "line_start": i, "line_end": i} for i in range(1, 5)]
+    same = pair(a="R-01", b="R-02", kind="status_conflict", basis="same_condition",
+                quote_a=doc[0], line_a=1, quote_b=doc[1], line_b=2)
+    two = pair(a="R-03", b="R-04", kind="status_conflict", basis="same_condition",
+               quote_a=doc[2], line_a=3, quote_b=doc[3], line_b=4)
+    out = C.postprocess(answer(pair_checks=[same, two]), view, reqs)
+    sev = {tuple(sorted(c["requirement_ids"])): c["severity"] for c in out["candidates"]}
+    assert sev[("R-01", "R-02")] == "major"
+    assert sev[("R-03", "R-04")] == "critical"
+
+
+def test_conflict_between_two_schemas_is_major():
+    reqs = [dict(r) for r in REQS]
+    reqs[1]["kind"], reqs[2]["kind"] = "architecture", "process"
+    out = C.postprocess(answer(pair_checks=[pair()]), VIEW, reqs)
+    assert out["candidates"][0]["severity"] == "major"
+
+
+def test_conflict_from_two_different_conditions_is_undefined():
+    p = pair(one_condition=False)
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"][0]["verdict"] == "undefined"
+    assert out["candidates"][0]["severity"] == "major"
+    assert "one_condition" in C.PAIR_SCHEMA["properties"]
+
+
+def test_internal_service_action_is_not_a_promise_of_interface_operation():
+    doc = ["Сервис учёта получает номер договора от партнёра.", "На экране: номер договора и дата.",
+           "Методы описаны в части B."]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    out = C.postprocess(answer(candidates=[_missing([(doc[0], 1), (doc[1], 2)])]), view, [])
+    assert out["candidates"][0]["severity"] == "major"
+    doc[0] = "Приложение получает номер договора через дочерний документ."
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    out = C.postprocess(answer(candidates=[_missing([("получает номер договора через дочерний документ", 1)])]), view, [])
+    assert out["candidates"][0]["severity"] == "critical"  # подлежащее «Приложение» — в строке, вне цитаты
+
+
+def test_conditional_permission_against_prohibition_of_other_state_is_not_conflict():
+    p = pair(kind="status_conflict", basis="same_condition",
+             quote_a="Вклад можно пополнять не более трёх раз в квартал.",
+             quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
+    assert C.postprocess(answer(pair_checks=[p]), VIEW, REQS)["pair_checks"][0]["verdict"] == "conflict"
+    doc = ["Клиент может закрыть вклад, если по нему нет операции в обработке.", "409 — вклад под арестом."]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    reqs = [{"id": f"R-0{i}", "source_id": "", "kind": "functional", "line_start": i, "line_end": i} for i in (1, 2)]
+    p = pair(a="R-01", b="R-02", kind="status_conflict", basis="same_condition",
+             quote_a=doc[0], line_a=1, quote_b=doc[1], line_b=2)
+    out = C.postprocess(answer(pair_checks=[p]), view, reqs)
+    assert out["pair_checks"][0]["verdict"] == "undefined"
+    assert [c["severity"] for c in out["candidates"]] == ["major"]

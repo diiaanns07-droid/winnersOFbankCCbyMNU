@@ -6,12 +6,18 @@
 
 * ``docx_merged.docx`` — Word: колонтитулы, автонумерация (List Number), таблица с объединёнными ячейками
   по горизонтали и вертикали, маркированный список;
+* ``docx_tracked.docx`` — Word с непринятыми исправлениями (вставка и удаление);
+* ``toc.docx`` + ``toc.pdf`` — оглавление с точками и номерами страниц; в PDF из LibreOffice «-1.» и точки —
+  отдельные фрагменты без зазора;
 * ``word_export.docx`` + ``word_export.pdf`` — PDF «из Word» (LibreOffice): колонтитулы на каждой странице
   с номером страницы, переносы слов (мягкие переносы), 3+ страницы, таблица;
 * ``two_columns.pdf`` — PDF в две колонки (reportlab), 2 страницы;
 * ``scan_page.pdf`` — 2 страницы: текст и страница-скан (картинка без текстового слоя);
+* ``api_narrow.pdf`` — узкая таблица API (слова режутся без дефиса) и страница статусов почти целиком латиницей;
 * ``no_part_b.md`` — Markdown только с бизнес-частью, без спецификации API;
-* ``long_tz.md`` — длинное ТЗ на 600+ строк, с повторяющимися фразами в разных разделах;
+* ``long_tz.md`` — длинное ТЗ на 600+ строк, с повторяющимися фразами в разных разделах; ``long_tz.docx`` и
+  ``long_tz.pdf`` — оно же в Word и PDF из Word (многостраничные таблицы);
+* ``word_saved.html`` — официальный документ (``release/input/requirements.docx``), сохранённый как веб-страница;
 * ``confluence.html`` — HTML-экспорт страницы Confluence: хлебные крошки, метаданные, оглавление, панели, код,
   таблицы confluenceTable, вложения и подвал.
 
@@ -62,6 +68,55 @@ def _headers(doc, head: str, foot: str) -> None:
     _field(p, "PAGE")
     p.add_run(" из ")
     _field(p, "NUMPAGES")
+
+
+def make_docx_tracked(path: Path) -> None:
+    """DOCX с непринятыми исправлениями: удалено «100 000», вставлено «200 000»."""
+    import docx
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    d = docx.Document()
+    d.add_heading("Лимит снятия наличных", level=1)
+    d.add_paragraph("СН-1. Клиент снимает наличные в банкоматах банка без комиссии.")
+    p = d.add_paragraph()
+    p.add_run("СН-2. Лимит снятия составляет ")
+    for tag, text, rid in (("w:del", "100 000", "1"), ("w:ins", "200 000", "2")):
+        el = OxmlElement(tag)
+        el.set(qn("w:id"), rid)
+        el.set(qn("w:author"), "Аналитик")
+        el.set(qn("w:date"), "2026-11-20T10:00:00Z")
+        r = OxmlElement("w:r")
+        t = OxmlElement("w:delText" if tag == "w:del" else "w:t")
+        t.set(qn("xml:space"), "preserve")
+        t.text = text
+        r.append(t)
+        el.append(r)
+        p._p.append(el)
+    p.add_run(" тенге в сутки.")
+    d.save(path)
+
+
+def make_docx_toc(path: Path) -> None:
+    """Word с оглавлением (табуляция с точками и номером страницы) перед разделами; PDF из него — через LibreOffice
+    со шрифтом по умолчанию (подстановка Calibri даёт отдельные фрагменты для «-1.» и точек)."""
+    import docx
+    from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
+    from docx.shared import Pt
+    d = docx.Document()
+    d.add_heading("Выпуск виртуальной карты", level=1)
+    d.add_paragraph("Содержание").runs[0].bold = True
+    for t, pg in (("1. Общие сведения", 2), ("2. Цели", 2), ("3. Функциональные требования", 3),
+                  ("4. Критерии приёмки", 4)):
+        p = d.add_paragraph()
+        p.paragraph_format.tab_stops.add_tab_stop(Pt(450), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+        p.add_run(f"{t}\t{pg}")
+    for head, body in (("1. Общие сведения", "Клиент выпускает виртуальную карту в приложении."),
+                       ("2. Цели", "Карта доступна для оплаты сразу после выпуска."),
+                       ("3. Функциональные требования", "ВК-1. Выпуск бесплатный."),
+                       ("4. Критерии приёмки", "Карта выпущена за 10 секунд.")):
+        d.add_heading(head, level=2)
+        d.add_paragraph(body)
+    d.save(path)
 
 
 def make_docx_merged(path: Path) -> None:
@@ -253,6 +308,37 @@ def make_two_columns(path: Path) -> None:
     doc.build(story)
 
 
+def make_api_pdf(path: Path) -> None:
+    """Спецификация API: узкая таблица (длинные слова режутся без дефиса — «strin g», «Mandator y») и последняя
+    страница со статусами почти целиком латиницей (читатель v1 принимает её за «нечитаемый шрифт»)."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle
+    _fonts()
+    hs = ParagraphStyle("h", fontName="DejaVu-Bold", fontSize=13, leading=16, spaceBefore=8, spaceAfter=6)
+    ps = ParagraphStyle("p", fontName="DejaVu", fontSize=10, leading=13, spaceAfter=5)
+    cs = ParagraphStyle("c", fontName="DejaVu", fontSize=9, leading=11)
+    story = [Paragraph("Метод getStatement", hs),
+             Paragraph("Метод возвращает выписку по счёту за период. Даты передаются в формате ГГГГ-ММ-ДД.", ps),
+             Paragraph("Параметры запроса", hs)]
+    rows = [["Parameter", "Format", "Mandatory", "Description"],
+            ["accountId", "string", "Да", "Идентификатор счёта"],
+            ["dateFrom", "string", "Да", "Начало периода"],
+            ["pageSize", "integer", "Нет", "Число операций на странице"],
+            ["includeHolds", "boolean", "Нет", "Показывать заблокированные суммы"]]
+    t = Table([[Paragraph(c, cs) for c in r] for r in rows], colWidths=[52, 34, 40, 170])
+    t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, "black"), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story += [t, PageBreak(), Paragraph("Статусы", hs)]
+    for code, title, body in (("200", "Successful", '{"items":[],"total":0}'),
+                              ("400", "Unsuccessful — Bad request", '{"message":"Invalid date range"}'),
+                              ("401", "Unsuccessful — Unauthorized", '{"message":"Authorization required"}'),
+                              ("404", "Unsuccessful — Not found", '{"message":"Account not found"}'),
+                              ("410", "Unsuccessful — Gone", '{"message":"Счёт закрыт"}'),
+                              ("500", "Unsuccessful — Internal server error", '{"message":"Internal error"}')):
+        story += [Paragraph(f"{code}. {title}", hs), Paragraph(body, ps)]
+    SimpleDocTemplate(str(path), pagesize=A4).build(story)
+
+
 def make_scan(path: Path) -> None:
     """Страница 1 — текст, страница 2 — картинка с текстом (скан без текстового слоя)."""
     import io
@@ -432,11 +518,36 @@ CONFLUENCE = """<!DOCTYPE html>
 
 def main() -> int:
     make_docx_merged(HERE / "docx_merged.docx")
+    make_docx_tracked(HERE / "docx_tracked.docx")
+    make_docx_toc(HERE / "toc.docx")
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(HERE / "toc.docx")],
+                           check=True, capture_output=True, timeout=180)
+            shutil.copy(Path(tmp) / "toc.pdf", HERE / "toc.pdf")
     make_word_export(HERE / "word_export.docx", HERE / "word_export.pdf")
     make_two_columns(HERE / "two_columns.pdf")
     make_scan(HERE / "scan_page.pdf")
+    make_api_pdf(HERE / "api_narrow.pdf")
     (HERE / "no_part_b.md").write_text(NO_PART_B, encoding="utf-8")
     n = make_long_md(HERE / "long_tz.md")
+    # то же длинное ТЗ в DOCX (конвертер официального документа) и PDF из Word (LibreOffice)
+    sys.path.insert(0, str(HERE))
+    from make_official_docx import convert
+    convert(HERE / "long_tz.md", HERE / "long_tz.docx")
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(HERE / "long_tz.docx")],
+                           check=True, capture_output=True, timeout=300)
+            shutil.copy(Path(tmp) / "long_tz.pdf", HERE / "long_tz.pdf")
+            # официальный документ, сохранённый из Word как веб-страница (LibreOffice: переносы строк внутри <p>,
+            # <li><p>…</p></li>, стили)
+            subprocess.run([soffice, "--headless", "--convert-to", "html", "--outdir", tmp,
+                            str(HERE.parents[3] / "release/input/requirements.docx")],
+                           check=True, capture_output=True, timeout=300)
+            shutil.copy(Path(tmp) / "requirements.html", HERE / "word_saved.html")
     (HERE / "confluence.html").write_text(CONFLUENCE, encoding="utf-8")
     print(f"готово: {HERE} (long_tz.md — {n} строк)")
     return 0

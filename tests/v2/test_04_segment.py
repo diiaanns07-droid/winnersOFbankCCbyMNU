@@ -415,18 +415,23 @@ def test_long_document_chunks_and_ids():
     assert len(h["requirements"]) == 242
 
 
-@pytest.mark.xfail(strict=False, reason="DOCX: читатель не отдаёт номер пункта нумерованного списка (просьба к №03 "
-                                        "в status/04.md); с моделью список совпадает с MD")
-def test_official_docx_matches_md_offline():
+@pytest.mark.parametrize("docx", ["release/input/requirements.docx", "tests/v2/fixtures/04_structures/official.docx"])
+def test_official_docx_matches_md_offline(docx):
     md = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
-    dx = sg.heuristic_segment(sg.load_view(str(STRUCT / "official.docx")))["requirements"]
+    path = ROOT / docx
+    if not path.exists():
+        pytest.skip(f"нет {docx}")
+    dx = sg.heuristic_segment(sg.load_view(str(path)))["requirements"]
     assert [r["source_id"] for r in md] == [r["source_id"] for r in dx]
 
 
-def test_official_pdf_matches_md_offline():
+@pytest.mark.parametrize("other", ["release/input/requirements.pdf", "tests/v2/fixtures/04_structures/official.html"])
+def test_official_pdf_html_match_md_offline(other):
     md = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
-    pdf = sg.heuristic_segment(sg.load_view(str(ROOT / "release" / "input" / "requirements.pdf")))["requirements"]
-    assert [r["source_id"] for r in md] == [r["source_id"] for r in pdf]
+    view = sg.load_view(str(ROOT / other))
+    h = sg.heuristic_segment(view)
+    assert [r["source_id"] for r in md] == [r["source_id"] for r in h["requirements"]]
+    assert sg.uncovered_lines(view, h["requirements"], h["excluded"]) == []
 
 
 def test_caption_line_auto_excluded():
@@ -434,3 +439,33 @@ def test_caption_line_auto_excluded():
     n = next(x["n"] for x in view["lines"] if x["text"].strip() == "Ответ метода списка устройств:")
     excl, rest = sg.auto_exclude(view, [n])
     assert rest == [] and excl[0]["what"].startswith("Подпись")
+
+
+def test_duplicate_source_ids_qualified_by_section():
+    view = sg.load_view(str(STRUCT / "long.md"))
+    h = sg.heuristic_segment(view)
+    sids = [r["source_id"] for r in h["requirements"] if r["source_id"]]
+    assert len(sids) == len(set(sids))
+    assert any(s.endswith(": Статус 200") for s in sids)
+
+
+def test_several_requirements_on_one_line_kept():
+    v = _view(["Статусы", "200. Успех. 400. Неверные параметры. 404. Не найдено."], sections=["Статусы", "Статусы"])
+    raw = {"requirements": [
+        {"source_id": f"Статус {c}", "kind": "api", "summary": "к", "quote": q, "line_start": 2, "line_end": 2}
+        for c, q in (("200", "200. Успех."), ("400", "400. Неверные параметры."), ("404", "404. Не найдено."))],
+        "excluded": []}
+    out = sg.segment_from_response(v, raw)
+    assert [r["source_id"] for r in out["requirements"]] == ["Статус 200", "Статус 400", "Статус 404"]
+
+
+def test_bare_status_code_merged_with_sentence(official_view):
+    raw = _official_raw()
+    raw["requirements"] = [r for r in raw["requirements"] if r["source_id"] != "Статус 404"] + [
+        {"source_id": "", "kind": "api", "summary": "чужая карта", "line_start": 189, "line_end": 189,
+         "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."},
+        {"source_id": "Статус 404", "kind": "api", "summary": "404", "line_start": 190, "line_end": 192, "quote": "404"}]
+    out = sg.segment_from_response(official_view, raw)
+    last = out["requirements"][-1]
+    assert (last["source_id"], last["line_start"], last["line_end"]) == ("Статус 404", 189, 192)
+    assert len(out["requirements"]) == 40

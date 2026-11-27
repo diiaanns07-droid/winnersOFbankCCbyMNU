@@ -1,0 +1,759 @@
+{
+ "schema": "bcc-v2-score/1",
+ "gold": {
+  "path": "evaluation/v2/open2/grace_clean/gold.yaml",
+  "document": "evaluation/v2/open2/grace_clean/source.md",
+  "sha256": "6f1d1441c7de2b6f543751bbb3ff97fd52789c170f4a584f0b0bf53ce4bf9db2"
+ },
+ "report": {
+  "version": "v2",
+  "same_doc": true,
+  "document": {
+   "file": "source.md",
+   "format": "md",
+   "sha256": "6f1d1441c7de2b6f543751bbb3ff97fd52789c170f4a584f0b0bf53ce4bf9db2",
+   "lines": 212
+  },
+  "status": "complete",
+  "provider": "claude_cli",
+  "model": "haiku",
+  "models_used": [
+   "claude-haiku-5-5"
+  ],
+  "commit": "79b0fa1",
+  "duration_s": 372.0,
+  "calls": {
+   "total": 9,
+   "cached": 0,
+   "failed": 0,
+   "split": 0
+  },
+  "tokens": {
+   "input": 192325,
+   "output": 156736
+  },
+  "cost_usd": 0.11
+ },
+ "counts": {
+  "findings": 39,
+  "by_severity": {
+   "critical": 1,
+   "major": 22,
+   "minor": 16
+  },
+  "duplicates": 0,
+  "outside_gold": {
+   "total": 36,
+   "real": 0,
+   "partial": 0,
+   "false": 0,
+   "duplicate": 0,
+   "gold": 0,
+   "unknown": 36
+  },
+  "report_md_lines": 879
+ },
+ "recall": {
+  "critical": {
+   "found": [],
+   "n": 0,
+   "of": 5,
+   "as_critical": [],
+   "lenient": []
+  },
+  "major": {
+   "found": [],
+   "n": 0,
+   "of": 20,
+   "lenient": []
+  },
+  "minor": {
+   "found_parents": [
+    "М1",
+    "М2",
+    "М3"
+   ],
+   "of": 4,
+   "parts_found": [
+    "М1",
+    "М2",
+    "М3"
+   ]
+  },
+  "key_25": {
+   "n": 0,
+   "of": 25,
+   "lenient": 0,
+   "loose_any_edge": 0
+  },
+  "all_items": {
+   "n": 3,
+   "of": 4
+  },
+  "parents": {
+   "n": 3,
+   "of": 4
+  }
+ },
+ "precision": {
+  "matched": 3,
+  "duplicates": 0,
+  "outside_real": 0,
+  "outside_false": 0,
+  "outside_unknown": 36,
+  "outside_partial": 0,
+  "precision_useful": 0.077,
+  "precision_gold": 0.077
+ },
+ "severity": {
+  "pairs": 3,
+  "ok": 3,
+  "exact": 3,
+  "accuracy_ok": 1.0,
+  "accuracy_exact": 1.0,
+  "critical_false": [
+   {
+    "finding": "D-01",
+    "title": "Термин «отражение покупки на счёте»: авторизация или проведение — сумма погашения зависит от выбора",
+    "reason": "вне эталона"
+   }
+  ],
+  "rows": [
+   {
+    "gold": "М1",
+    "level": "minor",
+    "finding": "D-25",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М2",
+    "level": "minor",
+    "finding": "D-36",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М3",
+    "level": "minor",
+    "finding": "D-32",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   }
+  ]
+ },
+ "quotes": {
+  "total": 74,
+  "missing": 0,
+  "fuzzy": 0,
+  "line_mismatch": 0,
+  "verified_field_missing": 0,
+  "findings_without_evidence": [],
+  "missing_list": []
+ },
+ "language": {
+  "generic": [],
+  "english": [],
+  "english_report_md": []
+ },
+ "report_sections": {
+  "паспорт прогона": true,
+  "нарезка требований": true,
+  "проверка каждого требования": true,
+  "проверка набора": true,
+  "сводка": true,
+  "итог": true
+ },
+ "verdict": {
+  "got": {
+   "development": "no",
+   "testing": "no"
+  },
+  "expected": {
+   "development": "yes",
+   "testing": "yes"
+  }
+ },
+ "assignment": [
+  {
+   "gold": "М1",
+   "finding": "D-25",
+   "title": "Версия, дата и источник документа не указаны; пункты не трассируются",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.version",
+    "consistency"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М2",
+   "finding": "D-36",
+   "title": "Блок согласующих пуст",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.approvals"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М3",
+   "finding": "D-32",
+   "title": "Раздел «Тестирование требований» оставлен заглушкой",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.tbd",
+    "lens:qa"
+   ],
+   "how": "детерминированно"
+  }
+ ],
+ "duplicates": [],
+ "outside": [
+  {
+   "finding": "D-01",
+   "severity": "critical",
+   "kind": "ambiguity",
+   "title": "Термин «отражение покупки на счёте»: авторизация или проведение — сумма погашения зависит от выбора",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-02",
+   "severity": "major",
+   "kind": "event_conflict",
+   "title": "Учёт платежа: NFR исключает платежи моложе 5 минут, Ф-5 учитывает с момента зачисления",
+   "sources": [
+    "lens:analyst",
+    "lens:qa",
+    "lens:risk",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-03",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "Возврат покупки после выписки: Ф-2 фиксирует сумму, Ф-5 уменьшает её возвратом",
+   "sources": [
+    "lens:analyst",
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-04",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "База прогноза процентов: остаток (L158) или вся задолженность (L127, Ф-3)",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-05",
+   "severity": "major",
+   "kind": "boundary_conflict",
+   "title": "Покупка, отражённая в день выписки: Ф-2 и Ф-5 относят её к разным периодам",
+   "sources": [
+    "lens:qa",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-06",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Переключатель включён после окна 22-го: push по Ф-4 или нет по NFR",
+   "sources": [
+    "consistency",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-07",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Метод 2 (PUT) не показан ни в одной схеме вызова",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-08",
+   "severity": "major",
+   "kind": "terminology",
+   "title": "Один компонент назван «API кредитных карт» и «GraceController»",
+   "sources": [
+    "consistency",
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-09",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Кнопка «Пополнить» в блоке без описанного действия",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-10",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "BPMN линейна: напоминание без ветвлений по переключателю и полной оплате",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-11",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Расчётный период и выписка без часового пояса, окончание периода задано по UTC+5",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-12",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Начисление процентов: дата покупки или дата отражения на счёте не определена",
+   "sources": [
+    "lens:qa",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-13",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Перечень операций вне суммы погашения неполон: комиссии и квази-кэш не названы",
+   "sources": [
+    "lens:risk",
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-14",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Статус LOST до окончания платёжного периода при неполном внесении не определён",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-15",
+   "severity": "major",
+   "kind": "contradiction",
+   "title": "Последовательность передаёт напоминание безусловно, Ф-4 — при условиях",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-16",
+   "severity": "major",
+   "kind": "event_conflict",
+   "title": "Проверка «сумма не внесена» и окно 10:00–12:00: момент проверки не задан",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-17",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Возврат покупки после окончания платёжного периода не описан",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-18",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Поля due_date и total_debt не входят в перечень хранимых данных",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-19",
+   "severity": "major",
+   "kind": "ops_risk",
+   "title": "Повторная передача напоминания без ключа: два push по одному платежному периоду",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-20",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Критерии приёмки не покрывают граничные и служебные ветки",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-21",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Отсутствие выписки и закрытый период: какой период возвращается после 25-го",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-22",
+   "severity": "major",
+   "kind": "missing_element",
+   "title": "Код 400 метода 2 не входит в перечень статусов и неуспешных кодов",
+   "sources": [
+    "rules:api.status_400",
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-23",
+   "severity": "major",
+   "kind": "status_conflict",
+   "title": "Чужая некредитная карта: 404 по L166 или 422 по L167",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-24",
+   "severity": "minor",
+   "kind": "other",
+   "title": "Требования NFR, данных и интеграции без ID и приоритета",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-26",
+   "severity": "minor",
+   "kind": "ambiguity",
+   "title": "Цель «Снизить долю клиентов» без базы и целевого значения",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-27",
+   "severity": "minor",
+   "kind": "terminology",
+   "title": "Термины «переключатель напоминания» и «внесение денег» названы по-разному",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-28",
+   "severity": "minor",
+   "kind": "duplicate",
+   "title": "Дата окончания платёжного периода задана в Ф-1 и Ф-5",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-29",
+   "severity": "minor",
+   "kind": "non_singular",
+   "title": "Несколько независимых правил в одном пункте Ф-4, Ф-5 и NFR",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-30",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Состав операций выписки и платежей (тип, ссылка на покупку) не описан",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-31",
+   "severity": "minor",
+   "kind": "ops_risk",
+   "title": "Сбой сервиса уведомлений в окне 22-го числа не описан",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-33",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Валюта покупок и пересчёт сумм не описаны",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-34",
+   "severity": "minor",
+   "kind": "placeholder",
+   "title": "Чек-лист ревью не отмечен: в 14 пунктах оба варианта «Да / Нет»",
+   "sources": [
+    "rules:placeholder.checklist"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-35",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Схема отката функции не описана",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-37",
+   "severity": "minor",
+   "kind": "security",
+   "title": "Держатель дополнительной карты не назван; «клиент» и «владелец карты» не различены",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-38",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Переплата: судьба суммы сверх задолженности не определена",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-39",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Пример ответа дан только для ACTIVE, для LOST примера нет",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  }
+ ],
+ "misses": [
+  {
+   "gold": "М4",
+   "level": "minor",
+   "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+   "where": "есть близкое замечание, но не та проблема или не те строки",
+   "owners": [
+    "rules",
+    "analyst",
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-24",
+     "status": "disputed",
+     "score": 1.6,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": []
+  }
+ ],
+ "stage_recall": {
+  "consistency": {
+   "candidates": 14,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:analyst": {
+   "candidates": 10,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:architect": {
+   "candidates": 6,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:qa": {
+   "candidates": 5,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "lens:risk": {
+   "candidates": 11,
+   "K": [],
+   "C": [],
+   "only_here": []
+  },
+  "rules": {
+   "candidates": 7,
+   "K": [],
+   "C": [],
+   "only_here": []
+  }
+ },
+ "gates": [
+  {
+   "metric": "К1–К5 найдены",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "из них критичными",
+   "value": "0/5",
+   "ok": true
+  },
+  {
+   "metric": "С1–С20 найдены",
+   "value": "0/20",
+   "ok": true
+  },
+  {
+   "metric": "критичных ложных",
+   "value": "1",
+   "ok": false
+  },
+  {
+   "metric": "всего замечаний",
+   "value": "39",
+   "ok": true
+  },
+  {
+   "metric": "цитаты найдены в документе",
+   "value": "74/74",
+   "ok": true
+  },
+  {
+   "metric": "строк отчёта",
+   "value": "879",
+   "ok": true
+  },
+  {
+   "metric": "разделы п. 6 ТЗ",
+   "value": "6/6",
+   "ok": true
+  },
+  {
+   "metric": "общие фразы",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "английские слова",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "вердикт разработка/тестирование",
+   "value": "no/no",
+   "ok": false
+  },
+  {
+   "metric": "время, мин",
+   "value": "6.2",
+   "ok": true
+  },
+  {
+   "metric": "вызовов модели",
+   "value": "9",
+   "ok": true
+  }
+ ],
+ "arbiter": {
+  "mode": "off",
+  "calls": 0,
+  "seconds": 0.0,
+  "cost_usd": 0.0,
+  "pending": 39,
+  "model": ""
+ },
+ "seconds": 0.03
+}

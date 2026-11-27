@@ -17,7 +17,9 @@ reports
 *.egg-info
 build
 dist
+# из тестов в образ попадают только записанные ответы модели для --provider mock
 tests
+!tests/v2/fixtures/official
 evaluation
 docs
 presentation

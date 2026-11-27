@@ -180,7 +180,9 @@ def test_model_duplicate_of_acceptance_conflict_removed():
     assert sum(c["severity"] == "critical" for c in out["candidates"]) == 1
 
 
-def test_non_conflict_critical_from_model_is_demoted():
+def test_model_critical_is_demoted_only_acceptance_conflict_stays_critical():
+    """Critical линзы — только вычисленный конфликт строки приёмки; кандидат модели — не выше major
+    (противоречие двух правил — зона проверки набора, серьёзность ставит судья), с подсказкой severity_hint."""
     c = {"title": "Нет метрики", "kind": "unverifiable", "criterion": "verifiable", "severity": "critical",
          "requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
          "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "none"}
@@ -188,7 +190,41 @@ def test_non_conflict_critical_from_model_is_demoted():
     out = lens_qa.postprocess({"candidates": [c, conflict]}, REQS)
     sev = {x["title"]: (x["severity"], x["blocks"]) for x in out["candidates"]}
     assert sev["Нет метрики"][0] == "major"
-    assert sev["Два исхода"] == ("critical", "testing")
+    assert sev["Два исхода"] == ("major", "testing")
+    assert all(x["severity_hint"] == "critical" for x in out["candidates"])
+    acc = lens_qa.postprocess({"acceptance_checks": [_check()]}, REQS)["candidates"]
+    assert [x["severity"] for x in acc] == ["critical"]
+
+
+def test_schema_field_names_in_texts_become_russian():
+    raw = {"title": "Acceptance не покрывает границы", "kind": "missing_element", "criterion": "set_validatable",
+           "severity": "major", "requirement_ids": [], "evidence": [], "problem": "Строки acceptance_checks пусты",
+           "scenario": "", "impact": "", "recommendation": "", "rewrite": "", "question": "", "blocks": "testing"}
+    c = lens_qa.normalize_candidate(raw)
+    assert c["title"].startswith("Критерии приёмки") and "acceptance" not in c["problem"].lower()
+    t = lens_qa.normalize_test_case({"title": "Граница", "then": "Итог по test cases", "expected_defined": True})
+    assert "тест-кейсы" in t["then"]
+
+
+def test_other_candidates_limited_conflicts_kept():
+    """Противоречия модели остаются все; прочих замечаний — два: покрытие приёмкой и проверяемость первыми."""
+    base = {"requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
+            "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "testing",
+            "severity": "major"}
+    raw = [dict(base, title="Неоднозначность", kind="ambiguity", criterion="unambiguous"),
+           dict(base, title="Контракт", kind="api_contract", criterion="complete"),
+           dict(base, title="Два исхода", kind="contradiction", criterion="set_consistent", severity="critical"),
+           dict(base, title="Метрика", kind="unverifiable", criterion="verifiable"),
+           dict(base, title="Коды", kind="status_conflict", criterion="set_consistent"),
+           dict(base, title="Покрытие", kind="missing_element", criterion="set_validatable")]
+    raw.append(dict(base, title="Покрытие-2", kind="missing_element", criterion="set_validatable", severity="minor"))
+    out = lens_qa.postprocess({"candidates": raw}, REQS)
+    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие"]
+    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт", "Покрытие-2"}
+    assert all("не больше 2" in d["reason"] for d in out["dropped"])
+    # неоднозначность одного места без своих видов — тоже снимается: это зона аналитика
+    only = lens_qa.postprocess({"candidates": [raw[0]]}, REQS)
+    assert only["candidates"] == [] and [d["title"] for d in only["dropped"]] == ["Неоднозначность"]
 
 
 # ---------------------------------------------------------------- тест-кейсы
@@ -270,6 +306,7 @@ class _LLM:
 
     def ask(self, stage, system, user, schema, **kw):
         self.calls.append((stage, user))
+        self.kw = kw
         return self.answers.pop(0)
 
 
@@ -300,6 +337,8 @@ def test_run_without_missing_rows_makes_one_call():
     llm = _LLM([full])
     out = lens_qa.run(_Ctx(llm, REQS))
     assert len(llm.calls) == 1 and out["candidates"] == []
+    # лимит ответа сразу 32 000: на haiku 16 000 включают рассуждение, обрезанная попытка стоит целого вызова
+    assert llm.kw.get("max_output_tokens") == lens_qa.MAX_OUTPUT_TOKENS == 32000
 
 
 def test_other_topic_both_acceptance_conflicts_found():

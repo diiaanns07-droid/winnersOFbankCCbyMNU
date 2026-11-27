@@ -171,3 +171,27 @@ def test_prompts_have_no_official_words(name):
     text = (ROOT / "src" / "bcc_review" / "v2" / "prompts" / f"{name}.md").read_text(encoding="utf-8").lower()
     for word in ("push", "savelimit", "тиын", "порог", "алматы", "ф-1", "ф-2", "кэшбэк", "₸", "alerts"):
         assert word not in text, f"{name}.md содержит слово официального документа: {word}"
+
+
+def test_no_formatting_questions_and_both_sides(findings):
+    view = load_view()
+    raw = {"questions": [
+        {"topic": "Оформление", "finding_ids": ["D-25"], "to": "Аналитик", "blocking": False,
+         "question": "Нужны ли ID у требований?", "evidence": [{"quote": "Сервис передаёт push на отправку", "line": 46}],
+         "options": ["Да, сквозные ID", "Нет"], "why": "…"},
+        {"topic": "Конфликт", "finding_ids": ["D-02"], "to": "Аналитик", "blocking": True,
+         "question": "Какой месяц?", "evidence": [{"quote": "Месяц определяется по дате совершения покупки", "line": 38}],
+         "options": ["По дате покупки", "По дате проведения"], "why": "…"},
+    ]}
+    qs = clarify.postprocess(raw, findings, view)
+    assert [q["topic"] for q in qs] == ["Конфликт"]
+    assert len({e["line_start"] for e in qs[0]["evidence"]}) >= 2  # вторая сторона — из цитат дефекта (строка 64)
+    assert 64 in {e["line_start"] for e in qs[0]["evidence"]}
+
+
+def test_only_formatting_findings_no_call():
+    llm = FakeLLM({"questions": []})
+    only_minor = [{"id": "D-01", "severity": "minor", "kind": "placeholder", "criterion": "conforming", "evidence": []},
+                  {"id": "D-02", "severity": "minor", "kind": "traceability", "criterion": "traceable", "evidence": []}]
+    assert clarify.run(FakeCtx(llm), only_minor) == {"questions": []}
+    assert llm.calls == []
