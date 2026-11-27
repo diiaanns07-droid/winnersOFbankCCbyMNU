@@ -121,7 +121,7 @@ def test_schema_too_large_switches_to_schema_as_text(server):
     assert out["meta"]["schema_mode"] == "text"
 
 
-@pytest.mark.parametrize("kind, err", [("safety", "refusal"), ("finish_safety", "refusal"),
+@pytest.mark.parametrize("kind, err", [("safety", "refusal"),
                                        ("max_tokens", "truncated"), ("401", "auth"), ("403", "auth")])
 def test_non_retryable_faults_raise_clean_error_once(server, kind, err):
     fake = server([{"kind": kind, "times": 99}])
@@ -165,3 +165,39 @@ def test_rpm_window_holds_under_parallel_lenses(server, monkeypatch):
         in_window = [x for x in times[i:] if x - t < 1.5 - 0.2]   # запас на дрожание потоков
         assert len(in_window) <= 2, times
     assert times[-1] - times[0] >= 2 * 1.5 - 0.5                  # 5 запросов при 2 за окно — минимум 2 окна
+
+
+def test_schema_rejected_once_keeps_other_schemas_native(server):
+    """v2.1: 400 «схема слишком сложная» у одного этапа не переводит остальные этапы модели в режим «текстом»."""
+    fake = server([{"kind": "400_schema"}])
+    p = provider()
+    ask(p)                                            # схема A: 400 → текстом
+    other = {"type": "object", "required": ["questions", "note"],
+             "properties": {"questions": {"type": "array", "items": {"type": "string"}}, "note": {"type": "string"}}}
+    p.invoke(model=None, messages=MESSAGES, schema=other, timeout_s=30, stage="clarify")   # схема B
+    ask(p)                                            # снова A — сразу текстом, без второго 400
+    assert [r["schema_mode"] for r in fake.log] == ["native", "text", "native", "text"]
+
+
+@pytest.mark.parametrize("kind", ["finish_recitation", "finish_safety", "finish_spii"])
+def test_output_filter_stop_is_retried_once(server, kind):
+    """v2.1: ответ остановлен фильтром на выходе (зависит от выборки) — повтор той же модели (было: этап падал)."""
+    fake = server([{"kind": kind}])
+    out = ask(provider())
+    assert isinstance(out["data"]["questions"], list)
+    assert kinds(fake) == [("gemini-3.8-flash", kind), ("gemini-3.8-flash", "ok")]
+
+
+def test_output_filter_stop_twice_goes_to_fallback(server):
+    fake = server([{"kind": "finish_recitation", "model": "gemini-3.8-flash", "times": 99}])
+    out = ask(provider())
+    assert out["model"] == "gemini-3.7-flash"
+    assert [m for m, _ in kinds(fake)] == ["gemini-3.8-flash", "gemini-3.8-flash", "gemini-3.7-flash"]
+
+
+def test_persistent_output_filter_stop_spends_at_most_three_requests(server):
+    fake = server([{"kind": "finish_safety", "times": 99}])
+    with pytest.raises(ProviderError) as e:
+        ask(provider())
+    assert e.value.kind == "refusal" and "фильтр" in e.value.message
+    assert len(fake.log) == 3      # не перебираем всю цепочку из шести моделей (у каждой 20 запросов в сутки)
