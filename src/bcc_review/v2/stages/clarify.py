@@ -26,6 +26,15 @@ _ROLE_ALIASES = {
     "безопас": "ИБ", "security": "ИБ", "тест": "Тестирование", "qa": "Тестирование",
 }
 _SEV_RANK = {"critical": 0, "major": 1, "minor": 2}
+# оформление не требует решения владельца: по таким дефектам вопросов нет
+FORMAT_KINDS = {"placeholder", "traceability", "terminology", "non_singular", "duplicate"}
+FORMAT_CRITERIA = {"conforming", "ranked", "modifiable", "traceable"}
+CONFLICT_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
+                  "api_contract"}
+
+
+def is_formatting(f: dict) -> bool:
+    return f.get("severity") == "minor" and (f.get("kind") in FORMAT_KINDS or f.get("criterion") in FORMAT_CRITERIA)
 
 # Варианты, которые не являются решением: их программа выбрасывает.
 _BANNED_OPTION = re.compile(
@@ -249,6 +258,19 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
         if not evidence:
             warnings.append(f"clarify: вопрос «{text[:60]}» отброшен — цитата не найдена в документе")
             continue
+        if all(is_formatting(by_id[fid]) for fid in ids):
+            warnings.append(f"clarify: вопрос «{text[:60]}» отброшен — вопрос об оформлении")
+            continue
+        # у конфликта — цитаты обеих сторон: недостающую сторону берём из сверенных цитат дефекта
+        if any(by_id[fid].get("kind") in CONFLICT_KINDS for fid in ids):
+            lines_have = {e["line_start"] for e in evidence}
+            for fid in ids:
+                for e in by_id[fid].get("evidence", []):
+                    if len(lines_have) >= 2 or len(evidence) >= 3:
+                        break
+                    if e.get("line_start") and e["line_start"] not in lines_have and e.get("verified", "exact") != "missing":
+                        evidence.append(dict(e))
+                        lines_have.add(e["line_start"])
         options = clean_options(q.get("options") or [])
         if len(options) < 2:
             warnings.append(f"clarify: вопрос «{text[:60]}» отброшен — меньше двух проверяемых вариантов")
@@ -290,8 +312,9 @@ def option_label(index: int) -> str:
 # --------------------------------------------------------------------------- этап
 def run(ctx: Any, findings: list[dict]) -> dict:
     """Вопросы владельцу по итоговым дефектам. Один вызов модели; без дефектов — без вызова."""
-    relevant = [f for f in findings if f.get("severity") in ("critical", "major")] or list(findings)
-    if not relevant:
+    relevant = [f for f in findings if f.get("severity") in ("critical", "major")] or \
+        [f for f in findings if not is_formatting(f)]
+    if not relevant:  # только оформление (или дефектов нет) — спрашивать владельца не о чем
         return {"questions": []}
     def build(items: list) -> tuple[str, str]:
         return build_messages(ctx, STAGE, "findings", format_findings(items), "Задание: вопросы владельцу")
