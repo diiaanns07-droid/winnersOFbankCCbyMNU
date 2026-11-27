@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 from bcc_review.v2 import docview  # noqa: E402
 import bcc_review.v2.stages.lens_risk as LR  # noqa: E402
 from evaluation.v2 import score as sc  # noqa: E402
-from bench import doc_path, OPEN2, OPEN2_CLEAN, CLEAN_CORPUS, MUT_CORPUS, CORPUS  # noqa: E402
+from bench import doc_path, OPEN2, OPEN2_CLEAN, CLEAN_CORPUS, MUT_CORPUS, CORPUS, CLEAN2  # noqa: E402
 
 SEV = ("critical", "major", "minor")
 
@@ -111,7 +111,7 @@ def main():
             else:
                 clean_sum.append(kept)
             print(head + (f"  ERR {rec['error'][:60]}" if rec["error"] else ""))
-            if a.v or name in OPEN2_CLEAN + CLEAN_CORPUS:
+            if a.v or name in OPEN2_CLEAN + CLEAN_CORPUS + CLEAN2:
                 for c in kept:
                     print(f"     + {c.get('severity'):8s} {c.get('kind',''):16s} {c.get('title','')[:120]}")
             if a.v:

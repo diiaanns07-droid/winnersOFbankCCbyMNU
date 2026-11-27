@@ -511,3 +511,30 @@ def test_repeat_request_answered_by_special_rule():
     kept, dropped = lens_risk.postprocess([_cand(ev, kind="ops_risk", criterion="risk")],
                                           doc + "\nПовторное событие не учитывается повторно.")
     assert _sev(ev, kept, dropped) == "major"
+
+
+def test_weekend_deadline_glued_with_timezone_is_kept():
+    t = "Срок платежа «25-го числа» без часа, пояса и правила для выходных"
+    kept, dropped = lens_risk.postprocess([_cand(t)], "Платёжный период заканчивается 25-го числа.")
+    assert _sev(t, kept, dropped) == "major"
+
+
+def test_repeat_request_with_words_between_and_event_repeat_without_hook():
+    doc = "2. Повторный запрос с тем же `requestId` возвращает результат первого запроса."
+    t = "Повтор с тем же requestId после оплаты QR с суммой: DONE или 410"
+    kept, dropped = lens_risk.postprocess([_cand(t, kind="contradiction")], doc)
+    assert _sev(t, kept, dropped) == "снято"
+    # «повтор события» без обещания документа о повторах — вопрос, а не major
+    ev = "Повтор события «проведена» по покупке не распознаётся: нет идентификатора операции"
+    kept, dropped = lens_risk.postprocess([_cand(ev, kind="ops_risk", criterion="risk")], "Кэшбэк за покупки.")
+    assert _sev(ev, kept, dropped) == "снято"
+
+
+def test_rollback_described_in_filled_template():
+    t = "Схема отката решения не описана, хотя пункт шаблона её требует"
+    tmpl = "| Реализация задачи/проекта предусматривает схему отката решений | Да / Нет | | При невозможности отката — варианты скрытия функционала |"
+    kept, _ = lens_risk.postprocess([_cand(t, "minor", "missing_element")], tmpl)
+    assert kept
+    filled = "| Реализация задачи/проекта предусматривает схему отката решений | Да | Да | Откат — выключение функционала флагом |"
+    kept, dropped = lens_risk.postprocess([_cand(t, "minor", "missing_element")], filled)
+    assert not kept and "описана" in dropped[0]["reject_reason"]

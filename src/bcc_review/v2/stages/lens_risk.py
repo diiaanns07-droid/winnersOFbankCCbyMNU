@@ -96,7 +96,8 @@ _TITLE_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in OUT_OF_S
 # устойчивость к повторам, говорит о параллельных событиях или сбоях). Иначе это вопрос — minor.
 MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
     "повторы и дубли событий": {
-        "title": r"дедуплик|дубл|повторн\w*\s+(доставк|событи|уведомлени|обработк|запрос|вызов)|идемпотент|двойн",
+        "title": r"дедуплик|дубл|повторн\w*\s+(доставк|событи|уведомлени|обработк|запрос|вызов)|идемпотент|двойн"
+                 r"|повтор\w*\s+(\w+\s+)?(событи|доставк|уведомлени|сообщени)",
         "hooks": ["повтор", "дубл", "идемпотент", "исходный итог", "однократн"],
     },
     "гонки параллельных событий": {
@@ -305,6 +306,9 @@ _TZ_TITLE_RE = re.compile(r"пояс|\butc\b|(до|с)\s+какого\s+часа
 _TZ_CITY_RE = re.compile(r"город|местн\w+\s+врем|алмат|астан", re.I)
 _DAY_MONEY_RE = re.compile(r"(на\s+)?кон(ец|ца)\s+(операционного\s+)?дня|на\s+начало\s+дня", re.I)
 _TZ_DOC_RE = re.compile(r"utc|часов\w*\s+пояс", re.I)
+# Перенос срока с выходного или праздничного дня — отдельный major (проценты и штрафы клиента), даже если модель
+# склеила его в одно замечание с поясом.
+_WEEKEND_RE = re.compile(r"выходн|праздни|нерабоч|рабоч\w*\s+д|перенос", re.I)
 # Два периода, которые должны считаться по одной дате и в одном поясе (учёт операций и ограничение действия): это
 # расхождение мест документа, а не граница одного срока.
 _TWO_PERIODS_RE = re.compile(r"ограничени|лимит|два\w*\s+период|разн\w+\s+(дат|период)|месяц\w*\s+(лимит|отправк|уведомлен|push)"
@@ -316,7 +320,8 @@ def tz_only_question(c: dict, doc_text: str) -> str | None:
     if c.get("severity") == "critical" or _is_key_event(c) or c.get("kind") in CONFLICT_KINDS + ("unit_mismatch",):
         return None
     title = str(c.get("title", ""))
-    if not _TZ_TITLE_RE.search(title) or _TZ_CITY_RE.search(title) or _TWO_PERIODS_RE.search(title):
+    if not _TZ_TITLE_RE.search(title) or _TZ_CITY_RE.search(title) or _TWO_PERIODS_RE.search(title) \
+            or _WEEKEND_RE.search(title):
         return None
     if not _TZ_DOC_RE.search(doc_text) and any(_DAY_MONEY_RE.search(q) for q in _quotes(c)):
         return None  # «остаток на конец дня» без пояса: деньги считаются каждый день — дефект, а не граница
@@ -384,7 +389,7 @@ def failure_outcome_defined(c: dict, view: Any) -> str | None:
 # Ответ на повтор запроса клиента задан особым правилом («Повторная установка … не считается ошибкой», «Повторный
 # вызов … возвращает …»): вопрос о варианте повтора — уточнение (разбор №18: «повтор: 200 или 400»), а не дефект.
 # Повтор события от внешней системы (дубль события процессинга) сюда не относится.
-_REPEAT_REQ_TITLE_RE = re.compile(r"повтор\w*\s+(\w+\s+){0,2}(установк|запрос|вызов|оплат|нажати|requestid|сохранени|подключ)"
+_REPEAT_REQ_TITLE_RE = re.compile(r"повтор\w*\s+(\w+\s+){0,4}(установк|запрос|вызов|оплат|нажати|requestid|сохранени|подключ)"
                                   r"|повторн\w*\s+(\w+\s+)?(установк|вызов|запрос|оплат|сохранени)", re.I)
 _REPEAT_EVENT_RE = re.compile(r"событи|уведомлени|доставк|процессинг|сообщени", re.I)
 _REPEAT_RULE_RE = re.compile(r"повторн\w*\s+(\w+\s+){0,3}(установк|вызов|запрос|оплат|сохранени|подключ)\w*.{0,120}"
@@ -400,6 +405,19 @@ def repeat_request_defined(c: dict, view: Any) -> str | None:
         return None
     if any(_REPEAT_RULE_RE.search(x["text"]) for x in _lines(view)):
         return "ответ на повтор запроса задан особым правилом документа — уточнение, не замечание линзы"
+    return None
+
+
+# Пункт шаблона ревью о схеме отката заполнен (отмечено «Да» и описан флаг или выключение функции): замечания нет.
+_ROLLBACK_DONE_RE = re.compile(r"откат\w*.{0,200}(флаг\w*|выключ\w*|отключ\w*|feature)", re.I)
+
+
+def rollback_described(c: dict, view: Any) -> str | None:
+    """Причина снять «схема отката не описана», если документ её описывает (заполненный пункт шаблона), или None."""
+    if "откат" not in str(c.get("title", "")).lower():
+        return None
+    if any(_ROLLBACK_DONE_RE.search(x["text"]) for x in _lines(view)):
+        return "схема отката описана в документе"
     return None
 
 
@@ -503,7 +521,7 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
         why = payout_closed_question(c, doc) if doc else None
         if not why and doc:
             why = (tz_only_question(c, doc) or refund_edge_defined(c, view) or failure_outcome_defined(c, view)
-                   or repeat_request_defined(c, view))
+                   or repeat_request_defined(c, view) or rollback_described(c, view))
         if why:
             dropped.append(_drop(c, why))
             continue
