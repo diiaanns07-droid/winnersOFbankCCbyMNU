@@ -477,3 +477,45 @@ def test_part_candidate_may_be_outside_focus():
     res = sc.score_report(rep, gold, arbiter="off")
     assert {p["finding"]: p["gold"] for p in res["parts"]} == {"D-16": "С2"}
     assert res["precision"]["duplicates"] == 0 and res["recall"]["major"]["n"] == 17
+
+
+def test_viewdiff_compare_reports_first_difference():
+    """Вид документа на двух коммитах: совпал, отличается (строка, поле и кусок вокруг первого отличия), не прочитан."""
+    from evaluation.v2 import viewdiff as vd
+
+    line = lambda n, text, section="": [n, text, None, section, n, "", "", 0, False]  # noqa: E731
+    a = {"title": "ТЗ", "format": "md", "warnings": [], "pages": None,
+         "lines": [line(1, "# ТЗ"), line(2, "Сумма в тиынах, порог в тенге, пересчёт не описан", "Ф-1")]}
+    b = {**a, "lines": [line(1, "# ТЗ"), line(2, "Сумма в тиынах, порог в тенге, пересчёт описан", "Ф-1")]}
+    res = vd.compare({"x.md": a, "y.md": a, "z.md": a}, {"x.md": a, "y.md": b, "z.md": {"error": "ValueError()"}})
+    assert res["docs"] == 3 and res["same"] == ["x.md"]
+    assert [d["doc"] for d in res["diff"]] == ["y.md"] and [e["doc"] for e in res["errors"]] == ["z.md"]
+    where = res["diff"][0]["where"]
+    assert where.startswith("строка 2, text:") and "не описан" in where and "пересчёт описан" in where
+    assert vd.first_difference(a, {**a, "title": "Другое"}).startswith("title:")
+
+
+def test_viewdiff_main_run_prompts_and_summary():
+    """Промпты и код этапов делятся на основной прогон и прочее (режим `--answers`): recheck/revise — не основной."""
+    from evaluation.v2 import viewdiff as vd
+
+    stages = vd.MAIN_STAGES
+    assert vd._in_main("judge_check.md", stages) and vd._in_main("_system.md", stages)
+    assert vd._in_main("src/bcc_review/v2/stages/lens_risk.py", stages)
+    assert not vd._in_main("recheck.md", stages) and not vd._in_main("revise_check.md", stages)
+    res = {"docs": 51, "same": ["d"] * 51, "diff": [], "errors": [], "prompts_main": [],
+           "prompts_other": ["recheck.md"], "stage_code_changed": []}
+    s = vd.summary_line(res)
+    assert s.startswith("вид документов оценки не изменился (51 из 51)") and "вне его — recheck.md" in s
+    assert s.endswith("код этапов основного прогона тот же") and vd.same_input(res)
+    res["stage_code_changed"] = ["stages/judge.py"]
+    assert not vd.same_input(res) and vd.summary_line(res).endswith("изменён: stages/judge.py")
+
+
+def test_viewdiff_same_commit_builds_view_from_exported_code():
+    """Код коммита выгружается `git archive`, вид строит его же docview (не установленный пакет): HEAD → HEAD совпал."""
+    from evaluation.v2 import viewdiff as vd
+
+    res = vd.check("HEAD", "HEAD", docs=["release/input/requirements.md"])
+    assert res["docs"] == 1 and res["same"] == ["release/input/requirements.md"] and not res["errors"]
+    assert res["prompts_changed"] == [] and res["stage_code_changed"] == [] and vd.same_input(res)

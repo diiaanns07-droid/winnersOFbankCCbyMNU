@@ -187,7 +187,7 @@ def official_table(off: list[dict]) -> list[str]:
     return L
 
 
-def newer_lines(sha: str, newer: list[str]) -> list[str]:
+def newer_lines(sha: str, newer: list[str], view_check: bool = True) -> list[str]:
     """Официальный документ на более новом коде (после замера релиза) — с тем, чем код отличается от `sha`."""
     L: list[str] = []
     for ref in newer:
@@ -202,13 +202,31 @@ def newer_lines(sha: str, newer: list[str]) -> list[str]:
         L += official_table(rows)
         note_code = code_note(nsha, [rows])
         L += ["", note_code] if note_code else []
+        if view_check and diff:
+            L += ["", view_line(sha, nsha)]
     return L
 
 
-def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newer: list[str] | None = None) -> str:
+def view_line(sha: str, nsha: str) -> str:
+    """Вход модели на новой голове: вид документов оценки и промпты этапов (`viewdiff`, без вызовов модели)."""
+    from . import viewdiff
+
+    try:
+        res = viewdiff.check(sha, nsha)
+    except Exception as exc:  # noqa: BLE001 — сверка вида не роняет итог релиза
+        return f"Вход модели не сверен (`viewdiff {sha} {nsha}`): {str(exc).splitlines()[0][:200]}"
+    return (f"Вход модели (`python -m evaluation.v2.viewdiff {sha} {nsha}`): {viewdiff.summary_line(res)}"
+            + (" — модель получает тот же вход, разница в цифрах — разброс выборки ответов."
+               if viewdiff.same_input(res) else "."))
+
+
+def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newer: list[str] | None = None,
+           extra: list[str] | None = None, view_check: bool = True) -> str:
     L = [f"Код: `{sha}`" + (f" ({note})" if note else "") + ". Все числа — из готовых замеров с этим коммитом в "
          "метке; пересчитать — `python -m evaluation.v2.final --commit " + ref
          + "".join(f" --newer {n}" for n in newer or []) + " --write`.", ""]
+    for x in extra or []:
+        L += [x, ""]
     off = official(sha)
     L += ["**Официальный документ** (каждая модель — все прогоны на этом коде, разброс min–max):", ""]
     L += official_table(off)
@@ -247,7 +265,7 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newe
         note_code = code_note(sha, [off, corp, nz])
         if note_code:
             L[1:1] = ["", note_code]
-        L += newer_lines(sha, newer or [])
+        L += newer_lines(sha, newer or [], view_check)
         L += gate_lines(sha, checks)
     return "\n".join(L) + "\n"
 
@@ -259,10 +277,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--code", help="коммит, на котором мерили, если --commit — тег (по умолчанию — сам тег)")
     ap.add_argument("--newer", action="append", default=[], metavar="SHA",
                     help="ещё и официальный документ на более новом коде (исправления после замера), с разницей кода")
+    ap.add_argument("--no-view", action="store_true",
+                    help="не сверять вход модели (вид документов оценки и промпты) на другом коде — `viewdiff`")
     ap.add_argument("--write", action="store_true", help="записать блок «Финальные цифры» в RESULTS.md")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     sha, note = resolve(a.code or a.commit)
+    extra: list[str] = []
     if a.code:
         tag_sha, _ = resolve(a.commit)
         same = same_code(tag_sha, sha)
@@ -270,7 +291,9 @@ def main(argv: list[str] | None = None) -> int:
                                                          None: "не сверен"}[same] + f" с `{sha}`")
         if same is False:
             note += f": отличаются {code_diff(sha, tag_sha)}"
-    text = render(a.commit, sha, note, newer=a.newer)
+            if not a.no_view:
+                extra.append(view_line(sha, tag_sha))
+    text = render(a.commit, sha, note, newer=a.newer, extra=extra, view_check=not a.no_view)
     print(text)
     if a.write:
         put_results_block(RESULTS, "final", text, "Финальные цифры релиза (W4-07)")

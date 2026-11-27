@@ -30,6 +30,13 @@ from .common import ROOT
 
 LINE_FIELDS = ("n", "text", "page", "section", "src_line", "block_id", "kind", "level", "heading")
 PROMPTS = "src/bcc_review/v2/prompts"
+STAGES = "src/bcc_review/v2/stages"
+# Этапы основного прогона (без `--answers`), если нет готового отчёта официального документа, откуда их взять
+MAIN_STAGES = ("segment", "rules", "lens_analyst", "lens_qa", "lens_architect", "lens_risk", "consistency", "quotes",
+               "judge", "clarify")
+# Общий код, через который проходит вход каждого этапа основного прогона
+SHARED_CODE = ("src/bcc_review/v2/stages/lens.py", "src/bcc_review/v2/stages/__init__.py", "src/bcc_review/v2/llm.py",
+               "src/bcc_review/v2/context.py", "src/bcc_review/v2/pipeline.py")
 
 # Код дочернего процесса: argv — каталог выгруженного src, затем пути документов; печатает JSON {путь: вид}.
 _CHILD = r"""
@@ -104,9 +111,17 @@ def first_difference(a: dict, b: dict) -> str:
         if x != y:
             fields = [LINE_FIELDS[j] for j in range(len(LINE_FIELDS)) if j < len(x) and j < len(y) and x[j] != y[j]]
             k = LINE_FIELDS.index(fields[0]) if fields else 1
-            return (f"строка {x[0] if x else i + 1}, {', '.join(fields) or 'поля'}: "
-                    f"{str(x[k])[:50]!r} → {str(y[k])[:50]!r}")
+            sx, sy = _window(str(x[k]), str(y[k]))
+            return f"строка {x[0] if x else i + 1}, {', '.join(fields) or 'поля'}: {sx!r} → {sy!r}"
     return f"строк {len(la)} → {len(lb)}"
+
+
+def _window(x: str, y: str, before: int = 15, width: int = 45) -> tuple[str, str]:
+    """Кусок двух строк вокруг первого отличающегося символа (общее начало длинной строки — «…»)."""
+    i = next((j for j, (p, q) in enumerate(zip(x, y)) if p != q), min(len(x), len(y)))
+    s = max(0, i - before)
+    cut = (lambda v: ("…" if s else "") + v[s:s + width] + ("…" if len(v) > s + width else ""))
+    return cut(x), cut(y)
 
 
 def compare(va: dict, vb: dict) -> dict:
@@ -130,6 +145,32 @@ def prompts_changed(a: str, b: str) -> list[str]:
     """Файлы промптов этапов, которые отличаются между коммитами."""
     out = _git("diff", "--name-only", a, b, "--", PROMPTS)
     return [p[len(PROMPTS) + 1:] for p in out.splitlines() if p.strip()]
+
+
+def main_stages() -> tuple[str, ...]:
+    """Этапы основного прогона — из последнего отчёта официального документа (`run.stages`), иначе `MAIN_STAGES`."""
+    reps = sorted((ROOT / "evaluation" / "v2" / "measurements").glob("*/report.json"),
+                  key=lambda p: p.stat().st_mtime, reverse=True)
+    for rp in reps[:5]:
+        try:
+            st = (json.loads(rp.read_text(encoding="utf-8")).get("run") or {}).get("stages") or {}
+        except (OSError, ValueError):
+            continue
+        if st:
+            return tuple(st)
+    return MAIN_STAGES
+
+
+def _in_main(name: str, stages: tuple[str, ...]) -> bool:
+    stem = Path(name).stem
+    return stem == "_system" or any(stem == s or stem.startswith(s + "_") for s in stages)
+
+
+def stage_code_changed(a: str, b: str, stages: tuple[str, ...]) -> list[str]:
+    """Код этапов основного прогона и общий код их входа, который отличается между коммитами."""
+    out = _git("diff", "--name-only", a, b, "--", STAGES, *SHARED_CODE)
+    files = [p for p in out.splitlines() if p.strip()]
+    return [p[len("src/bcc_review/v2/"):] for p in files if p in SHARED_CODE or _in_main(p, stages)]
 
 
 def evaluation_docs(all_formats: bool = False) -> list[str]:
@@ -167,25 +208,43 @@ def check(a: str, b: str, docs: list[str] | None = None, all_formats: bool = Fal
     else:
         va, vb = views_at(sa, paths), views_at(sb, paths)
     res = compare({rel[k]: v for k, v in va.items()}, {rel[k]: v for k, v in vb.items()})
-    res.update({"a": sa, "b": sb, "prompts_changed": prompts_changed(sa, sb),
+    stages = main_stages()
+    pr = prompts_changed(sa, sb)
+    res.update({"a": sa, "b": sb, "main_stages": list(stages), "prompts_changed": pr,
+                "prompts_main": [p for p in pr if _in_main(p, stages)],
+                "prompts_other": [p for p in pr if not _in_main(p, stages)],
+                "stage_code_changed": stage_code_changed(sa, sb, stages),
                 "docview_changed": bool(_git("diff", "--name-only", sa, sb, "--", "src/bcc_review/v2/docview.py",
                                              "src/bcc_review/v2/readers_html.py").strip())})
     return res
+
+
+def same_input(res: dict) -> bool:
+    """Вид документов, промпты и код этапов основного прогона — те же: модель получает тот же вход."""
+    return not (res["diff"] or res["errors"] or res.get("prompts_main") or res.get("stage_code_changed"))
 
 
 def summary_line(res: dict) -> str:
     """Одна строка для `final` и статуса: «вид N документов оценки тот же, промпты этапов не менялись»."""
     n, same, diff, errs = res["docs"], len(res["same"]), res["diff"], res["errors"]
     if not diff and not errs:
-        view = f"вид всех {n} документов оценки тот же"
+        view = f"вид документов оценки не изменился ({n} из {n})"
     else:
         view = f"вид документов оценки: тот же у {same} из {n}, отличается у {len(diff)}" + (
             f", не прочитан у {len(errs)}" if errs else "")
         if diff:
             view += " (" + "; ".join(f"{Path(d['doc']).parent.name or d['doc']}: {d['where']}" for d in diff[:3]) + (
                 "; …" if len(diff) > 3 else "") + ")"
-    pr = res.get("prompts_changed") or []
-    prompts = "промпты этапов не менялись" if not pr else "промпты этапов изменены: " + ", ".join(pr)
+    main, other = res.get("prompts_main"), res.get("prompts_other")
+    if main is None:  # результат без разбора по этапам
+        main, other = res.get("prompts_changed") or [], []
+    prompts = ("промпты основного прогона не менялись" if not main else "промпты основного прогона изменены: "
+               + ", ".join(main))
+    if other:
+        prompts += " (вне его — " + ", ".join(other) + ")"
+    code = res.get("stage_code_changed")
+    if code is not None:
+        prompts += "; код этапов основного прогона " + ("тот же" if not code else "изменён: " + ", ".join(code))
     return f"{view}; {prompts}"
 
 
