@@ -465,7 +465,14 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
     if len(terms) < 2:
         return None
     sev = g.get("severity") if g.get("severity") in GLOSSARY_SEVERITIES else "minor"
+    # Бизнес-имя компонента и его техническое имя (контроллер, путь, поле) — норма шаблона, а не разночтение:
+    # major только если разных названий словами (не идентификаторов) хотя бы два.
+    if sev == "major" and len({_norm(t["term"]) for t in terms if _CYR.search(t["term"])}) < 2:
+        sev = "minor"
     return {"concept": _s(g.get("concept")), "terms": terms, "problem": _s(g.get("problem")), "severity": sev}
+
+
+_CYR = re.compile(r"[а-яё]", re.I)
 
 
 def glossary_to_candidate(g: dict) -> dict | None:

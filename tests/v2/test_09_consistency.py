@@ -586,3 +586,11 @@ def test_major_glossary_entries_on_the_same_two_lines_merge_into_one_remark():
     assert len(out) == 2
     assert out[0]["glossary_ids"] == ["G-01", "G-02"] and "учёт расходов" in out[0]["title"]
     assert out[1]["glossary_ids"] == ["G-03"]
+
+
+def test_component_name_and_its_controller_identifier_are_not_a_major_terminology_defect():
+    doc = ["Архитектура: приложение → API вкладов → депозитный модуль.", "Controller | DepositController"]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    g = {"concept": "Компонент API", "severity": "major", "problem": "",
+         "terms": [{"term": "API вкладов", "line": 1}, {"term": "DepositController", "line": 2}]}
+    assert C.normalize_glossary(g, view)["severity"] == "minor"
