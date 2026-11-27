@@ -67,6 +67,7 @@ def export(report: dict, view: dict, input_path: str | Path, out_base: str | Pat
     base = Path(out_base)
     if base.suffix.lower() in (".md", ".json", ".html"):
         base = base.with_suffix("")
+    report = reader_report(report)
     results = []
     for fmt in _formats(formats):
         try:
@@ -83,6 +84,40 @@ def export(report: dict, view: dict, input_path: str | Path, out_base: str | Pat
             res["traceback"] = traceback.format_exc(limit=5)
         results.append(res)
     return results
+
+
+_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,7})\s+)?\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+_FINDING_TEXT = ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question")
+
+
+def reader_text(text: Any) -> str:
+    """Текст для читателя Jira/Word/PDF: «L038», «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»
+    (с падежом после предлога, как в отчёте №13)."""
+    s = str(text or "")
+    if "L" not in s:
+        return s
+    try:
+        from .markdown import _lref  # падеж «строке/строках…» — как в Markdown-отчёте
+    except Exception:  # noqa: BLE001
+        def _lref(m: re.Match) -> str:
+            word = f"строки {m.group(2)}–{m.group(3)}" if m.group(3) else f"строка {m.group(2)}"
+            return f"{m.group(1)} {word}" if m.group(1) else word
+    return _LREF.sub(_lref, s)
+
+
+def reader_report(report: dict) -> dict:
+    """Копия отчёта с текстами дефектов и вопросов без внутренних кодов строк («L042» → «строка 42»)."""
+    out = dict(report)
+    out["findings"] = [{**f, **{k: reader_text(f[k]) for k in _FINDING_TEXT if isinstance(f.get(k), str)}}
+                       if isinstance(f, dict) else f for f in report.get("findings") or []]
+    qs = []
+    for q in report.get("questions") or []:
+        if isinstance(q, dict):
+            q = {**q, "question": reader_text(q.get("question")), "why": reader_text(q.get("why")),
+                 "options": [reader_text(o) for o in q.get("options") or []]}
+        qs.append(q)
+    out["questions"] = qs
+    return out
 
 
 def _formats(formats: Iterable[str] | str) -> list[str]:
@@ -132,16 +167,26 @@ def criterion_label(code: Any) -> str:
     return f"{name} ({ref})" if ref else name
 
 
+def _short_section(section: str) -> str:
+    """Раздел как в отчёте №13: «Часть A › Функциональные требования» вместо полного пути."""
+    try:
+        from .markdown import short_section
+        return short_section(section)
+    except Exception:  # noqa: BLE001 — отчёт №13 недоступен: полный путь
+        return str(section or "")
+
+
 def place_of(ev: dict) -> str:
+    """Место как в отчёте: «Часть A › Функциональные требования, строка 38, стр. 2» (страница — для PDF)."""
     a, b = ev.get("line_start") or ev.get("line"), ev.get("line_end") or ev.get("line_start") or ev.get("line")
     parts = []
     if ev.get("section"):
-        parts.append(str(ev["section"]))
-    if ev.get("page"):
-        parts.append(f"с. {ev['page']}")
+        parts.append(_short_section(str(ev["section"])))
     if a:
         parts.append(f"строка {a}" if not b or b == a else f"строки {a}–{b}")
-    return ", ".join(parts)
+    if ev.get("page"):
+        parts.append(f"стр. {ev['page']}")
+    return ", ".join(p for p in parts if p)
 
 
 def _questions_for(report: dict, fid: str) -> list[dict]:
@@ -254,6 +299,10 @@ def write_jira_csv(report: dict, path: str | Path, **options: Any) -> dict:
 # --------------------------------------------------------------------------- координаты для экспорта v1
 def _v1_document(input_path: Path) -> dict:
     from bcc_review.engine import read_document
+
+    from .. import docview
+    if Path(input_path).suffix.lower() == ".pdf":
+        docview.pdf_fast_mode()  # без нейросетевого анализа вёрстки PyMuPDF 2.x — в 10 раз быстрее (как в docview)
     return read_document(input_path)
 
 
