@@ -139,7 +139,12 @@ def merge(base: dict, others: list[dict], n_requested: int) -> dict:
     }
     run = report.setdefault("run", {})
     run.setdefault("options", {})["runs"] = n_requested
-    run["stability"] = {"runs": n, "threshold": thr, "calls_total": calls}
+    run["stability"] = {"runs": n, "threshold": thr, "calls_total": calls, "cost_usd_total": round(cost, 4)}
+    if isinstance(run.get("cost_limit"), dict):  # потолок --max-cost общий на все проходы — и потрачено за все
+        run["cost_limit"]["spent_usd"] = round(cost, 4)
+        run["cost_limit"]["spent_tokens"] = tok_in + tok_out
+        run["cost_limit"]["hit"] = bool(run["cost_limit"].get("hit")) or any(
+            ((r.get("run") or {}).get("cost_limit") or {}).get("hit") for r in others)
     failed = [p["pass"] for p in report["stability"]["passes"] if p["status"] == "failed"]
     if failed:
         run.setdefault("warnings", []).append(

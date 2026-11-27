@@ -258,3 +258,80 @@ def test_max_cost_cli_bad_value(tmp_path, capsys):
     from bcc_review.v2.__main__ import main
     assert main([str(OFFICIAL), str(tmp_path / "r.md"), "--max-cost", "много"]) == 2
     assert "--max-cost" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------- 4. --interactive
+
+QS = [{"id": "Q-01", "topic": "Метод", "question": "Каким методом?", "options": ["POST", "PUT", "GET"],
+       "to": "Архитектор", "blocking": True},
+      {"id": "Q-02", "topic": "Срок", "question": "Сколько хранить?", "options": ["30 дней", "90 дней"]},
+      {"id": "Q-03", "topic": "", "question": "Кто владелец?", "options": []},
+      {"id": "Q-04", "topic": "Лишний", "question": "?", "options": ["да", "нет"]}]
+
+
+def _feed(*answers):
+    it = iter(answers)
+
+    def inp(_prompt=""):
+        try:
+            return next(it)
+        except StopIteration:
+            raise EOFError from None
+    return inp
+
+
+def test_ask_questions_letters_text_skip_and_eof():
+    from bcc_review.v2.__main__ import ask_questions
+    shown: list[str] = []
+    lines = ask_questions(QS, input_fn=_feed("б", "", "  команда   платежей "), print_fn=shown.append)
+    assert lines == ["Q-01 [Метод]: B — PUT", "Q-03: команда платежей"]
+    assert any("A) POST" in x for x in shown) and any("Ввод закончен" in x for x in shown)
+    assert ask_questions(QS[:2], input_fn=_feed("2", "a"), print_fn=lambda *_: None) == [
+        "Q-01 [Метод]: B — PUT", "Q-02 [Срок]: A — 30 дней"]
+
+
+def test_interactive_lines_parse_as_answers():
+    from bcc_review.v2.__main__ import ask_questions
+    from bcc_review.v2.stages import recheck
+    lines = ask_questions(QS, input_fn=_feed("C", "свой срок 60 дней"), print_fn=lambda *_: None)
+    parsed = recheck.parse_answers_text("\n".join(lines))
+    got = {x["id"]: (x["choice"], x["text"]) for x in parsed["answers"]}
+    assert got["Q-01"][0] is not None and got["Q-02"] == (None, "свой срок 60 дней")
+
+
+def test_interactive_cli_writes_answers_and_rechecks(tmp_path, monkeypatch, capsys):
+    import builtins
+    from bcc_review.v2.__main__ import main
+    monkeypatch.setattr(builtins, "input", _feed("A", "", "B"))
+    out = tmp_path / "r.md"
+    code = main([str(OFFICIAL), str(out), "--provider", "mock", "--interactive", "-q", "--no-html",
+                 "--runs-dir", str(tmp_path / "runs")])
+    assert code == 0
+    answers = tmp_path / "r.answers.md"
+    assert answers.is_file()
+    text = answers.read_text(encoding="utf-8")
+    assert text.startswith("# Ответы владельца") and "Q-01" in text and "SHA-256" in text
+    data = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+    assert data.get("clarification"), "пересмотр по ответам не выполнен"
+    assert data["run"]["options"]["answers"] is True
+    assert all(st.get("reused") for k, st in data["run"]["stage_stats"].items()
+               if k in ("segment", "lens_qa", "judge"))
+    assert "Пересмотр дефектов" in capsys.readouterr().out
+
+
+def test_interactive_no_answers_keeps_report(tmp_path, monkeypatch):
+    import builtins
+    from bcc_review.v2.__main__ import main
+    monkeypatch.setattr(builtins, "input", _feed())
+    out = tmp_path / "r.md"
+    assert main([str(OFFICIAL), str(out), "--provider", "mock", "--interactive", "-q", "--no-html",
+                 "--runs-dir", str(tmp_path / "runs")]) == 0
+    assert not (tmp_path / "r.answers.md").exists()
+    assert not json.loads((tmp_path / "r.json").read_text(encoding="utf-8")).get("clarification")
+
+
+def test_runs_cost_limit_counts_all_passes(tmp_path):
+    report, _, _ = _run(tmp_path, runs=2, max_tokens=10**9)
+    lim = report["run"]["cost_limit"]
+    assert lim["spent_tokens"] == sum(report["stability"]["tokens_total"].values())
+    assert lim["hit"] is False
