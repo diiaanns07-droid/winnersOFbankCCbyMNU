@@ -131,3 +131,23 @@ def test_v1_patches_still_apply(patch):
     fwd = subprocess.run([git, "apply", "--check", str(patch)], cwd=root, capture_output=True)
     back = subprocess.run([git, "apply", "--check", "-R", str(patch)], cwd=root, capture_output=True)
     assert fwd.returncode == 0 or back.returncode == 0, fwd.stderr.decode()
+
+
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет pymupdf")
+def test_pdf_cell_word_breaks_by_stem_chain_and_bracket():
+    """v2.1: слово, разорванное в узкой ячейке PDF, склеивается и когда целиком в документе его нет, но есть слово
+    с той же основой («страхова / нии» при «страхования»); разрывов в слове может быть два («нач / ислени / й»);
+    закрывающая скобка на следующей строке ячейки («{loanId / }/insurance»). Так нарезка PDF совпадает с MD."""
+    root = Path(__file__).resolve().parents[2] / "evaluation/v2/open2"
+    ins = [ln["text"] for ln in dv.load(root / "insurance_clean/source.pdf")["lines"]]
+    assert any(t.startswith("5. Сведения о страховании | GET /loans/{loanId}/insurance |") for t in ins)
+    cap = [ln["text"] for ln in dv.load(root / "capital_clean/source.pdf")["lines"]]
+    assert any(t.startswith("3. История начислений | GET /savings/{accountId}/interest/history") for t in cap)
+
+
+def test_same_stem_is_strict():
+    words = {"страхования": 3, "страхованием": 1, "идентификатор": 2}
+    assert dv._same_stem("страховании", words)
+    assert not dv._same_stem("страхованиями", {"страх": 1})
+    assert not dv._same_stem("идентификаторкарты", words)  # «Идентификатор / карты» — два слова
+    assert not dv._same_stem("карты", {"картой": 1})  # короткие слова не трогаем
