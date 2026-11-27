@@ -14,6 +14,7 @@ import concurrent.futures as cf
 import copy
 import hashlib
 import os
+import re
 import subprocess
 import time
 import traceback
@@ -67,7 +68,16 @@ def git_commit() -> tuple[str, bool]:
                                     capture_output=True, text=True, timeout=10).stdout.strip())
     except (OSError, subprocess.SubprocessError):
         sha, dirty = "", False
-    return (sha or env or "unknown"), dirty
+    return (sha or env or _archive_commit() or "unknown"), dirty
+
+
+def _archive_commit() -> str:
+    """Хеш из архива GitHub (export-subst в .gitattributes); в клоне в файле шаблон «$Format:%H$» — пусто."""
+    try:
+        value = (Path(__file__).with_name("COMMIT")).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    return value if re.fullmatch(r"[0-9a-f]{7,40}", value) else ""
 
 
 def load_view(path: str | Path) -> dict:
