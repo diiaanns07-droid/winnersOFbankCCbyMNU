@@ -31,8 +31,6 @@ def test_normal_document_exit_code_0(tmp_path):
     official = Path(__file__).resolve().parents[2] / "release" / "input" / "requirements.md"
     assert main([str(official), str(tmp_path / "r.md"), "--provider", "mock", "-q", "--no-html",
                  "--runs-dir", str(tmp_path / "runs")]) == 0
-<<<<<<< HEAD
-=======
 
 
 def test_passport_commands_use_command_line_paths(tmp_path, monkeypatch):
@@ -52,4 +50,3 @@ def test_passport_commands_use_command_line_paths(tmp_path, monkeypatch):
     if "doc_path" in inspect.signature(markdown.render).parameters:
         line = next(x for x in md.splitlines() if "bcc_review verify" in x)
         assert "release/input/requirements.md" in line and "r.json" in line
->>>>>>> 80b4f371
