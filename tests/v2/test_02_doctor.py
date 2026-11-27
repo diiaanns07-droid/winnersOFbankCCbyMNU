@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from bcc_review.contracts import PROVIDER_ERROR_KINDS, ProviderError
@@ -212,7 +214,9 @@ def test_daily_reset_time_in_gemini_quota_error():
 def test_pipeline_auto_prefers_gemini_key_over_installed_claude(monkeypatch):
     """Как у жюри: в .env есть GEMINI_API_KEY, а на машине стоит Claude Code — выбирается Gemini."""
     from bcc_review.v2 import pipeline
-    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/claude" if name == "claude" else None)
+    # на Windows CLI ищется как claude.exe (нативная установка): подделка отвечает на оба имени
+    fake_cli = "C:/Tools/claude.exe" if sys.platform == "win32" else "/usr/bin/claude"
+    monkeypatch.setattr("shutil.which", lambda name: fake_cli if name in ("claude", "claude.exe") else None)
     for name in ("GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")

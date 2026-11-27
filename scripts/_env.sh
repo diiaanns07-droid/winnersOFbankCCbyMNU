@@ -11,15 +11,15 @@ elif [ -x .venv/bin/python ]; then
   PY=.venv/bin/python
 else
   base=""
-  for candidate in python3.12 python3.13 python3.11 python3 python; do
+  for candidate in python3.12 python3.13 python3.11 python3.14 python3 python; do
     if command -v "$candidate" >/dev/null 2>&1 &&
-       "$candidate" -c 'import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 14) else 1)' 2>/dev/null; then
+       "$candidate" -c 'import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 15) else 1)' 2>/dev/null; then
       base="$candidate"
       break
     fi
   done
   if [ -z "$base" ]; then
-    echo "Нужен Python 3.11, 3.12 или 3.13: https://www.python.org/downloads/" >&2
+    echo "Нужен Python 3.11–3.14: https://www.python.org/downloads/" >&2
     exit 1
   fi
   echo "== создаю окружение .venv ($("$base" --version))"
