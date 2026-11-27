@@ -31,7 +31,7 @@ SHORT_MODE = ("\n\n### Краткий режим\nПредыдущий отве�
 
 MAX_PAIRS = 15
 MAX_UNDEFINED_CANDIDATES = 2
-MAX_MODEL_CANDIDATES = 6
+MAX_MODEL_CANDIDATES = 8
 MAX_GLOSSARY = 8
 
 # Требования, для которых строится трассировка (CONTRACT 2.2, поле kind).
@@ -291,6 +291,15 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     return pair
 
 
+_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")
+
+
+def _same_codes(qa: str, qb: str) -> bool:
+    """Обе цитаты называют коды ответа, и коды одной входят в коды другой (второго кода для входа нет)."""
+    a, b = set(_CODE.findall(qa)), set(_CODE.findall(qb))
+    return bool(a and b and (a <= b or b <= a))
+
+
 _LIMIT_REMOVED = re.compile(r"независимо от|вне зависимости от|без ограничени|в любом случае", re.I)
 _LIMIT = re.compile(r"\b(не более|не больше|не чаще|максимум|не свыше|только один|только одн|один раз|"
                     r"не превыша\w*|не может превышать)\b", re.I)
@@ -324,6 +333,10 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         soft = any((known or {}).get(x, {}).get("kind") in SOFT_KINDS for x in (pair["a"], pair["b"]))
         # Разные единицы одной величины обычно снимаются правилом пересчёта — major; судья может поднять.
         severity = "critical" if two_places and not soft and kind not in MAJOR_CONFLICT_KINDS else "major"
+        # «Один вход — два кода»: если цитаты не называют двух разных кодов (обе о коде 200, одна шире другой),
+        # спор о смысле кода, а не два исхода — major.
+        if kind == "status_conflict" and _same_codes(pair["quote_a"], pair["quote_b"]):
+            severity = "major"
     else:  # undefined
         # Строка приёмки сверяется только на противоречие (шаг 2б); её неполноту проверяет линза тестировщика.
         if any((known or {}).get(x, {}).get("kind") == "acceptance" for x in (pair["a"], pair["b"])):
@@ -566,20 +579,27 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
         cand["blocks"] = "both"
     # «Обещано, но не описано»: если все названные в цитатах методы и поля описаны в заголовках документа,
     # обещанное на месте — это не critical (модель приняла соседний процесс за обещанную операцию).
-    if cand["severity"] == "critical" and cand["kind"] == "missing_element" and _all_named_described(evidence, view):
+    # Если ни одна цитируемая строка не обещает действие словами (экран с элементом, перечень систем, пример ответа),
+    # обещания нет, есть только догадка модели — тоже не critical.
+    if cand["severity"] == "critical" and cand["kind"] == "missing_element" and (
+            _all_named_described(evidence, view) or not _PROMISE.search(" ".join(_s(e.get("quote")) for e in evidence))):
         cand["severity"] = "major"
     return cand
 
 
 _IDENT = re.compile(r"\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+# Глаголы обещанного действия (основы, с начала слова): читает, получает, отдаёт, возвращает, сохраняет, показывает…
+_PROMISE = re.compile(r"(?<![а-яё])(чита|получа|получ|отда|возвра|верн|сохран|показ|отобра|вызыв|отправ|запраш|"
+                      r"переда|хран|меня|измен|удал|созда|отмен|отзыв|включ|выключ|рассчит|подключ|оформл|"
+                      r"выполн|формир|загруж|обновл|блокир|разблокир|приходит|присыла)", re.I)
 
 
 def _headings(view: Any) -> list[str]:
     return [_s(x.get("text")) for x in _lines(view) if x.get("heading") or x.get("kind") == "heading"]
 
 
-def _all_named_described(evidence: list[dict], view: Any) -> bool:
-    """Все идентификаторы (camelCase, snake_case) из цитируемых строк встречаются в заголовках документа."""
+def _cited_texts(evidence: list[dict], view: Any) -> list[str]:
+    """Цитаты и полный текст найденных строк."""
     by_n = {x.get("n"): _s(x.get("text")) for x in _lines(view)}
     texts = []
     for e in evidence:
@@ -587,6 +607,12 @@ def _all_named_described(evidence: list[dict], view: Any) -> bool:
         if _found(e):
             a, b = _span(e)
             texts.extend(by_n.get(n, "") for n in range(a, b + 1))
+    return texts
+
+
+def _all_named_described(evidence: list[dict], view: Any) -> bool:
+    """Все идентификаторы (camelCase, snake_case) из цитируемых строк встречаются в заголовках документа."""
+    texts = _cited_texts(evidence, view)
     names = {m.group(0) for t in texts for m in _IDENT.finditer(t)}
     heads = " ".join(_headings(view))
     return bool(names) and bool(heads) and all(re.search(rf"\b{re.escape(n)}\b", heads) for n in names)

@@ -465,10 +465,17 @@ def test_promised_but_missing_is_major_when_every_named_method_is_described():
 
 
 def test_promise_without_identifiers_keeps_model_severity():
-    out = C.postprocess(answer(candidates=[_missing([("Методы описаны в части B.", 3)])]),
-                        {"lines": [dict(x, text=x["text"].replace("getLimit", "чтение").replace("setLimit", "запись"))
-                                   for x in VIEW_API["lines"]]}, [])
+    view = {"lines": [dict(x, text=x["text"].replace("методом getLimit", "").replace("методом setLimit", ""))
+                      for x in VIEW_API["lines"]]}
+    out = C.postprocess(answer(candidates=[_missing([("Приложение читает лимит", 2)])]), view, [])
     assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_missing_element_without_promise_verb_in_quotes_is_major():
+    # экран с элементом или перечень систем — не обещание операции словами
+    out = C.postprocess(answer(candidates=[_missing([("Методы описаны в части B.", 3), ("Часть B", 4)])]),
+                        VIEW_API, [])
+    assert out["candidates"][0]["severity"] == "major"
 
 
 def test_link_trace_points_rows_to_findings_about_the_requirement():
@@ -506,3 +513,18 @@ def test_undefined_pair_with_acceptance_row_gives_no_candidate():
              quote_b="| Сумма 10 000 | Пополнить на 1 000 | Сумма 11 000 |", line_b=8)
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
     assert out["pair_checks"] and out["candidates"] == []
+
+
+def test_status_conflict_about_meaning_of_one_code_is_major():
+    doc = ["Если результат 200 — успешный, 400 — неуспешный.", "При отказе проверки вернуть 200 со статусом ОТКАЗ.",
+           "404 — объект не найден.", "Для чужого объекта вернуть 403."]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    reqs = [{"id": f"R-0{i}", "source_id": "", "kind": "api", "line_start": i, "line_end": i} for i in range(1, 5)]
+    same = pair(a="R-01", b="R-02", kind="status_conflict", basis="same_condition",
+                quote_a=doc[0], line_a=1, quote_b=doc[1], line_b=2)
+    two = pair(a="R-03", b="R-04", kind="status_conflict", basis="same_condition",
+               quote_a=doc[2], line_a=3, quote_b=doc[3], line_b=4)
+    out = C.postprocess(answer(pair_checks=[same, two]), view, reqs)
+    sev = {tuple(sorted(c["requirement_ids"])): c["severity"] for c in out["candidates"]}
+    assert sev[("R-01", "R-02")] == "major"
+    assert sev[("R-03", "R-04")] == "critical"
