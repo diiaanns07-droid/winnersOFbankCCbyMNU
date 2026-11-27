@@ -1,0 +1,12 @@
+{
+  "observed_astana": "2026-11-27T20:59:28+05:00",
+  "release": "973ce4d746b87e9355eb8c130909424ef2aa2f89",
+  "v2.0.0": null,
+  "peeled_tag": null,
+  "jury_files_on_release": [],
+  "last_independently_measured_source": "d013c123b984b3a2d519fa8b9c6c06871ed7e3eb",
+  "paths_changed_since_measured_source": [
+    "docs/plan-v2/INTEGRATION.md",
+    "docs/plan-v2/status/46.md"
+  ]
+}
