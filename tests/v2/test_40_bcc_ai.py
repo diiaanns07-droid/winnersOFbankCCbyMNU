@@ -1,6 +1,7 @@
 """№40: BCC AI — маскот и знакомство с ключом. Без сети: проверка ключа подменена."""
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -88,10 +89,13 @@ def test_fresh_start_without_keys_goes_to_welcome(base):
     code, body, _ = _req(base + "/welcome")
     text = body.decode()
     assert code == 200
-    for s in ("Ключ Gemini", "бесплатно", "Ключ Claude", "Без ключа", "https://aistudio.google.com/apikey",
-              "получить за минуту", 'type="password"', "показать", "Проверить ключ",
-              "Запомнить на этом компьютере (файл .env)", "Открыть систему", "/assets/agent.js", "Здравствуйте"):
+    for s in ("Ключ модели для BCC AI", "Здравствуйте", "Gemini — бесплатно", "Claude", "https://aistudio.google.com/apikey",
+              'type="password"', "показать", "Проверить ключ", "Запомнить на этом компьютере (файл .env)",
+              "Открыть систему", "Продолжить без ключа", "/welcome/skip", "/assets/agent.js", "/assets/agent.css",
+              "feTurbulence", "КЛЮЧ ПРИНЯТ", "#0B1220"):
         assert s in text, s
+    for banned in ("radial-gradient", "blur(", "w-pill"):    # тёмный стол без пятен, без таблеток выбора
+        assert banned not in text, banned
 
 
 def test_with_key_or_cli_opens_system(base, monkeypatch):
@@ -231,3 +235,145 @@ def test_agent_assets_served(base):
     assert "prefers-reduced-motion" in css and "image-rendering:pixelated" in css.replace(" ", "")
     assert len((ASSETS / "agent.js").read_bytes()) < 40 * 1024
     assert "http" not in js.split("*/", 1)[1]          # никаких внешних ссылок
+
+
+def test_auto_provider_by_key_prefix(base):
+    code, out, _ = _post_key(base, {"provider": "auto", "key": KEY})
+    assert code == 200 and out["provider"] == "gemini" and out["ok"]
+    code, out, _ = _post_key(base, {"key": "sk-ant-api03-" + "q" * 30})          # провайдер не указан — по виду ключа
+    assert code == 200 and out["provider"] == "anthropic"
+    code, out, _ = _post_key(base, {"provider": "auto", "key": "hello-world-123456"})
+    assert code == 400 and "AIza" in out["message"]
+
+
+def test_skip_from_terminal_hides_welcome(calls, tmp_path, monkeypatch):
+    monkeypatch.setattr(O, "SKIP_WELCOME", False)
+    app = S.build_app(tmp_path / "d")
+    assert O.needs_welcome(app, None)
+    monkeypatch.setattr(O, "SKIP_WELCOME", True)
+    assert not O.needs_welcome(app, None)
+
+
+# ─────────────────────────────── терминал (tty_agent) ───────────────────────────────
+
+from bcc_review.v2.web import tty_agent as T  # noqa: E402
+
+
+class _Out(io.TextIOWrapper):
+    def __init__(self):
+        super().__init__(io.BytesIO(), encoding="utf-8", write_through=True)
+
+    def text(self) -> str:
+        self.flush()
+        return self.buffer.getvalue().decode("utf-8")
+
+
+@pytest.fixture()
+def tty(calls, monkeypatch):
+    monkeypatch.setattr(T, "_sleep", lambda s: None)
+    monkeypatch.setattr(O, "SKIP_WELCOME", False)
+    monkeypatch.setenv("COLUMNS", "100")
+    monkeypatch.setenv("LINES", "40")
+    return calls
+
+
+def _greet(asked, answers=("д",), **kw):
+    out = _Out()
+    secrets = list(asked)
+    replies = list(answers)
+    prompts = []
+
+    def ask_secret(prompt):
+        prompts.append(prompt)
+        return secrets.pop(0)
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return replies.pop(0)
+
+    kw.setdefault("interactive", True)
+    kw.setdefault("mode", "truecolor")
+    r = T.greet(8014, O.ENV_FILE, stdout=out, ask_secret=ask_secret, ask=ask, **kw)
+    return r, out.text(), prompts
+
+
+def test_greet_without_tty_asks_nothing(tty):
+    r, text, prompts = _greet([], interactive=None)          # _Out — не терминал
+    assert r == "" and prompts == []
+    assert "http://127.0.0.1:8014/welcome" in text and "\x1b[" not in text
+
+
+def test_greet_without_tty_with_key_one_line(tty, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", KEY)
+    r, text, prompts = _greet([], interactive=None)
+    assert r == "gemini" and prompts == []
+    assert "AIza…3f9Q" in text and KEY not in text and text.count("\n") == 1
+
+
+def test_greet_good_key_remembered(tty):
+    r, text, prompts = _greet([KEY], ["д"])
+    assert r == "gemini"
+    assert tty == [("gemini", KEY)]                           # проверка — тем же кодом, что /api/key (verify_key)
+    assert "▀" in text and "\x1b[38;2;" in text               # дрон 24-битным цветом
+    assert "Здравствуйте! Я BCC AI" in text and "Ключ работает" in text and "AIza…3f9Q" in text
+    assert "https://aistudio.google.com/apikey" in text
+    assert KEY not in text
+    assert O.ENV_FILE.read_text(encoding="utf-8").strip() == f"GEMINI_API_KEY={KEY}"
+    assert os.environ["GEMINI_API_KEY"] == KEY
+    assert any("[Д/н]" in p for p in prompts)
+    assert text.endswith("\x1b[?25h\x1b[0m")                  # курсор вернули, цвет сбросили
+
+
+def test_greet_key_not_remembered(tty):
+    r, text, _ = _greet([KEY], ["н"])
+    assert r == "gemini" and not O.ENV_FILE.exists() and os.environ["GEMINI_API_KEY"] == KEY
+
+
+def test_greet_bad_key_then_enter_is_offline(tty):
+    r, text, prompts = _greet(["AIzaSyWRONG0000000000000000000000000000", ""])
+    assert r == "offline" and O.SKIP_WELCOME is True
+    assert "Ключ не подошёл: Google ответил 400" in text
+    assert not O.ENV_FILE.exists() and "GEMINI_API_KEY" not in os.environ
+    assert len([p for p in prompts if "Ключ" in p]) == 2
+
+
+def test_greet_unknown_key_is_not_sent(tty):
+    r, text, _ = _greet(["hello", ""])
+    assert r == "offline" and tty == []
+    assert "AIza" in text and "sk-ant-" in text
+
+
+def test_greet_returning_user(tty, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api03-" + "w" * 30)
+    r, text, prompts = _greet([])
+    assert r == "anthropic" and prompts == [] and "С возвращением!" in text and "wwww" not in text.replace("…wwww", "")
+
+
+def test_greet_claude_cli_needs_no_key(tty, monkeypatch):
+    monkeypatch.setattr(R, "_have_claude_cli", lambda env: True)
+    r, text, prompts = _greet([])
+    assert r == "claude_cli" and prompts == [] and "Claude Code" in text
+
+
+def test_greet_ascii_and_256(tty):
+    r, text, _ = _greet([""], mode="ascii")
+    assert r == "offline" and "\x1b" not in text and "[  o  o  ]" in text
+    lines = T.render("idle", "256")
+    assert any("38;5;" in ln for ln in lines) and not any("38;2;" in ln for ln in lines)
+    assert len(T.render("idle", "truecolor")) == 22 and len(T.render("idle", "truecolor", small=True)) == 11
+
+
+def test_color_mode_detection():
+    out = _Out()
+    assert T.color_mode(out, {"NO_COLOR": "1", "COLORTERM": "truecolor"}) == "ascii"
+    assert T.color_mode(out, {"TERM": "dumb"}) == "ascii"
+    assert T.color_mode(io.StringIO(), {"COLORTERM": "truecolor"}) == "ascii"   # кодировка неизвестна — без «▀»
+    if os.name == "posix":
+        assert T.color_mode(out, {"COLORTERM": "truecolor", "TERM": "xterm"}) == "truecolor"
+        assert T.color_mode(out, {"TERM": "xterm-256color"}) == "256"
+
+
+def test_xterm256_mapping():
+    assert T.xterm256((0, 0, 0)) == 16
+    assert T.xterm256((255, 255, 255)) == 231
+    assert 232 <= T.xterm256((128, 128, 128)) <= 255

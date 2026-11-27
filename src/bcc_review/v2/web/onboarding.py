@@ -3,7 +3,7 @@
 Маршруты (подключаются одной строкой в начале ``Handler.do_GET`` / ``do_POST``)::
 
     GET  /                  → 303 /welcome, если ни один провайдер с моделью не готов и «Без ключа» не выбран
-    GET  /welcome           экран знакомства (BCC AI 160 px, три капсулы, поле ключа)
+    GET  /welcome           окно ключа — лист на тёмном столе (запасной путь, если не было терминала)
     GET  /welcome/skip      «Без ключа»: cookie и в систему (провайдер offline)
     GET  /assets/agent.js   маскот
     GET  /assets/agent.css
@@ -33,6 +33,7 @@ CLAUDE_KEY_URL = "https://console.anthropic.com/settings/keys"
 CHECK_BUDGET_S = 9.0
 NO_KEY_LINE = "Без ключа: только правила и готовые отчёты"
 HELLO = "Здравствуйте! Я BCC AI, проверяю ТЗ до начала разработки. Чтобы думать, мне нужен ключ модели."
+HELLO_LINE = "Здравствуйте! Вставьте ключ модели в строку 4 — и начнём."
 MAX_BODY = 8 * 1024
 
 ENV_FILE: Path | None = None          # куда писать .env; None — .env в текущем каталоге (тесты подменяют)
@@ -300,167 +301,198 @@ def handle_post(handler: Any, path: str) -> bool:
 
 
 # ─────────────────────────────── страница ───────────────────────────────
+# Запасной путь (двойной щелчок без терминала): не модалка, а лист на тёмном столе — как всё в системе.
 
 def _e(v: Any) -> str:
     return escape("" if v is None else str(v), quote=True)
 
 
 PAGE_CSS = """
-:root{--w-ink:var(--b-ink,#0F2841);--w-ink2:var(--b-ink-2,#3A5068);--w-ink3:var(--b-ink-3,#5B6F84);
---w-green:var(--b-green,#00B975);--w-gs:var(--b-green-strong,#008556);--w-gi:var(--b-green-ink,#00704A);
---w-red:var(--b-red,#C2362B);--w-hair:var(--b-hair,rgba(15,40,65,.08));--w-hair2:var(--b-hair-2,rgba(15,40,65,.14));
---w-ease:var(--b-ease,cubic-bezier(.2,.8,.2,1));--w-font:var(--b-font,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif)}
+:root{--desk:#0B1220;--paper:#FFFFFF;--ink:#1A2433;--ink2:#4A5A6E;--num:#98A6B6;--green:#00B975;--gs:#008556;--gi:#00704A;
+--red:#C2362B;--pad-r:64px;--ease:cubic-bezier(.2,.8,.2,1);
+--serif:"PT Serif",Georgia,"Times New Roman",serif;
+--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+--sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%}
-body{background:var(--b-canvas,#F3F6F5);color:var(--w-ink);font:400 17px/1.5 var(--w-font);-webkit-font-smoothing:antialiased;
-overflow-x:hidden}
-body::before,body::after{content:"";position:fixed;z-index:-1;border-radius:50%;filter:blur(110px);pointer-events:none}
-body::before{width:680px;height:680px;left:-220px;top:-260px;background:rgba(0,185,117,.18)}
-body::after{width:620px;height:620px;right:-200px;top:-240px;background:rgba(220,162,98,.26)}
-.w{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 16px}
-.w-card{width:100%;max-width:600px;background:var(--b-paper,#fff);border-radius:var(--b-r-xl,28px);padding:40px 40px 32px;
-box-shadow:0 0 0 1px var(--w-hair),var(--b-shadow-2,0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10));
-animation:w-in var(--b-slow,360ms) var(--w-ease) both}
-@keyframes w-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.w-hero{display:flex;margin-bottom:28px}
-.w-hero .bcc-agent{align-items:center}
-.w-h{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.w-pills{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;padding:0;border:0}
-.w-pill{position:relative}
-.w-pill input{position:absolute;opacity:0;pointer-events:none}
-.w-pill span{display:inline-flex;align-items:center;height:var(--b-h,46px);padding:0 18px;border-radius:999px;cursor:pointer;
-background:var(--b-paper,#fff);color:var(--w-ink);font-weight:600;font-size:16px;
-box-shadow:0 0 0 1px var(--w-hair2);transition:box-shadow var(--b-fast,120ms) var(--w-ease),transform var(--b-fast,120ms) var(--w-ease),background var(--b-base,220ms) var(--w-ease)}
-.w-pill span:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--w-hair2),var(--b-shadow-2,0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10))}
-.w-pill span:active{transform:scale(.98)}
-.w-pill input:checked+span{background:var(--b-green-wash,#F1FBF5);box-shadow:0 0 0 2px var(--w-green)}
-.w-pill input:focus-visible+span{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
-.w-pill small{font-weight:500;color:var(--w-gi);margin-left:6px;font-size:15px}
-.w-panel[hidden]{display:none}
-.w-label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 8px;font-size:15px;color:var(--w-ink2)}
-.w-label a{color:var(--w-gi);font-weight:600;text-decoration:none}
-.w-label a:hover{text-decoration:underline}
-.w-field{display:flex;align-items:center;height:var(--b-h,46px);border-radius:var(--b-r-md,14px);background:var(--b-paper,#fff);
-box-shadow:0 0 0 1px var(--w-hair2);transition:box-shadow var(--b-fast,120ms) var(--w-ease)}
-.w-field:focus-within{box-shadow:0 0 0 2px var(--w-green)}
-.w-field input{flex:1;min-width:0;height:100%;border:0;background:transparent;padding:0 14px;font:500 16px var(--w-font);color:var(--w-ink);outline:0;letter-spacing:.02em}
-.w-show{border:0;background:transparent;color:var(--w-ink2);font:600 15px var(--w-font);padding:0 14px;height:100%;cursor:pointer;border-radius:0 14px 14px 0}
-.w-show:focus-visible,.w-btn:focus-visible,.w-check input:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
-.w-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:20px}
-.w-btn{display:inline-flex;align-items:center;justify-content:center;height:var(--b-h,46px);padding:0 24px;border-radius:999px;border:0;
-font:600 16px var(--w-font);cursor:pointer;text-decoration:none;transition:transform var(--b-fast,120ms) var(--w-ease),box-shadow var(--b-fast,120ms) var(--w-ease),opacity var(--b-base,220ms)}
-.w-btn:hover{transform:translateY(-1px);box-shadow:var(--b-shadow-2,0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10))}
+html,body{margin:0;min-height:100%;background:var(--desk)}
+body{color:#E6EDF5;font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.w-top{height:48px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.w-top a{display:inline-flex;align-items:center;gap:10px;color:#E6EDF5;text-decoration:none;font:600 15px var(--sans);letter-spacing:-.01em}
+.w-desk{padding:150px 16px 96px}
+.w-sheet{position:relative;max-width:760px;margin:0 auto;background:var(--paper);color:var(--ink);border-radius:2px;
+padding:56px var(--pad-r) 52px 92px;box-shadow:0 1px 2px rgba(0,0,0,.45),0 28px 70px rgba(0,0,0,.5);counter-reset:ln;
+animation:w-in 360ms var(--ease) both}
+@keyframes w-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.ln{position:relative;margin:0}
+.ln::before{counter-increment:ln;content:counter(ln);position:absolute;left:-62px;width:34px;text-align:right;top:.42em;
+font:400 12px/1 var(--mono);color:var(--num)}
+.w-h{font:700 25px/1.3 var(--serif);margin:0 0 16px;letter-spacing:-.01em;padding-right:220px}
+.w-h::before{top:.62em}
+.w-p{font:400 16.5px/1.6 var(--serif)}
+.w-form{position:relative;margin-top:26px}
+.w-field{display:flex;align-items:baseline;gap:14px;padding:5px 2px 5px 0;border-bottom:1.5px solid #CBD5E0;
+transition:border-color 120ms var(--ease),background-color 220ms var(--ease)}
+.w-field::before{top:.9em}
+.w-field:focus-within{border-bottom-color:var(--green)}
+.w-field label{font:400 16.5px/1.6 var(--serif);color:var(--ink2);flex:0 0 auto}
+.w-field input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 15px/1.75 var(--mono);color:var(--ink);
+letter-spacing:.02em;padding:0}
+.w-field input::placeholder{color:#A3AFBD}
+.w-show{border:0;background:none;font:500 14px var(--sans);color:var(--ink2);cursor:pointer;padding:2px;
+text-decoration:underline;text-underline-offset:3px;text-decoration-color:#CBD5E0}
+.w-show:hover{color:var(--ink)}
+.w-field.is-bad{border-bottom-color:transparent;background:rgba(194,54,43,.07) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 3 Q2 0 4 2 T8 2' fill='none' stroke='%23C2362B' stroke-width='1.3'/%3E%3C/svg%3E") repeat-x left bottom}
+.w-hint{font:400 15.5px/1.6 var(--serif);color:var(--ink2);margin-top:10px}
+.w-hint::before{top:.5em}
+.w-sheet a{color:var(--gi);text-decoration-thickness:1px;text-underline-offset:3px}
+.w-remember{display:flex;align-items:center;gap:10px;margin-top:14px;font:400 16.5px/1.6 var(--serif);color:var(--ink);cursor:pointer}
+.w-remember::before{top:.55em}
+.w-remember input{width:18px;height:18px;margin:0;accent-color:var(--gs)}
+.w-actions{display:flex;flex-wrap:wrap;align-items:center;gap:20px;margin-top:28px}
+.w-btn{height:44px;padding:0 22px;border:0;border-radius:8px;background:var(--gs);color:#fff;font:600 15px var(--sans);
+cursor:pointer;display:inline-flex;align-items:center;transition:transform 120ms var(--ease),background-color 120ms var(--ease)}
+.w-btn:hover{background:#007A4F}
 .w-btn:active{transform:scale(.98)}
-.w-btn[hidden]{display:none}
-.w-btn[disabled]{opacity:.55;cursor:progress;transform:none;box-shadow:none}
-.w-main{background:var(--w-gs);color:#fff}
-.w-sec{background:var(--b-paper,#fff);color:var(--w-ink);box-shadow:0 0 0 1px var(--w-hair2)}
-.w-msg{margin:14px 0 0;min-height:1.5em;font-size:15px;color:var(--w-ink2)}
-.w-msg.ok{color:var(--w-gi);font-weight:600}
-.w-msg.err{color:var(--w-red);font-weight:600}
-.w-check{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:15px;color:var(--w-ink2);cursor:pointer}
-.w-check input{width:20px;height:20px;accent-color:var(--w-gs);margin:0}
-.w-done[hidden]{display:none}
-.w-foot{margin:24px 0 0;font-size:15px;color:var(--w-ink3)}
-@media (max-width:560px){.w{align-items:flex-start;padding:24px 16px}.w-card{padding:28px 20px 24px;border-radius:var(--b-r-lg,22px)}
-.w-hero{justify-content:center}.w-pills{justify-content:center}.w-actions .w-btn{flex:1}}
-@media (prefers-reduced-motion: reduce){.w-card{animation:none}.w-pill span,.w-btn{transition:none}}
+.w-btn[disabled]{opacity:.65;cursor:progress}
+.w-btn[hidden],.w-remember[hidden],.w-note[hidden]{display:none}
+.w-link{font:500 15px var(--sans);color:var(--ink2)!important;text-decoration:underline;text-underline-offset:4px;
+text-decoration-color:#CBD5E0}
+.w-link:hover{color:var(--ink)!important}
+:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
+.w-field input:focus-visible{outline:0}
+.w-stamp{position:absolute;right:30px;top:24px;width:216px;color:#0B8A57;transform:rotate(-4deg);opacity:0;pointer-events:none}
+.w-stamp.is-on{animation:w-stamp 220ms cubic-bezier(.2,.8,.3,1.3) both}
+@keyframes w-stamp{from{opacity:0;transform:rotate(-4deg) scale(1.15)}to{opacity:.94;transform:rotate(-4deg) scale(1)}}
+.w-note{position:absolute;top:auto;left:calc(100% + var(--pad-r) + 28px);width:244px;margin:-2.1em 0 0;
+font:400 14px/1.45 var(--sans);color:#E6EDF5;animation:w-note 220ms var(--ease) both}
+@keyframes w-note{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.w-note::before{content:"";position:absolute;right:calc(100% + 4px);top:.72em;width:24px;height:1px;background:rgba(240,97,106,.75)}
+.w-note b{display:block;font:600 12px/1.7 var(--mono);color:#F0616A;letter-spacing:.06em}
+.w-foot{max-width:760px;margin:22px auto 0;font:400 14px/1.5 var(--sans);color:#8FA3BA;padding:0 2px}
+.w-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:1360px){.w-note{position:static;width:auto;margin:10px 0 0;color:var(--red);animation:none}
+.w-note::before{display:none}.w-note b{display:inline;margin-right:8px;color:var(--red)}}
+@media (max-width:640px){.w-top{padding:0 16px}.w-desk{padding:92px 0 56px}
+.w-sheet{padding:36px 18px 32px 46px;border-radius:0;--pad-r:18px}.ln::before{left:-38px;width:26px}
+.w-h{font-size:21px;padding-right:0;margin-top:58px}.w-stamp{right:14px;top:16px;width:176px}.w-foot{padding:0 16px}
+.w-actions{gap:16px}.w-actions .w-btn{flex:1 1 100%;justify-content:center}}
+@media (prefers-reduced-motion: reduce){.w-sheet,.w-note{animation:none}.w-stamp.is-on{animation:none;opacity:.94}}
 """
 
 PAGE_JS = r"""
 (function(){
   var $=function(s){return document.querySelector(s)};
-  var host=$('#w-agent'), A=window.BCCAgent&&BCCAgent.mount(host,{size:160,mood:'idle'});
-  var say=function(t,m){ if(!A) return; if(m) A.mood(m); A.say(t); };
-  say(host.getAttribute('data-hello'));
-  var form=$('#w-form'), key=$('#w-key'), check=$('#w-check'), msg=$('#w-msg'), done=$('#w-done'),
-      remember=$('#w-remember'), open=$('#w-open'), keyPanel=$('#w-keypanel'), nokey=$('#w-nokey'),
-      get=$('#w-get'), lbl=$('#w-keylbl'), verified=false;
-  var LINKS={gemini:[get.getAttribute('data-gemini'),'получить за минуту'],anthropic:[get.getAttribute('data-claude'),'где взять']};
-  function prov(){ var r=form.querySelector('input[name=provider]:checked'); return r?r.value:'gemini'; }
-  function setMsg(t,c){ msg.textContent=t||''; msg.className='w-msg'+(c?' '+c:''); }
-  function reset(){ verified=false; done.hidden=true; check.hidden=false; setMsg(''); }
-  form.addEventListener('change',function(ev){
-    if(ev.target.name!=='provider') return;
-    var p=prov();
-    keyPanel.hidden=(p==='none'); nokey.hidden=(p!=='none'); reset();
-    if(p==='none'){ say('Без ключа покажу готовые отчёты и проверю документ правилами.','idle'); return; }
-    lbl.textContent=p==='gemini'?'Ключ Gemini':'Ключ Claude API';
-    key.placeholder=p==='gemini'?'AIza…':'sk-ant-…';
-    get.href=LINKS[p][0]; get.textContent=LINKS[p][1];
-    say(p==='gemini'?'Ключ Gemini бесплатный: войдите в Google AI Studio и нажмите Create API key.':'Подойдёт ключ Claude API из консоли Anthropic.','idle');
-  });
-  key.addEventListener('input',function(){ if(verified) reset(); });
-  $('#w-show').addEventListener('click',function(){
-    var s=key.type==='password'; key.type=s?'text':'password'; this.textContent=s?'скрыть':'показать';
-    this.setAttribute('aria-pressed',s?'true':'false'); key.focus();
-  });
-  function post(rem){
-    return fetch('/api/key',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify({provider:prov(),key:key.value,remember:!!rem})}).then(function(r){return r.json()});
+  var sheet=$('#w-sheet'), form=$('#w-form'), key=$('#w-key'), field=$('#w-field'), check=$('#w-check'), open=$('#w-open'),
+      remember=$('#w-remember'), rem=$('#w-rem'), note=$('#w-note'), noteText=$('#w-note-text'), stamp=$('#w-stamp'),
+      stampSub=$('#w-stamp-sub'), status=$('#w-status');
+  var small = window.matchMedia && matchMedia('(max-width:640px)').matches;
+  var P = window.BCCAgent ? BCCAgent.fly(sheet, {size: small ? 80 : 160, bottomInset: 0}) : null;
+  var verified=false, busy=false;
+  function after(fn){
+    if (!P || P.state === 'landed') { fn(); return; }
+    sheet.addEventListener('bcc-agent:landed', function h(){ sheet.removeEventListener('bcc-agent:landed', h); fn(); });
   }
-  form.addEventListener('submit',function(ev){
-    ev.preventDefault();
-    if(prov()==='none'){ location.href='/welcome/skip'; return; }
-    if(!key.value.trim()){ setMsg('Вставьте ключ в поле.','err'); say('Вставьте ключ в поле — я подожду.','alert'); key.focus(); return; }
-    check.disabled=true; check.textContent='Проверяю…'; setMsg('Проверяю ключ, это до 10 секунд.');
-    say('Проверяю ключ…','analyzing');
-    post(false).then(function(r){
-      if(r.ok){ verified=true; setMsg((r.message||'Ключ работает')+' · '+r.mask,'ok'); say('Ключ работает. Можно открывать систему.','verified');
-        check.hidden=true; done.hidden=false; open.focus(); }
-      else { setMsg(r.message||'Ключ не подошёл.','err'); say('Не получилось. Что сделать — написал под кнопкой.','alert'); }
-    }).catch(function(){ setMsg('Сервер не ответил. Он запущен?','err'); say('Сервер не ответил. Он запущен?','alert'); })
-    .then(function(){ check.disabled=false; check.textContent='Проверить ключ'; });
+  if (P) { after(function(){ P.say(sheet.getAttribute('data-hello')); }); P.land(); }
+  function bad(msg){ field.classList.toggle('is-bad', !!msg); noteText.textContent = msg || ''; note.hidden = !msg; }
+  function reset(){ verified=false; check.hidden=false; open.hidden=true; rem.hidden=true; stamp.classList.remove('is-on'); bad(''); }
+  key.addEventListener('input', function(){ if (verified || !note.hidden) { reset(); if (P) P.mood('idle'); } });
+  $('#w-show').addEventListener('click', function(){
+    var s=key.type==='password'; key.type=s?'text':'password'; this.textContent=s?'скрыть':'показать';
+    this.setAttribute('aria-pressed', s?'true':'false'); key.focus();
   });
-  open.addEventListener('click',function(){
-    if(!remember.checked){ location.href='/'; return; }
+  function post(rememberIt){
+    return fetch('/api/key',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({provider:'auto',key:key.value,remember:!!rememberIt})}).then(function(r){return r.json();});
+  }
+  function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function go(){
+    if (!remember.checked) { location.href='/'; return; }
     open.disabled=true;
-    post(true).then(function(r){
-      if(r.remembered){ location.href='/'; return; }
-      open.disabled=false; setMsg(r.message||'Файл .env не записан.','err');
-    }).catch(function(){ open.disabled=false; setMsg('Сервер не ответил.','err'); });
+    post(true).then(function(r){ if (r.remembered) { location.href='/'; return; } open.disabled=false; bad(r.message||'Файл .env не записан.'); })
+      .catch(function(){ open.disabled=false; bad('Сервер не ответил. Окно терминала с BCC Review открыто?'); });
+  }
+  open.addEventListener('click', go);
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    if (busy) return;
+    if (verified) { go(); return; }
+    if (!key.value.trim()) { bad('Вставьте ключ: у Gemini он начинается с AIza, у Claude — с sk-ant-.'); if (P) P.mood('alert'); key.focus(); return; }
+    busy=true; check.disabled=true; check.textContent='Проверяю…'; bad(''); status.textContent='Проверяю ключ, это до 10 секунд.';
+    if (P) { P.say(''); P.takeoff(); P.mood('analyzing'); P.progress(field, 'проверяю ключ'); }
+    var t0=Date.now();
+    post(false).then(function(r){ return wait(Math.max(0, 1500-(Date.now()-t0))).then(function(){ return r; }); })
+    .then(function(r){
+      if (P) P.land();
+      after(function(){
+        if (r.ok) {
+          verified=true; stampSub.textContent=(r.provider==='anthropic'?'CLAUDE':'GEMINI')+' · '+r.mask; stamp.classList.add('is-on');
+          check.hidden=true; open.hidden=false; rem.hidden=false; status.textContent=(r.message||'Ключ работает')+' · '+r.mask;
+          if (P) { P.mood('verified'); P.say('Ключ работает. Можно открывать систему.'); }
+          open.focus();
+        } else {
+          bad(r.message||'Ключ не подошёл.'); status.textContent=r.message||'';
+          if (P) { P.mood('alert'); P.say('Не подошёл. Что сделать — на полях.'); }
+          key.focus();
+        }
+      });
+    }).catch(function(){
+      if (P) { P.land(); after(function(){ P.mood('alert'); P.say('Сервер не ответил.'); }); }
+      bad('Сервер не ответил. Окно терминала с BCC Review открыто?');
+    }).then(function(){ busy=false; check.disabled=false; check.textContent='Проверить ключ'; });
   });
 })();
 """
+
+STAMP_SVG = """<svg id="w-stamp" class="w-stamp" viewBox="0 0 240 92" aria-hidden="true">
+<defs><filter id="w-ink" x="-5%" y="-5%" width="110%" height="110%">
+<feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="11" result="n"/>
+<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.45" result="a"/>
+<feComposite in="SourceGraphic" in2="a" operator="in"/></filter></defs>
+<g filter="url(#w-ink)"><rect x="3" y="3" width="234" height="86" rx="7" fill="none" stroke="currentColor" stroke-width="4"/>
+<rect x="11" y="11" width="218" height="70" rx="4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+<text x="120" y="48" text-anchor="middle" fill="currentColor" font-family="PT Serif,Georgia,serif" font-weight="700"
+font-size="25" letter-spacing="2.5">КЛЮЧ ПРИНЯТ</text>
+<text id="w-stamp-sub" x="120" y="69" text-anchor="middle" fill="currentColor"
+font-family="JetBrains Mono,ui-monospace,Consolas,monospace" font-size="11.5" letter-spacing="1.2">GEMINI</text></g></svg>"""
 
 
 def welcome_page() -> str:
     tokens = '<link rel="stylesheet" href="/assets/tokens.css">\n' if (ASSETS / "tokens.css").is_file() else ""
     return f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BCC AI · знакомство</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230F2841'/%3E%3Crect x='8' y='12' width='16' height='9' rx='4' fill='%23CAA166'/%3E%3Crect x='10' y='14' width='12' height='5' rx='2' fill='%230E1525'/%3E%3Crect x='12' y='15' width='2' height='2' fill='%2334D36A'/%3E%3Crect x='18' y='15' width='2' height='2' fill='%2334D36A'/%3E%3C/svg%3E">
+<title>BCC AI · ключ модели</title>
+<meta name="theme-color" content="#0B1220">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B1220'/%3E%3Crect x='7' y='11' width='18' height='10' rx='4' fill='%23CAA166'/%3E%3Crect x='9' y='13' width='14' height='6' rx='2' fill='%230E1525'/%3E%3Crect x='11' y='15' width='3' height='2' fill='%2334D36A'/%3E%3Crect x='18' y='15' width='3' height='2' fill='%2334D36A'/%3E%3C/svg%3E">
 {tokens}<link rel="stylesheet" href="/assets/agent.css">
 <style>{PAGE_CSS}</style>
 </head><body>
-<main class="w"><section class="w-card" aria-labelledby="w-title">
-<h1 id="w-title" class="w-h">Знакомство с BCC AI</h1>
-<div class="w-hero"><div id="w-agent" data-hello="{_e(HELLO)}"></div></div>
-<form id="w-form" autocomplete="off" novalidate>
-<fieldset class="w-pills"><legend class="w-h">Чем BCC AI будет думать</legend>
-<label class="w-pill"><input type="radio" name="provider" value="gemini" checked><span>Ключ Gemini<small>бесплатно</small></span></label>
-<label class="w-pill"><input type="radio" name="provider" value="anthropic"><span>Ключ Claude</span></label>
-<label class="w-pill"><input type="radio" name="provider" value="none"><span>Без ключа</span></label>
-</fieldset>
-<div id="w-keypanel" class="w-panel">
-<div class="w-label"><label for="w-key" id="w-keylbl">Ключ Gemini</label>
-<a id="w-get" href="{GEMINI_KEY_URL}" target="_blank" rel="noopener noreferrer" data-gemini="{GEMINI_KEY_URL}" data-claude="{CLAUDE_KEY_URL}">получить за минуту</a></div>
-<div class="w-field"><input id="w-key" name="key" type="password" placeholder="AIza…" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="w-msg">
+<header class="w-top"><a href="/welcome" aria-label="BCC Review"><span data-bcc-agent data-size="24" data-mood="idle"></span>BCC Review</a></header>
+<main class="w-desk">
+<article id="w-sheet" class="w-sheet" data-hello="{_e(HELLO_LINE)}" aria-labelledby="w-title">
+{STAMP_SVG}
+<h1 id="w-title" class="ln w-h">Ключ модели для BCC AI</h1>
+<p class="ln w-p">Здравствуйте! Я BCC AI — проверяю ТЗ до начала разработки.</p>
+<p class="ln w-p">Чтобы думать, мне нужен ключ модели: Gemini — бесплатно, или Claude.</p>
+<form id="w-form" class="w-form" autocomplete="off" novalidate>
+<div class="ln w-field" id="w-field"><label for="w-key">Ключ</label>
+<input id="w-key" name="key" type="password" placeholder="AIza… или sk-ant-…" spellcheck="false" autocapitalize="off"
+autocomplete="off" aria-describedby="w-note-text">
 <button type="button" id="w-show" class="w-show" aria-pressed="false" aria-controls="w-key">показать</button></div>
-<div class="w-actions"><button id="w-check" class="w-btn w-main" type="submit">Проверить ключ</button></div>
-<p id="w-msg" class="w-msg" role="status"></p>
-<div id="w-done" class="w-done" hidden>
-<label class="w-check"><input id="w-remember" type="checkbox" checked> Запомнить на этом компьютере (файл .env)</label>
-<div class="w-actions"><button id="w-open" class="w-btn w-main" type="button">Открыть систему</button></div>
-</div>
-</div>
-<div id="w-nokey" class="w-panel" hidden>
-<p class="w-msg">{_e(NO_KEY_LINE)}. Ключ можно добавить позже.</p>
-<div class="w-actions"><a class="w-btn w-main" href="/welcome/skip">Открыть систему</a></div>
-</div>
+<p class="w-note" id="w-note" hidden><b>K-01</b><span id="w-note-text"></span></p>
+<p class="ln w-hint">Бесплатный ключ Gemini — за минуту: <a href="{GEMINI_KEY_URL}" target="_blank"
+rel="noopener noreferrer">aistudio.google.com/apikey</a>. Ключ Claude — в <a href="{CLAUDE_KEY_URL}" target="_blank"
+rel="noopener noreferrer">консоли Anthropic</a>.</p>
+<label class="ln w-remember" id="w-rem" hidden><input id="w-remember" type="checkbox" checked>
+Запомнить на этом компьютере (файл .env)</label>
+<div class="w-actions"><button id="w-check" class="w-btn" type="submit">Проверить ключ</button>
+<button id="w-open" class="w-btn" type="button" hidden>Открыть систему</button>
+<a id="w-skip" class="w-link" href="/welcome/skip">Продолжить без ключа</a></div>
+<p id="w-status" class="w-sr" role="status"></p>
 </form>
-<p class="w-foot">Ключ хранится только на этом компьютере и уходит только в {_e("Google или Anthropic")} для проверки.</p>
-</section></main>
+</article>
+<p class="w-foot">{_e(NO_KEY_LINE)} — если продолжить без ключа. Ключ остаётся на этом компьютере
+и уходит только в Google или Anthropic.</p>
+</main>
 <script src="/assets/agent.js"></script>
 <script>{PAGE_JS}</script>
 </body></html>"""

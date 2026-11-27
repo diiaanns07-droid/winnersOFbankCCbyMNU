@@ -361,16 +361,20 @@
     var g = cv.getContext('2d'), typeSay = typer(sayEl);
     var side = opts.land || sheet.getAttribute('data-land') || 'right';
     var p = {
-      sheet: sheet, size: S, _drone: makeDrone(), _visible: !io, state: 'scan', prog: 0, target: 0,
-      x: null, y: null, x0: 0, y0: 0, t0: 0, dur: 900, bottomInset: +(opts.bottomInset || 96), _said: null,
+      sheet: sheet, size: S, _drone: makeDrone(), _visible: !io, state: 'scan', prog: 0, target: 0, focusEl: null,
+      x: null, y: null, ly: null, x0: 0, y0: 0, t0: 0, dur: 900, _said: null,
+      bottomInset: opts.bottomInset != null ? +opts.bottomInset : 96,
       _spot: function (W) { return { x: side === 'left' ? 28 : W - S - 40, y: -Math.round(S * 61 / 80) }; },
       _step: function (now, dt, still) {
         var r = sheet.getBoundingClientRect(), W = r.width, H = r.height, tt = now / 1000;
         var vt = clamp(-r.top + 12, 0, H), vb = clamp(window.innerHeight - r.top - p.bottomInset, 0, H);
         if (vb - vt < 180) { vt = 0; vb = H; }
         if (p.state === 'scan') {
-          p.prog = (still || p.x == null) ? p.target : p.prog + (p.target - p.prog) * Math.min(1, dt * 2.5);
-          var ly = vt + 36 + p.prog * Math.max(0, vb - vt - 72);
+          var ty;
+          if (p.focusEl && p.focusEl.isConnected) ty = p.focusEl.getBoundingClientRect().bottom - r.top + 4;
+          else ty = vt + 36 + p.target * Math.max(0, vb - vt - 72);
+          p.ly = (still || p.ly == null) ? ty : p.ly + (ty - p.ly) * Math.min(1, dt * 3);
+          var ly = p.ly;
           var padL = Math.min(72, W * .12), padR = Math.min(48, W * .08), span = Math.max(0, W - padL - padR - S);
           var cx = padL + S / 2 + (still ? .5 : .5 + .5 * Math.sin(tt * .7)) * span;
           p.x = cx - S / 2; p.y = ly - S * 78 / 80;
@@ -388,14 +392,16 @@
         } else {
           var s2 = p._spot(W); p.x = s2.x; p.y = s2.y;
         }
-        talk.classList.toggle('is-left', p.x + S + 280 > W && p.x > 280);
+        var left = p.x + S + 300 > W && p.x > 160;
+        talk.classList.toggle('is-left', left);
+        talk.style.maxWidth = Math.max(140, Math.min(460, left ? p.x - 8 : W - p.x - S - 8)) + 'px';
         craft.style.transform = 'translate3d(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px,0)';
         if (p.state === 'landed' && p._drone.cur === 'idle') lookAt(p._drone, cv.getBoundingClientRect());
         paint(cv, g, p._drone, now, dt, false, still);
       },
       _refresh: function () { if (LITE) p._step(1200, 0, true); else kick(); },
       progress: function (v, stage) {
-        p.target = clamp(+v || 0, 0, 1);
+        if (v && v.nodeType === 1) { p.focusEl = v; } else { p.focusEl = null; p.target = clamp(+v || 0, 0, 1); }
         if (stage != null) p.stage(stage);
         if (p.state !== 'scan') p.takeoff();
         p._refresh();

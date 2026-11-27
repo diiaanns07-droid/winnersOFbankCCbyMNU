@@ -138,6 +138,7 @@ _FRAMES_Z = {
 }
 
 _cache: dict[str, list[list[int]]] = {}
+_sleep = time.sleep                      # тесты подменяют, чтобы не ждать анимацию
 _OUTLINE = _PALETTE.index("#121826") + 1
 _BRIGHT = {i + 1: sum(int(c[k:k + 2], 16) for k in (1, 3, 5)) for i, c in enumerate(_PALETTE)}
 
@@ -352,7 +353,7 @@ class _Screen:
             for ch in body:
                 self.write(ch)
                 if ch not in " ":
-                    time.sleep(0.012)
+                    _sleep(0.012)
             self.write(self.reset if style else "")
         else:
             self.write(f"{style}{body}{self.reset if style else ''}")
@@ -472,9 +473,9 @@ def greet(port: int = 8014, env_path: str | Path | None = None, *, stdin: TextIO
     try:
         scr.cursor(False)
         scr.sprite("idle")
-        time.sleep(0.25)
+        _sleep(0.25)
         scr.swap("blink")
-        time.sleep(0.13)
+        _sleep(0.13)
         scr.swap("idle")
         if ready:
             hello = "С возвращением!" if ready in ("gemini", "anthropic", "openai") else "Здравствуйте! Я BCC AI."
@@ -482,7 +483,7 @@ def greet(port: int = 8014, env_path: str | Path | None = None, *, stdin: TextIO
             scr.say("Открываю систему…", style=scr.dim, typing=False)
             return ready
         scr.say("Здравствуйте! Я BCC AI — проверяю ТЗ до начала разработки.", style=scr.bold)
-        time.sleep(0.2)
+        _sleep(0.2)
         scr.swap("look")
         scr.say("Вставьте ключ Gemini или Claude. Enter — без ключа.")
         scr.say(f"Бесплатный ключ Gemini, за минуту: {KEY_URL}", style=scr.dim, typing=False)
