@@ -1,0 +1,36 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.docx /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_sonnet_1/report.md --provider claude_cli --model sonnet --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 31 дефект (критичных 5, существенных 14, незначительных 12), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, каждый останавливает разработку и тестирование:
+  D-01 Ф-3 «один push в месяц» противоречит Ф-4 «независимо от истории»
+  D-02 Не определено событие «проведённая покупка»: авторизация или клиринг
+  D-03 Обещано чтение порога и суммы за месяц, метода чтения нет
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 2 мин 36 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 93 из 93
+Отчёт: /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_sonnet_1/report.md и /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_sonnet_1/report.json
+  ! судья: 3 дефекта (пожелания полноты) сведены в одно незначительное
+HTML: /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_sonnet_1/report.html
+
+--- stderr
+Документ: release/input/requirements.docx
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_qa: запуск
+  lens_risk: запуск
+  lens_analyst: запуск
+  segment: готово за 17 с, вызовов 1
+  lens_analyst: готово за 42 с, вызовов 1, кандидатов 9
+  lens_risk: готово за 45 с, вызовов 1, кандидатов 8
+  lens_qa: готово за 47 с, вызовов 1, кандидатов 4
+  consistency: готово за 50 с, вызовов 1, кандидатов 13
+  lens_architect: готово за 59 с, вызовов 1, кандидатов 11
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 60
+  judge: запуск
+  judge: готово за 89 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0

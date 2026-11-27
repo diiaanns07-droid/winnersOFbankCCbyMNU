@@ -1,0 +1,37 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.docx /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_haiku_1/report.md --provider claude_cli --model haiku --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 33 дефекта (критичных 3, существенных 20, незначительных 10), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 3, каждый останавливает разработку и тестирование:
+  D-01 Чтение порога обещано, но ни одной операции чтения в API нет
+  D-02 Неверная сумма: код 200 с ERROR против кода 400
+  D-03 Второй push за месяц после смены порога: Ф-3 запрещает, Ф-4 разрешает
+Прогон завершён полностью: 5 мин 6 с, 10 вызовов модели, claude-haiku-5-5; цитат сверено 91 из 91
+Отчёт: /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_haiku_1/report.md и /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_haiku_1/report.json
+  ! проверка серьёзности понизила 1 дефект: критичный→существенный 1, существенный→незначительный 0
+  ! судья: 'Не определено, какое событие процессинга считается проведённ' понижен до существенный…
+  ! судья: к 'Чужая карта: 403 без тела или 404 с сообщением о к' добавлена цитата места…
+HTML: /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_docx_2eac95c_haiku_1/report.html
+
+--- stderr
+Документ: release/input/requirements.docx
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  segment: готово за 60 с, вызовов 1
+  lens_qa: готово за 60 с, вызовов 1, кандидатов 5
+  lens_risk: готово за 65 с, вызовов 1, кандидатов 7
+  lens_analyst: готово за 72 с, вызовов 1, кандидатов 8
+  consistency: готово за 79 с, вызовов 1, кандидатов 14
+  lens_architect: готово за 91 с, вызовов 1, кандидатов 11
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 60
+  judge: запуск
+  judge: готово за 174 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 33 с, вызовов 1

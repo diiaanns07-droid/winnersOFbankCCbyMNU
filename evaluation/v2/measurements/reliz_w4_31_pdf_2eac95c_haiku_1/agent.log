@@ -1,0 +1,38 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.pdf /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_pdf_2eac95c_haiku_1/report.md --provider claude_cli --model haiku --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 35 дефектов (критичных 5, существенных 18, незначительных 12), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, каждый останавливает разработку и тестирование:
+  D-01 Чтение порога и суммы за месяц не описано ни одной операцией
+  D-02 Ключевое событие «проведённая покупка» не определено: авторизация или клиринг
+  D-03 Критерий приёмки №2 противоречит дате месяца в Ф-2
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 4 мин 49 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 97 из 97
+Отчёт: /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_pdf_2eac95c_haiku_1/report.md и /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_pdf_2eac95c_haiku_1/report.json
+  ! проверка серьёзности понизила 1 дефект: критичный→существенный 1, существенный→незначительный 0
+  ! судья: 3 дефекта (пожелания полноты) сведены в одно незначительное
+  ! Вопросы: оставлено 8 вопросов из 9
+HTML: /home/claude/repo/evaluation/v2/measurements/reliz_w4_31_pdf_2eac95c_haiku_1/report.html
+
+--- stderr
+Документ: release/input/requirements.pdf
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  segment: готово за 55 с, вызовов 1
+  lens_qa: готово за 57 с, вызовов 1, кандидатов 4
+  lens_architect: готово за 72 с, вызовов 1, кандидатов 12
+  lens_risk: готово за 89 с, вызовов 1, кандидатов 8
+  consistency: готово за 104 с, вызовов 1, кандидатов 16
+  lens_analyst: готово за 114 с, вызовов 1, кандидатов 12
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 67
+  judge: запуск
+  judge: готово за 166 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
