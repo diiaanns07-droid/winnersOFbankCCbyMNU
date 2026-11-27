@@ -108,8 +108,18 @@ def _stage_owners(score: dict | None, *, slow: bool = False, failed: bool = Fals
     if failed:
         parts += [f"{s} {st}{': ' + str(e)[:60] if e else ''} ({STAGE_OWNER.get(s, '?')})" for s, st, _, _, e in rows
                   if st not in ("ok", "complete", "done", "skipped", None)]
+    truncated: set[str] = set()
+    tr = Path(rd) / "trace.jsonl"
+    if tr.exists():
+        for line in tr.read_text(encoding="utf-8").splitlines():
+            if "exceeded" in line or "truncated" in line or "output token maximum" in line:
+                try:
+                    truncated.add(json.loads(line).get("stage") or "")
+                except json.JSONDecodeError:
+                    pass
     if slow:
-        multi = [f"{s} {c} вызова ({STAGE_OWNER.get(s, '?')})" for s, _, _, c, _ in rows if c > 1]
+        multi = [f"{s} {c} вызова{' (обрезка ответа)' if s in truncated else ''} ({STAGE_OWNER.get(s, '?')})"
+                 for s, _, _, c, _ in rows if c > 1]
         top = sorted(rows, key=lambda r: -r[2])[:2]
         parts += multi + [f"{s} {sec / 60:.1f} мин ({STAGE_OWNER.get(s, '?')})" for s, _, sec, _, _ in top if sec]
     return "; ".join(dict.fromkeys(parts)) or "№01 (профиль слабой модели)"
@@ -169,6 +179,7 @@ def official_gates(kind: str, row: dict | None, gold: dict) -> list[dict]:
                           None if c is None else c <= t["calls"], _stage_owners(score, slow=True)))
     for x in out:
         x["source"] = src
+        x["info"] = kind in WAVE2_ONLY
     return out
 
 
@@ -207,8 +218,9 @@ def _latest_summary(folder: Path, kind: str) -> dict | None:
     return best
 
 
-def _clean_owners(d: dict) -> str:
-    fp = [x for x in (d.get("details") or {}).get("fp") or [] if x.get("clean")]
+def _clean_owners(d: dict, severity: str | None = None) -> str:
+    fp = [x for x in (d.get("details") or {}).get("fp") or []
+          if x.get("clean") and (severity is None or x.get("severity") == severity)]
     cnt: dict[str, int] = {}
     for x in fp:
         for o in x.get("owners") or ["?"]:
@@ -248,7 +260,7 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> lis
                           f"{over} из {c['measured']} (максимум {c.get('max_findings')})",
                           None if over is None else over == 0, _clean_owners(d)))
     out.append(_check(f"{title}: critical на чистых", "0", f"{c['critical']} (документов {c['docs_with_critical']})",
-                      c["critical"] == 0, _clean_owners(d)))
+                      c["critical"] == 0, _clean_owners(d, "critical") + "; №10 (серьёзность)"))
     if "clean_verdict_no" in t:
         out.append(_check(f"{title}: вердикт «нельзя» на чистых", "0", str(c["verdict_no"]), c["verdict_no"] == 0,
                           "№10 (вердикт), №13"))
@@ -318,26 +330,30 @@ def collect(runs: list[str] | None = None) -> list[dict]:
     checks += corpus_gates("Новые ТЗ №18, sonnet", _latest_summary(V2 / "newtz_results", "sonnet"), NEWTZ, "№18, №15")
     checks += stability_gates(gold)
     checks += official_gates("sonnet", latest.get("sonnet"), gold)
-    last_full = max((r for r in rows if model_kind(r.get("provider"), r.get("model")) in ("opus", "sonnet")),
-                    key=lambda r: r.get("at", ""), default=None)
+    last_full = max(rows, key=lambda r: r.get("at", ""), default=None)
     checks += report_quality(last_full)
     return checks
 
 
 def render(checks: list[dict]) -> str:
     mark = {True: "✅", False: "❌", None: "⏳"}
-    red = [c for c in checks if c["ok"] is False]
-    wait = [c for c in checks if c["ok"] is None]
+    red = [c for c in checks if c["ok"] is False and not c.get("info")]
+    wait = [c for c in checks if c["ok"] is None and not c.get("info")]
     L = [f"# Ворота второй волны — {sc.astana_now()} (Астана)", "",
          f"Зелёных {sum(1 for c in checks if c['ok'])}, красных {len(red)}, без замера {len(wait)}. "
          "Цели — `docs/plan-v2/WAVE2.md`; пересчитать: `python -m evaluation.v2.gate`.", "",
          "| | Ворота | Цель | Факт | Замер | Владелец красного |", "| :---: | :--- | :--- | :--- | :--- | :--- |"]
     for c in checks:
-        L.append(f"| {mark[c['ok']]} | {c['name']} | {c['target']} | {c['fact']} | {c.get('source', '—')} | "
+        m = "⚠️" if c.get("info") and c["ok"] is False else mark[c["ok"]]
+        L.append(f"| {m} | {c['name']} | {c['target']} | {c['fact']} | {c.get('source', '—')} | "
                  f"{str(c.get('owners') or '').replace('|', '/')} |")
     if red:
         L += ["", "## Красное — владельцам", ""]
         L += [f"* **{c['name']}** ({c['fact']}, цель {c['target']}): {c['owners']}" for c in red]
+    info = [c for c in checks if c.get("info") and c["ok"] is False]
+    if info:
+        L += ["", "Справочно (⚠️ — вне ворот WAVE2): "
+              + "; ".join(f"{c['name']} {c['fact']}: {c['owners']}" for c in info)]
     return "\n".join(L) + "\n"
 
 
@@ -356,9 +372,10 @@ def main(argv: list[str] | None = None) -> int:
         (V2 / "GATE.md").write_text(text, encoding="utf-8")
         with (V2 / "gate_history.jsonl").open("a", encoding="utf-8") as fh:
             fh.write(json.dumps({"at": sc.astana_now(), "green": sum(1 for c in checks if c["ok"]),
-                                 "red": [c["name"] for c in checks if c["ok"] is False],
+                                 "red": [c["name"] for c in checks if c["ok"] is False and not c.get("info")],
                                  "waiting": [c["name"] for c in checks if c["ok"] is None]}, ensure_ascii=False) + "\n")
-    red = any(c["ok"] is False for c in checks) or (a.strict and any(c["ok"] is None for c in checks))
+    gate_checks = [c for c in checks if not c.get("info")]
+    red = any(c["ok"] is False for c in gate_checks) or (a.strict and any(c["ok"] is None for c in gate_checks))
     return 1 if red else 0
 
 
