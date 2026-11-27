@@ -286,6 +286,11 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     # Исходы вызваны двумя разными условиями, соединёнными в один сценарий, — это порядок проверок, не конфликт.
     if pair["verdict"] == "conflict" and not pair["one_condition"]:
         pair["basis"] = "none"
+    # Условное право («может …, если нет X») — необходимое, а не достаточное условие: запрет для другого состояния
+    # с ним не спорит (контрпример 7 промпта, который слабая модель пропускает).
+    if (pair["verdict"] == "conflict" and pair["kind"] in ("event_conflict", "status_conflict")
+            and (_PERMISSION.search(pair["quote_a"]) or _PERMISSION.search(pair["quote_b"]))):
+        pair["basis"] = "none"
     # Конфликт без названного основания (модель сама не нашла ни одного из трёх) — неопределённость.
     if pair["verdict"] == "conflict" and pair["basis"] == "none":
         pair["verdict"] = "undefined"
@@ -299,6 +304,8 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     return pair
 
 
+_PERMISSION = re.compile(r"(?<![а-яё])(?:может|могут|можно|вправе|разрешен\w*|доступн\w*)(?![а-яё])[^.;]{0,80}?"
+                         r"(?<![а-яё])если(?![а-яё])", re.I)
 _CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")
 
 

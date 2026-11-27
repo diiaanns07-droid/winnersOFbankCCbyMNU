@@ -558,3 +558,18 @@ def test_internal_service_action_is_not_a_promise_of_interface_operation():
     view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
     out = C.postprocess(answer(candidates=[_missing([("получает номер договора через дочерний документ", 1)])]), view, [])
     assert out["candidates"][0]["severity"] == "critical"  # подлежащее «Приложение» — в строке, вне цитаты
+
+
+def test_conditional_permission_against_prohibition_of_other_state_is_not_conflict():
+    p = pair(kind="status_conflict", basis="same_condition",
+             quote_a="Вклад можно пополнять не более трёх раз в квартал.",
+             quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
+    assert C.postprocess(answer(pair_checks=[p]), VIEW, REQS)["pair_checks"][0]["verdict"] == "conflict"
+    doc = ["Клиент может закрыть вклад, если по нему нет операции в обработке.", "409 — вклад под арестом."]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    reqs = [{"id": f"R-0{i}", "source_id": "", "kind": "functional", "line_start": i, "line_end": i} for i in (1, 2)]
+    p = pair(a="R-01", b="R-02", kind="status_conflict", basis="same_condition",
+             quote_a=doc[0], line_a=1, quote_b=doc[1], line_b=2)
+    out = C.postprocess(answer(pair_checks=[p]), view, reqs)
+    assert out["pair_checks"][0]["verdict"] == "undefined"
+    assert [c["severity"] for c in out["candidates"]] == ["major"]
