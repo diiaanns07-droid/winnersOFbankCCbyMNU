@@ -6,7 +6,23 @@
 from __future__ import annotations
 
 from . import jsonout
+import re
+
+from . import markdown as _md
 from .markdown import BLOCKS, STATUS, _clean_report, duration, plural, shorten
+
+
+def plain_warn(text) -> str:
+    """Предупреждение этапа для терминала: «Этап consistency не выполнен» → «Этап «Набор целиком» не выполнен»,
+    critical → критичный, «линза» → «роль»; без разметки Markdown."""
+    s = _md.dejargon(" ".join(str(text or "").split()))
+    m = _md._STAGE_PREFIX.match(s)
+    if m and _md.stage_key(m.group(1)) in _md.STAGES:
+        s = f"{_md.STAGES[_md.stage_key(m.group(1))][0]}: " + s[m.end():]
+    s = _md._EXC.sub("", s)
+    s = _md._STAGE_WORD.sub(lambda m: f"«{_md.STAGES[m.group(1)][0]}»", s)
+    s = _md._SEV_WORD.sub(lambda m: _md.SEV_NAME[m.group(1)], s)
+    return _md._LREF.sub(_md._lref, s)
 
 READY = {"no": "нельзя", "conditional": "с условиями", "yes": "можно", "undetermined": "не определено",
          "none": "не вынесен"}
@@ -30,9 +46,11 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
     fs = s.get("findings", {})
     total = sum(fs.get(k, 0) for k in ("critical", "major", "minor"))
     nq = len(report.get("questions") or [])
+    nreq = s.get("requirements", 0)
+    reqs = (f"{nreq} {plural(nreq, 'требование', 'требования', 'требований')}" if nreq or run.get("provider") != "offline"
+            else "требования без модели не выделялись")
     lines = [
-        f"BCC Review: «{doc.get('title') or doc.get('file') or 'документ'}» — {s.get('requirements', 0)} "
-        f"{plural(s.get('requirements', 0), 'требование', 'требования', 'требований')}, {total} "
+        f"BCC Review: «{doc.get('title') or doc.get('file') or 'документ'}» — {reqs}, {total} "
         f"{plural(total, 'дефект', 'дефекта', 'дефектов')} (критичных {fs.get('critical', 0)}, существенных "
         f"{fs.get('major', 0)}, незначительных {fs.get('minor', 0)}), вопросов {nq}",
         f"Разработка: {READY.get(v.get('development'), '—')} · тестирование: {READY.get(v.get('testing'), '—')}",
@@ -48,7 +66,14 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
     calls = (run.get("calls") or {}).get("total", 0)
     model = ", ".join(run.get("models_used") or []) or PLAIN_PROVIDERS.get(run.get("provider"), run.get("provider") or "—")
     cached = (run.get("calls") or {}).get("cached", 0)
-    lines.append(f"Прогон {STATUS.get(run.get('status'), run.get('status') or '—')}: {duration(run.get('duration_s'))}, "
+    why = ""
+    if run.get("status") == "partial":
+        try:
+            why = _md._partial_reason(_md._Ctx(report))
+        except Exception:  # noqa: BLE001
+            why = ""
+    lines.append(f"Прогон {STATUS.get(run.get('status'), run.get('status') or '—')}"
+                 + (f" ({re.sub(r'`', '', why)})" if why else "") + f": {duration(run.get('duration_s'))}, "
                  f"{calls} {plural(int(calls or 0), 'вызов', 'вызова', 'вызовов')} модели"
                  + (f" (+{cached} из кэша)" if cached else "") + f", {model}; "
                  f"цитат сверено {s.get('quotes_verified', 0)} из {s.get('quotes_total', s.get('quotes_verified', 0))}")
@@ -61,5 +86,5 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
         lines.append(f"  ! {err}")
         warns = [w for w in warns if " ".join(w.split()) != err]
     for w in warns[:3 if not err else 2]:
-        lines.append(f"  ! {shorten(w, width - 4)}")
+        lines.append(f"  ! {shorten(plain_warn(w), width - 4)}")
     return "\n".join(lines)
