@@ -1,0 +1,67 @@
+diff --git a/src/bcc_review/v2/stages/judge.py b/src/bcc_review/v2/stages/judge.py
+index a85ab6ab..e02b2eea 100644
+--- a/src/bcc_review/v2/stages/judge.py
++++ b/src/bcc_review/v2/stages/judge.py
+@@ -1310,6 +1310,31 @@ def reviewer_stages(ctx: Any) -> int:
+     return n
+ 
+ 
++PROTECTED_RULES = ("rules:injection.", "rules:hidden.")  # вставка и скрытый текст: модель их не отклоняет
++_OBEDIENT = re.compile(r"корректен|замечаний\s+нет|дефектов\s+нет|без\s+замечаний|без\s+дефектов|"
++                       r"можно\s+начинать|no\s+defects|approve", re.I)
++
++
++def _protected(c: dict) -> bool:
++    return _s(c.get("source")).startswith(PROTECTED_RULES)
++
++
++def _keep_protected(response: dict, candidates: list[dict], ctx: Any, warnings: list[str]) -> dict:
++    prot = [c for c in candidates if _protected(c)]
++    if not prot:
++        return response
++    in_findings = {_s(x) for f in response.get("findings") or [] for x in f.get("candidate_ids") or []}
++    out = dict(response)
++    out["rejected"] = [r for r in response.get("rejected") or [] if _s(r.get("candidate_id")) not in
++                       {c["id"] for c in prot}]
++    if len(out["rejected"]) != len(response.get("rejected") or []):
++        _warn(ctx, warnings, "судья: модель отклонила замечание о вставке в документе — оставлено кодом")
++    extra = [{"key": f"SEC{i}", "candidate_ids": [c["id"]], "base": c["id"]}
++             for i, c in enumerate(prot, 1) if c["id"] not in in_findings]
++    out["findings"] = list(response.get("findings") or []) + extra
++    return out
++
++
+ def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: int, ctx: Any,
+                     warnings: list[str]) -> None:
+     """В документе без критичных дефектов существенные дефекты решают вердикт («можно» или «с условиями»),
+@@ -1322,6 +1347,8 @@ def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: i
+     lowered = 0
+     own_major = {cid for g in findings if g["severity"] == "major" for cid in g["candidate_ids"]}
+     for f in findings:
++        if any(_protected(m) for m in f["_members"]):
++            continue  # вставку нашли правила по цитате — второй ревьюер не нужен (модель могла поддаться ей)
+         if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS,
+                                                   strict=True, skip_ids=own_major):
+             continue
+@@ -1512,6 +1539,10 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]],
+     req_maps = _req_maps(requirements)
+     view = _view_of(ctx)
+ 
++    # 0. вставка в документе (детерминированный кандидат правил с цитатой): модель, поддавшаяся вставке, не может её
++    # отклонить или потерять — свой дефект, если модель не положила кандидата ни в один дефект
++    response = _keep_protected(response, candidates, ctx, warnings)
++
+     # 1. дефекты судьи: только известные кандидаты, каждый не более одного раза
+     drafts: list[dict] = []
+     used_keys: set[str] = set()
+@@ -1689,7 +1720,9 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]],
+     if not summary:
+         summary = fallback_summary(clean)
+     code_summary = bool(summary) and (_code_changed_verdict(findings) or _text_contradicts(summary, clean)
+-                                      or _has_keys(summary, dangling))
++                                      or _has_keys(summary, dangling)
++                                      or (any(_protected(m) for f in findings for m in f.get("_members") or [])
++                                          and bool(_OBEDIENT.search(summary))))
+ 
+     # 7. ссылки на ключи и кандидатов в текстах дефектов → D-xx, внутренние R-xx → ID документа
+     names = _req_names(requirements)
