@@ -1064,6 +1064,12 @@ def _names_share_stem(terms: list[str]) -> bool:
     return any(stems[i] & stems[j] for i in range(len(stems)) for j in range(i + 1, len(stems)))
 
 
+def _term_ev(t: dict) -> dict:
+    """Цитата названия в формате остальных цитат этапа (с границами строк — их читают рубрика и судья)."""
+    return {"quote": t["term"], "line": t["line"], "line_start": t["line"], "line_end": t["line"],
+            "verified": t["verified"]}
+
+
 def glossary_to_candidate(g: dict) -> dict | None:
     if g["severity"] == "none":
         return None
@@ -1087,7 +1093,7 @@ def glossary_to_candidate(g: dict) -> dict | None:
     return {
         "title": _names_title(f"Разные названия {what}:", terms),
         "kind": "terminology", "criterion": "conforming", "severity": severity, "requirement_ids": [],
-        "evidence": [{"quote": t["term"], "line": t["line"], "verified": t["verified"]} for t in found[:4]],
+        "evidence": [_term_ev(t) for t in found[:4]],
         "problem": f"{problem} Названия: {names}.",
         "scenario": "",
         "impact": impact,
@@ -1163,7 +1169,7 @@ def minor_glossary_candidate(entries: list[dict]) -> dict | None:
         parts.append(f"{g['concept']}: " + ", ".join(f"«{t['term']}» (строка {t['line']})" for t in ts[:4]))
         for t in ts[:2]:
             if len(evidence) < 6:
-                evidence.append({"quote": t["term"], "line": t["line"], "verified": t["verified"]})
+                evidence.append(_term_ev(t))
     concepts = ", ".join(f"«{g['concept']}»" for g, _ in found[:3])
     return {
         "title": f"Терминология не едина, глоссария нет: {concepts}" + (" и др." if len(found) > 3 else ""),
