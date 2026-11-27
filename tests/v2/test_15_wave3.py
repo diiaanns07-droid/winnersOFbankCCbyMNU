@@ -74,3 +74,28 @@ def test_clarity_rubric_rows():
     assert sc.clarity_row(ref, set())["fails"] == []  # ссылки на D-/Q-/T- отчёта — не внутренние коды
     res = sc.clarity_of([{**good, "raw": good}, {**bad, "raw": bad}], set())
     assert res["n"] == 2 and res["passed"] == 1 and res["worst"][0]["id"] == "D-02"
+
+
+def test_competitors_adapter_keeps_active_and_maps_fields():
+    from evaluation.v2 import competitors as cp
+
+    gold = {"sha256": "x"}
+    era = {"findings": [{"status": "open", "severity": "critical", "title": "Т", "problem": "П",
+                         "evidence": [{"quote": "q", "line_start": 38, "line_end": 38}]}],
+           "verdict": {"ready_for_development": False, "ready_for_testing": False}}
+    rep = cp.adapt("ERA216", era, gold)
+    assert len(rep["findings"]) == 1 and rep["findings"][0]["severity"] == "critical"
+    assert rep["verdict"] == {"development": "no", "testing": "no"}
+    solo = {"findings": [{"status": "active", "severity": "MAJOR", "title": "А", "explanation": "Е",
+                          "evidence": [{"quote": "q", "line": 16}]},
+                         {"status": "merged", "severity": "MAJOR", "title": "Б", "evidence": [{"quote": "q", "line": 1}]}],
+            "verdict": {"dev_status": "no", "test_status": "no"}}
+    rep = cp.adapt("SoloHive", solo, gold)
+    assert [f["title"] for f in rep["findings"]] == ["А"]
+    assert rep["findings"][0]["severity"] == "major" and rep["findings"][0]["evidence"][0]["line_start"] == 16
+    azk = {"findings": [{"status": "rejected", "severity": "major", "title": "X", "evidence": []},
+                        {"status": "confirmed", "severity": "minor", "title": "Y", "defect_type": "ambiguous",
+                         "evidence": [{"quote": "q", "line_start": 2, "line_end": 2}]}],
+           "verdict": {"development": "not_ready", "testing": "not_ready"}}
+    rep = cp.adapt("azekowka", azk, gold)
+    assert [f["kind"] for f in rep["findings"]] == ["ambiguity"] and rep["verdict"]["testing"] == "no"
