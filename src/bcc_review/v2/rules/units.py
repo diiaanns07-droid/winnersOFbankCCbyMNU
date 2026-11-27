@@ -470,16 +470,22 @@ def rule_day_kinds(doc: Doc, out: dict) -> None:
                     common = stems(ca) & stems(cb)
                     if not common:
                         continue
+                    kind_a = "рабочих" if ka.startswith("рабоч") else "календарных"
+                    kind_b = "рабочих" if kb.startswith("рабоч") else "календарных"
+                    clause_a, clause_b = ca.strip(" *"), cb.strip(" *")
                     out["candidates"].append(candidate(
                         "units.day_kinds",
                         title=f"Одна величина в разных днях: {quoted(qa)} и {quoted(qb)}",
                         kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
                         evidence=[ev(xa, qa), ev(xb, qb)],
-                        problem=(f"{quoted(xa.joined[:160])} и {quoted(xb.joined[:160])}: срок считается в разных днях "
-                                 f"({qa} и {qb})."),
-                        scenario="Период включает выходные: по одному месту остаётся 5 дней, по другому — 3.",
+                        problem=(f"Связанный срок в одном месте считается в {kind_a} днях — {quoted(clause_a)}, "
+                                 f"в другом — в {kind_b}: {quoted(clause_b)}. Какие дни "
+                                 "считать, не сказано: от этого зависят дата окончания и число дней, которое видит клиент."),
+                        scenario=("До окончания срока 9 календарных дней, из них 2 выходных: по одному месту осталось 9 "
+                                  "дней, по другому — 7; дата окончания по двум местам разная."),
                         impact="Клиенту показывают неверный срок; расчёт и тесты расходятся на выходных и праздниках.",
-                        recommendation="Указать один вид дней для этого срока во всех разделах.",
+                        recommendation=("Указать один вид дней для этого срока во всех разделах; если в другом месте нужен "
+                                        "другой вид — назвать величину иначе и описать пересчёт."),
                         conflict=True,
                     ))
                     return
