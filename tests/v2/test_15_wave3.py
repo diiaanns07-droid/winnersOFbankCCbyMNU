@@ -255,3 +255,14 @@ def test_clarity_sentences_ignore_abbreviations():
     assert len(sc._sentences("Ф-2 (стр. 38) относит покупку к месяцу. Критерий (стр. 64) требует роста.")) == 2
     assert len(sc._sentences("См. п. 5 логики метода. Итог 1 000 ₸.")) == 2
     assert len(sc._sentences("Первое. Второе. Третье.")) == 3
+
+
+def test_cleantable_tilde_times_are_older_and_open2_edition():
+    from evaluation.v2 import cleantable as ct
+
+    old = ct._row("№18: чистые версии (2-я редакция)", "haiku", "№18 haiku_clean2_0835", "~0835", "qr_clean", {}, {})
+    new = ct._row("№18: чистые версии (2-я редакция)", "haiku", "замер 15:30", "2026-11-27 15:35", "qr_clean", {}, {})
+    assert ct.latest([old, new])[("№18: чистые версии (2-я редакция)", "haiku")][0]["label"] == "замер 15:30"
+    assert ct._set_of("evaluation/v2/clean/fx/source.md") == "чистые ТЗ №20"
+    assert ct._set_of("evaluation/v2/open2/qr_clean/source.md", ["нет-такого"], "2026-11-27 15:35").endswith("(2-я редакция)")
+    assert ct._set_of("evaluation/v2/open2/qr_clean/source.md", [], "2026-11-27 05:20").endswith("(1-я редакция)")

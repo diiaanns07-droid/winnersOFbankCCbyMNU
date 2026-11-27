@@ -59,12 +59,33 @@ def _corpus_rows() -> list[dict]:
     return out
 
 
-def _set_of(doc: str | None) -> str:
-    doc = str(doc or "")
+OPEN2_EDITION2 = "4d108e42"  # №18: вторая редакция чистых версий open2 (27.11 08:32) — в дереве с тех пор она
+
+
+def _has_edition2(commits: list[str]) -> bool | None:
+    """Есть ли в коде прогона вторая редакция чистых open2: None — коммиты git не знает."""
+    import subprocess
+
+    known = None
+    for c in commits:
+        r = subprocess.run(["git", "merge-base", "--is-ancestor", OPEN2_EDITION2, c], cwd=str(ROOT),
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            return True
+        if r.returncode == 1:
+            known = False
+    return known
+
+
+def _set_of(doc: str | None, commits: list[str] | None = None, at: str = "") -> str:
+    doc = str(doc or "").replace("\\", "/")
     if "/v2/clean/" in doc or doc.startswith("evaluation/v2/clean/"):
         return "чистые ТЗ №20"
     if "open2" in doc:
-        return "№18: чистые версии (1-я редакция)"
+        ed2 = _has_edition2(commits or [])
+        if ed2 is None:  # коммит неизвестен — по времени прогона
+            ed2 = at >= "2026-11-27 08:40"
+        return f"№18: чистые версии ({'2' if ed2 else '1'}-я редакция)"
     return "прочие чистые"
 
 
@@ -76,8 +97,9 @@ def _newtz_rows() -> list[dict]:
             if r.get("variant") != "clean" or r.get("status") in (None, "failed"):
                 continue
             sev = r.get("fa_by_severity") or r.get("by_severity") or {}
-            out.append(_row(_set_of(r.get("doc")), d.get("model"), d.get("label", p.parent.name), d.get("at", ""),
-                            r["case"], sev, r.get("verdict")))
+            commits = [c for c in [r.get("commit"), *(d.get("commit") or [])] if c]
+            out.append(_row(_set_of(r.get("doc"), commits, d.get("at", "")), d.get("model"),
+                            d.get("label", p.parent.name), d.get("at", ""), r["case"], sev, r.get("verdict")))
     return out
 
 
@@ -111,16 +133,20 @@ def _external_rows(path: Path | None = None) -> list[dict]:
 
 def latest(rows: list[dict]) -> dict[tuple, list[dict]]:
     """(набор, модель) → строки последнего прогона."""
-    best: dict[tuple, str] = {}
+    def when(r: dict) -> tuple:
+        # «~0835» — прогоны open2/run.py без даты (вторая волна): старше любого прогона с полной датой
+        at = r["at"] or ""
+        return (0 if at.startswith("~") or not at else 1, at, r["label"])
+
+    best: dict[tuple, tuple] = {}
     for r in rows:
         k = (r["set"], r["model"])
-        key = (r["at"], r["label"])
-        if k not in best or key > best[k]:
-            best[k] = key
+        if k not in best or when(r) > best[k]:
+            best[k] = when(r)
     out: dict[tuple, list[dict]] = {}
     for r in rows:
         k = (r["set"], r["model"])
-        if (r["at"], r["label"]) == best[k]:
+        if when(r) == best[k]:
             out.setdefault(k, []).append(r)
     return out
 
