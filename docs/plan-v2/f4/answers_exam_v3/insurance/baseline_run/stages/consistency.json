@@ -1,0 +1,884 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 57.03,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 46,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Срок: месяцы в Ф-2 и дни в параметре term",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-06",
+          "R-33"
+        ],
+        "evidence": [
+          {
+            "quote": "Страховая премия равна сумме кредита × 0,15 % × срок кредита в месяцах.",
+            "line": 38,
+            "line_start": 38,
+            "line_end": 38,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "term | integer | 1–2 знака | Да | 6–60 | Срок кредита в днях | loan_term",
+            "line": 151,
+            "line_start": 151,
+            "line_end": 151,
+            "page": null,
+            "section": "Часть B. REST API › Параметры запроса › Request body",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-2 и «Request body: term» по-разному решают один случай — срок кредита: месяцы в Ф-2, дни в API. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Клиент выбирает срок 24 месяца, приложение шлёт term=24 в API. Ф-2: 24 — месяцы, премия 36 000 ₸. Request body: term: 24 — дни, срок вне смысла кредита, премия иная.",
+        "impact": "Неверная премия и ошибки интеграции приложения с API.",
+        "recommendation": "Указать в API срок в месяцах.",
+        "rewrite": "",
+        "question": "Что верно: «24 — месяцы, премия 36 000 ₸» (как в Ф-2) или «24 — дни, срок вне смысла кредита, премия иная» (как в «Request body: term»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-01"
+        ]
+      },
+      {
+        "title": "Возраст: 200 DECLINED в логике и 422 в статусах",
+        "kind": "status_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-23",
+          "R-44"
+        ],
+        "evidence": [
+          {
+            "quote": "Если он больше 65 лет, вернуть 200 со status = DECLINED и причиной.",
+            "line": 123,
+            "line_start": 123,
+            "line_end": 123,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          },
+          {
+            "quote": "422. Ответ в случае, если клиент не подходит по возрасту.",
+            "line": 170,
+            "line_start": 170,
+            "line_end": 170,
+            "page": null,
+            "section": "Часть B. REST API › Статусы",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«Логика работы метода, п. 4» и «Статус 422» по-разному решают один случай — код ответа при возрасте клиента свыше 65 лет. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Клиенту 61 год, срок 60 месяцев, окончание кредита в 66 лет, вызов метода. Логика работы метода, п. 4: HTTP 200 со status DECLINED и reason. Статус 422: HTTP 422 с сообщением об ошибке.",
+        "impact": "Приложение и тесты по-разному обрабатывают отказ по возрасту.",
+        "recommendation": "Выбрать один исход и убрать второй из логики или таблицы.",
+        "rewrite": "",
+        "question": "Отказ по возрасту — это 200 DECLINED или 422?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-02"
+        ]
+      },
+      {
+        "title": "Ф-4 повышает ставку, особое правило 3 запрещает менять условия",
+        "kind": "event_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-08",
+          "R-28"
+        ],
+        "evidence": [
+          {
+            "quote": "После отказа ставка по кредиту повышается до 27 % годовых со дня отказа.",
+            "line": 40,
+            "line_start": 40,
+            "line_end": 40,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Отказ от страхования не изменяет условия кредитного договора.",
+            "line": 130,
+            "line_start": 130,
+            "line_end": 130,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-4 и «Особые правила, п. 3» по-разному решают один случай — изменение условий кредита после отказа от страхования. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Клиент отказывается от страхования на 10-й день, ставка была 24 %. Ф-4: ставка становится 27 %. Особые правила, п. 3: условия договора, включая ставку, не меняются.",
+        "impact": "Неясно, пересчитывать ли график платежей после отказа.",
+        "recommendation": "Уточнить, что отказ меняет ставку, или убрать повышение.",
+        "rewrite": "",
+        "question": "Что верно: «ставка становится 27 %» (как в Ф-4) или «условия договора, включая ставку, не меняются» (как в «Особые правила, п. 3»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-03"
+        ]
+      },
+      {
+        "title": "Ф-4: полный возврат, приёмка: 90 % премии",
+        "kind": "boundary_conflict",
+        "criterion": "unambiguous",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-08",
+          "R-16"
+        ],
+        "evidence": [
+          {
+            "quote": "премия возвращается полностью на текущий счёт клиента в течение 7 рабочих дней",
+            "line": 40,
+            "line_start": 40,
+            "line_end": 40,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Возвращено 32 400 ₸ (90 % премии), ставка 27 % годовых",
+            "line": 66,
+            "line_start": 66,
+            "line_end": 66,
+            "page": null,
+            "section": "Часть A. Новый функционал › Критерии приемки",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-4 и «критерий приёмки, строка 2» по-разному решают один случай — сумма возврата премии при отказе на 10-й день. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Подключено 1 марта, премия 36 000 ₸, отказ 10 марта (в пределах 14 дней). Ф-4: возврат 36 000 ₸ полностью. Критерий приёмки, строка 2: возврат 32 400 ₸.",
+        "impact": "Клиент недополучит 3 600 ₸ или тест не пройдёт.",
+        "recommendation": "Привести приёмку или Ф-4 к одному правилу возврата.",
+        "rewrite": "",
+        "question": "Возврат при отказе в период охлаждения полный или 90 %?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-04"
+        ]
+      },
+      {
+        "title": "Не определено, с какого события идут 14 дней",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-08",
+          "R-25"
+        ],
+        "evidence": [
+          {
+            "quote": "в течение 14 календарных дней с даты подключения",
+            "line": 40,
+            "line_start": 40,
+            "line_end": 40,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Полис выпускается после выдачи кредита.",
+            "line": 125,
+            "line_start": 125,
+            "line_end": 125,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-4 и «Логика работы метода, п. 6» задают разные проверки, а один запрос может нарушить обе — момент начала 14 дней: подключение или выпуск полиса. Порядок проверок не задан, поэтому неясно, какой результат вернуть.",
+        "scenario": "Подключено в заявке 1 марта, кредит выдан 6 марта, полис выпущен 6 марта. Ф-4: срок отказа идёт с 1 марта, до 15 марта. Логика работы метода, п. 6: кнопка и полис есть только с 6 марта, срок неясен.",
+        "impact": "Разный срок отказа в реализации и тестах.",
+        "recommendation": "Зафиксировать событие: подключение, подпись или выдача.",
+        "rewrite": "",
+        "question": "Какая проверка идёт первой: по Ф-4 («срок отказа идёт с 1 марта, до 15 марта») или по «Логика работы метода, п. 6» («кнопка и полис есть только с 6 марта, срок неясен»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-05"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Страховая компания», «Клиентское приложение», «Компонент API»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "страховая компания-партнёр",
+            "line": 18,
+            "line_start": 18,
+            "line_end": 18,
+            "verified": "normalized"
+          },
+          {
+            "quote": "СК",
+            "line": 125,
+            "line_start": 125,
+            "line_end": 125,
+            "verified": "normalized"
+          },
+          {
+            "quote": "Мобильное приложение",
+            "line": 25,
+            "line_start": 25,
+            "line_end": 25,
+            "verified": "normalized"
+          },
+          {
+            "quote": "Мобильный банк",
+            "line": 14,
+            "line_start": 14,
+            "line_end": 14,
+            "verified": "normalized"
+          },
+          {
+            "quote": "API кредитов",
+            "line": 25,
+            "line_start": 25,
+            "line_end": 25,
+            "verified": "normalized"
+          },
+          {
+            "quote": "LoanInsuranceController",
+            "line": 134,
+            "line_start": 134,
+            "line_end": 134,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Страховая компания: «страховая компания-партнёр» (строка 18), «СК» (строка 125); Клиентское приложение: «Мобильное приложение» (строка 25), «Мобильный банк» (строка 14), «Приложение» (строка 45); Компонент API: «API кредитов» (строка 25), «LoanInsuranceController» (строка 134).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02",
+          "G-03"
+        ]
+      },
+      {
+        "title": "Метод отказа от страхования не описан в API",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-14",
+          "R-08",
+          "R-03"
+        ],
+        "evidence": [
+          {
+            "quote": "оформляет отказ через дочерний документ «Страхование жизни к кредиту наличными — REST API»",
+            "line": 54,
+            "line_start": 54,
+            "line_end": 54,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          },
+          {
+            "quote": "кнопка «Отказаться от страхования»",
+            "line": 29,
+            "line_start": 29,
+            "line_end": 29,
+            "page": null,
+            "section": "Часть A. Новый функционал › Дизайн процесса UI",
+            "verified": "exact"
+          },
+          {
+            "quote": "Подключение страхования жизни к заявке на кредит наличными",
+            "line": 106,
+            "line_start": 106,
+            "line_end": 106,
+            "page": null,
+            "section": "Часть B. REST API › Общие параметры",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Дочерний документ описывает только POST подключения, метода отказа и возврата нет.",
+        "scenario": "Клиент на 5-й день нажимает «Отказаться от страхования», вызывать нечего.",
+        "impact": "Ключевая цель — отказ в период охлаждения — не реализуется.",
+        "recommendation": "Описать метод отказа: URL, параметры, ответ, коды, возврат премии.",
+        "rewrite": "Добавить метод POST /loans/{loanId}/insurance/cancel: параметры, ответ, статусы 200/404/409 (срок истёк), <уточнить: прочие коды>.",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Экран «Страхование» показывает данные, которые ни один метод не отдаёт",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-03",
+          "R-13",
+          "R-19"
+        ],
+        "evidence": [
+          {
+            "quote": "«Страхование» → номер полиса, дата начала действия и кнопка",
+            "line": 29,
+            "line_start": 29,
+            "line_end": 29,
+            "page": null,
+            "section": "Часть A. Новый функционал › Дизайн процесса UI",
+            "verified": "exact"
+          },
+          {
+            "quote": "REST type | POST",
+            "line": 107,
+            "line_start": 107,
+            "line_end": 107,
+            "page": null,
+            "section": "Часть B. REST API › Общие параметры",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Описан только POST подключения, метода чтения полиса нет.",
+        "scenario": "После выдачи приложение открывает экран «Страхование».",
+        "impact": "Экран нельзя реализовать без неописанного метода.",
+        "recommendation": "Описать метод получения данных страхования по кредиту.",
+        "rewrite": "GET /loans/{loanId}/insurance возвращает номер полиса, дату начала, статус, премию.",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Анкета здоровья передаётся СК, но API её не принимает",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-13",
+          "R-25",
+          "R-32"
+        ],
+        "evidence": [
+          {
+            "quote": "ответы анкеты здоровья клиента",
+            "line": 51,
+            "line_start": 51,
+            "line_end": 51,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к данным",
+            "verified": "exact"
+          },
+          {
+            "quote": "-d '{\"amount\":1000000,\"term\":24}'",
+            "line": 112,
+            "line_start": 112,
+            "line_end": 112,
+            "page": null,
+            "section": "Часть B. REST API › Общие параметры",
+            "verified": "exact"
+          }
+        ],
+        "problem": "В запросе только amount и term, анкеты нет ни в UI, ни в API.",
+        "scenario": "Клиент подключает страхование, СК требует ответы анкеты.",
+        "impact": "Предварительная проверка СК не реализуема.",
+        "recommendation": "Добавить анкету в UI и тело запроса или убрать из данных.",
+        "rewrite": "Тело запроса содержит healthAnswers: <уточнить: состав и формат анкеты>.",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Связи сервиса страхования различаются в архитектуре и схемах",
+        "kind": "other",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-02",
+          "R-11",
+          "R-29"
+        ],
+        "evidence": [
+          {
+            "quote": "Кредитный конвейер → сервис страхования → страховая компания-партнёр.",
+            "line": 25,
+            "line_start": 25,
+            "line_end": 25,
+            "page": null,
+            "section": "Часть A. Новый функционал › Архитектура решения",
+            "verified": "exact"
+          },
+          {
+            "quote": "API кредитов → сервис страхования: рассчитать премию и проверить клиента.",
+            "line": 45,
+            "line_start": 45,
+            "line_end": 45,
+            "page": null,
+            "section": "Часть A. Новый функционал › Sequence Diagram",
+            "verified": "exact"
+          },
+          {
+            "quote": "Приложение → LoanInsuranceController → сервис страхования → СК",
+            "line": 134,
+            "line_start": 134,
+            "line_end": 134,
+            "page": null,
+            "section": "Часть B. REST API › Схема",
+            "verified": "exact"
+          }
+        ],
+        "problem": "В архитектуре API кредитов вызывает только конвейер, в sequence и API — напрямую сервис страхования.",
+        "scenario": "Разработчик строит интеграцию по архитектуре, а не по sequence.",
+        "impact": "Разные маршруты вызова и согласования с архитекторами.",
+        "recommendation": "Привести архитектуру к sequence или наоборот.",
+        "rewrite": "Мобильное приложение → API кредитов → сервис страхования → СК; кредитный конвейер → сервис страхования.",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "У требований нет приоритета и стабильности",
+        "kind": "missing_element",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-05",
+          "R-06",
+          "R-07",
+          "R-08",
+          "R-09",
+          "R-10"
+        ],
+        "evidence": [
+          {
+            "quote": "Ф-1. Страхование предлагается при оформлении кредита наличными",
+            "line": 37,
+            "line_start": 37,
+            "line_end": 37,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-1…Ф-6 без приоритета и признака важности.",
+        "scenario": "При нехватке времени неясно, что делать первым.",
+        "impact": "Спор о порядке реализации.",
+        "recommendation": "Добавить колонку приоритета и стабильности.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-06",
+        "b": "R-33",
+        "subject": "Срок кредита: месяцы в Ф-2, дни в API",
+        "same_subject": true,
+        "quote_a": "Страховая премия равна сумме кредита × 0,15 % × срок кредита в месяцах.",
+        "line_a": 38,
+        "quote_b": "term | integer | 1–2 знака | Да | 6–60 | Срок кредита в днях | loan_term",
+        "line_b": 151,
+        "scenario": "Клиент выбирает срок 24 месяца, приложение шлёт term=24 в API.",
+        "outcome_a": "24 — месяцы, премия 36 000 ₸.",
+        "outcome_b": "24 — дни, срок вне смысла кредита, премия иная.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "unit_mismatch",
+        "title": "Срок: месяцы в Ф-2 и дни в параметре term",
+        "impact": "Неверная премия и ошибки интеграции приложения с API.",
+        "recommendation": "Указать в API срок в месяцах.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      },
+      {
+        "a": "R-23",
+        "b": "R-44",
+        "subject": "Код ответа при возрасте клиента свыше 65 лет",
+        "same_subject": true,
+        "quote_a": "Если он больше 65 лет, вернуть 200 со status = DECLINED и причиной.",
+        "line_a": 123,
+        "quote_b": "422. Ответ в случае, если клиент не подходит по возрасту.",
+        "line_b": 170,
+        "scenario": "Клиенту 61 год, срок 60 месяцев, окончание кредита в 66 лет, вызов метода.",
+        "outcome_a": "HTTP 200 со status DECLINED и reason.",
+        "outcome_b": "HTTP 422 с сообщением об ошибке.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "same_condition",
+        "kind": "status_conflict",
+        "title": "Возраст: 200 DECLINED в логике и 422 в статусах",
+        "impact": "Приложение и тесты по-разному обрабатывают отказ по возрасту.",
+        "recommendation": "Выбрать один исход и убрать второй из логики или таблицы.",
+        "question": "Отказ по возрасту — это 200 DECLINED или 422?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-02"
+      },
+      {
+        "a": "R-08",
+        "b": "R-28",
+        "subject": "Изменение условий кредита после отказа от страхования",
+        "same_subject": true,
+        "quote_a": "После отказа ставка по кредиту повышается до 27 % годовых со дня отказа.",
+        "line_a": 40,
+        "quote_b": "Отказ от страхования не изменяет условия кредитного договора.",
+        "line_b": 130,
+        "scenario": "Клиент отказывается от страхования на 10-й день, ставка была 24 %.",
+        "outcome_a": "Ставка становится 27 %.",
+        "outcome_b": "Условия договора, включая ставку, не меняются.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "same_condition",
+        "kind": "event_conflict",
+        "title": "Ф-4 повышает ставку, особое правило 3 запрещает менять условия",
+        "impact": "Неясно, пересчитывать ли график платежей после отказа.",
+        "recommendation": "Уточнить, что отказ меняет ставку, или убрать повышение.",
+        "question": "Меняется ли ставка кредита после отказа?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-03"
+      },
+      {
+        "a": "R-08",
+        "b": "R-16",
+        "subject": "Сумма возврата премии при отказе на 10-й день",
+        "same_subject": true,
+        "quote_a": "премия возвращается полностью на текущий счёт клиента в течение 7 рабочих дней",
+        "line_a": 40,
+        "quote_b": "Возвращено 32 400 ₸ (90 % премии), ставка 27 % годовых",
+        "line_b": 66,
+        "scenario": "Подключено 1 марта, премия 36 000 ₸, отказ 10 марта (в пределах 14 дней).",
+        "outcome_a": "Возврат 36 000 ₸ полностью.",
+        "outcome_b": "Возврат 32 400 ₸.",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "boundary_conflict",
+        "title": "Ф-4: полный возврат, приёмка: 90 % премии",
+        "impact": "Клиент недополучит 3 600 ₸ или тест не пройдёт.",
+        "recommendation": "Привести приёмку или Ф-4 к одному правилу возврата.",
+        "question": "Возврат при отказе в период охлаждения полный или 90 %?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-04"
+      },
+      {
+        "a": "R-08",
+        "b": "R-25",
+        "subject": "Момент начала 14 дней: подключение или выпуск полиса",
+        "same_subject": true,
+        "quote_a": "в течение 14 календарных дней с даты подключения",
+        "line_a": 40,
+        "quote_b": "Полис выпускается после выдачи кредита.",
+        "line_b": 125,
+        "scenario": "Подключено в заявке 1 марта, кредит выдан 6 марта, полис выпущен 6 марта.",
+        "outcome_a": "Срок отказа идёт с 1 марта, до 15 марта.",
+        "outcome_b": "Кнопка и полис есть только с 6 марта, срок неясен.",
+        "one_condition": false,
+        "verdict": "undefined",
+        "basis": "none",
+        "kind": "ambiguity",
+        "title": "Не определено, с какого события идут 14 дней",
+        "impact": "Разный срок отказа в реализации и тестах.",
+        "recommendation": "Зафиксировать событие: подключение, подпись или выдача.",
+        "question": "С какого события отсчитываются 14 дней?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-05"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-05",
+        "verified_by": [
+          "R-15"
+        ],
+        "implemented_by": [
+          "R-22",
+          "R-32"
+        ],
+        "note": "нет критерия на границы суммы и срока"
+      },
+      {
+        "requirement_id": "R-06",
+        "verified_by": [
+          "R-15"
+        ],
+        "implemented_by": [
+          "R-24",
+          "R-33"
+        ],
+        "note": "противоречие: Request body: term; единица срока в API расходится",
+        "conflicts_with": [
+          "R-33"
+        ]
+      },
+      {
+        "requirement_id": "R-07",
+        "verified_by": [
+          "R-15",
+          "R-16"
+        ],
+        "implemented_by": [
+          "R-37"
+        ],
+        "note": "ставка после отказа нигде не реализована"
+      },
+      {
+        "requirement_id": "R-08",
+        "verified_by": [
+          "R-16"
+        ],
+        "implemented_by": [],
+        "note": "противоречие: критерий приёмки, строка 2; нет метода отказа; приёмка расходится",
+        "conflicts_with": [
+          "R-28",
+          "R-16"
+        ]
+      },
+      {
+        "requirement_id": "R-09",
+        "verified_by": [
+          "R-18"
+        ],
+        "implemented_by": [],
+        "note": "нет метода или события погашения"
+      },
+      {
+        "requirement_id": "R-10",
+        "verified_by": [
+          "R-17"
+        ],
+        "implemented_by": [
+          "R-23",
+          "R-44"
+        ],
+        "note": "нет проверки возраста 18 лет"
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "нет измеримых значений и критериев"
+      },
+      {
+        "requirement_id": "R-13",
+        "verified_by": [],
+        "implemented_by": [
+          "R-35",
+          "R-36"
+        ],
+        "note": "нет полей дат отказа и возврата"
+      },
+      {
+        "requirement_id": "R-14",
+        "verified_by": [],
+        "implemented_by": [
+          "R-19"
+        ],
+        "note": "описан только метод подключения"
+      },
+      {
+        "requirement_id": "R-20",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-21",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-22",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-23",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "противоречие: Статус 422; трассировка не построена",
+        "conflicts_with": [
+          "R-44"
+        ]
+      },
+      {
+        "requirement_id": "R-24",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-25",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "трассировка не построена"
+      },
+      {
+        "requirement_id": "R-26",
+        "verified_by": [],
+        "implemented_by": [
+          "R-19"
+        ],
+        "note": "нет критерия приёмки на повтор"
+      },
+      {
+        "requirement_id": "R-27",
+        "verified_by": [],
+        "implemented_by": [
+          "R-19"
+        ],
+        "note": "нет критерия на пересчёт"
+      },
+      {
+        "requirement_id": "R-28",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "противоречие: Ф-4",
+        "conflicts_with": [
+          "R-08"
+        ]
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Страховая компания",
+        "terms": [
+          {
+            "term": "страховая компания-партнёр",
+            "line": 18
+          },
+          {
+            "term": "СК",
+            "line": 125
+          }
+        ],
+        "problem": "Аббревиатура не расшифрована, мешает поиску.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Клиентское приложение",
+        "terms": [
+          {
+            "term": "Мобильное приложение",
+            "line": 25
+          },
+          {
+            "term": "Мобильный банк",
+            "line": 14
+          },
+          {
+            "term": "Приложение",
+            "line": 45
+          }
+        ],
+        "problem": "Три названия одного клиентского канала.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-03",
+        "concept": "Компонент API",
+        "terms": [
+          {
+            "term": "API кредитов",
+            "line": 25
+          },
+          {
+            "term": "LoanInsuranceController",
+            "line": 134
+          }
+        ],
+        "problem": "Не сказано, один ли это компонент.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Единица срока кредита (term)",
+        "places": [
+          "R-06",
+          "R-33",
+          "R-05"
+        ]
+      },
+      {
+        "subject": "Исход при возрасте свыше 65 лет",
+        "places": [
+          "R-23",
+          "R-44",
+          "R-10"
+        ]
+      },
+      {
+        "subject": "Ставка после отказа от страхования",
+        "places": [
+          "R-08",
+          "R-28"
+        ]
+      },
+      {
+        "subject": "Сумма возврата при отказе",
+        "places": [
+          "R-08",
+          "R-16"
+        ]
+      },
+      {
+        "subject": "Дата подключения и выпуск полиса",
+        "places": [
+          "R-08",
+          "R-25",
+          "R-03"
+        ]
+      },
+      {
+        "subject": "Связь API кредитов и сервиса страхования",
+        "places": [
+          "R-02",
+          "R-11",
+          "R-29"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}
