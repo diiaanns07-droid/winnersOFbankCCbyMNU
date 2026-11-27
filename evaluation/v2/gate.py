@@ -323,9 +323,10 @@ def _recall_owners(d: dict) -> str:
 
 
 def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
-                 d_rec: dict | None = None) -> list[dict]:
+                 d_rec: dict | None = None, line_commit: str | None = None) -> list[dict]:
     """Ворота корпуса. Чистые — по последнему прогону `d`; recall и F1 — по последнему прогону с дефектами
-    `d_rec` (если не передан — тот же `d`; прогон без дефектов даёт ⏳, а не F1 = 0)."""
+    `d_rec` (если не передан — тот же `d`; прогон без дефектов даёт ⏳, а не F1 = 0). `line_commit` — код ворот:
+    по нему выбирается прогон правил без модели в строке F1."""
     if not d:
         return [_check(f"{title}: замер", "есть", "нет замера", None, missing_owner)]
     c = d["clean"]
@@ -348,7 +349,7 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
                           None if f1 is None else f1 >= t["f1"],
                           ((_recall_owners(d_rec) + "; " if rec is not None and rec < 0.9 else "")
                            + "ложные на мутантах и чистых → " + _clean_owners(d_rec) + _background_note(d_rec)
-                           + _rules_only_note()) if h
+                           + _rules_only_note(line_commit)) if h
                           else f"{missing_owner}: нет прогона корпуса с дефектами"))
         out[-1]["_src"] = rec_src
     if "clean_max_findings" in t:
@@ -375,25 +376,46 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
     return out
 
 
-def _rules_only_note() -> str:
-    """«; правила без модели (3e7133c): TP 27, FP 0, F1 0.98» — последний прогон корпуса `--provider offline`: что
-    находят одни правила. Если у них столько же верных, а ложных нет, — все ложные полного прогона от этапов модели."""
-    best = None
+def _rules_only_note(line_commit: str | None = None) -> str:
+    """«; правила без модели (3e7133c): TP 27, FP 0, F1 0.98» — прогон корпуса `--provider offline`: что находят одни
+    правила. Если у них столько же верных, а ложных нет, — все ложные полного прогона от этапов модели.
+
+    `line_commit` — код ворот (последний официальный прогон): берётся прогон правил на том же коде (`code_tree`), а
+    более новый на другом коде (например, ветка следующего выпуска) — отдельно, с его SHA, чтобы ворота одной линии не
+    показывали цифры другой. Без `line_commit` или без прогона на этом коде — последний прогон."""
+    runs = []
     for p in (V2 / "corpus_results").glob("*/summary.json"):
         try:
             d = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if d.get("provider") != "offline" or not (d.get("harness") or {}).get("support"):
-            continue
-        if not best or d.get("at", "") > best.get("at", ""):
-            best = d
-    if not best:
+        if d.get("provider") == "offline" and (d.get("harness") or {}).get("support"):
+            runs.append(d)
+    if not runs:
         return ""
-    h = best["harness"]
-    codes = _SHA.findall(str(best.get("label") or ""))
-    return (f"; правила без модели{f' ({codes[0]})' if codes else ''}: TP {h.get('tp')}, FP {h.get('fp')}, "
-            f"F1 {h.get('f1') or 0:.2f} — ложные добавляют этапы модели")
+    runs.sort(key=lambda d: d.get("at", ""))
+
+    def commit(d: dict) -> str | None:
+        c = d.get("commit")
+        return (c[0] if c else None) if isinstance(c, list) else c
+
+    def code(d: dict) -> str:
+        codes = _SHA.findall(str(d.get("label") or ""))
+        return codes[0] if codes else str(commit(d) or "")[:7]
+
+    def nums(d: dict) -> str:
+        h = d["harness"]
+        return f"TP {h.get('tp')}, FP {h.get('fp')}, F1 {h.get('f1') or 0:.2f}"
+
+    tree = code_tree(line_commit)
+    same = [d for d in runs if tree and code_tree(commit(d)) == tree]
+    best = same[-1] if same else runs[-1]
+    other = [d for d in runs if d.get("at", "") > best.get("at", "") and code_tree(commit(d)) != code_tree(commit(best))]
+    extra = ""
+    if other and nums(other[-1]) != nums(best):
+        extra = f"; на другом коде ({code(other[-1])}): {nums(other[-1])}"
+    c = code(best)
+    return f"; правила без модели{f' ({c})' if c else ''}: {nums(best)}{extra} — ложные добавляют этапы модели"
 
 
 def _background_note(d: dict) -> str:
@@ -588,8 +610,9 @@ def collect(runs: list[str] | None = None, with_tests: bool = False) -> list[dic
             continue
         checks += official_gates(kind, latest.get(kind), gold, same_code_rows(rows, kind, latest.get(kind)))
     checks += stability_gates(gold)
+    line = (latest.get("sonnet") or latest.get("haiku") or {}).get("commit")
     checks += corpus_gates("Корпус, haiku", _latest_summary(V2 / "corpus_results", "haiku"), CORPUS, "№15",
-                           _latest_summary(V2 / "corpus_results", "haiku", with_defects=True))
+                           _latest_summary(V2 / "corpus_results", "haiku", with_defects=True), line)
     for kind in ("sonnet", "haiku", "gemini"):
         d = _latest_newtz(kind, clean_only=False)
         if d or kind == "sonnet":

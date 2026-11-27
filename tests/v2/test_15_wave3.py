@@ -762,6 +762,27 @@ def test_gate_corpus_f1_notes_rules_only_run(tmp_path, monkeypatch):
     assert gate._rules_only_note() == "; правила без модели (3e7133c): TP 27, FP 0, F1 0.98 — ложные добавляют этапы модели"
 
 
+def test_gate_rules_only_note_follows_gate_code(tmp_path, monkeypatch):
+    """Строка «правила без модели» — с прогона на коде ворот (последний официальный); более новый прогон на другом
+    коде (ветка следующего выпуска) не подменяет его, а идёт отдельно со своим SHA."""
+    import json as _json
+
+    for name, at, commit, label, tp, fn, f1 in (
+            ("line", "2026-11-27 18:51", ["669876f7"], "v2 офлайн-правила (3e7133c)", 27, 1, 0.98),
+            ("next", "2026-11-27 19:20", ["5411a15"], "v2.1 офлайн-правила (5411a15)", 28, 0, 1.0)):
+        d = tmp_path / "corpus_results" / name
+        d.mkdir(parents=True)
+        (d / "summary.json").write_text(_json.dumps({"label": label, "provider": "offline", "at": at, "commit": commit,
+                                                     "harness": {"tp": tp, "fp": 0, "fn": fn, "support": 28, "f1": f1}}),
+                                        encoding="utf-8")
+    monkeypatch.setattr(gate, "V2", tmp_path)
+    monkeypatch.setattr(gate, "code_tree", lambda c: {"3e7133c2": "T1", "669876f7": "T1", "5411a15": "T2"}.get(c))
+    assert gate._rules_only_note("3e7133c2") == ("; правила без модели (3e7133c): TP 27, FP 0, F1 0.98; на другом коде "
+                                                 "(5411a15): TP 28, FP 0, F1 1.00 — ложные добавляют этапы модели")
+    assert gate._rules_only_note("5411a15") == "; правила без модели (5411a15): TP 28, FP 0, F1 1.00 — ложные добавляют этапы модели"
+    assert gate._rules_only_note() == "; правила без модели (5411a15): TP 28, FP 0, F1 1.00 — ложные добавляют этапы модели"
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final
