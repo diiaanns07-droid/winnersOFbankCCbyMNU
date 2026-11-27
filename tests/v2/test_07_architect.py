@@ -127,9 +127,9 @@ def test_schema_can_wrap_external_candidate_schema():
 
 def test_critical_without_scenario_or_blocks_is_downgraded():
     out = la.postprocess({"candidates": [
-        _cand(severity="critical", scenario="", evidence=[{"quote": "a", "line": 1}]),
-        _cand(severity="critical", blocks="none", evidence=[{"quote": "b", "line": 2}]),
-        _cand(severity="critical", evidence=[{"quote": "c", "line": 3}]),
+        _cand(severity="critical", kind="status_conflict", scenario="", evidence=[{"quote": "a", "line": 1}]),
+        _cand(severity="critical", kind="status_conflict", blocks="none", evidence=[{"quote": "b", "line": 2}]),
+        _cand(severity="critical", kind="status_conflict", evidence=[{"quote": "c", "line": 3}]),
     ]})
     assert [c["severity"] for c in out["candidates"]] == ["critical", "major", "major"]
 
@@ -139,7 +139,7 @@ def test_order_dedupe_limit_and_evidence_filter():
     cands += [_cand(evidence=[{"quote": f"q{i}", "line": i}]) for i in range(1, 17)]
     cands += [_cand(evidence=[{"quote": "dup", "line": 3}])]          # дубль по виду и строкам
     cands += [_cand(evidence=[])]                                      # без цитаты
-    cands += [_cand(severity="critical", evidence=[{"quote": "k", "line": 99}])]
+    cands += [_cand(severity="critical", kind="status_conflict", evidence=[{"quote": "k", "line": 99}])]
     out = la.postprocess({"candidates": cands})["candidates"]
     assert len(out) == la.MAX_CANDIDATES
     assert out[0]["severity"] == "critical"
@@ -232,3 +232,12 @@ def test_critical_missing_operation_needs_explicit_interface_promise():
         assert out["severity"] == "critical", ev
     other = dict(base, kind="status_conflict")
     assert la.postprocess({"candidates": [_cand(evidence=[screen], **other)]})["candidates"][0]["severity"] == "critical"
+
+
+def test_critical_only_for_lens_scale_kinds():
+    base = dict(severity="critical", scenario="s", impact="i", blocks="both",
+                evidence=[{"quote": "Приложение читает данные методом getX", "line": 3}])
+    sev = {k: la.postprocess({"candidates": [_cand(kind=k, **base)]})["candidates"][0]["severity"]
+           for k in ("missing_element", "status_conflict", "contradiction", "unit_mismatch", "incomplete")}
+    assert sev == {"missing_element": "critical", "status_conflict": "critical", "contradiction": "major",
+                   "unit_mismatch": "major", "incomplete": "major"}

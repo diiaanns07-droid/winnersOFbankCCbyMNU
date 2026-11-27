@@ -105,6 +105,12 @@ PROMISE_MARK = re.compile(r"дочерн\w* документ|метод|descript
                           r"→[^:.]{1,60}:", re.I)
 
 
+# Шкала линзы (промпт, «Серьёзность»): critical — только обещанная, но не описанная операция или код ответа
+# (missing_element) и успех против ошибки для одного входа (status_conflict). Замер волны 3: critical других видов
+# (contradiction, unit_mismatch) из линзы — 7 из 16 на чистых ТЗ №18, остальные — конфликты правил зоны №09.
+CRITICAL_KINDS = {"missing_element", "status_conflict"}
+
+
 def unpromised_critical(c: dict) -> bool:
     """critical «нет операции», ни одна цитата которого не содержит явного обещания интерфейса и кода ответа.
 
@@ -135,6 +141,8 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
                                             or not str(c.get("impact") or "").strip()
                                             or c.get("blocks") in (None, "", "none")):
             c["severity"] = "major"
+        if c["severity"] == "critical" and c.get("kind") not in CRITICAL_KINDS:
+            c["severity"] = "major"  # шкала линзы: противоречия правил и единицы — major (их critical — набор №09)
         if unpromised_critical(c):
             c["severity"] = "major"
         if requirement_ids is not None:
