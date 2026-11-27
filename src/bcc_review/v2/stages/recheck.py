@@ -364,6 +364,10 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             prev["answer"] = " / ".join(f"{r['label']}: {r['text']}" for r in prev["replies"])
             prev["choice"] = prev["choice"] if prev["choice"] == label else ""
             prev["deferred"] = prev["deferred"] + deferred
+            # адресаты выбрали разные варианты одного вопроса — это конфликт по построению вариантов, без модели
+            letters = {r["choice"] for r in prev["replies"] if r["choice"]}
+            if len(letters) > 1:
+                prev["choice_conflict"] = [r["label"] for r in prev["replies"] if r["choice"]]
             warnings.append(f"recheck: на {q['id']} несколько ответов ({len(prev['replies'])}) — сверяются при пересмотре")
             continue
         answered[q["id"]] = {"question_id": q["id"], "topic": q.get("topic", ""), "question": q.get("question", ""),
@@ -684,7 +688,29 @@ def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", sl
     return ""
 
 
+def _force_choice_conflicts(result: dict) -> None:
+    """Разные буквы вариантов на один вопрос — дефекты вопроса остаются open с ``answer_conflict``,
+    что бы ни решила модель: варианты вопроса взаимоисключающие, владелец должен выбрать один."""
+    for a in result["answers"]["answered"]:
+        clash = a.get("choice_conflict") or []
+        if len(clash) < 2:
+            continue
+        for g in result["findings"]:
+            if g.get("id") not in a["finding_ids"]:
+                continue
+            rc = g["recheck"]
+            rc["affected"] = True
+            rc["answer_conflict"] = list(dict.fromkeys(list(rc.get("answer_conflict") or []) + clash))
+            if rc["status"] != "open" or "противореч" not in rc["reason"]:
+                rc["status"], rc["severity_after"] = "open", g.get("severity")
+                rc.pop("answer_ids", None)
+                rc.pop("title_after", None)
+                rc.pop("problem_after", None)
+                rc["reason"] = f"ответы {' и '.join(clash)} выбирают разные варианты одного вопроса — выберите один"
+
+
 def _finish(ctx: Any, result: dict) -> dict:
+    _force_choice_conflicts(result)
     for w in result.get("warnings", []):
         _cl._warn(ctx, w)
     return result

@@ -146,3 +146,29 @@ def test_partial_answer_keeps_rule_and_marks_deferred_part():
 def test_rules_with_similar_words_are_answers(rule):
     body, deferred = recheck.split_deferred(rule)
     assert body == rule and deferred == []
+
+
+# --------------------------------------------------------------------------- разные буквы у адресатов
+LETTERS = "Q-03 [Срок хранения идентификатора запроса]: A\nQ-03 [Срок хранения идентификатора запроса]: B\n"
+
+
+@pytest.mark.parametrize("model_status", ["resolved", "open"])
+def test_different_letters_are_conflict_without_model_opinion(model_status):
+    resp = _resp([{"finding_id": "D-03", "status": model_status, "by": ["Q-03"] if model_status != "open" else [],
+                   "reason": "выбран срок"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), LETTERS)["clarification"]
+    ch = next(c for c in clar["changes"] if c["finding_id"] == "D-03")
+    assert ch["status"] == "open" and ch["answer_conflict"] == ["Q-03.1", "Q-03.2"]
+    assert clar["answer_conflicts"][0]["answers"] == ["Q-03.1", "Q-03.2"]
+
+
+def test_different_letters_conflict_when_model_fails():
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(exc=RuntimeError("нет сети"))), _report(), LETTERS)["clarification"]
+    ch = next(c for c in clar["changes"] if c["finding_id"] == "D-03")
+    assert ch["status"] == "open" and ch["answer_conflict"] == ["Q-03.1", "Q-03.2"]
+
+
+def test_same_letter_twice_is_one_reply():
+    text = "Q-03: B\nQ-03: B\n"
+    a = recheck.resolve_answers(QS, recheck.load_answers(text))["answered"][0]
+    assert len(a["replies"]) == 1 and not a.get("choice_conflict")
