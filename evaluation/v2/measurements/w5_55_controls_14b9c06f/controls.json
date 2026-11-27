@@ -1,0 +1,208 @@
+{
+  "исходный_коммит": "973ce4d746b87e9355eb8c130909424ef2aa2f89",
+  "коммит_правки": "14b9c06f3956cdfad1966153c4afdb7f86450381",
+  "офлайн_без_LLM": [
+    {
+      "case": "capital_v2",
+      "input_sha256": "ff27cc133bdb5209d9392ddc712ba616905206538a3d18c1fcf42f56d590a760",
+      "jury-A": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      },
+      "fix": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      }
+    },
+    {
+      "case": "fx",
+      "input_sha256": "799b8696893a03b07f0a7993340ab324a0166fda62f4b227464f1650fdaf0d83",
+      "jury-A": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      },
+      "fix": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      }
+    },
+    {
+      "case": "grace_v2",
+      "input_sha256": "0b7d50146598e1122c47cf2c9df8a49efc458eb36a3122c6b4cb6640b2d590af",
+      "jury-A": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      },
+      "fix": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      }
+    },
+    {
+      "case": "insurance_v2",
+      "input_sha256": "c4468d556c821968f0f303a77f41e22118e877aa3e914c4cecb2b43e62207708",
+      "jury-A": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      },
+      "fix": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      }
+    },
+    {
+      "case": "qr_v2",
+      "input_sha256": "b28ee44494c76f571bcb3a9973052af55cd6029960df61c065d414265b5a13f2",
+      "jury-A": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      },
+      "fix": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      }
+    },
+    {
+      "case": "repay",
+      "input_sha256": "9dd9436071ff21e10587fca71a2516722aed5d271805a220ee66c239ba9bf94d",
+      "jury-A": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      },
+      "fix": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      }
+    },
+    {
+      "case": "roundup",
+      "input_sha256": "25177b791f7b4d85bee3eaa2f28fe311d8731a63677eafcc48ab704a726ea480",
+      "jury-A": {
+        "exit": 0,
+        "count": 1,
+        "critical": 0,
+        "severity": [
+          "minor"
+        ]
+      },
+      "fix": {
+        "exit": 0,
+        "count": 1,
+        "critical": 0,
+        "severity": [
+          "minor"
+        ]
+      }
+    },
+    {
+      "case": "statement",
+      "input_sha256": "b00162f6c787b20dbc80596556e1bd9d81a5bd4b5ea3fed14b99f0ca90d14688",
+      "jury-A": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      },
+      "fix": {
+        "exit": 0,
+        "count": 0,
+        "critical": 0,
+        "severity": []
+      }
+    }
+  ],
+  "воспроизведение_429": [
+    {
+      "source": "jury-A",
+      "kind": "локальное воспроизведение с тестовым транспортом",
+      "window_s": 2,
+      "trials": [
+        {
+          "outputs": [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash-lite"
+          ],
+          "seconds": 2.5,
+          "calls": 4,
+          "daily_errors": 2
+        },
+        {
+          "outputs": [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash-lite"
+          ],
+          "seconds": 2.5,
+          "calls": 4,
+          "daily_errors": 2
+        },
+        {
+          "outputs": [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash-lite"
+          ],
+          "seconds": 2.5,
+          "calls": 4,
+          "daily_errors": 2
+        }
+      ]
+    },
+    {
+      "source": "fix",
+      "kind": "локальное воспроизведение с тестовым транспортом",
+      "window_s": 2,
+      "trials": [
+        {
+          "outputs": [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash-lite"
+          ],
+          "seconds": 0.0,
+          "calls": 3,
+          "daily_errors": 1
+        },
+        {
+          "outputs": [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash-lite"
+          ],
+          "seconds": 0.0,
+          "calls": 3,
+          "daily_errors": 1
+        },
+        {
+          "outputs": [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash-lite"
+          ],
+          "seconds": 0.0,
+          "calls": 3,
+          "daily_errors": 1
+        }
+      ]
+    }
+  ]
+}
