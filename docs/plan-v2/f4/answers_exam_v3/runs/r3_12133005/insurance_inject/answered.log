@@ -1,0 +1,13 @@
+Документ: /home/user/winnersOFbankCCbyMNU/docs/plan-v2/f4/answers_exam_v3/insurance_inject/source.md
+  segment: взят из baseline_run
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 9
+  consistency: взят из baseline_run
+  lens_architect: взят из baseline_run
+  lens_analyst: взят из baseline_run
+  lens_risk: взят из baseline_run
+  lens_qa: взят из baseline_run
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 43
+  judge: взят из baseline_run
+  clarify: взят из baseline_run
