@@ -1,0 +1,6645 @@
+{
+  "label": "W4-07 после заморозки: 28fe64f, haiku",
+  "at": "2026-11-27 16:50",
+  "harness": {
+    "tp": 27,
+    "fp": 202,
+    "fn": 1,
+    "duplicates": 0,
+    "precision": 0.11790393013100436,
+    "recall": 0.9642857142857143,
+    "f1": 0.21011673151750973,
+    "precision_strict": 0.11790393013100436,
+    "support": 28,
+    "predicted": 229,
+    "clean_false_alarms": 50,
+    "fp_background": 15,
+    "tp_parent_level": 8,
+    "pending_adjudication": 8
+  },
+  "per_issue_type": {
+    "ambiguity": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 31,
+      "recall": null
+    },
+    "api_contract": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 9,
+      "recall": null
+    },
+    "boundary_conflict": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "recall": 1.0
+    },
+    "contradiction": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 13,
+      "recall": null
+    },
+    "duplicate": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 3,
+      "recall": null
+    },
+    "event_conflict": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 1,
+      "recall": 1.0
+    },
+    "incomplete": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 58,
+      "recall": null
+    },
+    "missing_element": {
+      "tp": 6,
+      "fn": 0,
+      "fp": 36,
+      "recall": 1.0
+    },
+    "other": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 18,
+      "recall": null
+    },
+    "status_conflict": {
+      "tp": 5,
+      "fn": 1,
+      "fp": 0,
+      "recall": 0.8333333333333334
+    },
+    "terminology": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 30,
+      "recall": null
+    },
+    "traceability": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 2,
+      "recall": null
+    },
+    "unit_mismatch": {
+      "tp": 6,
+      "fn": 0,
+      "fp": 0,
+      "recall": 1.0
+    },
+    "unverifiable": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 1,
+      "recall": null
+    }
+  },
+  "missing_measurements": 0,
+  "not_run": 0,
+  "cases": 33,
+  "failed": 0,
+  "clean": {
+    "n": 8,
+    "measured": 8,
+    "findings": 50,
+    "critical": 0,
+    "major": 4,
+    "docs_with_critical": 0,
+    "docs_over_1_major": 1,
+    "docs_over_1_finding": 8,
+    "max_findings": 9,
+    "verdict_no": 0
+  },
+  "time": {
+    "total_s": 3751.2,
+    "calls": 244,
+    "cost_usd": 1.643
+  },
+  "details": {
+    "fp": [
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы по-разному, глоссария не задан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "АП-5 и АП-6: неясно, входит ли отклонённая попытка в лимит трёх",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Функциональные требования АП-1…АП-7 и НФ-1 не имеют приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают малую часть функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-01",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «не опускается ниже порога» не согласуется с лимитом и НФ-1",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.base",
+        "clean": true,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Сброс суточного счётчика при пересоздании настройки не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Проверка валюты карты KZT отсутствует в логике createAutopay",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают малую часть требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Повтор события после отказа по нехватке средств не определён",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель обещает неснижение баланса, которое требования не гарантируют",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Функциональные и нефункциональные требования без приоритета",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Изменение порога или суммы настройки не описано",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы разными словами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Проверка карты KZT из АП-1 отсутствует в логике createAutopay",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Один и тот же объект назван разными терминами; глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Учёт отказанных по нехватке средств попыток в лимит трёх неясен",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "clean": false,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "traceability",
+        "title": "Требования и пункты документа без ID и приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают не все функциональные требования",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель обещает порог без исключений, которые допускают правила",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Приоритеты требований АП-1…АП-8 и НФ-1 не указаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Тело успешного ответа createAutopay не описано, хотя таблица ссылается",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни понятия названы разными терминами, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Не определено, к какому времени относить лимит: уведомление или пополнение",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «баланс не ниже порога» расходится с правилами АП-6, АП-5",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "АП-8: долг по кредитному пополнению не входит в перечень данных",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Лимит трёх пополнений в сутки: счётчик по номеру или карте",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Проверка карты в KZT из АП-1 отсутствует в логике createAutopay",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приёмка проверяет 3 из 9 функциональных требований, границы не покрыты",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.paraphrase.nfr",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки не покрывают границы, ошибки и повторы",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.paraphrase.nfr",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "АП-1 и логика п. 3 расходятся по повторной настройке номера",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.paraphrase.nfr",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Изменение порога и суммы настройки не описано",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.paraphrase.nfr",
+        "clean": true,
+        "id": "D-01",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Пункты требований не имеют приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.paraphrase.nfr",
+        "clean": true,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Неудачная попытка не учтена: считается ли она в лимите АП-5",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.paraphrase.nfr",
+        "clean": true,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни понятия названы разными терминами, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.range_boundary.trigger_at_threshold",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "api_contract",
+        "title": "Тело успешного ответа createAutopay не описано, хотя таблица отсылает к методу",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.range_boundary.trigger_at_threshold",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Пункты требований без ID и приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.range_boundary.trigger_at_threshold",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают малую часть требований и кодов",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.range_boundary.trigger_at_threshold",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «баланс не ниже порога» не достижима по АП-5 и АП-6",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.range_boundary.trigger_at_threshold",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одна и та же сущность названа разными терминами, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.range_boundary.trigger_at_threshold",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Изменение порога и судьба счётчика за сутки не описаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Счётчик пополнений при удалении и повторном создании не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель о неизменном балансе расходится с лимитом и отказами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы в документе разными терминами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Проверка валюты карты KZT не описана в логике createAutopay",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают 2 из 8 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Требования не имеют приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Отказ при нехватке средств: засчитывается ли в лимит трёх пополнений",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Недостаточно средств: не определено, учитываются ли холды карты",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "autopay.two_statuses.range_422",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Тело успешного ответа createAutopay не описано, хотя обещано",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.unit_change.limit_per_hour",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают три из одиннадцати функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "autopay.unit_change.limit_per_hour",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы по-разному, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.unit_change.limit_per_hour",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "У пунктов требований нет ID и приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.unit_change.limit_per_hour",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Не определено, может ли номер иметь настройки по нескольким картам",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.unit_change.limit_per_hour",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Проверка валюты карты KZT отсутствует в логике createAutopay",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "autopay.unit_change.limit_per_hour",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «не опускается ниже порога» не достигается правилами АП-5, АП-6",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "autopay.unit_change.limit_per_hour",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Тело успешного ответа createAutopay не описано",
+        "sources": [
+          "consistency",
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Пустое тело blockCard при Content-Type application/json не определено",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Приоритеты функциональных требований БК-1…БК-7 не указаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки не покрывают разблокировку, push и ошибки 400–409",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-01",
+        "severity": "major",
+        "kind": "event_conflict",
+        "title": "Момент вступления блокировки не задан: исход авторизации в окне 10 с",
+        "sources": [
+          "lens:analyst",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Один объект назван по-разному: «Мобильный банк» и «Приложение»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.base",
+        "clean": true,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "api_contract",
+        "title": "Ответ getCardStatus для ACTIVE и бессрочной блокировки не задан",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Один продукт назван «Мобильный банк» и «приложение»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Таблица кодов 409 не отражает исключение для повторной блокировки",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки не покрывают разблокировку, ошибки и повторы",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+        "clean": false,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Требования БК-1…БК-7 и критерии без приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.drop_promised.no_last_digits",
+        "clean": false,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни понятия названы в документе разными терминами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.drop_promised.no_last_digits",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Функциональные требования БК-1…БК-7 без приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.drop_promised.no_last_digits",
+        "clean": false,
+        "id": "D-01",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Момент вступления блокировки не определён: авторизации в окне 10 с",
+        "sources": [
+          "lens:analyst",
+          "lens:risk",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05",
+          "№08",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.drop_promised.no_last_digits",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Значение days в getCardStatus для бессрочной блокировки не задано",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.drop_promised.no_last_digits",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Коды 400 и 409 для одного запроса без порядка проверок",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.drop_promised.no_last_digits",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Срок блокировки в сутках не привязан к началу и концу отсчёта",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.drop_promised.no_last_digits",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают три строки из семи требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Тело getCardStatus для статуса ACTIVE не описано",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "БК-5 не измерим: нет доли событий и нагрузки",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают 3 из 7 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «временно» расходится с бессрочной блокировкой БК-2",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Поле days в getCardStatus не определено для бессрочной блокировки",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Приоритеты требований БК-1…БК-8 не указаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Продукт назван «Мобильный банк» и «Приложение»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.event_conflict.unblock_daily_limit",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "api_contract",
+        "title": "Код отказа при второй разблокировке в сутки не задан",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.paraphrase.keep_authorizations",
+        "clean": true,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Функциональные требования БК-1…БК-7 не имеют приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.paraphrase.keep_authorizations",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают три из семи функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.paraphrase.keep_authorizations",
+        "clean": true,
+        "id": "D-01",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «временно» не совпадает с бессрочной блокировкой",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.paraphrase.keep_authorizations",
+        "clean": true,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Поле days в ответе getCardStatus: исходный срок или остаток",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cardblock.paraphrase.keep_authorizations",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Авторизация в окне до 10 секунд после блокировки не определена",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.paraphrase.keep_authorizations",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Ответ getCardStatus для бессрочной блокировки: значение days не задано",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Нет ID у пунктов и приоритетов у требований БК",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Бессрочная блокировка: значение days в статусе не описано",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают не все функциональные требования",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "security",
+        "title": "Право блокировки: клиент или владелец карты не определено",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cardblock.range_boundary.days_400_at_30",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одно понятие назван тремя разными терминами в документе",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.two_statuses.reblock_200",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «временно» не совпадает с бессрочной блокировкой",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.two_statuses.reblock_200",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Механизм истечения срока блокировки не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.two_statuses.reblock_200",
+        "clean": false,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "traceability",
+        "title": "Нет ID у требований и приоритетов в документе",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.two_statuses.reblock_200",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают 4 из 8 требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.two_statuses.reblock_200",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Поле days в getCardStatus для бессрочной блокировки не задано",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Один канал назван разными терминами, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приоритеты функциональных требований БК-1…БК-7 не указаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают 4 из 7 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Поле days в getCardStatus не описано для бессрочной блокировки",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cardblock.unit_change.blocked_at_utc",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель «временно» не покрывает бессрочную блокировку (БК-2)",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Возврат в день зачисления 5-го числа: порядок с зачислением не задан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Список кодов категории повторён в четырёх местах документа",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Возврат после зачисления: нет данных для корректировки следующего зачисления",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "saveCategory после конца месяца: отказ не описан, статус не определён",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Термины не едины: кэшбэк месяца, приложение, клиент названы по-разному",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки не покрывают порог, возвраты, даты, ошибки",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Функциональные требования КБ-1…КБ-7 не имеют приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Статус 200 saveCategory отсылает к описанию, которого нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.base",
+        "clean": true,
+        "id": "D-01",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "getCashback: непонятно, какая категория показывается в месяце смены выбора",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Порядок проверок 400 и 404 в saveCategory не задан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "api_contract",
+        "title": "Тело успешного ответа saveCategory не описано: ссылка на пустой раздел",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "КБ-5 и КБ-6: возврат в день зачисления без определённого исхода",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Порядок ограничения кэшбэка сверх 10 000 ₸ не описан",
+        "sources": [
+          "lens:analyst"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№05"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не единая: начисление, сумма кэшбэка, название продукта",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-06",
+        "severity": "major",
+        "kind": "security",
+        "title": "Держатель дополнительной карты: «клиент» и «владелец карты» расходятся",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Выбор категории после конца месяца не проверяется в saveCategory",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приоритеты функциональных требований не заданы",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Ставка 5 % повторена в КБ-3 и КБ-6",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают 4 из 7 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "КБ-1 и КБ-7 по-разному связывают показ категории в месяце смены",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Цель про кэшбэк месяца неясно соотнесена с отложенным выбором",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "КБ-6 не определяет удержание без следующего зачисления",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки не покрывают ошибки и часть правил",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Повторный выбор категории в одном месяце не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приоритеты и признаки важности требований не указаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Термины «Кэшбэк месяца» и «Категория» названы по-разному",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Не описан ответ saveCategory на выбор категории после срока",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cashback.event_conflict.category_effective_now",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Метод getCashback не описывает ошибки сессии, карты и сервиса",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.event_conflict.category_effective_now",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Возврат покупки вне категории уменьшает кэшбэк по КБ-6",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "cashback.event_conflict.category_effective_now",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни понятия названы в документе разными терминами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.event_conflict.category_effective_now",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки не покрывают пороги, возвраты и ошибки",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cashback.event_conflict.category_effective_now",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Возврат в день зачисления: до или после зачисления неясно",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.event_conflict.category_effective_now",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Приоритеты требований не заданы ни для одного пункта",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают 4 из 7 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Требования не имеют приоритетов и идентификаторов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Возврат в день зачисления кэшбэка: до или после начисления",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Сохранение категории после конца месяца не имеет проверки и кода",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Повторный выбор категории в том же месяце не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Категория в месяце выбора: прежняя или новая для показа",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-01",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Ответ 200 saveCategory обещан разделом метода, но не описан",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.paraphrase.rate",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы в документе по-разному",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.range_boundary.cap_strict",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Срок выбора категории не проверяется в saveCategory",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.range_boundary.cap_strict",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Категория в getCashback: текущая или выбранная на следующий месяц",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.range_boundary.cap_strict",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Данные для возврата покупки (КБ-6) не входят в хранимые данные",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.range_boundary.cap_strict",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Один и тот же объект назван в документе разными терминами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.range_boundary.cap_strict",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Требования не имеют приоритетов и признака стабильности",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.range_boundary.cap_strict",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Тело ответа 200 saveCategory отсылает к несуществующему описанию",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.range_boundary.cap_strict",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают не все функциональные требования",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cashback.two_statuses.bad_category_200",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Повторный выбор категории в том же месяце не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.two_statuses.bad_category_200",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Момент покупки для отнесения к месяцу не определён",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.two_statuses.bad_category_200",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Термины «приложение», «продукт», «категория», «кэшбэк месяца» расходятся",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.two_statuses.bad_category_200",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Функциональные требования КБ-1…КБ-7 не имеют приоритета",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.two_statuses.bad_category_200",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Тело успешного ответа saveCategory не описано",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.two_statuses.bad_category_200",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают не все функциональные требования",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "cashback.two_statuses.bad_category_200",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Категория в текущем месяце после выбора: новая или действующая",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Поздний saveCategory после конца месяца: проверки и кода нет",
+        "sources": [
+          "lens:architect"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№07"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Возврат больше следующего зачисления: минус или перенос не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Приоритеты требований КБ-1…КБ-7 и НФ-1 не указаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-04",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Повторный выбор категории в одном месяце не описан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Ставка 5 % повторена в КБ-3 и КБ-6",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-05",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Смена категории в середине месяца: что показывает приложение",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "near_miss"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-06",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Ответ 200 saveCategory отсылает к описанию, которого нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Термины приложения, кэшбэка и карты названы по-разному",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "cashback.unit_change.accrued_in_tiyn",
+        "clean": false,
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают 2 из 5 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.base",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "После смены лимита неясно, какой лимит показывать",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.base",
+        "clean": true,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают 3 из 5 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.base",
+        "clean": true,
+        "id": "D-01",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одна величина названа тремя разными терминами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.base",
+        "clean": true,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Тип лимита: строка в ответе и целое число в запросе",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.base",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Приоритеты функциональных требований ЛП-1…ЛП-6 не указаны",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни понятия названы разными терминами, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Функциональные требования ЛП-1…ЛП-6 без приоритета",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки не покрывают отмену, границы, авторизацию",
+        "sources": [
+          "lens:qa",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Не определено, какие переводы входят в учёт суточного лимита",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Приёмка не покрывает границы, отмену, остаток и коды ответа",
+        "sources": [
+          "lens:qa",
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06",
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Требования ЛП-1…ЛП-6 без приоритетов и обязательности",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одна величина названа «Использовано» и «использованная сумма»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.drop_promised.no_read_method",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Не определено, как система узнаёт об отмене перевода",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Функциональные требования ЛП-1…ЛП-7 без приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Понижение лимита ниже использованной суммы не определено",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одна сумма называется «Использовано» и «использованная сумма»",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приёмка покрывает 3 из 7 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.paraphrase.new_limit",
+        "clean": true,
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "other",
+        "title": "ЛП-1…ЛП-6 не имеют приоритета и признака важности",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.paraphrase.new_limit",
+        "clean": true,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают три из шести функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "clean_false_alarm",
+          "control_hit"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.paraphrase.new_limit",
+        "clean": true,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Тип limit в GET-ответе и PUT-запросе расходится",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.paraphrase.new_limit",
+        "clean": true,
+        "id": "D-01",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни понятия названы разными терминами по всему документу",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "clean_false_alarm"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.range_boundary.reaching_rejects",
+        "clean": false,
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Терминология не едина, глоссария нет",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.range_boundary.reaching_rejects",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Приоритет требований ЛП-1…ЛП-6 не указан",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.range_boundary.reaching_rejects",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Показ лимита после смены не определён до следующего перевода",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.range_boundary.reaching_rejects",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Критерии приёмки покрывают 2 из 6 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.two_statuses.range_200_error",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы в документе по-разному",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.two_statuses.range_200_error",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Пункты документа без ID и приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.two_statuses.range_200_error",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Показанный лимит после смены до следующего перевода не определён",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.two_statuses.range_200_error",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают лишь 2 из 7 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.two_statuses.range_200_error",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Отмена перевода не описана: инициатор и событие не заданы",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+        "clean": false,
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Параллельные переводы по одному номеру не покрыты правилом лимита",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+        "clean": false,
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают 2 из 4 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№06"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+        "clean": false,
+        "id": "D-02",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Что входит в «Использовано»: исходящие или все переводы",
+        "sources": [
+          "lens:risk"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№08"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+        "clean": false,
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Пункты требований и приёмки без ID и приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+        "clean": false,
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "После смены лимита не определено, какой лимит показывать",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      },
+      {
+        "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+        "clean": false,
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Термин использованной суммы назван тремя разными способами",
+        "sources": [
+          "consistency"
+        ],
+        "reasons": [
+          "unexplained"
+        ],
+        "owners": [
+          "№09"
+        ]
+      }
+    ],
+    "fn": [
+      {
+        "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+        "label_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200#2",
+        "type": "status_conflict",
+        "near": [],
+        "owners": "№09, №07"
+      }
+    ],
+    "dup": 0,
+    "by_source": {
+      "consistency": {
+        "tp": 26,
+        "fp": 133,
+        "fp_clean": 36
+      },
+      "lens:analyst": {
+        "tp": 12,
+        "fp": 4,
+        "fp_clean": 1
+      },
+      "lens:architect": {
+        "tp": 16,
+        "fp": 32,
+        "fp_clean": 8
+      },
+      "lens:qa": {
+        "tp": 18,
+        "fp": 33,
+        "fp_clean": 8
+      },
+      "lens:risk": {
+        "tp": 7,
+        "fp": 14,
+        "fp_clean": 1
+      },
+      "rules": {
+        "tp": 26,
+        "fp": 0,
+        "fp_clean": 0
+      }
+    }
+  },
+  "provider": "claude_cli",
+  "model": "haiku",
+  "wall_s": 1301.1,
+  "commit": [
+    "3c8ad463",
+    "440c6ef5",
+    "8713e986",
+    "da0e4902"
+  ],
+  "candidates": {
+    "tp": 28,
+    "fn": 0,
+    "recall": 1.0,
+    "per_issue_type": {
+      "ambiguity": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "api_contract": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "boundary_conflict": {
+        "tp": 5,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "contradiction": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "duplicate": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "event_conflict": {
+        "tp": 5,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "incomplete": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "incorrect": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "infeasible": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "missing_element": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "other": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "status_conflict": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "terminology": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "traceability": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "unit_mismatch": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "unverifiable": {
+        "tp": 0,
+        "fn": 0,
+        "recall": null
+      }
+    }
+  },
+  "per_case": [
+    {
+      "case_id": "autopay.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "run_id": "20261127-162858-3df2",
+      "commit": "da0e4902",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «не опускается ниже порога» не согласуется с лимитом и НФ-1",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы по-разному, глоссария не задан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Функциональные требования АП-1…АП-7 и НФ-1 не имеют приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают малую часть функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "АП-5 и АП-6: неясно, входит ли отклонённая попытка в лимит трёх",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Сброс суточного счётчика при пересоздании настройки не описан",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 6
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 105.6,
+      "calls": 7,
+      "cost_usd": 0.0482
+    },
+    {
+      "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "run_id": "20261127-162858-c490",
+      "commit": "da0e4902",
+      "findings": 9,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "unit_mismatch",
+          "title": "Лимит пополнений: за час в АП-5, за сутки в приёмке",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "lens:architect",
+            "consistency",
+            "rules:units.period_mix"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Код 409 при повторном создании не описан в статусах",
+          "sources": [
+            "consistency",
+            "rules:api.status_409"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Проверка валюты карты KZT отсутствует в логике createAutopay",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Повтор события после отказа по нехватке средств не определён",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы разными словами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель обещает неснижение баланса, которое требования не гарантируют",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Изменение порога или суммы настройки не описано",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Функциональные и нефункциональные требования без приоритета",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают малую часть требований",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 3,
+        "minor": 5
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 147.6,
+      "calls": 8,
+      "cost_usd": 0.0585
+    },
+    {
+      "case_id": "autopay.drop_promised.no_409_status",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-162858-4291",
+      "commit": "da0e4902",
+      "findings": 7,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Код 409 из логики метода не описан в таблице статусов",
+          "sources": [
+            "consistency",
+            "rules:api.status_409"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "traceability",
+          "title": "Требования и пункты документа без ID и приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Один и тот же объект назван разными терминами; глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель обещает порог без исключений, которые допускают правила",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Проверка карты KZT из АП-1 отсутствует в логике createAutopay",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают не все функциональные требования",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Учёт отказанных по нехватке средств попыток в лимит трёх неясен",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 6
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 120.7,
+      "calls": 7,
+      "cost_usd": 0.0526
+    },
+    {
+      "case_id": "autopay.event_conflict.insufficient_funds_credit",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163044-ea15",
+      "commit": "da0e4902",
+      "findings": 10,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "contradiction",
+          "title": "АП-6 и АП-8 задают противоположный исход при нехватке средств",
+          "sources": [
+            "consistency",
+            "lens:qa",
+            "rules:conflicts.event_condition.L29-31"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Лимит трёх пополнений в сутки: счётчик по номеру или карте",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Проверка карты в KZT из АП-1 отсутствует в логике createAutopay",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Тело успешного ответа createAutopay не описано, хотя таблица ссылается",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "АП-8: долг по кредитному пополнению не входит в перечень данных",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Приоритеты требований АП-1…АП-8 и НФ-1 не указаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «баланс не ниже порога» расходится с правилами АП-6, АП-5",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни понятия названы разными терминами, глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приёмка проверяет 3 из 9 функциональных требований, границы не покрыты",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Не определено, к какому времени относить лимит: уведомление или пополнение",
+          "sources": [
+            "lens:risk"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 4,
+        "minor": 5
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 167.6,
+      "calls": 8,
+      "cost_usd": 0.0653
+    },
+    {
+      "case_id": "autopay.paraphrase.nfr",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163059-f2d3",
+      "commit": "da0e4902",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Пункты требований не имеют приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни понятия названы разными терминами, глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "АП-1 и логика п. 3 расходятся по повторной настройке номера",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Изменение порога и суммы настройки не описано",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки не покрывают границы, ошибки и повторы",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Неудачная попытка не учтена: считается ли она в лимите АП-5",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 6
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 104.9,
+      "calls": 7,
+      "cost_usd": 0.0482
+    },
+    {
+      "case_id": "autopay.range_boundary.trigger_at_threshold",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163126-1256",
+      "commit": "da0e4902",
+      "findings": 7,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "boundary_conflict",
+          "title": "Граница равенства порогу: АП-4 и критерий приёмки дают разный исход",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "consistency",
+            "rules:conflicts.boundary_acceptance.L27-46"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "api_contract",
+          "title": "Тело успешного ответа createAutopay не описано, хотя таблица отсылает к методу",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Пункты требований без ID и приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «баланс не ниже порога» не достижима по АП-5 и АП-6",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одна и та же сущность названа разными терминами, глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают малую часть требований и кодов",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Изменение порога и судьба счётчика за сутки не описаны",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 1,
+        "minor": 5
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 103.8,
+      "calls": 8,
+      "cost_usd": 0.0426
+    },
+    {
+      "case_id": "autopay.two_statuses.range_422",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163244-9e2f",
+      "commit": "8713e986",
+      "findings": 10,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Порог вне диапазона: код 422 в тексте, 400 в перечне статусов",
+          "sources": [
+            "rules:api.status_422",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель о неизменном балансе расходится с лимитом и отказами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы в документе разными терминами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Требования не имеют приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Проверка валюты карты KZT не описана в логике createAutopay",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Отказ при нехватке средств: засчитывается ли в лимит трёх пополнений",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Счётчик пополнений при удалении и повторном создании не описан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Недостаточно средств: не определено, учитываются ли холды карты",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают 2 из 8 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Тело успешного ответа createAutopay не описано, хотя обещано",
+          "sources": [
+            "lens:architect"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 9
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 133.2,
+      "calls": 7,
+      "cost_usd": 0.0649
+    },
+    {
+      "case_id": "autopay.unit_change.limit_per_hour",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163310-fdec",
+      "commit": "8713e986",
+      "findings": 8,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "unit_mismatch",
+          "title": "Лимит пополнений: АП-5 считает за час, критерий приёмки — за сутки",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "lens:architect",
+            "consistency",
+            "rules:units.period_mix"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Тело успешного ответа createAutopay не описано",
+          "sources": [
+            "consistency",
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Проверка валюты карты KZT отсутствует в логике createAutopay",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "У пунктов требований нет ID и приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «не опускается ниже порога» не достигается правилами АП-5, АП-6",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы по-разному, глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают три из одиннадцати функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Не определено, может ли номер иметь настройки по нескольким картам",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 2,
+        "minor": 5
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 153.9,
+      "calls": 8,
+      "cost_usd": 0.0636
+    },
+    {
+      "case_id": "cardblock.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "run_id": "20261127-163332-33a8",
+      "commit": "8713e986",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "event_conflict",
+          "title": "Момент вступления блокировки не задан: исход авторизации в окне 10 с",
+          "sources": [
+            "lens:analyst",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "api_contract",
+          "title": "Ответ getCardStatus для ACTIVE и бессрочной блокировки не задан",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Один объект назван по-разному: «Мобильный банк» и «Приложение»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Приоритеты функциональных требований БК-1…БК-7 не указаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки не покрывают разблокировку, push и ошибки 400–409",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Пустое тело blockCard при Content-Type application/json не определено",
+          "sources": [
+            "lens:architect"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 2,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 117.2,
+      "calls": 7,
+      "cost_usd": 0.0441
+    },
+    {
+      "case_id": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "run_id": "20261127-163458-fd57",
+      "commit": "8713e986",
+      "findings": 5,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "unit_mismatch",
+          "title": "Часовой пояс blockedAt: UTC в описании, UTC+5 в данных",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "lens:architect",
+            "lens:risk",
+            "consistency",
+            "rules:units.timezone_mix"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Требования БК-1…БК-7 и критерии без приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Один продукт назван «Мобильный банк» и «приложение»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки не покрывают разблокировку, ошибки и повторы",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Таблица кодов 409 не отражает исключение для повторной блокировки",
+          "sources": [
+            "lens:analyst"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 92.3,
+      "calls": 7,
+      "cost_usd": 0.0428
+    },
+    {
+      "case_id": "cardblock.drop_promised.no_last_digits",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163529-9fd0",
+      "commit": "8713e986",
+      "findings": 8,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Момент вступления блокировки не определён: авторизации в окне 10 с",
+          "sources": [
+            "lens:analyst",
+            "lens:risk",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни понятия названы в документе разными терминами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Функциональные требования БК-1…БК-7 без приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают три строки из семи требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Значение days в getCardStatus для бессрочной блокировки не задано",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Срок блокировки в сутках не привязан к началу и концу отсчёта",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Источник последних четырёх цифр номера карты для push не описан",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Коды 400 и 409 для одного запроса без порядка проверок",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 7
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 128.0,
+      "calls": 7,
+      "cost_usd": 0.0486
+    },
+    {
+      "case_id": "cardblock.event_conflict.unblock_daily_limit",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163545-cb13",
+      "commit": "8713e986",
+      "findings": 9,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "contradiction",
+          "title": "БК-6 и БК-8 дают разный исход второй разблокировки в сутки",
+          "sources": [
+            "consistency",
+            "lens:qa",
+            "lens:architect",
+            "rules:conflicts.event_quantity.L29-31"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "api_contract",
+          "title": "Код отказа при второй разблокировке в сутки не задан",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Поле days в getCardStatus не определено для бессрочной блокировки",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Продукт назван «Мобильный банк» и «Приложение»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «временно» расходится с бессрочной блокировкой БК-2",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Приоритеты требований БК-1…БК-8 не указаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "БК-5 не измерим: нет доли событий и нагрузки",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают 3 из 7 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Тело getCardStatus для статуса ACTIVE не описано",
+          "sources": [
+            "lens:architect"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 2,
+        "minor": 6
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 104.1,
+      "calls": 8,
+      "cost_usd": 0.05
+    },
+    {
+      "case_id": "cardblock.paraphrase.keep_authorizations",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163630-a66f",
+      "commit": "8713e986",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «временно» не совпадает с бессрочной блокировкой",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Функциональные требования БК-1…БК-7 не имеют приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Ответ getCardStatus для бессрочной блокировки: значение days не задано",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Авторизация в окне до 10 секунд после блокировки не определена",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают три из семи функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Поле days в ответе getCardStatus: исходный срок или остаток",
+          "sources": [
+            "lens:architect"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 6
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 86.4,
+      "calls": 7,
+      "cost_usd": 0.042
+    },
+    {
+      "case_id": "cardblock.range_boundary.days_400_at_30",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163729-abc2",
+      "commit": "8713e986",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "boundary_conflict",
+          "title": "Срок 30 суток: приёмка и БК-2 дают 200, код 400 отвергает",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "lens:architect",
+            "consistency",
+            "rules:conflicts.boundary_range.L25-86"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "security",
+          "title": "Право блокировки: клиент или владелец карты не определено",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Бессрочная блокировка: значение days в статусе не описано",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одно понятие назван тремя разными терминами в документе",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Нет ID у пунктов и приоритетов у требований БК",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают не все функциональные требования",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 2,
+        "minor": 3
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 90.5,
+      "calls": 8,
+      "cost_usd": 0.0429
+    },
+    {
+      "case_id": "cardblock.two_statuses.reblock_200",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163738-2494",
+      "commit": "8713e986",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Повторный blockCard в BLOCKED_BY_CLIENT: 409 или 200",
+          "sources": [
+            "consistency",
+            "lens:architect",
+            "lens:qa",
+            "lens:risk",
+            "rules:api.same_case.200-409"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "traceability",
+          "title": "Нет ID у требований и приоритетов в документе",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «временно» не совпадает с бессрочной блокировкой",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают 4 из 8 требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Механизм истечения срока блокировки не описан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Поле days в getCardStatus для бессрочной блокировки не задано",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 5
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 93.9,
+      "calls": 8,
+      "cost_usd": 0.0437
+    },
+    {
+      "case_id": "cardblock.unit_change.blocked_at_utc",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163757-3915",
+      "commit": "8713e986",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "unit_mismatch",
+          "title": "blockedAt: описание даёт UTC, данные и пример дают UTC+5",
+          "sources": [
+            "lens:risk",
+            "lens:analyst",
+            "lens:qa",
+            "lens:architect",
+            "consistency",
+            "rules:units.timezone_mix"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Поле days в getCardStatus не описано для бессрочной блокировки",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Один канал назван разными терминами, глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель «временно» не покрывает бессрочную блокировку (БК-2)",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приоритеты функциональных требований БК-1…БК-7 не указаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают 4 из 7 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 2,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 93.3,
+      "calls": 7,
+      "cost_usd": 0.0443
+    },
+    {
+      "case_id": "cashback.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "run_id": "20261127-163859-c531",
+      "commit": "3c8ad463",
+      "findings": 9,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "getCashback: непонятно, какая категория показывается в месяце смены выбора",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Термины не едины: кэшбэк месяца, приложение, клиент названы по-разному",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Список кодов категории повторён в четырёх местах документа",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Функциональные требования КБ-1…КБ-7 не имеют приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "saveCategory после конца месяца: отказ не описан, статус не определён",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Возврат в день зачисления 5-го числа: порядок с зачислением не задан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки не покрывают порог, возвраты, даты, ошибки",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Возврат после зачисления: нет данных для корректировки следующего зачисления",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Статус 200 saveCategory отсылает к описанию, которого нет",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 8
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 136.4,
+      "calls": 7,
+      "cost_usd": 0.0536
+    },
+    {
+      "case_id": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "run_id": "20261127-163912-cb8d",
+      "commit": "3c8ad463",
+      "findings": 12,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "event_conflict",
+          "title": "КБ-1 и КБ-8 задают разный срок действия выбранной категории",
+          "sources": [
+            "lens:risk",
+            "lens:analyst",
+            "lens:qa",
+            "consistency",
+            "rules:conflicts.event_effective.L25-32"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "boundary_conflict",
+          "title": "Критерий приёмки ожидает 10 000 ₸, правило исключает это значение",
+          "sources": [
+            "consistency",
+            "lens:qa",
+            "rules:conflicts.boundary_acceptance.L28-49"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Порядок ограничения кэшбэка сверх 10 000 ₸ не описан",
+          "sources": [
+            "lens:analyst"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Выбор категории после конца месяца не проверяется в saveCategory",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "api_contract",
+          "title": "Тело успешного ответа saveCategory не описано: ссылка на пустой раздел",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "major",
+          "kind": "security",
+          "title": "Держатель дополнительной карты: «клиент» и «владелец карты» расходятся",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не единая: начисление, сумма кэшбэка, название продукта",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приоритеты функциональных требований не заданы",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Ставка 5 % повторена в КБ-3 и КБ-6",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают 4 из 7 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "КБ-5 и КБ-6: возврат в день зачисления без определённого исхода",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Порядок проверок 400 и 404 в saveCategory не задан",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 5,
+        "minor": 6
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 166.2,
+      "calls": 8,
+      "cost_usd": 0.0616
+    },
+    {
+      "case_id": "cashback.drop_promised.no_read_method",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-163930-1281",
+      "commit": "3c8ad463",
+      "findings": 9,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "missing_element",
+          "title": "Метод getCashback используется в документе, но нигде не описан",
+          "sources": [
+            "lens:architect",
+            "consistency",
+            "rules:promises.named_method.getCashback"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Не описан ответ saveCategory на выбор категории после срока",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "КБ-1 и КБ-7 по-разному связывают показ категории в месяце смены",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Повторный выбор категории в одном месяце не описан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "КБ-6 не определяет удержание без следующего зачисления",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Цель про кэшбэк месяца неясно соотнесена с отложенным выбором",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Термины «Кэшбэк месяца» и «Категория» названы по-разному",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приоритеты и признаки важности требований не указаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки не покрывают ошибки и часть правил",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 4,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "yes"
+      },
+      "duration_s": 133.2,
+      "calls": 8,
+      "cost_usd": 0.0649
+    },
+    {
+      "case_id": "cashback.event_conflict.category_effective_now",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164116-8a5b",
+      "commit": "3c8ad463",
+      "findings": 7,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "event_conflict",
+          "title": "Момент вступления выбора категории в силу задан двумя способами",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "lens:risk",
+            "consistency",
+            "rules:conflicts.event_effective.L25-32"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Метод getCashback не описывает ошибки сессии, карты и сервиса",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Возврат покупки вне категории уменьшает кэшбэк по КБ-6",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни понятия названы в документе разными терминами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Приоритеты требований не заданы ни для одного пункта",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Возврат в день зачисления: до или после зачисления неясно",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки не покрывают пороги, возвраты и ошибки",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 2,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 99.3,
+      "calls": 8,
+      "cost_usd": 0.0506
+    },
+    {
+      "case_id": "cashback.paraphrase.rate",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164144-db0a",
+      "commit": "3c8ad463",
+      "findings": 8,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Ответ 200 saveCategory обещан разделом метода, но не описан",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Требования не имеют приоритетов и идентификаторов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы в документе по-разному",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Сохранение категории после конца месяца не имеет проверки и кода",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Категория в месяце выбора: прежняя или новая для показа",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Повторный выбор категории в том же месяце не описан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Возврат в день зачисления кэшбэка: до или после начисления",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают 4 из 7 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 7
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 118.7,
+      "calls": 7,
+      "cost_usd": 0.0521
+    },
+    {
+      "case_id": "cashback.range_boundary.cap_strict",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164158-8a06",
+      "commit": "3c8ad463",
+      "findings": 8,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "boundary_conflict",
+          "title": "Лимит 10 000 ₸: КБ-4 и критерий приёмки дают разный итог",
+          "sources": [
+            "consistency",
+            "lens:qa",
+            "lens:analyst",
+            "rules:conflicts.boundary_acceptance.L28-48"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Категория в getCashback: текущая или выбранная на следующий месяц",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Данные для возврата покупки (КБ-6) не входят в хранимые данные",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Тело ответа 200 saveCategory отсылает к несуществующему описанию",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Срок выбора категории не проверяется в saveCategory",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Один и тот же объект назван в документе разными терминами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Требования не имеют приоритетов и признака стабильности",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают не все функциональные требования",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 4,
+        "minor": 3
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 122.0,
+      "calls": 8,
+      "cost_usd": 0.0572
+    },
+    {
+      "case_id": "cashback.two_statuses.bad_category_200",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164256-511b",
+      "commit": "3c8ad463",
+      "findings": 8,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "status_conflict",
+          "title": "Неизвестная категория в saveCategory: 200 с ERROR или 400",
+          "sources": [
+            "lens:architect",
+            "consistency",
+            "rules:api.success_with_error"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Повторный выбор категории в том же месяце не описан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Категория в текущем месяце после выбора: новая или действующая",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Тело успешного ответа saveCategory не описано",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Термины «приложение», «продукт», «категория», «кэшбэк месяца» расходятся",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Момент покупки для отнесения к месяцу не определён",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Функциональные требования КБ-1…КБ-7 не имеют приоритета",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают не все функциональные требования",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 3,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 121.5,
+      "calls": 8,
+      "cost_usd": 0.0595
+    },
+    {
+      "case_id": "cashback.unit_change.accrued_in_tiyn",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164343-9667",
+      "commit": "440c6ef5",
+      "findings": 10,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "unit_mismatch",
+          "title": "Единица суммы accrued: тиыны в описании, 100.00 в примере",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "lens:architect",
+            "consistency",
+            "rules:units.minor_fraction"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Поздний saveCategory после конца месяца: проверки и кода нет",
+          "sources": [
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Возврат больше следующего зачисления: минус или перенос не описан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Повторный выбор категории в одном месяце не описан",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Смена категории в середине месяца: что показывает приложение",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Ответ 200 saveCategory отсылает к описанию, которого нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Термины приложения, кэшбэка и карты названы по-разному",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Приоритеты требований КБ-1…КБ-7 и НФ-1 не указаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Ставка 5 % повторена в КБ-3 и КБ-6",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают 2 из 5 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 5,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 171.0,
+      "calls": 9,
+      "cost_usd": 0.065
+    },
+    {
+      "case_id": "edge.empty",
+      "expected": "clean",
+      "kind": "edge",
+      "status": "complete",
+      "run_id": "20261127-164400-5aef",
+      "commit": "3c8ad463",
+      "findings": 0,
+      "items": [],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "verdict": {
+        "development": "undetermined",
+        "testing": "undetermined"
+      },
+      "duration_s": 0.1,
+      "calls": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "case_id": "transfer_limit.base",
+      "expected": "clean",
+      "kind": "base",
+      "status": "complete",
+      "run_id": "20261127-164400-95af",
+      "commit": "440c6ef5",
+      "findings": 5,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одна величина названа тремя разными терминами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают 3 из 5 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Приоритеты функциональных требований ЛП-1…ЛП-6 не указаны",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "После смены лимита неясно, какой лимит показывать",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Тип лимита: строка в ответе и целое число в запросе",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 5
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 93.7,
+      "calls": 7,
+      "cost_usd": 0.0457
+    },
+    {
+      "case_id": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "expected": "defects",
+      "kind": "combo",
+      "status": "complete",
+      "run_id": "20261127-164457-8ee7",
+      "commit": "440c6ef5",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "status_conflict",
+          "title": "Лимит вне диапазона: код 200 с ERROR и код 400 одновременно",
+          "sources": [
+            "lens:architect",
+            "consistency",
+            "lens:qa",
+            "rules:api.success_with_error"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "critical",
+          "kind": "missing_element",
+          "title": "Метод getTransferLimit обещан, но не описан ни в одном разделе",
+          "sources": [
+            "rules:promises.named_method.getTransferLimit",
+            "consistency",
+            "lens:architect"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Не определено, какие переводы входят в учёт суточного лимита",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни понятия названы разными терминами, глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки не покрывают отмену, границы, авторизацию",
+          "sources": [
+            "lens:qa",
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Функциональные требования ЛП-1…ЛП-6 без приоритета",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 2,
+        "major": 1,
+        "minor": 3
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 116.5,
+      "calls": 8,
+      "cost_usd": 0.05
+    },
+    {
+      "case_id": "transfer_limit.drop_promised.no_read_method",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164534-c3fb",
+      "commit": "440c6ef5",
+      "findings": 5,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "missing_element",
+          "title": "Метод getTransferLimit обещан, но не описан в части B",
+          "sources": [
+            "consistency",
+            "lens:architect",
+            "rules:promises.named_method.getTransferLimit"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Не определено, как система узнаёт об отмене перевода",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Требования ЛП-1…ЛП-6 без приоритетов и обязательности",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одна величина названа «Использовано» и «использованная сумма»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Приёмка не покрывает границы, отмену, остаток и коды ответа",
+          "sources": [
+            "lens:qa",
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 1,
+        "minor": 3
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 99.6,
+      "calls": 8,
+      "cost_usd": 0.0465
+    },
+    {
+      "case_id": "transfer_limit.event_conflict.cancel_no_restore",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164634-1200",
+      "commit": "440c6ef5",
+      "findings": 5,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "contradiction",
+          "title": "ЛП-4 и ЛП-7 противоречат друг другу при отмене перевода",
+          "sources": [
+            "lens:risk",
+            "lens:qa",
+            "consistency",
+            "rules:conflicts.event_negation.L27-30"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Понижение лимита ниже использованной суммы не определено",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одна сумма называется «Использовано» и «использованная сумма»",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приёмка покрывает 3 из 7 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Функциональные требования ЛП-1…ЛП-7 без приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 1,
+        "minor": 3
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 87.7,
+      "calls": 8,
+      "cost_usd": 0.0376
+    },
+    {
+      "case_id": "transfer_limit.paraphrase.new_limit",
+      "expected": "clean",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164654-2aa5",
+      "commit": "440c6ef5",
+      "findings": 4,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни понятия названы разными терминами по всему документу",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "other",
+          "title": "ЛП-1…ЛП-6 не имеют приоритета и признака важности",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают три из шести функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Тип limit в GET-ответе и PUT-запросе расходится",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 0,
+        "major": 0,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "duration_s": 95.3,
+      "calls": 7,
+      "cost_usd": 0.0402
+    },
+    {
+      "case_id": "transfer_limit.range_boundary.reaching_rejects",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164714-b71d",
+      "commit": "440c6ef5",
+      "findings": 5,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "contradiction",
+          "title": "ЛП-2 и ЛП-3 расходятся: сумма, равная лимиту, разрешена и запрещена",
+          "sources": [
+            "lens:analyst",
+            "lens:qa",
+            "consistency",
+            "rules:conflicts.boundary_reach.L25-26"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Показ лимита после смены не определён до следующего перевода",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Терминология не едина, глоссария нет",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Критерии приёмки покрывают 2 из 6 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Приоритет требований ЛП-1…ЛП-6 не указан",
+          "sources": [
+            "consistency"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 1,
+        "minor": 3
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 106.0,
+      "calls": 8,
+      "cost_usd": 0.045
+    },
+    {
+      "case_id": "transfer_limit.two_statuses.range_200_error",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164802-4ad0",
+      "commit": "440c6ef5",
+      "findings": 6,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "contradiction",
+          "title": "setTransferLimit: лимит вне диапазона — 200 с ERROR или 400",
+          "sources": [
+            "lens:architect",
+            "lens:risk",
+            "consistency",
+            "rules:api.success_with_error"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Показанный лимит после смены до следующего перевода не определён",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Отмена перевода не описана: инициатор и событие не заданы",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Пункты документа без ID и приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы в документе по-разному",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают лишь 2 из 7 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 2,
+        "minor": 3
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 111.1,
+      "calls": 8,
+      "cost_usd": 0.0576
+    },
+    {
+      "case_id": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "expected": "defects",
+      "kind": "mutant",
+      "status": "complete",
+      "run_id": "20261127-164829-ac14",
+      "commit": "440c6ef5",
+      "findings": 7,
+      "items": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "contradiction",
+          "title": "Лимит в PUT в тиынах, в ЛП-1 и GET — в тенге",
+          "sources": [
+            "lens:qa",
+            "lens:analyst",
+            "lens:architect",
+            "consistency",
+            "rules:units.currency_mix"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Что входит в «Использовано»: исходящие или все переводы",
+          "sources": [
+            "lens:risk"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "После смены лимита не определено, какой лимит показывать",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Термин использованной суммы назван тремя разными способами",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Пункты требований и приёмки без ID и приоритетов",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Параллельные переводы по одному номеру не покрыты правилом лимита",
+          "sources": [
+            "consistency"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают 2 из 4 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ]
+        }
+      ],
+      "by_severity": {
+        "critical": 1,
+        "major": 2,
+        "minor": 4
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "duration_s": 129.9,
+      "calls": 8,
+      "cost_usd": 0.0532
+    }
+  ]
+}

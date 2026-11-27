@@ -334,3 +334,17 @@ def test_stability_gate_prefers_more_runs_within_same_minute(tmp_path, monkeypat
     rows = [c for c in gate.stability_gates({}) if c["name"].startswith("Стабильность, sonnet")]
     assert rows and all(c["source"] == "sonnet ×3" for c in rows)
     assert rows[0]["name"].endswith("в 3 из 3") and rows[0]["ok"] is True
+
+
+def test_final_code_note_flags_runs_on_other_code(monkeypatch):
+    """Метка «на abc1234» не доказательство: код каждого прогона сверяется по git, чужой — предупреждение."""
+    from evaluation.v2 import final
+
+    same = {"aaa1111": True, "bbb2222": True, "ccc3333": False, "ddd4444": None}
+    monkeypatch.setattr(final, "same_code", lambda c, sha: same[c])
+    ok = final.code_note("abc1234", [[{"commit": "aaa1111"}], [{"commit": ["aaa1111", "bbb2222"]}], []])
+    assert ok.startswith("Код прогонов сверен: 2 из 2") and "⚠" not in ok
+    bad = final.code_note("abc1234", [[{"commit": "aaa1111"}, {"commit": "ccc3333"}]])
+    assert bad.startswith("⚠") and "`ccc3333`" in bad and "aaa1111" not in bad
+    assert "git не знает: ddd4444" in final.code_note("abc1234", [[{"commit": "ddd4444"}, {"commit": "aaa1111"}]])
+    assert final.code_note("abc1234", [[{"label": "без коммита"}]]) == ""

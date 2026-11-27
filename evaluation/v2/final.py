@@ -42,6 +42,22 @@ def same_code(a: str, b: str) -> bool | None:
     return {0: True, 1: False}.get(r.returncode)
 
 
+def code_note(sha: str, groups: list[list[dict]]) -> str:
+    """Метка говорит «на `sha`» — сверить, что у каждого прогона (`commit` в истории и сводках) тот же `src/`."""
+    commits = sorted({c for rows in groups for r in rows
+                      for c in (r.get("commit") if isinstance(r.get("commit"), list) else [r.get("commit")]) if c})
+    if not commits:
+        return ""
+    verdict = {c: same_code(c, sha) for c in commits}
+    bad = [c for c, v in verdict.items() if v is False]
+    unknown = [c for c, v in verdict.items() if v is None]
+    if bad:
+        return (f"⚠ **Код прогонов не совпадает с `{sha}`:** " + ", ".join(f"`{c}`" for c in bad)
+                + " — метка говорит одно, а `src/` у прогона другой; эти цифры не про этот код.")
+    return (f"Код прогонов сверен: {len(commits) - len(unknown)} из {len(commits)} коммитов прогонов — `src/` и "
+            f"`pyproject.toml` как у `{sha}`" + (f", git не знает: {', '.join(unknown)}" if unknown else "") + ".")
+
+
 def _span(vals: list, digits: int = 1) -> str:
     vals = [v for v in vals if v is not None]
     if not vals:
@@ -188,6 +204,9 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None) -> s
     if not (off or corp or nz):
         L += ["", f"Замеров с `{sha}` в метке нет — `python -m evaluation.v2.round … --label-commit {sha}`."]
     else:
+        note_code = code_note(sha, [off, corp, nz])
+        if note_code:
+            L[1:1] = ["", note_code]
         L += gate_lines(sha, checks)
     return "\n".join(L) + "\n"
 
