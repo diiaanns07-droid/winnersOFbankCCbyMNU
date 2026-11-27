@@ -1008,17 +1008,42 @@ def _critical_support(members: list[dict], run_has_critical: bool = True) -> boo
 
 def _confirmed_critical(f: dict, members: list[dict], all_cands: list[dict] | None) -> bool:
     """Подтверждение critical двумя ревьюерами (см. ``_confirmed``). Для противоречия строже: оно утверждает, что
-    два места дают разные исходы, поэтому его подтверждает только другой ревьюер, тоже увидевший противоречие в тех
-    же строках, или исполненная строка приёмки. Попарная сверка набора сама себя не подтверждает (как и для major),
-    а сосед другого вида по тем же строкам («порядок погашения не описан») — не второе мнение о противоречии.
-    Живой haiku на релизе: ложные critical на чистых grace_v2 («платёж до выписки: Ф-2 против шага 3», сосед —
-    пропуск по тем же строкам) и insurance_v2 («отказ после досрочного погашения: Ф-4 против 409», только
-    попарная сверка). То же для «неверного значения» (формула против примера). Неопределённое ключевое событие
-    (К4/К5) по-прежнему подтверждается соседом по строкам."""
+    два места дают разные исходы, поэтому его подтверждает другой ревьюер (среди кандидатов дефекта), исполненная
+    строка приёмки или кандидат другого ревьюера, который тоже видит противоречие и цитирует **те же фрагменты**
+    хотя бы двух мест. Совпадения номеров строк мало: строка таблицы API держит весь метод, и соседнее противоречие
+    про другое поле той же строки — не второе мнение. Попарная сверка набора сама себя не подтверждает (как и для
+    major). Живой haiku на релизе — ложные critical на чистых: grace_v2 «платёж до выписки: Ф-2 против шага 3»
+    (сосед — пропуск по тем же строкам), insurance_v2 «отказ после досрочного погашения: Ф-4 против 409» (попарная
+    сверка; сосед — «refundUntil в примере» той же строки метода). То же для «неверного значения» (формула против
+    примера). Неопределённое ключевое событие (К4/К5) по-прежнему подтверждается соседом по строкам."""
     if f.get("kind") not in _STRICT_CONFIRM_KINDS:
         return _confirmed(f, members, all_cands)
-    conflicts = [c for c in all_cands or [] if _s(c.get("kind")) in _STRICT_CONFIRM_KINDS]
-    return _confirmed(f, members, conflicts, MAJOR_STRUCTURED_ORIGINS)
+    fams = {_source_family(_s(m.get("source"))) for m in members}
+    if len(fams) >= 2 or any(_s(m.get("origin")) in MAJOR_STRUCTURED_ORIGINS for m in members):
+        return True
+    quotes: dict[int, list[str]] = {}
+    for e in f["evidence"]:
+        quotes.setdefault(e["line_start"], []).append(_s(e.get("quote")))
+    member_ids = {m["id"] for m in members}
+    for c in all_cands or []:
+        if (c["id"] in member_ids or _source_family(_s(c.get("source"))) in fams
+                or _s(c.get("kind")) not in _STRICT_CONFIRM_KINDS):
+            continue
+        same = {_ev_line(e) for e in c.get("evidence") or []
+                if any(_same_fragment(q, _s(e.get("quote"))) for q in quotes.get(_ev_line(e) or -1, []))}
+        if len(same - {None}) >= 2:
+            return True
+    return False
+
+
+def _same_fragment(a: str, b: str) -> bool:
+    """Две цитаты одного места говорят об одном: одна содержит другую (≥ 12 знаков) или ≥ 3 общих опорных слова."""
+    x, y = _norm_q(a), _norm_q(b)
+    if not x or not y:
+        return False
+    if len(min(x, y, key=len)) >= 12 and (x in y or y in x):
+        return True
+    return len(_subject_tokens(a) & _subject_tokens(b)) >= 3
 
 
 # «Неверное значение» (формула против примера) — то же утверждение о двух местах; на живом haiku ни разу не был

@@ -54,8 +54,16 @@ def test_conflict_from_acceptance_line_stays_critical():
 
 def test_conflict_confirmed_by_other_reviewer_conflict_on_same_lines():
     other = cand("C-010", 40, "в течение 14 дней", kind="status_conflict", source="lens:architect", reqs=(),
-                 extra=[(124, "409")])
+                 extra=[(124, "409 — отказ невозможен: страхование прекращено")])
     assert _run([_main(), other] + _background()) == "critical"
+
+
+def test_conflict_neighbour_on_same_lines_but_other_fragment_is_not_critical():
+    """Строка таблицы API держит весь метод: соседнее противоречие про другое поле той же строки
+    («refundUntil в примере») — не второе мнение (ложный critical haiku на insurance_v2)."""
+    other = cand("C-010", 40, "в течение 14 дней", kind="contradiction", source="lens:architect", reqs=(),
+                 extra=[(124, '{"refund":36000,"refundUntil":"2026-03-19"}')])
+    assert _run([_main(), other] + _background()) != "critical"
 
 
 def test_conflict_with_neighbour_of_other_kind_is_not_critical():
