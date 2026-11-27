@@ -1,0 +1,34 @@
+{
+  "python": "3.12.10",
+  "os": "Windows 11 Home 26H2",
+  "command": "python -m pytest tests/v2 -q -p no:cacheprovider --tb=line",
+  "parent": {
+    "sha": "973ce4d746b87e9355eb8c130909424ef2aa2f89",
+    "passed": 2267,
+    "failed": 2,
+    "skipped": 5,
+    "xfailed": 3,
+    "xpassed": 7,
+    "seconds": 388.13
+  },
+  "candidate": {
+    "sha": "14b9c06f3956cdfad1966153c4afdb7f86450381",
+    "passed": 2269,
+    "failed": 2,
+    "skipped": 5,
+    "xfailed": 3,
+    "xpassed": 7,
+    "seconds": 368.87
+  },
+  "failed_on_both": [
+    "tests/v2/test_03_wave3.py::test_tesseract_probe_skipped_on_windows_without_tesseract",
+    "tests/v2/test_33_report.py::test_passport_commands_use_paths_from_command_line"
+  ],
+  "focused_gemini_before": "регрессионный случай повторной отправки воспроизведён",
+  "focused_gemini_after": "оба новых теста прошли",
+  "offline_clean_critical": {
+    "parent": 0,
+    "candidate": 0,
+    "documents": 8
+  }
+}
