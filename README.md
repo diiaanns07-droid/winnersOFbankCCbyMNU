@@ -5,7 +5,7 @@
 начинать разработку и тестирование. Решение кейса BCC-HUB × MNU FinTech Hackathon «ИИ-агент проверки требований»
 ([ТЗ](https://github.com/BCC-HUB/ai-requirements-validator-task)).
 
-**Видео-демо:** [`presentation/demo.mp4`](presentation/demo.mp4) (с субтитрами — [`demo_subtitled.mp4`](presentation/demo_subtitled.mp4)) · **Слайды:** [`presentation/deck.pdf`](presentation/deck.pdf) ·
+**Видео-демо:** [`presentation/demo.mp4`](presentation/demo.mp4) (с субтитрами — [`demo_subtitled.mp4`](presentation/demo_subtitled.mp4)) ·
 **Готовый отчёт по документу кейса:** [`reports/requirements.md`](reports/requirements.md)
 (интерактивный — [`reports/requirements.html`](reports/requirements.html)) · **Что сдаём:** [`SUBMISSION.md`](SUBMISSION.md)
 
@@ -327,6 +327,6 @@ docker run --rm --env-file .env -v "$(pwd)/reports:/app/reports" bcc-review rele
 | `reports/` | финальные отчёты агента и таблица прогонов |
 | `evaluation/` | эталон, корпус и счётчик качества |
 | `scripts/` | одна команда для запуска и проверки, финальные отчёты |
-| `presentation/` | слайды, видео-демо, скриншоты |
+| `presentation/` | видео-демо, скриншоты, исходники слайдов (сами слайды — к финалу) |
 | `tests/v2/` | тесты без сети: `python -m pytest tests/v2 -q` |
 | `docs/` | разбор задачи, план и контракт v2 |

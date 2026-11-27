@@ -22,9 +22,9 @@ check_links = importlib.util.module_from_spec(_spec)
 sys.modules["check_links"] = check_links
 _spec.loader.exec_module(check_links)
 
-# Слайды делает №37 в своей ветке; их приносит тимлид при слиянии. Пока их нет — не считаются битыми,
-# с BCC_RELEASE_CHECK=1 (проверка тега v2.0.0 и ветки release) проверяется всё.
-PENDING_FROM_OTHERS = {"presentation/deck.pdf", "presentation/deck.pptx"}
+# Файлы, которые приносит другая ветка при слиянии: пока их нет — не считаются битыми, с BCC_RELEASE_CHECK=1
+# (проверка ветки release) проверяется всё. Слайды №37 отложены к финалу 4.12, ссылки на них из сдачи убраны.
+PENDING_FROM_OTHERS: set[str] = set()
 
 
 def _write(root: Path, rel: str, text: str = "x") -> Path:

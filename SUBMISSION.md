@@ -18,7 +18,7 @@
 | Цепочка уточнения на чужом ТЗ | [`reports/demo_answers/README.md`](reports/demo_answers/README.md) — вопросы → ответы владельца → исправленное ТЗ → повторная проверка |
 | Все прогоны, модели, время, `verify` | [`reports/README.md`](reports/README.md) |
 | Видео-демо (2–3 мин) | [`presentation/demo.mp4`](presentation/demo.mp4); с вшитыми субтитрами — [`presentation/demo_subtitled.mp4`](presentation/demo_subtitled.mp4), отдельно — [`presentation/demo.srt`](presentation/demo.srt) |
-| Презентация | [`presentation/deck.pdf`](presentation/deck.pdf) (и `deck.pptx`) |
+| Презентация | В сдаче 27.11 слайдов (`presentation/deck.pdf`) нет — их готовим к финалу 4.12; агента показывает видео-демо выше |
 | Качество: эталон, корпус, стабильность | [`evaluation/v2/RESULTS.md`](evaluation/v2/RESULTS.md) |
 | Разбор задачи и эталон дефектов | [`docs/task-analysis.md`](docs/task-analysis.md) |
 
@@ -75,9 +75,9 @@
 - [ ] **По желанию — секрет `GEMINI_API_KEY`:** Settings → Secrets and variables → Actions → New repository secret,
       имя `GEMINI_API_KEY`. Тогда Actions → «Сформировать отчёт» → Run workflow строит отчёт на Gemini прямо
       на GitHub (отчёт — в артефактах запуска). Workflow виден, только когда лежит в ветке по умолчанию.
-- [ ] **Видео и слайды:** `presentation/demo.mp4` и `presentation/deck.pdf` открываются по ссылкам выше. Если видео
+- [ ] **Видео:** `presentation/demo.mp4` открывается по ссылке выше. Если видео
       загружено ещё и на YouTube или Google Drive, вписать ссылку сюда: _____
 - [ ] **Проверка глазами жюри:** открыть репозиторий в окне инкогнито (или аккаунтом без доступа к команде): виден
-      README ветки `release`, ссылки на отчёт, видео и слайды открываются.
+      README ветки `release`, ссылки на отчёт и видео открываются (`python scripts/check_links.py` — 0 битых).
 - [ ] **Форма сдачи:** ссылка на репозиторий (`…/winnersOFbankCCbyMNU/tree/release`), рядом — отчёт (`reports/requirements.md` или `.html`) и исходный
       документ (`release/input/requirements.md`).
