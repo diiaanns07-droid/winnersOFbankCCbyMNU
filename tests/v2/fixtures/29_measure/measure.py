@@ -41,8 +41,11 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
 
+SRC = ROOT / "src"  # `replay --src <каталог src>`: тот же ответ модели — кодом другой версии (например, bcc/v2)
+
+
 def sh(cmd: list[str]) -> subprocess.CompletedProcess:
-    env = {"PYTHONPATH": str(ROOT / "src")}
+    env = {"PYTHONPATH": str(SRC)}
     import os
     return subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env={**os.environ, **env})
 
@@ -73,7 +76,7 @@ def answer_path(doc: str, lens: str, model: str, tag: str) -> Path:
 def run_stage(doc: str, lens: str, model: str, tag: str, provider: str = "claude_cli",
               mock_dir: Path | None = None) -> dict:
     prep([doc])
-    rid = f"29s-{doc}-{lens}-{model}-{tag}" + ("-replay" if mock_dir else "")
+    rid = f"29s-{doc}-{lens}-{model}-{tag}" + ("-replay" if mock_dir else "") + ("" if SRC == ROOT / "src" else "-base")
     cmd = [PY, "-m", "bcc_review", "stage", f"lens_{lens}", "--doc", str(DOCS[doc]), "--from",
            str(RUNS / mock_id(doc)), "--provider", provider, "--run-id", rid, "--no-html", "-q", "--no-cache"]
     if provider != "mock":
@@ -106,6 +109,9 @@ def cmd_run(a: argparse.Namespace) -> None:
 
 def cmd_replay(a: argparse.Namespace) -> None:
     """Сохранённый сырой ответ модели → этап кода ветки (mock-провайдер), без живого вызова."""
+    global SRC
+    if a.src:
+        SRC = Path(a.src).resolve()
     for p in sorted(ANSWERS.glob(f"*.{a.tag}.json")):
         d = json.loads(p.read_text(encoding="utf-8"))
         if not d.get("raw"):
@@ -201,7 +207,8 @@ def main() -> None:
     ps = sub.add_parser("score")
     ps.add_argument("--tag", default="")
     pl = sub.add_parser("replay")
-    pl.add_argument("--tag", required=True)
+    pl.add_argument("--tag", required=True, help="метка ответов; «*» — все")
+    pl.add_argument("--src", default="", help="каталог src другой версии кода (по умолчанию — ветка)")
     a = ap.parse_args()
     if a.cmd == "prep":
         prep(a.docs)
