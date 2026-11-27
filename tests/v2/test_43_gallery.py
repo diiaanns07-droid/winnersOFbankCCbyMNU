@@ -89,7 +89,7 @@ def test_examples_json_paths_exist():
     assert len(set(d["id"] for d in raw["documents"])) == len(raw["documents"])
     assert all(i and i.replace("-", "").isalnum() for i in ids)
     for r in raw["reports"]:
-        for k in ("json", "html", "md", "docx", "pdf", "csv", "source"):
+        for k in ("json", "html", "md", "docx", "pdf", "csv", "pdf_annotated", "source"):
             if k in r:
                 assert not Path(r[k]).is_absolute() and ".." not in Path(r[k]).parts, r[k]
         assert (ROOT / r["source"]).is_file(), r["source"]

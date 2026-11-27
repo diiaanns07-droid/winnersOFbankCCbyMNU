@@ -1,5 +1,5 @@
 {
-  "_comment": "№43: готовые отчёты и примеры документов для главной веб-демо. Пути — от корня репозитория. Запись отчёта показывается, только если есть json, html и source; md, docx, pdf, csv — необязательные выгрузки. Отчёты руками не править: команды генерации — в README.md рядом.",
+  "_comment": "№43: готовые отчёты и примеры документов для главной веб-демо. Пути — от корня репозитория. Запись отчёта показывается, только если есть json, html и source; md, docx, pdf, csv, pdf_annotated — необязательные выгрузки. Отчёты руками не править: команды генерации — в README.md рядом.",
   "reports": [
     {
       "id": "official",
@@ -18,7 +18,7 @@
       "html": "reports/requirements_pdf.html",
       "md": "reports/requirements_pdf.md",
       "docx": "reports/requirements_pdf.docx",
-      "pdf": "reports/requirements_pdf.pdf",
+      "pdf_annotated": "reports/requirements_pdf.annotated.pdf",
       "csv": "reports/requirements_pdf.jira.csv",
       "source": "release/input/requirements.pdf"
     },
