@@ -123,7 +123,8 @@
      "F-S7",
      "F-S16b",
      "F-S17"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -267,7 +268,8 @@
     "finding_ids": [
      "F-M1"
     ],
-    "blocking_finding_ids": []
+    "blocking_finding_ids": [],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -368,7 +370,8 @@
     ],
     "blocking_finding_ids": [
      "F-S16"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -469,7 +472,8 @@
     ],
     "blocking_finding_ids": [
      "F-S17"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -649,7 +653,8 @@
     "value": "no",
     "basis": "проверять нечего: описания нет",
     "finding_ids": [],
-    "blocking_finding_ids": []
+    "blocking_finding_ids": [],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -784,7 +789,8 @@
     "blocking_finding_ids": [
      "F-K5",
      "F-S13"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -879,7 +885,8 @@
     ],
     "blocking_finding_ids": [
      "F-S7"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -983,7 +990,8 @@
      "F-K2",
      "F-K3",
      "F-S16"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -1096,7 +1104,8 @@
     ],
     "blocking_finding_ids": [
      "F-S16"
-    ]
+    ],
+    "resolved": []
    },
    "approval": {
     "required": true,
@@ -1228,7 +1237,8 @@
     "value": "yes",
     "basis": "блокирующих замечаний нет",
     "finding_ids": [],
-    "blocking_finding_ids": []
+    "blocking_finding_ids": [],
+    "resolved": []
    },
    "approval": {
     "required": true,
@@ -1358,7 +1368,8 @@
     ],
     "blocking_finding_ids": [
      "F-S1"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -1464,7 +1475,8 @@
     ],
     "blocking_finding_ids": [
      "F-S16b"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -1654,7 +1666,8 @@
      "F-K3",
      "F-K4",
      "F-S1"
-    ]
+    ],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -1850,7 +1863,8 @@
     "finding_ids": [
      "F-M2"
     ],
-    "blocking_finding_ids": []
+    "blocking_finding_ids": [],
+    "resolved": []
    },
    "approval": null,
    "not_required_basis": null,
@@ -1934,6 +1948,7 @@
    "values": {
     "input": 999,
     "unit": "₸",
+    "step": 1,
     "boundary": "lo-1",
     "range": [
      1000,
@@ -2007,6 +2022,7 @@
    "values": {
     "input": 1000,
     "unit": "₸",
+    "step": 1,
     "boundary": "lo",
     "range": [
      1000,
@@ -2078,6 +2094,7 @@
    "values": {
     "input": 1000000,
     "unit": "₸",
+    "step": 1,
     "boundary": "hi",
     "range": [
      1000,
@@ -2157,6 +2174,7 @@
    "values": {
     "input": 1000001,
     "unit": "₸",
+    "step": 1,
     "boundary": "hi+1",
     "range": [
      1000,
@@ -2238,6 +2256,7 @@
    "values": {
     "input": 1000.5,
     "unit": "₸",
+    "step": 1,
     "boundary": "fraction",
     "range": [
      1000,
@@ -3672,6 +3691,7 @@
    "values": {
     "input": 1000,
     "unit": "₸",
+    "step": 1,
     "boundary": "lo",
     "range": [
      1000,
@@ -3778,6 +3798,7 @@
    "values": {
     "input": 1000000,
     "unit": "₸",
+    "step": 1,
     "boundary": "hi",
     "range": [
      1000,
@@ -3898,6 +3919,7 @@
    "values": {
     "input": 999,
     "unit": "₸",
+    "step": 1,
     "boundary": "lo-1",
     "range": [
      1000,
@@ -4078,6 +4100,7 @@
    "values": {
     "input": 1000001,
     "unit": "₸",
+    "step": 1,
     "boundary": "hi+1",
     "range": [
      1000,
@@ -4258,6 +4281,7 @@
    "values": {
     "input": 1000.5,
     "unit": "₸",
+    "step": 1,
     "boundary": "fraction",
     "range": [
      1000,

@@ -1,0 +1,25 @@
+{
+  "individual": {
+    "results": [
+      {
+        "req_id": "R-001.1",
+        "checks": []
+      },
+      {
+        "req_id": "R-001.2",
+        "checks": []
+      },
+      {
+        "req_id": "R-002",
+        "checks": []
+      },
+      {
+        "req_id": "R-003",
+        "checks": []
+      }
+    ]
+  },
+  "verify_meaning": {
+    "__verdicts__": "confirmed"
+  }
+}

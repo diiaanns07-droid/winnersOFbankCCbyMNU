@@ -1,0 +1,558 @@
+{
+ "checklist": [
+  {
+   "id": "CHK-01",
+   "position": 1,
+   "text": "Техническое требование зафиксировано и покрывает бизнес-требование",
+   "source_note": "",
+   "available": "yes",
+   "checked": "yes",
+   "cells": {
+    "available": "Да",
+    "checked": "Да"
+   },
+   "note": "Наличие: да — «Ограничить сумму одного перевода с карты на карту.» (строка 13). Автопроверка: да — блокирующих замечаний нет.",
+   "finding_ids": [],
+   "evidence": [
+    {
+     "block_id": "b0008",
+     "start": 0,
+     "end": 50,
+     "quote": "Ограничить сумму одного перевода с карты на карту."
+    },
+    {
+     "block_id": "b0010",
+     "start": 5,
+     "end": 63,
+     "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+    }
+   ],
+   "allowed": {
+    "available": [
+     "Да",
+     "Нет"
+    ],
+    "checked": [
+     "Да",
+     "Нет"
+    ]
+   },
+   "source_value": {
+    "available": null,
+    "checked": null
+   },
+   "topic": "business",
+   "presence": {
+    "value": "yes",
+    "basis": "описано: «Цели», «Функциональные требования»",
+    "evidence": [
+     {
+      "block_id": "b0008",
+      "start": 0,
+      "end": 50,
+      "quote": "Ограничить сумму одного перевода с карты на карту."
+     },
+     {
+      "block_id": "b0010",
+      "start": 5,
+      "end": 63,
+      "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+     }
+    ],
+    "negative_evidence": [],
+    "inspected_block_ids": [
+     "b0007",
+     "b0008",
+     "b0009",
+     "b0010",
+     "b0011"
+    ]
+   },
+   "machine": {
+    "value": "yes",
+    "basis": "блокирующих замечаний нет",
+    "finding_ids": [],
+    "blocking_finding_ids": [],
+    "resolved": []
+   },
+   "approval": null,
+   "not_required_basis": null,
+   "status": "filled",
+   "question": null,
+   "changes": [],
+   "source": {
+    "block_id": "b0017",
+    "evidence": {
+     "block_id": "b0017",
+     "start": 0,
+     "end": 66,
+     "quote": "Техническое требование зафиксировано и покрывает бизнес-требование"
+    },
+    "location": "строка 30",
+    "columns": {
+     "text": "Проверка",
+     "available": "Создано или доступно",
+     "checked": "Проверено",
+     "note": "Примечания"
+    },
+    "cells": {
+     "available": "Да / Нет",
+     "checked": "Да / Нет"
+    }
+   },
+   "method": "rules",
+   "criteria_link": null
+  },
+  {
+   "id": "CHK-02",
+   "position": 2,
+   "text": "Требование может быть протестировано",
+   "source_note": "",
+   "available": "yes",
+   "checked": "yes",
+   "cells": {
+    "available": "Да",
+    "checked": "Да"
+   },
+   "note": "Наличие: да — «На карте 600 000 ₸ | Перевести 100 000 ₸ | Перевод выполнен» (строка 24). Автопроверка: да — блокирующих замечаний нет.",
+   "finding_ids": [],
+   "evidence": [
+    {
+     "block_id": "b0014",
+     "start": 0,
+     "end": 59,
+     "quote": "На карте 600 000 ₸ | Перевести 100 000 ₸ | Перевод выполнен"
+    }
+   ],
+   "allowed": {
+    "available": [
+     "Да",
+     "Нет"
+    ],
+    "checked": [
+     "Да",
+     "Нет"
+    ]
+   },
+   "source_value": {
+    "available": null,
+    "checked": null
+   },
+   "topic": "testability",
+   "presence": {
+    "value": "yes",
+    "basis": "описано: «Критерии приемки»",
+    "evidence": [
+     {
+      "block_id": "b0014",
+      "start": 0,
+      "end": 59,
+      "quote": "На карте 600 000 ₸ | Перевести 100 000 ₸ | Перевод выполнен"
+     }
+    ],
+    "negative_evidence": [],
+    "inspected_block_ids": [
+     "b0012",
+     "b0013",
+     "b0014"
+    ]
+   },
+   "machine": {
+    "value": "yes",
+    "basis": "блокирующих замечаний нет",
+    "finding_ids": [],
+    "blocking_finding_ids": [],
+    "resolved": []
+   },
+   "approval": null,
+   "not_required_basis": null,
+   "status": "filled",
+   "question": null,
+   "changes": [],
+   "source": {
+    "block_id": "b0018",
+    "evidence": {
+     "block_id": "b0018",
+     "start": 0,
+     "end": 36,
+     "quote": "Требование может быть протестировано"
+    },
+    "location": "строка 31",
+    "columns": {
+     "text": "Проверка",
+     "available": "Создано или доступно",
+     "checked": "Проверено",
+     "note": "Примечания"
+    },
+    "cells": {
+     "available": "Да / Нет",
+     "checked": "Да / Нет"
+    }
+   },
+   "method": "rules",
+   "criteria_link": null
+  },
+  {
+   "id": "CHK-03",
+   "position": 3,
+   "text": "Требование не имеет противоречий или явных показателей операционных рисков",
+   "source_note": "",
+   "available": "yes",
+   "checked": "yes",
+   "cells": {
+    "available": "Да",
+    "checked": "Да"
+   },
+   "note": "Наличие: да — требования для проверки есть: 2. Автопроверка: да — блокирующих замечаний нет.",
+   "finding_ids": [],
+   "evidence": [],
+   "allowed": {
+    "available": [
+     "Да",
+     "Нет"
+    ],
+    "checked": [
+     "Да",
+     "Нет"
+    ]
+   },
+   "source_value": {
+    "available": null,
+    "checked": null
+   },
+   "topic": "consistency",
+   "presence": {
+    "value": "yes",
+    "basis": "требования для проверки есть: 2",
+    "evidence": [],
+    "negative_evidence": [],
+    "inspected_block_ids": []
+   },
+   "machine": {
+    "value": "yes",
+    "basis": "блокирующих замечаний нет",
+    "finding_ids": [],
+    "blocking_finding_ids": [],
+    "resolved": []
+   },
+   "approval": null,
+   "not_required_basis": null,
+   "status": "filled",
+   "question": null,
+   "changes": [],
+   "source": {
+    "block_id": "b0019",
+    "evidence": {
+     "block_id": "b0019",
+     "start": 0,
+     "end": 74,
+     "quote": "Требование не имеет противоречий или явных показателей операционных рисков"
+    },
+    "location": "строка 32",
+    "columns": {
+     "text": "Проверка",
+     "available": "Создано или доступно",
+     "checked": "Проверено",
+     "note": "Примечания"
+    },
+    "cells": {
+     "available": "Да / Нет",
+     "checked": "Да / Нет"
+    }
+   },
+   "method": "rules",
+   "criteria_link": null
+  }
+ ],
+ "test_cases": [
+  {
+   "id": "TC-01",
+   "key": "range:business:сумма::500000:hi-1",
+   "kind": "boundary",
+   "level": "business",
+   "title": "Операция на 499 999 ₸: на 1 ₸ ниже верхней границы — проводится",
+   "precondition": "Правило Л-1: «Сумма одной операции перевода — до 500 000 ₸ включительно». Допустимо до 500 000 ₸ (верхняя граница включена, только целые значения)",
+   "action": "провести операцию на 499 999 ₸ (на 1 ₸ ниже верхней границы)",
+   "expected": "операция на 499 999 ₸ проводится",
+   "gherkin": "Дано Правило Л-1: «Сумма одной операции перевода — до 500 000 ₸ включительно». Допустимо до 500 000 ₸ (верхняя граница включена, только целые значения)\nКогда провести операцию на 499 999 ₸ (на 1 ₸ ниже верхней границы)\nТогда операция на 499 999 ₸ проводится",
+   "req_ids": [
+    "R-01"
+   ],
+   "source_ids": [
+    "Л-1"
+   ],
+   "obligation": {
+    "req_id": "R-01",
+    "source_id": "Л-1",
+    "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно.",
+    "evidence": {
+     "block_id": "b0010",
+     "start": 5,
+     "end": 63,
+     "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+    }
+   },
+   "evidence": [
+    {
+     "block_id": "b0010",
+     "start": 5,
+     "end": 63,
+     "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+    },
+    {
+     "block_id": "b0010",
+     "start": 37,
+     "end": 62,
+     "quote": "до 500 000 ₸ включительно"
+    },
+    {
+     "block_id": "b0010",
+     "start": 64,
+     "end": 98,
+     "quote": "Сумма задаётся целым числом тенге."
+    }
+   ],
+   "values": {
+    "input": 499999,
+    "unit": "₸",
+    "step": 1,
+    "boundary": "hi-1",
+    "range": [
+     null,
+     500000
+    ]
+   },
+   "status": "draft",
+   "open_question_id": null,
+   "open_question": null,
+   "options": [],
+   "decision_id": null,
+   "resolved_question_id": null,
+   "finding_ids": [],
+   "covers_gaps": [],
+   "needs_clarification": false,
+   "source": "rules",
+   "notes": [],
+   "changes": [],
+   "draft": true
+  },
+  {
+   "id": "TC-02",
+   "key": "range:business:сумма::500000:hi",
+   "kind": "boundary",
+   "level": "business",
+   "title": "Операция на 500 000 ₸: верхняя граница — проводится",
+   "precondition": "Правило Л-1: «Сумма одной операции перевода — до 500 000 ₸ включительно». Допустимо до 500 000 ₸ (верхняя граница включена, только целые значения)",
+   "action": "провести операцию на 500 000 ₸ (верхняя граница)",
+   "expected": "операция на 500 000 ₸ проводится",
+   "gherkin": "Дано Правило Л-1: «Сумма одной операции перевода — до 500 000 ₸ включительно». Допустимо до 500 000 ₸ (верхняя граница включена, только целые значения)\nКогда провести операцию на 500 000 ₸ (верхняя граница)\nТогда операция на 500 000 ₸ проводится",
+   "req_ids": [
+    "R-01"
+   ],
+   "source_ids": [
+    "Л-1"
+   ],
+   "obligation": {
+    "req_id": "R-01",
+    "source_id": "Л-1",
+    "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно.",
+    "evidence": {
+     "block_id": "b0010",
+     "start": 5,
+     "end": 63,
+     "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+    }
+   },
+   "evidence": [
+    {
+     "block_id": "b0010",
+     "start": 5,
+     "end": 63,
+     "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+    },
+    {
+     "block_id": "b0010",
+     "start": 37,
+     "end": 62,
+     "quote": "до 500 000 ₸ включительно"
+    },
+    {
+     "block_id": "b0010",
+     "start": 64,
+     "end": 98,
+     "quote": "Сумма задаётся целым числом тенге."
+    }
+   ],
+   "values": {
+    "input": 500000,
+    "unit": "₸",
+    "step": 1,
+    "boundary": "hi",
+    "range": [
+     null,
+     500000
+    ]
+   },
+   "status": "draft",
+   "open_question_id": null,
+   "open_question": null,
+   "options": [],
+   "decision_id": null,
+   "resolved_question_id": null,
+   "finding_ids": [],
+   "covers_gaps": [],
+   "needs_clarification": false,
+   "source": "rules",
+   "notes": [],
+   "changes": [],
+   "draft": true
+  },
+  {
+   "id": "TC-03",
+   "key": "range:business:сумма::500000:hi+1",
+   "kind": "boundary",
+   "level": "business",
+   "title": "Операция на 500 001 ₸: на 1 ₸ выше верхней границы — отклоняется",
+   "precondition": "Правило Л-1: «Сумма одной операции перевода — до 500 000 ₸ включительно». Допустимо до 500 000 ₸ (верхняя граница включена, только целые значения)",
+   "action": "провести операцию на 500 001 ₸ (на 1 ₸ выше верхней границы)",
+   "expected": "операция на 500 001 ₸ отклоняется с сообщением «Превышен лимит операции»",
+   "gherkin": "Дано Правило Л-1: «Сумма одной операции перевода — до 500 000 ₸ включительно». Допустимо до 500 000 ₸ (верхняя граница включена, только целые значения)\nКогда провести операцию на 500 001 ₸ (на 1 ₸ выше верхней границы)\nТогда операция на 500 001 ₸ отклоняется с сообщением «Превышен лимит операции»",
+   "req_ids": [
+    "R-01",
+    "R-02"
+   ],
+   "source_ids": [
+    "Л-1",
+    "Л-2"
+   ],
+   "obligation": {
+    "req_id": "R-01",
+    "source_id": "Л-1",
+    "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно.",
+    "evidence": {
+     "block_id": "b0010",
+     "start": 5,
+     "end": 63,
+     "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+    }
+   },
+   "evidence": [
+    {
+     "block_id": "b0010",
+     "start": 5,
+     "end": 63,
+     "quote": "Сумма одной операции перевода — до 500 000 ₸ включительно."
+    },
+    {
+     "block_id": "b0010",
+     "start": 37,
+     "end": 62,
+     "quote": "до 500 000 ₸ включительно"
+    },
+    {
+     "block_id": "b0010",
+     "start": 64,
+     "end": 98,
+     "quote": "Сумма задаётся целым числом тенге."
+    },
+    {
+     "block_id": "b0011",
+     "start": 5,
+     "end": 77,
+     "quote": "Перевод сверх лимита отклоняется с сообщением «Превышен лимит операции»."
+    }
+   ],
+   "values": {
+    "input": 500001,
+    "unit": "₸",
+    "step": 1,
+    "boundary": "hi+1",
+    "range": [
+     null,
+     500000
+    ]
+   },
+   "status": "draft",
+   "open_question_id": null,
+   "open_question": null,
+   "options": [],
+   "decision_id": null,
+   "resolved_question_id": null,
+   "finding_ids": [],
+   "covers_gaps": [],
+   "needs_clarification": false,
+   "source": "rules",
+   "notes": [],
+   "changes": [],
+   "draft": true
+  },
+  {
+   "id": "TC-04",
+   "key": "acceptance:1:1",
+   "kind": "acceptance",
+   "level": "business",
+   "title": "Критерий приёмки 1: Перевод выполнен",
+   "precondition": "На карте 600 000 ₸",
+   "action": "Перевести 100 000 ₸",
+   "expected": "Перевод выполнен",
+   "gherkin": "Дано На карте 600 000 ₸\nКогда Перевести 100 000 ₸\nТогда Перевод выполнен",
+   "req_ids": [],
+   "source_ids": [],
+   "obligation": {
+    "req_id": null,
+    "source_id": null,
+    "quote": "На карте 600 000 ₸ | Перевести 100 000 ₸ | Перевод выполнен",
+    "evidence": {
+     "block_id": "b0014",
+     "start": 0,
+     "end": 59,
+     "quote": "На карте 600 000 ₸ | Перевести 100 000 ₸ | Перевод выполнен"
+    }
+   },
+   "evidence": [
+    {
+     "block_id": "b0014",
+     "start": 0,
+     "end": 59,
+     "quote": "На карте 600 000 ₸ | Перевести 100 000 ₸ | Перевод выполнен"
+    },
+    {
+     "block_id": "b0014",
+     "start": 0,
+     "end": 18,
+     "quote": "На карте 600 000 ₸"
+    },
+    {
+     "block_id": "b0014",
+     "start": 21,
+     "end": 40,
+     "quote": "Перевести 100 000 ₸"
+    },
+    {
+     "block_id": "b0014",
+     "start": 43,
+     "end": 59,
+     "quote": "Перевод выполнен"
+    }
+   ],
+   "values": {},
+   "status": "draft",
+   "open_question_id": null,
+   "open_question": null,
+   "options": [],
+   "decision_id": null,
+   "resolved_question_id": null,
+   "finding_ids": [],
+   "covers_gaps": [],
+   "needs_clarification": false,
+   "source": "acceptance_table",
+   "notes": [
+    "автоматическая сверка с правилами не выполнена"
+   ],
+   "changes": [],
+   "draft": true
+  }
+ ],
+ "warnings": [],
+ "questions": []
+}
