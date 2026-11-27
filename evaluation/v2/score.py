@@ -469,6 +469,14 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         c["_lines"], _ = finding_lines(c, lines, same_doc or bool(run_dir))
         c["_text"] = (c["title"] + " " + c["text"]).replace("ё", "е")
         c["_title"] = c["title"].replace("ё", "е")
+    # Кандидат «видел» пункт, только если пункт — его тема: строгая пара и оценка не дальше 0,3 от лучшей пары
+    # этого кандидата (как focus() у замечаний). Иначе кандидат о К3 по общим словам «находил» С5, и промах
+    # записывался судье («кандидат нашёл, судья не взял»), хотя кандидата о С5 не было (просьба №18).
+    cand_focus: list[set[str]] = []
+    for c in cands:
+        sc_by = {it["id"]: p["score"] for it in items for p in [pair_info(it, c)] if p["status"] == "match"}
+        top = max(sc_by.values(), default=None)
+        cand_focus.append({g for g, v in sc_by.items() if top is not None and v >= top - 0.3})
     misses = []
     for it in items:
         if it["id"] in assign:
@@ -478,9 +486,8 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                 for (gid, fid), p in pairs.items() if gid == it["id"]]
         near.sort(key=lambda x: -x["score"])
         seen_in = []
-        for c in cands:
-            p = pair_info(it, c)
-            if p["status"] == "match":
+        for c, foc in zip(cands, cand_focus):
+            if it["id"] in foc:
                 seen_in.append({"source": c["sources"][0] if c["sources"] else "?", "id": c["id"],
                                 "title": c["title"][:120], "reason": c.get("reason", "")[:160]})
         lens_seen = [x for x in seen_in if x["source"] not in ("rejected", "quotes:rejected")]

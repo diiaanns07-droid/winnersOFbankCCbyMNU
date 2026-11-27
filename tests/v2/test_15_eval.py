@@ -173,3 +173,16 @@ def test_stage_candidates_as_report():
     assert res["recall"]["critical"]["found"] == ["К2"]
     assert "С8" in res["recall"]["major"]["found"]
     assert "С8" in score.render_lens(res, GOLD, "analyst")
+
+
+def test_miss_where_counts_candidate_only_for_its_own_topic():
+    """Просьба №18: кандидат о К2 (Ф-3 ↔ Ф-4) не «находит» С8 только потому, что цитирует те же строки —
+    промах С8 не записывается судье как «кандидат нашёл, судья не взял»."""
+    cand = _finding("C-001", ITEMS["К2"])
+    cand["reason"] = "судья: не дефект"
+    rep = _report([])
+    rep["rejected"] = [cand]
+    res = _score(rep)
+    where = {m["gold"]: m["where"] for m in res["misses"]}
+    assert where["К2"].startswith("найден кандидатом")
+    assert not where.get("С8", "").startswith("найден кандидатом")
