@@ -148,7 +148,8 @@ def test_real_sonnet_edits_apply_cleanly():
     ctx.options = {"input": str(DOC)}
     res = revise.run(ctx, findings)
     st = res["stats"]
-    assert st["not_applied"] == 0 and st["replaced"] >= 20 and st["inserted"] >= 10
+    # №11-Б: одна замена — строка 148, которую цитирует D-22, — не применяется страховкой (test_11b_revise_guard)
+    assert st["not_applied"] == st["rejected"] == 1 and st["replaced"] >= 20 and st["inserted"] >= 10
     md = res["revised_markdown"]
     assert md.count("```") % 2 == 0
     for line in md.splitlines():
