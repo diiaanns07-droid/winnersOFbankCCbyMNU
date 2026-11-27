@@ -441,7 +441,10 @@ table.rw td:nth-child(4), table.rw td:nth-child(5) { min-width: 220px; }
 @media (max-width: 1000px) { :root[data-embed] .perch { left: auto; right: 10px; top: -70px; max-width: 78vw; flex-direction: row-reverse; } }
 
 /* ── узкие экраны: лист во всю ширину, заметки — под строкой ──── */
-@media (max-width: 1220px) { :root { --notes-w: 280px; } .split { column-gap: 40px; } .minimap { display: none; } }
+@media (max-width: 1220px) {
+  :root { --notes-w: 280px; } .split { column-gap: 40px; } .minimap { display: none; }
+  .filters .frow:first-child { flex-wrap: wrap; border-radius: 18px; }
+}
 @media (max-width: 1000px) {
   :root { --gutter: 44px; }
   .split { display: block; }
