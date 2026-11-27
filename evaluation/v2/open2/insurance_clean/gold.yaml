@@ -3,11 +3,11 @@
 # Номера строк — по evaluation/v2/open2/insurance_clean/source.md; для PDF/DOCX счётчик находит строки по тексту цитат.
 schema: bcc-v2-gold/1
 document: evaluation/v2/open2/insurance_clean/source.md
-sha256: 8246ea1dce171c6988974ce12b0a17124c81f2a0953fe4aa247c567113d99e08
+sha256: 99197c1e9c6936089e9a13a8ab449fef99f29815afe7a28a85cf9895c120d9db
 case: insurance_clean
 variant: clean
 title: Страхование жизни при оформлении кредита наличными
-lines: 222
+lines: 223
 expected_verdict:
   development: 'yes'
   testing: 'yes'
