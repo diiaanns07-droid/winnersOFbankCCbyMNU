@@ -551,6 +551,12 @@ def coverage_share(checks: list[Mapping[str, Any]], reqs: list[Mapping[str, Any]
     covered: set[str] = set()
     for c in checks:
         covered |= set(c.get("rule_requirement_ids") or [])
+        # и по строкам процитированных правил: модель перечисляет ID непостоянно (4 или 5 из 14 от прогона к
+        # прогону), а цитата решающей фразы правила — устойчивый след того, что строка приёмки его проверяет
+        for e in c.get("rule_evidence") or []:
+            n = _int(e.get("line"))
+            covered |= {r.get("id") for r in reqs if n and (_int(r.get("line_start")) or 0) <= n
+                        <= (_int(r.get("line_end")) or _int(r.get("line_start")) or 0)}
     return len(covered & functional), len(functional)
 
 
@@ -571,8 +577,11 @@ def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs:
             c.setdefault("severity_hint", c["severity"])
             c["severity"] = severity
         fact = f"Строки приёмки проверяют {done} из {total} функциональных требований."
-        if fact not in c["problem"]:
-            c["problem"] = f"{c['problem']} {fact}".strip()
+        if fact not in c["problem"]:  # факт — первым: судья видит problem обрезанным до 420 символов
+            c["problem"] = f"{fact} {c['problem']}".strip()
+        if severity == "major":  # заголовок называет объект и меру неполноты (рубрика понятности)
+            c.setdefault("model_title", c["title"])
+            c["title"] = f"Критерии приёмки проверяют {done} из {total} функциональных требований"
 
 
 # Норматив задан числом с единицей (время, доля, частота) — требование проверяемо, не хватает только условий
@@ -792,6 +801,15 @@ BATCH_ROWS = 10
 SHORT_INSTRUCTION = ("\n\n### Дополнительно\nПрошлый ответ не поместился в лимит вывода. Пиши короче: candidates — "
                      "не больше 4, test_cases — не больше 6, каждое текстовое поле — одно-два предложения.")
 NO_ROWS = " acceptance_checks — пустой список: строки приёмки исполнены отдельным запросом."
+EMPTY_INSTRUCTION = ("\n\n### Дополнительно\nВ прошлом ответе списки nfr_checks, candidates и test_cases пустые. "
+                     "Заполни их по документу, как сказано в шагах 1б, 2 и 3; acceptance_checks — пустой список: "
+                     "строки приёмки уже исполнены.")
+
+
+def _empty_answer(data: Mapping[str, Any]) -> bool:
+    """Слабая модель изредка возвращает только acceptance_checks (haiku: 1 из 16 прогонов, 22 тыс. токенов вывода):
+    без тест-кейсов и кандидатов ответ неполон — тест-кейсы есть на любом документе с требованиями."""
+    return not data.get("test_cases") and not data.get("candidates") and not data.get("nfr_checks")
 
 
 _TRUNC_TEXT = re.compile(r"output token|max_tokens|max output|обрез|не поместился", re.I)
@@ -849,6 +867,15 @@ def run(ctx: Any) -> dict:
             warnings.append(f"{STAGE}: короткий ответ тоже обрезан — кандидаты и тест-кейсы линзы не получены")
         if rows:
             data["acceptance_checks"] = []
+    if not partial and reqs and _empty_answer(data):
+        warnings.append(f"{STAGE}: в ответе только строки приёмки — кандидаты и тест-кейсы запрошены повторно")
+        try:
+            extra = dict(ctx.llm.ask(f"{STAGE}_rest", system, user + EMPTY_INSTRUCTION, SCHEMA,
+                                     max_output_tokens=MAX_OUTPUT_TOKENS) or {})
+            for key in ("nfr_checks", "candidates", "test_cases"):
+                data[key] = extra.get(key) or []
+        except Exception as exc:  # повтор — улучшение, а не условие работы линзы
+            warnings.append(f"{STAGE}: повторный запрос кандидатов не удался: {exc}")
     checks = [c for c in data.get("acceptance_checks") or [] if isinstance(c, Mapping)]
     step = BATCH_ROWS // 2 if partial else BATCH_ROWS
     for i in range(0, len(later), step):

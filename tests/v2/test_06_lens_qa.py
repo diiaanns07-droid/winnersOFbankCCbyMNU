@@ -228,7 +228,8 @@ def test_other_candidates_limited_conflicts_kept():
     raw.append(dict(base, title="Заглушка", kind="placeholder", criterion="complete", requirement_ids=[]))
     raw.append(dict(base, title="Заглушка-2", kind="placeholder", criterion="complete", severity="minor"))
     out = lens_qa.postprocess({"candidates": raw}, REQS)
-    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие", "Заглушка"]
+    assert [c.get("model_title", c["title"]) for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие",
+                                                                         "Заглушка"]
     assert out["candidates"][-1]["severity"] == "minor"  # пустой раздел тестирования — minor
     assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт", "Покрытие-2", "Заглушка-2"}
     assert all("не больше 3" in d["reason"] for d in out["dropped"])
@@ -246,10 +247,16 @@ def test_coverage_severity_from_share_of_checked_requirements():
     half = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match")], "candidates": [cover]}, REQS)
     c = half["candidates"][0]
     assert c["severity"] == "minor" and c["severity_hint"] == "major"
-    assert c["problem"].endswith("Строки приёмки проверяют 1 из 2 функциональных требований.")
-    none = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match", rule_requirement_ids=[])],
+    assert c["problem"].startswith("Строки приёмки проверяют 1 из 2 функциональных требований.")
+    assert c["title"] == "Покрытие", "minor — заголовок модели"
+    by_line = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match", rule_requirement_ids=[])],
+                                   "candidates": [dict(cover)]}, REQS)
+    assert by_line["candidates"][0]["severity"] == "minor", "правило найдено по строке цитаты, без ID модели"
+    none = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match", rule_requirement_ids=[],
+                                                            rule_evidence=[])],
                                 "candidates": [dict(cover, severity="minor")]}, REQS)
     assert none["candidates"][0]["severity"] == "major"
+    assert none["candidates"][0]["title"] == "Критерии приёмки проверяют 0 из 2 функциональных требований"
     # без нарезки доли не посчитать — серьёзность модели
     assert lens_qa.postprocess({"candidates": [cover]})["candidates"][0]["severity"] == "major"
 
@@ -364,6 +371,10 @@ def test_range_boundary_mutants_found(case, line):
 
 # ---------------------------------------------------------------- run(ctx) на поддельном контексте
 
+_TC = [{"requirement_ids": ["R-01"], "title": "Граница", "given": "Дано", "when": "Когда", "then": "Итог 12",
+        "gap": "", "expected_defined": True}]
+
+
 class _LLM:
     def __init__(self, answers):
         self.answers, self.calls = list(answers), []
@@ -384,7 +395,7 @@ class _Ctx:
 
 
 def test_run_retries_missing_rows_once():
-    first = {"acceptance_checks": [_check(verdict="match")], "candidates": [], "test_cases": []}
+    first = {"acceptance_checks": [_check(verdict="match")], "candidates": [], "test_cases": _TC}
     second = {"acceptance_checks": [_check(row_requirement_id="R-04", row_line=31, stated_line=31)],
               "candidates": [], "test_cases": []}
     llm = _LLM([first, second])
@@ -397,7 +408,7 @@ def test_run_retries_missing_rows_once():
 def test_run_without_missing_rows_makes_one_call():
     full = {"acceptance_checks": [_check(verdict="match"), _check(row_requirement_id="R-04", row_line=31,
                                                                   verdict="match")],
-            "candidates": [], "test_cases": []}
+            "candidates": [], "test_cases": _TC}
     llm = _LLM([full])
     out = lens_qa.run(_Ctx(llm, REQS))
     assert len(llm.calls) == 1 and out["candidates"] == []
@@ -423,7 +434,7 @@ def test_run_batches_many_acceptance_rows():
 
     def answer(ids):
         return {"acceptance_checks": [_check(row_requirement_id=r, row_line=100 + int(r[2:]), verdict="match")
-                                      for r in ids], "candidates": [], "test_cases": []}
+                                      for r in ids], "candidates": [], "test_cases": _TC if "R-01" in ids else []}
 
     ids = [r["id"] for r in reqs]
     llm = _LLM([answer(ids[:10]), answer(ids[10:20]), answer(ids[20:])])
@@ -558,3 +569,15 @@ def test_model_texts_use_document_names_not_internal_ids():
     idx = {r["id"]: r for r in REQS}
     text = lens_qa.humanize_ids("Строка R-03 противоречит R-01 (L010); код по L163 или L165–L171.", idx)
     assert text == "Критерий приёмки №1 противоречит П-1 (строка 10); код по строке 163 или строки 165–171."
+
+
+def test_run_asks_again_when_answer_has_only_acceptance_rows():
+    """haiku изредка возвращает только acceptance_checks: один повтор за кандидатами и тест-кейсами, строки
+    приёмки не переисполняются; всего вызовов — 2."""
+    rows = [_check(verdict="match"), _check(row_requirement_id="R-04", row_line=31, verdict="match")]
+    rest = {"acceptance_checks": [], "nfr_checks": [], "candidates": [], "test_cases": _TC}
+    llm = _LLM([{"acceptance_checks": rows, "nfr_checks": [], "candidates": [], "test_cases": []}, rest])
+    out = lens_qa.run(_Ctx(llm, REQS))
+    assert [st for st, _ in llm.calls] == ["lens_qa", "lens_qa_rest"]
+    assert "строки приёмки уже исполнены" in llm.calls[1][1]
+    assert len(out["acceptance_checks"]) == 2 and [t["id"] for t in out["test_cases"]] == ["T-01"]
