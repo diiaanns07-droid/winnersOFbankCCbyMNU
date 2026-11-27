@@ -57,6 +57,10 @@
   --b-ease:cubic-bezier(.2,.8,.2,1); --b-fast:120ms; --b-base:220ms; --b-slow:360ms;
   --b-h:44px; --b-bar-h:44px; --b-gap:28px;
   --b-focus:0 0 0 3px rgba(0,185,117,.55);
+  /* совместимость с экранами v1 (страница задания до переделки №41) */
+  --b-canvas:#F3F6F5; --b-max:1180px; --b-pad:24px;
+  --b-shadow-1:0 1px 2px rgba(15,40,65,.04),0 6px 18px rgba(15,40,65,.06);
+  --b-shadow-2:0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10);
 }
 
 /* ── основа ── */
@@ -95,7 +99,7 @@ html{-webkit-text-size-adjust:100%;color-scheme:dark;background:var(--b-desk)}
 }
 .b-sheet ::selection{background:rgba(0,185,117,.22)}
 .b-sheet a{color:var(--b-green-ink)}
-.b-sheet.has-stamp{padding-top:150px}
+.b-sheet.has-stamp{padding-top:132px}
 .b-sheet-head{position:absolute;top:42px;left:64px;right:330px;font:12px/1.5 var(--b-mono);color:var(--b-sheet-ln);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .b-line{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);align-items:baseline;
@@ -103,15 +107,15 @@ html{-webkit-text-size-adjust:100%;color-scheme:dark;background:var(--b-desk)}
 .b-ln{padding-right:18px;text-align:right;font:12px/1 var(--b-mono);color:var(--b-sheet-ln);
   font-variant-numeric:tabular-nums;user-select:none;-webkit-user-select:none;white-space:nowrap}
 .b-tx{min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
-.b-line.blank .b-tx{min-height:.8em}
+.b-line.blank,.b-line.sep{height:10px}
+.b-line.blank>.b-ln,.b-line.sep>.b-ln,.b-line.rule>.b-ln{visibility:hidden}
 .b-line.h1 .b-tx{font-size:27px;line-height:1.25;font-weight:700;letter-spacing:-.01em;padding:4px 0 10px}
 .b-line.h2 .b-tx{font-size:21px;line-height:1.3;font-weight:700;padding:14px 0 6px}
 .b-line.h3 .b-tx{font-size:18px;line-height:1.35;font-weight:700;padding:10px 0 4px}
 .b-line.h4 .b-tx{font-weight:700;padding-top:6px}
 .b-line.rule .b-tx{height:1px;margin:14px 0;background:var(--b-hair-2);font-size:0}
 .b-line.li .b-tx{padding-left:22px;text-indent:-14px}
-.b-line.cell .b-tx{font-size:15px;line-height:1.5;padding:3px 0;box-shadow:inset 0 -1px 0 var(--b-hair)}
-.b-line.cell .b-tx .c{display:inline-block;min-width:24%;padding-right:14px;vertical-align:top}
+.b-line.cell .b-tx{display:grid;column-gap:16px;font-size:15px;line-height:1.5;padding:4px 0;box-shadow:inset 0 -1px 0 var(--b-hair);white-space:normal}
 .b-line.cell.th .b-tx{font-weight:700}
 .b-line.ok .b-ln::before{content:"✓";display:inline-block;margin-right:6px;font:700 11px/1 var(--b-font);color:var(--b-green-ink)}
 .b-sheet.is-focus .b-line:not(.on){opacity:.26}
@@ -173,7 +177,7 @@ html{-webkit-text-size-adjust:100%;color-scheme:dark;background:var(--b-desk)}
 .b-stamp small{font-size:12.5px;letter-spacing:.16em;font-weight:700}
 .b-stamp.ok{color:var(--b-green-ink)}
 .b-stamp.cond{color:#8A5C14}
-.b-stamp-meta{position:absolute;top:112px;right:38px;font:12.5px/1.3 var(--b-font);color:var(--b-ink-3);text-align:right;
+.b-stamp-meta{position:absolute;top:104px;right:38px;font:12.5px/1.3 var(--b-font);color:var(--b-ink-3);text-align:right;
   animation:b-fade var(--b-slow) var(--b-ease) both;animation-delay:380ms}
 .b-stamp.mini{position:relative;top:auto;right:auto;padding:3px 7px 2px;border-width:2px;border-radius:4px;
   box-shadow:inset 0 0 0 1.5px var(--b-paper),inset 0 0 0 2.5px currentColor;font-size:10px;letter-spacing:.1em;animation:none}
