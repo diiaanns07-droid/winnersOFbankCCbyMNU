@@ -1,0 +1,1078 @@
+{
+ "doc": "official",
+ "lens": "architect",
+ "model": "sonnet",
+ "tag": "v0b",
+ "seconds": 35.13,
+ "status": "ok",
+ "raw": [
+  {
+   "inventory": {
+    "operations": [
+     {
+      "name": "/alerts/saveLimit",
+      "method": "GET",
+      "purpose": "изменение",
+      "line": 108
+     },
+     {
+      "name": "получить порог карты",
+      "method": "вызов",
+      "purpose": "чтение",
+      "line": 43
+     },
+     {
+      "name": "проведена покупка",
+      "method": "событие",
+      "purpose": "уведомление",
+      "line": 43
+     },
+     {
+      "name": "передать последние четыре цифры карты и сумму",
+      "method": "вызов",
+      "purpose": "уведомление",
+      "line": 43
+     }
+    ],
+    "promises": [
+     {
+      "what": "приложение читает настройки через дочерний документ",
+      "line": 52,
+      "operation": ""
+     },
+     {
+      "what": "приложение сохраняет настройки через дочерний документ",
+      "line": 52,
+      "operation": "/alerts/saveLimit"
+     },
+     {
+      "what": "показать сумму за месяц на экране",
+      "line": 29,
+      "operation": ""
+     },
+     {
+      "what": "описание метода: чтение порога",
+      "line": 103,
+      "operation": ""
+     }
+    ],
+    "codes": [
+     {
+      "code": "200",
+      "lines": [
+       151,
+       162,
+       165,
+       167
+      ],
+      "described": true,
+      "note": "подписан Successful — Created; тело содержит и OK, и ERROR"
+     },
+     {
+      "code": "201",
+      "lines": [
+       151,
+       165
+      ],
+      "described": false,
+      "note": "успешный по тексту, нет в перечне"
+     },
+     {
+      "code": "400",
+      "lines": [
+       151,
+       163,
+       178,
+       180
+      ],
+      "described": true,
+      "note": "тело без result; для ошибки суммы пример 200 ERROR"
+     },
+     {
+      "code": "401",
+      "lines": [
+       151,
+       174,
+       183
+      ],
+      "described": true,
+      "note": ""
+     },
+     {
+      "code": "403",
+      "lines": [
+       175,
+       188
+      ],
+      "described": false,
+      "note": "в разделе 403 описан 404; тело 403 нет"
+     },
+     {
+      "code": "404",
+      "lines": [
+       189,
+       190,
+       192
+      ],
+      "described": true,
+      "note": "нет в перечне, в разделе 403"
+     },
+     {
+      "code": "500",
+      "lines": [
+       176,
+       195
+      ],
+      "described": true,
+      "note": ""
+     }
+    ],
+    "fields": [
+     {
+      "name": "amount",
+      "places": "запрос integer 32 bit 1 000–1 000 000, limit_kzt; ответ string; данные: порог в тенге"
+     },
+     {
+      "name": "enabled",
+      "places": "запрос integer; ответ string «0»/«1»; в данных нет признака включения явно"
+     },
+     {
+      "name": "cardId",
+      "places": "запрос string 1–64, card_id; данные: идентификатор карты"
+     },
+     {
+      "name": "result",
+      "places": "ответ string OK/ERROR; нет в 400/401/404/500"
+     },
+     {
+      "name": "message",
+      "places": "ответ string при ошибке"
+     }
+    ],
+    "branches": [
+     {
+      "operation": "/alerts/saveLimit",
+      "step": "проверить сессию",
+      "line": 117,
+      "outcome": "401 {\"message\":\"Требуется вход\"}"
+     },
+     {
+      "operation": "/alerts/saveLimit",
+      "step": "карта не принадлежит клиенту",
+      "line": 118,
+      "outcome": "404 {\"message\":\"Карта не найдена\"} (в разделе 403, противоречиво)"
+     },
+     {
+      "operation": "/alerts/saveLimit",
+      "step": "проверить сумму и переключатель",
+      "line": 119,
+      "outcome": ""
+     },
+     {
+      "operation": "/alerts/saveLimit",
+      "step": "при отклонении суммы вернуть прежнее состояние и ERROR",
+      "line": 121,
+      "outcome": ""
+     },
+     {
+      "operation": "/alerts/saveLimit",
+      "step": "заменить настройку и вернуть результат",
+      "line": 120,
+      "outcome": "200 {\"result\":\"OK\",\"amount\":\"50000\",\"enabled\":\"1\"}"
+     }
+    ]
+   },
+   "candidates": [
+    {
+     "title": "Чтение порога и суммы обещано, но метода чтения нет",
+     "kind": "missing_element",
+     "criterion": "set_complete",
+     "severity": "critical",
+     "requirement_ids": [
+      "R-12",
+      "R-16",
+      "R-03"
+     ],
+     "evidence": [
+      {
+       "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API».",
+       "line": 52
+      },
+      {
+       "quote": "Description | Сохранение порога. Функциональные требования: чтение порога",
+       "line": 103
+      },
+      {
+       "quote": "Request URL | Dev: /alerts/saveLimit . Prod: —",
+       "line": 108
+      }
+     ],
+     "problem": "Интеграция обещает чтение настроек через дочерний документ, описание метода называет «чтение порога», но описан только saveLimit, который сохраняет. Метода чтения порога, признака и суммы за месяц нет.",
+     "scenario": "Клиент открывает экран «Уведомления»: приложению нужны порог, переключатель и сумма за месяц, но ни одна операция их не возвращает.",
+     "impact": "Клиентский разработчик не сможет показать текущие настройки и сумму.",
+     "recommendation": "Описать отдельный метод чтения настроек карты с ответом (порог, признак, сумма за месяц) и исправить Description.",
+     "rewrite": "GET /alerts/<уточнить: путь чтения> ?cardId=... → 200 {\"amount\":\"50000\",\"enabled\":\"1\",\"spent\":\"<уточнить: единица>\"}",
+     "question": "Откуда приложение берёт сумму расходов за месяц?",
+     "blocks": "both"
+    },
+    {
+     "title": "Ошибка суммы: 200 с ERROR против 400",
+     "kind": "status_conflict",
+     "criterion": "set_consistent",
+     "severity": "critical",
+     "requirement_ids": [
+      "R-30",
+      "R-21",
+      "R-36",
+      "R-35"
+     ],
+     "evidence": [
+      {
+       "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}",
+       "line": 171
+      },
+      {
+       "quote": "400. Ответ в случае, если параметры запроса заполнены неверно.",
+       "line": 163
+      },
+      {
+       "quote": "Если результат 200 или 201 — успешный. Если результат 400, 401 и далее — неуспешный.",
+       "line": 151
+      }
+     ],
+     "problem": "Неверная сумма по шагу 5 логики возвращает ERROR в теле под заголовком 200, а по перечню параметры заполнены неверно — 400. Клиент, смотрящий на код, сочтёт отказ успехом.",
+     "scenario": "amount=500: по примеру 200 {result:ERROR}, по перечню 400 {message:Некорректный запрос}.",
+     "impact": "Разные реализации сервера и клиента, ложный успех сохранения.",
+     "recommendation": "Для отклонённой суммы зафиксировать один код 400 и одно тело; убрать ERROR из ответа 200.",
+     "rewrite": "400. {\"message\":\"Проверьте сумму\"}; 200 всегда {\"result\":\"OK\",\"amount\":\"50000\",\"enabled\":\"1\"}",
+     "question": "Какой код возвращается при сумме вне 1 000–1 000 000?",
+     "blocks": "both"
+    },
+    {
+     "title": "Сохранение порога выполняется методом GET",
+     "kind": "api_contract",
+     "criterion": "correct",
+     "severity": "major",
+     "requirement_ids": [
+      "R-16"
+     ],
+     "evidence": [
+      {
+       "quote": "REST type | GET",
+       "line": 104
+      },
+      {
+       "quote": "curl -G \"$BASE/alerts/saveLimit\" -H \"Authorization: Bearer $TOKEN\" --data 'cardId=demo-42&amount=50000&enabled=1'",
+       "line": 109
+      }
+     ],
+     "problem": "Метод меняет настройку, но объявлен как GET с параметрами в строке запроса (RFC 9110 п. 9.2.1). Повтор, кэш и предзагрузка изменят данные, параметры попадут в журналы.",
+     "scenario": "Прокси повторит GET с amount=50000 после сохранения 70000 — порог откатится.",
+     "impact": "Непредсказуемое изменение настроек.",
+     "recommendation": "Использовать PUT или POST с телом JSON.",
+     "rewrite": "REST type | PUT; тело {\"cardId\":\"demo-42\",\"amount\":50000,\"enabled\":1}",
+     "question": "",
+     "blocks": "development"
+    },
+    {
+     "title": "Коды ответа: 201, 403 и 404 описаны противоречиво",
+     "kind": "status_conflict",
+     "criterion": "set_consistent",
+     "severity": "major",
+     "requirement_ids": [
+      "R-30",
+      "R-38",
+      "R-40",
+      "R-35"
+     ],
+     "evidence": [
+      {
+       "quote": "200. Successful — Created",
+       "line": 165
+      },
+      {
+       "quote": "403. Unsuccessful — Forbidden",
+       "line": 188
+      },
+      {
+       "quote": "404",
+       "line": 190
+      },
+      {
+       "quote": "403. Ответ в случае, если на указанный ресурс доступ запрещен.",
+       "line": 175
+      }
+     ],
+     "problem": "200 подписан «Created», 201 назван успешным, но не описан; в разделе 403 описан 404, у 403 нет тела, 404 нет в перечне; перечень открыт («401 и далее»).",
+     "scenario": "Чужая карта: перечень даёт 403, раздел — 404; клиент не знает, что обрабатывать.",
+     "impact": "Разные реализации обработки ошибок.",
+     "recommendation": "Привести перечень к реально возвращаемым: 200, 400, 401, 404, 500; убрать 201 и 403 либо описать.",
+     "rewrite": "404. Карта чужая или не найдена: {\"message\":\"Карта не найдена\"}; 403 исключить; успех — только 200",
+     "question": "Нужен ли 403 или только 404?",
+     "blocks": "both"
+    },
+    {
+     "title": "Ветка логики без ответа: при отклонении суммы вернуть прежнее состояние",
+     "kind": "api_contract",
+     "criterion": "complete",
+     "severity": "major",
+     "requirement_ids": [
+      "R-21",
+      "R-34",
+      "R-32"
+     ],
+     "evidence": [
+      {
+       "quote": "5. При отклонении суммы вернуть прежнее состояние и результат ERROR.",
+       "line": 121
+      },
+      {
+       "quote": "amount | string | При успехе | Порог в тенге | limit_kzt",
+       "line": 156
+      }
+     ],
+     "problem": "Нужно вернуть прежнее состояние, но amount и enabled по таблице есть только при успехе; код и тело ветки не заданы.",
+     "scenario": "Порог 50000, приходит amount=5: что вернуть — прежние amount/enabled или только message, неясно.",
+     "impact": "Клиент не знает, что показать после отказа.",
+     "recommendation": "Задать код и тело отказа с прежними значениями или без них.",
+     "rewrite": "400. {\"result\":\"ERROR\",\"amount\":\"<прежний порог>\",\"enabled\":\"<прежний признак>\",\"message\":\"Проверьте сумму\"}",
+     "question": "",
+     "blocks": "both"
+    },
+    {
+     "title": "Ветка логики без ответа: проверка переключателя",
+     "kind": "api_contract",
+     "criterion": "complete",
+     "severity": "major",
+     "requirement_ids": [
+      "R-19",
+      "R-28"
+     ],
+     "evidence": [
+      {
+       "quote": "3. Проверить сумму и переключатель.",
+       "line": 119
+      },
+      {
+       "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
+       "line": 144
+      }
+     ],
+     "problem": "Отказ при enabled вне 0/1 не имеет ответа; шаг 5 говорит только об отклонении суммы.",
+     "scenario": "enabled=2: код и тело не определены; также неясно, обязателен ли amount при enabled=0.",
+     "impact": "Неопределённое поведение сервера и тесты.",
+     "recommendation": "Определить ответ на неверный enabled.",
+     "rewrite": "400. {\"message\":\"Некорректный запрос\"} при enabled не 0 и не 1",
+     "question": "Обязателен ли amount при enabled=0?",
+     "blocks": "both"
+    },
+    {
+     "title": "amount и enabled: integer в запросе, string в ответе",
+     "kind": "api_contract",
+     "criterion": "set_consistent",
+     "severity": "major",
+     "requirement_ids": [
+      "R-27",
+      "R-28",
+      "R-32",
+      "R-33"
+     ],
+     "evidence": [
+      {
+       "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+       "line": 143
+      },
+      {
+       "quote": "amount | string | При успехе | Порог в тенге | limit_kzt",
+       "line": 156
+      },
+      {
+       "quote": "enabled | string | «0» или «1» | Признак включения | enabled",
+       "line": 157
+      }
+     ],
+     "problem": "Одни и те же поля в запросе числа, в ответе строки.",
+     "scenario": "Отправлено amount=50000, ответ \"50000\"; типизированный клиент ломается при разборе.",
+     "impact": "Ошибки десериализации.",
+     "recommendation": "Привести к одному типу.",
+     "rewrite": "amount | integer | При успехе | Порог в тенге | limit_kzt",
+     "question": "",
+     "blocks": "both"
+    },
+    {
+     "title": "Поля интерфейса и правил отсутствуют в перечне хранимых данных",
+     "kind": "missing_element",
+     "criterion": "set_complete",
+     "severity": "major",
+     "requirement_ids": [
+      "R-11",
+      "R-06",
+      "R-07",
+      "R-27",
+      "R-28"
+     ],
+     "evidence": [
+      {
+       "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге.",
+       "line": 49
+      },
+      {
+       "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
+       "line": 144
+      },
+      {
+       "quote": "Переводы и снятие наличных исключаются.",
+       "line": 38
+      }
+     ],
+     "problem": "Признак включения enabled пишется в БД, но в перечне данных его нет; для исключения переводов и возвратов нет типа операции и ссылки на исходную покупку; для push нужны последние четыре цифры карты.",
+     "scenario": "Возврат в марте на покупку февраля: без ссылки на исходную операцию месяц не определить; тип перевода не определить.",
+     "impact": "Нельзя реализовать правила Ф-2 и хранение настроек.",
+     "recommendation": "Дополнить перечень: признак включения, тип операции, ссылка на исходную операцию, дата покупки.",
+     "rewrite": "Хранить также: признак включения уведомления, тип операции, идентификатор исходной операции для возврата, дату совершения покупки.",
+     "question": "",
+     "blocks": "both"
+    },
+    {
+     "title": "Единицы: тиыны в данных, тенге в порогах и приёмке",
+     "kind": "unit_mismatch",
+     "criterion": "unambiguous",
+     "severity": "major",
+     "requirement_ids": [
+      "R-11",
+      "R-05",
+      "R-13"
+     ],
+     "evidence": [
+      {
+       "quote": "сумму покупки в тиынах, признак отправки и порог в тенге",
+       "line": 49
+      },
+      {
+       "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push",
+       "line": 63
+      }
+     ],
+     "problem": "Расходы хранятся в тиынах, порог в тенге, правила пересчёта нет.",
+     "scenario": "Покупка 150000 тиынов (1500 ₸) сравнивается с порогом 50000 без пересчёта — сработает сравнение 150000 с 50000.",
+     "impact": "Ложные или пропущенные push.",
+     "recommendation": "Задать правило пересчёта: 1 ₸ = 100 тиынов.",
+     "rewrite": "Сравнение: расходы в тиынах сравниваются с порогом × 100.",
+     "question": "",
+     "blocks": "both"
+    },
+    {
+     "title": "Повторная доставка: не задан ключ идемпотентности и смысл «исходного итога»",
+     "kind": "incomplete",
+     "criterion": "complete",
+     "severity": "major",
+     "requirement_ids": [
+      "R-12",
+      "R-07"
+     ],
+     "evidence": [
+      {
+       "quote": "Повторная доставка одного события процессинга сохраняет исходный итог.",
+       "line": 52
+      },
+      {
+       "quote": "Процессинг → сервис расходов: проведена покупка.",
+       "line": 43
+      }
+     ],
+     "problem": "Не сказано, по какому полю повтор распознаётся (идентификатор операции хранится, но связь не задана), и что значит «исходный итог» для суммы и push.",
+     "scenario": "Событие покупки 1 500 ₸ приходит дважды параллельно у порога: сумма может вырасти дважды и уйти два push.",
+     "impact": "Двойной учёт и дубль push.",
+     "recommendation": "Задать ключ повтора и правило обработки.",
+     "rewrite": "Повтор распознаётся по паре «идентификатор карты + идентификатор операции»; повторное событие не меняет сумму и не вызывает push.",
+     "question": "",
+     "blocks": "both"
+    },
+    {
+     "title": "Разные имена одного компонента и заглушка Prod",
+     "kind": "terminology",
+     "criterion": "conforming",
+     "severity": "minor",
+     "requirement_ids": [
+      "R-02",
+      "R-09",
+      "R-25",
+      "R-16"
+     ],
+     "evidence": [
+      {
+       "quote": "Мобильное приложение → сервис настроек. Карточный процессинг → учёт расходов → сервис push.",
+       "line": 26
+      },
+      {
+       "quote": "Сервис расходов → настройки: получить порог карты.",
+       "line": 43
+      },
+      {
+       "quote": "Request URL | Dev: /alerts/saveLimit . Prod: —",
+       "line": 108
+      }
+     ],
+     "problem": "«сервис настроек», «настройки», «хранилище настроек» и «учёт расходов»/«сервис расходов» — неясно, одни ли это компоненты; Prod-адрес и Swagger — прочерки.",
+     "scenario": "Интегратор не знает, кто отдаёт порог сервису расходов.",
+     "impact": "Путаница при реализации.",
+     "recommendation": "Единые имена; заполнить Prod и Swagger.",
+     "rewrite": "Использовать «сервис настроек» и «сервис расходов» во всех разделах; Prod: <уточнить: адрес>",
+     "question": "",
+     "blocks": "development"
+    }
+   ]
+  }
+ ],
+ "kept": [
+  {
+   "title": "Чтение порога и суммы обещано, но метода чтения нет",
+   "kind": "missing_element",
+   "criterion": "set_complete",
+   "severity": "critical",
+   "requirement_ids": [
+    "R-12",
+    "R-16",
+    "R-03"
+   ],
+   "evidence": [
+    {
+     "quote": "Приложение читает и сохраняет настройки через дочерний документ «Уведомление о расходах по карте — REST API",
+     "line": 52,
+     "line_start": 52,
+     "line_end": 52,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к интеграции",
+     "verified": "exact"
+    },
+    {
+     "quote": "Description | Сохранение порога. Функциональные требования: чтение порога",
+     "line": 103,
+     "line_start": 103,
+     "line_end": 103,
+     "page": null,
+     "section": "Часть B. REST API › Общие параметры",
+     "verified": "exact"
+    },
+    {
+     "quote": "Request URL | Dev: /alerts/saveLimit . Prod: —",
+     "line": 108,
+     "line_start": 108,
+     "line_end": 108,
+     "page": null,
+     "section": "Часть B. REST API › Общие параметры",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Интеграция обещает чтение настроек через дочерний документ, описание метода называет «чтение порога», но описан только saveLimit, который сохраняет. Метода чтения порога, признака и суммы за месяц нет.",
+   "scenario": "Клиент открывает экран «Уведомления»: приложению нужны порог, переключатель и сумма за месяц, но ни одна операция их не возвращает.",
+   "impact": "Клиентский разработчик не сможет показать текущие настройки и сумму.",
+   "recommendation": "Описать отдельный метод чтения настроек карты с ответом (порог, признак, сумма за месяц) и исправить Description.",
+   "rewrite": "GET /alerts/<уточнить: путь чтения> ?cardId=... → 200 {\"amount\":\"50000\",\"enabled\":\"1\",\"spent\":\"<уточнить: единица>\"}",
+   "question": "Откуда приложение берёт сумму расходов за месяц?",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-017",
+   "line_start": 52,
+   "line_end": 52,
+   "page": null,
+   "section": "Часть A. Новый функционал › Требования к интеграции"
+  },
+  {
+   "title": "Ошибка суммы: 200 с ERROR против 400",
+   "kind": "status_conflict",
+   "criterion": "set_consistent",
+   "severity": "critical",
+   "requirement_ids": [
+    "R-30",
+    "R-21",
+    "R-36",
+    "R-35"
+   ],
+   "evidence": [
+    {
+     "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}",
+     "line": 171,
+     "line_start": 171,
+     "line_end": 171,
+     "page": null,
+     "section": "Часть B. REST API › Статусы › 200. Successful — Created",
+     "verified": "exact"
+    },
+    {
+     "quote": "400. Ответ в случае, если параметры запроса заполнены неверно",
+     "line": 163,
+     "line_start": 163,
+     "line_end": 163,
+     "page": null,
+     "section": "Часть B. REST API › Статусы",
+     "verified": "exact"
+    },
+    {
+     "quote": "Если результат 200 или 201 — успешный. Если результат 400, 401 и далее — неуспешный",
+     "line": 151,
+     "line_start": 151,
+     "line_end": 151,
+     "page": null,
+     "section": "Часть B. REST API › Ответ",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Неверная сумма по шагу 5 логики возвращает ERROR в теле под заголовком 200, а по перечню параметры заполнены неверно — 400. Клиент, смотрящий на код, сочтёт отказ успехом.",
+   "scenario": "amount=500: по примеру 200 {result:ERROR}, по перечню 400 {message:Некорректный запрос}.",
+   "impact": "Разные реализации сервера и клиента, ложный успех сохранения.",
+   "recommendation": "Для отклонённой суммы зафиксировать один код 400 и одно тело; убрать ERROR из ответа 200.",
+   "rewrite": "400. {\"message\":\"Проверьте сумму\"}; 200 всегда {\"result\":\"OK\",\"amount\":\"50000\",\"enabled\":\"1\"}",
+   "question": "Какой код возвращается при сумме вне 1 000–1 000 000?",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-018",
+   "line_start": 171,
+   "line_end": 171,
+   "page": null,
+   "section": "Часть B. REST API › Статусы › 200. Successful — Created"
+  },
+  {
+   "title": "Коды ответа: 201, 403 и 404 описаны противоречиво",
+   "kind": "status_conflict",
+   "criterion": "set_consistent",
+   "severity": "critical",
+   "requirement_ids": [
+    "R-30",
+    "R-38",
+    "R-40",
+    "R-35"
+   ],
+   "evidence": [
+    {
+     "quote": "200. Successful — Created",
+     "line": 165,
+     "line_start": 165,
+     "line_end": 165,
+     "page": null,
+     "section": "Часть B. REST API › Статусы › 200. Successful — Created",
+     "verified": "exact"
+    },
+    {
+     "quote": "403. Unsuccessful — Forbidden",
+     "line": 188,
+     "line_start": 188,
+     "line_end": 188,
+     "page": null,
+     "section": "Часть B. REST API › Статусы › 403. Unsuccessful — Forbidden",
+     "verified": "exact"
+    },
+    {
+     "quote": "404",
+     "line": 190,
+     "line_start": 190,
+     "line_end": 190,
+     "page": null,
+     "section": "Часть B. REST API › Статусы › 403. Unsuccessful — Forbidden",
+     "verified": "exact"
+    },
+    {
+     "quote": "403. Ответ в случае, если на указанный ресурс доступ запрещен",
+     "line": 175,
+     "line_start": 175,
+     "line_end": 175,
+     "page": null,
+     "section": "Часть B. REST API › Статусы › 200. Successful — Created",
+     "verified": "exact"
+    }
+   ],
+   "problem": "200 подписан «Created», 201 назван успешным, но не описан; в разделе 403 описан 404, у 403 нет тела, 404 нет в перечне; перечень открыт («401 и далее»).",
+   "scenario": "Чужая карта: перечень даёт 403, раздел — 404; клиент не знает, что обрабатывать.",
+   "impact": "Разные реализации обработки ошибок.",
+   "recommendation": "Привести перечень к реально возвращаемым: 200, 400, 401, 404, 500; убрать 201 и 403 либо описать.",
+   "rewrite": "404. Карта чужая или не найдена: {\"message\":\"Карта не найдена\"}; 403 исключить; успех — только 200",
+   "question": "Нужен ли 403 или только 404?",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-019",
+   "line_start": 165,
+   "line_end": 165,
+   "page": null,
+   "section": "Часть B. REST API › Статусы › 200. Successful — Created"
+  },
+  {
+   "title": "Сохранение порога выполняется методом GET",
+   "kind": "api_contract",
+   "criterion": "correct",
+   "severity": "major",
+   "requirement_ids": [
+    "R-16"
+   ],
+   "evidence": [
+    {
+     "quote": "REST type | GET",
+     "line": 104,
+     "line_start": 104,
+     "line_end": 104,
+     "page": null,
+     "section": "Часть B. REST API › Общие параметры",
+     "verified": "exact"
+    },
+    {
+     "quote": "curl -G \"$BASE/alerts/saveLimit\" -H \"Authorization: Bearer $TOKEN\" --data 'cardId=demo-42&amount=50000&enabled=1",
+     "line": 109,
+     "line_start": 109,
+     "line_end": 109,
+     "page": null,
+     "section": "Часть B. REST API › Общие параметры",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Метод меняет настройку, но объявлен как GET с параметрами в строке запроса (RFC 9110 п. 9.2.1). Повтор, кэш и предзагрузка изменят данные, параметры попадут в журналы.",
+   "scenario": "Прокси повторит GET с amount=50000 после сохранения 70000 — порог откатится.",
+   "impact": "Непредсказуемое изменение настроек.",
+   "recommendation": "Использовать PUT или POST с телом JSON.",
+   "rewrite": "REST type | PUT; тело {\"cardId\":\"demo-42\",\"amount\":50000,\"enabled\":1}",
+   "question": "",
+   "blocks": "development",
+   "source": "lens:architect",
+   "id": "C-020",
+   "line_start": 104,
+   "line_end": 104,
+   "page": null,
+   "section": "Часть B. REST API › Общие параметры"
+  },
+  {
+   "title": "Ветка логики без ответа: при отклонении суммы вернуть прежнее состояние",
+   "kind": "api_contract",
+   "criterion": "complete",
+   "severity": "major",
+   "requirement_ids": [
+    "R-21",
+    "R-34",
+    "R-32"
+   ],
+   "evidence": [
+    {
+     "quote": "5. При отклонении суммы вернуть прежнее состояние и результат ERROR",
+     "line": 121,
+     "line_start": 121,
+     "line_end": 121,
+     "page": null,
+     "section": "Часть B. REST API › Логика работы метода",
+     "verified": "exact"
+    },
+    {
+     "quote": "amount | string | При успехе | Порог в тенге | limit_kzt",
+     "line": 156,
+     "line_start": 156,
+     "line_end": 156,
+     "page": null,
+     "section": "Часть B. REST API › Ответ",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Нужно вернуть прежнее состояние, но amount и enabled по таблице есть только при успехе; код и тело ветки не заданы.",
+   "scenario": "Порог 50000, приходит amount=5: что вернуть — прежние amount/enabled или только message, неясно.",
+   "impact": "Клиент не знает, что показать после отказа.",
+   "recommendation": "Задать код и тело отказа с прежними значениями или без них.",
+   "rewrite": "400. {\"result\":\"ERROR\",\"amount\":\"<прежний порог>\",\"enabled\":\"<прежний признак>\",\"message\":\"Проверьте сумму\"}",
+   "question": "",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-021",
+   "line_start": 121,
+   "line_end": 121,
+   "page": null,
+   "section": "Часть B. REST API › Логика работы метода"
+  },
+  {
+   "title": "Ветка логики без ответа: проверка переключателя",
+   "kind": "api_contract",
+   "criterion": "complete",
+   "severity": "major",
+   "requirement_ids": [
+    "R-19",
+    "R-28"
+   ],
+   "evidence": [
+    {
+     "quote": "3. Проверить сумму и переключатель",
+     "line": 119,
+     "line_start": 119,
+     "line_end": 119,
+     "page": null,
+     "section": "Часть B. REST API › Логика работы метода",
+     "verified": "exact"
+    },
+    {
+     "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
+     "line": 144,
+     "line_start": 144,
+     "line_end": 144,
+     "page": null,
+     "section": "Часть B. REST API › Параметры запроса › Query-параметры",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Отказ при enabled вне 0/1 не имеет ответа; шаг 5 говорит только об отклонении суммы.",
+   "scenario": "enabled=2: код и тело не определены; также неясно, обязателен ли amount при enabled=0.",
+   "impact": "Неопределённое поведение сервера и тесты.",
+   "recommendation": "Определить ответ на неверный enabled.",
+   "rewrite": "400. {\"message\":\"Некорректный запрос\"} при enabled не 0 и не 1",
+   "question": "Обязателен ли amount при enabled=0?",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-022",
+   "line_start": 119,
+   "line_end": 119,
+   "page": null,
+   "section": "Часть B. REST API › Логика работы метода"
+  },
+  {
+   "title": "amount и enabled: integer в запросе, string в ответе",
+   "kind": "api_contract",
+   "criterion": "set_consistent",
+   "severity": "major",
+   "requirement_ids": [
+    "R-27",
+    "R-28",
+    "R-32",
+    "R-33"
+   ],
+   "evidence": [
+    {
+     "quote": "amount | integer | 32 bit | Да | 1 000–1 000 000 | Порог в тенге | limit_kzt",
+     "line": 143,
+     "line_start": 143,
+     "line_end": 143,
+     "page": null,
+     "section": "Часть B. REST API › Параметры запроса › Query-параметры",
+     "verified": "exact"
+    },
+    {
+     "quote": "amount | string | При успехе | Порог в тенге | limit_kzt",
+     "line": 156,
+     "line_start": 156,
+     "line_end": 156,
+     "page": null,
+     "section": "Часть B. REST API › Ответ",
+     "verified": "exact"
+    },
+    {
+     "quote": "enabled | string | «0» или «1» | Признак включения | enabled",
+     "line": 157,
+     "line_start": 157,
+     "line_end": 157,
+     "page": null,
+     "section": "Часть B. REST API › Ответ",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Одни и те же поля в запросе числа, в ответе строки.",
+   "scenario": "Отправлено amount=50000, ответ \"50000\"; типизированный клиент ломается при разборе.",
+   "impact": "Ошибки десериализации.",
+   "recommendation": "Привести к одному типу.",
+   "rewrite": "amount | integer | При успехе | Порог в тенге | limit_kzt",
+   "question": "",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-023",
+   "line_start": 143,
+   "line_end": 143,
+   "page": null,
+   "section": "Часть B. REST API › Параметры запроса › Query-параметры"
+  },
+  {
+   "title": "Поля интерфейса и правил отсутствуют в перечне хранимых данных",
+   "kind": "missing_element",
+   "criterion": "set_complete",
+   "severity": "major",
+   "requirement_ids": [
+    "R-11",
+    "R-06",
+    "R-07",
+    "R-27",
+    "R-28"
+   ],
+   "evidence": [
+    {
+     "quote": "Хранить идентификатор карты, месяц, идентификатор операции, сумму покупки в тиынах, признак отправки и порог в тенге",
+     "line": 49,
+     "line_start": 49,
+     "line_end": 49,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к данным",
+     "verified": "exact"
+    },
+    {
+     "quote": "enabled | integer | 1 знак | Да | 0 или 1 | Признак включения | enabled",
+     "line": 144,
+     "line_start": 144,
+     "line_end": 144,
+     "page": null,
+     "section": "Часть B. REST API › Параметры запроса › Query-параметры",
+     "verified": "exact"
+    },
+    {
+     "quote": "Переводы и снятие наличных исключаются",
+     "line": 38,
+     "line_start": 38,
+     "line_end": 38,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Признак включения enabled пишется в БД, но в перечне данных его нет; для исключения переводов и возвратов нет типа операции и ссылки на исходную покупку; для push нужны последние четыре цифры карты.",
+   "scenario": "Возврат в марте на покупку февраля: без ссылки на исходную операцию месяц не определить; тип перевода не определить.",
+   "impact": "Нельзя реализовать правила Ф-2 и хранение настроек.",
+   "recommendation": "Дополнить перечень: признак включения, тип операции, ссылка на исходную операцию, дата покупки.",
+   "rewrite": "Хранить также: признак включения уведомления, тип операции, идентификатор исходной операции для возврата, дату совершения покупки.",
+   "question": "",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-024",
+   "line_start": 49,
+   "line_end": 49,
+   "page": null,
+   "section": "Часть A. Новый функционал › Требования к данным"
+  },
+  {
+   "title": "Единицы: тиыны в данных, тенге в порогах и приёмке",
+   "kind": "unit_mismatch",
+   "criterion": "unambiguous",
+   "severity": "major",
+   "requirement_ids": [
+    "R-11",
+    "R-05",
+    "R-13"
+   ],
+   "evidence": [
+    {
+     "quote": "сумму покупки в тиынах, признак отправки и порог в тенге",
+     "line": 49,
+     "line_start": 49,
+     "line_end": 49,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к данным",
+     "verified": "exact"
+    },
+    {
+     "quote": "Расходы 48 500 ₸, порог 50 000 ₸ | Провести покупку на 1 500 ₸ | Итог 50 000 ₸ и один push",
+     "line": 63,
+     "line_start": 63,
+     "line_end": 63,
+     "page": null,
+     "section": "Часть A. Новый функционал › Критерии приемки",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Расходы хранятся в тиынах, порог в тенге, правила пересчёта нет.",
+   "scenario": "Покупка 150000 тиынов (1500 ₸) сравнивается с порогом 50000 без пересчёта — сработает сравнение 150000 с 50000.",
+   "impact": "Ложные или пропущенные push.",
+   "recommendation": "Задать правило пересчёта: 1 ₸ = 100 тиынов.",
+   "rewrite": "Сравнение: расходы в тиынах сравниваются с порогом × 100.",
+   "question": "",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-025",
+   "line_start": 49,
+   "line_end": 49,
+   "page": null,
+   "section": "Часть A. Новый функционал › Требования к данным"
+  },
+  {
+   "title": "Повторная доставка: не задан ключ идемпотентности и смысл «исходного итога»",
+   "kind": "incomplete",
+   "criterion": "complete",
+   "severity": "major",
+   "requirement_ids": [
+    "R-12",
+    "R-07"
+   ],
+   "evidence": [
+    {
+     "quote": "Повторная доставка одного события процессинга сохраняет исходный итог",
+     "line": 52,
+     "line_start": 52,
+     "line_end": 52,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к интеграции",
+     "verified": "exact"
+    },
+    {
+     "quote": "Процессинг → сервис расходов: проведена покупка",
+     "line": 43,
+     "line_start": 43,
+     "line_end": 43,
+     "page": null,
+     "section": "Часть A. Новый функционал › Sequence Diagram",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Не сказано, по какому полю повтор распознаётся (идентификатор операции хранится, но связь не задана), и что значит «исходный итог» для суммы и push.",
+   "scenario": "Событие покупки 1 500 ₸ приходит дважды параллельно у порога: сумма может вырасти дважды и уйти два push.",
+   "impact": "Двойной учёт и дубль push.",
+   "recommendation": "Задать ключ повтора и правило обработки.",
+   "rewrite": "Повтор распознаётся по паре «идентификатор карты + идентификатор операции»; повторное событие не меняет сумму и не вызывает push.",
+   "question": "",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-026",
+   "line_start": 52,
+   "line_end": 52,
+   "page": null,
+   "section": "Часть A. Новый функционал › Требования к интеграции"
+  },
+  {
+   "title": "Разные имена одного компонента и заглушка Prod",
+   "kind": "terminology",
+   "criterion": "conforming",
+   "severity": "minor",
+   "requirement_ids": [
+    "R-02",
+    "R-09",
+    "R-25",
+    "R-16"
+   ],
+   "evidence": [
+    {
+     "quote": "Мобильное приложение → сервис настроек. Карточный процессинг → учёт расходов → сервис push",
+     "line": 26,
+     "line_start": 26,
+     "line_end": 26,
+     "page": null,
+     "section": "Часть A. Новый функционал › Архитектура решения",
+     "verified": "exact"
+    },
+    {
+     "quote": "Сервис расходов → настройки: получить порог карты",
+     "line": 43,
+     "line_start": 43,
+     "line_end": 43,
+     "page": null,
+     "section": "Часть A. Новый функционал › Sequence Diagram",
+     "verified": "exact"
+    },
+    {
+     "quote": "Request URL | Dev: /alerts/saveLimit . Prod: —",
+     "line": 108,
+     "line_start": 108,
+     "line_end": 108,
+     "page": null,
+     "section": "Часть B. REST API › Общие параметры",
+     "verified": "exact"
+    }
+   ],
+   "problem": "«сервис настроек», «настройки», «хранилище настроек» и «учёт расходов»/«сервис расходов» — неясно, одни ли это компоненты; Prod-адрес и Swagger — прочерки.",
+   "scenario": "Интегратор не знает, кто отдаёт порог сервису расходов.",
+   "impact": "Путаница при реализации.",
+   "recommendation": "Единые имена; заполнить Prod и Swagger.",
+   "rewrite": "Использовать «сервис настроек» и «сервис расходов» во всех разделах; Prod: <уточнить: адрес>",
+   "question": "",
+   "blocks": "development",
+   "source": "lens:architect",
+   "id": "C-027",
+   "line_start": 26,
+   "line_end": 26,
+   "page": null,
+   "section": "Часть A. Новый функционал › Архитектура решения"
+  }
+ ]
+}
