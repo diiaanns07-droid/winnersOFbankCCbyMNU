@@ -200,7 +200,7 @@ class Pipeline:
                 self.stages[name] = rec.get("status", "ok")
                 self.stage_stats[name] = {"calls": 0, "seconds": 0.0, "reused": True,
                                           "candidates": len(rec["output"].get("candidates") or [])}
-                self.run.save_stage(name, {**rec, "reused_from": str(self.reuse.path)})
+                self._save_stage(name, {**rec, "reused_from": str(self.reuse.path)})
                 self.log(f"  {name}: взят из {self.reuse.run_id}")
                 return copy.deepcopy(rec["output"])
         llm = self.ctx.llm if self.ctx else None
@@ -244,14 +244,27 @@ class Pipeline:
             st["split"] = after["split"] - before.get("split", 0)
         self.stage_stats[name] = st
         stage_warnings = list(out.get("warnings") or []) + (self.ctx.warnings[warn_before:] if self.ctx else [])
-        self.run.save_stage(name, {"stage": name, "status": status, "seconds": seconds, "calls": calls,
-                                   "error": err, "input": inputs or {}, "output": out, "warnings": stage_warnings})
+        self._save_stage(name, {"stage": name, "status": status, "seconds": seconds, "calls": calls,
+                                "error": err, "input": inputs or {}, "output": out, "warnings": stage_warnings})
         if status == "ok":
             self.log(f"  {name}: готово за {seconds:.0f} с, вызовов {calls}"
                      + (f", кандидатов {st['candidates']}" if st["candidates"] else ""))
         if required and status == "failed":
             raise _StageFailed(name, err)
         return out
+
+    def _save_stage(self, name: str, record: dict) -> None:
+        """Файл этапа — для команды stage и веб-демо, не для отчёта: сбой записи (Windows: файл держит антивирус
+        или демо читает прогресс) — повтор, затем предупреждение, но не падение прогона."""
+        for attempt in range(3):
+            try:
+                self.run.save_stage(name, record)
+                return
+            except OSError as exc:
+                if attempt == 2:
+                    self.warnings.append(f"Файл этапа {name} не записан: {exc}")
+                    return
+                time.sleep(0.2 * (attempt + 1))
 
     # ------------------------------------------------------------------ весь прогон
 
@@ -521,6 +534,11 @@ class Pipeline:
         from .stages import clarify
         finish = getattr(clarify, "finish", None)
         if early is not None and callable(finish):
+            # часы этапа clarify пошли с ранним вызовом, параллельно судье; если ранний вызов не удался, поздний
+            # вызов по итоговым дефектам получает свой лимит времени, а не остаток после медленного судьи
+            restart = getattr(ctx.llm, "restart_stage_clock", None)
+            if callable(restart):
+                restart("clarify")
             return finish(ctx, findings, early)
         return clarify.run(ctx, findings)
 
