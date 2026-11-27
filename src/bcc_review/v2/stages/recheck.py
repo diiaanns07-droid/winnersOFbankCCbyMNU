@@ -226,6 +226,27 @@ def _injected(part: str) -> bool:
                                               or _inj.IMPERATIVE.search(part)))
 
 
+# реплика без собственного предмета: выбирает вариант («второй вариант», «как в варианте B») или только
+# подтверждает («да», «так и оставляем», «согласен»). С вопросом это ответ; без вопроса не понять, какое правило
+# вносить, — такую реплику переспрашивают, а не вносят общим решением (№56)
+_OPTION_REF = re.compile(
+    r"\b(?:перв|втор|трет|четв[её]рт|последн)\w*\s+вариант\w*|\bвариант\w*\s+(?:№\s*)?(?:[A-DА-Г1-4])(?![\w])"
+    r"|\b(?:как|по)\s+(?:в\s+)?вариант\w*\b|^\s*(?:\*\*)?[A-DА-Г](?:\*\*)?\s*[.!)]?\s*$", re.I)
+_BARE = re.compile(
+    r"^\s*(?:да|нет|ок|окей|согласен|согласна|согласны|верно|принято|подтверждаю|оставляем|оставить|включаем"
+    r"|выключаем|нужно|не\s+нужно|так\s+и\s+(?:оставляем|делаем)|так\s+и\s+есть|пусть\s+так)\b", re.I)
+
+
+def needs_binding(text: str) -> bool:
+    """Реплика без своего предмета: ссылается на вариант или только подтверждает — без вопроса её не применить."""
+    t = str(text or "").strip()
+    if not t:
+        return False
+    if _OPTION_REF.search(t):
+        return True
+    return bool(_BARE.match(t)) and len(_tokens(t)) <= 3
+
+
 def strip_injection(text: str) -> tuple[str, list[str]]:
     """Ответ → (текст без указаний модели, вырезанные предложения)."""
     kept, cut = [], []
@@ -550,12 +571,17 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             warnings.append(f"recheck: {where} — указание модели («{_short(cut[0], 80)}»), это не решение "
                             f"владельца; не учтено")
         return kept
+    pending: list[dict] = []
     for d in parsed.get("decisions") or []:
         d = clean(str(d or ""), "в общем решении")
         if not d:
             continue
         body, deferred = split_deferred(d)
-        if body:
+        if body and needs_binding(body):
+            pending.append({"question_id": "", "topic": "", "text": d, "possible_questions": []})
+            warnings.append(f"recheck: общее решение «{_short(d, 80)}» не называет вопрос, а само правила не задаёт "
+                            f"(вариант или подтверждение) — подтвердите, к какому вопросу оно относится; не внесено")
+        elif body:
             extra.append(d)
         else:
             warnings.append(f"recheck: общее решение «{str(d)[:60]}» откладывает решение — не учтено")
@@ -581,7 +607,6 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     bound: dict[int, dict | None] = {}
     pairs = []
     ambiguous: dict[int, list[str]] = {}
-    pending: list[dict] = []
     for gk, members in groups.items():
         hint = entries[members[0]].get("topic_hint") or ""
         text = " ".join(entries[k].get("text") or "" for k in members).strip()
@@ -652,6 +677,12 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 body, _deferred = split_deferred(a["text"])
                 if not body:
                     warnings.append(f"recheck: {a['id']}: ответ откладывает решение — не учтён")
+                    continue
+                if needs_binding(body):  # «Q-12: Да, так и оставляем» — без вопроса не понять, что оставлять
+                    pending.append({"question_id": a["id"], "topic": hint, "text": a["text"], "possible_questions": []})
+                    warnings.append(f"recheck: {a['id']}" + (f" [{hint}]" if hint else "")
+                                    + f": «{_short(a['text'], 60)}» — вопроса с таким номером и темой в прогоне нет, а "
+                                      f"ответ сам правила не задаёт — подтвердите, к какому вопросу он относится; не внесён")
                     continue
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
                 # реплики одного номера и одной темы — ответы адресатов на один вопрос, даже если в этом прогоне
