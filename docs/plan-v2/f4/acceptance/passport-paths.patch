@@ -1,0 +1,71 @@
+diff --git a/src/bcc_review/v2/render/markdown.py b/src/bcc_review/v2/render/markdown.py
+index 2cb79e8d..5e4fe221 100644
+--- a/src/bcc_review/v2/render/markdown.py
++++ b/src/bcc_review/v2/render/markdown.py
+@@ -1359,22 +1359,29 @@ def run_stamp(run: dict) -> str:
+ 
+ 
+ def _report_paths(c: _Ctx):
+-    """Имена для команд паспорта: отчёт .json — по пути, куда пишется Markdown (если он известен), документ — по
+-    имени файла из отчёта."""
+-    from pathlib import PurePath
+-    out = getattr(c, "out_path", None)
+-    out_json = PurePath(str(out)).with_suffix(".json") if out else None
+-    json_arg = (out_json.as_posix() if out_json and not out_json.is_absolute() else out_json.name if out_json
+-                else "отчёт.json")
+-    # документ — по пути, как его указали в командной строке (относительный: команду можно скопировать и
+-    # выполнить из той же папки); абсолютный путь машины в отчёт не пишется — только имя файла
+-    given = getattr(c, "doc_path", None)
+-    given = PurePath(str(given)) if given else None
+-    doc = (given.as_posix() if given and not given.is_absolute() and given.name == PurePath(
+-        str(c.doc.get("file") or given.name)).name else str(c.doc.get("file") or "документ"))
+-    doc_arg = doc if re.fullmatch(r"[\w./\\:-]+", doc) else f'"{doc}"'
+-    clean = lambda x: str(x).replace("`", "").replace("|", "\\|")  # noqa: E731
+-    return out_json, clean(json_arg), clean(doc_arg)
++    """Команды из паспорта сохраняют относительные пути и скрывают каталоги конкретной машины."""
++    from pathlib import PurePosixPath, PureWindowsPath
++
++    def portable(value):
++        if not value:
++            return None
++        text = str(value)
++        windows = PureWindowsPath(text)
++        path = windows if windows.drive or "\\" in text else PurePosixPath(text)
++        return PurePosixPath(path.name if path.anchor else path.as_posix())
++
++    def command_arg(path):
++        text = path.as_posix().replace(chr(96), "").replace("|", "\\|")
++        return text if re.fullmatch(r"[\w./:-]+", text) else f'"{text}"'
++
++    out = portable(getattr(c, "out_path", None))
++    out_json = out.with_suffix(".json") if out else None
++    given = portable(getattr(c, "doc_path", None))
++    source = portable(c.doc.get("file"))
++    if source is None:
++        source = given if given else PurePosixPath("документ")
++    doc = given if given and given.name == source.name else PurePosixPath(source.name)
++    return out_json, command_arg(out_json or PurePosixPath("отчёт.json")), command_arg(doc)
+ 
+ 
+ def _passport(c: _Ctx) -> list[str]:
+diff --git a/tests/v2/test_33_report.py b/tests/v2/test_33_report.py
+index 2afc5e63..621bc604 100644
+--- a/tests/v2/test_33_report.py
++++ b/tests/v2/test_33_report.py
+@@ -147,3 +147,16 @@ def test_passport_commands_use_paths_from_command_line(sample):
+     assert "/home/u" not in md and "verify r.json requirements.md" in md
+     # без путей — как раньше
+     assert "verify отчёт.json requirements.md" in markdown.render(sample)
++
++
++@pytest.mark.parametrize("location", ["/home/example", "C:/Users/example", r"\\server\share\example"])
++def test_passport_hides_machine_specific_directories(sample, location):
++    md = markdown.render(sample, out_path=location + "/Отчёты/r.md",
++                         doc_path=location + "/Вход/requirements.md")
++    assert location not in md
++    assert "verify r.json requirements.md" in md
++
++
++def test_passport_quotes_relative_report_path_with_spaces(sample):
++    md = markdown.render(sample, out_path="Мои отчёты/мой отчёт.md", doc_path="Вход/requirements.md")
++    assert 'verify "Мои отчёты/мой отчёт.json" Вход/requirements.md' in md
