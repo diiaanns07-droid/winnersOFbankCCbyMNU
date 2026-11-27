@@ -615,6 +615,7 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
             sample = "; ".join(f"«{t}»" for t in dropped[:3])
             warnings.append(f"Колонтитулы убраны из текста ({n} {word}): {sample}.")
     out: list[dict] = []
+    vocab = _wrap_vocab(blocks) if sizes else None
     heading_nums: dict[int, tuple[str, str]] = {}   # глубина пути → (заголовок, заголовок с номером автонумерации)
     for b in blocks:
         loc = b.get("loc") or {}
@@ -625,7 +626,7 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
             sec, hnum = _numbered_section(b, sec, heading_nums)
             if hnum:
                 b = {**b, "text": hnum}
-        text = _tight_text(b) if sizes else str(b.get("text") or "")
+        text = _tight_text(b, vocab) if sizes else str(b.get("text") or "")
         if not sizes and b.get("kind") in ("table_row", "table_header") and "\n" in text.strip():
             # DOCX: абзацы внутри ячейки («Итог 50 000 ₸» + пункты списка) — одна строка таблицы, как в PDF;
             # иначе «Один push» стал бы отдельной строкой без колонок и без связи с условиями строки
@@ -711,8 +712,14 @@ def _cell_word_break(b: dict, frags: list[dict], f1: dict, f2: dict, text: str) 
     if (len(w1) < 3 or not re.fullmatch(r"[\x21-\x7e]*[A-Za-z][A-Za-z0-9]*", w1) or sum(ch.isalpha() for ch in w1) < 2
             or not re.fullmatch(r"[a-z][\x21-\x7e]*", w2)):
         return False
+    return _edge_wrap(cell, frags, f1, f2, w1, w2)
+
+
+def _edge_wrap(cell: dict, frags: list[dict], f1: dict, f2: dict, w1: str, w2: str) -> bool:
+    """Геометрия разрыва слова в ячейке: первая часть — последний фрагмент своей строки и доходит до правого края
+    ячейки (следующая буква не помещалась), продолжение — у левого края ячейки на следующей строке."""
     same_line = [f for f in frags if f.get("line") == f1["line"] and cell["start"] <= f["start"] < cell["end"]]
-    if max(f["rect"][2] for f in same_line) > f1["rect"][2] + 0.5:
+    if not same_line or max(f["rect"][2] for f in same_line) > f1["rect"][2] + 0.5:
         return False  # первая часть — последний фрагмент своей строки в ячейке
     in_cell = [f for f in frags if cell["start"] <= f["start"] < cell["end"]]
     pad = max(0.0, min(f["rect"][0] for f in in_cell) - cell["rect"][0])
@@ -795,10 +802,78 @@ def _reorder_fragments(b: dict) -> dict:
     return {**b, "text": new_text, "loc": loc}
 
 
-def _tight_text(b: dict) -> str:
+_TOKEN = re.compile(r"\w+")
+
+
+def _table_frags(b: dict) -> list[dict]:
+    if not (b.get("loc") or {}).get("table"):
+        return []
+    raw = (b.get("loc") or {}).get("fragments") or []
+    return sorted((f for f in (raw if isinstance(raw, list) else []) if isinstance(f, dict)
+                   and isinstance(f.get("start"), int) and isinstance(f.get("end"), int)), key=lambda f: f["start"])
+
+
+def _wrap_vocab(blocks: list[dict]) -> dict:
+    """Словарь самого документа для склейки слов, разорванных переносом в узкой ячейке таблицы PDF: число вхождений
+    каждого слова и отдельно — сколько раз слово стоит в начале перенесённой строки ячейки."""
+    from collections import Counter
+    words: Counter = Counter()
+    wraps: Counter = Counter()
+    for b in blocks:
+        text = str(b.get("text") or "")
+        words.update(t.casefold() for t in _TOKEN.findall(text))
+        frags = _table_frags(b)
+        for f1, f2 in zip(frags, frags[1:]):
+            if isinstance(f1.get("line"), int) and f2.get("line") == f1["line"] + 1:
+                m = _TOKEN.match(text[f2["start"]:f2["end"]])
+                if m:
+                    wraps[m.group().casefold()] += 1
+    return {"words": words, "wraps": wraps}
+
+
+def _vocab_word_break(b: dict, f1: dict, f2: dict, text: str, vocab: dict | None) -> bool:
+    """Слово разорвано переносом в узкой ячейке таблицы («проце нты», «a ccountId», «CAPI TALIZATION»,
+    «страхов ания»): разрыв на переносе строки ячейки, склеенное слово встречается в документе целым, а вторая часть
+    отдельным словом (вне таких переносов) — нигде. «Идентификатор / карты» не склеится: «идентификаторкарты» в
+    документе нет."""
+    if not vocab or not (b.get("loc") or {}).get("table") or not isinstance(f1.get("line"), int) \
+            or f2.get("line") != f1["line"] + 1:
+        return False
+    w1, w2 = text[f1["start"]:f1["end"]], text[f2["start"]:f2["end"]]
+    m1, m2 = re.search(r"\w+$", w1), _TOKEN.match(w2)
+    if not m1 or not m2:
+        return False
+    t1, t2 = m1.group(), m2.group()
+    # «60 000 ₸»: группа из трёх цифр после 1–3 цифр — разряды, пробел законный; «11 890.36» в JSON — разрыв
+    if t1.isdigit() and len(t1) <= 3 and t2.isdigit() and len(t2) == 3 and not re.match(r"[.,]\d", w2[m2.end():]):
+        return False
+    joined, tail = (t1 + t2).casefold(), t2.casefold()
+    words, wraps = vocab["words"], vocab["wraps"]
+    if words.get(joined, 0) >= 1 and words.get(tail, 0) - wraps.get(tail, 0) <= 0:
+        return True
+    frags = _table_frags(b)
+    cells = ((b.get("loc") or {}).get("table") or {}).get("cells") or []
+    cell = next((c for c in cells if isinstance(c, dict) and c.get("rect")
+                 and c.get("start", 0) <= f1["start"] and f2["end"] <= c.get("end", -1)), None)
+    if cell is None or not all(isinstance(f.get("rect"), (list, tuple)) and len(f["rect"]) == 4 for f in frags) \
+            or not _edge_wrap(cell, frags, f1, f2, w1, w2):
+        return False
+    # у края ячейки: склеенное слово есть в документе — клеим; без словаря — только числа и латинские
+    # идентификаторы (camelCase, ЗАГЛАВНЫЕ): кириллицу без словаря не трогаем
+    if words.get(joined, 0) >= 1:
+        return True
+    if t1[-1].isdigit() and t2[0].isdigit():
+        return True
+    if re.fullmatch(r"[A-Za-z_]+", t1) and re.fullmatch(r"[a-z][a-z0-9]*[A-Z][A-Za-z0-9_]*", t2):
+        return True
+    return bool(re.fullmatch(r"[A-Z_]+", t1) and re.fullmatch(r"[A-Z0-9_]+", t2))
+
+
+def _tight_text(b: dict, vocab: dict | None = None) -> str:
     """Текст блока PDF без лишних пробелов: читатель ставит пробел между соседними фрагментами строки, даже если
     зазора между ними нет («ВК -1», «приложении .»). Пробел убирается, если зазор < 8 % высоты строки.
-    Знаки, которые читатель унёс в конец строки (другой шрифт), возвращаются на место (``_reorder_fragments``)."""
+    Знаки, которые читатель унёс в конец строки (другой шрифт), возвращаются на место (``_reorder_fragments``);
+    слово, разорванное переносом в узкой ячейке таблицы, склеивается по словарю документа (``_vocab_word_break``)."""
     try:
         b = _reorder_fragments(b)
     except Exception:  # noqa: BLE001 — порядок как у читателя v1
@@ -815,7 +890,7 @@ def _tight_text(b: dict) -> str:
             h = max(f1["rect"][3] - f1["rect"][1], 1.0)
             if f2["rect"][0] - f1["rect"][2] < 0.08 * h:
                 cut.append(f1["end"])
-        elif _cell_word_break(b, frags, f1, f2, text):
+        elif _cell_word_break(b, frags, f1, f2, text) or _vocab_word_break(b, f1, f2, text, vocab):
             cut.append(f1["end"])
     if not cut:
         return text

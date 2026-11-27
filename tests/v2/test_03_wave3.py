@@ -523,3 +523,20 @@ def test_document_warnings_in_summary_and_junk_file(tmp_path):
     junk.write_bytes(bytes(range(256)) * 20)
     assert any("двоичный или повреждённый" in w for w in dv.load(junk)["warnings"])
     assert dv.load(OFFICIAL_MD)["warnings"] == []
+
+
+# --------------------------------------------------------------------------- PDF: слово, разорванное в узкой ячейке
+@pytest.mark.skipif(not _has("pymupdf"), reason="нет PyMuPDF")
+def test_words_broken_in_narrow_cells_are_glued():
+    """«проце нты», «a ccountId», «CAPI TALIZATION», «Созда ние», «0 1T10» — разрыв на переносе строки ячейки
+    склеивается по словарю документа и краю ячейки; разряды «60 000 ₸» и обычный перенос слов не трогаются."""
+    cap = " ".join(ln["text"] for ln in dv.load(ROOT / "evaluation/v2/open2/capital_clean/source.pdf")["lines"])
+    for w in ("проценты", "{accountId}", "CAPITALIZATION", "История"):
+        assert w in cap, w
+    assert "проце нты" not in cap and "a ccountId" not in cap
+    qr = " ".join(ln["text"] for ln in dv.load(ROOT / "evaluation/v2/open2/qr_clean/source.pdf")["lines"])
+    assert "Создание QR" in qr and "expiresAt" in qr and "01T10:15" in qr
+    tl = " ".join(ln["text"] for ln in dv.load(ROOT / "evaluation/dev/corpus/cases/transfer_limit.base/source.pdf")["lines"])
+    assert "60 000 ₸" in tl and "60000 ₸" not in tl
+    off = [ln["text"] for ln in dv.load(OFFICIAL_PDF)["lines"]]
+    assert len(off) == 128  # официальный PDF не меняется
