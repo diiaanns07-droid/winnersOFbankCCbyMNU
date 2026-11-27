@@ -257,15 +257,12 @@ def test_error_body_gap_is_minor():
     assert la.postprocess({"candidates": [conflict]})["candidates"][0]["severity"] == "critical"
 
 
-def test_inventory_tolerates_model_notes_but_candidates_stay_strict():
-    """Заметки модели в описи не ломают схему (иначе claude -p переписывает ответ заново); постобработка их убирает."""
-    inv = dict(la.empty_inventory(), promises_check_note="все обещания сверены",
-               operations=[{"name": "m", "method": "GET", "purpose": "чтение", "line": 1, "note": "x"}])
-    jsonschema.validate({"inventory": inv, "candidates": [_cand()]}, la.SCHEMA)
-    out = la.postprocess({"inventory": inv, "candidates": [_cand()]})
-    assert set(out["inventory"]) == set(la.empty_inventory())
+def test_inventory_is_strict_and_prompt_forbids_own_fields():
+    """Свободная опись ухудшила К3 (замер волны 3): опись строгая, а промпт запрещает модели свои поля."""
+    inv = dict(la.empty_inventory(), promises_check_note="все обещания сверены")
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate({"inventory": inv, "candidates": [_cand(note="x")]}, la.SCHEMA)
+        jsonschema.validate({"inventory": inv, "candidates": [_cand()]}, la.SCHEMA)
+    assert "не добавляй своих полей" in PROMPT.read_text(encoding="utf-8")
 
 
 def test_field_missing_from_data_list_is_minor_unless_rule_needs_it():

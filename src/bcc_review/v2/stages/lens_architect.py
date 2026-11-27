@@ -57,21 +57,16 @@ CANDIDATE_SCHEMA = _obj({
     "blocks": {"type": "string", "enum": ["development", "testing", "both", "none"]},
 })
 
-def _draft(props: dict) -> dict:
-    """Объект описи: лишние поля разрешены (черновик модели; постобработка оставляет только известные)."""
-    return {**_obj(props), "additionalProperties": True}
-
-
-# Опись — черновик: модель добавляет в неё свои заметки («promises_check_note», «sequence_note»), и строгая схема
-# заставляла claude -p переписывать весь ответ заново — 3–6 ходов вместо 2 в 10 из 43 прогонов haiku
-# (+50–80 % времени этапа; замер волны 3, сессия 2). Кандидаты остаются строгими (CONTRACT 2.3).
-INVENTORY_SCHEMA = _draft({
-    "operations": {"type": "array", "items": _draft({"name": _S, "method": _S, "purpose": _S, "line": _INT})},
-    "promises": {"type": "array", "items": _draft({"what": _S, "line": _INT, "operation": _S})},
-    "codes": {"type": "array", "items": _draft({
+# Опись строгая (additionalProperties: false). Замер волны 3, сессия 2: со свободной описью (лишние поля разрешены)
+# sonnet на официальном писал К3 в 1 из 3 прогонов вместо 3 из 3 и 8–11 кандидатов вместо 10–12, haiku терял К3
+# в 4 из 11. Лишние поля модели (заметки в описи) запрещает промпт; claude -p при них переписывает ответ заново.
+INVENTORY_SCHEMA = _obj({
+    "operations": {"type": "array", "items": _obj({"name": _S, "method": _S, "purpose": _S, "line": _INT})},
+    "promises": {"type": "array", "items": _obj({"what": _S, "line": _INT, "operation": _S})},
+    "codes": {"type": "array", "items": _obj({
         "code": _S, "lines": {"type": "array", "items": _INT}, "described": {"type": "boolean"}, "note": _S})},
-    "fields": {"type": "array", "items": _draft({"name": _S, "places": _S})},
-    "branches": {"type": "array", "items": _draft({"operation": _S, "step": _S, "line": _INT, "outcome": _S})},
+    "fields": {"type": "array", "items": _obj({"name": _S, "places": _S})},
+    "branches": {"type": "array", "items": _obj({"operation": _S, "step": _S, "line": _INT, "outcome": _S})},
 })
 
 
