@@ -1,0 +1,422 @@
+# Эталон открытого набора №18 (кейс qr). Собран из evaluation/v2/open2/qr/spec.yaml сборщиком evaluation/v2/open2/build.py —
+# руками не править: правьте spec.yaml и пересоберите. Формат bcc-v2-gold/1 (как evaluation/v2/official/gold.yaml).
+# Номера строк — по evaluation/v2/open2/qr/source.md; для PDF/DOCX счётчик находит строки по тексту цитат.
+schema: bcc-v2-gold/1
+document: evaluation/v2/open2/qr/source.md
+sha256: 38bd6a86d36b89a44065e7de3ba9264740651f34d09ffe621b836c49d261abc8
+case: qr
+variant: defects
+title: Перевод по QR-коду
+lines: 202
+expected_verdict:
+  development: 'no'
+  testing: 'no'
+targets:
+  findings_min: 12
+  findings_max: 40
+  report_lines_max: 900
+  critical_found_min: 4
+  critical_as_critical_min: 3
+  major_found_min: 3
+items:
+- id: К1
+  level: critical
+  severity_ok:
+  - critical
+  title: 'Срок действия QR-кода без суммы: 15 минут в Ф-2 и до конца дня в части B'
+  essence: 'Ф-2: любой QR-код действует 15 минут с момента создания. Особое правило 1 части B: QR-код без суммы
+    действует до конца календарного дня. QR-код без суммы, отсканированный через час, по части A недействителен,
+    по части B — оплачивается.'
+  anchors:
+    policy: all
+    groups:
+    - lines: '38'
+      quote: QR-код действует 15 минут с момента создания.
+    - lines: '131'
+      quote: 1. QR-код без суммы действует до конца календарного дня создания.
+  keywords:
+    min: 2
+    groups:
+    - 15 минут|15 мин
+    - конц\w* (календарн\w* )?дн|до конца дня|сутк
+    - срок\w* действи|действует|без суммы|истек|противореч
+  kinds:
+  - event_conflict
+  - contradiction
+  - boundary_conflict
+  - ambiguity
+  owners:
+  - consistency
+  - analyst
+  related:
+  - С2
+- id: К2
+  level: critical
+  severity_ok:
+  - critical
+  title: 'Критерий приёмки №3 противоречит Ф-1: 500 000 ₸ входит в диапазон'
+  essence: 'Ф-1 и Ф-3: сумма от 100 до 500 000 ₸ включительно, логика API проверяет тот же диапазон. Критерий приёмки
+    №3 ожидает, что перевод на 500 000 ₸ отклонён, потому что «сумма превышает максимальную».'
+  anchors:
+    policy: all
+    groups:
+    - lines: '37'
+      quote: QR-код создаётся без суммы или с суммой от 100 до 500 000 ₸ включительно
+    - lines: '67'
+      quote: '| QR-код на сумму 500 000 ₸ | Подтвердить перевод | Перевод отклонён: сумма превышает максимальную
+        |'
+  keywords:
+    min: 2
+    groups:
+    - приемк|критери|ожидаем
+    - 500 000|500000|максим|граница|включительно
+    - отклон|превыша|противореч|допустим|входит
+  kinds:
+  - boundary_conflict
+  - contradiction
+  - event_conflict
+  - incorrect
+  owners:
+  - qa
+  - consistency
+  related: []
+- id: К3
+  level: critical
+  severity_ok:
+  - critical
+  title: Нет методов создания, получения данных и отмены QR-кода
+  essence: 'Часть A: приложения «создают QR-код, получают данные QR-кода перед подтверждением и выполняют перевод»
+    через дочерний документ; в sequence есть «создать QR-код» и «получить данные QR-кода», на экране — кнопка «Отменить».
+    Часть B описывает только перевод (POST /qr/transfer): создать QR-код, показать отправителю имя получателя до
+    подтверждения (Ф-3) и отменить QR-код (Ф-5) нечем.'
+  anchors:
+    policy: any
+    groups:
+    - lines: '54'
+      quote: Приложения создают QR-код, получают данные QR-кода перед подтверждением и выполняют перевод через дочерний
+        документ
+    - lines: '45'
+      quote: 'Приложение получателя → сервис QR-кодов: создать QR-код. Приложение отправителя → сервис QR-кодов:
+        получить данные QR-кода.'
+    - lines: '107'
+      quote: '| **Description** | Выполнение перевода по QR-коду |'
+  keywords:
+    min: 2
+    groups:
+    - создани\w* qr|созда\w* qr|сформир|получени\w* данн|данн\w* qr|отмен|чтени|просмотр
+    - нет|отсутств|не описан|не определ|только (метод )?(перевод|выполнени)|не предусмотр|единственн|лишь
+    - метод|api|endpoint|эндпоинт|операци|контракт
+  kinds:
+  - missing_element
+  - incomplete
+  - api_contract
+  - traceability
+  owners:
+  - architect
+  - consistency
+  related:
+  - С5
+- id: К4
+  level: critical
+  severity_ok:
+  - critical
+  title: Не определено, когда QR-код с суммой считается оплаченным
+  essence: 'Ф-2 разрешает оплатить QR-код с суммой один раз, шаг 6 логики проверяет «ещё не оплачен», но событие
+    «оплачен» не определено: приём запроса, одобрение антифродом, списание или зачисление. Неясно, можно ли оплатить
+    QR-код повторно, пока перевод на проверке антифрода или после отказа (REJECTED), и что вернуть при повторной
+    оплате — двойной перевод или потерянный QR-код.'
+  anchors:
+    policy: any
+    groups:
+    - lines: '38'
+      quote: QR-код с суммой можно оплатить один раз
+    - lines: '126'
+      quote: 6. Проверить, что QR-код с суммой ещё не оплачен.
+    - lines: '51'
+      quote: статус (активен, оплачен, отменён, истёк)
+  keywords:
+    min: 2
+    groups:
+    - оплачен|оплат\w* (один раз|повторн)|однократн|повторн\w* оплат|двойн|дважды
+    - момент|когда|в обработк|антифрод|rejected|отклонен|списани|зачислени|не определ|не указан|неясн|гонк|параллельн|одновременн
+    - статус|событи|считается|определени|код ответа|не описан
+  kinds:
+  - ambiguity
+  - incomplete
+  - missing_element
+  - event_conflict
+  owners:
+  - risk
+  - analyst
+  related:
+  - С5
+- id: С1
+  level: major
+  severity_ok:
+  - major
+  - critical
+  title: 'Истёкший QR-код: 410 в логике метода, 400 в статусах и примере'
+  essence: 'Шаг 4 логики: если срок истёк — вернуть 410. Раздел «Статусы»: 400 — «срок действия QR-кода истёк»,
+    410 — только «QR-код отменён»; пример ответа 400 — «Срок действия QR-кода истёк». Один вход — два кода.'
+  anchors:
+    policy: all
+    groups:
+    - lines: '124'
+      quote: Если срок истёк или QR-код отменён, вернуть 410.
+    - lines: 168,181
+      quote: '**400.** Ответ в случае, если параметры запроса заполнены неверно или срок действия QR-кода истёк.'
+  keywords:
+    min: 2
+    groups:
+    - \b410\b|gone
+    - \b400\b|bad request
+    - истек|срок\w* действи|просроч|противореч|разн\w* (код|статус)|два (кода|статуса)
+  kinds:
+  - status_conflict
+  - contradiction
+  - api_contract
+  - ambiguity
+  owners:
+  - architect
+  - consistency
+  related: []
+- id: С2
+  level: major
+  severity_ok:
+  - major
+  - critical
+  title: 'Срок действия ttl: минуты в требованиях к данным, секунды в логике API'
+  essence: Требования к данным хранят срок действия ttl в минутах, шаг 4 логики прибавляет ttl секунд ко времени
+    создания. При ttl = 15 QR-код «истечёт» через 15 секунд вместо 15 минут.
+  anchors:
+    policy: all
+    groups:
+    - lines: '51'
+      quote: срок действия `ttl` в минутах
+    - lines: '124'
+      quote: текущее время не позже времени создания QR-кода + `ttl` секунд
+  keywords:
+    min: 2
+    groups:
+    - ttl|срок\w* действи
+    - секунд
+    - минут|единиц
+  kinds:
+  - unit_mismatch
+  - contradiction
+  - ambiguity
+  owners:
+  - consistency
+  - architect
+  related:
+  - К1
+- id: С3
+  level: major
+  severity_ok:
+  - major
+  - critical
+  title: Номер карты получателя в открытом виде в QR-коде
+  essence: По требованиям к данным QR-код содержит номер карты получателя. QR-код показывают на экране посторонним,
+    его фотографируют — номер карты раскрывается (PCI DSS, тайна банковских реквизитов), хотя для перевода достаточно
+    идентификатора QR-кода.
+  anchors:
+    policy: any
+    groups:
+    - lines: '51'
+      quote: QR-код содержит идентификатор QR-кода, номер карты получателя и сумму, если она задана.
+  keywords:
+    min: 2
+    groups:
+    - номер\w* карт|pan|реквизит|карт\w* получател
+    - безопасн|раскры|утечк|pci|персональн|конфиденц|маскир|открыт\w* вид|фотограф|посторонн|иб\b|токен
+  kinds:
+  - security
+  - design_constraint
+  - incorrect
+  - ops_risk
+  - other
+  owners:
+  - risk
+  - architect
+  related: []
+- id: С4
+  level: major
+  severity_ok:
+  - major
+  title: 'НФТ непроверяемы: «мгновенно», «высокие нагрузки»'
+  essence: Нет времени ответа, перцентиля и числа операций в секунду; «мгновенно» и «высокие нагрузки» не проверить.
+  anchors:
+    policy: any
+    groups:
+    - lines: '48'
+      quote: Создание QR-кода и перевод выполняются мгновенно.
+  keywords:
+    min: 2
+    groups:
+    - мгновенн|высок\w* нагрузк|пиков
+    - непроверяем|измерим|метрик|не задан|критери|числ|секунд|перцентил|sla|rps|порог|не определ|размыт|субъектив
+  kinds:
+  - unverifiable
+  - ambiguity
+  - incomplete
+  owners:
+  - qa
+  - analyst
+  - rules
+  related: []
+- id: С5
+  level: major
+  severity_ok:
+  - major
+  title: Не описана отмена QR-кода во время оплаты
+  essence: 'Ф-5 разрешает получателю отменить неоплаченный QR-код, но не сказано, что будет, если отправитель уже
+    на экране подтверждения или перевод проверяет антифрод: можно ли отменить, что получит отправитель.'
+  anchors:
+    policy: any
+    groups:
+    - lines: '41'
+      quote: Получатель может отменить неоплаченный QR-код.
+  keywords:
+    min: 2
+    groups:
+    - отмен
+    - одновременн|параллельн|гонк|во время|в процессе|в обработк|уже подтвер|экран\w* подтвержд|антифрод|не описан|не
+      определ|неясн
+  kinds:
+  - incomplete
+  - missing_element
+  - ambiguity
+  - event_conflict
+  owners:
+  - risk
+  - qa
+  related:
+  - К4
+- id: М5
+  level: minor
+  severity_ok:
+  - minor
+  - major
+  title: «Плательщик» в части B вместо «отправителя»
+  essence: Шаг 2 логики называет отправителя «плательщиком»; глоссария нет, термины расходятся.
+  anchors:
+    policy: any
+    groups:
+    - lines: '122'
+      quote: 2. Проверить, что карта списания принадлежит плательщику, активна и открыта в тенге.
+  keywords:
+    min: 1
+    groups:
+    - плательщик
+  kinds:
+  - terminology
+  - ambiguity
+  owners:
+  - analyst
+  - consistency
+  related: []
+- id: М1
+  level: minor
+  severity_ok:
+  - minor
+  title: Чек-лист ревью не заполнен, версия и дата документа не указаны
+  essence: Отметки чек-листа не проставлены, версия и дата документа не заполнены.
+  anchors:
+    policy: any
+    groups:
+    - lines: '72'
+      quote: Документ (версия/дата) в источнике не заполнен.
+  keywords:
+    min: 2
+    groups:
+    - чек-лист|чеклист|ревью|верси|дат[аы] документ
+    - не заполн|не проставл|пуст|отсутств|заглушк|шаблон|не указан
+  kinds:
+  - placeholder
+  - traceability
+  - format
+  owners:
+  - rules
+  related:
+  - М2
+- id: М2
+  level: minor
+  severity_ok:
+  - minor
+  title: Блок согласующих пуст
+  essence: Подразделения, ФИО и подписи согласующих не указаны.
+  anchors:
+    policy: any
+    groups:
+    - lines: '93'
+      quote: '| Подразделение | ФИО ответственного | Подпись |'
+  keywords:
+    min: 2
+    groups:
+    - согласующ|согласовани|подпис|фио
+    - пуст|не заполн|отсутств|не указан|не провед
+  kinds:
+  - placeholder
+  - traceability
+  owners:
+  - rules
+  related:
+  - М1
+- id: М3
+  level: minor
+  severity_ok:
+  - minor
+  title: Раздел «Тестирование требований» — заглушка
+  essence: Вместо требований к тестированию стоит «заполняются тестировщиками».
+  anchors:
+    policy: any
+    groups:
+    - lines: '59'
+      quote: заполняются тестировщиками
+  keywords:
+    min: 2
+    groups:
+    - тестировщик|тестировани\w* требовани|требовани\w* к тестировани
+    - заглушк|не заполн|пуст|отсутств|не описан|не определ
+  kinds:
+  - placeholder
+  - incomplete
+  owners:
+  - rules
+  - qa
+  related: []
+- id: М4
+  level: minor
+  severity_ok:
+  - minor
+  title: Нет ID и приоритетов у НФТ, требований к данным и интеграции
+  essence: Номера есть только у функциональных требований; у НФТ, данных и интеграции нет ID и приоритетов (IEEE
+    830, 4.3.5).
+  anchors:
+    policy: any
+    groups:
+    - lines: '47'
+      quote: '### Нефункциональные требования'
+    - lines: '50'
+      quote: '### Требования к данным'
+    - lines: '53'
+      quote: '### Требования к интеграции'
+  keywords:
+    min: 2
+    groups:
+    - \bid\b|идентификатор\w* требовани|нумерац|номер\w* требовани|приоритет
+    - 'нет|отсутств|без '
+  kinds:
+  - traceability
+  - format
+  - placeholder
+  owners:
+  - rules
+  - analyst
+  related: []
+fix_order:
+- К3
+- К1
+- К4
+- К2
+- С1
