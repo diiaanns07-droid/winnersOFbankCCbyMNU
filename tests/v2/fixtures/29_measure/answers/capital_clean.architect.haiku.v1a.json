@@ -1,0 +1,543 @@
+{
+ "doc": "capital_clean",
+ "lens": "architect",
+ "model": "haiku",
+ "tag": "v1a",
+ "seconds": 97.54,
+ "status": "ok",
+ "raw": [
+  {
+   "inventory": {
+    "operations": [
+     {
+      "name": "PUT /savings/{accountId}/payout-mode",
+      "method": "PUT",
+      "purpose": "изменение",
+      "line": 110
+     },
+     {
+      "name": "GET /savings/{accountId}/interest",
+      "method": "GET",
+      "purpose": "чтение",
+      "line": 201
+     },
+     {
+      "name": "GET /savings/{accountId}/interest/history",
+      "method": "GET",
+      "purpose": "чтение",
+      "line": 202
+     }
+    ],
+    "promises": [
+     {
+      "what": "показать ставку и проценты за текущий месяц",
+      "line": 28,
+      "operation": "GET /savings/{accountId}/interest"
+     },
+     {
+      "what": "показать текущий способ выплаты в переключателе",
+      "line": 28,
+      "operation": "GET /savings/{accountId}/interest"
+     },
+     {
+      "what": "показать дату, с которой действует новый способ, после сохранения",
+      "line": 28,
+      "operation": "PUT /savings/{accountId}/payout-mode"
+     },
+     {
+      "what": "сохранить способ выплаты по кнопке «Сохранить»",
+      "line": 28,
+      "operation": "PUT /savings/{accountId}/payout-mode"
+     },
+     {
+      "what": "показать историю начислений",
+      "line": 28,
+      "operation": "GET /savings/{accountId}/interest/history"
+     },
+     {
+      "what": "получает ставку и проценты за текущий месяц",
+      "line": 53,
+      "operation": "GET /savings/{accountId}/interest"
+     },
+     {
+      "what": "получает историю начислений",
+      "line": 53,
+      "operation": "GET /savings/{accountId}/interest/history"
+     },
+     {
+      "what": "сохраняет способ выплаты",
+      "line": 53,
+      "operation": "PUT /savings/{accountId}/payout-mode"
+     },
+     {
+      "what": "видеть сколько процентов начислено за текущий месяц",
+      "line": 22,
+      "operation": "GET /savings/{accountId}/interest"
+     }
+    ],
+    "codes": [
+     {
+      "code": "200",
+      "lines": [
+       152,
+       164,
+       170,
+       172
+      ],
+      "described": true,
+      "note": "условие и пример тела есть"
+     },
+     {
+      "code": "400",
+      "lines": [
+       152,
+       165,
+       175,
+       177,
+       202
+      ],
+      "described": true,
+      "note": "тело описано для метода 1; для метода 3 тело не задано"
+     },
+     {
+      "code": "401",
+      "lines": [
+       152,
+       166,
+       180,
+       182,
+       197
+      ],
+      "described": true,
+      "note": "для методов 2 и 3 — как у метода 1"
+     },
+     {
+      "code": "404",
+      "lines": [
+       152,
+       167,
+       185,
+       187,
+       201,
+       202
+      ],
+      "described": true,
+      "note": "у метода 2 условие без слова «закрыт»"
+     },
+     {
+      "code": "500",
+      "lines": [
+       152,
+       168,
+       190,
+       192,
+       197
+      ],
+      "described": true,
+      "note": "для методов 2 и 3 — как у метода 1"
+     }
+    ],
+    "fields": [
+     {
+      "name": "accountId",
+      "places": "path, string 1–64, обязательный (строки 141, 201, 202)"
+     },
+     {
+      "name": "mode",
+      "places": "request body, string, обязательный, CAPITALIZATION / CARD (строка 148)"
+     },
+     {
+      "name": "cardId",
+      "places": "request body, string 1–64, для CARD (строка 149); в ответе метода 2 — payoutCardId (строка 201)"
+     },
+     {
+      "name": "currentMode",
+      "places": "response, string, CAPITALIZATION / CARD (строки 156, 172, 201)"
+     },
+     {
+      "name": "nextMode",
+      "places": "response, string, CAPITALIZATION / CARD (строки 157, 172, 201)"
+     },
+     {
+      "name": "effectiveFrom",
+      "places": "response, string ГГГГ-ММ-ДД (строки 158, 172)"
+     },
+     {
+      "name": "rate",
+      "places": "response, number, % годовых (строки 159, 172, 201)"
+     },
+     {
+      "name": "accruedInterest",
+      "places": "response, number ≥ 0, ₸ (строки 160, 172, 201)"
+     },
+     {
+      "name": "from / to",
+      "places": "query, string ГГГГ-ММ, обязательные (строка 202)"
+     },
+     {
+      "name": "amount / month / mode (история)",
+      "places": "response items, number ₸ / string ГГГГ-ММ / string (строка 202)"
+     }
+    ],
+    "branches": [
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "1. Проверить сессию клиента — не пройдена",
+      "line": 119,
+      "outcome": "401, {\"message\":\"Требуется вход\"}"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "2. Счёт не принадлежит клиенту или закрыт",
+      "line": 120,
+      "outcome": "404, {\"message\":\"Счёт или карта не найдены\"}"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "3. mode = CARD: карта не активна или открыта не в тенге",
+      "line": 121,
+      "outcome": "400, {\"message\":\"Некорректный запрос\"}"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "3. mode = CARD: карта принадлежит другому клиенту",
+      "line": 121,
+      "outcome": "404, {\"message\":\"Счёт или карта не найдены\"}"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "mode неизвестен или для CARD не передан cardId",
+      "line": 165,
+      "outcome": "400, {\"message\":\"Некорректный запрос\"}"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "4. Сохранить способ выплаты с датой 1-е число следующего месяца; внутренняя ошибка",
+      "line": 122,
+      "outcome": "500, {\"message\":\"Ошибка сервиса\"}"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "5. Вернуть способ текущего и следующего месяца, ставку и проценты",
+      "line": 123,
+      "outcome": "200, поля как в примере ответа"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "Повторная установка уже выбранного способа",
+      "line": 126,
+      "outcome": "200, текущие условия"
+     },
+     {
+      "operation": "PUT /savings/{accountId}/payout-mode",
+      "step": "Для CAPITALIZATION cardId не передаётся, переданное значение не сохраняется",
+      "line": 128,
+      "outcome": "200; прежняя карта не описана"
+     },
+     {
+      "operation": "GET /savings/{accountId}/interest",
+      "step": "Счёт не найден или принадлежит другому клиенту",
+      "line": 201,
+      "outcome": "404, {\"message\":\"Счёт или карта не найдены\"}"
+     },
+     {
+      "operation": "GET /savings/{accountId}/interest/history",
+      "step": "from позже to или период больше 12 месяцев",
+      "line": 202,
+      "outcome": "400; тело не задано"
+     },
+     {
+      "operation": "GET /savings/{accountId}/interest/history",
+      "step": "Счёт не найден или принадлежит другому клиенту",
+      "line": 202,
+      "outcome": "404; тело не задано"
+     }
+    ]
+   },
+   "candidates": [
+    {
+     "title": "Причина капитализации в push не хранится и не приходит в API",
+     "kind": "missing_element",
+     "criterion": "set_complete",
+     "severity": "major",
+     "requirement_ids": [
+      "R-09",
+      "R-13"
+     ],
+     "evidence": [
+      {
+       "line": 40,
+       "quote": "Если на дату выплаты карта для выплаты закрыта или заблокирована, проценты за месяц капитализируются, а в push указывается причина."
+      },
+      {
+       "line": 50,
+       "quote": "Хранить идентификатор счёта, способ выплаты, карту для выплаты, дату начала действия нового способа"
+      }
+     ],
+     "problem": "Ф-5 требует указать в push причину капитализации, но в перечне хранимых данных (строка 50) причины нет, а ни одна операция (строки 110, 201, 202) её не возвращает. Причина не определена ни как поле, ни как значение.",
+     "scenario": "Карта для выплаты заблокирована 31 марта, проценты капитализированы. Клиент получает push с причиной, но история (GET .../interest/history, строка 202) содержит только month, amount, mode, и причину восстановить нельзя.",
+     "impact": "Клиент не видит причины в приложении и поддержка не может объяснить капитализацию; приёмка push-текста невозможна без источника значения.",
+     "recommendation": "Добавить в перечень хранимых данных признак причины выплаты и вернуть его в истории начислений.",
+     "rewrite": "Хранить для каждого месяца причину выплаты <уточнить: имя поля> (<уточнить: перечень причин и тексты>) и возвращать её в поле items строки 202.",
+     "question": "Какие причины капитализации нужно хранить и показывать клиенту?",
+     "blocks": "both"
+    },
+    {
+     "title": "Поле payoutCardId после смены на CAPITALIZATION: прежняя карта или null",
+     "kind": "api_contract",
+     "criterion": "unambiguous",
+     "severity": "major",
+     "requirement_ids": [
+      "R-52",
+      "R-70"
+     ],
+     "evidence": [
+      {
+       "line": 128,
+       "quote": "3. Для способа CAPITALIZATION поле cardId не передаётся; переданное значение не сохраняется."
+      },
+      {
+       "line": 201,
+       "quote": "{\"currentMode\":\"CAPITALIZATION\",\"nextMode\":\"CAPITALIZATION\",\"payoutCardId\":null"
+      }
+     ],
+     "problem": "Строка 128 говорит только о том, что переданное значение не сохраняется, но не о том, что делать с ранее сохранённой картой. Пример ответа метода чтения (строка 201) показывает payoutCardId null только для варианта без карты.",
+     "scenario": "10 марта клиент выбрал CARD с cardId c-2001, 20 марта выбрал CAPITALIZATION. GET /savings/{accountId}/interest: по строке 128 карта не сохраняется, но payoutCardId может вернуть c-2001 или null, документ не решает.",
+     "impact": "Разные клиентские приложения и серверы покажут разное значение карты в переключателе, а тест на сброс карты не может быть написан по тексту.",
+     "recommendation": "Явно указать, очищается ли payout_card_id при смене на CAPITALIZATION и что возвращает payoutCardId в этом случае.",
+     "rewrite": "PUT /savings/{accountId}/payout-mode, mode = CAPITALIZATION: payout_card_id устанавливается в null; GET /savings/{accountId}/interest возвращает payoutCardId = null, пока nextMode или currentMode = CAPITALIZATION. <уточнить: сохраняется ли прежняя карта для следующего выбора CARD>",
+     "question": "Нужно ли при смене на CAPITALIZATION сохранять прежнюю карту для последующего выбора «На карту»?",
+     "blocks": "both"
+    },
+    {
+     "title": "Предусловие «счёт в тенге» не проверяется в логике метода",
+     "kind": "incomplete",
+     "criterion": "complete",
+     "severity": "minor",
+     "requirement_ids": [
+      "R-05",
+      "R-46"
+     ],
+     "evidence": [
+      {
+       "line": 36,
+       "quote": "Ф-1. Владелец накопительного счёта в тенге выбирает способ выплаты процентов"
+      },
+      {
+       "line": 120,
+       "quote": "2. Проверить, что накопительный счёт принадлежит клиенту и открыт."
+      }
+     ],
+     "problem": "Ф-1 ограничивает способ выплаты счётом в тенге, но шаги логики метода (строки 119–123) проверяют только сессию, принадлежность и открытость счёта. Ответ для счёта в другой валюте не задан.",
+     "scenario": "PUT /savings/{accountId}/payout-mode для накопительного счёта не в тенге с действующим клиентом: по шагам 1–5 запрос проходит и сохраняется способ выплаты.",
+     "impact": "Метод сохранит способ выплаты для счёта, которому правило Ф-1 не разрешает его менять.",
+     "recommendation": "Добавить в шаг 2 проверку валюты счёта и ветку отказа с кодом.",
+     "rewrite": "2. Проверить, что накопительный счёт принадлежит клиенту, открыт и ведётся в тенге; иначе 404 или 400 с телом {\"message\":\"<уточнить: код и текст>\"}.",
+     "question": "Какой код возвращать для счёта не в тенге: 400 или 404?",
+     "blocks": "development"
+    },
+    {
+     "title": "Поле next_payout_mode не перечислено в хранимых данных",
+     "kind": "missing_element",
+     "criterion": "complete",
+     "severity": "minor",
+     "requirement_ids": [
+      "R-60",
+      "R-13"
+     ],
+     "evidence": [
+      {
+       "line": 157,
+       "quote": "nextMode | string | CAPITALIZATION / CARD | Способ выплаты с 1-го числа следующего месяца | next_payout_mode"
+      },
+      {
+       "line": 50,
+       "quote": "Хранить идентификатор счёта, способ выплаты, карту для выплаты, дату начала действия нового способа"
+      }
+     ],
+     "problem": "Ответ сохраняет next_payout_mode как отдельное поле, а перечень хранимых данных упоминает один «способ выплаты». Непонятно, хранятся ли текущий и следующий способ раздельно.",
+     "scenario": "Клиент в марте выбрал CARD, 31 марта выплата должна идти по текущему способу CAPITALIZATION, с 1 апреля по следующему. Без раздельного хранения нельзя выполнить Ф-3.",
+     "impact": "Разработчики по-разному реализуют хранение, и приёмка переключения с 1-го числа не имеет однозначной модели.",
+     "recommendation": "Указать в перечне хранимых данных оба поля отдельно.",
+     "rewrite": "Хранить текущий способ выплаты payout_mode и способ с 1-го числа следующего месяца next_payout_mode, дату next_mode_from в тенге с точностью до тиына, если применимо.",
+     "question": "",
+     "blocks": "development"
+    }
+   ]
+  }
+ ],
+ "kept": [
+  {
+   "title": "Причина капитализации в push не хранится и не приходит в API",
+   "kind": "missing_element",
+   "criterion": "set_complete",
+   "severity": "major",
+   "requirement_ids": [
+    "R-09",
+    "R-13"
+   ],
+   "evidence": [
+    {
+     "line": 40,
+     "quote": "Если на дату выплаты карта для выплаты закрыта или заблокирована, проценты за месяц капитализируются, а в push указывается причина",
+     "line_start": 40,
+     "line_end": 40,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+     "verified": "exact"
+    },
+    {
+     "line": 50,
+     "quote": "Хранить идентификатор счёта, способ выплаты, карту для выплаты, дату начала действия нового способа",
+     "line_start": 50,
+     "line_end": 50,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к данным",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Ф-5 требует указать в push причину капитализации, но в перечне хранимых данных (строка 50) причины нет, а ни одна операция (строки 110, 201, 202) её не возвращает. Причина не определена ни как поле, ни как значение.",
+   "scenario": "Карта для выплаты заблокирована 31 марта, проценты капитализированы. Клиент получает push с причиной, но история (GET .../interest/history, строка 202) содержит только month, amount, mode, и причину восстановить нельзя.",
+   "impact": "Клиент не видит причины в приложении и поддержка не может объяснить капитализацию; приёмка push-текста невозможна без источника значения.",
+   "recommendation": "Добавить в перечень хранимых данных признак причины выплаты и вернуть его в истории начислений.",
+   "rewrite": "Хранить для каждого месяца причину выплаты <уточнить: имя поля> (<уточнить: перечень причин и тексты>) и возвращать её в поле items строки 202.",
+   "question": "Какие причины капитализации нужно хранить и показывать клиенту?",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-001",
+   "line_start": 40,
+   "line_end": 40,
+   "page": null,
+   "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования"
+  },
+  {
+   "title": "Поле payoutCardId после смены на CAPITALIZATION: прежняя карта или null",
+   "kind": "api_contract",
+   "criterion": "unambiguous",
+   "severity": "major",
+   "requirement_ids": [
+    "R-52",
+    "R-70"
+   ],
+   "evidence": [
+    {
+     "line": 128,
+     "quote": "3. Для способа CAPITALIZATION поле cardId не передаётся; переданное значение не сохраняется",
+     "line_start": 128,
+     "line_end": 128,
+     "page": null,
+     "section": "Часть B. REST API › Особые правила",
+     "verified": "exact"
+    },
+    {
+     "line": 201,
+     "quote": "{\"currentMode\":\"CAPITALIZATION\",\"nextMode\":\"CAPITALIZATION\",\"payoutCardId\":null",
+     "line_start": 201,
+     "line_end": 201,
+     "page": null,
+     "section": "Часть B. REST API › Методы чтения",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Строка 128 говорит только о том, что переданное значение не сохраняется, но не о том, что делать с ранее сохранённой картой. Пример ответа метода чтения (строка 201) показывает payoutCardId null только для варианта без карты.",
+   "scenario": "10 марта клиент выбрал CARD с cardId c-2001, 20 марта выбрал CAPITALIZATION. GET /savings/{accountId}/interest: по строке 128 карта не сохраняется, но payoutCardId может вернуть c-2001 или null, документ не решает.",
+   "impact": "Разные клиентские приложения и серверы покажут разное значение карты в переключателе, а тест на сброс карты не может быть написан по тексту.",
+   "recommendation": "Явно указать, очищается ли payout_card_id при смене на CAPITALIZATION и что возвращает payoutCardId в этом случае.",
+   "rewrite": "PUT /savings/{accountId}/payout-mode, mode = CAPITALIZATION: payout_card_id устанавливается в null; GET /savings/{accountId}/interest возвращает payoutCardId = null, пока nextMode или currentMode = CAPITALIZATION. <уточнить: сохраняется ли прежняя карта для следующего выбора CARD>",
+   "question": "Нужно ли при смене на CAPITALIZATION сохранять прежнюю карту для последующего выбора «На карту»?",
+   "blocks": "both",
+   "source": "lens:architect",
+   "id": "C-002",
+   "line_start": 128,
+   "line_end": 128,
+   "page": null,
+   "section": "Часть B. REST API › Особые правила"
+  },
+  {
+   "title": "Предусловие «счёт в тенге» не проверяется в логике метода",
+   "kind": "incomplete",
+   "criterion": "complete",
+   "severity": "minor",
+   "requirement_ids": [
+    "R-05",
+    "R-46"
+   ],
+   "evidence": [
+    {
+     "line": 36,
+     "quote": "Ф-1. Владелец накопительного счёта в тенге выбирает способ выплаты процентов",
+     "line_start": 36,
+     "line_end": 36,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+     "verified": "exact"
+    },
+    {
+     "line": 120,
+     "quote": "2. Проверить, что накопительный счёт принадлежит клиенту и открыт",
+     "line_start": 120,
+     "line_end": 120,
+     "page": null,
+     "section": "Часть B. REST API › Логика работы метода",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Ф-1 ограничивает способ выплаты счётом в тенге, но шаги логики метода (строки 119–123) проверяют только сессию, принадлежность и открытость счёта. Ответ для счёта в другой валюте не задан.",
+   "scenario": "PUT /savings/{accountId}/payout-mode для накопительного счёта не в тенге с действующим клиентом: по шагам 1–5 запрос проходит и сохраняется способ выплаты.",
+   "impact": "Метод сохранит способ выплаты для счёта, которому правило Ф-1 не разрешает его менять.",
+   "recommendation": "Добавить в шаг 2 проверку валюты счёта и ветку отказа с кодом.",
+   "rewrite": "2. Проверить, что накопительный счёт принадлежит клиенту, открыт и ведётся в тенге; иначе 404 или 400 с телом {\"message\":\"<уточнить: код и текст>\"}.",
+   "question": "Какой код возвращать для счёта не в тенге: 400 или 404?",
+   "blocks": "development",
+   "source": "lens:architect",
+   "id": "C-003",
+   "line_start": 36,
+   "line_end": 36,
+   "page": null,
+   "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования"
+  },
+  {
+   "title": "Поле next_payout_mode не перечислено в хранимых данных",
+   "kind": "missing_element",
+   "criterion": "complete",
+   "severity": "minor",
+   "requirement_ids": [
+    "R-60",
+    "R-13"
+   ],
+   "evidence": [
+    {
+     "line": 157,
+     "quote": "nextMode | string | CAPITALIZATION / CARD | Способ выплаты с 1-го числа следующего месяца | next_payout_mode",
+     "line_start": 157,
+     "line_end": 157,
+     "page": null,
+     "section": "Часть B. REST API › Ответ",
+     "verified": "exact"
+    },
+    {
+     "line": 50,
+     "quote": "Хранить идентификатор счёта, способ выплаты, карту для выплаты, дату начала действия нового способа",
+     "line_start": 50,
+     "line_end": 50,
+     "page": null,
+     "section": "Часть A. Новый функционал › Требования к данным",
+     "verified": "exact"
+    }
+   ],
+   "problem": "Ответ сохраняет next_payout_mode как отдельное поле, а перечень хранимых данных упоминает один «способ выплаты». Непонятно, хранятся ли текущий и следующий способ раздельно.",
+   "scenario": "Клиент в марте выбрал CARD, 31 марта выплата должна идти по текущему способу CAPITALIZATION, с 1 апреля по следующему. Без раздельного хранения нельзя выполнить Ф-3.",
+   "impact": "Разработчики по-разному реализуют хранение, и приёмка переключения с 1-го числа не имеет однозначной модели.",
+   "recommendation": "Указать в перечне хранимых данных оба поля отдельно.",
+   "rewrite": "Хранить текущий способ выплаты payout_mode и способ с 1-го числа следующего месяца next_payout_mode, дату next_mode_from в тенге с точностью до тиына, если применимо.",
+   "question": "",
+   "blocks": "development",
+   "source": "lens:architect",
+   "id": "C-004",
+   "line_start": 157,
+   "line_end": 157,
+   "page": null,
+   "section": "Часть B. REST API › Ответ"
+  }
+ ]
+}
