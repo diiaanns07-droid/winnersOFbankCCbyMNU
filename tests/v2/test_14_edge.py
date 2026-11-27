@@ -556,6 +556,7 @@ def test_same_input_gives_same_markdown(tmp_path):
         finally:
             lens.run_named = real
         md = Path(written["md"]).read_text(encoding="utf-8")
+        md = re.sub(r"(\d{2}:\d{2})–\d{2}:\d{2}", r"\1", md)   # «15:44–15:45», если прогон пересёк границу минуты
         texts.append(re.sub(r"\d", "0", re.sub(r"20\d{6}-\d{6}-[0-9a-f]{4}", "RUN", md)))
     assert texts[0] == texts[1]
 
