@@ -20,12 +20,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT, STAGE_OWNER, source_owner
+from .common import ROOT, STAGE_OWNER
 
 V2 = ROOT / "evaluation" / "v2"
 HISTORY = V2 / "history.jsonl"
@@ -224,12 +225,19 @@ def report_quality(row: dict | None) -> list[dict]:
     return out
 
 
-def _latest_summary(folder: Path, kind: str) -> dict | None:
+def _latest_summary(folder: Path, kind: str, with_defects: bool = False) -> dict | None:
+    """Последний прогон модели; with_defects — только прогон, где были кейсы с дефектами (support > 0).
+
+    Прогон только по чистым документам (например, «корпус чистые 13:00») не даёт recall и F1: в нём нет
+    ни одного заложенного дефекта, F1 = 0 там — не промах, а отсутствие замера.
+    """
     best = None
     for p in folder.glob("*/summary.json"):
         d = json.loads(p.read_text(encoding="utf-8"))
         k = model_kind(d.get("provider"), d.get("model") or d.get("label"))
         if k != kind:
+            continue
+        if with_defects and not ((d.get("harness") or {}).get("support") or 0):
             continue
         if not best or d.get("at", "") > best.get("at", ""):
             best = {**d, "_path": str(p.relative_to(ROOT))}
@@ -262,24 +270,34 @@ def _recall_owners(d: dict) -> str:
     return "; ".join(parts)
 
 
-def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list[dict]:
+def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
+                 d_rec: dict | None = None) -> list[dict]:
+    """Ворота корпуса. Чистые — по последнему прогону `d`; recall и F1 — по последнему прогону с дефектами
+    `d_rec` (если не передан — тот же `d`; прогон без дефектов даёт ⏳, а не F1 = 0)."""
     if not d:
         return [_check(f"{title}: замер", "есть", "нет замера", None, missing_owner)]
-    h, c = d["harness"], d["clean"]
+    c = d["clean"]
     src = f"{d.get('label')} ({str(d.get('at', ''))[11:16]})"
+    if d_rec is None:
+        d_rec = d
+    h = d_rec["harness"] if (d_rec.get("harness") or {}).get("support") else {}
+    rec_src = f"{d_rec.get('label')} ({str(d_rec.get('at', ''))[11:16]})" if h else src
     rec, f1 = h.get("recall"), h.get("f1")
     out = []
     if "recall" in t:
         out.append(_check(f"{title}: recall (строгий)", f"≥ {100 * t['recall']:.0f} %",
                           "—" if rec is None else f"{100 * rec:.0f} % ({h.get('tp')}/{h.get('support')})",
-                          None if rec is None else rec >= t["recall"], _recall_owners(d)))
+                          None if rec is None else rec >= t["recall"], _recall_owners(d_rec) if h else missing_owner))
+        out[-1]["_src"] = rec_src
     if "f1" in t:
         prec = h.get("precision")
         out.append(_check(f"{title}: F1 (строгий)", f"≥ {t['f1']:.2f}",
                           "—" if f1 is None else f"{f1:.2f} (P {prec or 0:.2f}, R {rec or 0:.2f})",
                           None if f1 is None else f1 >= t["f1"],
-                          (_recall_owners(d) + "; " if rec is not None and rec < 0.9 else "")
-                          + "ложные на мутантах и чистых → " + _clean_owners(d)))
+                          ((_recall_owners(d_rec) + "; " if rec is not None and rec < 0.9 else "")
+                           + "ложные на мутантах и чистых → " + _clean_owners(d_rec)) if h
+                          else f"{missing_owner}: нет прогона корпуса с дефектами"))
+        out[-1]["_src"] = rec_src
     if "clean_max_findings" in t:
         over = c.get("docs_over_1_finding")
         out.append(_check(f"{title}: на чистом ≤ {t['clean_max_findings']} замечания",
@@ -290,12 +308,14 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> lis
                       c["critical"] == 0, _clean_owners(d, "critical") + "; №10 (серьёзность)"))
     if "clean_verdict_no" in t:
         out.append(_check(f"{title}: вердикт «нельзя» на чистых", "0", str(c["verdict_no"]), c["verdict_no"] == 0,
-                          "№10 (вердикт), №13"))
+                          # вердикт считает код по правилу CONTRACT 5 (critical блокирующий → «нельзя», №13):
+                          # «нельзя» на чистом — это серьёзность судьи и источник critical, а не отчёт
+                          "№10 (серьёзность судьи) и источник critical: " + _clean_owners(d, "critical")))
     if d.get("failed"):
         out.append(_check(f"{title}: прогон", "все кейсы измерены", f"не измерено {d['failed']} из {d['cases']}",
                           False, "№01, №02"))
     for x in out:
-        x["source"] = src
+        x["source"] = x.pop("_src", src)
     return out
 
 
@@ -306,7 +326,9 @@ def stability_gates(gold: dict) -> list[dict]:
         best = None
         for p in files:
             d = json.loads(p.read_text(encoding="utf-8"))
-            if model_kind(None, " ".join(d.get("models") or [])) == kind and (not best or d["at"] > best["at"]):
+            # последняя сводка; в одну минуту — с большим числом прогонов (×3 по двум раундам после ×2 раунда)
+            if model_kind(None, " ".join(d.get("models") or [])) == kind and (
+                    not best or (d["at"], d.get("n") or 0) > (best["at"], best.get("n") or 0)):
                 best = d
         title = f"Стабильность, {'Opus' if kind == 'opus' else kind}"
         if not best:
@@ -391,7 +413,15 @@ def newtz_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list
     return out
 
 
-def _latest_newtz(kind: str, clean_only: bool) -> dict | None:
+def _newtz_set(d: dict) -> str:
+    """Набор прогона `newtz`: «№20» — документы `evaluation/v2/clean/`, иначе «open2» (ТЗ №18)."""
+    docs = [str(r.get("doc") or "").replace("\\", "/") for r in d.get("rows") or []]
+    return "№20" if docs and all("v2/clean/" in x for x in docs) else "open2"
+
+
+def _latest_newtz(kind: str, clean_only: bool, clean_set: str | None = None) -> dict | None:
+    """Последний прогон `newtz` модели. clean_only — только чистые документы; clean_set — «№20» или «open2»
+    (прогон только чистых версий open2 не должен попадать в ворота «Чистые ТЗ №20» и наоборот)."""
     best = None
     for p in (V2 / "newtz_results").glob("*/summary.json"):
         d = json.loads(p.read_text(encoding="utf-8"))
@@ -399,6 +429,8 @@ def _latest_newtz(kind: str, clean_only: bool) -> dict | None:
             continue
         is_clean_only = not (d.get("harness") or {}).get("support") and (d.get("clean") or {}).get("n")
         if bool(is_clean_only) != clean_only:
+            continue
+        if clean_set and _newtz_set(d) != clean_set:
             continue
         if not best or d.get("at", "") > best.get("at", ""):
             best = {**d, "_path": str(p.relative_to(ROOT))}
@@ -420,13 +452,15 @@ def clarity_gates(row: dict | None) -> list[dict]:
                       for w in (cl.get("worst") or [])[:5])
     return [{**_check("Понятность: рубрика", f"≥ {100 * CLARITY['rubric']:.0f} %",
                       f"{100 * share:.0f} % ({cl['passed']}/{cl['n']})", share >= CLARITY["rubric"],
-                      "№10 (тексты), №13; худшие: " + worst), "source": src}]
+                      # рендер №13 показывает поля судьи и ролей как есть — владельцы текстов: №10 и источники
+                      "№10 (тексты судьи) и источники в скобках; худшие: " + worst), "source": src}]
 
 
 def stress_gate() -> dict:
     import subprocess
     r = subprocess.run([sys.executable, "-m", "pytest", "tests/v2/test_03_stress.py", "-q", "-p", "no:cacheprovider"],
-                       capture_output=True, text=True, cwd=str(ROOT), timeout=900)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT), timeout=900,
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     last = (r.stdout.strip().splitlines() or ["—"])[-1]
     return {**_check("Надёжность: стресс-набор №03", "0 падений", last[:80], r.returncode == 0, "№03"),
             "source": "pytest tests/v2/test_03_stress.py"}
@@ -468,14 +502,18 @@ def collect(runs: list[str] | None = None, with_tests: bool = False) -> list[dic
             continue
         checks += official_gates(kind, latest.get(kind), gold)
     checks += stability_gates(gold)
-    checks += corpus_gates("Корпус, haiku", _latest_summary(V2 / "corpus_results", "haiku"), CORPUS, "№15")
+    checks += corpus_gates("Корпус, haiku", _latest_summary(V2 / "corpus_results", "haiku"), CORPUS, "№15",
+                           _latest_summary(V2 / "corpus_results", "haiku", with_defects=True))
     for kind in ("sonnet", "haiku", "gemini"):
         d = _latest_newtz(kind, clean_only=False)
         if d or kind == "sonnet":
             checks += newtz_gates(f"Новые ТЗ №18, {kind}", d, NEWTZ, "№18, №15")
-        c = _latest_newtz(kind, clean_only=True)
+        c = _latest_newtz(kind, clean_only=True, clean_set="№20")
         if c or kind == "haiku":
             checks += newtz_gates(f"Чистые ТЗ №20, {kind}", c, NEWTZ, "№20, №15")
+        o = _latest_newtz(kind, clean_only=True, clean_set="open2")
+        if o:
+            checks += newtz_gates(f"Чистые open2 (№18), {kind}", o, NEWTZ, "№18, №15")
     last_full = max(rows, key=lambda r: r.get("at", ""), default=None)
     checks += report_quality(last_full)
     checks += clarity_gates(last_full)
@@ -506,6 +544,56 @@ def render(checks: list[dict]) -> str:
     return "\n".join(L) + "\n"
 
 
+def render_summary(checks: list[dict], at: str, history: list[dict] | None = None) -> str:
+    """Итог ворот для начала RESULTS.md: счёт и красное с владельцами одной таблицей (полностью — GATE.md)."""
+    gate = [c for c in checks if not c.get("info")]
+    red = [c for c in gate if c["ok"] is False]
+    wait = [c for c in gate if c["ok"] is None]
+    L = [f"**{at}:** зелёных {sum(1 for c in gate if c['ok'])}, красных {len(red)}, без замера {len(wait)} — "
+         "все проверки и источники в `evaluation/v2/GATE.md` (`python -m evaluation.v2.gate --save`).", ""]
+    if red:
+        L += ["| Красное | Факт (цель) | Замер | Кому |", "| :--- | :--- | :--- | :--- |"]
+        for c in red:
+            owners = str(c.get("owners") or "").replace("|", "/")
+            owners = owners if len(owners) <= 160 else owners[:157] + "…"
+            L.append(f"| {c['name']} | {c['fact']} ({c['target']}) | {c.get('source') or '—'} | {owners} |")
+    if wait:
+        L += ["", "Без замера: " + "; ".join(c["name"] for c in wait) + "."]
+    hist = history_line(history)
+    if hist:
+        L += ["", hist]
+    return "\n".join(L) + "\n"
+
+
+_SHA = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,8}\b")
+
+
+def codes_of(checks: list[dict]) -> list[str]:
+    """Коммиты кода из меток замеров, на которых стоят ворота (`… c6aa9b5, haiku`)."""
+    return sorted({m for c in checks if not c.get("info") for m in _SHA.findall(str(c.get("source") or ""))})
+
+
+def history_line(rows: list[dict] | None, last: int = 6) -> str:
+    """Ворота по времени из gate_history.jsonl: подряд одинаковый счёт — одна запись (последняя), код — если записан
+    (в записях до 16:56 27.11 кода нет)."""
+    out: list[dict] = []
+    for r in rows or []:
+        key = (r.get("green"), len(r.get("red") or []), len(r.get("waiting") or []))
+        if out and out[-1]["_key"] == key:
+            out[-1] = {**r, "_key": key}
+        else:
+            out.append({**r, "_key": key})
+    if len(out) < 2:
+        return ""
+    parts = []
+    for r in out[-last:]:
+        codes = r.get("codes") or []
+        code = (" на " + ", ".join(f"`{c}`" for c in codes[:3]) + (" …" if len(codes) > 3 else "")) if codes else ""
+        parts.append(f"{str(r.get('at', ''))[-5:]}{code} — {r.get('green')}/{len(r.get('red') or [])}/"
+                     f"{len(r.get('waiting') or [])}")
+    return "Ворота за день (зелёных/красных/без замера): " + "; ".join(parts) + "."
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.gate", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -520,10 +608,17 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     if a.save:
         (V2 / "GATE.md").write_text(text, encoding="utf-8")
-        with (V2 / "gate_history.jsonl").open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"at": sc.astana_now(), "green": sum(1 for c in checks if c["ok"]),
-                                 "red": [c["name"] for c in checks if c["ok"] is False and not c.get("info")],
-                                 "waiting": [c["name"] for c in checks if c["ok"] is None]}, ensure_ascii=False) + "\n")
+        from .common import put_results_block
+
+        hist_path = V2 / "gate_history.jsonl"
+        entry = {"at": sc.astana_now(), "green": sum(1 for c in checks if c["ok"]),
+                 "red": [c["name"] for c in checks if c["ok"] is False and not c.get("info")],
+                 "waiting": [c["name"] for c in checks if c["ok"] is None], "codes": codes_of(checks)}
+        with hist_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        history = [json.loads(x) for x in hist_path.read_text(encoding="utf-8").splitlines() if x.strip()]
+        put_results_block(V2 / "RESULTS.md", "gate",
+                          render_summary(checks, f"Ворота WAVE3, {entry['at']}", history), "Итог ворот")
     gate_checks = [c for c in checks if not c.get("info")]
     red = any(c["ok"] is False for c in gate_checks) or (a.strict and any(c["ok"] is None for c in gate_checks))
     return 1 if red else 0

@@ -1,0 +1,1869 @@
+{
+  "cases": 4,
+  "runs": 4,
+  "failed": 0,
+  "harness": {
+    "tp": 0,
+    "fn": 0,
+    "support": 0,
+    "recall": null,
+    "fp": 0,
+    "duplicates": 0,
+    "critical_false": 0
+  },
+  "by_level": {
+    "critical": {
+      "n": 0,
+      "of": 0
+    },
+    "major": {
+      "n": 0,
+      "of": 0
+    },
+    "minor": {
+      "n": 0,
+      "of": 0
+    }
+  },
+  "per_issue_type": {},
+  "clean": {
+    "n": 4,
+    "measured": 4,
+    "findings": 68,
+    "false_alarms": 63,
+    "critical": 1,
+    "major": 11,
+    "docs_with_critical": 1,
+    "docs_over_1_finding": 4,
+    "max_findings": 19,
+    "verdict_no": 1
+  },
+  "injection": {
+    "n": 0,
+    "flagged": 0
+  },
+  "details": {
+    "fp": [
+      {
+        "id": "D-01",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Закрытие счёта в режиме «На карту»: получатель процентов не определён",
+        "sources": [
+          "lens:risk",
+          "lens:analyst",
+          "consistency"
+        ],
+        "owners": [
+          "№05",
+          "№08",
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы разными терминами",
+        "sources": [
+          "consistency",
+          "lens:architect"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "other",
+        "title": "Требования, методы и НФТ без идентификаторов и приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "Цель по обращениям в контакт-центр не привязана к требованию",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Нет метода получения списка карт для выбора выплаты",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Схема процесса линейна: нет ветвей блокировки, порога и закрытия",
+        "sources": [
+          "consistency",
+          "lens:architect"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Проверка счёта в тенге из Ф-1 отсутствует в логике метода",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Проценты «на дату запроса»: входит ли текущий незавершённый день",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Момент выплаты за последний день не согласован с начислением",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Правило даты вступления нового способа продублировано в методе",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки не покрывают границы, ошибки и повторы",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Карта неактивна, но не закрыта и не заблокирована: выплата не описана",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Событие выплаты не содержит суммы, способа и причины для push",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "Не задана нагрузка для норматива времени ответа API",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "История начислений не хранит способ выплаты прошлых месяцев",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-17",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Нет схемы отката и способа выключить выплату по способу",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-18",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Смена карты при повторной установке способа CARD не определена",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-19",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Чужая неактивная карта: ответ 400 или 404 не определён",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "capital_clean",
+        "clean": true
+      },
+      {
+        "id": "D-01",
+        "severity": "major",
+        "kind": "ambiguity",
+        "title": "Напоминание, включённое после окна 22-го, не описано",
+        "sources": [
+          "lens:analyst",
+          "consistency"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Документ не рассматривает ряд случаев",
+        "sources": [
+          "consistency",
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "Цель без числа: снижение потерь льготного периода не измеряется",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни и те же понятия названы разными терминами",
+        "sources": [
+          "consistency",
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Кнопка «Пополнить» на экране без описанного действия",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Ответ до выписки: прошедший период и daysLeft не согласованы",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Дата окончания платёжного периода задана в Ф-1 и Ф-5",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Прогноз процентов нельзя рассчитать: данных о покупках нет",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "non_singular",
+        "title": "Ф-5 объединяет несколько независимо проверяемых правил",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Приёмка покрывает четыре сценария, границы и ошибки пропущены",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "unit_mismatch",
+        "title": "Суммы в приёмке в тенге, в API в тиынах без пересчёта",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "ops_risk",
+        "title": "Нет схемы отката и способа скрыть блок и напоминания",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Порядок проверок 404 и 422 для чужой некредитной карты не задан",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "grace_clean",
+        "clean": true
+      },
+      {
+        "id": "D-01",
+        "severity": "critical",
+        "kind": "contradiction",
+        "title": "Двойной возврат премии при отказе после полного погашения",
+        "sources": [
+          "lens:risk",
+          "consistency"
+        ],
+        "owners": [
+          "№08",
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-02",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Маршрут вызова сервиса страхования различается в схемах",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-03",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Нижний возрастной предел 18 лет не проверяется в логике метода",
+        "sources": [
+          "lens:analyst",
+          "consistency"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-04",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Событие полного досрочного погашения не описано в интеграции",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-05",
+        "severity": "major",
+        "kind": "incomplete",
+        "title": "Не описан возврат премии, если полис не выпущен",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-06",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Расчёт премии передаёт ПДн страховщику без согласия",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-07",
+        "severity": "major",
+        "kind": "terminology",
+        "title": "Участник страхования назван тремя разными терминами",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-08",
+        "severity": "major",
+        "kind": "missing_element",
+        "title": "Расчёт стоимости не описывает отказ по возрасту или страховщику",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-09",
+        "severity": "major",
+        "kind": "status_conflict",
+        "title": "Код 409 в методе отказа имеет другой смысл, чем в общей таблице",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-10",
+        "severity": "minor",
+        "kind": "traceability",
+        "title": "Приоритеты и ID требований в документе не заданы",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Названия компонентов и периода отказа не едины",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "Цель по доле страхования и жалобам не измеряется",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Не задано правило округления премии до тенге",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "ambiguity",
+        "title": "Не сказано, входит ли 14-й день в срок отказа",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-15",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Правило повышения ставки записано в двух местах",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-16",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Событие выдачи кредита не содержит идентификатор и дату",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-17",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Поля согласия, суммы и срока не перечислены в данных",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-19",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают 6 из 14 функциональных требований",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-20",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Повторный вызов после снятия страхования не определён",
+        "sources": [
+          "lens:analyst",
+          "consistency"
+        ],
+        "owners": [
+          "№05",
+          "№09"
+        ],
+        "case_id": "insurance_clean",
+        "clean": true
+      },
+      {
+        "id": "D-01",
+        "severity": "major",
+        "kind": "contradiction",
+        "title": "Маршрут вызова перевода: напрямую или через сервис QR-кодов",
+        "sources": [
+          "lens:architect",
+          "consistency"
+        ],
+        "owners": [
+          "№07",
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-02",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "Цель без измеримого показателя не связана с требованием",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-03",
+        "severity": "minor",
+        "kind": "terminology",
+        "title": "Одни понятия названы разными терминами в документе",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-04",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Функциональные требования Ф-1…Ф-6 без приоритетов",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-05",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Параллельная оплата QR-кода с суммой не описана",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-06",
+        "severity": "minor",
+        "kind": "duplicate",
+        "title": "Срок действия 15 минут задан в двух местах",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-07",
+        "severity": "minor",
+        "kind": "unverifiable",
+        "title": "Нагрузка 200 переводов в секунду без условия успеха",
+        "sources": [
+          "lens:analyst"
+        ],
+        "owners": [
+          "№05"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-08",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Поля requestId и cardId не перечислены в данных QR-кода",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-09",
+        "severity": "minor",
+        "kind": "missing_element",
+        "title": "Состояние «в обработке» не входит в статусы QR-кода",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-11",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Критерии приёмки покрывают малую часть ошибочных веток",
+        "sources": [
+          "lens:qa"
+        ],
+        "owners": [
+          "№06"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-12",
+        "severity": "minor",
+        "kind": "incomplete",
+        "title": "Нет схемы отката и способа выключить QR-переводы",
+        "sources": [
+          "lens:risk"
+        ],
+        "owners": [
+          "№08"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-13",
+        "severity": "minor",
+        "kind": "contradiction",
+        "title": "Поле amount без суммы в QR: необязательно или обязательно",
+        "sources": [
+          "consistency"
+        ],
+        "owners": [
+          "№09"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      },
+      {
+        "id": "D-14",
+        "severity": "minor",
+        "kind": "api_contract",
+        "title": "Тело ответа ошибки не содержит обещанных полей status",
+        "sources": [
+          "lens:architect"
+        ],
+        "owners": [
+          "№07"
+        ],
+        "case_id": "qr_clean",
+        "clean": true
+      }
+    ]
+  },
+  "time": {
+    "total_s": 970.1,
+    "calls": 29,
+    "cost_usd": 0.447
+  },
+  "provider": "claude_cli",
+  "model": "haiku",
+  "wall_s": 294.5,
+  "label": "замер 15:30: чистые open2, c6aa9b5, haiku",
+  "at": "2026-11-27 15:35",
+  "commit": [
+    "28c8c20a",
+    "5168e05d",
+    "89fe2e6a"
+  ],
+  "rows": [
+    {
+      "case": "capital_clean",
+      "variant": "clean",
+      "doc": "evaluation/v2/open2/capital_clean/source.md",
+      "status": "complete",
+      "commit": "5168e05d",
+      "duration_s": 251.1,
+      "calls": 7,
+      "cost_usd": 0.0899,
+      "findings": 19,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 18
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "background_found": [
+        "М1"
+      ],
+      "false_alarms": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Закрытие счёта в режиме «На карту»: получатель процентов не определён",
+          "sources": [
+            "lens:risk",
+            "lens:analyst",
+            "consistency"
+          ],
+          "owners": [
+            "№05",
+            "№08",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы разными терминами",
+          "sources": [
+            "consistency",
+            "lens:architect"
+          ],
+          "owners": [
+            "№07",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "other",
+          "title": "Требования, методы и НФТ без идентификаторов и приоритетов",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "Цель по обращениям в контакт-центр не привязана к требованию",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Нет метода получения списка карт для выбора выплаты",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Схема процесса линейна: нет ветвей блокировки, порога и закрытия",
+          "sources": [
+            "consistency",
+            "lens:architect"
+          ],
+          "owners": [
+            "№07",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Проверка счёта в тенге из Ф-1 отсутствует в логике метода",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Проценты «на дату запроса»: входит ли текущий незавершённый день",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Момент выплаты за последний день не согласован с начислением",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Правило даты вступления нового способа продублировано в методе",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки не покрывают границы, ошибки и повторы",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Карта неактивна, но не закрыта и не заблокирована: выплата не описана",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Событие выплаты не содержит суммы, способа и причины для push",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "Не задана нагрузка для норматива времени ответа API",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "История начислений не хранит способ выплаты прошлых месяцев",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-17",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Нет схемы отката и способа выключить выплату по способу",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        },
+        {
+          "id": "D-18",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Смена карты при повторной установке способа CARD не определена",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-19",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Чужая неактивная карта: ответ 400 или 404 не определён",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        }
+      ],
+      "fa_by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 17
+      }
+    },
+    {
+      "case": "grace_clean",
+      "variant": "clean",
+      "doc": "evaluation/v2/open2/grace_clean/source.md",
+      "status": "complete",
+      "commit": "5168e05d",
+      "duration_s": 238.6,
+      "calls": 7,
+      "cost_usd": 0.0799,
+      "findings": 15,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 14
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "background_found": [
+        "М1",
+        "М4"
+      ],
+      "false_alarms": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "ambiguity",
+          "title": "Напоминание, включённое после окна 22-го, не описано",
+          "sources": [
+            "lens:analyst",
+            "consistency"
+          ],
+          "owners": [
+            "№05",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Документ не рассматривает ряд случаев",
+          "sources": [
+            "consistency",
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "Цель без числа: снижение потерь льготного периода не измеряется",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни и те же понятия названы разными терминами",
+          "sources": [
+            "consistency",
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Кнопка «Пополнить» на экране без описанного действия",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Ответ до выписки: прошедший период и daysLeft не согласованы",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Дата окончания платёжного периода задана в Ф-1 и Ф-5",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Прогноз процентов нельзя рассчитать: данных о покупках нет",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "non_singular",
+          "title": "Ф-5 объединяет несколько независимо проверяемых правил",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Приёмка покрывает четыре сценария, границы и ошибки пропущены",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "unit_mismatch",
+          "title": "Суммы в приёмке в тенге, в API в тиынах без пересчёта",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "ops_risk",
+          "title": "Нет схемы отката и способа скрыть блок и напоминания",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Порядок проверок 404 и 422 для чужой некредитной карты не задан",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        }
+      ],
+      "fa_by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 12
+      }
+    },
+    {
+      "case": "insurance_clean",
+      "variant": "clean",
+      "doc": "evaluation/v2/open2/insurance_clean/source.md",
+      "status": "complete",
+      "commit": "28c8c20a",
+      "duration_s": 294.2,
+      "calls": 8,
+      "cost_usd": 0.1977,
+      "findings": 20,
+      "by_severity": {
+        "critical": 1,
+        "major": 8,
+        "minor": 11
+      },
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "background_found": [
+        "М1"
+      ],
+      "false_alarms": [
+        {
+          "id": "D-01",
+          "severity": "critical",
+          "kind": "contradiction",
+          "title": "Двойной возврат премии при отказе после полного погашения",
+          "sources": [
+            "lens:risk",
+            "consistency"
+          ],
+          "owners": [
+            "№08",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Маршрут вызова сервиса страхования различается в схемах",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Нижний возрастной предел 18 лет не проверяется в логике метода",
+          "sources": [
+            "lens:analyst",
+            "consistency"
+          ],
+          "owners": [
+            "№05",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Событие полного досрочного погашения не описано в интеграции",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "major",
+          "kind": "incomplete",
+          "title": "Не описан возврат премии, если полис не выпущен",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Расчёт премии передаёт ПДн страховщику без согласия",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "major",
+          "kind": "terminology",
+          "title": "Участник страхования назван тремя разными терминами",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "major",
+          "kind": "missing_element",
+          "title": "Расчёт стоимости не описывает отказ по возрасту или страховщику",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "major",
+          "kind": "status_conflict",
+          "title": "Код 409 в методе отказа имеет другой смысл, чем в общей таблице",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-10",
+          "severity": "minor",
+          "kind": "traceability",
+          "title": "Приоритеты и ID требований в документе не заданы",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Названия компонентов и периода отказа не едины",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "Цель по доле страхования и жалобам не измеряется",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Не задано правило округления премии до тенге",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "ambiguity",
+          "title": "Не сказано, входит ли 14-й день в срок отказа",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-15",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Правило повышения ставки записано в двух местах",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-16",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Событие выдачи кредита не содержит идентификатор и дату",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-17",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Поля согласия, суммы и срока не перечислены в данных",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-19",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают 6 из 14 функциональных требований",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-20",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Повторный вызов после снятия страхования не определён",
+          "sources": [
+            "lens:analyst",
+            "consistency"
+          ],
+          "owners": [
+            "№05",
+            "№09"
+          ]
+        }
+      ],
+      "fa_by_severity": {
+        "critical": 1,
+        "major": 8,
+        "minor": 10
+      }
+    },
+    {
+      "case": "qr_clean",
+      "variant": "clean",
+      "doc": "evaluation/v2/open2/qr_clean/source.md",
+      "status": "complete",
+      "commit": "89fe2e6a",
+      "duration_s": 186.2,
+      "calls": 7,
+      "cost_usd": 0.0796,
+      "findings": 14,
+      "by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 13
+      },
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "background_found": [
+        "М1"
+      ],
+      "false_alarms": [
+        {
+          "id": "D-01",
+          "severity": "major",
+          "kind": "contradiction",
+          "title": "Маршрут вызова перевода: напрямую или через сервис QR-кодов",
+          "sources": [
+            "lens:architect",
+            "consistency"
+          ],
+          "owners": [
+            "№07",
+            "№09"
+          ]
+        },
+        {
+          "id": "D-02",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "Цель без измеримого показателя не связана с требованием",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-03",
+          "severity": "minor",
+          "kind": "terminology",
+          "title": "Одни понятия названы разными терминами в документе",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-04",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Функциональные требования Ф-1…Ф-6 без приоритетов",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-05",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Параллельная оплата QR-кода с суммой не описана",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-06",
+          "severity": "minor",
+          "kind": "duplicate",
+          "title": "Срок действия 15 минут задан в двух местах",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-07",
+          "severity": "minor",
+          "kind": "unverifiable",
+          "title": "Нагрузка 200 переводов в секунду без условия успеха",
+          "sources": [
+            "lens:analyst"
+          ],
+          "owners": [
+            "№05"
+          ]
+        },
+        {
+          "id": "D-08",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Поля requestId и cardId не перечислены в данных QR-кода",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        },
+        {
+          "id": "D-09",
+          "severity": "minor",
+          "kind": "missing_element",
+          "title": "Состояние «в обработке» не входит в статусы QR-кода",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-11",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Критерии приёмки покрывают малую часть ошибочных веток",
+          "sources": [
+            "lens:qa"
+          ],
+          "owners": [
+            "№06"
+          ]
+        },
+        {
+          "id": "D-12",
+          "severity": "minor",
+          "kind": "incomplete",
+          "title": "Нет схемы отката и способа выключить QR-переводы",
+          "sources": [
+            "lens:risk"
+          ],
+          "owners": [
+            "№08"
+          ]
+        },
+        {
+          "id": "D-13",
+          "severity": "minor",
+          "kind": "contradiction",
+          "title": "Поле amount без суммы в QR: необязательно или обязательно",
+          "sources": [
+            "consistency"
+          ],
+          "owners": [
+            "№09"
+          ]
+        },
+        {
+          "id": "D-14",
+          "severity": "minor",
+          "kind": "api_contract",
+          "title": "Тело ответа ошибки не содержит обещанных полей status",
+          "sources": [
+            "lens:architect"
+          ],
+          "owners": [
+            "№07"
+          ]
+        }
+      ],
+      "fa_by_severity": {
+        "critical": 0,
+        "major": 1,
+        "minor": 12
+      }
+    }
+  ]
+}

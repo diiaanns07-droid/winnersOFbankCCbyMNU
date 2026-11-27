@@ -1,0 +1,15 @@
+[
+  {
+    "set": "№18: чистые версии (2-я редакция)",
+    "model": "sonnet",
+    "label": "№19 sonnet open2 чистые, код 92542d8 (статус №19, 7205112)",
+    "at": "2026-11-27 12:05",
+    "source": "docs/plan-v2/status/19.md в origin/v2/19-measure-clean @ 7205112",
+    "rows": [
+      {"case": "capital_clean", "critical": 0, "major": 6, "minor": 10, "verdict": {"development": "conditional", "testing": "conditional"}},
+      {"case": "grace_clean", "critical": 0, "major": 3, "minor": 13, "verdict": {"development": "conditional", "testing": "yes"}},
+      {"case": "insurance_clean", "critical": 0, "major": 5, "minor": 11, "verdict": {"development": "conditional", "testing": "conditional"}},
+      {"case": "qr_clean", "critical": 0, "major": 2, "minor": 12, "verdict": {"development": "yes", "testing": "yes"}}
+    ]
+  }
+]

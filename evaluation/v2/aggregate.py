@@ -181,9 +181,9 @@ def _pct(x) -> str:
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     sys.stdout.reconfigure(encoding="utf-8")
-    if not args or args[0] not in ("stability", "models"):
+    if not args or args[0] not in ("stability", "models") or any(x in ("-h", "--help") for x in args):
         print(__doc__)
-        return 2
+        return 0 if args and any(x in ("-h", "--help") for x in args) else 2
     if args[0] == "models":
         if args[1:] in (["--auto"], ["--auto", "--write"], ["--write", "--auto"]):
             if "--write" in args:

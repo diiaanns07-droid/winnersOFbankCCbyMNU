@@ -124,11 +124,14 @@ def pair_info(item: dict, f: dict) -> dict:
     kw_hits = [bool(r.search(text)) for r in item["_kw"]]
     n_kw = sum(kw_hits)
     kw_min = int(item["keywords"].get("min", 1))
+    # required — номера групп ключевых слов, без которых пункт не засчитывается (тема пункта): у К4 это «чтение»,
+    # иначе «нет … операции» с общей строкой-опорой забирает К4 у замечания о другом (просьба №08)
+    req_ok = all(kw_hits[i] for i in item["keywords"].get("required") or [] if i < len(kw_hits))
     policy = item["anchors"].get("policy", "any")
     lines_ok = all(groups_hit) if policy == "all" else any(groups_hit)
     lines_any = any(groups_hit)
     kind_ok = f.get("kind") in (item.get("kinds") or [])
-    if lines_ok and n_kw >= kw_min:
+    if lines_ok and n_kw >= kw_min and req_ok:
         status = "match"
     elif (lines_any and n_kw >= 1) or (not lines_any and n_kw >= max(2, kw_min) and n_kw == len(kw_hits)):
         status = "disputed"
@@ -140,7 +143,7 @@ def pair_info(item: dict, f: dict) -> dict:
     # заголовок говорит, о чём замечание: совпадения в нём весят больше (замечание засчитывается за свою тему)
     score = line_score + 0.5 * n_kw + 0.3 * n_title + (0.3 if kind_ok else 0)
     return {"status": status, "score": round(score, 3), "groups_hit": groups_hit, "kw_hits": n_kw,
-            "kw_total": len(kw_hits), "kind_ok": kind_ok}
+            "kw_total": len(kw_hits), "kind_ok": kind_ok, "title_hits": n_title}
 
 
 def max_matching(items: list[dict], findings: list[dict], edges: dict[tuple[str, str], float]) -> dict[str, str]:
@@ -184,9 +187,26 @@ _SENT_SPLIT = re.compile(r"(?<=[.!?…])\s+(?=[«\"(]?[А-ЯЁA-Z0-9])")
 _WORD = re.compile(r"[0-9A-Za-zА-Яа-яЁё][0-9A-Za-zА-Яа-яЁё‑-]*")
 
 
+# Сокращения, после которых точка — не конец предложения: «стр. 52», «п. 5», «см. Ф-2», «т. е.», «рис. 1».
+_ABBREV_END = re.compile(r"(?:^|[\s(«\"])(?:стр|с|п|пп|ст|гл|рис|табл|прил|разд|см|ср|напр|т|е|д|др|пр|ок|мин|макс"
+                         r"|руб|тыс|млн|млрд|г|гг|в|вв|ч|сек|им|т\.е|т\.д|т\.п|e\.g|i\.e|vs|no)\.$", re.I)
+
+
 def _sentences(text: str) -> list[str]:
+    """Предложения текста. Точка после сокращения («стр. 52», «п. 5») предложение не заканчивает — иначе
+    «Ф-2 (стр. 38) относит…» считалось двумя предложениями и рубрика «проблема 1–2 предложения» падала зря."""
     s = " ".join(str(text or "").split())
-    return [x for x in _SENT_SPLIT.split(s) if x.strip()] if s else []
+    if not s:
+        return []
+    out: list[str] = []
+    for part in _SENT_SPLIT.split(s):
+        if not part.strip():
+            continue
+        if out and _ABBREV_END.search(out[-1]):
+            out[-1] = f"{out[-1]} {part}"
+        else:
+            out.append(part)
+    return out
 
 
 def clarity_row(f: dict, vocab) -> dict:
@@ -281,6 +301,25 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                 e[(gid, fid)] = max(e.get((gid, fid), 0.0), 0.5)
         return e
 
+    def second_chance(assignment: dict[str, str], e_all: dict[tuple[str, str], float]) -> None:
+        """Замечание без пары, у которого есть строгая пара (строки-опоры + ключевые слова, `match`) с пунктом, не
+        найденным никем, засчитывается за этот пункт. focus() отбрасывает такую пару, когда соседний пункт по общей
+        строке набирает больше (С15 ↔ С3 на строке 156, С14 ↔ К4 на строке 52, просьба №07) — и замечание о другом
+        дефекте уходило в дубли. Только если заголовок замечания говорит о теме пункта (ключевые слова пункта в
+        заголовке): иначе настоящий дубль К1 «доставался» бы соседнему М8. Порядок: критичные первыми, по оценке."""
+        used = set(assignment.values())
+        for it in sorted(items, key=lambda it: (LEVEL_ORDER.get(it["level"], 3), items.index(it))):
+            gid = it["id"]
+            if gid in assignment:
+                continue
+            cand = sorted(((sc, fid) for (g, fid), sc in e_all.items()
+                           if g == gid and fid not in used and pairs.get((g, fid), {}).get("status") == "match"
+                           and pairs[(g, fid)].get("title_hits")),  # заголовок замечания — о теме этого пункта
+                          key=lambda x: (-x[0], x[1]))
+            if cand:
+                assignment[gid] = cand[0][1]
+                used.add(cand[0][1])
+
     def focus(e: dict[tuple[str, str], float]) -> dict[tuple[str, str], float]:
         """Оставить у каждого замечания только пункты эталона, близкие к лучшему по оценке (не дальше 0,3):
         замечание засчитывается за то, о чём оно, а не за всё, чего касается."""
@@ -319,6 +358,8 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
     edges_len = focus(edges_for(True, extra_gold))
     assign = max_matching(items, findings, edges)
     assign_len = max_matching(items, findings, edges_len)
+    second_chance(assign, edges_all)
+    second_chance(assign_len, edges_all)
     f2g = {fid: gid for gid, fid in assign.items()}
 
     # дубли: замечание без пары в паросочетании, но с допустимым ребром к уже найденному пункту
@@ -428,6 +469,14 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         c["_lines"], _ = finding_lines(c, lines, same_doc or bool(run_dir))
         c["_text"] = (c["title"] + " " + c["text"]).replace("ё", "е")
         c["_title"] = c["title"].replace("ё", "е")
+    # Кандидат «видел» пункт, только если пункт — его тема: строгая пара и оценка не дальше 0,3 от лучшей пары
+    # этого кандидата (как focus() у замечаний). Иначе кандидат о К3 по общим словам «находил» С5, и промах
+    # записывался судье («кандидат нашёл, судья не взял»), хотя кандидата о С5 не было (просьба №18).
+    cand_focus: list[set[str]] = []
+    for c in cands:
+        sc_by = {it["id"]: p["score"] for it in items for p in [pair_info(it, c)] if p["status"] == "match"}
+        top = max(sc_by.values(), default=None)
+        cand_focus.append({g for g, v in sc_by.items() if top is not None and v >= top - 0.3})
     misses = []
     for it in items:
         if it["id"] in assign:
@@ -437,9 +486,8 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                 for (gid, fid), p in pairs.items() if gid == it["id"]]
         near.sort(key=lambda x: -x["score"])
         seen_in = []
-        for c in cands:
-            p = pair_info(it, c)
-            if p["status"] == "match":
+        for c, foc in zip(cands, cand_focus):
+            if it["id"] in foc:
                 seen_in.append({"source": c["sources"][0] if c["sources"] else "?", "id": c["id"],
                                 "title": c["title"][:120], "reason": c.get("reason", "")[:160]})
         lens_seen = [x for x in seen_in if x["source"] not in ("rejected", "quotes:rejected")]
