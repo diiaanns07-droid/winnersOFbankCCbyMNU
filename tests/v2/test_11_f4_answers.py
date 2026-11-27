@@ -204,3 +204,12 @@ def test_deferred_comment_to_letter_is_not_rule(text):
 def test_plain_comment_to_letter_is_kept():
     a = recheck.resolve_answers(QS, recheck.load_answers("Q-03: B — считаем от первого запроса"))["answered"][0]
     assert a["answer"] == "48 часов (считаем от первого запроса)" and a["deferred"] == []
+
+
+def test_postponed_listed_in_report_section():
+    text = PARTIAL + "Q-02 [Маршрут вызова между сервисами]: Не знаю, примем после встречи команд.\n"
+    resp = _resp([{"finding_id": "D-03", "status": "changed", "by": ["Q-03"], "reason": "срок задан ответом Q-03"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), text)["clarification"]
+    assert [(p["question_id"], p["partial"]) for p in clar["postponed"]] == [("Q-02", False), ("Q-03", True)]
+    md = recheck.render_markdown(clar)
+    assert "Владелец отложил решение" in md and "Q-02 (весь ответ)" in md and "Q-03 (часть ответа)" in md

@@ -276,6 +276,7 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     by_id = {q["id"]: q for q in questions}
     answered: dict[str, dict] = {}
     extra: list[str] = []
+    postponed: list[dict] = []  # вопросы, где владелец отложил решение целиком (для отчёта)
     for d in parsed.get("decisions") or []:
         body, deferred = split_deferred(d)
         if body:
@@ -352,6 +353,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         if not text or _VAGUE.search(text) or len(text) < 3:
             why = "откладывает решение" if deferred else "не задаёт правила"
             warnings.append(f"recheck: ответ на {q['id']} {why} — вопрос остаётся открытым")
+            if deferred:
+                postponed.append({"question_id": q["id"], "text": " ".join(deferred), "partial": False})
             continue
         comment, later = split_deferred(a.get("comment") or "")
         if a.get("comment") and not comment and not later:
@@ -379,7 +382,10 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                              "replies": [{"label": f"{q['id']}.1", "choice": label, "text": full, "deferred": deferred}],
                              "finding_ids": list(q.get("finding_ids") or [])}
     unanswered = [q["id"] for q in questions if q["id"] not in answered]
-    return {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra}
+    postponed = [p for p in postponed if p["question_id"] not in answered] + \
+        [{"question_id": a["question_id"], "text": x, "partial": True} for a in answered.values()
+         for x in a.get("deferred") or []]
+    return {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
 
 
 def severity_counts(findings: Iterable[dict]) -> dict:
@@ -820,6 +826,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "decisions": rc["answers"]["decisions"],
         "unanswered": [q for q in rc["answers"]["unanswered"] if q not in closed],
         "closed_by_decisions": closed,
+        "postponed": list(rc["answers"].get("postponed") or []),
         "changes": changes,
         "new_findings": [f["id"] for f in new_found],
         "answer_conflicts": [{"finding_id": c["finding_id"], "answers": c["answer_conflict"], "reason": c["reason"]}
@@ -873,6 +880,12 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
         lines.append("Ответы, которые противоречат друг другу (выберите один):")
         for c in clar["answer_conflicts"]:
             lines.append(f"* {' ↔ '.join(c['answers'])} — {c['finding_id']}: {c['reason']}")
+        lines.append("")
+    if clar.get("postponed"):
+        lines.append("Владелец отложил решение — это не ответ, дефект по этой части остаётся открытым:")
+        for p in clar["postponed"]:
+            how = "часть ответа" if p.get("partial") else "весь ответ"
+            lines.append(f"* {p['question_id']} ({how}): «{p['text']}»")
         lines.append("")
     if clar["new_findings"] and findings_after:
         by_id = {f["id"]: f for f in findings_after}
