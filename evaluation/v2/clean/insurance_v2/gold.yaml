@@ -3,7 +3,7 @@
 # Эталон пустой: документ без дефектов, любое замечание агента — ложная тревога.
 schema: bcc-v2-gold/1
 document: evaluation/v2/clean/insurance_v2/source.md
-sha256: c4468d556c821968f0f303a77f41e22118e877aa3e914c4cecb2b43e62207708
+sha256: d704d48643af67b5909aea1d27cd749e554040cb89f34b35da451c1060a0151b
 case: insurance_v2
 variant: clean
 title: Страхование жизни при оформлении кредита наличными

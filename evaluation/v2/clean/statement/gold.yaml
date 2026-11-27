@@ -3,7 +3,7 @@
 # Эталон пустой: документ без дефектов, любое замечание агента — ложная тревога.
 schema: bcc-v2-gold/1
 document: evaluation/v2/clean/statement/source.md
-sha256: b00162f6c787b20dbc80596556e1bd9d81a5bd4b5ea3fed14b99f0ca90d14688
+sha256: 4a9cbac366b5d92bf448afc5e8408d848b12b4e70545615088f0f2ca3dea2132
 case: statement
 variant: clean
 title: Заказ выписки по счёту в PDF
