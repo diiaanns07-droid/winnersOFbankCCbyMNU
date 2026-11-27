@@ -129,6 +129,24 @@ def _option_index(text: str, options: list) -> int | None:
     return hits[0] if len(hits) == 1 else None
 
 
+def _option_by_text(text: str, options: list) -> int | None:
+    """Вариант, который называет текст ответа: точное совпадение или все значимые слова текста (не меньше двух)
+    есть в одном варианте и не меньше чем на 0,2 реже — в любом другом."""
+    exact = _option_index(text, options)
+
+    def words(s: str) -> set[str]:  # слова и числа: «48 часов» отличается от «24 часа» числом
+        return _tokens(s) | set(re.findall(r"\d+", str(s or "")))
+    said = words(text)
+    if exact is not None or len(said) < 2:
+        return exact
+    scores = sorted(((len(said & words(str(o))) / len(said), i) for i, o in enumerate(options)), reverse=True)
+    if not scores or scores[0][0] < 0.8:
+        return None
+    if len(scores) > 1 and scores[0][0] - scores[1][0] < 0.2:
+        return None
+    return scores[0][1]
+
+
 def _soft(part: str) -> bool:
     """Предложение не задаёт правила: откладывает решение или отсылает к «как обычно», «по ситуации»."""
     return bool(_DEFER.search(part) or _VAGUE.search(part))
@@ -462,6 +480,14 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         deferred: list[str] = []
         if a.get("choice") is not None:
             opts = q.get("options") or []
+            # «B — 48 часов»: буква с текстом варианта. Полный прогон перегенерирует вопросы, и варианты могут
+            # переставиться — смысл задаёт текст, который видел владелец, а не позиция буквы в новом списке
+            j = _option_by_text(a.get("comment") or "", opts)
+            if j is not None and j != a["choice"]:
+                was = _cl.option_label(a["choice"])
+                warnings.append(f"recheck: {q['id']}: буква {was} в этом прогоне указывает на другой вариант, а текст "
+                                f"ответа совпал с вариантом {_cl.option_label(j)} («{str(opts[j])[:60]}») — взят он")
+                a = dict(a, choice=j)
             if a["choice"] >= len(opts):
                 warnings.append(f"recheck: у {q['id']} нет варианта {_cl.option_label(a['choice'])} — ответ пропущен")
                 continue

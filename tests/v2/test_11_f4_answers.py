@@ -538,3 +538,32 @@ def test_revise_schema_accepts_five_edits():
     from bcc_review.v2.llm import schema_errors
     edit = {"action": "replace", "line": 1, "old": "а", "new": "б"}
     assert schema_errors({"rewrites": [{"finding_id": "D-01", "summary": "", "edits": [edit] * 5}]}, revise.SCHEMA) == []
+
+
+# --------------------------------------------------------------------------- буква при перегенерации вопросов
+QS_SWAPPED = [dict(QS[2], options=["Хранить 48 часов с первого запроса", "Хранить 24 часа с первого запроса"])]
+
+
+def test_letter_follows_option_text_after_regeneration():
+    w: list[str] = []
+    a = recheck.resolve_answers(QS_SWAPPED, recheck.load_answers("Q-03: B — хранить 48 часов с первого запроса\n"),
+                                w)["answered"][0]
+    assert a["choice"] == "A" and a["answer"] == "Хранить 48 часов с первого запроса"
+    assert any("указывает на другой вариант" in x for x in w)
+
+
+def test_letter_with_partial_option_words():
+    a = recheck.resolve_answers(QS_SWAPPED, recheck.load_answers("Q-03: B — 48 часов\n"))["answered"][0]
+    assert a["choice"] == "A"
+
+
+def test_letter_with_qualifier_stays():
+    w: list[str] = []
+    a = recheck.resolve_answers(QS_SWAPPED, recheck.load_answers("Q-03: B — считаем от первого запроса\n"),
+                                w)["answered"][0]
+    assert a["choice"] == "B" and not any("указывает на другой вариант" in x for x in w)
+
+
+def test_letter_out_of_range_but_text_matches():
+    a = recheck.resolve_answers(QS_SWAPPED, recheck.load_answers("Q-03: C — хранить 24 часа\n"))["answered"][0]
+    assert a["choice"] == "B"
