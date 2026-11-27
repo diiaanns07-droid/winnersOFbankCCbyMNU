@@ -10,6 +10,12 @@
 * точные дубли (тот же вид и тот же набор строк цитат) схлопываются;
 * порядок critical → major → minor, не больше MAX_CANDIDATES;
 * critical «нет операции» без цитаты явного обещания интерфейса (и без кода ответа) понижается до major;
+* «поле без условия нет в телах ошибок» (проверка 4а) и «поле не перечислено в хранимых данных» без правила,
+  которому оно нужно (разбор №18), — minor;
+* документ задаёт ключ идемпотентности — замечания о повторах minor (`cap_defined_repeats`);
+* страховки по описи и сигналам: ветка без ответа, обещанная операция без описания, «успех против ошибки»
+  по сигналу правила `api.success_with_error` (`branch_candidates`, `promise_candidates`,
+  `success_error_candidates`);
 * `requirement_ids`, которых нет в нарезке, убираются (модель иногда ставит ID из документа);
 * метки нумерации «L052» в текстах заменяются на «стр. 52» (рубрика понятности: без внутренних кодов).
 """
@@ -51,13 +57,21 @@ CANDIDATE_SCHEMA = _obj({
     "blocks": {"type": "string", "enum": ["development", "testing", "both", "none"]},
 })
 
-INVENTORY_SCHEMA = _obj({
-    "operations": {"type": "array", "items": _obj({"name": _S, "method": _S, "purpose": _S, "line": _INT})},
-    "promises": {"type": "array", "items": _obj({"what": _S, "line": _INT, "operation": _S})},
-    "codes": {"type": "array", "items": _obj({
+def _draft(props: dict) -> dict:
+    """Объект описи: лишние поля разрешены (черновик модели; постобработка оставляет только известные)."""
+    return {**_obj(props), "additionalProperties": True}
+
+
+# Опись — черновик: модель добавляет в неё свои заметки («promises_check_note», «sequence_note»), и строгая схема
+# заставляла claude -p переписывать весь ответ заново — 3–6 ходов вместо 2 в 10 из 43 прогонов haiku
+# (+50–80 % времени этапа; замер волны 3, сессия 2). Кандидаты остаются строгими (CONTRACT 2.3).
+INVENTORY_SCHEMA = _draft({
+    "operations": {"type": "array", "items": _draft({"name": _S, "method": _S, "purpose": _S, "line": _INT})},
+    "promises": {"type": "array", "items": _draft({"what": _S, "line": _INT, "operation": _S})},
+    "codes": {"type": "array", "items": _draft({
         "code": _S, "lines": {"type": "array", "items": _INT}, "described": {"type": "boolean"}, "note": _S})},
-    "fields": {"type": "array", "items": _obj({"name": _S, "places": _S})},
-    "branches": {"type": "array", "items": _obj({"operation": _S, "step": _S, "line": _INT, "outcome": _S})},
+    "fields": {"type": "array", "items": _draft({"name": _S, "places": _S})},
+    "branches": {"type": "array", "items": _draft({"operation": _S, "step": _S, "line": _INT, "outcome": _S})},
 })
 
 
@@ -90,7 +104,7 @@ def unfulfilled_promises(inventory: dict) -> list[dict]:
 
 
 TEXT_FIELDS = ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question")
-LINE_MARK = re.compile(r"\bL(\d{3})\b")  # метка нумерации документа «L052» в тексте для читателя
+LINE_MARK = re.compile(r"\bL(\d{2,4})\b")  # метка нумерации «L052», «L52» в тексте для читателя
 
 
 def plain_line_refs(text: str) -> str:
@@ -109,6 +123,29 @@ PROMISE_MARK = re.compile(r"дочерн\w* документ|метод|descript
 # (missing_element) и успех против ошибки для одного входа (status_conflict). Замер волны 3: critical других видов
 # (contradiction, unit_mismatch) из линзы — 7 из 16 на чистых ТЗ №18, остальные — конфликты правил зоны №09.
 CRITICAL_KINDS = {"missing_element", "status_conflict"}
+# «Поле без условия нет в телах ошибок» (проверка 4а) — minor: клиент разбирает тело по коду ответа, а на чистых
+# ТЗ №20 это замечание шло major там, где документ сам задаёт состав тела ошибки (волна 3, сессия 2).
+ERROR_BODY_TITLE = re.compile(r"(тел\w*|ответ\w*|пример\w*)\s+(\w+\s+)?(ошиб|неуспеш|[45]\d\d)", re.I)
+
+
+# «Поле API есть, но нет в перечне хранимых данных» (разбор №18, задача 0а) — minor, если правила на поле не
+# опираются: значение приходит в запросе или пишется в колонку БД. Major остаётся, когда заголовок называет правило
+# или атрибут, без которого правило не выполнить (тип операции, ссылка на исходную операцию, история).
+DATA_LIST_TITLE = re.compile(r"(не входит|не входят|нет|вне|не указан\w*|не перечислен\w*|отсутству\w*)\s.{0,30}"
+                             r"перече?н|перече?н\w*\s.{0,40}(нет|не содерж|не указ)|пиш\w+ в (бд|хранилищ)", re.I)
+RULE_NEED = re.compile(r"правил|\bф-\d|требу|нужн|\bдля\b|тип\w* операц|ссылк|возврат|истори|расч[её]т|"
+                       r"показ|отправ|сообщени|уведомл", re.I)
+
+
+def data_list_only(c: dict) -> bool:
+    """Замечание только о том, что поле интерфейса не перечислено в хранимых данных (без правила, которому оно нужно)."""
+    title = str(c.get("title") or "")
+    return c.get("kind") == "missing_element" and bool(DATA_LIST_TITLE.search(title)) and not RULE_NEED.search(title)
+
+
+def error_body_gap(c: dict) -> bool:
+    """Замечание проверки 4а: поле ответа без условия отсутствует в телах ошибок."""
+    return c.get("kind") == "api_contract" and bool(ERROR_BODY_TITLE.search(str(c.get("title") or "")))
 
 
 def unpromised_critical(c: dict) -> bool:
@@ -145,6 +182,8 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
             c["severity"] = "major"  # шкала линзы: противоречия правил и единицы — major (их critical — набор №09)
         if unpromised_critical(c):
             c["severity"] = "major"
+        if c["severity"] != "minor" and (error_body_gap(c) or data_list_only(c)):
+            c["severity"] = "minor"
         if requirement_ids is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in requirement_ids]
         for k in TEXT_FIELDS:
@@ -227,6 +266,138 @@ def branch_candidates(inventory: dict, view: Any, candidates: list[dict]) -> lis
         })
         if len(out) >= MAX_BRANCH_CANDIDATES:
             break
+    return out
+
+
+# Явное обещание интерфейса в строке обещания (без вызова «A → B:» — его сверяет проверка 8).
+EXPLICIT_PROMISE = re.compile(r"дочерн\w* документ|спецификац|\bapi\b|\brest\b|интерфейс|\bметод\w*", re.I)
+MAX_PROMISE_CANDIDATES = 2
+_STEM = re.compile(r"[а-яёa-z]{5,}", re.I)
+
+
+def _stems(text: str) -> set[str]:
+    return {w[:5].lower().replace("ё", "е") for w in _STEM.findall(text or "")}
+
+
+def promise_candidates(inventory: dict, view: Any, candidates: list[dict]) -> list[dict]:
+    """Кандидаты «обещанная операция не описана», которые модель внесла в опись, но не оформила замечанием.
+
+    Замер волны 3 (haiku, open2): опись верно отмечает обещание без операции («включает … через дочерний
+    документ», operation пуст), а кандидата нет — пропадает К3-тип. Код добавляет critical, только если строка
+    обещания сама называет интерфейс (дочерний документ, спецификация, API, метод) и ни одно замечание
+    «нет элемента» не цитирует эту строку и не говорит о том же действии. Обещания одной строки — одно замечание.
+    """
+    mine = [c for c in candidates if c.get("kind") == "missing_element"]
+    cited = {int(e.get("line") or 0) for c in mine for e in c.get("evidence") or []}
+    told = [_stems(" ".join(str(c.get(k) or "") for k in ("title", "problem"))) for c in mine]
+    by_line: dict[int, list[str]] = {}
+    for p in unfulfilled_promises(inventory):
+        try:
+            n = int(p.get("line") or 0)
+        except (TypeError, ValueError):
+            continue
+        what = str(p.get("what") or "").strip().rstrip(".")
+        text = _line_text(view, n)
+        if not n or n in cited or not what or not text or not EXPLICIT_PROMISE.search(text):
+            continue
+        if any(len(_stems(what) & t) >= 2 for t in told):
+            continue
+        by_line.setdefault(n, []).append(what)
+    out: list[dict] = []
+    for n, whats in sorted(by_line.items())[:MAX_PROMISE_CANDIDATES]:
+        text = _line_text(view, n)
+        objs = "; ".join(dict.fromkeys(whats))
+        out.append({
+            "title": f"Обещанная операция не описана: {objs}"[:120],
+            "kind": "missing_element", "criterion": "set_complete", "severity": "critical", "requirement_ids": [],
+            "evidence": [{"quote": text[:200], "line": n}],
+            "problem": f"Документ обещает через интерфейс: {objs}, — но ни одна описанная операция этого не "
+                       "выполняет.",
+            "scenario": "Разработчик приложения ищет в спецификации запрос для этого действия и не находит его: "
+                        "метод, путь, параметры и ответ не заданы.",
+            "impact": "Обещанную функцию нельзя реализовать и проверить по документу.",
+            "recommendation": "Описать операцию в спецификации: метод, путь, параметры, коды и тело ответа.",
+            "rewrite": "<уточнить: метод, путь и тело ответа операции>", "question": "", "blocks": "both",
+            "source": SOURCE, "origin": "inventory",
+        })
+    return out
+
+
+# Документ сам задаёт ключ идемпотентности запроса («ключ идемпотентности …», «повторный запрос с тем же requestId не
+# создаёт …»). Тогда замечания о повторах (после ошибки, во время первого запроса, гонки) — уровень minor: промпт
+# (проверка 9) велит в этом случае о повторах не писать, а haiku пишет (чистые ТЗ №20: fx, repay — 4 major из 16).
+IDEMPOTENCY_DEFINED = re.compile(r"ключ\w* идемпотентност|idempotency|повторн\w* (запрос|вызов)\w* с тем же|"
+                                 r"с тем же `?[\w-]+`? (не создаёт|возвращ)", re.I)
+REPEAT_TITLE = re.compile(r"повтор|идемпотент|дубл", re.I)
+
+
+def defines_idempotency(view: Any) -> bool:
+    return any(IDEMPOTENCY_DEFINED.search(str(ln.get("text") or "")) for ln in (view or {}).get("lines") or [])
+
+
+def cap_defined_repeats(candidates: list[dict], view: Any) -> int:
+    """Понижает до minor замечания о повторах, если документ задаёт ключ идемпотентности. Возвращает число правок."""
+    if not defines_idempotency(view):
+        return 0
+    n = 0
+    for c in candidates:
+        if isinstance(c, dict) and c.get("severity") in ("critical", "major") and \
+                REPEAT_TITLE.search(str(c.get("title") or "")):
+            c["severity"] = "minor"
+            n += 1
+    return n
+
+
+SUCCESS_ERROR_RULE = "api.success_with_error"
+_CODE = re.compile(r"(?<!\d)([1-5]\d\d)(?!\d)")
+
+
+def success_error_candidates(signals: list, view: Any, candidates: list[dict]) -> list[dict]:
+    """Страховка К-типа «успех против ошибки» по сигналу правила №12 `api.success_with_error`.
+
+    Замер волны 3 (haiku): опись линзы отмечает «тело с признаком ошибки у 200», но critical-замечания нет
+    (4 из 11 прогонов) или оно major. Правило детерминированно находит то же противоречие (на чистых ТЗ корпуса,
+    open2 и №20 не срабатывает). Если status_conflict линзы цитирует строки сигнала — он становится critical
+    (шкала линзы: 2xx с ошибкой в теле против 4xx — critical); если такого нет — добавляется замечание с цитатами
+    строк документа. Изменяет `candidates` на месте; возвращает добавленные.
+    """
+    out: list[dict] = []
+    for sg in signals or []:
+        if not isinstance(sg, dict) or not str(sg.get("rule") or "").startswith(SUCCESS_ERROR_RULE):
+            continue
+        lines = [int(n) for n in ([sg.get("line")] + list(sg.get("lines") or [])) if str(n or "").isdigit()]
+        lines = list(dict.fromkeys(n for n in lines if _line_text(view, n)))
+        if not lines:
+            continue
+        own = [c for c in candidates if c.get("kind") == "status_conflict"
+               and {int(e.get("line") or 0) for e in c.get("evidence") or []} & set(lines)]
+        if own:
+            for c in own:
+                if c.get("severity") != "critical":
+                    c["severity"] = "critical"
+                    c["scenario"] = c.get("scenario") or "Клиент отправляет неверные данные и по одному месту " \
+                                                           "документа получает успешный код, по другому — код ошибки."
+                    c["impact"] = c.get("impact") or "Клиент, который смотрит на код ответа, сочтёт отказ успехом."
+                    c["blocks"] = c.get("blocks") if c.get("blocks") not in (None, "", "none") else "both"
+            continue
+        codes = _CODE.findall(str(sg.get("note") or sg.get("message") or ""))
+        ok = next((x for x in codes if x.startswith("2")), "200")
+        err = next((x for x in codes if x.startswith("4")), "400")
+        a, b = lines[0], next((n for n in lines[1:]), lines[0])
+        out.append({
+            "title": f"Неверный ввод: код {ok} с ошибкой в теле и код {err}",
+            "kind": "status_conflict", "criterion": "set_consistent", "severity": "critical", "requirement_ids": [],
+            "evidence": [{"quote": _line_text(view, n)[:200], "line": n} for n in lines[:3]],
+            "problem": f"Для одного и того же неверного ввода документ в одном месте задаёт успешный код {ok} с "
+                       f"признаком ошибки в теле, а в другом — код ошибки {err}.",
+            "scenario": f"Клиент отправляет запрос с неверным значением: по строке {a} сервер вернёт {ok} с ошибкой "
+                        f"в теле, по строке {b} — {err}; приложение, которое смотрит на код, покажет успех.",
+            "impact": "Клиент сочтёт отказ успехом; тест не знает, какой код ожидать.",
+            "recommendation": f"Оставить для неверного ввода один исход — код {err} с телом ошибки — и исправить "
+                              f"пример ответа {ok}.",
+            "rewrite": f"{err} — параметры запроса заполнены неверно; тело: <уточнить: поля тела ошибки>",
+            "question": "", "blocks": "both", "source": SOURCE, "origin": "signal",
+        })
     return out
 
 
@@ -341,11 +512,16 @@ def run(ctx: Any) -> dict:
         if hasattr(ctx, "warn"):
             ctx.warn("Линза «Архитектор»: ответ не уместился в лимит вывода — повтор двумя частями")
         raw = _run_parts(ctx)
-    raw = dict(raw or {})
+    raw = copy.deepcopy(dict(raw or {}))  # страховки правят кандидатов модели на месте — не трогаем кэш ответа
     inv = raw.get("inventory") if isinstance(raw.get("inventory"), dict) else {}
     extra = branch_candidates(inv, getattr(ctx, "view", None), list(raw.get("candidates") or []))
+    extra += promise_candidates(inv, getattr(ctx, "view", None), list(raw.get("candidates") or []) + extra)
+    model_cands = [c for c in raw.get("candidates") or [] if isinstance(c, dict)]
+    extra += success_error_candidates(getattr(ctx, "signals", None) or [], getattr(ctx, "view", None), model_cands)
+    raw["candidates"] = model_cands
     if extra:
         raw["candidates"] = list(raw.get("candidates") or []) + extra
+    cap_defined_repeats(raw["candidates"], getattr(ctx, "view", None))
     reqs = {r.get("id") for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)}
     result = postprocess(raw, requirement_ids=reqs or None)
     extras = {k: v for k, v in raw.items() if k not in ("candidates", "inventory")}

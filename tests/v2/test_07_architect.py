@@ -241,3 +241,40 @@ def test_critical_only_for_lens_scale_kinds():
            for k in ("missing_element", "status_conflict", "contradiction", "unit_mismatch", "incomplete")}
     assert sev == {"missing_element": "critical", "status_conflict": "critical", "contradiction": "major",
                    "unit_mismatch": "major", "incomplete": "major"}
+
+
+def test_error_body_gap_is_minor():
+    """Проверка 4а («поле без условия нет в телах ошибок») — minor; другие замечания о кодах и ветках не трогаем."""
+    titles = {"Тела ошибок не содержат полей status, amount и recipientName": "minor",
+              "Ответы 400/401/404/500 без поля result": "minor",
+              "Ветка логики без ответа: отклонённая сумма": "major",
+              "Тело ответа 200 при отказе не показано": "major"}
+    for t, want in titles.items():
+        out = la.postprocess({"candidates": [_cand(title=t)]})["candidates"][0]
+        assert out["severity"] == want, t
+    conflict = _cand(title="Ответы ошибок: 200 с признаком ошибки и 400", kind="status_conflict", severity="critical",
+                     scenario="s", impact="i", blocks="both", evidence=[{"quote": "вернуть 400", "line": 3}])
+    assert la.postprocess({"candidates": [conflict]})["candidates"][0]["severity"] == "critical"
+
+
+def test_inventory_tolerates_model_notes_but_candidates_stay_strict():
+    """Заметки модели в описи не ломают схему (иначе claude -p переписывает ответ заново); постобработка их убирает."""
+    inv = dict(la.empty_inventory(), promises_check_note="все обещания сверены",
+               operations=[{"name": "m", "method": "GET", "purpose": "чтение", "line": 1, "note": "x"}])
+    jsonschema.validate({"inventory": inv, "candidates": [_cand()]}, la.SCHEMA)
+    out = la.postprocess({"inventory": inv, "candidates": [_cand()]})
+    assert set(out["inventory"]) == set(la.empty_inventory())
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({"inventory": inv, "candidates": [_cand(note="x")]}, la.SCHEMA)
+
+
+def test_field_missing_from_data_list_is_minor_unless_rule_needs_it():
+    """Разбор №18: «поле API нет в перечне хранимых данных» — minor; major — если названо правило или атрибут для него."""
+    minor = ["Поля requestId и cardId не входят в перечень хранимых данных",
+             "Поле enabled пишется в хранилище, но в перечне хранимых данных его нет"]
+    major = ["Хранимые данные не содержат тип операции и ссылку возврата",
+             "Момент получения события не хранится, а правило 4 его требует",
+             "Чтение настроек не описано ни одной операцией"]
+    for t in minor + major:
+        out = la.postprocess({"candidates": [_cand(title=t, kind="missing_element")]})["candidates"][0]
+        assert out["severity"] == ("minor" if t in minor else "major"), t

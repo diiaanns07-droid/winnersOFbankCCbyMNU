@@ -246,3 +246,45 @@ def test_branch_candidate_not_duplicated_when_model_titles_it_differently(ctx):
     inv = {"branches": [{"operation": "m", "step": "отказ по сумме", "line": 121, "outcome": ""}]}
     model = [{"title": "Ветка «вернуть прежнее состояние» без поля в ответе", "evidence": [{"quote": "q", "line": 121}]}]
     assert lens_architect.branch_candidates(inv, ctx.view, model) == []
+
+
+def test_promise_candidates_from_inventory(ctx):
+    """Обещание без операции в описи, а кандидата нет (haiku, open2) — код добавляет critical с цитатой строки."""
+    inv = {"promises": [
+        {"what": "читать настройки", "line": 52, "operation": ""},          # строка 52 — «через дочерний документ»
+        {"what": "показать сумму за месяц", "line": 29, "operation": ""},   # экран без обещания интерфейса
+        {"what": "сохранить настройки", "line": 52, "operation": "saveLimit"}]}
+    out = lens_architect.promise_candidates(inv, ctx.view, [])
+    assert [c["evidence"][0]["line"] for c in out] == [52]
+    c = out[0]
+    assert c["severity"] == "critical" and c["kind"] == "missing_element" and "читать настройки" in c["title"]
+    m = quotes.verify_quote(ctx.view, c["evidence"][0]["quote"], line_hint=52)
+    assert m and m["line_start"] == 52
+    post = lens_architect.postprocess({"candidates": out})["candidates"][0]
+    assert post["severity"] == "critical"  # цитата содержит явное обещание интерфейса
+    cited = [{"kind": "missing_element", "title": "Нет чтения", "evidence": [{"quote": "q", "line": 52}]}]
+    assert lens_architect.promise_candidates(inv, ctx.view, cited) == []
+    same = [{"kind": "missing_element", "title": "Чтение настроек не описано", "problem": "читать настройки нечем",
+             "evidence": [{"quote": "q", "line": 103}]}]
+    assert lens_architect.promise_candidates(inv, ctx.view, same) == []
+
+
+def test_success_error_signal_makes_critical_conflict(ctx):
+    """Сигнал правила «200 с ошибкой в теле, для ошибок ввода есть 400»: нет замечания линзы — добавляется critical
+    с цитатами строк документа; есть major status_conflict по тем же строкам — становится critical."""
+    sig = [{"rule": "api.success_with_error", "line": 171, "lines": [163, 165, 171],
+            "note": "Успешный код 200 несёт ошибку в теле; для ошибок ввода есть 400."}]
+    cands: list[dict] = []
+    out = lens_architect.success_error_candidates(sig, ctx.view, cands)
+    assert len(out) == 1 and out[0]["severity"] == "critical" and out[0]["kind"] == "status_conflict"
+    assert "200" in out[0]["title"] and "400" in out[0]["title"]
+    for e in out[0]["evidence"]:
+        m = quotes.verify_quote(ctx.view, e["quote"], line_hint=e["line"])
+        assert m and m["line_start"] == e["line"]
+    assert lens_architect.postprocess({"candidates": out})["candidates"][0]["severity"] == "critical"
+    model = [{"title": "Ошибка суммы: 200 и 400", "kind": "status_conflict", "severity": "major", "scenario": "s",
+              "impact": "i", "blocks": "both", "evidence": [{"quote": "q", "line": 171}]}]
+    assert lens_architect.success_error_candidates(sig, ctx.view, model) == []
+    assert model[0]["severity"] == "critical"
+    other = [{"rule": "api.status_404", "line": 188, "lines": [188, 189], "note": "x"}]
+    assert lens_architect.success_error_candidates(other, ctx.view, []) == []
