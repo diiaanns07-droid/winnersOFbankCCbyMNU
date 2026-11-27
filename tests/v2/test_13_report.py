@@ -485,3 +485,26 @@ def test_export_text_for_word(sample, tmp_path):
     assert not [t for t in texts if "<a id" in t or "\\|" in t]
     heads = [p.text for p in d.paragraphs if p.style.name.startswith("Heading")]
     assert "1. Паспорт прогона" in heads and "Кратко" in heads
+
+
+@pytest.mark.parametrize("n_findings,n_reqs", [(50, 48), (70, 100), (100, 150), (60, 300)])
+def test_long_reports_fit_900_lines(sample, n_findings, n_reqs):
+    """Любой документ — не длиннее 900 строк: при 70+ дефектах существенные идут строками таблицы,
+    критичные остаются полными карточками."""
+    r = copy.deepcopy(sample)
+    fs, rq = r["findings"], r["requirements"]
+    while len(fs) < n_findings:
+        f = copy.deepcopy(fs[len(fs) % 32])
+        f["id"] = f"D-{len(fs) + 1:02d}"
+        if f["severity"] == "critical":
+            f["severity"], f["blocks"] = "major", "development"
+        fs.append(f)
+    while len(rq) < n_reqs:
+        q = copy.deepcopy(rq[len(rq) % 48])
+        q["id"] = f"R-{len(rq) + 1:02d}"
+        rq.append(q)
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert md.count("\n") <= 900
+    assert md.count('<a id="d-') == n_findings  # у каждого дефекта есть якорь — ссылки не ломаются
+    assert md.count("**Проблема.**") >= 5  # критичные — полными карточками

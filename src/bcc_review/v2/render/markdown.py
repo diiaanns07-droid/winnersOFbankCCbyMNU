@@ -673,9 +673,12 @@ def _header(c: _Ctx) -> list[str]:
     if status == "partial":
         bad = [stage_name(k) for k, v in (run.get("stages") or {}).items()
                if v in ("partial", "failed")]
+        why = _partial_reason(c)
         out += [">", f"> ⚠️ Прогон завершён частично"
                 + (f": не полностью выполнены этапы {', '.join(bad)}" if bad else "")
-                + ". Вердикт не выше «с условиями»; недостающие проверки — в приложении Д."]
+                + (f". Причина: {why}" if why else "")
+                + ". Вердикт «можно начинать» по частичной проверке не выносится; недостающие проверки — в "
+                  "приложении Д."]
     elif status == "failed":
         out += [">", "> ⛔ Прогон завершился сбоем: вердикт не вынесен, ниже — то, что успели проверить."]
     if c.offline:
@@ -686,6 +689,36 @@ def _header(c: _Ctx) -> list[str]:
                      f"проверка критериев приёмки и вопросы владельцу требуют модели ({how})."]
     out += ["", "**Содержание:** [Кратко](#s0) · " + " · ".join(f"[{name}](#{a})" for a, name in NAV)]
     return out + [""]
+
+
+_REASONS = [
+    (re.compile(r"исчерпан бюджет вызовов модели(?: \(\d+\))?"), "{0} — повторите с большим `--max-calls`"),
+    (re.compile(r"(?:бюджет|лимит) времени[^;,.)]*|превышен[^;,.)]*времени[^;,.)]*|timeout|таймаут[^;,.)]*", re.I),
+     "истёк лимит времени — повторите с большим `--max-seconds`"),
+    (re.compile(r"\b429\b|квот\w*|quota|rate limit|лимит запросов", re.I),
+     "модель отклонила запросы из-за лимита запросов (квоты) — повторите позже или с другой моделью"),
+    (re.compile(r"обрез\w*|truncat\w*|output token maximum", re.I), "ответ модели обрезан по длине"),
+]
+
+
+def _partial_reason(c: _Ctx) -> str:
+    """Понятная причина частичного прогона по предупреждениям этапов: бюджет вызовов, время, квота, обрезка."""
+    found: list[str] = []
+    for w in c.run.get("warnings") or []:
+        for rx, text in _REASONS:
+            m = rx.search(str(w))
+            if m:
+                msg = text.format(m.group(0))
+                if msg not in found:
+                    found.append(msg)
+                break
+    if not found:
+        for w in c.run.get("warnings") or []:
+            m = re.search(r"не выполнен:\s*(.+)$", str(w))
+            if m:
+                found.append(warn_text(shorten(m.group(1), 120)))
+                break
+    return "; ".join(found[:2])
 
 
 def _brief(c: _Ctx) -> list[str]:
@@ -731,8 +764,13 @@ def _why(c: _Ctx, limit: int = 420) -> str:
     """Обоснование вердикта для первого экрана: текст судьи без перечня блокеров (он стоит ниже списком),
     не длиннее limit; без текста судьи — короткое обоснование кодом."""
     text = " ".join(str(c.verdict.get("summary") or "").split())
-    if not text:
-        return _auto_reason(c)
+    judge_down = any("судья недоступен" in str(w) or "реестр собран кодом" in str(w) for w in c.run.get("warnings") or [])
+    if c.offline:
+        lim = ("Смысл требований без модели не проверялся (противоречия правил, критерии приёмки, полнота основной "
+               "функции), поэтому отсутствие других дефектов не означает, что их нет.")
+        return (_auto_why(c) + " " + lim) if _blockers(c) else ("Без модели вердикт «можно» не выносится. " + lim)
+    if not text or judge_down or text.startswith("Итог ревью:"):
+        return _auto_why(c)
     if not _blockers(c):
         return shorten(text, limit + 200)
     sents = _SENT_SPLIT.split(text)
@@ -743,6 +781,28 @@ def _why(c: _Ctx, limit: int = 420) -> str:
             break
         out = f"{out} {s}".strip()
     return out or shorten(text, limit)
+
+
+def _auto_why(c: _Ctx) -> str:
+    """Обоснование для первого экрана, если судья его не написал: без перечня (блокеры стоят ниже списком)."""
+    if c.run.get("status") == "failed":
+        return _auto_reason(c)
+    bl = _blockers(c)
+    partial = c.run.get("status") == "partial"
+    tail = (" Проверка неполная, поэтому возможны и другие дефекты." if partial else "")
+    if bl:
+        what = {b for f in bl for b in ({"both": ("development", "testing")}.get(f.get("blocks")) or (f.get("blocks"),))}
+        target = BLOCKS["both"] if what >= {"development", "testing"} else BLOCKS.get(next(iter(what)), "работу")
+        n = len(bl)
+        noun = (plural(n, "дефект", "дефекта", "дефектов") if c.offline else
+                plural(n, "критичный дефект", "критичных дефекта", "критичных дефектов"))
+        verb = "блокирует" if plural(n, "1", "2", "5") == "1" else "блокируют"
+        return f"{n} {noun} {verb} {target} — они перечислены ниже." + tail
+    majors = [f for f in c.findings if f.get("severity") == "major"]
+    if len(majors) >= 3:
+        return (f"Критичных дефектов нет; существенных — {len(majors)}: начинать можно, исправляя их параллельно "
+                f"с работой." + tail)
+    return "Критичных дефектов нет, существенных меньше трёх." + tail
 
 
 def _blockers(c: _Ctx) -> list[dict]:
@@ -1048,7 +1108,15 @@ def _per_requirement(c: _Ctx) -> list[str]:
             row.append(SEV_ICON.get(_worst(hit), "·") if hit else "·")
         row.append(c.f_links([f["id"] for f in doc_level]))
         rows.append(row)
-    if rows:
+    if rows and c.level >= 7:
+        # очень большой документ: вместо матрицы — требования, сгруппированные по самой серьёзной находке
+        for sev in ("critical", "major", "minor"):
+            grp = [r for r in rows if r[1] == SEV_ICON[sev]]
+            if grp:
+                out.append(f"- {SEV_ICON[sev]} {SEV_PLURAL[sev][2].capitalize()} нарушения ({len(grp)}): "
+                           + "; ".join(f"{r[0]} — {r[-1]}" for r in grp))
+        out += ["", "Критерий каждого дефекта — в его карточке или строке таблицы ниже.", ""]
+    elif rows:
         out += table(["Требование", "Итог"] + [lab for _, lab in cols] + ["Дефекты"], rows,
                      [":---", ":---:"] + [":---:"] * len(cols) + [":---"])
         out.append("")
@@ -1061,22 +1129,18 @@ def _per_requirement(c: _Ctx) -> list[str]:
     out += ["### 3.2. Критичные и существенные дефекты", ""]
     if not cards:
         out += ["Критичных и существенных дефектов нет.", ""]
+    as_rows = [f for f in cards if c.level >= 6 and f.get("severity") != "critical"]
     for f in cards:
-        out += _card(c, f)
+        if f not in as_rows:
+            out += _card(c, f)
+    if as_rows:
+        out += [f"Существенные ({len(as_rows)}) — по строке на дефект, чтобы отчёт уместился в 900 строк; сценарий, "
+                f"последствия и «было → стало» каждого — в `report.json`.", ""]
+        out += _finding_rows(c, as_rows) + [""]
     minors = [f for f in c.findings if f.get("severity") not in ("critical", "major")]
     out += ["### 3.3. Незначительные дефекты", ""]
     if minors:
-        rows = []
-        for f in minors:
-            ev = (f.get("evidence") or [{}])[0]
-            rows.append([f"<a id=\"{anchor(f['id'])}\"></a>🟡 {f['id']}",
-                         cell(f.get("title")),
-                         cell(c.ev_place(ev, f.get("requirement_ids") or [])) + ": "
-                         + quote_md(ev.get("quote"), 90, in_table=True) if ev else "документ в целом",
-                         cell(_criterion_name(f.get("criterion"))),
-                         pcell(f.get("recommendation"))])
-        out += table(["Дефект", "Суть", "Где", "Критерий", "Как исправить"], rows)
-        out.append("")
+        out += _finding_rows(c, minors) + [""]
     else:
         out += ["Незначительных дефектов нет.", ""]
     sig = [g for g in c.r.get("signals") or [] if isinstance(g, dict) and g.get("kind") != "inventory"
@@ -1091,6 +1155,20 @@ def _per_requirement(c: _Ctx) -> list[str]:
             out.append(f"- и ещё {len(sig) - limit} — в `report.json`, поле `signals`.")
         out.append("")
     return out
+
+
+def _finding_rows(c: _Ctx, fs: list[dict]) -> list[str]:
+    """Дефекты таблицей, по строке: суть, место с цитатой, критерий, как исправить."""
+    rows = []
+    for f in fs:
+        ev = (f.get("evidence") or [{}])[0]
+        rows.append([f"<a id=\"{anchor(f['id'])}\"></a>{SEV_ICON.get(f.get('severity'), '')} {f['id']}",
+                     cell(f.get("title")),
+                     cell(c.ev_place(ev, f.get("requirement_ids") or [])) + ": "
+                     + quote_md(ev.get("quote"), 90, in_table=True) if ev else "документ в целом",
+                     cell(_criterion_name(f.get("criterion"))),
+                     pcell(f.get("recommendation"))])
+    return table(["Дефект", "Суть", "Где", "Критерий", "Как исправить"], rows)
 
 
 def _applied_edits(report: dict) -> list[tuple[str, dict]]:
@@ -1664,7 +1742,7 @@ def _appendix_method(c: _Ctx) -> list[str]:
             "**Вердикт.** Критичный дефект, блокирующий разработку, — разработку начинать нельзя; то же для "
             "тестирования. Иначе при трёх и более существенных дефектах по направлению — «можно с условиями»: "
             "начинать части, не затронутые дефектами, и исправлять их параллельно. Иначе — «можно». Частичный "
-            "прогон — не выше «с условиями».", "",
+            "прогон не даёт «можно»: в лучшем случае «с условиями».", "",
             "**Сверка цитат.** Сравнение без учёта регистра, вида кавычек и тире, лишних пробелов и разметки; "
             "цитата ищется у указанной строки, затем во всём документе, ближе к требованию. Нечёткое совпадение "
             "(не ниже 92 %) допускается только рядом с указанной строкой.", ""]
@@ -1674,7 +1752,7 @@ def _appendix_method(c: _Ctx) -> list[str]:
 # ================================================================== сборка
 
 MAX_LINES = 900
-MAX_LEVEL = 5
+MAX_LEVEL = 7
 
 
 _LIST_KEYS = ("requirements", "excluded", "findings", "rejected", "acceptance_checks", "pair_checks", "trace",
