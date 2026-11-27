@@ -526,6 +526,9 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
         c = calibrate(raw)
         if known is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in known]
+        # Пустая цитата проходит схему, но не доказывает ничего (системный промпт, правило 2): такой кандидат занимал
+        # место в лимите линзы (12, minor — 2) и вытеснял настоящий, а затем его всё равно снимала сверка цитат.
+        c["evidence"] = [e for e in c.get("evidence") or [] if isinstance(e, dict) and str(e.get("quote") or "").strip()]
         if not c.get("evidence"):
             dropped.append(_drop(c, "нет цитаты-зацепки"))
             continue
