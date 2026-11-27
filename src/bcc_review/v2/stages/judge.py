@@ -81,8 +81,11 @@ NEVER_CRITICAL_KINDS = {"placeholder", "terminology", "traceability", "duplicate
 NEVER_CRITICAL_CRITERIA = {"conforming", "language", "ranked", "modifiable", "traceable", "necessary",
                            "singular", "risk", "set_comprehensible"}
 
-# Пропуск (critical по пункту «в») должен заметить больше одного ревьюера: «не описано» легко заявить ложно.
+# Critical должны подтвердить два независимых ревьюера (линзы, набор, правила): на живых прогонах каждый из
+# заложенных critical официального документа подтверждён ≥ 2 источниками, а ложные critical на чистых ТЗ — чаще
+# одним. Исключение — кандидаты, где исход выведен на конкретном входе по двум сверенным цитатам.
 MISSING_KINDS = {"missing_element", "incomplete"}
+STRUCTURED_ORIGINS = {"acceptance_check", "pair_check"}
 MIN_SOURCES_FOR_CONSENSUS = 3  # правило действует, если в прогоне не меньше трёх разных источников
 
 # Противоречие (critical по пункту «а» шкалы) доказывается цитатами двух разных мест.
@@ -698,9 +701,10 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "дефект ничего не блокирует"
         elif f["kind"] in CONFLICT_KINDS and len({e["line_start"] for e in f["evidence"]}) < 2:
             why = "противоречие подтверждено цитатой только одного места"
-        elif (f["kind"] in MISSING_KINDS and run_sources >= MIN_SOURCES_FOR_CONSENSUS
-              and len({_source_family(_s(m.get("source"))) for m in members}) < 2):
-            why = "пропуск заметил только один ревьюер"
+        elif (run_sources >= MIN_SOURCES_FOR_CONSENSUS
+              and len({_source_family(_s(m.get("source"))) for m in members}) < 2
+              and not any(_s(m.get("origin")) in STRUCTURED_ORIGINS for m in members)):
+            why = "critical подтвердил только один ревьюер"
         if why:
             f["severity"] = "major"
             _warn(ctx, warnings, f"судья: {f['title'][:60]!r} понижен до major ({why})")

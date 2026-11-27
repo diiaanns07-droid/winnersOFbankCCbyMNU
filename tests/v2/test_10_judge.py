@@ -72,7 +72,7 @@ class Truncated(Exception):
 
 def cand(cid, line, quote, *, kind="ambiguity", criterion="unambiguous", severity="major", reqs=("R-06",),
          source="lens:analyst", title=None, scenario="Вход X даёт два исхода.", impact="Спор при приёмке.",
-         blocks="both", extra=()):
+         blocks="both", extra=(), origin=""):
     ev = [{"quote": quote, "line": line, "line_start": line, "line_end": line, "page": None,
            "section": "Раздел", "verified": "exact"}]
     for ln, q in extra:
@@ -82,7 +82,7 @@ def cand(cid, line, quote, *, kind="ambiguity", criterion="unambiguous", severit
             "severity": severity, "requirement_ids": list(reqs), "evidence": ev,
             "problem": f"Проблема {cid}.", "scenario": scenario, "impact": impact,
             "recommendation": f"Исправить {cid}.", "rewrite": "", "question": "", "blocks": blocks,
-            "source": source}
+            "source": source, "origin": origin}
 
 
 def finding(key, ids, *, severity="major", kind="ambiguity", criterion="unambiguous", priority=0,
@@ -567,18 +567,19 @@ def test_empty_model_answer_falls_back_to_code_registry():
 
 def test_wishes_and_placeholders_become_one_minor_each():
     cs = [cand("C-001", 38, "Месяц определяется", kind="contradiction", criterion="set_consistent",
-               extra=[(64, "Февральский счётчик")]),
+               extra=[(64, "Февральский счётчик")], origin="pair_check"),
           cand("C-002", 46, "в течение минуты", kind="incomplete", source="lens:risk"),
           cand("C-003", 49, "Хранить идентификатор карты", kind="ops_risk", source="lens:risk"),
           cand("C-004", 52, "Повторная доставка", kind="incomplete", source="consistency"),
           cand("C-005", 57, "заполняются тестировщиками", kind="placeholder", source="rules:placeholder.tbd"),
           cand("C-006", 68, "Документ (версия/дата)", kind="placeholder", source="rules:placeholder.version"),
-          cand("C-007", 91, "| | |", kind="placeholder", source="rules:placeholder.approvals")]
+          cand("C-007", 91, "| | |", kind="placeholder", source="rules:placeholder.approvals"),
+          cand("C-008", 52, "Повторная доставка одного события", kind="ops_risk", source="lens:risk")]
     fs = [finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
                   scenario="Вход: два исхода.", impact="Две реализации.", priority=1),
           dict(finding("F02", ["C-002"], title="Сбой внешней системы не описан"), wish=True),
-          dict(finding("F03", ["C-003"], title="Гонки параллельных событий не описаны"), wish=True),
-          dict(finding("F04", ["C-004"], severity="critical", title="Ключевое событие не определено",
+          dict(finding("F03", ["C-008"], title="Гонки параллельных событий не описаны"), wish=True),
+          dict(finding("F04", ["C-004", "C-003"], severity="critical", title="Ключевое событие не определено",
                        kind="ambiguity", criterion="unambiguous", scenario="s", impact="i"), wish=True),  # critical не сводится
           finding("F05", ["C-005"], severity="minor", kind="placeholder", title="Раздел тестирования — заглушка"),
           finding("F06", ["C-006"], severity="major", kind="placeholder", title="Версия не указана"),
@@ -587,10 +588,27 @@ def test_wishes_and_placeholders_become_one_minor_each():
     all_placed(res, [c["id"] for c in cs])
     by_title = {f["title"]: f for f in res["findings"]}
     w = by_title["Документ не рассматривает ряд случаев"]
-    assert w["candidate_ids"] == ["C-002", "C-003"] and w["severity"] == "minor" and w["blocks"] == "none"
+    assert w["candidate_ids"] == ["C-002", "C-008"] and w["severity"] == "minor" and w["blocks"] == "none"
     assert "сбой внешней системы" in w["problem"] and "гонки" in w["problem"]
     p = by_title["Не заполнены поля и разделы шаблона документа"]
     assert p["candidate_ids"] == ["C-005", "C-006", "C-007"] and p["severity"] == "minor"
     assert [e["line_start"] for e in p["evidence"]] == [57, 68, 91]
-    assert any(f["candidate_ids"] == ["C-004"] and f["severity"] == "critical" for f in res["findings"])
+    assert any(f["candidate_ids"] == ["C-003", "C-004"] and f["severity"] == "critical" for f in res["findings"])
     assert len(res["findings"]) == 4
+
+
+def test_single_reviewer_critical_is_major_unless_structured():
+    cs = [cand("C-001", 39, "максимум один", kind="contradiction", criterion="set_consistent", source="lens:qa",
+               extra=[(40, "независимо от истории")]),
+          cand("C-002", 121, "вернуть ERROR", kind="status_conflict", criterion="set_consistent",
+               source="consistency", origin="pair_check", extra=[(163, "400")]),
+          cand("C-003", 23, "в момент", kind="ambiguity", source="lens:risk", extra=[(38, "проведённые")]),
+          cand("C-004", 46, "в течение минуты", kind="unverifiable", source="rules:x")]
+    fs = [finding(f"F0{i}", [f"C-00{i}"], severity="critical", kind=k, criterion=c, scenario="s", impact="i",
+                  priority=i)
+          for i, k, c in ((1, "contradiction", "set_consistent"), (2, "status_conflict", "set_consistent"),
+                          (3, "ambiguity", "unambiguous"))]
+    res = judge.run(Ctx(FakeLLM(response(fs + [finding("F04", ["C-004"])]))), cs)
+    sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert sev["C-001"] == "major" and sev["C-003"] == "major"        # один ревьюер
+    assert sev["C-002"] == "critical"                                  # попарная сверка по сценарию
