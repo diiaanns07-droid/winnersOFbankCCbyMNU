@@ -1,0 +1,227 @@
+{
+  "source_sha": "d605be97479a28fbccae0687004eafcb2a8fc992",
+  "case": "c_web_md",
+  "entry": "web",
+  "input": "requirements.md",
+  "state": "done",
+  "seconds": 45.18,
+  "queue_seconds": 0.0,
+  "outputs": [
+    "csv",
+    "docx",
+    "html",
+    "json",
+    "md",
+    "pdf"
+  ],
+  "cached": 0,
+  "logical_calls_traced": 9,
+  "physical_attempts_observed": 17,
+  "unattributed_failed_calls": 0,
+  "successful_models": {
+    "gemini-3.5-flash-lite": 9
+  },
+  "provider_errors": [
+    {
+      "model": "gemini-3.5-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "400",
+      "class": "schema_rejected",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "503",
+      "class": "http_503",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "error",
+      "class": "not_json",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "http": "503",
+      "class": "http_503",
+      "count": 1
+    }
+  ],
+  "stages": [
+    {
+      "stage": "consistency",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 4.3,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_architect",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 6.6,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "segment",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 15.8,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.8-flash",
+          "503",
+          "http_503"
+        ],
+        [
+          "gemini-3.8-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.7-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.6-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.5-flash",
+          "429",
+          "per_day"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_analyst",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 9.5,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash-lite",
+          "503",
+          "http_503"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_qa",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 9.7,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_risk",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 16.5,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "clarify",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 10.3,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash-lite",
+          "400",
+          "schema_rejected"
+        ],
+        [
+          "gemini-3.5-flash-lite",
+          "error",
+          "not_json"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 12.4,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 2.4,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    }
+  ],
+  "report_bytes": 112792,
+  "report_status": "complete",
+  "stages_with_partial_or_failed_status": [],
+  "failed_logical_calls": 0,
+  "physical_attempts_are_lower_bound": false,
+  "gold": {
+    "K": 3,
+    "K_as_critical": 1,
+    "C": 9,
+    "key25": 12,
+    "findings": 17,
+    "duplicates": 3,
+    "critical_false": 0,
+    "quotes_missing": 0,
+    "quotes_total": 43
+  },
+  "missing_major": [
+    "С5",
+    "С6",
+    "С7",
+    "С8",
+    "С9",
+    "С11",
+    "С12",
+    "С15",
+    "С17",
+    "С18",
+    "С20"
+  ],
+  "counts": {
+    "critical": 1,
+    "major": 13,
+    "minor": 3
+  },
+  "verify_exit": 0,
+  "queue_to_report_seconds": 45.18
+}
