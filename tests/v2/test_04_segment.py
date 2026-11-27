@@ -423,10 +423,13 @@ def test_official_docx_matches_md_offline():
     assert [r["source_id"] for r in md] == [r["source_id"] for r in dx]
 
 
-def test_official_pdf_matches_md_offline():
+@pytest.mark.parametrize("other", ["release/input/requirements.pdf", "tests/v2/fixtures/04_structures/official.html"])
+def test_official_pdf_html_match_md_offline(other):
     md = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
-    pdf = sg.heuristic_segment(sg.load_view(str(ROOT / "release" / "input" / "requirements.pdf")))["requirements"]
-    assert [r["source_id"] for r in md] == [r["source_id"] for r in pdf]
+    view = sg.load_view(str(ROOT / other))
+    h = sg.heuristic_segment(view)
+    assert [r["source_id"] for r in md] == [r["source_id"] for r in h["requirements"]]
+    assert sg.uncovered_lines(view, h["requirements"], h["excluded"]) == []
 
 
 def test_caption_line_auto_excluded():

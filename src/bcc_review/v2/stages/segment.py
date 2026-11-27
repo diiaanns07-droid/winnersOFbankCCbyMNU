@@ -741,6 +741,8 @@ def heuristic_segment(view: dict) -> dict:
     reqs, excl = [], []
     prev_table_row = False
     row_no = 0
+    # вводный текст до первого раздела — пояснение о самом документе (если разделы в документе вообще есть)
+    first_sectioned = next((int(x["n"]) for x in lines if x.get("section")), 0)
     for i, ln in enumerate(lines):
         n, t = int(ln["n"]), _text(ln).strip()
         if (n in headings and re.fullmatch(r"[1-5]\d\d\.?", t) and reqs and t[:3] in reqs[-1]["quote"]
@@ -762,7 +764,7 @@ def heuristic_segment(view: dict) -> dict:
                          "reason": "Метаданные или шаблон процесса, не требование"})
             prev_table_row = is_row
             continue
-        if not section and n <= 5:
+        if not section and n < first_sectioned:
             excl.append({"what": "Служебное пояснение", "line_start": n, "line_end": n,
                          "reason": "Пояснение о самом документе"})
             continue
@@ -787,6 +789,11 @@ def heuristic_segment(view: dict) -> dict:
             if not reqs[-1]["source_id"]:
                 reqs[-1]["source_id"], reqs[-1]["kind"] = f"Статус {t[:3]}", "api"
             continue
+        bid = ln.get("block_id") or ""
+        starts_item = bool(is_row or _ID_RE.match(t) or _STATUS_RE.match(t) or _NUM_RE.match(t))
+        if bid and not starts_item and reqs and reqs[-1].get("_block") == bid and n - reqs[-1]["line_end"] <= 2:
+            reqs[-1]["line_end"] = n  # продолжение того же абзаца или пункта (перенос строки в HTML/PDF/DOCX)
+            continue
         tail = _section_tail(ln)
         clean = re.sub(r"^\s*[-*•]\s+", "", t)
         sid, kind = "", _guess_kind(low_sec, clean, is_row)
@@ -809,7 +816,10 @@ def heuristic_segment(view: dict) -> dict:
                                          "summary": _short_quote(clean)[:90], "quote": _short_quote(clean),
                                          "line_start": n, "line_end": n})
         if r:
+            r["_block"] = bid
             reqs.append(r)
+    for r in reqs:
+        r.pop("_block", None)
     reqs = _collapse_key_value_tables(view, reqs)
     reqs, excl = merge_items(reqs, excl)
     return {"requirements": assign_ids(uniquify_source_ids(canonical_source_ids(view, reqs))), "excluded": excl}

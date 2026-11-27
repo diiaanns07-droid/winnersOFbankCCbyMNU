@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>requirements</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<h1 id="уведомление-о-расходах-по-карте">Уведомление о расходах по
+карте</h1>
+<p>Комплект из двух исходных документов. Текст требований не вычитывался
+и не исправлялся.<br />
+Часть B — дочерняя спецификация, на которую ссылается раздел интеграции
+в части A.</p>
+<hr />
+<h2 id="часть-a.-новый-функционал">Часть A. Новый функционал</h2>
+<h3 id="общие-сведения">Общие сведения</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Поле</th>
+<th style="text-align: left;">Значение</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Наименование задачи</strong></td>
+<td style="text-align: left;">Месячный порог расходов по карте</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Продукт</strong></td>
+<td style="text-align: left;">Мобильный банк, учебный кейс</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Бизнес-процесс</strong></td>
+<td style="text-align: left;">Информирование держателя карты</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Business owner / Product owner /
+Аналитик</strong></td>
+<td style="text-align: left;">Учебные роли розничного бизнеса, владельца
+мобильного банка и аналитика команды</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Тип работы</strong></td>
+<td style="text-align: left;">Новый функционал</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Влияние на ИС</strong></td>
+<td style="text-align: left;">Мобильный банк, карточный процессинг,
+сервис уведомлений</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Задача в JIRA</strong></td>
+<td style="text-align: left;">Практикум без Jira-задачи</td>
+</tr>
+</tbody>
+</table>
+<h3 id="цели">Цели</h3>
+<p>Дать клиенту возможность узнать о достижении личного бюджета в момент
+покупки.</p>
+<h3 id="архитектура-решения">Архитектура решения</h3>
+<p>Мобильное приложение → сервис настроек. Карточный процессинг → учёт
+расходов → сервис push.</p>
+<h3 id="дизайн-процесса-ui">Дизайн процесса UI</h3>
+<p>Карты → Расходы → Уведомления. На экране видны переключатель, поле
+«Порог, ₸», сумма за месяц и кнопка «Сохранить». При ошибке ввода
+сообщение появляется под полем.</p>
+<h3 id="требования-к-изменениям">Требования к изменениям</h3>
+<h4 id="bpmn-схема-процесса">BPMN схема процесса</h4>
+<p>Проведение покупки → пересчёт расходов → проверка порога → при
+достижении отправка push → завершение.</p>
+<h4 id="функциональные-требования">Функциональные требования</h4>
+<ul>
+<li><strong>Ф-1.</strong> Держатель активной карты KZT задаёт целый
+порог от 1 000 до 1 000 000 ₸ включительно. По умолчанию уведомление
+выключено.</li>
+<li><strong>Ф-2.</strong> Месяц определяется по дате совершения покупки
+в Алматы. В расходы входят проведённые покупки. Возврат уменьшает
+расходы месяца исходной покупки. Переводы и снятие наличных
+исключаются.</li>
+<li><strong>Ф-3.</strong> Когда расходы переходят от суммы ниже порога к
+сумме, равной порогу или выше, клиент получает push. На карту приходится
+максимум один такой push за календарный месяц.</li>
+<li><strong>Ф-4.</strong> При изменении порога накопленная сумма
+сохраняется. Если она ниже нового порога, следующее достижение вызывает
+push независимо от истории предыдущей настройки.</li>
+</ul>
+<h3 id="sequence-diagram">Sequence Diagram</h3>
+<p>Процессинг → сервис расходов: проведена покупка. Сервис расходов →
+настройки: получить порог карты. Сервис расходов → push: передать
+последние четыре цифры карты и сумму при достижении порога.</p>
+<h3 id="нефункциональные-требования">Нефункциональные требования</h3>
+<p>Сервис передаёт push на отправку в течение минуты после получения
+события.</p>
+<h3 id="требования-к-данным">Требования к данным</h3>
+<p>Хранить идентификатор карты, месяц, идентификатор операции, сумму
+покупки в тиынах, признак отправки и порог в тенге.</p>
+<h3 id="требования-к-интеграции">Требования к интеграции</h3>
+<p>Приложение читает и сохраняет настройки через дочерний документ
+«Уведомление о расходах по карте — REST API». Повторная доставка одного
+события процессинга сохраняет исходный итог.</p>
+<h3 id="требования-к-тестированию">Требования к тестированию</h3>
+<h4 id="тестирование-требований">Тестирование требований</h4>
+<p>заполняются тестировщиками</p>
+<h3 id="критерии-приемки">Критерии приемки</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Исходные условия</th>
+<th style="text-align: left;">Действие</th>
+<th style="text-align: left;">Ожидаемый результат</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Расходы 48 500 ₸, порог 50 000 ₸</td>
+<td style="text-align: left;">Провести покупку на 1 500 ₸</td>
+<td style="text-align: left;">Итог 50 000 ₸ и один push</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Покупка 31 января в 23:58 на 4 000 ₸</td>
+<td style="text-align: left;">Провести 1 февраля в 00:03 по Алматы</td>
+<td style="text-align: left;">Февральский счётчик вырос на 4 000 ₸</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Расходы 19 900 ₸, порог 20 000 ₸</td>
+<td style="text-align: left;">Перевести 500 ₸</td>
+<td style="text-align: left;">Счётчик показывает 19 900 ₸</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ревью-требований">Ревью требований</h3>
+<p>Документ (версия/дата) в источнике не заполнен. Пункты чек-листа
+приведены как в шаблоне, отметки не проставлены.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Проверка</th>
+<th style="text-align: left;">Создано или доступно</th>
+<th style="text-align: left;">Проверено</th>
+<th style="text-align: left;">Примечания</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Техническое требование зафиксировано и
+покрывает бизнес-требование</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Функциональная спецификация имеет
+структурированное описание (по стандарту, шаблону)</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sequence-диаграммы, предусмотрены
+взаимодействия систем, компонентов и решений</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Требование покрывает спецификацию UX/UI
+дизайна</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Реализация задачи/проекта предусматривает
+схему отката решений</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">При невозможности отката — варианты
+скрытия функционала</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Требование может быть протестировано</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Требование предусматривает модель данных
+или поток, содержит описание</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Требование не имеет противоречий или явных
+показателей операционных рисков</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Требование содержит архитектуру и
+согласовано с архитекторами</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Для архитектуры — чек-лист</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Все изменения, влияющие на иные
+продукты/системы в требовании, согласованы с ответственными лицами</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Структура требований не несёт изменений и
+рисков информационной безопасности</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">По информационной безопасности —
+чек-лист</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">В требовании присутствует схема полного
+бизнес-процесса и часть реализуемой доработки</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Требование носит интеграционный характер и
+имеет четкую постановку реализации интеграционного взаимодействия</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;">Да / Нет / Не требуется</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Поддерживается версионность документа /
+зафиксирована</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;">Да / Нет</td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<h3 id="блок-согласующих">Блок согласующих</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Подразделение</th>
+<th style="text-align: left;">ФИО ответственного</th>
+<th style="text-align: left;">Подпись</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="часть-b.-rest-api">Часть B. REST API</h2>
+<p>Дочерний документ части A: «Уведомление о расходах по карте — REST
+API».</p>
+<h3 id="общие-параметры">Общие параметры</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Поле</th>
+<th style="text-align: left;">Значение</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Description</strong></td>
+<td style="text-align: left;">Сохранение порога. Функциональные
+требования: чтение порога</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>REST type</strong></td>
+<td style="text-align: left;">GET</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Authorization</strong></td>
+<td style="text-align: left;">Bearer, сессия владельца карты</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Controller</strong></td>
+<td style="text-align: left;">AlertsController</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>URL type</strong></td>
+<td style="text-align: left;">Dev / Prod</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Request URL</strong></td>
+<td style="text-align: left;">Dev: <code>/alerts/saveLimit</code> .
+Prod: —</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>CURL</strong></td>
+<td
+style="text-align: left;"><code>curl -G "$BASE/alerts/saveLimit" -H "Authorization: Bearer $TOKEN" --data 'cardId=demo-42&amp;amount=50000&amp;enabled=1'</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Swagger</strong></td>
+<td style="text-align: left;">—</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Gitlab project</strong></td>
+<td style="text-align: left;">Учебный контур</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Framework</strong></td>
+<td style="text-align: left;">Учебный контур</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Author</strong></td>
+<td style="text-align: left;">Школа тестирования</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Developer</strong></td>
+<td style="text-align: left;">Команда практикума</td>
+</tr>
+</tbody>
+</table>
+<h3 id="логика-работы-метода">Логика работы метода</h3>
+<ol type="1">
+<li>Проверить пользовательскую сессию.</li>
+<li>Проверить принадлежность карты клиенту.</li>
+<li>Проверить сумму и переключатель.</li>
+<li>Заменить настройку и вернуть результат сохранения.</li>
+<li>При отклонении суммы вернуть прежнее состояние и результат
+ERROR.</li>
+</ol>
+<h3 id="особые-правила">Особые правила</h3>
+<ol type="1">
+<li>Целое число тенге, обе границы включены.</li>
+<li>Повторное сохранение заменяет действующую настройку.</li>
+<li>Изменение порога сохраняет накопленные расходы.</li>
+</ol>
+<h3 id="схема">Схема</h3>
+<pre class="text"><code>Приложение → AlertsController → хранилище настроек → AlertsController → приложение.</code></pre>
+<h3 id="параметры-запроса">Параметры запроса</h3>
+<h4 id="path-параметры">Path-параметры</h4>
+<p>Не используются.</p>
+<h4 id="query-параметры">Query-параметры</h4>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Format</th>
+<th style="text-align: left;">Size</th>
+<th style="text-align: left;">Mandatory</th>
+<th style="text-align: left;">Logic</th>
+<th style="text-align: left;">Description</th>
+<th style="text-align: left;">DB field</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>cardId</code></td>
+<td style="text-align: left;">string</td>
+<td style="text-align: left;">1–64</td>
+<td style="text-align: left;">Да</td>
+<td style="text-align: left;">Карта клиента</td>
+<td style="text-align: left;">Идентификатор карты</td>
+<td style="text-align: left;"><code>card_id</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>amount</code></td>
+<td style="text-align: left;">integer</td>
+<td style="text-align: left;">32 bit</td>
+<td style="text-align: left;">Да</td>
+<td style="text-align: left;">1 000–1 000 000</td>
+<td style="text-align: left;">Порог в тенге</td>
+<td style="text-align: left;"><code>limit_kzt</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>enabled</code></td>
+<td style="text-align: left;">integer</td>
+<td style="text-align: left;">1 знак</td>
+<td style="text-align: left;">Да</td>
+<td style="text-align: left;">0 или 1</td>
+<td style="text-align: left;">Признак включения</td>
+<td style="text-align: left;"><code>enabled</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="request-body">Request body</h4>
+<ul>
+<li><strong>Content-Type:</strong> <code>application/json</code> .</li>
+<li>Тело не используется.</li>
+</ul>
+<h3 id="ответ">Ответ</h3>
+<p>Если результат 200 или 201 — успешный. Если результат 400, 401 и
+далее — неуспешный.</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Format</th>
+<th style="text-align: left;">Logic</th>
+<th style="text-align: left;">Description</th>
+<th style="text-align: left;">DB field</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>result</code></td>
+<td style="text-align: left;">string</td>
+<td style="text-align: left;">OK / ERROR</td>
+<td style="text-align: left;">Исход сохранения</td>
+<td style="text-align: left;">—</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>amount</code></td>
+<td style="text-align: left;">string</td>
+<td style="text-align: left;">При успехе</td>
+<td style="text-align: left;">Порог в тенге</td>
+<td style="text-align: left;"><code>limit_kzt</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>enabled</code></td>
+<td style="text-align: left;">string</td>
+<td style="text-align: left;">«0» или «1»</td>
+<td style="text-align: left;">Признак включения</td>
+<td style="text-align: left;"><code>enabled</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>message</code></td>
+<td style="text-align: left;">string</td>
+<td style="text-align: left;">При ошибке</td>
+<td style="text-align: left;">Описание ошибки</td>
+<td style="text-align: left;">—</td>
+</tr>
+</tbody>
+</table>
+<h3 id="статусы">Статусы</h3>
+<p><strong>200.</strong> Ответ в случае успешного выполнения
+метода.<br />
+<strong>400.</strong> Ответ в случае, если параметры запроса заполнены
+неверно.</p>
+<h4 id="successful-created">200. Successful — Created</h4>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;result&quot;</span><span class="fu">:</span><span class="st">&quot;OK&quot;</span><span class="fu">,</span><span class="dt">&quot;amount&quot;</span><span class="fu">:</span><span class="st">&quot;50000&quot;</span><span class="fu">,</span><span class="dt">&quot;enabled&quot;</span><span class="fu">:</span><span class="st">&quot;1&quot;</span><span class="fu">}</span></span></code></pre></div>
+<p>или</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;result&quot;</span><span class="fu">:</span><span class="st">&quot;ERROR&quot;</span><span class="fu">,</span><span class="dt">&quot;message&quot;</span><span class="fu">:</span><span class="st">&quot;Проверьте сумму&quot;</span><span class="fu">}</span></span></code></pre></div>
+<p><strong>401.</strong> Ответ в случае, если запрос выполнен без
+необходимой авторизации.<br />
+<strong>403.</strong> Ответ в случае, если на указанный ресурс доступ
+запрещен.<br />
+<strong>500.</strong> Ответ в случае, если произошла внутренняя ошибка
+сервера.</p>
+<h4 id="unsuccessful-bad-request">400. Unsuccessful — Bad request</h4>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;message&quot;</span><span class="fu">:</span><span class="st">&quot;Некорректный запрос&quot;</span><span class="fu">}</span></span></code></pre></div>
+<h4 id="unsuccessful-unauthorized">401. Unsuccessful — Unauthorized</h4>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;message&quot;</span><span class="fu">:</span><span class="st">&quot;Требуется вход&quot;</span><span class="fu">}</span></span></code></pre></div>
+<h4 id="unsuccessful-forbidden">403. Unsuccessful — Forbidden</h4>
+<p>Для чужой карты возвращается 404, как и для отсутствующей
+карты.<br />
+<strong>404</strong></p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;message&quot;</span><span class="fu">:</span><span class="st">&quot;Карта не найдена&quot;</span><span class="fu">}</span></span></code></pre></div>
+<h4 id="unsuccessful-internal-server-error">500. Unsuccessful — Internal
+server error</h4>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;message&quot;</span><span class="fu">:</span><span class="st">&quot;Ошибка сервиса&quot;</span><span class="fu">}</span></span></code></pre></div>
+</body>
+</html>
