@@ -61,6 +61,7 @@ FILES = [  # (ключ, имя файла в out/, подпись, mime)
     ("pdf_annotated", "report.annotated.pdf", "PDF с выделениями", "application/pdf"),
     ("revised", "report.revised.md", "Исправленное ТЗ", "text/markdown; charset=utf-8"),
     ("answers_next", "report.answers-next.md", "Следующий круг ответов", "text/markdown; charset=utf-8"),
+    ("confluence", "report.confluence.txt", "Confluence", "text/plain; charset=utf-8"),
 ]
 
 
@@ -445,6 +446,12 @@ class PipelineRunner:
             except Exception:  # noqa: BLE001
                 view = None
             H.write(report, view, out / "report.html")
+        if not (out / "report.confluence.txt").exists():  # вики-разметка для «Вставить → Разметка» в Confluence
+            try:
+                from bcc_review.v2.render import confluence
+                confluence.write(report, out / "report.confluence.txt")
+            except Exception:  # noqa: BLE001 — выгрузка необязательна, отчёт уже есть
+                pass
         job.files = {k: n for k, n, _, _ in FILES if (out / n).exists()}
         job.summary = _summary(report)
         job.notice = _notice(report)
