@@ -126,3 +126,13 @@ def test_corpus_mutant_keeps_acceptance_conflict(case):
     out = lens_qa.postprocess(_json(QA / f"{case}.sonnet.json"), seg, view)
     assert [c["severity"] for c in out["candidates"]] == ["critical"]
     assert out["candidates"][0]["origin"] == "acceptance_check"
+
+
+def test_model_candidate_without_quote_goes_to_dropped():
+    """Кандидат модели без цитаты — в dropped линзы с причиной (раньше доходил до сверки и отклонялся там)."""
+    cand = {"title": "Покрытие", "kind": "missing_element", "criterion": "set_validatable", "severity": "minor",
+            "requirement_ids": [], "evidence": [{"quote": " ", "line": 3}], "problem": "п", "scenario": "", "impact": "",
+            "recommendation": "", "rewrite": "", "question": "", "blocks": "testing"}
+    out = lens_qa.postprocess({"candidates": [cand]}, [])
+    assert out["candidates"] == []
+    assert [d["reason"] for d in out["dropped"]] == [lens_qa.NO_QUOTE_REASON]
