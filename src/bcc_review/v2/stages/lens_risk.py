@@ -96,7 +96,9 @@ _TITLE_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in OUT_OF_S
 # устойчивость к повторам, говорит о параллельных событиях или сбоях). Иначе это вопрос — minor.
 MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
     "повторы и дубли событий": {
-        "title": r"дедуплик|дубл|повторн\w*\s+(доставк|событи|уведомлени|обработк|запрос|вызов)|идемпотент|двойн",
+        "title": r"дедуплик|дубл|повторн\w*\s+(доставк|событи|уведомлени|обработк|запрос|вызов)|идемпотент|двойн"
+                 r"|повтор\w*\s+(\w+\s+)?(событи|доставк|уведомлени|сообщени|передач|отправк)"
+                 r"|(признак|ключ)\w*\s+(\w+\s+)?повтор",
         "hooks": ["повтор", "дубл", "идемпотент", "исходный итог", "однократн"],
     },
     "гонки параллельных событий": {
@@ -111,6 +113,11 @@ MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
     },
 }
 _MAJOR_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in MAJOR_NEEDS_HOOK.items()}
+# Зацепка для major о повторах — обещание документа, что повтор не меняет итог («повторная доставка … сохраняет
+# исходный итог», «повтор не учитывается», «обработка однократна»), а не любое слово «повтор» («передача
+# повторяется до 2 раз»): без обещания вопрос о дублях — вопрос предметной области.
+_REPEAT_PROMISE_RE = re.compile(r"повтор\w*[^;|.]{0,80}(не\s+(меня|учитыва|созда|влия|увеличива|начисля)|сохраня)"
+                                r"|однократн|исходн\w+\s+итог|не\s+более\s+одного\s+раза\s+на\s+(событи|операци)", re.I)
 
 
 # Риск ИБ уровня major — только конкретный риск описанного интерфейса (данные в адресе, GET, ответ на чужой
@@ -119,6 +126,15 @@ _MAJOR_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in MAJOR_NE
 SECURITY_MAJOR_RE = re.compile(
     r"строк\w*\s+запрос|query|адрес|url|\bget\b|40[34]|чуж|владе|принадлеж|сесси|роль|роли|держател"
     r"|номер\w*\s+карт|цифр|маск|персональн|журнал|лог[аиоу]|перебор|раскры", re.I)
+
+
+# Признак повтора назван в самом обещании («с тем же идентификатором», «ключ идемпотентности»): вопрос закрыт.
+_REPEAT_KEYED_RE = re.compile(r"с\s+тем\s+же|ключ\w*\s+идемпотент|идентификатор\w*\s+(событи|операци|запрос)", re.I)
+
+
+def repeat_promise_without_key(doc_text: str) -> bool:
+    """В документе есть обещание «повтор не меняет итог», в строке которого не назван признак повтора."""
+    return any(_REPEAT_PROMISE_RE.search(ln) and not _REPEAT_KEYED_RE.search(ln) for ln in doc_text.splitlines())
 
 
 def major_without_hook(candidate: dict, doc_text: str) -> str | None:
@@ -131,7 +147,8 @@ def major_without_hook(candidate: dict, doc_text: str) -> str | None:
     if candidate.get("kind") == "security" and not SECURITY_MAJOR_RE.search(title):
         return "риск ИБ без опоры на описанный интерфейс"
     matched = [topic for topic, rx in _MAJOR_RES.items() if rx.search(title)]
-    hooked = [t for t in matched if any(h in doc_text for h in MAJOR_NEEDS_HOOK[t]["hooks"])]
+    hooked = [t for t in matched if (repeat_promise_without_key(doc_text) if t == "повторы и дубли событий"
+                                     else any(h in doc_text for h in MAJOR_NEEDS_HOOK[t]["hooks"]))]
     return matched[0] if matched and not hooked else None
 
 
@@ -245,9 +262,13 @@ _DEST_DEFINED_RE = re.compile(r"карт\w*(\s+для\s+\w+)?\s+(\w+\s+)?(зак
                               r"|сч[её]т\w*\s+для\s+\w+\s+(\w+\s+)?(закрыт|заблокирован)", re.I)
 
 
+# «Порядок событий» (возврат раньше покупки) — эксплуатация, а не неопределённое ключевое событие.
+_EVENT_ORDER_RE = re.compile(r"порядок\s+(\w+\s+)?событи|раньше\s+(покупк|событи|операци)", re.I)
+
+
 def _is_key_event(c: dict) -> bool:
     title = str(c.get("title", ""))
-    return bool(_KEY_EVENT_RE.search(title)) and not _ACCEPTANCE_RE.search(title)
+    return bool(_KEY_EVENT_RE.search(title)) and not _ACCEPTANCE_RE.search(title) and not _EVENT_ORDER_RE.search(title)
 
 
 def _quotes(c: dict) -> list[str]:
@@ -292,6 +313,131 @@ def payout_closed_question(c: dict, doc_text: str) -> str | None:
         return "случай закрытой карты или счёта для выплаты описан в документе"
     if not _DEST_CHOICE_RE.search(doc_text):
         return "выплата на тот же продукт: закрытие карты — вопрос жизненного цикла, не замечание линзы"
+    return None
+
+
+# «Нет часового пояса / часа» у срока или границы периода — по шкале судьи и эталону чистых ТЗ это уточнение (minor),
+# а minor без зацепки линза не пишет. Остаются: два места с разными поясами или датами (противоречие), пояс назван
+# городом или «местным временем» (minor с зацепкой) и момент дня, на котором каждый день считаются деньги
+# («остаток на конец дня»), когда пояс в документе не назван нигде.
+_TZ_TITLE_RE = re.compile(r"пояс|\butc\b|(до|с)\s+какого\s+часа|час\w*\s+(и|или)\s+(пояс|минут)|граница?\w*\s+(суток|дня|месяц"
+                          r"|период|календарн)|без\s+(часа|времени)|врем\w*\s+окончани|момент\w*\s+(начала\s+и\s+)?окончани"
+                          r"|окончани\w*\s+(срока|период)\w*.{0,40}(час|врем|пояс)", re.I)
+_TZ_CITY_RE = re.compile(r"город|местн\w+\s+врем|алмат|астан", re.I)
+_DAY_MONEY_RE = re.compile(r"(на\s+)?кон(ец|ца)\s+(операционного\s+)?дня|на\s+начало\s+дня", re.I)
+_TZ_DOC_RE = re.compile(r"utc|часов\w*\s+пояс", re.I)
+# Перенос срока с выходного или праздничного дня — отдельный major (проценты и штрафы клиента), даже если модель
+# склеила его в одно замечание с поясом.
+_WEEKEND_RE = re.compile(r"выходн|праздни|нерабоч|рабоч\w*\s+д|перенос", re.I)
+# Два периода, которые должны считаться по одной дате и в одном поясе (учёт операций и ограничение действия): это
+# расхождение мест документа, а не граница одного срока.
+_TWO_PERIODS_RE = re.compile(r"ограничени|лимит|два\w*\s+период|разн\w+\s+(дат|период)|месяц\w*\s+(лимит|отправк|уведомлен|push)"
+                             r"|какой\s+месяц|в\s+сч[её]т\s+какого|приёмк|приемк", re.I)
+
+
+def tz_only_question(c: dict, doc_text: str) -> str | None:
+    """Причина снять «не задан часовой пояс / час границы срока», или None (замечание остаётся)."""
+    if c.get("severity") == "critical" or _is_key_event(c) or c.get("kind") in CONFLICT_KINDS + ("unit_mismatch",):
+        return None
+    title = str(c.get("title", ""))
+    if not _TZ_TITLE_RE.search(title) or _TZ_CITY_RE.search(title) or _TWO_PERIODS_RE.search(title) \
+            or _WEEKEND_RE.search(title):
+        return None
+    if not _TZ_DOC_RE.search(doc_text) and any(_DAY_MONEY_RE.search(q) for q in _quotes(c)):
+        return None  # «остаток на конец дня» без пояса: деньги считаются каждый день — дефект, а не граница
+    return "граница срока или периода без часа и пояса — уточнение, а не замечание линзы"
+
+
+# Крайний случай возврата или отмены, который документ сам решил: в строке правила возврата назван поздний случай
+# («возврат, отражённый позже, …», «возврат после зачисления уменьшает следующее …», «… не восстанавливает»).
+_REFUND_TITLE_RE = re.compile(r"возврат|сторн", re.I)
+_REFUND_LINE_RE = re.compile(r"возврат|сторн", re.I)
+_LATE_CASE_RE = re.compile(r"(?<!не\s)позже|после\s+(окончани|зачислени|выплат|начислени|закрыти|выписк|отправк)"
+                           r"|не\s+восстанавлива", re.I)
+
+
+def _doc_lines_of(c: dict, view: Any) -> list[str]:
+    """Строки документа, на которые указывают цитаты кандидата (по номеру строки и по тексту цитаты)."""
+    lines = _lines(view)
+    by_n = {int(x["n"]): x["text"] for x in lines if str(x.get("n", "")).isdigit() or isinstance(x.get("n"), int)}
+    out = []
+    for ev in c.get("evidence") or []:
+        if not isinstance(ev, dict):
+            continue
+        q = str(ev.get("quote", "")).strip().lower()
+        hit = [x["text"] for x in lines if q and q[:60] in x["text"].lower()]
+        if hit:
+            out += hit
+        else:
+            n = ev.get("line_start") or ev.get("line")
+            if isinstance(n, int) and n in by_n:
+                out.append(by_n[n])
+    return out
+
+
+def refund_edge_defined(c: dict, view: Any) -> str | None:
+    """Причина снять вопрос о крайнем случае возврата, который правило документа уже решило, или None."""
+    if c.get("severity") == "critical" or _is_key_event(c) or c.get("kind") in CONFLICT_KINDS:
+        return None
+    title = str(c.get("title", ""))
+    if not _REFUND_TITLE_RE.search(title) or _CANCEL_DURING_RE.search(title):
+        return None
+    for line in _doc_lines_of(c, view):
+        if _REFUND_LINE_RE.search(line) and _LATE_CASE_RE.search(line):
+            return "поздний возврат или отмена описаны в правиле документа — крайний случай, вопрос"
+    return None
+
+
+# Исход сбоя описан в документе («при сбое не проводится ни одна из них», «при ошибке списание отменяется»):
+# «не описано состояние после сбоя / ответа 500» — неверное прочтение.
+_FAIL_TITLE_RE = re.compile(r"сбо[йяеию]|\b5\d\d\b|ошибк|таймаут|недоступн", re.I)
+_FAIL_OUTCOME_RE = re.compile(r"(сбо[йяеию]|ошибк\w*|недоступн\w*|не\s+ответил)\W.{0,80}(не\s+(провод|выполня|списыва|зачисля|сохраня"
+                              r"|меня)|ни\s+одн|отменя|откатыва|возвраща)", re.I)
+
+
+def failure_outcome_defined(c: dict, view: Any) -> str | None:
+    """Причина снять «не описан исход сбоя», если документ его описывает, или None."""
+    if c.get("severity") == "critical" or _is_key_event(c):
+        return None
+    if not _FAIL_TITLE_RE.search(str(c.get("title", ""))):
+        return None
+    if any(_FAIL_OUTCOME_RE.search(x["text"]) for x in _lines(view)):
+        return "исход сбоя описан в документе"
+    return None
+
+
+# Ответ на повтор запроса клиента задан особым правилом («Повторная установка … не считается ошибкой», «Повторный
+# вызов … возвращает …»): вопрос о варианте повтора — уточнение (разбор №18: «повтор: 200 или 400»), а не дефект.
+# Повтор события от внешней системы (дубль события процессинга) сюда не относится.
+_REPEAT_REQ_TITLE_RE = re.compile(r"повтор\w*\s+(\w+\s+){0,4}(установк|запрос|вызов|оплат|нажати|requestid|сохранени|подключ)"
+                                  r"|повторн\w*\s+(\w+\s+)?(установк|вызов|запрос|оплат|сохранени)", re.I)
+_REPEAT_EVENT_RE = re.compile(r"событи|уведомлени|доставк|процессинг|сообщени", re.I)
+_REPEAT_RULE_RE = re.compile(r"повторн\w*\s+(\w+\s+){0,3}(установк|вызов|запрос|оплат|сохранени|подключ)\w*.{0,120}"
+                             r"(не\s+считается\s+ошибк|возвраща|отвеча|ответ|не\s+созда|не\s+меня)", re.I)
+
+
+def repeat_request_defined(c: dict, view: Any) -> str | None:
+    """Причина снять вопрос об ответе на повтор запроса, если документ задаёт его особым правилом, или None."""
+    if c.get("severity") == "critical" or _is_key_event(c):
+        return None
+    title = str(c.get("title", ""))
+    if not _REPEAT_REQ_TITLE_RE.search(title) or _REPEAT_EVENT_RE.search(title):
+        return None
+    if any(_REPEAT_RULE_RE.search(x["text"]) for x in _lines(view)):
+        return "ответ на повтор запроса задан особым правилом документа — уточнение, не замечание линзы"
+    return None
+
+
+# Пункт шаблона ревью о схеме отката заполнен (отмечено «Да» и описан флаг или выключение функции): замечания нет.
+_ROLLBACK_DONE_RE = re.compile(r"откат\w*.{0,200}(флаг\w*|выключ\w*|отключ\w*|feature)", re.I)
+
+
+def rollback_described(c: dict, view: Any) -> str | None:
+    """Причина снять «схема отката не описана», если документ её описывает (заполненный пункт шаблона), или None."""
+    if "откат" not in str(c.get("title", "")).lower():
+        return None
+    if any(_ROLLBACK_DONE_RE.search(x["text"]) for x in _lines(view)):
+        return "схема отката описана в документе"
     return None
 
 
@@ -393,6 +539,9 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
             dropped.append(_drop(c, "согласие на передачу персональных данных описано в документе"))
             continue
         why = payout_closed_question(c, doc) if doc else None
+        if not why and doc:
+            why = (tz_only_question(c, doc) or refund_edge_defined(c, view) or failure_outcome_defined(c, view)
+                   or repeat_request_defined(c, view) or rollback_described(c, view))
         if why:
             dropped.append(_drop(c, why))
             continue

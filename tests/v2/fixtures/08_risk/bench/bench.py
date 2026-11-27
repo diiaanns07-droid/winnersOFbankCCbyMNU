@@ -32,9 +32,12 @@ MUT_CORPUS = ["cardblock.unit_change.blocked_at_utc", "transfer_limit.event_conf
               "cardblock.event_conflict.unblock_daily_limit", "cashback.event_conflict.category_effective_now"]
 OPEN2 = ["grace", "qr", "capital", "insurance", "insurance_inject"]
 OPEN2_CLEAN = ["grace_clean", "qr_clean", "capital_clean", "insurance_clean"]
+# чистые ТЗ №20 (ветка v2/20-clean-docs, evaluation/v2/clean): вторые редакции open2 и 4 новых домена
+CLEAN2 = ["capital_v2", "grace_v2", "insurance_v2", "qr_v2", "fx", "repay", "roundup", "statement"]
 GROUPS = {"official": ["official"], "clean": CLEAN_CORPUS, "mut": MUT_CORPUS, "open2": OPEN2,
           "open2c": OPEN2_CLEAN}
 GROUPS["all"] = sum(GROUPS.values(), [])
+GROUPS["clean2"] = CLEAN2
 GROUPS["fast"] = ["official"] + CLEAN_CORPUS[:4] + OPEN2 + OPEN2_CLEAN
 
 
@@ -43,6 +46,8 @@ def doc_path(name: str) -> Path:
         return ROOT / "release/input/requirements.md"
     if name in OPEN2 + OPEN2_CLEAN:
         return S / "open2" / name / "source.md"
+    if name in CLEAN2:
+        return S / "clean2" / name / "source.md"
     return CORPUS / name / "source.md"
 
 
