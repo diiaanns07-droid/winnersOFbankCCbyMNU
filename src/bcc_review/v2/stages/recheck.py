@@ -517,7 +517,7 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     for a in parsed.get("answers") or []:
         a = dict(a)
         had = bool(str(a.get("text") or "").strip())
-        for key in ("text", "comment"):
+        for key in ("text", "comment", "topic_hint"):  # тема в скобках уходит в текст общего решения
             if a.get(key):
                 a[key] = clean(str(a[key]), f"в ответе {a.get('id')}")
         if a.get("choice") is None and had and not a.get("text"):
