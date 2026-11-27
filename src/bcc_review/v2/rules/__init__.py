@@ -14,12 +14,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import api, language, placeholders, promises, terms, units
+from . import api, conflicts, injection, language, placeholders, promises, terms, units
 from ._text import Doc, build_doc
 
 __all__ = ["run", "format_signals", "signals_for"]
 
 SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2}
+# False — линзы получают пустой блок <сигналы> (замер вклада сигналов); кандидаты правил судье идут как обычно.
+SIGNALS_ENABLED = True
 AUDIENCES = ("analyst", "qa", "architect", "risk", "consistency")
 
 
@@ -58,6 +60,8 @@ def run(view: dict, requirements: Any = None) -> dict:
     for name, fn in (("api", lambda: api.run(doc, out)),
                      ("promises", lambda: promises.run(doc, out)),
                      ("units", lambda: units.run(doc, out)),
+                     ("conflicts", lambda: conflicts.run(doc, out)),
+                     ("injection", lambda: injection.run(doc, out)),
                      ("placeholders", lambda: placeholders.run(doc, out)),
                      ("language", lambda: language.run(doc, out, reqs, excluded)),
                      ("terms", lambda: terms.run(doc, out))):
@@ -106,6 +110,8 @@ def format_signals(signals: list[dict], audience: str | None = None, limit: int 
 
     Сигналы — подсказки правил, а не готовые дефекты: модель проверяет их по документу сама.
     """
+    if not SIGNALS_ENABLED:
+        return "Сигналов правил нет."  # замер вклада сигналов: линзы без блока <сигналы>, кандидаты правил остаются
     items = signals_for(signals, audience)[:limit]
     if not items:
         return "Сигналов правил нет."

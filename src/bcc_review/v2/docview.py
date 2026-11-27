@@ -46,13 +46,24 @@ _PAGE_WARN_CODES = {"partial_read", "unreadable_page", "decode_error", "ocr_requ
 
 
 # --------------------------------------------------------------------------- публичный интерфейс
+CONVERTIBLE = {".doc", ".rtf", ".odt", ".docm", ".dotx", ".dot", ".wps"}
+SUPPORTED_RU = "DOCX, PDF, Markdown, TXT, HTML"
+
+
 def load(path: str | Path) -> dict:
-    """Прочитать файл и вернуть DocView. Неподдерживаемый формат — ``ValueError``."""
+    """Прочитать файл и вернуть DocView. Неподдерживаемый формат — ``ValueError`` с объяснением по-русски.
+
+    DOC, RTF, ODT читаются через преобразование в DOCX (LibreOffice ``soffice``), если он установлен."""
     p = Path(path)
-    fmt = FORMATS.get(p.suffix.lower())
+    if not p.is_file():
+        raise ValueError(f"файл не найден: {p}")
+    suffix = p.suffix.lower()
+    if suffix in CONVERTIBLE:
+        return _load_converted(p)
+    fmt = FORMATS.get(suffix)
     if fmt is None:
-        raise ValueError(f"формат {p.suffix or '(без расширения)'} не поддерживается: "
-                         f"{', '.join(sorted(set(FORMATS)))}")
+        raise ValueError(f"формат {p.suffix or '(без расширения)'} не поддерживается; сохраните документ как "
+                         f"{SUPPORTED_RU}")
     data = p.read_bytes()
     sha = hashlib.sha256(data).hexdigest()
     if fmt == "html":
@@ -71,8 +82,7 @@ def load(path: str | Path) -> dict:
         warnings.append(f"Читатель разметки не сработал ({type(exc).__name__}: {exc}); "
                         "строки взяты из файла как есть.")
     if fmt in ("md", "txt"):
-        text = data.decode("utf-8-sig", errors="replace")
-        lines = _text_lines(text, doc)
+        lines = _text_lines(_decode_text(data), doc)
     else:
         sizes = _page_sizes(p) if fmt == "pdf" else {}
         lines = _block_lines(doc or {}, sizes, warnings)
@@ -83,10 +93,67 @@ def load(path: str | Path) -> dict:
         ext = (doc or {}).get("extraction") or {}
         pages = ext.get("pages") or max((ln["page"] or 0 for ln in lines), default=0) or None
     warnings += _doc_warnings(doc)
+    if fmt == "docx":
+        warnings += _docx_revisions(data)
     if not any(ln["text"].strip() for ln in lines) and not warnings:
         warnings.append("В документе нет текста: проверять нечего.")
     return {"title": title, "file": p.name, "format": fmt, "sha256": sha, "lines": lines,
             "pages": pages, "warnings": _dedup(warnings)}
+
+
+def _docx_revisions(data: bytes) -> list[str]:
+    """Непринятые исправления Word (режим рецензирования): текст читается в итоговой редакции — об этом стоит сказать."""
+    import io
+    import zipfile
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
+    except Exception:  # noqa: BLE001
+        return []
+    ins, dels = len(re.findall(r"<w:ins\b", xml)), len(re.findall(r"<w:del\b", xml))
+    if not ins and not dels:
+        return []
+    return [f"В документе есть непринятые исправления (вставок {ins}, удалений {dels}): проверена итоговая редакция "
+            "— вставки учтены, удалённый текст не проверялся."]
+
+
+def _decode_text(data: bytes) -> str:
+    """UTF-8 (с BOM или без), иначе Windows-1251 — так сохраняют текст в Блокноте на русской Windows."""
+    if data.startswith(b"\xff\xfe") or data.startswith(b"\xfe\xff"):
+        return data.decode("utf-16", errors="replace")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp1251", errors="replace")
+
+
+def _load_converted(p: Path) -> dict:
+    """DOC/RTF/ODT → DOCX через LibreOffice во временном каталоге; паспорт (имя, SHA-256) — исходного файла."""
+    import shutil
+    import subprocess
+    import tempfile
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise ValueError(f"формат {p.suffix} читается через LibreOffice, а он не установлен; сохраните документ "
+                         f"как {SUPPORTED_RU}")
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            subprocess.run([soffice, "--headless", "--convert-to", "docx", "--outdir", tmp, str(p)],
+                           check=True, capture_output=True, timeout=180)
+        except (subprocess.SubprocessError, OSError) as exc:
+            raise ValueError(f"не удалось преобразовать {p.name} в DOCX ({type(exc).__name__}); сохраните "
+                             f"документ как {SUPPORTED_RU}") from exc
+        out = Path(tmp) / (p.stem + ".docx")
+        if not out.is_file():
+            raise ValueError(f"не удалось преобразовать {p.name} в DOCX; сохраните документ как {SUPPORTED_RU}")
+        view = load(out)
+    view["file"] = p.name
+    view["sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()
+    view["warnings"] = [f"Документ {p.suffix.upper().lstrip('.')} прочитан через преобразование в DOCX "
+                        f"(LibreOffice); номера строк — по преобразованному тексту."] + list(view["warnings"])
+    if view.get("title") == p.stem + ".docx" or not view.get("title"):
+        view["title"] = p.stem
+    return view
 
 
 def from_text(text: str, *, file: str = "inline.md", fmt: str = "md", title: str = "") -> dict:
@@ -275,6 +342,10 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                             "(сначала левая, затем правая).")
         before = len(blocks)
         blocks, dropped = _drop_running(blocks, sizes)
+        blocks = _split_merged_headings(blocks, sizes)
+        blocks, glued = _glue_split_rows(blocks)
+        if glued:
+            warnings.append(f"Строки таблиц, разорванные переходом на новую страницу, склеены: {glued}.")
         if dropped:
             n = before - len(blocks)
             word = "строка" if n % 10 == 1 and n % 100 != 11 else (
@@ -287,11 +358,12 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
         page = loc.get("page")
         page = int(page) if isinstance(page, int) or (isinstance(page, str) and page.isdigit()) else None
         sec = _section(b)
-        parts = str(b.get("text") or "").splitlines() or [""]
+        text = _tight_text(b) if sizes else str(b.get("text") or "")
+        parts = text.splitlines() or [""]
         label = _list_label(b)
         for i, part in enumerate(parts):
             t = part
-            if b.get("kind") == "list_item" and i == 0:
+            if i == 0 and (b.get("kind") == "list_item" or _BULLET_GLYPH.match(t.lstrip())):
                 t = _BULLET_GLYPH.sub("", t.lstrip())
                 if label and not t.startswith(label):
                     t = f"{label} {t}"
@@ -299,7 +371,81 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                         "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
                         "level": _level(b) if b.get("kind") == "heading" else 0,
                         "heading": b.get("kind") == "heading"})
+    out, toc = drop_toc(out)
+    if toc:
+        warnings.append(f"Оглавление убрано из текста ({toc} строк): оно повторяет заголовки разделов.")
     return out
+
+
+_TOC_ENTRY = re.compile(r"^(?P<title>.*?\S)(?:\s*(?:\.{2,}|…+|_{3,}|·{3,}))?\s*(?P<page>\d{1,4})\s*$")
+_TOC_TITLES = {"содержание", "оглавление", "contents", "table of contents", "содержание документа"}
+
+
+def drop_toc(lines: list[dict]) -> tuple[list[dict], int]:
+    """Оглавление: подряд ≥ 2 строки «заголовок … номер страницы», где заголовок совпадает с заголовком раздела
+    документа, и строка «Содержание»/«Оглавление» перед ними. Убираются, номера строк пересчитываются."""
+    heads = {_toc_key(ln["text"]) for ln in lines if ln.get("kind") == "heading" and ln["text"].strip()}
+    if not heads:
+        return lines, 0
+
+    def entry(ln: dict) -> bool:
+        if ln.get("kind") == "heading":
+            return False
+        m = _TOC_ENTRY.match(ln["text"])
+        return bool(m) and _toc_key(m.group("title")) in heads
+    drop: set[int] = set()
+    i = 0
+    while i < len(lines):
+        if entry(lines[i]):
+            j = i
+            while j < len(lines) and (entry(lines[j]) or not lines[j]["text"].strip()):
+                j += 1
+            run = [k for k in range(i, j) if lines[k]["text"].strip()]
+            if len(run) >= 2:
+                drop.update(range(i, j))
+                k = i - 1
+                while k >= 0 and not lines[k]["text"].strip():
+                    k -= 1
+                if k >= 0 and lines[k]["text"].strip().casefold().rstrip(":") in _TOC_TITLES:
+                    drop.add(k)
+            i = max(j, i + 1)
+        else:
+            i += 1
+    if not drop:
+        return lines, 0
+    kept = [dict(ln) for k, ln in enumerate(lines) if k not in drop]
+    for n, ln in enumerate(kept, 1):
+        ln["n"] = n
+    return kept, sum(1 for k in drop if lines[k]["text"].strip())
+
+
+def _toc_key(text: str) -> str:
+    t = re.sub(r"\s+", " ", text.casefold().replace("ё", "е")).strip(" .:")
+    return t
+
+
+def _tight_text(b: dict) -> str:
+    """Текст блока PDF без лишних пробелов: читатель ставит пробел между соседними фрагментами строки, даже если
+    зазора между ними нет («ВК -1», «приложении .»). Пробел убирается, если зазор < 8 % высоты строки."""
+    text = str(b.get("text") or "")
+    frags = sorted((f for f in (b.get("loc") or {}).get("fragments") or []
+                    if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and f.get("rect")),
+                   key=lambda f: f["start"])
+    cut: list[int] = []
+    for f1, f2 in zip(frags, frags[1:]):
+        if f1.get("line") != f2.get("line") or text[f1["end"]:f2["start"]] != " ":
+            continue
+        h = max(f1["rect"][3] - f1["rect"][1], 1.0)
+        if f2["rect"][0] - f1["rect"][2] < 0.08 * h:
+            cut.append(f1["end"])
+    if not cut:
+        return text
+    out, prev = [], 0
+    for pos in cut:
+        out.append(text[prev:pos])
+        prev = pos + 1
+    out.append(text[prev:])
+    return "".join(out)
 
 
 def _list_label(b: dict) -> str:
@@ -380,6 +526,87 @@ def _reorder_columns(blocks: list[dict], sizes: dict) -> tuple[list[dict], list[
             order[pos] = i
         two_col.append(pg)
     return [blocks[i] for i in order], sorted(two_col)
+
+
+def _split_merged_headings(blocks: list[dict], sizes: dict) -> list[dict]:
+    """Два заголовка подряд, которые читатель PDF склеил в один блок («Требования к изменениям BPMN схема процесса»):
+    строки блока разной высоты (разный кегль) или первая строка короткая — делим на два заголовка и чиним разделы."""
+    out: list[dict] = []
+    fixes: list[tuple[str, str, str, int]] = []  # (склеенный текст, первый, второй, уровень второго)
+    for b in blocks:
+        frags = (b.get("loc") or {}).get("fragments") or []
+        text = str(b.get("text") or "")
+        lines_idx = sorted({f.get("line") for f in frags if isinstance(f.get("line"), int)})
+        if b.get("kind") != "heading" or len(lines_idx) != 2 or _page_of(b) not in sizes:
+            out.append(b)
+            continue
+        l0 = [f for f in frags if f.get("line") == lines_idx[0]]
+        l1 = [f for f in frags if f.get("line") == lines_idx[1]]
+        h0 = max(f["rect"][3] - f["rect"][1] for f in l0)
+        h1 = max(f["rect"][3] - f["rect"][1] for f in l1)
+        right0 = max(f["rect"][2] for f in l0)
+        width = sizes[_page_of(b)][0]
+        cut = max(f["end"] for f in l0)
+        first, second = text[:cut].strip(), text[cut:].strip()
+        if not first or not second or not (abs(h0 - h1) > 0.4 or right0 < width * 0.45):
+            out.append(b)
+            continue
+        lvl = _level(b)
+        lvl2 = lvl + 1 if h1 < h0 - 0.4 else lvl
+        b1, b2 = dict(b), dict(b)
+        b1["text"], b2["text"] = first, second
+        b2["id"] = f"{b.get('id', '')}s"
+        b2["loc"] = {**(b.get("loc") or {}), "level": lvl2, "heading_level": lvl2}
+        parent = [x for x in (b.get("section") or []) if x != text]
+        b1["section"] = parent + [first]
+        b2["section"] = parent + ([first] if lvl2 > lvl else []) + [second]
+        out += [b1, b2]
+        fixes.append((text, first, second, lvl2))
+    for merged, first, second, lvl2 in fixes:
+        inside = False
+        for b in out:
+            if b.get("kind") == "heading" and b.get("text") in (first, second) and merged not in (b.get("section") or []):
+                inside = inside or b.get("text") == second
+                continue
+            sec = list(b.get("section") or [])
+            if merged not in sec:
+                continue
+            if inside and b.get("kind") == "heading" and _level(b) <= lvl2:
+                inside = False
+            i = sec.index(merged)
+            b["section"] = sec[:i] + ([first, second] if inside else [first]) + sec[i + 1:]
+    return out
+
+
+def _cells(text: str) -> list[str]:
+    return [c.strip() for c in re.split(r" \| ", " " + text + " ")]
+
+
+def _glue_split_rows(blocks: list[dict]) -> tuple[list[dict], int]:
+    """Строка таблицы, которую перенос страницы разорвал на две: последняя строка таблицы на странице и первая
+    строка следующей страницы с тем же числом ячеек, часть из которых пуста, склеиваются по ячейкам."""
+    out: list[dict] = []
+    glued = 0
+    i = 0
+    while i < len(blocks):
+        b = blocks[i]
+        nb = blocks[i + 1] if i + 1 < len(blocks) else None
+        if (nb is not None and b.get("kind") in ("table_row", "table_header") and nb.get("kind") == "table_row"
+                and _page_of(b) is not None and _page_of(nb) == _page_of(b) + 1):
+            a, c = _cells(str(b.get("text") or "")), _cells(str(nb.get("text") or ""))
+            first_on_page = not any(_page_of(x) == _page_of(nb) for x in out)
+            filled = [k for k, x in enumerate(c) if x]
+            if (len(a) == len(c) > 1 and filled and len(filled) * 2 <= len(c) and all(a[k] for k in filled)
+                    and first_on_page):
+                merged = dict(b)
+                merged["text"] = " | ".join(" ".join(p for p in (x, y) if p) for x, y in zip(a, c))
+                out.append(merged)
+                glued += 1
+                i += 2
+                continue
+        out.append(b)
+        i += 1
+    return out, glued
 
 
 def _running_key(text: str) -> str:

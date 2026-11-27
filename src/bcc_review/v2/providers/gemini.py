@@ -46,6 +46,7 @@ DEFAULT_THINKING_BUDGET = 4096      # Gemini 2.x
 RETRY_DELAYS_S = (2.0, 5.0, 10.0)   # 503/500/504/overloaded/timeout
 NETWORK_DELAYS_S = (2.0, 5.0)
 RATE_WAITS = 2
+RETRY_SLACK_S = 120.0               # запас времени на повторы сверх таймаута вызова
 DEFAULT_MAX_RATE_WAIT_S = 65.0
 DEFAULT_CONCURRENCY = 4
 KEY_HELP = "Бесплатный ключ: https://aistudio.google.com/apikey — добавьте в .env строку GEMINI_API_KEY=<ключ>."
@@ -259,7 +260,9 @@ class GeminiProvider:
                timeout_s: float, max_output_tokens: int | None = None, **_: Any) -> dict[str, Any]:
         chain = self.model_chain(model)
         per_call = max(5.0, float(timeout_s or 300))
-        total = float(self.total_timeout_s) if self.total_timeout_s else per_call * 3 + 60
+        # Бюджет всего invoke: таймаут вызывающего (LLMClient уже ограничил его остатком лимита этапа) + запас на
+        # быстрые повторы (503, Retry-After). Зависший запрос не растянет этап втрое.
+        total = float(self.total_timeout_s) if self.total_timeout_s else per_call + RETRY_SLACK_S
         deadline = self._clock() + total
         attempts: list[dict[str, Any]] = []
         last: ProviderError | None = None
