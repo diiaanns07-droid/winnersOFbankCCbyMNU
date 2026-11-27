@@ -245,3 +245,31 @@ def test_free_tier_realistic_limits_fit_in_six_minutes(tmp_path, monkeypatch):
     calls = len(tier.log)
     assert calls <= 12
     assert clock.now() <= 6 * 60 * 2   # сумма задержек всех вызовов (последовательная оценка сверху)
+
+
+def test_free_tier_nov_2026_limits_three_runs_a_day(tmp_path, monkeypatch):
+    """Лимиты бесплатного ключа на ноябрь 2026: Flash — 5 в минуту и 20 в сутки на модель (AI Studio, живой 429 F3),
+    Flash-Lite — 15 и 500. Жюри запускает агента три раза за день на одном проекте Google: первые два прогона целиком
+    на основной Flash (по 9 запросов), третий — 2 запроса на основной, один отказ «суточная квота», остальное на
+    следующей Flash; все три — complete, ни одного 429 «в минуту», ни одного сбоя этапа."""
+    clock = SimClock()
+    tier = FreeTier(clock, tier_of(primary={"rpm": 5, "rpd": 20}, second={"rpm": 5, "rpd": 20},
+                                   lite={"rpm": 15, "rpd": 500}), latency_s=20.0)
+    reports = []
+    for i in range(3):
+        before = len(tier.log)
+        (tmp_path / f"run{i}").mkdir()
+        code, report = run_review(tmp_path / f"run{i}", monkeypatch, make_sim(tier, clock))
+        reports.append((report, tier.log[before:]))
+    for report, log in reports:
+        assert report["run"]["status"] == "complete", report["run"].get("warnings")
+        assert not any("не выполнен" in w for w in report["run"].get("warnings") or [])
+        assert [o for _, o in log].count("200") == 9                       # 9 запросов модели на прогон
+        assert "429 rpm" not in [o for _, o in log]
+    first, second, third = (log for _, log in reports)
+    assert {m for m, _ in first} == {PRIMARY} and {m for m, _ in second} == {PRIMARY}
+    assert tier.day[PRIMARY] == 20
+    prim = [o for m, o in third if m == PRIMARY]
+    # отказы квоты — только у запросов, ушедших параллельно до первого отказа; дальше модель в прогоне не зовётся
+    assert 1 <= prim.count("429 day") <= 6 and "200" not in prim[prim.index("429 day"):], prim
+    assert any(m.startswith(SECOND) for m in reports[2][0]["run"]["models_used"])   # фактическая версия модели
