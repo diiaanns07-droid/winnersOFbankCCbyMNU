@@ -165,6 +165,20 @@ _NO_ID_RE = re.compile(
     r"приоритет\w*(?: \S+){0,4} не (?:указан|задан|определ)\w*",
     re.I)
 
+# «Термин не определён» — неоднозначность правила (что такое «активный», «подтверждённый»), а не разные названия
+# одного понятия: в сводное «одни и те же понятия названы разными терминами» не идёт (№12, Gemini c1, 27.11:
+# неопределённое состояние карты из бизнес-требования исчезло в сводке названий компонентов).
+_UNDEFINED_TERM_RE = re.compile(r"не\s?определ|нет\s+определени|без\s+определени|не\s+дано\s+определени", re.I)
+
+# Проверки кода с определённым предметом: сигнал правил «ответы без поля X» (rules:api.result_field_missing.X) и
+# проверки аналитика — состояние из условия не проверяется в логике метода (state_check), не задано, как считается
+# период ограничения (period_check). По шагу 2 промпта судьи разные проблемы — разные дефекты; слабый судья кладёт
+# такую проверку в дефект о другом (Gemini 27.11: «ответы без поля result» — в дефект о кодах ответа, c1 и c3;
+# «как считается месяц ограничения» — в дефект о возвратах, c3), и проверку не видно ни читателю, ни счётчику.
+_FIELD_RULE_RE = re.compile(r"^api\.result_field_missing\.(\w+)$")
+_PERIOD_SUBJECT_RE = re.compile(r"пояс|\butc\b|\bgmt\b|по\s+дат|по\s+времен|отсчит|как\w*\s+счита|границ|календарн",
+                                re.I)
+
 # --- схема ответа модели -----------------------------------------------------------------------
 
 
@@ -1186,6 +1200,53 @@ def _kept_completeness(c: dict) -> dict:
             "requirement_ids": list(c.get("requirement_ids") or [])}
 
 
+def _alnum(text: str) -> str:
+    return re.sub(r"[^a-z0-9а-яё]", "", text.lower())
+
+
+def _check_subject(c: dict):
+    """Предмет проверки кода — функция «заголовок называет этот предмет»; None — кандидат не проверка кода."""
+    m = _FIELD_RULE_RE.match(_rule_name(c))
+    if m:
+        field = _alnum(m.group(1))
+        return (lambda t: field in _alnum(t)) if field else None
+    origin = _s(c.get("origin"))
+    if origin == "period_check":
+        return lambda t: bool(_PERIOD_SUBJECT_RE.search(t))
+    if origin == "state_check":
+        q = re.search(r"«([^»]+)»", _s(c.get("title")))
+        words = re.findall(r"[а-яё]{4,}", q.group(1).lower() if q else "")
+        stem = words[0][:5] if words else ""
+        return (lambda t: stem in t.lower()) if stem else None
+    return None
+
+
+def _checks_apart(raw: dict, ids: list[str], by_id: dict) -> list[str]:
+    """Проверки кода, которые судья присоединил к дефекту о другом предмете: предмет проверки не назван ни в
+    заголовке дефекта, ни в заголовках остальных его кандидатов. Такие проверки — отдельные дефекты."""
+    if len(ids) < 2:
+        return []
+    out = []
+    for cid in ids:
+        names = _check_subject(by_id[cid])
+        if names is None:
+            continue
+        titles = [_s(raw.get("title"))] + [_s(by_id[x].get("title")) for x in ids if x != cid]
+        if not any(names(t) for t in titles):
+            out.append(cid)
+    return out if len(out) < len(ids) else []
+
+
+def _kept_check(c: dict) -> dict:
+    """Черновик дефекта судьи из проверки кода, отделённой от чужого дефекта; уровень — проверки, не выше major."""
+    sev = _s(c.get("severity"))
+    return {"title": _s(c.get("title")), "kind": _s(c.get("kind")), "criterion": _s(c.get("criterion")) or "complete",
+            "severity": sev if sev in ("major", "minor") else "major", "blocks": _s(c.get("blocks")) or "none",
+            "problem": _s(c.get("problem")), "scenario": _s(c.get("scenario")), "impact": _s(c.get("impact")),
+            "recommendation": _s(c.get("recommendation")), "question": _s(c.get("question")),
+            "requirement_ids": list(c.get("requirement_ids") or [])}
+
+
 def _place_key(f: dict) -> str:
     """Место дефекта для сведения пожеланий: первое требование, иначе первая строка цитаты."""
     reqs = [r for r in f.get("requirement_ids") or [] if r]
@@ -1402,6 +1463,12 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             if not f.get("candidate_ids") and _s(f.get("title")):
                 _warn(ctx, warnings, f"судья: дефект {_cut(f.get('title'), 60)!r} без кандидатов отброшен")
             continue
+        for cid in _checks_apart(f, ids, by_id):
+            ids.remove(cid)
+            placed[cid] = f"CHECK-{cid}"
+            drafts.append({"key": f"CHECK-{cid}", "raw": _kept_check(by_id[cid]), "ids": [cid]})
+            _warn(ctx, warnings, f"судья присоединил проверку кода {cid} к дефекту {_cut(f.get('title'), 50)!r} "
+                                 "о другом предмете; проверка — отдельный дефект")
         for cid in ids:
             placed[cid] = key
         drafts.append({"key": key, "raw": f, "ids": ids})
@@ -1501,8 +1568,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         f["severity"] == "minor" or f["criterion"] in {"conforming", "ranked", "traceable"}), _NO_IDS, ctx, warnings)
     findings = _wishes_by_place(findings, ctx, warnings)
     for kind, spec in (("terminology", _TERMS), ("non_singular", _NONSINGULAR), ("duplicate", _DUPLICATES)):
-        findings = _consolidate(findings, lambda f, k=kind: f["kind"] == k and f["severity"] == "minor",
-                                spec, ctx, warnings)
+        findings = _consolidate(findings, lambda f, k=kind: f["kind"] == k and f["severity"] == "minor" and not (
+            k == "terminology" and _UNDEFINED_TERM_RE.search(f["title"])), spec, ctx, warnings)
     findings = _spec_params_apart(findings, ctx, warnings)
     findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] == "minor",
                             _PLACEHOLDERS, ctx, warnings)  # major-заглушки (параметры спецификации) — отдельно

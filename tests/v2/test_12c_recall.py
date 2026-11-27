@@ -276,3 +276,62 @@ def test_wish_grouped_by_judge_is_not_merged_with_other_wishes_of_same_place():
     assert by_ids[("C-001", "C-002")] == "Перечень исключённых операций открыт"     # темы, собранные судьёй, — как есть
     assert by_ids[("C-003", "C-004")] == "Пояс и граница календарного месяца"
     assert by_ids[("C-005", "C-006")].startswith("Документ не рассматривает ряд случаев")  # мелочи к месту — сводятся
+
+
+def test_undefined_term_is_not_folded_into_different_names_summary():
+    cs = [cand("C-001", 37, "Держатель активной карты", kind="terminology", severity="minor", reqs=("R-05",)),
+          cand("C-002", 26, "сервис настроек", kind="terminology", severity="minor", reqs=(), source="lens:architect"),
+          cand("C-003", 43, "сервис уведомлений", kind="terminology", severity="minor", reqs=(),
+               source="consistency")]
+    fs = [finding("F01", ["C-001"], severity="minor", kind="terminology",
+                  title="Неопределён бизнес-термин «активная карта» в условии требования"),
+          finding("F02", ["C-002"], severity="minor", kind="terminology", title="Компонент назван по-разному"),
+          finding("F03", ["C-003"], severity="minor", kind="terminology", title="Сервис назван двумя словами")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    all_placed(res, [c["id"] for c in cs])
+    by_ids = {tuple(f["candidate_ids"]): f["title"] for f in res["findings"]}
+    assert by_ids[("C-001",)].startswith("Неопределён бизнес-термин")          # неоднозначность правила — отдельно
+    assert by_ids[("C-002", "C-003")] == "Одни и те же понятия названы разными терминами"
+    assert all(judge._UNDEFINED_TERM_RE.search(t) for t in (
+        "Термин «X» не определён", "Не определено понятие", "Нет определения статуса", "Неопределённый термин"))
+    assert not judge._UNDEFINED_TERM_RE.search("Компонент назван по-разному в схеме и тексте")
+
+
+def test_missing_field_rule_folded_into_other_defect_is_kept_apart():
+    cs = [cand("C-001", 171, '{"result":"ERROR"}', kind="status_conflict", reqs=(), source="lens:architect",
+               title="Ошибка валидации возвращается с кодом 200"),
+          cand("C-002", 151, "и далее", kind="api_contract", reqs=(), source="rules:language.open_list",
+               title="Открытый перечень кодов ответа"),
+          cand("C-003", 180, '{"message":"Некорректный запрос"}', kind="api_contract", reqs=(),
+               source="rules:api.result_field_missing.result", title="Ответы 400 и 500 без поля result из таблицы")]
+    fs = [finding("F01", ["C-001", "C-002", "C-003"], kind="status_conflict",
+                  title="Противоречивое описание кодов ответа и ошибка под кодом 200")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    all_placed(res, [c["id"] for c in cs])
+    by_ids = {tuple(f["candidate_ids"]): f for f in res["findings"]}
+    assert set(by_ids) == {("C-001", "C-002"), ("C-003",)}
+    apart = by_ids[("C-003",)]
+    assert apart["title"] == "Ответы 400 и 500 без поля result из таблицы" and apart["severity"] in ("major", "minor")
+    # судья сам назвал поле в заголовке — сигнал остаётся в его дефекте
+    fs2 = [finding("F01", ["C-001", "C-003"], kind="api_contract", title="Ответы об ошибках: поле result и код 200")]
+    res2 = judge.run(Ctx(FakeLLM(response(fs2))), cs[:1] + cs[2:])
+    assert [tuple(f["candidate_ids"]) for f in res2["findings"]] == [("C-001", "C-003")]
+
+
+def test_period_check_folded_into_other_defect_is_kept_apart():
+    cs = [cand("C-001", 38, "Возврат уменьшает расходы", kind="incomplete", reqs=("R-06",)),
+          cand("C-002", 38, "Возврат уменьшает расходы", kind="incomplete", reqs=("R-06",), source="lens:risk",
+               title="Не определено поведение при возврате за прошлый закрытый период"),
+          cand("C-003", 39, "не больше одного сообщения за календарный месяц", reqs=("R-07",), origin="period_check",
+               title="Не определено, как считается период ограничения «за календарный месяц»")]
+    fs = [finding("F01", ["C-001", "C-002", "C-003"], kind="incomplete",
+                  title="Не определено влияние возвратов на признак отправки в прошедших месяцах")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    all_placed(res, [c["id"] for c in cs])
+    by_ids = {tuple(f["candidate_ids"]): f["title"] for f in res["findings"]}
+    assert by_ids == {("C-001", "C-002"): "Не определено влияние возвратов на признак отправки в прошедших месяцах",
+                      ("C-003",): "Не определено, как считается период ограничения «за календарный месяц»"}
+    # судья назвал пояс и границу периода — проверка остаётся в его дефекте
+    fs2 = [finding("F01", ["C-002", "C-003"], title="Не определены часовой пояс и граница календарного месяца")]
+    res2 = judge.run(Ctx(FakeLLM(response(fs2))), cs[1:])
+    assert [tuple(f["candidate_ids"]) for f in res2["findings"]] == [("C-002", "C-003")]
