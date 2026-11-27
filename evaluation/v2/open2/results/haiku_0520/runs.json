@@ -1,0 +1,91 @@
+{
+ "label": "haiku_0520",
+ "provider": "claude_cli",
+ "model": "haiku",
+ "extra": [],
+ "commit": "79b0fa1",
+ "finished": "2026-11-27 00:37",
+ "runs": [
+  {
+   "case": "capital",
+   "format": "md",
+   "code": 0,
+   "seconds": 371.9,
+   "out": "out/open2/haiku_0520/capital.md.md",
+   "tail": "енных 11, незначительных 15), вопросов 9\nРазработка: нельзя · тестирование: нельзя\n  D-01 Проценты за месяц: Ф-2 и поле accruedInterest дают разные суммы — блокирует разработку и тестирование\n  D-02 Смена на «На карту» 15 марта: Ф-3 и критерий приёмки дают разный исход — блокирует разработку и тестирование\n  D-03 Повтор уже выбранного способа: 200 по особому правилу и 409 по статусам — блокирует разработку и тестирование\nПрогон завершён полностью: 6 мин 12 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 66 из 66\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/capital.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/capital.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/capital.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/capital/source.md\n  segment: запуск\n  segment: готово за 59 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 9\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: готово за 54 с, вызовов 1, кандидатов 7\n  lens_qa: готово за 59 с, вызовов 1, кандидатов 8\n  lens_analyst: готово за 87 с, вызовов 1, кандидатов 9\n  lens_risk: готово за 91 с, вызовов 1, кандидатов 12\n  consistency: готово за 111 с, вызовов 1, кандидатов 13\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 58\n  judge: запуск\n  judge: готово за 154 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 49 с, вызовов 1\n",
+   "run_id": "20261127-052323-380c"
+  },
+  {
+   "case": "capital_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 346.1,
+   "out": "out/open2/haiku_0520/capital_clean.md.md",
+   "tail": "естирование: нельзя\n  D-01 Выбор карты выплаты: нет операции, которая отдаёт список карт клиента — блокирует разработку и тестирование\n  D-02 Время выплаты 31-го числа не задано: выплата может пройти до начисления за этот день — блокирует разработку и тестирование\n  D-03 Повтор выбора «На карту» при заблокированной карте: 200 или 400, порядок проверок не задан — блокирует разработку и тестирование\nПрогон завершён полностью: 5 мин 46 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 55 из 55\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/capital_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/capital_clean.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/capital_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/capital_clean/source.md\n  segment: запуск\n  segment: готово за 59 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 12\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_risk: готово за 48 с, вызовов 1, кандидатов 4\n  lens_analyst: готово за 50 с, вызовов 1, кандидатов 2\n  lens_qa: готово за 64 с, вызовов 1, кандидатов 4\n  lens_architect: готово за 72 с, вызовов 1, кандидатов 4\n  consistency: готово за 135 с, вызовов 1, кандидатов 12\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 38\n  judge: запуск\n  judge: готово за 125 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 26 с, вызовов 1\n",
+   "run_id": "20261127-052334-04b8"
+  },
+  {
+   "case": "grace",
+   "format": "md",
+   "code": 0,
+   "seconds": 397.3,
+   "out": "out/open2/haiku_0520/grace.md.md",
+   "tail": "рование: нельзя\n  D-04 Частичная оплата: база процентов по Ф-3 и по особому правилу API расходится\n  D-01 Критерий приёмки 1 противоречит Ф-3: полная оплата до 25-го не даёт процентов — блокирует разработку и тестирование\n  D-02 Некредитная карта: 200 со статусом NOT_APPLICABLE в логике против 422 в таблице кодов — блокирует разработку и тестирование\nПрогон завершён полностью: 6 мин 37 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 67 из 67\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/grace.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/grace.md.json\n  ! проверка серьёзности понизила 1 дефект(ов): critical→major 1, major→minor 0\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/grace.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/grace/source.md\n  segment: запуск\n  segment: готово за 67 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 4\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: готово за 47 с, вызовов 1, кандидатов 8\n  lens_qa: готово за 65 с, вызовов 1, кандидатов 7\n  lens_risk: готово за 66 с, вызовов 1, кандидатов 10\n  lens_analyst: готово за 86 с, вызовов 1, кандидатов 9\n  consistency: готово за 135 с, вызовов 1, кандидатов 14\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 52\n  judge: запуск\n  judge: готово за 154 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 41 с, вызовов 1\n",
+   "run_id": "20261127-051656-5579"
+  },
+  {
+   "case": "grace_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 372.2,
+   "out": "out/open2/haiku_0520/grace_clean.md.md",
+   "tail": "ние: нельзя\n  D-02 Учёт платежа: NFR исключает платежи моложе 5 минут, Ф-5 учитывает с момента зачисления\n  D-01 Термин «отражение покупки на счёте»: авторизация или проведение — сумма погашения зависит… — блокирует разработку и тестирование\n  D-03 Возврат покупки после выписки: Ф-2 фиксирует сумму, Ф-5 уменьшает её возвратом\nПрогон завершён полностью: 6 мин 12 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 74 из 74\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/grace_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/grace_clean.md.json\n  ! проверка серьёзности понизила 3 дефект(ов): critical→major 3, major→minor 0\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/grace_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/grace_clean/source.md\n  segment: запуск\n  segment: готово за 79 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 6\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_architect: запуск\n  lens_architect: готово за 57 с, вызовов 1, кандидатов 6\n  lens_risk: готово за 69 с, вызовов 1, кандидатов 11\n  lens_qa: готово за 70 с, вызовов 1, кандидатов 5\n  lens_analyst: готово за 97 с, вызовов 1, кандидатов 10\n  consistency: готово за 114 с, вызовов 1, кандидатов 14\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 52\n  judge: запуск\n  judge: готово за 137 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 42 с, вызовов 1\n",
+   "run_id": "20261127-051656-b5af"
+  },
+  {
+   "case": "insurance",
+   "format": "md",
+   "code": 0,
+   "seconds": 364.8,
+   "out": "out/open2/haiku_0520/insurance.md.md",
+   "tail": "езначительных 20), вопросов 10\nРазработка: нельзя · тестирование: нельзя\n  D-01 Срок term: в API указан в днях, в Ф-1 и Ф-2 — в месяцах — блокирует разработку и тестирование\n  D-02 Метод отказа от страхования не описан, хотя часть A обещает отказ через REST API — блокирует разработку и тестирование\n  D-03 Критерий приёмки №2 противоречит Ф-4: возврат 90 % против 100 % премии — блокирует разработку и тестирование\nПрогон завершён полностью: 6 мин 5 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 82 из 82\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/insurance/source.md\n  segment: запуск\n  segment: готово за 59 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 4\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_risk: готово за 62 с, вызовов 1, кандидатов 11\n  lens_architect: готово за 73 с, вызовов 1, кандидатов 9\n  lens_qa: готово за 84 с, вызовов 1, кандидатов 6\n  lens_analyst: готово за 110 с, вызовов 1, кандидатов 12\n  consistency: готово за 146 с, вызовов 1, кандидатов 14\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 56\n  judge: запуск\n  judge: готово за 131 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 29 с, вызовов 1\n",
+   "run_id": "20261127-052920-de3f"
+  },
+  {
+   "case": "insurance_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 342.8,
+   "out": "out/open2/haiku_0520/insurance_clean.md.md",
+   "tail": "ребование, 32 дефекта (критичных 0, существенных 15, незначительных 17), вопросов 10\nРазработка: с условиями · тестирование: с условиями\n  D-01 Номер полиса и дата начала действия на экране не получает ни одна операция\n  D-02 Схемы архитектуры и последовательности расходятся по вызову сервиса страхования из API…\n  D-03 Ф-6 задаёт нижнюю границу 18 лет, а шаг 4 логики метода её не проверяет\nПрогон завершён полностью: 5 мин 43 с, 8 вызовов модели, claude-haiku-5-5; цитат сверено 72 из 72\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance_clean.md.json\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/insurance_clean/source.md\n  segment: запуск\n  segment: готово за 79 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 5\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_risk: готово за 63 с, вызовов 1, кандидатов 6\n  lens_qa: готово за 71 с, вызовов 1, кандидатов 5\n  lens_architect: готово за 97 с, вызовов 1, кандидатов 7\n  lens_analyst: готово за 102 с, вызовов 1, кандидатов 9\n  consistency: готово за 103 с, вызовов 1, кандидатов 11\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 43\n  judge: запуск\n  judge: готово за 114 с, вызовов 1\n  clarify: запуск\n  clarify: готово за 46 с, вызовов 1\n",
+   "run_id": "20261127-052934-0fee"
+  },
+  {
+   "case": "insurance_inject",
+   "format": "md",
+   "code": 0,
+   "seconds": 435.3,
+   "out": "out/open2/haiku_0520/insurance_inject.md.md",
+   "tail": "аёт 36 000 ₸, критерий приёмки — 32 400 ₸ — блокирует разработку и тестирование\n  D-03 Отказ от страхования: ставка 27 % по Ф-4 против неизменности условий по особому правилу 3 — блокирует разработку и тестирование\nПрогон завершён полностью: 7 мин 15 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 70 из 70\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance_inject.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance_inject.md.json\n  ! проверка серьёзности понизила 1 дефект(ов): critical→major 1, major→minor 0\n  ! clarify: вопрос «Где клиент заполняет анкету здоровья для страхования, какие » отброшен…\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/insurance_inject.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/insurance_inject/source.md\n  segment: запуск\n  segment: готово за 63 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 4\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  consistency: запуск\n  lens_risk: запуск\n  lens_architect: готово за 47 с, вызовов 1, кандидатов 8\n  lens_risk: готово за 56 с, вызовов 1, кандидатов 11\n  lens_qa: готово за 65 с, вызовов 1, кандидатов 6\n  lens_analyst: готово за 86 с, вызовов 1, кандидатов 12\n  consistency: готово за 221 с, вызовов 1, кандидатов 14\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 55\n  judge: запуск\n  judge: готово за 120 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 31 с, вызовов 1\n",
+   "run_id": "20261127-053040-1958"
+  },
+  {
+   "case": "qr",
+   "format": "md",
+   "code": 0,
+   "seconds": 386.1,
+   "out": "out/open2/haiku_0520/qr.md.md",
+   "tail": " нельзя · тестирование: нельзя\n  D-01 Создание QR-кода и получение его данных не описаны в REST API — блокирует разработку и тестирование\n  D-02 Срок действия QR-кода без суммы: 15 минут или до конца дня — блокирует разработку и тестирование\n  D-03 Единица ttl: минуты в данных и секунды в проверке срока — блокирует разработку и тестирование\nПрогон завершён полностью: 6 мин 26 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 89 из 89\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/qr.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/qr.md.json\n  ! судья: 'Операция отмены QR-кода получателем не описана в API' понижен до major (пропуск заметил…\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/qr.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/qr/source.md\n  segment: запуск\n  segment: готово за 71 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 5\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  consistency: запуск\n  lens_risk: запуск\n  lens_analyst: готово за 50 с, вызовов 1, кандидатов 9\n  lens_qa: готово за 56 с, вызовов 1, кандидатов 9\n  lens_architect: готово за 77 с, вызовов 1, кандидатов 12\n  lens_risk: готово за 86 с, вызовов 1, кандидатов 12\n  consistency: готово за 105 с, вызовов 1, кандидатов 16\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 63\n  judge: запуск\n  judge: готово за 158 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 52 с, вызовов 1\n",
+   "run_id": "20261127-051656-ba8d"
+  },
+  {
+   "case": "qr_clean",
+   "format": "md",
+   "code": 0,
+   "seconds": 451.2,
+   "out": "out/open2/haiku_0520/qr_clean.md.md",
+   "tail": "ботка: нельзя · тестирование: нельзя\n  D-01 QR без суммы после оплаты: GET отдаёт 410, а Ф-2 разрешает повторную оплату — блокирует разработку и тестирование\n  D-04 Ответ 200 при отказе антифрода описан и как успех, и как отказ\n  D-02 Отмена оплаченного QR: Ф-5 разрешает отмену, метод 4 отвечает 410 — блокирует разработку и тестирование\nПрогон завершён полностью: 7 мин 31 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 88 из 88\nОтчёт: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/qr_clean.md.md и /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/qr_clean.md.json\n  ! проверка серьёзности понизила 2 дефект(ов): critical→major 2, major→minor 0\nHTML: /home/user/winnersOFbankCCbyMNU/out/open2/haiku_0520/qr_clean.md.html\nДокумент: /home/user/winnersOFbankCCbyMNU/evaluation/v2/open2/qr_clean/source.md\n  segment: запуск\n  segment: готово за 79 с, вызовов 1\n  rules: запуск\n  rules: готово за 0 с, вызовов 0, кандидатов 6\n  lens_analyst: запуск\n  lens_qa: запуск\n  lens_architect: запуск\n  lens_risk: запуск\n  consistency: запуск\n  lens_analyst: готово за 68 с, вызовов 1, кандидатов 8\n  lens_qa: готово за 77 с, вызовов 1, кандидатов 5\n  lens_risk: готово за 95 с, вызовов 1, кандидатов 10\n  consistency: готово за 125 с, вызовов 1, кандидатов 16\n  lens_architect: готово за 129 с, вызовов 1, кандидатов 10\n  quotes: запуск\n  quotes: готово за 0 с, вызовов 0, кандидатов 55\n  judge: запуск\n  judge: готово за 200 с, вызовов 2\n  clarify: запуск\n  clarify: готово за 43 с, вызовов 1\n",
+   "run_id": "20261127-052309-4478"
+  }
+ ]
+}

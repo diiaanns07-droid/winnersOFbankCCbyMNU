@@ -1,4 +1,4 @@
-# Прогон агента на бесплатном Gemini в Windows PowerShell — так, как его повторит жюри.
+﻿# Прогон агента на бесплатном Gemini в Windows PowerShell — так, как его повторит жюри.
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\gemini_report.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\gemini_report.ps1 -Doc release\input\requirements.pdf -Name requirements_pdf.gemini
@@ -34,7 +34,7 @@ Write-Host "== проверка настройки"
 
 $report = Join-Path $OutDir "$Name.md"
 $json = Join-Path $OutDir "$Name.json"
-$runArgs = @($Doc, $report, "--provider", "gemini", "--no-cache", "--export", "html,jira")
+$runArgs = @($Doc, $report, "--provider", "gemini", "--no-cache", "--export", "jira")
 if ($Model) { $runArgs += @("--model", $Model) }
 
 Write-Host "== прогон: $Doc -> $report"

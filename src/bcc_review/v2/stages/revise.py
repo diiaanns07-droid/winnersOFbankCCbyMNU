@@ -430,7 +430,7 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
 
     warnings: list[str] = []
     try:
-        raw = _cl.ask_items(ctx, STAGE, targets, build, SCHEMA, max_output_tokens=16000)
+        raw = _cl.ask_items(ctx, STAGE, targets, build, SCHEMA, max_output_tokens=32000)
     except Exception as exc:  # noqa: BLE001
         _cl._warn(ctx, f"revise: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); редакция не построена")
         return {"rewrites": [], "revised_markdown": "", "stats": {}, "status": "failed"}
@@ -513,7 +513,7 @@ def _check_pass(ctx: Any, applied: dict, warnings: list[str]) -> dict:
         task = user0[user0.find("<правки>"):] if "<правки>" in user0 else user0
     user = f"<документ>\n{_number_markdown(ctx, md)}\n</документ>\n\n{task}"
     try:
-        raw = ctx.llm.ask(CHECK_STAGE, system, user, CHECK_SCHEMA, max_output_tokens=12000) or {}
+        raw = ctx.llm.ask(CHECK_STAGE, system, user, CHECK_SCHEMA, max_output_tokens=24000) or {}
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"revise: самопроверка редакции не выполнена ({type(exc).__name__}: {str(exc)[:160]})")
         return {"fixes": []}

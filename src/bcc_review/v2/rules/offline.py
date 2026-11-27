@@ -94,28 +94,43 @@ def _finding(i: int, c: dict) -> dict:
     }
 
 
+HOW_TO_FULL = [
+    "Получите бесплатный ключ Gemini: https://aistudio.google.com/apikey (войдите аккаунтом Google, "
+    "«Create API key»).",
+    "Создайте в корне репозитория файл `.env` из шаблона `.env.example` и впишите ключ в строку "
+    "`GEMINI_API_KEY=` (или задайте переменную окружения `GEMINI_API_KEY`).",
+    "Повторите ту же команду `python -m bcc_review <файл требований> <отчёт.md>` — агент сам выберет Gemini, "
+    "полная проверка занимает несколько минут.",
+]
+
+
 def verdict(findings: list[dict]) -> dict:
     """Офлайн-вердикт; совпадает с `render.jsonout.rule_verdict` для provider = offline (иначе `verify` упадёт):
     «нельзя» — при противоречии двух цитат об одном предмете или критичном дефекте правила (обещанная, но не
-    описанная операция); иначе «не определено»."""
-    conflicts = [f for f in findings if (f.get("rule_conflict") and len(f.get("evidence") or []) >= 2)
-                 or f.get("severity") == "critical"]
-    dev = [f for f in conflicts if f.get("blocks") in ("development", "both")]
-    test = [f for f in conflicts if f.get("blocks") in ("testing", "both")]
-    base = ("Модель не вызывалась: проверены только формальные признаки — контракт API, единицы измерения, "
-            "заглушки и шаблон, язык требований. Смысл требований без модели не проверялся")
-    if dev or test:
-        ids = ", ".join(f["id"] for f in (dev or test)[:5])
-        what = ("противоречие двух мест документа об одном предмете" if any(f.get("rule_conflict") for f in (dev or test))
-                else "обещанную, но не описанную операцию")
-        summary = (f"Правила нашли {what} ({ids}): "
-                   f"{'разработку' if dev else ''}{' и ' if dev and test else ''}{'тестирование' if test else ''} "
-                   f"начинать нельзя, пока оно не исправлено. {base}, поэтому остальное не оценено.")
+    описанная операция); иначе «не определено». «Можно» без модели не бывает."""
+    proven = [f for f in findings if (f.get("rule_conflict") and len(f.get("evidence") or []) >= 2)
+              or f.get("severity") == "critical"]
+    dev = [f for f in proven if f.get("blocks") in ("development", "both")]
+    test = [f for f in proven if f.get("blocks") in ("testing", "both")]
+    blocking = dev or test
+    tail = ("Смысл требований без модели не проверялся (противоречия правил, критерии приёмки, полнота основной "
+            "функции), поэтому отсутствие других замечаний не означает, что их нет. Для полного ревью нужен ключ "
+            "модели: бесплатный ключ Gemini — https://aistudio.google.com/apikey, строка GEMINI_API_KEY в файле .env.")
+    if blocking:
+        conf = [f["id"] for f in blocking if f.get("rule_conflict")][:5]
+        crit = [f["id"] for f in blocking if f.get("severity") == "critical" and not f.get("rule_conflict")][:3]
+        parts = []
+        if conf:
+            parts.append(f"противоречия двух мест документа с цитатами ({', '.join(conf)})")
+        if crit:
+            parts.append(f"обещанную, но не описанную операцию ({', '.join(crit)})")
+        what = "разработку" if dev and not test else ("тестирование" if test and not dev else "разработку и тестирование")
+        summary = (f"Даже без модели правила нашли {' и '.join(parts)}: {what} начинать нельзя, пока это не исправлено. "
+                   + tail)
     else:
-        summary = (f"{base}, поэтому вердикт не определён: отсутствие замечаний здесь не означает, что "
-                   "документ готов. Для вердикта запустите проверку с моделью.")
+        summary = "Вердикт не определён: без модели проверены только формальные признаки. " + tail
     return {"development": "no" if dev else "undetermined", "testing": "no" if test else "undetermined",
-            "summary": summary, "fix_first": [f["id"] for f in (dev or test)[:3]]}
+            "summary": summary, "fix_first": [f["id"] for f in blocking[:3]]}
 
 
 def _git_state() -> tuple[str, bool]:
@@ -135,7 +150,7 @@ def _git_state() -> tuple[str, bool]:
 
 
 def build(view: dict, requirements: Any = None, *, started_at: str | None = None,
-          rules_out: dict | None = None) -> dict:
+          rules_out: dict | None = None, reason: str = "") -> dict:
     """Отчёт по форме report.json для прогона без модели."""
     t0 = time.monotonic()
     started = started_at or _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
@@ -169,6 +184,13 @@ def build(view: dict, requirements: Any = None, *, started_at: str | None = None
         "signals": out["signals"], "acceptance_checks": [], "pair_checks": [], "trace": [], "glossary": [],
         "test_cases": [], "questions": [], "checklist": [], "verdict": verdict(findings),
         "not_checked": NOT_CHECKED,
+        "offline": {
+            "title": TITLE,
+            "reason": reason or "модель не настроена: нет ключа модели и программы claude",
+            "found": _found_line(findings),
+            "how_to_full": HOW_TO_FULL,
+            "not_checked": NOT_CHECKED,
+        },
         "summary": {"requirements": len(reqs or []), "findings": sev,
                     "requirements_without_findings": max(0, len(reqs or []) - len(with_findings)),
                     "quotes_verified": quotes_total},
@@ -176,17 +198,38 @@ def build(view: dict, requirements: Any = None, *, started_at: str | None = None
 
 
 VERDICT_RU = {"no": "нельзя", "undetermined": "не определено", "conditional": "с условиями", "yes": "можно"}
+VERDICT_MD = {"no": "⛔ нельзя начинать", "undetermined": "❔ не определено", "conditional": "⚠️ с условиями",
+              "yes": "✅ можно", "none": "— не вынесен"}
+SEV_ICON = {"critical": "🔴", "major": "🟠", "minor": "🟡"}
+
+
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    n10, n100 = n % 10, n % 100
+    return one if n10 == 1 and n100 != 11 else (few if 2 <= n10 <= 4 and not 12 <= n100 <= 14 else many)
+
+
+def _found_line(findings: list[dict]) -> str:
+    n = len(findings)
+    if not n:
+        return "Без модели правила замечаний не нашли."
+    sev = {k: sum(1 for f in findings if f.get("severity") == k) for k in ("critical", "major", "minor")}
+    conf = sum(1 for f in findings if f.get("rule_conflict"))
+    s = (f"Без модели найдено {n} {_plural(n, 'замечание', 'замечания', 'замечаний')}: критичных {sev['critical']}, "
+         f"существенных {sev['major']}, незначительных {sev['minor']}")
+    if conf:
+        s += f"; {conf} из них — противоречия двух мест документа, у каждого две цитаты"
+    return s + ". Все цитаты сверены с документом."
 SEV_RU = {"critical": "критичное", "major": "существенное", "minor": "незначительное"}
 
 
 def render(report: dict) -> str:
-    """Markdown: рендер №13, если он умеет офлайн-отчёт, иначе короткий запасной рендер."""
+    """Markdown: рендер №13, если он есть, иначе короткий отчёт `render_brief`."""
     try:
         from bcc_review.v2.render import markdown as md13  # type: ignore
 
         return md13.render(report)
-    except Exception:  # noqa: BLE001 — рендера №13 ещё нет
-        return render_fallback(report)
+    except Exception:  # noqa: BLE001 — рендера №13 нет или он упал
+        return render_brief(report)
 
 
 def _place(e: dict) -> str:
@@ -195,47 +238,72 @@ def _place(e: dict) -> str:
     return (f"с. {e['page']}, " if e.get("page") else "") + s
 
 
-def render_fallback(report: dict) -> str:
-    v = report["verdict"]
+def _first_sentence(text: str, limit: int = 240) -> str:
+    """Текст целиком, если короче limit, иначе — столько целых предложений, сколько помещается."""
+    t = (text or "").strip()
+    if len(t) <= limit:
+        return t
+    cut = t[:limit]
+    k = max(cut.rfind(". "), cut.rfind("; "))
+    return t[:k + 1] if k > 40 else cut.rsplit(" ", 1)[0] + "…"
+
+
+def _md(text: str) -> str:
+    """Угловые скобки «<уточнить: …>» иначе спрячет рендер Markdown."""
+    return text.replace("<", "&lt;").replace(">", "&gt;")
+
+
+def render_brief(report: dict) -> str:
+    """Короткий офлайн-отчёт для читателя без ключа: итог, как получить полную проверку, замечания, оговорки.
+
+    На официальном документе — около 120 строк; на чистом — около 40."""
+    v = report.get("verdict") or {}
     doc = report.get("document") or {}
-    f = report["findings"]
-    s = report["summary"]["findings"]
-    out = [f"# {TITLE}: {doc.get('title') or doc.get('file') or 'документ'}", ""]
-    out += ["> Модель не вызывалась. Это проверка детерминированными правилами: контракт API, единицы, "
-            "заглушки и шаблон, язык требований. Отсутствие замечаний не означает готовность документа.", ""]
-    out += ["## Кратко", "",
-            f"* **Начинать разработку:** {VERDICT_RU.get(v['development'], v['development'])}",
-            f"* **Начинать тестирование:** {VERDICT_RU.get(v['testing'], v['testing'])}",
-            f"* **Обоснование:** {v['summary']}",
-            f"* **Замечаний:** {len(f)} (критичных {s['critical']}, существенных {s['major']}, "
-            f"незначительных {s['minor']}); все цитаты сверены с документом.", ""]
-    out += ["## Замечания правил", ""]
-    if not f:
-        out += ["Правила замечаний не нашли.", ""]
-    for x in f:
-        out += [f"### {x['id']}. {x['title']}", "",
-                f"*{SEV_RU.get(x['severity'], x['severity']).capitalize()}* · "
-                f"{', '.join(x['standard_refs']) or '—'}", ""]
-        for e in x["evidence"]:
-            out.append(f"* {_place(e)}: «{e['quote']}»")
-        out += ["", f"**Проблема.** {x['problem']}", ""]
-        if x.get("scenario"):
-            out += [f"**Сценарий.** {x['scenario']}", ""]
-        if x.get("impact"):
-            out += [f"**Последствия.** {x['impact']}", ""]
-        out += [f"**Что сделать.** {x['recommendation']}", ""]
-        if x.get("rewrite"):
-            out += [f"**Формулировка.** {x['rewrite']}", ""]
-    sig = [g for g in report.get("signals") or [] if g.get("kind") != "inventory"]
+    run = report.get("run") or {}
+    off = report.get("offline") or {}
+    f = report.get("findings") or []
+    title = doc.get("title") or doc.get("file") or "документ"
+    out = [f"# {TITLE}: «{title}»", "",
+           f"> Модель не вызывалась ({off.get('reason') or 'модель не настроена'}). Документ проверен детерминированными "
+           "правилами: контракт API, единицы измерения, заглушки и шаблон, язык требований, явные противоречия. "
+           "Это предварительная проверка, а не полное ревью.", ""]
+    out += ["## Итог", "",
+            "| Разработка | Тестирование |", "| :---: | :---: |",
+            f"| **{VERDICT_MD.get(v.get('development'), '—')}** | **{VERDICT_MD.get(v.get('testing'), '—')}** |", "",
+            off.get("found") or _found_line(f), "", v.get("summary", ""), ""]
+    out += ["## Как получить полную проверку", ""]
+    out += [f"{i}. {step}" for i, step in enumerate(off.get("how_to_full") or HOW_TO_FULL, 1)]
+    out += ["", "Полная проверка добавляет: смысловые противоречия требований и критериев приёмки, неполноту правил "
+            "основной функции, вопросы владельцу с вариантами ответа, черновик тест-кейсов и заполненный чек-лист.", ""]
+    if f:
+        out += ["## Замечания без модели", ""]
+        for x in f:
+            ev0 = x.get("evidence") or []
+            out += [f"### {SEV_ICON.get(x.get('severity'), '')} {x['id']}. {x['title']}", ""]
+            for e in ev0[:3]:
+                out.append(f"* {_place(e)}: «{e.get('quote', '')}»")
+            out += ["", f"**Почему это проблема.** {_md(_first_sentence(x.get('problem', ''), 480))}", "",
+                    f"**Что сделать.** {_md(_first_sentence(x.get('recommendation', ''), 320))}", ""]
+    # подсказки для человека: без сводок, без служебных указаний модели и без дублей замечаний
+    noted = {str(x.get("sources", [""])[0]).split(":", 1)[-1] for x in f}
+    sig = [g for g in report.get("signals") or [] if g.get("kind") not in ("inventory", "security")
+           and not str(g.get("rule", "")).startswith(("api.", "injection.", "promises."))
+           and g.get("rule") not in noted]
     if sig:
-        out += ["## Подсказки для ручной проверки", "",
-                "Места, на которые правила обращают внимание; это не замечания.", ""]
-        for g in sig[:20]:
-            out.append(f"* строка {g['line']}: «{g['quote']}» — {g['message']}")
+        out += ["## Подсказки для ручной проверки", "", "Места, на которые правила обращают внимание; это не замечания.", ""]
+        for g in sig[:10]:
+            q = g.get("quote", "")
+            q = q if len(q) <= 90 else q[:87] + "…"
+            out.append(f"* строка {g['line']}: «{q}» — {g.get('message', '')}")
         out.append("")
-    out += ["## Что без модели не проверялось", ""] + [f"* {t}" for t in report.get("not_checked") or []]
-    out += ["", f"Документ: `{doc.get('file', '')}`, строк: {doc.get('lines', 0)}, sha256 `{(doc.get('sha256') or '')[:12]}`."]
+    out += ["## Что без модели не проверялось", ""] + [f"* {t}" for t in off.get("not_checked") or NOT_CHECKED]
+    commit = (run.get("commit") or "")[:7]
+    out += ["", f"*Файл `{doc.get('file', '')}`, строк {doc.get('lines', 0)}, SHA-256 `{(doc.get('sha256') or '')[:12]}…`; "
+            f"агент{' коммит `' + commit + '`' if commit else ''}; вызовов модели 0. Отчёт сформирован без ручных правок.*"]
     return "\n".join(out) + "\n"
+
+
+render_fallback = render_brief  # прежнее имя
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -87,7 +87,50 @@ ENUM_BEFORE = re.compile(r"((?:[\w«»\"]+[\w\s«»\"\-]{0,30},\s*){1,}[\w«»\"
 CODE_ENUM = re.compile(r"[1-5]\d\d(?:\s*,\s*[1-5]\d\d)+\s*$")
 
 
+NFR_SECTION = re.compile(r"нефункциональн|non-?functional|nfr|качеств\w+\s+характеристик", re.I)
+NFR_ID = re.compile(r"^\s*(?:НФ|НФТ|NFR|NF)-?\d+", re.I)
+# размытые характеристики качества в НФТ (без «корректно» и «достаточно» — они слишком общие)
+NFR_VAGUE = re.compile(
+    r"\bбыстр(?:о|ый|ая|ое|ые|ого|ому)\b|\bмгновенн\w*|\bнемедленн\w*|\bсвоевременн\w*|\bоперативн\w*|"
+    r"\bв\s+реальном\s+времени\b|\bудобн\w*|\bинтуитивн\w*|\bнадёжн\w*|\bнадежн\w*|\bвысок\w+\s+нагрузк\w*|"
+    r"\bвсегда\s+актуальн\w*|\bбез\s+задерж\w*|\bстабильн\w*|\bотзывчив\w*", re.I)
+
+
+def _nfr_candidate(doc: Doc, out: dict) -> None:
+    """Нефункциональное требование без числа, но с размытым сроком или оценкой: «быстро», «мгновенно»."""
+    hits = []
+    for x in doc.lines:
+        if not x.text or x.is_code or x.is_heading or x.cells is not None:
+            continue
+        if not (NFR_SECTION.search(x.section or "") or NFR_ID.match(x.text)):
+            continue
+        if NUMBER.search(re.sub(r"^\s*(?:НФ|НФТ|NFR|NF)-?\d+\.?", "", x.text, flags=re.I)):
+            continue
+        masked = _mask_quotes(x.joined)
+        words = [x.joined[m.start():m.end()] for m in NFR_VAGUE.finditer(masked)]
+        if words:
+            hits.append((x, words))
+    if not hits:
+        return
+    x, words = hits[0]
+    allw = [w for _, ws in hits for w in ws]
+    out["candidates"].append(candidate(
+        "language.nfr_unverifiable",
+        title=f"Нефункциональные требования непроверяемы: {', '.join(quoted(w) for w in allw[:3])} без чисел",
+        kind="unverifiable", criterion="verifiable", severity="major", blocks="testing",
+        evidence=[ev(h[0]) for h in hits[:3]],
+        problem=(f"В нефункциональных требованиях нет ни одного измеримого значения: {quoted(x.joined)}. "
+                 f"Слова {', '.join(quoted(w) for w in allw[:4])} нельзя проверить тестом."),
+        scenario="Нагрузочный тест показывает 3 секунды на 95-й перцентили: одна сторона считает это «быстро», другая — нет.",
+        impact="Требование нельзя принять или отклонить; эксплуатационные риски не ограничены договорённостью.",
+        recommendation=("Задать измеримые значения: время ответа и доля запросов (например, p95), нагрузка, "
+                        "точка начала и конца замера, допустимая задержка данных."),
+        rewrite="<уточнить: операция> выполняется не дольше <уточнить: N> с для 95 % запросов при нагрузке <уточнить> rps.",
+    ))
+
+
 def run(doc: Doc, out: dict, requirements: list[dict] | None = None, excluded: list[dict] | None = None) -> None:
+    _nfr_candidate(doc, out)
     open_list_done = False
     for x in obligation_lines(doc, requirements, excluded):
         text = x.joined

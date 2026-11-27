@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import re
 import traceback
 from pathlib import Path
@@ -56,6 +57,7 @@ AUTHOR = "BCC Review"
 SUFFIX = {"jira": ".jira.csv", "docx_annotated": ".annotated.docx", "docx": ".docx", "pdf_annotated": ".annotated.pdf",
           "pdf": ".pdf"}
 FORMATS = ("jira", "docx", "pdf")
+os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")  # без совета про pymupdf_layout в stdout (№16)
 
 
 # --------------------------------------------------------------------------- общая точка вызова
@@ -326,7 +328,8 @@ def to_v1_report(report: dict, view: dict, input_path: Path, doc1: dict | None =
         fix = str(f.get("recommendation") or "").strip()
         if f.get("rewrite"):
             fix = (fix + "\n" if fix else "") + "Формулировка: " + str(f["rewrite"]).strip()
-        findings.append({"id": f.get("id"), "status": "confirmed", "severity": f.get("severity"), "title": title,
+        # status None: в v2 все дефекты прошли судью, пометка «подтверждено» в комментарии лишняя
+        findings.append({"id": f.get("id"), "status": None, "severity": f.get("severity"), "title": title,
                          "criterion": criterion_label(f.get("criterion")) if f.get("criterion") else None,
                          "kind": f.get("kind"), "impact": impact, "question": f.get("question") or None,
                          "recommendation": fix or None, "req_ids": list(f.get("requirement_ids") or []),
@@ -617,12 +620,14 @@ def annotate_pdf(report: dict, view: dict, input_path: Path, output_path: Path) 
                 continue
             page = doc[int(page_no) - 1]
             bbox = _area(view, rects, int(n), int(ev.get("line_end") or n), int(page_no)) if n else None
-            quads = _find_quads(page, str(ev.get("quote") or ""), bbox)
+            quads = _find_quads(page, str(ev.get("quote") or ""), bbox) or \
+                _word_quads(page, str(ev.get("quote") or ""), bbox)
             if not quads:
                 missed.append(fid)
                 continue
             a = page.add_highlight_annot(quads=quads)
             a.set_colors(stroke=color)
+            a.set_opacity(0.45)  # полупрозрачно: текст под выделением читается, наложения не чернеют
             a.set_info(title=AUTHOR, subject=f"{fid} · {SEVERITY_RU.get(str(f.get('severity')), '')}", content=note)
             a.set_name(f"bcc-{fid}-{places}")
             a.update()
@@ -671,6 +676,7 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
 
     for vi, variant in enumerate(_search_variants(quote)):
         found: list = []
+        prev_x = None
         for piece in variant:
             hits = page.search_for(piece, quads=True)
             if not hits and len(piece) > 60:
@@ -682,7 +688,13 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
             if vi == 0 and ins:
                 hits = ins  # цитата целиком: все части переноса внутри блока
             elif ins:
-                hits = ins[:1]  # часть цитаты (ячейка, фрагмент): одно вхождение внутри блока
+                # часть цитаты (ячейка, фрагмент): одно вхождение внутри блока, ячейки — слева направо;
+                # перенос внутри ячейки даёт несколько четырёхугольников — берём их все
+                cand = [h for h in ins if prev_x is None or h.rect.x0 >= prev_x - 1] or ins
+                first = cand[0]
+                hits = [first] + [h for h in cand[1:] if abs(h.rect.x0 - first.rect.x0) < 4
+                                  and 0 < h.rect.y0 - first.rect.y0 <= 2.6 * max(first.rect.height, 1)]
+                prev_x = first.rect.x1
             elif area is not None:
                 hits = sorted(hits, key=lambda h: abs(h.rect.y0 - area.y0))[:1]
             else:
@@ -691,6 +703,43 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
         if found:
             return found
     return []
+
+
+def _word_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
+    """Запасной поиск по словам: фрагменты строки в PDF могут лежать не по порядку (другой шрифт у цифр и точек),
+    и search_for не находит фразу. Слова в рамке блока раскладываются по строкам слева направо и сравниваются
+    с цитатой без пробелов. Не нашлось — выделяется весь блок (место дефекта всё равно видно)."""
+    import pymupdf
+    from bcc_review.v2.quotes import normalize
+    area = pymupdf.Rect(bbox) + (-2, -2, 2, 2) if bbox else None
+    words = page.get_text("words", clip=area) if area is not None else page.get_text("words")
+    if not words:
+        return []
+    words = sorted(words, key=lambda w: (w[1] + w[3]) / 2)
+    lines: list[list] = []
+    for w in words:
+        mid, h = (w[1] + w[3]) / 2, w[3] - w[1]
+        if lines and abs(mid - lines[-1][0]) <= max(h, 1) * 0.5:
+            lines[-1][1].append(w)
+        else:
+            lines.append([mid, [w]])
+    ordered = [w for _, ws in lines for w in sorted(ws, key=lambda w: w[0])]
+    chars, owner = [], []
+    for k, w in enumerate(ordered):
+        t = normalize(w[4]).replace(" ", "")
+        chars.append(t)
+        owner += [k] * len(t)
+    text = "".join(chars)
+    first = quote.split(" … ")[0]
+    needle = normalize(first).replace(" ", "").strip('".,;:')
+    pos = text.find(needle) if len(needle) >= 4 else -1
+    if pos >= 0:
+        sel = ordered[owner[pos]:owner[pos + len(needle) - 1] + 1]
+    elif area is not None:
+        sel = ordered
+    else:
+        return []
+    return [pymupdf.Rect(w[:4]).quad for w in sel]
 
 
 def _summary_note(page: Any, report: dict, findings: list[dict], anchored: set[str]) -> None:
