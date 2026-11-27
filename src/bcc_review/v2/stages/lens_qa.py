@@ -357,11 +357,11 @@ def normalize_test_case(raw: Mapping[str, Any]) -> dict:
 
 # ---------------------------------------------------------------- сборка
 
-MAX_OTHER_CANDIDATES = 2
+MAX_OTHER_CANDIDATES = 2  # одно о покрытии приёмкой + одно о проверяемости
 
 
 def _other_rank(c: Mapping[str, Any]) -> int:
-    """Порядок замечаний модели вне противоречий: покрытие приёмкой, проверяемость, остальное."""
+    """Вид замечания модели вне противоречий: 0 — покрытие приёмкой, 1 — проверяемость, 2 — прочее."""
     if c.get("kind") == "missing_element" and c.get("criterion") == "set_validatable":
         return 0
     if c.get("kind") == "unverifiable":
@@ -370,20 +370,29 @@ def _other_rank(c: Mapping[str, Any]) -> int:
 
 
 def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Противоречия модели (два места — два исхода) остаются все; прочих замечаний — не больше
-    :data:`MAX_OTHER_CANDIDATES`: одно о покрытии приёмкой и одно о проверяемости раньше остальных.
-
-    На чистых документах корпуса haiku давал 3–5 major (неоднозначности одного места, контракт API, доставка
-    сообщений) — это зона аналитика и архитектора; линза тестировщика держит свои два вида. Снятые идут в
-    ``dropped`` (в отчёте — «отклонено линзой»), не теряются.
+    """Противоречия модели (два места — два исхода) остаются все; вне противоречий линза держит только свои
+    два вида — не больше одного замечания о покрытии приёмкой и одного о проверяемости. Прочее (неоднозначность
+    одного места, неполнота, контракт API, доставка сообщений) — зона аналитика и архитектора: на чистых
+    документах корпуса и №18 это был основной шум линзы. Снятые идут в ``dropped`` (отчёт: «отклонено линзой»).
     """
-    conflicts = [c for c in cands if c.get("kind") in _CONFLICT_FAMILY]
-    others = sorted((c for c in cands if c.get("kind") not in _CONFLICT_FAMILY),
-                    key=lambda c: (_other_rank(c), {"critical": 0, "major": 1, "minor": 2}.get(c.get("severity"), 3)))
-    keep_ids = {id(c) for c in conflicts + others[:MAX_OTHER_CANDIDATES]}
-    kept = [c for c in cands if id(c) in keep_ids]
-    reason = f"сверх лимита линзы тестировщика: не больше {MAX_OTHER_CANDIDATES} замечаний вне противоречий"
-    dropped = [{**c, "reason": reason} for c in others[MAX_OTHER_CANDIDATES:]]
+    sev = {"critical": 0, "major": 1, "minor": 2}
+    best: dict[int, dict] = {}
+    for c in cands:
+        if c.get("kind") in _CONFLICT_FAMILY:
+            continue
+        r = _other_rank(c)
+        if r < 2 and (r not in best or sev.get(c.get("severity"), 3) < sev.get(best[r].get("severity"), 3)):
+            best[r] = c
+    keep = {id(c) for c in best.values()}
+    kept, dropped = [], []
+    for c in cands:
+        if c.get("kind") in _CONFLICT_FAMILY or id(c) in keep:
+            kept.append(c)
+        else:
+            why = ("второе замечание того же вида" if _other_rank(c) < 2
+                   else "вне зоны линзы тестировщика (неоднозначность, неполнота, контракт — у аналитика и архитектора)")
+            dropped.append({**c, "reason": f"снято линзой тестировщика: {why}; вне противоречий — не больше "
+                                          f"{MAX_OTHER_CANDIDATES} замечаний (покрытие приёмкой, проверяемость)"})
     return kept, dropped
 
 

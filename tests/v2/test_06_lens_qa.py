@@ -217,10 +217,14 @@ def test_other_candidates_limited_conflicts_kept():
            dict(base, title="Метрика", kind="unverifiable", criterion="verifiable"),
            dict(base, title="Коды", kind="status_conflict", criterion="set_consistent"),
            dict(base, title="Покрытие", kind="missing_element", criterion="set_validatable")]
+    raw.append(dict(base, title="Покрытие-2", kind="missing_element", criterion="set_validatable", severity="minor"))
     out = lens_qa.postprocess({"candidates": raw}, REQS)
     assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие"]
-    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт"}
+    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт", "Покрытие-2"}
     assert all("не больше 2" in d["reason"] for d in out["dropped"])
+    # неоднозначность одного места без своих видов — тоже снимается: это зона аналитика
+    only = lens_qa.postprocess({"candidates": [raw[0]]}, REQS)
+    assert only["candidates"] == [] and [d["title"] for d in only["dropped"]] == ["Неоднозначность"]
 
 
 # ---------------------------------------------------------------- тест-кейсы
