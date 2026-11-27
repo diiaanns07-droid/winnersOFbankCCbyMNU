@@ -1366,7 +1366,12 @@ def _report_paths(c: _Ctx):
     out_json = PurePath(str(out)).with_suffix(".json") if out else None
     json_arg = (out_json.as_posix() if out_json and not out_json.is_absolute() else out_json.name if out_json
                 else "отчёт.json")
-    doc = str(c.doc.get("file") or "документ")
+    # документ — по пути, как его указали в командной строке (относительный: команду можно скопировать и
+    # выполнить из той же папки); абсолютный путь машины в отчёт не пишется — только имя файла
+    given = getattr(c, "doc_path", None)
+    given = PurePath(str(given)) if given else None
+    doc = (given.as_posix() if given and not given.is_absolute() and given.name == PurePath(
+        str(c.doc.get("file") or given.name)).name else str(c.doc.get("file") or "документ"))
     doc_arg = doc if re.fullmatch(r"[\w./\\:-]+", doc) else f'"{doc}"'
     clean = lambda x: str(x).replace("`", "").replace("|", "\\|")  # noqa: E731
     return out_json, clean(json_arg), clean(doc_arg)
@@ -2463,9 +2468,10 @@ def _sections():
             ("Приложение Е. Методика", _appendix_method)]
 
 
-def _render_level(report: dict, level: int, out_path=None) -> str:
+def _render_level(report: dict, level: int, out_path=None, doc_path=None) -> str:
     c = _Ctx(_clean_report(report), level)
     c.out_path = out_path
+    c.doc_path = doc_path
     _KNOWN_IDS.clear()
     _KNOWN_IDS.update(str(f.get("id")) for f in c.findings)
     _KNOWN_IDS.update(str(q.get("id")) for q in c.reqs)
@@ -2499,13 +2505,14 @@ def _render_level(report: dict, level: int, out_path=None) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render(report: dict, *, max_lines: int | None = MAX_LINES, out_path=None) -> str:
+def render(report: dict, *, max_lines: int | None = MAX_LINES, out_path=None, doc_path=None) -> str:
     """Markdown-отчёт по report.json v2. Если отчёт длиннее max_lines, вспомогательные таблицы сжимаются
-    (содержание дефектов не теряется: полные данные — в report.json). ``out_path`` — куда пишется этот .md
-    (для команд проверки в паспорте: report.json лежит рядом с тем же именем)."""
+    (содержание дефектов не теряется: полные данные — в report.json). ``out_path`` — куда пишется этот .md,
+    ``doc_path`` — путь к документу из командной строки: по ним паспорт пишет команды проверки и повтора, которые
+    можно выполнить как есть (без них — «отчёт.json» и имя файла документа)."""
     text = ""
     for level in range(MAX_LEVEL + 1):
-        text = _render_level(report, level, out_path)
+        text = _render_level(report, level, out_path, doc_path)
         if max_lines is None or text.count("\n") <= max_lines:
             break
     return text
@@ -2525,10 +2532,10 @@ def export_text(md: str) -> str:
     return out
 
 
-def write(report: dict, path) -> str:
+def write(report: dict, path, doc_path=None) -> str:
     from pathlib import Path
 
-    text = render(report, out_path=path)
+    text = render(report, out_path=path, doc_path=doc_path)
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")

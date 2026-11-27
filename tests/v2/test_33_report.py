@@ -135,3 +135,15 @@ def test_stage_warnings_read_as_russian_sentences():
     for out in (markdown.warn_text(clar), console.plain_warn(clar)):
         assert "«Где клиент заполняет анкету здоровья для страхования, какие…» отброшен" in out
     assert "«Короткий?» отброшен" in markdown.warn_text("clarify: вопрос «Короткий?» отброшен — повтор")
+
+
+def test_passport_commands_use_paths_from_command_line(sample):
+    """Паспорт: команды проверки и повтора можно скопировать и выполнить — пути те, что указали при запуске
+    (раньше «verify отчёт.json requirements.md»: такого файла нет, документ лежит в другой папке)."""
+    md = markdown.render(sample, out_path="reports/requirements.md", doc_path="release/input/requirements.md")
+    assert "`python -m bcc_review verify reports/requirements.json release/input/requirements.md`" in md
+    # абсолютные пути машины в отчёт не попадают — только имена файлов
+    md = markdown.render(sample, out_path="/home/u/Мои документы/r.md", doc_path="/home/u/ТЗ/requirements.md")
+    assert "/home/u" not in md and "verify r.json requirements.md" in md
+    # без путей — как раньше
+    assert "verify отчёт.json requirements.md" in markdown.render(sample)
