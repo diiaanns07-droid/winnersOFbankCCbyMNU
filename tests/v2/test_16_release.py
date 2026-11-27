@@ -406,7 +406,7 @@ def test_dockerfile_runs_the_agent():
     ignore = _read(ROOT / ".dockerignore").splitlines()
     for entry in (".env", ".git/*", ".bcc_cache", "runs"):
         assert entry in ignore, entry
-    allowed = {"!tests/v2/fixtures/official"}  # записанные ответы для --provider mock в контейнере
+    allowed = {"!tests/v2/fixtures/official", "!tests/v2/fixtures/official_pdf"}  # ответы для --provider mock
     assert not any(ln.startswith("!") and ".git/" not in ln and ln not in allowed for ln in ignore), \
         "исключения .dockerignore только для .git и фикстур mock"
     assert "COPY tests/v2/fixtures/official" in text
@@ -578,3 +578,19 @@ def test_output_same_as_input_does_not_overwrite_source(tmp_path):
     src.write_bytes(original)
     _review(tmp_path, str(src), str(src))
     assert src.read_bytes() == original
+
+
+def test_docker_image_has_mock_fixtures_for_every_case_format():
+    """mock выбирает записанные ответы по входу (`pipeline._mock_dir_for`: для PDF — `official_pdf`). Каждая такая
+    папка должна попасть в образ, иначе mock-отчёт в контейнере другой, чем вне его (было: PDF — `official`)."""
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    from bcc_review.v2 import pipeline
+
+    docker = _read(ROOT / "Dockerfile")
+    ignore = _read(ROOT / ".dockerignore").splitlines()
+    for name in ("requirements.md", "requirements.pdf", "requirements.docx"):
+        d = pipeline._mock_dir_for(ROOT / "release" / "input" / name)
+        rel = d.relative_to(ROOT).as_posix()
+        assert f"COPY {rel} ./{rel}" in docker, f"{name}: в Dockerfile нет COPY {rel}"
+        assert f"!{rel}" in ignore, f"{name}: {rel} исключена .dockerignore"
