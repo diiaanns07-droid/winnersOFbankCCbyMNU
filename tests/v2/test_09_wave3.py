@@ -97,11 +97,13 @@ def test_units_of_acceptance_row_are_display_units_not_mismatch():
     assert len(run(p2)["candidates"]) == 1
 
 
-def test_status_conflict_without_codes_on_both_sides_is_major():
+def test_status_conflict_without_codes_on_both_sides_is_not_conflict():
     p = pair(a="R-10", b="R-10", quote_a=DOC[11][3:], line_a=12, quote_b=DOC[12], line_b=13,
              outcome_a="перевод на 3 000", outcome_b="пример показывает 5 000")
-    [c] = run(p)["candidates"]
-    assert c["severity"] == "major"
+    out = run(p)
+    [c] = out["candidates"]
+    # №27: второй исход вывела модель, цитаты его не называют — неопределённость, minor
+    assert c["severity"] == "minor" and out["pair_checks"][0]["gate"] == "no_value"
 
 
 def test_different_systems_are_not_major_glossary_but_roles_and_shared_names_are():
@@ -193,12 +195,12 @@ def test_period_mismatch_with_acceptance_row_stays_conflict():
 
 
 def test_silence_with_two_conditions_is_incompleteness_not_check_order():
-    # «шаг логики не проверяет условие правила» — неполнота (major), даже если модель сказала «два условия»
+    # «шаг логики не проверяет условие правила» — неполнота, даже если модель сказала «два условия»; №27: minor
     p = pair(a="R-01", b="R-02", quote_a=DOC[1][10:], line_a=2, quote_b=DOC[2][3:], line_b=3, verdict="undefined",
              basis="none", kind="incomplete", one_condition=False, outcome_a="второй раз — отказ",
              outcome_b="код не назван")
     [c] = run(p)["candidates"]
-    assert c["severity"] == "major" and c["kind"] == "incomplete"
+    assert c["severity"] == "minor" and c["kind"] == "incomplete"
     p2 = dict(p, kind="ambiguity")
     [c2] = run(p2)["candidates"]
     assert c2["severity"] == "minor" and "Порядок проверок" in c2["problem"]

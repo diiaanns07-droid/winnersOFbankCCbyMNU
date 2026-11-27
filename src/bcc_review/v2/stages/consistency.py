@@ -384,11 +384,23 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         elif (acc_texts and pair["kind"] == "event_conflict"
               and not any(_MOMENT.search(t) for t in acc_texts)):
             pair.update(verdict="compatible", basis="none", resolved_by="acceptance_no_moment")
+    if pair["verdict"] == "conflict":
+        reason = conflict_gate(pair, ev_a, ev_b, view, known)
+        if reason:
+            pair["gate"] = reason
+            if reason in GATE_DROP:  # разные предметы или условие права — исходы совместимы
+                pair.update(verdict="compatible", basis="none")
+            else:  # пример, экран, граница без значения — расхождение не доказано цитатами: неопределённость
+                pair.update(verdict="undefined", basis="none", kind="ambiguity")
     if pair["verdict"] == "conflict" and pair["kind"] == "status_conflict":
         ex = status_example_evidence(view, pair)
         if ex:
             pair["_extra_ev"] = [ex]
             pair["example_line"] = ex["line"]
+        # «Один вход — два кода» держится на цитатах: каждая сторона называет код или значение статуса (или найдена
+        # строка примера второго кода). Иначе второй исход вывела модель по соседним местам — не доказанный конфликт.
+        elif not all(_CODE.search(q) or _TOKEN.search(q) for q in (pair["quote_a"], pair["quote_b"])):
+            pair.update(verdict="undefined", basis="none", kind="ambiguity", gate="no_value")
     return pair
 
 
@@ -507,6 +519,126 @@ def _removes_limit(qa: str, qb: str) -> bool:
     """Одна цитата снимает ограничение, другая его задаёт (без слов снятия)."""
     return any(_LIMIT_REMOVED.search(x) and _LIMIT.search(y) and not _LIMIT_REMOVED.search(y)
                for x, y in ((qa, qb), (qb, qa)))
+
+
+# ---------------------------------------------------------------- проверка конфликта кодом (№27)
+# Конфликт — две цитаты из разных нормативных мест про один предмет (поле, событие, правило) с несовместимым исходом
+# на одном входе. Ложные конфликты слабой модели на чистых ТЗ (замер h0, haiku, 20 документов) — каждый из видов ниже:
+# пример ответа против правила, условие права против запрета для другого состояния, хранение записи против срока
+# действия ключа, текст методики тестирования, «граница» без значения, экран против правила сервера, строка приёмки,
+# которая задаёт конец срока «действует N минут».
+
+# Пример тела или ответа: значение в примере зависит от входа примера, а не задаёт правило.
+_EXAMPLE = re.compile(r'"[\w.$-]+"\s*:|^\s*[{\[]')
+# Право («может», «можно», «вправе») — необходимое, а не достаточное условие: запрет или ошибка для другого состояния
+# с ним не спорит (контрпример 7 промпта, в том числе без «если»: «может отказаться в течение 14 дней»).
+_RIGHT = re.compile(r"(?<![а-яё])(?:может|могут|можно|вправе|разрешается|разрешено)(?![а-яё])", re.I)
+_ALWAYS = re.compile(r"(?<![а-яё])(?:всегда|каждый\s+раз|любой|любом)(?![а-яё])", re.I)
+# Запрет или ошибка: «не …», «нельзя», «отклоняется», «отказ», код 4xx.
+_REFUSAL = re.compile(r"(?<![а-яё])(?:не|нельзя|запрещ\w*|отклон\w*|отказ\w*|недоступ\w*|ошибк\w*)(?![а-яё])|"
+                      r"(?<!\d)4\d\d(?!\d)", re.I)
+# Хранение записи и срок действия — разные предметы: «запись хранится 5 лет», «ключ действует 30 дней».
+_STORE = re.compile(r"(?<![а-яё])хран(?:ит|ят|ится|ятся|ени|ен)\w*", re.I)
+_VALID = re.compile(r"(?<![а-яё])(?:действ(?:ует|уют|ителен|ительн|ия)|истека\w*|истеч\w*)", re.I)
+# Значение или слово границы: число, «включительно», «не более», «меньше», «достигнет», «≥» …
+_BOUND = re.compile(r"\d|включительно|(?<![а-яё])(?:не\s+)?(?:более|больше|менее|меньше|выше|ниже|позднее|позже|"
+                    r"раньше|ранее|дольше|превыша\w*|превыс\w*|достиг\w*|максимум|минимум|предел\w*|лимит\w*|"
+                    r"порог\w*)(?![а-яё])|[≥≤<>]", re.I)
+# Номер пункта списка в начале цитаты («3. Если …») — не значение.
+_ITEM_NO = re.compile(r"^\W*\d{1,2}[.)]\s+")
+# Срок действия в строке правила: «действует 15 минут», «в течение 14 дней» (без «включительно» конец срока задаёт
+# строка приёмки — это уточнение, а не другой исход).
+_DURATION = re.compile(r"(?:действ\w*|в\s+течение)[^.;|]{0,40}?\d+\s*(?:секунд|сек|минут|мин|час|сут|дн|дня|дней|"
+                       r"недел|месяц|мес)", re.I)
+# Разделы, которые описывают проверку документа или методику тестирования, а не поведение системы.
+_NON_NORMATIVE_SECTION = re.compile(r"тестирование\s+требований|методик\w*\s+тестир|история\s+изменени|"
+                                    r"согласовани|глоссари", re.I)
+
+# Причины, по которым пара не конфликт, а совместима (разные предметы, условие права, уточнение границы приёмкой).
+GATE_DROP = ("right_condition", "storage_vs_validity", "non_normative", "acceptance_duration")
+GATE_RU = {
+    "right_condition": "одно место задаёт условие права, другое — запрет для другого состояния",
+    "storage_vs_validity": "срок хранения записи и срок действия — разные предметы",
+    "non_normative": "одна сторона — описание проверки документа, а не правило системы",
+    "acceptance_duration": "строка приёмки задаёт конец срока, правило его не уточняет",
+    "example_value": "одна сторона — пример с другим входом",
+    "ui_display": "одна сторона — показ на экране, а не исход правила",
+    "no_value": "у одной стороны нет ни значения, ни слова границы (ни кода, ни статуса)",
+    "two_phase": "одна сторона — следствие ответа другой системы, а не ответ на тот же запрос",
+}
+
+
+_COND_CODE = re.compile(r"(?<![а-яё])(?:при|после|на)\s+(?:ответ\w*|код\w*|статус\w*)\s+([1-5]\d\d)(?!\d)|"
+                        r"(?<![а-яё])(?:если|когда)[^.;]{0,40}?(?:вернул\w*|ответил\w*|получ\w*\s+ответ\w*)\s+([1-5]\d\d)(?!\d)",
+                        re.I)
+
+
+def _cond_codes(q: str) -> set[str]:
+    """Коды ответа, которые стоят в цитате условием («при ответе 422», «если АБС вернула 500»), а не исходом."""
+    return {a or b for a, b in _COND_CODE.findall(q)}
+
+
+def _req_of(ev: dict, known: dict[str, dict] | None) -> dict:
+    """Требование нарезки, в строки которого попала цитата (по строкам, а не по ID, который назвала модель)."""
+    if not _found(ev):
+        return {}
+    a, b = _span(ev)
+    best: dict = {}
+    for r in (known or {}).values():
+        rs, re_ = r.get("line_start") or 0, r.get("line_end") or r.get("line_start") or 0
+        if rs and rs <= a and b <= re_ and (not best or re_ - rs < (best.get("line_end") or 0) - (best.get("line_start") or 0)):
+            best = r
+    return best
+
+
+def _section(ev: dict, view: Any) -> str:
+    a, _ = _span(ev)
+    for x in _lines(view):
+        if x.get("n") == a:
+            return _s(x.get("section"))
+    return _s(ev.get("section"))
+
+
+def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str, dict] | None) -> str:
+    """Проверка конфликта кодом: пустая строка — конфликт держится на цитатах; иначе — причина (ключ ``GATE_RU``)."""
+    kind, qa, qb = pair["kind"], pair["quote_a"], pair["quote_b"]
+    quotes = (qa, qb)
+    sides = [(ev, q, _req_of(ev, known) or (known or {}).get(rid, {})) for ev, q, rid in
+             ((ev_a, qa, pair["a"]), (ev_b, qb, pair["b"]))]
+    # Нормативные места: методика тестирования и согласование документа поведение системы не задают.
+    for ev, _q, r in sides:
+        if r.get("kind") != "acceptance" and _NON_NORMATIVE_SECTION.search(_section(ev, view) or r.get("section") or ""):
+            return "non_normative"
+    # Один предмет: хранение записи и срок действия ключа (кода, ссылки) — разные величины.
+    if kind in ("event_conflict", "unit_mismatch", "boundary_conflict") and any(
+            _STORE.search(x) and not _STORE.search(y) and _VALID.search(y) for x, y in ((qa, qb), (qb, qa))):
+        return "storage_vs_validity"
+    # Несовместимый исход: право с условием («может отказаться в течение 14 дней») не спорит с запретом или ошибкой
+    # для другого состояния. Право с пределом («можно не более трёх раз») против снятия предела — конфликт.
+    if kind in ("event_conflict", "status_conflict") and pair["basis"] != "limit_removed" and not any(
+            _LIMIT_REMOVED.search(q) or _ALWAYS.search(q) for q in quotes) and any(
+            _RIGHT.search(x) and not _LIMIT.search(x) and not _RIGHT.search(y) and _REFUSAL.search(y)
+            for x, y in ((qa, qb), (qb, qa))):
+        return "right_condition"
+    # Два шага процесса: в одной цитате код ответа — условие («при ответе 422 операция получает статус REJECTED»),
+    # а не исход запроса; другая цитата — ответ на запрос. Это следствие ответа, а не второй исход того же входа.
+    if kind == "status_conflict" and any(_CODE.search(q) and not (set(_CODE.findall(q)) - _cond_codes(q)) for q in quotes):
+        return "two_phase"
+    # Граница срока: строка приёмки с конкретным временем против «действует N минут» без «включительно».
+    if kind == "boundary_conflict":
+        for (ev, q, r), (_ev2, q2, _r2) in ((sides[0], sides[1]), (sides[1], sides[0])):
+            if _in_acceptance(ev, known) and _DURATION.search(q2) and not re.search(r"включительно", q2, re.I):
+                return "acceptance_duration"
+    # Пример: значение примера (дата, сумма) зависит от его входа; коды и форматы примера сверяет status/unit.
+    if kind in ("event_conflict", "boundary_conflict") and any(_EXAMPLE.search(q) for q in quotes):
+        return "example_value"
+    # Экран показывает (таймер, подпись), правило сервера решает: момент показа — не второй исход правила.
+    if kind == "event_conflict" and any(r.get("kind") == "ui" for _ev, _q, r in sides):
+        return "ui_display"
+    # Граница — значение у обеих сторон: без числа и без слова границы расхождение вывела модель, а не документ.
+    if kind == "boundary_conflict" and not all(_BOUND.search(_ITEM_NO.sub("", q)) for q in quotes):
+        return "no_value"
+    return ""
 
 
 # Виды требований, конфликт с которыми не блокирует сам по себе: цель — намерение, а не правило;
@@ -682,7 +814,10 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
             kind = "ambiguity"
         # Два разных условия в одном запросе (неверный параметр и неподходящее состояние) — вопрос порядка
         # проверок: реализации разойдутся только кодом ошибки, основной процесс не страдает — minor.
-        severity = "minor" if _check_order(pair, kind) else "major"
+        # Неопределённость — не конфликт: ни одно место не даёт исхода, который спорит с другим (молчание, два прочтения,
+        # пример, экран). На чистых ТЗ это догадки модели о сценарии (замер h0: 26 major из 58), поэтому minor;
+        # счётчик и судья видят её, а major делают линзы, если дефект подтверждён ими.
+        severity = "minor"
     criterion = "unambiguous" if kind in ("boundary_conflict", "unit_mismatch", "ambiguity") else "set_consistent"
     if pair["verdict"] == "undefined" and kind == "incomplete":
         criterion = "set_complete"
@@ -1061,18 +1196,47 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
     # обещанное на месте — это не critical (модель приняла соседний процесс за обещанную операцию).
     # Если ни одна цитируемая строка не обещает действие словами (экран с элементом, перечень систем, пример ответа),
     # обещания нет, есть только догадка модели — тоже не critical.
+    promised = (_promises(" ".join(_s(e.get("quote")) for e in evidence))
+                or bool(_PROMISE_SUBJ.search(" ".join(_cited_texts(evidence, view)))))
     if cand["severity"] == "critical" and cand["kind"] == "missing_element" and (
-            _all_named_described(evidence, view) or not _promises(" ".join(_s(e.get("quote")) for e in evidence))
-            and not _PROMISE_SUBJ.search(" ".join(_cited_texts(evidence, view)))):
+            _all_named_described(evidence, view) or not promised):
         cand["severity"] = "major"
+    cand["severity"] = model_severity(cand, promised, known)
     return cand
+
+
+# Цель с конкретным моментом, сроком или результатом: «в момент покупки», «сразу», «в течение 5 минут».
+_GOAL_MOMENT = re.compile(r"(?<![а-яё])(?:в\s+момент|сразу|мгновенн\w*|немедленн\w*|в\s+реальном\s+времени|"
+                          r"не\s+позднее|в\s+течение\s+\d|за\s+\d|\d+\s*(?:секунд|сек|минут|мин|час))", re.I)
+# Виды дефектов набора, у которых модель может поставить major без проверки кодом нет: такой major — мнение одного
+# ревьюера о сценарии или схеме (полнота набора, расхождение схем, дубль), на чистых ТЗ — ложная тревога
+# (замер h0, haiku: 24 major из 58 — кандидаты модели). Счётчик и судья видят их и как minor.
+MODEL_MAJOR_KINDS = ("missing_element", "terminology")
+
+
+def model_severity(cand: dict, promised: bool, known: dict[str, dict] | None) -> str:
+    """Серьёзность кандидата модели после проверки кодом: major остаётся только у обещанного, но не описанного
+    (обещание есть в цитатах) и у цели, которая называет конкретный момент или срок; остальное — minor."""
+    sev = cand["severity"]
+    if sev == "minor":
+        return sev
+    if sev == "critical" and cand["kind"] != "missing_element":  # по шкале промпта critical — только обещанное
+        sev = "major"
+    goal = [e for e in cand["evidence"] if _req_of(e, known).get("kind") == "goal"]
+    if goal:  # цель против требований (п. 1 шага 5): major — только если цель называет момент, срок или результат
+        return sev if any(_GOAL_MOMENT.search(_s(e.get("quote"))) for e in goal) else "minor"
+    if cand["kind"] == "missing_element":
+        return sev if promised else "minor"
+    return sev if cand["kind"] in MODEL_MAJOR_KINDS else "minor"
 
 
 _IDENT = re.compile(r"\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
 # Глаголы обещанного действия (основы, с начала слова): читает, получает, отдаёт, возвращает, сохраняет, показывает…
 _VERB = (r"(?<![а-яё])(?:чита|получа|получ|отда|возвра|верн|сохран|показ|отобра|вызыв|отправ|запраш|"
          r"переда|хран|меня|измен|удал|созда|отмен|отзыв|включ|выключ|рассчит|подключ|оформл|"
-         r"выполн|формир|загруж|обновл|блокир|разблокир|приходит|присыла)")
+         r"выполн|формир|загруж|обновл|блокир|разблокир|приходит|присыла)"
+         # существительные-деятели и места — не обещание действия: «получатель», «отправитель», «хранилище»
+         r"(?![а-яё]*тел(?:ь|я|ю|ем|е|и|ей|ям|ями|ях)(?![а-яё])|[а-яё]*илищ)")
 _PROMISE = re.compile(_VERB, re.I)
 # Обещание интерфейса: действие приложения, клиента, экрана — в одной фразе с глаголом; или шаг логики («вернуть 409»).
 _PROMISE_SUBJ = re.compile(r"(?<![а-яё])(?:приложени|клиент|экран|интерфейс|пользовател|мобильн)\w*[^.;|]{0,80}?"
