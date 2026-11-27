@@ -603,6 +603,15 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             closing = list(dict.fromkeys(x.split(".")[0] for x in by if x.startswith("Q-")))
             rc["linked_question_ids"] = list(rc["question_ids"])
             rc["question_ids"] = closing
+        # ответ своего вопроса с отложенной частью («…, остальное ещё решаем») снимает дефект только частично:
+        # нерешённая часть остаётся дефектом прежней серьёзности
+        pending = [p for a in resolved["answered"] if a["question_id"] in rc["question_ids"]
+                   and g["id"] in a["finding_ids"] for p in a.get("deferred") or []]
+        if status == "resolved" and pending:
+            rc["status"], status = "changed", "changed"
+            d = dict(d, severity=g.get("severity"), title=d.get("title") or g.get("title", ""),
+                     problem="Владелец не решил: " + " ".join(pending))
+            rc["reason"] = (rc["reason"] + " Часть решения владелец отложил — дефект снят не полностью.").strip()
         if status == "changed":
             sev = d.get("severity") if d.get("severity") in SEVERITIES else g.get("severity")
             # частичный ответ на противоречие снимает его не для всех входов: critical остаётся critical

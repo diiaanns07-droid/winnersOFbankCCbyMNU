@@ -172,3 +172,24 @@ def test_same_letter_twice_is_one_reply():
     text = "Q-03: B\nQ-03: B\n"
     a = recheck.resolve_answers(QS, recheck.load_answers(text))["answered"][0]
     assert len(a["replies"]) == 1 and not a.get("choice_conflict")
+
+
+# --------------------------------------------------------------------------- частичный ответ
+PARTIAL = ("Q-03 [Срок хранения идентификатора запроса]: Храним 48 часов с первого запроса. "
+           "Что делать после истечения срока, ещё решаем.\n")
+
+
+def test_partial_answer_cannot_fully_resolve():
+    resp = _resp([{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "срок задан ответом Q-03"}])
+    out = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), PARTIAL)
+    ch = next(c for c in out["clarification"]["changes"] if c["finding_id"] == "D-03")
+    assert ch["status"] == "changed" and ch["severity_after"] == "critical"
+    left = next(f for f in out["findings_after"] if f["id"] == "D-03")
+    assert "ещё решаем" in left["problem"]
+
+
+def test_full_answer_still_resolves():
+    text = "Q-03 [Срок хранения идентификатора запроса]: Храним 48 часов с первого запроса, потом запрос новый.\n"
+    resp = _resp([{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "срок задан ответом Q-03"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), text)["clarification"]
+    assert next(c for c in clar["changes"] if c["finding_id"] == "D-03")["status"] == "resolved"
