@@ -160,3 +160,37 @@ def test_output_limit_by_provider(ctx):
     for name, want in (("claude_cli", 32000), ("gemini", 32000), ("anthropic", 32000), ("openai", 16000), ("", 16000)):
         local = Context(view=ctx.view, llm=_L(name), requirements=ctx.requirements)
         assert lens_architect.output_limit(local) == want, name
+
+
+def test_branch_candidates_from_inventory(ctx):
+    inv = {"branches": [
+        {"operation": "m", "step": "отказ по сумме", "line": 121, "outcome": ""},
+        {"operation": "m", "step": "проверка сессии", "line": 117, "outcome": ""},        # шаг не называет исход
+        {"operation": "m", "step": "успех", "line": 120, "outcome": "200 {...}"}]}
+    out = lens_architect.branch_candidates(inv, ctx.view, [])
+    assert [c["evidence"][0]["line"] for c in out] == [121]
+    c = out[0]
+    assert c["title"].startswith("Ветка логики без ответа") and c["severity"] == "major"
+    m = quotes.verify_quote(ctx.view, c["evidence"][0]["quote"], line_hint=121)
+    assert m and m["verified"] == "exact" and m["line_start"] == 121
+    view = {"lines": [{"n": 1, "text": "4. Сохранить настройку и вернуть 200."}]}
+    assert lens_architect.branch_candidates(
+        {"branches": [{"operation": "m", "step": "успех", "line": 1, "outcome": ""}]}, view, []) == []
+    covered = [{"title": "Ветка логики без ответа: x", "evidence": [{"quote": "q", "line": 121}]}]
+    assert lens_architect.branch_candidates(inv, ctx.view, covered) == []
+
+
+def test_run_adds_missing_branch_candidate(ctx):
+    answer = json.loads((MOCK / "lens_architect.json").read_text(encoding="utf-8"))
+    answer = dict(answer, inventory=dict(answer["inventory"], branches=[
+        {"operation": "m", "step": "отказ по сумме", "line": 121, "outcome": ""}]))
+    answer["candidates"] = [c for c in answer["candidates"] if not c["title"].startswith("Ветка логики")][:5]
+
+    class _One:
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            return answer
+
+    local = Context(view=ctx.view, llm=_One(), requirements=ctx.requirements, signals=ctx.signals)
+    out = lens.run_named(local, "architect")
+    assert any(c["title"].startswith("Ветка логики без ответа") and c["evidence"][0]["line"] == 121
+               for c in out["candidates"])

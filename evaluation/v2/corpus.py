@@ -256,7 +256,7 @@ def harness_score(out: Path, preds: Path, fmt: str, sub: str = "harness") -> dic
 def summarize(metrics: dict, per_case: list[dict]) -> dict:
     ov = metrics.get("micro") or {}
     clean = [c for c in per_case if c["expected"] == "clean" and c["case_id"] != "edge.empty"]
-    measured_clean = [c for c in clean if c.get("findings") is not None]
+    measured_clean = [c for c in clean if c.get("findings") is not None and c.get("status") not in (None, "failed")]
     s = {
         "harness": {k: ov.get(k) for k in ("tp", "fp", "fn", "duplicates", "precision", "recall", "f1",
                                              "precision_strict", "support", "predicted", "clean_false_alarms",
