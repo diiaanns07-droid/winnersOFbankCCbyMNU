@@ -289,7 +289,8 @@ def _split_block(lines: list[Line], page_no: int) -> list[Unit]:
             size_jump = abs(probe.size - probe_prev.size) > 0.12 * max(probe_prev.size, 1)
             bold_jump = (probe.bold > 0.9) != (probe_prev.bold > 0.9)
             gap = box[1] - prev_box[3] > 0.8 * height
-            marker = bool(MARKER.match(_row_text(row))) and box[0] <= _row_box(current[0])[0] + 3
+            marker = (bool(MARKER.match(_row_text(row))) and box[0] <= _row_box(current[0])[0] + 3
+                      and not _dash_wrap(prev, row, current[0]))
             if size_jump or bold_jump or gap or marker:
                 units.append(Unit('text', page_no, _union(_row_box(r) for r in current), rows=current))
                 current = []
@@ -334,13 +335,14 @@ def _continues(prev: Unit, unit: Unit, wrapped: list[Unit]) -> bool:
     if abs(unit.size - prev.size) > 0.12 * em or (unit.bold > 0.9) != (prev.bold > 0.9):
         return False
     before, after = _row_text(prev.rows[-1]), _row_text(unit.rows[0])
-    if MARKER.match(after) or not after:
+    if not after or (MARKER.match(after) and not _dash_wrap(prev.rows[-1], unit.rows[0], prev.rows[0])):
         return False
     if before.endswith(('.', '!', '?', ':', ';')) and not after[:1].islower():
         return False
     edges = [u.vbox[2] for u in wrapped if abs(u.vbox[0] - left) <= 2 * em and u is not prev]
     full = bool(edges) and (last[2] - left) >= 0.8 * max(1.0, max(edges) - left)
-    flowing = after[:1].islower() or before.endswith((',', '-', '\u00ad'))
+    flowing = (after[:1].islower() or before.endswith((',', '-', '\u00ad'))
+               or _dash_wrap(prev.rows[-1], unit.rows[0], prev.rows[0]))
     return full or flowing
 
 
@@ -1077,10 +1079,33 @@ def _role(unit: Unit, body: float, heading_sizes: dict[float, int], toc: dict) -
     elif (short and len(unit.rows) <= 2 and unit.bold > 0.9 and unit.size >= body * 0.95
           and all(len(row) == 1 for row in unit.rows) and not text.rstrip().endswith(('.', ':', ';', ','))):
         unit.role, unit.level = 'heading', len(heading_sizes) + 1
-    elif unit.mono > 0.8:
+    elif unit.mono > 0.8 and not _prose_lead(unit):
         unit.role = 'code'
     elif MARKER.match(text):
         unit.role = 'list_item'
+
+
+def _prose_lead(unit: Unit) -> bool:
+    """Абзац начинается словом обычного шрифта, а моноширинный — вставка («Ответ 200: {…json…}.»): это текст с
+    кодом внутри, как в Markdown с `…`, а не блок кода, хотя по числу знаков моноширинного больше."""
+    chars = [ch for row in unit.rows for line in row for ch in line.chars if not ch.c.isspace()]
+    word = []
+    for ch in chars:
+        if not ch.c.isalpha():
+            break
+        word.append(ch)
+    return len(word) >= 2 and not any(ch.mono for ch in word)
+
+
+def _dash_wrap(prev_row: list[Line], row: list[Line], first_row: list[Line]) -> bool:
+    """Строка с тире в начале продолжает фразу, а не открывает пункт списка: в русском тексте перенос часто
+    приходится перед тире («…, где NNNN / — последние четыре цифры»). Продолжение — если предыдущая строка не кончается
+    знаком конца фразы или перечня, пункт начат не тире, а после тире — строчная буква."""
+    text = _row_text(row)
+    if text[:1] not in '–—' or not text[1:].strip()[:1].islower():
+        return False
+    before = _row_text(prev_row)
+    return bool(before) and not before.endswith(('.', '!', '?', ':', ';')) and _row_text(first_row)[:1] not in '–—-'
 
 
 def _link_tables(pages: list[dict], warnings: list[dict]) -> None:

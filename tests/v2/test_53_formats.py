@@ -150,3 +150,47 @@ def test_same_document_three_formats_same_lines(tmp_path):
             assert (a["kind"] == "code") == (b["kind"] == "code"), (e, a["text"])
             assert a["heading"] == b["heading"], (e, a["text"])
             assert a["section"].split(dv.SECTION_SEP)[-1] == b["section"].split(dv.SECTION_SEP)[-1], (e, a["text"])
+
+
+
+def _pdf_rows(path, rows) -> None:
+    """PDF по рядам [(отступ сверху, html ряда), …]: каждый ряд — своя строка у того же левого края, шрифты MuPDF
+    со всей Юникод-таблицей (тире, маркеры), ``<code>`` — моноширинный."""
+    import pymupdf
+    doc = pymupdf.open()
+    page = doc.new_page()
+    y = 60
+    for gap, html in rows:
+        y += gap
+        page.insert_htmlbox(pymupdf.Rect(56, y, 560, y + 16), f'<p style="font-size:11px;margin:0">{html}</p>')
+        y += 14
+    doc.save(str(path))
+
+
+BODY = '{"message":"The card is not found here","amount":2000}'
+
+
+@needs_pdf
+def test_pdf_inline_code_in_sentence_is_text(tmp_path):
+    _pdf_rows(tmp_path / "c.pdf", [(0, "<b>Card API</b>"), (6, f"Reply 200: <code>{BODY}</code>."),
+                                   (10, f"<code>{BODY}</code>")])
+    lines = [ln for ln in dv.load(tmp_path / "c.pdf")["lines"] if ln["text"].strip()]
+    prose = next(ln for ln in lines if ln["text"].startswith("Reply 200"))
+    code = next(ln for ln in lines if ln["text"].startswith('{"message"'))
+    assert prose["kind"] == "paragraph"      # вставка кода в фразе — текст, как `…` в Markdown
+    assert code["kind"] == "code"            # строка целиком моноширинным — код
+
+
+@needs_pdf
+def test_pdf_line_wrapped_before_dash_continues_sentence(tmp_path):
+    _pdf_rows(tmp_path / "d.pdf", [
+        (0, "<b>Rules</b>"),
+        (6, "\u2022 R-7. After blocking the client gets a push with the card mask NNNN, where NNNN"),
+        (0, "\u2014 the last four digits of the card number."),
+        (6, "\u2022 R-8. The list of states:"), (0, "\u2014 active;"), (0, "\u2014 blocked."),
+    ])
+    texts = [" ".join(ln["text"].split()) for ln in dv.load(tmp_path / "d.pdf")["lines"] if ln["text"].strip()]
+    assert "R-7. After blocking the client gets a push with the card mask NNNN, where NNNN \u2014 the last four " \
+           "digits of the card number." in texts, texts
+    # перечень после двоеточия — по-прежнему отдельные пункты
+    assert texts[-3:] == ["R-8. The list of states:", "\u2014 active;", "\u2014 blocked."], texts
