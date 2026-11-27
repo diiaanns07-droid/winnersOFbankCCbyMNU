@@ -310,15 +310,41 @@ def _text_lines(text: str, doc: dict | None) -> list[dict]:
         else:
             t = _strip_md(src, in_fence)
         t = _clean(t)
+        html_row = None if in_fence or _MD_FENCE.match(src) else _html_table_line(t)
+        if html_row is not None:
+            t = html_row
         if sections[k]:
             cur_section = sections[k]
         kind = kinds[k] if t else ""
         if not doc and t:
             kind = "heading" if _MD_HEADING.match(src) else ("table_row" if " | " in t else "paragraph")
+        if html_row:
+            kind = "table_row"
         out.append({"n": k, "text": t, "page": None, "section": sections[k] or cur_section,
                     "src_line": k, "block_id": block_ids[k], "kind": kind,
                     "level": levels[k] if kind == "heading" else 0, "heading": kind == "heading"})
     return out
+
+
+_HTML_TABLE_TAG = re.compile(r"^\s*(?:</?(?:table|thead|tbody|tfoot|tr|colgroup|col)\b[^>]*>\s*)+$", re.I)
+_HTML_CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)(?:</t[dh]>|(?=<t[dh]\b)|$)", re.I | re.S)
+
+
+def _html_table_line(t: str) -> str | None:
+    """Строка HTML-таблицы внутри Markdown («<tr><td>Порог</td><td>100 ₸</td></tr>») → «Порог | 100 ₸»; строка из
+    одних тегов таблицы («<table>», «</tr>») → пустая. Не HTML-таблица — ``None``."""
+    if "<" not in t:
+        return None
+    if _HTML_TABLE_TAG.match(t):
+        return ""
+    if not re.search(r"<t[dh]\b", t, re.I):
+        return None
+    import html as _html
+    cells = [_WS_RE.sub(" ", _html.unescape(re.sub(r"<[^>]+>", " ", c))).strip() for c in _HTML_CELL.findall(t)]
+    return " | ".join(cells) if cells else None
+
+
+_WS_RE = re.compile(r"\s+")
 
 
 def _strip_md(s: str, in_code: bool = False) -> str:

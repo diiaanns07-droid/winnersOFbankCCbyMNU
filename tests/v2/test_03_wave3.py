@@ -282,3 +282,28 @@ def test_borderless_quotes_and_two_columns_untouched(borderless):
     two = dv.load(ROOT / "tests/v2/fixtures/03_stress/two_columns.pdf")
     assert not any(" | " in ln["text"] for ln in two["lines"])
     assert not any("собрана по строкам" in w for w in two["warnings"])
+
+
+# --------------------------------------------------------------------------- MD с HTML-таблицей, HTML из Google Docs
+def test_html_table_inside_markdown():
+    view = dv.from_text("# ТЗ\n\nФ-1. Порог задаёт клиент.\n\n<table>\n<tr><th>Параметр</th><th>Значение</th></tr>\n"
+                        "<tr><td>Порог баланса</td><td><b>100</b> ₸</td></tr>\n</table>\n")
+    texts = [ln["text"] for ln in view["lines"]]
+    assert "Параметр | Значение" in texts and "Порог баланса | 100 ₸" in texts
+    assert not any("<" in t for t in texts)
+    row = next(ln for ln in view["lines"] if ln["text"] == "Порог баланса | 100 ₸")
+    assert row["n"] == 7 and row["kind"] == "table_row"  # номер строки = строка файла
+    m = Q.verify_quote(view, "Порог баланса — 100 ₸")
+    assert m and m["line_start"] == 7
+
+
+def test_google_docs_comments_not_in_text(tmp_path):
+    html = ('<html><head><meta charset="utf-8"></head><body><h1>Часть A</h1>'
+            '<p><span>Ф-1. Кэшбэк начисляется за покупки.</span><sup><a href="#cmnt1" id="cmnt_ref1">[a]</a></sup></p>'
+            '<div><p><a href="#cmnt_ref1" id="cmnt1">[a]</a><span>Рецензент: уточнить лимит</span></p></div>'
+            '</body></html>')
+    p = tmp_path / "gdocs.html"
+    p.write_text(html, encoding="utf-8")
+    texts = [ln["text"] for ln in dv.load(p)["lines"]]
+    assert "Ф-1. Кэшбэк начисляется за покупки." in texts
+    assert not any("Рецензент" in t or "[a]" in t for t in texts)
