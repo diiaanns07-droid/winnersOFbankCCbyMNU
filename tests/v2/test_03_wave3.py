@@ -351,3 +351,154 @@ def test_markdown_escapes_and_html_entities(quote, line, text):
     m = Q.verify_quote(view, quote, line)
     assert m and m["text"] == text and m["verified"] == "normalized"
     assert Q.verify_quote(view, r"совсем нет такого \_ текста") is None
+
+
+# --------------------------------------------------------------------------- живые цитаты моделей
+LIVE = json.loads((ROOT / "tests/v2/fixtures/03_live_quotes.json").read_text(encoding="utf-8"))["quotes"]
+
+
+@pytest.fixture(scope="module")
+def live_views():
+    if not _has("pymupdf") or not _has("docx"):
+        pytest.skip("нужны PyMuPDF и python-docx")
+    return {d: dv.load(ROOT / d) for d in sorted({x["doc"] for x in LIVE})}
+
+
+def _live_check(views, transform, use_hint=True):
+    ok = tot = 0
+    for x in LIVE:
+        q = transform(x["quote"])
+        if not q:
+            continue
+        tot += 1
+        m = Q.verify_quote(views[x["doc"]], q, x["line"] if use_hint else None)
+        ok += bool(m and m["line_start"] <= x["found"] <= m["line_end"])
+    return ok, tot
+
+
+def test_live_quotes_on_model_line(live_views):
+    """410 цитат линз из 6 живых прогонов haiku (официальный PDF/DOCX, open2 PDF/DOCX): все — на своей строке."""
+    ok, tot = _live_check(live_views, lambda q: q)
+    assert tot == len(LIVE) >= 400 and ok == tot
+    assert sum(1 for x in LIVE if x["found"] == x["line"]) >= tot - 1  # строка модели совпала с найденной
+
+
+@pytest.mark.parametrize("sep", [": ", " ", " — "])
+def test_live_table_rows_with_other_separator(live_views, sep):
+    """Строки таблиц (34), переписанные моделью с другим разделителем ячеек, — на своей строке (было 14/37 для «:»)."""
+    ok, tot = _live_check(live_views, lambda q: q.replace(" | ", sep) if " | " in q else None)
+    assert tot >= 30 and ok == tot
+
+
+def test_live_quotes_with_bracket_ellipsis_and_prefix(live_views):
+    cut = _live_check(live_views, lambda q: (lambda w: " ".join(w[:3]) + " [...] " + " ".join(w[-3:]))(q.split())
+                      if len(q.split()) >= 9 else None)
+    pref = _live_check(live_views, lambda q: "L012| [с.3] " + q)
+    assert cut[0] == cut[1] >= 100 and pref[0] == pref[1]
+
+
+def test_short_term_needs_model_line():
+    view = dv.load(ROOT / "evaluation/v2/open2/insurance/source.docx") if _has("docx") else None
+    if view is None:
+        pytest.skip("нет python-docx")
+    k = next(ln["n"] for ln in view["lines"] if " СК " in f" {ln['text']} ")
+    m = Q.verify_quote(view, "СК", k)
+    assert m and m["line_start"] == k and m["text"] == "СК"
+    assert Q.verify_quote(view, "СК") is None or len([ln for ln in view["lines"] if " СК " in f" {ln['text']} "]) == 1
+    assert Q.verify_quote(view, "К", k) is None
+
+
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_cell_with_paragraphs_is_one_row():
+    """Абзацы и список внутри ячейки DOCX — одна строка таблицы (как в PDF), а не три строки без колонок."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/cell_paragraphs.docx")
+    texts = [ln["text"] for ln in view["lines"]]
+    assert ("Расходы 48 500 ₸, порог 50 000 ₸ | Покупка на 1 500 ₸ | Итог 50 000 ₸; Один push; "
+            "Счётчик не сбрасывается") in texts
+    assert "Один push" not in texts and texts[-1] == "После таблицы."
+    m = Q.verify_quote(view, "Итог 50 000 ₸, один push")
+    assert m is None or m["line_start"] == 4
+    m2 = Q.verify_quote(view, "Счётчик не сбрасывается", 4)
+    assert m2 and m2["line_start"] == 4
+
+
+# --------------------------------------------------------------------------- TXT с разметкой Markdown
+def test_markdown_saved_as_txt_reads_like_markdown(tmp_path):
+    """Жюри может дать .txt с Markdown внутри (переименованный .md): разделы, таблицы и номера строк — как у MD."""
+    txt = tmp_path / "requirements.txt"
+    txt.write_bytes(OFFICIAL_MD.read_bytes())
+    a, b = dv.load(OFFICIAL_MD), dv.load(txt)
+    assert b["format"] == "txt" and b["title"] == a["title"]
+    assert [(x["n"], x["text"], x["section"], x["kind"]) for x in a["lines"]] == \
+           [(x["n"], x["text"], x["section"], x["kind"]) for x in b["lines"]]
+    m = Q.verify_quote(b, "Месяц определяется по дате совершения покупки", 38)
+    assert m and m["line_start"] == 38 and m["section"].endswith("Функциональные требования")
+
+
+def test_plain_txt_not_treated_as_markdown(tmp_path):
+    p = tmp_path / "plain.txt"
+    p.write_text("ТЗ\n\n# не заголовок, а комментарий\n1. Общие положения\n1.1. Карта блокируется **сразу**.\n",
+                 encoding="utf-8")
+    v = dv.load(p)
+    assert [ln["text"] for ln in v["lines"] if ln["text"]][1] == "# не заголовок, а комментарий"
+
+
+def test_new_pdf_steps_survive_malformed_blocks():
+    """Сборка таблиц и порядок фрагментов на «кривых» блоках не падают (у жюри может быть любой PDF)."""
+    bad = [
+        {"id": "b1", "kind": "paragraph", "text": "Текст", "loc": {"page": 1, "bbox": [0, 0, 10, 10]}},
+        {"id": "b2", "kind": "paragraph", "text": "А Б", "loc": {"page": 1, "bbox": [50, 0, 60, 10],
+                                                          "fragments": [{"start": 0, "end": 1, "rect": None},
+                                                                        {"start": 2, "end": 3, "rect": [1, 2]}]}},
+        {"id": "b3", "kind": "paragraph", "text": "x y z", "loc": {"page": 1, "bbox": [0, 0, 0, 0], "fragments": [
+            {"start": 0, "end": 1, "rect": [0, 0, 0, 0], "line": 0}, {"start": 2, "end": 3, "rect": [5, 0, 5, 0], "line": 0},
+            {"start": 4, "end": 5, "rect": [1, 0, 1, 0], "line": 0}]}},
+        {"id": "b4", "kind": "table_row", "text": "a | b", "loc": {}},
+        {"kind": "paragraph"},
+    ]
+    lines = dv._block_lines({"blocks": bad}, {1: (595.0, 842.0)}, [])
+    assert [ln["text"] for ln in lines][:2] == ["Текст", "А Б"]
+    assert dv._reorder_fragments({"text": "", "loc": {"fragments": "мусор"}}) is not None
+
+
+def test_plain_txt_tab_separated_table(tmp_path):
+    """«Обычный текст» из Word: ячейки таблицы через табуляцию → «ячейка | ячейка», а не слитно."""
+    p = tmp_path / "tabs.txt"
+    p.write_text("ТЗ: Лимит переводов\n\nПоле\tЗначение\nПродукт\tМобильный банк\nЛимит\t500 000 ₸ в сутки\n\n"
+                 "\tТ-1. Лимит действует с 00:00 по Астане.\n", encoding="utf-8")
+    v = dv.load(p)
+    texts = [ln["text"] for ln in v["lines"]]
+    assert "Продукт | Мобильный банк" in texts and "Лимит | 500 000 ₸ в сутки" in texts
+    assert "Т-1. Лимит действует с 00:00 по Астане." in texts  # табуляция в начале строки — не ячейка
+    row = next(ln for ln in v["lines"] if ln["text"].startswith("Продукт"))
+    assert row["kind"] == "table_row" and row["n"] == 4
+
+
+# --------------------------------------------------------------------------- DOCX: разделы без названия, жирные подзаголовки
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_parts_and_bold_subheading():
+    """Без заголовка-названия «Часть A» не вырезается из путей (иначе A и B несогласованы); подзаголовок жирным
+    абзацем — заголовок, раздел следующей строки уточнён."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/ru_styles.docx")
+    by = {ln["text"]: ln for ln in view["lines"]}
+    assert by["Ф-1. Порог от 1 000 до 1 000 000 ₸."]["section"] == \
+        "Часть A. Новый функционал › Функциональные требования"
+    assert by["1. Проверить сессию."]["section"] == "Часть B. REST API › Логика метода"
+    head = by["Требования к данным"]
+    assert head["heading"] and head["kind"] == "heading" and head["level"] == 3
+    assert by["Хранить идентификатор карты."]["section"].endswith("› Требования к данным")
+    # название стилем Word «Название» по-прежнему вырезается из путей
+    tb = dv.load(ROOT / "tests/v2/fixtures/03_stress/textbox.docx")
+    assert next(ln for ln in tb["lines"] if ln["text"].startswith("Ф-1."))["section"] == "1. Часть A. Бизнес-требования"
+
+
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_heading_autonumber_in_text_and_section():
+    """Номер автонумерации заголовка Word («2.») — в тексте заголовка и в пути раздела, как в PDF того же документа."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/numbered_headings.docx")
+    by = {ln["text"]: ln for ln in view["lines"]}
+    assert "1. Общие сведения" in by and "2. Требования" in by and by["2. Требования"]["heading"]
+    assert by["Ф-1. Лимит кэшбэка — 10 000 ₸ в месяц; исключения — в п. 1."]["section"] == "2. Требования"
+    assert by["Кэшбэк начисляется за покупки в выбранных категориях."]["section"] == "1. Общие сведения"
+    m = Q.verify_quote(view, "2. Требования")
+    assert m and m["line_start"] == by["2. Требования"]["n"]
