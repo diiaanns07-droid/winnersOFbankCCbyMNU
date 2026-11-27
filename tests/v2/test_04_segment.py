@@ -415,11 +415,13 @@ def test_long_document_chunks_and_ids():
     assert len(h["requirements"]) == 242
 
 
-@pytest.mark.xfail(strict=False, reason="DOCX: читатель не отдаёт номер пункта нумерованного списка (просьба к №03 "
-                                        "в status/04.md); с моделью список совпадает с MD")
-def test_official_docx_matches_md_offline():
+@pytest.mark.parametrize("docx", ["release/input/requirements.docx", "tests/v2/fixtures/04_structures/official.docx"])
+def test_official_docx_matches_md_offline(docx):
     md = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
-    dx = sg.heuristic_segment(sg.load_view(str(STRUCT / "official.docx")))["requirements"]
+    path = ROOT / docx
+    if not path.exists():
+        pytest.skip(f"нет {docx}")
+    dx = sg.heuristic_segment(sg.load_view(str(path)))["requirements"]
     assert [r["source_id"] for r in md] == [r["source_id"] for r in dx]
 
 
