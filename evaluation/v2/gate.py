@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT, STAGE_OWNER
+from .common import ROOT, STAGE_OWNER, other_format
 
 V2 = ROOT / "evaluation" / "v2"
 HISTORY = V2 / "history.jsonl"
@@ -486,7 +486,7 @@ def score_run(path: str, gold: dict) -> dict:
 
 def collect(runs: list[str] | None = None, with_tests: bool = False) -> list[dict]:
     gold = sc.load_gold(sc.DEFAULT_GOLD)
-    rows = [r for r in _read_jsonl(HISTORY) if r.get("version") == "v2"]
+    rows = [r for r in _read_jsonl(HISTORY) if r.get("version") == "v2" and not other_format(r.get("label"))]
     for r in runs or []:
         rows.append(score_run(r, gold))
     latest: dict[str, dict] = {}

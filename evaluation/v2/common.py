@@ -296,3 +296,11 @@ def source_owner(src: str) -> str:
     if s.startswith("rules"):
         return "№12"
     return STAGE_OWNER.get(s.split(":", 1)[0], "?")
+
+
+def other_format(label: str | None) -> bool:
+    """Замер официального не в Markdown (метки «… pdf: …», «… docx: …»): эталон и `verify` — по md, поэтому такие
+    строки истории идут отдельной таблицей форматов, а не в «последний замер модели» (ворота, финальные цифры)."""
+    import re as _re
+
+    return bool(_re.search(r"\b(pdf|docx)\b", label or "", _re.I))

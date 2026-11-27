@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .common import ROOT, put_results_block
+from .common import ROOT, other_format, put_results_block
 
 V2 = ROOT / "evaluation" / "v2"
 RESULTS = V2 / "RESULTS.md"
@@ -72,7 +72,7 @@ def official(sha: str) -> list[dict]:
     hist = V2 / "history.jsonl"
     for line in hist.read_text(encoding="utf-8").splitlines() if hist.exists() else []:
         r = json.loads(line) if line.strip() else {}
-        if sha in str(r.get("label", "")):
+        if sha in str(r.get("label", "")) and not other_format(r.get("label")):
             sp = ROOT / str(r.get("dir", "")) / "score.json"
             sc = json.loads(sp.read_text(encoding="utf-8")) if sp.is_file() else {}
             r["clarity"] = sc.get("clarity") or {}
