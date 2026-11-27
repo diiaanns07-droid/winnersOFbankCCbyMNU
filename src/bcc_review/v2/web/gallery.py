@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import threading
 import time
@@ -281,91 +282,198 @@ def _doc_hint(doc: dict[str, Any], provider: str) -> str:
     return "модель: " + _SHORT.get(provider, provider)
 
 
-# ─────────────────────────────── блок на главной ───────────────────────────────
+# ─────────────────────────────── стопка листов на главной ───────────────────────────────
+#
+# Светлый стол (bcc-ui.md, разделы 2–6, с правкой 20:25): белые листы внахлёст — верхний виден целиком (начало
+# документа мелким набором, модель, дата, сверка цитат), из-под него выглядывают нижние: название и строка вердикта
+# «Разработка: нельзя · 5 блокеров». Цветом — только слово вердикта (красное «нельзя», зелёное «можно»). Наведение
+# или фокус выдвигает лист целиком. Вторая стопка — «Свой документ» и примеры, которые проверяются одним нажатием.
 
 _CSS = """<style>
-.g43{display:flex;flex-direction:column;gap:14px}
-.g43-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 14px}
-.g43-cards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-.g43-cards>li{display:flex;min-width:0}
-.g43-card{display:flex;flex-direction:column;gap:10px;width:100%;min-height:132px;color:inherit;text-decoration:none;
-  transition:transform var(--b-fast,120ms) var(--b-ease,ease),box-shadow var(--b-fast,120ms) var(--b-ease,ease)}
-.b-root a.g43-card{color:var(--b-ink,#0F2841);text-decoration:none}
-.g43-card:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--b-hair,rgba(15,40,65,.08)),var(--b-shadow-2,0 16px 40px rgba(15,40,65,.1))}
-.g43-card:active{transform:scale(.98)}
-.g43-t{font-size:17px;font-weight:650;line-height:1.3;letter-spacing:-.01em}
-.g43-m{margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.g43-try{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
-.g43-try form{margin:0;display:contents}
-.g43-try .g43-lbl{font-weight:600;color:var(--b-ink-2,#3A5068);font-size:15px;margin-right:2px}
-@media (max-width:1100px){.g43-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:560px){.g43-cards{grid-template-columns:minmax(0,1fr);gap:10px}.g43-card{min-height:0;gap:8px}
-  .g43-try .g43-lbl{flex-basis:100%}.g43-try .b-button{white-space:normal;text-align:center;height:auto;min-height:40px}}
+.g43{display:flex;flex-direction:column;gap:26px;min-width:0;color:var(--b-ink,#0F2841)}
+.g43-sec{min-width:0}
+.g43-cap{margin:0 0 10px 2px;font-size:13px;line-height:1.3;font-weight:600;letter-spacing:.02em;color:var(--b-ink-2,#3A5068)}
+.g43-pile{--h:176px;--band:86px;display:flex;flex-direction:column;min-width:0}
+.g43-pile.docs{--h:140px;--band:62px}
+.g43-pile>*{position:relative;display:block;margin:0;min-width:0;
+  transition:margin-top var(--b-base,220ms) var(--b-ease,cubic-bezier(.2,.8,.2,1));
+  animation:g43-in var(--b-slow,360ms) var(--b-ease,cubic-bezier(.2,.8,.2,1)) both;animation-delay:calc(var(--i,0) * 40ms)}
+.g43-pile>*+*{margin-top:calc(var(--band) - var(--h))}
+.g43-pile>*+*:hover,.g43-pile>*+*:focus-within{margin-top:8px}
+@keyframes g43-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.g43-leaf{box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;width:100%;
+  height:var(--h);margin:0;padding:12px 16px 14px;border:0;border-radius:var(--b-r-md,14px);overflow:hidden;
+  background:var(--b-paper,#fff);color:var(--b-ink,#0F2841);font:inherit;text-align:left;text-decoration:none;cursor:pointer;
+  box-shadow:0 0 0 1px rgba(15,40,65,.07),0 1px 2px rgba(15,40,65,.05),0 8px 22px rgba(15,40,65,.07);
+  transition:box-shadow var(--b-fast,120ms) var(--b-ease,ease),transform var(--b-fast,120ms) var(--b-ease,ease)}
+.b-root a.g43-leaf,a.g43-leaf{color:var(--b-ink,#0F2841);text-decoration:none}
+.g43-leaf:hover{box-shadow:0 0 0 1px rgba(15,40,65,.08),0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10)}
+.g43-leaf:active{transform:scale(.985)}
+.g43-leaf:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
+.g43-pv{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:1px;margin-bottom:6px;
+  font-size:7.5px;line-height:1.5;color:var(--b-ink-3,#5B6F84);opacity:.8;
+  -webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
+.g43-pv>span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g43-pv>span:first-child{font-weight:700;font-size:8.5px;color:var(--b-ink-2,#3A5068);margin-bottom:2px}
+.g43-meta{font-size:13px;line-height:1.35;color:var(--b-ink-2,#3A5068);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g43-t{font-size:15px;line-height:1.35;font-weight:600;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g43-v{font-size:15px;line-height:1.4;color:var(--b-ink,#0F2841)}
+.g43-v b{font-weight:650}
+.g43-v b.no{color:var(--b-red,#C2362B)} .g43-v b.yes{color:var(--b-green-ink,#00704A)}
+.g43-v b.cond,.g43-v b.none{color:var(--b-ink,#0F2841)}
+.g43-own .g43-t{color:var(--b-green-ink,#00704A)}
+.g43-own{justify-content:flex-start}
+.g43-own .g43-meta{white-space:normal}
+@media (max-width:760px){
+  .g43{gap:18px}
+  .g43-pile>*+*,.g43-pile>*+*:hover,.g43-pile>*+*:focus-within{margin-top:8px}
+  .g43-leaf{height:auto;min-height:0;padding:12px 14px}
+  .g43-pv{display:none}
+}
+@media (prefers-reduced-motion:reduce){.g43-pile>*,.g43-leaf{animation:none;transition:none}}
 </style>"""
+
+_VWORD = {"no": ("нельзя", "no"), "conditional": ("с условиями", "cond"), "yes": ("можно", "yes")}
+_PV: dict[tuple[str, int], list[str]] = {}
+_MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+
+
+def verdict_html(summary: dict[str, Any]) -> str:
+    """«Разработка: <b>нельзя</b> · 5 блокеров» — цветом только слово (для своих листов №39 — та же строка)."""
+    word, cls = _VWORD.get(str(summary.get("development") or ""), ("не вынесен", "none"))
+    crit = int(summary.get("critical") or 0)
+    tail = f"{crit} {_plural(crit, 'блокер', 'блокера', 'блокеров')}" if crit else "без блокеров"
+    return f'Разработка: <b class="{cls}">{e(word)}</b> · {e(tail)}'
+
+
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    n = abs(n) % 100
+    if 11 <= n <= 14:
+        return many
+    return {1: one, 2: few, 3: few, 4: few}.get(n % 10, many)
+
+
+def preview_lines(path: Path, n: int = 9) -> list[str]:
+    """Начало документа для миниатюры листа: Markdown без разметки, у PDF — текст первой страницы."""
+    try:
+        st = path.stat()
+    except OSError:
+        return []
+    key = (str(path), st.st_mtime_ns)
+    if key in _PV:
+        return _PV[key]
+    text = ""
+    try:
+        if path.suffix.lower() in (".md", ".markdown", ".txt"):
+            text = path.read_text(encoding="utf-8", errors="replace")[:6000]
+        elif path.suffix.lower() == ".pdf":
+            import pymupdf  # уже в зависимостях; нет его — миниатюра без текста
+            with pymupdf.open(path) as doc:
+                text = doc[0].get_text()[:6000] if doc.page_count else ""
+    except Exception:  # noqa: BLE001
+        text = ""
+    out: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or set(line) <= set("|-: "):
+            continue
+        if line.startswith("|"):
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            line = " · ".join(c for c in cells if c)
+        line = _MD_LINK.sub(r"\1", line.lstrip("#>*- ").replace("**", "").replace("`", "")).strip()
+        if line:
+            out.append(line[:90])
+        if len(out) >= n:
+            break
+    if len(_PV) > 64:
+        _PV.clear()
+    _PV[key] = out
+    return out
+
+
+def _pv(lines: list[str]) -> str:
+    return f'<span class="g43-pv" aria-hidden="true">{"".join(f"<span>{e(x)}</span>" for x in lines)}</span>' if lines else \
+        '<span class="g43-pv" aria-hidden="true"></span>'
+
+
+def _quotes(report: dict[str, Any]) -> str:
+    s = report.get("summary") or {}
+    v, t = s.get("quotes_verified"), s.get("quotes_total")
+    return f"цитат {v} из {t}" if isinstance(v, int) and isinstance(t, int) and t else ""
 
 
 def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = None) -> str:
+    """Стопка готовых отчётов: листы внахлёст, ссылки /examples/<id> → готовое задание."""
     ex = examples if examples is not None else load_examples()
     ready = ensure_ready(app, ex)
-    cards = []
-    for rec in ex["reports"]:
-        if rec["id"] not in ready:
-            continue
+    recs = [r for r in ex["reports"] if r["id"] in ready]
+    leaves = []
+    for i, rec in enumerate(recs):
         m = report_meta(rec["json"])
-        cards.append(
-            f'<li><a class="b-surface g43-card" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}">'
-            f'<span class="g43-t">{e(rec.get("title") or rec["id"])}</span>'
-            f'<span class="g43-m"><span class="b-note">{e(m["model"])}{" · " + e(m["date"]) if m["date"] else ""}</span>'
-            f'<span class="b-badge {m["verdict_cls"]}">{e(m["line"])}</span></span></a></li>')
-    return "".join(cards)
+        date = m["date"][:5] if m["date"] else ""
+        meta = " · ".join(x for x in (m["model"], date, _quotes(m["report"])) if x)
+        title = rec.get("title") or rec["id"]
+        leaves.append(
+            f'<a class="g43-leaf" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}" '
+            f'style="z-index:{len(recs) - i};--i:{i}" '
+            f'aria-label="{e(title)}: разработка — {e(m["verdict"])}, {e(m["line"].split(", ", 1)[-1])}; {e(meta)}">'
+            f'{_pv(preview_lines(rec["source"]))}<span class="g43-meta">{e(meta)}</span>'
+            f'<span class="g43-t">{e(title)}</span><span class="g43-v">{verdict_html(m["summary"])}</span></a>')
+    return "".join(leaves)
 
 
-def documents_block(examples: dict[str, list[dict[str, Any]]] | None = None) -> str:
+def documents_block(examples: dict[str, list[dict[str, Any]]] | None = None, *, own: bool = True) -> str:
+    """Вторая стопка: «Свой документ» (открывает выбор файла панели, input#file) и примеры — проверка одним нажатием."""
     ex = examples if examples is not None else load_examples()
-    btns = []
-    for d in ex["documents"]:
-        if not d.get("ok"):
-            continue
+    docs = [d for d in ex["documents"] if d.get("ok")]
+    n = len(docs) + (1 if own else 0)
+    leaves = []
+    if own:
+        leaves.append(f'<label class="g43-leaf g43-own" for="file" style="z-index:{n};--i:0">'
+                      f'<span class="g43-t">Свой документ</span>'
+                      f'<span class="g43-meta">перетащите файл на стол или выберите — PDF, Word, Markdown, TXT</span></label>')
+    for j, d in enumerate(docs):
+        i = j + (1 if own else 0)
         prov = pick_provider(d)
         hint = _doc_hint(d, prov)
-        btns.append(f'<form method="post" action="/examples/check/{e(d["id"])}"><button type="submit" '
-                    f'class="b-button small" title="Проверить этот документ: {e(d.get("title"))} ({e(hint)})" '
-                    f'aria-label="Проверить этот документ: {e(d.get("title"))}, {e(hint)}">{e(d.get("title"))}</button></form>')
-    return "".join(btns)
+        title = d.get("title") or d["id"]
+        leaves.append(f'<form method="post" action="/examples/check/{e(d["id"])}" style="z-index:{n - i};--i:{i}">'
+                      f'<button type="submit" class="g43-leaf" aria-label="Проверить этот документ: {e(title)}, {e(hint)}">'
+                      f'{_pv(preview_lines(d["path"]))}<span class="g43-t">{e(title)}</span>'
+                      f'<span class="g43-meta">проверить · {e(hint)}</span></button></form>')
+    return "".join(leaves)
 
 
-def _try_note(ex: dict[str, list[dict[str, Any]]]) -> str:
-    provs = {pick_provider(d) for d in ex["documents"] if d.get("ok")}
-    if provs and provs <= set(NO_MODEL):
-        if provs == {"mock", "offline"}:
-            return "Без ключа: официальный ТЗ — демо без модели, остальные — только правила."
-        return "Без ключа: " + _NO_KEY[next(iter(provs))] + "."
-    return "Проверка моделью: " + ", ".join(sorted(_SHORT.get(p, p) for p in provs)) + "." if provs else ""
+def job_leaf(job: Any, *, i: int = 0, n: int = 1) -> str:
+    """Своя проверка тем же листом (для стопки №39): название, строка вердикта, время и модель."""
+    s = job.summary or {}
+    when = time.strftime("%d.%m %H:%M", time.localtime(job.created))
+    if job.state == "done":
+        line = verdict_html(s)
+    else:
+        line = e({"queued": "в очереди", "running": "идёт проверка", "failed": "ошибка прогона"}.get(job.state, job.state))
+    meta = " · ".join(x for x in (when, _SHORT.get(job.provider, job.provider)) if x)
+    return (f'<a class="g43-leaf" href="/jobs/{e(job.id)}" style="z-index:{n - i};--i:{i}">'
+            f'{_pv(preview_lines(Path(job.input_path)))}<span class="g43-meta">{e(meta)}</span>'
+            f'<span class="g43-t">{e(Path(job.file_name).stem)}</span><span class="g43-v">{line}</span></a>')
 
 
 def gallery_block(app: Any) -> str:
-    """Блок «Готовые отчёты» для главной: 3–4 карточки и примеры документов одним нажатием. Пусто — если показывать нечего."""
+    """Стопка готовых листов для стола (левая колонка №39): готовые отчёты + «Свой документ» и примеры."""
     try:
         ex = load_examples()
-        cards = reports_block(app, ex)
+        reports = reports_block(app, ex)
         docs = documents_block(ex)
-    except Exception:  # noqa: BLE001 — галерея не должна ронять главную
+    except Exception:  # noqa: BLE001 — стопка не должна ронять главную
         return ""
-    if not cards and not docs:
-        return ""
-    parts = [_CSS, '<section class="home-sec b-rise g43" id="ready" aria-labelledby="g43-h">']
-    if cards:
-        parts.append('<div class="g43-head"><h2 class="b-h2" id="g43-h">Готовые отчёты</h2>'
-                     '<span class="b-note">открываются сразу, без ключа и сети</span></div>'
-                     f'<ul class="g43-cards">{cards}</ul>')
-    else:
-        parts.append('<div class="g43-head"><h2 class="b-h2" id="g43-h">Примеры документов</h2></div>')
-    if docs:
-        note = _try_note(ex)
-        parts.append(f'<div class="g43-try" role="group" aria-label="Проверить пример">'
-                     f'<span class="g43-lbl">Проверить пример:</span>{docs}</div>'
-                     + (f'<p class="b-note" style="margin:0">{e(note)}</p>' if note else ""))
-    parts.append("</section>")
+    parts = [_CSS, '<div class="g43" id="ready">']
+    if reports:
+        parts.append('<section class="g43-sec" aria-labelledby="g43-h1"><h2 class="g43-cap" id="g43-h1">Готовые отчёты</h2>'
+                     f'<div class="g43-pile">{reports}</div></section>')
+    parts.append('<section class="g43-sec" aria-labelledby="g43-h2"><h2 class="g43-cap" id="g43-h2">Проверить</h2>'
+                 f'<div class="g43-pile docs">{docs}</div></section>')
+    parts.append("</div>")
     return "".join(parts)
 
 
