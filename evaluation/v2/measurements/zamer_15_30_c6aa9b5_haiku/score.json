@@ -856,8 +856,10 @@
       "gold": "С8",
       "level": "major",
       "title": "Ф-4 не описывает случай «сумма ≥ нового порога» и что считать изменением",
-      "where": "найден кандидатом (consistency, lens:analyst, lens:qa), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "consistency",
         "judge"
       ],
       "near": [
@@ -868,26 +870,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#1",
-          "title": "Максимум один push в месяц против push независимо от истории (Ф-3, Ф-4)",
-          "reason": ""
-        },
-        {
-          "source": "lens:analyst",
-          "id": "lens:analyst#2",
-          "title": "Повторный push в месяце: Ф-3 запрещает, Ф-4 разрешает",
-          "reason": ""
-        },
-        {
-          "source": "lens:qa",
-          "id": "lens:qa#3",
-          "title": "Ф-3 и Ф-4 дают разное число push за месяц при смене порога",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "С10",
@@ -1072,8 +1055,10 @@
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (consistency, lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "rules",
         "judge"
       ],
       "near": [
@@ -1084,20 +1069,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#2",
-          "title": "Покупка 31 января: январь по Ф-2 или февраль по приёмке",
-          "reason": ""
-        },
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#6",
-          "title": "Часовой пояс границы месяца назван городом, а не смещением UTC",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
   "stage_recall": {
@@ -1294,7 +1266,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.32,
+  "seconds": 0.49,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-9a4d",
-  "rescored_at": "2026-11-27 15:41"
+  "rescored_at": "2026-11-27 16:25"
 }

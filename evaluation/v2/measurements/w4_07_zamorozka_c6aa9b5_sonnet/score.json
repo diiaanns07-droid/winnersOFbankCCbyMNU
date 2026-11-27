@@ -786,7 +786,7 @@
       "gold": "М1",
       "level": "minor",
       "title": "Терминология не едина, глоссария нет",
-      "where": "найден кандидатом (consistency, lens:analyst), судья не взял",
+      "where": "найден кандидатом (consistency), судья не взял",
       "owners": [
         "judge"
       ],
@@ -803,12 +803,6 @@
           "source": "consistency",
           "id": "consistency#7",
           "title": "Терминология не едина, глоссария нет: «Пользовательский лимит расходов»",
-          "reason": ""
-        },
-        {
-          "source": "lens:analyst",
-          "id": "lens:analyst#1",
-          "title": "Цель обещает «в момент покупки», а учёт идёт по проведению",
           "reason": ""
         }
       ]
@@ -945,19 +939,12 @@
       "gold": "М5",
       "level": "minor",
       "title": "Неатомарные требования Ф-1, Ф-2, Ф-3",
-      "where": "найден кандидатом (lens:architect), судья не взял",
+      "where": "не найден ни одним этапом",
       "owners": [
-        "judge"
+        "analyst"
       ],
       "near": [],
-      "seen_in": [
-        {
-          "source": "lens:architect",
-          "id": "lens:architect#9",
-          "title": "Повторная доставка: ключ идемпотентности не задан",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М6",
@@ -982,8 +969,10 @@
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "rules",
         "judge"
       ],
       "near": [
@@ -994,14 +983,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#8",
-          "title": "Часовой пояс задан городом «Алматы» без смещения",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
   "stage_recall": {
@@ -1185,13 +1167,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 27.5,
-    "cost_usd": 0.1902864,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 27.81,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_zamorozka/runs/20261127-161150-dac3"
+  "seconds": 0.41,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_zamorozka/runs/20261127-161150-dac3",
+  "rescored_at": "2026-11-27 16:25"
 }

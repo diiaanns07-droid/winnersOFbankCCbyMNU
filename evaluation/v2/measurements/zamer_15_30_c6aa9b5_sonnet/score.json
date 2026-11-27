@@ -802,7 +802,7 @@
       "gold": "С17",
       "level": "major",
       "title": "UI описан неполно",
-      "where": "найден кандидатом (lens:analyst, rules:promises.read_operation), судья не взял",
+      "where": "найден кандидатом (lens:analyst), судья не взял",
       "owners": [
         "judge"
       ],
@@ -831,12 +831,6 @@
           "source": "lens:analyst",
           "id": "lens:analyst#5",
           "title": "Экран не описывает выбор карты и сообщения об ошибках",
-          "reason": ""
-        },
-        {
-          "source": "rules:promises.read_operation",
-          "id": "rules#1",
-          "title": "Обещано чтение данных, но в спецификации API нет ни одной операции чтения",
           "reason": ""
         }
       ]
@@ -882,7 +876,7 @@
       "gold": "М2в",
       "level": "minor",
       "title": "Чек-лист ревью без отметок",
-      "where": "найден кандидатом (lens:risk, rules:placeholder.checklist), судья не взял",
+      "where": "найден кандидатом (rules:placeholder.checklist), судья не взял",
       "owners": [
         "judge"
       ],
@@ -901,12 +895,6 @@
         }
       ],
       "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#8",
-          "title": "Схема отката решения не описана",
-          "reason": ""
-        },
         {
           "source": "rules:placeholder.checklist",
           "id": "rules#11",
@@ -1002,8 +990,10 @@
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (lens:analyst, lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "rules",
         "judge"
       ],
       "near": [
@@ -1014,20 +1004,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:analyst",
-          "id": "lens:analyst#2",
-          "title": "Месяц покупки: дата совершения или дата проведения",
-          "reason": ""
-        },
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#7",
-          "title": "Город Алматы без смещения вместо часового пояса",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
   "stage_recall": {
@@ -1223,7 +1200,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.29,
+  "seconds": 0.43,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-dfad",
-  "rescored_at": "2026-11-27 15:41"
+  "rescored_at": "2026-11-27 16:25"
 }

@@ -79,7 +79,7 @@
 ## Промахи (кто должен был поймать)
 
 * **С15** Логика метода, п. 5, и обязательность полей — найден кандидатом (lens:architect), судья не взял; владельцы: judge №10; кандидаты: lens:architect lens:architect#3
-* **С17** UI описан неполно — найден кандидатом (lens:analyst, rules:promises.read_operation), судья не взял; владельцы: judge №10; близкие: D-21 (match); D-04 (disputed, no_match); D-08 (disputed, no_match); кандидаты: lens:analyst lens:analyst#5, rules:promises.read_operation rules#1
+* **С17** UI описан неполно — найден кандидатом (lens:analyst), судья не взял; владельцы: judge №10; близкие: D-21 (match); D-04 (disputed, no_match); D-08 (disputed, no_match); кандидаты: lens:analyst lens:analyst#5
 
 ## Вклад этапов (кандидаты до судьи, детерминированно)
 

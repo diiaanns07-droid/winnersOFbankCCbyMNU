@@ -855,7 +855,7 @@
       "gold": "С17",
       "level": "major",
       "title": "UI описан неполно",
-      "where": "найден кандидатом (consistency, lens:architect, lens:qa, rules:promises.read_operation), судья не взял",
+      "where": "найден кандидатом (consistency, lens:qa), судья не взял",
       "owners": [
         "judge"
       ],
@@ -888,20 +888,8 @@
         },
         {
           "source": "consistency",
-          "id": "consistency#9",
-          "title": "Чтение порога обещано, но метод чтения не описан",
-          "reason": ""
-        },
-        {
-          "source": "consistency",
           "id": "consistency#12",
           "title": "Переключение уведомления в середине периода не описано",
-          "reason": ""
-        },
-        {
-          "source": "lens:architect",
-          "id": "lens:architect#1",
-          "title": "Чтение настроек и суммы за месяц не описано ни одной операцией",
           "reason": ""
         }
       ]
@@ -1231,13 +1219,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 65.1,
-    "cost_usd": 0.3258591,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 65.52,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_zamorozka/runs/20261127-161150-4b69"
+  "seconds": 0.52,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_zamorozka/runs/20261127-161150-4b69",
+  "rescored_at": "2026-11-27 16:25"
 }

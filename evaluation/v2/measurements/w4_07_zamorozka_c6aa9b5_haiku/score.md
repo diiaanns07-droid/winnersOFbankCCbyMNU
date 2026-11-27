@@ -1,6 +1,6 @@
 # Оценка по эталону официального документа — W4-07 заморозка: c6aa9b5, haiku
 
-Отчёт: v2, статус `complete`, провайдер `claude_cli`, модель `haiku`, коммит `bc07af55`. Арбитр: `sonnet` (вызовов 2, неразрешённых 0).
+Отчёт: v2, статус `complete`, провайдер `claude_cli`, модель `haiku`, коммит `bc07af55`. Арбитр: `off` (вызовов 0, неразрешённых 0).
 
 ## Ворота качества
 
@@ -79,7 +79,7 @@
 
 * **С10** Возвраты не описаны полностью — есть близкое замечание, но не та проблема или не те строки; владельцы: risk №08, analyst №05, judge №10; близкие: D-10 (disputed, duplicate); D-23 (disputed, duplicate); D-24 (disputed, duplicate)
 * **С14** Идемпотентность и гонки не определены — найден кандидатом (lens:architect), судья не взял; владельцы: judge №10; близкие: D-14 (match); кандидаты: lens:architect lens:architect#9
-* **С17** UI описан неполно — найден кандидатом (consistency, lens:architect, lens:qa, rules:promises.read_operation), судья не взял; владельцы: judge №10; близкие: D-01 (match); D-09 (disputed, gold); D-23 (disputed, real); кандидаты: lens:qa rejected#1, consistency consistency#9, consistency consistency#12, lens:architect lens:architect#1
+* **С17** UI описан неполно — найден кандидатом (consistency, lens:qa), судья не взял; владельцы: judge №10; близкие: D-01 (match); D-09 (disputed, gold); D-23 (disputed, real); кандидаты: lens:qa rejected#1, consistency consistency#12
 
 ## Вклад этапов (кандидаты до судьи, детерминированно)
 
