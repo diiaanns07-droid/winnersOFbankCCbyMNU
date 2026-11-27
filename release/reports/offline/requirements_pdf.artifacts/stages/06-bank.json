@@ -132,7 +132,8 @@
           "F-002",
           "F-004",
           "F-007"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -286,7 +287,8 @@
           "F-017",
           "F-018"
         ],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -382,7 +384,8 @@
         "value": "unknown",
         "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -494,7 +497,8 @@
         ],
         "blocking_finding_ids": [
           "F-002"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -685,7 +689,8 @@
         "value": "no",
         "basis": "проверять нечего: описания нет",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -810,7 +815,8 @@
           "F-014",
           "F-016"
         ],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -921,7 +927,8 @@
         ],
         "blocking_finding_ids": [
           "F-004"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -1050,7 +1057,8 @@
           "F-008",
           "F-003",
           "F-010"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -1153,7 +1161,8 @@
         "value": "unknown",
         "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": {
         "required": true,
@@ -1321,7 +1330,8 @@
           "F-002",
           "F-004",
           "F-007"
-        ]
+        ],
+        "resolved": []
       },
       "approval": {
         "required": true,
@@ -1453,7 +1463,8 @@
         ],
         "blocking_finding_ids": [
           "F-005"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -1560,7 +1571,8 @@
         "value": "unknown",
         "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -1789,7 +1801,8 @@
           "F-004",
           "F-007",
           "F-010"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -1993,7 +2006,8 @@
         "value": "no",
         "basis": "проверять нечего: описания нет",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -2084,6 +2098,7 @@
       "values": {
         "input": 999,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo-1",
         "range": [
           1000,
@@ -2151,6 +2166,7 @@
       "values": {
         "input": 1000,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo",
         "range": [
           1000,
@@ -2218,6 +2234,7 @@
       "values": {
         "input": 1000000,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi",
         "range": [
           1000,
@@ -2293,6 +2310,7 @@
       "values": {
         "input": 1000001,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi+1",
         "range": [
           1000,
@@ -2368,6 +2386,7 @@
       "values": {
         "input": 1000.5,
         "unit": "₸",
+        "step": 1,
         "boundary": "fraction",
         "range": [
           1000,
@@ -3790,6 +3809,7 @@
       "values": {
         "input": 1000,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo",
         "range": [
           1000,
@@ -3909,6 +3929,7 @@
       "values": {
         "input": 1000000,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi",
         "range": [
           1000,
@@ -4148,6 +4169,7 @@
       "values": {
         "input": 999,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo-1",
         "range": [
           1000,
@@ -4346,6 +4368,7 @@
       "values": {
         "input": 1000001,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi+1",
         "range": [
           1000,
@@ -4544,6 +4567,7 @@
       "values": {
         "input": 1000.5,
         "unit": "₸",
+        "step": 1,
         "boundary": "fraction",
         "range": [
           1000,

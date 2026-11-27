@@ -1196,6 +1196,24 @@ def _maps(f: NF, topic: Topic, row_crit: set[str] | None) -> bool:
     return bool(f.criteria & row_crit) and topic.id in _PROPERTY_ROWS
 
 
+def _lifted(topic: Topic | None, mapped: list[NF], links: Mapping[str, dict[str, list[dict]]] | None) -> dict[str, list[dict]]:
+    """Замечания строки о тестируемости, снятые решением владельца.
+
+    Неоднозначность границы блокирует тестируемость, пока исход на границе открыт. Когда решение владельца
+    согласовало все граничные сценарии этого замечания, исход конкретный и проверяемый: замечание остаётся
+    в ``finding_ids`` строки, но не блокирует её. Другие строки (противоречия, покрытие…) решение не снимает:
+    документ по-прежнему содержит дефект, пока его не исправит редакция.
+    """
+    if not links or topic is None or topic.id != "testability":
+        return {}
+    out: dict[str, list[dict]] = {}
+    for f in mapped:
+        item = links.get(f.id)
+        if item and item["agreed"] and not item["open"]:
+            out[f.id] = item["agreed"]
+    return out
+
+
 def _machine(topic: Topic, pres: Facet, mapped: list[NF], complete: bool, external: bool) -> tuple[Facet, list[str]]:
     blocking = [f for f in mapped if f.status == "confirmed" and f.severity in BLOCKING]
     minor = [f for f in mapped if f.status == "confirmed" and f.severity not in BLOCKING]
@@ -1355,6 +1373,8 @@ def build_checklist(
     warnings: list[dict],
     complete: bool = True,
     crit: Mapping[str, set[str]] | None = None,
+    links: Mapping[str, dict[str, list[dict]]] | None = None,
+    open_bounds: list[dict] | None = None,
 ) -> list[dict]:
     t = scan.checklist
     if t is None:
@@ -1375,7 +1395,8 @@ def build_checklist(
     rows: list[dict] = []
     pending_llm: list[int] = []
     for pos, r in enumerate(t.body, 1):
-        rows.append(_row(doc, scan, t, roles, headers, allowed_col, pos, r, requirements, findings, decisions, warnings, complete, crit=crit))
+        rows.append(_row(doc, scan, t, roles, headers, allowed_col, pos, r, requirements, findings, decisions, warnings, complete, crit=crit,
+                         links=links, open_bounds=open_bounds))
         if rows[-1]["topic"] is None:
             pending_llm.append(pos)
     if pending_llm and ask is not None:
@@ -1407,7 +1428,8 @@ def _row(
     col_allowed: Mapping[str, list[str]], pos: int, r: list[Cell], requirements: list[Any],
     findings: list[NF], decisions: Mapping[str, Any], warnings: list[dict], complete: bool,
     topic_override: Topic | None = None, approval_override: bool | None = None, llm: dict | None = None,
-    crit: Mapping[str, set[str]] | None = None,
+    crit: Mapping[str, set[str]] | None = None, links: Mapping[str, dict[str, list[dict]]] | None = None,
+    open_bounds: list[dict] | None = None,
 ) -> dict:
     text_cell = t.col(r, roles["text"]) or r[0]
     text = text_cell.text.strip()
@@ -1493,7 +1515,19 @@ def _row(
     if spec:
         row["criteria_link"] = {"checklist_id": spec["id"], "criteria": sorted(spec["criteria"]), "source": crit.source}
     mapped = [f for f in findings if topic is not None and _maps(f, topic, row_crit)]
-    machine, fids = _machine(topic or TOPICS[0], pres, mapped, complete, external)
+    lifted = _lifted(topic, mapped, links)
+    active = [f for f in mapped if f.id not in lifted]
+    machine, fids = _machine(topic or TOPICS[0], pres, active, complete, external)
+    unlifted = None
+    if lifted:
+        unlifted, _ = _machine(topic or TOPICS[0], pres, mapped, complete, external)
+        machine.basis += "; снято решением владельца: " + ", ".join(
+            f"{fid} ({a[0]['decision_id']} → {', '.join(x['test_case_id'] for x in a)}: {a[0]['option']})" for fid, a in lifted.items())
+        fids = fids + [fid for fid in lifted if fid not in fids]
+    if topic is not None and topic.id == "testability" and open_bounds and machine.value == "yes":
+        # Свой же сценарий пакета не выводит исход на границе: «может быть протестировано» не ставится.
+        machine = Facet(None, "исход на границе не определён: " + ", ".join(
+            f"{x['test_case_id']} открыт до решения {x['question_id']}" for x in open_bounds) + " — положительный вывод не делается")
     row["finding_ids"] = fids
     # --- согласование человеком
     approval = None
@@ -1533,17 +1567,36 @@ def _row(
         row[key] = option_sem(tok) if tok else (fallback if (fallback and not allowed[key]) else "unknown")
     # --- примечание
     row["presence"] = {"value": pres.value or "unknown", "basis": pres.basis, "evidence": pres.evidence, "negative_evidence": pres.negative, "inspected_block_ids": pres.inspected[:200]}
-    row["machine"] = {"value": machine.value or "unknown", "basis": machine.basis, "finding_ids": fids,
-                      "blocking_finding_ids": [f.id for f in sorted((x for x in mapped if x.status == "confirmed" and x.severity in BLOCKING),
-                                                                    key=lambda x: _evidence_rank(x, topic))]}
-    row["approval"] = approval
-    blocking = sorted((f for f in mapped if f.status == "confirmed" and f.severity in BLOCKING),
+    blocking = sorted((f for f in active if f.status == "confirmed" and f.severity in BLOCKING),
                       key=lambda f: _evidence_rank(f, topic))
+    row["machine"] = {"value": machine.value or "unknown", "basis": machine.basis, "finding_ids": fids,
+                      "blocking_finding_ids": [f.id for f in blocking],
+                      "resolved": [{"finding_id": fid, **x} for fid, a in lifted.items() for x in a]}
+    row["approval"] = approval
     fevs = [_best_ev(f) for f in blocking if f.evidence][:3]
     row["evidence"] = _dedupe_ev(pres.evidence + pres.negative + (approval["evidence"] if approval else []) + fevs)
     if blocking and blocking[0].evidence:
         e = _best_ev(blocking[0])
         notes.insert(0, f"Ключевое замечание: {blocking[0].id} «{short(blocking[0].title, 80)}» — «{short(e['quote'], 70)}» ({doc.label(e)})")
+    for f in blocking:
+        waiting = (links or {}).get(f.id, {}).get("open") or []
+        if waiting:
+            notes.append(f"{f.id}: исход на границе не выводится — {', '.join(x['test_case_id'] for x in waiting)} открыт до решения {waiting[0]['question_id']}")
+    for fid, agreed in lifted.items():
+        a = agreed[0]
+        notes.append(f"{fid} снято решением владельца {a['decision_id']} по вопросу {a['question_id']} ({a['option']}): "
+                     f"{', '.join(x['test_case_id'] for x in agreed)} согласован — {short(a['expected'], 90)}"
+                     + ("" if a["document_edited"] else "; формулировка в документе не изменена — нужна правка редакции"))
+    if lifted and unlifted is not None and approval is None and allowed["checked"]:
+        before_cell = pick(allowed["checked"], unlifted.value)
+        if before_cell != row["cells"]["checked"]:
+            fid, agreed = next(iter(lifted.items()))
+            a = agreed[0]
+            row["changes"].append({
+                "field": "checked", "before": before_cell, "after": row["cells"]["checked"], "decision_id": a["decision_id"],
+                "reason": f"решение владельца ({a['decision_id']}) по вопросу {a['question_id']}: "
+                          f"{', '.join(lifted)} больше не блокирует — {', '.join(x['test_case_id'] for x in agreed)} согласован ({a['option']})",
+            })
     row["note"] = _compose_note(doc, row, pres, machine, approval, source_value, external, source_note, notes)
     if approval is not None and approval["status"] == "requires_confirmation":
         row["question"] = {
@@ -1751,15 +1804,63 @@ def build_bank_pack(
     scan = scan_document(doc)
     nfs = normalize_findings(doc, findings, crit)
     decs = decisions_by_question(decisions)
-    checklist = build_checklist(doc, scan, reqs, nfs, decs, ask, warnings, complete, crit)
+    # Сценарии раньше чек-листа: строке о тестируемости нужно знать, какие граничные исходы открыты
+    # и какие согласованы решением владельца. Порядок предупреждений прежний: чек-лист, затем сценарии.
+    tc_warnings: list[dict] = []
     test_cases = acceptance.build_test_cases(
-        doc, scan, reqs, findings, decisions, ask, coverage=as_list(coverage), questions=as_list(questions), warnings=warnings,
+        doc, scan, reqs, findings, decisions, ask, coverage=as_list(coverage), questions=as_list(questions), warnings=tc_warnings,
         publish_own_questions=questions is not None,
     )
+    links = boundary_links(test_cases, decs)
+    for f in nfs:
+        if f.id in links:
+            f.signals.add("testability")
+            f.topics.add("testability")
+    checklist = build_checklist(doc, scan, reqs, nfs, decs, ask, warnings, complete, crit, links=links,
+                                open_bounds=open_boundaries(test_cases))
+    warnings.extend(tc_warnings)
     if previous:
         apply_previous(checklist, test_cases, previous, warnings)
     _check_decisions(decs, checklist, test_cases, warnings)
     return {"checklist": checklist, "test_cases": test_cases, "warnings": warnings}
+
+
+def _inclusive_question(tc: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    q = tc.get("open_question") or {}
+    return q if tc.get("kind") == "boundary" and str(q.get("key") or "").endswith(":inclusive") else None
+
+
+def open_boundaries(test_cases: Iterable[Mapping[str, Any]]) -> list[dict]:
+    """Граничные сценарии, исход которых ждёт решения о включённости границы (с замечанием или без)."""
+    return [{"test_case_id": tc["id"], "question_id": tc.get("open_question_id") or q.get("id")}
+            for tc in test_cases if tc.get("status") == "open" and (q := _inclusive_question(tc)) is not None]
+
+
+def boundary_links(test_cases: Iterable[Mapping[str, Any]], decisions: Mapping[str, Any]) -> dict[str, dict[str, list[dict]]]:
+    """Замечания, из-за которых исход на границе не выводился: ``{finding_id: {"open": […], "agreed": […]}}``.
+
+    Берутся только вопросы о включённости границы (ключ ``…:inclusive``): в их ``finding_ids`` попадает
+    неоднозначность, стоящая на цитате самой границы. ``open`` — сценарий ждёт решения; ``agreed`` —
+    решение владельца выбрало вариант, и исход теперь конкретный.
+    """
+    links: dict[str, dict[str, list[dict]]] = {}
+    for tc in test_cases:
+        q = _inclusive_question(tc)
+        if q is None:
+            continue
+        for fid in q.get("finding_ids") or []:
+            item = links.setdefault(str(fid), {"open": [], "agreed": []})
+            if tc["status"] == "open":
+                item["open"].append({"test_case_id": tc["id"], "question_id": tc.get("open_question_id") or q.get("id")})
+            elif tc["status"] == "agreed" and tc.get("decision_id"):
+                chosen = next((o for o in tc.get("options") or [] if o.get("chosen")), None)
+                dec = decisions.get(str(tc.get("resolved_question_id") or ""))
+                item["agreed"].append({
+                    "test_case_id": tc["id"], "question_id": tc.get("resolved_question_id"), "decision_id": tc["decision_id"],
+                    "option": chosen["label"] if chosen else None, "expected": tc.get("expected"),
+                    "document_edited": bool(as_list(g(dec, "edits"))),
+                })
+    return links
 
 
 def _check_decisions(decs: Mapping[str, Any], checklist: list[dict], test_cases: list[dict], warnings: list[dict]) -> None:

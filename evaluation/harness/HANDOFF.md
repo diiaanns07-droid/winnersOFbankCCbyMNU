@@ -219,3 +219,83 @@ CLI даёт ту же матрицу.
 | короткий путь `/tmp/s16` (интеграция + ветка) | 3.13 | 86 passed; `selfcheck` 0 расхождений; сквозной сценарий выше |
 | короткий путь `/tmp/s16` | 3.11.18 | 86 passed; `selfcheck` 0 расхождений |
 | Windows | — | недоступен в этой среде; защита — тест длины путей |
+
+---
+
+# Четвёртый проход: состав прогонов до подсчёта (`bcc-eval-audit/1`)
+
+Ветка следующего кандидата: `claude/p16-composition-audit` от `a79a47d`. Сборка 2821989 для парного
+эксперимента Max не менялась. Политика сопоставления дефектов не менялась: код подсчёта
+(`evaluation/harness/*.py`, `taxonomy.toml`) не тронут, `python -m evaluation.harness --version` до и после —
+`0.1.2 bcc-eval-policy/1 7b54d224c8115c5ec18c71ade817df4e53911ed53324c1e3f131c06bc0dc4660`.
+
+## Для GPT Pro: выполнить до сравнения F1
+
+```bash
+python -m evaluation.harness.audit --gold CLOSED/labels.jsonl \
+  --run rules_only=out/closed/ro --run rules_plus_llm=out/closed/llm \
+  --expect-agent-commit 2821989 --out out/closed/audit
+```
+
+* Работает только с файлами каталогов прогона: продукт и сеть не нужны, ключ не нужен.
+  Подходит для каталогов, которые пишет счётчик сборки 2821989 (0.1.0).
+* Код 0 — все пары допустимы, можно идти в `compare`. Partial с ответом модели допустим и вынесен в
+  раздел «partial — допустимо».
+* Код 3 — есть нарушения: `matrix.jsonl` и `composition.md` перечисляют нарушение → case_id → причину.
+  Сравнивать F1 на этом составе нельзя. Варианты: перезапустить затронутые кейсы, или (решение GPT Pro)
+  считать только по `admissible_case_ids.txt`.
+* Код 4 — нарушений нет, но часть пар не доказана: старые отчёты без полей (`unknown`).
+* `config_mismatch` с `case_id = *` блокирует все пары; `admissible_case_ids.txt` тогда пуст.
+* Симметричный пропуск (кейс не измерен ни в одном прогоне, например пустой файл) — не нарушение:
+  кейс выпадает из обоих наборов одинаково и указан в `excluded_symmetric`.
+
+## Доказательство на открытом стенде (выполнено)
+
+`python -m evaluation.dev composition --stand ../stand-2821989 --python ../venv/bin/python --out out/composition`:
+* настоящий продукт и раннер 2821989;
+* записанный транспорт Anthropic из `tests/p11/fixtures` — синтетические записи, реальных запросов нет;
+* по одному нарушению на копию LLM-прогона;
+* ручной ответ — `evaluation/dev/composition_controls/expected.json`.
+
+Итог: 8/8 совпали (`evaluation/dev/results/composition_open_stand.json`, сборка с нуля 5 мин 25 с).
+Существующий `compare` во всех 8 сценариях ответил «сопоставимо: да».
+
+| Нарушение (введено) | case_id | Аудит | Причина |
+| :--- | :--- | :--- | :--- |
+| файл изменён под тем же именем | cashback.unit_change.accrued_in_tiyn | `sha_mismatch`, код 3 | отчёт по `89c8f351…`, манифест/строка run — `386739bb…` |
+| документ запущен дважды | autopay.two_statuses.range_422 | `repeat`, код 3 | 2 строки run, 2 отчёта, 2 `run_id` |
+| на чистом входе нет report | cardblock.base | `missing_report`, код 3 | продукт упал на 529 в `bank` (exit 1); помечено, что precision завысится |
+| запрошен rules_plus_llm, отчёт rules_only | transfer_limit.range_boundary.reaching_rejects | `mode_mismatch`, код 3 | 0 вызовов, адаптер не создан без ключа |
+| валидный partial после успешного ответа (контроль) | cashback.two_statuses.bad_category_200 | допустимо, код 0, partial | 5 этапов ok, `individual=failed` |
+| старый отчёт без полей | autopay.paraphrase.nfr | `unknown`, код 4 | нет `run.mode`, `run.calls.physical`, `run.stages` |
+| скрытый partial (контроль) | cardblock.unit_change.blocked_at_utc | допустимо, код 0, partial | отчёт `complete`, 2 ошибки 529 видны только в `stderr.txt` |
+
+## Для Max: что стенд показал о сборке 2821989 (код продукта, не меняю)
+
+Адаптер Anthropic команды бросает `_BootstrapProviderError`: он ищет общий `ProviderError` в
+`bcc_review.providers.base` или `bcc_review.errors`, а класс лежит в `bcc_review.contracts`. `asker`
+перехватывает только `contracts.ProviderError`. На записанном транспорте:
+* 529 на `bank` → процесс падает, `report.json` нет;
+* 529 на `cross.pairs` → `status=complete`, этап не записан;
+* 529 на `individual` → этап failed с `calls=0`.
+
+В обоих последних случаях `calls.physical` занижен на число неуспешных вызовов, `calls.failed=0`, а
+`--max-retries 3` не даёт повторов. Если в живом прогоне Max будут 429/529, это даст пропуски и
+скрытые partial; аудит их показывает по `stderr.txt`.
+
+## Тесты (выполнено)
+
+`python -m pytest tests/p16 tests/contract -q` → 136 passed, 2 skipped на Python 3.13 и 3.11. Оба пропуска
+прежние: тест реального продукта, которого нет в этом checkout. Новые тесты — `tests/p16/test_composition_audit.py`:
+обе раскладки раннера, каждое нарушение отдельно, удалённый отчёт при строке `complete`, симметричный
+пропуск, `agent_commit`, нечитаемый отчёт, CLI и коды выхода, независимость от кода подсчёта, сквозной
+прогон раннера ветки с подставным продуктом. Мутационная проверка: если отключить детекторы повтора и SHA,
+падают ровно их тесты.
+
+## Не выполнялось
+
+* Аудит каталогов настоящего прогона Max: их у меня нет. Отчёты реального API не проверялись.
+  Был ли ответ модели живым, по файлам не доказать.
+* Windows в этом проходе не проверялся (Linux, Python 3.13 и 3.11).
+* Неуспешные вызовы, которых нет ни в `run.stages`, ни в `stderr.txt` (например, если stderr не сохранён),
+  аудит не видит.

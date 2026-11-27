@@ -1,0 +1,358 @@
+{
+  "schema": "bcc-eval-audit-controls/1",
+  "what": "Открытый стенд: настоящий продукт и раннер сборки 2821989, записанный транспорт Anthropic (tests/p11/fixtures, синтетические записи), аудит состава кодом этой ветки. Реальных запросов к Anthropic нет.",
+  "command": "python -m evaluation.dev composition --stand ../stand-2821989 --python ../venv/bin/python --out out/composition",
+  "stand": {
+    "checkout": "2821989bc5a3691a26352de28ae4a11aae677360",
+    "harness_version": "0.1.0",
+    "harness_sha256": null,
+    "product_agent_commit": "2821989bc5a3691a26352de28ae4a11aae677360",
+    "product_agent_version": "0.1.0",
+    "harness_note": "счётчик 0.1.0 (2821989) не считает harness_sha256; сборка стенда подтверждена agent_commit отчётов и --expect-agent-commit 2821989"
+  },
+  "gold_sha256": "3acd3ae58726f2426f0bd4e8efb3b61c517070a94738c2a76e5e2c6cebdb52aa",
+  "audit_sha256": "8070c8711cb4a179b18a9ae29699cd00a0c3c0384efd5bb357b63cd1393f372c",
+  "ok": true,
+  "scenarios": {
+    "base": {
+      "change": "без изменений",
+      "ok": true,
+      "problems": [],
+      "exit_code": 0,
+      "matrix": [],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 32,
+      "matrix_reasons": [],
+      "partial_reasons": [],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 32,
+        "complete": 32,
+        "partial": 0,
+        "llm_known": 32,
+        "llm_ok": 32,
+        "physical_calls": 317,
+        "adapter_errors_stderr": 0,
+        "reports_with_unreported_errors": 0,
+        "stages_not_ok": {}
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    },
+    "same_name_changed": {
+      "change": "cashback.unit_change.accrued_in_tiyn/source.md изменён под тем же именем, манифест прежний",
+      "ok": true,
+      "problems": [],
+      "exit_code": 3,
+      "matrix": [
+        [
+          "sha_mismatch",
+          "rules_plus_llm",
+          "cashback.unit_change.accrued_in_tiyn"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31,
+      "matrix_reasons": [
+        {
+          "code": "sha_mismatch",
+          "run": "rules_plus_llm",
+          "case_id": "cashback.unit_change.accrued_in_tiyn",
+          "reason": "report.run.source_sha256=89c8f3518733…, ожидается 386739bbc4f1… (манифест); source_name=source.md; строка run: 386739bbc4f1… — подсчёт сопоставит отчёт с эталоном прежнего файла"
+        }
+      ],
+      "partial_reasons": [],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 32,
+        "complete": 32,
+        "partial": 0,
+        "llm_known": 32,
+        "llm_ok": 32,
+        "physical_calls": 317,
+        "adapter_errors_stderr": 0,
+        "reports_with_unreported_errors": 0,
+        "stages_not_ok": {}
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    },
+    "run_twice": {
+      "change": "autopay.two_statuses.range_422 прогнан второй раз (rerun/), predictions.jsonl объединён",
+      "ok": true,
+      "problems": [],
+      "exit_code": 3,
+      "matrix": [
+        [
+          "repeat",
+          "rules_plus_llm",
+          "autopay.two_statuses.range_422"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31,
+      "matrix_reasons": [
+        {
+          "code": "repeat",
+          "run": "rules_plus_llm",
+          "case_id": "autopay.two_statuses.range_422",
+          "reason": "строк run: 2 (llm/predictions.jsonl:31, llm/predictions.jsonl:201), report.json: 2 (reports/autopay.two_statuses.range_422__md/report.json, rerun/reports/autopay.two_statuses.range_422__md/report.json); run_id: 20261126T185022Z-5b79ce91-e9e9, 20261126T185156Z-5b79ce91-91dd; находок кейса в predictions.jsonl: 8 — подсчёт объединит находки всех запусков"
+        }
+      ],
+      "partial_reasons": [],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 31,
+        "complete": 31,
+        "partial": 0,
+        "llm_known": 31,
+        "llm_ok": 31,
+        "physical_calls": 307,
+        "adapter_errors_stderr": 0,
+        "reports_with_unreported_errors": 0,
+        "stages_not_ok": {}
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    },
+    "clean_without_report": {
+      "change": "чистый cardblock.base: этап bank получает 529, продукт падает и не пишет report.json",
+      "ok": true,
+      "problems": [],
+      "exit_code": 3,
+      "matrix": [
+        [
+          "missing_report",
+          "rules_plus_llm",
+          "cardblock.base"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31,
+      "matrix_reasons": [
+        {
+          "code": "missing_report",
+          "run": "rules_plus_llm",
+          "case_id": "cardblock.base",
+          "reason": "строка run status=failed: нет report.json рядом с OUTPUT.md (exit=1); stderr.txt: bcc_review.providers.anthropic._BootstrapProviderError: overloaded: API перегружен. HTTP 529: Overloaded [чистый кейс: его ложные тревоги выпадут из подсчёта, precision завысится]"
+        }
+      ],
+      "partial_reasons": [],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 31,
+        "complete": 31,
+        "partial": 0,
+        "llm_known": 31,
+        "llm_ok": 31,
+        "physical_calls": 307,
+        "adapter_errors_stderr": 0,
+        "reports_with_unreported_errors": 0,
+        "stages_not_ok": {}
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    },
+    "requested_llm_got_rules_only": {
+      "change": "transfer_limit.range_boundary.reaching_rejects без ключа Anthropic: адаптер не создан, отчёт rules_only",
+      "ok": true,
+      "problems": [],
+      "exit_code": 3,
+      "matrix": [
+        [
+          "mode_mismatch",
+          "rules_plus_llm",
+          "transfer_limit.range_boundary.reaching_rejects"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31,
+      "matrix_reasons": [
+        {
+          "code": "mode_mismatch",
+          "run": "rules_plus_llm",
+          "case_id": "transfer_limit.range_boundary.reaching_rejects",
+          "reason": "запрошен rules_plus_llm, report.run.mode=rules_only; этапов с вызовом модели 0, ok 0 (—); физ. вызовов 0; не завершены: questions=partial(calls=0), bank=partial(calls=0); individual: anthropic: адаптер не создан: _BootstrapProviderError: auth: Не задан ANTHROPIC_API_KEY: живой вызов Claude API невозможен."
+        }
+      ],
+      "partial_reasons": [],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 32,
+        "complete": 31,
+        "partial": 1,
+        "llm_known": 32,
+        "llm_ok": 31,
+        "physical_calls": 307,
+        "adapter_errors_stderr": 0,
+        "reports_with_unreported_errors": 0,
+        "stages_not_ok": {
+          "bank": 1,
+          "questions": 1
+        }
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    },
+    "valid_partial": {
+      "change": "cashback.two_statuses.bad_category_200: inventory получил успешный ответ, individual — 529; partial",
+      "ok": true,
+      "problems": [],
+      "exit_code": 0,
+      "matrix": [],
+      "partial": [
+        [
+          "rules_plus_llm",
+          "cashback.two_statuses.bad_category_200"
+        ]
+      ],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 32,
+      "matrix_reasons": [],
+      "partial_reasons": [
+        {
+          "run": "rules_plus_llm",
+          "case_id": "cashback.two_statuses.bad_category_200",
+          "reason": "этапов с вызовом модели 5, ok 5 (inventory, cross.pairs, cross.coverage, clarify, bank); физ. вызовов 7; не завершены: individual=failed(calls=0); в stderr.txt ошибок адаптера 3 (overloaded/529×3), в run.calls.failed 0: отчёт их не учёл"
+        }
+      ],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 32,
+        "complete": 31,
+        "partial": 1,
+        "llm_known": 32,
+        "llm_ok": 32,
+        "physical_calls": 314,
+        "adapter_errors_stderr": 3,
+        "reports_with_unreported_errors": 1,
+        "stages_not_ok": {
+          "individual": 1
+        }
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    },
+    "old_report_fields": {
+      "change": "report.json кейса autopay.paraphrase.nfr без run.mode, run.calls и run.stages (старый формат)",
+      "ok": true,
+      "problems": [],
+      "exit_code": 4,
+      "matrix": [
+        [
+          "unknown",
+          "rules_plus_llm",
+          "autopay.paraphrase.nfr"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31,
+      "matrix_reasons": [
+        {
+          "code": "unknown",
+          "run": "rules_plus_llm",
+          "case_id": "autopay.paraphrase.nfr",
+          "reason": "в отчёте нет полей: run.mode, run.calls.physical, run.stages (reports/autopay.paraphrase.nfr__md/report.json)"
+        }
+      ],
+      "partial_reasons": [],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 32,
+        "complete": 32,
+        "partial": 0,
+        "llm_known": 31,
+        "llm_ok": 31,
+        "physical_calls": 307,
+        "adapter_errors_stderr": 0,
+        "reports_with_unreported_errors": 0,
+        "stages_not_ok": {}
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    },
+    "hidden_llm_failure": {
+      "change": "cardblock.unit_change.blocked_at_utc: оба запроса cross.pairs получают 529; продукт пишет status=complete, вызовы не учтены. Добавлен после первого запуска семи сценариев, ответ записан до прогона этого сценария",
+      "ok": true,
+      "problems": [],
+      "exit_code": 0,
+      "matrix": [],
+      "partial": [
+        [
+          "rules_plus_llm",
+          "cardblock.unit_change.blocked_at_utc"
+        ]
+      ],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 32,
+      "matrix_reasons": [],
+      "partial_reasons": [
+        {
+          "run": "rules_plus_llm",
+          "case_id": "cardblock.unit_change.blocked_at_utc",
+          "reason": "скрытый partial: report.run.status=complete, но этапов с вызовом модели 5, ok 5 (inventory, individual, cross.coverage, clarify, bank); физ. вызовов 8; в stderr.txt ошибок адаптера 2 (overloaded/529×2), в run.calls.failed 0: отчёт их не учёл"
+        }
+      ],
+      "llm_coverage": {
+        "requested_mode": "rules_plus_llm",
+        "cases_with_report": 32,
+        "complete": 32,
+        "partial": 0,
+        "llm_known": 32,
+        "llm_ok": 32,
+        "physical_calls": 315,
+        "adapter_errors_stderr": 2,
+        "reports_with_unreported_errors": 1,
+        "stages_not_ok": {}
+      },
+      "existing_compare": {
+        "comparable": true,
+        "reasons": [],
+        "exit_code": 0
+      }
+    }
+  }
+}

@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
   "run": {
-    "run_id": "20261126T192056Z-dba61171-d677",
+    "run_id": "20261127T042103Z-dba61171-12f3",
     "parent_run_id": null,
     "source_sha256": "dba611718f649983b808d5f502e79fea4f8abe64b29b10da325bc0581ecd0b4b",
     "source_name": "other_topic_cashback.md",
     "agent_version": "0.1.0",
-    "agent_commit": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+    "agent_commit": "12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3",
     "provider": "none",
     "model": null,
     "requested_model": null,
@@ -20,9 +20,9 @@
       "questions: вопросы построены по правилам без модели",
       "bank: чек-лист размечен по правилам без модели"
     ],
-    "started_at": "2026-11-26T19:20:56Z",
-    "finished_at": "2026-11-26T19:20:56Z",
-    "duration_s": 0.766,
+    "started_at": "2026-11-27T04:21:03Z",
+    "finished_at": "2026-11-27T04:21:04Z",
+    "duration_s": 0.672,
     "calls": {
       "physical": 0,
       "cache_hits": 0,
@@ -50,7 +50,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.14,
+        "duration_s": 0.125,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.readers.text:read_text"
@@ -63,7 +63,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.031,
+        "duration_s": 0.047,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.inventory:build_inventory"
@@ -76,7 +76,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.062,
+        "duration_s": 0.032,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "fallback:bcc_review.runtime.fallback.rules:lint"
@@ -89,7 +89,7 @@
         "retries": 0,
         "model": null,
         "reason": "модель не вызывалась: режим --offline-lint (только детерминированные правила)",
-        "duration_s": 0.047,
+        "duration_s": 0.032,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.individual:review_individual"
@@ -102,7 +102,7 @@
         "retries": 0,
         "model": null,
         "reason": "модель не вызывалась: режим --offline-lint (только детерминированные правила)",
-        "duration_s": 0.109,
+        "duration_s": 0.063,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.cross:review_set"
@@ -115,7 +115,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.016,
+        "duration_s": 0.015,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.evidence:resolve_candidate"
@@ -152,7 +152,7 @@
         "retries": 0,
         "model": null,
         "reason": "фактов: 0",
-        "duration_s": 0.015,
+        "duration_s": 0.016,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.facts:reconcile_facts"
@@ -165,7 +165,7 @@
         "retries": 0,
         "model": null,
         "reason": "вопросы построены по правилам без модели",
-        "duration_s": 0.047,
+        "duration_s": 0.031,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.decisions.clarify:build_questions"
@@ -178,7 +178,7 @@
         "retries": 0,
         "model": null,
         "reason": "чек-лист размечен по правилам без модели",
-        "duration_s": 0.125,
+        "duration_s": 0.063,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.bank.checklist:build_bank_pack"
@@ -8463,14 +8463,83 @@
   "test_cases": [
     {
       "id": "TC-01",
+      "key": "range:business:суммы::10000:hi-1",
+      "kind": "boundary",
+      "level": "business",
+      "title": "Операция на 9 999 ₸: на 1 ₸ ниже верхней границы — проводится",
+      "precondition": "Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)",
+      "action": "провести операцию на 9 999 ₸ (на 1 ₸ ниже верхней границы)",
+      "expected": "операция на 9 999 ₸ проводится",
+      "gherkin": "Дано Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)\nКогда провести операцию на 9 999 ₸ (на 1 ₸ ниже верхней границы)\nТогда операция на 9 999 ₸ проводится",
+      "req_ids": [
+        "R-002"
+      ],
+      "source_ids": [
+        "КБ-2"
+      ],
+      "obligation": {
+        "req_id": "R-002",
+        "source_id": "КБ-2",
+        "quote": "За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента.",
+        "evidence": {
+          "block_id": "b0013",
+          "start": 6,
+          "end": 113,
+          "quote": "За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента."
+        }
+      },
+      "evidence": [
+        {
+          "block_id": "b0013",
+          "start": 6,
+          "end": 113,
+          "quote": "За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента."
+        },
+        {
+          "block_id": "b0013",
+          "start": 76,
+          "end": 93,
+          "quote": "не более 10 000 ₸"
+        }
+      ],
+      "values": {
+        "input": 9999,
+        "unit": "₸",
+        "step": 1,
+        "boundary": "hi-1",
+        "range": [
+          null,
+          10000
+        ]
+      },
+      "status": "draft",
+      "open_question_id": null,
+      "open_question": null,
+      "options": [],
+      "decision_id": null,
+      "resolved_question_id": null,
+      "finding_ids": [
+        "F-011"
+      ],
+      "covers_gaps": [],
+      "needs_clarification": false,
+      "source": "rules",
+      "notes": [
+        "целочисленность в тексте не указана: шаг 1 принят по виду границ"
+      ],
+      "changes": [],
+      "draft": true
+    },
+    {
+      "id": "TC-02",
       "key": "range:business:суммы::10000:hi",
       "kind": "boundary",
       "level": "business",
-      "title": "Суммы 10 000 ₸: верхняя граница — принимается",
+      "title": "Операция на 10 000 ₸: верхняя граница — проводится",
       "precondition": "Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)",
-      "action": "задать суммы 10 000 ₸ (верхняя граница)",
-      "expected": "значение 10 000 ₸ принимается и сохраняется",
-      "gherkin": "Дано Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)\nКогда задать суммы 10 000 ₸ (верхняя граница)\nТогда значение 10 000 ₸ принимается и сохраняется",
+      "action": "провести операцию на 10 000 ₸ (верхняя граница)",
+      "expected": "операция на 10 000 ₸ проводится",
+      "gherkin": "Дано Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)\nКогда провести операцию на 10 000 ₸ (верхняя граница)\nТогда операция на 10 000 ₸ проводится",
       "req_ids": [
         "R-002"
       ],
@@ -8505,6 +8574,7 @@
       "values": {
         "input": 10000,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi",
         "range": [
           null,
@@ -8530,15 +8600,15 @@
       "draft": true
     },
     {
-      "id": "TC-02",
+      "id": "TC-03",
       "key": "range:business:суммы::10000:hi+1",
       "kind": "boundary",
       "level": "business",
-      "title": "Суммы 10 001 ₸: на 1 ₸ выше верхней границы — отклоняется",
+      "title": "Операция на 10 001 ₸: на 1 ₸ выше верхней границы — отклоняется",
       "precondition": "Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)",
-      "action": "задать суммы 10 001 ₸ (на 1 ₸ выше верхней границы)",
-      "expected": "значение 10 001 ₸ отклоняется, суммы не сохраняется",
-      "gherkin": "Дано Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)\nКогда задать суммы 10 001 ₸ (на 1 ₸ выше верхней границы)\nТогда значение 10 001 ₸ отклоняется, суммы не сохраняется",
+      "action": "провести операцию на 10 001 ₸ (на 1 ₸ выше верхней границы)",
+      "expected": "операция на 10 001 ₸ отклоняется",
+      "gherkin": "Дано Правило КБ-2: «За покупку в выбранной категории начисляется 5 % от суммы покупки, но не более 10 000 ₸ в месяц на клиента». Допустимо до 10 000 ₸ (верхняя граница включена)\nКогда провести операцию на 10 001 ₸ (на 1 ₸ выше верхней границы)\nТогда операция на 10 001 ₸ отклоняется",
       "req_ids": [
         "R-002"
       ],
@@ -8573,6 +8643,7 @@
       "values": {
         "input": 10001,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi+1",
         "range": [
           null,
@@ -8598,7 +8669,7 @@
       "draft": true
     },
     {
-      "id": "TC-03",
+      "id": "TC-04",
       "key": "acceptance:1:1",
       "kind": "acceptance",
       "level": "business",
@@ -8670,7 +8741,7 @@
       "draft": true
     },
     {
-      "id": "TC-04",
+      "id": "TC-05",
       "key": "acceptance:1:2",
       "kind": "acceptance",
       "level": "business",
@@ -8742,7 +8813,7 @@
       "draft": true
     },
     {
-      "id": "TC-05",
+      "id": "TC-06",
       "key": "acceptance:1:3",
       "kind": "acceptance",
       "level": "business",
@@ -8812,7 +8883,7 @@
       "draft": true
     },
     {
-      "id": "TC-06",
+      "id": "TC-07",
       "key": "api:success",
       "kind": "api_success",
       "level": "api",
@@ -8888,7 +8959,7 @@
       "draft": true
     },
     {
-      "id": "TC-07",
+      "id": "TC-08",
       "key": "witness:F-007",
       "kind": "conflict",
       "level": "business",
@@ -8995,7 +9066,7 @@
       "draft": true
     },
     {
-      "id": "TC-08",
+      "id": "TC-09",
       "key": "witness:F-008",
       "kind": "conflict",
       "level": "business",
@@ -9371,7 +9442,7 @@
   ],
   "rejected": [],
   "exports": {
-    "html": "C:\\t\\gen2\\other_topic_cashback.html",
-    "jira": "other_topic_cashback.jira.csv"
+    "html": "C:\\bcc-release-v1-18\\release\\reports\\offline\\other_topic_cashback.html",
+    "jira": "release\\reports\\offline\\other_topic_cashback.jira.csv"
   }
 }

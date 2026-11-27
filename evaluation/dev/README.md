@@ -97,6 +97,51 @@ python -m evaluation.dev controls --check
 Итог: TP 2, FP 2, FN 1, дубли 1; P 2/4, R 2/3. Режим `--type-match exact`: TP 1, FP 4, FN 2.
 Без находок: P = null, R = 0/3. Контроли ссылаются на документы корпуса seed 1 и его хеш не меняют.
 
+## Контроли состава прогонов (`composition_controls/`)
+
+Проверяют `python -m evaluation.harness.audit` на **настоящих** отчётах сборки 2821989 до подсчёта.
+Ручной ответ — `composition_controls/expected.json`, записан до запуска. Сценарий `hidden_llm_failure`
+добавлен после первого запуска семи, его ответ тоже записан до его прогона.
+
+```bash
+git worktree add --detach ../stand-2821989 2821989
+python -m venv --system-site-packages ../venv && ../venv/bin/pip install anthropic==2.14.0
+python -m evaluation.dev composition --stand ../stand-2821989 --python ../venv/bin/python --out out/composition
+```
+
+Как устроен стенд:
+* Прогоны идут раннером и счётчиком стенда (раскладка 0.1.0, как у Max) на 33 кейсах MD.
+* `rules_only` — `python -m bcc_review --offline-lint` в сетевой песочнице.
+* `rules_plus_llm` — тот же движок через `replay_product.py`: подменён только HTTP-транспорт адаптера
+  Anthropic. Отвечают конверты записей `tests/p11/fixtures`, они синтетические (`"_synthetic": true`).
+  Реальных запросов к Anthropic нет, ключ не нужен.
+* Пара: `rules_only` базы и `rules_plus_llm` сценария. Каждый сценарий меняет ровно один кейс.
+
+Фактический результат (`results/composition_open_stand.json`, 8 из 8 совпали с ручным ответом,
+сборка с нуля — 5 мин 25 с):
+
+| Сценарий | Код аудита | Нарушение → case_id | Причина (из матрицы) | Существующий `compare` |
+| :--- | ---: | :--- | :--- | :--- |
+| base | 0 | — (32 пары допустимы, `edge.empty` — симметричный пропуск) | — | сопоставимо |
+| same_name_changed | 3 | `sha_mismatch` → cashback.unit_change.accrued_in_tiyn | отчёт по `89c8f351…`, манифест и строка run — `386739bb…`, имя то же | сопоставимо |
+| run_twice | 3 | `repeat` → autopay.two_statuses.range_422 | 2 строки run, 2 `report.json`, два `run_id`, 8 находок объединятся | сопоставимо |
+| clean_without_report | 3 | `missing_report` → cardblock.base (чистый) | `status=failed (exit=1)`, stderr: `_BootstrapProviderError: overloaded … 529` | сопоставимо |
+| requested_llm_got_rules_only | 3 | `mode_mismatch` → transfer_limit.range_boundary.reaching_rejects | запрошен `rules_plus_llm`, отчёт `rules_only`, 0 вызовов: адаптер не создан без ключа | сопоставимо |
+| valid_partial | 0 | — (partial: cashback.two_statuses.bad_category_200) | 5 этапов с ответом модели ok, `individual=failed`; 3 ошибки 529 в stderr, отчёт их не учёл | сопоставимо |
+| old_report_fields | 4 | `unknown` → autopay.paraphrase.nfr | нет `run.mode`, `run.calls.physical`, `run.stages` | сопоставимо |
+| hidden_llm_failure | 0 | — (partial: cardblock.unit_change.blocked_at_utc) | отчёт `complete`, но 2 ошибки 529 на `cross.pairs` есть только в stderr | сопоставимо |
+
+Что стенд показал о сборке 2821989 (это код продукта, не зона №16; передано Max):
+* Адаптер команды ищет общий `ProviderError` в `bcc_review.providers.base` и `bcc_review.errors`. Класс
+  лежит в `bcc_review.contracts`, поэтому адаптер бросает `_BootstrapProviderError`, а `asker`
+  такую ошибку не перехватывает. Следствия:
+  * 529 на этапе `bank` роняет процесс (exit 1, `report.json` нет);
+  * 529 на `cross.pairs` не виден в отчёте: `status=complete`, этап не записан, `calls.physical`
+    занижен на число неуспешных вызовов, `calls.failed=0`;
+  * повторов нет: при `--max-retries 3` каждый пакет `individual` с ответом 529 запрошен один раз,
+    `run.calls.retries=0`.
+* Без `ANTHROPIC_API_KEY` прогон `--provider anthropic` завершается с кодом 0 и отчётом `mode=rules_only`.
+
 ## Изоляция закрытого набора
 
 * В dev-корпусе только `visibility: public`. Тест `test_dev_corpus_has_no_closed_material`

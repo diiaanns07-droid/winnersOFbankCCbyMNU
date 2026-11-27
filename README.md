@@ -4,12 +4,12 @@
 
 ## Запустить пример жюри без ключа
 
-Нужны Git и Python 3.11 или новее. Команды ниже получают официальную сборку Max `70d26174e7f448eb2f061f6268b2c566baacf7c1`. Для закрытого репозитория используется учётная запись GitHub с доступом команды. [Интеграционная ветка](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/bcc/integration) · [Состав релиза](release/README.md)
+Нужны Git и Python 3.11 или новее. Команды ниже получают официальную сборку Max `12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3`. Для закрытого репозитория используется учётная запись GitHub с доступом команды. [Интеграционная ветка](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/bcc/integration) · [Состав релиза](release/README.md)
 
 ```sh
 git clone --branch bcc/integration --single-branch https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git bcc-review
 cd bcc-review
-git switch --detach 70d26174e7f448eb2f061f6268b2c566baacf7c1
+git switch --detach 12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3
 ```
 
 **Windows PowerShell**, пример для установленного Python 3.13. При другой версии укажите её номер в первой строке.
