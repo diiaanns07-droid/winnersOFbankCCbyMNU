@@ -177,6 +177,43 @@ def cmd_score(a) -> int:
     return 0
 
 
+FIX = ROOT / "tests" / "v2" / "fixtures"
+
+
+def official_recorded() -> list[tuple[str, dict, list[dict]]]:
+    """Записанные ответы этапа по официальному документу (фикстуры №09) с той нарезкой, на которой они получены."""
+    out = []
+    for f in sorted((FIX / "09_official").glob("consistency.*.json")) + [FIX / "official" / "consistency.json"]:
+        model = f.stem.split(".", 1)[1] if "." in f.stem else ""
+        seg = FIX / "official" / "segment.json"
+        for name in (f"segment.{model}.json", f"segment.{model.rsplit('_', 1)[0]}.json"):
+            if model and (f.parent / name).exists():
+                seg = f.parent / name
+                break
+        out.append((f"{f.parent.name}/{f.stem}", json.loads(f.read_text(encoding="utf-8")),
+                    json.loads(seg.read_text(encoding="utf-8"))["requirements"]))
+    return out
+
+
+def cmd_official(a) -> int:
+    """К1–К5 этапа на записанных ответах по официальному документу текущим кодом разбора (без модели)."""
+    view = load_view(OFFICIAL)
+    labels: dict = {}
+    tot = {"k": 0, "kcr": 0, "n": 0, "fcr": 0}
+    for name, raw, reqs in official_recorded():
+        out = consistency.postprocess(raw, view, reqs)
+        row = SB.score_file({"case": "official", "seconds": 0, "error": "", "output": out}, labels)
+        crit = [c for c in out["candidates"] if c["severity"] == "critical"]
+        print(f"{name}: К {row['k']}, critical {len(crit)}, ложных critical {len(row['false_crit'])}, "
+              f"major {row['sev']['major']}; найдено {', '.join(row['found'])}")
+        tot["n"] += 1
+        tot["k"] += int(row["k"].split("/")[0])
+        tot["kcr"] += int(row["k"].split("cr ")[1].rstrip(")"))
+        tot["fcr"] += len(row["false_crit"])
+    print(f"Итого ответов {tot['n']}: К найдено {tot['k']}, критичными {tot['kcr']}, ложных critical {tot['fcr']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -197,8 +234,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("score")
     s.add_argument("--label", required=True)
     s.add_argument("--list", action="store_true")
+    sub.add_parser("official")
     a = ap.parse_args(argv)
-    return {"run": cmd_run, "repost": cmd_repost, "score": cmd_score}[a.cmd](a)
+    return {"run": cmd_run, "repost": cmd_repost, "score": cmd_score, "official": cmd_official}[a.cmd](a)
 
 
 if __name__ == "__main__":
