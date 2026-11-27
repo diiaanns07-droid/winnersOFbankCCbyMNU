@@ -7,7 +7,7 @@
 
 | Что | Где |
 | :--- | :--- |
-| Репозиторий | <https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/release> — ветка `release` (= тег `v2.0.0`); клонировать: `git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git` |
+| Репозиторий | <https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/release> — ветка `release`; клонировать: `git clone -b release https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU.git` |
 | Как запустить | [`README.md`](README.md), «Быстрый старт»: три шага на бесплатном Gemini, Windows и macOS/Linux |
 | Одна команда | `python -m bcc_review <файл требований> <файл отчёта.md>` |
 | Исходный документ | [`release/input/requirements.md`](release/input/requirements.md) — официальный, байт в байт; его PDF — [`release/input/requirements.pdf`](release/input/requirements.pdf); происхождение и SHA-256 — [`release/input/PROVENANCE.md`](release/input/PROVENANCE.md) |
@@ -24,8 +24,8 @@
 
 Каждый отчёт в корне `reports/` сформирован командой `python -m bcc_review …` без кэша и руками не правился.
 Коммит агента — в паспорте отчёта: это финальная сборка `bcc/v2` 27.11 (у `reports/demo_answers/` — более ранняя
-сборка, она названа в его README). Что изменилось в коде после неё до тега `v2.0.0`, показывает
-`git log --oneline <коммит из паспорта>..v2.0.0 -- src`. `python -m bcc_review verify отчёт.json исходник` заново
+сборка, она названа в его README). Что изменилось в коде после неё в ветке `release`, показывает
+`git log --oneline <коммит из паспорта>..release -- src`. `python -m bcc_review verify отчёт.json исходник` заново
 находит каждую цитату в исходнике и сверяет SHA-256 входа. Команды и сводка прогонов —
 [`reports/README.md`](reports/README.md).
 
@@ -70,7 +70,7 @@
       умолчанию стоит ветка с разбором задачи (`claude/nice-edison-gpkcfl`), и жюри по ссылке без `/tree/release`
       увидело бы её README. README и эта страница уже ведут на `release` (`git clone -b release`, `/tree/release`).
 - [ ] **CI.** Для публичного репозитория Actions бесплатны — после открытия зелёные прогоны «Тесты» (3 ОС, Docker)
-      появятся на `release` и теге `v2.0.0`. Для приватного: Settings → Billing and plans — сейчас задания не
+      появятся на `release`. Для приватного: Settings → Billing and plans — сейчас задания не
       стартуют из-за неуспешного платежа или лимита расходов.
 - [ ] **По желанию — секрет `GEMINI_API_KEY`:** Settings → Secrets and variables → Actions → New repository secret,
       имя `GEMINI_API_KEY`. Тогда Actions → «Сформировать отчёт» → Run workflow строит отчёт на Gemini прямо
