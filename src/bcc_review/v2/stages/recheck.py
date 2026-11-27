@@ -444,13 +444,15 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
 
     by_id = {g["id"]: g for g in out_findings}
     valid = answer_labels(resolved)
+    keep = _cl.doc_codes(getattr(ctx, "view", None))
     for d in raw.get("decisions") or []:
         g = by_id.get(str(d.get("finding_id", "")).strip())
         if g is None or not g["recheck"]["affected"]:
             continue
         status = d.get("status") if d.get("status") in STATUSES else "open"
         rc = g["recheck"]
-        rc["status"], rc["reason"] = status, str(d.get("reason", "")).strip()
+        # причина — для владельца: без номеров строк L… и ID требований (ID дефектов и ответов остаются ссылками)
+        rc["status"], rc["reason"] = status, _plain_reason(str(d.get("reason", "")).strip(), keep)
         # два ответа противоречат друг другу — дефект остаётся открытым, владелец выбирает один ответ
         clash = norm_labels(list(d.get("conflicting_answers") or []), valid)
         if len(clash) >= 2:
@@ -477,9 +479,9 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
                 sev = "critical"
             rc["severity_after"] = sev
             if str(d.get("title", "")).strip():
-                rc["title_after"] = str(d["title"]).strip()
+                rc["title_after"] = _cl.plain_text(str(d["title"]).strip(), keep)
             if str(d.get("problem", "")).strip():
-                rc["problem_after"] = str(d["problem"]).strip()
+                rc["problem_after"] = _cl.plain_text(str(d["problem"]).strip(), keep)
         elif status == "resolved":
             rc["severity_after"] = ""
     for g in out_findings:
@@ -507,6 +509,22 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         cand["line_start"], cand["line_end"] = ev[0]["line_start"], ev[0]["line_end"]
         result["new_candidates"].append(cand)
     return _finish(ctx, result)
+
+
+def _plain_reason(text: str, keep: set[str]) -> str:
+    """Причина решения: номера строк «L064» → «стр. 64»; «Q-03», «D-05», «R-12» и «Решение-1»
+    остаются — это ссылки на вопросы и дефекты отчёта, по ним видно, какой ответ снял дефект."""
+    protected: dict[str, str] = {}
+
+    def hide(m: re.Match) -> str:
+        key = f"\x00{len(protected)}\x00"
+        protected[key] = m.group(0)
+        return key
+    s = re.sub(r"\b(?:Q|D|R)-\d{1,3}\b", hide, text)
+    s = _cl.plain_text(s, keep)
+    for key, val in protected.items():
+        s = s.replace(key, val)
+    return s
 
 
 def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", slack: int = 1) -> str:

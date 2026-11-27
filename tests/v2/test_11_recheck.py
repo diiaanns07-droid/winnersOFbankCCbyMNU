@@ -327,3 +327,13 @@ def test_partial_answer_keeps_critical_conflict(findings, questions):
     res = recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q['id']}: A\n", questions)
     rc = {g["id"]: g["recheck"] for g in res["findings"]}[crit["id"]]
     assert rc["status"] == "changed" and rc["severity_after"] == "critical"
+
+
+def test_reason_without_line_codes(findings, questions):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "resolved", "by": [q1["id"]],
+                   "reason": f"{q1['id']} задаёт правило; критерий L064 переписывается (L171)."}])
+    rc = {g["id"]: g["recheck"] for g in recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q1['id']}: A\n",
+                                                     questions)["findings"]}[fid]
+    assert "L064" not in rc["reason"] and "L171" not in rc["reason"] and q1["id"] in rc["reason"]
