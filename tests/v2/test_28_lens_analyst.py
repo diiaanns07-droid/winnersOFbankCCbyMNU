@@ -77,3 +77,88 @@ def test_touches_api_uses_verified_line():
                                  {"evidence": [{"quote": view["lines"][37]["text"][:60], "line": 120}]}],
                           A.api_lines(view))
     assert flags == [True, False]
+
+
+# ---------------------------------------------------------------- два просмотра
+
+def _cand(title: str, sev: str, lines: list[int], kind: str = "ambiguity") -> dict:
+    return {"title": title, "kind": kind, "criterion": "unambiguous", "severity": sev, "requirement_ids": [],
+            "evidence": [{"quote": f"цитата {n}", "line": n} for n in lines], "problem": "п", "scenario": "с",
+            "impact": "и", "recommendation": "р", "rewrite": "", "question": "", "blocks": "both"}
+
+
+def test_merge_views_keeps_agreed_severity_and_demotes_single():
+    a = [_cand("общее", "major", [38]), _cand("только первый", "major", [40])]
+    b = [_cand("общее иначе", "major", [38, 64]), _cand("только второй", "critical", [23, 46], "event_conflict")]
+    out = A.merge_views(a, b, [{38}, {40}], [{38, 64}, {23, 46}])
+    assert [(c["title"], c["severity"], c["views"]) for c in out] == [
+        ("общее", "major", 2), ("только первый", "minor", 1), ("только второй", "minor", 1)]
+    assert out[2]["severity_hint"] == "critical"
+
+
+class _Ctx:
+    def __init__(self, view, llm=object(), options=None):
+        self.view, self.llm, self.options, self.warnings = view, llm, options or {}, []
+
+    def warn(self, msg):
+        self.warnings.append(msg)
+
+
+def _fake_lens_run(answers: dict):
+    """Ответ по просмотру: второй просмотр узнаётся по клиенту модели (`_SecondView`)."""
+    def run(ctx, name):
+        key = "second" if isinstance(ctx.llm, A._SecondView) else "first"
+        got = answers[key]
+        if isinstance(got, Exception):
+            raise got
+        return {"candidates": [dict(c) for c in got]}
+    return run
+
+
+def test_run_two_views_on_immature_document():
+    view = docview.load(OFFICIAL)
+    q38, q64 = view["lines"][37]["text"][:50], view["lines"][63]["text"][:40]
+    first = [{**_cand("месяц", "critical", [38, 64], "event_conflict"),
+              "evidence": [{"quote": q38, "line": 38}, {"quote": q64, "line": 64}]}, _cand("редкое", "major", [29])]
+    second = [{**_cand("месяц-2", "critical", [38], "event_conflict"),
+               "evidence": [{"quote": q38, "line": 38}, {"quote": q64, "line": 64}]}]
+    out = A.run(_Ctx(view), lens_run=_fake_lens_run({"first": first, "second": second}))
+    assert [(c["title"], c["severity"]) for c in out["candidates"]] == [("месяц", "critical"), ("редкое", "minor")]
+    assert out["views"] == {"first": 2, "second": 1, "agreed": 1}
+
+
+def test_run_one_view_on_mature_document():
+    from evaluation.v2 import corpus as cp
+    path = next(c["path"] for c in cp.select_cases("md", None) if c["case_id"] == "cardblock.base")
+    view = docview.load(path)
+    calls = []
+
+    def run(ctx, name):
+        calls.append(type(ctx.llm).__name__)
+        return {"candidates": []}
+    out = A.run(_Ctx(view), lens_run=run)
+    assert calls == ["object"] and "views" not in out
+
+
+def test_run_second_view_failure_keeps_first():
+    view = docview.load(OFFICIAL)
+    ctx = _Ctx(view)
+    out = A.run(ctx, lens_run=_fake_lens_run({"first": [_cand("одно", "major", [29])], "second": RuntimeError("сбой")}))
+    assert [(c["title"], c["severity"]) for c in out["candidates"]] == [("одно", "major")]
+    assert ctx.warnings and "не удался" in ctx.warnings[0]
+
+
+def test_run_both_views_fail_raises():
+    with pytest.raises(RuntimeError):
+        A.run(_Ctx(docview.load(OFFICIAL)), lens_run=_fake_lens_run({"first": RuntimeError("a"), "second": RuntimeError("b")}))
+
+
+def test_second_view_changes_prompt_and_passes_attributes():
+    class LLM:
+        stats = {"calls": 0}
+
+        def ask(self, stage, system, user, schema, **kw):
+            return {"user": user}
+    v = A._SecondView(LLM())
+    assert v.ask("lens_analyst", "s", "задание", {})["user"].endswith(A.SECOND_VIEW)
+    assert v.stats == {"calls": 0}
