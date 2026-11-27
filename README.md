@@ -105,9 +105,11 @@ scripts/run_official.sh
 | `out/report.md` | отчёт для чтения (GitHub, VS Code, любой просмотрщик Markdown) |
 | `out/report.json` | то же для программ: замечания, полные цитаты, паспорт прогона (схема `contracts/v2.json`) |
 | `out/report.html` | интерактивный отчёт одним файлом: документ с подсвеченными цитатами, фильтры, работает без интернета |
-| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf`: копия документа с комментариями на местах цитат |
+| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf`: копия документа с комментариями на местах цитат; для DOCX с `--revise` — ещё и правки «было → стало» исправлениями Word (Рецензирование → Принять / Отклонить) |
 | `out/report.jira.csv` | по `--export jira`: замечание — строка для импорта в Jira |
 | `out/report.revised.md` | по `--revise`: исправленная редакция ТЗ |
+| `out/report.sarif` | по `--export sarif`: SARIF 2.1.0 — дефекты на строках ТЗ в GitHub Code Scanning, Azure DevOps, SonarQube, VS Code |
+| `out/report.codequality.json` | по `--export gitlab`: GitLab Code Quality — пометки в diff merge request |
 | `runs/<id прогона>/` | журнал: вход и выход каждого этапа, каждое обращение к модели |
 
 Проверить отчёт независимо от агента — каждая цитата ищется в исходнике заново, сверяются SHA-256 и счётчики:
@@ -115,6 +117,21 @@ scripts/run_official.sh
 ```bash
 python -m bcc_review verify reports/my/requirements.json release/input/requirements.md
 ```
+
+## Проверка ТЗ в pull request
+
+Требования проверяются так же, как код. Workflow [`.github/workflows/tz-review.yml`](.github/workflows/tz-review.yml)
+на каждый PR, где изменился документ требований (`requirements/`, `docs/requirements/`, `release/input/`, `*.tz.md`):
+
+* ставит каждый дефект пометкой на его строку во вкладке **Files changed** (критичный — ошибка, существенный —
+  предупреждение) — без GitHub Advanced Security, работает и в приватном репозитории;
+* пишет в PR комментарий: вердикт, таблица «что исправить первым» с номерами строк, ссылка на полный отчёт;
+* загружает SARIF в Code Scanning (где он доступен) и кладёт MD/HTML/JSON/Jira CSV в артефакт;
+* **красный статус при блокере** (`--fail-on blocker`) — сделайте проверку обязательной в Branch protection, и ТЗ
+  с противоречием не сольётся.
+
+Без секрета `GEMINI_API_KEY` работает на детерминированных правилах (`--provider offline`, меньше секунды). Тот же
+вывод для любого CI: `python -m bcc_review.v2.render.ci out/report.json ТЗ.md --format github|sarif|gitlab|summary`.
 
 ## Пример первого экрана
 

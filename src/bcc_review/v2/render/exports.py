@@ -55,8 +55,9 @@ CRITERIA = {
 JIRA_COLUMNS = ["Summary", "Description", "Issue Type", "Priority", "Labels"]
 AUTHOR = "BCC Review"
 SUFFIX = {"jira": ".jira.csv", "docx_annotated": ".annotated.docx", "docx": ".docx", "pdf_annotated": ".annotated.pdf",
-          "pdf": ".pdf"}
+          "pdf": ".pdf", "sarif": ".sarif", "gitlab": ".codequality.json"}
 FORMATS = ("jira", "docx", "pdf")
+CI_FORMATS = ("sarif", "gitlab")  # пометки на строках ТЗ в pull/merge request — render/ci.py
 os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")  # без совета про pymupdf_layout в stdout (№16)
 
 
@@ -77,8 +78,12 @@ def export(report: dict, view: dict, input_path: str | Path, out_base: str | Pat
                 res = write_docx(report, view, input_path, base, markdown=markdown)
             elif fmt == "pdf":
                 res = write_pdf(report, view, input_path, base)
+            elif fmt in CI_FORMATS:
+                from . import ci
+                writer = ci.write_sarif if fmt == "sarif" else ci.write_gitlab
+                res = writer(report, input_path, base.with_name(base.name + SUFFIX[fmt]))
             else:
-                res = _res(fmt, "skipped", None, f"формат экспорта «{fmt}» не поддерживается: jira, docx, pdf")
+                res = _res(fmt, "skipped", None, f"формат экспорта «{fmt}» не поддерживается: jira, docx, pdf, sarif, gitlab")
         except Exception as exc:  # noqa: BLE001 — экспорт не должен ронять прогон
             res = _res(fmt, "failed", None, f"экспорт {fmt} не выполнен: {type(exc).__name__}: {exc}")
             res["traceback"] = traceback.format_exc(limit=5)
@@ -128,6 +133,8 @@ def _formats(formats: Iterable[str] | str) -> list[str]:
         f = f.strip().lower()
         if f in ("word",):
             f = "docx"
+        if f in ("codequality", "gitlab-codequality"):
+            f = "gitlab"
         if f and f not in ("html", "md", "json") and f not in out:
             out.append(f)
     return out
@@ -418,11 +425,22 @@ def annotate_docx(report: dict, view: dict, input_path: Path, output_path: Path)
     if res.status != "written":
         return _res("docx", "failed", None, res.message, anchored=0, total=total)
     anchored = len({a.finding_id for a in res.anchors})
+    revisions: dict = {}
+    if report.get("rewrites"):  # --revise: «было → стало» исправлениями Word (Рецензирование → Принять/Отклонить)
+        try:
+            from .word_revisions import write_revisions
+            revisions = write_revisions(output_path, report["rewrites"], view)
+        except Exception as exc:  # noqa: BLE001 — комментарии уже записаны, правки необязательны
+            revisions = {"applied": 0, "total": len(report["rewrites"]), "error": f"{type(exc).__name__}: {exc}"}
+    rev_msg = ""
+    if revisions.get("applied"):
+        rev_msg = (f"; правок «было → стало» исправлениями Word: {revisions['applied']} из {revisions['total']}")
     return _res("docx", "written", output_path,
                 f"Word с комментариями: отмечено {anchored} из "
                 f"{_n(len(rep1['findings']), 'дефекта', 'дефектов', 'дефектов')} "
-                f"({_n(len(res.anchors), 'место', 'места', 'мест')} в тексте) и сводный комментарий", anchored=anchored,
-                total=len(rep1["findings"]), comments=len(res.anchors))
+                f"({_n(len(res.anchors), 'место', 'места', 'мест')} в тексте) и сводный комментарий" + rev_msg,
+                anchored=anchored, total=len(rep1["findings"]), comments=len(res.anchors),
+                revisions={k: v for k, v in revisions.items() if k != "skipped"} if revisions else None)
 
 
 def report_docx(report: dict, output_path: Path, *, markdown: str | None = None) -> dict:

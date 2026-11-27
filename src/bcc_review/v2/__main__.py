@@ -1,6 +1,6 @@
 """Командная строка v2.
 
-    python -m bcc_review ВХОД ОТЧЁТ.md [--provider P] [--model M] [--export html,jira,docx,pdf]
+    python -m bcc_review ВХОД ОТЧЁТ.md [--provider P] [--model M] [--export html,jira,docx,pdf,sarif,gitlab]
     python -m bcc_review stage ЭТАП --doc ВХОД --from runs/<id> [--provider P --model M] [--out ОТЧЁТ.md]
     python -m bcc_review verify ОТЧЁТ.json ВХОД
     python -m bcc_review doctor [--live] [--provider P] [--model M]
@@ -90,7 +90,7 @@ def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--runs-dir", default="runs", help="каталог артефактов прогонов (по умолчанию runs)")
     p.add_argument("--run-id", help="имя каталога прогона")
     p.add_argument("--mock-dir", help="каталог ответов mock-провайдера")
-    p.add_argument("--export", default="", help="доп. форматы через запятую: html,jira,docx,pdf")
+    p.add_argument("--export", default="", help="доп. форматы через запятую: html,jira,docx,pdf,sarif,gitlab")
     p.add_argument("--no-html", action="store_true", help="не писать HTML-отчёт рядом с .md")
     p.add_argument("--passes", type=int, default=1, help="сколько раз запускать линзы (2 — для стабильности)")
     p.add_argument("--lenses", default=",".join(LENSES), help="какие линзы запускать, через запятую")
