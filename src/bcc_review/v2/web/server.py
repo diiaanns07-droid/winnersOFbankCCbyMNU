@@ -292,8 +292,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._fail(400, "Выберите файл требований.", provider, model)
         ext = Path(fname).suffix.lower()
         if ext not in ALLOWED_EXT:
-            return self._fail(400, f"Формат {ext or 'без расширения'} не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML.",
-                              provider, model)
+            msg = f"Формат {ext or 'без расширения'} не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML."
+            try:  # №57: та же фраза, что в командной строке («это изображение…», «это таблица…»)
+                from ..pipeline import unreadable_reason
+                msg = unreadable_reason(Path(fname), ValueError(msg[0].lower() + msg[1:]))
+            except Exception:  # noqa: BLE001
+                pass
+            return self._fail(400, msg, provider, model)
         problem = check_provider(provider, model)
         if problem:
             return self._fail(400, problem, provider, model)

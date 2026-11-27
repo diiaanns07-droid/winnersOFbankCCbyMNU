@@ -60,7 +60,7 @@ STORY = re.compile(r"\bкак\s+[\w\- ]{2,40},\s*я\s+хочу\b|\bas\s+an?\s+[\
 TABLE = re.compile(r"^[^|]*\|[^|]*\|")
 WORD = re.compile(r"[^\W\d_]{2,}", re.U)
 
-MIN_WORDS = 8  # меньше — «слишком мало текста»: проверять требования не по чему
+MIN_WORDS = 8  # меньше (и нет номера пункта «Ф-1.») — «слишком мало текста»: проверять требования не по чему
 
 
 def _words_ru(n: int) -> str:
@@ -95,7 +95,7 @@ def assess(view: dict) -> dict:
     strong = sig["obligation_system"] >= 1 or sig["story"] >= 1 or sig["title"] >= 1
     looks = strong or (not genre and (sig["system"] >= 1 or sig["req_id"] >= 2 or sig["table"] >= 2))
     sig["genre"] = genre
-    if words < MIN_WORDS and len(body) <= 2:
+    if (words < MIN_WORDS and not sig["req_id"] and len(body) <= 2) or words < 4:
         return {"kind": "too_short", "words": words, "signals": sig,
                 "reason": (f"Слишком мало текста для проверки требований: {_words_ru(words)}. Модель не вызывалась, вердикт "
                            "не выносится — пришлите ТЗ целиком: роли, функции, поля, статусы, ограничения.")}

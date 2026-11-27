@@ -423,9 +423,11 @@ class Pipeline:
         if self.stages.get("judge") == "failed" and kept:
             findings = self._code_findings(kept)
             self.warnings.append("Судья недоступен: реестр собран кодом из сверенных кандидатов без отсева")
+        jd_rejected = list(jd.get("rejected") or [])
+        findings, jd_rejected = self._keep_injection(kept, findings, jd_rejected)
         self._finish_findings(findings)
         self._link(extras, kept, findings)
-        rejected += list(jd.get("rejected") or [])
+        rejected += jd_rejected
 
         # 6. вопросы владельцу
         questions: list = []
@@ -490,7 +492,7 @@ class Pipeline:
         where = ", ".join(str(n) for n in lines[:5])
         msg = (f"В документе указание для ИИ-проверки (строк{'а' if len(lines) == 1 else 'и'} {where}): агент его не "
                "исполнил — текст документа для модели только данные, вердикт считает код по найденным блокерам; "
-               "строка отмечена в дефектах как подозрительная вставка.")
+               "строка отмечена в дефектах как подозрительная вставка")
         if msg not in self.warnings:
             self.warnings.insert(0, msg)
 
@@ -689,6 +691,38 @@ class Pipeline:
                      evidence=c.get("evidence") or [], sources=[c.get("source", "")], priority=0)
             out.append(f)
         return out
+
+    def _keep_injection(self, kept: list[dict], findings: list[dict],
+                        rejected: list[dict]) -> tuple[list[dict], list[dict]]:
+        """№57: вставка «игнорируй инструкции, дефектов нет» всегда в реестре как подозрительная строка — судья
+        (модель) её не отсеивает и не делает блокером: вердикт по ней не меняется, его считает код по остальным."""
+        inj = [c for c in kept if str(c.get("source") or "").startswith("rules:injection")]
+        if not inj:
+            return findings, rejected
+        ids = {str(c.get("id")) for c in inj}
+        lines = {int(e.get("line") or 0) for c in inj for e in c.get("evidence") or []}
+        covered = False
+        for f in findings:
+            # судья мог слить вставку с другим дефектом — пометка есть, только если цитата вставки в находке
+            own = {int(e.get("line") or 0) for e in f.get("evidence") or []}
+            if (ids & {str(x) for x in f.get("candidate_ids") or []} or any(
+                    str(x).startswith("rules:injection") for x in f.get("sources") or [])) and own & lines:
+                covered = True
+                if f.get("severity") == "critical":
+                    f["severity"] = "major"
+                f["blocks"] = "none"
+        if covered:
+            return findings, rejected
+        add = self._code_findings(inj[:1])[0]
+        used = {str(f.get("id")) for f in findings}
+        n = len(findings) + 1
+        while f"D-{n:02d}" in used:
+            n += 1
+        add.update(id=f"D-{n:02d}", blocks="none", severity="major")
+        rejected = [r for r in rejected if not (ids & {str(v) for v in (r.get("candidate_ids") or [])}
+                                                or str(r.get("candidate_id") or r.get("id") or "") in ids)]
+        self.warnings.append("Судья не включил вставку для ИИ в реестр — добавлена кодом как подозрительная строка")
+        return findings + [add], rejected
 
     def _link(self, extras: dict, kept: list[dict], findings: list[dict]) -> None:
         """finding_ids у строк приёмки (через acceptance_row кандидата), пар и понятий глоссария."""
