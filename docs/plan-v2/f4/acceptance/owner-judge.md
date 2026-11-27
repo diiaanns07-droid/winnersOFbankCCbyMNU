@@ -26,3 +26,5 @@ foreach ($doc in 'car-loan','official','qr') {
     python "$f4/acceptance/owner_judge.py" --repo . --out out/f4-judge-control --inputs "$f4/acceptance/owner-judge-controls.json" --document $doc
 }
 ```
+
+В трёх последующих полных прогонах приняты те же три коллизии. Все три получили minor. [Новые паспорта и решение по каждому случаю](owner-e2e/RESULTS.md).
