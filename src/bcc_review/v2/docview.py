@@ -503,6 +503,10 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
         page = int(page) if isinstance(page, int) or (isinstance(page, str) and page.isdigit()) else None
         sec = _section(b)
         text = _tight_text(b) if sizes else str(b.get("text") or "")
+        if not sizes and b.get("kind") in ("table_row", "table_header") and "\n" in text.strip():
+            # DOCX: абзацы внутри ячейки («Итог 50 000 ₸» + пункты списка) — одна строка таблицы, как в PDF;
+            # иначе «Один push» стал бы отдельной строкой без колонок и без связи с условиями строки
+            text = "; ".join(x.strip() for x in text.strip().splitlines() if x.strip())
         parts = text.splitlines() or [""]
         label = _list_label(b)
         for i, part in enumerate(parts):

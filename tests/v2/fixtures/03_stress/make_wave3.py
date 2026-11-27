@@ -8,6 +8,8 @@
   Читатель v1 (PyMuPDF без нейросети вёрстки, как у жюри по ``requirements.txt``) отдаёт таблицу колонками, а знаки
   препинания уносит в конец строки. Проверяет ``docview``: таблица собирается по строкам, знаки на месте.
 
+* ``cell_paragraphs.docx`` — Word: в ячейке критерия приёмки абзац и маркированный список; строка таблицы должна
+  остаться одной строкой («Итог 50 000 ₸; Один push; Счётчик не сбрасывается»).
 * ``textbox.docx`` — Word: требование в надписи (текстовом поле, ``w:txbxContent`` с запасной копией VML),
   вложенная таблица, комментарий рецензента, гиперссылка. Читатель v1 надписи не видит — ``docview`` их добавляет.
 
@@ -111,8 +113,28 @@ def make_textbox_docx(path: Path) -> None:
     d.save(path)
 
 
+def make_cell_paragraphs(path: Path) -> None:
+    from docx import Document
+    d = Document()
+    d.add_heading("ТЗ: Уведомление о пороге", 0)
+    d.add_heading("Критерии приемки", 1)
+    t = d.add_table(rows=2, cols=3)
+    t.style = "Table Grid"
+    for i, h in enumerate(["Исходные условия", "Действие", "Ожидаемый результат"]):
+        t.cell(0, i).text = h
+    t.cell(1, 0).text = "Расходы 48 500 ₸, порог 50 000 ₸"
+    t.cell(1, 1).text = "Покупка на 1 500 ₸"
+    c = t.cell(1, 2)
+    c.text = "Итог 50 000 ₸"
+    c.add_paragraph("Один push", style="List Bullet")
+    c.add_paragraph("Счётчик не сбрасывается", style="List Bullet")
+    d.add_paragraph("После таблицы.")
+    d.save(path)
+
+
 def main() -> int:
     make_textbox_docx(HERE / "textbox.docx")
+    make_cell_paragraphs(HERE / "cell_paragraphs.docx")
     md = HERE / "borderless.md"
     md.write_text(BORDERLESS, encoding="utf-8")
     pandoc = shutil.which("pandoc")

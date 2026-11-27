@@ -406,3 +406,17 @@ def test_short_term_needs_model_line():
     assert m and m["line_start"] == k and m["text"] == "СК"
     assert Q.verify_quote(view, "СК") is None or len([ln for ln in view["lines"] if " СК " in f" {ln['text']} "]) == 1
     assert Q.verify_quote(view, "К", k) is None
+
+
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_cell_with_paragraphs_is_one_row():
+    """Абзацы и список внутри ячейки DOCX — одна строка таблицы (как в PDF), а не три строки без колонок."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/cell_paragraphs.docx")
+    texts = [ln["text"] for ln in view["lines"]]
+    assert ("Расходы 48 500 ₸, порог 50 000 ₸ | Покупка на 1 500 ₸ | Итог 50 000 ₸; Один push; "
+            "Счётчик не сбрасывается") in texts
+    assert "Один push" not in texts and texts[-1] == "После таблицы."
+    m = Q.verify_quote(view, "Итог 50 000 ₸, один push")
+    assert m is None or m["line_start"] == 4
+    m2 = Q.verify_quote(view, "Счётчик не сбрасывается", 4)
+    assert m2 and m2["line_start"] == 4
