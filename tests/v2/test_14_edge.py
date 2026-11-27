@@ -630,3 +630,21 @@ def test_transient_stage_file_write_error_does_not_abort_run(tmp_path, monkeypat
     monkeypatch.setattr(runs.RunDir, "save_stage", flaky)
     report, _, out = _review(tmp_path, OFFICIAL, provider="mock")
     assert report["run"]["status"] != "failed" and report["findings"]
+
+
+@_bug("01", "справка и ошибки командной строки на английском (argparse): «usage:», «positional arguments», "
+            "«options», «show this help message and exit», «error: the following arguments are required: output», "
+            "«unrecognized arguments», «invalid int value» (__main__.py)")
+@pytest.mark.parametrize("argv", [["вход.md"], ["вход.md", "отчёт.md", "--bogus"], ["вход.md", "o.md", "--max-calls", "x"],
+                                  ["--help"]])
+def test_cli_messages_are_russian(argv, capsys):
+    import re
+
+    from bcc_review.v2.__main__ import main
+    with pytest.raises(SystemExit):
+        main(argv)
+    cap = capsys.readouterr()
+    text = cap.out + cap.err
+    english = re.findall(r"\b(usage|positional arguments|options|show this help message|error|the following arguments"
+                         r"|unrecognized arguments|invalid int value|required)\b", text)
+    assert not english, english
