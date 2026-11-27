@@ -1,0 +1,57 @@
+--- a/src/bcc_review/v2/web/onboarding.py
++++ b/src/bcc_review/v2/web/onboarding.py
+@@ -151,8 +151,8 @@
+ 
+ 
+ def detect_provider(key: str) -> str:
+-    """По виду ключа: AIza… — Gemini, sk-ant-… — Claude. Иначе пусто."""
+-    if key.startswith("AIza"):
++    """По виду ключа: AIza… или AQ.… — Gemini, sk-ant-… — Claude. Иначе пусто."""
++    if key.startswith(("AIza", "AQ.")):
+         return "gemini"
+     if key.startswith("sk-ant-"):
+         return "anthropic"
+@@ -218,7 +218,7 @@
+     if provider == "auto":
+         provider = detect_provider(key)
+         if not provider:
+-            return 400, {"ok": False, "message": "Не похоже на ключ: у Gemini он начинается с AIza, у Claude — с sk-ant-."}
++            return 400, {"ok": False, "message": "Не похоже на ключ: у Gemini он начинается с AIza или AQ., у Claude — с sk-ant-."}
+     if provider not in ENV_NAME:
+         return 400, {"ok": False, "message": "Нужен ключ Gemini или Claude."}
+     if len(key) > 400:
+@@ -442,7 +442,7 @@
+     ev.preventDefault();
+     if (busy) return;
+     if (verified) { go(); return; }
+-    if (!key.value.trim()) { bad('Вставьте ключ: у Gemini он начинается с AIza, у Claude — с sk-ant-.'); if (P) P.mood('oops'); key.focus(); return; }
++    if (!key.value.trim()) { bad('Вставьте ключ: у Gemini он начинается с AIza или AQ., у Claude — с sk-ant-.'); if (P) P.mood('oops'); key.focus(); return; }
+     busy=true; check.disabled=true; check.textContent='Проверяю…'; bad(''); status.textContent='Проверяю ключ, это до 10 секунд.';
+     field.classList.add('is-checking'); show('', 'проверяю…');
+     if (P) { P.say(''); P.mood('work'); P.stage('проверяю ключ'); }
+--- /dev/null
++++ b/tests/v2/test_55_gemini_key_format.py
+@@ -0,0 +1,23 @@
++import pytest
++
++from bcc_review.v2.web import onboarding
++
++
++@pytest.mark.parametrize("prefix", ["AQ.", "AIza"])
++def test_welcome_sends_both_google_key_formats_to_verification(prefix, monkeypatch):
++    monkeypatch.setattr(onboarding, "_verified", set())
++    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
++    key = prefix + "unit" * 4
++    calls = []
++
++    def verify(provider, value):
++        calls.append((provider, value))
++        return True, "ok"
++
++    status, reply = onboarding.handle_key(
++        {"provider": "auto", "key": key, "remember": False}, verify=verify
++    )
++
++    assert status == 200 and reply["ok"]
++    assert calls == [("gemini", key)]
++    assert not reply["remembered"]
