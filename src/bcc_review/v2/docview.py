@@ -30,6 +30,23 @@ from typing import Any, Iterable
 # (просьба №16). Переменная проверяется в момент разбора страницы, поэтому достаточно задать её здесь.
 os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")
 
+
+def pdf_fast_mode() -> None:
+    """Выключить нейросетевой анализ вёрстки PyMuPDF 2.x (пакет ``pymupdf_layout``, ONNX).
+
+    ``pip install -e .`` ставит свежий PyMuPDF 2.x вместе с ``pymupdf_layout``; тогда ``page.find_tables()`` в
+    читателе v1 гоняет модель на каждой странице: 0,55 с на страницу (официальный PDF — 4 с, 19 страниц — 10 с) и
+    результат зависит от установки. Без модели поиск таблиц — по линейкам, как в зафиксированном PyMuPDF 1.28:
+    текст строк, страницы и разделы те же, чтение в 10 раз быстрее. Повторный вызов безопасен; PyMuPDF 1.x не
+    затрагивается (флага нет)."""
+    try:
+        import pymupdf
+    except Exception:  # noqa: BLE001 — без PyMuPDF PDF не читается вовсе, ошибку даст читатель
+        return
+    if hasattr(pymupdf, "_layout_enabled"):
+        pymupdf._layout_enabled = False
+
+
 SECTION_SEP = " › "
 FORMATS = {".md": "md", ".markdown": "md", ".txt": "txt", ".pdf": "pdf", ".docx": "docx",
            ".html": "html", ".htm": "html"}
@@ -73,6 +90,8 @@ def load(path: str | Path) -> dict:
         return view
     warnings: list[str] = []
     doc: dict | None = None
+    if fmt == "pdf":
+        pdf_fast_mode()
     try:
         from bcc_review.engine import read_document
         doc = read_document(p)
@@ -221,13 +240,13 @@ def page_of(view: dict, n: int) -> int | None:
 
 
 def place(view: dict, start: int, end: int | None = None) -> str:
-    """Человекочитаемое место: «строки 38–40», для PDF «с. 2, строка 25»."""
+    """Человекочитаемое место, как в отчёте: «строки 38–40», для PDF «строка 25, стр. 2»."""
     end = start if end is None else end
     rng = f"строка {start}" if end == start else f"строки {start}–{end}"
     p1, p2 = page_of(view, start), page_of(view, end)
     if p1:
-        pg = f"с. {p1}" if not p2 or p2 == p1 else f"с. {p1}–{p2}"
-        return f"{pg}, {rng}"
+        pg = f"стр. {p1}" if not p2 or p2 == p1 else f"стр. {p1}–{p2}"
+        return f"{rng}, {pg}"
     return rng
 
 
