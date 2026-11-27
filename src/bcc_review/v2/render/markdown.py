@@ -555,6 +555,8 @@ class _Ctx:
         label = rid
         if sid and _DOC_ID.fullmatch(sid):
             label = f"{rid} / {sid}"
+        elif doc_label(q).startswith("критерий приёмки №"):
+            label = f"{rid} / приёмка {doc_label(q).rsplit(' ', 1)[-1]}"
         if not (link and q):
             return label
         tip = shorten(_LREF.sub(_lref, " ".join(str(q.get("summary") or "").split())), 120).replace('"', "'").replace("\\", "/")
