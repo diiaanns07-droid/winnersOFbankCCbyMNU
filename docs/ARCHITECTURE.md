@@ -33,7 +33,11 @@ flowchart LR
     S --> P
     R --> P
     subgraph P [параллельно]
-        A[lens_analyst] & Q[lens_qa] & X[lens_architect] & K[lens_risk] & C[consistency]
+        A[lens_analyst]
+        Q[lens_qa]
+        X[lens_architect]
+        K[lens_risk]
+        C[consistency]
     end
     P --> QV[quotes<br/>сверка цитат кодом]
     QV --> J[judge + judge_check<br/>реестр D-01…]
