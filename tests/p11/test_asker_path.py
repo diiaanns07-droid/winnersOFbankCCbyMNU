@@ -26,7 +26,7 @@ from bcc_review.runtime.context import ContextBuilder
 from bcc_review.runtime.core import Budget, Cache, StageStats, Tracer
 from bcc_review.runtime.modules import Modules
 
-from conftest import observe
+from tests.p11.conftest import observe
 
 MODEL = "claude-opus-5-5"
 KEY = "test-key-not-a-secret"

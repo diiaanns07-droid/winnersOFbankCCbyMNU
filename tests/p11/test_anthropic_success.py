@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from conftest import load
+from tests.p11.conftest import load
 
 
 def _keys(node):
@@ -145,7 +145,7 @@ def test_env_configuration(make_adapter, messages, schema, monkeypatch):
 
 def test_from_fixture_files_entry_point(messages, schema):
     from bcc_review.providers.anthropic import AnthropicAdapter
-    from conftest import FIXTURES
+    from tests.p11.conftest import FIXTURES
 
     adapter = AnthropicAdapter.from_fixture_files(
         [FIXTURES / "success_candidates.json"], models_path=FIXTURES / "model_info.json"

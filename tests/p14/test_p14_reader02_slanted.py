@@ -330,7 +330,7 @@ def test_cli_export_pdf_with_real_reader(tmp_path):
     # Ридер №02, привязка №07 и экспорт №14 — командные. Этапы анализа — резервные: их формат
     # понимает mock-сценарий (командные №04–06 ждут другой схемы ответов). Внешних вызовов нет.
     env["BCC_FORCE_FALLBACK"] = "build_inventory,review_individual,review_set,reconcile_facts"
-    cmd = [sys.executable, "-m", "bcc_review", str(src), str(tmp_path / "report.md"), "--provider", "mock",
+    cmd = [sys.executable, "-m", "bcc_review", "--engine", "v1", str(src), str(tmp_path / "report.md"), "--provider", "mock",
            "--mock-script", str(MOCK), "--export", "pdf", "--no-cache", "--cache-dir", str(tmp_path / "cache"),
            "--artifacts-dir", str(tmp_path / "art"), "-q"]
     proc = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=tmp_path, timeout=300)

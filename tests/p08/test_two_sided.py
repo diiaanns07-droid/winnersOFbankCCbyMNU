@@ -37,6 +37,8 @@ def sha(p: Path) -> str:
 def cli(cwd: Path, *args: str, module: str = "bcc_review") -> subprocess.CompletedProcess:
     env = dict(os.environ, PYTHONPATH=str(SRC), BCC_FORCE_FALLBACK="review_individual,review_set")
     env.pop("ANTHROPIC_API_KEY", None)
+    if module == "bcc_review":
+        args = ("--engine", "v1", *args)
     return subprocess.run([sys.executable, "-m", module, *args], cwd=cwd, env=env, capture_output=True,
                           text=True, timeout=300)
 

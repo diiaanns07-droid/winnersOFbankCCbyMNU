@@ -35,7 +35,7 @@ jobs:
       - run: python -m pytest -q tests/p18
       - run: python -m pytest -q tests/p11/test_anthropic_errors.py tests/p11/test_asker_path.py
       - run: python -m pytest -q tests/p08/test_engine_answers.py::test_cli_answers_changes_only_the_agreed_phrase
-      - run: python -m bcc_review release/input/requirements.md out/requirements.md --offline-lint --no-cache
+      - run: python -m bcc_review --engine v1 release/input/requirements.md out/requirements.md --offline-lint --no-cache
       - run: python -m bcc_review verify out/requirements.json release/input/requirements.md
 
   container:
@@ -50,5 +50,5 @@ jobs:
         run: |
           docker build --build-arg BCC_AGENT_COMMIT="$GITHUB_SHA" -t bcc-review:smoke .
           mkdir -p out
-          docker run --rm --network none -v "$PWD/release/input:/input:ro" -v "$PWD/out:/out" bcc-review:smoke /input/requirements.md /out/requirements.md --offline-lint --no-cache
+          docker run --rm --network none -v "$PWD/release/input:/input:ro" -v "$PWD/out:/out" bcc-review:smoke --engine v1 /input/requirements.md /out/requirements.md --offline-lint --no-cache
           docker run --rm --network none -v "$PWD/release/input:/input:ro" -v "$PWD/out:/out:ro" bcc-review:smoke verify /out/requirements.json /input/requirements.md

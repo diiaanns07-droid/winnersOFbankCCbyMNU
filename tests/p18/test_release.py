@@ -19,7 +19,7 @@ def run_cli(cwd, *args, expected=0):
     env = {k: v for k, v in os.environ.items() if not k.startswith(("ANTHROPIC_", "GEMINI_", "BCC_"))
            and k not in {"GOOGLE_API_KEY", "PYTHONPATH", "PYTHONHOME"}}
     env.update(PYTHONNOUSERSITE="1", PYTHONIOENCODING="utf8")
-    result = subprocess.run([sys.executable, "-m", "bcc_review", *map(str, args)], env=env, cwd=cwd,
+    result = subprocess.run([sys.executable, "-m", "bcc_review", "--engine", "v1", *map(str, args)], env=env, cwd=cwd,
                             capture_output=True, text=True, encoding="utf8", timeout=90)
     assert result.returncode == expected, result.stdout + result.stderr
     return result

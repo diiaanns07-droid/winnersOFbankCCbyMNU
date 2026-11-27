@@ -39,7 +39,7 @@ def sha(p: Path) -> str:
 def cli(cwd: Path, *args: str, src: Path = SRC) -> subprocess.CompletedProcess:
     env = dict(os.environ, PYTHONPATH=str(src), BCC_FORCE_FALLBACK="review_set")
     env.pop("ANTHROPIC_API_KEY", None)
-    return subprocess.run([sys.executable, "-m", "bcc_review", *args, "--provider", "mock",
+    return subprocess.run([sys.executable, "-m", "bcc_review", "--engine", "v1", *args, "--provider", "mock",
                            "--mock-script", str(FIX / "mock_transfer.json"), "--no-cache", "-q"],
                           cwd=cwd, env=env, capture_output=True, text=True, timeout=300)
 

@@ -27,7 +27,7 @@ from bcc_review.providers.anthropic import RecordedTransport
 from bcc_review.runtime.context import ContextBuilder
 from bcc_review.runtime.modules import Modules
 
-from conftest import load, models, outcome
+from tests.p11.conftest import load, models, outcome
 from test_asker_path import DATA, DOC, REQS, STAGE_1
 
 MODEL = "claude-opus-5-5"

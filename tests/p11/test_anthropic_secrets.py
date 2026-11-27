@@ -10,7 +10,7 @@ import httpx2
 import pytest
 
 from bcc_review.providers.anthropic import AnthropicAdapter, ProviderError, RecordedTransport, redact
-from conftest import load, models
+from tests.p11.conftest import load, models
 
 SECRET = "sk-ant-api03-TESTSECRET-abcdefghijklmnopqrstuvwxyz0123456789"
 

@@ -177,6 +177,7 @@ def test_shell_quote_posix_and_windows(monkeypatch):
     """Просьба №20: на Windows строку команды разбирает cmd.exe — нужны двойные кавычки, не одинарные shlex."""
     from evaluation.v2 import common
 
+    monkeypatch.setattr(common.os, "name", "posix")
     assert common.shell_quote("/tmp/а б/report.md") == "'/tmp/а б/report.md'"
     monkeypatch.setattr(common.os, "name", "nt")
     assert common.shell_quote(r"C:\bcc\новые ТЗ\source.md") == '"C:\\bcc\\новые ТЗ\\source.md"'
