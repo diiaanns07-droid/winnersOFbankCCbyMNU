@@ -1496,6 +1496,18 @@ def _drop_keys(text: str, keys: set[str]) -> str:
     return re.sub(r"\s+([.,;:])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
 
 
+def _rule_names_case(f: dict, req_kind_at: dict[int, str]) -> int:
+    """Пожелание по шкале — случай, который документ не называет ни словом. Если заголовок замечания называет
+    предмет процитированного нормативного требования (≥ 2 общих опорных слова с цитатой строки основной
+    функции), документ этот случай вводит сам: это неполное правило, отдельное замечание, а не строка сводки
+    «ряд случаев». Возвращает строку такого требования или 0."""
+    head = _subject_tokens(f["title"])
+    for e in f["evidence"]:
+        if req_kind_at.get(e["line_start"]) in MAIN_REQ_KINDS and len(head & _subject_tokens(e["quote"])) >= 2:
+            return e["line_start"]
+    return 0
+
+
 def _section2(ev: dict) -> str:
     """Раздел цитаты до второго уровня («Часть › Подраздел»): место правки, а не абзац."""
     parts = [p.strip() for p in _s(ev.get("section")).split("›") if p.strip()]
@@ -1748,6 +1760,13 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
 
     findings = _consolidate(findings, lambda f: bool(_NO_ID_RE.search(f["title"])) and (
         f["severity"] == "minor" or f["criterion"] in {"conforming", "ranked", "traceable"}), _NO_IDS, ctx, warnings)
+    if _option(ctx, "judge_wish_scope", True):
+        for f in findings:
+            line = _rule_names_case(f, req_maps[0]) if f["_wish"] and f["severity"] != "critical" else 0
+            if line:
+                f["_wish"] = False
+                _warn(ctx, warnings, f"судья: {f['title'][:60]!r} — не пожелание: случай назван в требовании "
+                                     f"(строка {line}); отдельное замечание")
     findings = _consolidate(findings, lambda f: f["_wish"] and f["severity"] != "critical", _WISHES, ctx, warnings)
     for kind, spec in (("terminology", _TERMS), ("non_singular", _NONSINGULAR), ("duplicate", _DUPLICATES)):
         findings = _consolidate(findings, lambda f, k=kind: f["kind"] == k and f["severity"] == "minor",

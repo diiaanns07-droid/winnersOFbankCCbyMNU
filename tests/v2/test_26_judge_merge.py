@@ -180,3 +180,49 @@ def test_prompt_states_rule_in_general_words():
     text = (ROOT / "src" / "bcc_review" / "v2" / "prompts" / "judge.md").read_text(encoding="utf-8")
     assert "одна и та же правка в одном и том же месте" in text
     assert "«что хранить» и «что показать или отправить пользователю»" in text
+
+
+# --- пожелания: случай, названный в процитированном требовании, — не строка сводки «ряд случаев» ----------
+
+RULE = "Возврат уменьшает расходы месяца исходной покупки. Переводы и снятие наличных исключаются"
+
+
+def _wishes(title_a, title_b):
+    cs = [_c("C-001", 38, RULE, DATA, source="lens:risk", severity="minor", kind="incomplete", title=title_a,
+             reqs=("R-11",)),
+          _c("C-002", 40, "Сервис отправляет сообщение клиенту", FLOW, source="lens:risk", severity="minor",
+             kind="incomplete", title=title_b, reqs=("R-40",))]
+    fs = [finding("F01", ["C-001"], severity="minor", kind="incomplete", title=title_a, blocks="none"),
+          finding("F02", ["C-002"], severity="minor", kind="incomplete", title=title_b, blocks="none")]
+    for f in fs:
+        f["wish"] = True
+    reqs = [{"id": "R-11", "kind": "functional", "line_start": 38, "line_end": 38, "text": RULE},
+            {"id": "R-40", "kind": "functional", "line_start": 40, "line_end": 40, "text": "Т"}]
+    return cs, response(fs, checklist=[]), reqs
+
+
+def test_wish_named_in_quoted_rule_stays_separate():
+    """«Возврат после отправки: исход не описан» при цитате правила о возврате — неполное правило документа,
+    а не случай, о котором документ молчит; два разных вопроса не сводятся в одно замечание."""
+    cs, resp, reqs = _wishes("Возврат в закрытом месяце: исход для исходной покупки не описан",
+                             "Не описан сбой канала доставки сообщений")
+    res = judge.run(Ctx(FakeLLM(resp), requirements=reqs), cs)
+    all_placed(res, ["C-001", "C-002"])
+    assert len(res["findings"]) == 2
+    assert _by(res, "C-001")["title"] == "Возврат в закрытом месяце: исход для исходной покупки не описан"
+    assert _by(res, "C-001")["severity"] == "minor"
+    assert any("не пожелание" in w for w in res["warnings"])
+
+
+def test_pure_wishes_still_consolidated():
+    cs, resp, reqs = _wishes("Не описана блокировка карты клиента", "Не описан сбой канала доставки сообщений")
+    res = judge.run(Ctx(FakeLLM(resp), requirements=reqs), cs)
+    assert len(res["findings"]) == 1 and res["findings"][0]["title"] == "Документ не рассматривает ряд случаев"
+
+
+def test_wish_scope_off_switch():
+    cs, resp, reqs = _wishes("Возврат в закрытом месяце: исход для исходной покупки не описан",
+                             "Не описан сбой канала доставки сообщений")
+    res = judge.run(Ctx(FakeLLM(resp), requirements=reqs, options={"judge_check": False,
+                                                                   "judge_wish_scope": False}), cs)
+    assert len(res["findings"]) == 1
