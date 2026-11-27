@@ -1,0 +1,120 @@
+# Эталон открытого набора №18 (кейс insurance_clean). Собран из evaluation/v2/open2/insurance/spec.yaml сборщиком evaluation/v2/open2/build.py —
+# руками не править: правьте spec.yaml и пересоберите. Формат bcc-v2-gold/1 (как evaluation/v2/official/gold.yaml).
+# Номера строк — по evaluation/v2/open2/insurance_clean/source.md; для PDF/DOCX счётчик находит строки по тексту цитат.
+schema: bcc-v2-gold/1
+document: evaluation/v2/open2/insurance_clean/source.md
+sha256: 48f5c4c0c1b240c94670b4d1a8f929f33f6d9d083bdf33c90c64b2562f4bac5d
+case: insurance_clean
+variant: clean
+title: Страхование жизни при оформлении кредита наличными
+lines: 221
+expected_verdict:
+  development: 'yes'
+  testing: 'yes'
+targets:
+  findings_min: 5
+  findings_max: 40
+  report_lines_max: 900
+  critical_found_min: 0
+  critical_as_critical_min: 0
+  major_found_min: 0
+items:
+- id: М1
+  level: minor
+  severity_ok:
+  - minor
+  title: Чек-лист ревью не заполнен, версия и дата документа не указаны
+  essence: Отметки чек-листа не проставлены, версия и дата документа не заполнены.
+  anchors:
+    policy: any
+    groups:
+    - lines: '71'
+      quote: Документ (версия/дата) в источнике не заполнен.
+  keywords:
+    min: 2
+    groups:
+    - чек-лист|чеклист|ревью|верси|дат[аы] документ
+    - не заполн|не проставл|пуст|отсутств|заглушк|шаблон|не указан
+  kinds:
+  - placeholder
+  - traceability
+  - format
+  owners:
+  - rules
+  related:
+  - М2
+- id: М2
+  level: minor
+  severity_ok:
+  - minor
+  title: Блок согласующих пуст
+  essence: Подразделения, ФИО и подписи согласующих не указаны.
+  anchors:
+    policy: any
+    groups:
+    - lines: '92'
+      quote: '| Подразделение | ФИО ответственного | Подпись |'
+  keywords:
+    min: 2
+    groups:
+    - согласующ|согласовани|подпис|фио
+    - пуст|не заполн|отсутств|не указан|не провед
+  kinds:
+  - placeholder
+  - traceability
+  owners:
+  - rules
+  related:
+  - М1
+- id: М3
+  level: minor
+  severity_ok:
+  - minor
+  title: Раздел «Тестирование требований» — заглушка
+  essence: Вместо требований к тестированию стоит «заполняются тестировщиками».
+  anchors:
+    policy: any
+    groups:
+    - lines: '59'
+      quote: заполняются тестировщиками
+  keywords:
+    min: 2
+    groups:
+    - тестировщик|тестировани\w* требовани|требовани\w* к тестировани
+    - заглушк|не заполн|пуст|отсутств|не описан|не определ
+  kinds:
+  - placeholder
+  - incomplete
+  owners:
+  - rules
+  - qa
+  related: []
+- id: М4
+  level: minor
+  severity_ok:
+  - minor
+  title: Нет ID и приоритетов у НФТ, требований к данным и интеграции
+  essence: Номера есть только у функциональных требований; у НФТ, данных и интеграции нет ID и приоритетов (IEEE
+    830, 4.3.5).
+  anchors:
+    policy: any
+    groups:
+    - lines: '47'
+      quote: '### Нефункциональные требования'
+    - lines: '50'
+      quote: '### Требования к данным'
+    - lines: '53'
+      quote: '### Требования к интеграции'
+  keywords:
+    min: 2
+    groups:
+    - \bid\b|идентификатор\w* требовани|нумерац|номер\w* требовани|приоритет
+    - 'нет|отсутств|без '
+  kinds:
+  - traceability
+  - format
+  - placeholder
+  owners:
+  - rules
+  - analyst
+  related: []
