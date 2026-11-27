@@ -136,3 +136,13 @@ def test_model_candidate_without_quote_goes_to_dropped():
     out = lens_qa.postprocess({"candidates": [cand]}, [])
     assert out["candidates"] == []
     assert [d["reason"] for d in out["dropped"]] == [lens_qa.NO_QUOTE_REASON]
+
+
+def test_acceptance_row_without_quotes_builds_no_candidate():
+    """Строка приёмки `undefined` без цитат строки, заявленного и правила: замечание не строится, только предупреждение."""
+    check = {"row_requirement_id": "", "row_quote": "", "row_line": 0, "row_facts": "ф", "assumptions": "",
+             "rule_requirement_ids": [], "rule_evidence": [], "derivation": "", "expected_by_rules": "не определено",
+             "stated": "", "stated_line": 0, "verdict": "undefined", "conflict_kind": "none", "explanation": "", "fix": ""}
+    out = lens_qa.postprocess({"acceptance_checks": [check]}, [])
+    assert out["candidates"] == [] and len(out["acceptance_checks"]) == 1
+    assert any("без цитат" in w for w in out["warnings"])

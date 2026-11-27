@@ -1069,6 +1069,10 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     flagged: set[str] = set()
     for c in checks:
         cand = check_to_candidate(c, index)
+        if cand and not any(_s(e.get("quote")) for e in cand["evidence"]):
+            warnings.append(f"{STAGE}: строка приёмки {c['row_requirement_id'] or c['row_line'] or '?'} без цитат "
+                            "строки и правила — замечание не построено")
+            continue
         if cand:
             candidates.append(cand)
             flagged.add(c["row_requirement_id"])
