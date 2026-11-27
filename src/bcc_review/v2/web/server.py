@@ -34,6 +34,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 from .sheet import VERDICT as VERDICT_WORD, build_sheet, load_report, plural, read_source
 from .runner import (ALLOWED_EXT, FILES, MAX_UPLOAD, FixtureRunner, Job, JobStore, PipelineRunner, Worker,
                      check_provider, load_dotenv, provider_status)
+from . import onboarding as _onboarding  # №40: знакомство, /api/key, файлы BCC AI
 
 ASSETS = Path(__file__).with_name("assets")
 # №39: tokens.css — дизайн-система, шрифты Inter и JetBrains Mono (OFL); agent.* — BCC AI (№40), отдаются, когда файлы появятся
@@ -352,6 +353,7 @@ class Handler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_GET(self) -> None:  # noqa: N802
+        if _onboarding.handle_get(self, urlsplit(self.path).path): return  # №40: /welcome, /assets/agent.*  # noqa: E701
         url = urlsplit(self.path)
         path = url.path
         if path == "/":
@@ -402,6 +404,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── POST ──
     def do_POST(self) -> None:  # noqa: N802
+        if _onboarding.handle_post(self, urlsplit(self.path).path): return  # №40: POST /api/key  # noqa: E701
         path = urlsplit(self.path).path
         m = JOB_PATH.match(path)
         if m and m.group(1) and m.group("rest") == "/answers":
