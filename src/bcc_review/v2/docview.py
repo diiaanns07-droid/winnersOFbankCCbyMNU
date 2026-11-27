@@ -94,9 +94,13 @@ def load(path: str | Path) -> dict:
         pdf_fast_mode()
     try:
         from bcc_review.engine import read_document
+        doc = None
         if fmt == "txt" and _looks_markdown(_decode_text(data)):
-            doc = _read_as_markdown(p, data, read_document)
-        else:
+            try:
+                doc = _read_as_markdown(p, data, read_document)
+            except Exception:  # noqa: BLE001 — не вышло как Markdown: читаем как простой текст
+                doc = None
+        if doc is None:
             doc = read_document(p)
     except Exception as exc:  # noqa: BLE001 — читатель v1 не должен ронять v2 на MD/TXT
         if fmt in ("pdf", "docx"):
@@ -123,7 +127,10 @@ def load(path: str | Path) -> dict:
     warnings += _doc_warnings(doc)
     if fmt == "docx":
         warnings += _docx_revisions(data)
-        lines, boxes = _docx_textboxes(data, lines)
+        try:
+            lines, boxes = _docx_textboxes(data, lines)
+        except Exception:  # noqa: BLE001 — надписи необязательны
+            boxes = 0
         if boxes:
             warnings.append(f"Текст из надписей Word (текстовых полей) добавлен после абзаца, к которому они "
                             f"привязаны: {boxes} абз.")
@@ -498,7 +505,10 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
     blocks = [b for b in doc.get("blocks") or [] if isinstance(b, dict)]
     warnings = warnings if warnings is not None else []
     if sizes:
-        blocks, tabled = _borderless_tables(blocks, sizes)
+        try:
+            blocks, tabled = _borderless_tables(blocks, sizes)
+        except Exception:  # noqa: BLE001 — сборка таблиц не должна ронять чтение: блоки как прочитал v1
+            tabled = []
         if tabled:
             what = f"странице {tabled[0]}" if len(tabled) == 1 else f"страницах {_pages_list(tabled)}"
             warnings.append(f"Таблица без линеек на {what} собрана по строкам (ячейки — по колонкам и рядам текста); "
@@ -649,9 +659,10 @@ def _reorder_fragments(b: dict) -> dict:
     (одно значение ``line``) пересобирается по рядам и координате x, только если порядок нарушен; между фрагментами —
     один пробел (лишние уберёт ``_tight_text`` по зазору)."""
     text = str(b.get("text") or "")
-    frags = sorted((f for f in (b.get("loc") or {}).get("fragments") or []
-                    if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and f.get("rect")
-                    and len(f["rect"]) == 4), key=lambda f: f["start"])
+    raw = (b.get("loc") or {}).get("fragments") or []
+    frags = sorted((f for f in (raw if isinstance(raw, list) else [])
+                    if isinstance(f, dict) and isinstance(f.get("start"), int) and isinstance(f.get("end"), int)
+                    and isinstance(f.get("rect"), (list, tuple)) and len(f["rect"]) == 4), key=lambda f: f["start"])
     if len(frags) < 2:
         return b
     groups: list[list[dict]] = []
@@ -700,7 +711,10 @@ def _tight_text(b: dict) -> str:
     """Текст блока PDF без лишних пробелов: читатель ставит пробел между соседними фрагментами строки, даже если
     зазора между ними нет («ВК -1», «приложении .»). Пробел убирается, если зазор < 8 % высоты строки.
     Знаки, которые читатель унёс в конец строки (другой шрифт), возвращаются на место (``_reorder_fragments``)."""
-    b = _reorder_fragments(b)
+    try:
+        b = _reorder_fragments(b)
+    except Exception:  # noqa: BLE001 — порядок как у читателя v1
+        pass
     text = str(b.get("text") or "")
     frags = sorted((f for f in (b.get("loc") or {}).get("fragments") or []
                     if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and f.get("rect")),
@@ -824,10 +838,16 @@ def _frags_of(b: dict) -> list[dict]:
     """Фрагменты блока с текстом (по смещениям в тексте блока; знаки, унесённые читателем, уже на месте)."""
     if "_frags" in b:
         return b["_frags"]
-    b = _reorder_fragments(b)
+    try:
+        b = _reorder_fragments(b)
+    except Exception:  # noqa: BLE001
+        pass
     text = str(b.get("text") or "")
     out = []
-    for f in (b.get("loc") or {}).get("fragments") or []:
+    raw = (b.get("loc") or {}).get("fragments") or []
+    for f in raw if isinstance(raw, list) else []:
+        if not isinstance(f, dict):
+            continue
         r = f.get("rect")
         if isinstance(f.get("start"), int) and isinstance(f.get("end"), int) and r and len(r) == 4:
             t = text[f["start"]:f["end"]]

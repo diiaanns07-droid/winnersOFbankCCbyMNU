@@ -441,3 +441,21 @@ def test_plain_txt_not_treated_as_markdown(tmp_path):
                  encoding="utf-8")
     v = dv.load(p)
     assert [ln["text"] for ln in v["lines"] if ln["text"]][1] == "# не заголовок, а комментарий"
+
+
+def test_new_pdf_steps_survive_malformed_blocks():
+    """Сборка таблиц и порядок фрагментов на «кривых» блоках не падают (у жюри может быть любой PDF)."""
+    bad = [
+        {"id": "b1", "kind": "paragraph", "text": "Текст", "loc": {"page": 1, "bbox": [0, 0, 10, 10]}},
+        {"id": "b2", "kind": "paragraph", "text": "А Б", "loc": {"page": 1, "bbox": [50, 0, 60, 10],
+                                                          "fragments": [{"start": 0, "end": 1, "rect": None},
+                                                                        {"start": 2, "end": 3, "rect": [1, 2]}]}},
+        {"id": "b3", "kind": "paragraph", "text": "x y z", "loc": {"page": 1, "bbox": [0, 0, 0, 0], "fragments": [
+            {"start": 0, "end": 1, "rect": [0, 0, 0, 0], "line": 0}, {"start": 2, "end": 3, "rect": [5, 0, 5, 0], "line": 0},
+            {"start": 4, "end": 5, "rect": [1, 0, 1, 0], "line": 0}]}},
+        {"id": "b4", "kind": "table_row", "text": "a | b", "loc": {}},
+        {"kind": "paragraph"},
+    ]
+    lines = dv._block_lines({"blocks": bad}, {1: (595.0, 842.0)}, [])
+    assert [ln["text"] for ln in lines][:2] == ["Текст", "А Б"]
+    assert dv._reorder_fragments({"text": "", "loc": {"fragments": "мусор"}}) is not None
