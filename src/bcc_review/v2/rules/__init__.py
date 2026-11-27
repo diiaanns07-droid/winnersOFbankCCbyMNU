@@ -108,6 +108,10 @@ def format_signals(signals: list[dict], audience: str | None = None, limit: int 
 
     Сигналы — подсказки правил, а не готовые дефекты: модель проверяет их по документу сама.
     """
+    import os
+
+    if os.environ.get("BCC_RULES_SIGNALS", "1").strip().lower() in ("0", "no", "off", "false"):
+        return "Сигналов правил нет."  # замер вклада сигналов: линзы без блока <сигналы>, кандидаты правил остаются
     items = signals_for(signals, audience)[:limit]
     if not items:
         return "Сигналов правил нет."
