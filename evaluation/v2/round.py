@@ -55,7 +55,8 @@ def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]
                    f"--runs-dir {shell_quote(o / 'runs')}")
         out.append((name, [py, "-m", "evaluation.v2.newtz", "run", "--out", str(o), "--root", str(root),
                            "--cases", *cases, "--provider", "claude_cli", "--model", model, "--cmd", cmd_tpl,
-                           "--jobs", "2", "--label", f"{a.name}: {title}, {sha}, {model}", "--save"]))
+                           "--jobs", str(getattr(a, "clean_jobs", 2)), "--label", f"{a.name}: {title}, {sha}, {model}",
+                           "--save"]))
     return out
 
 
@@ -73,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="отдельно — только чистые версии open2 (№18) этой моделью, например haiku")
     ap.add_argument("--clean20", metavar="MODEL",
                     help="отдельно — 8 чистых ТЗ №20 (evaluation/v2/clean) этой моделью, например haiku")
+    ap.add_argument("--clean-jobs", type=int, default=2, help="параллельных документов в чистых наборах")
     ap.add_argument("--label-commit", help="коммит в метках вместо HEAD (замер на коммите интеграции)")
     ap.add_argument("--no-cache", action="store_true", help="официальный документ мимо кэша (стабильность)")
     ap.add_argument("--arbiter", default="sonnet")
