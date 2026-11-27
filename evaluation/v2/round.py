@@ -27,6 +27,38 @@ def _commit() -> str:
                           cwd=str(ROOT)).stdout.strip() or "?"
 
 
+def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]:
+    """Чистые наборы отдельными частями: open2 (только `variant: clean`) и №20 (`evaluation/v2/clean`)."""
+    from .newtz import OPEN2, discover
+
+    out = []
+    sets = []
+    if a.clean_open2:
+        found = discover(OPEN2)
+        # только кейсы, где все варианты чистые (иначе --cases запустил бы и дефектную версию)
+        cases = sorted({c["case"] for c in found if c["variant"] == "clean"}
+                       - {c["case"] for c in found if c["variant"] != "clean"})
+        if cases:
+            sets.append(("clean_open2", a.clean_open2, OPEN2, cases, "чистые open2"))
+        else:
+            print("чистых версий в evaluation/v2/open2 нет — пропускаю")
+    if a.clean20:
+        root = ROOT / "evaluation" / "v2" / "clean"
+        cases = sorted({c["case"] for c in discover(root) if c["variant"] != "error"})
+        if cases:
+            sets.append(("clean20", a.clean20, root, cases, "чистые №20"))
+        else:
+            print("набора evaluation/v2/clean нет (№20 не влит?) — пропускаю")
+    for name, model, root, cases, title in sets:
+        o = logs / name
+        cmd_tpl = ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
+                   f"--runs-dir {o / 'runs'}")
+        out.append((name, [py, "-m", "evaluation.v2.newtz", "run", "--out", str(o), "--root", str(root),
+                           "--cases", *cases, "--provider", "claude_cli", "--model", model, "--cmd", cmd_tpl,
+                           "--jobs", "2", "--label", f"{a.name}: {title}, {sha}, {model}", "--save"]))
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.round", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -37,12 +69,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-corpus", action="store_true")
     ap.add_argument("--newtz-model", default="sonnet")
     ap.add_argument("--no-newtz", action="store_true")
+    ap.add_argument("--clean-open2", metavar="MODEL",
+                    help="отдельно — только чистые версии open2 (№18) этой моделью, например haiku")
+    ap.add_argument("--clean20", metavar="MODEL",
+                    help="отдельно — 8 чистых ТЗ №20 (evaluation/v2/clean) этой моделью, например haiku")
+    ap.add_argument("--label-commit", help="коммит в метках вместо HEAD (замер на коммите интеграции)")
     ap.add_argument("--no-cache", action="store_true", help="официальный документ мимо кэша (стабильность)")
     ap.add_argument("--arbiter", default="sonnet")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
-    sha = _commit()
+    sha = a.label_commit or _commit()
     slug = slugify(a.name)
     logs = ROOT / "out" / "round" / slug
     logs.mkdir(parents=True, exist_ok=True)
@@ -79,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
                                    "--label", f"{a.name}: {sha}, {a.newtz_model}", "--save"]))
         else:
             print("новых ТЗ в evaluation/v2/open2 нет — пропускаю")
+    jobs += _clean_jobs(a, py, logs, sha)
     for name, cmd in jobs:
         print(f"[{name}] {' '.join(cmd)}")
     if a.dry_run:

@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT, STAGE_OWNER, source_owner
+from .common import ROOT, STAGE_OWNER
 
 V2 = ROOT / "evaluation" / "v2"
 HISTORY = V2 / "history.jsonl"
@@ -408,7 +408,15 @@ def newtz_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list
     return out
 
 
-def _latest_newtz(kind: str, clean_only: bool) -> dict | None:
+def _newtz_set(d: dict) -> str:
+    """Набор прогона `newtz`: «№20» — документы `evaluation/v2/clean/`, иначе «open2» (ТЗ №18)."""
+    docs = [str(r.get("doc") or "").replace("\\", "/") for r in d.get("rows") or []]
+    return "№20" if docs and all("v2/clean/" in x for x in docs) else "open2"
+
+
+def _latest_newtz(kind: str, clean_only: bool, clean_set: str | None = None) -> dict | None:
+    """Последний прогон `newtz` модели. clean_only — только чистые документы; clean_set — «№20» или «open2»
+    (прогон только чистых версий open2 не должен попадать в ворота «Чистые ТЗ №20» и наоборот)."""
     best = None
     for p in (V2 / "newtz_results").glob("*/summary.json"):
         d = json.loads(p.read_text(encoding="utf-8"))
@@ -416,6 +424,8 @@ def _latest_newtz(kind: str, clean_only: bool) -> dict | None:
             continue
         is_clean_only = not (d.get("harness") or {}).get("support") and (d.get("clean") or {}).get("n")
         if bool(is_clean_only) != clean_only:
+            continue
+        if clean_set and _newtz_set(d) != clean_set:
             continue
         if not best or d.get("at", "") > best.get("at", ""):
             best = {**d, "_path": str(p.relative_to(ROOT))}
@@ -491,9 +501,12 @@ def collect(runs: list[str] | None = None, with_tests: bool = False) -> list[dic
         d = _latest_newtz(kind, clean_only=False)
         if d or kind == "sonnet":
             checks += newtz_gates(f"Новые ТЗ №18, {kind}", d, NEWTZ, "№18, №15")
-        c = _latest_newtz(kind, clean_only=True)
+        c = _latest_newtz(kind, clean_only=True, clean_set="№20")
         if c or kind == "haiku":
             checks += newtz_gates(f"Чистые ТЗ №20, {kind}", c, NEWTZ, "№20, №15")
+        o = _latest_newtz(kind, clean_only=True, clean_set="open2")
+        if o:
+            checks += newtz_gates(f"Чистые open2 (№18), {kind}", o, NEWTZ, "№18, №15")
     last_full = max(rows, key=lambda r: r.get("at", ""), default=None)
     checks += report_quality(last_full)
     checks += clarity_gates(last_full)

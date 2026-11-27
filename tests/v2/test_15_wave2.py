@@ -178,3 +178,14 @@ def test_round_dry_run_builds_jobs(capsys):
     assert rnd.main(["--name", "проба", "--official", "sonnet", "sonnet", "--no-corpus", "--no-newtz", "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert "official_sonnet_1" in out and "official_sonnet_2" in out and "#2" in out
+
+
+def test_round_dry_run_clean_sets_and_label_commit(capsys):
+    from evaluation.v2 import round as rnd
+
+    assert rnd.main(["--name", "проба", "--official", "--no-corpus", "--no-newtz", "--clean-open2", "haiku",
+                     "--label-commit", "abc1234", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    line = next(x for x in out.splitlines() if x.startswith("[clean_open2]"))
+    assert "--model haiku" in line and "abc1234" in line and "_clean" in line
+    assert " capital " not in line + " "  # дефектные версии open2 не запускаются
