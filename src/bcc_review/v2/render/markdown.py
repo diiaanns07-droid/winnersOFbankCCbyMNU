@@ -1393,7 +1393,9 @@ def _card(c: _Ctx, f: dict) -> list[str]:
                 body.append(f"**Было → стало.** Строка {e['line']}: {quote_md(e['before'])} → "
                             + (f"«{prose(e['after'])}»" if e["after"] else "удалить"))
     elif src is not None:
-        body.append(f"**Было → стало.** {_cap(_page_line(src.get('page'), src.get('line_start'), src.get('line_end')))}: "
+        label = ("Было → стало (места «<уточнить>» заполнит ответ владельца)"
+                 if re.search(r"<\s*уточнить", str(f.get("rewrite") or ""), re.I) else "Было → стало")
+        body.append(f"**{label}.** {_cap(_page_line(src.get('page'), src.get('line_start'), src.get('line_end')))}: "
                     f"{quote_md(src.get('quote'), CARD_QUOTE)} → «{prose(f.get('rewrite'))}»")
     qids = c.q_by_finding.get(f["id"], [])
     if f.get("question"):
