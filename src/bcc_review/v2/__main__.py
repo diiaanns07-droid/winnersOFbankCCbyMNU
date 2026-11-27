@@ -61,6 +61,8 @@ def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--lenses", default=",".join(LENSES), help="какие линзы запускать, через запятую")
     p.add_argument("--no-consistency", action="store_true", help="без проверки набора целиком")
     p.add_argument("--no-clarify", action="store_true", help="без вопросов владельцу")
+    p.add_argument("--fast-start", action="store_true",
+                   help="рецензенты не ждут нарезку моделью: стартуют по таблице эвристики, ссылки переводятся по строкам")
     p.add_argument("-q", "--quiet", action="store_true", help="без хода выполнения в консоли")
 
 
@@ -74,6 +76,7 @@ def _opts(a: argparse.Namespace) -> dict:
         "export": [x.strip().lower() for x in (a.export or "").split(",") if x.strip()], "html": not a.no_html,
         "passes": a.passes, "lenses": [x.strip() for x in a.lenses.split(",") if x.strip()],
         "consistency": not a.no_consistency, "clarify": not a.no_clarify, "quiet": a.quiet,
+        "fast_start": bool(getattr(a, "fast_start", False)),
         "answers": getattr(a, "answers", None), "revise": getattr(a, "revise", False),
     }
 
