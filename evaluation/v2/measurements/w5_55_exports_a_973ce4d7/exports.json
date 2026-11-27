@@ -1,0 +1,110 @@
+{
+  "sha": "973ce4d746b87e9355eb8c130909424ef2aa2f89",
+  "checks": {
+    ".pdf": {
+      "findings": 19,
+      "downloads": {
+        "report.annotated.pdf": {
+          "http": 200,
+          "bytes": 534692,
+          "identical_to_saved": true
+        },
+        "report.docx": {
+          "http": 200,
+          "bytes": 63678,
+          "identical_to_saved": true
+        },
+        "report.html": {
+          "http": 200,
+          "bytes": 355324,
+          "identical_to_saved": true
+        },
+        "report.jira.csv": {
+          "http": 200,
+          "bytes": 45039,
+          "identical_to_saved": true
+        },
+        "report.json": {
+          "http": 200,
+          "bytes": 116627,
+          "identical_to_saved": true
+        },
+        "report.md": {
+          "http": 200,
+          "bytes": 104404,
+          "identical_to_saved": true
+        },
+        "report.pdf": {
+          "http": 200,
+          "bytes": 534692,
+          "identical_to_saved": true
+        }
+      },
+      "pdf": {
+        "original_pages": 6,
+        "output_pages": 6,
+        "pages_with_annotations": 6,
+        "annotation_types": {
+          "Highlight": 51,
+          "Text": 1
+        },
+        "notes_with_text": 52,
+        "finding_ids_in_annotations": 19,
+        "finding_ids_without_annotation": [],
+        "underlying_text_preserved": true,
+        "two_pdf_downloads_identical": true
+      }
+    },
+    ".docx": {
+      "findings": 21,
+      "downloads": {
+        "report.annotated.docx": {
+          "http": 200,
+          "bytes": 53664,
+          "identical_to_saved": true
+        },
+        "report.docx": {
+          "http": 200,
+          "bytes": 53664,
+          "identical_to_saved": true
+        },
+        "report.html": {
+          "http": 200,
+          "bytes": 373098,
+          "identical_to_saved": true
+        },
+        "report.jira.csv": {
+          "http": 200,
+          "bytes": 48223,
+          "identical_to_saved": true
+        },
+        "report.json": {
+          "http": 200,
+          "bytes": 123407,
+          "identical_to_saved": true
+        },
+        "report.md": {
+          "http": 200,
+          "bytes": 111714,
+          "identical_to_saved": true
+        }
+      },
+      "word": {
+        "zip_crc_ok": true,
+        "comments": 48,
+        "comment_relationship": true,
+        "markers": {
+          "commentRangeStart": 48,
+          "commentRangeEnd": 48,
+          "commentReference": 48
+        },
+        "comment_ids_fully_linked": 48,
+        "orphan_ids": 0,
+        "finding_ids_in_comments": 21,
+        "finding_ids_without_comment": [],
+        "original_visible_text_is_prefix": true,
+        "standalone_report_zip_ok": true
+      }
+    }
+  }
+}
