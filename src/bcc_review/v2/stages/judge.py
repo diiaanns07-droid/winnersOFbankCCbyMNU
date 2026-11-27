@@ -844,10 +844,13 @@ def _source_family(src: str) -> str:
 
 
 def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
-               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS, strict: bool = False) -> bool:
+               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS, strict: bool = False,
+               skip_ids: set[str] | frozenset[str] = frozenset()) -> bool:
     """Critical подтверждён двумя ревьюерами: два источника среди кандидатов дефекта или кандидат другого
     источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект.
-    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам."""
+    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам.
+    ``strict`` (для major): сосед — того же вида и с ≥ 2 общими строками; кандидаты из ``skip_ids`` (они сами
+    образуют другой major) не подтверждают: два major по одним строкам не держат друг друга."""
     fams = {_source_family(_s(m.get("source"))) for m in members}
     if len(fams) >= 2 or any(_s(m.get("origin")) in structured for m in members):
         return True
@@ -855,7 +858,7 @@ def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
     need = 2 if strict else min(2, len(lines))
     member_ids = {m["id"] for m in members}
     for c in all_cands or []:
-        if c["id"] in member_ids or _source_family(_s(c.get("source"))) in fams:
+        if c["id"] in member_ids or c["id"] in skip_ids or _source_family(_s(c.get("source"))) in fams:
             continue
         if strict and _s(c.get("kind")) != f["kind"]:  # соседний дефект другого вида — не подтверждение
             continue
@@ -1136,9 +1139,10 @@ def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: i
     if run_sources < MIN_SOURCES_FOR_CONSENSUS or any(f["severity"] == "critical" for f in findings):
         return
     lowered = 0
+    own_major = {cid for g in findings if g["severity"] == "major" for cid in g["candidate_ids"]}
     for f in findings:
         if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS,
-                                                  strict=True):
+                                                  strict=True, skip_ids=own_major):
             continue
         f["severity"], f["blocks"], f["priority"] = "minor", "none", 0
         lowered += 1

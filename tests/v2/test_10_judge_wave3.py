@@ -277,3 +277,23 @@ def test_side_named_in_text_with_line_becomes_evidence():
     assert [e["line_start"] for e in d["evidence"]] == [10, 20]
     assert d["evidence"][0]["quote"] == "Начисление выполняется по дате зачисления платежа"  # как в документе
     assert d["evidence"][0]["section"] == "Правила" and d["severity"] == "critical"
+
+
+def test_two_single_reviewer_majors_on_same_lines_do_not_confirm_each_other():
+    """№10-Б: два major одного вида по одним строкам от разных ревьюеров судья счёл разными дефектами —
+    друг друга они не подтверждают (insurance_clean: «сумма возврата» и «момент погашения», строки 41 и 68)."""
+    cs = _three_sources()
+    two = [{"quote": "Сумма возврата", "line": 41, "line_start": 41, "line_end": 41, "page": None,
+            "section": "Раздел", "verified": "exact"},
+           {"quote": "Досрочное погашение", "line": 68, "line_start": 68, "line_end": 68, "page": None,
+            "section": "Раздел", "verified": "exact"}]
+    cs.append({**cand("C-005", 41, "Сумма возврата", source="lens:analyst"), "evidence": two})
+    cs.append({**cand("C-006", 41, "Сумма возврата", source="lens:risk"), "evidence": two})
+    res, _ = run([finding("F01", ["C-005"], severity="major"), finding("F02", ["C-006"], severity="major"),
+                  finding("F03", ["C-001", "C-002"], severity="major")], cs)
+    by = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert by["C-005"] == "minor" and by["C-006"] == "minor"
+    assert by["C-001"] == "major"   # два ревьюера в самом дефекте
+    # сосед, который сам не major (отклонён или minor), по-прежнему подтверждает
+    res, _ = run([finding("F01", ["C-005"], severity="major"), finding("F02", ["C-006"], severity="minor")], cs)
+    assert {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}["C-005"] == "major"
