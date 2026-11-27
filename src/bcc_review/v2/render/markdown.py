@@ -654,6 +654,14 @@ def _criterion_ref(f: dict) -> str:
     return CRITERIA.get(f.get("criterion"), ("", "", ""))[1]
 
 
+def _q_word(c: _Ctx, form: str) -> str:
+    """Как назвать «блокирующий» вопрос: при блокирующих дефектах — «блокирующий», иначе — «первоочередной»
+    (иначе отчёт с вердиктом «с условиями» противоречил бы себе)."""
+    blocked = bool(_blockers(c))
+    return {("many", True): "блокирующих", ("many", False): "первоочередных",
+            ("mark", True): "⛔ блокирует", ("mark", False): "❗ первоочередной"}[(form, blocked)]
+
+
 def _counts_line(c: _Ctx) -> str:
     s = c.summary
     fs = s.get("findings", {})
@@ -668,7 +676,7 @@ def _counts_line(c: _Ctx) -> str:
     if qs:
         blocking = sum(1 for q in qs if q.get("blocking"))
         parts.append(f"**{len(qs)}** {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')} владельцу"
-                     + (f" (блокирующих — {blocking})" if blocking else ""))
+                     + (f" ({_q_word(c, 'many')} — {blocking})" if blocking else ""))
     return " · ".join(parts)
 
 
@@ -918,7 +926,7 @@ def _how_obtained(c: _Ctx) -> list[str]:
     if total and judged:
         drop = n["judge"] + n["not_reviewed"]
         parts.append(f"судья объединил повторы в {nf} {plural(nf, 'дефект', 'дефекта', 'дефектов')}"
-                     + (f" и отклонил {drop} как ложные" if drop else "")
+                     + (f" и отклонил {drop} {plural(drop, 'как ложный', 'как ложные', 'как ложные')}" if drop else "")
                      + (f", ещё {n['no_quote']} без найденной цитаты отброшены программой" if n["no_quote"] else "")
                      + (f"; после ответов владельца открыто {len(c.findings)}" if c.resolved else ""))
     elif c.findings:
@@ -1456,6 +1464,21 @@ def _infer_glossary(c: _Ctx, g: dict) -> list[str]:
     return [f["id"] for f in hits[:2]]
 
 
+_COVER_CRIT = {"verifiable", "set_validatable"}
+
+
+def _infer_trace(c: _Ctx, rid: str) -> list[str]:
+    """Дефект строки покрытия, если этап набора его не указал: про это требование и про приёмку/проверяемость."""
+    hits = [f for f in c.findings if rid in (f.get("requirement_ids") or [])
+            and (f.get("criterion") in _COVER_CRIT or f.get("kind") == "unverifiable"
+                 or "приёмк" in str(f.get("title") or "").lower() or "приемк" in str(f.get("title") or "").lower())]
+    # дефект «на весь документ» (у него десятки требований) — последним: он не про эту строку
+    hits = [f for f in hits if len(f.get("requirement_ids") or []) <= 8]
+    hits.sort(key=lambda f: (len(f.get("requirement_ids") or []) > 4, SEV_ORDER.get(f.get("severity"), 3),
+                             _id_num(f.get("id"))))
+    return [f["id"] for f in hits[:2]]
+
+
 def _coverage(c: _Ctx) -> list[str]:
     out = ["### 4.4. Покрытие требований критериями приёмки", ""]
     acc_ids = [q["id"] for q in c.reqs if q.get("kind") == "acceptance"]
@@ -1499,12 +1522,17 @@ def _coverage(c: _Ctx) -> list[str]:
                 cells.append("✓")
             else:
                 cells.append("·")
-        rows.append([c.req_label(rid)] + cells + [cell(t.get("note") or ("нет критерия приёмки" if not by else ""))])
+        rows.append([c.req_label(rid)] + cells + [cell(t.get("note") or ("нет критерия приёмки" if not by else "")),
+                                                  c.f_links(t.get("finding_ids") or _infer_trace(c, rid))])
     out += [f"Покрыто приёмкой {covered} из {len(rows_ids)} требований, которые должны проверяться. "
             f"✓ — критерий проверяет требование, ⛔ — критерий противоречит требованию, «·» — не проверяет.", ""]
     if rows:
-        out += table(["Требование"] + [c.req_label(a) for a in acc_ids] + ["Чего не хватает"], rows,
-                     [":---"] + [":---:"] * len(acc_ids) + [":---"])
+        def head(a: str) -> str:
+            lab = doc_label(c.req_by_id.get(a))
+            return (f"[{lab.replace('критерий приёмки ', 'Приёмка ')}](#{anchor(a)})"
+                    if lab.startswith("критерий приёмки №") else c.req_label(a))
+        out += table(["Требование"] + [head(a) for a in acc_ids] + ["Чего не хватает", "Дефект"], rows,
+                     [":---"] + [":---:"] * len(acc_ids) + [":---", ":---"])
     for note, ids in grouped.items():
         out += ["", f"Без критерия приёмки — {cell(note)} ({len(ids)}): " + ", ".join(c.req_label(r) for r in ids) + "."]
     if bare:
@@ -1523,7 +1551,7 @@ def _summary(c: _Ctx) -> list[str]:
     rows = [["Требований выделено", num(nreq)], ["С нарушениями", num(nreq - clean)], ["Без замечаний", num(clean)],
             ["Нарушений (дефектов)", f"{total}: " + " · ".join(f"{SEV_ICON[k]} {fs.get(k, 0)}" for k in SEV_ICON)],
             ["Цитат сверено программой", f"{ok} из {qt}"],
-            ["Вопросов владельцу", f"{len(qs)}, из них блокирующих {sum(1 for q in qs if q.get('blocking'))}"]]
+            ["Вопросов владельцу", f"{len(qs)}, из них {_q_word(c, 'many')} {sum(1 for q in qs if q.get('blocking'))}"]]
     out = [h2("s5", "5. Сводка"), ""] + table(["Показатель", "Значение"], rows) + [""]
     out += ["**Критичные дефекты по видам** (п. 6 ТЗ: непроверяемые, противоречивые, неполные)", ""]
     rows = []
@@ -1602,13 +1630,13 @@ def _appendix_questions(c: _Ctx) -> list[str]:
     blocking = sum(1 for q in qs if q.get("blocking"))
     cl = c.r.get("clarification") or {}
     answered = {a.get("question_id"): a for a in cl.get("answers") or [] if isinstance(a, dict)}
-    out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}, блокирующих — {blocking}. "
+    out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}, {_q_word(c, 'many')} — {blocking}. "
             f"Ответ — буква варианта или свой текст, по строке на вопрос (`Q-01: B`); повторный прогон с ответами: "
             f"`python -m bcc_review ВХОД ОТЧЁТ.md --answers ответы.md`.", ""]
     for q in sorted(qs, key=lambda q: (not q.get("blocking"), _id_num(q.get("id")))):
         head = [f"**<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}**"
                 + (f" {esc(q['topic'])}" if q.get("topic") else ""),
-                "⛔ блокирует" if q.get("blocking") else "не блокирует"]
+                _q_word(c, "mark") if q.get("blocking") else "можно ответить позже"]
         if q.get("to"):
             head.append(f"кому: {esc(q['to'])}")
         if q.get("finding_ids"):
