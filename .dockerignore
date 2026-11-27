@@ -20,6 +20,7 @@ dist
 # из тестов в образ попадают только записанные ответы модели для --provider mock
 tests
 !tests/v2/fixtures/official
+!tests/v2/fixtures/official_pdf
 evaluation
 docs
 presentation

@@ -128,6 +128,7 @@ STAGES = {
     "lenses": ("Проверка ролями", "аналитик, тестировщик, архитектор, риски"),
     "export": ("Экспорт", "DOCX, PDF, задачи Jira"),
     "html": ("HTML-отчёт", "интерактивная страница отчёта"),
+    "refute": ("Повторная проверка", "подтверждает или снимает критичные и существенные дефекты по тексту документа"),
 }
 
 
@@ -136,7 +137,7 @@ def stage_name(key: str) -> str:
 PROPOSING = {"rules", "analyst", "qa", "architect", "risk", "consistency"}  # этапы, которые предлагают кандидатов
 STAGE_STATUS = {"ok": "✅ выполнен", "partial": "⚠️ частично", "failed": "⛔ сбой", "skipped": "— пропущен"}
 SOURCES = {"analyst": "аналитик", "qa": "тестировщик", "architect": "архитектор", "risk": "риски",
-           "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр"}
+           "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр", "refute": "повторная проверка"}
 PROVIDERS = {
     "claude_cli": "«Claude Code», команда `claude -p`", "gemini": "«Google Gemini», API", "anthropic": "«Anthropic», API",
     "openai": "сервер, совместимый с «OpenAI» («Ollama», «vLLM» и др.)", "mock": "тестовый: ответы из файлов",
@@ -335,7 +336,11 @@ def prose(text) -> str:
     """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»;
     выражения floor(x/100), пути /a/b?x=1 и идентификаторы monthSpent, limit_kzt, response.result — как код;
     упоминания D-…, R-…, Q-… — ссылки."""
-    return _link_ids(_code_spans(_LREF.sub(_lref, esc(text))))
+    return _link_ids(_code_spans(_LREF.sub(_lref, _JOIN_DOT.sub(". ", esc(text)))))
+
+
+# «…во всех схемах.; Порог …» — две формулировки склеены через «; » после точки
+_JOIN_DOT = re.compile(r"\.;\s+(?=[А-ЯЁA-Z«])")
 
 
 _SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
@@ -421,6 +426,9 @@ def quote_md(text, limit: int = QUOTE_LIMIT, *, in_table: bool = False) -> str:
     s = _HTML_START.sub(r"\\<", s)
     if in_table:
         s = s.replace("|", "\\|")
+    # цитата оборвана внутри кавычек документа («…кнопка «Сохранить») — закрыть их, иначе читатель не видит, где
+    # кончается цитата (сама цитата в report.json не меняется)
+    s += "»" * max(0, s.count("«") - s.count("»"))
     return f"«{s}»"
 
 
@@ -916,7 +924,7 @@ def _brief(c: _Ctx) -> list[str]:
                     + "".join(f", {f['id']} — только {BLOCKS.get(f.get('blocks'), '—')}" for f in odd)
                     + "; что не так, где и что сделать (по порядку):", ""]
         for i, f in enumerate(blockers, 1):
-            act = _screen_text(c, _action(f))
+            act = _screen_text(c, _action(f, limit=260))  # у блокера действие — отдельной строкой, места больше
             tail = f"; останавливает только {BLOCKS.get(f.get('blocks'), '—')}." if f in odd else "."
             out.append(f"{i}. {SEV_ICON.get(f.get('severity'), '')} [{f['id']}](#{anchor(f['id'])}) "
                        f"**{prose(f.get('title'))}** — {prose(c.where_short(f, limit=5))}{tail}"
@@ -1119,9 +1127,14 @@ def _action(f: dict, limit: int = 190) -> str:
     части предложения («;», «:»), а не посреди слова."""
     sent = first_sentence(_plain_ids(" ".join(str(f.get("recommendation") or "").split())), 10 ** 4).rstrip(".")
     if len(sent) > limit:
+        ok = lambda i: sent.rfind("<", 0, i) <= sent.rfind(">", 0, i) and sent.rfind("(", 0, i) <= sent.rfind(")", 0, i)  # noqa: E731
         cuts = [i for i in (sent.rfind("; ", 0, limit), sent.rfind(": ", 0, limit), sent.rfind(" — ", 0, limit))
-                if i > limit * 0.5 and sent.rfind("<", 0, i) <= sent.rfind(">", 0, i)]  # не внутри «<уточнить: …>»
-        sent = sent[:max(cuts)] if cuts else shorten(sent, limit)
+                if i > limit * 0.5 and ok(i)]  # не внутри «<уточнить: …>» и скобок
+        comma = sent.rfind(", ", 0, limit)
+        if not cuts and comma > limit * 0.6 and ok(comma):
+            sent = sent[:comma].rstrip(" ,") + "…"  # граница части предложения, а не середина слова
+        else:
+            sent = sent[:max(cuts)] if cuts else shorten(sent, limit)
         open_ph = sent.rfind("<")
         if open_ph > sent.rfind(">"):  # обрезка пришлась на «<уточнить: …» — место убираем целиком
             sent = sent[:open_ph].rstrip(" ,;:—.") + "…"
@@ -1142,8 +1155,9 @@ def _candidate_counts(c: _Ctx) -> dict:
     out = {"accepted": accepted,
            "self_dropped": sum(1 for r in rej if code(r) == "lens_dropped"),
            "no_quote": sum(1 for r in rej if code(r) == "no_quote"),
-           "not_reviewed": sum(1 for r in rej if code(r) == "not_reviewed")}
-    out["judge"] = len(rej) - out["self_dropped"] - out["no_quote"] - out["not_reviewed"]
+           "not_reviewed": sum(1 for r in rej if code(r) == "not_reviewed"),
+           "refuted": sum(1 for r in rej if code(r) == "refuted")}  # сняты повторной проверкой (№17), не судьёй
+    out["judge"] = len(rej) - out["self_dropped"] - out["no_quote"] - out["not_reviewed"] - out["refuted"]
     out["total"] = accepted + len(rej) - out["self_dropped"]
     return out
 
@@ -1186,6 +1200,12 @@ def _how_obtained(c: _Ctx) -> list[str]:
                      + (f", ещё {n['no_quote']} отброшены программой: цитата не найдена в документе"
                         if n["no_quote"] else "")
                      + (f"; после ответов владельца открыто {len(c.findings)}" if c.resolved else ""))
+        ref = c.r.get("refutation") if isinstance(c.r.get("refutation"), dict) else {}
+        dec = [d for d in ref.get("decisions") or [] if isinstance(d, dict)]
+        if dec:
+            gone = sum(1 for d in dec if d.get("decision") == "refuted")
+            lower = sum(1 for d in dec if d.get("decision") == "partial")
+            parts.append(f"повторная проверка критичных и существенных ({len(dec)}) сняла {gone} и понизила {lower}")
     elif c.findings:
         parts.append(f"в отчёт вошли {nf} {plural(nf, 'дефект', 'дефекта', 'дефектов')} без итогового отбора моделью"
                      + (" (она не ответила, повторы объединены программой)" if judge_down else ""))
@@ -2225,6 +2245,8 @@ def _appendix_how(c: _Ctx) -> list[str]:
             bits.append(f"без найденной в документе цитаты — {n['no_quote']}")
         if n["not_reviewed"]:
             bits.append(f"не рассмотрены судьёй — {n['not_reviewed']}")
+        if n["refuted"]:
+            bits.append(f"сняты повторной проверкой — {n['refuted']}")
         out += [f"Кандидатов в дефекты: {total}{extra}; " + "; ".join(bits) + "."
                 + (f" Ещё {n['self_dropped']} {plural(n['self_dropped'], 'кандидат отброшен', 'кандидата отброшены', 'кандидатов отброшены')} самой ролью при проверке." if n["self_dropped"] else "")
                 + " Кандидат без найденной в документе цитаты в отчёт не попадает.", ""]
