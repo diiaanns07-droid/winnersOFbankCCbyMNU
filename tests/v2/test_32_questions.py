@@ -99,3 +99,16 @@ def test_measure_on_saved_reports():
     assert res["after"]["similar_pairs"] == 0 and res["after"]["over_cap"] == 0
     assert res["after"]["critical_without"] <= res["before"]["critical_without"]
     assert res["after"]["no_if_no_answer"] == 0
+
+
+def test_merge_keeps_blocking_twin_first():
+    ev = [{"quote": "Возврат уменьшает расходы", "line": 38}]
+    e = [{"quote": "Возврат уменьшает расходы", "line_start": 38, "line_end": 38, "verified": "exact"}]
+    findings = [dict(_f("D-01"), evidence=e), dict(_f("D-02"), evidence=e), dict(_f("D-03", "critical"), evidence=e)]
+    raw = {"questions": [dict(_q(TTL_A, ["D-01"]), to="Аналитик", why="…", evidence=ev),
+                         dict(_q(OTHER, ["D-02"]), to="Аналитик", why="…", evidence=ev),
+                         dict(_q(TTL_B, ["D-01", "D-03"], True), to="Аналитик", why="…", evidence=ev)]}
+    qs = clarify.postprocess(raw, findings, load_view(), [])
+    # из пары остаётся блокирующий (с critical D-03), он первый; дефект слитого вопроса D-01 — у него
+    assert len(qs) == 2 and qs[0]["topic"] == TTL_B["topic"] and qs[0]["blocking"] and qs[0]["id"] == "Q-01"
+    assert set(qs[0]["finding_ids"]) == {"D-01", "D-03"} and qs[1]["topic"] == OTHER["topic"]
