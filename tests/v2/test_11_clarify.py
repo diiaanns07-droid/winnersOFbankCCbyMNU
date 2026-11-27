@@ -231,7 +231,10 @@ def test_plain_text_removes_internal_codes():
     out = clarify.plain_text(s)
     for code in ("L028", "D-03", "R-12", "L067", "lens:qa"):
         assert code not in out
-    assert "строка 67" in out and "(" not in out
+    assert "строка 67" in out and "строка строка" not in out and "(" not in out
+    assert clarify.plain_text("Сколько уведомлений (D-01, D-02) по L039?") == "Сколько уведомлений по стр. 39?"
+    assert clarify.plain_text("Один — как в D-01") == "Один"
+    assert not clarify.plain_text("Один, как в D-01.").endswith("в.")
     assert clarify.plain_text("Правило R-12 документа", keep={"R-12"}) == "Правило R-12 документа"
 
 

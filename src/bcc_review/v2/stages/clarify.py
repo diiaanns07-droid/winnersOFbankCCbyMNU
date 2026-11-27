@@ -1,8 +1,10 @@
 """Этап clarify (№11): вопросы владельцу документа с вариантами ответа.
 
-Один вызов модели после судьи. Код проверяет то, что нельзя доверить модели:
-каждая цитата найдена в документе, у вопроса 2–4 различных варианта без «оставить как есть»,
-вопрос ссылается на существующие дефекты, блокирующие идут первыми, вопросов не больше 10.
+Один вызов модели: после судьи (``run``) или параллельно с ним по сверенным кандидатам (``start`` →
+``finish``). Код проверяет то, что нельзя доверить модели: каждая цитата найдена в документе, у вопроса
+2–4 различных варианта без «оставить как есть», вопрос закрывает существующие critical/major-дефекты,
+блокирующий — только вопрос по critical, блокирующие идут первыми, вопросов не больше 8 (5 без critical),
+в текстах для владельца нет внутренних кодов отчёта.
 
 Вход: ``findings`` (итоговые дефекты судьи, контракт 2.4). Выход: ``{"questions": [...]}``
 (контракт 2.5) плюс поля ``topic`` и ``evidence`` (цитаты обеих сторон, сверенные кодом).
@@ -37,7 +39,7 @@ CONFLICT_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundar
 
 # внутренние коды отчёта в тексте для владельца: «L038», «(D-03, D-07)», «R-12», «C-014», «lens:qa»
 _CODE_PAREN = re.compile(r"\s*\((?:\s*(?:строк[аиеу]\s*)?(?:L\d{1,4}|[DRCQT]-\d{1,3})(?:\s*[-–—]\s*L?\d{1,4})?\s*[,;]?)+\)")
-_CODE_LINE = re.compile(r"\bL0*(\d{1,4})\b")
+_CODE_LINE = re.compile(r"\b(?:(строк\w*)\s+)?L0*(\d{1,4})\b", re.I)
 _CODE_ID = re.compile(r"\s*\b(?:дефект\w*\s+|требовани\w*\s+)?[DRCQT]-\d{1,3}\b")
 _CODE_SRC = re.compile(r"\s*\b(?:lens|rules):[\w.]+")
 
@@ -49,10 +51,18 @@ def plain_text(text: str, keep: set[str] | frozenset = frozenset()) -> str:
         return s
     s = _CODE_PAREN.sub(lambda m: m.group(0) if any(k in m.group(0) for k in keep) else "", s)
     s = _CODE_ID.sub(lambda m: m.group(0) if m.group(0).strip().split()[-1] in keep else "", s)
-    s = _CODE_LINE.sub(lambda m: m.group(0) if m.group(0) in keep else f"строка {int(m.group(1))}", s)
+    s = _CODE_LINE.sub(lambda m: m.group(0) if m.group(0).split()[-1] in keep
+                       else f"{m.group(1) or 'стр.'} {int(m.group(2))}", s)
     s = _CODE_SRC.sub("", s)
-    s = re.sub(r"\s+([,.;:!?)])", r"\1", s)
-    s = re.sub(r"\(\s*\)", "", s)
+    # хвосты после удалённых кодов: «см. и,», «( )», «, ,»
+    for _ in range(2):
+        s = re.sub(r"\(\s*(?:см\.?)?\s*\)", "", s)
+        s = re.sub(r"\bсм\.\s*(?:и\s*)?(?=[,.;)]|$)", "", s)
+        s = re.sub(r"\s+и\s*(?=[,.;)]|$)", "", s)
+        s = re.sub(r"\s+(?:как\s+в|в|во|по|из|к|на|у|со?|для)\s*(?=[,.;)]|$)", "", s)
+        s = re.sub(r"[,;]\s*(?=[,.;)]|$)", "", s)
+        s = re.sub(r"\s+([,.;:!?)])", r"\1", s)
+        s = re.sub(r"\s*[—–-]\s*([.;]?)$", r"\1", s)
     return re.sub(r"[ \t]{2,}", " ", s).strip()
 
 

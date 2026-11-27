@@ -285,3 +285,17 @@ def test_by_label_from_reason_is_accepted(findings, questions):
 def test_schema_requires_by():
     item = recheck.SCHEMA["properties"]["decisions"]["items"]
     assert "by" in item["required"] and item["properties"]["by"]["type"] == "array"
+
+
+def test_conflicting_answers_keep_defect_open(findings, questions, stub_judge):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "resolved", "by": [q1["id"]],
+                   "conflicting_answers": [q1["id"], "Решение-1"], "reason": "ответы расходятся"}])
+    answers = f"{q1['id']}: A\n\n## Решения\n- Противоположное правило.\n"
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), report, answers)["clarification"]
+    ch = next(c for c in clar["changes"] if c["finding_id"] == fid)
+    assert ch["status"] == "open" and "противоречат" in ch["reason"]
+    assert clar["answer_conflicts"] == [{"finding_id": fid, "answers": [q1["id"], "Решение-1"], "reason": ch["reason"]}]
+    assert "противоречат друг другу" in recheck.render_markdown(clar)

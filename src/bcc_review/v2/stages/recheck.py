@@ -66,11 +66,13 @@ SCHEMA: dict = {
     "properties": {
         "decisions": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
-            "required": ["finding_id", "status", "by", "reason", "severity", "title", "problem"],
+            "required": ["finding_id", "status", "by", "conflicting_answers", "reason", "severity", "title",
+                         "problem"],
             "properties": {
                 "finding_id": {"type": "string"},
                 "status": {"type": "string", "enum": list(STATUSES)},
                 "by": {"type": "array", "items": {"type": "string"}},
+                "conflicting_answers": {"type": "array", "items": {"type": "string"}},
                 "reason": {"type": "string"},
                 "severity": {"type": "string", "enum": list(SEVERITIES)},
                 "title": {"type": "string"},
@@ -449,6 +451,13 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         status = d.get("status") if d.get("status") in STATUSES else "open"
         rc = g["recheck"]
         rc["status"], rc["reason"] = status, str(d.get("reason", "")).strip()
+        # два ответа противоречат друг другу — дефект остаётся открытым, владелец выбирает один ответ
+        clash = norm_labels(list(d.get("conflicting_answers") or []), valid)
+        if len(clash) >= 2:
+            rc["answer_conflict"] = clash
+            if status != "open":
+                rc["status"], status = "open", "open"
+                rc["reason"] = (f"ответы {' и '.join(clash)} противоречат друг другу: " + rc["reason"]).strip(": ")
         # дефект снимает только ответ, который модель назвала прямо (в by или в тексте причины)
         by = norm_labels(list(d.get("by") or []), valid) if status != "open" else []
         if status != "open" and not by:
@@ -570,6 +579,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         changes.append({"finding_id": g["id"], "title": g.get("title", ""), "severity_before": r["severity_before"],
                         "status": r["status"], "severity_after": r["severity_after"], "reason": r["reason"],
                         "question_ids": r["question_ids"], "answer_ids": r.get("answer_ids", []),
+                        "answer_conflict": r.get("answer_conflict", []),
                         "title_after": r.get("title_after", "")})
     order = {"resolved": 0, "changed": 1, "open": 2}
     changes.sort(key=lambda c: (order.get(c["status"], 3), SEVERITIES.index(c["severity_before"] or "minor")))
@@ -586,6 +596,8 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "closed_by_decisions": closed,
         "changes": changes,
         "new_findings": [f["id"] for f in new_found],
+        "answer_conflicts": [{"finding_id": c["finding_id"], "answers": c["answer_conflict"], "reason": c["reason"]}
+                             for c in changes if c.get("answer_conflict")],
         "before": {"verdict": v_before, "findings": severity_counts(findings)},
         "after": {"verdict": {"development": after_rule["development"], "testing": after_rule["testing"],
                               "fix_first": after_rule.get("fix_first", [])},
@@ -630,6 +642,11 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
             lines.append(f"| {c['finding_id']} {c['title'].replace('|', '/')} | {_S.get(c['severity_before'], '—')} | "
                          f"{_ST.get(c['status'], c['status'])} | {_S.get(c['severity_after'] or '', '—')} | {reason} | "
                          f"{', '.join(c['question_ids']) or 'общее решение'} |")
+        lines.append("")
+    if clar.get("answer_conflicts"):
+        lines.append("Ответы, которые противоречат друг другу (выберите один):")
+        for c in clar["answer_conflicts"]:
+            lines.append(f"* {' ↔ '.join(c['answers'])} — {c['finding_id']}: {c['reason']}")
         lines.append("")
     if clar["new_findings"] and findings_after:
         by_id = {f["id"]: f for f in findings_after}
