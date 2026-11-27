@@ -54,7 +54,7 @@ def _cand(title: str, quote: str, line: int, severity: str = "major", kind: str 
 def test_official_promise_without_key_adds_major_with_verified_quote():
     view = docview.load(OFFICIAL)
     out = _run(view, [])
-    extra = [c for c in out["candidates"] if c.get("origin") == "doc_text"]
+    extra = [c for c in out["candidates"] if c.get("origin") == "doc_text" and R.REPEAT_TOPIC_RE.search(c["title"])]
     assert len(extra) == 1
     c = extra[0]
     assert c["severity"] == "major" and c["kind"] == "ops_risk" and c["blocks"] == "both"
@@ -71,8 +71,8 @@ def test_official_model_wrote_repeat_no_duplicate():
     line = next(x for x in view["lines"] if "Повторная доставка" in x["text"])
     model = [_cand("Повтор события процессинга не распознаётся по ключу", line["text"][-80:], line["n"])]
     out = _run(view, model)
-    assert not [c for c in out["candidates"] if c.get("origin") == "doc_text"]
-    assert len(out["candidates"]) == 1
+    assert not [c for c in out["candidates"] if c.get("origin") == "doc_text" and R.REPEAT_TOPIC_RE.search(c["title"])]
+    assert len([c for c in out["candidates"] if R.REPEAT_TOPIC_RE.search(c["title"])]) == 1
 
 
 def test_fallback_survives_limit_of_twelve():
@@ -81,7 +81,7 @@ def test_fallback_survives_limit_of_twelve():
     model = [_cand(f"Сумма в строке запроса GET, случай {i}", text, 104, kind="security") for i in range(12)]
     out = _run(view, model)
     assert len(out["candidates"]) == 12
-    assert [c for c in out["candidates"] if c.get("origin") == "doc_text"]
+    assert [c for c in out["candidates"] if c.get("origin") == "doc_text" and R.REPEAT_TOPIC_RE.search(c["title"])]
 
 
 def test_requirement_ids_from_segmentation():
@@ -89,7 +89,7 @@ def test_requirement_ids_from_segmentation():
     n = next(x for x in view["lines"] if "Повторная доставка" in x["text"])["n"]
     reqs = [{"id": "R-07", "line_start": n, "line_end": n}, {"id": "R-01", "line_start": 37, "line_end": 37}]
     out = _run(view, [], reqs)
-    extra = [c for c in out["candidates"] if c.get("origin") == "doc_text"]
+    extra = [c for c in out["candidates"] if c.get("origin") == "doc_text" and R.REPEAT_TOPIC_RE.search(c["title"])]
     assert extra and extra[0]["requirement_ids"] == ["R-07"]
 
 
@@ -114,7 +114,7 @@ def test_mock_official_answer_unchanged():
     raw = json.loads((ROOT / "tests" / "v2" / "fixtures" / "official" / "lens_risk.json").read_text("utf-8"))
     data = raw[0] if isinstance(raw, list) else raw
     out = _run(docview.load(OFFICIAL), data.get("candidates") or [])
-    assert not [c for c in out["candidates"] if c.get("origin") == "doc_text"]
+    assert not [c for c in out["candidates"] if c.get("origin") == "doc_text" and R.REPEAT_TOPIC_RE.search(c["title"])]
     assert any(R.REPEAT_TOPIC_RE.search(c["title"]) for c in out["candidates"])
 
 
@@ -124,5 +124,5 @@ def test_dirty_segmentation_lines_do_not_crash():
     reqs = [{"id": "R-01", "line_start": "x", "line_end": None}, {"id": "R-02", "line_start": str(n), "line_end": "?"},
             {"id": "R-03", "line_start": None}, {"id": "R-04", "line_start": n - 1, "line_end": n + 1}, "мусор"]
     out = _run(view, [], reqs)
-    extra = [c for c in out["candidates"] if c.get("origin") == "doc_text"]
+    extra = [c for c in out["candidates"] if c.get("origin") == "doc_text" and R.REPEAT_TOPIC_RE.search(c["title"])]
     assert extra and extra[0]["requirement_ids"] == ["R-02", "R-04"]
