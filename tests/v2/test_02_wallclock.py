@@ -118,7 +118,7 @@ def make_provider(server: FreeTierServer, clock: ScaledClock, **kw) -> SimProvid
 
 def run_graph(*, concurrency: int | None = None, client_rpm: float = 10.0, server_rpm: int = 10,
               factor: float = 1.0, latency: dict | None = None, fail_503: int = 0, env: dict | None = None,
-              scale: float = SCALE, overloaded_until: float = 0.0) -> dict:
+              scale: float = SCALE, overloaded_until: float = 0.0, clarify_early: bool = True) -> dict:
     """Один прогон графа вызовов. Возвращает модельное время, исходы запросов и максимум одновременных."""
     clock = ScaledClock(scale)
     server = FreeTierServer(clock, rpm=server_rpm, latency=latency, factor=factor, fail_503=fail_503,
@@ -136,8 +136,15 @@ def run_graph(*, concurrency: int | None = None, client_rpm: float = 10.0, serve
     ask("segment")
     with cf.ThreadPoolExecutor(max_workers=len(PARALLEL)) as ex:
         list(ex.map(ask, PARALLEL))
-    for stage in ("judge", "judge_check", "clarify"):
-        ask(stage)
+    if clarify_early:   # №01 9c5ea31: вопросы стартуют вместе с судьёй, итог собирается после проверки судьи
+        with cf.ThreadPoolExecutor(max_workers=2) as ex:
+            early = ex.submit(ask, "clarify")
+            ask("judge")
+            ask("judge_check")
+            early.result()
+    else:
+        for stage in ("judge", "judge_check", "clarify"):
+            ask(stage)
     return {"seconds": clock.now(), "outcomes": server.outcomes(), "max_in_flight": server.max_in_flight,
             "calls": llm.stats["calls"], "log": server.log,
             "models": sorted({m for _, m, _, o in server.log if o == "200"})}
@@ -146,8 +153,20 @@ def run_graph(*, concurrency: int | None = None, client_rpm: float = 10.0, serve
 # --------------------------------------------------------------------------- тесты
 
 
-CRITICAL_S = HAIKU_S["segment"] + max(HAIKU_S[s] for s in PARALLEL) + sum(
-    HAIKU_S[s] for s in ("judge", "judge_check", "clarify"))   # 370 с: нарезка + набор + судья + проверка + вопросы
+try:
+    import pytest
+
+    @pytest.fixture(scope="module", autouse=True)
+    def _warm_up():
+        """Первый прогон в процессе платит за импорты — в ускоренных часах это десятки «секунд»."""
+        run_graph(scale=1000.0)
+except ImportError:  # pragma: no cover - запуск файлом без pytest
+    pass
+
+
+# нарезка + набор + судья + проверка судьи (вопросы идут параллельно с судьёй — №01 9c5ea31): 332 с
+CRITICAL_S = HAIKU_S["segment"] + max(HAIKU_S[s] for s in PARALLEL) + max(
+    HAIKU_S["judge"] + HAIKU_S["judge_check"], HAIKU_S["clarify"])
 
 
 def test_provider_window_runs_all_parallel_stages_at_once_without_429():
@@ -206,7 +225,8 @@ def test_peak_overload_ends_and_primary_is_back():
 
 
 def _table() -> None:  # pragma: no cover - ручной запуск
-    rows = [("параллельность 4 (было), окно --rpm 10", {"concurrency": 4, "client_rpm": 10}),
+    rows = [("вопросы после судьи (до 9c5ea31)", {"clarify_early": False}),
+            ("параллельность 4 (было), окно --rpm 10", {"concurrency": 4, "client_rpm": 10}),
             ("параллельность 5 (сейчас), окно --rpm 10", {"client_rpm": 10}),
             ("параллельность 5, только окно провайдера", {"client_rpm": 0}),
             ("сервер 5 RPM, GEMINI_RPM=5", {"server_rpm": 5, "client_rpm": 0, "env": {"GEMINI_RPM": "5"}}),
@@ -214,6 +234,7 @@ def _table() -> None:  # pragma: no cover - ручной запуск
             ("вызовы ×1,5", {"factor": 1.5, "client_rpm": 0}), ("волна 503 ×6", {"fail_503": 6, "client_rpm": 0}),
             ("основная перегружена первые 5 мин", {"overloaded_until": 300.0}),
             ("основная перегружена весь прогон", {"overloaded_until": 10_000.0})]
+    run_graph(scale=1000.0)   # прогрев: первый прогон в процессе платит за импорты (×SCALE в модельном времени)
     print(f"{'вариант':42} {'модельное время':>16} {'запросов':>9} {'429':>4} {'одновременно':>13}")
     for name, kw in rows:
         r = run_graph(**kw)
