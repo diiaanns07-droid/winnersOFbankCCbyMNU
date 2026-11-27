@@ -1,74 +1,48 @@
-﻿# Одна команда: установить агента и проверить официальный документ кейса (Windows PowerShell).
+﻿# Одна команда: окружение, проверка документа, verify, сводка (Windows PowerShell 5.1 и PowerShell 7).
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\run_official.ps1
-#   powershell -ExecutionPolicy Bypass -File scripts\run_official.ps1 -Provider gemini
-#   powershell -ExecutionPolicy Bypass -File scripts\run_official.ps1 -Doc release\input\requirements.pdf
+#   powershell -ExecutionPolicy Bypass -File scripts\run_official.ps1 C:\Документы\ТЗ.pdf
+#   powershell -ExecutionPolicy Bypass -File scripts\run_official.ps1 release\input\requirements.md --provider mock
 #
-# Скрипт создаёт .venv (если его нет), ставит зависимости, проверяет настройку (doctor), запускает агента,
-# сверяет отчёт с документом (verify) и печатает, где лежат файлы. Отчёт — в reports\my\ (не попадает в git).
-param(
-    [string]$Provider = "auto",
-    [string]$Model = "",
-    [string]$Doc = "release\input\requirements.md",
-    [string]$Out = ""
-)
-$ErrorActionPreference = "Stop"
-Set-Location (Split-Path -Parent $PSScriptRoot)
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$env:PYTHONIOENCODING = "utf-8"
-$env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
+# Без пути — официальный документ кейса; модель — по ключу в .env (GEMINI_API_KEY → Gemini). Параметры агента
+# пишутся после пути. Отчёт: reports\my\<имя документа>.md (для PDF, DOCX и др. — <имя>_<расширение>.md),
+# рядом .json и .html. Первый запуск сам создаёт .venv и ставит зависимости.
+# Файл сохранён в UTF-8 с BOM (иначе Windows PowerShell 5.1 искажает русский текст).
 
-if (-not $Out) { $Out = Join-Path "reports\my" ([System.IO.Path]::GetFileNameWithoutExtension($Doc) + ".md") }
-
-if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    Write-Host "== создаю .venv"
-    $made = $false
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        py -3.12 -m venv .venv
-        $made = ($LASTEXITCODE -eq 0)
-    }
-    if (-not $made) { python -m venv .venv }
-}
-$py = (Resolve-Path ".venv\Scripts\python.exe").Path
-
-Write-Host "== установка"
-& $py -m pip install -q -r requirements.txt -e .
-if ($LASTEXITCODE -ne 0) { throw "установка не удалась" }
-
-if (-not (Test-Path ".env") -and (Test-Path ".env.example")) {
-    Copy-Item ".env.example" ".env"
-    Write-Host "создан .env из .env.example — впишите ключ в строку GEMINI_API_KEY="
+$rest = @($args)
+$Doc = "release\input\requirements.md"
+if ($rest.Count -gt 0 -and -not ([string]$rest[0]).StartsWith("-")) {
+    $Doc = [string]$rest[0]
+    $rest = @($rest | Select-Object -Skip 1)
+    # путь от текущего каталога: дальше скрипт работает из корня репозитория
+    if (Test-Path -LiteralPath $Doc -PathType Leaf) { $Doc = (Resolve-Path -LiteralPath $Doc).Path }
 }
 
-Write-Host "== проверка настройки"
-& $py -m bcc_review doctor --provider $Provider
+. (Join-Path $PSScriptRoot "_env.ps1")
 
-$runArgs = @($Doc, $Out, "--provider", $Provider)
-if ($Model) { $runArgs += @("--model", $Model) }
+if (-not (Test-Path -LiteralPath $Doc -PathType Leaf)) {
+    Write-Host "Файл не найден: $Doc" -ForegroundColor Red
+    exit 2
+}
+$stem = [IO.Path]::GetFileNameWithoutExtension($Doc)
+$ext = [IO.Path]::GetExtension($Doc).TrimStart(".").ToLower()
+if ($ext -and $ext -ne "md") { $stem = "$($stem)_$ext" }
+$outDir = if ($env:OUT) { $env:OUT } else { "reports\my" }
+$report = Join-Path $outDir "$stem.md"
+$json = Join-Path $outDir "$stem.json"
 
-Write-Host ""
-Write-Host "== прогон: $Doc -> $Out"
-& $py -m bcc_review @runArgs
+Write-Host "== проверка документа: $Doc -> $report"
+$sw = [Diagnostics.Stopwatch]::StartNew()
+& $Py -m bcc_review $Doc $report @rest
 $code = $LASTEXITCODE
-
-$base = $Out -replace '\.md$', ''
-$json = "$base.json"
-if (-not (Test-Path $json)) {
-    Write-Host "отчёт не записан (код выхода $code)"
-    if ($code -eq 0) { $code = 1 }
-    exit $code
-}
+$seconds = [int]$sw.Elapsed.TotalSeconds
+if (-not (Test-Path $json)) { exit $code }
 
 Write-Host ""
-Write-Host "== verify"
-& $py -m bcc_review verify $json $Doc
+Write-Host "== verify: каждая цитата ищется в документе заново"
+& $Py -m bcc_review verify $json $Doc
 $verify = $LASTEXITCODE
 
-Write-Host ""
-Write-Host "Отчёт: $Out"
-foreach ($f in @("$base.html", $json)) { if (Test-Path $f) { Write-Host "       $f" } }
-if ($code -eq 3) {
-    Write-Host "Модель недоступна: отчёт собран только правилами. Проверьте ключ: $py -m bcc_review doctor --live"
-}
+& $Py scripts\run_summary.py $json --verify-code $verify --seconds $seconds
 if ($verify -ne 0) { exit $verify }
 exit $code

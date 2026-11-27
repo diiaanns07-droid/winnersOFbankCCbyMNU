@@ -1,39 +1,77 @@
 #!/usr/bin/env bash
-# Проверка агента так, как его запустит жюри: doctor --live -> прогон официального документа -> verify -> сводка.
-# Черновик №02, принят №16.
+# Проверка «как у жюри» одной командой (macOS и Linux): ключ и модель → прогон официального документа без кэша →
+# verify → сверка с эталоном К1–К5, С1–С20 → сводка с воротами (статус complete, время, вызовы).
 #
-#   bash scripts/jury_check.sh                               # Gemini, ключ — строка GEMINI_API_KEY=... в .env
-#   PROVIDER=claude_cli MODEL=haiku bash scripts/jury_check.sh
-#   DOC=release/input/requirements.pdf bash scripts/jury_check.sh
-set -u
-cd "$(dirname "$0")/.."
-PROVIDER="${PROVIDER:-gemini}"
-MODEL="${MODEL:-}"
-DOC="${DOC:-release/input/requirements.md}"
-OUT="${OUT:-out/jury_check}"
-if [ -z "${PYTHON:-}" ] && [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY="${PYTHON:-python3}"; fi
-# Массивы не бывают пустыми: в bash 3.2 (macOS) пустой массив при set -u — ошибка «unbound variable».
-doctor=(doctor --live --provider "$PROVIDER")
-run=(--provider "$PROVIDER" --no-cache)
-if [ -n "$MODEL" ]; then doctor+=(--model "$MODEL"); run+=(--model "$MODEL"); fi
-mkdir -p "$OUT"
-name="$(basename "${DOC%.*}")"
+#   scripts/jury_check.sh                         # Gemini, модель по умолчанию (ключ GEMINI_API_KEY в .env)
+#   scripts/jury_check.sh gemini gemini-3.6-flash
+#   scripts/jury_check.sh claude_cli haiku
+#   scripts/jury_check.sh mock                    # без сети: проверка установки
+#
+# Отчёт: out/jury/requirements.<провайдер>.md (+ .json, .html, score.md). Код выхода 0 — все ворота пройдены.
+# Пределы: MAX_MINUTES (по умолчанию 6 для gemini, 15 для остальных), MAX_CALLS (12).
+set -uo pipefail
 
-echo "== 1/4 проверка модели: doctor --live --provider $PROVIDER"
-if ! "$PY" -m bcc_review "${doctor[@]}"; then
-  echo "СТОП: модель не ответила. Исправьте по подсказке «Что исправить» выше и запустите скрипт снова."
-  exit 2
+PROVIDER="${1:-gemini}"
+MODEL="${2:-}"
+
+# shellcheck source=scripts/_env.sh
+source "$(dirname "$0")/_env.sh"
+
+if [ "$PROVIDER" = "gemini" ]; then
+  MAX_MINUTES="${MAX_MINUTES:-6}"
+else
+  MAX_MINUTES="${MAX_MINUTES:-15}"
+fi
+MAX_CALLS="${MAX_CALLS:-12}"
+DOC=release/input/requirements.md
+OUTDIR=out/jury
+OUT="$OUTDIR/requirements.${PROVIDER}.md"
+JSON="${OUT%.md}.json"
+model_args=()
+[ -n "$MODEL" ] && model_args=(--model "$MODEL")
+
+echo "== коммит агента: $(git rev-parse --short HEAD 2>/dev/null || echo 'нет .git')"
+
+if [ "$PROVIDER" != "mock" ] && [ "$PROVIDER" != "offline" ]; then
+  echo "== 1. ключ и пробный вызов модели"
+  if ! "$PY" -m bcc_review doctor --live --provider "$PROVIDER" ${model_args[@]+"${model_args[@]}"}; then
+    echo
+    echo "Модель не ответила — исправьте то, что написано в «Что исправить» выше, и запустите снова." >&2
+    exit 3
+  fi
 fi
 
-echo "== 2/4 прогон: $DOC -> $OUT/$name.md"
+echo
+echo "== 2. прогон официального документа без кэша: $DOC -> $OUT"
+rm -f "$JSON"
 start=$(date +%s)
-"$PY" -m bcc_review "$DOC" "$OUT/$name.md" "${run[@]}"
+"$PY" -m bcc_review "$DOC" "$OUT" --provider "$PROVIDER" ${model_args[@]+"${model_args[@]}"} --no-cache --export jira
 code=$?
-secs=$(( $(date +%s) - start ))
+seconds=$(( $(date +%s) - start ))
+echo "время: ${seconds} с, код выхода ${code}"
+if [ ! -f "$JSON" ]; then
+  echo "Отчёт не записан." >&2
+  [ "$code" -eq 0 ] && code=1
+  exit "$code"
+fi
 
-echo "== 3/4 verify: цитаты и паспорт отчёта"
-"$PY" -m bcc_review verify "$OUT/$name.json" "$DOC"
-vcode=$?
+echo
+echo "== 3. verify"
+"$PY" -m bcc_review verify "$JSON" "$DOC"
+verify=$?
 
-echo "== 4/4 сводка"
-"$PY" scripts/jury_summary.py "$OUT/$name.json" "$secs" "$code" "$vcode"
+score_args=()
+if [ -d evaluation/v2 ]; then
+  echo
+  echo "== 4. сверка с эталоном (строгий счёт, без модели)"
+  if "$PY" -m evaluation.v2.score "$JSON" --report-md "$OUT" --out "$OUTDIR/score.${PROVIDER}.json" \
+       --md "$OUTDIR/score.${PROVIDER}.md" >/dev/null; then
+    score_args=(--score "$OUTDIR/score.${PROVIDER}.json")
+    echo "разбор: $OUTDIR/score.${PROVIDER}.md"
+  else
+    echo "счётчик эталона не отработал — пропускаю" >&2
+  fi
+fi
+
+"$PY" scripts/run_summary.py "$JSON" ${score_args[@]+"${score_args[@]}"} --verify-code "$verify" --seconds "$seconds" \
+  --max-minutes "$MAX_MINUTES" --max-calls "$MAX_CALLS" --check

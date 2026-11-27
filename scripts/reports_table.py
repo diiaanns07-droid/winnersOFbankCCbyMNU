@@ -5,16 +5,20 @@
     python scripts/reports_table.py reports --src cashback=evaluation/dev/.../source.md   # исходник не из release/input
 
 Для каждого отчёта заново запускается `python -m bcc_review verify ОТЧЁТ.json ИСХОДНИК`: исходник берётся из
-паспорта (document.file) и ищется в release/input/, рядом с отчётом и по пути из паспорта.
+паспорта (document.file) и ищется в release/input/, рядом с отчётом и по пути из паспорта. Отчёты по документу
+кейса (`release/input/requirements.md` или его PDF, сверка по SHA-256) дополнительно сверяются с эталоном К1–К5,
+С1–С20: `python -m evaluation.v2.score` в строгом счёте без арбитра — детерминированно и без модели.
 Сами отчёты скрипт не меняет.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +56,35 @@ def _verify(report: Path, source: Path | None) -> str:
     r = subprocess.run([sys.executable, "-m", "bcc_review", "verify", str(report), str(source)], cwd=ROOT,
                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
     return "OK" if r.returncode == 0 else f"ошибка (код {r.returncode})"
+
+
+def _official_hashes() -> set[str]:
+    out = set()
+    for name in ("requirements.md", "requirements.pdf", "requirements.docx"):
+        path = ROOT / "release" / "input" / name
+        if path.is_file():
+            out.add(hashlib.sha256(path.read_bytes()).hexdigest())
+    return out
+
+
+def _score(report: Path, data: dict) -> str:
+    """К и С по эталону официального документа (строгий счёт без арбитра); для других документов — «—»."""
+    if _get(data, "document", "sha256", default="") not in _official_hashes():
+        return "—"
+    if not (ROOT / "evaluation" / "v2" / "score.py").is_file():
+        return "—"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "score.json"
+        r = subprocess.run([sys.executable, "-m", "evaluation.v2.score", str(report.resolve()), "--out", str(out)],
+                           cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        if r.returncode != 0 or not out.is_file():
+            return "—"
+        gates = {g.get("metric"): g.get("value") for g in json.loads(out.read_text(encoding="utf-8")).get("gates", [])}
+    k, kc, s, fp = (gates.get(m) for m in ("К1–К5 найдены", "из них критичными", "С1–С20 найдены", "критичных ложных"))
+    if k is None or s is None:
+        return "—"
+    kc = str(kc).split("/", 1)[0] if kc is not None else "?"
+    return f"К {k} (крит. {kc}) · С {s} · ложных крит. {fp if fp is not None else '?'}"
 
 
 def _minutes(seconds) -> str:
@@ -93,19 +126,20 @@ def rows(reports_dir: Path, overrides: dict[str, str] | None = None) -> list[dic
             "commit": commit,
             "version": run.get("version", "—"),
             "verify": _verify(path, source),
+            "gold": _score(path, data),
         })
     return out
 
 
 def table(items: list[dict]) -> str:
     head = ("| Отчёт | Вход | Провайдер | Модель | Статус | Время | Вызовов (из кэша) | Требований | "
-            "Замечаний крит./сущ./незн. | Разработка / тестирование | Коммит | verify |\n"
-            "| :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | :--- | :--- | :--- | :--- |")
+            "Замечаний крит./сущ./незн. | Разработка / тестирование | Эталон кейса | Коммит | verify |\n"
+            "| :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | :--- | :--- | :--- | :--- | :--- |")
     lines = [head]
     for r in items:
         lines.append(f"| [{r['report']}]({r['report']}) | `{r['input']}` | {r['provider']} | {r['model']} | {r['status']} | "
                      f"{r['duration']} | {r['calls']} ({r['cached']}) | {r['requirements']} | {r['findings']} | "
-                     f"{r['verdict']} | `{r['commit']}` | {r['verify']} |")
+                     f"{r['verdict']} | {r['gold']} | `{r['commit']}` | {r['verify']} |")
     return "\n".join(lines)
 
 

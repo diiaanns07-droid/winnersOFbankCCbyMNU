@@ -1,66 +1,52 @@
 #!/usr/bin/env bash
-# Одна команда: установить агента и проверить официальный документ кейса (Linux, macOS).
+# Одна команда: окружение, проверка документа, verify, сводка (macOS и Linux).
 #
-#   scripts/run_official.sh                       # провайдер по ключам в .env (auto)
-#   scripts/run_official.sh gemini                # бесплатный Gemini (ключ GEMINI_API_KEY в .env)
-#   scripts/run_official.sh claude_cli sonnet     # Claude Code CLI с выбранной моделью
-#   DOC=release/input/requirements.pdf scripts/run_official.sh
+#   scripts/run_official.sh                                  # официальный документ кейса, модель — по ключу в .env
+#   scripts/run_official.sh путь/к/ТЗ.pdf                    # свой документ (.pdf, .docx, .md, .html, .txt)
+#   scripts/run_official.sh release/input/requirements.md --provider mock   # любые параметры bcc_review после пути
 #
-# Скрипт создаёт .venv (если его нет), ставит зависимости, проверяет настройку (doctor), запускает агента,
-# сверяет отчёт с документом (verify) и печатает, где лежат файлы. Отчёт — в reports/my/ (не попадает в git).
-set -euo pipefail
+# Отчёт: reports/my/<имя документа>.md (для PDF, DOCX и др. — <имя>_<расширение>.md), рядом .json и .html.
+# Первый запуск сам создаёт .venv и ставит зависимости.
+set -uo pipefail
 
-PROVIDER="${1:-auto}"
-MODEL="${2:-}"
-DOC="${DOC:-release/input/requirements.md}"
-OUT="${OUT:-reports/my/$(basename "${DOC%.*}").md}"
-PYTHON="${PYTHON:-python3}"
-export PIP_DISABLE_PIP_VERSION_CHECK=1
-
-cd "$(dirname "$0")/.."
-
-if [ ! -x .venv/bin/python ]; then
-  echo "== создаю .venv ($PYTHON)"
-  "$PYTHON" -m venv .venv
-fi
-py=.venv/bin/python
-
-echo "== установка"
-"$py" -m pip install -q -r requirements.txt -e .
-
-if [ ! -f .env ] && [ -f .env.example ]; then
-  cp .env.example .env
-  echo "создан .env из .env.example — впишите ключ в строку GEMINI_API_KEY="
+DOC="release/input/requirements.md"
+if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
+  DOC="$1"
+  shift
+  # путь от текущего каталога: дальше скрипт работает из корня репозитория
+  if [ -f "$DOC" ]; then
+    DOC="$(cd "$(dirname "$DOC")" && pwd)/$(basename "$DOC")"
+  fi
 fi
 
-echo "== проверка настройки"
-"$py" -m bcc_review doctor --provider "$PROVIDER" || true
+# shellcheck source=scripts/_env.sh
+source "$(dirname "$0")/_env.sh"
+if [ ! -f "$DOC" ]; then
+  echo "Файл не найден: $DOC" >&2
+  exit 2
+fi
+stem="$(basename "${DOC%.*}")"
+ext="${DOC##*.}"
+[ "$ext" != "md" ] && [ "$ext" != "$DOC" ] && stem="${stem}_${ext}"
+OUT="${OUT:-reports/my}/${stem}.md"
+JSON="${OUT%.md}.json"
 
-args=(--provider "$PROVIDER")
-[ -n "$MODEL" ] && args+=(--model "$MODEL")
-
-echo
-echo "== прогон: $DOC -> $OUT"
-code=0
-"$py" -m bcc_review "$DOC" "$OUT" "${args[@]}" || code=$?
-
-json="${OUT%.md}.json"
-if [ ! -f "$json" ]; then
-  echo "отчёт не записан (код выхода $code)" >&2
-  [ "$code" -eq 0 ] && code=1
+echo "== проверка документа: $DOC -> $OUT"
+start=$(date +%s)
+"$PY" -m bcc_review "$DOC" "$OUT" "$@"
+code=$?
+seconds=$(( $(date +%s) - start ))
+if [ ! -f "$JSON" ]; then
   exit "$code"
 fi
 
 echo
-echo "== verify"
-verify=0
-"$py" -m bcc_review verify "$json" "$DOC" || verify=$?
+echo "== verify: каждая цитата ищется в документе заново"
+"$PY" -m bcc_review verify "$JSON" "$DOC"
+verify=$?
 
-echo
-echo "Отчёт: $OUT"
-for f in "${OUT%.md}".html "$json"; do [ -f "$f" ] && echo "       $f"; done
-if [ "$code" -eq 3 ]; then
-  echo "Модель недоступна: отчёт собран только правилами. Проверьте ключ: $py -m bcc_review doctor --live" >&2
+"$PY" scripts/run_summary.py "$JSON" --verify-code "$verify" --seconds "$seconds"
+if [ "$verify" -ne 0 ]; then
+  exit "$verify"
 fi
-[ "$verify" -ne 0 ] && exit "$verify"
 exit "$code"

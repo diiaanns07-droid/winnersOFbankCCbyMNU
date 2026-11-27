@@ -1,55 +1,79 @@
-﻿# Проверка агента так, как его запустит жюри: doctor --live -> прогон официального документа -> verify -> сводка.
-# Черновик №02, принят №16.
+﻿# Проверка «как у жюри» одной командой (Windows PowerShell 5.1 и PowerShell 7): ключ и модель → прогон
+# официального документа без кэша → verify → сверка с эталоном К1–К5, С1–С20 → сводка с воротами.
 #
-#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1
-#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 -Provider claude_cli -Model haiku
-#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 -Doc release\input\requirements.pdf
+#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1                  # Gemini, ключ в .env
+#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 gemini gemini-3.6-flash
+#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 claude_cli haiku
+#   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 mock            # без сети: проверка установки
 #
-# Ключ Gemini: строка GEMINI_API_KEY=... в файле .env в корне репозитория (или $env:GEMINI_API_KEY).
-# Файл сохранён в UTF-8 с BOM: иначе Windows PowerShell 5.1 покажет русский текст нечитаемым.
-param(
-    [string]$Provider = "gemini",
-    [string]$Model = "",
-    [string]$Doc = "release\input\requirements.md",
-    [string]$OutDir = "out\jury_check"
-)
-Set-Location (Split-Path -Parent $PSScriptRoot)
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$env:PYTHONIOENCODING = "utf-8"
+# Отчёт: out\jury\requirements.<провайдер>.md (+ .json, .html, score.<провайдер>.md). Код выхода 0 — все ворота
+# пройдены. Пределы: $env:MAX_MINUTES (по умолчанию 6 для gemini, 15 для остальных), $env:MAX_CALLS (12).
+# Файл сохранён в UTF-8 с BOM (иначе Windows PowerShell 5.1 искажает русский текст).
 
-if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    Write-Host "== подготовка: создаю .venv и ставлю зависимости (один раз)"
-    $made = $false
-    if (Get-Command py -ErrorAction SilentlyContinue) { py -3.12 -m venv .venv; $made = ($LASTEXITCODE -eq 0) }
-    if (-not $made) { python -m venv .venv }
-    & ".venv\Scripts\python.exe" -m pip install -q -r requirements.txt -e .
-    if ($LASTEXITCODE -ne 0) { Write-Host "СТОП: установка зависимостей не удалась (см. сообщения pip выше)."; exit 1 }
+$Provider = if ($args.Count -ge 1) { [string]$args[0] } else { "gemini" }
+$Model = if ($args.Count -ge 2) { [string]$args[1] } else { "" }
+
+. (Join-Path $PSScriptRoot "_env.ps1")
+
+$maxMinutes = if ($env:MAX_MINUTES) { $env:MAX_MINUTES } elseif ($Provider -eq "gemini") { "6" } else { "15" }
+$maxCalls = if ($env:MAX_CALLS) { $env:MAX_CALLS } else { "12" }
+$Doc = "release\input\requirements.md"
+$outDir = "out\jury"
+$report = Join-Path $outDir "requirements.$Provider.md"
+$json = Join-Path $outDir "requirements.$Provider.json"
+$modelArgs = @()
+if ($Model) { $modelArgs = @("--model", $Model) }
+
+$commit = "нет .git"
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    $c = (& git rev-parse --short HEAD 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $c) { $commit = $c }
 }
-$py = (Resolve-Path ".venv\Scripts\python.exe").Path
-$mopt = @()
-if ($Model) { $mopt = @("--model", $Model) }
-New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$name = [System.IO.Path]::GetFileNameWithoutExtension($Doc)
-$report = Join-Path $OutDir "$name.md"
-$json = Join-Path $OutDir "$name.json"
+Write-Host "== коммит агента: $commit"
 
-Write-Host "== 1/4 проверка модели: doctor --live --provider $Provider"
-& $py -m bcc_review doctor --live --provider $Provider @mopt
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "СТОП: модель не ответила. Исправьте по подсказке «Что исправить» выше и запустите скрипт снова."
-    exit 2
+if ($Provider -ne "mock" -and $Provider -ne "offline") {
+    Write-Host "== 1. ключ и пробный вызов модели"
+    & $Py -m bcc_review doctor --live --provider $Provider @modelArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "Модель не ответила — исправьте то, что написано в «Что исправить» выше, и запустите снова." -ForegroundColor Red
+        exit 3
+    }
 }
 
-Write-Host "== 2/4 прогон: $Doc -> $report"
-$sw = [System.Diagnostics.Stopwatch]::StartNew()
-& $py -m bcc_review $Doc $report --provider $Provider @mopt --no-cache
+Write-Host ""
+Write-Host "== 2. прогон официального документа без кэша: $Doc -> $report"
+if (Test-Path $json) { Remove-Item $json }
+$sw = [Diagnostics.Stopwatch]::StartNew()
+& $Py -m bcc_review $Doc $report --provider $Provider @modelArgs --no-cache --export jira
 $code = $LASTEXITCODE
-$sw.Stop()
+$seconds = [int]$sw.Elapsed.TotalSeconds
+Write-Host "время: $seconds с, код выхода $code"
+if (-not (Test-Path $json)) {
+    Write-Host "Отчёт не записан." -ForegroundColor Red
+    if ($code -eq 0) { $code = 1 }
+    exit $code
+}
 
-Write-Host "== 3/4 verify: цитаты и паспорт отчёта"
-& $py -m bcc_review verify $json $Doc
-$vcode = $LASTEXITCODE
+Write-Host ""
+Write-Host "== 3. verify"
+& $Py -m bcc_review verify $json $Doc
+$verify = $LASTEXITCODE
 
-Write-Host "== 4/4 сводка"
-& $py scripts\jury_summary.py $json ([int]$sw.Elapsed.TotalSeconds) $code $vcode
+$scoreArgs = @()
+if (Test-Path "evaluation\v2") {
+    Write-Host ""
+    Write-Host "== 4. сверка с эталоном (строгий счёт, без модели)"
+    $scoreJson = Join-Path $outDir "score.$Provider.json"
+    $scoreMd = Join-Path $outDir "score.$Provider.md"
+    & $Py -m evaluation.v2.score $json --report-md $report --out $scoreJson --md $scoreMd | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        $scoreArgs = @("--score", $scoreJson)
+        Write-Host "разбор: $scoreMd"
+    } else {
+        Write-Host "счётчик эталона не отработал — пропускаю" -ForegroundColor Yellow
+    }
+}
+
+& $Py scripts\run_summary.py $json @scoreArgs --verify-code $verify --seconds $seconds --max-minutes $maxMinutes --max-calls $maxCalls --check
 exit $LASTEXITCODE

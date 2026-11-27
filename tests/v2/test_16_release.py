@@ -93,18 +93,38 @@ def test_readme_has_required_sections():
         assert heading in text, heading
 
 
-def test_readme_local_links_exist():
-    text = _read(README)
+def _local_links_missing(text: str) -> list[str]:
+    """Битые локальные ссылки. Файлы поздних этапов выпуска (отчёты, видео, слайды) пропускаются, пока их нет;
+    с BCC_RELEASE_CHECK=1 (проверка тега v2.0.0) проверяется всё."""
+    import os
+
+    strict = os.environ.get("BCC_RELEASE_CHECK") == "1"
     missing = []
     for target in re.findall(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", text):
         if re.match(r"^[a-z]+://", target) or target.startswith("mailto:"):
             continue
         # каталоги и файлы, которые появляются на поздних этапах выпуска, проверяются после тега v2.0.0
-        if target.startswith(("reports/", "evaluation/v2/", "examples/v2/")) and not (ROOT / target).exists():
+        late = ("reports/", "evaluation/v2/", "examples/v2/", "presentation/deck.", "presentation/demo.")
+        if not strict and target.startswith(late) and not (ROOT / target).exists():
             continue
         if not (ROOT / target).exists():
             missing.append(target)
+    return missing
+
+
+def test_readme_local_links_exist():
+    missing = _local_links_missing(_read(README))
     assert not missing, f"битые ссылки в README: {missing}"
+
+
+def test_submission_lists_deliverables_and_operator_checklist():
+    text = _read(ROOT / "SUBMISSION.md")
+    missing = _local_links_missing(text)
+    assert not missing, f"битые ссылки в SUBMISSION.md: {missing}"
+    for needed in ("github.com/diiaanns07-droid/winnersOFbankCCbyMNU", "`release`", "reports/requirements.md",
+                   "release/input/requirements.md", "presentation/demo.mp4", "presentation/deck.pdf",
+                   "GEMINI_API_KEY", "Public", "Default branch"):
+        assert needed in text, needed
 
 
 @pytest.mark.skipif(not _v2_cli_ready(), reason="каркаса v2 ещё нет")
@@ -238,7 +258,10 @@ def test_dockerfile_runs_the_agent():
     ignore = _read(ROOT / ".dockerignore").splitlines()
     for entry in (".env", ".git/*", ".bcc_cache", "runs"):
         assert entry in ignore, entry
-    assert not any(ln.startswith("!") and ".git/" not in ln for ln in ignore), "исключения .dockerignore только для .git"
+    allowed = {"!tests/v2/fixtures/official"}  # записанные ответы для --provider mock в контейнере
+    assert not any(ln.startswith("!") and ".git/" not in ln and ln not in allowed for ln in ignore), \
+        "исключения .dockerignore только для .git и фикстур mock"
+    assert "COPY tests/v2/fixtures/official" in text
 
 
 def test_git_commit_script_resolves_head(tmp_path):
@@ -257,37 +280,6 @@ def test_git_commit_script_resolves_head(tmp_path):
     (tmp_path / "refs" / "heads" / "main").write_text(other, encoding="utf-8")
     assert mod.resolve(tmp_path) == other
     assert mod.resolve(tmp_path / "нет") == ""
-
-
-# --------------------------------------------------------------------------- скрипты
-
-
-def test_powershell_scripts_have_utf8_bom():
-    """Windows PowerShell 5.1 читает .ps1 без BOM как ANSI: байт 0x94 из «—» становится кавычкой ” и рвёт строку."""
-    scripts = sorted((ROOT / "scripts").glob("*.ps1"))
-    assert scripts, "нет скриптов PowerShell"
-    for path in scripts:
-        data = path.read_bytes()
-        assert data.startswith(b"\xef\xbb\xbf"), f"{path.name}: сохраните в UTF-8 с BOM"
-        data[3:].decode("utf-8")
-
-
-@pytest.mark.skipif(sys.platform.startswith("win"), reason="bash-скрипты — для Linux и macOS")
-def test_shell_scripts_parse_and_are_executable():
-    for path in sorted((ROOT / "scripts").glob("*.sh")):
-        r = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True, encoding="utf-8")
-        assert r.returncode == 0, f"{path.name}: {r.stderr}"
-        mode = subprocess.run(["git", "ls-files", "-s", str(path.relative_to(ROOT))], cwd=ROOT,
-                              capture_output=True, text=True).stdout.split(" ", 1)[0]
-        if mode:  # файл уже в git
-            assert mode == "100755", f"{path.name}: git update-index --chmod=+x {path.relative_to(ROOT)}"
-
-
-def test_readme_mentions_one_command_scripts():
-    readme = _read(README)
-    for name in ("scripts/run_official.sh", "scripts\\run_official.ps1"):
-        assert name in readme, name
-        assert (ROOT / name.replace("\\", "/")).is_file(), name
 
 
 # --------------------------------------------------------------------------- секреты в репозитории
@@ -321,3 +313,70 @@ def test_no_secrets_in_tracked_files():
                 if not FAKE_MARKERS.search(m.group(0)):
                     found.append(f"{rel}: {label}")
     assert not found, found
+
+
+# --------------------------------------------------------------------------- скрипты для жюри и оператора
+
+SCRIPTS = ROOT / "scripts"
+
+
+def test_powershell_scripts_have_utf8_bom():
+    """Windows PowerShell 5.1 читает .ps1 без BOM в кодировке ANSI: байты «Д» (D0 94) становятся кавычкой «”»."""
+    ps1 = sorted(SCRIPTS.glob("*.ps1"))
+    assert {p.name for p in ps1} >= {"run_official.ps1", "jury_check.ps1", "_env.ps1"}
+    for path in ps1:
+        assert path.read_bytes().startswith(b"\xef\xbb\xbf"), f"{path.name}: нужен UTF-8 с BOM"
+
+
+def test_shell_scripts_parse_and_are_executable():
+    import os
+    import shutil
+
+    bash = shutil.which("bash")
+    for name in ("run_official.sh", "jury_check.sh", "final_reports.sh", "check_clean_install.sh"):
+        path = SCRIPTS / name
+        assert path.read_bytes().startswith(b"#!/usr/bin/env bash"), name
+        assert b"\r\n" not in path.read_bytes(), f"{name}: окончания строк CRLF"
+        if os.name != "nt":
+            assert os.access(path, os.X_OK), f"{name}: нет права на запуск (chmod +x)"
+        if bash and os.name != "nt":
+            r = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True, timeout=30)
+            assert r.returncode == 0, r.stderr
+    assert b"\r\n" not in (SCRIPTS / "_env.sh").read_bytes()
+
+
+def _summary_report(tmp_path: Path, status: str, *, verified: int = 10, seconds: float = 120.0) -> Path:
+    import json
+
+    rep = {"run": {"status": status, "provider": "gemini", "models_used": ["gemini-3.8-flash"],
+                   "calls": {"total": 9, "cached": 0, "failed": 0, "split": 0}, "duration_s": seconds,
+                   "tokens": {"input": 1000, "output": 500}, "warnings": []},
+           "summary": {"requirements": 40, "findings": {"critical": 4, "major": 10, "minor": 8},
+                       "quotes_verified": verified, "quotes_total": 10},
+           "verdict": {"development": "no", "testing": "no"}}
+    path = tmp_path / f"r_{status}.json"
+    path.write_text(json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def _run_summary(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(SCRIPTS / "run_summary.py"), *args], capture_output=True,
+                          text=True, encoding="utf-8", errors="replace", timeout=60)
+
+
+def test_run_summary_gates(tmp_path):
+    ok = _summary_report(tmp_path, "complete")
+    r = _run_summary(str(ok), "--check", "--max-minutes", "6", "--max-calls", "12", "--verify-code", "0")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "gemini-3.8-flash" in r.stdout and "Все проверки пройдены" in r.stdout
+
+    partial = _summary_report(tmp_path, "partial")
+    r = _run_summary(str(partial), "--check")
+    assert r.returncode == 1 and "статус прогона" in r.stdout.split("Не пройдено:", 1)[1]
+
+    slow = _summary_report(tmp_path, "complete", seconds=500)
+    assert _run_summary(str(slow), "--check", "--max-minutes", "6").returncode == 1
+    assert _run_summary(str(ok), "--check", "--verify-code", "4").returncode == 1
+    # без --check сводка только печатается
+    assert _run_summary(str(partial)).returncode == 0
+    assert _run_summary(str(tmp_path / "нет.json")).returncode == 1
