@@ -102,7 +102,10 @@ def _raw_source_lines(view: dict) -> list[str] | None:
         return None
     try:
         p = Path(f)
-        return p.read_text(encoding="utf-8-sig").splitlines() if p.is_file() else None
+        if not p.is_file():
+            return None
+        from bcc_review.v2.docview import _decode_text  # та же кодировка, что у view (UTF-16, cp1251)
+        return _decode_text(p.read_bytes()).splitlines()
     except OSError:
         return None
 

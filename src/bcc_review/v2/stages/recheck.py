@@ -184,7 +184,8 @@ def load_answers(source: Any) -> dict:
     s = str(source or "")
     p = Path(s) if len(s) < 4096 and "\n" not in s else None
     if p is not None and p.exists():
-        text = p.read_text(encoding="utf-8-sig")
+        from bcc_review.v2.docview import _decode_text  # UTF-16 и ANSI (cp1251) из Блокнота, как у документа
+        text = _decode_text(p.read_bytes())
         if p.suffix.lower() == ".json":
             return parse_answers_json(json.loads(text))
     else:
