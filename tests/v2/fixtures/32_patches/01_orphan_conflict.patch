@@ -1,0 +1,219 @@
+From c63d1d380b666094b832cf623ff8213215fcf6ad Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 27 Nov 2026 12:29:30 +0000
+Subject: [PATCH] =?UTF-8?q?fix(=D0=BF=D0=BE=D1=81=D0=BB=D0=B5=20=D0=B7?=
+ =?UTF-8?q?=D0=B0=D0=BC=D0=BE=D1=80=D0=BE=D0=B7=D0=BA=D0=B8,=20=E2=84=9632?=
+ =?UTF-8?q?):=20=D1=81=D0=BF=D0=BE=D1=80=D1=8F=D1=89=D0=B8=D0=B5=20=D1=80?=
+ =?UTF-8?q?=D0=B5=D0=BF=D0=BB=D0=B8=D0=BA=D0=B8=20=D0=BD=D0=B0=20=D0=B2?=
+ =?UTF-8?q?=D0=BE=D0=BF=D1=80=D0=BE=D1=81,=20=D0=BA=D0=BE=D1=82=D0=BE?=
+ =?UTF-8?q?=D1=80=D0=BE=D0=B3=D0=BE=20=D0=BD=D0=B5=D1=82=20=D0=B2=20=D0=BF?=
+ =?UTF-8?q?=D1=80=D0=BE=D0=B3=D0=BE=D0=BD=D0=B5,=20=D0=BD=D0=B5=20=D0=B2?=
+ =?UTF-8?q?=D0=BD=D0=BE=D1=81=D1=8F=D1=82=D1=81=D1=8F=20=D0=B2=20=D1=80?=
+ =?UTF-8?q?=D0=B5=D0=B4=D0=B0=D0=BA=D1=86=D0=B8=D1=8E=20=D0=BE=D0=B1=D0=B5?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Полный прогон с --answers перегенерирует вопросы; если темы вопроса в новом прогоне нет, реплики
+двух адресатов с разными значениями (422 и 403) уходили в общие решения порознь, и --revise вносил
+обе отдельными новыми требованиями — редакция с двумя противоречащими кодами. Теперь такие реплики
+(номер и тема одни, у каждой стороны своё число) — answer_conflicts: решения в споре редакция не
+вносит, дефект, закрытый одной стороной, остаётся открытым, раздел «до и после» показывает обе.
+Тест tests/v2/test_32_release_orphan_conflict.py.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Wm634Lo1xpuYs1eF72iqYt
+---
+ src/bcc_review/v2/stages/recheck.py         | 72 ++++++++++++++++++++-
+ tests/v2/test_32_release_orphan_conflict.py | 61 +++++++++++++++++
+ 2 files changed, 131 insertions(+), 2 deletions(-)
+ create mode 100644 tests/v2/test_32_release_orphan_conflict.py
+
+diff --git a/src/bcc_review/v2/stages/recheck.py b/src/bcc_review/v2/stages/recheck.py
+index eddd4318..bc8f5355 100644
+--- a/src/bcc_review/v2/stages/recheck.py
++++ b/src/bcc_review/v2/stages/recheck.py
+@@ -498,6 +498,7 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
+     answered: dict[str, dict] = {}
+     extra: list[str] = []
+     postponed: list[dict] = []  # вопросы, где владелец отложил решение целиком (для отчёта)
++    orphans: dict[tuple, list[dict]] = {}  # ответы на вопросы, которых нет в прогоне, по номеру и теме
+     def clean(text: str, where: str) -> str:
+         kept, cut = strip_injection(text)
+         if cut:
+@@ -584,6 +585,10 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
+                     warnings.append(f"recheck: {a['id']}: ответ откладывает решение — не учтён")
+                     continue
+                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
++                # реплики одного номера и одной темы — ответы адресатов на один вопрос, даже если в этом прогоне
++                # его нет: запоминаем вместе, чтобы сверить их между собой (общими решениями порознь не сверить)
++                orphans.setdefault((a.get("id"), " ".join(sorted(_tokens(hint)))), []).append(
++                    {"label": f"Решение-{len(extra)}", "text": a["text"], "topic": hint, "id": a.get("id")})
+                 why = "тема не совпала ни с одним вопросом прогона" if hint else "такого вопроса нет в прогоне"
+                 warnings.append(f"recheck: {a['id']}: {why} — ответ учтён как общее решение")
+             else:
+@@ -653,7 +658,55 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
+     postponed = [p for p in postponed if p["question_id"] not in answered] + \
+         [{"question_id": a["question_id"], "text": x, "partial": True} for a in answered.values()
+          for x in a.get("deferred") or []]
+-    return {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
++    out = {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
++    clashes = decision_clashes(orphans)
++    for c in clashes:
++        warnings.append(f"recheck: {c['question_id']} [{c['topic']}]: ответы адресатов расходятся в значениях "
++                        f"({' ↔ '.join(c['answers'])}), а вопроса с этой темой в прогоне нет — ни одно значение не "
++                        f"вносится, выберите одно")
++    if clashes:
++        out["decision_conflicts"] = clashes
++    return out
++
++
++def _values(text: str) -> set[str]:
++    """Числа ответа: «100 000» = «100000», «0,5» = «0.5»; одна цифра («1 раз», «шаг 2») — не значение."""
++    s = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d{3}(?!\d))", "", str(text or ""))
++    return {n.replace(",", ".") for n in re.findall(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])", s) if len(n) >= 2}
++
++
++def decision_clashes(orphans: dict) -> list[dict]:
++    """Реплики разных адресатов на один вопрос (номер и тема), которого нет в прогоне, с разными значениями — конфликт.
++
++    Расхождение кодом — только по числам (коды, сроки, суммы): у каждой стороны есть число, которого нет у другой
++    («422» ↔ «403»). Реплики, где одна дополняет другую («48 часов» и «48 часов, затем 409»), — не конфликт."""
++    out = []
++    for (qid, _topic), items in orphans.items():
++        if len(items) < 2:
++            continue
++        vals = [_values(x["text"]) for x in items]
++        clash = [x for i, x in enumerate(items)
++                 if any(vals[i] - vals[j] and vals[j] - vals[i] for j in range(len(items)) if j != i)]
++        if len(clash) >= 2:
++            out.append({"question_id": qid or "", "topic": clash[0]["topic"], "answers": [x["label"] for x in clash],
++                        "texts": {x["label"]: x["text"] for x in clash}})
++    return out
++
++
++def _orphan_conflicts(resolved: dict, conflicts: list[dict]) -> list[dict]:
++    """Спорящие реплики на вопрос, которого нет в прогоне, — в ``answer_conflicts`` (номер, тема, тексты): решения
++    в споре редакция не вносит (``revise.decision_targets``), владелец выбирает одно."""
++    out = [dict(c) for c in conflicts]
++    for d in resolved.get("decision_conflicts") or []:
++        extra = {"question_id": d.get("question_id", ""), "topic": d.get("topic", ""), "texts": dict(d.get("texts") or {})}
++        hit = [c for c in out if set(c.get("answers") or []) == set(d["answers"])]
++        for c in hit:
++            c.update(extra)
++        if not hit:
++            out.append({"finding_id": "", "answers": list(d["answers"]), **extra,
++                        "reason": f"адресаты по-разному ответили на «{d.get('topic') or d.get('question_id')}», а такого "
++                                  f"вопроса в этом прогоне нет — ни одно значение не внесено, выберите одно"})
++    return out
+ 
+ 
+ def severity_counts(findings: Iterable[dict]) -> dict:
+@@ -1057,6 +1110,19 @@ def _force_choice_conflicts(result: dict) -> None:
+                 rc.pop("title_after", None)
+                 rc.pop("problem_after", None)
+                 rc["reason"] = f"ответы {' и '.join(clash)} выбирают разные варианты одного вопроса — выберите один"
++    # общее решение из спорящих реплик (вопроса в прогоне нет) не снимает дефект: значение не согласовано
++    for c in result["answers"].get("decision_conflicts") or []:
++        labels = set(c["answers"])
++        for g in result["findings"]:
++            rc = g["recheck"]
++            if rc["status"] == "open" or not labels & set(rc.get("answer_ids") or []):
++                continue
++            rc["status"], rc["severity_after"] = "open", g.get("severity")
++            rc["answer_conflict"] = list(dict.fromkeys(list(rc.get("answer_conflict") or []) + c["answers"]))
++            for k in ("answer_ids", "title_after", "problem_after"):
++                rc.pop(k, None)
++            rc["reason"] = (f"ответы адресатов на «{c['topic']}» расходятся ({' и '.join(c['answers'])}) — "
++                            f"выберите одно значение")
+ 
+ 
+ def _finish(ctx: Any, result: dict) -> dict:
+@@ -1229,6 +1295,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
+         "warnings": warnings,
+         "status": rc.get("status", "ok"),
+     }
++    clar["answer_conflicts"] = _orphan_conflicts(rc["answers"], clar["answer_conflicts"])
+     return {"clarification": clar, "findings_after": after,
+             "rejected_after": list(rc.get("rejected") or []) + new_rejected}
+ 
+@@ -1274,7 +1341,8 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
+         for c in clar["answer_conflicts"]:
+             texts = c.get("texts") or {}
+             sides = " ↔ ".join(f"{x} «{_short(texts[x])}»" if texts.get(x) else x for x in c["answers"])
+-            lines.append(f"* {sides} — {c['finding_id']}: {c['reason']}")
++            where = c.get("finding_id") or (f"{c['question_id']} [{c.get('topic', '')}]" if c.get("question_id") else "")
++            lines.append(f"* {sides} — {where}: {c['reason']}" if where else f"* {sides} — {c['reason']}")
+         lines.append("")
+     if clar.get("postponed"):
+         lines.append("Владелец отложил решение — это не ответ, дефект по этой части остаётся открытым:")
+diff --git a/tests/v2/test_32_release_orphan_conflict.py b/tests/v2/test_32_release_orphan_conflict.py
+new file mode 100644
+index 00000000..0d0d974e
+--- /dev/null
++++ b/tests/v2/test_32_release_orphan_conflict.py
+@@ -0,0 +1,61 @@
++"""№32, исправление в релиз: спорящие реплики двух адресатов на вопрос, которого нет в новом прогоне.
++
++Полный прогон с ``--answers`` перегенерирует вопросы; если темы вопроса в новом прогоне нет, обе реплики («423» у
++одного адресата, «409» у другого) уходили в общие решения порознь — и ``--revise`` вносил ОБЕ в исправленную
++редакцию отдельными новыми требованиями («[добавлено: Решение-1]», «[добавлено: Решение-2]»): документ с двумя
++противоречащими кодами. Живой случай — ТЗ перевода по QR, sonnet, 27.11 17:05 (вопрос «отказ антифрода»: 422 ↔ 403).
++"""
++from __future__ import annotations
++
++import sys
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++
++from bcc_review.v2.stages import recheck, revise  # noqa: E402
++from test_11_clarify import FakeCtx, FakeLLM  # noqa: E402
++
++QS = [{"id": "Q-01", "topic": "Срок хранения журнала", "question": "Сколько хранить журнал?",
++       "options": ["1 год", "5 лет"], "finding_ids": ["D-01"]}]
++FINDINGS = [{"id": "D-01", "severity": "major", "kind": "incompleteness", "title": "Срок хранения журнала не задан",
++             "blocks": "development", "priority": 1, "evidence": [], "problem": "…", "scenario": "…"},
++            {"id": "D-02", "severity": "major", "kind": "incompleteness", "title": "Не задан код ответа при блокировке счёта",
++             "blocks": "development", "priority": 2, "evidence": [], "scenario": "…",
++             "problem": "При блокировке счёта код ответа не указан, клиент не знает, создана ли операция."}]
++CLASH = ("Q-07 [Код ответа при блокировке счёта]: Команда безопасности: при блокировке возвращаем 423, операцию не создаём.\n"
++         "Q-07 [Код ответа при блокировке счёта]: Владелец API: при блокировке возвращаем 409, операцию не создаём.\n")
++
++
++def _report():
++    return {"findings": FINDINGS, "questions": QS, "verdict": {}, "run": {"status": "complete"}}
++
++
++def _resp(decisions):
++    return {"decisions": [dict({"severity": "major", "title": "", "problem": "", "by": [], "conflicting_answers": [],
++                                "reason": "", "status": "open"}, **d) for d in decisions], "candidates": []}
++
++
++def test_conflicting_orphan_replies_not_written_into_revision():
++    clar = recheck.apply_answers(FakeCtx(FakeLLM(_resp([]))), _report(), CLASH)["clarification"]
++    assert len(clar["decisions"]) == 2
++    conf = [c for c in clar["answer_conflicts"] if not c["finding_id"]]
++    assert len(conf) == 1 and conf[0]["answers"] == ["Решение-1", "Решение-2"] and conf[0]["question_id"] == "Q-07"
++    assert revise.decision_targets(clar) == []  # было: оба решения — отдельные правки редакции
++    assert any("расходятся в значениях" in w for w in clar["warnings"])
++    md = recheck.render_markdown(clar)
++    assert "Q-07 [Код ответа при блокировке счёта]" in md and "423" in md and "409" in md
++
++
++def test_finding_closed_by_one_side_stays_open():
++    resp = _resp([{"finding_id": "D-02", "status": "resolved", "by": ["Решение-1"], "reason": "снят решением"}])
++    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), CLASH)["clarification"]
++    ch = next(c for c in clar["changes"] if c["finding_id"] == "D-02")
++    assert ch["status"] == "open" and set(ch["answer_conflict"]) == {"Решение-1", "Решение-2"}
++
++
++def test_complementary_replies_still_written():
++    text = ("Q-07 [Срок хранения ключа запроса]: Ключ храним 48 часов с первого запроса.\n"
++            "Q-07 [Срок хранения ключа запроса]: Да, 48 часов; после изменения суммы под тем же ключом — 409.\n")
++    clar = recheck.apply_answers(FakeCtx(FakeLLM(_resp([]))), _report(), text)["clarification"]
++    assert not clar["answer_conflicts"]
++    assert [t["id"] for t in revise.decision_targets(clar)] == ["Решение-1", "Решение-2"]
+-- 
+2.43.0
+

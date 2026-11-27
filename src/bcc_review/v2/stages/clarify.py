@@ -407,14 +407,91 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
             "_rank": (0 if blocking else 1, min(_SEV_RANK.get(s, 2) for s in sev), prio, -min(found_by, 3), i),
         })
     kept.sort(key=lambda x: x["_rank"])
-    cap = question_cap(findings)
-    if len(kept) > cap:
-        warnings.append(f"clarify: оставлено {cap} вопросов из {len(kept)}")
-        kept = kept[:cap]
+    kept = merge_similar(kept, by_id, warnings)
+    kept = cap_questions(kept, findings, warnings)
     for n, q in enumerate(kept, 1):
         q.pop("_rank", None)
         q["id"] = f"Q-{n:02d}"
     return kept
+
+
+# --------------------------------------------------------------------------- почти одинаковые вопросы
+# Мера сходства двух вопросов: доля общих основ слов темы и текста (Жаккар по первым 5 буквам слов от 3 букв и
+# числам) и доля общих дефектов (от меньшего набора). Пороги — по 20 сохранённым отчётам (open2 sonnet 08:20 и
+# haiku 05:20, официальный sonnet и haiku 13:00; 762 пары): у разных вопросов текст не выше 0,46 и общих дефектов
+# нет ни в одной паре; перефразировка того же решения — 0,41–0,55 по тексту, дефекты общие. Поэтому только по
+# тексту — от 0,6 (повтор почти слово в слово), при общих дефектах (половина и больше) — от 0,3.
+SIMILAR_TEXT = 0.6
+SIMILAR_TEXT_SHARED = 0.3
+
+
+def question_similarity(a: dict, b: dict) -> tuple[float, float]:
+    """(сходство текста темы и вопроса, доля общих дефектов) — оба от 0 до 1. Числа — тоже слова («24 часа» и
+    «48 часов» — разные вопросы); у коротких текстов (меньше 4 основ) сходство — только полное совпадение."""
+    def words(q: dict) -> set[str]:
+        s = f"{q.get('topic', '')} {q.get('question', '')}"
+        return _tok(s) | set(re.findall(r"\d+", s))
+    ta, tb = words(a), words(b)
+    if min(len(ta), len(tb)) < 4:
+        text = 1.0 if ta == tb and ta else 0.0
+    else:
+        text = len(ta & tb) / len(ta | tb)
+    fa, fb = set(a.get("finding_ids") or []), set(b.get("finding_ids") or [])
+    shared = len(fa & fb) / min(len(fa), len(fb)) if fa and fb else 0.0
+    return text, shared
+
+
+def is_similar(a: dict, b: dict) -> bool:
+    text, shared = question_similarity(a, b)
+    return text >= SIMILAR_TEXT or (shared >= 0.5 and text >= SIMILAR_TEXT_SHARED)
+
+
+def merge_similar(questions: list[dict], by_id: dict, warnings: list[str] | None = None) -> list[dict]:
+    """Почти одинаковые вопросы — один: остаётся первый (вопросы уже отсортированы по важности — блокирующий и более
+    серьёзный идёт раньше, поэтому порядок после слияния не меняется), его дефекты дополняются дефектами слитого —
+    чтобы critical слитого вопроса не остался без вопроса. Блокирующим вопрос становится, если среди
+    дефектов есть блокирующий critical."""
+    warnings = warnings if warnings is not None else []
+    out: list[dict] = []
+    for q in questions:
+        twin = next((p for p in out if is_similar(p, q)), None)
+        if twin is None:
+            out.append(q)
+            continue
+        twin["finding_ids"] = list(dict.fromkeys(list(twin.get("finding_ids") or []) + list(q.get("finding_ids") or [])))
+        twin["blocking"] = bool(twin.get("blocking")) or any(
+            (by_id.get(fid) or {}).get("severity") == "critical" and (by_id.get(fid) or {}).get("blocks", "both") != "none"
+            for fid in twin["finding_ids"])
+        warnings.append(f"clarify: вопрос «{str(q.get('question', ''))[:60]}» слит с похожим «"
+                        f"{str(twin.get('question', ''))[:60]}» — то же решение")
+    return out
+
+
+def cap_questions(questions: list[dict], findings: list[dict], warnings: list[str] | None = None) -> list[dict]:
+    """Не больше ``question_cap``; при отсечении в первую очередь остаются вопросы, без которых блокирующий
+    critical остался бы без вопроса (порядок важности внутри групп сохраняется)."""
+    warnings = warnings if warnings is not None else []
+    cap = question_cap(findings)
+    if len(questions) <= cap:
+        return questions
+    crit = {f.get("id") for f in findings
+            if f.get("severity") == "critical" and f.get("blocks", "both") != "none" and f.get("id")}
+    keep: list[int] = []
+    covered: set = set()
+    for i, q in enumerate(questions):  # сначала — вопросы с ещё не покрытым critical
+        new = crit & set(q.get("finding_ids") or []) - covered
+        if new and len(keep) < cap:
+            keep.append(i)
+            covered |= new
+    for i in range(len(questions)):
+        if len(keep) >= cap:
+            break
+        if i not in keep:
+            keep.append(i)
+    lost = sorted(crit - covered - {fid for i in keep for fid in questions[i].get("finding_ids") or []})
+    warnings.append(f"clarify: оставлено {cap} вопросов из {len(questions)}"
+                    + (f"; без вопроса остались критичные {', '.join(lost)}" if lost else ""))
+    return [questions[i] for i in sorted(keep)]
 
 
 # --------------------------------------------------------------------------- каждый critical — в вопросе
@@ -509,10 +586,7 @@ def cover_critical(questions: list[dict], findings: list[dict], warnings: list[s
     if not added:
         return with_consequences(questions, findings)
     out = [q for q in questions if q.get("blocking")] + added + [q for q in questions if not q.get("blocking")]
-    cap = question_cap(findings)
-    if len(out) > cap:
-        warnings.append(f"clarify: оставлено {cap} вопросов из {len(out)}")
-        out = out[:cap]
+    out = cap_questions(out, findings, warnings)
     for n, q in enumerate(out, 1):
         q["id"] = f"Q-{n:02d}"
     return with_consequences(out, findings)

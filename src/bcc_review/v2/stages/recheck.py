@@ -277,6 +277,49 @@ def unhide(text: str) -> tuple[str, int]:
     return _INVISIBLE.sub("", _HIDDEN.sub("", text)), n
 
 
+# SHA-256 документа, по которому составлены ответы (идея mynbaev1989-cell): строка-пояснение «> Документ: …,
+# SHA-256 <64 знака>» в шапке файла ответов. Разбор берёт его только из строк «>» и «#» — их ответами не считают;
+# в JSON — ``document_sha256``, ``sha256`` или ``document.sha256``. Хватает первых 12 знаков (так их печатает отчёт).
+_SHA = re.compile(r"SHA[-‑\s]?256\W{0,6}([0-9a-f]{12,64})(?![0-9a-z])", re.I)
+
+
+def answers_sha(text: str) -> str:
+    """SHA-256 документа из шапки файла ответов (строки «>» и «#»), в нижнем регистре; нет — пустая строка."""
+    for raw in str(text or "").splitlines():
+        line = raw.strip()
+        if line.startswith((">", "#")):
+            m = _SHA.search(_INVISIBLE.sub("", line))
+            if m:
+                return m.group(1).lower()
+    return ""
+
+
+def answers_header(document: str = "", sha256: str = "") -> list[str]:
+    """Строка шапки файла ответов с документом и его SHA-256 — по ней ``--answers`` узнает, что документ изменился."""
+    if not (document or sha256):
+        return []
+    return [f"> Документ: {document or '—'}" + (f", SHA-256 {sha256}" if sha256 else "")]
+
+
+def check_document(parsed: dict, document: dict | None, warnings: list[str] | None = None) -> dict:
+    """Сверка SHA-256 из файла ответов с проверяемым документом: ``{"answers_sha256", "document_sha256", "match"}``.
+
+    ``match`` — True/False, None, если в файле ответов SHA нет (старый формат — без предупреждения). При
+    расхождении — предупреждение: вопросы и номера строк могли измениться, ответы привязаны по номеру и теме."""
+    got = str((parsed or {}).get("document_sha256") or "").strip().lower()
+    have = str((document or {}).get("sha256") or "").strip().lower()
+    out = {"answers_sha256": got, "document_sha256": have, "match": None}
+    if not got or not have:
+        return out
+    out["match"] = have.startswith(got) if len(got) < len(have) else have == got
+    if not out["match"] and warnings is not None:
+        name = (document or {}).get("file") or "документ"
+        warnings.append(f"recheck: ответы составлены по другой редакции документа (SHA-256 в файле ответов "
+                        f"{got[:12]}…, у проверенного «{name}» — {have[:12]}…): вопросы и номера строк могли "
+                        f"измениться, ответы привязаны по номеру и теме вопроса — сверьте их с вопросами этого отчёта")
+    return out
+
+
 def _unhide_obj(obj: Any, count: list[int]) -> Any:
     if isinstance(obj, str):
         out, n = unhide(obj)
@@ -353,6 +396,9 @@ def parse_answers_text(text: str) -> dict:
         out["unparsed"] = unparsed
     if hidden:
         out["hidden"] = hidden
+    sha = answers_sha(text)
+    if sha:
+        out["document_sha256"] = sha
     return out
 
 
@@ -361,6 +407,7 @@ def parse_answers_json(data: Any) -> dict:
     decisions: list[str] = []
     count = [0]
     data = _unhide_obj(data, count)
+    data_top = data
 
     def add(qid: str, val: Any) -> None:
         if isinstance(val, list):  # {"Q-02": ["422 …", "403 …"]} — реплики разных адресатов на один вопрос
@@ -407,6 +454,12 @@ def parse_answers_json(data: Any) -> dict:
     out = {"answers": [a for a in answers if a["id"]], "decisions": decisions}
     if count[0]:
         out["hidden"] = count[0]
+    if isinstance(data_top, dict):
+        doc = data_top.get("document") if isinstance(data_top.get("document"), dict) else {}
+        raw_sha = data_top.get("document_sha256") or data_top.get("sha256") or doc.get("sha256") or ""
+        m = re.fullmatch(r"\s*([0-9a-fA-F]{12,64})\s*", str(raw_sha))
+        if m:
+            out["document_sha256"] = m.group(1).lower()
     return out
 
 
@@ -504,6 +557,7 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     answered: dict[str, dict] = {}
     extra: list[str] = []
     postponed: list[dict] = []  # вопросы, где владелец отложил решение целиком (для отчёта)
+    orphans: dict[tuple, list[dict]] = {}  # ответы на вопросы, которых нет в прогоне, по номеру и теме
     def clean(text: str, where: str) -> str:
         kept, cut = strip_injection(text)
         if cut:
@@ -590,6 +644,10 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                     warnings.append(f"recheck: {a['id']}: ответ откладывает решение — не учтён")
                     continue
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
+                # реплики одного номера и одной темы — ответы адресатов на один вопрос, даже если в этом прогоне
+                # его нет: запоминаем вместе, чтобы сверить их между собой (общими решениями порознь не сверить)
+                orphans.setdefault((a.get("id"), " ".join(sorted(_tokens(hint)))), []).append(
+                    {"label": f"Решение-{len(extra)}", "text": a["text"], "topic": hint, "id": a.get("id")})
                 why = "тема не совпала ни с одним вопросом прогона" if hint else "такого вопроса нет в прогоне"
                 warnings.append(f"recheck: {a['id']}: {why} — ответ учтён как общее решение")
             else:
@@ -665,7 +723,39 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     postponed = [p for p in postponed if p["question_id"] not in answered] + \
         [{"question_id": a["question_id"], "text": x, "partial": True} for a in answered.values()
          for x in a.get("deferred") or []]
-    return {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
+    out = {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
+    clashes = decision_clashes(orphans)
+    for c in clashes:
+        warnings.append(f"recheck: {c['question_id']} [{c['topic']}]: ответы адресатов расходятся в значениях "
+                        f"({' ↔ '.join(c['answers'])}), а вопроса с этой темой в прогоне нет — ни одно значение не "
+                        f"вносится, выберите одно в файле следующего круга")
+    if clashes:
+        out["decision_conflicts"] = clashes
+    return out
+
+
+def _values(text: str) -> set[str]:
+    """Числа ответа: «100 000» = «100000», «0,5» = «0.5»; одна цифра («1 раз», «шаг 2») — не значение."""
+    s = re.sub(r"(?<=\d)[\s  ](?=\d{3}(?!\d))", "", str(text or ""))
+    return {n.replace(",", ".") for n in re.findall(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])", s) if len(n) >= 2}
+
+
+def decision_clashes(orphans: dict) -> list[dict]:
+    """Реплики разных адресатов на один вопрос (номер и тема), которого нет в прогоне, с разными значениями — конфликт.
+
+    Расхождение кодом — только по числам (коды, сроки, суммы): у каждой стороны есть число, которого нет у другой
+    («422» ↔ «403»). Реплики, где одна дополняет другую («48 часов» и «48 часов, затем 409»), — не конфликт."""
+    out = []
+    for (qid, _topic), items in orphans.items():
+        if len(items) < 2:
+            continue
+        vals = [_values(x["text"]) for x in items]
+        clash = [x for i, x in enumerate(items)
+                 if any(vals[i] - vals[j] and vals[j] - vals[i] for j in range(len(items)) if j != i)]
+        if len(clash) >= 2:
+            out.append({"question_id": qid or "", "topic": clash[0]["topic"], "answers": [x["label"] for x in clash],
+                        "texts": {x["label"]: x["text"] for x in clash}})
+    return out
 
 
 def severity_counts(findings: Iterable[dict]) -> dict:
@@ -754,6 +844,25 @@ def _expand(labels: list[str], resolved: dict) -> list[str]:
     return out
 
 
+def _orphan_conflicts(resolved: dict, conflicts: list[dict]) -> list[dict]:
+    """Спорящие реплики на вопрос, которого нет в прогоне (``decision_conflicts``), — в ``answer_conflicts``.
+
+    Дефект, который модель закрыла одной из реплик, уже там (код вернул его в open): ему — номер и тема вопроса и
+    тексты реплик без темы. Реплики без дефекта — отдельной записью с пустым ``finding_id``. По номеру и теме
+    следующий круг пишет строки «Q-02 [тема]: …», из которых владелец оставляет одну."""
+    out = [dict(c) for c in conflicts]
+    for d in resolved.get("decision_conflicts") or []:
+        extra = {"question_id": d.get("question_id", ""), "topic": d.get("topic", ""), "texts": dict(d.get("texts") or {})}
+        hit = [c for c in out if set(c.get("answers") or []) == set(d["answers"])]
+        for c in hit:
+            c.update(extra)
+        if not hit:
+            out.append({"finding_id": "", "answers": list(d["answers"]), **extra,
+                        "reason": f"адресаты по-разному ответили на «{d.get('topic') or d.get('question_id')}», а такого "
+                                  f"вопроса в этом прогоне нет — ни одно значение не внесено, выберите одно"})
+    return out
+
+
 def answer_text_map(resolved: dict) -> dict[str, str]:
     """ID ответа → текст решения владельца (для судьи новых конфликтов: вторая сторона — сам ответ).
     У вопроса с несколькими репликами есть и метки реплик ``Q-02.1``, ``Q-02.2``."""
@@ -814,6 +923,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     warnings: list[str] = []
     parsed = answers if isinstance(answers, dict) and "answers" in answers and isinstance(answers.get("answers"), list) \
         else load_answers(answers)
+    doc_check = check_document(parsed, (report or {}).get("document"), warnings)
     resolved = resolve_answers(questions, parsed, warnings)
     q_by_finding: dict[str, list[str]] = {}
     for a in resolved["answered"]:
@@ -835,7 +945,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
                         "severity_before": f.get("severity"), "severity_after": f.get("severity"),
                         "affected": f.get("id") in affected_ids}
         out_findings.append(g)
-    result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings}
+    result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings,
+              "document_check": doc_check}
     if not affected and not resolved["decisions"]:
         for g in out_findings:
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
@@ -1069,6 +1180,19 @@ def _force_choice_conflicts(result: dict) -> None:
                 rc.pop("title_after", None)
                 rc.pop("problem_after", None)
                 rc["reason"] = f"ответы {' и '.join(clash)} выбирают разные варианты одного вопроса — выберите один"
+    # общее решение из спорящих реплик (вопроса в прогоне нет) не снимает дефект: значение не согласовано
+    for c in result["answers"].get("decision_conflicts") or []:
+        labels = set(c["answers"])
+        for g in result["findings"]:
+            rc = g["recheck"]
+            if rc["status"] == "open" or not labels & set(rc.get("answer_ids") or []):
+                continue
+            rc["status"], rc["severity_after"] = "open", g.get("severity")
+            rc["answer_conflict"] = list(dict.fromkeys(list(rc.get("answer_conflict") or []) + c["answers"]))
+            for k in ("answer_ids", "title_after", "problem_after"):
+                rc.pop(k, None)
+            rc["reason"] = (f"ответы адресатов на «{c['topic']}» расходятся ({' и '.join(c['answers'])}) — "
+                            f"выберите одно значение")
 
 
 def _finish(ctx: Any, result: dict) -> dict:
@@ -1240,7 +1364,10 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "open": sum(1 for c in changes if c["status"] == "open"),
         "warnings": warnings,
         "status": rc.get("status", "ok"),
+        # SHA-256 документа из шапки файла ответов против проверенного: match False — ответы к другой редакции
+        "answers_document": rc.get("document_check") or {"answers_sha256": "", "document_sha256": "", "match": None},
     }
+    clar["answer_conflicts"] = _orphan_conflicts(rc["answers"], clar["answer_conflicts"])
     clar["next_round"] = next_round(clar, report.get("questions") or [])
     return {"clarification": clar, "findings_after": after,
             "rejected_after": list(rc.get("rejected") or []) + new_rejected}
@@ -1269,12 +1396,25 @@ def next_round(clar: dict, questions: list[dict]) -> list[dict]:
     for c in clar.get("answer_conflicts") or []:
         texts = c.get("texts") or {}
         qids = list(dict.fromkeys(x.split(".")[0] for x in c["answers"] if str(x).startswith("Q-")))
+        # спорящие реплики на вопрос, которого нет в прогоне: номер и тема — их собственные (под тем же номером в
+        # этом прогоне может быть другой вопрос), привязка в следующем круге пойдёт по теме
+        own = not qids and bool(c.get("question_id"))
+        if own:
+            qids = [c["question_id"]]
         sides = [_one_line(texts.get(x)) for x in c["answers"] if _one_line(texts.get(x))]
         if qids:
-            lines = list(dict.fromkeys(_head(qids[0], topic.get(qids[0], "")) + t for t in sides))
+            head = _head(qids[0], c.get("topic", "") if own else topic.get(qids[0], ""))
+            lines = list(dict.fromkeys(head + t for t in sides))
         else:  # спорят общие решения: в разделе «## Решения» остаётся одно
             lines = list(dict.fromkeys(f"- {t}" for t in sides))
         if len(lines) >= 2:
+            # один вопрос с несколькими дефектами (D-03 и D-11 по одной паре реплик) — один блок выбора: иначе
+            # владелец оставит одну строку в первом блоке, а обе строки второго снова дадут конфликт
+            same = next((n for n in out if n["kind"] == "conflict" and n["lines"] == lines), None)
+            if same is not None:
+                if c["finding_id"] and c["finding_id"] not in same["finding_id"].split(", "):
+                    same["finding_id"] = ", ".join(x for x in (same["finding_id"], c["finding_id"]) if x)
+                continue
             out.append({"kind": "conflict", "finding_id": c["finding_id"], "question_id": qids[0] if qids else "",
                         "lines": lines})
     asked = {q.get("id"): _one_line(q.get("question")) for q in questions if isinstance(q, dict)}
@@ -1311,16 +1451,19 @@ def next_round(clar: dict, questions: list[dict]) -> list[dict]:
     return out
 
 
-def render_next_answers(clar: dict, document: str = "", report: str = "") -> str:
+def render_next_answers(clar: dict, document: str = "", report: str = "", sha256: str = "") -> str:
     """Файл ответов для следующего круга: что решить (расхождения, отложенное) и всё уже согласованное — чтобы
-    повторный ``--answers`` не потерял прежние ответы. Пояснения — строками «>»: разбор ответов их пропускает."""
+    повторный ``--answers`` не потерял прежние ответы. Пояснения — строками «>»: разбор ответов их пропускает.
+    ``sha256`` — SHA-256 проверенного документа в шапке: изменится документ — следующий круг предупредит."""
     todo = clar.get("next_round") or []
     busy = {n["question_id"] for n in todo if n.get("question_id")}
+    sha256 = sha256 or (clar.get("answers_document") or {}).get("document_sha256") or ""
     lines = ["# Ответы владельца: следующий круг", "",
+             *answers_header(document, sha256),
              "> При расхождении оставьте одну строку на вопрос; вместо «<решите: …>» впишите решение.",
              "> Строки «Уже согласовано» не меняйте, если решение то же: без них повторный прогон их потеряет."]
     if document or report:
-        lines.append(f"> Запуск: python -m bcc_review.v2 review {document or 'ДОКУМЕНТ'} {report or 'ОТЧЁТ.md'} "
+        lines.append(f"> Запуск: python -m bcc_review {document or 'ДОКУМЕНТ'} {report or 'ОТЧЁТ.md'} "
                      f"--answers ЭТОТ_ФАЙЛ")
     lines.append("")
     if todo:
@@ -1332,7 +1475,8 @@ def render_next_answers(clar: dict, document: str = "", report: str = "") -> str
                 continue
             what = {"conflict": "ответы расходятся, оставьте одну строку",
                     "partial": "решена только часть, допишите решение"}.get(n["kind"], "решение отложено, впишите его")
-            lines += [f"> {n.get('question_id') or 'Общие решения'} ({n['finding_id']}): {what}", *n["lines"], ""]
+            fid = f" ({n['finding_id']})" if n.get("finding_id") else ""
+            lines += [f"> {n.get('question_id') or 'Общие решения'}{fid}: {what}", *n["lines"], ""]
     agreed = []
     for a in clar.get("answers") or []:
         if a["question_id"] in busy:
@@ -1347,7 +1491,10 @@ def render_next_answers(clar: dict, document: str = "", report: str = "") -> str
             agreed.append(head + _one_line(a.get("answer")))
     if agreed:
         lines += ["## Уже согласовано", "", *agreed, ""]
-    decided = [d for d in clar.get("decisions") or [] if _one_line(d)]
+    # спорящие решения уже стоят строками выбора в «Что решить»: в «Решения» их не повторяем — иначе оба
+    # останутся и в следующем круге, сколько бы строк владелец ни удалил выше
+    disputed = {str(x) for c in clar.get("answer_conflicts") or [] for x in c.get("answers") or []}
+    decided = [d for i, d in enumerate(clar.get("decisions") or [], 1) if _one_line(d) and f"Решение-{i}" not in disputed]
     if decided:
         lines += ["## Решения", "", *[f"- {_one_line(d)}" for d in decided], ""]
     rest = [q for q in clar.get("unanswered") or [] if q not in busy
@@ -1361,6 +1508,152 @@ def render_next_answers(clar: dict, document: str = "", report: str = "") -> str
 def next_answers_path(report_path: str | Path) -> Path:
     p = Path(report_path)
     return p.with_name(p.stem + ".answers-next.md") if p.suffix else p.with_name(p.name + ".answers-next.md")
+
+
+def answers_path(report_path: str | Path) -> Path:
+    """``<отчёт>.answers.md`` — файл ответов, записанный в консоли (``--interactive``)."""
+    p = Path(report_path)
+    return p.with_name(p.stem + ".answers.md") if p.suffix else p.with_name(p.name + ".answers.md")
+
+
+# --------------------------------------------------------------------------- ответы в консоли (--interactive, №22)
+STOP_WORDS = {"стоп", "выход", "хватит"}
+
+
+def reply_line(q: dict, reply: str) -> dict:
+    """Ввод владельца на один вопрос → строка файла ответов в формате ``parse_answers_text``.
+
+    Возвращает ``{"line", "echo", "error", "skip"}``: ``line`` — «Q-01 [тема]: B — текст варианта» (буква с текстом
+    варианта: если вопросы перегенерируют и варианты переставятся, ответ сверят по тексту), «Q-01 [тема]: B — оговорка»
+    или «Q-01 [тема]: свой текст»; Enter, «?», «не знаю» — «Q-01 [тема]: ?» (нет ответа). ``echo`` — как ответ понят,
+    по-русски; ``error`` — переспросить (варианта с такой буквой нет)."""
+    qid = str(q.get("id") or "")
+    head = _head(qid, q.get("topic", ""))
+    reply = _one_line(unhide(str(reply or ""))[0])
+    parsed = _parse_value(reply)
+    opts = [str(o) for o in q.get("options") or []]
+    if parsed["choice"] is None and not parsed["text"]:
+        return {"line": head + "?", "echo": "без ответа — вопрос останется открытым", "error": "", "skip": True}
+    if parsed["choice"] is not None:
+        idx = parsed["choice"]
+        if idx >= len(opts):
+            last = _cl.option_label(len(opts) - 1) if opts else ""
+            hint = f"варианты {_cl.option_label(0)}–{last}" if len(opts) > 1 else "своим текстом"
+            return {"line": head + "?", "echo": "", "skip": True,
+                    "error": f"варианта {_cl.option_label(idx)} нет — ответьте: {hint}, свой текст или Enter"}
+        label, comment = _cl.option_label(idx), _one_line(parsed["comment"])
+        body, later = split_deferred(comment) if comment else ("", [])
+        line = head + f"{label} — " + (comment if comment and _opt_key(comment) != _opt_key(opts[idx]) else opts[idx])
+        echo = f"вариант {label}: «{_short(opts[idx], 100)}»" + (f", оговорка: «{_short(comment, 80)}»"
+                                                               if comment and _opt_key(comment) != _opt_key(opts[idx]) else "")
+        if parsed.get("ambiguous_letter") and len(opts) >= 3:
+            echo += "; русская «В» понята как B — если имели в виду третий вариант, введите C"
+        if later and not body:
+            echo += "; оговорка откладывает решение — эта часть останется открытой"
+        return {"line": line, "echo": echo, "error": "", "skip": False}
+    text = _one_line(parsed["text"])
+    body, later = split_deferred(text)
+    pick = _option_index(text, opts)
+    if pick is not None:
+        echo = f"текст варианта {_cl.option_label(pick)} — засчитан как этот вариант"
+    elif not body and later:
+        echo = "ответ откладывает решение — вопрос останется открытым"
+    else:
+        echo = "свой ответ" + (f"; отложенная часть «{_short(' '.join(later), 60)}» останется открытой" if later else "")
+    return {"line": head + text, "echo": echo, "error": "", "skip": False}
+
+
+def format_question(q: dict, n: int = 0, total: int = 0) -> str:
+    """Вопрос для консоли: номер, тема, блокер, кому, текст, варианты буквами и «если ответа не будет»."""
+    meta = [f"{q.get('id', '')} [{_one_line(q.get('topic', ''))}]" if q.get("topic") else str(q.get("id", ""))]
+    if q.get("blocking"):
+        meta.append("блокер")
+    if q.get("to"):
+        meta.append(f"кому: {_one_line(q['to'])}")
+    if q.get("finding_ids"):
+        meta.append("дефекты " + ", ".join(q["finding_ids"]))
+    lines = [(f"Вопрос {n} из {total} · " if n and total else "") + " · ".join(meta), _one_line(q.get("question"))]
+    lines += [f"  {_cl.option_label(i)} — {_one_line(o)}" for i, o in enumerate(q.get("options") or [])]
+    if q.get("if_no_answer"):
+        lines.append(f"  Если ответа не будет: {_one_line(q['if_no_answer'])}")
+    return "\n".join(lines)
+
+
+def answers_file_text(questions: list[dict], replies: dict[str, str] | None = None, *, document: str = "",
+                      sha256: str = "", decisions: Iterable[str] = (), report: str = "") -> str:
+    """Вопросы и ответы владельца (сырой ввод по номеру вопроса) → текст файла ответов для ``--answers``.
+
+    Каждый вопрос — строкой «Q-01 [тема]: …» (без ответа — «?»), над ней пояснение «>» с текстом вопроса; в шапке —
+    документ и его SHA-256 (``answers_header``), в конце — «## Решения» владельца. Файл читает ``parse_answers_text``;
+    его можно дописать в редакторе и запустить ещё раз."""
+    replies = {(_qid(str(k)) or str(k)): v for k, v in (replies or {}).items()}
+    lines = ["# Ответы владельца", "", *answers_header(document, sha256),
+             "> Ответ — буква варианта, свой текст или «?» (нет ответа). Строки «>» — пояснения, их не разбирают."]
+    if document or report:
+        lines.append(f"> Запуск: python -m bcc_review {document or 'ДОКУМЕНТ'} {report or 'ОТЧЁТ.md'} --answers ЭТОТ_ФАЙЛ")
+    lines.append("")
+    for q in questions or []:
+        if not isinstance(q, dict) or not _qid(str(q.get("id") or "")):
+            continue
+        r = reply_line(q, replies.get(_qid(str(q["id"])), ""))
+        ids = ", ".join(q.get("finding_ids") or [])
+        lines += [f"> {q['id']}" + (f" ({ids})" if ids else "") + f": {_one_line(q.get('question'))}",
+                  r["line"] if not r["error"] else _head(str(q["id"]), q.get("topic", "")) + "?", ""]
+    decided = [_one_line(d) for d in decisions or [] if _one_line(d)]
+    if decided:
+        lines += ["## Решения", "", *[f"- {d}" for d in decided], ""]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def console_answers(questions: list[dict], *, ask: Any = input, say: Any = print, document: str = "",
+                    sha256: str = "", report: str = "", ask_decisions: bool = True) -> dict:
+    """Вопросы по одному в консоли → ``{"text", "replies", "decisions", "answered", "stopped"}``.
+
+    ``ask(prompt) -> str`` и ``say(text)`` — ввод и вывод (по умолчанию ``input``/``print``; в тестах — подмена).
+    На каждый вопрос: буква, свой текст или Enter — пропустить; «стоп» — закончить, остальные без ответа; варианта
+    с такой буквой нет — переспросить (до трёх раз). Конец ввода (Ctrl+D / Ctrl+Z, ввод из канала) — как «стоп».
+    Затем общие решения без вопроса, по строке, пустая строка — конец. ``text`` записывайте в ``answers_path``
+    и передавайте в ``--answers``: формат тот же, что у файла ответов."""
+    qs = [q for q in questions or [] if isinstance(q, dict) and _qid(str(q.get("id") or ""))]
+    replies: dict[str, str] = {}
+    decisions: list[str] = []
+    stopped = False
+
+    def read(prompt: str) -> str | None:
+        try:
+            return str(ask(prompt) or "")
+        except EOFError:
+            return None
+
+    for n, q in enumerate(qs, 1):
+        say("")
+        say(format_question(q, n, len(qs)))
+        for _ in range(3):
+            raw = read("Ответ — буква, свой текст или Enter, чтобы пропустить: ")
+            if raw is None or raw.strip().lower() in STOP_WORDS:
+                stopped = True
+                break
+            r = reply_line(q, raw)
+            if r["error"]:
+                say("  " + r["error"])
+                continue
+            say("  → " + r["echo"])
+            if not r["skip"]:
+                replies[q["id"]] = raw
+            break
+        if stopped:
+            say(f"Остановлено: вопросов без ответа — {len(qs) - len(replies)}; их можно дописать в файл ответов.")
+            break
+    if ask_decisions and not stopped:
+        say("")
+        say("Общие решения без вопроса — по одному в строке; пустая строка — закончить.")
+        while True:
+            raw = read("Решение: ")
+            if raw is None or not raw.strip() or raw.strip().lower() in STOP_WORDS:
+                break
+            decisions.append(_one_line(raw))
+    text = answers_file_text(qs, replies, document=document, sha256=sha256, decisions=decisions, report=report)
+    return {"text": text, "replies": replies, "decisions": decisions, "answered": len(replies), "stopped": stopped}
 
 
 # --------------------------------------------------------------------------- Markdown-раздел (для №13)
@@ -1381,8 +1674,13 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
              f"Ответов на вопросы: {len(clar['answers'])}, общих решений: {len(clar['decisions'])}, "
              f"закрыто общими решениями: {len(clar.get('closed_by_decisions') or [])}, "
              f"без ответа: {len(clar['unanswered'])}. Оценка «после» предполагает, что ответы внесены в документ "
-             f"(см. исправленную редакцию).", "",
-             "| Показатель | До уточнения | После уточнения |", "| :--- | :--- | :--- |",
+             f"(см. исправленную редакцию).", ""]
+    ad = clar.get("answers_document") or {}
+    if ad.get("match") is False:
+        lines += [f"**Ответы составлены по другой редакции документа:** SHA-256 в файле ответов "
+                  f"{ad.get('answers_sha256', '')[:12]}…, у проверенного документа {ad.get('document_sha256', '')[:12]}…. "
+                  f"Вопросы и номера строк могли измениться — сверьте ответы с вопросами этого отчёта.", ""]
+    lines += ["| Показатель | До уточнения | После уточнения |", "| :--- | :--- | :--- |",
              f"| Начинать разработку | {_V.get(b['verdict'].get('development', ''), '—')} | "
              f"{_V.get(a['verdict'].get('development', ''), '—')} |",
              f"| Начинать тестирование | {_V.get(b['verdict'].get('testing', ''), '—')} | "
@@ -1404,7 +1702,8 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
         for c in clar["answer_conflicts"]:
             texts = c.get("texts") or {}
             sides = " ↔ ".join(f"{x} «{_short(texts[x])}»" if texts.get(x) else x for x in c["answers"])
-            lines.append(f"* {sides} — {c['finding_id']}: {c['reason']}")
+            where = c.get("finding_id") or (f"{c['question_id']} [{c.get('topic', '')}]" if c.get("question_id") else "")
+            lines.append(f"* {sides} — {where}: {c['reason']}" if where else f"* {sides} — {c['reason']}")
         lines.append("")
     if clar.get("postponed"):
         lines.append("Владелец отложил решение — это не ответ, дефект по этой части остаётся открытым:")
