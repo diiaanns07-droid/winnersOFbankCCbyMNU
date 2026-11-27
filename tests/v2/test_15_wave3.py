@@ -369,3 +369,18 @@ def test_gate_history_line_and_codes():
     assert gate.history_line(rows[:1]) == ""
     text = gate.render_summary([{"name": "a", "ok": True}], "Ворота WAVE3, 16:55", rows)
     assert "Ворота за день" in text and text.index("Ворота за день") > text.index("зелёных 1")
+
+
+def test_final_code_diff_lists_changed_files(monkeypatch):
+    """Код тега не тот, что мерили, — видно, какие файлы: задевает ли разница основной прогон."""
+    import subprocess as _sp
+
+    from evaluation.v2 import final
+
+    out = "12\t0\tsrc/bcc_review/v2/prompts/recheck.md\n533\t64\tsrc/bcc_review/v2/stages/recheck.py\n1\t1\tpyproject.toml\n"
+    monkeypatch.setattr(final, "_git", lambda *a: _sp.CompletedProcess(a, 0, stdout=out, stderr=""))
+    assert final.code_diff("a", "b") == ("`prompts/recheck.md` (+12/−0), `stages/recheck.py` (+533/−64), "
+                                         "`pyproject.toml` (+1/−1)")
+    assert final.code_diff("a", "b", limit=1).endswith("и ещё 2")
+    monkeypatch.setattr(final, "_git", lambda *a: _sp.CompletedProcess(a, 128, stdout="", stderr="bad"))
+    assert final.code_diff("a", "b") == ""

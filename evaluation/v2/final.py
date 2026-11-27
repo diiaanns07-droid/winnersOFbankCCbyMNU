@@ -42,6 +42,17 @@ def same_code(a: str, b: str) -> bool | None:
     return {0: True, 1: False}.get(r.returncode)
 
 
+def code_diff(a: str, b: str, limit: int = 8) -> str:
+    """Чем код двух коммитов отличается: файлы `src/` и `pyproject.toml` с числом строк (+/−) — чтобы читатель
+    видел, задевает ли разница основной прогон (линзы, судья) или, например, только режим `--answers`."""
+    r = _git("diff", "--numstat", a, b, "--", "src", "pyproject.toml")
+    rows = [x.split("\t") for x in r.stdout.splitlines() if x.count("\t") >= 2] if r.returncode == 0 else []
+    if not rows:
+        return ""
+    short = [f"`{path.removeprefix('src/bcc_review/v2/')}` (+{add}/−{rem})" for add, rem, path in rows[:limit]]
+    return ", ".join(short) + (f" и ещё {len(rows) - limit}" if len(rows) > limit else "")
+
+
 def code_note(sha: str, groups: list[list[dict]]) -> str:
     """Метка говорит «на `sha`» — сверить, что у каждого прогона (`commit` в истории и сводках) тот же `src/`."""
     commits = sorted({c for rows in groups for r in rows
@@ -226,6 +237,8 @@ def main(argv: list[str] | None = None) -> int:
         same = same_code(tag_sha, sha)
         note = (f"тег `{a.commit}` = `{tag_sha}`, код " + {True: "совпадает", False: "**не совпадает**",
                                                          None: "не сверен"}[same] + f" с `{sha}`")
+        if same is False:
+            note += f": отличаются {code_diff(sha, tag_sha)}"
     text = render(a.commit, sha, note)
     print(text)
     if a.write:
