@@ -152,12 +152,26 @@ def repeat(base: dict, p: Any, input_path: str | Path, opts: dict, n: int, log: 
     """Проходы 2…N на нарезке первого прохода ``p`` и сведение (``merge``)."""
     from .pipeline import LLM_STAGES, Pipeline, _execute
     others = []
+    spent_usd = float((base.get("run") or {}).get("cost_usd") or 0)
+    spent_tok = sum(int(v or 0) for v in ((base.get("run") or {}).get("tokens") or {}).values())
     for k in range(2, n + 1):
-        log(f"Проход {k} из {n}")
         o = {**opts, "pass_index": k, "run_id": None, "clarify": False, "answers": None, "revise": False,
              "runs": 1}
-        q = Pipeline(input_path, o, reuse=p.run, rerun=set(LLM_STAGES) - {"segment"}, log=log)
-        others.append(_execute(q, input_path))
+        # потолок --max-cost — на все проходы вместе: проходу достаётся остаток
+        if opts.get("max_cost_usd"):
+            o["max_cost_usd"] = float(opts["max_cost_usd"]) - spent_usd
+        if opts.get("max_tokens"):
+            o["max_tokens"] = int(opts["max_tokens"]) - spent_tok
+        if (opts.get("max_cost_usd") and o["max_cost_usd"] <= 0) or (opts.get("max_tokens") and o["max_tokens"] <= 0):
+            base.setdefault("run", {}).setdefault("warnings", []).append(
+                f"Проходы {k}–{n} не выполнялись: потолок --max-cost исчерпан")
+            break
+        log(f"Проход {k} из {n}")
+        rep = _execute(Pipeline(input_path, o, reuse=p.run, rerun=set(LLM_STAGES) - {"segment"}, log=log),
+                       input_path)
+        others.append(rep)
+        spent_usd += float((rep.get("run") or {}).get("cost_usd") or 0)
+        spent_tok += sum(int(v or 0) for v in ((rep.get("run") or {}).get("tokens") or {}).values())
     return merge(base, others, n)
 
 

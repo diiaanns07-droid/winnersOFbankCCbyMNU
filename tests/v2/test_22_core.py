@@ -210,3 +210,51 @@ def test_runs_cli_rejects_with_answers(tmp_path, capsys):
     ans = tmp_path / "a.md"
     ans.write_text("Q-01: A\n", encoding="utf-8")
     assert main([str(OFFICIAL), str(tmp_path / "r.md"), "--runs", "2", "--answers", str(ans)]) == 2
+
+
+# --------------------------------------------------------------------------- 3. --max-cost
+
+def test_parse_cost():
+    from bcc_review.v2.__main__ import parse_cost
+    assert parse_cost("0.5") == {"max_cost_usd": 0.5}
+    assert parse_cost("$1,5") == {"max_cost_usd": 1.5}
+    assert parse_cost("200k") == {"max_tokens": 200000}
+    assert parse_cost("1.5m") == {"max_tokens": 1500000}
+    assert parse_cost("300000т") == {"max_tokens": 300000}
+    assert parse_cost(None) == {}
+    with pytest.raises(ValueError):
+        parse_cost("дорого")
+
+
+def test_estimate_cost():
+    from bcc_review.v2.llm import estimate_cost
+    assert estimate_cost("claude-sonnet-5-5", 1_000_000, 0) == 3.0
+    assert estimate_cost("gemini-3-flash-lite", 0, 1_000_000) == 0.4
+    assert estimate_cost("неизвестная", 10, 10) is None
+
+
+def test_max_tokens_ceiling_gives_honest_partial(tmp_path):
+    # mock считает входные токены (длина запроса / 4): потолок 1 токен — после первого вызова дальше не идём
+    report, written, _ = _run(tmp_path, max_tokens=1, fast_start=False)
+    run = report["run"]
+    assert run["cost_limit"]["hit"] is True and run["cost_limit"]["max_tokens"] == 1
+    assert run["status"] == "partial"
+    assert "yes" not in (report["verdict"]["development"], report["verdict"]["testing"])
+    assert "conditional" not in (report["verdict"]["development"], report["verdict"]["testing"])
+    assert any("--max-cost" in w for w in run["warnings"])
+    assert run["calls"]["total"] == 1
+    assert _verify(written) == 0
+
+
+def test_cost_ceiling_not_hit_is_recorded(tmp_path):
+    report, _, _ = _run(tmp_path, max_cost_usd=5.0)
+    assert report["run"]["cost_limit"] == {"max_cost_usd": 5.0, "max_tokens": None, "spent_usd": 0.0,
+                                           "spent_tokens": report["run"]["cost_limit"]["spent_tokens"],
+                                           "hit": False}
+    assert report["run"]["status"] == "complete"
+
+
+def test_max_cost_cli_bad_value(tmp_path, capsys):
+    from bcc_review.v2.__main__ import main
+    assert main([str(OFFICIAL), str(tmp_path / "r.md"), "--max-cost", "много"]) == 2
+    assert "--max-cost" in capsys.readouterr().err

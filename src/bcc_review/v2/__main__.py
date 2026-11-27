@@ -101,6 +101,8 @@ def _common(p: argparse.ArgumentParser) -> None:
                    help="рецензенты не ждут нарезку моделью: стартуют по таблице эвристики (по умолчанию — да)")
     p.add_argument("--no-fast-start", dest="fast_start", action="store_false",
                    help="рецензенты ждут нарезку моделью")
+    p.add_argument("--max-cost", metavar="ПОТОЛОК",
+                   help="потолок на прогон: «0.5» — доллары, «200k» — токены; при превышении — частичный отчёт")
     p.add_argument("-q", "--quiet", action="store_true", help="без хода выполнения в консоли")
 
 
@@ -117,7 +119,24 @@ def _opts(a: argparse.Namespace) -> dict:
         "fast_start": getattr(a, "fast_start", None),
         "answers": getattr(a, "answers", None), "revise": getattr(a, "revise", False),
         "replay": getattr(a, "replay", None), "runs": getattr(a, "runs", 1) or 1,
+        **parse_cost(getattr(a, "max_cost", None)),
     }
+
+
+def parse_cost(value: str | None) -> dict:
+    """``--max-cost``: «0.5» или «$0.5» — доллары; «200k», «1.5m», «300000t», «200к» — токены (вход + выход)."""
+    if not value:
+        return {}
+    v = str(value).strip().lower().replace(",", ".").replace(" ", "")
+    import re
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)(k|к|m|м|t|т|tok|ток|токенов)", v)
+    if m:
+        mult = {"k": 1e3, "к": 1e3, "m": 1e6, "м": 1e6}.get(m.group(2), 1)
+        return {"max_tokens": int(float(m.group(1)) * mult)}
+    m = re.fullmatch(r"\$?(\d+(?:\.\d+)?)\$?(usd)?", v)
+    if m and float(m.group(1)) > 0:
+        return {"max_cost_usd": float(m.group(1))}
+    raise ValueError(value)
 
 
 def _log(quiet: bool):
@@ -209,6 +228,11 @@ def cmd_review(argv: list[str]) -> int:
                    help="N независимых проходов рецензентов и судьи: у каждого дефекта устойчивость k/N; в реестр "
                         "идут найденные не меньше чем в половине проходов, остальные — в приложение")
     a = p.parse_args(argv)
+    try:
+        parse_cost(a.max_cost)
+    except ValueError:
+        print(f"--max-cost: не понял «{a.max_cost}»; примеры: 0.5 (доллары), 200k (токены)", file=sys.stderr)
+        return 2
     if a.runs < 1 or a.runs > 9:
         print("--runs: от 1 до 9", file=sys.stderr)
         return 2

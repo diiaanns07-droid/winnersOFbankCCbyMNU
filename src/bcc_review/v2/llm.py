@@ -98,7 +98,7 @@ class LLMClient:
                  fallback_models: Sequence[str] = (), max_calls: int = 16, max_seconds: float = 1500.0,
                  max_retries: int = 5, timeout_s: float = 600.0, cache_dir: str | Path | None = None,
                  trace: Callable[[dict], None] | None = None, max_split_depth: int = 1,
-                 stage_timeout_s: float = 0.0, rpm: float = 0.0,
+                 stage_timeout_s: float = 0.0, rpm: float = 0.0, max_cost_usd: float = 0.0, max_tokens: int = 0,
                  sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic):
         self.provider = provider
         self.provider_name = provider_name or getattr(provider, "name", "") or type(provider).__name__
@@ -131,6 +131,11 @@ class LLMClient:
         # --runs N (№22): метка прохода в конце запроса — у прохода k свой ключ кэша (повтор `--runs 3` берёт
         # из кэша те же три прохода), модель видит тот же документ и ту же задачу
         self.salt = ""
+        # --max-cost (№22): потолок денег (USD) и/или токенов (вход + выход) на прогон; 0 — без потолка.
+        # Проверяется перед каждым вызовом: вызов, начатый до потолка, доходит; следующие не начинаются.
+        self.max_cost_usd = float(max_cost_usd or 0)
+        self.max_tokens = int(max_tokens or 0)
+        self.cost_hit = ""  # чем упёрлись: текст для отчёта
 
     def _record(self, stage: str, data: Any) -> None:
         with self._lock:
@@ -185,6 +190,16 @@ class LLMClient:
             if self.elapsed() > self.max_seconds:
                 st["budget"] = st.get("budget", 0) + 1
                 raise BudgetExceeded(stage, f"исчерпан бюджет времени прогона ({self.max_seconds:.0f} с)")
+            if self.max_cost_usd and self.stats["cost_usd"] >= self.max_cost_usd:
+                st["budget"] = st.get("budget", 0) + 1
+                self.cost_hit = self.cost_hit or (f"потолок стоимости ${self.max_cost_usd:g} достигнут "
+                                                  f"(потрачено ${self.stats['cost_usd']:.4f})")
+                raise BudgetExceeded(stage, f"исчерпан потолок стоимости прогона (${self.max_cost_usd:g})")
+            used = self.stats["tokens_in"] + self.stats["tokens_out"]
+            if self.max_tokens and used >= self.max_tokens:
+                st["budget"] = st.get("budget", 0) + 1
+                self.cost_hit = self.cost_hit or f"потолок {self.max_tokens} токенов достигнут (потрачено {used})"
+                raise BudgetExceeded(stage, f"исчерпан потолок токенов прогона ({self.max_tokens})")
             t0 = self._stage_t0.setdefault(stage, self._clock())
             if self.stage_timeout_s and self._clock() - t0 > self.stage_timeout_s:
                 st["budget"] = st.get("budget", 0) + 1
@@ -233,6 +248,10 @@ class LLMClient:
         cost = result.get("cost_usd")
         if cost is None:
             cost = usage.get("cost_usd")
+        estimated = False
+        if cost is None and (tin or tout):
+            cost = estimate_cost(result.get("model") or self.model, tin, tout)
+            estimated = cost is not None
         with self._lock:
             st = self._stage_stats(stage)
             self.stats["tokens_in"] += tin
@@ -243,6 +262,8 @@ class LLMClient:
             self.stats["seconds"] = round(self.stats["seconds"] + seconds, 2)
             if cost:
                 self.stats["cost_usd"] = round(self.stats["cost_usd"] + float(cost), 6)
+                if estimated:
+                    self.stats["cost_estimated"] = True
             used = (result.get("meta") or {}).get("models_used") or [result.get("model")]
             for m in used:
                 if m and m not in self.stats["models_used"]:
@@ -436,9 +457,27 @@ class LLMClient:
 
     def summary(self) -> dict:
         s = self.stats
-        return {"calls": {"total": s["calls"], "cached": s["cached"], "failed": s["failed"], "split": s["split"]},
-                "tokens": {"input": s["tokens_in"], "output": s["tokens_out"]},
-                "cost_usd": round(s["cost_usd"], 4), "models_used": list(s["models_used"])}
+        out = {"calls": {"total": s["calls"], "cached": s["cached"], "failed": s["failed"], "split": s["split"]},
+               "tokens": {"input": s["tokens_in"], "output": s["tokens_out"]},
+               "cost_usd": round(s["cost_usd"], 4), "models_used": list(s["models_used"])}
+        if s.get("cost_estimated"):
+            out["cost_estimated"] = True
+        return out
+
+
+# Цена за 1 млн токенов (вход, выход), USD — для оценки, когда провайдер стоимость не сообщает (Gemini, OpenAI-
+# совместимые, API без поля стоимости). claude -p сообщает стоимость сам. Оценка помечается cost_estimated.
+PRICES_PER_MTOK = {"haiku": (1.0, 5.0), "sonnet": (3.0, 15.0), "opus": (5.0, 25.0),
+                   "flash-lite": (0.1, 0.4), "flash": (0.3, 2.5), "gemini": (1.25, 10.0), "pro": (1.25, 10.0),
+                   "mock": (0.0, 0.0), "replay": (0.0, 0.0)}
+
+
+def estimate_cost(model: str | None, tokens_in: int, tokens_out: int) -> float | None:
+    m = str(model or "").lower()
+    for key, (pin, pout) in PRICES_PER_MTOK.items():  # порядок важен: «flash-lite» раньше «flash»
+        if key in m:
+            return round((tokens_in * pin + tokens_out * pout) / 1e6, 6)
+    return None
 
 
 def merge_lists(parts: Iterable[dict]) -> dict:

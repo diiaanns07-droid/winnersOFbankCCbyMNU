@@ -181,7 +181,8 @@ def make_llm(opts: dict, run: RunDir | None, input_path: str | Path | None = Non
                     max_seconds=opts["max_seconds"], max_retries=opts["max_retries"], timeout_s=opts["timeout"],
                     cache_dir=cache_dir, trace=run.trace if run else None,
                     stage_timeout_s=float(opts.get("stage_timeout") or 0),
-                    rpm=float(opts["rpm"]) if opts.get("rpm") is not None else DEFAULT_RPM.get(pname, 0))
+                    rpm=float(opts["rpm"]) if opts.get("rpm") is not None else DEFAULT_RPM.get(pname, 0),
+                    max_cost_usd=float(opts.get("max_cost_usd") or 0), max_tokens=int(opts.get("max_tokens") or 0))
     if int(opts.get("pass_index") or 1) > 1:
         llm.salt = f"\n\n<!-- независимый проход {int(opts['pass_index'])} -->"
     return llm, pname
@@ -781,6 +782,9 @@ class Pipeline:
         llm_ok = [s for s in LLM_STAGES if self.stages.get(s) in ("ok", "partial")]
         reviewers = [s for s in [f"lens_{x}" for x in LENSES] + ["consistency"] if self.stages.get(s) != "skipped"]
         if not any(self.stages.get(s) in ("ok", "partial") for s in reviewers) or not llm_ok:
+            # упёрлись в --max-cost: это решение пользователя, а не сбой — частичный отчёт (вердикт — без «можно»)
+            if getattr(self.ctx.llm if self.ctx else None, "cost_hit", "") and self.stages.get("rules") == "ok":
+                return "partial"
             return "failed"
         if any(v in ("failed", "partial") for v in self.stages.values()):
             return "partial"
@@ -803,7 +807,24 @@ class Pipeline:
                 "fast_start": self.fast_start_used,
                 **(self._replay_block(s) if self.replay else {}),
                 **({"incomplete_stages": incomplete_stages(self.stages)} if incomplete_stages(self.stages) else {}),
+                **self._cost_block(llm, s),
                 **({"model_error": self.model_error} if self.model_error else {})}
+
+    def _cost_block(self, llm: Any, s: dict) -> dict:
+        """Паспорт стоимости (``--max-cost``): потолок, потрачено, упёрлись ли."""
+        usd, tok = float(self.opts.get("max_cost_usd") or 0), int(self.opts.get("max_tokens") or 0)
+        if not usd and not tok:
+            return {"cost_estimated": True} if s.get("cost_estimated") else {}
+        hit = str(getattr(llm, "cost_hit", "") or "")
+        block = {"max_cost_usd": usd or None, "max_tokens": tok or None, "spent_usd": s.get("cost_usd", 0.0),
+                 "spent_tokens": int((s.get("tokens") or {}).get("input", 0)) + int((s.get("tokens") or {}).get(
+                     "output", 0)), "hit": bool(hit)}
+        if s.get("cost_estimated"):
+            block["estimated"] = True
+        out = {"cost_limit": block}
+        if s.get("cost_estimated"):
+            out["cost_estimated"] = True
+        return out
 
     def _replay_block(self, s: dict) -> dict:
         """Паспорт повтора: провайдер и модели — исходного прогона, живых вызовов — ноль."""
@@ -817,6 +838,10 @@ class Pipeline:
     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
                 questions: list, qstats: dict) -> dict:
         status = self._status()
+        hit = str(getattr(self.ctx.llm if self.ctx else None, "cost_hit", "") or "")
+        if hit:
+            self.warnings.insert(0, f"Прогон остановлен по --max-cost: {hit}. Отчёт частичный — этапы после "
+                                    "потолка не выполнялись; поднимите потолок, чтобы проверить документ целиком.")
         incomplete = incomplete_stages(self.stages)
         if incomplete and status != "failed":
             # первым остаётся объяснение отказа модели (model_error), если оно есть
