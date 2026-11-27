@@ -1216,13 +1216,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 22.4,
-    "cost_usd": 0.1954784,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 22.74,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-dfad"
+  "seconds": 0.29,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-dfad",
+  "rescored_at": "2026-11-27 15:41"
 }

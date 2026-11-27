@@ -187,9 +187,26 @@ _SENT_SPLIT = re.compile(r"(?<=[.!?…])\s+(?=[«\"(]?[А-ЯЁA-Z0-9])")
 _WORD = re.compile(r"[0-9A-Za-zА-Яа-яЁё][0-9A-Za-zА-Яа-яЁё‑-]*")
 
 
+# Сокращения, после которых точка — не конец предложения: «стр. 52», «п. 5», «см. Ф-2», «т. е.», «рис. 1».
+_ABBREV_END = re.compile(r"(?:^|[\s(«\"])(?:стр|с|п|пп|ст|гл|рис|табл|прил|разд|см|ср|напр|т|е|д|др|пр|ок|мин|макс"
+                         r"|руб|тыс|млн|млрд|г|гг|в|вв|ч|сек|им|т\.е|т\.д|т\.п|e\.g|i\.e|vs|no)\.$", re.I)
+
+
 def _sentences(text: str) -> list[str]:
+    """Предложения текста. Точка после сокращения («стр. 52», «п. 5») предложение не заканчивает — иначе
+    «Ф-2 (стр. 38) относит…» считалось двумя предложениями и рубрика «проблема 1–2 предложения» падала зря."""
     s = " ".join(str(text or "").split())
-    return [x for x in _SENT_SPLIT.split(s) if x.strip()] if s else []
+    if not s:
+        return []
+    out: list[str] = []
+    for part in _SENT_SPLIT.split(s):
+        if not part.strip():
+            continue
+        if out and _ABBREV_END.search(out[-1]):
+            out[-1] = f"{out[-1]} {part}"
+        else:
+            out.append(part)
+    return out
 
 
 def clarity_row(f: dict, vocab) -> dict:

@@ -245,3 +245,13 @@ def test_score_second_chance_for_focused_out_strict_pair():
     assert got.get("С15") == "D-18"  # «Шаг 5 возвращает прежний порог, но в ответе ERROR amount не описан»
     assert all(d["finding"] != "D-18" for d in res["duplicates"])
     assert {"К1", "К2", "К3", "К4", "К5"} <= set(got)
+
+
+def test_clarity_sentences_ignore_abbreviations():
+    """«Ф-2 (стр. 38) относит…» — одно предложение: точка после «стр.»/«п.»/«см.» не конец предложения
+    (на haiku 15:30 рубрика «проблема» падала у 28 из 30 карточек только из-за «стр. N»)."""
+    from evaluation.v2 import score as sc
+
+    assert len(sc._sentences("Ф-2 (стр. 38) относит покупку к месяцу. Критерий (стр. 64) требует роста.")) == 2
+    assert len(sc._sentences("См. п. 5 логики метода. Итог 1 000 ₸.")) == 2
+    assert len(sc._sentences("Первое. Второе. Третье.")) == 3

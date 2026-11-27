@@ -422,12 +422,12 @@
   },
   "clarity": {
     "n": 30,
-    "passed": 0,
-    "share": 0.0,
+    "passed": 22,
+    "share": 0.733,
     "by_check": {
       "заголовок": 0,
       "место": 0,
-      "проблема": 28,
+      "проблема": 5,
       "сценарий": 2,
       "последствие": 0,
       "исправление": 0,
@@ -435,38 +435,10 @@
     },
     "worst": [
       {
-        "id": "D-08",
-        "title": "Вызов настроек из сервиса расходов нет в архитектуре",
-        "severity": "major",
-        "source": "lens:architect, consistency",
-        "fails": [
-          "проблема",
-          "сценарий"
-        ]
-      },
-      {
         "id": "D-01",
         "title": "Чтение настроек обещано, но метода чтения в API нет",
         "severity": "critical",
         "source": "lens:architect, rules:promises.read_operation, consistency",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
-        "id": "D-02",
-        "title": "Не определено, какое событие считается проведённой покупкой",
-        "severity": "critical",
-        "source": "lens:risk",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
-        "id": "D-03",
-        "title": "Месяц покупки: дата совершения по Ф-2 против критерия приёмки",
-        "severity": "critical",
-        "source": "lens:analyst, lens:qa, consistency",
         "fails": [
           "проблема"
         ]
@@ -481,46 +453,55 @@
         ]
       },
       {
-        "id": "D-05",
-        "title": "Сумма вне диапазона: код 400 и код 200 с ERROR",
-        "severity": "critical",
-        "source": "lens:architect, consistency, rules:api.success_with_error",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
-        "id": "D-06",
-        "title": "Метод, меняющий порог, объявлен GET с параметрами в адресе",
-        "severity": "major",
-        "source": "rules:api.get_mutation.saveLimit, lens:risk, rules:api.content_type_without_body",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
-        "id": "D-07",
-        "title": "Держатель, владелец и клиент: кому разрешено менять порог",
-        "severity": "major",
-        "source": "consistency, lens:analyst, lens:risk",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
-        "id": "D-09",
-        "title": "Компоненты названы по-разному в трёх местах",
+        "id": "D-08",
+        "title": "Вызов настроек из сервиса расходов нет в архитектуре",
         "severity": "major",
         "source": "lens:architect, consistency",
         "fails": [
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-17",
+        "title": "Адрес Prod и ссылка на Swagger не заполнены",
+        "severity": "major",
+        "source": "lens:architect, rules:placeholder.dash",
+        "fails": [
           "проблема"
         ]
       },
       {
-        "id": "D-10",
-        "title": "Метод не проверяет статус и валюту карты из Ф-1",
+        "id": "D-20",
+        "title": "Перечень кодов ответа противоречив и неполон",
         "severity": "major",
+        "source": "rules:api.status_201, lens:architect, rules:language.open_list, rules:api.status_404",
+        "fails": [
+          "проблема"
+        ]
+      },
+      {
+        "id": "D-24",
+        "title": "Документ не рассматривает ряд случаев",
+        "severity": "minor",
         "source": "lens:analyst",
+        "fails": [
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-28",
+        "title": "Критерии приёмки покрывают малую часть правил",
+        "severity": "minor",
+        "source": "lens:qa",
+        "fails": [
+          "язык"
+        ]
+      },
+      {
+        "id": "D-29",
+        "title": "Шаблонные разделы не заполнены: версия, чек-лист, согласующие, тесты",
+        "severity": "minor",
+        "source": "rules:placeholder.version, rules:placeholder.checklist, rules:placeholder.approvals, lens:qa, rules:placeholder.tbd",
         "fails": [
           "проблема"
         ]
@@ -1281,7 +1262,7 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "0/30",
+      "value": "22/30",
       "ok": false
     },
     {
@@ -1306,13 +1287,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 41.5,
-    "cost_usd": 0.2821056,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 41.94,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-9a4d"
+  "seconds": 0.32,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-9a4d",
+  "rescored_at": "2026-11-27 15:41"
 }
