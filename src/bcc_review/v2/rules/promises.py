@@ -21,6 +21,9 @@ READ_PROMISE = re.compile(
     r"получени\w+\s+(?:данных|настро\w*|значени\w*|сведени\w*|информаци\w*|статус\w*|остатк\w*|"
     r"сумм\w*|истори\w*)|получа(?:ет|ют)\s+(?:данн\w*|сведени\w*|информаци\w*|настро\w*|статус\w*|состояни\w*|"
     r"список\w*|истори\w*|остат\w*)|на\s+экране\s+видн\w*)", re.I)
+# «показывается сообщение «PIN-код изменён»», «выводит подсказку» — отклик интерфейса, а не показ данных
+UI_FEEDBACK = re.compile(r"^\s*(?:\w+\s+){0,2}?(?:сообщени|надпис|подсказк|уведомлени|ошибк|предупреждени|"
+                         r"окн[оа]\b|диалог|баннер|анимаци|индикатор|кнопк|экран\w*\s+(?:успех|ошибк|подтвержд))", re.I)
 INTEGRATION_CTX = re.compile(r"дочерн\w+\s+документ\w*|через\s+api|rest\s+api|метод\w*", re.I)
 ACTOR = re.compile(r"приложени\w*|экран\w*|интерфейс\w*|клиент\w*|пользовател\w*|фронт\w*|ui\b|api|"
                    r"документ\w*|функциональн\w+\s+требовани\w*", re.I)
@@ -334,7 +337,7 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
         if not x.text or x.is_code or x.is_heading:
             continue
         t = x.joined
-        m = READ_PROMISE.search(t)
+        m = next((r for r in READ_PROMISE.finditer(t) if not UI_FEEDBACK.match(t[r.end():])), None)
         if not m or not (ACTOR.search(t) or INTEGRATION_CTX.search(t)):
             continue
         promises.append((x, _sentence(t, m.group(0))))

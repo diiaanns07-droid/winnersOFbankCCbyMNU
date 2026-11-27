@@ -32,8 +32,11 @@ READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load"
 # Начало описания метода, означающее изменение состояния.
 MUTATING_DESC = re.compile(
     r"^(сохранени|изменени|удалени|создани|обновлени|замен|установк|установлени|отключени|включени|"
-    r"блокировк|разблокировк|отмен|добавлени|редактировани|запис|регистраци|подтверждени|перевод|списани)",
+    r"блокировк|разблокировк|отмен|добавлени|редактировани|запис|регистраци|подтверждени|перевод|списани|"
+    r"смен[аыуе]\b|заказ\b|подключени|оформлени|закрыти|открыти|привязк|отвязк|перевыпуск)",
     re.I)
+# заголовок блока метода с описанием: «Метод 1. Смена PIN-кода», «Метод 2: заказ выписки»
+METHOD_TITLE = re.compile(r"^(?:метод|method|операция)\s*№?\s*\d+\s*[.:)—–-]\s*(.{3,80})$", re.I)
 
 REASON_PHRASES = [
     (re.compile(r"\bno content\b", re.I), 204), (re.compile(r"\bcreated\b", re.I), 201),
@@ -167,6 +170,7 @@ INLINE_METHOD = re.compile(r"^(?P<lead>[^:|]{0,60}?(?:эндпоинт|endpoint|
 def find_methods(doc: Doc) -> list[Method]:
     L = doc.lines
     methods: list[Method] = []
+    head_desc: dict[int, tuple[str, Line]] = {}
     row_methods: list[Method] = []
     for idx, x in enumerate(L):
         if not x.text or x.is_code:
@@ -227,6 +231,10 @@ def find_methods(doc: Doc) -> list[Method]:
             if hm:
                 meth.name, meth.name_line, meth.start = hm.group(1), L[k], L[k].n
                 break
+            tm = METHOD_TITLE.match(L[k].text.strip()) if L[k].is_heading else None
+            if tm:
+                head_desc[id(meth)] = (tm.group(1).strip(), L[k])
+                break
             if L[k].text and L[k].cells is None and not L[k].is_sep and k < idx - 1 and \
                     (L[k].is_heading or len(L[k].text) < 60):
                 # другой заголовок раньше названия метода — дальше не ищем
@@ -261,6 +269,8 @@ def find_methods(doc: Doc) -> list[Method]:
                 m.desc, m.desc_line = val, y
             elif key == "curl" and m.curl_line is None:
                 m.curl_line = y
+        if not m.desc and id(m) in head_desc:  # описание из заголовка блока, если в таблице его нет
+            m.desc, m.desc_line = head_desc[id(m)]
         if not m.name and m.url:
             segs = [s for s in m.url.split("/") if s and not s.startswith("{")]
             if segs and re.match(r"^[a-z]+[A-Z]\w*$", segs[-1]):

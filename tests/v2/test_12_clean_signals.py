@@ -230,3 +230,55 @@ def test_idempotent_replay_hint(text: str) -> None:
 def test_idempotent_replay_lookalikes(text: str) -> None:
     out = rules.run(_view([("Часть B › Особые правила", text)]))
     assert not _sig(out, "api.idempotent_replay"), text
+
+
+# --- обобщение: два новых ТЗ других доменов (смена PIN-кода, выписка в PDF), написаны после правок волны 3 ---
+NEW_CLEAN = ["wave3b_pin_clean.md", "wave3b_statement_clean.md"]
+
+
+@pytest.mark.parametrize("name", NEW_CLEAN)
+def test_new_clean_documents_zero_candidates(name: str) -> None:
+    from bcc_review.v2 import docview
+    from bcc_review.v2.stages import segment
+    view = docview.load(STYLES / name)
+    for seg in (None, segment.heuristic_segment(view)):
+        out = rules.run(view, seg)
+        assert out["candidates"] == [], [(c["source"], c["title"]) for c in out["candidates"]]
+        assert _defect_signals(out) == [], [(s["rule"], s["line"]) for s in _defect_signals(out)]
+
+
+def test_new_defect_documents_found() -> None:
+    pin = rules.run(fallback_load(STYLES / "wave3b_pin_defects.md"))
+    src = {c["source"] for c in pin["candidates"]}
+    assert {"rules:api.get_mutation.cards_cardId_pin", "rules:api.status_423", "rules:language.nfr_unverifiable",
+            "rules:language.open_list"} <= src, src
+    st = rules.run(fallback_load(STYLES / "wave3b_statement_defects.md"))
+    src = {c["source"] for c in st["candidates"]}
+    assert {"rules:promises.promised_ops", "rules:api.success_with_error", "rules:units.day_kinds"} <= src, src
+    assert any("отменяет заказ" in c["title"] for c in st["candidates"])
+
+
+def test_ui_feedback_is_not_data_read() -> None:
+    sec = "Часть A › Пользовательский интерфейс"
+    tail = [("Часть B › Метод", "REST type | POST"), ("Часть B › Метод", "Request URL | https://api.bank.local/x/change")]
+    for text in ("После успешной смены показывается сообщение «PIN-код изменён».",
+                 "При ошибке приложение показывает подсказку под полем ввода.",
+                 "Приложение отображает экран успеха с кнопкой «Готово»."):
+        out = rules.run(_view([(sec, text)] + tail))
+        assert not [c for c in out["candidates"] if c["source"] == "rules:promises.read_operation"], text
+    out = rules.run(_view([(sec, "На экране показывается текущий лимит и остаток лимита.")] + tail))
+    assert [c for c in out["candidates"] if c["source"] == "rules:promises.read_operation"]
+
+
+def test_validity_period_is_not_effective_date() -> None:
+    sec = "Часть A › Функциональные требования"
+    out = rules.run(_view([
+        (sec, "Ф-1. Код действует 5 минут с момента отправки."),
+        (sec, "Ф-2. Новый PIN-код действует со следующей операции по карте."),
+    ]))
+    assert not [c for c in out["candidates"] if "event_effective" in c["source"]]
+    out = rules.run(_view([
+        (sec, "Ф-1. Выбранная категория кэшбэка действует с первого дня следующего месяца."),
+        (sec, "Ф-2. Выбранная категория кэшбэка действует сразу после сохранения."),
+    ]))
+    assert [c for c in out["candidates"] if "event_effective" in c["source"]]
