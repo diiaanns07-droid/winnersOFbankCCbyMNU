@@ -159,9 +159,15 @@ def _option_by_text(text: str, options: list) -> int | None:
     return scores[0][1]
 
 
+# заготовка файла следующего круга, которую владелец не заполнил, или маркер редакции, вставленный в ответ
+_TODO = re.compile(r"<\s*(?:решите|допишите|уточнить)\s*:", re.I)
+_TODO_WRAP = re.compile(r"^\s*<\s*(?:решите|допишите|уточнить)\s*:\s*|\s*>\s*$", re.I)
+
+
 def _soft(part: str) -> bool:
-    """Предложение не задаёт правила: откладывает решение или отсылает к «как обычно», «по ситуации»."""
-    return bool(_DEFER.search(part) or _VAGUE.search(part))
+    """Предложение не задаёт правила: откладывает решение, отсылает к «как обычно», «по ситуации» или осталось
+    незаполненной заготовкой «<решите: …>»."""
+    return bool(_DEFER.search(part) or _VAGUE.search(part) or _TODO.search(part))
 
 
 def split_deferred(text: str) -> tuple[str, list[str]]:
@@ -605,16 +611,18 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 continue
             text = opts[a["choice"]]
             label = _cl.option_label(a["choice"])
+            rejected = [str(o) for i, o in enumerate(opts) if i != a["choice"]]
             if a.get("ambiguous_letter") and len(opts) >= 3:
                 warnings.append(f"recheck: {q['id']}: кириллическая «В» понята как вариант B («{text[:60]}»); "
                                 f"если имелся в виду третий вариант (А, Б, В), укажите C")
         else:
             text, deferred = split_deferred(a.get("text", ""))
-            label = ""
+            label, rejected = "", []
             # владелец скопировал текст варианта вместо буквы — это выбор варианта, а не «свой ответ»
             pick = _option_index(text, q.get("options") or [])
             if pick is not None:
                 text, label = q["options"][pick], _cl.option_label(pick)
+                rejected = [str(o) for i, o in enumerate(q["options"]) if i != pick]
         # свой текст уже разобран по предложениям (split_deferred); «как обычно» в варианте модели — не правило
         if not text or (label and _VAGUE.search(text)) or len(text) < 3:
             why = "откладывает решение" if deferred else "не задаёт правила"
@@ -638,6 +646,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                                     "deferred": deferred})
             prev["answer"] = " / ".join(f"{r['label']}: {r['text']}" for r in prev["replies"])
             prev["choice"] = prev["choice"] if prev["choice"] == label else ""
+            if not prev["choice"]:
+                prev["rejected_options"] = []
             prev["deferred"] = prev["deferred"] + deferred
             # адресаты выбрали разные варианты одного вопроса — это конфликт по построению вариантов, без модели
             letters = {r["choice"] for r in prev["replies"] if r["choice"]}
@@ -647,6 +657,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             continue
         answered[q["id"]] = {"question_id": q["id"], "topic": q.get("topic", ""), "question": q.get("question", ""),
                              "choice": label, "answer": full, "deferred": deferred,
+                             # отвергнутые владельцем варианты: правка редакции не должна вписать их значение
+                             "rejected_options": rejected,
                              "replies": [{"label": f"{q['id']}.1", "choice": label, "text": full, "deferred": deferred}],
                              "finding_ids": list(q.get("finding_ids") or [])}
     unanswered = [q["id"] for q in questions if q["id"] not in answered]
@@ -1229,8 +1241,126 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "warnings": warnings,
         "status": rc.get("status", "ok"),
     }
+    clar["next_round"] = next_round(clar, report.get("questions") or [])
     return {"clarification": clar, "findings_after": after,
             "rejected_after": list(rc.get("rejected") or []) + new_rejected}
+
+
+# --------------------------------------------------------------------------- следующий круг ответов
+def _one_line(text: Any) -> str:
+    return " ".join(str(text or "").split())
+
+
+def _head(qid: str, topic: str) -> str:
+    return f"{qid} [{_one_line(topic).replace('[', '(').replace(']', ')')}]: " if topic else f"{qid}: "
+
+
+def next_round(clar: dict, questions: list[dict]) -> list[dict]:
+    """Что осталось решить после ответов — готовыми строками файла ответов (идея: уточняющий вопрос на дефект,
+    который ответ не закрыл). ``kind``: ``conflict`` — ответы расходятся, оставить одну строку; ``partial`` —
+    решена часть, вписать решение вместо «<решите: …>»; ``postponed`` — решение отложено целиком. Строки с темой в скобках: номер вопроса в следующем
+    прогоне может смениться, привязка идёт по теме."""
+    topic = {q.get("id"): q.get("topic", "") for q in questions if isinstance(q, dict)}
+    answered = {a["question_id"]: a for a in clar.get("answers") or []}
+    for qid, a in answered.items():
+        topic[qid] = a.get("topic") or topic.get(qid, "")
+    status = {c["finding_id"]: c["status"] for c in clar.get("changes") or []}
+    out: list[dict] = []
+    for c in clar.get("answer_conflicts") or []:
+        texts = c.get("texts") or {}
+        qids = list(dict.fromkeys(x.split(".")[0] for x in c["answers"] if str(x).startswith("Q-")))
+        sides = [_one_line(texts.get(x)) for x in c["answers"] if _one_line(texts.get(x))]
+        if qids:
+            lines = list(dict.fromkeys(_head(qids[0], topic.get(qids[0], "")) + t for t in sides))
+        else:  # спорят общие решения: в разделе «## Решения» остаётся одно
+            lines = list(dict.fromkeys(f"- {t}" for t in sides))
+        if len(lines) >= 2:
+            out.append({"kind": "conflict", "finding_id": c["finding_id"], "question_id": qids[0] if qids else "",
+                        "lines": lines})
+    asked = {q.get("id"): _one_line(q.get("question")) for q in questions if isinstance(q, dict)}
+    by_q: dict[str, list[str]] = {}
+    for p in clar.get("postponed") or []:
+        # весь ответ отложен — решить нужно сам вопрос; отложена часть — эту часть словами владельца
+        part = _one_line(p.get("text")) if p.get("partial") or not asked.get(p["question_id"]) \
+            else asked[p["question_id"]]
+        by_q.setdefault(p["question_id"], []).append(_TODO_WRAP.sub("", part))
+    for qid, parts in by_q.items():
+        a = answered.get(qid)
+        fids = list((a or {}).get("finding_ids") or next((q.get("finding_ids") or [] for q in questions
+                                                           if isinstance(q, dict) and q.get("id") == qid), []))
+        if fids and all(status.get(f) == "resolved" for f in fids):
+            continue
+        todo = " ".join("<решите: " + re.sub(r"[.!?;<>]+", ",", x).strip(" ,") + ">" for x in parts if x)
+        rule = ""
+        if a and len(a.get("replies") or []) <= 1:
+            rule = _one_line(a.get("answer"))
+            rule = rule if not rule or rule.endswith((".", "!", "?")) else rule + "."
+        out.append({"kind": "partial" if a else "postponed", "finding_id": ", ".join(fids), "question_id": qid,
+                    "lines": [_head(qid, topic.get(qid, "")) + (rule + " " if rule else "") + todo]})
+    # без ответа: вопрос, варианты и что будет без ответа — пояснением (строку ответа владелец пишет сам)
+    for q in questions:
+        qid = q.get("id") if isinstance(q, dict) else None
+        if not qid or qid not in (clar.get("unanswered") or []) or qid in by_q:
+            continue
+        opts = "; ".join(f"{_cl.option_label(i)} — {_one_line(o)}" for i, o in enumerate(q.get("options") or []))
+        note = f"{_one_line(q.get('question'))}" + (f" Варианты: {opts}." if opts else "")
+        if q.get("if_no_answer"):
+            note += f" Если ответа не будет: {q['if_no_answer']}."
+        out.append({"kind": "unanswered", "finding_id": ", ".join(q.get("finding_ids") or []), "question_id": qid,
+                    "lines": [], "note": note, "head": _head(qid, q.get("topic", "")).rstrip()})
+    return out
+
+
+def render_next_answers(clar: dict, document: str = "", report: str = "") -> str:
+    """Файл ответов для следующего круга: что решить (расхождения, отложенное) и всё уже согласованное — чтобы
+    повторный ``--answers`` не потерял прежние ответы. Пояснения — строками «>»: разбор ответов их пропускает."""
+    todo = clar.get("next_round") or []
+    busy = {n["question_id"] for n in todo if n.get("question_id")}
+    lines = ["# Ответы владельца: следующий круг", "",
+             "> При расхождении оставьте одну строку на вопрос; вместо «<решите: …>» впишите решение.",
+             "> Строки «Уже согласовано» не меняйте, если решение то же: без них повторный прогон их потеряет."]
+    if document or report:
+        lines.append(f"> Запуск: python -m bcc_review.v2 review {document or 'ДОКУМЕНТ'} {report or 'ОТЧЁТ.md'} "
+                     f"--answers ЭТОТ_ФАЙЛ")
+    lines.append("")
+    if todo:
+        lines += ["## Что решить", ""]
+        for n in todo:
+            if n["kind"] == "unanswered":
+                lines += [f"> {n['question_id']} ({n['finding_id']}): без ответа. {n.get('note', '')}",
+                          f"> Ответ — строкой «{n.get('head') or n['question_id'] + ':'} буква или свой текст».", ""]
+                continue
+            what = {"conflict": "ответы расходятся, оставьте одну строку",
+                    "partial": "решена только часть, допишите решение"}.get(n["kind"], "решение отложено, впишите его")
+            lines += [f"> {n.get('question_id') or 'Общие решения'} ({n['finding_id']}): {what}", *n["lines"], ""]
+    agreed = []
+    for a in clar.get("answers") or []:
+        if a["question_id"] in busy:
+            continue
+        head = _head(a["question_id"], a.get("topic", ""))
+        replies = a.get("replies") or []
+        if len(replies) > 1:
+            agreed += [head + _one_line(r.get("text")) for r in replies]
+        elif a.get("choice"):
+            agreed.append(head + f"{a['choice']} — " + _one_line(a.get("answer")))
+        else:
+            agreed.append(head + _one_line(a.get("answer")))
+    if agreed:
+        lines += ["## Уже согласовано", "", *agreed, ""]
+    decided = [d for d in clar.get("decisions") or [] if _one_line(d)]
+    if decided:
+        lines += ["## Решения", "", *[f"- {_one_line(d)}" for d in decided], ""]
+    rest = [q for q in clar.get("unanswered") or [] if q not in busy
+            and not any(n.get("question_id") == q for n in todo)]
+    if rest:
+        lines += [f"> Без ответа остаются: {', '.join(rest)}. Ответ можно дописать строкой «{rest[0]} [тема]: ответ» "
+                  f"в раздел выше.", ""]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def next_answers_path(report_path: str | Path) -> Path:
+    p = Path(report_path)
+    return p.with_name(p.stem + ".answers-next.md") if p.suffix else p.with_name(p.name + ".answers-next.md")
 
 
 # --------------------------------------------------------------------------- Markdown-раздел (для №13)

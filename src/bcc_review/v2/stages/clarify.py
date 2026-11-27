@@ -507,7 +507,7 @@ def cover_critical(questions: list[dict], findings: list[dict], warnings: list[s
         added.append(q)
         covered.add(f["id"])
     if not added:
-        return questions
+        return with_consequences(questions, findings)
     out = [q for q in questions if q.get("blocking")] + added + [q for q in questions if not q.get("blocking")]
     cap = question_cap(findings)
     if len(out) > cap:
@@ -515,7 +515,35 @@ def cover_critical(questions: list[dict], findings: list[dict], warnings: list[s
         out = out[:cap]
     for n, q in enumerate(out, 1):
         q["id"] = f"Q-{n:02d}"
-    return out
+    return with_consequences(out, findings)
+
+
+def if_no_answer(q: dict, by_id: dict) -> str:
+    """Что будет, если владелец не ответит (идея конкурентов: «Если ответа не будет»). Считается кодом по дефектам
+    вопроса — без выдуманного «значения по умолчанию»: решение остаётся за владельцем."""
+    fs = [by_id[f] for f in q.get("finding_ids") or [] if f in by_id]
+    if not fs:
+        return ""
+    crit = [f for f in fs if f.get("severity") == "critical" and f.get("blocks", "both") != "none"]
+    if crit:
+        dirs = {f.get("blocks", "both") for f in crit}
+        what = ("разработку и тестирование" if "both" in dirs or {"development", "testing"} <= dirs
+                else "разработку" if "development" in dirs else "тестирование")
+        ids = ", ".join(f["id"] for f in crit)
+        return (f"{what} начинать нельзя: {ids} — {'блокер' if len(crit) == 1 else 'блокеры'}; "
+                f"в исправленной редакции на этом месте — «<уточнить: …>»")
+    ids = ", ".join(f["id"] for f in fs)
+    return (f"{ids} {'остаётся открытым' if len(fs) == 1 else 'остаются открытыми'}; в исправленной редакции "
+            f"на этом месте — «<уточнить: …>» вместо значения")
+
+
+def with_consequences(questions: list[dict], findings: list[dict]) -> list[dict]:
+    by_id = {f.get("id"): f for f in findings if f.get("id")}
+    for q in questions:
+        text = if_no_answer(q, by_id)
+        if text:
+            q["if_no_answer"] = text
+    return questions
 
 
 def option_label(index: int) -> str:
