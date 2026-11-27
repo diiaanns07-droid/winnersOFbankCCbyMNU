@@ -335,6 +335,8 @@
         var rc = $("#recheck"); if (rc && !rc.hasAttribute("data-busy")) rc.disabled = !answersText().n;
       });
       d.addEventListener("click", function () { closeMenus(); });
+      var h = location.hash.slice(1);  // №54: панель главной ведёт сюда с #questions и #revised (просьба №39 к №41)
+      if (h === "questions" || h === "revised") setView(h);
       press(view);
       setTimeout(function () { fr.classList.add("ready"); }, 40);
     }
