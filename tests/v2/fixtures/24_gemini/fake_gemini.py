@@ -60,6 +60,14 @@ def _error(code: int, status: str, message: str, details: list | None = None) ->
     return {"error": {"code": code, "status": status, "message": message, "details": details or []}}
 
 
+class _QuietServer(ThreadingHTTPServer):
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        """Клиент ушёл по своему тайм-ауту раньше ответа (сценарий ``slow``) — это ожидаемо, не шум в консоли."""
+        import sys
+        if not isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
+            super().handle_error(request, client_address)
+
+
 class FakeGemini:
     """Сервер в фоне. ``with FakeGemini(faults=[...]) as fake: env["GOOGLE_GEMINI_BASE_URL"] = fake.url``."""
 
@@ -75,7 +83,7 @@ class FakeGemini:
         self.active = 0
         self.max_active = 0
         handler = self._handler()
-        self.server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+        self.server = _QuietServer(("127.0.0.1", port), handler)
         self.server.daemon_threads = True
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 
