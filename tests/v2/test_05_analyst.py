@@ -169,14 +169,14 @@ def test_maturity_on_real_documents():
         assert m(docview.load(str(CASES / f"{base}.base" / "source.md")))["mature"], base
 
 
-def test_postprocess_mature_keeps_conflicts_and_one_major():
+def test_postprocess_mature_keeps_only_conflicts():
     pp = _load_stage().postprocess
     cands = [_cand("пробел 1", "major", "incomplete", lines=(1,)),
              _cand("пробел 2", "major", "ambiguity", lines=(2,)),
              _cand("мелочь", "minor", "ambiguity", lines=(3,)),
              _cand("единицы", "major", "unit_mismatch", lines=(4, 40)),
              _cand("граница", "critical", "boundary_conflict", lines=(5, 50))]
-    assert [c["title"] for c in pp(cands, mature=True)] == ["граница", "пробел 1", "единицы"]
+    assert [c["title"] for c in pp(cands, mature=True)] == ["граница", "единицы"]
     assert len(pp(cands, mature=False)) == 5
 
 
@@ -190,7 +190,12 @@ def test_run_reports_maturity_and_applies_strict_mode():
         return {"candidates": [_cand("a", "minor", lines=(1,)), _cand("b", "major", lines=(2,))]}
 
     out = mod.run(Ctx(), lens_run=fake_lens)
-    assert out["document_maturity"]["mature"] and [c["title"] for c in out["candidates"]] == ["b"]
+    assert out["document_maturity"]["mature"] and out["candidates"] == []
+
+    def conflict_lens(ctx, name):
+        return {"candidates": [_cand("u", "major", "unit_mismatch", lines=(1, 9))]}
+
+    assert [c["title"] for c in mod.run(Ctx(), lens_run=conflict_lens)["candidates"]] == ["u"]
 
 
 @pytest.mark.parametrize("bad", [None, [], [None, "x", 3]])
