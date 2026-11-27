@@ -42,18 +42,23 @@ if [ ! -x "$PY" ]; then
     if good_python "$c"; then base="$c"; break; fi
   done
   if [ -z "$base" ]; then
+    old=""
+    if command -v python3 >/dev/null 2>&1; then
+      old="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)"
+    fi
     if [ "$os" = "Darwin" ]; then
-      fail "Нужен Python 3.11 или новее: brew install python@3.12 (или установщик с https://www.python.org/downloads/), затем снова ./start.sh"
+      fail "Нужен Python 3.11 или новее${old:+ (найден $old)}: brew install python@3.12 (или установщик с https://www.python.org/downloads/), затем снова ./start.sh"
     else
-      fail "Нужен Python 3.11 или новее: sudo apt install python3 python3-venv (Fedora: sudo dnf install python3), затем снова ./start.sh"
+      fail "Нужен Python 3.11 или новее${old:+ (найден $old)}: sudo apt install python3 python3-venv (Ubuntu 22.04: python3.11 python3.11-venv; Fedora: sudo dnf install python3), затем снова ./start.sh"
     fi
   fi
-  say "Создаю окружение .venv ($("$base" --version 2>&1))…"
+  ver="$("$base" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+  say "Создаю окружение .venv (Python $ver)…"
   if ! "$base" -m venv .venv >/dev/null 2>"$ROOT/.venv-error.log"; then
     rm -rf .venv
     cat "$ROOT/.venv-error.log" >&2
     rm -f "$ROOT/.venv-error.log"
-    fail "Не удалось создать .venv. Ubuntu/Debian: sudo apt install python3-venv, затем снова ./start.sh"
+    fail "Не удалось создать .venv. Ubuntu/Debian: sudo apt install python${ver}-venv, затем снова ./start.sh"
   fi
   rm -f "$ROOT/.venv-error.log"
 fi
@@ -79,4 +84,5 @@ if [ ! -f "$stamp" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$want" ]; then
   printf '%s' "$want" > "$stamp"
 fi
 
-exec "$PY" -m bcc_review.v2.web --open "$@"
+# ${1+"$@"}: bash 3.2 (macOS) с set -u падает на пустом "$@"
+exec "$PY" -m bcc_review.v2.web --open ${1+"$@"}

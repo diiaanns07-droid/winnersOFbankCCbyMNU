@@ -422,6 +422,13 @@ def _wait_ready(url: str, timeout: float = 15.0) -> bool:
     return False
 
 
+def _has_gui() -> bool:
+    """Linux без графики (ssh, сервер): webbrowser запустил бы текстовый lynx/w3m прямо в этом терминале."""
+    if sys.platform in ("win32", "darwin"):
+        return True
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
 def _banner(url: str, encoding: str | None = None) -> str:
     line = f"BCC Review работает: {url.rstrip('/')} — остановить: Ctrl+C"
     h, v, (a, b, c, d) = "═", "║", "╔╗╚╝"
@@ -506,10 +513,10 @@ def main(argv: list[str] | None = None) -> int:
         if not _wait_ready(url):
             print(f"Сервер не ответил на {url}healthz — откройте адрес вручную.", file=sys.stderr, flush=True)
         print(_banner(url), flush=True)
-        if a.open:
+        if a.open and _has_gui():
             try:
                 webbrowser.open(url)
-            except Exception:  # noqa: BLE001 — нет браузера (сервер, Docker): адрес уже напечатан
+            except Exception:  # noqa: BLE001 — нет браузера: адрес уже напечатан
                 pass
 
     import threading

@@ -277,6 +277,7 @@ def test_open_browser_only_after_server_answers(tmp_path, monkeypatch, capsys):
         return True
 
     monkeypatch.setattr(S.webbrowser, "open", fake_open)
+    monkeypatch.setattr(S, "_has_gui", lambda: True)
     port = _free_port()
     th = threading.Thread(target=S.main, args=(["--open", "--port", str(port), "--data-dir", str(tmp_path / "w")],),
                           daemon=True)
@@ -289,6 +290,20 @@ def test_open_browser_only_after_server_answers(tmp_path, monkeypatch, capsys):
         th.join(10)
     assert answered == [b"ok"]
     assert f"BCC Review работает: http://127.0.0.1:{port} — остановить: Ctrl+C" in capsys.readouterr().out
+
+
+def test_no_text_browser_on_headless_linux(monkeypatch):
+    monkeypatch.setattr(S.sys, "platform", "linux")
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    assert S._has_gui() is False
+    monkeypatch.setenv("DISPLAY", ":0")
+    assert S._has_gui() is True
+
+
+def test_start_sh_empty_args_safe_for_bash32():
+    text = (ROOT / "start.sh").read_text(encoding="utf-8")
+    assert 'exec "$PY" -m bcc_review.v2.web --open ${1+"$@"}' in text  # bash 3.2 + set -u: пустой "$@" — ошибка
 
 
 def test_host_0000_prints_local_address():
