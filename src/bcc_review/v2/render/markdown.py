@@ -336,7 +336,11 @@ def prose(text) -> str:
     """Текст модели: «L038» и «L38–L40» из нумерованного документа → «строка 38», «строки 38–40»;
     выражения floor(x/100), пути /a/b?x=1 и идентификаторы monthSpent, limit_kzt, response.result — как код;
     упоминания D-…, R-…, Q-… — ссылки."""
-    return _link_ids(_code_spans(_LREF.sub(_lref, esc(text))))
+    return _link_ids(_code_spans(_LREF.sub(_lref, _JOIN_DOT.sub(". ", esc(text)))))
+
+
+# «…во всех схемах.; Порог …» — две формулировки склеены через «; » после точки
+_JOIN_DOT = re.compile(r"\.;\s+(?=[А-ЯЁA-Z«])")
 
 
 _SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
@@ -422,6 +426,9 @@ def quote_md(text, limit: int = QUOTE_LIMIT, *, in_table: bool = False) -> str:
     s = _HTML_START.sub(r"\\<", s)
     if in_table:
         s = s.replace("|", "\\|")
+    # цитата оборвана внутри кавычек документа («…кнопка «Сохранить») — закрыть их, иначе читатель не видит, где
+    # кончается цитата (сама цитата в report.json не меняется)
+    s += "»" * max(0, s.count("«") - s.count("»"))
     return f"«{s}»"
 
 
