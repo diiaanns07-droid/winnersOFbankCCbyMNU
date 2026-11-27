@@ -86,23 +86,10 @@ NEVER_CRITICAL_CRITERIA = {"conforming", "language", "ranked", "modifiable", "tr
 # одним. Исключение — кандидаты, где исход выведен на конкретном входе по двум сверенным цитатам.
 MISSING_KINDS = {"missing_element", "incomplete"}
 STRUCTURED_ORIGINS = {"acceptance_check", "pair_check"}
-# для major без critical в документе: попарная сверка — мнение одного ревьюера (набора), строка приёмки — исполнена
-MAJOR_STRUCTURED_ORIGINS = {"acceptance_check"}
 MIN_SOURCES_FOR_CONSENSUS = 3  # правило действует, если в прогоне не меньше трёх разных источников
 
 # Противоречие (critical по пункту «а» шкалы) доказывается цитатами двух разных мест.
 CONFLICT_KINDS = {"event_conflict", "status_conflict", "boundary_conflict", "contradiction", "unit_mismatch"}
-
-# Проверка critical после судьи (волна 3): основание (а)/(б)/(в), для (а) — цитаты двух мест об одном предмете,
-# для любого critical — признак основной функции (цитата или требование функционального вида, не только НФТ,
-# цель, ограничения и архитектура). Не прошёл — major с предупреждением; вердикт «нельзя» даёт только прошедший.
-MAIN_REQ_KINDS = {"functional", "api", "acceptance", "integration", "data", "process", "ui"}
-_BASIS_LETTER_RE = re.compile(r"(?<![а-яёa-z])\(?\s*([абв])\s*\)", re.I)
-_BASIS_MAJOR_RE = re.compile(r"(?<![а-яёa-z])\(?\s*[мm]\s?[1-6]\b", re.I)
-_BASIS_NONE_RE = re.compile(r"нет основани|основани\w* нет", re.I)
-_SUBJ_STOP = frozenset("""которые который которая которое когда если после перед также только может могут
-    должен должна должно должны нужно через более менее между всегда каждый каждая каждого документ
-    требование требования метод метода ответ ответа строка строки""".split())
 
 MAX_CRITICAL = 7
 MAX_PRIORITY = 7
@@ -259,17 +246,6 @@ def _norm_q(text: str) -> str:
 def _words_cut(text: str, limit: int) -> str:
     words = _s(text).split()
     return " ".join(words) if len(words) <= limit else " ".join(words[:limit]).rstrip(",;:") + "…"
-
-
-def _fallback_title(f: dict, base: dict) -> str:
-    """Заголовок, если его не дали ни судья, ни кандидат (схема допускает пустую строку): первая фраза проблемы,
-    иначе место. Пустой заголовок нарушает contracts/v2.json, и отчёт не прошёл бы verify."""
-    problem = _s(f.get("problem")) or _s(base.get("problem"))
-    first = re.split(r"(?<=[.!?])\s", problem, maxsplit=1)[0].rstrip(".") if problem else ""
-    if first:
-        return _words_cut(first, 12)
-    line = _first_line(base)
-    return f"Замечание к строке {line}" if line < 10 ** 6 else "Замечание без заголовка"
 
 
 def _cid_num(cid: str) -> int:
@@ -691,51 +667,6 @@ def _pick_evidence(members: list[dict], base: dict | None) -> list[dict]:
     return [per_line[n] for n in lines]
 
 
-_LQ_RES = [re.compile(r"\bL0*(\d{1,4})\s*[:—–-]?\s*«([^«»]{8,300})»"),
-           re.compile(r"«([^«»]{8,300})»\s*\(L0*(\d{1,4})\)")]
-
-
-def _named_quotes(text: str) -> list[tuple[int, str]]:
-    out = []
-    for i, rx in enumerate(_LQ_RES):
-        for m in rx.finditer(text or ""):
-            n, q = (m.group(1), m.group(2)) if i == 0 else (m.group(2), m.group(1))
-            out.append((int(n), q.strip()))
-    return out
-
-
-def _add_named_sides(item: dict, view: dict) -> int:
-    """Судья в тексте дефекта цитирует место со строкой («L040: «…»»), а среди цитат кандидатов его нет —
-    дословная цитата, найденная в документе на этой строке, добавляется в доказательства. Только для
-    противоречий и дефектов меньше чем с двумя местами: читатель должен видеть обе стороны."""
-    lines = {ln.get("n"): ln for ln in view.get("lines") or [] if isinstance(ln.get("n"), int)}
-    have = {e["line_start"] for e in item["evidence"]}
-    if not lines or (len(have) >= 2 and item["kind"] not in CONFLICT_KINDS):
-        return 0
-    added = 0
-    for n, q in _named_quotes(item["problem"] + " " + item["scenario"]):
-        if n in have or len(item["evidence"]) >= MAX_EVIDENCE:
-            continue
-        found = _find_line(view, q, n)
-        ln = lines.get(found) if found is not None and abs(found - n) <= 1 else None
-        if ln is None:
-            continue
-        text = _s(ln.get("text"))
-        at = text.lower().replace("ё", "е").find(q.lower().replace("ё", "е"))
-        if at < 0:
-            continue
-        item["evidence"].append({"quote": text[at:at + len(q)], "line": found, "line_start": found,
-                                 "line_end": found, "page": ln.get("page"), "section": _s(ln.get("section")),
-                                 "verified": "exact"})
-        have.add(found)
-        item.setdefault("_named_ev", []).append(item["evidence"][-1])
-        added += 1
-    if added:
-        item["evidence"].sort(key=lambda e: e["line_start"])
-        item["_first_line"] = item["evidence"][0]["line_start"]
-    return added
-
-
 def _text(f: dict, base: dict | None, field: str, limit: int) -> str:
     val = _s(f.get(field))
     if not val and base is not None:
@@ -756,13 +687,11 @@ def _source_family(src: str) -> str:
     return "rules" if src.startswith("rules:") else src
 
 
-def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
-               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS) -> bool:
+def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None) -> bool:
     """Critical подтверждён двумя ревьюерами: два источника среди кандидатов дефекта или кандидат другого
-    источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект.
-    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам."""
+    источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект."""
     fams = {_source_family(_s(m.get("source"))) for m in members}
-    if len(fams) >= 2 or any(_s(m.get("origin")) in structured for m in members):
+    if len(fams) >= 2 or any(_s(m.get("origin")) in STRUCTURED_ORIGINS for m in members):
         return True
     lines = {e["line_start"] for e in f["evidence"]}
     need = min(2, len(lines))
@@ -775,83 +704,8 @@ def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
     return False
 
 
-def _subject_tokens(text: str) -> set[str]:
-    """Опорные слова предмета: числа, латинские имена, основы русских слов от 5 букв."""
-    out: set[str] = set()
-    for w in re.findall(r"[a-zа-я0-9_]+", _s(text).lower().replace("ё", "е")):
-        if w.isdigit() or (w[0].isascii() and w[0].isalpha() and len(w) >= 3):
-            out.add(w)
-        elif len(w) >= 5 and w not in _SUBJ_STOP:
-            out.add(w[:5])
-    return out
-
-
-def _two_sides_same_subject(f: dict, req_kind_at: dict[int, str]) -> bool:
-    """Есть две цитаты разных строк (не только цель документа) об одном предмете: у цитат общее опорное слово
-    или обе перекликаются с заголовком и описанием дефекта."""
-    head = _subject_tokens(f["title"] + " " + f["problem"] + " " + f["scenario"])
-    sides = [(e["line_start"], _subject_tokens(e["quote"])) for e in f["evidence"]
-             if req_kind_at.get(e["line_start"]) != "goal"]
-    for i, (la, ta) in enumerate(sides):
-        for lb, tb in sides[i + 1:]:
-            if la != lb and (ta & tb or (ta & head and tb & head)):
-                return True
-    return False
-
-
-def critical_basis(f: dict) -> str:
-    """Буква основания critical: из обоснования судьи, затем из второй проверки, иначе по виду дефекта."""
-    for text in (_s(f.get("_basis")), _s(f.get("_check_basis"))):
-        m = _BASIS_LETTER_RE.search(text[:60])
-        if m:
-            return m.group(1).lower()
-    if f.get("kind") in CONFLICT_KINDS:
-        return "а"
-    if f.get("kind") in MISSING_KINDS:
-        return "в"
-    return "б" if f.get("kind") == "ambiguity" else ""
-
-
-def verify_critical(f: dict, req_kind_at: dict[int, str] | None = None,
-                    req_kind_by_id: dict[str, str] | None = None) -> str:
-    """Проверка critical, прошедшего шкалу: пустая строка — прошёл, иначе причина понижения до major."""
-    req_kind_at, req_kind_by_id = req_kind_at or {}, req_kind_by_id or {}
-    texts = " ".join(_s(f.get(k))[:200] for k in ("_basis", "_check_basis"))
-    if _BASIS_NONE_RE.search(texts):
-        return "судья или проверка не назвали основание critical"
-    if _BASIS_MAJOR_RE.search(texts) and not _BASIS_LETTER_RE.search(texts):
-        return "основание судьи — уровня major (м1–м6)"
-    basis = critical_basis(f)
-    if (basis == "а" or f.get("kind") in CONFLICT_KINDS) and not _two_sides_same_subject(f, req_kind_at):
-        return "нет цитат двух мест об одном предмете"
-    kinds = [req_kind_at.get(e["line_start"]) for e in f["evidence"]]
-    kinds += [req_kind_by_id.get(r) for r in f.get("requirement_ids") or []]
-    known = [k for k in kinds if k]
-    if known and not any(k in MAIN_REQ_KINDS for k in known):
-        return "дефект не касается основной функции (только " + ", ".join(sorted(set(known))) + ")"
-    return ""
-
-
-def _req_maps(requirements: list[dict] | None) -> tuple[dict[int, str], dict[str, str]]:
-    """Строка документа → вид требования; ID требования → вид (для признака основной функции)."""
-    at: dict[int, str] = {}
-    by_id: dict[str, str] = {}
-    for r in requirements or []:
-        kind = _s(r.get("kind"))
-        if not kind:
-            continue
-        if _s(r.get("id")):
-            by_id[_s(r.get("id"))] = kind
-        start, end = r.get("line_start"), r.get("line_end")
-        if isinstance(start, int) and start > 0:
-            end = end if isinstance(end, int) and end >= start else start
-            for n in range(start, min(end, start + 40) + 1):
-                at.setdefault(n, kind)
-    return at, by_id
-
-
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0,
-               all_cands: list[dict] | None = None, req_maps: tuple[dict, dict] | None = None) -> None:
+               all_cands: list[dict] | None = None) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
         # критерий у противоречия и пропуска — по виду: модель иногда ставит «conforming» и т. п.
@@ -875,8 +729,6 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "противоречие подтверждено цитатой только одного места"
         elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed(f, members, all_cands):
             why = "critical подтвердил только один ревьюер"
-        else:
-            why = verify_critical(f, *(req_maps or ({}, {})))
         if why:
             f["severity"] = "major"
             _warn(ctx, warnings, f"судья: {f['title'][:60]!r} понижен до major ({why})")
@@ -975,26 +827,6 @@ def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
                          f"{len(crit) - MAX_CRITICAL} наименее приоритетных понижены до major")
 
 
-def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: int, ctx: Any,
-                    warnings: list[str]) -> None:
-    """В документе без критичных дефектов существенные дефекты решают вердикт («можно» или «с условиями»),
-    поэтому major остаётся major, только если его подтвердили два разных ревьюера (или кандидат вывел исход,
-    исполнив строку приёмки). Попарная сверка набора здесь — мнение одного ревьюера. Найденное одним ревьюером — minor с предупреждением.
-    Если в документе есть critical, правило не действует: его вердикт и так «нельзя», а все существенные
-    дефекты нужны для исправления."""
-    if run_sources < MIN_SOURCES_FOR_CONSENSUS or any(f["severity"] == "critical" for f in findings):
-        return
-    lowered = 0
-    for f in findings:
-        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS):
-            continue
-        f["severity"], f["blocks"], f["priority"] = "minor", "none", 0
-        lowered += 1
-    if lowered:
-        _warn(ctx, warnings, f"судья: критичных дефектов нет; {lowered} существенных, найденных одним "
-                             "ревьюером, понижены до незначительных")
-
-
 def _assign_priorities(findings: list[dict]) -> None:
     """priority 1…7 без повторов: сначала то, что указал судья, затем недостающие critical."""
     for f in findings:  # minor ничего не блокирует — в «исправить первым» не идёт
@@ -1054,8 +886,6 @@ _TERMS_RU = [
     (re.compile(r"\bUSD\b"), "доллары США"),
     (re.compile(r"\bв EUR\b"), "в евро"),
     (re.compile(r"\bfeature[- ]flag\w*", re.I), "флаг включения функции"),
-    (re.compile(r"\bevent[ _-]?id\b", re.I), "идентификатор события"),
-    (re.compile(r"\bNFR\b"), "НФТ"),
 ]
 
 
@@ -1088,8 +918,6 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     cluster_of = {cid: gi for gi, g in enumerate(clusters) for cid in g}
     placed: dict[str, str] = {}  # C-id → ключ дефекта или "rejected"
     run_sources = len({_source_family(_s(c.get("source"))) for c in candidates if _s(c.get("source"))})
-    req_maps = _req_maps(requirements)
-    view = _view_of(ctx)
 
     # 1. дефекты судьи: только известные кандидаты, каждый не более одного раза
     drafts: list[dict] = []
@@ -1168,7 +996,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         item = {
             "key": d["key"],
             "candidate_ids": sorted(d["ids"], key=_cid_num),
-            "title": _cut(_s(f.get("title")) or _s(base.get("title")) or _fallback_title(f, base), 180),
+            "title": _cut(_s(f.get("title")) or _s(base.get("title")), 180),
             "kind": kind,
             "criterion": crit,
             "standard_refs": list(STANDARD_REFS.get(crit, [])),
@@ -1187,14 +1015,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             "_members": members,
             "_first_line": evidence[0]["line_start"],
             "_wish": f.get("wish") is True,
-            "_basis": _s(f.get("severity_basis")),
-            "_check_basis": _s(f.get("_check_basis")),
-            "_model_sev": sev,
-            "_model_blocks": blocks,
         }
-        if _add_named_sides(item, view):
-            _warn(ctx, warnings, f"судья: к {item['title'][:50]!r} добавлена цитата места, названного в тексте")
-        _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps)
+        _calibrate(item, members, ctx, warnings, run_sources, candidates)
         findings.append(item)
 
     findings = _merge_no_id(findings, ctx, warnings)
@@ -1204,14 +1026,9 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     for f in findings:  # после слияния — доказательства и источники заново
         if len(f["_members"]) > 1:
             f["evidence"] = _pick_evidence(f["_members"], f["_members"][0]) or f["evidence"]
-            have = {e["line_start"] for e in f["evidence"]}
-            f["evidence"] += [e for e in f.get("_named_ev") or [] if e["line_start"] not in have]
-            f["evidence"].sort(key=lambda e: e["line_start"])
             f["sources"] = _sources(f["_members"])
             f["_first_line"] = f["evidence"][0]["line_start"]
     _cap_critical(findings, ctx, warnings)
-    if _option(ctx, "judge_confirm_majors", True):
-        _confirm_majors(findings, candidates, run_sources, ctx, warnings)
     _assign_priorities(findings)
 
     # 5. номера D-xx: серьёзность → приоритет → строка
@@ -1253,17 +1070,11 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     summary = _ru_levels(_replace_keys(_s(response.get("verdict_summary")), key_map))
     if not summary:
         summary = fallback_summary(clean)
-    code_summary = bool(summary) and bool(clean) and (_code_changed_verdict(findings)
-                                                      or _text_contradicts(summary, clean))
 
     # 7. ссылки на ключи в текстах дефектов → D-xx
     for f in clean:
         for field in ("title", "problem", "scenario", "impact", "recommendation", "question"):
             f[field] = _ru_levels(_replace_keys(f[field], {k: v for k, v in key_map.items() if not k.startswith("C-")}))
-
-    if code_summary:  # после замены ключей: в заголовках уже D-xx
-        summary = verdict_text(clean)
-        _warn(ctx, warnings, "судья: уровни изменены кодом — обоснование вердикта собрано кодом")
 
     fix_first = [f["id"] for f in sorted((f for f in clean if f["priority"] > 0), key=lambda f: f["priority"])]
     changes = [{"id": key_map[k], **v} for k, v in (response.get("_checks") or {}).items() if k in key_map]
@@ -1299,65 +1110,6 @@ def _rejected_entry(c: dict, code: str, reason: str, line: int) -> dict:
         "evidence": [{k: e.get(k) for k in ("quote", "line_start", "line_end", "page", "section", "verified")
                       if k in e} for e in c.get("evidence") or []][:5],
     }
-
-
-_SIDE_RU = {"no": "нельзя начинать", "conditional": "можно начинать с условиями", "yes": "можно начинать"}
-
-
-def _list_ids(fs: list[dict], n: int = 3) -> str:
-    return ", ".join(f"{f['id']} ({_lc_first(re.sub(r'[.;:\s]+$', '', f['title']))})" for f in fs[:n])
-
-
-def verdict_text(findings: list[dict]) -> str:
-    """Обоснование вердикта кодом — когда уровни, по которым модель писала свой текст, изменил код
-    (понижения проверкой, консенсус, сведение мелочей): текст модели тогда противоречил бы вердикту."""
-    v = compute_verdict(findings)
-    dev, test = v["development"], v["testing"]
-    by_prio = sorted(findings, key=lambda f: (f.get("priority") or 99, SEV_RANK.get(f.get("severity"), 3)))
-    crit = [f for f in by_prio if f.get("severity") == "critical"]
-    major = [f for f in by_prio if f.get("severity") == "major"]
-    head = (f"Разработку и тестирование {_SIDE_RU[dev]}" if dev == test
-            else f"Разработку {_SIDE_RU[dev]}, тестирование — {_SIDE_RU[test]}")
-    if crit:
-        parts = [f"{head}: работу блокируют критичные дефекты {_list_ids(crit)}."]
-        if major:
-            parts.append(f"До приёмки нужно закрыть и существенные {_list_ids(major, 2)}.")
-    elif "conditional" in (dev, test):
-        parts = [f"{head}: критичных дефектов нет, но до приёмки нужно закрыть существенные {_list_ids(major)}."]
-    elif major:
-        parts = [f"{head}: критичных дефектов нет, существенных меньше трёх.",
-                 f"До приёмки стоит закрыть {_list_ids(major, 2)}."]
-    else:
-        parts = [f"{head}: критичных и существенных дефектов нет; незначительные замечания можно закрыть по ходу "
-                 "работы."]
-    if v["fix_first"]:
-        parts.append("Исправить первым: " + ", ".join(v["fix_first"][:5]) + ".")
-    return " ".join(parts)
-
-
-def _code_changed_verdict(findings: list[dict]) -> bool:
-    """Код изменил уровни так, что текст модели устарел: другой вердикт или снят critical модели."""
-    if any(f.get("_model_sev") == "critical" and f["severity"] != "critical" for f in findings):
-        return True
-    model = [{"severity": f.get("_model_sev", f["severity"]), "blocks": f.get("_model_blocks", f["blocks"])}
-             for f in findings]
-    a, b = compute_verdict(model), compute_verdict(findings)
-    return (a["development"], a["testing"]) != (b["development"], b["testing"])
-
-
-def _text_contradicts(summary: str, findings: list[dict]) -> bool:
-    """Текст обоснования говорит не то, что вердикт: «нельзя» без «нельзя» в вердикте и наоборот,
-    «с условиями» при вердикте «можно» по обеим сторонам."""
-    v = compute_verdict(findings)
-    sides = {v["development"], v["testing"]}
-    low = summary.lower()
-    says_no = bool(re.search(r"нельзя|не может начинаться|не следует начинать|блокиру", low))
-    says_cond = "услови" in low
-    if "no" in sides:
-        return not says_no
-    if sides == {"yes"}:
-        return says_no or says_cond
-    return bool(re.search(r"нельзя", low))
 
 
 def fallback_summary(findings: list[dict]) -> str:
@@ -1481,7 +1233,6 @@ def _check_severity(ctx: Any, response: dict, by_id: dict[str, dict], warnings: 
         new = _s(ch.get("severity"))
         if f is None or new not in SEV_RANK:
             continue
-        f["_check_basis"] = _cut(ch.get("basis"), 200)  # основание проверки — для verify_critical
         old = _s(f.get("severity"))
         if SEV_RANK[new] <= SEV_RANK[old]:
             continue  # повышать нельзя; без изменений — пропускаем
