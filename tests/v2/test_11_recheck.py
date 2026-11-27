@@ -299,3 +299,21 @@ def test_conflicting_answers_keep_defect_open(findings, questions, stub_judge):
     assert ch["status"] == "open" and "противоречат" in ch["reason"]
     assert clar["answer_conflicts"] == [{"finding_id": fid, "answers": [q1["id"], "Решение-1"], "reason": ch["reason"]}]
     assert "противоречат друг другу" in recheck.render_markdown(clar)
+
+
+def test_new_candidate_repeating_old_defect_is_rejected(findings, questions):
+    q1 = questions[0]
+    old = next(f for f in findings if len({e["line_start"] for e in f["evidence"]}) >= 2)
+    e1, e2 = old["evidence"][0], old["evidence"][1]
+    twin = dict(CAND, title="Тот же конфликт заново", evidence=[{"quote": e1["quote"], "line": e1["line_start"]},
+                                                                  {"quote": e2["quote"], "line": e2["line_start"]}])
+    res = recheck.run(FakeCtx(FakeLLM(_resp([], [twin, CAND]))), findings, f"{q1['id']}: A\n", questions)
+    assert [c["title"] for c in res["new_candidates"]] == [CAND["title"]]
+    assert any(r["reason"].startswith("повторяет дефект") for r in res["rejected"])
+
+
+def test_single_line_twin_needs_same_essence(findings):
+    old = next(f for f in findings if f["id"] == "D-04")
+    ev = [{"line_start": old["evidence"][0]["line_start"]}]
+    assert recheck.duplicate_of(ev, [old], "Ответ противоречит примеру ответа API") == ""
+    assert recheck.duplicate_of(ev, [old], old["title"]) == "D-04"

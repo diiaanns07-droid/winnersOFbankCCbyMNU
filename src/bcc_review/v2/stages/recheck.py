@@ -495,10 +495,37 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             result["rejected"].append({"candidate_id": cand["id"], "title": cand.get("title", ""),
                                        "reason": "цитата не найдена", "source": "recheck"})
             continue
+        twin = duplicate_of(ev, findings, str(cand.get("title", "")))
+        if twin:  # прежний дефект модель описала заново — это не новый конфликт от ответа
+            result["rejected"].append({"candidate_id": cand["id"], "title": cand.get("title", ""),
+                                       "reason": f"повторяет дефект {twin}", "source": "recheck"})
+            continue
         cand["evidence"] = ev
         cand["line_start"], cand["line_end"] = ev[0]["line_start"], ev[0]["line_end"]
         result["new_candidates"].append(cand)
     return _finish(ctx, result)
+
+
+def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", slack: int = 1) -> str:
+    """ID прежнего дефекта, который новый кандидат описывает заново, иначе пустая строка.
+
+    Новый конфликт от ответа цитирует место, которое теперь противоречит ответу. Если все его цитаты —
+    строки одного прежнего дефекта (±``slack``), это тот же дефект (закрытый ответом или оставшийся открытым):
+    для двух и более строк хватает совпадения строк, для одной строки нужна ещё та же суть в заголовке."""
+    cand = {int(e["line_start"]) for e in evidence if e.get("line_start")}
+    if not cand:
+        return ""
+    words = _tokens(_cl.plain_text(title))
+    for f in findings:
+        own = {int(x) for x in _cl.finding_lines(f)}
+        if not own or not all(any(abs(c - o) <= slack for o in own) for c in cand):
+            continue
+        if len(cand) >= 2:
+            return str(f.get("id", ""))
+        theirs = _tokens(f"{f.get('title', '')} {f.get('problem', '')}")
+        if words and len(words & theirs) / len(words) >= 0.4:
+            return str(f.get("id", ""))
+    return ""
 
 
 def _finish(ctx: Any, result: dict) -> dict:
@@ -542,7 +569,11 @@ def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[st
                   "rewrite": c.get("rewrite", ""), "question": c.get("question", ""), "blocks": c.get("blocks", "both"),
                   "priority": 0, "sources": ["recheck"]} for c in candidates]
         rejected = []
+    keep = _cl.doc_codes(getattr(ctx, "view", None))
     for i, f in enumerate(found):
+        for key in ("title", "problem", "scenario", "impact", "recommendation", "question"):
+            if isinstance(f.get(key), str):
+                f[key] = _cl.plain_text(f[key], keep)
         f["id"] = f"D-{start_n + i:02d}"
         f.setdefault("sources", ["recheck"])
         if "recheck" not in f["sources"]:
