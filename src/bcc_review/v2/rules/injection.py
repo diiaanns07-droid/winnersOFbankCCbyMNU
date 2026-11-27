@@ -122,7 +122,7 @@ def run(doc: Doc, out: dict) -> None:
     first = hits[0]
     out["candidates"].append(candidate(
         "injection.prompt",
-        title=(f"В тексте требований — указание для ИИ-проверки, а не требование (строка {first[0].n}"
+        title=(f"Указание для ИИ-проверки вместо требования (строка {first[0].n}"
                + (f" и ещё {len(hits) - 1}" if len(hits) > 1 else "") + ")"),
         kind="security", criterion="risk", severity="major", blocks="none",
         evidence=[ev(h[0], h[1]) for h in hits[:3]],

@@ -38,7 +38,10 @@
   затем следующая модель цепочки: «молча пустых» ответов наверх нет;
 * ответ не по схеме возвращается как есть: ``LLMClient`` один раз просит модель исправить его по списку
   нарушений (раньше этап сразу падал без попытки починки);
-* рассуждения по этапам — из профиля модели (``profiles.py``).
+* рассуждения по этапам — из профиля модели (``profiles.py``);
+* перегрузка в часы пик: если у модели исчерпаны повторы 503, следующие 10 минут она пробуется один раз без
+  пауз, при 503 — сразу запасная (модель времени: основная перегружена весь прогон — 8,5 → 6,5 мин, вместо 45
+  запросов 21). Успешный ответ снимает «охлаждение».
 """
 
 from __future__ import annotations
@@ -65,6 +68,7 @@ RETRY_DELAYS_S = (2.0, 5.0, 10.0)   # 503/500/504/overloaded/timeout
 NETWORK_DELAYS_S = (2.0, 5.0)
 RATE_WAITS = 2
 RETRY_SLACK_S = 120.0               # запас времени на повторы сверх таймаута вызова
+COOL_S = 600.0                      # после исчерпанных повторов 503: столько секунд модель — одна попытка без пауз
 DEFAULT_MAX_RATE_WAIT_S = 65.0
 DEFAULT_CONCURRENCY = 5             # 4 линзы + набор идут разом (модель времени: при 4 прогон дольше на 40–45 с)
 RATE_WINDOW_S = 60.0
@@ -113,7 +117,8 @@ def settings(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     fallbacks = list(DEFAULT_FALLBACKS) if raw_fb is None else (
         [] if raw_fb.strip().lower() in _OFF else _models(raw_fb))
     return {
-        "api_key": (env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY") or "").strip() or None,
+        # кавычки вокруг ключа: docker --env-file и set в cmd передают их как часть значения
+        "api_key": (env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY") or "").strip().strip("\"'").strip() or None,
         "model": (env.get("GEMINI_MODEL") or "").strip().removeprefix("models/") or DEFAULT_MODEL,
         "fallback_models": fallbacks,
         "max_output_tokens": int(_num(env, "GEMINI_MAX_OUTPUT_TOKENS", 0) or 0) or None,   # None — по профилю модели
@@ -264,6 +269,7 @@ class GeminiProvider:
         explicit = max_output_tokens or cfg["max_output_tokens"]
         self.max_output_tokens = int(explicit) if explicit else None   # None — потолок модели из профиля
         self._out_cap: dict[str, int] = {}                             # модели, отвергшие большой лимит ответа
+        self._cooling: dict[str, float] = {}   # перегруженные модели: до какого времени — одна попытка без пауз
         self.thinking_level = cfg["thinking_level"]
         self.thinking_budget = cfg["thinking_budget"]
         self.temperature = cfg["temperature"]
@@ -272,6 +278,16 @@ class GeminiProvider:
         self.retry_delays = tuple(retry_delays)
         self.network_delays = tuple(network_delays)
         self._factory = adapter_factory or self._v1_adapter
+        if adapter_factory is None:
+            # Нет ключа или пакета — ошибка сразу, при создании (как у Claude API): конвейер покажет объяснение
+            # первой строкой и построит отчёт правилами, а не будет по очереди «ронять» каждый этап.
+            if not self._api_key:
+                raise ProviderError("not_configured", f"Не задан GEMINI_API_KEY. {KEY_HELP}")
+            try:
+                import google.genai  # noqa: F401
+            except ImportError:
+                raise ProviderError("not_configured", "Не установлен пакет google-genai: выполните "
+                                                      "«pip install -r requirements.txt» и повторите.") from None
         self._sleep = sleep
         self._clock = clock
         self._lock = threading.Lock()
@@ -280,7 +296,7 @@ class GeminiProvider:
         self._gate = threading.BoundedSemaphore(max(1, self.concurrency))
         self._adapters: dict[tuple[str, tuple], Any] = {}
         self._dead: dict[str, ProviderError] = {}       # модели, отключённые до конца прогона (404, квота)
-        self._no_thinking: set[str] = set()              # модели, отвергшие настройку рассуждений
+        self._no_thinking: set[tuple] = set()            # (модель, настройка рассуждений), которую модель отвергла
         self._text_schema: set[str] = set()              # модели, отвергшие схему ответа (слишком сложная)
 
     # ------------------------------------------------------------------ adapters
@@ -307,8 +323,9 @@ class GeminiProvider:
                    thinking_budget=thinking.get("thinking_budget"), thinking_level=thinking.get("thinking_level"))
 
     def _adapter(self, model: str, stage: str = "") -> tuple[Any, dict[str, Any], str]:
-        thinking = ({} if model in self._no_thinking
-                    else thinking_for(model, self.thinking_level, self.thinking_budget, stage))
+        thinking = thinking_for(model, self.thinking_level, self.thinking_budget, stage)
+        if (model, tuple(sorted(thinking.items()))) in self._no_thinking:
+            thinking = {}   # отвергнута именно эта настройка: другой уровень (low у нарезки) остаётся в силе
         mode = "text" if model in self._text_schema else "native"
         key = (model, tuple(sorted(thinking.items())), mode)
         with self._lock:
@@ -427,10 +444,13 @@ class GeminiProvider:
                             continue
                         break   # та же модель дважды ответила пустым — следующая модель цепочки
                     if kind in TRANSIENT:
-                        if transient < len(self.retry_delays):
+                        cooling = self._cooling.get(current, 0.0) > self._clock()
+                        if transient < len(self.retry_delays) and not cooling:
                             self._sleep(self.retry_delays[transient])
                             transient += 1
                             continue
+                        # повторы исчерпаны (или модель уже «остывает»): COOL_S секунд пробуем её один раз без пауз
+                        self._cooling[current] = self._clock() + COOL_S
                         break
                     if kind == "rate_limit":
                         wait = exc.retry_after_s
@@ -452,12 +472,13 @@ class GeminiProvider:
                         self._out_cap[current] = 32768 if max_tokens > 32768 else 8192
                         continue
                     if kind == "bad_request" and thinking and "think" in low:
-                        self._no_thinking.add(current)
+                        self._no_thinking.add((current, tuple(sorted(thinking.items()))))
                         continue
                     if kind == "bad_request" and mode == "native" and ("schema" in low or "too many states" in low):
                         self._text_schema.add(current)
                         continue
                     raise self._final(exc, chain, attempts) from None
+                self._cooling.pop(current, None)
                 out = self._normalize(result, chain, current, attempts, thinking)
                 out["meta"]["schema_mode"] = mode
                 return out

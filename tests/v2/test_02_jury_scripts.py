@@ -38,8 +38,10 @@ def test_summary_prints_russian_passport(tmp_path, status, vcode, ok):
               "verdict": {"development": "no", "testing": "conditional"}}
     path = tmp_path / "r.json"
     path.write_text(json.dumps(report), encoding="utf-8")
+    import os
     r = subprocess.run([sys.executable, str(D / "jury_summary.py"), str(path), "281", "0", str(vcode)],
-                       capture_output=True, text=True, encoding="utf-8")
+                       capture_output=True, text=True, encoding="utf-8",
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})   # Windows без UTF-8 (просьба №16)
     assert (r.returncode == 0) is ok
     out = r.stdout
     assert "gemini-3.8-flash-001" in out and "Вызовов модели:   9" in out

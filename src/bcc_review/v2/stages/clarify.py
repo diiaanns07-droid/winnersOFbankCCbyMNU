@@ -211,12 +211,18 @@ def finding_lines(finding: dict) -> list[int]:
     return [int(e["line_start"]) for e in finding.get("evidence", []) if e.get("line_start")]
 
 
+def reviewers(f: dict) -> int:
+    """Сколько независимых ревьюеров (линзы, набор, правила) нашли дефект: у major с 3+ ревьюерами на новых ТЗ
+    №18 доля дефектов эталона 87 %, с одним — 42 %."""
+    return len({str(x).split(":")[0] if str(x).startswith("rules") else str(x) for x in f.get("sources") or []}) or 1
+
+
 def format_findings(findings: list[dict], *, full: bool = True) -> str:
     """Компактная таблица дефектов для промпта (цитаты уже сверены кодом)."""
     rows: list[str] = []
     for f in findings:
         head = (f"{f.get('id', '')} | {f.get('severity', '')} | блокирует: {f.get('blocks', 'none')} | "
-                f"{', '.join(f.get('requirement_ids', [])) or '—'} | {f.get('title', '')}")
+                f"ревьюеров: {reviewers(f)} | {', '.join(f.get('requirement_ids', [])) or '—'} | {f.get('title', '')}")
         rows.append(head)
         quotes = "; ".join(f"L{int(e.get('line_start') or e.get('line') or 0):03d} «{e.get('quote', '')}»"
                            for e in f.get("evidence", []))
@@ -271,19 +277,37 @@ def _role(value: str) -> str:
     return "Аналитик"
 
 
+_PLACEHOLDER = re.compile(r"<\s*уточнить\s*:?\s*([^>]*)>", re.I)
+
+
+def soften_placeholder(text: str) -> str:
+    """«<уточнить: часовой пояс банка>» → «(часовой пояс банка — укажите)»: вариант остаётся читаемым правилом."""
+    return _PLACEHOLDER.sub(lambda m: f"({m.group(1).strip() or 'значение'} — укажите)", text)
+
+
 def clean_options(options: Iterable[str]) -> list[str]:
-    out: list[str] = []
-    seen: set[str] = set()
-    for opt in options or []:
-        text = _LEADING_LABEL.sub("", str(opt or "")).strip().rstrip(";")
-        if len(text) < 3 or _BANNED_OPTION.search(text) or "<уточнить" in text.lower():
-            continue
-        key = _norm(text)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(text)
-    return out[:4]
+    """2–4 различных варианта без «оставить как есть». Варианты с заглушкой «<уточнить>» отбрасываются;
+    если без них остаётся меньше двух, заглушка смягчается и вариант остаётся — иначе пропал бы весь вопрос
+    (на `qr` haiku так потерял вопрос по критичному дефекту из-за «<уточнить: часовой пояс>»)."""
+    def collect(soft: bool) -> list[str]:
+        out: list[str] = []
+        seen: set[str] = set()
+        for opt in options or []:
+            text = _LEADING_LABEL.sub("", str(opt or "")).strip().rstrip(";")
+            if "<уточнить" in text.lower():
+                if not soft:
+                    continue
+                text = soften_placeholder(text)
+            if len(text) < 3 or _BANNED_OPTION.search(text):
+                continue
+            key = _norm(text)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(text)
+        return out[:4]
+    strict = collect(False)
+    return strict if len(strict) >= 2 else collect(True)
 
 
 def _warn(ctx: Any, msg: str) -> None:
@@ -360,11 +384,12 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
         blocking = any(by_id[fid].get("severity") == "critical" and by_id[fid].get("blocks", "both") != "none"
                        for fid in ids)
         prio = min((int(by_id[fid].get("priority") or 0) or 99) for fid in ids)
+        found_by = max(reviewers(by_id[fid]) for fid in ids)
         kept.append({
             "id": "", "topic": plain_text(str(q.get("topic", "")).strip(), keep_codes)[:80], "finding_ids": ids,
             "to": _role(q.get("to")), "blocking": blocking, "question": text, "evidence": evidence[:3],
             "options": options, "why": plain_text(str(q.get("why", "")).strip(), keep_codes),
-            "_rank": (0 if blocking else 1, min(_SEV_RANK.get(s, 2) for s in sev), prio, i),
+            "_rank": (0 if blocking else 1, min(_SEV_RANK.get(s, 2) for s in sev), prio, -min(found_by, 3), i),
         })
     kept.sort(key=lambda x: x["_rank"])
     cap = question_cap(findings)
@@ -391,7 +416,7 @@ def select_findings(findings: list[dict]) -> list[dict]:
         lines = finding_lines(f)
         return min(lines) if lines else 10 ** 6
     return sorted(serious, key=lambda f: (_SEV_RANK.get(f.get("severity"), 2), int(f.get("priority") or 0) or 99,
-                                          first_line(f)))
+                                          -reviewers(f), first_line(f)))
 
 
 def _ask_questions(ctx: Any, items: list[dict], block: str) -> dict:
@@ -434,7 +459,8 @@ def select_candidates(candidates: list[dict]) -> list[list[dict]]:
         groups = [[c["id"]] for c in good]
     out = [[by_id[x] for x in g if x in by_id] for g in groups]
     out = [g for g in out if g]
-    out.sort(key=lambda g: (min(_SEV_RANK.get(c.get("severity"), 2) for c in g), -len(g)))
+    out.sort(key=lambda g: (min(_SEV_RANK.get(c.get("severity"), 2) for c in g),
+                            -len({str(c.get("source") or c.get("id")) for c in g})))
     return out
 
 
@@ -445,8 +471,9 @@ def format_candidates(groups: list[list[dict]]) -> str:
         head = g[0]
         sev = min((c.get("severity", "minor") for c in g), key=lambda s: _SEV_RANK.get(s, 2))
         reqs = sorted({r for c in g for r in c.get("requirement_ids") or []})
+        n_rev = len({str(c.get("source") or c.get("id")) for c in g})
         rows.append(f"{', '.join(c['id'] for c in g)} | {sev} | блокирует: {head.get('blocks', 'both')} | "
-                    f"{', '.join(reqs) or '—'} | {head.get('title', '')}")
+                    f"ревьюеров: {n_rev} | {', '.join(reqs) or '—'} | {head.get('title', '')}")
         seen: set[int] = set()
         quotes = []
         for c in g:

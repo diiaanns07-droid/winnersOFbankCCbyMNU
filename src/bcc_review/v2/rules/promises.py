@@ -227,6 +227,17 @@ def _covers(op: dict, words: list[str]) -> bool:
     return len(obj) >= 2 and all(any(w.startswith(_stem5(o)) for w in words) for o in obj)
 
 
+def _short_op(quote: str, limit: int = 4) -> str:
+    """Операция для заголовка: до 4 слов, без висящего предлога («получают данные QR-кода»)."""
+    words = quote.split()
+    if len(words) <= limit:
+        return quote
+    words = words[:limit]
+    while words and _w(words[-1]) in OBJ_STOP:
+        words.pop()
+    return " ".join(words)
+
+
 def _compatible(op: dict, m: Method) -> bool:
     if op["cls"] == "read":
         return m.is_read()
@@ -275,6 +286,7 @@ def rule_promised_ops(doc: Doc, methods: list[Method], out: dict) -> bool:
         listed = missing + (reads if no_read else [])
         listed.sort(key=lambda op: clause.find(op["quote"]))
         names = [quoted(op["quote"]) for op in listed]
+        short = [quoted(_short_op(op["quote"])) for op in listed]
         frag = _sentence(t, clause.strip()[:40])
         described = fmt_list([f"{m.desc or m.label} ({m.verb} {m.url})".replace(" ()", "") if m.url
                               else (m.desc or m.label or m.verb) for m in methods])
@@ -286,8 +298,8 @@ def rule_promised_ops(doc: Doc, methods: list[Method], out: dict) -> bool:
         one = len(listed) == 1
         out["candidates"].append(candidate(
             "promises.promised_ops",
-            title=(f"Нет метода API для обещанной операции {names[0]}" if one
-                   else f"Нет методов API для обещанных операций: {fmt_list(names)}"),
+            title=(f"Нет метода API для обещанной операции {short[0]}" if one
+                   else f"Нет методов API для обещанных операций: {fmt_list(short)}"),
             kind="missing_element", criterion="set_complete", severity="critical", blocks="development",
             evidence=evidence,
             problem=(f"Раздел интеграции обещает: {quoted(frag)}. В спецификации описано только: {described}. "

@@ -167,12 +167,18 @@ def test_first_screen(sample):
     brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
-    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+); блокирует (.+)\.$", brief, re.M)
-    assert len(blockers) == 5  # блокер — одна строка: что, где, что блокирует
-    assert all("строк" in where for where, _ in blockers) and blockers[0][0] == "Ф-3 (строка 39), Ф-4 (строка 40)"
+    # все блокеры останавливают одно и то же — это сказано один раз в заголовке, строка блокера: что и где
+    assert "**Блокеры (5)** — каждый останавливает разработку и тестирование; что не так и где:" in brief
+    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+)\.$", brief, re.M)
+    assert len(blockers) == 5
+    assert all("строк" in where for where in blockers) and blockers[0] == "Ф-3 (строка 39), Ф-4 (строка 40)"
+    assert "ещё 1 место" not in brief
     assert "**Почему.**" in brief and "**Исправить первым**" in brief
     fix = brief[brief.find("**Исправить первым**"):]
-    assert fix.count(" → ") >= 7  # у каждого пункта — что сделать
+    items = re.findall(r"^\d\. (\S+) \[(D-\d+)\]", fix, re.M)
+    assert 5 <= len(items) <= 5 and all(icon == "🔴" for icon, _ in items[:5])  # сначала блокеры, не больше 5
+    assert fix.count(" → ") >= 5  # у каждого пункта — что сделать
+    assert "на 5 нужен ответ до начала работы" in brief
     assert len(brief.split("\n")) <= 40
     text = re.sub(r"\]\(#[^)]*\)", "]", brief)
     assert not re.search(r"\bR-\d", text) and "коммит" not in text and "кандидат" not in text
@@ -253,8 +259,10 @@ def test_templates_are_russian(sample):
 
 def test_minimal_offline_report_has_all_sections():
     md = markdown.render(minimal())
+    offline_empty = ("Приложение А.", "Приложение Б.", "Приложение В.")  # без модели всегда пусты (№12)
     for h in REQUIRED_HEADINGS:
-        assert h in md, h
+        assert (h in md) != any(x in h for x in offline_empty), h
+    assert "(#pa)" not in md and "(#pb)" not in md and "(#pv)" not in md  # и в содержании их нет
     assert "Режим без модели" in md and "Дефектов не найдено" in md
     assert "❔ не определено" in md and "✅ можно начинать" not in md
 
@@ -382,7 +390,8 @@ def test_line_refs_from_model_text_become_russian():
         "по строке 151 и в строках 38–40, из строк 7–9; Сервер по строке 121"
     assert markdown.cell("a | L7") == "a \\| строка 7"
     assert markdown.prose("Привести L045 к маршруту L136") == "Привести строки 45 к маршруту строки 136"
-    assert markdown.prose("L038 и L064 расходятся") == "строка 38 и строка 64 расходятся"
+    assert markdown.prose("L038 и L064 расходятся") == "строки 38 и 64 расходятся"
+    assert markdown.prose("убрать из L052 и L103") == "убрать из строк 52 и 103"
     assert markdown.prose("Строки L10-L12 описывают") == "Строки 10–12 описывают"
     assert markdown.source_name("lens:что-то") == "проверка ролью"
     assert markdown.source_name("rules:units.time_mix.ttl") == "правило «единицы измерения»"

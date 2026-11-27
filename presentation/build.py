@@ -128,8 +128,9 @@ def from_evaluation(root: Path) -> dict:
                 continue
     v1 = next((r for r in rows if r.get("version") == "v1"), None)
     v2 = [r for r in rows if r.get("version") == "v2" and r.get("status") == "complete"]
-    strong = [r for r in v2 if "opus" in str(r.get("model", "")).lower()] or \
-             [r for r in v2 if "sonnet" in str(r.get("model", "")).lower()] or v2
+    main = [r for r in v2 if not str(r.get("label", "")).lower().startswith("стабильность")] or v2  # основные замеры
+    strong = [r for r in main if "opus" in str(r.get("model", "")).lower()] or \
+             [r for r in main if "sonnet" in str(r.get("model", "")).lower()] or main
     best = strong[-1] if strong else None
     if best:
         qt, qm = best.get("quotes_total") or 0, best.get("quotes_missing") or 0
@@ -144,7 +145,7 @@ def from_evaluation(root: Path) -> dict:
         })
     # модели: последний полный замер по каждой модели
     per: dict = {}
-    for r in v2:
+    for r in main:
         per[(r.get("provider"), r.get("model"))] = r
     if per:
         order = sorted(per.values(), key=lambda r: ["opus", "sonnet", "haiku"].index(str(r.get("model")).lower())
@@ -177,17 +178,34 @@ def from_evaluation(root: Path) -> dict:
         out["v1v2_rows"] = "".join(rws)
         out["v1v2_source"] = (f"Официальный документ, один счётчик №15: v1 — «{v1.get('label', '')}» ({v1.get('at', '')}), "
                               f"v2 — «{best.get('label', '')}» ({best.get('at', '')}).")
-    # корпус
-    best_c = None
+    # стабильность: доля прогонов, где найдены все К1–К5
+    stab = []
+    for p in sorted((root / "evaluation" / "v2" / "stability").glob("*.json")):
+        try:
+            stab.append(json.loads(p.read_text(encoding="utf-8")))
+        except Exception:  # noqa: BLE001
+            continue
+    if stab:
+        st = sorted(stab, key=lambda d: ("opus" in " ".join(d.get("models") or []).lower(), str(d.get("at"))))[-1]
+        runs = st.get("runs") or []
+        all5 = sum(1 for r in runs if len(r.get("K") or []) >= 5)
+        crit = [len(r.get("K_as_critical") or []) for r in runs]
+        cs = [len(r.get("C") or []) for r in runs]
+        out["stability"] = _tone(f"{all5}/{len(runs)}", all5 < len(runs))
+        out["stability_source"] = (f"{', '.join(st.get('models') or [])} ×{len(runs)} без кэша ({st.get('at', '')}): "
+                                   f"критичными {min(crit)}–{max(crit)} из 5, С {min(cs)}–{max(cs)} из 20.")
+    # корпус: прогон с моделью на самом полном наборе кейсов (обрезанный лимитом — нет), иначе правила
+    best_c, best_key = None, None
     for p in sorted((root / "evaluation" / "v2" / "corpus_results").glob("*/summary.json")):
         try:
             c = json.loads(p.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             continue
-        if "офлайн" in str(c.get("label", "")).lower() and best_c is not None:
-            continue
-        if best_c is None or "офлайн" in str(best_c.get("label", "")).lower() or str(c.get("at")) > str(best_c.get("at")):
-            best_c = c
+        model = "офлайн" not in str(c.get("label", "")).lower()
+        full = (c.get("cases") or 0) - (c.get("not_run") or 0) - (c.get("missing_measurements") or 0)
+        key = (model, (c.get("harness") or {}).get("support", 0), full, str(c.get("at")))
+        if best_key is None or key > best_key:
+            best_c, best_key = c, key
     if best_c:
         h = best_c.get("harness") or {}
         clean = best_c.get("clean") or {}
