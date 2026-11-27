@@ -1,0 +1,221 @@
+{
+  "source_sha": "d605be97479a28fbccae0687004eafcb2a8fc992",
+  "case": "c_md",
+  "entry": "cli",
+  "input": "release/input/requirements.md",
+  "state": 0,
+  "seconds": 69.28,
+  "queue_seconds": 0,
+  "outputs": [
+    "json"
+  ],
+  "cached": 0,
+  "logical_calls_traced": 9,
+  "physical_attempts_observed": 18,
+  "unattributed_failed_calls": 0,
+  "successful_models": {
+    "gemini-3.5-flash-lite": 8,
+    "gemini-3.1-flash-lite": 1
+  },
+  "provider_errors": [
+    {
+      "model": "gemini-3.1-flash-lite",
+      "http": "400",
+      "class": "schema_rejected",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.1-flash-lite",
+      "http": "error",
+      "class": "not_json",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "400",
+      "class": "schema_rejected",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "error",
+      "class": "not_json",
+      "count": 2
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "http": "429",
+      "class": "per_day",
+      "count": 1
+    }
+  ],
+  "stages": [
+    {
+      "stage": "segment",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 9.4,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.8-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.7-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.6-flash",
+          "429",
+          "per_day"
+        ],
+        [
+          "gemini-3.5-flash",
+          "429",
+          "per_day"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_analyst",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 5.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_risk",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 5.9,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_architect",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 7.1,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_qa",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 8.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "consistency",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 12.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 14.1,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 1.8,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "clarify",
+      "answered_by": "gemini-3.1-flash-lite",
+      "seconds": 48.2,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash-lite",
+          "400",
+          "schema_rejected"
+        ],
+        [
+          "gemini-3.5-flash-lite",
+          "error",
+          "not_json"
+        ],
+        [
+          "gemini-3.5-flash-lite",
+          "error",
+          "not_json"
+        ],
+        [
+          "gemini-3.1-flash-lite",
+          "400",
+          "schema_rejected"
+        ],
+        [
+          "gemini-3.1-flash-lite",
+          "error",
+          "not_json"
+        ]
+      ],
+      "rpm_wait_s": 0
+    }
+  ],
+  "report_bytes": 122828,
+  "report_status": "complete",
+  "stages_with_partial_or_failed_status": [],
+  "failed_logical_calls": 0,
+  "physical_attempts_are_lower_bound": false,
+  "gold": {
+    "K": 3,
+    "K_as_critical": 2,
+    "C": 8,
+    "key25": 11,
+    "findings": 20,
+    "duplicates": 4,
+    "critical_false": 0,
+    "quotes_missing": 0,
+    "quotes_total": 45
+  },
+  "missing_major": [
+    "С5",
+    "С6",
+    "С7",
+    "С8",
+    "С9",
+    "С10",
+    "С11",
+    "С12",
+    "С15",
+    "С17",
+    "С18",
+    "С20"
+  ]
+}
