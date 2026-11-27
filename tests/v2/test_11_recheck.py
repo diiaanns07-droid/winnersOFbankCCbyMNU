@@ -352,7 +352,8 @@ def test_others_only_closures_count(findings, questions):
                   {"finding_id": third["id"], "status": "open", "reason": "не касается"},
                   {"finding_id": minor["id"], "status": "resolved", "by": ["Решение-1"], "reason": "minor"}])
     llm = FakeLLM(resp)
-    res = recheck.run(FakeCtx(llm), findings, f"{q1['id']}: A\n\n## Решения\n- Правило.\n", questions)
+    # решение говорит о том же, что дефект (общие слова), — иначе чужой дефект им не снимается
+    res = recheck.run(FakeCtx(llm), findings, f"{q1['id']}: A\n\n## Решения\n- {other['title']}: правило.\n", questions)
     rc = {g["id"]: g["recheck"] for g in res["findings"]}
     assert rc[other["id"]]["status"] == "resolved" and rc[other["id"]]["affected"]
     assert not rc[third["id"]]["affected"]  # «open» по дефекту вне вопросов не превращает его в затронутый
@@ -363,7 +364,7 @@ def test_others_only_closures_count(findings, questions):
 def test_decisions_only_make_one_call(findings, questions):
     target = next(f for f in findings if f["severity"] == "major")
     llm = FakeLLM(_resp([{"finding_id": target["id"], "status": "resolved", "by": ["Решение-1"], "reason": "ok"}]))
-    res = recheck.run(FakeCtx(llm), findings, "## Решения\n- Общее правило для всех.\n", questions)
+    res = recheck.run(FakeCtx(llm), findings, f"## Решения\n- {target['title']}: общее правило.\n", questions)
     assert len(llm.calls) == 1
     assert {g["id"]: g["recheck"] for g in res["findings"]}[target["id"]]["status"] == "resolved"
 
