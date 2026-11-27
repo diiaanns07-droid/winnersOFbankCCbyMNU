@@ -1,0 +1,11 @@
+Документ: docs/plan-v2/f4/answers_exam_v3/runs/r3_12133005/insurance_inject/answered.revised.md
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  lens_risk: готово за 18 с, вызовов 1, кандидатов 3
+  segment: готово за 40 с, вызовов 1
+  lens_qa: готово за 38 с, вызовов 1, кандидатов 4
+  lens_analyst: готово за 40 с, вызовов 1, кандидатов 7

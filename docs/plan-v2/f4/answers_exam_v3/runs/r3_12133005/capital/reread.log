@@ -1,0 +1,10 @@
+Документ: docs/plan-v2/f4/answers_exam_v3/runs/r3_12133005/capital/answered.revised.md
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_risk: запуск
+  lens_analyst: запуск
+  lens_qa: запуск
+  lens_risk: готово за 25 с, вызовов 1, кандидатов 4
+  lens_architect: готово за 30 с, вызовов 1, кандидатов 2
+  segment: готово за 45 с, вызовов 2
