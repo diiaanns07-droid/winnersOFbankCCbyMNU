@@ -16,7 +16,9 @@ METHOD_CTX = re.compile(r"метод\w*|операци\w*|endpoint|вызов\w*
 READ_PROMISE = re.compile(
     r"\b(читает|читают|чтени\w*|считыва\w*|показыва\w*|отобража\w*|выводит|просматрива\w*|"
     r"получени\w+\s+(?:данных|настро\w*|значени\w*|сведени\w*|информаци\w*|статус\w*|остатк\w*|"
-    r"сумм\w*|истори\w*)|на\s+экране\s+видн\w*)", re.I)
+    r"сумм\w*|истори\w*)|получа(?:ет|ют)\s+(?:данн\w*|сведени\w*|информаци\w*|настро\w*|статус\w*|состояни\w*|"
+    r"список\w*|истори\w*|остат\w*)|на\s+экране\s+видн\w*)", re.I)
+INTEGRATION_CTX = re.compile(r"дочерн\w+\s+документ\w*|через\s+api|rest\s+api|метод\w*", re.I)
 ACTOR = re.compile(r"приложени\w*|экран\w*|интерфейс\w*|клиент\w*|пользовател\w*|фронт\w*|ui\b|api|"
                    r"документ\w*|функциональн\w+\s+требовани\w*", re.I)
 
@@ -102,7 +104,7 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
             continue
         t = x.joined
         m = READ_PROMISE.search(t)
-        if not m or not ACTOR.search(t):
+        if not m or not (ACTOR.search(t) or INTEGRATION_CTX.search(t)):
             continue
         promises.append((x, _sentence(t, m.group(0))))
     if not promises:

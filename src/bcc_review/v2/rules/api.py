@@ -57,6 +57,7 @@ MENTION = re.compile(
 DECL_LIST = re.compile(rf"^(?:HTTP\s+)?({CODE})(?:\s*[.:)]\s*\S|\s+[A-Za-z][A-Za-z \-]{{1,30}}?\s*[—–:\-]\s*\S|\s*[—–]\s*\S)")
 DECL_OTVET = re.compile(rf"^(?:ответ|response)\s+({CODE})\b", re.I)
 BARE_CODE = re.compile(rf"^({CODE})\.?$")
+DECL_LIST_INLINE = re.compile(rf"(?<=[.!?»)]\s)({CODE})\.\s+[А-ЯЁA-Z]")
 DECL_INLINE = re.compile(rf"\b(?:Ответ|Статус|Код\s+ответа)\s+({CODE})\s*[—–:\-]\s*\S", re.I)
 ERROR_JSON = re.compile(
     r'"(?:result|status|state)"\s*:\s*"(error|fail\w*|err|failure|declined|rejected)"|"error"\s*:|'
@@ -231,7 +232,7 @@ def find_methods(doc: Doc) -> list[Method]:
                 continue
             key, val = kv
             if any(key == k or key.startswith(k + " ") for k in URL_KEYS) and not m.url:
-                um = re.search(r"(/[\w\-{}/.]+)", val)
+                um = re.search(r"https?://[^/\s]+(/[\w\-{}/.]+)", val) or re.search(r"(?<![/\w])(/[\w\-{}/.]+)", val)
                 if um:
                     m.url, m.url_line = um.group(1), y
             elif any(key == k for k in DESC_KEYS) and not m.desc:
@@ -359,7 +360,12 @@ def rule_content_type_without_body(doc: Doc, methods: list[Method], out: dict) -
 class Status:
     code: int
     line: Line
-    kind: str  # list | heading | table | otvet
+    kind: str  # list | heading | table | otvet | inline
+    seg: str = ""  # текст объявления (в PDF/DOCX перечень статусов бывает склеен в одну строку)
+
+    @property
+    def text(self) -> str:
+        return self.seg or self.line.joined
 
 
 def _status_tables(doc: Doc) -> list[Table]:
@@ -382,7 +388,15 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
             continue
         m = DECL_LIST.match(x.text)
         if m:
-            decls.append(Status(int(m.group(1)), x, "list"))
+            starts = [0] + [k.start(1) for k in DECL_LIST_INLINE.finditer(x.text)]
+            if len(starts) == 1:
+                decls.append(Status(int(m.group(1)), x, "list"))
+            else:  # «200. Ответ … 401. Ответ … 422. Ответ …» в одной строке
+                for i, a in enumerate(starts):
+                    seg = x.text[a:starts[i + 1] if i + 1 < len(starts) else len(x.text)].strip()
+                    cm = re.match(CODE, seg)
+                    if cm:
+                        decls.append(Status(int(cm.group(0)), x, "list", seg))
             continue
         m = DECL_OTVET.match(x.text)
         if m:
@@ -447,7 +461,7 @@ def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method |
         named = {w.lower() for w in re.findall(r"\b[a-z]+[A-Z]\w*\b", d.line.joined)} & names
         if named and (method is None or (method.name or "").lower() not in named):
             continue
-        k = len(st & _stems(re.sub(CODE, " ", d.line.joined)))
+        k = len(st & _stems(re.sub(CODE, " ", d.text)))
         if k > score:
             best, score = d, k
     return best
@@ -479,9 +493,9 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
             f"api.same_case.{code}-{other.code}",
             title=f"Один и тот же случай: код {code} в логике метода и {other.code} в перечне статусов",
             kind="status_conflict", criterion="set_consistent", severity="major", blocks="both",
-            evidence=[ev(line, frag), ev(other.line)],
+            evidence=[ev(line, frag), ev(other.line, other.text)],
             problem=(f"В логике сказано {quoted(frag)}, а в перечне статусов тот же случай описан кодом {other.code}: "
-                     f"{quoted(other.line.joined)}."),
+                     f"{quoted(other.text)}."),
             scenario=(f"Наступает этот случай: сервер по логике метода отвечает {code}, клиент и автотест по перечню "
                       f"статусов ждут {other.code}."),
             impact="Клиент обработает ответ неверно; тест на этот случай нельзя написать однозначно.",
@@ -542,9 +556,9 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
                 parts.append(f"В тексте сказано {quoted(p['mentions'][0][1])}, но кода {code} нет в перечне "
                              f"статусов (описаны {decl_list}).")
                 if same_case is not None:
-                    evidence.append(ev(same_case.line))
+                    evidence.append(ev(same_case.line, same_case.text))
                     parts.append(f"Тот же случай в перечне статусов описан кодом {same_case.code}: "
-                                 f"{quoted(same_case.line.joined)}.")
+                                 f"{quoted(same_case.text)}.")
                     title = (f"Один и тот же случай получает код {code} в тексте и {same_case.code} "
                              f"в перечне статусов")
             else:
@@ -690,6 +704,8 @@ def _table_role(doc: Doc, t: Table) -> str:
 
 def _base_type(s: str) -> str:
     s = s.strip().strip("`").strip()
+    if not any(rx.match(s) for rx, _ in TYPE_MAP):
+        s = s.replace(" ", "")  # PDF: «integ er»
     for rx, t in TYPE_MAP:
         if rx.match(s):
             return t
@@ -832,6 +848,9 @@ def rule_date_format(doc: Doc, methods: list[Method], out: dict) -> None:
             if not r.cells or ni >= len(r.cells):
                 continue
             name = r.cells[ni].split()[0] if r.cells[ni] else ""
+            joined_name = r.cells[ni].replace(" ", "")
+            if name not in examples and IDENT.match(joined_name) and joined_name in examples:
+                name = joined_name  # PDF: «paymentDueD ate»
             if not IDENT.match(name) or name not in examples:
                 continue
             rest = " | ".join(r.cells[ni + 1:])
