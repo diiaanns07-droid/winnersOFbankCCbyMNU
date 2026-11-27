@@ -249,6 +249,22 @@ def near_amount_only(expected: str, stated: str) -> tuple[float, float] | None:
     return pairs[0]
 
 
+_NEG_BEFORE = re.compile(r"(?:\bне|\bнет|\bбез|\bни)\s*$")
+
+
+def stated_within_expected(expected: str, stated: str) -> bool:
+    """Заявленный результат строки дословно входит в выведенный по правилам («Истёк срок: показано «QR-код
+    недействителен»; код ответа не определён» ⊃ «Показано «QR-код недействителен»»): строка проверяет часть
+    результата, и эта часть выводится. Неопределённость той части, которую строка не проверяет (код ответа),
+    — не дефект строки, а тест-кейс. Короткие заявленные (меньше 3 слов) и вхождение после отрицания
+    («не отправлен» ⊃ «отправлен») не считаются."""
+    e, s = _norm(expected).rstrip("."), _norm(stated).rstrip(".")
+    if len(s.split()) < 3 or not e:
+        return False
+    i = e.find(s)
+    return i >= 0 and not _NEG_BEFORE.search(e[:i])
+
+
 def _fmt_amount(v: float) -> str:
     whole, frac = f"{v:,.2f}".split(".")
     return whole.replace(",", " ") + ("," + frac if frac != "00" else "")
@@ -277,7 +293,12 @@ def normalize_check(raw: Mapping[str, Any]) -> dict:
             c["stated"]).rstrip("."):
         # Модель сама вывела ровно заявленный результат — это совпадение, а не противоречие.
         c["verdict"] = "match"
-    near = near_amount_only(c["expected_by_rules"], c["stated"]) if c["verdict"] == "conflict" else None
+    if c["verdict"] in ("conflict", "undefined") and stated_within_expected(c["expected_by_rules"], c["stated"]):
+        # Заявленное выводится, неопределённа или шире только часть, которую строка не проверяет (haiku на qr:
+        # «показано «QR-код недействителен»» выводится, код ответа 400/410 — нет; это пункт другого замечания).
+        c["verdict"] = "match"
+        c["partial_match"] = True
+    near =near_amount_only(c["expected_by_rules"], c["stated"]) if c["verdict"] == "conflict" else None
     if near:
         # Расхождение только в копейках вычисленной суммы: шаг 1 промпта велит считать это совпадением, а слабая и
         # сильная модель всё же дают conflict (sonnet на чистом ТЗ: 11 903,07 против верных 11 890,36 ₸).

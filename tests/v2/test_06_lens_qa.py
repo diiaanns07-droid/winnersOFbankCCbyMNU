@@ -636,3 +636,18 @@ def test_model_candidate_texts_without_internal_codes():
     assert c["title"] == "П-1 и R-02 дают разный итог"
     assert c["problem"] == "По П-1 (строка 10) — 5." and "L0" not in c["scenario"]
     assert "по строке 12" in c["scenario"]
+
+
+def test_stated_part_of_expected_is_match():
+    """Заявленное дословно входит в выведенное (строка проверяет часть результата) — match; после отрицания и
+    короткое заявленное — нет."""
+    w = lens_qa.stated_within_expected
+    assert w("Истёк срок: показано «QR-код недействителен»; код ответа не определён (400 или 410)",
+             "Показано «QR-код недействителен»")
+    assert not w("Push не отправлен, итог 19 900 ₸", "отправлен, итог 19 900 ₸")
+    assert not w("Итог 12", "Итог 12")  # короткое: решает точное совпадение выше
+    assert not w("Январский счётчик вырос на 4 000 ₸", "Февральский счётчик вырос на 4 000 ₸")
+    raw = _check(verdict="undefined", expected_by_rules="Итог 15 ₸ и один push; код ответа не определён",
+                 stated="Итог 15 ₸ и один push")
+    c = lens_qa.normalize_check(raw)
+    assert c["verdict"] == "match" and c["partial_match"]
