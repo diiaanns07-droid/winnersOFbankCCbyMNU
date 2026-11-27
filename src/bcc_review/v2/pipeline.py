@@ -1050,7 +1050,7 @@ def write_outputs(report: dict, view: dict | None, input_path: Path, out_md: Pat
     md_text = ""
     try:
         from .render import markdown
-        md_text = markdown.render(report)
+        md_text = markdown.render(report, out_path=out_md, doc_path=input_path)
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"Отчёт Markdown собран упрощённо: {type(exc).__name__}: {exc}")
         md_text = fallback_markdown(report)

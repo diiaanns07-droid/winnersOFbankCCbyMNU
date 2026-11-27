@@ -247,11 +247,16 @@ def test_free_tier_realistic_limits_fit_in_six_minutes(tmp_path, monkeypatch):
     assert clock.now() <= 6 * 60 * 2   # сумма задержек всех вызовов (последовательная оценка сверху)
 
 
-def test_free_tier_nov_2026_limits_three_runs_a_day(tmp_path, monkeypatch):
-    """Лимиты бесплатного ключа на ноябрь 2026: Flash — 5 в минуту и 20 в сутки на модель (AI Studio, живой 429 F3),
-    Flash-Lite — 15 и 500. Жюри запускает агента три раза за день на одном проекте Google: первые два прогона целиком
-    на основной Flash (по 9 запросов), третий — 2 запроса на основной, один отказ «суточная квота», остальное на
-    следующей Flash; все три — complete, ни одного 429 «в минуту», ни одного сбоя этапа."""
+@pytest.mark.parametrize(("analyst_passes", "successful_calls"), [(None, 10), ("1", 9)])
+def test_free_tier_nov_2026_limits_three_runs_a_day(tmp_path, monkeypatch, analyst_passes, successful_calls):
+    """Симуляция квот 5 RPM / 20 RPD на Flash и 15 / 500 на Flash-Lite.
+    Первые два отчёта строятся на основной модели. На третьем резервная модель завершает
+    оставшиеся этапы. Оба режима аналитика укладываются в поминутную квоту.
+    """
+    if analyst_passes is None:
+        monkeypatch.delenv("BCC_ANALYST_PASSES", raising=False)
+    else:
+        monkeypatch.setenv("BCC_ANALYST_PASSES", analyst_passes)
     clock = SimClock()
     tier = FreeTier(clock, tier_of(primary={"rpm": 5, "rpd": 20}, second={"rpm": 5, "rpd": 20},
                                    lite={"rpm": 15, "rpd": 500}), latency_s=20.0)
@@ -264,7 +269,7 @@ def test_free_tier_nov_2026_limits_three_runs_a_day(tmp_path, monkeypatch):
     for report, log in reports:
         assert report["run"]["status"] == "complete", report["run"].get("warnings")
         assert not any("не выполнен" in w for w in report["run"].get("warnings") or [])
-        assert [o for _, o in log].count("200") == 9                       # 9 запросов модели на прогон
+        assert [o for _, o in log].count("200") == successful_calls
         assert "429 rpm" not in [o for _, o in log]
     first, second, third = (log for _, log in reports)
     assert {m for m, _ in first} == {PRIMARY} and {m for m, _ in second} == {PRIMARY}

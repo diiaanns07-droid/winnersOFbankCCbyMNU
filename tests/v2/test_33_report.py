@@ -147,3 +147,12 @@ def test_passport_commands_use_paths_from_command_line(sample):
     assert "/home/u" not in md and "verify r.json requirements.md" in md
     # без путей — как раньше
     assert "verify отчёт.json requirements.md" in markdown.render(sample)
+
+
+def test_written_passport_uses_cli_paths(sample, tmp_path, monkeypatch):
+    from bcc_review.v2.pipeline import write_outputs
+
+    monkeypatch.chdir(tmp_path)
+    report_path = Path("reports/result.md")
+    write_outputs(sample, None, Path("sources/requirements.md"), report_path, {"html": False})
+    assert "verify reports/result.json sources/requirements.md" in report_path.read_text(encoding="utf-8")

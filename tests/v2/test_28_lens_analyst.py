@@ -162,3 +162,28 @@ def test_second_view_changes_prompt_and_passes_attributes():
     v = A._SecondView(LLM())
     assert v.ask("lens_analyst", "s", "задание", {})["user"].endswith(A.SECOND_VIEW)
     assert v.stats == {"calls": 0}
+
+@pytest.mark.parametrize(
+    ("provider", "model", "options", "expected_calls"),
+    [
+        ("mock", None, {}, 1),
+        ("gemini", "gemini-3.6-flash", {}, 2),
+        ("gemini", "gemini-3.6-flash", {"passes": 2}, 1),
+        ("claude_cli", "sonnet", {"analyst_passes": 1}, 1),
+    ],
+)
+def test_analyst_call_count_in_combined_pipeline(monkeypatch, provider, model, options, expected_calls):
+    from types import SimpleNamespace
+
+    monkeypatch.delenv("BCC_ANALYST_PASSES", raising=False)
+    llm = SimpleNamespace(provider_name=provider, model=model)
+    ctx = _Ctx(docview.load(OFFICIAL), llm=llm, options=options)
+    calls = []
+
+    def review(ctx, name):
+        calls.append(name)
+        return {"candidates": []}
+
+    result = A.run(ctx, lens_run=review)
+    assert calls == ["analyst"] * expected_calls
+    assert result["passes"] == expected_calls
