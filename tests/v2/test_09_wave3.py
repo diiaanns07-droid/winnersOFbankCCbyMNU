@@ -202,3 +202,18 @@ def test_silence_with_two_conditions_is_incompleteness_not_check_order():
     p2 = dict(p, kind="ambiguity")
     [c2] = run(p2)["candidates"]
     assert c2["severity"] == "minor" and "Порядок проверок" in c2["problem"]
+
+
+def test_tiyn_with_decimals_against_tenge_row_stays_conflict():
+    # «в тиынах с двумя знаками после точки» — тиыны целые, единица действительно перепутана
+    p = pair(a="R-09", b="R-10", quote_a="Долг 120 000 ₸", line_a=10, quote_b="Сумма в тиынах", line_b=11,
+             kind="unit_mismatch", basis="value_mismatch", outcome_a="120 000 ₸", outcome_b="12 000 000 тиынов")
+    assert run(p)["candidates"] == []
+    p2 = dict(p, quote_b="Сумма в тиынах с двумя знаками после точки")
+    doc_line = VIEW["lines"][10]
+    old = doc_line["text"]
+    doc_line["text"] = "amount | integer | Сумма в тиынах с двумя знаками после точки"
+    try:
+        assert len(run(p2)["candidates"]) == 1
+    finally:
+        doc_line["text"] = old

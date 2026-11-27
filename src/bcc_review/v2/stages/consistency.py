@@ -471,6 +471,8 @@ def _in_acceptance(ev: dict, known: dict[str, dict] | None) -> bool:
 
 _MINOR_UNIT = re.compile(r"тиын", re.I)
 _MAJOR_UNIT = re.compile(r"₸|тенге|(?<![A-Za-z])KZT(?![A-Za-z])", re.I)
+# Тиыны — целые: «в тиынах с двумя знаками после точки» или «100.00» в тиынах — это путаница единиц, а не показ.
+_DECIMAL = re.compile(r"знак\w*\s+после\s+(?:точки|запятой)|дробн|(?<![\d.,])\d+[.,]\d{2}(?![\d])", re.I)
 
 
 def _display_currency(pair: dict, ev_a: dict, ev_b: dict, known: dict[str, dict] | None) -> bool:
@@ -478,7 +480,7 @@ def _display_currency(pair: dict, ev_a: dict, ev_b: dict, known: dict[str, dict]
     теста, а не расхождение (расхождение периода «за час» ↔ «за сутки» сюда не попадает)."""
     for ev, q, other_q in ((ev_a, pair["quote_a"], pair["quote_b"]), (ev_b, pair["quote_b"], pair["quote_a"])):
         if _in_acceptance(ev, known) and _MAJOR_UNIT.search(q) and not _MINOR_UNIT.search(q) \
-                and _MINOR_UNIT.search(other_q):
+                and _MINOR_UNIT.search(other_q) and not _DECIMAL.search(other_q):
             return True
     return False
 
@@ -684,7 +686,8 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     question = _sentence(human(pair["question"]))
     if pair["verdict"] == "conflict" and oa and ob and not _has_variants(question):
         # Вопрос владельцу с двумя вариантами: какой из двух исходов сценария верный.
-        question = f"{_cap(_short(subject, 12))}: какой результат верный — «{oa}» (как в {qa_}) или «{ob}» (как в {qb_})?"
+        # Предмет уже назван в заголовке — вопрос только о выборе между двумя исходами.
+        question = f"Что верно: «{oa}» (как в {qa_}) или «{ob}» (как в {qb_})?"
     elif pair["verdict"] == "undefined" and _check_order(pair, kind) and oa and ob and not _has_variants(question):
         question = f"Какая проверка идёт первой: по {qa_} («{oa}») или по {qb_} («{ob}»)?"
     return {
@@ -811,16 +814,24 @@ def glossary_to_candidate(g: dict) -> dict | None:
     first = found[0]["term"]
     severity = "major" if g["severity"] == "major" else "minor"
     problem = g["problem"] or "Одно понятие названо в документе по-разному, и по тексту не понять, одно ли это."
+    terms = [t["term"] for t in found]
+    person = sum(1 for t in terms if _PERSON.search(t)) >= 2
+    what = "участника" if person else ("компонента" if any(_generic(_stem(w)) for t in terms for w in _WORD.findall(t)
+                                                          if _CYR.search(w)) else "понятия")
+    if severity == "major":
+        impact = ("Права проверят не у того человека: разработчик проверит одно лицо, тестировщик — другое, клиент "
+                  "получит отказ или чужой доступ." if person else
+                  "Разработчики сделают лишний компонент или связь, тестировщик не поймёт, какой компонент проверять.")
+    else:
+        impact = "Документ труднее читать и искать по нему; растёт риск ошибки при изменениях."
     return {
-        "title": f"«{_short(g['concept'], 5)}» названо по-разному: " + ", ".join(f"«{t['term']}»" for t in found[:3])
-                 + (" и др." if len(found) > 3 else ""),
+        "title": f"Разные названия {what}: " + ", ".join(f"«{t}»" for t in terms[:3])
+                 + (" и др." if len(terms) > 3 else ""),
         "kind": "terminology", "criterion": "conforming", "severity": severity, "requirement_ids": [],
         "evidence": [{"quote": t["term"], "line": t["line"], "verified": t["verified"]} for t in found[:4]],
         "problem": f"{problem} Названия: {names}.",
         "scenario": "",
-        "impact": ("Разработчики разных компонентов и тестировщик могут понять названия как разные сущности: "
-                   "появятся лишние связи, проверки прав или полей." if severity == "major" else
-                   "Документ труднее читать и искать по нему; растёт риск ошибки при изменениях."),
+        "impact": impact,
         "recommendation": (f"Выбрать одно название (например, «{first}»), заменить им остальные во всех частях "
                            f"документа и добавить его в глоссарий с определением."),
         "rewrite": "", "question": "", "blocks": "development" if severity == "major" else "none",
