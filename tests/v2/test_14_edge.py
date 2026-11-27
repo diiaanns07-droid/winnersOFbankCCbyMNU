@@ -572,3 +572,12 @@ def test_same_input_gives_same_markdown(tmp_path):
         md = Path(written["md"]).read_text(encoding="utf-8")
         texts.append(re.sub(r"\d", "0", re.sub(r"20\d{6}-\d{6}-[0-9a-f]{4}", "RUN", md)))
     assert texts[0] == texts[1]
+
+
+@_bug("01", "фатальная ошибка посреди прогона (квота, ключ отклонён) не попадает в run.model_error: stage() пишет "
+            "self.model_error, а _run_block его не выносит — код выхода не 3, консоль молчит о причине")
+def test_fatal_error_mid_run_sets_model_error(tmp_path, monkeypatch):
+    report, _, _ = _faulty_run(tmp_path, monkeypatch,
+                               lambda s, k: ProviderError("quota", "дневная квота исчерпана") if s == "lens_risk" else None)
+    assert report["run"].get("model_error")
+    assert report["run"]["warnings"][0] == report["run"]["model_error"]
