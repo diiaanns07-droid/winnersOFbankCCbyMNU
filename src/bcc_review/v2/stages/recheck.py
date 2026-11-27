@@ -283,6 +283,39 @@ def _unhide_obj(obj: Any, count: list[int]) -> Any:
     return obj
 
 
+_SHA = re.compile(r"SHA[-‑\s]?256\W{0,6}([0-9a-f]{12,64})(?![0-9a-z])", re.I)
+
+
+def answers_sha(text: str) -> str:
+    """SHA-256 документа из шапки файла ответов (строки «>» и «#»), в нижнем регистре; нет — пустая строка."""
+    for raw in str(text or "").splitlines():
+        line = raw.strip()
+        if line.startswith((">", "#")):
+            m = _SHA.search(_INVISIBLE.sub("", line))
+            if m:
+                return m.group(1).lower()
+    return ""
+
+
+def check_document(parsed: dict, document: dict | None, warnings: list[str] | None = None) -> dict:
+    """Сверка SHA-256 из файла ответов с проверяемым документом: ``{"answers_sha256", "document_sha256", "match"}``.
+
+    ``match`` — True/False, None, если в файле ответов SHA нет (старый формат — без предупреждения). При
+    расхождении — предупреждение: вопросы и номера строк могли измениться, ответы привязаны по номеру и теме."""
+    got = str((parsed or {}).get("document_sha256") or "").strip().lower()
+    have = str((document or {}).get("sha256") or "").strip().lower()
+    out = {"answers_sha256": got, "document_sha256": have, "match": None}
+    if not got or not have:
+        return out
+    out["match"] = have.startswith(got) if len(got) < len(have) else have == got
+    if not out["match"] and warnings is not None:
+        name = (document or {}).get("file") or "документ"
+        warnings.append(f"recheck: ответы составлены по другой редакции документа (SHA-256 в файле ответов "
+                        f"{got[:12]}…, у проверенного «{name}» — {have[:12]}…): вопросы и номера строк могли "
+                        f"измениться. Проверьте привязки к вопросам этого отчёта")
+    return out
+
+
 def parse_answers_text(text: str) -> dict:
     """Markdown/текст → ``{"answers": [{"id","topic_hint","choice","text","comment"}], "decisions": [str]}``."""
     answers: list[dict] = []
@@ -347,6 +380,9 @@ def parse_answers_text(text: str) -> dict:
         out["unparsed"] = unparsed
     if hidden:
         out["hidden"] = hidden
+    sha = answers_sha(text)
+    if sha:
+        out["document_sha256"] = sha
     return out
 
 
@@ -355,6 +391,7 @@ def parse_answers_json(data: Any) -> dict:
     decisions: list[str] = []
     count = [0]
     data = _unhide_obj(data, count)
+    data_top = data
 
     def add(qid: str, val: Any) -> None:
         if isinstance(val, list):  # {"Q-02": ["422 …", "403 …"]} — реплики разных адресатов на один вопрос
@@ -401,6 +438,12 @@ def parse_answers_json(data: Any) -> dict:
     out = {"answers": [a for a in answers if a["id"]], "decisions": decisions}
     if count[0]:
         out["hidden"] = count[0]
+    if isinstance(data_top, dict):
+        doc = data_top.get("document") if isinstance(data_top.get("document"), dict) else {}
+        raw_sha = data_top.get("document_sha256") or data_top.get("sha256") or doc.get("sha256") or ""
+        m = re.fullmatch(r"\s*([0-9a-fA-F]{12,64})\s*", str(raw_sha))
+        if m:
+            out["document_sha256"] = m.group(1).lower()
     return out
 
 
@@ -475,7 +518,8 @@ def _topic_score(hint: str, q: dict) -> float:
     return (2 * len(h & topic) + len((h & text) - topic)) / (2 * len(h))
 
 
-def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | None = None) -> dict:
+def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | None = None,
+                    *, document_changed: bool = False) -> dict:
     """Ответы → решения по вопросам этого прогона. Возвращает ``answered``, ``unanswered``, ``decisions``.
 
     Несколько реплик на один вопрос (например, два адресата) не склеиваются и не уходят в общие решения:
@@ -583,7 +627,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
         q = by_id.get(a["id"])
-        if k in ambiguous or (hint and k not in bound and a.get("choice") is not None):
+        unknown_choice = hint and k not in bound and a.get("choice") is not None
+        if k in ambiguous or unknown_choice or (document_changed and not hint):
             text = str(a.get("text") or "").strip()
             if a.get("choice") is not None:
                 text = " ".join(filter(None, [_cl.option_label(a["choice"]), text, a.get("comment")])).strip()
@@ -880,7 +925,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     warnings: list[str] = []
     parsed = answers if isinstance(answers, dict) and "answers" in answers and isinstance(answers.get("answers"), list) \
         else load_answers(answers)
-    resolved = resolve_answers(questions, parsed, warnings)
+    document_check = check_document(parsed, (report or {}).get("document"), warnings)
+    resolved = resolve_answers(questions, parsed, warnings, document_changed=document_check["match"] is False)
     q_by_finding: dict[str, list[str]] = {}
     for a in resolved["answered"]:
         for fid in a["finding_ids"]:
@@ -902,6 +948,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
                         "affected": f.get("id") in affected_ids}
         out_findings.append(g)
     result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings}
+    if document_check["answers_sha256"]:
+        result["document_check"] = document_check
     if not affected and not resolved["decisions"]:
         for g in out_findings:
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
@@ -1324,6 +1372,8 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "warnings": warnings,
         "status": rc.get("status", "ok"),
     }
+    if rc.get("document_check"):
+        clar["answers_document"] = rc["document_check"]
     if rc["answers"].get("needs_confirmation"):
         clar["needs_confirmation"] = rc["answers"]["needs_confirmation"]
     clar["answer_conflicts"] = _orphan_conflicts(rc["answers"], clar["answer_conflicts"])

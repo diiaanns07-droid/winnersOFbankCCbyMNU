@@ -77,3 +77,20 @@ def test_letter_on_missing_topic_is_not_applied_to_a_reused_number():
     assert resolved["needs_confirmation"][0]["text"] == "B"
     control = recheck.resolve_answers(questions, recheck.parse_answers_text("Q-01: B"))
     assert control["answered"][0]["answer"] == "Областной склад"
+
+
+def test_questions_from_another_revision_cannot_be_answered_by_number_alone():
+    from test_11_clarify import FakeCtx, FakeLLM
+
+    questions = [{"id": "Q-01", "topic": "Выбор канала", "question": "Где показать уведомление?",
+                  "options": ["Личный кабинет", "Экран карты"], "finding_ids": []}]
+    report = {"document": {"file": "spec.md", "sha256": "a" * 64}, "questions": questions, "findings": []}
+    changed = "> Документ: spec.md, SHA-256 " + "b" * 64 + "\nQ-01: B"
+    result = recheck.apply_answers(FakeCtx(FakeLLM({})), report, changed)["clarification"]
+    assert result["answers"] == [] and result["decisions"] == []
+    assert result["answers_document"]["match"] is False
+    assert result["needs_confirmation"][0]["text"] == "B"
+    same = changed.replace("b" * 64, "a" * 64)
+    matched = recheck.apply_answers(FakeCtx(FakeLLM({})), report, same)["clarification"]
+    assert matched["answers_document"]["match"] is True
+    assert matched["answers"][0]["answer"] == "Экран карты"

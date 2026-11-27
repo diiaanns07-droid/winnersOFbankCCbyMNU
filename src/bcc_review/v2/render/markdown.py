@@ -1292,12 +1292,15 @@ def _before_after(c: _Ctx) -> list[str]:
     decisions = cl.get("decisions") or []
     out = [f"**До и после ответов владельца** — ответов {len(answers)}, общих решений {len(decisions)}, "
            f"без ответа {len(cl.get('unanswered') or [])}", ""]
+    if (cl.get("answers_document") or {}).get("match") is False:
+        out += ["**Владелец отвечал по другой редакции ТЗ.** Проверьте привязки к текущим вопросам.", ""]
     pending = cl.get("needs_confirmation") or []
     if pending:
         out += [f"**Нужно подтвердить привязку ответов ({len(pending)})**", ""]
         for item in pending:
             options = ", ".join(item.get("possible_questions") or []) or "уточните текущий вопрос"
-            out.append(f"- {prose(item['question_id'])} [{prose(item['topic'])}] — "
+            topic = f" [{prose(item['topic'])}]" if item.get("topic") else ""
+            out.append(f"- {prose(item['question_id'])}{topic} — "
                        f"«{prose(item['text'])}». {prose(options)}.")
         out.append("")
     rows = [["Разработка", READINESS.get(bv.get("development"), "—"), READINESS.get(av.get("development"), "—")],
@@ -2166,6 +2169,9 @@ def _appendix_questions(c: _Ctx) -> list[str]:
     out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}{_q_need(c, blocking)}. "
             f"Ответ — буква варианта или свой текст, по строке на вопрос (`Q-01: B`); повторный прогон с ответами: "
             f"`python -m bcc_review ВХОД ОТЧЁТ.md --answers ответы.md`.", ""]
+    if c.doc.get("sha256"):
+        out += ["Первая строка для файла ответов привязывает их к этой редакции ТЗ.",
+                "", "```", f"> SHA-256 {c.doc['sha256']}", "```", ""]
     for q in sorted(qs, key=lambda q: (not q.get("blocking"), _id_num(q.get("id")))):
         head = [f"**<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}**"
                 + (f" {esc(q['topic'])}" if q.get("topic") else ""),
