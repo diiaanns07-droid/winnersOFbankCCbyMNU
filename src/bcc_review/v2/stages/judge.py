@@ -81,8 +81,11 @@ NEVER_CRITICAL_KINDS = {"placeholder", "terminology", "traceability", "duplicate
 NEVER_CRITICAL_CRITERIA = {"conforming", "language", "ranked", "modifiable", "traceable", "necessary",
                            "singular", "risk", "set_comprehensible"}
 
-# Пропуск (critical по пункту «в») должен заметить больше одного ревьюера: «не описано» легко заявить ложно.
+# Critical должны подтвердить два независимых ревьюера (линзы, набор, правила): на живых прогонах каждый из
+# заложенных critical официального документа подтверждён ≥ 2 источниками, а ложные critical на чистых ТЗ — чаще
+# одним. Исключение — кандидаты, где исход выведен на конкретном входе по двум сверенным цитатам.
 MISSING_KINDS = {"missing_element", "incomplete"}
+STRUCTURED_ORIGINS = {"acceptance_check", "pair_check"}
 MIN_SOURCES_FOR_CONSENSUS = 3  # правило действует, если в прогоне не меньше трёх разных источников
 
 # Противоречие (critical по пункту «а» шкалы) доказывается цитатами двух разных мест.
@@ -172,13 +175,12 @@ def response_schema() -> dict:
         "requirement_ids": _SA,
         "problem": _S,
         "scenario": _S,
-        "impact": _S,
+        "wish": {"type": "boolean"},
         "severity_basis": _S,
         "severity": {"type": "string", "enum": SEVERITIES},
         "blocks": {"type": "string", "enum": BLOCKS},
         "priority": {"type": "integer"},
-        "recommendation": _S,
-    })
+    })  # impact, recommendation, rewrite, question — у кандидата base (короче ответ на слабых моделях)
     rejected = _obj({
         "candidate_id": _S,
         "reason_code": {"type": "string", "enum": _MODEL_REJECT_CODES},
@@ -699,9 +701,10 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "дефект ничего не блокирует"
         elif f["kind"] in CONFLICT_KINDS and len({e["line_start"] for e in f["evidence"]}) < 2:
             why = "противоречие подтверждено цитатой только одного места"
-        elif (f["kind"] in MISSING_KINDS and run_sources >= MIN_SOURCES_FOR_CONSENSUS
-              and len({_source_family(_s(m.get("source"))) for m in members}) < 2):
-            why = "пропуск заметил только один ревьюер"
+        elif (run_sources >= MIN_SOURCES_FOR_CONSENSUS
+              and len({_source_family(_s(m.get("source"))) for m in members}) < 2
+              and not any(_s(m.get("origin")) in STRUCTURED_ORIGINS for m in members)):
+            why = "critical подтвердил только один ревьюер"
         if why:
             f["severity"] = "major"
             _warn(ctx, warnings, f"судья: {f['title'][:60]!r} понижен до major ({why})")
@@ -727,6 +730,65 @@ def _merge_no_id(findings: list[dict], ctx: Any, warnings: list[str]) -> list[di
     _warn(ctx, warnings, f"судья: {len(hits)} замечания об отсутствии ID сведены в одно")
     drop = {id(f) for f in hits[1:]}
     return [f for f in findings if id(f) not in drop]
+
+
+_WISHES = {
+    "title": "Документ не рассматривает ряд случаев",
+    "lead": "Документ не говорит, что происходит в случаях: ",
+    "impact": "Без решения владельца продукта поведение в этих случаях выберут разработчики, и его нечем проверить.",
+    "recommendation": "Решить с владельцем продукта, какие из перечисленных случаев описать в требованиях, а какие "
+                      "явно исключить из объёма доработки.",
+    "kind": "incomplete", "criterion": "set_complete", "warn": "пожелания полноты",
+}
+_PLACEHOLDERS = {
+    "title": "Не заполнены поля и разделы шаблона документа",
+    "lead": "Оставлены незаполненными или заглушкой: ",
+    "impact": "Документ нельзя считать согласованным и прослеживаемым: не видно версии, ответственных и источников.",
+    "recommendation": "Заполнить перечисленные поля и разделы шаблона или явно указать «не применимо» с причиной.",
+    "kind": "placeholder", "criterion": "conforming", "warn": "незаполненные поля шаблона",
+}
+
+
+def _lc_first(text: str) -> str:
+    """Первая буква строчная, кроме аббревиатур и ID («ID», «Ф-2», «НФТ»)."""
+    if len(text) > 1 and (text[1].isupper() or not text[1].isalpha()):
+        return text
+    return text[:1].lower() + text[1:]
+
+
+def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: list[str]) -> list[dict]:
+    """Однотипные мелочи — одно minor на документ: дефекты, отобранные ``pred``, сводятся в один со всеми местами."""
+    hits = [f for f in findings if pred(f)]
+    if not hits:
+        return findings
+    if len(hits) == 1:
+        hits[0]["severity"], hits[0]["blocks"], hits[0]["priority"] = "minor", "none", 0
+        return findings
+    hits.sort(key=lambda f: f["_first_line"])
+    members = [m for f in hits for m in f["_members"]]
+    items = [re.sub(r"[.;:\s]+$", "", f["title"]) for f in hits]
+    lead = spec["lead"]
+    listed = "; ".join(_lc_first(x) for x in items[:10])
+    main = dict(hits[0])
+    main.update({
+        "candidate_ids": sorted({c for f in hits for c in f["candidate_ids"]}, key=_cid_num),
+        "title": spec["title"],
+        "kind": spec["kind"], "criterion": spec["criterion"],
+        "standard_refs": list(STANDARD_REFS.get(spec["criterion"], [])),
+        "severity": "minor", "blocks": "none", "priority": 0,
+        "requirement_ids": list(dict.fromkeys(r for f in hits for r in f["requirement_ids"])),
+        "evidence": _pick_evidence(members, None),
+        "problem": _cut(lead + listed + ".", 900),
+        "scenario": "", "impact": spec["impact"], "recommendation": spec["recommendation"],
+        "rewrite": "", "question": "",
+        "sources": _sources(members), "_members": members, "_wish": False,
+    })
+    main["_first_line"] = main["evidence"][0]["line_start"] if main["evidence"] else hits[0]["_first_line"]
+    _warn(ctx, warnings, f"судья: {len(hits)} замечаний ({spec['warn']}) сведены в одно незначительное")
+    drop = {id(f) for f in hits}
+    out = [f for f in findings if id(f) not in drop]
+    out.append(main)
+    return out
 
 
 def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
@@ -928,11 +990,15 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             "sources": _sources(members),
             "_members": members,
             "_first_line": evidence[0]["line_start"],
+            "_wish": f.get("wish") is True,
         }
         _calibrate(item, members, ctx, warnings, run_sources)
         findings.append(item)
 
     findings = _merge_no_id(findings, ctx, warnings)
+    findings = _consolidate(findings, lambda f: f["_wish"] and f["severity"] != "critical", _WISHES, ctx, warnings)
+    findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] != "critical",
+                            _PLACEHOLDERS, ctx, warnings)
     for f in findings:  # после слияния — доказательства и источники заново
         if len(f["_members"]) > 1:
             f["evidence"] = _pick_evidence(f["_members"], f["_members"][0]) or f["evidence"]
