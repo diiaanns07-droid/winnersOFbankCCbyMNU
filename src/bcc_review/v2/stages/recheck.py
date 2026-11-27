@@ -277,6 +277,49 @@ def unhide(text: str) -> tuple[str, int]:
     return _INVISIBLE.sub("", _HIDDEN.sub("", text)), n
 
 
+# SHA-256 документа, по которому составлены ответы (идея mynbaev1989-cell): строка-пояснение «> Документ: …,
+# SHA-256 <64 знака>» в шапке файла ответов. Разбор берёт его только из строк «>» и «#» — их ответами не считают;
+# в JSON — ``document_sha256``, ``sha256`` или ``document.sha256``. Хватает первых 12 знаков (так их печатает отчёт).
+_SHA = re.compile(r"SHA[-‑\s]?256\W{0,6}([0-9a-f]{12,64})(?![0-9a-z])", re.I)
+
+
+def answers_sha(text: str) -> str:
+    """SHA-256 документа из шапки файла ответов (строки «>» и «#»), в нижнем регистре; нет — пустая строка."""
+    for raw in str(text or "").splitlines():
+        line = raw.strip()
+        if line.startswith((">", "#")):
+            m = _SHA.search(_INVISIBLE.sub("", line))
+            if m:
+                return m.group(1).lower()
+    return ""
+
+
+def answers_header(document: str = "", sha256: str = "") -> list[str]:
+    """Строка шапки файла ответов с документом и его SHA-256 — по ней ``--answers`` узнает, что документ изменился."""
+    if not (document or sha256):
+        return []
+    return [f"> Документ: {document or '—'}" + (f", SHA-256 {sha256}" if sha256 else "")]
+
+
+def check_document(parsed: dict, document: dict | None, warnings: list[str] | None = None) -> dict:
+    """Сверка SHA-256 из файла ответов с проверяемым документом: ``{"answers_sha256", "document_sha256", "match"}``.
+
+    ``match`` — True/False, None, если в файле ответов SHA нет (старый формат — без предупреждения). При
+    расхождении — предупреждение: вопросы и номера строк могли измениться, ответы привязаны по номеру и теме."""
+    got = str((parsed or {}).get("document_sha256") or "").strip().lower()
+    have = str((document or {}).get("sha256") or "").strip().lower()
+    out = {"answers_sha256": got, "document_sha256": have, "match": None}
+    if not got or not have:
+        return out
+    out["match"] = have.startswith(got) if len(got) < len(have) else have == got
+    if not out["match"] and warnings is not None:
+        name = (document or {}).get("file") or "документ"
+        warnings.append(f"recheck: ответы составлены по другой редакции документа (SHA-256 в файле ответов "
+                        f"{got[:12]}…, у проверенного «{name}» — {have[:12]}…): вопросы и номера строк могли "
+                        f"измениться, ответы привязаны по номеру и теме вопроса — сверьте их с вопросами этого отчёта")
+    return out
+
+
 def _unhide_obj(obj: Any, count: list[int]) -> Any:
     if isinstance(obj, str):
         out, n = unhide(obj)
@@ -353,6 +396,9 @@ def parse_answers_text(text: str) -> dict:
         out["unparsed"] = unparsed
     if hidden:
         out["hidden"] = hidden
+    sha = answers_sha(text)
+    if sha:
+        out["document_sha256"] = sha
     return out
 
 
@@ -361,6 +407,7 @@ def parse_answers_json(data: Any) -> dict:
     decisions: list[str] = []
     count = [0]
     data = _unhide_obj(data, count)
+    data_top = data
 
     def add(qid: str, val: Any) -> None:
         if isinstance(val, list):  # {"Q-02": ["422 …", "403 …"]} — реплики разных адресатов на один вопрос
@@ -407,6 +454,12 @@ def parse_answers_json(data: Any) -> dict:
     out = {"answers": [a for a in answers if a["id"]], "decisions": decisions}
     if count[0]:
         out["hidden"] = count[0]
+    if isinstance(data_top, dict):
+        doc = data_top.get("document") if isinstance(data_top.get("document"), dict) else {}
+        raw_sha = data_top.get("document_sha256") or data_top.get("sha256") or doc.get("sha256") or ""
+        m = re.fullmatch(r"\s*([0-9a-fA-F]{12,64})\s*", str(raw_sha))
+        if m:
+            out["document_sha256"] = m.group(1).lower()
     return out
 
 
@@ -814,6 +867,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     warnings: list[str] = []
     parsed = answers if isinstance(answers, dict) and "answers" in answers and isinstance(answers.get("answers"), list) \
         else load_answers(answers)
+    doc_check = check_document(parsed, (report or {}).get("document"), warnings)
     resolved = resolve_answers(questions, parsed, warnings)
     q_by_finding: dict[str, list[str]] = {}
     for a in resolved["answered"]:
@@ -835,7 +889,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
                         "severity_before": f.get("severity"), "severity_after": f.get("severity"),
                         "affected": f.get("id") in affected_ids}
         out_findings.append(g)
-    result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings}
+    result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings,
+              "document_check": doc_check}
     if not affected and not resolved["decisions"]:
         for g in out_findings:
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
@@ -1240,6 +1295,8 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "open": sum(1 for c in changes if c["status"] == "open"),
         "warnings": warnings,
         "status": rc.get("status", "ok"),
+        # SHA-256 документа из шапки файла ответов против проверенного: match False — ответы к другой редакции
+        "answers_document": rc.get("document_check") or {"answers_sha256": "", "document_sha256": "", "match": None},
     }
     clar["next_round"] = next_round(clar, report.get("questions") or [])
     return {"clarification": clar, "findings_after": after,
@@ -1311,16 +1368,19 @@ def next_round(clar: dict, questions: list[dict]) -> list[dict]:
     return out
 
 
-def render_next_answers(clar: dict, document: str = "", report: str = "") -> str:
+def render_next_answers(clar: dict, document: str = "", report: str = "", sha256: str = "") -> str:
     """Файл ответов для следующего круга: что решить (расхождения, отложенное) и всё уже согласованное — чтобы
-    повторный ``--answers`` не потерял прежние ответы. Пояснения — строками «>»: разбор ответов их пропускает."""
+    повторный ``--answers`` не потерял прежние ответы. Пояснения — строками «>»: разбор ответов их пропускает.
+    ``sha256`` — SHA-256 проверенного документа в шапке: изменится документ — следующий круг предупредит."""
     todo = clar.get("next_round") or []
     busy = {n["question_id"] for n in todo if n.get("question_id")}
+    sha256 = sha256 or (clar.get("answers_document") or {}).get("document_sha256") or ""
     lines = ["# Ответы владельца: следующий круг", "",
+             *answers_header(document, sha256),
              "> При расхождении оставьте одну строку на вопрос; вместо «<решите: …>» впишите решение.",
              "> Строки «Уже согласовано» не меняйте, если решение то же: без них повторный прогон их потеряет."]
     if document or report:
-        lines.append(f"> Запуск: python -m bcc_review.v2 review {document or 'ДОКУМЕНТ'} {report or 'ОТЧЁТ.md'} "
+        lines.append(f"> Запуск: python -m bcc_review {document or 'ДОКУМЕНТ'} {report or 'ОТЧЁТ.md'} "
                      f"--answers ЭТОТ_ФАЙЛ")
     lines.append("")
     if todo:
@@ -1381,8 +1441,13 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
              f"Ответов на вопросы: {len(clar['answers'])}, общих решений: {len(clar['decisions'])}, "
              f"закрыто общими решениями: {len(clar.get('closed_by_decisions') or [])}, "
              f"без ответа: {len(clar['unanswered'])}. Оценка «после» предполагает, что ответы внесены в документ "
-             f"(см. исправленную редакцию).", "",
-             "| Показатель | До уточнения | После уточнения |", "| :--- | :--- | :--- |",
+             f"(см. исправленную редакцию).", ""]
+    ad = clar.get("answers_document") or {}
+    if ad.get("match") is False:
+        lines += [f"**Ответы составлены по другой редакции документа:** SHA-256 в файле ответов "
+                  f"{ad.get('answers_sha256', '')[:12]}…, у проверенного документа {ad.get('document_sha256', '')[:12]}…. "
+                  f"Вопросы и номера строк могли измениться — сверьте ответы с вопросами этого отчёта.", ""]
+    lines += ["| Показатель | До уточнения | После уточнения |", "| :--- | :--- | :--- |",
              f"| Начинать разработку | {_V.get(b['verdict'].get('development', ''), '—')} | "
              f"{_V.get(a['verdict'].get('development', ''), '—')} |",
              f"| Начинать тестирование | {_V.get(b['verdict'].get('testing', ''), '—')} | "

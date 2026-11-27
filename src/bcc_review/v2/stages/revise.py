@@ -787,7 +787,9 @@ def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = 
                 doc = (report.get("document") or {}).get("file") or (report.get("document") or {}).get("name") or ""
                 path = recheck.next_answers_path(report_path)
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(recheck.render_next_answers(clar, str(doc), Path(report_path).name), encoding="utf-8")
+                sha = str((report.get("document") or {}).get("sha256") or "")
+                path.write_text(recheck.render_next_answers(clar, str(doc), Path(report_path).name, sha),
+                                encoding="utf-8")
                 clar["next_answers_file"] = str(path)
                 if clar.get("next_round"):
                     _cl._warn(ctx, f"recheck: осталось решить {len(clar['next_round'])} — строки для следующего круга "
