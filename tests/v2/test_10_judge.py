@@ -292,9 +292,10 @@ def test_no_quote_candidates_rejected_before_model():
 
 
 def test_critical_cap_and_priorities():
-    cs = [cand(f"C-{i:03d}", 30 + i * 3, f"q{i}", kind="contradiction", criterion="set_consistent",
-               reqs=(f"R-{i:02d}",), extra=[(100 + i, f"p{i}")]) for i in range(1, 11)]
-    view = {"lines": [{"n": 30 + i * 3, "text": f"q{i}"} for i in range(1, 11)]}
+    # цитаты двух мест об одном предмете (общее слово «лимит»): волна 3 проверяет это кодом
+    cs = [cand(f"C-{i:03d}", 30 + i * 3, f"лимит {i} в правиле", kind="contradiction", criterion="set_consistent",
+               reqs=(f"R-{i:02d}",), extra=[(100 + i, f"лимит {i} в приёмке")]) for i in range(1, 11)]
+    view = {"lines": [{"n": 30 + i * 3, "text": f"лимит {i} в правиле"} for i in range(1, 11)]}
     fs = [finding(f"F{i:02d}", [f"C-{i:03d}"], severity="critical", kind="contradiction",
                   criterion="set_consistent", priority=i if i <= 3 else 0, scenario="Вход: два исхода.",
                   impact="Две реализации.") for i in range(1, 11)]
@@ -608,6 +609,7 @@ def test_single_reviewer_critical_is_major_unless_structured():
                   priority=i)
           for i, k, c in ((1, "contradiction", "set_consistent"), (2, "status_conflict", "set_consistent"),
                           (3, "ambiguity", "unambiguous"))]
+    fs[1]["title"] = "Ответ на ошибку: ERROR в ответе 200 против кода 400"  # предмет обеих цитат
     res = judge.run(Ctx(FakeLLM(response(fs + [finding("F04", ["C-004"])]))), cs)
     sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
     assert sev["C-001"] == "major" and sev["C-003"] == "major"        # один ревьюер
@@ -620,7 +622,8 @@ def test_conflict_critical_with_odd_criterion_keeps_level():
           cand("C-002", 39, "максимум один такой", kind="contradiction", criterion="conforming", source="lens:analyst",
                extra=[(40, "следующее достижение")])]
     f = finding("F01", ["C-001", "C-002"], severity="critical", kind="contradiction", criterion="conforming",
-                scenario="Вход: два исхода.", impact="Две реализации.", priority=1)
+                scenario="Вход: два исхода.", impact="Две реализации.", priority=1,
+                title="Максимум один раз против «независимо от истории»")
     res = judge.run(Ctx(FakeLLM(response([f]))), cs)
     d = res["findings"][0]
     assert d["severity"] == "critical" and d["criterion"] == "set_consistent"
