@@ -433,6 +433,7 @@ def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = N
     leaves = []
     for i, rec in enumerate(recs):
         on = i == 0 and not own_done  # этот лист №39 раскрывает на столе, пока своих проверок нет
+        on_cls, on_attr = (" on", 'aria-current="page" ') if on else ("", "")  # без «\"» в f-строке: Python 3.11
         m = report_meta(rec["json"])
         date = m["date"][:5] if m["date"] else ""
         meta = " · ".join(x for x in (rec.get("subtitle") or m["model"], date) if x)
@@ -440,8 +441,7 @@ def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = N
         title = rec.get("title") or rec["id"]
         leaves.append(
             f'<div class="g43-slot" style="z-index:{len(recs) - i};--i:{i}">'
-            f'<a class="g43-leaf{" on" if on else ""}" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}" '
-            f'{"aria-current=\"page\" " if on else ""}'
+            f'<a class="g43-leaf{on_cls}" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}" {on_attr}'
             f'title="{e(meta)}{" · " + e(quotes) if quotes else ""}" '
             f'aria-label="{e(title)}: разработка — {e(m["verdict"])}, {e(m["line"].split(", ", 1)[-1])}; {e(meta)}">'
             f'{_pv(preview_lines(rec["source"]))}<span class="g43-meta">{e(meta)}</span>'
