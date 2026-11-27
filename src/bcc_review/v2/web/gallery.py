@@ -291,8 +291,8 @@ _CSS = """<style>
 .g43-try form{margin:0;display:contents}
 .g43-try .g43-lbl{font-weight:600;color:var(--b-ink-2,#3A5068);font-size:15px;margin-right:2px}
 @media (max-width:1100px){.g43-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:560px){.g43-cards{grid-template-columns:minmax(0,1fr)}.g43-card{min-height:0}
-  .g43-try{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}.g43-try .b-button{width:100%}}
+@media (max-width:560px){.g43-cards{grid-template-columns:minmax(0,1fr);gap:10px}.g43-card{min-height:0;gap:8px}
+  .g43-try .g43-lbl{flex-basis:100%}.g43-try .b-button{white-space:normal;text-align:center;height:auto;min-height:40px}}
 </style>"""
 
 

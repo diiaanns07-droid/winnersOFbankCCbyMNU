@@ -53,7 +53,7 @@
     },
     {
       "id": "official-pdf",
-      "title": "Официальный ТЗ в PDF",
+      "title": "Официальный ТЗ, PDF",
       "kind": "PDF",
       "path": "release/input/requirements.pdf",
       "no_key": "mock"
@@ -68,7 +68,7 @@
     },
     {
       "id": "transfer-limit",
-      "title": "Чистый документ: лимит переводов",
+      "title": "Чистый ТЗ: лимит переводов",
       "kind": "Markdown",
       "path": "evaluation/dev/corpus/cases/transfer_limit.base/source.md",
       "file_name": "transfer_limit.md",
