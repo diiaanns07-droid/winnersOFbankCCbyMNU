@@ -627,6 +627,57 @@ def _build_messages(ctx: Any, block: str, checklist: str, n_candidates: int, com
     return "", user
 
 
+_ID_SPLIT_RE = re.compile(r"[\s,;]+")
+
+
+def _conform(value: Any, schema: dict) -> Any:
+    """Ответ модели → типы схемы этапа (только то, что описано в схеме; лишние поля остаются как есть).
+
+    Схему держит провайдер, но не всегда (локальная модель без структурированного вывода, ответ из чужого
+    кэша): одно поле не того типа — «candidate_ids» строкой, элемент «findings» строкой, «finding_keys»
+    числом — роняло весь этап судьи, и отчёт уходил в «частичный» без отсева ложных. Здесь: объект — только
+    dict (иначе элемент массива выбрасывается), массив строк из строки — по запятым и пробелам, строка из
+    числа — ``str``, целое из bool/строки/дроби — число или 0, bool — только настоящий bool."""
+    t = schema.get("type")
+    if t == "object":
+        if not isinstance(value, dict):
+            return None
+        out = dict(value)
+        for k, sub in (schema.get("properties") or {}).items():
+            if k in out:
+                out[k] = _conform(out[k], sub)
+        return out
+    if t == "array":
+        items = schema.get("items") or {}
+        if isinstance(value, str) and items.get("type") == "string":
+            value = [x for x in _ID_SPLIT_RE.split(value) if x]
+        elif isinstance(value, dict):
+            value = [value]
+        elif not isinstance(value, list):
+            return []
+        conformed = (_conform(x, items) for x in value)
+        return [x for x in conformed if x is not None]
+    if t == "string":
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bool) or value is None or isinstance(value, (list, dict)):
+            return ""
+        return str(value)
+    if t == "integer":
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value == value and abs(value) < 10 ** 9:
+            return int(value)
+        if isinstance(value, str) and re.fullmatch(r"\s*-?\d{1,9}\s*", value):
+            return int(value)
+        return 0
+    if t == "boolean":
+        return value if isinstance(value, bool) else False
+    return value
+
+
 def _ask(ctx: Any, system: str, user: str, schema: dict) -> dict:
     llm = getattr(ctx, "llm", None)
     if llm is None:
@@ -638,7 +689,7 @@ def _ask(ctx: Any, system: str, user: str, schema: dict) -> dict:
     missing = [k for k in schema.get("required") or [] if not isinstance(data, dict) or k not in data]
     if missing:  # ответ не по схеме этапа — это сбой вызова, а не пустой реестр
         raise ValueError(f"ответ модели без полей {', '.join(missing)}")
-    return data
+    return _conform(data, schema)
 
 
 def _call_judge(ctx: Any, cands: list[dict], clusters: list[list[str]], checklist: str,
@@ -688,11 +739,19 @@ def _merge_responses(parts: list[dict]) -> dict:
     order = {"Нет": 0, "Частично": 1, "Да": 2, "Не требуется": 3}
     for pi, resp in enumerate(parts, 1):
         remap: dict[str, str] = {}
+        own = []
         for f in resp.get("findings") or []:
-            key = f"P{pi}{_s(f.get('key')) or len(findings) + 1}"
-            remap[_s(f.get("key"))] = key
-            findings.append({**f, "key": key})
-        rejected += list(resp.get("rejected") or [])
+            key = f"P{pi}{_s(f.get('key')) or len(findings) + len(own) + 1}"
+            if _s(f.get("key")):
+                remap[_s(f.get("key"))] = key
+            own.append({**f, "key": key})
+        for f in own:  # ссылки на дефекты своей части в текстах — на новые ключи
+            for field in ("title", "problem", "scenario"):
+                if _s(f.get(field)):
+                    f[field] = _replace_keys(_s(f[field]), remap)
+        findings += own
+        rejected += [dict(r, reason=_replace_keys(_s(r.get("reason")), remap)) if isinstance(r, dict) else r
+                     for r in resp.get("rejected") or []]
         for ch in resp.get("checklist") or []:
             n = ch.get("n")
             ch = {**ch, "finding_keys": [remap.get(k, k) for k in ch.get("finding_keys") or []],
@@ -1135,6 +1194,7 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
         "scenario": "", "impact": spec["impact"], "recommendation": spec["recommendation"],
         "rewrite": _cut("; ".join(rewrites[:3]), 700), "question": "" if rewrites else spec.get("question", ""),
         "sources": _sources(members), "_members": members, "_wish": False,
+        "_absorbed": [k for f in hits for k in [f["key"], *(f.get("_absorbed") or [])]],
     })
     main["_first_line"] = main["evidence"][0]["line_start"] if main["evidence"] else hits[0]["_first_line"]
     _warn(ctx, warnings, f"судья: {len(hits)} замечаний ({spec['warn']}) сведены в одно незначительное")
@@ -1239,19 +1299,49 @@ _SEV_WORD_RE = re.compile(r"\b(critical|major|minor)(?:[- ](дефект|зам�
                           re.I)
 
 
+_SEV_NOUNS = ("дефект", "замечание", "дефекты", "замечания", "дефектов", "замечаний")
+_SEV_NOUN_FIRST_RE = re.compile(r"\b(" + "|".join(_SEV_NOUNS) + r")\s+(critical|major|minor)\b(?![-\w])", re.I)
+
+
+def _sev_adj(level: str, noun: str) -> str:
+    """Прилагательное уровня в согласии с существительным («существенное замечание», «критичных дефектов»)."""
+    one, many, gen = _SEV_ADJ[level.lower()]
+    noun = noun.lower()
+    if noun == "замечание":
+        return one[:-2] + "ое"
+    if noun == "дефект":
+        return one
+    return many if noun in ("дефекты", "замечания") else gen
+
+
+def _cap_as(src: str, text: str) -> str:
+    return text[:1].upper() + text[1:] if src[:1].isupper() else text
+
+
+def _noun_first_sub(m: re.Match) -> str:
+    """«замечание minor» → «незначительное замечание»."""
+    return _cap_as(m.group(1), f"{_sev_adj(m.group(2), m.group(1))} {m.group(1).lower()}")
+
+
 def _sev_sub(m: re.Match) -> str:
     one, many, gen = _SEV_ADJ[m.group(1).lower()]
     noun = (m.group(2) or "").lower()
-    if noun in ("дефект", "замечание"):
-        return f"{one if noun == 'дефект' else one[:-2] + 'ое'} {noun}"
-    if noun in ("дефекты", "замечания"):
-        return f"{many} {noun}"
-    if noun in ("дефектов", "замечаний"):
-        return f"{gen} {noun}"
-    prev = m.string[max(0, m.start() - 12):m.start()].lower()
-    if re.search(r"(\d|нет|пять|шесть|семь|восемь|много|несколько|два|три|четыре)\s*$", prev):
-        return f"{gen} дефектов" if not re.search(r"(два|три|четыре|\b[234])\s*$", prev) else f"{gen} дефекта"
-    return f"{many} дефекты"
+    if noun:
+        return _cap_as(m.group(1), f"{_sev_adj(m.group(1), noun)} {noun}")
+    prev = m.string[max(0, m.start() - 14):m.start()].lower()
+    if re.search(r"(?:^|[\s(«])(?:до|для|от|выше|ниже)\s+$", prev):  # «понижен до minor» → «до незначительного»
+        out = one[:-2] + "ого"
+    elif re.search(r"уров\w*\s+$", prev):  # «уровень major» → «уровень «существенный»»
+        out = f"«{one}»"
+    elif re.search(r"[—–:]\s*$|\s-\s*$", prev):  # «… — minor.» → «… — незначительное замечание.»
+        out = f"{one[:-2]}ое замечание"
+    elif re.search(r"(?:^|\s)(?:не|как|это)\s+$", prev):  # «поэтому не critical» → «поэтому не критичный»
+        out = one
+    elif re.search(r"(\d|нет|пять|шесть|семь|восемь|много|несколько|два|три|четыре)\s*$", prev):
+        out = f"{gen} дефектов" if not re.search(r"(два|три|четыре|\b[234])\s*$", prev) else f"{gen} дефекта"
+    else:
+        out = f"{many} дефекты"
+    return _cap_as(m.group(1), out)
 
 
 # Частые латинские термины в текстах линз → по-русски (идентификаторы документа не трогаем).
@@ -1280,6 +1370,7 @@ def _ru_levels(text: str) -> str:
     """Страховка «только русский»: латинские названия уровней и частые термины в тексте → русские."""
     if not text:
         return text
+    text = _SEV_NOUN_FIRST_RE.sub(_noun_first_sub, text)
     text = _SEV_WORD_RE.sub(_sev_sub, text)
     for rx, ru in _TERMS_RU:
         text = rx.sub(ru, text)
@@ -1291,6 +1382,49 @@ def _replace_keys(text: str, key_map: dict[str, str]) -> str:
         return text
     pattern = re.compile(r"\b(" + "|".join(re.escape(k) for k in sorted(key_map, key=len, reverse=True)) + r")\b")
     return pattern.sub(lambda m: key_map[m.group(1)], text)
+
+
+_MODEL_KEY_RE = re.compile(r"(?<![\w-])(?:P\d{1,2})?[FR]\d{2,3}(?:#\d+)?(?![\w-])")  # F01, P1F02, R01, F03#4
+_DANGLING_REF = (r"\s*\((?:см\.\s*|как в\s+|в\s+)?{key}\)"  # «(см. F07)», «(F07)»
+                 r"|(?:\s*,\s*|\s+)(?:см\.|как в|покрыт\w*|учт[её]н\w*|в)\s+{key}(?=[\s.,;:)]|$)")  # «покрыт F03»
+
+
+def _dangling_keys(response: dict, key_map: dict[str, str], view: dict | None = None) -> set[str]:
+    """Ключи модели (F01, P1F02, R01), которых нет в реестре: дефект модели отпал (нет известных кандидатов,
+    нет цитат) или ключ выдуман. Ключ отпавшего дефекта, чьи кандидаты легли в другой дефект, ведёт к нему
+    (``key_map`` дополняется). Возвращает оставшиеся висячие ключи; слова документа (его собственные ID вида
+    F01) висячими не считаются."""
+    doc = {m.group(0) for ln in (view or {}).get("lines") or [] for m in _MODEL_KEY_RE.finditer(_s(ln.get("text")))}
+    for f in response.get("findings") or []:
+        k = _s(f.get("key"))
+        if not k or k in key_map:
+            continue
+        targets = list(dict.fromkeys(key_map[c] for c in (_s(x) for x in f.get("candidate_ids") or [])
+                                     if c in key_map))
+        if len(targets) == 1:
+            key_map[k] = targets[0]
+    texts = [_s(response.get("verdict_summary"))]
+    texts += [_s(f.get(x)) for f in response.get("findings") or [] for x in ("title", "problem", "scenario")]
+    texts += [_s(r.get("reason")) for r in response.get("rejected") or []]
+    texts += [_s(c.get("comment")) for c in response.get("checklist") or []]
+    used = {m.group(0) for t in texts for m in _MODEL_KEY_RE.finditer(t)}
+    keys = {_s(f.get("key")) for f in response.get("findings") or [] if _s(f.get("key"))}
+    return {k for k in used | keys if k not in key_map and k not in doc}
+
+
+def _has_keys(text: str, keys: set[str]) -> bool:
+    return bool(keys) and any(m.group(0) in keys for m in _MODEL_KEY_RE.finditer(text or ""))
+
+
+def _drop_keys(text: str, keys: set[str]) -> str:
+    """Ссылка на висячий ключ убирается из текста («(см. F07)», «покрыт F03»), иначе — «другое замечание»."""
+    if not _has_keys(text, keys):
+        return text
+    for k in sorted(keys, key=len, reverse=True):
+        key = r"(?<![\w-])" + re.escape(k) + r"(?![\w-])"
+        text = re.sub(_DANGLING_REF.replace("{key}", key), "", text)
+        text = re.sub(key, "другое замечание", text)
+    return re.sub(r"\s+([.,;:])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
 
 
 def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], *,
@@ -1447,6 +1581,10 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         key_map[f["key"]] = f["id"]
         for cid in f["candidate_ids"]:
             key_map.setdefault(cid, f["id"])
+    for f in findings:  # дефекты, сведённые кодом в одно замечание, — ссылки на них ведут к нему
+        for k in f.get("_absorbed") or []:
+            key_map.setdefault(k, f["id"])
+    dangling = _dangling_keys(response, key_map, view)
 
     # 6. чек-лист
     items = checklist or [x for x, _ in BANK_CHECKLIST]
@@ -1468,7 +1606,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         final_check.append({
             "item": text,
             "answer": _s(ch.get("answer")),
-            "comment": _words_cut(_ru_levels(_replace_keys(_s(ch.get("comment")), key_map)), 30),
+            "comment": _words_cut(_ru_levels(_drop_keys(_replace_keys(_s(ch.get("comment")), key_map), dangling)), 30),
             "finding_ids": list(dict.fromkeys(fids)),
         })
     if missed_items:
@@ -1477,8 +1615,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     summary = _ru_levels(_replace_keys(_s(response.get("verdict_summary")), key_map))
     if not summary:
         summary = fallback_summary(clean)
-    code_summary = bool(summary) and bool(clean) and (_code_changed_verdict(findings)
-                                                      or _text_contradicts(summary, clean))
+    code_summary = bool(summary) and (_code_changed_verdict(findings) or _text_contradicts(summary, clean)
+                                      or _has_keys(summary, dangling))
 
     # 7. ссылки на ключи и кандидатов в текстах дефектов → D-xx, внутренние R-xx → ID документа
     names = _req_names(requirements)
@@ -1486,7 +1624,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         own = set(f["candidate_ids"])
         refs = {k: v for k, v in key_map.items() if not (k.startswith("C-") and k in own)}
         for field in ("title", "problem", "scenario", "impact", "recommendation", "question"):
-            f[field] = _doc_ids(_ru_levels(_replace_keys(f[field], refs)), names)
+            f[field] = _doc_ids(_ru_levels(_drop_keys(_replace_keys(f[field], refs), dangling)), names)
             f[field] = re.sub(r"\bC-\d{2,4}\b", "это замечание", f[field])  # ссылка на себя
         f["rewrite"] = _doc_ids(f["rewrite"], names)
 
@@ -1494,6 +1632,10 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         summary = verdict_text(clean)
         _warn(ctx, warnings, "судья: уровни изменены кодом — обоснование вердикта собрано кодом")
 
+    for r in rejected:  # причина отклонения ссылается на дефекты по ключам модели («покрыт F03») → D-xx
+        if r.get("reason"):
+            r["reason"] = _drop_keys(_replace_keys(r["reason"], {k: v for k, v in key_map.items()
+                                                                  if not k.startswith("C-")}), dangling)
     fix_first = [f["id"] for f in sorted((f for f in clean if f["priority"] > 0), key=lambda f: f["priority"])]
     changes = [{"id": key_map[k], **v} for k, v in (response.get("_checks") or {}).items() if k in key_map]
     changes.sort(key=lambda x: x["id"])
@@ -1839,6 +1981,21 @@ def candidates_from_v1(report: dict, view: dict) -> list[dict]:
 # --- этап -------------------------------------------------------------------------------------
 
 
+def _clean_candidate(c: dict) -> dict:
+    """Кандидат → типы контракта 2.3: цитаты — список объектов, ID требований — список строк.
+    Линзы почти всегда держат схему; строка вместо списка требований ломала сравнение (``set("R-04")`` — буквы),
+    число — роняло этап."""
+    c = dict(c)
+    ev = c.get("evidence")
+    ev = [ev] if isinstance(ev, dict) else ev if isinstance(ev, list) else []
+    c["evidence"] = [e for e in ev if isinstance(e, dict)]
+    reqs = c.get("requirement_ids")
+    reqs = [x for x in _ID_SPLIT_RE.split(reqs) if x] if isinstance(reqs, str) else reqs if isinstance(
+        reqs, list) else []
+    c["requirement_ids"] = [_s(x) for x in reqs if isinstance(x, (str, int)) and not isinstance(x, bool) and _s(x)]
+    return c
+
+
 def run(ctx: Any, candidates: list[dict]) -> dict:
     """Этап «судья»: ``{"findings", "rejected", "checklist", "verdict_summary", "fix_first", "warnings"}``."""
     warnings: list[str] = []
@@ -1846,7 +2003,10 @@ def run(ctx: Any, candidates: list[dict]) -> dict:
     good: list[dict] = []
     pre_rejected: list[dict] = []
     for i, c in enumerate(candidates or [], 1):
-        c = dict(c)
+        if not isinstance(c, dict):
+            _warn(ctx, warnings, f"судья: кандидат №{i} не объект ({type(c).__name__}) — пропущен")
+            continue
+        c = _clean_candidate(c)
         c["id"] = _s(c.get("id")) or f"C-{i:03d}"
         if c["id"] in seen:
             c["id"] = f"{c['id']}-{i}"
