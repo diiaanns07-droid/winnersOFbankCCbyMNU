@@ -146,6 +146,11 @@
   ],
   "report_bytes": 112676,
   "report_status": "partial",
+  "stages_with_partial_or_failed_status": [
+    "clarify"
+  ],
+  "failed_logical_calls": 1,
+  "physical_attempts_are_lower_bound": true,
   "gold": {
     "K": 4,
     "K_as_critical": 3,

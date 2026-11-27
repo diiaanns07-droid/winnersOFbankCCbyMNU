@@ -26,7 +26,7 @@
     {
       "model": "gemini-3.5-flash-lite",
       "http": "error",
-      "class": "unknown",
+      "class": "not_json",
       "count": 1
     }
   ],
@@ -101,7 +101,7 @@
         [
           "gemini-3.5-flash-lite",
           "error",
-          "unknown"
+          "not_json"
         ]
       ],
       "rpm_wait_s": 0
@@ -124,7 +124,10 @@
     }
   ],
   "report_bytes": 116576,
-  "report_status": null,
+  "report_status": "complete",
+  "stages_with_partial_or_failed_status": [],
+  "failed_logical_calls": 0,
+  "physical_attempts_are_lower_bound": false,
   "gold": {
     "K": 4,
     "K_as_critical": 2,

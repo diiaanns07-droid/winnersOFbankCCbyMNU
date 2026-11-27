@@ -150,7 +150,10 @@
     }
   ],
   "report_bytes": 113073,
-  "report_status": null,
+  "report_status": "complete",
+  "stages_with_partial_or_failed_status": [],
+  "failed_logical_calls": 0,
+  "physical_attempts_are_lower_bound": false,
   "gold": {
     "K": 3,
     "K_as_critical": 1,

@@ -32,7 +32,7 @@
     {
       "model": "gemini-3.1-flash-lite",
       "http": "error",
-      "class": "unknown",
+      "class": "not_json",
       "count": 1
     },
     {
@@ -50,7 +50,7 @@
     {
       "model": "gemini-3.5-flash-lite",
       "http": "error",
-      "class": "unknown",
+      "class": "not_json",
       "count": 2
     },
     {
@@ -172,12 +172,12 @@
         [
           "gemini-3.5-flash-lite",
           "error",
-          "unknown"
+          "not_json"
         ],
         [
           "gemini-3.5-flash-lite",
           "error",
-          "unknown"
+          "not_json"
         ],
         [
           "gemini-3.1-flash-lite",
@@ -187,14 +187,17 @@
         [
           "gemini-3.1-flash-lite",
           "error",
-          "unknown"
+          "not_json"
         ]
       ],
       "rpm_wait_s": 0
     }
   ],
   "report_bytes": 123407,
-  "report_status": null,
+  "report_status": "complete",
+  "stages_with_partial_or_failed_status": [],
+  "failed_logical_calls": 0,
+  "physical_attempts_are_lower_bound": false,
   "counts": {
     "critical": 3,
     "major": 14,
