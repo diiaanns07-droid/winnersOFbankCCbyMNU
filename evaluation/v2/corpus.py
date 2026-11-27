@@ -23,7 +23,7 @@ import sys
 import time
 from pathlib import Path
 
-from .common import ROOT, run_shell, sha256_file, shell_quote, source_owner
+from .common import ROOT, run_shell, sha256_file, shell_quote, source_owner, tokens
 
 CORPUS = ROOT / "evaluation" / "dev" / "corpus"
 HARNESS_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
@@ -195,6 +195,92 @@ def details(per_case: list[dict], matrix: list[dict]) -> dict:
     return {"fp": fp, "fn": fn, "dup": dup, "by_source": dict(sorted(by_source.items()))}
 
 
+_TITLE_STOP = set("не в и на по с к о об для из от до при что как или а но же ли бы".split())
+
+
+def _quote_close(a: str, b: str) -> bool:
+    """Цитаты об одном месте: не меньше 3 общих слов и 80 % слов более короткой."""
+    ta, tb = set(tokens(a)), set(tokens(b))
+    inter = len(ta & tb)
+    return bool(ta and tb) and inter >= 3 and inter / min(len(ta), len(tb)) >= 0.8
+
+
+def _title_sim(a: str, b: str) -> float:
+    ta = {x for x in tokens(a) if x not in _TITLE_STOP and len(x) > 2}
+    tb = {x for x in tokens(b) if x not in _TITLE_STOP and len(x) > 2}
+    return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
+
+
+def background(preds_path: Path, matrix: list[dict], per_case: list[dict] | None = None) -> dict:
+    """Ложные находки на мутантах по происхождению — сравнение с находками на чистой базе того же семейства.
+
+    * «та же жалоба» — цитата о том же месте (≥ 3 общих слов, 80 % более короткой) и близкий заголовок (≥ 0,2 по
+      словам): агент повторяет на мутанте ложную находку чистой базы — уберёте её на чистых, уйдёт и здесь;
+    * «то же место» — цитата о том же месте, жалоба другая (или сказана иначе): так же и у половины верных находок
+      (вторая сторона противоречия — строка базы), поэтому это не «фон», а только место;
+    * «только у мутанта» — места нет среди находок базы.
+    Строгий фон счётчика `evaluation/harness` (тот же тип и все цитаты в обе стороны) — `strict`.
+    Калибровка на корпусе 28fe64f (haiku): верных с «той же жалобой» 0 из 27, «то же место» — 16 из 27."""
+    man = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
+    meta = {c["case_id"]: c for c in man["cases"]}
+    sha2case = {r["sha256"]: c["case_id"] for c in man["cases"] for r in c.get("renders") or []}
+    preds: dict[str, dict[str, dict]] = {}
+    for line in preds_path.read_text(encoding="utf-8").splitlines():
+        r = json.loads(line) if line.strip() else {}
+        if r.get("record") == "finding" and r.get("source_sha256") in sha2case:
+            preds.setdefault(sha2case[r["source_sha256"]], {})[str(r.get("defect_id"))] = r
+    sources = {(pc["case_id"], it.get("id")): it.get("sources") or [] for pc in per_case or []
+               for it in pc.get("items") or []}
+    out = {"fp_mutant": 0, "same_complaint": 0, "same_place": 0, "own": 0, "no_base": 0, "strict": 0,
+           "by_owner_same": {}, "examples": []}
+    for m in matrix:
+        c = meta.get(m.get("case_id")) or {}
+        if m.get("outcome") != "FP" or c.get("expected_outcome") == "clean":
+            continue
+        out["fp_mutant"] += 1
+        out["strict"] += 1 if m.get("background") else 0
+        base = c.get("base_case_id")
+        if not base or base not in preds:
+            out["no_base"] += 1
+            continue
+        p = (preds.get(m["case_id"]) or {}).get(str(m.get("defect_id"))) or {}
+        qa = [a.get("quote") or "" for a in p.get("anchors") or []]
+        best, best_sim = None, -1.0
+        for bp in preds[base].values():
+            if any(_quote_close(x, a.get("quote") or "") for x in qa for a in bp.get("anchors") or []):
+                s = _title_sim(p.get("explanation") or "", bp.get("explanation") or "")
+                if s > best_sim:
+                    best, best_sim = bp, s
+        if best is None:
+            out["own"] += 1
+        elif best_sim >= 0.2:
+            out["same_complaint"] += 1
+            for o in sorted({source_owner(x) for x in sources.get((m["case_id"], m.get("defect_id"))) or []}):
+                out["by_owner_same"][o] = out["by_owner_same"].get(o, 0) + 1
+            if len(out["examples"]) < 5:
+                out["examples"].append({"case_id": m["case_id"], "title": str(p.get("explanation") or "")[:120],
+                                        "base_title": str(best.get("explanation") or "")[:120]})
+        else:
+            out["same_place"] += 1
+    out["by_owner_same"] = dict(sorted(out["by_owner_same"].items(), key=lambda kv: -kv[1]))
+    return out
+
+
+def background_line(b: dict | None) -> str:
+    """Одна строка для сводки корпуса и ворот."""
+    if not b or not b.get("fp_mutant"):
+        return ""
+    n = b["fp_mutant"]
+    pct = (lambda k: f"{100 * b[k] / n:.0f} %")
+    owners = ", ".join(f"{k} {v}" for k, v in list(b.get("by_owner_same", {}).items())[:5])
+    return (f"Ложные на мутантах ({n}) по происхождению: та же жалоба, что на чистой базе семейства — "
+            f"{b['same_complaint']} ({pct('same_complaint')}{'; ' + owners if owners else ''}), то же место с другой "
+            f"жалобой — {b['same_place']}, только у мутанта — {b['own']}"
+            + (f", без базы в прогоне — {b['no_base']}" if b.get("no_base") else "")
+            + f"; строгий фон счётчика — {b['strict']}. Ложная жалоба чистой базы повторяется на мутантах: убрать "
+              "её на чистых — уйдут и эти.")
+
+
 def candidate_predictions(out: Path, cases: list[dict], mode: str) -> Path | None:
     """Предсказания из кандидатов этапов (линзы, набор, правила) до судьи — верхняя граница recall."""
     from .score import CANDIDATE_STAGES
@@ -313,6 +399,9 @@ def render_summary(s: dict, per_case: list[dict], label: str) -> str:
               f"recall {_f(cd.get('recall'))}; по типам: " + ", ".join(
                   f"{k} {v.get('tp', 0)}/{(v.get('tp') or 0) + (v.get('fn') or 0)}"
                   for k, v in sorted(cd.get("per_issue_type", {}).items()) if (v.get('tp') or 0) + (v.get('fn') or 0)) + ".", ""]
+    bg = background_line(s.get("background"))
+    if bg:
+        L += [bg, ""]
     dt = s.get("details") or {}
     if dt.get("by_source"):
         L += ["Вклад источников (замечание с несколькими источниками считается каждому):", "",
@@ -441,6 +530,7 @@ def main(argv: list[str] | None = None) -> int:
     matrix = [json.loads(x) for x in matrix_p.read_text(encoding="utf-8").splitlines() if x.strip()] \
         if matrix_p.exists() else []
     s["details"] = details(per_case, matrix)
+    s["background"] = background(preds, matrix, per_case)
     run_log = out / "run_log.json"
     if run_log.exists():
         rl = json.loads(run_log.read_text(encoding="utf-8"))
