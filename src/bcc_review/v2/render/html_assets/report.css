@@ -369,6 +369,7 @@ select.mini { height: 32px; font-size: 14px; padding: 0 26px 0 12px; color: var(
 .empty { padding: 28px; text-align: center; color: var(--ink-3); background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow); }
 
 .card {
+  min-width: 0; overflow-wrap: anywhere;
   background: var(--surface); border: 0; border-radius: var(--r-lg); padding: 18px var(--pad) 16px; position: relative;
   box-shadow: var(--shadow); cursor: pointer; overflow: hidden;
   transition: box-shadow 220ms var(--ease), transform 120ms var(--ease);
@@ -398,7 +399,7 @@ select.mini { height: 32px; font-size: 14px; padding: 0 26px 0 12px; color: var(
 }
 .ev:hover { background: var(--brand-soft); box-shadow: inset 0 0 0 1px rgba(0, 185, 117, .35); }
 .evl { flex: none; font-size: 13.5px; font-weight: 650; color: var(--ink-2); min-width: 78px; white-space: nowrap; }
-.ev q { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13.5px; color: var(--ink); quotes: "«" "»"; }
+.ev q { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 13.5px; color: var(--ink); quotes: "«" "»"; }
 .vf { flex: none; font-weight: 800; font-size: 14px; }
 .vf.ok { color: var(--ok); }
 .vf.fuzzy { color: var(--major); }
@@ -461,7 +462,7 @@ table.kv th { width: 230px; font-size: 15px; color: var(--ink-2); background: va
 .qtools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
 .qtools p { margin: 0; color: var(--ink-2); max-width: 80ch; }
 .qlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: 16px; }
-.qcard { background: var(--surface); border-radius: var(--r-lg); padding: 18px var(--pad); box-shadow: var(--shadow); }
+.qcard { background: var(--surface); border-radius: var(--r-lg); padding: 18px var(--pad); box-shadow: var(--shadow); min-width: 0; overflow-wrap: anywhere; }
 .qcard .to { font-size: 14px; color: var(--ink-3); }
 .qcard .to b { color: var(--ink-2); }
 .qlinks { margin-left: auto; display: flex; gap: 4px; }

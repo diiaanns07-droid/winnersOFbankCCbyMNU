@@ -130,14 +130,12 @@ a.jb-row:hover .jb-go{opacity:1;transform:translateX(2px) rotate(45deg)}
   .jb-prog{padding:20px}
   .jb-phead{gap:14px}
   .jb-ptitle{font-size:22px}
-  .jb-hero{flex-wrap:wrap;gap:16px}
-  .jb-hero .jb-agent{width:64px;height:64px}
-  .jb-hero .jb-agent:empty,.jb-hero .jb-agent>[data-bcc-agent]:not(.bcc-agent){border-radius:18px}
-  .jb-hmain{flex-basis:calc(100% - 80px)}
+  .jb-hero{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;align-items:center}
+  .jb-hmain{grid-column:1/-1;grid-row:2}
   .jb-verdict{font-size:26px}
   .jb-verdict .sep{display:none}
   .jb-verdict .v{display:block}
-  .jb-hact{width:100%}
+  .jb-hact{grid-column:2;grid-row:1;justify-self:end;align-self:center}
   .jb-row{display:grid;grid-template-columns:50px minmax(0,1fr);column-gap:10px;row-gap:4px;align-items:baseline}
   .jb-row>*:not(.jb-id){grid-column:2}
   .jb-row .jb-only{justify-self:start}
