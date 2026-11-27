@@ -325,6 +325,7 @@ box-shadow:0 0 0 1px var(--w-hair2);transition:box-shadow var(--b-fast,120ms) va
 font:600 16px var(--w-font);cursor:pointer;text-decoration:none;transition:transform var(--b-fast,120ms) var(--w-ease),box-shadow var(--b-fast,120ms) var(--w-ease),opacity var(--b-base,220ms)}
 .w-btn:hover{transform:translateY(-1px);box-shadow:var(--b-shadow-2,0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10))}
 .w-btn:active{transform:scale(.98)}
+.w-btn[hidden]{display:none}
 .w-btn[disabled]{opacity:.55;cursor:progress;transform:none;box-shadow:none}
 .w-main{background:var(--w-gs);color:#fff}
 .w-sec{background:var(--b-paper,#fff);color:var(--w-ink);box-shadow:0 0 0 1px var(--w-hair2)}
@@ -381,7 +382,7 @@ PAGE_JS = r"""
     post(false).then(function(r){
       if(r.ok){ verified=true; setMsg((r.message||'Ключ работает')+' · '+r.mask,'ok'); say('Ключ работает. Можно открывать систему.','verified');
         check.hidden=true; done.hidden=false; open.focus(); }
-      else { setMsg(r.message||'Ключ не подошёл.','err'); say(r.message||'Ключ не подошёл.','alert'); }
+      else { setMsg(r.message||'Ключ не подошёл.','err'); say('Не получилось. Что сделать — написал под кнопкой.','alert'); }
     }).catch(function(){ setMsg('Сервер не ответил. Он запущен?','err'); say('Сервер не ответил. Он запущен?','alert'); })
     .then(function(){ check.disabled=false; check.textContent='Проверить ключ'; });
   });
