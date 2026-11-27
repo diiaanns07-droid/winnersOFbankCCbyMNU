@@ -31,9 +31,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlsplit
 
-from . import onboarding as _onboarding  # №40
 from .runner import (ALLOWED_EXT, FILES, MAX_UPLOAD, FixtureRunner, Job, JobStore, PipelineRunner, Worker,
                      check_provider, load_dotenv, provider_status)
+from . import onboarding as _onboarding  # №40: знакомство, /api/key, файлы BCC AI
 
 ASSETS = Path(__file__).with_name("assets")
 REPO = Path(__file__).resolve().parents[4]
@@ -220,9 +220,9 @@ class Handler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_GET(self) -> None:  # noqa: N802
+        if _onboarding.handle_get(self, urlsplit(self.path).path): return  # №40: /welcome, /assets/agent.*  # noqa: E701
         url = urlsplit(self.path)
         path = url.path
-        if _onboarding.handle_get(self, path): return  # №40: /welcome, /assets/agent.*, переход на знакомство
         if path == "/":
             return self._html(200, index_page(self.app))
         if path == "/healthz":
@@ -271,8 +271,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── POST ──
     def do_POST(self) -> None:  # noqa: N802
+        if _onboarding.handle_post(self, urlsplit(self.path).path): return  # №40: POST /api/key  # noqa: E701
         path = urlsplit(self.path).path
-        if _onboarding.handle_post(self, path): return  # №40: POST /api/key
         m = JOB_PATH.match(path)
         if m and m.group(1) and m.group("rest") == "/answers":
             return self._answers(m.group("id"))
