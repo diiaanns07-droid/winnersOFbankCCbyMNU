@@ -201,6 +201,18 @@ def score_one(name: str, path: Path, gold: dict) -> dict:
             "verdict": rep["verdict"]}
 
 
+def _ran_on_requested(r: dict) -> bool:
+    """Прогон шёл на запрошенной модели: `models_used` отчёта содержит её имя (gemini-3.8-flash, «sonnet» в
+    claude-sonnet-…). Прогон, целиком или частично ушедший на запасную модель, — замер другой модели."""
+    try:
+        sj = json.loads((ROOT / r["dir"] / "score.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return True
+    used = [str(m).lower() for m in ((sj.get("report") or {}).get("models_used") or [])]
+    want = str(r.get("model") or "").lower()
+    return not used or not want or all(want in m for m in used)
+
+
 def ours() -> list[dict]:
     """Последний замер каждой нашей модели на официальном документе (history.jsonl)."""
     rows = [json.loads(x) for x in (V2 / "history.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
@@ -211,6 +223,8 @@ def ours() -> list[dict]:
         if re.search(r"\b(pdf|docx)\b", r.get("label") or "", re.I):  # соперники — по Markdown; PDF/DOCX — отдельно
             continue
         if r.get("dir") and not (ROOT / r["dir"] / "score.json").exists():  # строка без сохранённого замера
+            continue
+        if r.get("dir") and not _ran_on_requested(r):  # прогон ушёл на запасную модель (квота, 503) — не та модель
             continue
         k = next((m for m in ("opus", "sonnet", "haiku", "gemini") if m in f"{r.get('model')}".lower()), None)
         if k:
