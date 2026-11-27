@@ -220,8 +220,6 @@ def test_report_has_no_local_paths(tmp_path, monkeypatch):
             assert needle not in text, f"{path.name}: локальный путь {needle}"
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №04 (статус №16, патч 04_segment_latin_cache.patch): кэш _doc_latin "
-                                        "не срабатывает — словарь пересчитывается по всему документу на каждое требование")
 def test_segment_document_caches_are_reused():
     """Длинное ТЗ: словарь латиницы и индекс строк считаются один раз на документ, а не на каждое требование."""
     from bcc_review.v2.stages import segment
@@ -233,8 +231,6 @@ def test_segment_document_caches_are_reused():
         assert segment._by_n(view) is segment._by_n(view)
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, патч 01_fast_start_repeatable.patch): «проба» быстрого "
-                                        "старта при нарезке из кэша выбирает другой путь — повтор не из кэша")
 def test_fast_start_decision_is_replayed_when_segment_comes_from_cache(tmp_path):
     """Живой прогон записывает решение «пробы»; повтор с нарезкой из кэша идёт тем же путём, даже если проба
     (нарезка закончилась мгновенно) сказала бы «обычный путь»."""
