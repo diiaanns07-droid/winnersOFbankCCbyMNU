@@ -850,9 +850,12 @@ def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
     источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект.
     Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам.
     ``strict`` (для major): сосед — того же вида и с ≥ 2 общими строками; кандидаты из ``skip_ids`` (они сами
-    образуют другой major) не подтверждают: два major по одним строкам не держат друг друга."""
+    образуют другой major) не подтверждают: два major по одним строкам не держат друг друга; ревьюер, сам
+    предложивший minor, major не подтверждает."""
     fams = {_source_family(_s(m.get("source"))) for m in members}
-    if len(fams) >= 2 or any(_s(m.get("origin")) in structured for m in members):
+    voters = {_source_family(_s(m.get("source"))) for m in members
+              if not (strict and _s(m.get("severity")) == "minor")}
+    if len(voters) >= 2 or any(_s(m.get("origin")) in structured for m in members):
         return True
     lines = {e["line_start"] for e in f["evidence"]}
     need = 2 if strict else min(2, len(lines))
@@ -860,8 +863,8 @@ def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
     for c in all_cands or []:
         if c["id"] in member_ids or c["id"] in skip_ids or _source_family(_s(c.get("source"))) in fams:
             continue
-        if strict and _s(c.get("kind")) != f["kind"]:  # соседний дефект другого вида — не подтверждение
-            continue
+        if strict and (_s(c.get("kind")) != f["kind"] or _s(c.get("severity")) == "minor"):
+            continue  # соседний дефект другого вида или сам minor — не подтверждение
         if len(lines & set(_lines_of(c))) >= need:
             return True
     return False

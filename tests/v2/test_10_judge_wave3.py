@@ -297,3 +297,15 @@ def test_two_single_reviewer_majors_on_same_lines_do_not_confirm_each_other():
     # сосед, который сам не major (отклонён или minor), по-прежнему подтверждает
     res, _ = run([finding("F01", ["C-005"], severity="major"), finding("F02", ["C-006"], severity="minor")], cs)
     assert {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}["C-005"] == "major"
+
+
+def test_reviewer_who_proposed_minor_does_not_confirm_major():
+    cs = [cand("C-001", 10, "Правило начисления", source="lens:analyst"),
+          {**cand("C-002", 10, "Правило начисления", source="consistency"), "severity": "minor"},
+          cand("C-003", 20, "Платёж от 31-го", source="lens:architect"),
+          cand("C-004", 20, "Платёж от 31-го", source="lens:qa")]
+    res, _ = run([finding("F01", ["C-001", "C-002"], severity="major"),
+                  finding("F02", ["C-003", "C-004"], severity="major")], cs)
+    by = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert by["C-001"] == "minor"   # второй ревьюер сам счёл мелочью
+    assert by["C-003"] == "major"
