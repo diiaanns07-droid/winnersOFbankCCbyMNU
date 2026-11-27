@@ -508,3 +508,22 @@ def test_long_reports_fit_900_lines(sample, n_findings, n_reqs):
     assert md.count("\n") <= 900
     assert md.count('<a id="d-') == n_findings  # у каждого дефекта есть якорь — ссылки не ломаются
     assert md.count("**Проблема.**") >= 5  # критичные — полными карточками
+
+
+def test_why_names_kind_of_blockers_and_keeps_priority_sentence(sample):
+    md = markdown.render(sample)
+    why = next(ln for ln in md.split("\n") if ln.startswith("**Почему.**"))
+    assert "5 критичных дефектов блокируют разработку и тестирование: " in why and "противореч" in why
+    r = copy.deepcopy(sample)
+    r["verdict"]["summary"] = ("Нельзя: D-01, D-02, D-03 и D-04 блокируют работу. Первым исправить D-01 и D-02. "
+                               "Потом всё остальное.")
+    why = next(ln for ln in markdown.render(r).split("\n") if ln.startswith("**Почему.**"))
+    assert "Первым исправить [D-01](#d-01) и [D-02](#d-02)." in why and "Потом" not in why and "D-03" not in why
+
+
+def test_offline_does_not_claim_unchecked_criteria_are_fine():
+    r = {"run": {"provider": "offline", "status": "complete", "stages": {"rules": "ok"}},
+         "document": {"title": "т", "file": "t.md"}, "requirements": [], "findings": []}
+    md = markdown.render(r)
+    assert "✅ нарушений не найдено" not in md and "❔ без модели не проверялся" in md
+    assert "4.2–4.5." in md and "### 4.3." not in md

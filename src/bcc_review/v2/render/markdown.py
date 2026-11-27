@@ -218,6 +218,26 @@ def _same_label(inner: str, label: str, sid: str) -> bool:
                if x)
 
 
+def _plain_ids(text: str) -> str:
+    """Как _link_ids, но без ссылок: «R-06 (Ф-1)» → «Ф-1» — чтобы резать текст по видимой длине."""
+    if not _REQ_LABELS:
+        return text
+
+    def sub(m: re.Match) -> str:
+        rid, paren, inner = m.group(1), m.group(2) or "", m.group(3) or ""
+        lab, sid = _REQ_LABELS.get(rid, ("", ""))
+        if not lab:
+            return m.group(0)
+        if lab.startswith("критерий приёмки №") and re.search(r"критери\w*\s+(?:приёмки\s+|приемки\s+)?$",
+                                                              m.string[max(0, m.start() - 24):m.start()], re.I):
+            lab = lab.rsplit(" ", 1)[-1]
+        return lab + ("" if paren and _same_label(inner, *_REQ_LABELS[rid]) else paren)
+
+    text = _LABEL_THEN_ID.sub(lambda m: m.group(1) if _REQ_LABELS.get(m.group(2), ("",))[0]
+                              and m.group(1).endswith(_REQ_LABELS[m.group(2)][0]) else m.group(0), text)
+    return _IDREF.sub(sub, text)
+
+
 def _link_ids(text: str) -> str:
     """D-…, R-…, Q-… в тексте — ссылки; требование с названием в документе показывается этим названием
     («R-07» → «Ф-3»), повтор названия в скобках после ID убирается."""
@@ -760,9 +780,13 @@ def _brief(c: _Ctx) -> list[str]:
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z«])")
 
 
+_PRIORITY = re.compile(r"^(?:Первым|Первыми|Сначала|В первую очередь|Начать с|Первое)\b", re.I)
+
+
 def _why(c: _Ctx, limit: int = 420) -> str:
-    """Обоснование вердикта для первого экрана: текст судьи без перечня блокеров (он стоит ниже списком),
-    не длиннее limit; без текста судьи — короткое обоснование кодом."""
+    """Обоснование вердикта для первого экрана. Есть блокеры — фраза кода (сколько, что блокируют и какого рода:
+    противоречия, пропуски, неоднозначности) плюс фраза судьи о порядке исправления; перечень блокеров стоит ниже
+    списком. Блокеров нет — текст судьи (не длиннее limit)."""
     text = " ".join(str(c.verdict.get("summary") or "").split())
     judge_down = any("судья недоступен" in str(w) or "реестр собран кодом" in str(w) for w in c.run.get("warnings") or [])
     if c.offline:
@@ -771,16 +795,17 @@ def _why(c: _Ctx, limit: int = 420) -> str:
         return (_auto_why(c) + " " + lim) if _blockers(c) else ("Без модели вердикт «можно» не выносится. " + lim)
     if not text or judge_down or text.startswith("Итог ревью:"):
         return _auto_why(c)
-    if not _blockers(c):
-        return shorten(text, limit + 200)
     sents = _SENT_SPLIT.split(text)
-    keep = [s for s in sents if len(re.findall(r"\bD-\d{2,4}\b", s)) < 3] or sents[:1]
-    out = ""
-    for s in keep:
-        if out and len(out) + len(s) + 1 > limit:
-            break
-        out = f"{out} {s}".strip()
-    return out or shorten(text, limit)
+    if not _blockers(c):
+        out = ""
+        for s in sents:
+            if out and len(out) + len(s) + 1 > limit:
+                break
+            out = f"{out} {s}".strip()
+        return out or shorten(text, limit)
+    prio = next((s for s in sents if _PRIORITY.match(s)), "")
+    why = _auto_why(c)
+    return why + (f" {shorten(prio, limit)}" if prio else "")
 
 
 def _auto_why(c: _Ctx) -> str:
@@ -797,7 +822,21 @@ def _auto_why(c: _Ctx) -> str:
         noun = (plural(n, "дефект", "дефекта", "дефектов") if c.offline else
                 plural(n, "критичный дефект", "критичных дефекта", "критичных дефектов"))
         verb = "блокирует" if plural(n, "1", "2", "5") == "1" else "блокируют"
-        return f"{n} {noun} {verb} {target} — они перечислены ниже." + tail
+        kinds = {}
+        for f in bl:
+            kinds[_category(f)] = kinds.get(_category(f), 0) + 1
+        words = {"contradictory": ("противоречие между местами документа", "противоречия между местами документа",
+                                   "противоречий между местами документа"),
+                 "incomplete": ("пропуск обязательного описания", "пропуска обязательного описания",
+                                "пропусков обязательного описания"),
+                 "unverifiable": ("неоднозначное ключевое правило", "неоднозначных ключевых правила",
+                                  "неоднозначных ключевых правил"),
+                 "other": ("другой дефект", "других дефекта", "других дефектов")}
+        order = [k for k in ("contradictory", "incomplete", "unverifiable", "other") if kinds.get(k)]
+        what_kind = [f"{kinds[k]} {plural(kinds[k], *words[k])}" for k in order]
+        kind_txt = (": " + (", ".join(what_kind[:-1]) + " и " + what_kind[-1] if len(what_kind) > 1 else what_kind[0])
+                    if what_kind and not (len(order) == 1 and order[0] == "other") else "")
+        return f"{n} {noun} {verb} {target}{kind_txt} — список ниже." + tail
     majors = [f for f in c.findings if f.get("severity") == "major"]
     if len(majors) >= 3:
         return (f"Критичных дефектов нет; существенных — {len(majors)}: начинать можно, исправляя их параллельно "
@@ -814,7 +853,7 @@ def _blockers(c: _Ctx) -> list[dict]:
 def _action(f: dict, limit: int = 190) -> str:
     """Что сделать — первое предложение рекомендации, со строчной буквы (после «→»); длинное режется по границе
     части предложения («;», «:»), а не посреди слова."""
-    sent = first_sentence(f.get("recommendation") or "", 10 ** 4).rstrip(".")
+    sent = first_sentence(_plain_ids(" ".join(str(f.get("recommendation") or "").split())), 10 ** 4).rstrip(".")
     if len(sent) > limit:
         cut = max(sent.rfind("; ", 0, limit), sent.rfind(": ", 0, limit), sent.rfind(" — ", 0, limit))
         sent = sent[:cut] if cut > limit * 0.5 else shorten(sent, limit)
@@ -1085,7 +1124,8 @@ def _per_requirement(c: _Ctx) -> list[str]:
     out += ["### 3.1. Матрица: требование × нарушенный критерий", "",
             f"Столбцы: {legend}. В клетке — самая серьёзная находка: 🔴 критичная, 🟠 существенная, "
             f"🟡 незначительная; «·» — нарушений нет."
-            + (f" Критерии без нарушений во всём документе: {', '.join(unused)}." if unused else ""), ""]
+            + ((f" Без модели по остальным критериям ({', '.join(unused)}) документ не проверялся." if c.offline else
+                f" Критерии без нарушений во всём документе: {', '.join(unused)}.") if unused else ""), ""]
     rows, clean = [], []
     for q in c.reqs:
         fs = by_req.get(q.get("id"), [])
@@ -1295,11 +1335,18 @@ def _set_check(c: _Ctx) -> list[str]:
     for k in SET_CRITERIA:
         fs = [f for f in c.findings if _set_bucket(f) == k]
         w = _worst(fs)
-        verdict = (f"{SEV_ICON[w]} нарушен" if w else "✅ нарушений не найдено")
+        verdict = (f"{SEV_ICON[w]} нарушен" if w else ("❔ без модели не проверялся" if c.offline
+                                                        else "✅ нарушений не найдено"))
         rows.append([CRITERIA[k][0], CRITERIA[k][1], verdict,
                      c.f_links(sorted({f["id"] for f in fs}, key=_id_num)) if fs else "—"])
     out += table(["Критерий", "Стандарт", "Итог", "Дефекты"], rows) + [""]
 
+    if c.offline and not (c.r.get("pair_checks") or c.r.get("acceptance_checks") or c.r.get("trace")
+                          or c.r.get("glossary")):
+        return out + ["### 4.2–4.5. Противоречия, критерии приёмки, покрытие, глоссарий", "",
+                      "Без модели не выполнялись: попарная сверка требований по сценариям, исполнение критериев "
+                      "приёмки, покрытие требований приёмкой и глоссарий разночтений требуют модели. Явные "
+                      "противоречия, которые нашли правила, — среди дефектов раздела 3.", ""]
     pairs = c.r.get("pair_checks") or []
     out += ["### 4.2. Противоречия по сценариям", ""]
     if pairs:
@@ -1721,7 +1768,7 @@ def _appendix_method(c: _Ctx) -> list[str]:
            "проверяющие роли (аналитик, тестировщик, архитектор, риски, набор целиком) предлагают кандидатов с "
            "дословными цитатами; программа находит каждую цитату в документе и сама определяет строку; судья "
            "объединяет дубли, отклоняет ложные и калибрует серьёзность; вердикт считает программа.", ""]
-    if c.level >= 1:
+    if c.level >= 1 or c.offline:
         out += ["**Критерии.** Отдельное требование (ISO/IEC/IEEE 29148:2018 п. 5.2.5, 5.2.7): "
                 + ", ".join(CRITERIA[k][0].lower() for k in INDIVIDUAL) + ". Набор (29148 п. 5.2.6, IEEE 830-1998 "
                 "п. 4.3): " + ", ".join(CRITERIA[k][0].lower() for k in SET_CRITERIA)
