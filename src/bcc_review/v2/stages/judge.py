@@ -1368,19 +1368,49 @@ _SEV_WORD_RE = re.compile(r"\b(critical|major|minor)(?:[- ](дефект|зам�
                           re.I)
 
 
+_SEV_NOUNS = ("дефект", "замечание", "дефекты", "замечания", "дефектов", "замечаний")
+_SEV_NOUN_FIRST_RE = re.compile(r"\b(" + "|".join(_SEV_NOUNS) + r")\s+(critical|major|minor)\b(?![-\w])", re.I)
+
+
+def _sev_adj(level: str, noun: str) -> str:
+    """Прилагательное уровня в согласии с существительным («существенное замечание», «критичных дефектов»)."""
+    one, many, gen = _SEV_ADJ[level.lower()]
+    noun = noun.lower()
+    if noun == "замечание":
+        return one[:-2] + "ое"
+    if noun == "дефект":
+        return one
+    return many if noun in ("дефекты", "замечания") else gen
+
+
+def _cap_as(src: str, text: str) -> str:
+    return text[:1].upper() + text[1:] if src[:1].isupper() else text
+
+
+def _noun_first_sub(m: re.Match) -> str:
+    """«замечание minor» → «незначительное замечание»."""
+    return _cap_as(m.group(1), f"{_sev_adj(m.group(2), m.group(1))} {m.group(1).lower()}")
+
+
 def _sev_sub(m: re.Match) -> str:
     one, many, gen = _SEV_ADJ[m.group(1).lower()]
     noun = (m.group(2) or "").lower()
-    if noun in ("дефект", "замечание"):
-        return f"{one if noun == 'дефект' else one[:-2] + 'ое'} {noun}"
-    if noun in ("дефекты", "замечания"):
-        return f"{many} {noun}"
-    if noun in ("дефектов", "замечаний"):
-        return f"{gen} {noun}"
-    prev = m.string[max(0, m.start() - 12):m.start()].lower()
-    if re.search(r"(\d|нет|пять|шесть|семь|восемь|много|несколько|два|три|четыре)\s*$", prev):
-        return f"{gen} дефектов" if not re.search(r"(два|три|четыре|\b[234])\s*$", prev) else f"{gen} дефекта"
-    return f"{many} дефекты"
+    if noun:
+        return _cap_as(m.group(1), f"{_sev_adj(m.group(1), noun)} {noun}")
+    prev = m.string[max(0, m.start() - 14):m.start()].lower()
+    if re.search(r"(?:^|[\s(«])(?:до|для|от|выше|ниже)\s+$", prev):  # «понижен до minor» → «до незначительного»
+        out = one[:-2] + "ого"
+    elif re.search(r"уров\w*\s+$", prev):  # «уровень major» → «уровень «существенный»»
+        out = f"«{one}»"
+    elif re.search(r"[—–:]\s*$|\s-\s*$", prev):  # «… — minor.» → «… — незначительное замечание.»
+        out = f"{one[:-2]}ое замечание"
+    elif re.search(r"(?:^|\s)(?:не|как|это)\s+$", prev):  # «поэтому не critical» → «поэтому не критичный»
+        out = one
+    elif re.search(r"(\d|нет|пять|шесть|семь|восемь|много|несколько|два|три|четыре)\s*$", prev):
+        out = f"{gen} дефектов" if not re.search(r"(два|три|четыре|\b[234])\s*$", prev) else f"{gen} дефекта"
+    else:
+        out = f"{many} дефекты"
+    return _cap_as(m.group(1), out)
 
 
 # Частые латинские термины в текстах линз → по-русски (идентификаторы документа не трогаем).
@@ -1409,6 +1439,7 @@ def _ru_levels(text: str) -> str:
     """Страховка «только русский»: латинские названия уровней и частые термины в тексте → русские."""
     if not text:
         return text
+    text = _SEV_NOUN_FIRST_RE.sub(_noun_first_sub, text)
     text = _SEV_WORD_RE.sub(_sev_sub, text)
     for rx, ru in _TERMS_RU:
         text = rx.sub(ru, text)
