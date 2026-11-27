@@ -112,7 +112,9 @@ def make_provider(server: FreeTierServer, clock: ScaledClock, **kw) -> SimProvid
         def invoke(self, *, model, messages, schema, timeout_s, max_output_tokens=None, **_):
             return server.call(model, getattr(_tls, "stage", ""))
 
-    return SimProvider(api_key="sim", env=kw.pop("env", {}), sleep=clock.sleep, clock=clock.now,
+    # модель времени считалась на прежней цепочке 3.8 → 3.6 → 3.5-lite; цепочка по умолчанию — test_02_gemini
+    env = {"GEMINI_FALLBACK_MODELS": "gemini-3.6-flash,gemini-3.5-flash-lite", **(kw.pop("env", None) or {})}
+    return SimProvider(api_key="sim", env=env, sleep=clock.sleep, clock=clock.now,
                        adapter_factory=lambda model, thinking, schema_mode="native": Adapter(model), **kw)
 
 

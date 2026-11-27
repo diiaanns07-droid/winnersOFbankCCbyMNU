@@ -279,7 +279,24 @@ def _match(idx: _Index, a: int, b: int, ls: int, le: int, verified: str, text: s
 
 # --------------------------------------------------------------------------- основная функция
 def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iterable[Any] = ()) -> dict | None:
-    """Найти цитату в документе. Возвращает Match или None (см. описание модуля)."""
+    """Найти цитату в документе. Возвращает Match или None (см. описание модуля).
+
+    Короткая цитата (короче 12 знаков, например «200»), которая встречается в документе несколько раз, при строке
+    модели или строках требования принимается только в пределах ±5 строк от них — иначе место замечания «уехало» бы к
+    чужому вхождению (просьба №14). Единственное вхождение и цитата без подсказки — как раньше."""
+    m = _verify_quote(view, quote, line_hint, near_lines)
+    if m and isinstance(quote, str):
+        needle = _clean_quote(_LINE_PREFIX.sub(" ", quote))
+        if len(needle) < MIN_FUZZY_QUOTE:
+            hint, near = _anchors(line_hint, near_lines)
+            points = ([hint] if hint else []) + near
+            if points and len(_line_hits(view, needle)) > 1 and \
+                    _dist(m["line_start"], m["line_end"], points) > FUZZY_RADIUS:
+                return None
+    return m
+
+
+def _verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iterable[Any] = ()) -> dict | None:
     if not isinstance(quote, str):
         return None
     raw = _LINE_PREFIX.sub(" ", quote).strip() if _LINE_PREFIX.search(quote) else quote.strip()
