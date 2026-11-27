@@ -459,6 +459,16 @@ def _short(s: str, n: int) -> str:
     return " ".join(w[:n]) + (" …" if len(w) > n else "")
 
 
+_LINE_REF = re.compile(r"\s*\((?:L\d{1,4}|строк[аи]?\s*\d)[^)]*\)|\s*\(L\d{1,4}\s*(?:и|,|–|-)\s*L?\d{1,4}\)")
+
+
+def _clean_title(t: str) -> str:
+    """Заголовок без номеров строк в скобках («(L038)», «(строки 39–40)»): место показывает цитата."""
+    t = _LINE_REF.sub("", _s(t))
+    t = re.sub(r"\bL0*(\d{1,4})\b", r"строка \1", t)
+    return re.sub(r"\s{2,}", " ", t).strip(" ,;")
+
+
 def _has_variants(q: str) -> bool:
     """Вопрос уже предлагает варианты («… или …»)."""
     return bool(re.search(r"(?<![а-яё])или(?![а-яё])", q or "", re.I))
@@ -511,7 +521,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     human = _humanizer(known, {pair["a"]: qa_, pair["b"]: qb_})
     subject = _phrase(human(pair["subject"]))
     oa, ob = _phrase(human(pair["outcome_a"])), _phrase(human(pair["outcome_b"]))
-    model_title = human(pair["title"])
+    model_title = _clean_title(human(pair["title"]))
     if pair["verdict"] == "conflict":
         fallback = f"{qa_} и {qb_} дают разный результат: {_short(subject, 8)}"
         problem = (f"{_cap(qa_)} и {qb_} по-разному решают один случай — {subject}. "
