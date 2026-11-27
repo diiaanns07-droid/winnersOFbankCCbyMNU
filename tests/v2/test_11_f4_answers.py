@@ -349,3 +349,34 @@ def test_cyrillic_v_is_b_with_warning():
     w2: list[str] = []
     recheck.resolve_answers(qs, recheck.load_answers("Q-01: Б\n"), w2)
     assert not any("кириллическая" in x for x in w2)
+
+
+# --------------------------------------------------------------------------- перенос строки ответа
+def test_wrapped_answer_without_indent_is_kept():
+    text = "Q-02 [Маршрут вызова между сервисами]: Вызов идёт через шлюз платежей,\nбез прямого обращения к процессингу.\n\nQ-01: A\n"
+    a = {x["id"]: x for x in recheck.parse_answers_text(text)["answers"]}
+    assert a["Q-02"]["text"] == "Вызов идёт через шлюз платежей, без прямого обращения к процессингу."
+    assert a["Q-01"]["choice"] == 0
+
+
+def test_letter_with_comment_on_next_line():
+    a = recheck.parse_answers_text("Q-03: B\nсчитаем от первого запроса\n")["answers"][0]
+    assert a["choice"] == 1 and a["comment"] == "считаем от первого запроса"
+
+
+@pytest.mark.parametrize("text,choice,body", [("Q-03:\nB\n", 1, ""), ("Q-02:\nЧерез шлюз платежей.\n", None,
+                                                                         "Через шлюз платежей.")])
+def test_value_on_next_line(text, choice, body):
+    a = recheck.parse_answers_text(text)["answers"][0]
+    assert a["choice"] == choice and a["text"] == body
+
+
+def test_explicit_no_answer_has_no_continuation():
+    text = "Q-04: ?\nэто строка-пояснение вне ответа\n"
+    a = recheck.parse_answers_text(text)["answers"][0]
+    assert a["choice"] is None and a["text"] == ""
+
+
+def test_blank_line_ends_answer():
+    text = "Q-02: Через шлюз.\n\nПримечание для команды, не ответ.\n"
+    assert recheck.parse_answers_text(text)["answers"][0]["text"] == "Через шлюз."

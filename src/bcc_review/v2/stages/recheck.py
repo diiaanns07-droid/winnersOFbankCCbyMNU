@@ -192,10 +192,15 @@ def parse_answers_text(text: str) -> dict:
                 continue
         m = _QLINE.match(line)
         if m and _qid(m.group(1)):
+            value = (m.group(4) or "").strip()
             entry = {"id": _qid(m.group(1)), "topic_hint": (m.group(2) or m.group(3) or "").strip(),
-                     **_parse_value(m.group(4))}
+                     **_parse_value(value)}
             answers.append(entry)
-            current = entry if entry["choice"] is None and entry["text"] else None
+            # продолжение ответа — следующие строки до пустой (абзац Markdown): с отступом или без; у буквы —
+            # оговорка; «Q-03:» без значения — ответ на следующей строке. Явный отказ («?», «—») продолжения нет.
+            current = entry if (entry["choice"] is not None or entry["text"] or not value) else None
+            if current is not None and not value:
+                current["_empty"] = True
             continue
         if _QSTART.match(line):  # строка с номером вопроса, которую не удалось разобрать, не теряется молча
             unparsed.append(line.strip()[:120])
@@ -205,8 +210,15 @@ def parse_answers_text(text: str) -> dict:
         if in_decisions and stripped:
             decisions.append(stripped)
             continue
-        if current is not None and raw[:1].isspace():  # продолжение своего ответа с отступом
-            current["text"] = (current["text"] + " " + stripped).strip()
+        if current is not None and stripped:
+            if current.pop("_empty", False):  # «Q-03:» — значение на следующей строке
+                current.update(_parse_value(stripped))
+            elif current["choice"] is not None:
+                current["comment"] = (current["comment"] + " " + stripped).strip()
+            else:
+                current["text"] = (current["text"] + " " + stripped).strip()
+    for a in answers:
+        a.pop("_empty", None)
     out = {"answers": answers, "decisions": decisions}
     if unparsed:
         out["unparsed"] = unparsed
