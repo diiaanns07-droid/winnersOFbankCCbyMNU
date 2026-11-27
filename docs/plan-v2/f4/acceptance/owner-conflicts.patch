@@ -1,0 +1,56 @@
+diff --git a/src/bcc_review/v2/stages/recheck.py b/src/bcc_review/v2/stages/recheck.py
+index bc8f5355..ac1e00aa 100644
+--- a/src/bcc_review/v2/stages/recheck.py
++++ b/src/bcc_review/v2/stages/recheck.py
+@@ -1043,10 +1043,10 @@ def _plain_reason(text: str, keep: set[str]) -> str:
+ def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", slack: int = 1) -> str:
+     """ID прежнего дефекта, который новый кандидат описывает заново, иначе пустая строка.
+ 
+-    Новый конфликт от ответа цитирует место, которое теперь противоречит ответу. Если все его цитаты —
+-    строки одного прежнего дефекта (±``slack``), это тот же дефект (закрытый ответом или оставшийся открытым):
+-    для двух и более строк хватает совпадения строк, для одной строки нужна ещё та же суть в заголовке."""
++    Соседние строки могут содержать несколько разных условий. Автоматически считаем повтором
++    две и более прежние цитаты на тех же строках. Для других выдержек проверяем также тему замечания."""
+     cand = {int(e["line_start"]) for e in evidence if e.get("line_start")}
++    quoted = {(int(e["line_start"]), _cl._norm(e.get("quote", ""))) for e in evidence if e.get("line_start")}
+     if not cand:
+         return ""
+     words = _tokens(_cl.plain_text(title))
+@@ -1055,7 +1055,10 @@ def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", sl
+         if not own or not all(any(abs(c - o) <= slack for o in own) for c in cand):
+             continue
+         if len(cand) >= 2:
+-            return str(f.get("id", ""))
++            original = {(int(e["line_start"]), _cl._norm(e["quote"])) for e in f.get("evidence") or []
++                        if e.get("line_start") and e.get("quote")}
++            if quoted <= original:
++                return str(f.get("id", ""))
+         theirs = _tokens(f"{f.get('title', '')} {f.get('problem', '')}")
+         if words and len(words & theirs) / len(words) >= 0.4:
+             return str(f.get("id", ""))
+diff --git a/tests/v2/test_11_recheck.py b/tests/v2/test_11_recheck.py
+index 4b35305b..74b33b09 100644
+--- a/tests/v2/test_11_recheck.py
++++ b/tests/v2/test_11_recheck.py
+@@ -471,3 +471,21 @@ def test_judge_rewrite_into_old_defect_is_rejected(findings, questions, monkeypa
+     out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{questions[0]['id']}: A")
+     assert out["clarification"]["new_findings"] == []
+     assert any(r["reason"] == f"повторяет дефект {old['id']}" for r in out["rejected_after"])
++
++
++@pytest.mark.parametrize("second_line", [14, 15])
++def test_neighboring_quotes_can_support_two_different_owner_conflicts(second_line):
++    old = {
++        "id": "D-17", "title": "Архив заявки удаляется в разные сроки",
++        "problem": "Срок хранения архива указан как пять и как семь лет.",
++        "evidence": [
++            {"line_start": 12, "quote": "Хранить архив пять лет."},
++            {"line_start": 14, "quote": "Удалить архив через семь лет."},
++        ],
++    }
++    unrelated = [
++        {"line_start": 12, "quote": "Уведомление передаётся письмом."},
++        {"line_start": second_line, "quote": "Телефон для извещения не используется."},
++    ]
++    assert recheck.duplicate_of(unrelated, [old], "Новый канал доставки извещения") == ""
++    assert recheck.duplicate_of(old["evidence"], [old], "Повтор замечания") == "D-17"

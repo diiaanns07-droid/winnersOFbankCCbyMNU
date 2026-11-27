@@ -1,0 +1,1430 @@
+{
+  "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+  "seed": [
+    1
+  ],
+  "corpus": "8ddcb3f85b7d6f2d2392dddd5ea4ee1744f1a4fb1e35b7a9e807e44b041f7288",
+  "provider": "offline",
+  "physical_model_calls": 0,
+  "controls_excluded": [
+    "edge.empty@md",
+    "edge.empty@pdf",
+    "edge.empty@docx"
+  ],
+  "scores": {
+    "md": {
+      "tp": 27,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0
+    },
+    "pdf": {
+      "tp": 27,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0
+    },
+    "docx": {
+      "tp": 27,
+      "fp": 0,
+      "fn": 1,
+      "duplicates": 0
+    }
+  },
+  "format_checks": [
+    {
+      "case": "autopay.base",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "autopay.drop_promised.no_409_status",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "autopay.event_conflict.insufficient_funds_credit",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "autopay.paraphrase.nfr",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "autopay.range_boundary.trigger_at_threshold",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "autopay.two_statuses.range_422",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "autopay.unit_change.limit_per_hour",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.base",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.drop_promised.no_last_digits",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.event_conflict.unblock_daily_limit",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.paraphrase.keep_authorizations",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.range_boundary.days_400_at_30",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.two_statuses.reblock_200",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cardblock.unit_change.blocked_at_utc",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.base",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.drop_promised.no_read_method",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.event_conflict.category_effective_now",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.paraphrase.rate",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.range_boundary.cap_strict",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.two_statuses.bad_category_200",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "cashback.unit_change.accrued_in_tiyn",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.base",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.drop_promised.no_read_method",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.event_conflict.cancel_no_restore",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.paraphrase.new_limit",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.range_boundary.reaching_rejects",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.two_statuses.range_200_error",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    },
+    {
+      "case": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "count_range": 0,
+      "same_detected_roots": true,
+      "same_verdict": true
+    }
+  ],
+  "verified_reports": [
+    {
+      "case": "autopay.base",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "autopay.base",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "autopay.base",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "format": "md",
+      "count": 2,
+      "severity": {
+        "major": 2
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "format": "pdf",
+      "count": 2,
+      "severity": {
+        "major": 2
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+      "format": "docx",
+      "count": 2,
+      "severity": {
+        "major": 2
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "autopay.drop_promised.no_409_status",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 1
+    },
+    {
+      "case": "autopay.drop_promised.no_409_status",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 1
+    },
+    {
+      "case": "autopay.drop_promised.no_409_status",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 1
+    },
+    {
+      "case": "autopay.event_conflict.insufficient_funds_credit",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.event_conflict.insufficient_funds_credit",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.event_conflict.insufficient_funds_credit",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.paraphrase.nfr",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "autopay.paraphrase.nfr",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "autopay.paraphrase.nfr",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "autopay.range_boundary.trigger_at_threshold",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.range_boundary.trigger_at_threshold",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.range_boundary.trigger_at_threshold",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.two_statuses.range_422",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.two_statuses.range_422",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.two_statuses.range_422",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.unit_change.limit_per_hour",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.unit_change.limit_per_hour",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "autopay.unit_change.limit_per_hour",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.base",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.base",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.base",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "format": "md",
+      "count": 2,
+      "severity": {
+        "major": 2
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 4
+    },
+    {
+      "case": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "format": "pdf",
+      "count": 2,
+      "severity": {
+        "major": 2
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 4
+    },
+    {
+      "case": "cardblock.combo.unit_change-blocked_at_utc+two_statuses-reblock_200",
+      "format": "docx",
+      "count": 2,
+      "severity": {
+        "major": 2
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 4
+    },
+    {
+      "case": "cardblock.drop_promised.no_last_digits",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.drop_promised.no_last_digits",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.drop_promised.no_last_digits",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.event_conflict.unblock_daily_limit",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.event_conflict.unblock_daily_limit",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.event_conflict.unblock_daily_limit",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.paraphrase.keep_authorizations",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.paraphrase.keep_authorizations",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.paraphrase.keep_authorizations",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cardblock.range_boundary.days_400_at_30",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "cardblock.range_boundary.days_400_at_30",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "cardblock.range_boundary.days_400_at_30",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "cardblock.two_statuses.reblock_200",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.two_statuses.reblock_200",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.two_statuses.reblock_200",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.unit_change.blocked_at_utc",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.unit_change.blocked_at_utc",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cardblock.unit_change.blocked_at_utc",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.base",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cashback.base",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cashback.base",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "format": "md",
+      "count": 2,
+      "severity": {
+        "critical": 1,
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 4
+    },
+    {
+      "case": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "format": "pdf",
+      "count": 2,
+      "severity": {
+        "critical": 1,
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 4
+    },
+    {
+      "case": "cashback.combo.event_conflict-category_effective_now+range_boundary-cap_strict",
+      "format": "docx",
+      "count": 2,
+      "severity": {
+        "critical": 1,
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 4
+    },
+    {
+      "case": "cashback.drop_promised.no_read_method",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "undetermined"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.drop_promised.no_read_method",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "undetermined"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.drop_promised.no_read_method",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "undetermined"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.event_conflict.category_effective_now",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.event_conflict.category_effective_now",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.event_conflict.category_effective_now",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.paraphrase.rate",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cashback.paraphrase.rate",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cashback.paraphrase.rate",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "cashback.range_boundary.cap_strict",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.range_boundary.cap_strict",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.range_boundary.cap_strict",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.two_statuses.bad_category_200",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.two_statuses.bad_category_200",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.two_statuses.bad_category_200",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.unit_change.accrued_in_tiyn",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.unit_change.accrued_in_tiyn",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "cashback.unit_change.accrued_in_tiyn",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.base",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "transfer_limit.base",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "transfer_limit.base",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "format": "md",
+      "count": 2,
+      "severity": {
+        "critical": 1,
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "format": "pdf",
+      "count": 2,
+      "severity": {
+        "critical": 1,
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "transfer_limit.combo.two_statuses-range_200_error+drop_promised-no_read_method",
+      "format": "docx",
+      "count": 2,
+      "severity": {
+        "critical": 1,
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 3
+    },
+    {
+      "case": "transfer_limit.drop_promised.no_read_method",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "undetermined"
+      ],
+      "quotes": 1
+    },
+    {
+      "case": "transfer_limit.drop_promised.no_read_method",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "undetermined"
+      ],
+      "quotes": 1
+    },
+    {
+      "case": "transfer_limit.drop_promised.no_read_method",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "undetermined"
+      ],
+      "quotes": 1
+    },
+    {
+      "case": "transfer_limit.event_conflict.cancel_no_restore",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.event_conflict.cancel_no_restore",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.event_conflict.cancel_no_restore",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "critical": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.paraphrase.new_limit",
+      "format": "md",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "transfer_limit.paraphrase.new_limit",
+      "format": "pdf",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "transfer_limit.paraphrase.new_limit",
+      "format": "docx",
+      "count": 0,
+      "severity": {},
+      "verdict": [
+        "undetermined",
+        "undetermined"
+      ],
+      "quotes": 0
+    },
+    {
+      "case": "transfer_limit.range_boundary.reaching_rejects",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.range_boundary.reaching_rejects",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.range_boundary.reaching_rejects",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.two_statuses.range_200_error",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.two_statuses.range_200_error",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.two_statuses.range_200_error",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "format": "md",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "format": "pdf",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    },
+    {
+      "case": "transfer_limit.unit_change.api_limit_in_tiyn",
+      "format": "docx",
+      "count": 1,
+      "severity": {
+        "major": 1
+      },
+      "verdict": [
+        "no",
+        "no"
+      ],
+      "quotes": 2
+    }
+  ]
+}
