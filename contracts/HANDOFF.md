@@ -45,6 +45,27 @@ py -3.12 -m venv .venv
 Ворота Max на сборке: `tests/contract` 29 ✓, `tests/integration` 138 ✓. Офлайн-отчёты сборки и `verify` —
 `release/reports/offline/`; официальный онлайн-прогон — `release/reports/live/README.md`.
 
+## План Б: выпуск на движке v1 (для №01 v2)
+
+`bcc/integration` держит v1 готовым к выпуску, если в 12:00 v2 не пройдёт ворота качества.
+
+1. Влить `bcc/integration` в `bcc/v2`. Код движка сливается без конфликтов; конфликтуют только файлы
+   упаковки, которые завели и №18 v1, и №16 v2 (`README.md`, `.env.example`, `Dockerfile`, `.dockerignore`) —
+   в `bcc/v2` оставить версии v2: `git checkout --ours README.md .env.example Dockerfile .dockerignore`.
+   Проверено на временном слиянии: `tests/contract` + `tests/integration` зелёные, `--engine v1` работает.
+2. Живой прогон v1 без API-ключа — в сессии с Claude Code CLI:
+
+```sh
+python -m bcc_review --engine v1 release/input/requirements.md out/planb/requirements.md --provider claude_cli --no-cache --export html,jira --max-calls 40 --max-seconds 2700
+python -m bcc_review verify out/planb/requirements.json release/input/requirements.md
+```
+
+   Модель — `CLAUDE_CLI_MODEL` (по умолчанию `opus`). Прежний прогон v1 через `claude -p` на Opus: 28 мин,
+   17 вызовов, ≈ $6,3, все К1–К5. С ключом API вместо CLI — `--provider anthropic` (сборка `f84f730` или новее:
+   в старых Claude отвечал 400 на поле `cache`).
+3. Годность: `run.mode = rules_plus_llm`, `run.status = complete`, `verify` — OK. Обрезанные пакеты теперь
+   делятся пополам (`ask_split` в трассе), цитаты привязываются к блоку своего требования.
+
 ## Что движок выравнивает на стыках (просьбы к владельцам)
 
 Движок принимает отклонения ниже и пишет предупреждение или запись трассы. Лучше исправить у себя:
