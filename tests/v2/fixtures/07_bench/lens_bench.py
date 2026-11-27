@@ -155,6 +155,9 @@ def score_official(rep_path: Path, gold: Path | None = None, cache: Path | None 
             "critical_false": len(res["severity"]["critical_false"]),
             "duplicates": res["precision"]["duplicates"],
             "outside": res["precision"].get("outside_unknown"),
+            "outside_real": res["precision"].get("outside_real"),
+            "outside_false": res["precision"].get("outside_false"),
+            "matched": len(res["assignment"]), "findings": res["counts"]["findings"],
             "quotes": f"{res['quotes']['total'] - res['quotes']['missing']}/{res['quotes']['total']}"}
 
 
@@ -280,9 +283,14 @@ def score_set(a: argparse.Namespace) -> None:
         mine_f = sum(len(d.get("mine_found", [])) for d in summary["docs"] if not d["clean"])
         mine_t = sum(len(d.get("mine_found", [])) + len(d.get("mine_missing", [])) for d in summary["docs"] if not d["clean"])
         cl = {s: sum(d["by_severity"][s] for d in summary["docs"] if d["clean"]) for s in ("critical", "major", "minor")}
-        summary.update({"mine": f"{mine_f}/{mine_t}", "clean": cl})
+        defect = [d for d in summary["docs"] if not d["clean"]]
+        pr = {k: sum(d.get(k) or 0 for d in defect) for k in ("findings", "matched", "duplicates", "outside_real",
+                                                                "outside_false", "outside")}
+        summary.update({"mine": f"{mine_f}/{mine_t}", "clean": cl, "precision": pr})
         L += ["", f"Итого свои пункты {mine_f}/{mine_t}; чистые: critical {cl['critical']}, major {cl['major']}, "
-                  f"minor {cl['minor']}."]
+                  f"minor {cl['minor']}.", "",
+              f"Дефектные версии: кандидатов {pr['findings']}, в эталоне {pr['matched']}, дублей {pr['duplicates']}, "
+              f"вне эталона: настоящих {pr['outside_real']}, ложных {pr['outside_false']}, без решения {pr['outside']}."]
     secs = [d["meta"].get("seconds") or 0 for d in summary["docs"]]
     L += ["", f"Время этапа: среднее {sum(secs) / max(1, len(secs)):.0f} с, максимум {max(secs or [0]):.0f} с; "
               f"вызовов {sum((d['meta'].get('calls') or 0) for d in summary['docs'])} на {len(secs)} прогонов."]

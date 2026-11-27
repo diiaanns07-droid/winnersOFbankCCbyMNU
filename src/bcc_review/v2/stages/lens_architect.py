@@ -131,8 +131,11 @@ WIDE_OUTPUT_TOKENS = 32000
 
 
 BRANCH_TITLE = "Ветка логики без ответа"
-# Шаг, который сам называет исход: «вернуть …», «при …», «если …», «в случае …», «иначе …».
-NAMED_OUTCOME = re.compile(r"верн|\bпри\b|\bесли\b|в случае|иначе|отклон|отказ", re.I)
+# Условная ветка, которая сама велит что-то вернуть: «при отклонении … вернуть …», «если …, вернуть …».
+# Нужны оба признака: шаг основного пути («выполнить … и вернуть результат») описан ответом 200, а ветка,
+# которая задаёт исход словами («если …, возвращаются сведения …»), — с ответом (ложные на №18, волна 3).
+BRANCH_RETURN = re.compile(r"верн", re.I)
+BRANCH_CONDITION = re.compile(r"\bпри\b|\bесли\b|в случае|иначе|отклон|отказ", re.I)
 MAX_BRANCH_CANDIDATES = 2
 HTTP_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")  # шаг сам называет код ответа — исход задан
 
@@ -148,12 +151,14 @@ def branch_candidates(inventory: dict, view: Any, candidates: list[dict]) -> lis
     """Кандидаты на ветки логики без ответа, которые модель внесла в опись, но не оформила замечанием.
 
     Слабая модель (haiku с effort=low) верно отмечает ветку без ответа в `inventory.branches`, но потом
-    сливает её с соседним замечанием. Код добавляет замечание, только если шаг сам называет исход
-    («вернуть …», «при …», «если …») и ни один кандидат не цитирует эту строку как ветку логики.
+    сливает её с соседним замечанием. Код добавляет замечание, только если шаг — условная ветка, которая
+    велит что-то вернуть без кода («при отклонении … вернуть …»), и ни один кандидат не цитирует эту строку
+    как ветку логики
+    (заголовок со словом «ветка» — модель пишет и «Ветка «вернуть …» без поля …»).
     Цитата — дословный текст строки документа, поэтому сверка цитат пройдёт.
     """
     covered = {int(e.get("line") or 0) for c in candidates
-               if str(c.get("title") or "").startswith(BRANCH_TITLE) for e in c.get("evidence") or []}
+               if "ветк" in str(c.get("title") or "").lower() for e in c.get("evidence") or []}
     out: list[dict] = []
     for b in undefined_branches(inventory):
         try:
@@ -161,7 +166,8 @@ def branch_candidates(inventory: dict, view: Any, candidates: list[dict]) -> lis
         except (TypeError, ValueError):
             continue
         text = _line_text(view, n)
-        if not n or n in covered or not text or not NAMED_OUTCOME.search(text) or HTTP_CODE.search(text):
+        if (not n or n in covered or not text or not BRANCH_RETURN.search(text)
+                or not BRANCH_CONDITION.search(text) or HTTP_CODE.search(text)):
             continue
         covered.add(n)
         step = str(b.get("step") or "").strip().rstrip(".") or text
