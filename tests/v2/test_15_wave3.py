@@ -914,6 +914,22 @@ def test_newtz_outside_backfill_and_recurring_across_runs(tmp_path, monkeypatch)
         newtz.backfill_outside(out)
 
 
+def test_cleantable_verdict_table_shows_history_and_hides_superseded_sets():
+    """Первая таблица RESULTS: у документа с «нельзя» — в скольких прогонах модели так же; заменённая редакция
+    набора в ней не показывается (только сноской)."""
+    from evaluation.v2 import cleantable as ct
+
+    no, yes = {"development": "no", "testing": "no"}, {"development": "yes", "testing": "yes"}
+    rows = [ct._row("чистые ТЗ №20", "haiku", f"прогон {at[11:16]}", at, "repay", {"critical": 1}, no, 9)
+            for at in ("2026-11-27 12:53", "2026-11-27 19:03")]
+    rows += [ct._row("чистые ТЗ №20", "haiku", "прогон 19:03", "2026-11-27 19:03", "fx", {}, yes, 9),
+             ct._row("№18: чистые версии (1-я редакция)", "haiku", "старое", "~0520", "qr_clean", {"critical": 3}, no)]
+    text = ct.render_verdicts(ct.latest(rows), heading=False, rows=rows)
+    assert "| чистые ТЗ №20 | haiku | прогон 19:03 (19:03) | 1 | 0 | 1 из 2 | 1 | repay (2 из 2) |" in text
+    assert "| №18: чистые версии (1-я редакция) |" not in text
+    assert "Не показаны заменённые наборы (№18: чистые версии (1-я редакция))" in text
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final

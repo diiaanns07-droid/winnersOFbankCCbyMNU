@@ -165,25 +165,37 @@ def _verdict(v: dict) -> str:
     return f"{ru.get(v.get('development'), v.get('development'))} / {ru.get(v.get('testing'), v.get('testing'))}"
 
 
-def render_verdicts(groups: dict[tuple, list[dict]], heading: bool = True) -> str:
+def render_verdicts(groups: dict[tuple, list[dict]], heading: bool = True, rows: list[dict] | None = None) -> str:
     """«Вердикт на исправленных ТЗ» (таблица №01): по каждому набору — сколько чистых документов получили
-    «можно», «с условиями», «нельзя» (по разработке) в последнем прогоне модели; цель — «нельзя» 0."""
+    «можно», «с условиями», «нельзя» (по разработке) в последнем прогоне модели; цель — «нельзя» 0. С `rows` (все
+    прогоны) у документа с «нельзя» — в скольких прогонах модели на наборе так же («repay (4 из 4)»)."""
+    st = stability(rows) if rows else {}
     order = ["чистые ТЗ №20", "№18: чистые версии (2-я редакция)", "№18: чистые версии (1-я редакция)",
              "корпус: базы и перефразы", "прочие чистые"]
-    keys = sorted((k for k in groups if not k[1].startswith("офлайн")),
+    keys = sorted((k for k in groups if not k[1].startswith("офлайн") and k[0] not in SUPERSEDED),
                   key=lambda k: (order.index(k[0]) if k[0] in order else 9, k[1]))
     L = (["### Вердикт на исправленных ТЗ (цель: «нельзя» 0, critical 0)", ""] if heading else
-         ["Цель: на исправленном (чистом) ТЗ «нельзя» 0 и critical 0. Последний прогон каждого набора и модели;"
-          " пересчитать — `python -m evaluation.v2.cleantable --write`.", ""]) + [
+         ["Цель: на исправленном (чистом) ТЗ «нельзя» 0 и critical 0. Последний прогон каждого набора и модели; в скобках "
+          "у документа — в скольких прогонах этой модели на наборе он получил «нельзя» (без повторов из кэша); "
+          "пересчитать — `python -m evaluation.v2.cleantable --write`.", ""]) + [
          "| Набор | Модель | Прогон | «можно» | «с условиями» | «нельзя» | critical | Документы с «нельзя» |",
          "| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- |"]
     for k in keys:
         rs = groups[k]
         dev = [(r["verdict"] or {}).get("development") for r in rs]
         no_docs = [r["case"] for r in rs if "no" in (r["verdict"] or {}).values()]
+
+        def runs(case: str) -> str:
+            hist = (st.get(k) or {}).get(case) or []
+            return f" ({sum(_is_no(r) for r in hist)} из {len(hist)})" if len(hist) > 1 else ""
+
         L.append(f"| {k[0]} | {k[1]} | {rs[0]['label']} ({rs[0]['at'][11:16] or rs[0]['at']}) | "
                  f"{dev.count('yes')} | {dev.count('conditional')} | {len(no_docs)} из {len(rs)} | "
-                 f"{sum(r['critical'] for r in rs)} | {', '.join(sorted(no_docs)) or '—'} |")
+                 f"{sum(r['critical'] for r in rs)} | {', '.join(c + runs(c) for c in sorted(no_docs)) or '—'} |")
+    gone = sorted({k[0] for k in groups if k[0] in SUPERSEDED})
+    if gone:
+        L += ["", f"Не показаны заменённые наборы ({', '.join(gone)}): их документы заменены новой редакцией; прогоны — "
+                  "в «Чистые ТЗ — сводка»."]
     return "\n".join(L) + "\n\n"
 
 
@@ -351,11 +363,12 @@ def main(argv: list[str] | None = None) -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     rows = _corpus_rows() + _newtz_rows() + _open2_rows() + _external_rows()
     groups = latest(rows)
-    text = render_verdicts(groups) + render(groups) + render_stability(rows) + render_recurring(rows)
+    text = render_verdicts(groups, rows=rows) + render(groups) + render_stability(rows) + render_recurring(rows)
     print(text)
     if a.write:
         write_results(render(groups) + render_stability(rows) + render_recurring(rows))
-        put_results_block(RESULTS, "verdict", render_verdicts(groups, heading=False), "Вердикт на исправленных ТЗ")
+        put_results_block(RESULTS, "verdict", render_verdicts(groups, heading=False, rows=rows),
+                          "Вердикт на исправленных ТЗ")
     return 0
 
 
