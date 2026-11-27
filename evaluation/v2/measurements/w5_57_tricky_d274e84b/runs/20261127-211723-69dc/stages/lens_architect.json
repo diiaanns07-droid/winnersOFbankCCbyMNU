@@ -1,0 +1,547 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 110.54,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 599,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Чтение порога и суммы за месяц не описано ни одной операцией",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-013",
+          "R-017",
+          "R-021"
+        ],
+        "evidence": [
+          {
+            "line": 52,
+            "quote": "Приложение читает и сохраняет настройки через дочерний документ"
+          },
+          {
+            "line": 103,
+            "quote": "Description | Сохранение порога. Функциональные требования: чтение порога"
+          },
+          {
+            "line": 29,
+            "quote": "На экране видны переключатель, поле «Порог, ₸», сумма за месяц и кнопка «Сохранить»."
+          }
+        ],
+        "problem": "Раздел интеграции обещает чтение настроек через дочерний документ, но в части B описан только метод сохранения (Description: «Сохранение порога», путь /alerts/saveLimit). Метода чтения порога и суммы за месяц нет, хотя экран их показывает.",
+        "scenario": "Приложение открывает экран после перезапуска и должно загрузить сохранённый порог, включение и сумму за месяц; единственный описанный метод (строка 108) принимает только cardId, amount, enabled и возвращает результат сохранения.",
+        "impact": "Экран не может показать сохранённое состояние, разработчик клиента и сервера не имеют контракта на чтение, тестировщик не может проверить сохранённое значение.",
+        "recommendation": "Добавить в часть B метод чтения настроек с путём, query cardId, ответом с amount, enabled и суммой за месяц, а также кодами 401 и 404; либо убрать обещание чтения из раздела интеграции.",
+        "rewrite": "Метод 2. Чтение настроек: GET <уточнить: путь чтения порога>?cardId={cardId}; 200 {\"amount\":\"<уточнить: формат>\",\"enabled\":\"0 или 1\",\"monthSum\":\"<уточнить: источник суммы за месяц>\"}; 401 {\"message\":\"Требуется вход\"}; 404 {\"message\":\"Карта не найдена\"}",
+        "question": "Какой метод отдаёт текущий порог, признак и сумму за месяц?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Отказ по сумме: 200 с ERROR или 400 — два разных исхода",
+        "kind": "status_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-022",
+          "R-037",
+          "R-031",
+          "R-035"
+        ],
+        "evidence": [
+          {
+            "line": 121,
+            "quote": "5. При отклонении суммы вернуть прежнее состояние и результат ERROR."
+          },
+          {
+            "line": 163,
+            "quote": "400. Ответ в случае, если параметры запроса заполнены неверно."
+          },
+          {
+            "line": 171,
+            "quote": "{\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}"
+          }
+        ],
+        "problem": "Сумма вне 1 000–1 000 000 (строка 143) по шагу 5 возвращает result=ERROR, а пример этого тела дан под кодом 200 «Successful — Created». Для тех же неверных параметров строка 163 задаёт код 400.",
+        "scenario": "Запрос saveLimit с amount=999: по строке 171 сервер отвечает HTTP 200 с телом result=ERROR; по строке 163 тот же вход должен дать 400. Клиент, который смотрит на код, сочтёт отказ успехом.",
+        "impact": "Приложение покажет «сохранено» при отклонении суммы или будет разбирать одну и ту же ошибку по разным веткам.",
+        "recommendation": "Оставить один код для неверной суммы; отказ с result=ERROR отдавать с кодом 400, а 200 использовать только для result=OK.",
+        "rewrite": "Ошибка суммы: 400 {\"result\":\"ERROR\",\"message\":\"Проверьте сумму\"}; успех: 200 {\"result\":\"OK\",\"amount\":\"<строка>\",\"enabled\":\"0 или 1\"}",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Сумма грейс-периода в тиынах в API и в тенге в критерии и push",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-208",
+          "R-191",
+          "R-213"
+        ],
+        "evidence": [
+          {
+            "line": 766,
+            "quote": "Оставшаяся сумма для погашения без процентов, тиыны"
+          },
+          {
+            "line": 673,
+            "quote": "Клиент получил один push с датой 25-го числа и суммой 30 000 ₸"
+          }
+        ],
+        "problem": "Поле graceAmount возвращается в тиынах, а критерий приёмки и текст push оперируют суммой 30 000 ₸. Правила пересчёта между тиынами и тенге в документе нет.",
+        "scenario": "Сумма для погашения 30 000 ₸ в кредитном модуле даёт graceAmount=3000000; тестировщик, сверяя по критерию, ожидает 30000 и получит расхождение в 100 раз.",
+        "impact": "Неверная проверка суммы в push и в экране, ошибка на 100 раз при интеграции.",
+        "recommendation": "Явно указать, что graceAmount и totalDebt в тиынах (1 ₸ = 100 тиын), а в критериях и push суммы выводить в тенге после деления на 100.",
+        "rewrite": "graceAmount — целое число тиын; 1 ₸ = 100 тиын; в push и экране сумма = graceAmount / 100 ₸ с двумя знаками",
+        "question": "",
+        "blocks": "testing",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Сведения о ставке тарифа не хранятся и не приходят в описанных запросах",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-210",
+          "R-186"
+        ],
+        "evidence": [
+          {
+            "line": 768,
+            "quote": "Прогноз процентов по ставке тарифа карты за дни с даты отражения каждой покупки"
+          },
+          {
+            "line": 657,
+            "quote": "Хранить идентификатор карты, расчётный период, дату выписки, дату окончания платёжного периода, общую задолженность в тиынах"
+          }
+        ],
+        "problem": "Поле interestForecast считается по ставке тарифа карты, но перечень хранимых данных не содержит ставки, а описанные запросы и ответы её не передают.",
+        "scenario": "Метод чтения должен вернуть interestForecast при частичном погашении; кредитный модуль не получает ставку ни из одного описанного запроса, значит расчёт невозможен.",
+        "impact": "Метод 1 не может вернуть прогноз процентов, правило Ф-3 не выполняется.",
+        "recommendation": "Добавить в требования к данным годовую ставку тарифа карты и указать источник её получения из кредитного модуля.",
+        "rewrite": "Хранить ... годовую ставку тарифа карты, % годовых (источник: <уточнить: система-источник ставки>)",
+        "question": "Откуда берётся ставка тарифа карты для прогноза процентов?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Ветка логики без ответа: при отклонении суммы вернуть прежнее состояние и результат ERROR",
+        "kind": "api_contract",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "5. При отклонении суммы вернуть прежнее состояние и результат ERROR.",
+            "line": 121
+          }
+        ],
+        "problem": "Шаг логики «5. При отклонении суммы вернуть прежнее состояние и результат ERROR.» требует ответа, но документ не задаёт для этой ветки код и состав тела: в перечне кодов и в примерах тел её нет.",
+        "scenario": "Запрос попадает в эту ветку логики: по документу неизвестно, какой код и какие поля вернёт метод.",
+        "impact": "Сервер и клиент реализуют ответ по-разному; тест этой ветки нельзя написать однозначно.",
+        "recommendation": "Описать для ветки код ответа и тело: какие поля и с какими значениями возвращаются.",
+        "rewrite": "<уточнить: код и тело ответа для этой ветки>",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect",
+        "origin": "inventory"
+      },
+      {
+        "title": "Идемпотентность перевода по QR: область ключа и повтор после ошибки не описаны",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-305",
+          "R-311",
+          "R-288"
+        ],
+        "evidence": [
+          {
+            "line": 1106,
+            "quote": "Повторный запрос перевода с тем же requestId не создаёт второй перевод."
+          },
+          {
+            "line": 1187,
+            "quote": "2. Повторный запрос с тем же requestId возвращает результат первого запроса."
+          },
+          {
+            "line": 1183,
+            "quote": "ответ 400 или 500 соответственно"
+          },
+          {
+            "line": 1207,
+            "quote": "requestId | string | 36 | Да | UUID | Ключ идемпотентности | request_id"
+          }
+        ],
+        "problem": "Не сказано, уникален ли requestId в пределах клиента или глобально, сколько хранится ключ, и что возвращать на повтор, если первый запрос завершился 400, 410 или 500 (перевод не создан).",
+        "scenario": "Клиент повторяет перевод с тем же requestId после ответа 500 (строка 1183): по строке 1187 нужно вернуть «результат первого запроса», но результата успешного перевода нет; сервер может создать второй перевод или вернуть ошибку.",
+        "impact": "Риск двойного списания или расхождения ответов при повторной доставке запроса.",
+        "recommendation": "Указать область уникальности requestId, срок хранения ключа и правило повтора для ответов 400, 410 и 500 (повтор обрабатывается как новый запрос или возвращается сохранённая ошибка).",
+        "rewrite": "Ключ requestId уникален в пределах клиента, хранится <уточнить: срок>; повтор после 200 возвращает тот же ответ; повтор после 400, 410 или 500 — <уточнить: новый запрос или сохранённая ошибка>",
+        "question": "Что возвращать при повторе запроса, первая попытка которого отказала?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Один компонент назван по-разному в архитектуре и в последовательности",
+        "kind": "terminology",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-003",
+          "R-010",
+          "R-026"
+        ],
+        "evidence": [
+          {
+            "line": 26,
+            "quote": "Мобильное приложение → сервис настроек"
+          },
+          {
+            "line": 130,
+            "quote": "Приложение → AlertsController → хранилище настроек"
+          },
+          {
+            "line": 43,
+            "quote": "Сервис расходов → настройки: получить порог карты."
+          }
+        ],
+        "problem": "Настройки названы «сервисом настроек», «хранилищем настроек» и «настройками»; расходы — «учётом расходов» и «сервисом расходов». Непонятно, один ли это компонент.",
+        "scenario": "Интегратор ищет в схеме отдельный сервис настроек, которого нет в последовательности.",
+        "impact": "Неоднозначность при проектировании границ сервиса.",
+        "recommendation": "Выбрать одно название для каждого компонента и использовать его во всех схемах.",
+        "rewrite": "<уточнить: единое название компонента настроек и компонента расходов> во всех разделах",
+        "question": "",
+        "blocks": "none",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "saveLimit (/alerts/saveLimit)",
+          "method": "GET",
+          "purpose": "изменение",
+          "line": 104
+        },
+        {
+          "name": "PUT /savings/{accountId}/payout-mode",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 313
+        },
+        {
+          "name": "GET /savings/{accountId}/interest",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 404
+        },
+        {
+          "name": "GET /savings/{accountId}/interest/history",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 405
+        },
+        {
+          "name": "POST /fx/v1/quotes",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 529
+        },
+        {
+          "name": "POST /fx/v1/exchanges",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 529
+        },
+        {
+          "name": "GET /cards/{cardId}/grace",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 720
+        },
+        {
+          "name": "PUT /cards/{cardId}/grace/reminder",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 812
+        },
+        {
+          "name": "POST /loans/applications/{applicationId}/insurance",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 938
+        },
+        {
+          "name": "GET /loans/insurance/quote",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1047
+        },
+        {
+          "name": "POST /loans/{loanId}/insurance/refusal",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 1048
+        },
+        {
+          "name": "DELETE /loans/applications/{applicationId}/insurance",
+          "method": "DELETE",
+          "purpose": "удаление",
+          "line": 1049
+        },
+        {
+          "name": "GET /loans/{loanId}/insurance",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1050
+        },
+        {
+          "name": "POST /qr/transfer",
+          "method": "POST",
+          "purpose": "создание, изменение",
+          "line": 1167
+        },
+        {
+          "name": "POST /qr",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 1265
+        },
+        {
+          "name": "GET /qr/{qrId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1266
+        },
+        {
+          "name": "DELETE /qr/{qrId}",
+          "method": "DELETE",
+          "purpose": "изменение",
+          "line": 1267
+        },
+        {
+          "name": "POST /loans/{loanId}/early-repayments",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 1390
+        },
+        {
+          "name": "GET /loans/{loanId}/early-repayments/terms",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1468
+        },
+        {
+          "name": "POST /loans/{loanId}/early-repayments/calculations",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 1469
+        },
+        {
+          "name": "PUT /roundup/v1/cards/{cardId}/settings",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 1608
+        },
+        {
+          "name": "GET /roundup/v1/cards/{cardId}/settings",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1670
+        },
+        {
+          "name": "POST /statements/orders",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 1797
+        },
+        {
+          "name": "GET /statements/orders",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1868
+        },
+        {
+          "name": "GET /statements/orders/{orderId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1869
+        },
+        {
+          "name": "POST /statements/orders/{orderId}/link",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 1870
+        },
+        {
+          "name": "GET /statements/files/{token}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 1871
+        }
+      ],
+      "promises": [
+        {
+          "what": "читать настройки через дочерний документ",
+          "line": 52,
+          "operation": ""
+        },
+        {
+          "what": "показать сумму за месяц на экране",
+          "line": 29,
+          "operation": ""
+        },
+        {
+          "what": "сохранять настройки через дочерний документ",
+          "line": 52,
+          "operation": "saveLimit (/alerts/saveLimit)"
+        },
+        {
+          "what": "получать ставку, проценты за месяц и историю начислений",
+          "line": 253,
+          "operation": "GET /savings/{accountId}/interest/history"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            151,
+            162,
+            167,
+            171
+          ],
+          "described": true,
+          "note": "пример тела содержит result=ERROR при отказе сохранения"
+        },
+        {
+          "code": "201",
+          "lines": [
+            151,
+            165
+          ],
+          "described": false,
+          "note": "упомянут в условии, описан как Created у 200"
+        },
+        {
+          "code": "400",
+          "lines": [
+            151,
+            163,
+            178,
+            180
+          ],
+          "described": true,
+          "note": "параметры неверны; тот же вход может давать 200 с ERROR"
+        },
+        {
+          "code": "401",
+          "lines": [
+            151,
+            174,
+            185
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "403",
+          "lines": [
+            175,
+            188
+          ],
+          "described": false,
+          "note": "нет тела; текст под заголовком говорит о 404"
+        },
+        {
+          "code": "404",
+          "lines": [
+            189,
+            190,
+            192
+          ],
+          "described": true,
+          "note": "для чужой карты, в заголовке 403"
+        },
+        {
+          "code": "500",
+          "lines": [
+            176,
+            195,
+            197
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "places": "query: integer, 32 bit, обязательный, 1 000–1 000 000 (L143); ответ: string (L156)"
+        },
+        {
+          "name": "enabled",
+          "places": "query: integer, 1 знак, 0 или 1 (L144); ответ: string «0» или «1» (L157)"
+        },
+        {
+          "name": "cardId",
+          "places": "query: string 1–64, обязательный (L142)"
+        },
+        {
+          "name": "result",
+          "places": "ответ: string OK / ERROR (L155), не во всех телах ошибок"
+        },
+        {
+          "name": "message",
+          "places": "ответ: string при ошибке (L158)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "saveLimit (/alerts/saveLimit)",
+          "step": "проверить пользовательскую сессию",
+          "line": 117,
+          "outcome": "401 {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "saveLimit (/alerts/saveLimit)",
+          "step": "проверить принадлежность карты клиенту",
+          "line": 118,
+          "outcome": "404 {\"message\":\"Карта не найдена\"}"
+        },
+        {
+          "operation": "saveLimit (/alerts/saveLimit)",
+          "step": "проверить сумму и переключатель",
+          "line": 119,
+          "outcome": ""
+        },
+        {
+          "operation": "saveLimit (/alerts/saveLimit)",
+          "step": "заменить настройку и вернуть результат сохранения",
+          "line": 120,
+          "outcome": ""
+        },
+        {
+          "operation": "saveLimit (/alerts/saveLimit)",
+          "step": "при отклонении суммы вернуть прежнее состояние и результат ERROR",
+          "line": 121,
+          "outcome": ""
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

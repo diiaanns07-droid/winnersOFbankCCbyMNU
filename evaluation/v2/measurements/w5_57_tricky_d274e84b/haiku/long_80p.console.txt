@@ -5,3 +5,4 @@
   lens_analyst: запуск
   lens_risk: запуск
   lens_qa: запуск
+  lens_architect: готово за 111 с, вызовов 1, кандидатов 7

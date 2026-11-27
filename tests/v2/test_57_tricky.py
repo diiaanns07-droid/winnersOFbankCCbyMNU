@@ -384,6 +384,13 @@ def test_very_long_tz_offline_and_mock_do_not_crash(tmp_path, capsys):
         assert code in (0, 3), text.err[-800:]
         assert out.is_file()
         _no_trace(text.err + text.out)
+        warns = " ".join(_report(out)["run"]["warnings"])
+        assert "Большой документ" in warns and "Прочитан целиком" in warns, warns[:400]
+
+
+def test_size_note_only_for_big_documents():
+    assert intake.assess(docview.load(OFFICIAL))["note"] == ""
+    assert intake.assess(docview.from_text(TZ))["note"] == ""
 
 
 # --------------------------------------------------------------------------- 6. имена файлов
