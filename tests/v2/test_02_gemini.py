@@ -301,7 +301,8 @@ def test_total_budget_is_call_timeout_plus_slack():
 
 def test_overloaded_primary_cools_down_one_try_without_sleep_then_recovers():
     """После исчерпанных повторов 503 модель «остывает»: следующий вызов пробует её один раз без пауз."""
-    p, s, sleeps = make({"gemini-3.8-flash": [err("overloaded", 503)] * 5 + [ok("gemini-3.8-flash")]})
+    # окно запросов в минуту выключено: здесь проверяется «охлаждение», а не темп (6 запросов к модели подряд)
+    p, s, sleeps = make({"gemini-3.8-flash": [err("overloaded", 503)] * 5 + [ok("gemini-3.8-flash")]}, rpm=0)
     r1 = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
     assert r1["meta"]["called_model"] == "gemini-3.6-flash" and sleeps == [2.0, 5.0, 10.0]
     sleeps.clear()
