@@ -957,8 +957,8 @@ def _borderless_tables(blocks: list[dict], sizes: dict) -> tuple[list[dict], lis
             if any(not pieces[parent_of[i]] <= set(comp) for i in comp if i in parent_of):
                 continue  # блок, разрезанный по колонкам, должен целиком попасть в таблицу
             frags = [dict(f, col=cols.index(col_of[i])) for i in sorted(comp) for f in _frags_of(blocks[i])]
-            if len(frags) < 4:
-                continue
+            if len(frags) < 4 or len({f["col"] for f in frags}) < len(cols):
+                continue  # мало текста или у колонки нет координат слов — оставляем как прочитал v1
             rows = _rows(frags)
             aligned = sum(1 for r in rows if len({f["col"] for f in r}) >= 2)
             if aligned < 2 or aligned < 0.4 * len(rows):
