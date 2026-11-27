@@ -477,6 +477,7 @@ def verify_candidates(view: dict, candidates: Iterable[dict], requirements: Iter
 
 def verify_requirements(view: dict, requirements: Iterable[dict]) -> dict:
     """Уточнить строки требований по их цитатам (выход segment): line_start/line_end/page, раздел — если пуст.
+    Диапазон, внутри которого лежит цитата, сохраняется целиком; исправляется только диапазон, не содержащий цитату.
 
     Возвращает ``{"requirements": [...], "missing": [ID…]}``; требования без найденной цитаты остаются как есть.
     """
@@ -490,8 +491,9 @@ def verify_requirements(view: dict, requirements: Iterable[dict]) -> dict:
             continue
         ls, le = m["line_start"], m["line_end"]
         old_s, old_e = _as_int(r.get("line_start")), _as_int(r.get("line_end"))
-        # цитата — часть требования: строки требования расширяем, но не сужаем без причины
-        if old_s and old_e and old_s <= ls and le <= old_e and old_e - old_s <= 6:
+        # цитата — часть требования: если она внутри диапазона требования, диапазон не сужаем (просьба №04:
+        # «Общие параметры» 103–114 не должны стать 103); диапазон меняется, только если цитата вне его
+        if old_s and old_e and old_s <= ls and le <= old_e:
             ls, le = old_s, old_e
         r["line_start"], r["line_end"], r["page"] = ls, le, m["page"]
         if not r.get("section"):

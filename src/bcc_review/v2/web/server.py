@@ -150,6 +150,7 @@ def job_page(job: Job) -> str:
   {f'<p class="parent">Повторная проверка с ответами владельца к <a href="/jobs/{e(job.parent)}">исходной проверке</a>.</p>' if job.parent else ''}
   <ol class="stages" id="stages"></ol>
 
+  <div class="notice" id="notice" role="status" hidden></div>
   <div class="error" id="err" hidden></div>
   <details class="log"><summary>Журнал запуска</summary><pre id="log"></pre></details>
 </section>
@@ -290,7 +291,7 @@ class Handler(BaseHTTPRequestHandler):
         if ext not in ALLOWED_EXT:
             return self._fail(400, f"Формат {ext or 'без расширения'} не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML.",
                               provider, model)
-        problem = check_provider(provider)
+        problem = check_provider(provider, model)
         if problem:
             return self._fail(400, problem, provider, model)
         job = self.app.start(fname, data, provider, model)
@@ -310,7 +311,7 @@ class Handler(BaseHTTPRequestHandler):
         data = files.get("answers", ("", b""))[1] or (fields.get("answers_text") or "").encode("utf-8")
         if not data.strip():
             return self._json(400, {"error": "Загрузите файл ответов (кнопка «Скачать ответы» во вкладке «Вопросы» отчёта)."})
-        problem = check_provider(parent.provider)
+        problem = check_provider(parent.provider, parent.model)
         if problem:
             return self._json(400, {"error": problem})
         src = Path(parent.input_path)
@@ -332,9 +333,11 @@ def make_server(app: App, host: str = "127.0.0.1", port: int = 8014) -> Threadin
 
 
 def build_app(data_dir: Path, *, provider: str = "auto", fixture: Path | None = None, sample: Path | None = None,
-              step_s: float = 0.6, workers: int = 1, extra_args: list[str] | None = None) -> App:
+              step_s: float = 0.6, workers: int = 1, extra_args: list[str] | None = None,
+              cache_dir: Path | None = None, pace: float = 0.0) -> App:
     store = JobStore(data_dir)
-    runner = FixtureRunner(store, fixture, step_s=step_s) if fixture else PipelineRunner(store, extra_args=extra_args)
+    runner = (FixtureRunner(store, fixture, step_s=step_s) if fixture else
+              PipelineRunner(store, extra_args=extra_args, cache_dir=cache_dir or Path(data_dir) / "cache", pace=pace))
     if sample is None:
         cand = REPO / "release" / "input" / "requirements.md"
         sample = cand if cand.is_file() else None
@@ -351,11 +354,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--fixture", help="показ без модели: этапы по таймеру, отчёт из этого report.json")
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--pipeline-args", default="", help="доп. флаги для python -m bcc_review, например \"--engine v1\"")
+    ap.add_argument("--cache-dir", help="кэш ответов модели, общий для всех проверок (по умолчанию <data-dir>/cache)")
+    ap.add_argument("--pace", type=float, default=0.0,
+                    help="для съёмки демо: показывать этапы не быстрее раза в N секунд (анализ не замедляется)")
     ap.add_argument("--open", action="store_true", help="открыть браузер")
     a = ap.parse_args(argv)
     load_dotenv()
     app = build_app(Path(a.data_dir), provider=a.provider, fixture=Path(a.fixture) if a.fixture else None,
                     sample=Path(a.sample) if a.sample else None, workers=a.workers,
+                    cache_dir=Path(a.cache_dir) if a.cache_dir else None, pace=a.pace,
                     extra_args=shlex.split(a.pipeline_args, posix=(os.name != "nt")))
     srv = make_server(app, a.host, a.port)
     url = f"http://{a.host}:{srv.server_address[1]}/"
