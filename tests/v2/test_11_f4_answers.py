@@ -213,3 +213,20 @@ def test_postponed_listed_in_report_section():
     assert [(p["question_id"], p["partial"]) for p in clar["postponed"]] == [("Q-02", False), ("Q-03", True)]
     md = recheck.render_markdown(clar)
     assert "Владелец отложил решение" in md and "Q-02 (весь ответ)" in md and "Q-03 (часть ответа)" in md
+
+
+def test_second_addressee_with_own_topic_words_is_second_reply():
+    text = ("Q-01 [Код ответа при отказе антифрода]: Команда рисков: на отказ антифрода возвращаем 422.\n"
+            "Q-01 [Что вернуть API на отказ антифрода]: Владелец API: на тот же отказ возвращаем 403.\n")
+    r = recheck.resolve_answers(QS, recheck.load_answers(text))
+    assert r["decisions"] == []
+    assert [x["label"] for x in r["answered"][0]["replies"]] == ["Q-01.1", "Q-01.2"]
+
+
+def test_other_number_on_taken_question_is_not_merged():
+    # ответ с другим номером, чья тема совпала с уже занятым вопросом, — не вторая реплика этого вопроса
+    text = ("Q-01 [Код ответа при отказе антифрода]: возвращаем 422.\n"
+            "Q-05 [Код ответа при отказе антифрода]: возвращаем 403.\n")
+    r = recheck.resolve_answers(QS, recheck.load_answers(text))
+    q1 = next(a for a in r["answered"] if a["question_id"] == "Q-01")
+    assert len(q1["replies"]) == 1

@@ -306,15 +306,25 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             else:
                 sc, need = _topic_score(hint, x), 0.4
             pairs.append((sc + (0.01 if x["id"] == gk[0] else 0), need, gk, x["id"]))
-    taken: set[str] = set()
+    taken: dict[str, str] = {}  # вопрос → номер, с которым к нему пришла привязанная единица
     done: set[tuple] = set()
-    for sc, need, gk, qid in sorted(pairs, key=lambda t: -t[0]):
+    ranked = sorted(pairs, key=lambda t: -t[0])
+    for sc, need, gk, qid in ranked:
         if sc < need or gk in done or qid in taken:
             continue
         for k in groups[gk]:
             bound[k] = by_id[qid]
         done.add(gk)
-        taken.add(qid)
+        taken[qid] = gk[0]
+    # второй адресат подписал тот же вопрос с тем же номером, но своими словами («[Код при отказе]» против
+    # «[Ответ API на отказ антифрода]»): его лучший вопрос уже занят первым — это вторая реплика, а не общее решение
+    for sc, need, gk, qid in ranked:
+        if gk in done or sc < need:
+            continue
+        done.add(gk)  # только лучший вопрос группы
+        if taken.get(qid) == gk[0]:
+            for k in groups[gk]:
+                bound[k] = by_id[qid]
     for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
         q = by_id.get(a["id"])
