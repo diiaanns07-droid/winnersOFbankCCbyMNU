@@ -50,6 +50,14 @@ def _find_source(report: Path, data: dict, overrides: dict[str, str] | None = No
     return None
 
 
+def _rel(path: Path) -> str:
+    """Путь исходника от корня репозитория (как его повторить), иначе как есть."""
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def _verify(report: Path, source: Path | None) -> str:
     if source is None:
         return "нет исходника"
@@ -119,7 +127,7 @@ def rows(reports_dir: Path, overrides: dict[str, str] | None = None) -> list[dic
         commit = str(run.get("commit") or "—")[:7] + ("-dirty" if run.get("dirty") else "")
         out.append({
             "report": path.with_suffix(".md").name,
-            "input": _get(data, "document", "file", default="—"),
+            "input": _rel(source) if source is not None else _get(data, "document", "file", default="—"),
             "format": _get(data, "document", "format", default="—"),
             "provider": run.get("provider", "—"),
             "model": ", ".join(str(m) for m in models),

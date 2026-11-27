@@ -119,6 +119,9 @@ def test_desk_opens_last_report_as_sheet(srv):
     assert 'id="sheet"' in html and 'class="b-verdict"' in html
     assert 'Разработка: <b class="no">нельзя</b>' in html and "5 блокеров" in html and "цитат сверено 39 из 39" in html
     assert 'class="desk-notes b-margin"' in html
+    # вопросы владельцу — на полях, чернилами; нажатие ведёт к первому замечанию вопроса
+    assert '<div class="b-margin-sub">Вопросы владельцу</div>' in html and html.count('class="b-q"') == 5
+    assert '<button type="button" class="b-q" data-f="D-01"><b>Q-01 · Владелец продукта</b>' in html
     assert f'href="/jobs/{job.id}#questions"' in html and f'href="/jobs/{job.id}#revised"' in html
     assert html.count('class="b-note ') == 20 and html.count('data-line="') == 20  # заметки и засечки карты
     assert "Выгрузить" in html and f"/jobs/{job.id}/files/report.html" in html
@@ -139,6 +142,17 @@ def test_sheet_marks_quotes_on_their_lines():
     assert 'id="L39"' in sh2.html and "На карту приходится" in sh2.html
 
 
+def test_margin_questions_limit_and_escaping():
+    qs = [{"id": f"Q-0{i}", "to": "Владелец", "question": f"Вопрос {i} <b>?", "finding_ids": [f"D-0{i}"]} for i in range(1, 8)]
+    qs.append({"id": "Q-08", "question": "  "})  # пустой вопрос не показываем
+    html = S._margin_questions({"questions": qs}, "/jobs/abc")
+    assert html.count('class="b-q"') == 5 and "&lt;b&gt;?" in html and "<b>?" not in html
+    assert '<a class="b-q-more" href="/jobs/abc#questions">ещё 2 вопроса</a>' in html
+    assert S._margin_questions({"questions": []}, "/jobs/abc") == ""
+    lone = S._margin_questions({"questions": [{"question": "Без замечания?"}]}, "")
+    assert 'data-f=""' in lone and "b-q-more" not in lone
+
+
 def test_plural_and_verdict_variants():
     assert [SH.plural(n, "блокер", "блокера", "блокеров") for n in (1, 2, 5, 11, 21, 22)] == \
         ["блокер", "блокера", "блокеров", "блокеров", "блокер", "блокера"]
@@ -148,11 +162,24 @@ def test_plural_and_verdict_variants():
     assert '<b class="cond">с условиями</b>' in cond and "1 блокер<" in cond
 
 
-def test_empty_desk_shows_sample_sheet(srv):
+def test_empty_desk_shows_sample_sheet(srv, monkeypatch):
     base, _ = srv
+    # №54: с готовыми отчётами №43 раскрыт первый из них (см. ниже); здесь — стол совсем без отчётов
+    from bcc_review.v2.web import gallery
+    monkeypatch.setattr(gallery, "load_examples", lambda *a, **k: {"reports": [], "documents": []})
     html = _text(base + "/")
     assert 'id="sheet"' in html and "Ещё не проверен" in html and "Проверить пример" in html
     assert "Проверить этот лист" in html and 'class="b-hl' not in html  # не проверен — правки нет
+
+
+def test_desk_opens_first_ready_report(srv):
+    """№54: своих проверок нет, готовые отчёты №43 есть — на столе раскрыт первый из них с правкой."""
+    from bcc_review.v2.web import gallery
+    ready = [r for r in gallery.load_examples()["reports"] if r.get("ok")]
+    if not ready:
+        pytest.skip("готовых отчётов нет")
+    html = _text(srv[0] + "/")
+    assert 'id="sheet"' in html and 'class="b-hl' in html and f'href="/examples/{ready[0]["id"]}"' in html
 
 
 def test_no_external_links_in_html_css_js(srv):

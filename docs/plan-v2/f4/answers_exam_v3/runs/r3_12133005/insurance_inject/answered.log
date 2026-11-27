@@ -1,0 +1,21 @@
+Документ: /home/user/winnersOFbankCCbyMNU/docs/plan-v2/f4/answers_exam_v3/insurance_inject/source.md
+  segment: взят из baseline_run
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 9
+  consistency: взят из baseline_run
+  lens_architect: взят из baseline_run
+  lens_analyst: взят из baseline_run
+  lens_risk: взят из baseline_run
+  lens_qa: взят из baseline_run
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 43
+  judge: взят из baseline_run
+  clarify: взят из baseline_run
+BCC Review: «Страхование жизни при оформлении кредита наличными» — 46 требований, 18 дефектов (критичных 3, существенных 7, незначительных 8), вопросов 8
+Предварительная оценка по ответам владельца. Готовность новой редакции подтверждает отдельная проверка исправленного текста.
+Разработка: нельзя · тестирование: нельзя — блокеров 3, каждый останавливает разработку и тестирование:
+  D-02 Критерий приёмки №2 противоречит Ф-4 по сумме возврата
+  D-04 Возраст старше 65: логика даёт 200, статусы — 422
+  D-05 Ф-4 повышает ставку при отказе, правило 3 запрещает менять условия
+Прогон завершён полностью: 1 мин 37 с, 3 вызова модели, claude-sonnet-5-5; цитат сверено 46 из 46
+Отчёт: docs/plan-v2/f4/answers_exam_v3/runs/r3_12133005/insurance_inject/answered.md и docs/plan-v2/f4/answers_exam_v3/runs/r3_12133005/insurance_inject/answered.json

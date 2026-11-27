@@ -1452,7 +1452,8 @@ def build_user(view: dict, start: int, end: int, task: str, total: int | None = 
         sec = str((by_n.get(start) or {}).get("section") or "")
         where = f" Раздел в начале фрагмента: «{sec}»." if sec else ""
         head = f"Фрагмент документа: строки {start}–{end} из {total}.{where} Разбери только эти строки.\n"
-    return f"<документ>\n{head}{_numbered(view, start, end)}\n</документ>\n\n{task}"
+    from bcc_review.v2.context import data_only  # №57: документ не закрывает обёртку своим «</документ>»
+    return f"<документ>\n{head}{data_only(_numbered(view, start, end))}\n</документ>\n\n{task}"
 
 
 def _merge_results(*parts: Any) -> dict:

@@ -1,0 +1,22 @@
+Документ: evaluation/v2/clean/repay/source.md
+  segment: взят из repay__clean
+  rules: запуск
+  rules: готово за 0 с, вызовов 0
+  lens_analyst: запуск
+  lens_architect: взят из repay__clean
+  lens_risk: взят из repay__clean
+  lens_qa: взят из repay__clean
+  consistency: взят из repay__clean
+  lens_analyst: готово за 46 с, вызовов 1, кандидатов 2
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 20
+  judge: взят из repay__clean
+  clarify: взят из repay__clean
+Этап lens_analyst: ok, вызовов 1, 45.79 с, кандидатов 2
+Выход этапа: runs/20261127-205448-cd47/stages/lens_analyst.json
+BCC Review: «Досрочное погашение кредита наличными» — 100 требований, 14 дефектов (критичных 1, существенных 6, незначительных 7), вопросов 5
+Разработка: нельзя · тестирование: нельзя — блокер 1, останавливает разработку и тестирование:
+  D-01 Статус «не найдена» после 500: REJECTED против проведения погашения
+Прогон завершён полностью: 46 с, 1 вызов модели, claude-haiku-5-5; цитат сверено 33 из 33
+Отчёт: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean20-repay__clean/lens_analyst.json и evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean20-repay__clean/lens_analyst.json
+HTML: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean20-repay__clean/lens_analyst.html

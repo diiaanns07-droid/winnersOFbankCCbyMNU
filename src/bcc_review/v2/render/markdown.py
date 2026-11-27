@@ -875,7 +875,10 @@ def _header(c: _Ctx) -> list[str]:
         why = _failure_reason(c)
         out += [">", "> ⛔ Прогон завершился сбоем" + (f": {why}" if why else "")
                 + ". Вердикт не вынесен; ниже — то, что успели проверить."]
-    if c.offline:
+    if (run.get("input_check") or {}).get("kind") in ("not_requirements", "too_short"):
+        # №57: не ТЗ или одна строка — проверка не проводилась; подсказка про ключ модели тут не к месту
+        out += [">", f"> ⛔ {prose(str(c.verdict.get('summary') or ''))}"]
+    elif c.offline:
         how = ("как подключить модель — в конце раздела «Кратко»"
                if isinstance(c.r.get("offline"), dict) and c.r["offline"].get("how_to_full")
                else "как подключить модель — в инструкции «README», раздел о ключе")
@@ -946,6 +949,8 @@ def _partial_reason(c: _Ctx) -> str:
 def _brief(c: _Ctx) -> list[str]:
     v = c.verdict
     out = [h2("s0", "Кратко"), ""]
+    if c.r.get("clarification"):
+        out += [jsonout.OWNER_ASSESSMENT, ""]
     out += table(["Разработка", "Тестирование"],
                  [[f"**{READINESS.get(v.get('development'), '—')}**", f"**{READINESS.get(v.get('testing'), '—')}**"]],
                  [":---:", ":---:"])
@@ -1039,6 +1044,8 @@ def _why(c: _Ctx, limit: int = 420) -> str:
     списком. Блокеров нет — текст судьи (не длиннее limit)."""
     text = " ".join(str(c.verdict.get("summary") or "").split())
     judge_down = any("судья недоступен" in str(w) or "реестр собран кодом" in str(w) for w in c.run.get("warnings") or [])
+    if (c.run.get("input_check") or {}).get("kind") in ("not_requirements", "too_short") and text:
+        return text
     if c.run.get("status") == "failed" or (not c.reqs and not c.findings
                                            and c.verdict.get("development") == "undetermined" and not c.offline):
         return _auto_why(c)
@@ -1289,6 +1296,17 @@ def _before_after(c: _Ctx) -> list[str]:
     decisions = cl.get("decisions") or []
     out = [f"**До и после ответов владельца** — ответов {len(answers)}, общих решений {len(decisions)}, "
            f"без ответа {len(cl.get('unanswered') or [])}", ""]
+    if (cl.get("answers_document") or {}).get("match") is False:
+        out += ["**Владелец отвечал по другой редакции ТЗ.** Проверьте привязки к текущим вопросам.", ""]
+    pending = cl.get("needs_confirmation") or []
+    if pending:
+        out += [f"**Нужно подтвердить привязку ответов ({len(pending)})**", ""]
+        for item in pending:
+            options = ", ".join(item.get("possible_questions") or []) or "уточните текущий вопрос"
+            topic = f" [{prose(item['topic'])}]" if item.get("topic") else ""
+            out.append(f"- {prose(item['question_id'])}{topic} — "
+                       f"«{prose(item['text'])}». {prose(options)}.")
+        out.append("")
     rows = [["Разработка", READINESS.get(bv.get("development"), "—"), READINESS.get(av.get("development"), "—")],
             ["Тестирование", READINESS.get(bv.get("testing"), "—"), READINESS.get(av.get("testing"), "—")]]
     for k in ("critical", "major", "minor"):
@@ -1303,8 +1321,17 @@ def _before_after(c: _Ctx) -> list[str]:
             reason = str(x.get("reason") or "")
             qids = [q for q in x.get("question_ids") or [] if q not in reason]
             qs = ", ".join(qids) + ": " if qids else ("" if re.search(r"\bQ-\d", reason) else "общее решение: ")
-            out.append(f"- 🔴 {c.f_link(x.get('finding_id', ''))} {prose(x.get('title') or '')} — "
-                       f"{prose(qs + shorten(reason, 170))}")
+            fid = x.get("finding_id", "")
+            edit = next((e for e in c.r.get("rewrites") or [] if e.get("finding_id") == fid
+                         and e.get("line_start") and e.get("after")), None)
+            location = ""
+            if edit:
+                location = (f" Правка к стр. {edit['line_start']} исходника — "
+                            f"«{prose(shorten(edit['after'], 120))}». [Все правки](#pg)")
+            elif c.r.get("revised_file"):
+                location = " В списке применённых правок для этого блокера запись отсутствует."
+            out.append(f"- 🔴 {c.f_link(fid)} {prose(x.get('title') or '')} — "
+                       f"{prose(qs + shorten(reason, 170))}{location}")
     out += ["", f"Снято {num(cl.get('resolved', 0))}, уточнено {num(cl.get('changed', 0))}, осталось открытыми "
                 f"{num(cl.get('open', 0))}, новых конфликтов из-за ответов {len(cl.get('new_findings') or [])}"
                 + (f": {c.f_links(cl['new_findings'])}" if cl.get("new_findings") else "")
@@ -1359,22 +1386,29 @@ def run_stamp(run: dict) -> str:
 
 
 def _report_paths(c: _Ctx):
-    """Имена для команд паспорта: отчёт .json — по пути, куда пишется Markdown (если он известен), документ — по
-    имени файла из отчёта."""
-    from pathlib import PurePath
+    """Пути для воспроизведения отчёта. В абсолютных путях публикуется только имя файла."""
+    from pathlib import PureWindowsPath
+
+    # PureWindowsPath читает оба разделителя и распознаёт корень POSIX, диск Windows и UNC
+    # на любой машине. Отчёт можно повторно собрать на другой ОС.
     out = getattr(c, "out_path", None)
-    out_json = PurePath(str(out)).with_suffix(".json") if out else None
-    json_arg = (out_json.as_posix() if out_json and not out_json.is_absolute() else out_json.name if out_json
-                else "отчёт.json")
-    # документ — по пути, как его указали в командной строке (относительный: команду можно скопировать и
-    # выполнить из той же папки); абсолютный путь машины в отчёт не пишется — только имя файла
+    out_json = PureWindowsPath(str(out)).with_suffix(".json") if out else None
+    json_arg = "отчёт.json"
+    if out_json:
+        json_arg = out_json.name if out_json.anchor else out_json.as_posix()
+
     given = getattr(c, "doc_path", None)
-    given = PurePath(str(given)) if given else None
-    doc = (given.as_posix() if given and not given.is_absolute() and given.name == PurePath(
-        str(c.doc.get("file") or given.name)).name else str(c.doc.get("file") or "документ"))
-    doc_arg = doc if re.fullmatch(r"[\w./\\:-]+", doc) else f'"{doc}"'
-    clean = lambda x: str(x).replace("`", "").replace("|", "\\|")  # noqa: E731
-    return out_json, clean(json_arg), clean(doc_arg)
+    source = PureWindowsPath(str(given)) if given else None
+    recorded = c.doc.get("file")
+    doc = PureWindowsPath(str(recorded)).name if recorded else (source.name if source else "документ")
+    if source and not source.anchor and source.name == doc:
+        doc = source.as_posix()
+
+    def argument(value: str) -> str:
+        value = value.replace("\x60", "").replace("|", "\\|")
+        return value if re.fullmatch(r"[\w./\\:-]+", value) else f'"{value}"'
+
+    return out_json, argument(json_arg), argument(doc)
 
 
 def _passport(c: _Ctx) -> list[str]:
@@ -2063,7 +2097,8 @@ def _summary(c: _Ctx) -> list[str]:
 def _conclusion(c: _Ctx) -> list[str]:
     v = c.verdict
     out = [h2("s6", "6. Итог"), ""]
-    out += table(["Можно ли по этому документу начинать", "Ответ"],
+    question = "Предварительная готовность по ответам владельца" if c.r.get("clarification") else "Можно ли по этому документу начинать"
+    out += table([question, "Ответ"],
                  [["разработку", f"**{READINESS.get(v.get('development'), '—')}**"],
                   ["тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     out += [f"**Обоснование.** {prose(_final_reason(c))}", ""]
@@ -2145,6 +2180,9 @@ def _appendix_questions(c: _Ctx) -> list[str]:
     out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}{_q_need(c, blocking)}. "
             f"Ответ — буква варианта или свой текст, по строке на вопрос (`Q-01: B`); повторный прогон с ответами: "
             f"`python -m bcc_review ВХОД ОТЧЁТ.md --answers ответы.md`.", ""]
+    if c.doc.get("sha256"):
+        out += ["Первая строка для файла ответов привязывает их к этой редакции ТЗ.",
+                "", "```", f"> SHA-256 {c.doc['sha256']}", "```", ""]
     for q in sorted(qs, key=lambda q: (not q.get("blocking"), _id_num(q.get("id")))):
         head = [f"**<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}**"
                 + (f" {esc(q['topic'])}" if q.get("topic") else ""),

@@ -54,6 +54,8 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
         f"{plural(total, 'дефект', 'дефекта', 'дефектов')} (критичных {fs.get('critical', 0)}, существенных "
         f"{fs.get('major', 0)}, незначительных {fs.get('minor', 0)}), вопросов {nq}",
     ]
+    if report.get("clarification"):
+        lines.append(jsonout.OWNER_ASSESSMENT)
     verdict = f"Разработка: {READY.get(v.get('development'), '—')} · тестирование: {READY.get(v.get('testing'), '—')}"
     # те же блокеры и тот же порядок, что на первом экране отчёта; число блокеров — всегда полное (раньше терминал
     # показывал 3 блокера при счётчике 4); без блокеров — три пункта «исправить первым»

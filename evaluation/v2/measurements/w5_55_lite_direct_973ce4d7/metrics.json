@@ -1,0 +1,153 @@
+{
+  "source_sha": "973ce4d746b87e9355eb8c130909424ef2aa2f89",
+  "case": "lite_direct",
+  "entry": "cli",
+  "input": "release/input/requirements.md",
+  "state": 0,
+  "seconds": 40.64,
+  "queue_seconds": 0,
+  "outputs": [
+    "json"
+  ],
+  "cached": 0,
+  "logical_calls_traced": 10,
+  "physical_attempts_observed": 12,
+  "unattributed_failed_calls": 0,
+  "successful_models": {
+    "gemini-3.5-flash-lite": 10
+  },
+  "provider_errors": [
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "400",
+      "class": "schema_rejected",
+      "count": 1
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "http": "error",
+      "class": "unknown",
+      "count": 1
+    }
+  ],
+  "stages": [
+    {
+      "stage": "segment",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 6.2,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_analyst",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 4.1,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_qa",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 8.2,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "consistency",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 8.7,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_architect",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 10.7,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "lens_risk",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 15.0,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 12.8,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "clarify",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 13.3,
+      "error": null,
+      "attempts": [
+        [
+          "gemini-3.5-flash-lite",
+          "400",
+          "schema_rejected"
+        ],
+        [
+          "gemini-3.5-flash-lite",
+          "error",
+          "unknown"
+        ]
+      ],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 1.9,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    },
+    {
+      "stage": "judge",
+      "answered_by": "gemini-3.5-flash-lite",
+      "seconds": 1.5,
+      "error": null,
+      "attempts": [],
+      "rpm_wait_s": 0
+    }
+  ],
+  "report_bytes": 116576,
+  "report_status": null,
+  "gold": {
+    "K": 4,
+    "K_as_critical": 2,
+    "C": 8,
+    "key25": 12,
+    "findings": 17,
+    "duplicates": 3,
+    "critical_false": 0,
+    "quotes_missing": 0,
+    "quotes_total": 43
+  },
+  "missing_major": [
+    "С5",
+    "С6",
+    "С7",
+    "С8",
+    "С9",
+    "С10",
+    "С11",
+    "С12",
+    "С14",
+    "С15",
+    "С17",
+    "С18"
+  ]
+}

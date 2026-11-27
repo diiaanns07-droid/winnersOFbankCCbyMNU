@@ -335,7 +335,7 @@ def test_russian_title_kept_and_identifiers_allowed():
 
 def test_prompt_has_clean_document_filters():
     from pathlib import Path
-    text = (Path(__file__).resolve().parents[2] / "src/bcc_review/v2/prompts/lens_analyst.md").read_text()
+    text = (Path(__file__).resolve().parents[2] / "src/bcc_review/v2/prompts/lens_analyst.md").read_text(encoding="utf-8")
     for phrase in ("Правило счёта записано", "Названные состояния", "этот пояс действует для всех дат",
                    "включая `title`"):
         assert phrase in text

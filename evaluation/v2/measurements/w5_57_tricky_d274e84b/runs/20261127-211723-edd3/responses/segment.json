@@ -1,0 +1,56 @@
+[
+  {
+    "requirements": [
+      {
+        "source_id": "",
+        "kind": "other",
+        "summary": "Роли участников: клиент и оператор",
+        "line_start": 5,
+        "line_end": 5
+      },
+      {
+        "source_id": "FR-1",
+        "kind": "functional",
+        "summary": "Push-уведомление клиенту после списания",
+        "line_start": 9,
+        "line_end": 9
+      },
+      {
+        "source_id": "FR-2",
+        "kind": "functional",
+        "summary": "Оператор видит статус доставки уведомления",
+        "line_start": 11,
+        "line_end": 11
+      },
+      {
+        "source_id": "FR-3",
+        "kind": "functional",
+        "summary": "Повторные попытки при сбое отправки уведомления",
+        "line_start": 13,
+        "line_end": 13
+      },
+      {
+        "source_id": "FR-4",
+        "kind": "functional",
+        "summary": "Клиент может отключить уведомления в настройках",
+        "line_start": 15,
+        "line_end": 15
+      },
+      {
+        "source_id": "",
+        "kind": "api",
+        "summary": "Метод POST /notify принимает данные для уведомления",
+        "line_start": 19,
+        "line_end": 19
+      }
+    ],
+    "excluded": [
+      {
+        "what": "Название документа «Notification service requirements»",
+        "line_start": 1,
+        "line_end": 1,
+        "reason": "Название документа, не требование."
+      }
+    ]
+  }
+]

@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Разработка: Можно; тестирование: Можно; критичных 0, существенных 0, незначительных 3.">
+<meta name="generator" content="BCC Review 2.0.0-dev">
+<title>Ревью: Пирог с яблоками</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7C55'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem("bccr-theme");if(t)document.documentElement.dataset.theme=t}catch(_){}</script>
+<style>
+/* HTML-отчёт v2 (№14): один файл, без внешних шрифтов и библиотек. */
+:root {
+  color-scheme: light;
+  --bg: #F4F6F8;
+  --surface: #FFFFFF;
+  --surface-2: #F1F3F6;
+  --surface-3: #E8ECF1;
+  --ink: #131820;
+  --ink-2: #44505F;
+  --ink-3: #6E7887;
+  --line: #DFE4EA;
+  --line-2: #CBD2DB;
+  --brand: #0E7C55;
+  --brand-2: #0B6545;
+  --brand-ink: #FFFFFF;
+  --brand-soft: #E3F3EC;
+  --gold: #A9781F;
+  --gold-soft: #FBF1DE;
+  --crit: #C42B2B;
+  --crit-soft: #FCE9E9;
+  --crit-mark: rgba(214, 48, 48, .22);
+  --major: #C25E00;
+  --major-soft: #FDF0E2;
+  --major-mark: rgba(230, 126, 20, .24);
+  --minor: #8A6E00;
+  --minor-soft: #FBF5D9;
+  --minor-mark: rgba(214, 178, 20, .28);
+  --ok: #1E7F45;
+  --ok-soft: #E4F4EA;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
+  --shadow-lg: 0 6px 24px rgba(16, 24, 40, .10);
+  --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --top-h: 60px;
+  --tabs-h: 46px;
+  --r: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0D1117;
+    --surface: #151B23;
+    --surface-2: #1B222C;
+    --surface-3: #232B36;
+    --ink: #E6EAF0;
+    --ink-2: #B0B9C6;
+    --ink-3: #828C9A;
+    --line: #29313C;
+    --line-2: #36404D;
+    --brand: #2FB37E;
+    --brand-2: #4CC593;
+    --brand-ink: #06130D;
+    --brand-soft: rgba(47, 179, 126, .14);
+    --gold: #E0B15E;
+    --gold-soft: rgba(224, 177, 94, .14);
+    --crit: #FF7272;
+    --crit-soft: rgba(255, 114, 114, .13);
+    --crit-mark: rgba(255, 99, 99, .30);
+    --major: #FFAA55;
+    --major-soft: rgba(255, 170, 85, .12);
+    --major-mark: rgba(255, 160, 60, .28);
+    --minor: #E8CF5A;
+    --minor-soft: rgba(232, 207, 90, .11);
+    --minor-mark: rgba(232, 207, 90, .26);
+    --ok: #4CC98A;
+    --ok-soft: rgba(76, 201, 138, .13);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, .45);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0D1117;
+  --surface: #151B23;
+  --surface-2: #1B222C;
+  --surface-3: #232B36;
+  --ink: #E6EAF0;
+  --ink-2: #B0B9C6;
+  --ink-3: #828C9A;
+  --line: #29313C;
+  --line-2: #36404D;
+  --brand: #2FB37E;
+  --brand-2: #4CC593;
+  --brand-ink: #06130D;
+  --brand-soft: rgba(47, 179, 126, .14);
+  --gold: #E0B15E;
+  --gold-soft: rgba(224, 177, 94, .14);
+  --crit: #FF7272;
+  --crit-soft: rgba(255, 114, 114, .13);
+  --crit-mark: rgba(255, 99, 99, .30);
+  --major: #FFAA55;
+  --major-soft: rgba(255, 170, 85, .12);
+  --major-mark: rgba(255, 160, 60, .28);
+  --minor: #E8CF5A;
+  --minor-soft: rgba(232, 207, 90, .11);
+  --minor-mark: rgba(232, 207, 90, .26);
+  --ok: #4CC98A;
+  --ok-soft: rgba(76, 201, 138, .13);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, .45);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-padding-top: calc(var(--top-h) + var(--tabs-h) + 12px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14.5px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+h1, h2, h3 { margin: 0; line-height: 1.25; }
+.muted { color: var(--ink-3); }
+
+/* ── верхняя панель ───────────────────────────────────────────── */
+.top {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--top-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 clamp(16px, 3vw, 32px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo {
+  flex: none; width: 34px; height: 34px; border-radius: 9px;
+  background: var(--brand);
+  position: relative;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15);
+}
+.logo::after {
+  content: ""; position: absolute; left: 10px; top: 8px; width: 9px; height: 15px;
+  border: solid var(--brand-ink); border-width: 0 3px 3px 0; transform: rotate(45deg);
+}
+.bname { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.dname { font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw; }
+.actions { display: flex; gap: 8px; flex: none; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--brand); background: var(--brand); color: var(--brand-ink);
+  font-weight: 600; font-size: 13.5px; cursor: pointer;
+  transition: background .15s, border-color .15s, transform .05s;
+}
+.btn:hover { background: var(--brand-2); border-color: var(--brand-2); }
+.btn:active { transform: translateY(1px); }
+.btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+.i-theme { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor;
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ── итог ─────────────────────────────────────────────────────── */
+.hero { padding: 22px clamp(16px, 3vw, 32px) 18px; }
+.banner { border-radius: var(--r); padding: 10px 14px; margin-bottom: 16px; font-weight: 500; }
+.banner.info { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line-2); }
+.banner.warn { background: var(--major-soft); color: var(--major); border: 1px solid color-mix(in srgb, var(--major) 35%, transparent); }
+.hero-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 18px; }
+.eyebrow { font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; margin-bottom: 8px; }
+.vcards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vcard {
+  border-radius: 12px; padding: 14px 16px 13px; border: 1px solid var(--line);
+  background: var(--surface); box-shadow: var(--shadow); position: relative; overflow: hidden;
+}
+.vcard::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--ink-3); }
+.vcard.v-no::before { background: var(--crit); }
+.vcard.v-cond::before { background: var(--major); }
+.vcard.v-yes::before { background: var(--ok); }
+.vlabel { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.vword { font-size: 28px; font-weight: 750; letter-spacing: -.01em; margin: 2px 0 1px; }
+.v-no .vword { color: var(--crit); }
+.v-cond .vword { color: var(--major); }
+.v-yes .vword { color: var(--ok); }
+.vhint { font-size: 12.5px; color: var(--ink-3); }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface);
+  box-shadow: var(--shadow); min-height: 92px;
+}
+button.tile { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+button.tile:hover { border-color: var(--line-2); box-shadow: var(--shadow-lg); }
+.tnum { font-size: 30px; font-weight: 750; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.tlab { font-size: 12.5px; color: var(--ink-2); font-weight: 550; line-height: 1.3; }
+.tlab small { display: block; color: var(--ink-3); font-weight: 450; font-size: 11.5px; margin-top: 2px; }
+.t-critical .tnum { color: var(--crit); }
+.t-major .tnum { color: var(--major); }
+.t-minor .tnum { color: var(--minor); }
+.t-ok .tnum { color: var(--ok); }
+.hero-text { margin-top: 16px; }
+.vsummary { margin: 0; font-size: 16px; line-height: 1.55; max-width: 110ch; color: var(--ink); }
+.runmeta { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.fixfirst { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 8px; box-shadow: var(--shadow); }
+.fixfirst h2 { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.fixfirst ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); column-gap: 18px; }
+.fix { display: flex; align-items: baseline; gap: 8px; padding: 5px 6px; border-radius: 7px; text-decoration: none; min-width: 0; }
+.fix:hover { background: var(--surface-2); }
+.fixn { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); font-size: 11.5px; font-weight: 700; display: inline-grid; place-items: center; transform: translateY(-1px); }
+.fix .dot { flex: none; }
+.fix .fid { flex: none; }
+.fixt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.fixl { flex: none; color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.sev-critical .dot, .sev-critical.dot { background: var(--crit); }
+.sev-major .dot, .sev-major.dot { background: var(--major); }
+.sev-minor .dot, .sev-minor.dot { background: var(--minor); }
+.fid { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+
+/* ── вкладки ──────────────────────────────────────────────────── */
+.tabs {
+  position: sticky; top: var(--top-h); z-index: 25;
+  display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none;
+  padding: 0 clamp(16px, 3vw, 32px); height: var(--tabs-h); align-items: flex-end;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none; height: 38px; padding: 0 14px; border: 0; background: none; cursor: pointer;
+  color: var(--ink-2); font-weight: 600; font-size: 13.5px; border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--brand); }
+.cnt { font-size: 11.5px; font-weight: 650; background: var(--surface-3); color: var(--ink-2); border-radius: 10px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
+.tab[aria-selected="true"] .cnt { background: var(--brand-soft); color: var(--brand); }
+main { padding: 16px clamp(16px, 3vw, 32px) 32px; }
+.panel > .ph { display: none; }
+.sub { font-size: 15px; margin: 22px 0 8px; }
+.panel > .sub:first-child, .panel > .ph + .sub { margin-top: 4px; }
+.lead { color: var(--ink-2); margin: 0 0 12px; max-width: 100ch; }
+.none { color: var(--ink-3); padding: 24px 0; }
+
+/* ── документ + карточки ──────────────────────────────────────── */
+.split { display: grid; grid-template-columns: minmax(380px, 46fr) minmax(400px, 54fr); gap: 18px; align-items: start; }
+.docpane {
+  position: sticky; top: calc(var(--top-h) + var(--tabs-h) + 12px);
+  height: calc(100vh - var(--top-h) - var(--tabs-h) - 28px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.dochead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.doctitle { font-weight: 650; font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doctitle small { color: var(--ink-3); font-weight: 450; margin-left: 8px; }
+.doctools { display: flex; gap: 12px; flex: none; }
+.tg { font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+.tg input { accent-color: var(--brand); margin: 0; }
+.docbody { flex: 1; min-height: 0; display: flex; position: relative; }
+.minimap { flex: none; width: 12px; position: relative; border-left: 1px solid var(--line); background: var(--surface-2); }
+.minimap i { position: absolute; left: 2px; right: 2px; min-height: 3px; border-radius: 1px; cursor: pointer; background: var(--ink-3); }
+.minimap i.sev-critical { background: var(--crit); }
+.minimap i.sev-major { background: var(--major); }
+.minimap i.sev-minor { background: var(--minor); }
+.minimap .vw { position: absolute; left: 0; right: 0; border: 1px solid var(--line-2); background: color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: none; }
+.doc { flex: 1; overflow: auto; padding: 6px 0 24px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; scroll-behavior: smooth; }
+.doc-empty { padding: 24px; color: var(--ink-3); font-family: var(--sans); font-size: 14px; }
+.ln { display: grid; grid-template-columns: 46px 1fr auto; align-items: start; padding: 0 10px 0 0; border-left: 3px solid transparent; position: relative; }
+.ln .no { text-align: right; padding-right: 12px; color: var(--ink-3); user-select: none; font-size: 11.5px; line-height: 20px; opacity: .8; }
+.ln .tx { white-space: pre-wrap; word-break: break-word; min-height: 20px; color: var(--ink); }
+.ln.blank { min-height: 10px; }
+.ln.blank .tx, .ln.blank .no { min-height: 10px; line-height: 10px; font-size: 0; }
+.ln.h .tx { font-weight: 700; font-family: var(--sans); font-size: 13.5px; color: var(--ink); }
+.ln.hl { cursor: pointer; }
+.ln.hl.sev-critical { background: var(--crit-soft); border-left-color: var(--crit); }
+.ln.hl.sev-major { background: var(--major-soft); border-left-color: var(--major); }
+.ln.hl.sev-minor { background: var(--minor-soft); border-left-color: var(--minor); }
+mark.q { color: inherit; border-radius: 3px; padding: 1px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+mark.q.sev-critical { background: var(--crit-mark); box-shadow: inset 0 -2px 0 var(--crit); }
+mark.q.sev-major { background: var(--major-mark); box-shadow: inset 0 -2px 0 var(--major); }
+mark.q.sev-minor { background: var(--minor-mark); box-shadow: inset 0 -2px 0 var(--minor); }
+mark.q.on { outline: 2px solid var(--brand); outline-offset: 1px; }
+.fms { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; padding: 2px 0 2px 8px; max-width: 150px; }
+.fm {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700; line-height: 16px; padding: 0 5px; border-radius: 4px;
+  text-decoration: none; color: #fff; background: var(--ink-3); white-space: nowrap;
+}
+.fm.sev-critical { background: var(--crit); }
+.fm.sev-major { background: var(--major); }
+.fm.sev-minor { background: var(--minor); color: #1d1600; }
+:root[data-theme="dark"] .fm, :root[data-theme="dark"] .fm.sev-major { color: #160b00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fm { color: #160b00; } }
+.fms .fm:nth-child(n+4) { display: none; }
+.fmore { font: 700 10.5px/16px var(--mono); padding: 0 5px; border-radius: 4px; color: var(--ink-2); background: var(--surface-3); }
+.ln:hover .fms .fm, .ln.sel .fms .fm { display: inline; }
+.ln:hover .fmore, .ln.sel .fmore { display: none; }
+.ln.sel { outline: 2px solid var(--brand); outline-offset: -2px; z-index: 1; }
+/* фокус: выбран дефект — остальная подсветка гаснет, видно только его цитаты */
+.doc.focus .ln.hl:not(.sel) { background: transparent; border-left-color: transparent; }
+.doc.focus mark.q:not(.on) { background: transparent; box-shadow: inset 0 -1px 0 var(--line-2); }
+.doc.focus .ln.hl:not(.sel) .fm { opacity: .35; }
+.doc.focus mark.q.on { box-shadow: none; }
+.ln.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { 0% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--brand) 30%, transparent); } 100% { box-shadow: inset 0 0 0 999px transparent; } }
+.ln.rqsel { background: var(--brand-soft); border-left-color: var(--brand); }
+.rtag { display: none; font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border-radius: 4px; padding: 0 5px; margin-right: 6px; }
+.doc.showreq .rtag { display: inline-block; }
+.doc.showreq .ln.ex { opacity: .5; background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--surface-3) 6px 7px); }
+.doc.onlyhl .ln:not(.hl):not(.h) { display: none; }
+.doc.onlyhl .ln.h { opacity: .7; }
+.pgbreak { margin: 10px 12px 6px 46px; padding-top: 4px; border-top: 1px dashed var(--line-2); color: var(--ink-3); font-family: var(--sans); font-size: 11.5px; }
+.legend { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-3); background: var(--surface-2); }
+.lg { width: 10px; height: 10px; border-radius: 2px; margin-left: 8px; }
+.lg:first-child { margin-left: 0; }
+.lg.sev-critical { background: var(--crit); }
+.lg.sev-major { background: var(--major); }
+.lg.sev-minor { background: var(--minor); }
+
+.filters {
+  position: sticky; top: calc(var(--top-h) + var(--tabs-h)); z-index: 10;
+  background: var(--bg); padding: 0 0 10px; margin-bottom: 2px;
+}
+.frow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.frow:first-child { margin-top: 0; padding-top: 12px; }
+.frow.small { font-size: 12.5px; color: var(--ink-3); gap: 14px; }
+.sevchip {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 16px;
+  border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 550; color: var(--ink-2);
+}
+.sevchip b { font-variant-numeric: tabular-nums; color: var(--ink); }
+.sevchip[aria-pressed="false"] { opacity: .5; background: transparent; }
+.sevchip[aria-pressed="false"] .dot { background: var(--line-2); }
+.sevchip.sev-critical[aria-pressed="true"] { border-color: color-mix(in srgb, var(--crit) 50%, var(--line)); background: var(--crit-soft); }
+.sevchip.sev-major[aria-pressed="true"] { border-color: color-mix(in srgb, var(--major) 50%, var(--line)); background: var(--major-soft); }
+.sevchip.sev-minor[aria-pressed="true"] { border-color: color-mix(in srgb, var(--minor) 50%, var(--line)); background: var(--minor-soft); }
+#q { flex: 1 1 220px; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); min-width: 0; }
+select { height: 34px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; max-width: 210px; }
+.sortl { display: inline-flex; align-items: center; gap: 6px; }
+select.mini { height: 26px; font-size: 12.5px; padding: 0 22px 0 6px; border-radius: 6px; color: var(--ink-2); }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--brand); cursor: pointer; font-weight: 600; font-size: inherit; }
+.linkbtn:hover { text-decoration: underline; }
+.kbd { margin-left: auto; }
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.empty { padding: 28px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line-2); border-radius: 12px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--ink-3);
+  border-radius: 12px; padding: 13px 16px 12px; box-shadow: var(--shadow); cursor: pointer;
+  transition: box-shadow .15s, border-color .15s; scroll-margin-top: calc(var(--top-h) + var(--tabs-h) + 130px);
+}
+.card:hover { box-shadow: var(--shadow-lg); }
+.card.sev-critical { border-left-color: var(--crit); }
+.card.sev-major { border-left-color: var(--major); }
+.card.sev-minor { border-left-color: var(--minor); }
+.card.active { box-shadow: 0 0 0 2px var(--brand), var(--shadow-lg); }
+.ch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 2px 7px; }
+.badge.sev-critical { background: var(--crit-soft); color: var(--crit); }
+.badge.sev-major { background: var(--major-soft); color: var(--major); }
+.badge.sev-minor { background: var(--minor-soft); color: var(--minor); }
+.prio { margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--gold); background: var(--gold-soft); border-radius: 5px; padding: 2px 8px; }
+.ct { font-size: 15.5px; font-weight: 650; margin: 7px 0 6px; line-height: 1.35; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip { font-size: 12px; border-radius: 6px; padding: 2px 8px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.chip.blk { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 30%, var(--line)); background: transparent; }
+.evs { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ev {
+  width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer;
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2);
+  font-size: 13.5px; line-height: 1.45;
+}
+.ev:hover { border-color: var(--line-2); background: var(--surface-3); }
+.evl { flex: none; font-size: 12px; font-weight: 650; color: var(--ink-2); min-width: 74px; white-space: nowrap; }
+.ev q { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12.5px; color: var(--ink); quotes: "«" "»"; }
+.vf { flex: none; font-weight: 800; font-size: 13px; }
+.vf.ok { color: var(--ok); }
+.vf.fuzzy { color: var(--major); }
+.vf.miss { color: var(--crit); }
+.problem { margin: 0 0 6px; color: var(--ink); }
+.more { margin: 4px 0 6px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.more summary { cursor: pointer; color: var(--brand); font-weight: 600; font-size: 13px; list-style: none; padding: 2px 0; }
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .15s; }
+.more[open] summary::before { transform: rotate(90deg); }
+.dl { margin-top: 8px; }
+.dt { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+.dd { margin-top: 2px; white-space: pre-wrap; }
+.dl.rw .dd { background: var(--brand-soft); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: 8px; padding: 8px 11px; font-family: var(--mono); font-size: 12.5px; }
+.dl.qq .dd { font-style: italic; }
+.copy { border: 1px solid var(--line-2); background: var(--surface); border-radius: 5px; font-size: 11px; padding: 0 6px; cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--ink-2); }
+.cf { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-3); margin-top: 6px; }
+.cf b { color: var(--ink-2); font-weight: 600; margin-right: 3px; }
+.rref, .fref, .lnref {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 650; text-decoration: none; border-radius: 4px; padding: 0 4px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap;
+}
+.rref:hover, .fref:hover, .lnref:hover { border-color: var(--brand); color: var(--brand); }
+.fref.sev-critical { color: var(--crit); }
+.fref.sev-major { color: var(--major); }
+.fref.sev-minor { color: var(--minor); }
+
+/* ── таблицы и прочие вкладки ─────────────────────────────────── */
+.tw { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+thead th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 700; background: var(--surface-2); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.ans { display: inline-block; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.a-yes { background: var(--ok-soft); color: var(--ok); }
+.a-no { background: var(--crit-soft); color: var(--crit); }
+.a-part { background: var(--major-soft); color: var(--major); }
+.a-na { background: var(--surface-3); color: var(--ink-2); }
+.deriv { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+.warnmark { display: inline-block; font-weight: 650; color: var(--major); }
+table.tc td:nth-child(3) { min-width: 160px; }
+table.cl td:first-child { width: 42%; }
+table.kv th { width: 210px; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink-2); background: var(--surface-2); position: static; }
+.hash { word-break: break-all; font-size: 12px; }
+.pgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); gap: 20px; align-items: start; }
+.stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.st { display: flex; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.st b { font-size: 12px; }
+.st small { display: block; color: var(--ink-3); font-size: 11.5px; }
+.st-ok b { color: var(--ok); }
+.st-partial b { color: var(--major); }
+.st-failed b { color: var(--crit); }
+.st-skipped b { color: var(--ink-3); }
+.warns { margin: 0; padding-left: 18px; color: var(--ink-2); }
+.qtools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.qtools p { margin: 0; color: var(--ink-2); }
+.qlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
+.qcard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; box-shadow: var(--shadow); }
+.qcard .to { font-size: 12.5px; color: var(--ink-3); }
+.qcard .to b { color: var(--ink-2); }
+.qlinks { margin-left: auto; display: flex; gap: 4px; }
+.opts { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.opts label { display: flex; align-items: flex-start; gap: 9px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--surface-2); }
+.opts label:hover { border-color: var(--line-2); }
+.opts input { margin: 3px 0 0; accent-color: var(--brand); }
+.opts label:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.ol { flex: none; font-weight: 700; color: var(--brand); min-width: 14px; }
+.own { display: block; font-size: 12px; color: var(--ink-3); font-weight: 600; margin-top: 4px; }
+.own textarea { display: block; width: 100%; margin-top: 3px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--surface); resize: vertical; font-weight: 400; font-size: 13.5px; }
+.topic { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--brand); margin-top: 8px; }
+.qcard .evs { margin-top: 8px; }
+.was { font-family: var(--mono); font-size: 12.5px; background: var(--crit-soft); border-radius: 6px; padding: 4px 7px; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--crit) 60%, transparent); white-space: pre-wrap; }
+.became { font-family: var(--mono); font-size: 12.5px; background: var(--ok-soft); border-radius: 6px; padding: 4px 7px; white-space: pre-wrap; }
+table.rw td:nth-child(4), table.rw td:nth-child(5) { min-width: 240px; }
+table.ba { max-width: 720px; }
+.why { margin: 8px 0 0; color: var(--ink-2); font-size: 13.5px; }
+.foot { padding: 18px clamp(16px, 3vw, 32px) 28px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 50; box-shadow: var(--shadow-lg); }
+
+/* ── узкие экраны ─────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hero-grid { grid-template-columns: 1fr; }
+}
+.split > *, .hero-grid > *, .pgrid > * { min-width: 0; }
+@media (max-width: 960px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .docpane { position: relative; top: 0; height: 52vh; }
+  .filters { top: calc(var(--top-h) + var(--tabs-h)); }
+  .pgrid { grid-template-columns: 1fr; }
+  .fixfirst ol { grid-template-columns: minmax(0, 1fr); }
+  .kbd { display: none; }
+}
+@media (max-width: 600px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vword { font-size: 22px; }
+  .brand { flex: 1; }
+  .dname { max-width: none; font-size: 15px; }
+  #dljson, #print { display: none; }
+  .ev { flex-wrap: wrap; gap: 2px 10px; }
+  .ev q { flex-basis: 100%; }
+  #q { flex-basis: 100%; }
+  .qlist { grid-template-columns: 1fr; }
+  .fixl { display: none; }
+}
+
+/* ── печать ───────────────────────────────────────────────────── */
+@page { size: A4; margin: 14mm 12mm 16mm; }
+@media print {
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --bg: #fff; --surface: #fff; --surface-2: #F4F5F7; --surface-3: #ECEEF1; --ink: #111; --ink-2: #333; --ink-3: #666;
+    --line: #D5DAE0; --line-2: #C3C9D1; --brand: #0E7C55; --brand-soft: #E7F4EE; --gold: #8A5F10; --gold-soft: #F8EED8;
+    --crit: #B42020; --crit-soft: #FBEAEA; --major: #A85000; --major-soft: #FCEFE2; --minor: #7A6200; --minor-soft: #FAF4D8;
+    --ok: #1B6E3D; --ok-soft: #E4F2E9; --shadow: none; --shadow-lg: none;
+  }
+  body { font-size: 10.5pt; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .top { position: static; backdrop-filter: none; background: #fff; height: auto; padding: 0 0 8px; }
+  .actions, .tabs, .filters, .docpane, .kbd, .copy, .qtools button, .own, .toast { display: none !important; }
+  .hero { padding: 10px 0; }
+  .hero-grid { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(5, 1fr); }
+  .tile { min-height: 0; }
+  main { padding: 0; }
+  .panel { display: block !important; margin-top: 14px; }
+  .panel > .ph { display: block; font-size: 15pt; margin: 6px 0 10px; padding-bottom: 4px; border-bottom: 2px solid var(--ink); break-after: avoid; }
+  #p-questions, #p-checklist, #p-passport { break-before: page; }
+  .split, .flist, .cards, .evs, .meta, .ch, .cf { display: block; }
+  .meta .chip, .ch > *, .cf .fl { display: inline-block; margin: 0 6px 3px 0; }
+  .ev { display: flex; }
+  .card, .qcard, .vcard, .fixfirst, tr, .foot { break-inside: avoid; }
+  .foot { padding: 10px 0 0; }
+  .card { cursor: default; margin-bottom: 8px; }
+  .card.active { box-shadow: none; }
+  .more summary { display: none; }
+  .ev { border: 0; padding: 2px 0; background: none; }
+  .qlist { display: block; }
+  .qcard { margin-bottom: 8px; }
+  .opts label { background: none; }
+  .opts input { display: none; }
+  .tw { overflow: visible; border-radius: 0; }
+  thead th { position: static; }
+  table { font-size: 9.5pt; }
+  .fixfirst ol { grid-template-columns: minmax(0, 1fr); }
+  a { text-decoration: none; }
+}
+
+</style>
+</head>
+<body data-file="recipe">
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span><div><div class="bname">Ревью требований</div>
+  <h1 class="dname" title="Пирог с яблоками">Пирог с яблоками</h1></div></div>
+  <div class="actions">
+    <button type="button" class="btn ghost" id="theme" title="Светлая или тёмная тема" aria-label="Сменить тему"><span class="i-theme"></span></button>
+    <button type="button" class="btn ghost" id="dljson" title="Скачать report.json">JSON</button>
+    <button type="button" class="btn" id="print" title="Печать или сохранение в PDF">PDF / печать</button>
+  </div>
+</header>
+
+<section class="hero" aria-label="Итог ревью">
+  
+  <div class="hero-grid">
+    <div class="verdict">
+      <h2 class="eyebrow">Можно ли начинать</h2>
+      <div class="vcards"><div class="vcard v-yes"><div class="vlabel">Разработка</div><div class="vword">Можно</div><div class="vhint">блокирующих дефектов нет</div></div><div class="vcard v-yes"><div class="vlabel">Тестирование</div><div class="vword">Можно</div><div class="vhint">блокирующих дефектов нет</div></div></div>
+    </div>
+    <div class="stats">
+      <h2 class="eyebrow">Замечания</h2>
+      <div class="tiles"><button class="tile t-critical" data-sevonly="critical" title="Показать только: критичные"><span class="tnum">0</span><span class="tlab">Критичных</span></button><button class="tile t-major" data-sevonly="major" title="Показать только: существенные"><span class="tnum">0</span><span class="tlab">Существенных</span></button><button class="tile t-minor" data-sevonly="minor" title="Показать только: незначительные"><span class="tnum">3</span><span class="tlab">Незначительных</span></button><div class="tile t-neutral"><span class="tnum">9</span><span class="tlab">требований<small>0 без замечаний</small></span></div><div class="tile t-ok" title="Каждая цитата найдена в документе программой, номер строки посчитан кодом"><span class="tnum">100 %</span><span class="tlab">цитат сверено кодом<small>3 из 3 цитат</small></span></div></div>
+    </div>
+  </div>
+  <div class="hero-text">
+    <p class="vsummary">Разработку и тестирование можно начинать: критичных и существенных дефектов нет; незначительные замечания можно закрыть по ходу работы.</p>
+    <p class="runmeta">модель claude-haiku-5-5 · время 1 мин 01 с · 9 вызовов модели · 2026-11-27 21:19</p>
+  </div>
+  <div class="fixfirst"><h2>Исправить первым</h2><ol><li><a href="#D-01" data-goto="D-01" class="fix sev-minor"><span class="fixn">1</span><span class="dot"></span><span class="fid">D-01</span><span class="fixt">Пункты рецепта без ID, приоритетов, источника и версии</span><span class="fixl">строка 1</span></a></li><li><a href="#D-02" data-goto="D-02" class="fix sev-minor"><span class="fixn">2</span><span class="dot"></span><span class="fid">D-02</span><span class="fixt">Нет приёмочных критериев для функциональных шагов рецепта</span><span class="fixl">строка 10</span></a></li><li><a href="#D-03" data-goto="D-03" class="fix sev-minor"><span class="fixn">3</span><span class="dot"></span><span class="fid">D-03</span><span class="fixt">Температура выпечки без указания шкалы (°C или °F)</span><span class="fixl">строка 15</span></a></li></ol></div>
+</section>
+<nav class="tabs" role="tablist" aria-label="Разделы отчёта"><button type="button" role="tab" class="tab" id="t-findings" aria-controls="p-findings" aria-selected="true" data-tab="findings">Замечания<span class=cnt>3</span></button><button type="button" role="tab" class="tab" id="t-questions" aria-controls="p-questions" aria-selected="false" data-tab="questions">Вопросы<span class=cnt>1</span></button><button type="button" role="tab" class="tab" id="t-tests" aria-controls="p-tests" aria-selected="false" data-tab="tests">Тест-кейсы<span class=cnt>5</span></button><button type="button" role="tab" class="tab" id="t-checklist" aria-controls="p-checklist" aria-selected="false" data-tab="checklist">Чек-лист банка<span class=cnt>14</span></button><button type="button" role="tab" class="tab" id="t-checks" aria-controls="p-checks" aria-selected="false" data-tab="checks">Проверки<span class=cnt>0</span></button><button type="button" role="tab" class="tab" id="t-segment" aria-controls="p-segment" aria-selected="false" data-tab="segment">Нарезка<span class=cnt>9</span></button><button type="button" role="tab" class="tab" id="t-rejected" aria-controls="p-rejected" aria-selected="false" data-tab="rejected">Отклонённые<span class=cnt>1</span></button><button type="button" role="tab" class="tab" id="t-passport" aria-controls="p-passport" aria-selected="false" data-tab="passport">Паспорт</button></nav>
+<main><section class="panel" role="tabpanel" id="p-findings" aria-labelledby="t-findings"><h2 class="ph">Замечания</h2>
+<div class="split">
+  <aside class="docpane" aria-label="Документ">
+    <div class="dochead">
+      <div class="doctitle" title="Пирог с яблоками">Пирог с яблоками<small>16 строк</small></div>
+      <div class="doctools">
+        <label class="tg"><input type="checkbox" id="onlyhl"> только с замечаниями</label>
+        <label class="tg"><input type="checkbox" id="showreq"> нарезка</label>
+      </div>
+    </div>
+    <div class="docbody"><div class="doc" id="doc" tabindex="0"><div class="ln h hl sev-minor" id="L1" data-n="1" data-f="D-01"><span class="no">1</span><span class="tx"><mark class="q sev-minor" data-f="D-01">Пирог с яблоками</mark></span><span class="fms"><a class="fm sev-minor" href="#D-01" data-goto="D-01">D-01</a></span></div>
+<div class="ln blank" id="L2" data-n="2"><span class="no">2</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L3" data-n="3"><span class="no">3</span><span class="tx">Ингредиенты</span></div>
+<div class="ln blank" id="L4" data-n="4"><span class="no">4</span><span class="tx">&#8203;</span></div>
+<div class="ln rq" id="L5" data-n="5" data-r="R-01"><span class="no">5</span><span class="tx"><span class="rtag">R-01</span>мука — 300 г</span></div>
+<div class="ln rq" id="L6" data-n="6" data-r="R-02"><span class="no">6</span><span class="tx"><span class="rtag">R-02</span>сахар — 150 г</span></div>
+<div class="ln rq" id="L7" data-n="7" data-r="R-03"><span class="no">7</span><span class="tx"><span class="rtag">R-03</span>яйца — 3 шт.</span></div>
+<div class="ln rq" id="L8" data-n="8" data-r="R-04"><span class="no">8</span><span class="tx"><span class="rtag">R-04</span>яблоки — 4 шт.</span></div>
+<div class="ln blank" id="L9" data-n="9"><span class="no">9</span><span class="tx">&#8203;</span></div>
+<div class="ln h hl sev-minor" id="L10" data-n="10" data-f="D-02"><span class="no">10</span><span class="tx"><mark class="q sev-minor" data-f="D-02">Приготовление</mark></span><span class="fms"><a class="fm sev-minor" href="#D-02" data-goto="D-02">D-02</a></span></div>
+<div class="ln blank" id="L11" data-n="11"><span class="no">11</span><span class="tx">&#8203;</span></div>
+<div class="ln rq" id="L12" data-n="12" data-r="R-05"><span class="no">12</span><span class="tx"><span class="rtag">R-05</span>1. Взбейте яйца с сахаром до пышной пены.</span></div>
+<div class="ln rq" id="L13" data-n="13" data-r="R-06"><span class="no">13</span><span class="tx"><span class="rtag">R-06</span>2. Добавьте муку и аккуратно перемешайте.</span></div>
+<div class="ln rq" id="L14" data-n="14" data-r="R-07"><span class="no">14</span><span class="tx"><span class="rtag">R-07</span>3. Нарежьте яблоки дольками и выложите в форму.</span></div>
+<div class="ln hl sev-minor rq" id="L15" data-n="15" data-f="D-03" data-r="R-08"><span class="no">15</span><span class="tx"><span class="rtag">R-08</span>4. <mark class="q sev-minor" data-f="D-03">Залейте тестом и выпекайте 40 минут при 180 градусах</mark>.</span><span class="fms"><a class="fm sev-minor" href="#D-03" data-goto="D-03">D-03</a></span></div>
+<div class="ln rq" id="L16" data-n="16" data-r="R-09"><span class="no">16</span><span class="tx"><span class="rtag">R-09</span>5. Подавайте пирог тёплым, можно с мороженым.</span></div></div><div class="minimap" id="minimap" aria-hidden="true"></div></div>
+    <div class="legend"><span class="lg sev-critical"></span>критичный<span class="lg sev-major"></span>существенный<span class="lg sev-minor"></span>незначительный</div>
+  </aside>
+  <div class="flist">
+    <div class="filters" role="search">
+      <div class="frow"><button type="button" class="sevchip sev-critical" aria-pressed="true" data-sev="critical"><span class="dot"></span>Критичные <b>0</b></button><button type="button" class="sevchip sev-major" aria-pressed="true" data-sev="major"><span class="dot"></span>Существенные <b>0</b></button><button type="button" class="sevchip sev-minor" aria-pressed="true" data-sev="minor"><span class="dot"></span>Незначительные <b>3</b></button></div>
+      <div class="frow">
+        <input type="search" id="q" placeholder="Поиск по замечаниям, цитатам, ID…" aria-label="Поиск">
+        <select id="fkind" aria-label="Вид дефекта"><option value="">Все виды</option><option value="ambiguity">Неоднозначность</option><option value="missing_element">Обещанное не описано</option></select>
+        <select id="fsrc" aria-label="Кто нашёл"><option value="">Все линзы</option><option value="lens:analyst">Аналитик</option><option value="lens:qa">Тестировщик</option><option value="consistency">Набор целиком</option></select>
+      </div>
+      <div class="frow small"><span id="fcount" aria-live="polite"></span>
+        <label class="sortl">Порядок <select id="fsort" class="mini"><option value="prio">по приоритету</option><option value="line">по месту в документе</option><option value="sev">по серьёзности</option></select></label>
+        <button type="button" class="linkbtn" id="toggleall">Развернуть все</button><span class="kbd" title="Клавиши">↑ ↓ — по карточкам</span></div>
+    </div>
+    <div class="cards" id="cards"><article class="card sev-minor" id="D-01" tabindex="0" data-idx="0" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="1" data-kind="missing_element"
+ data-src="consistency" data-blocks="none" data-lines="1" data-search="d-01 пункты рецепта без id, приоритетов, источника и версии ни у одного из требований r-01…r-09 (строки 5–16) нет id, приоритета, источника и версии. без них изменение пункта нельзя связать с исходным требованием и определить, что важнее при нехватке времени. изменение пункта рецепта сложно связать с исходным требованием и версией при ревью. указать в шапке документа версию и источник, а пунктам присвоить идентификаторы. шапка: версия документа и источник рецепта; пункты рецепта имеют идентификаторы r-01…«приготовление, п. 5». пирог с яблоками r-01 r-02 r-03 r-04 r-05 r-06 r-07 r-08 r-09 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-01</span></header>
+  <h3 class="ct">Пункты рецепта без ID, приоритетов, источника и версии</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="IEEE 830-1998 п. 4.3.8">Прослеживаемость</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="1" data-le="1" title="Показать в документе"><span class="evl">строка 1</span><q>Пирог с яблоками</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Ни у одного из требований R-01…R-09 (строки 5–16) нет ID, приоритета, источника и версии. Без них изменение пункта нельзя связать с исходным требованием и определить, что важнее при нехватке времени.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Последствия</div><div class="dd">Изменение пункта рецепта сложно связать с исходным требованием и версией при ревью.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Указать в шапке документа версию и источник, а пунктам присвоить идентификаторы.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Шапка: версия документа и источник рецепта; пункты рецепта имеют идентификаторы R-01…«Приготовление, п. 5».</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L5" data-req="R-01" data-ls="5" data-le="5" title="Ингредиент: мука, 300 граммов">R-01</a> <a class="rref" href="#L6" data-req="R-02" data-ls="6" data-le="6" title="Ингредиент: сахар, 150 граммов">R-02</a> <a class="rref" href="#L7" data-req="R-03" data-ls="7" data-le="7" title="Ингредиент: яйца, 3 штуки">R-03</a> <a class="rref" href="#L8" data-req="R-04" data-ls="8" data-le="8" title="Ингредиент: яблоки, 4 штуки">R-04</a> <a class="rref" href="#L12" data-req="R-05" data-ls="12" data-le="12" title="Приготовление, п. 1 · Взбить яйца с сахаром до пышной пены">R-05</a> <a class="rref" href="#L13" data-req="R-06" data-ls="13" data-le="13" title="Приготовление, п. 2 · Добавить муку и аккуратно перемешать">R-06</a> <a class="rref" href="#L14" data-req="R-07" data-ls="14" data-le="14" title="Приготовление, п. 3 · Нарезать яблоки дольками и выложить в форму">R-07</a> <a class="rref" href="#L15" data-req="R-08" data-ls="15" data-le="15" title="Приготовление, п. 4 · Залить тестом и выпекать 40 минут при 180">R-08</a> <a class="rref" href="#L16" data-req="R-09" data-ls="16" data-le="16" title="Приготовление, п. 5 · Подавать тёплым, по желанию с мороженым">R-09</a></span><span class="fl"><b>Стандарт</b> IEEE 830-1998 п. 4.3.8</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-02" tabindex="0" data-idx="1" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="10" data-kind="missing_element"
+ data-src="lens:qa" data-blocks="none" data-lines="10" data-search="d-02 нет приёмочных критериев для функциональных шагов рецепта раздел «приготовление» (l010–l016) описывает пять шагов, но ни одна строка приёмки (условие → действие → результат) не задана. не описаны ветки: неполный набор ингредиентов, другая температура или время выпечки, порядок шагов. тестировщик для шага 4 (выпечка 40 минут при 180) не знает, что проверять: время, температуру или готовность пирога. тесты строятся по собственному пониманию тестировщика, приёмка может разойтись с ожиданием заказчика. добавить раздел критериев приёмки с одной строкой на каждое требование строки 5–16 и ветки отклонений. непокрытые ветки закрывают тест-кейсы t-03–t-05 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки. раздел «критерии приёмки»: для каждого r-0x — предусловие, действие, ожидаемый результат с числом; для строки 15 — выпечка 40 минут при 180 градусах, отклонение от значений &lt;уточнить: допустимое отклонение&gt;. кто утверждает критерии приёмки и какие отклонения допустимы? приготовление r-05 r-06 r-07 r-08 r-09 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-02</span></header>
+  <h3 class="ct">Нет приёмочных критериев для функциональных шагов рецепта</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.6">Проверяемость</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="10" data-le="10" title="Показать в документе"><span class="evl">строка 10</span><q>Приготовление</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Раздел «Приготовление» (строки 10–16) описывает пять шагов, но ни одна строка приёмки (условие → действие → результат) не задана. Не описаны ветки: неполный набор ингредиентов, другая температура или время выпечки, порядок шагов.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Тестировщик для шага 4 (выпечка 40 минут при 180) не знает, что проверять: время, температуру или готовность пирога.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Тесты строятся по собственному пониманию тестировщика, приёмка может разойтись с ожиданием заказчика.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить раздел критериев приёмки с одной строкой на каждое требование строки 5–16 и ветки отклонений. Непокрытые ветки закрывают тест-кейсы T-03–T-05 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Раздел «Критерии приёмки»: для каждого R-0X — предусловие, действие, ожидаемый результат с числом; для строки 15 — выпечка 40 минут при 180 градусах, отклонение от значений &lt;уточнить: допустимое отклонение&gt;.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Кто утверждает критерии приёмки и какие отклонения допустимы?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L12" data-req="R-05" data-ls="12" data-le="12" title="Приготовление, п. 1 · Взбить яйца с сахаром до пышной пены">R-05</a> <a class="rref" href="#L13" data-req="R-06" data-ls="13" data-le="13" title="Приготовление, п. 2 · Добавить муку и аккуратно перемешать">R-06</a> <a class="rref" href="#L14" data-req="R-07" data-ls="14" data-le="14" title="Приготовление, п. 3 · Нарезать яблоки дольками и выложить в форму">R-07</a> <a class="rref" href="#L15" data-req="R-08" data-ls="15" data-le="15" title="Приготовление, п. 4 · Залить тестом и выпекать 40 минут при 180">R-08</a> <a class="rref" href="#L16" data-req="R-09" data-ls="16" data-le="16" title="Приготовление, п. 5 · Подавать тёплым, по желанию с мороженым">R-09</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.6</span><span class="fl"><b>Нашли</b> Тестировщик</span></footer>
+</article>
+<article class="card sev-minor" id="D-03" tabindex="0" data-idx="2" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="15" data-kind="ambiguity"
+ data-src="lens:analyst" data-blocks="none" data-lines="15" data-search="d-03 температура выпечки без указания шкалы (°c или °f) в пункте 4 раздела «приготовление» (l015) температура задана как «при 180 градусах» без шкалы. при чтении как фаренгейта пирог за 40 минут не пропечётся. духовка выставлена на 180: по цельсию это 180 °c, по фаренгейту около 82 °c, и пирог не пропечётся за 40 минут. пользователь, который выставит температуру по другой шкале, получит непропечённый пирог, а проверяющий не сможет определить правильный результат. указать шкалу температуры прямо в пункте 4. 4. залейте тестом и выпекайте 40 минут при 180 градусах цельсия. температура задана в градусах цельсия (180 °c)? других вариантов шкалы в документе нет. залейте тестом и выпекайте 40 минут при 180 градусах r-08 неоднозначность">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-03</span></header>
+  <h3 class="ct">Температура выпечки без указания шкалы (°C или °F)</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>Залейте тестом и выпекайте 40 минут при 180 градусах</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">В пункте 4 раздела «Приготовление» (строка 15) температура задана как «при 180 градусах» без шкалы. При чтении как Фаренгейта пирог за 40 минут не пропечётся.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Духовка выставлена на 180: по Цельсию это 180 °C, по Фаренгейту около 82 °C, и пирог не пропечётся за 40 минут.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Пользователь, который выставит температуру по другой шкале, получит непропечённый пирог, а проверяющий не сможет определить правильный результат.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Указать шкалу температуры прямо в пункте 4.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">4. Залейте тестом и выпекайте 40 минут при 180 градусах Цельсия.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Температура задана в градусах Цельсия (180 °C)? Других вариантов шкалы в документе нет.</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L15" data-req="R-08" data-ls="15" data-le="15" title="Приготовление, п. 4 · Залить тестом и выпекать 40 минут при 180">R-08</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Аналитик</span></footer>
+</article><div class="empty" hidden>Под фильтр не попало ни одного замечания. <button type="button" class="linkbtn" data-reset>Сбросить фильтры</button></div></div>
+  </div>
+</div></section><section class="panel" role="tabpanel" id="p-questions" aria-labelledby="t-questions" hidden><h2 class="ph">Вопросы</h2><div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p><button type="button" class="btn" id="dlanswers">Скачать ответы</button></div><div class="qlist"><article class="qcard" data-q="Q-01" data-topic="Допустимые отклонения параметров рецепта">
+  <header class="ch"><span class="fid">Q-01</span><span class="to">Кому: <b>Владелец продукта</b></span><span class="qlinks"><a class="fref sev-minor" href="#D-02" data-goto="D-02" title="Нет приёмочных критериев для функциональных шагов рецепта">D-02</a></span></header>
+  <div class="topic">Допустимые отклонения параметров рецепта</div><h3 class="ct">Какие отклонения от параметров рецепта считаются допустимыми: температура и время выпечки, количество ингредиентов? Сейчас в документе задано только одно значение (180 градусов, 40 минут), а критериев приёмки для шагов рецепта нет.</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="10" data-le="10" title="Показать в документе"><span class="evl">строка 10</span><q>Приготовление</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="15" data-le="15" title="Показать в документе"><span class="evl">строка 15</span><q>Залейте тестом и выпекайте 40 минут при 180 градусах</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-01" value="0"><span class="ol">A</span>Отклонений нет: температура 180 °C, время 40 минут, количества ингредиентов ровно как указано; любое другое значение считается ошибкой рецепта</label></li><li><label><input type="radio" name="Q-01" value="1"><span class="ol">B</span>Допустимо отклонение температуры ±10 °C и времени ±5 минут; при выходе за пределы шага рецепт считается неверным</label></li><li><label><input type="radio" name="Q-01" value="2"><span class="ol">C</span>Указанные значения рекомендуемые: любые значения, введённые пользователем, принимаются без проверки, документ фиксирует только рекомендации</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-01" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Без границ отклонений тестировщик не может написать проверку шага выпечки: непонятно, какой результат считать корректным при другой температуре или времени, и две команды проверят один и тот же вход по-разному.</p>
+</article></div></section><section class="panel" role="tabpanel" id="p-tests" aria-labelledby="t-tests" hidden><h2 class="ph">Тест-кейсы</h2><p class="lead">Черновик для раздела «Тестирование требований»: проверки, которых не хватает в критериях приёмки. Где ожидаемый результат нельзя вывести из текста, это отмечено.</p><div class="tw"><table class="tc"><thead><tr><th>ID</th><th>Требования</th><th>Проверка</th><th>Дано</th><th>Когда</th><th>Тогда</th><th>Чего нет в приёмке</th></tr></thead><tbody><tr><td><span class="fid">T-01</span></td><td><a class="rref" href="#L14" data-req="R-07" data-ls="14" data-le="14" title="Приготовление, п. 3 · Нарезать яблоки дольками и выложить в форму">R-07</a></td><td><b>Нарезка яблок дольками и выкладка в форму</b></td><td>Яблоки — 4 шт., форма для выпечки подготовлена</td><td>Выполнен шаг 3 рецепта</td><td>Яблоки нарезаны дольками и выложены в форму</td><td></td></tr><tr><td><span class="fid">T-02</span></td><td><a class="rref" href="#L15" data-req="R-08" data-ls="15" data-le="15" title="Приготовление, п. 4 · Залить тестом и выпекать 40 минут при 180">R-08</a></td><td><b>Выпечка пирога 40 минут при 180 градусах</b></td><td>Форма залита тестом, духовка готова к работе</td><td>Выполнен шаг 4 рецепта</td><td>Выпечка длится 40 минут при 180 градусах</td><td></td></tr><tr><td><span class="fid">T-03</span></td><td><a class="rref" href="#L13" data-req="R-06" data-ls="13" data-le="13" title="Приготовление, п. 2 · Добавить муку и аккуратно перемешать">R-06</a></td><td><b>Перемешивание муки с массой: критерий окончания шага</b></td><td>Яйца взбиты с сахаром, мука — 300 г</td><td>Выполнен шаг 2 рецепта «аккуратно перемешайте»</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: не задано, когда перемешивание считается законченным (время, число движений или признак однородности)</td><td>Ветка окончания шага не покрыта ни одним критерием приёмки.</td></tr><tr><td><span class="fid">T-04</span></td><td><a class="rref" href="#L12" data-req="R-05" data-ls="12" data-le="12" title="Приготовление, п. 1 · Взбить яйца с сахаром до пышной пены">R-05</a></td><td><b>Взбивание яиц с сахаром до пышной пены</b></td><td>Яйца — 3 шт., сахар — 150 г</td><td>Выполнен шаг 1 рецепта</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: что считать «пышной пеной» (объём, кратность, время); тест нельзя считать пройденным или непройденным</td><td>Признак результата не задан, поэтому проверка шага не покрыта приёмкой.</td></tr><tr><td><span class="fid">T-05</span></td><td><a class="rref" href="#L16" data-req="R-09" data-ls="16" data-le="16" title="Приготовление, п. 5 · Подавать тёплым, по желанию с мороженым">R-09</a></td><td><b>Подача пирога тёплым с мороженым по желанию</b></td><td>Пирог выпечен по шагам 1–4</td><td>Выполнен шаг 5 рецепта</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Пирог подан; Не определено требованиями: температура «тёплым» не задана числом, как и условие подачи с мороженым (выбор клиента или обязательная опция)</td><td>Ветка подачи без мороженого и границы температуры не покрыты приёмкой.</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checklist" aria-labelledby="t-checklist" hidden><h2 class="ph">Чек-лист банка</h2><p class="lead">Чек-лист «Ревью требований» банка, заполненный по результатам проверки.</p><div class="tw"><table class="cl"><thead><tr><th>Проверка</th><th>Ответ</th><th>Комментарий</th><th>Замечания</th></tr></thead><tbody><tr><td>Техническое требование зафиксировано и покрывает бизнес-требование</td><td><span class="ans a-part">Частично</span></td><td>Документ — рецепт, он покрывает бизнес-содержание (ингредиенты и шаги), но без версии и источника привязка неполна (строка 1).</td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01" title="Пункты рецепта без ID, приоритетов, источника и версии">D-01</a></td></tr><tr><td>Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)</td><td><span class="ans a-part">Частично</span></td><td>Есть разделы «Ингредиенты» и «Приготовление» (строка 3, строка 10), но пункты без ID и приоритетов (строки 12–16).</td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01" title="Пункты рецепта без ID, приоритетов, источника и версии">D-01</a></td></tr><tr><td>Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений</td><td><span class="ans a-na">Не требуется</span></td><td>Документ не описывает взаимодействие систем, только последовательность кулинарных действий.</td><td></td></tr><tr><td>Требование покрывает спецификацию UX/UI дизайна</td><td><span class="ans a-na">Не требуется</span></td><td>Документ не содержит UX/UI-спецификации и экранов.</td><td></td></tr><tr><td>Реализация задачи/проекта предусматривает схему отката решений</td><td><span class="ans a-na">Не требуется</span></td><td>Документ описывает кулинарный рецепт, решения реализации не вводятся.</td><td></td></tr><tr><td>Требование может быть протестировано</td><td><span class="ans a-part">Частично</span></td><td>Шаги проверяемы по форме, но критерии приёмки не заданы ни для одного шага (строки 10–16).</td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02" title="Нет приёмочных критериев для функциональных шагов рецепта">D-02</a></td></tr><tr><td>Требование предусматривает модель данных или поток, содержит описание</td><td><span class="ans a-yes">Да</span></td><td>Ингредиенты заданы с количествами и единицами (строки 5–8), это данные требований R-01…R-04.</td><td></td></tr><tr><td>Требование не имеет противоречий или явных показателей операционных рисков</td><td><span class="ans a-part">Частично</span></td><td>Противоречий нет, но температура выпечки без шкалы допускает два толкования (строка 15).</td><td><a class="fref sev-minor" href="#D-03" data-goto="D-03" title="Температура выпечки без указания шкалы (°C или °F)">D-03</a></td></tr><tr><td>Требование содержит архитектуру и согласовано с архитекторами</td><td><span class="ans a-na">Не требуется</span></td><td>Архитектурные решения в документе не заявлены.</td><td></td></tr><tr><td>Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами</td><td><span class="ans a-na">Не требуется</span></td><td>Документ не затрагивает другие системы или продукты.</td><td></td></tr><tr><td>Структура требований не несёт изменений и рисков информационной безопасности</td><td><span class="ans a-na">Не требуется</span></td><td>Документ не вводит данных, доступа или обработки информации.</td><td></td></tr><tr><td>В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки</td><td><span class="ans a-na">Не требуется</span></td><td>Полная схема бизнес-процесса для рецепта неприменима.</td><td></td></tr><tr><td>Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия</td><td><span class="ans a-na">Не требуется</span></td><td>Интеграционное взаимодействие в документе отсутствует.</td><td></td></tr><tr><td>Поддерживается версионность документа / зафиксирована</td><td><span class="ans a-part">Частично</span></td><td>Версия и дата документа не указаны, в заголовке только название «Пирог с яблоками» (строка 1).</td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01" title="Пункты рецепта без ID, приоритетов, источника и версии">D-01</a></td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checks" aria-labelledby="t-checks" hidden><h2 class="ph">Проверки</h2><h3 class="sub">Трассировка</h3><div class="tw"><table class=""><thead><tr><th>Требование</th><th>Проверяется</th><th>Реализуется</th><th>Примечание</th></tr></thead><tbody><tr><td><a class="rref" href="#L5" data-req="R-01" data-ls="5" data-le="5" title="Ингредиент: мука, 300 граммов">R-01</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки и поля данных</td></tr><tr><td><a class="rref" href="#L6" data-req="R-02" data-ls="6" data-le="6" title="Ингредиент: сахар, 150 граммов">R-02</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки и поля данных</td></tr><tr><td><a class="rref" href="#L7" data-req="R-03" data-ls="7" data-le="7" title="Ингредиент: яйца, 3 штуки">R-03</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки и поля данных</td></tr><tr><td><a class="rref" href="#L8" data-req="R-04" data-ls="8" data-le="8" title="Ингредиент: яблоки, 4 штуки">R-04</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки и поля данных</td></tr><tr><td><a class="rref" href="#L12" data-req="R-05" data-ls="12" data-le="12" title="Приготовление, п. 1 · Взбить яйца с сахаром до пышной пены">R-05</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки для пышной пены</td></tr><tr><td><a class="rref" href="#L13" data-req="R-06" data-ls="13" data-le="13" title="Приготовление, п. 2 · Добавить муку и аккуратно перемешать">R-06</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки для аккуратного перемешивания</td></tr><tr><td><a class="rref" href="#L14" data-req="R-07" data-ls="14" data-le="14" title="Приготовление, п. 3 · Нарезать яблоки дольками и выложить в форму">R-07</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки на нарезку и форму</td></tr><tr><td><a class="rref" href="#L15" data-req="R-08" data-ls="15" data-le="15" title="Приготовление, п. 4 · Залить тестом и выпекать 40 минут при 180">R-08</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки на время и температуру</td></tr><tr><td><a class="rref" href="#L16" data-req="R-09" data-ls="16" data-le="16" title="Приготовление, п. 5 · Подавать тёплым, по желанию с мороженым">R-09</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>нет критерия приёмки на подачу</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-segment" aria-labelledby="t-segment" hidden><h2 class="ph">Нарезка</h2><p class="lead">Агент выделил 9 требований и присвоил им ID; номер строки — по исходному документу.</p><div class="tw"><table class="seg"><thead><tr><th>ID</th><th>В документе</th><th>Вид</th><th>Кратко</th><th>Строки</th><th>Замечания</th></tr></thead><tbody><tr><td><span class="fid">R-01</span></td><td></td><td>Данные</td><td>Ингредиент: мука, 300 граммов</td><td><a class="lnref" href="#L5" data-line="5" data-le="5">5</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-02</span></td><td></td><td>Данные</td><td>Ингредиент: сахар, 150 граммов</td><td><a class="lnref" href="#L6" data-line="6" data-le="6">6</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-03</span></td><td></td><td>Данные</td><td>Ингредиент: яйца, 3 штуки</td><td><a class="lnref" href="#L7" data-line="7" data-le="7">7</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-04</span></td><td></td><td>Данные</td><td>Ингредиент: яблоки, 4 штуки</td><td><a class="lnref" href="#L8" data-line="8" data-le="8">8</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-05</span></td><td>Приготовление, п. 1</td><td>Функциональное</td><td>Взбить яйца с сахаром до пышной пены</td><td><a class="lnref" href="#L12" data-line="12" data-le="12">12</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a></td></tr><tr><td><span class="fid">R-06</span></td><td>Приготовление, п. 2</td><td>Функциональное</td><td>Добавить муку и аккуратно перемешать</td><td><a class="lnref" href="#L13" data-line="13" data-le="13">13</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a></td></tr><tr><td><span class="fid">R-07</span></td><td>Приготовление, п. 3</td><td>Функциональное</td><td>Нарезать яблоки дольками и выложить в форму</td><td><a class="lnref" href="#L14" data-line="14" data-le="14">14</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a></td></tr><tr><td><span class="fid">R-08</span></td><td>Приготовление, п. 4</td><td>Функциональное</td><td>Залить тестом и выпекать 40 минут при 180</td><td><a class="lnref" href="#L15" data-line="15" data-le="15">15</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-03" data-goto="D-03">D-03</a></td></tr><tr><td><span class="fid">R-09</span></td><td>Приготовление, п. 5</td><td>Функциональное</td><td>Подавать тёплым, по желанию с мороженым</td><td><a class="lnref" href="#L16" data-line="16" data-le="16">16</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a> <a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a></td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-rejected" aria-labelledby="t-rejected" hidden><h2 class="ph">Отклонённые</h2><p class="lead">Кандидаты, которые линзы предложили, а судья не включил в отчёт, — с причиной. Так видно, что точность важнее количества.</p><div class="tw"><table class=""><thead><tr><th>Кандидат</th><th>Что предлагалось</th><th>Кто</th><th>Где</th><th>Почему отклонено</th></tr></thead><tbody><tr><td><span class="fid"></span></td><td>Шаг 1 рецепта «взбить до пышной пены» не имеет объективного признака прохождения</td><td>Тестировщик</td><td>строка 12</td><td>снято линзой тестировщика: результат функции не описан — это неполнота (зона аналитика), а не непроверяемость</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-passport" aria-labelledby="t-passport" hidden><h2 class="ph">Паспорт</h2><div class="pgrid"><div class="tw"><table class="kv"><tr><th>Агент</th><td>BCC Review 2.0.0-dev</td></tr><tr><th>Коммит</th><td>973ce4d7</td></tr><tr><th>Статус прогона</th><td>полный</td></tr><tr><th>Начало / конец</th><td>2026-11-27 21:18:22+05:00 — 2026-11-27 21:19:23+05:00</td></tr><tr><th>Длительность</th><td>1 мин 01 с</td></tr><tr><th>Провайдер</th><td>claude_cli</td></tr><tr><th>Модель (запрошена)</th><td>haiku</td></tr><tr><th>Модели (фактически)</th><td>claude-haiku-5-5</td></tr><tr><th>Вызовы модели</th><td>9 всего · 0 из кэша · 0 с ошибкой · 0 делений пакета</td></tr><tr><th>Токены</th><td>135 141 на входе · 19 142 на выходе</td></tr><tr><th>Сверка цитат кодом</th><td>4 из 4 цитат всех кандидатов найдены в документе <span class="muted">(дословно 4)</span></td></tr><tr><th>Кандидаты</th><td>4 от ревьюеров → 4 с найденными цитатами → судье; отклонено 0</td></tr><tr><th>Стоимость</th><td>$0.03</td></tr><tr><th>Документ</th><td>Пирог с яблоками <span class="muted">(recipe.md, md)</span></td></tr><tr><th>Строк / страниц</th><td>16 / —</td></tr><tr><th>SHA-256 документа</th><td><code class="hash">0b21763e64cd43890a1c4b67946706ad0c487045bcb5212726d1352e89fa1c46</code></td></tr><tr><th>Схема отчёта</th><td>bcc-review/2</td></tr></table></div><div><h3 class="sub">Этапы</h3><ul class="stages"><li class="st st-ok"><span>Нарезка требований<small>8 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Правила<small>&lt; 1 с</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Аналитик»<small>10 с · 1 вызов · 1 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Тестировщик»<small>23 с · 1 вызов · 1 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Архитектор»<small>8 с · 2 вызова</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Риски»<small>4 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Набор целиком<small>19 с · 1 вызов · 2 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Сверка цитат<small>&lt; 1 с · 4 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Судья<small>21 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Вопросы<small>9 с · 1 вызов</small></span><b>готово</b></li></ul><h3 class="sub">Предупреждения</h3><ul class="warns"><li>Линза «Архитектор»: модель вернула пустой ответ — один повтор</li><li>судья: уровни изменены кодом — обоснование вердикта собрано кодом</li></ul><h3 class="sub">Как проверить отчёт</h3><p class="lead">Каждая цитата в замечаниях найдена в документе программой, номер строки посчитан кодом, а не моделью. Повторная сверка: <code>python -m bcc_review.v2.verify report.json документ</code>.</p></div></div></section></main>
+<footer class="foot">Сформировано агентом BCC Review 2.0.0-dev · статическое ревью по ISO/IEC/IEEE 29148:2018 и IEEE 830-1998 ·
+цитаты сверены с документом программой</footer>
+<script type="application/json" id="report-data">{"schema": "bcc-review/2", "run": {"agent": "BCC Review", "version": "2.0.0-dev", "commit": "973ce4d7", "dirty": false, "run_id": "20261127-211822-a2a1", "started_at": "2026-11-27T21:18:22+05:00", "finished_at": "2026-11-27T21:19:23+05:00", "duration_s": 60.9, "provider": "claude_cli", "model_requested": "haiku", "models_used": ["claude-haiku-5-5"], "calls": {"total": 9, "cached": 0, "failed": 0, "split": 0}, "tokens": {"input": 135141, "output": 19142}, "cost_usd": 0.0268, "status": "complete", "stages": {"segment": "ok", "rules": "ok", "lens_analyst": "ok", "lens_qa": "ok", "lens_architect": "ok", "lens_risk": "ok", "consistency": "ok", "quotes": "ok", "judge": "ok", "clarify": "ok"}, "stage_stats": {"segment": {"calls": 1, "seconds": 7.74, "candidates": 0}, "rules": {"calls": 0, "seconds": 0.0, "candidates": 0}, "lens_analyst": {"calls": 1, "seconds": 10.1, "candidates": 1}, "lens_qa": {"calls": 1, "seconds": 22.65, "candidates": 1}, "lens_architect": {"calls": 2, "seconds": 8.16, "candidates": 0}, "lens_risk": {"calls": 1, "seconds": 4.14, "candidates": 0}, "consistency": {"calls": 1, "seconds": 19.01, "candidates": 2}, "quotes": {"calls": 0, "seconds": 0.0, "candidates": 4}, "judge": {"calls": 1, "seconds": 21.35, "candidates": 0}, "clarify": {"calls": 1, "seconds": 9.05, "candidates": 0, "early": true, "model_seconds": 9.1}}, "warnings": ["Линза «Архитектор»: модель вернула пустой ответ — один повтор", "судья: уровни изменены кодом — обоснование вердикта собрано кодом"], "options": {"max_calls": 16, "passes": 1, "lenses": ["analyst", "qa", "architect", "risk"], "export": [], "revise": false, "answers": false}, "fast_start": false}, "document": {"title": "Пирог с яблоками", "file": "recipe.md", "format": "md", "sha256": "0b21763e64cd43890a1c4b67946706ad0c487045bcb5212726d1352e89fa1c46", "lines": 16, "pages": null, "warnings": []}, "requirements": [{"id": "R-01", "source_id": "", "kind": "data", "section": "Ингредиенты", "summary": "Ингредиент: мука, 300 граммов", "quote": "мука — 300 г", "line_start": 5, "line_end": 5, "page": null}, {"id": "R-02", "source_id": "", "kind": "data", "section": "Ингредиенты", "summary": "Ингредиент: сахар, 150 граммов", "quote": "сахар — 150 г", "line_start": 6, "line_end": 6, "page": null}, {"id": "R-03", "source_id": "", "kind": "data", "section": "Ингредиенты", "summary": "Ингредиент: яйца, 3 штуки", "quote": "яйца — 3 шт.", "line_start": 7, "line_end": 7, "page": null}, {"id": "R-04", "source_id": "", "kind": "data", "section": "Ингредиенты", "summary": "Ингредиент: яблоки, 4 штуки", "quote": "яблоки — 4 шт.", "line_start": 8, "line_end": 8, "page": null}, {"id": "R-05", "source_id": "Приготовление, п. 1", "kind": "functional", "section": "Приготовление", "summary": "Взбить яйца с сахаром до пышной пены", "quote": "1. Взбейте яйца с сахаром до пышной пены.", "line_start": 12, "line_end": 12, "page": null}, {"id": "R-06", "source_id": "Приготовление, п. 2", "kind": "functional", "section": "Приготовление", "summary": "Добавить муку и аккуратно перемешать", "quote": "2. Добавьте муку и аккуратно перемешайте.", "line_start": 13, "line_end": 13, "page": null}, {"id": "R-07", "source_id": "Приготовление, п. 3", "kind": "functional", "section": "Приготовление", "summary": "Нарезать яблоки дольками и выложить в форму", "quote": "3. Нарежьте яблоки дольками и выложите в форму.", "line_start": 14, "line_end": 14, "page": null}, {"id": "R-08", "source_id": "Приготовление, п. 4", "kind": "functional", "section": "Приготовление", "summary": "Залить тестом и выпекать 40 минут при 180", "quote": "4. Залейте тестом и выпекайте 40 минут при 180 градусах.", "line_start": 15, "line_end": 15, "page": null}, {"id": "R-09", "source_id": "Приготовление, п. 5", "kind": "functional", "section": "Приготовление", "summary": "Подавать тёплым, по желанию с мороженым", "quote": "5. Подавайте пирог тёплым, можно с мороженым.", "line_start": 16, "line_end": 16, "page": null}], "excluded": [], "findings": [{"id": "D-01", "candidate_ids": ["C-003", "C-004"], "title": "Пункты рецепта без ID, приоритетов, источника и версии", "kind": "missing_element", "criterion": "traceable", "standard_refs": ["IEEE 830-1998 п. 4.3.8"], "severity": "minor", "requirement_ids": ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-09"], "evidence": [{"quote": "Пирог с яблоками", "line_start": 1, "line_end": 1, "page": null, "section": "", "verified": "exact"}], "problem": "Ни у одного из требований R-01…R-09 (строки 5–16) нет ID, приоритета, источника и версии. Без них изменение пункта нельзя связать с исходным требованием и определить, что важнее при нехватке времени.", "scenario": "", "impact": "Изменение пункта рецепта сложно связать с исходным требованием и версией при ревью.", "recommendation": "Указать в шапке документа версию и источник, а пунктам присвоить идентификаторы.", "rewrite": "Шапка: версия документа и источник рецепта; пункты рецепта имеют идентификаторы R-01…«Приготовление, п. 5».", "question": "", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-02", "candidate_ids": ["C-002"], "title": "Нет приёмочных критериев для функциональных шагов рецепта", "kind": "missing_element", "criterion": "verifiable", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.6"], "severity": "minor", "requirement_ids": ["R-05", "R-06", "R-07", "R-08", "R-09"], "evidence": [{"quote": "Приготовление", "line_start": 10, "line_end": 10, "page": null, "section": "Приготовление", "verified": "exact"}], "problem": "Раздел «Приготовление» (L010–L016) описывает пять шагов, но ни одна строка приёмки (условие → действие → результат) не задана. Не описаны ветки: неполный набор ингредиентов, другая температура или время выпечки, порядок шагов.", "scenario": "Тестировщик для шага 4 (выпечка 40 минут при 180) не знает, что проверять: время, температуру или готовность пирога.", "impact": "Тесты строятся по собственному пониманию тестировщика, приёмка может разойтись с ожиданием заказчика.", "recommendation": "Добавить раздел критериев приёмки с одной строкой на каждое требование строки 5–16 и ветки отклонений. Непокрытые ветки закрывают тест-кейсы T-03–T-05 из черновика тестов отчёта — их можно перенести в таблицу критериев приёмки.", "rewrite": "Раздел «Критерии приёмки»: для каждого R-0X — предусловие, действие, ожидаемый результат с числом; для строки 15 — выпечка 40 минут при 180 градусах, отклонение от значений \u003cуточнить: допустимое отклонение\u003e.", "question": "Кто утверждает критерии приёмки и какие отклонения допустимы?", "blocks": "none", "priority": 0, "sources": ["lens:qa"]}, {"id": "D-03", "candidate_ids": ["C-001"], "title": "Температура выпечки без указания шкалы (°C или °F)", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-08"], "evidence": [{"quote": "Залейте тестом и выпекайте 40 минут при 180 градусах", "line_start": 15, "line_end": 15, "page": null, "section": "Приготовление", "verified": "exact"}], "problem": "В пункте 4 раздела «Приготовление» (L015) температура задана как «при 180 градусах» без шкалы. При чтении как Фаренгейта пирог за 40 минут не пропечётся.", "scenario": "Духовка выставлена на 180: по Цельсию это 180 °C, по Фаренгейту около 82 °C, и пирог не пропечётся за 40 минут.", "impact": "Пользователь, который выставит температуру по другой шкале, получит непропечённый пирог, а проверяющий не сможет определить правильный результат.", "recommendation": "Указать шкалу температуры прямо в пункте 4.", "rewrite": "4. Залейте тестом и выпекайте 40 минут при 180 градусах Цельсия.", "question": "Температура задана в градусах Цельсия (180 °C)? Других вариантов шкалы в документе нет.", "blocks": "none", "priority": 0, "sources": ["lens:analyst"]}], "rejected": [{"candidate_id": "", "title": "Шаг 1 рецепта «взбить до пышной пены» не имеет объективного признака прохождения", "source": "lens:qa", "reason_code": "lens_dropped", "reason": "снято линзой тестировщика: результат функции не описан — это неполнота (зона аналитика), а не непроверяемость", "line": 12, "severity": "major", "kind": "unverifiable", "problem": "«Пышная пена» — оценка, а не измеримый признак: в документе нет ни объёма, ни кратности увеличения, ни времени взбивания, ни способа контроля.", "evidence": [{"quote": "Взбейте яйца с сахаром до пышной пены", "line": 12}]}], "acceptance_checks": [], "test_cases": [{"id": "T-01", "requirement_ids": ["R-07"], "title": "Нарезка яблок дольками и выкладка в форму", "given": "Яблоки — 4 шт., форма для выпечки подготовлена", "when": "Выполнен шаг 3 рецепта", "then": "Яблоки нарезаны дольками и выложены в форму", "gap": "", "expected_defined": true}, {"id": "T-02", "requirement_ids": ["R-08"], "title": "Выпечка пирога 40 минут при 180 градусах", "given": "Форма залита тестом, духовка готова к работе", "when": "Выполнен шаг 4 рецепта", "then": "Выпечка длится 40 минут при 180 градусах", "gap": "", "expected_defined": true}, {"id": "T-03", "requirement_ids": ["R-06"], "title": "Перемешивание муки с массой: критерий окончания шага", "given": "Яйца взбиты с сахаром, мука — 300 г", "when": "Выполнен шаг 2 рецепта «аккуратно перемешайте»", "then": "Не определено требованиями: не задано, когда перемешивание считается законченным (время, число движений или признак однородности)", "gap": "Ветка окончания шага не покрыта ни одним критерием приёмки.", "expected_defined": false}, {"id": "T-04", "requirement_ids": ["R-05"], "title": "Взбивание яиц с сахаром до пышной пены", "given": "Яйца — 3 шт., сахар — 150 г", "when": "Выполнен шаг 1 рецепта", "then": "Не определено требованиями: что считать «пышной пеной» (объём, кратность, время); тест нельзя считать пройденным или непройденным", "gap": "Признак результата не задан, поэтому проверка шага не покрыта приёмкой.", "expected_defined": false}, {"id": "T-05", "requirement_ids": ["R-09"], "title": "Подача пирога тёплым с мороженым по желанию", "given": "Пирог выпечен по шагам 1–4", "when": "Выполнен шаг 5 рецепта", "then": "Пирог подан; Не определено требованиями: температура «тёплым» не задана числом, как и условие подачи с мороженым (выбор клиента или обязательная опция)", "gap": "Ветка подачи без мороженого и границы температуры не покрыты приёмкой.", "expected_defined": false}], "pair_checks": [], "trace": [{"requirement_id": "R-01", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки и поля данных"}, {"requirement_id": "R-02", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки и поля данных"}, {"requirement_id": "R-03", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки и поля данных"}, {"requirement_id": "R-04", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки и поля данных"}, {"requirement_id": "R-05", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки для пышной пены"}, {"requirement_id": "R-06", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки для аккуратного перемешивания"}, {"requirement_id": "R-07", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки на нарезку и форму"}, {"requirement_id": "R-08", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки на время и температуру"}, {"requirement_id": "R-09", "verified_by": [], "implemented_by": [], "note": "нет критерия приёмки на подачу"}], "glossary": [], "questions": [{"id": "Q-01", "topic": "Допустимые отклонения параметров рецепта", "finding_ids": ["D-02"], "to": "Владелец продукта", "blocking": false, "question": "Какие отклонения от параметров рецепта считаются допустимыми: температура и время выпечки, количество ингредиентов? Сейчас в документе задано только одно значение (180 градусов, 40 минут), а критериев приёмки для шагов рецепта нет.", "evidence": [{"quote": "Приготовление", "line_start": 10, "line_end": 10, "page": null, "section": "Приготовление", "verified": "exact"}, {"quote": "Залейте тестом и выпекайте 40 минут при 180 градусах", "line_start": 15, "line_end": 15, "page": null, "section": "Приготовление", "verified": "exact"}], "options": ["Отклонений нет: температура 180 °C, время 40 минут, количества ингредиентов ровно как указано; любое другое значение считается ошибкой рецепта", "Допустимо отклонение температуры ±10 °C и времени ±5 минут; при выходе за пределы шага рецепт считается неверным", "Указанные значения рекомендуемые: любые значения, введённые пользователем, принимаются без проверки, документ фиксирует только рекомендации"], "why": "Без границ отклонений тестировщик не может написать проверку шага выпечки: непонятно, какой результат считать корректным при другой температуре или времени, и две команды проверят один и тот же вход по-разному."}], "checklist": [{"item": "Техническое требование зафиксировано и покрывает бизнес-требование", "answer": "Частично", "comment": "Документ — рецепт, он покрывает бизнес-содержание (ингредиенты и шаги), но без версии и источника привязка неполна (L001).", "finding_ids": ["D-01"]}, {"item": "Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)", "answer": "Частично", "comment": "Есть разделы «Ингредиенты» и «Приготовление» (L003, L010), но пункты без ID и приоритетов (L012–L016).", "finding_ids": ["D-01"]}, {"item": "Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений", "answer": "Не требуется", "comment": "Документ не описывает взаимодействие систем, только последовательность кулинарных действий.", "finding_ids": []}, {"item": "Требование покрывает спецификацию UX/UI дизайна", "answer": "Не требуется", "comment": "Документ не содержит UX/UI-спецификации и экранов.", "finding_ids": []}, {"item": "Реализация задачи/проекта предусматривает схему отката решений", "answer": "Не требуется", "comment": "Документ описывает кулинарный рецепт, решения реализации не вводятся.", "finding_ids": []}, {"item": "Требование может быть протестировано", "answer": "Частично", "comment": "Шаги проверяемы по форме, но критерии приёмки не заданы ни для одного шага (L010–L016).", "finding_ids": ["D-02"]}, {"item": "Требование предусматривает модель данных или поток, содержит описание", "answer": "Да", "comment": "Ингредиенты заданы с количествами и единицами (L005–L008), это данные требований R-01…R-04.", "finding_ids": []}, {"item": "Требование не имеет противоречий или явных показателей операционных рисков", "answer": "Частично", "comment": "Противоречий нет, но температура выпечки без шкалы допускает два толкования (L015).", "finding_ids": ["D-03"]}, {"item": "Требование содержит архитектуру и согласовано с архитекторами", "answer": "Не требуется", "comment": "Архитектурные решения в документе не заявлены.", "finding_ids": []}, {"item": "Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами", "answer": "Не требуется", "comment": "Документ не затрагивает другие системы или продукты.", "finding_ids": []}, {"item": "Структура требований не несёт изменений и рисков информационной безопасности", "answer": "Не требуется", "comment": "Документ не вводит данных, доступа или обработки информации.", "finding_ids": []}, {"item": "В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки", "answer": "Не требуется", "comment": "Полная схема бизнес-процесса для рецепта неприменима.", "finding_ids": []}, {"item": "Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия", "answer": "Не требуется", "comment": "Интеграционное взаимодействие в документе отсутствует.", "finding_ids": []}, {"item": "Поддерживается версионность документа / зафиксирована", "answer": "Частично", "comment": "Версия и дата документа не указаны, в заголовке только название «Пирог с яблоками» (L001).", "finding_ids": ["D-01"]}], "verdict": {"development": "yes", "testing": "yes", "summary": "Разработку и тестирование можно начинать: критичных и существенных дефектов нет; незначительные замечания можно закрыть по ходу работы.", "fix_first": ["D-01", "D-02", "D-03"], "why": "Критичных дефектов нет и существенных нет — начинать можно.", "reason": "Критичных дефектов нет и существенных нет — начинать можно."}, "checklist_source": "bank", "quote_stats": {"quotes": 4, "verified": 4, "exact": 4, "normalized": 0, "fuzzy": 0, "missing": 0, "candidates_in": 4, "candidates_kept": 4, "candidates_rejected": 0, "share_verified": 1.0}, "summary": {"requirements": 9, "findings": {"critical": 0, "major": 0, "minor": 3}, "requirements_without_findings": 0, "quotes_verified": 3, "quotes_total": 3, "questions": 1}}</script>
+<script>
+/* HTML-отчёт v2 (№14): фильтры, подсветка, вкладки, тема, печать. Без библиотек. */
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var root = document.documentElement;
+  var doc = $("#doc");
+  var cardsBox = $("#cards");
+  var cards = $$(".card", cardsBox || document);
+
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; }
+    return null;
+  }
+
+  function toast(msg) {
+    var t = document.createElement("div");
+    t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 1800);
+  }
+
+  /* ── тема ── */
+  function currentTheme() {
+    if (root.dataset.theme) return root.dataset.theme;
+    return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  $("#theme").addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    root.dataset.theme = next; store("bccr-theme", next);
+  });
+
+  /* ── вкладки ── */
+  var tabs = $$(".tab");
+  function showTab(name, focus) {
+    tabs.forEach(function (t) {
+      var on = t.dataset.tab === name;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      $("#p-" + t.dataset.tab).hidden = !on;
+      if (on && focus) t.focus();
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () {
+      showTab(t.dataset.tab);
+      history.replaceState(null, "", "#" + t.dataset.tab);
+      var y = $(".tabs").getBoundingClientRect().top + window.scrollY - parseInt(getComputedStyle(root).getPropertyValue("--top-h"), 10);
+      if (window.scrollY > y) window.scrollTo({ top: y });
+    });
+    t.addEventListener("keydown", function (ev) {
+      var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+      if (d) { ev.preventDefault(); showTab(tabs[(i + d + tabs.length) % tabs.length].dataset.tab, true); }
+    });
+  });
+
+  /* ── документ: прокрутка и подсветка ── */
+  function lineEl(n) { return doc ? doc.querySelector('.ln[data-n="' + n + '"]') : null; }
+  function scrollDocTo(n, n2) {
+    if (!doc) return;
+    var el = lineEl(n);
+    if (!el) return;
+    if (doc.classList.contains("onlyhl") && !el.classList.contains("hl")) { $("#onlyhl").checked = false; doc.classList.remove("onlyhl"); }
+    var top = el.offsetTop - doc.clientHeight / 3;
+    doc.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    var last = parseInt(n2 || n, 10);
+    for (var k = parseInt(n, 10); k <= last; k++) {
+      var x = lineEl(k);
+      if (x) { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); }
+    }
+    if (window.matchMedia("(max-width: 960px)").matches) {
+      var pane = $(".docpane");
+      if (pane) pane.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+  function clearSel() {
+    $$(".ln.sel, .ln.rqsel, mark.q.on").forEach(function (x) { x.classList.remove("sel", "rqsel", "on"); });
+    $$(".card.active").forEach(function (x) { x.classList.remove("active"); });
+    if (doc) doc.classList.remove("focus");
+  }
+
+  function selectFinding(id, opts) {
+    opts = opts || {};
+    var card = document.getElementById(id);
+    if (!card || !card.classList.contains("card")) return;
+    showTab("findings");
+    clearSel();
+    card.classList.add("active");
+    if (doc) doc.classList.add("focus");
+    if (card.hidden) { resetFilters(); }
+    var lines = (card.dataset.lines || "").split(" ").filter(Boolean);
+    if (doc) {
+      $$('.ln[data-f]', doc).forEach(function (x) {
+        if ((" " + x.dataset.f + " ").indexOf(" " + id + " ") >= 0) x.classList.add("sel");
+      });
+      $$("mark.q", doc).forEach(function (m) {
+        if ((" " + m.dataset.f + " ").indexOf(" " + id + " ") >= 0) m.classList.add("on");
+      });
+    }
+    if (lines.length && !opts.noDocScroll) scrollDocTo(lines[0]);
+    if (opts.scrollCard) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", "#" + id);
+  }
+
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest("[data-goto]");
+    if (a) { ev.preventDefault(); selectFinding(a.dataset.goto, { scrollCard: true }); return; }
+    var evb = ev.target.closest(".ev");
+    if (evb) {
+      var c = evb.closest(".card");
+      if (c) selectFinding(c.id, { noDocScroll: true });
+      scrollDocTo(evb.dataset.ls, evb.dataset.le);
+      return;
+    }
+    var r = ev.target.closest("[data-req]");
+    if (r) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var k = +r.dataset.ls; k <= +(r.dataset.le || r.dataset.ls); k++) { var x = lineEl(k); if (x) x.classList.add("rqsel"); }
+      scrollDocTo(r.dataset.ls, r.dataset.le);
+      return;
+    }
+    var l = ev.target.closest("[data-line]");
+    if (l && !l.closest(".card")) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var m = +l.dataset.line; m <= +(l.dataset.le || l.dataset.line); m++) { var y = lineEl(m); if (y) y.classList.add("rqsel"); }
+      scrollDocTo(l.dataset.line, l.dataset.le);
+      return;
+    }
+    var cp = ev.target.closest("[data-copy]");
+    if (cp) {
+      var txt = cp.closest(".dl").querySelector(".dd").textContent;
+      try { navigator.clipboard.writeText(txt).then(function () { toast("Формулировка скопирована"); }); } catch (_) { toast("Не удалось скопировать"); }
+      return;
+    }
+    var card = ev.target.closest(".card");
+    if (card && !ev.target.closest("a, button, summary, input, select, textarea") && !String(window.getSelection())) {
+      selectFinding(card.id);
+      return;
+    }
+    var ln = ev.target.closest(".ln.hl");
+    if (ln && !ev.target.closest("a")) {
+      var ids = ln.dataset.f.split(" ");
+      var cur = $(".card.active");
+      var i = cur ? ids.indexOf(cur.id) : -1;
+      selectFinding(ids[(i + 1) % ids.length], { scrollCard: true, noDocScroll: true });
+    }
+  });
+
+  if (doc) {
+    $("#onlyhl").addEventListener("change", function (ev) { doc.classList.toggle("onlyhl", ev.target.checked); });
+    $("#showreq").addEventListener("change", function (ev) { doc.classList.toggle("showreq", ev.target.checked); });
+    $$(".ln.ex", doc).forEach(function (x) { x.title = "Не требование — " + x.dataset.ex; });
+  }
+
+  /* ── мини-карта: где в документе замечания ── */
+  var mm = $("#minimap");
+  function drawMap() {
+    if (!doc || !mm || !doc.scrollHeight) return;
+    mm.innerHTML = "";
+    var H = doc.scrollHeight, h = mm.clientHeight;
+    $$(".ln.hl", doc).forEach(function (x) {
+      if (!x.offsetHeight) return;
+      var t = document.createElement("i");
+      t.className = (x.className.match(/sev-\w+/) || [""])[0];
+      t.style.top = (x.offsetTop / H * h) + "px";
+      t.style.height = Math.max(3, x.offsetHeight / H * h) + "px";
+      t.title = "Строка " + x.dataset.n + ": " + x.dataset.f;
+      t.addEventListener("click", function () { selectFinding(x.dataset.f.split(" ")[0], { scrollCard: true }); });
+      mm.appendChild(t);
+    });
+    var vw = document.createElement("div");
+    vw.className = "vw";
+    mm.appendChild(vw);
+    var upd = function () {
+      vw.style.top = (doc.scrollTop / H * h) + "px";
+      vw.style.height = Math.max(8, doc.clientHeight / H * h) + "px";
+    };
+    upd();
+    doc.onscroll = upd;
+  }
+  if (doc && mm) {
+    setTimeout(drawMap, 60);
+    addEventListener("resize", function () { clearTimeout(drawMap.t); drawMap.t = setTimeout(drawMap, 150); });
+    ["onlyhl", "showreq"].forEach(function (k) { $("#" + k).addEventListener("change", function () { setTimeout(drawMap, 30); }); });
+  }
+
+  /* ── фильтры ── */
+  var chips = $$(".sevchip");
+  var q = $("#q"), fkind = $("#fkind"), fsrc = $("#fsrc"), fsort = $("#fsort"), fcount = $("#fcount");
+  function applyFilters() {
+    if (!cardsBox) return;
+    var sev = {};
+    chips.forEach(function (c) { sev[c.dataset.sev] = c.getAttribute("aria-pressed") === "true"; });
+    var words = (q.value || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = sev[c.dataset.sev] !== false;
+      if (ok && fkind.value) ok = c.dataset.kind === fkind.value;
+      if (ok && fsrc.value) ok = (" " + c.dataset.src + " ").indexOf(" " + fsrc.value + " ") >= 0;
+      if (ok && words.length) {
+        var s = c.dataset.search;
+        ok = words.every(function (w) { return s.indexOf(w) >= 0; });
+      }
+      c.hidden = !ok;
+      if (ok) shown++;
+    });
+    fcount.textContent = "Показано " + shown + " из " + cards.length;
+    var empty = $(".empty[hidden], .empty", cardsBox);
+    if (empty && cards.length) empty.hidden = shown !== 0;
+  }
+  function sortCards() {
+    var key = fsort.value;
+    var sorted = cards.slice().sort(function (a, b) {
+      var A = a.dataset, B = b.dataset;
+      if (key === "line") return (+A.line - +B.line) || (+B.rank - +A.rank);
+      if (key === "sev") return (+B.rank - +A.rank) || (+A.line - +B.line);
+      var pa = +A.prio || 999, pb = +B.prio || 999;
+      return (pa - pb) || (+B.rank - +A.rank) || (+A.line - +B.line);
+    });
+    var empty = $(".empty", cardsBox);
+    sorted.forEach(function (c) { cardsBox.insertBefore(c, empty); });
+  }
+  function resetFilters() {
+    chips.forEach(function (c) { c.setAttribute("aria-pressed", "true"); });
+    q.value = ""; fkind.value = ""; fsrc.value = "";
+    applyFilters();
+  }
+  if (cardsBox) {
+    chips.forEach(function (c) {
+      c.addEventListener("click", function () {
+        c.setAttribute("aria-pressed", c.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        applyFilters();
+      });
+    });
+    q.addEventListener("input", applyFilters);
+    fkind.addEventListener("change", applyFilters);
+    fsrc.addEventListener("change", applyFilters);
+    fsort.addEventListener("change", sortCards);
+    $$("[data-reset]").forEach(function (b) { b.addEventListener("click", resetFilters); });
+    $$("[data-sevonly]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var s = b.dataset.sevonly;
+        chips.forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.sev === s ? "true" : "false"); });
+        showTab("findings"); applyFilters();
+        var t = $(".tabs"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 60, behavior: "smooth" });
+      });
+    });
+    var allOpen = false;
+    $("#toggleall").addEventListener("click", function (ev) {
+      allOpen = !allOpen;
+      $$(".card .more").forEach(function (d) { d.open = allOpen; });
+      ev.target.textContent = allOpen ? "Свернуть все" : "Развернуть все";
+    });
+    applyFilters();
+  }
+
+  /* ── клавиатура: ↑/↓ или j/k по карточкам ── */
+  document.addEventListener("keydown", function (ev) {
+    if (ev.target.closest("input, textarea, select") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key === "Escape") { clearSel(); history.replaceState(null, "", location.pathname); return; }
+    var d = (ev.key === "ArrowDown" || ev.key === "j") ? 1 : (ev.key === "ArrowUp" || ev.key === "k") ? -1 : 0;
+    if (!d || $("#p-findings").hidden || ev.target.closest(".doc")) return;
+    var vis = $$(".card", cardsBox).filter(function (c) { return !c.hidden; });
+    if (!vis.length) return;
+    ev.preventDefault();
+    var cur = $(".card.active");
+    var i = cur ? vis.indexOf(cur) : -1;
+    var next = vis[Math.min(vis.length - 1, Math.max(0, i + d))];
+    selectFinding(next.id, { scrollCard: true });
+  });
+
+  /* ── печать и скачивание ── */
+  var opened = [];
+  window.addEventListener("beforeprint", function () {
+    opened = $$("details").filter(function (d) { return !d.open; });
+    opened.forEach(function (d) { d.open = true; });
+  });
+  window.addEventListener("afterprint", function () { opened.forEach(function (d) { d.open = false; }); opened = []; });
+  $("#print").addEventListener("click", function () { window.print(); });
+
+  function download(name, text, type) {
+    var blob = new Blob([text], { type: type });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  var base = document.body.dataset.file || "report";
+  $("#dljson").addEventListener("click", function () {
+    download(base + ".report.json", $("#report-data").textContent, "application/json");
+  });
+
+  var dla = $("#dlanswers");
+  if (dla) {
+    dla.addEventListener("click", function () {
+      var data = JSON.parse($("#report-data").textContent);
+      var LET = "ABCDEFGH";
+      var md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
+        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.",
+        "> Передайте файл агенту: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers этот_файл.md", ""];
+      var n = 0;
+      (data.questions || []).forEach(function (qq) {
+        var pick = $('input[name="' + qq.id + '"]:checked');
+        var own = $('textarea[data-own="' + qq.id + '"]');
+        var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
+        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
+        if (!val) return;
+        n++;
+        md.push(qq.id + (qq.topic ? " [" + qq.topic + "]" : "") + ": " + val);
+      });
+      if (!n) { toast("Отметьте хотя бы один ответ"); return; }
+      download(base + ".answers.md", md.join("\n") + "\n", "text/markdown");
+      toast("Ответов в файле: " + n);
+    });
+  }
+
+  /* ── адрес страницы: #D-02 или #questions ── */
+  function fromHash() {
+    var h = decodeURIComponent(location.hash.slice(1));
+    if (!h) return;
+    if (document.getElementById("p-" + h)) { showTab(h); return; }
+    var el = document.getElementById(h);
+    if (el && el.classList.contains("card")) selectFinding(h, { scrollCard: true });
+    else if (/^L\d+$/.test(h)) { showTab("findings"); scrollDocTo(h.slice(1)); }
+  }
+  window.addEventListener("hashchange", fromHash);
+  fromHash();
+})();
+
+</script>
+</body>
+</html>

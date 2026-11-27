@@ -93,10 +93,11 @@ def test_compatible_pair_gives_no_candidate():
     assert out["candidates"] == []
 
 
-def test_conflict_with_one_missing_quote_is_downgraded_to_major():
+def test_conflict_with_one_missing_quote_is_not_conflict():
     out = C.postprocess(answer(pair_checks=[pair(quote_b="Этой фразы в документе нет")]), VIEW, REQS)
     [c] = out["candidates"]
-    assert c["severity"] == "major"
+    # №27: конфликт держится на двух цитатах из разных мест; одна не найдена — неопределённость, minor
+    assert c["severity"] == "minor" and out["pair_checks"][0]["gate"] == "same_place"
     assert out["pair_checks"][0]["verified_b"] == "missing"
 
 
@@ -111,7 +112,7 @@ def test_line_hint_is_corrected_by_quote_search():
     assert (p["line_a"], p["line_b"]) == (3, 4)
 
 
-def test_undefined_is_major_ambiguity_and_capped():
+def test_undefined_is_minor_ambiguity_and_capped():
     pairs = [pair(verdict="undefined", subject=f"предмет {i}", quote_a=q, line_a=n,
                   quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7)
              for i, (q, n) in enumerate([("Вклад можно пополнять", 3), ("Пополнение через кассу", 4),
@@ -119,7 +120,7 @@ def test_undefined_is_major_ambiguity_and_capped():
                                           ("Хранить идентификатор вклада", 9), ("Клиент открывает вклад", 10)])]
     out = C.postprocess(answer(pair_checks=pairs), VIEW, REQS)
     assert len(out["candidates"]) == C.MAX_UNDEFINED_CANDIDATES
-    assert {c["severity"] for c in out["candidates"]} == {"major"}
+    assert {c["severity"] for c in out["candidates"]} == {"minor"}  # №27: неопределённость — minor (не конфликт)
     assert {c["kind"] for c in out["candidates"]} == {"ambiguity"}
     assert len(out["pair_checks"]) == 6
 
@@ -165,7 +166,8 @@ def test_model_candidate_without_quotes_is_dropped_and_enums_sanitized():
     empty = dict(bad, evidence=[])
     out = C.postprocess(answer(candidates=[bad, empty]), VIEW, REQS)
     [c] = out["candidates"]
-    assert (c["kind"], c["criterion"], c["severity"], c["blocks"]) == ("other", "set_consistent", "major", "none")
+    # №27: major модели без проверки кодом (вид «other») — minor
+    assert (c["kind"], c["criterion"], c["severity"], c["blocks"]) == ("other", "set_consistent", "minor", "none")
     assert c["requirement_ids"] == ["R-08"]
 
 
@@ -319,7 +321,8 @@ def test_event_pair_with_goal_or_nonfunctional_gives_no_candidate_value_pair_is_
              b="R-06", quote_b="Доход начисляется банком на следующий рабочий день.", line_b=7)
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
     assert out["pair_checks"] and out["candidates"] == []  # цель ↔ требования — п. 1 шага 5, не пара
-    out = C.postprocess(answer(pair_checks=[dict(p, kind="boundary_conflict", basis="value_mismatch")]), VIEW, REQS)
+    # №27: «граница» без значения у обеих сторон — не граница; пара о величине с целью — единица измерения
+    out = C.postprocess(answer(pair_checks=[dict(p, kind="unit_mismatch", basis="value_mismatch")]), VIEW, REQS)
     assert out["candidates"][0]["severity"] == "major"
 
 
@@ -335,11 +338,11 @@ def test_fallback_fuzzy_quote_near_hint():
     assert C._fallback_verify(VIEW, "Пополнение через кассы доступно всегда", 10) is None
 
 
-def test_conflict_without_basis_becomes_undefined_major():
+def test_conflict_without_basis_becomes_undefined_minor():
     out = C.postprocess(answer(pair_checks=[pair(basis="none", kind="status_conflict")]), VIEW, REQS)
     assert out["pair_checks"][0]["verdict"] == "undefined"
     [c] = out["candidates"]
-    assert c["severity"] == "major" and c["kind"] == "ambiguity"
+    assert c["severity"] == "minor" and c["kind"] == "ambiguity"  # №27: неопределённость — minor (не конфликт)
 
 
 def test_old_answers_without_basis_still_work():
@@ -351,9 +354,10 @@ def test_old_answers_without_basis_still_work():
 
 def test_conflicts_touching_one_multiline_requirement_are_merged():
     reqs = REQS + [{"id": "R-09", "source_id": "", "kind": "api", "line_start": 9, "line_end": 10}]
-    p1 = pair(a="R-02", b="R-09", quote_b="Хранить идентификатор вклада", line_b=9, kind="status_conflict")
+    # №27: «один вход — два кода» без кодов в цитатах — не конфликт, поэтому слияние проверяем на конфликте событий
+    p1 = pair(a="R-02", b="R-09", quote_b="Хранить идентификатор вклада", line_b=9, kind="event_conflict")
     p2 = pair(a="R-04", b="R-09", quote_a="Минимальная сумма вклада — 10 000.", line_a=5,
-              quote_b="Клиент открывает вклад", line_b=10, kind="status_conflict", title="второй")
+              quote_b="Клиент открывает вклад", line_b=10, kind="event_conflict", title="второй")
     out = C.postprocess(answer(pair_checks=[p1, p2]), VIEW, reqs)
     assert len(out["candidates"]) == 1
     assert sorted(e["line"] for e in out["candidates"][0]["evidence"]) == [3, 5, 9, 10]
@@ -461,10 +465,15 @@ def test_promised_but_missing_stays_critical_when_named_method_has_no_section():
 
 
 def test_promised_but_missing_is_major_when_every_named_method_is_described():
-    out = C.postprocess(answer(candidates=[_missing([("Перевод сверх лимита отклоняется.", 9),
+    out = C.postprocess(answer(candidates=[_missing([("Приложение читает лимит методом getLimit", 2),
                                                      ("Методы описаны в части B.", 3), ("Метод setLimit", 7)])]),
                         VIEW_API, [])
     assert out["candidates"][0]["severity"] == "major"
+    # №27: без обещания в цитируемых строках — догадка модели, minor
+    out = C.postprocess(answer(candidates=[_missing([("Перевод сверх лимита отклоняется.", 9),
+                                                     ("Методы описаны в части B.", 3), ("Метод setLimit", 7)])]),
+                        VIEW_API, [])
+    assert out["candidates"][0]["severity"] == "minor"
 
 
 def test_promise_without_identifiers_keeps_model_severity():
@@ -474,11 +483,11 @@ def test_promise_without_identifiers_keeps_model_severity():
     assert out["candidates"][0]["severity"] == "critical"
 
 
-def test_missing_element_without_promise_verb_in_quotes_is_major():
+def test_missing_element_without_promise_verb_in_quotes_is_minor():
     # экран с элементом или перечень систем — не обещание операции словами
     out = C.postprocess(answer(candidates=[_missing([("Методы описаны в части B.", 3), ("Часть B", 4)])]),
                         VIEW_API, [])
-    assert out["candidates"][0]["severity"] == "major"
+    assert out["candidates"][0]["severity"] == "minor"  # №27: без обещания — minor
 
 
 def test_link_trace_points_rows_to_findings_about_the_requirement():
@@ -508,7 +517,7 @@ def test_undefined_pair_without_limit_words_stays_undefined():
              quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
     assert out["pair_checks"][0]["verdict"] == "undefined"
-    assert out["candidates"][0]["severity"] == "major"
+    assert out["candidates"][0]["severity"] == "minor"  # №27: неопределённость — minor (не конфликт)
 
 
 def test_undefined_pair_with_acceptance_row_gives_no_candidate():
@@ -553,7 +562,7 @@ def test_internal_service_action_is_not_a_promise_of_interface_operation():
            "Методы описаны в части B."]
     view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
     out = C.postprocess(answer(candidates=[_missing([(doc[0], 1), (doc[1], 2)])]), view, [])
-    assert out["candidates"][0]["severity"] == "major"
+    assert out["candidates"][0]["severity"] == "minor"  # №27: без обещания интерфейса — minor
     doc[0] = "Приложение получает номер договора через дочерний документ."
     view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
     out = C.postprocess(answer(candidates=[_missing([("получает номер договора через дочерний документ", 1)])]), view, [])
@@ -561,7 +570,7 @@ def test_internal_service_action_is_not_a_promise_of_interface_operation():
 
 
 def test_conditional_permission_against_prohibition_of_other_state_is_not_conflict():
-    p = pair(kind="status_conflict", basis="same_condition",
+    p = pair(kind="event_conflict", basis="same_condition",
              quote_a="Вклад можно пополнять не более трёх раз в квартал.",
              quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
     assert C.postprocess(answer(pair_checks=[p]), VIEW, REQS)["pair_checks"][0]["verdict"] == "conflict"
@@ -572,7 +581,7 @@ def test_conditional_permission_against_prohibition_of_other_state_is_not_confli
              quote_a=doc[0], line_a=1, quote_b=doc[1], line_b=2)
     out = C.postprocess(answer(pair_checks=[p]), view, reqs)
     assert out["pair_checks"][0]["verdict"] == "undefined"
-    assert [c["severity"] for c in out["candidates"]] == ["major"]
+    assert [c["severity"] for c in out["candidates"]] == ["minor"]  # №27: неопределённость — minor (не конфликт)
 
 
 def test_major_glossary_entries_on_the_same_two_lines_merge_into_one_remark():

@@ -35,6 +35,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
+from bcc_review.v2.rules.units import CURRENCIES, DUR_UNIT
 from bcc_review.v2.stages import clarify as _cl
 
 STAGE = "recheck"
@@ -225,6 +226,27 @@ def _injected(part: str) -> bool:
                                               or _inj.IMPERATIVE.search(part)))
 
 
+# реплика без собственного предмета: выбирает вариант («второй вариант», «как в варианте B») или только
+# подтверждает («да», «так и оставляем», «согласен»). С вопросом это ответ; без вопроса не понять, какое правило
+# вносить, — такую реплику переспрашивают, а не вносят общим решением (№56)
+_OPTION_REF = re.compile(
+    r"\b(?:перв|втор|трет|четв[её]рт|последн)\w*\s+вариант\w*|\bвариант\w*\s+(?:№\s*)?(?:[A-DА-Г1-4])(?![\w])"
+    r"|\b(?:как|по)\s+(?:в\s+)?вариант\w*\b|^\s*(?:\*\*)?[A-DА-Г](?:\*\*)?\s*[.!)]?\s*$", re.I)
+_BARE = re.compile(
+    r"^\s*(?:да|нет|ок|окей|согласен|согласна|согласны|верно|принято|подтверждаю|оставляем|оставить|включаем"
+    r"|выключаем|нужно|не\s+нужно|так\s+и\s+(?:оставляем|делаем)|так\s+и\s+есть|пусть\s+так)\b", re.I)
+
+
+def needs_binding(text: str) -> bool:
+    """Реплика без своего предмета: ссылается на вариант или только подтверждает — без вопроса её не применить."""
+    t = str(text or "").strip()
+    if not t:
+        return False
+    if _OPTION_REF.search(t):
+        return True
+    return bool(_BARE.match(t)) and len(_tokens(t)) <= 3
+
+
 def strip_injection(text: str) -> tuple[str, list[str]]:
     """Ответ → (текст без указаний модели, вырезанные предложения)."""
     kept, cut = [], []
@@ -281,6 +303,39 @@ def _unhide_obj(obj: Any, count: list[int]) -> Any:
     if isinstance(obj, dict):
         return {(unhide(k)[0] if isinstance(k, str) else k): _unhide_obj(v, count) for k, v in obj.items()}
     return obj
+
+
+_SHA = re.compile(r"SHA[-‑\s]?256\W{0,6}([0-9a-f]{12,64})(?![0-9a-z])", re.I)
+
+
+def answers_sha(text: str) -> str:
+    """SHA-256 документа из шапки файла ответов (строки «>» и «#»), в нижнем регистре; нет — пустая строка."""
+    for raw in str(text or "").splitlines():
+        line = raw.strip()
+        if line.startswith((">", "#")):
+            m = _SHA.search(_INVISIBLE.sub("", line))
+            if m:
+                return m.group(1).lower()
+    return ""
+
+
+def check_document(parsed: dict, document: dict | None, warnings: list[str] | None = None) -> dict:
+    """Сверка SHA-256 из файла ответов с проверяемым документом: ``{"answers_sha256", "document_sha256", "match"}``.
+
+    ``match`` — True/False, None, если в файле ответов SHA нет (старый формат — без предупреждения). При
+    расхождении — предупреждение: вопросы и номера строк могли измениться, ответы привязаны по номеру и теме."""
+    got = str((parsed or {}).get("document_sha256") or "").strip().lower()
+    have = str((document or {}).get("sha256") or "").strip().lower()
+    out = {"answers_sha256": got, "document_sha256": have, "match": None}
+    if not got or not have:
+        return out
+    out["match"] = have.startswith(got) if len(got) < len(have) else have == got
+    if not out["match"] and warnings is not None:
+        name = (document or {}).get("file") or "документ"
+        warnings.append(f"recheck: ответы составлены по другой редакции документа (SHA-256 в файле ответов "
+                        f"{got[:12]}…, у проверенного «{name}» — {have[:12]}…): вопросы и номера строк могли "
+                        f"измениться. Проверьте привязки к вопросам этого отчёта")
+    return out
 
 
 def parse_answers_text(text: str) -> dict:
@@ -347,6 +402,9 @@ def parse_answers_text(text: str) -> dict:
         out["unparsed"] = unparsed
     if hidden:
         out["hidden"] = hidden
+    sha = answers_sha(text)
+    if sha:
+        out["document_sha256"] = sha
     return out
 
 
@@ -355,6 +413,7 @@ def parse_answers_json(data: Any) -> dict:
     decisions: list[str] = []
     count = [0]
     data = _unhide_obj(data, count)
+    data_top = data
 
     def add(qid: str, val: Any) -> None:
         if isinstance(val, list):  # {"Q-02": ["422 …", "403 …"]} — реплики разных адресатов на один вопрос
@@ -401,6 +460,12 @@ def parse_answers_json(data: Any) -> dict:
     out = {"answers": [a for a in answers if a["id"]], "decisions": decisions}
     if count[0]:
         out["hidden"] = count[0]
+    if isinstance(data_top, dict):
+        doc = data_top.get("document") if isinstance(data_top.get("document"), dict) else {}
+        raw_sha = data_top.get("document_sha256") or data_top.get("sha256") or doc.get("sha256") or ""
+        m = re.fullmatch(r"\s*([0-9a-fA-F]{12,64})\s*", str(raw_sha))
+        if m:
+            out["document_sha256"] = m.group(1).lower()
     return out
 
 
@@ -475,7 +540,8 @@ def _topic_score(hint: str, q: dict) -> float:
     return (2 * len(h & topic) + len((h & text) - topic)) / (2 * len(h))
 
 
-def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | None = None) -> dict:
+def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | None = None,
+                    *, document_changed: bool = False) -> dict:
     """Ответы → решения по вопросам этого прогона. Возвращает ``answered``, ``unanswered``, ``decisions``.
 
     Несколько реплик на один вопрос (например, два адресата) не склеиваются и не уходят в общие решения:
@@ -505,12 +571,17 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             warnings.append(f"recheck: {where} — указание модели («{_short(cut[0], 80)}»), это не решение "
                             f"владельца; не учтено")
         return kept
+    pending: list[dict] = []
     for d in parsed.get("decisions") or []:
         d = clean(str(d or ""), "в общем решении")
         if not d:
             continue
         body, deferred = split_deferred(d)
-        if body:
+        if body and needs_binding(body):
+            pending.append({"question_id": "", "topic": "", "text": d, "possible_questions": []})
+            warnings.append(f"recheck: общее решение «{_short(d, 80)}» не называет вопрос, а само правила не задаёт "
+                            f"(вариант или подтверждение) — подтвердите, к какому вопросу оно относится; не внесено")
+        elif body:
             extra.append(d)
         else:
             warnings.append(f"recheck: общее решение «{str(d)[:60]}» откладывает решение — не учтено")
@@ -535,9 +606,11 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             groups.setdefault((a.get("id"), " ".join(sorted(_tokens(hint)))), []).append(k)
     bound: dict[int, dict | None] = {}
     pairs = []
+    ambiguous: dict[int, list[str]] = {}
     for gk, members in groups.items():
         hint = entries[members[0]].get("topic_hint") or ""
         text = " ".join(entries[k].get("text") or "" for k in members).strip()
+        options = []
         for x in questions:
             # свой текст ответа — такой же признак, как тема: «возвраты и повторный push» по теме ближе к вопросу
             # о повторном push, а по тексту ответа — к вопросу о возвратах. Ответ буквой — только по теме.
@@ -546,7 +619,18 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             else:
                 sc, need = _topic_score(hint, x), 0.4
             xid = _qid(str(x["id"]))
-            pairs.append((sc + (0.01 if xid == gk[0] else 0), need, gk, xid))
+            if sc >= need:
+                options.append((sc, need, gk, xid))
+        if not options:
+            continue
+        best = max(row[0] for row in options)
+        tied = sorted(qid for score, _, _, qid in options if abs(score - best) < 1e-9)
+        if len(tied) > 1:
+            # Номер от предыдущего прогона не выбирает между одинаково подходящими вопросами.
+            for k in members:
+                ambiguous[k] = tied
+        else:
+            pairs.extend(options)
     taken: dict[str, str] = {}  # вопрос → номер, с которым к нему пришла привязанная единица
     done: set[tuple] = set()
     ranked = sorted(pairs, key=lambda t: -t[0])
@@ -569,6 +653,16 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
         q = by_id.get(a["id"])
+        unknown_choice = hint and k not in bound and a.get("choice") is not None
+        if k in ambiguous or unknown_choice or (document_changed and k not in bound):
+            text = str(a.get("text") or "").strip()
+            if a.get("choice") is not None:
+                text = " ".join(filter(None, [_cl.option_label(a["choice"]), text, a.get("comment")])).strip()
+            possible = ambiguous.get(k, [])
+            pending.append({"question_id": a["id"], "topic": hint, "text": text, "possible_questions": possible})
+            warnings.append(f"recheck: {a['id']} [{hint}] — подтвердите, к какому вопросу относится ответ"
+                            + (f" ({', '.join(possible)})" if possible else ""))
+            continue
         if hint:
             if k in bound:
                 if q is None or bound[k]["id"] != q["id"]:
@@ -583,6 +677,12 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 body, _deferred = split_deferred(a["text"])
                 if not body:
                     warnings.append(f"recheck: {a['id']}: ответ откладывает решение — не учтён")
+                    continue
+                if needs_binding(body):  # «Q-12: Да, так и оставляем» — без вопроса не понять, что оставлять
+                    pending.append({"question_id": a["id"], "topic": hint, "text": a["text"], "possible_questions": []})
+                    warnings.append(f"recheck: {a['id']}" + (f" [{hint}]" if hint else "")
+                                    + f": «{_short(a['text'], 60)}» — вопроса с таким номером и темой в прогоне нет, а "
+                                      f"ответ сам правила не задаёт — подтвердите, к какому вопросу он относится; не внесён")
                     continue
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
                 # реплики одного номера и одной темы — ответы адресатов на один вопрос, даже если в этом прогоне
@@ -659,6 +759,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         [{"question_id": a["question_id"], "text": x, "partial": True} for a in answered.values()
          for x in a.get("deferred") or []]
     out = {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
+    if pending:
+        out["needs_confirmation"] = pending
     clashes = decision_clashes(orphans)
     for c in clashes:
         warnings.append(f"recheck: {c['question_id']} [{c['topic']}]: ответы адресатов расходятся в значениях "
@@ -669,10 +771,37 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     return out
 
 
-def _values(text: str) -> set[str]:
-    """Числа ответа: «100 000» = «100000», «0,5» = «0.5»; одна цифра («1 раз», «шаг 2») — не значение."""
-    s = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d{3}(?!\d))", "", str(text or ""))
-    return {n.replace(",", ".") for n in re.findall(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])", s) if len(n) >= 2}
+_ANSWER_NUMBER = re.compile(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])")
+_CURRENCY_UNITS = "|".join(pattern for major, minor, *_ in CURRENCIES for pattern in (major, minor))
+_MONEY_AFTER = re.compile(rf"(?:{_CURRENCY_UNITS})(?!\w)", re.I)
+_DURATION_AFTER = re.compile(DUR_UNIT, re.I)
+
+
+def _measurements(text: str) -> tuple[set[str], set[str]]:
+    """Числа и явно указанные величины. Пустой вид означает, что единица не названа."""
+    text = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d{3}(?!\d))", "", str(text or ""))
+    values, units = set(), set()
+    for match in _ANSWER_NUMBER.finditer(text):
+        value = match.group()
+        if len(value) < 2:
+            continue
+        values.add(value.replace(",", "."))
+        tail = text[match.end():].lstrip()
+        if _MONEY_AFTER.match(tail):
+            units.add("money")
+        elif _DURATION_AFTER.match(tail):
+            units.add("duration")
+        else:
+            units.add("")
+    return values, units
+
+
+def _values_clash(left: tuple[set[str], set[str]], right: tuple[set[str], set[str]]) -> bool:
+    a, kinds_a = left
+    b, kinds_b = right
+    if "" not in kinds_a | kinds_b and kinds_a.isdisjoint(kinds_b):
+        return False  # Например, одна реплика задаёт срок, другая — сумму.
+    return bool(a - b and b - a)
 
 
 def decision_clashes(orphans: dict) -> list[dict]:
@@ -684,9 +813,9 @@ def decision_clashes(orphans: dict) -> list[dict]:
     for (qid, _topic), items in orphans.items():
         if len(items) < 2:
             continue
-        vals = [_values(x["text"]) for x in items]
+        vals = [_measurements(x["text"]) for x in items]
         clash = [x for i, x in enumerate(items)
-                 if any(vals[i] - vals[j] and vals[j] - vals[i] for j in range(len(items)) if j != i)]
+                 if any(_values_clash(vals[i], other) for other in vals)]
         if len(clash) >= 2:
             out.append({"question_id": qid or "", "topic": clash[0]["topic"], "answers": [x["label"] for x in clash],
                         "texts": {x["label"]: x["text"] for x in clash}})
@@ -855,7 +984,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     warnings: list[str] = []
     parsed = answers if isinstance(answers, dict) and "answers" in answers and isinstance(answers.get("answers"), list) \
         else load_answers(answers)
-    resolved = resolve_answers(questions, parsed, warnings)
+    document_check = check_document(parsed, (report or {}).get("document"), warnings)
+    resolved = resolve_answers(questions, parsed, warnings, document_changed=document_check["match"] is False)
     q_by_finding: dict[str, list[str]] = {}
     for a in resolved["answered"]:
         for fid in a["finding_ids"]:
@@ -877,6 +1007,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
                         "affected": f.get("id") in affected_ids}
         out_findings.append(g)
     result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings}
+    if document_check["answers_sha256"]:
+        result["document_check"] = document_check
     if not affected and not resolved["decisions"]:
         for g in out_findings:
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
@@ -1043,19 +1175,23 @@ def _plain_reason(text: str, keep: set[str]) -> str:
 def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", slack: int = 1) -> str:
     """ID прежнего дефекта, который новый кандидат описывает заново, иначе пустая строка.
 
-    Новый конфликт от ответа цитирует место, которое теперь противоречит ответу. Если все его цитаты —
-    строки одного прежнего дефекта (±``slack``), это тот же дефект (закрытый ответом или оставшийся открытым):
-    для двух и более строк хватает совпадения строк, для одной строки нужна ещё та же суть в заголовке."""
+    Общее место — только повод сравнить формулировки: одна строка может задавать несколько правил.
+    Узнаём старую причину по совпадению текста цитат из разных строк или по смыслу заголовка."""
     cand = {int(e["line_start"]) for e in evidence if e.get("line_start")}
     if not cand:
         return ""
     words = _tokens(_cl.plain_text(title))
+    fragments = {(int(e["line_start"]), _cl._norm(e["quote"])) for e in evidence
+                 if e.get("line_start") and e.get("quote")}
     for f in findings:
         own = {int(x) for x in _cl.finding_lines(f)}
         if not own or not all(any(abs(c - o) <= slack for o in own) for c in cand):
             continue
-        if len(cand) >= 2:
-            return str(f.get("id", ""))
+        if len(cand) >= 2 and len({line for line, _ in fragments}) == len(cand):
+            old_fragments = {(int(e["line_start"]), _cl._norm(e["quote"])) for e in f.get("evidence") or []
+                             if e.get("line_start") and e.get("quote")}
+            if fragments <= old_fragments:
+                return str(f.get("id", ""))
         theirs = _tokens(f"{f.get('title', '')} {f.get('problem', '')}")
         if words and len(words & theirs) / len(words) >= 0.4:
             return str(f.get("id", ""))
@@ -1286,7 +1422,7 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
                               "texts": {x: texts.get(x, "") for x in c["answer_conflict"]}}
                              for c in changes if c.get("answer_conflict")],
         "before": {"verdict": v_before, "findings": severity_counts(findings)},
-        "after": {"verdict": {"development": after_rule["development"], "testing": after_rule["testing"],
+        "after": {"basis": "owner_answers", "verdict": {"development": after_rule["development"], "testing": after_rule["testing"],
                               "fix_first": after_rule.get("fix_first", [])},
                   "findings": severity_counts(after)},
         "resolved": sum(1 for c in changes if c["status"] == "resolved"),
@@ -1295,6 +1431,10 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "warnings": warnings,
         "status": rc.get("status", "ok"),
     }
+    if rc.get("document_check"):
+        clar["answers_document"] = rc["document_check"]
+    if rc["answers"].get("needs_confirmation"):
+        clar["needs_confirmation"] = rc["answers"]["needs_confirmation"]
     clar["answer_conflicts"] = _orphan_conflicts(rc["answers"], clar["answer_conflicts"])
     return {"clarification": clar, "findings_after": after,
             "rejected_after": list(rc.get("rejected") or []) + new_rejected}

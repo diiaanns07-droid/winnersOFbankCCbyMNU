@@ -14,6 +14,7 @@
  *   .b-hl              правка: .crit — тонкая красная черта под фразой; .major — бледный золотой маркер #FBE1BA;
  *                      .minor — серая пунктирная черта; рисуется слева направо, задержка style="--i:N" (шаг 30 мс)
  *   .b-margin          вторая бумага справа от листа — поля для заметок
+ *   .b-margin-q > .b-q вопросы владельцу на полях, под шапкой; нажатие — место в листе (data-f)
  *   .b-note            заметка: <b>D-01</b> + суть, точка смысла (.crit красная, .major золотой маркер, .minor серая)
  *   .is-focus / .on    место в фокусе, остальное приглушено
  *   .b-map             карта листа: тонкая полоска с засечками <i class="crit" style="--y:.19" data-line="39">
@@ -153,6 +154,16 @@ html{-webkit-text-size-adjust:100%;color-scheme:light;background:var(--b-canvas)
 .b-legend .crit::before,.b-note.crit b::before{background:var(--b-red);box-shadow:none}
 .b-legend .major::before,.b-note.major b::before{width:12px;height:7px;border-radius:2px;background:var(--b-mark-major);
   box-shadow:inset 0 0 0 1px rgba(15,40,65,.12)}
+.b-margin-q{padding:12px;box-shadow:inset 0 -1px 0 var(--b-hair)}
+.b-margin-sub{padding:2px 10px 4px;font-size:13.5px;font-weight:600;color:var(--b-ink-2)}
+.b-q{display:block;width:100%;margin:2px 0 0;padding:6px 10px 8px;border:0;border-radius:12px;background:none;text-align:left;
+  cursor:pointer;font:14.5px/1.45 var(--b-font);color:var(--b-ink);transition:background var(--b-fast) var(--b-ease)}
+.b-q b{display:block;font:400 12px/1.6 var(--b-mono);color:var(--b-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-q .t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.b-q:hover,.b-q.on{background:var(--b-wash)}
+.b-q.on .t{-webkit-line-clamp:unset}
+.b-q[data-f=""]{cursor:default}
+.b-q-more{display:block;padding:6px 10px 2px;font-size:13.5px}
 .b-note{position:absolute;z-index:2;top:calc(var(--dy,0px) - 6px);
   left:calc(100% + var(--b-sheet-pr) + var(--b-desk-gap) + 12px);width:calc(var(--b-margin-w) - 24px);
   display:block;margin:0;padding:6px 10px 8px;border:0;border-radius:12px;background:none;text-align:left;cursor:pointer;

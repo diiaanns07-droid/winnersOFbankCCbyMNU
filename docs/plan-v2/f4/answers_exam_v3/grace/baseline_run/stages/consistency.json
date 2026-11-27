@@ -1,0 +1,904 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 51.11,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 43,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Ф-3 и критерий 1: платёж 25-го — проценты или нет",
+        "kind": "boundary_conflict",
+        "criterion": "unambiguous",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-07",
+          "R-14"
+        ],
+        "evidence": [
+          {
+            "quote": "Если клиент внёс сумму для погашения полностью до окончания платёжного периода включительно, проценты по покупкам расчётного периода не начисляются.",
+            "line": 38,
+            "line_start": 38,
+            "line_end": 38,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Внести 120 000 ₸ 25 марта в 14:00 | Проценты за покупки февраля начислены",
+            "line": 63,
+            "line_start": 63,
+            "line_end": 63,
+            "page": null,
+            "section": "Часть A. Новый функционал › Критерии приемки",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-3 и «критерий приёмки, строка 1» по-разному решают один случай — платёж в последний день платёжного периода. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Долг 120 000 ₸, выписка 1 марта, полная оплата 25 марта 14:00. Ф-3: проценты не начисляются. Критерий приёмки, строка 1: проценты начислены.",
+        "impact": "Тест падает на верной реализации, клиент может получить лишние проценты.",
+        "recommendation": "Привести критерий к Ф-3: проценты не начисляются.",
+        "rewrite": "",
+        "question": "Что верно: «проценты не начисляются» (как в Ф-3) или «проценты начислены» (как в «критерий приёмки, строка 1»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-01"
+        ]
+      },
+      {
+        "title": "Некредитная карта: 200 NOT_APPLICABLE или 422",
+        "kind": "status_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-24",
+          "R-42"
+        ],
+        "evidence": [
+          {
+            "quote": "6. Если карта не кредитная, вернуть 200 с status = NOT_APPLICABLE.",
+            "line": 123,
+            "line_start": 123,
+            "line_end": 123,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          },
+          {
+            "quote": "422. Ответ в случае, если карта не является кредитной.",
+            "line": 167,
+            "line_start": 167,
+            "line_end": 167,
+            "page": null,
+            "section": "Часть B. REST API › Статусы",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«Логика работы метода, п. 6» и «Статус 422» по-разному решают один случай — ответ для некредитной карты. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "GET по cardId дебетовой карты клиента. Логика работы метода, п. 6: 200 со status NOT_APPLICABLE. Статус 422: 422 с сообщением.",
+        "impact": "Приложение обработает ответ по-разному, тесты разойдутся.",
+        "recommendation": "Выбрать один исход и убрать другой.",
+        "rewrite": "",
+        "question": "Для некредитной карты возвращать 200 NOT_APPLICABLE или 422?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-02"
+        ]
+      },
+      {
+        "title": "Дни до окончания: календарные (Ф-4) и рабочие (API)",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-03",
+          "R-35"
+        ],
+        "evidence": [
+          {
+            "quote": "за 3 календарных дня до окончания платёжного периода клиент получает push",
+            "line": 39,
+            "line_start": 39,
+            "line_end": 39,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Количество рабочих дней до окончания платёжного периода",
+            "line": 157,
+            "line_start": 157,
+            "line_end": 157,
+            "page": null,
+            "section": "Часть B. REST API › Ответ",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«описание экрана, строка 39» и «Ответ: daysLeft» по-разному решают один случай — единица daysLeft: календарные или рабочие дни. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Сегодня 20 марта, окончание 25 марта, между ними выходные. Описание экрана, строка 39: на экране календарные дни: 5. Ответ: daysLeft: API вернёт рабочие дни: 3.",
+        "impact": "Клиент видит неверный остаток дней.",
+        "recommendation": "Зафиксировать календарные дни в API.",
+        "rewrite": "",
+        "question": "Что верно: «на экране календарные дни: 5» (как в «описание экрана, строка 39») или «API вернёт рабочие дни: 3» (как в «Ответ: daysLeft»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-03"
+        ]
+      },
+      {
+        "title": "Формат даты: таблица ответа и пример 200",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-33",
+          "R-39"
+        ],
+        "evidence": [
+          {
+            "quote": "paymentDueDate | string | ДД.ММ.ГГГГ | Дата окончания платёжного периода | due_date",
+            "line": 155,
+            "line_start": 155,
+            "line_end": 155,
+            "page": null,
+            "section": "Часть B. REST API › Ответ",
+            "verified": "exact"
+          },
+          {
+            "quote": "{\"status\":\"ACTIVE\",\"paymentDueDate\":\"2026-03-25\",\"graceAmount\":12000000,\"daysLeft\":9",
+            "line": 172,
+            "line_start": 172,
+            "line_end": 172,
+            "page": null,
+            "section": "Часть B. REST API › Статусы › 200. Successful",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«Ответ: paymentDueDate» и «Статус 200» по-разному решают один случай — формат даты paymentDueDate. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Успешный ответ для даты 25 марта 2026. Ответ: paymentDueDate: \"25.03.2026\". Статус 200: \"2026-03-25\".",
+        "impact": "Разбор даты в приложении сломается.",
+        "recommendation": "Единый формат даты в таблице и примере.",
+        "rewrite": "",
+        "question": "Что верно: «\"25.03.2026\"» (как в «Ответ: paymentDueDate») или «\"2026-03-25\"» (как в «Статус 200»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-04"
+        ]
+      },
+      {
+        "title": "Ф-3 и особое правило 2: база процентов разная",
+        "kind": "event_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-07",
+          "R-26"
+        ],
+        "evidence": [
+          {
+            "quote": "проценты начисляются на всю задолженность по покупкам расчётного периода с даты каждой покупки",
+            "line": 38,
+            "line_start": 38,
+            "line_end": 38,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "При частичном погашении прогноз процентов считается только на непогашенную часть суммы для погашения.",
+            "line": 127,
+            "line_start": 127,
+            "line_end": 127,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-3 и «Особые правила, п. 2» по-разному решают один случай — база процентов при частичном погашении. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Долг 80 000 ₸, внесено 50 000 ₸ до 25-го. Ф-3: проценты на 80 000 ₸. Особые правила, п. 2: прогноз на 30 000 ₸.",
+        "impact": "Прогноз в приложении не совпадёт с фактическими процентами.",
+        "recommendation": "Считать прогноз по базе Ф-3 или явно развести понятия.",
+        "rewrite": "",
+        "question": "Прогноз считать на весь долг или на непогашенную часть?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-05"
+        ]
+      },
+      {
+        "title": "Смена переключателя после момента напоминания не описана",
+        "kind": "incomplete",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-08",
+          "R-13"
+        ],
+        "evidence": [
+          {
+            "quote": "за 3 календарных дня до окончания платёжного периода клиент получает push с датой окончания и оставшейся суммой",
+            "line": 39,
+            "line_start": 39,
+            "line_end": 39,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Кредитный модуль передаёт в сервис уведомлений одно напоминание на карту за платёжный период.",
+            "line": 52,
+            "line_start": 52,
+            "line_end": 52,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-4 и «описание интеграции, строка 52» касаются одного случая — включение напоминания после 22-го числа, — но результат по ним не определить: документ не говорит, что делать.",
+        "scenario": "Выключено до 22-го, клиент включил 23-го, долг не внесён. Ф-4: не сказано: срок 22-го прошёл. Описание интеграции, строка 52: не сказано: напоминание не передавалось.",
+        "impact": "Разное поведение у разработчиков, спор при приёмке.",
+        "recommendation": "Описать поведение при включении и выключении после 22-го.",
+        "rewrite": "",
+        "question": "Отправлять ли напоминание, если включили после 22-го числа?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-06"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Компонент API кредитных карт», «Сумма для погашения», «Напоминание клиенту»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "API кредитных карт",
+            "line": 25,
+            "line_start": 25,
+            "line_end": 25,
+            "verified": "normalized"
+          },
+          {
+            "quote": "GraceController",
+            "line": 107,
+            "line_start": 107,
+            "line_end": 107,
+            "verified": "normalized"
+          },
+          {
+            "quote": "сумма для погашения без процентов",
+            "line": 28,
+            "line_start": 28,
+            "line_end": 28,
+            "verified": "normalized"
+          },
+          {
+            "quote": "оставшуюся сумму для погашения",
+            "line": 40,
+            "line_start": 40,
+            "line_end": 40,
+            "verified": "normalized"
+          },
+          {
+            "quote": "push-уведомление",
+            "line": 25,
+            "line_start": 25,
+            "line_end": 25,
+            "verified": "normalized"
+          },
+          {
+            "quote": "напоминание",
+            "line": 33,
+            "line_start": 33,
+            "line_end": 33,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Компонент API кредитных карт: «API кредитных карт» (строка 25), «GraceController» (строка 107); Сумма для погашения: «сумма для погашения без процентов» (строка 28), «оставшуюся сумму для погашения» (строка 40), «graceAmount» (строка 156); Напоминание клиенту: «push-уведомление» (строка 25), «напоминание» (строка 33).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02",
+          "G-03"
+        ]
+      },
+      {
+        "title": "Обещано включение и выключение напоминания, метода нет",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-13",
+          "R-03",
+          "R-08",
+          "R-18"
+        ],
+        "evidence": [
+          {
+            "quote": "включает или выключает напоминание через дочерний документ «Льготный период по кредитной карте — REST API»",
+            "line": 52,
+            "line_start": 52,
+            "line_end": 52,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          },
+          {
+            "quote": "кнопка «Пополнить» и переключатель «Напоминать о платеже»",
+            "line": 28,
+            "line_start": 28,
+            "line_end": 28,
+            "page": null,
+            "section": "Часть A. Новый функционал › Дизайн процесса UI",
+            "verified": "exact"
+          },
+          {
+            "quote": "REST type | GET",
+            "line": 105,
+            "line_start": 105,
+            "line_end": 105,
+            "page": null,
+            "section": "Часть B. REST API › Общие параметры",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Дочерний документ описывает только GET чтения; метода изменения признака напоминания нет.",
+        "scenario": "Клиент выключает переключатель на экране; приложению нечего вызвать, reminder_enabled не изменится.",
+        "impact": "Переключатель нельзя реализовать, Ф-4 не проверить: напоминание нельзя выключить.",
+        "recommendation": "Описать метод изменения reminderEnabled: URL, тело, коды ответов, примеры.",
+        "rewrite": "PUT /cards/{cardId}/grace/reminder, тело {\"reminderEnabled\": boolean}; ответы 200, 401, 404, 422, 500 <уточнить: контракт>",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Схемы архитектуры, процесса и API показывают разный состав",
+        "kind": "other",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-02",
+          "R-28",
+          "R-10"
+        ],
+        "evidence": [
+          {
+            "quote": "Влияние на ИС | Мобильный банк, кредитный модуль, карточный процессинг, сервис уведомлений",
+            "line": 18,
+            "line_start": 18,
+            "line_end": 18,
+            "page": null,
+            "section": "Часть A. Новый функционал › Общие сведения",
+            "verified": "exact"
+          },
+          {
+            "quote": "Мобильное приложение → API кредитных карт → кредитный модуль.",
+            "line": 25,
+            "line_start": 25,
+            "line_end": 25,
+            "page": null,
+            "section": "Часть A. Новый функционал › Архитектура решения",
+            "verified": "exact"
+          },
+          {
+            "quote": "Приложение → GraceController → кредитный модуль → GraceController → приложение.",
+            "line": 132,
+            "line_start": 132,
+            "line_end": 132,
+            "page": null,
+            "section": "Часть B. REST API › Схема",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Карточный процессинг не показан ни на одной схеме; схема API без сервиса уведомлений.",
+        "scenario": "Разработчик не знает, откуда берутся платежи и покупки: из кредитного модуля или процессинга.",
+        "impact": "Неверные интеграции и неполное согласование смежных систем.",
+        "recommendation": "Добавить процессинг и уведомления на схемы или убрать из влияния на ИС.",
+        "rewrite": "",
+        "question": "Процессинг и уведомления на схемы или убрать из влияния на ИС?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нет приоритетов требований",
+        "kind": "other",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-05",
+          "R-06",
+          "R-07",
+          "R-08",
+          "R-09"
+        ],
+        "evidence": [
+          {
+            "quote": "Ф-4. Если переключатель «Напоминать о платеже» включён",
+            "line": 39,
+            "line_start": 39,
+            "line_end": 39,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          }
+        ],
+        "problem": "У Ф-1…Ф-5 нет приоритета и признака стабильности.",
+        "scenario": "При сокращении объёма непонятно, чем жертвовать: напоминанием или расчётом.",
+        "impact": "Спор о порядке реализации.",
+        "recommendation": "Добавить колонку приоритета и стабильности.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Версия и дата документа не заполнены",
+        "kind": "traceability",
+        "criterion": "traceable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-05"
+        ],
+        "evidence": [
+          {
+            "quote": "Документ (версия/дата) в источнике не заполнен.",
+            "line": 69,
+            "line_start": 69,
+            "line_end": 69,
+            "page": null,
+            "section": "Часть A. Новый функционал › Ревью требований",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Версия и дата не указаны, согласующие не названы.",
+        "scenario": "Правки Ф-1…Ф-5 нельзя отнести к версии.",
+        "impact": "Нет прослеживаемости изменений.",
+        "recommendation": "Указать версию, дату и согласующих.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-07",
+        "b": "R-14",
+        "subject": "Платёж в последний день платёжного периода",
+        "same_subject": true,
+        "quote_a": "Если клиент внёс сумму для погашения полностью до окончания платёжного периода включительно, проценты по покупкам расчётного периода не начисляются.",
+        "line_a": 38,
+        "quote_b": "Внести 120 000 ₸ 25 марта в 14:00 | Проценты за покупки февраля начислены",
+        "line_b": 63,
+        "scenario": "Долг 120 000 ₸, выписка 1 марта, полная оплата 25 марта 14:00",
+        "outcome_a": "Проценты не начисляются",
+        "outcome_b": "Проценты начислены",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "boundary_conflict",
+        "title": "Ф-3 и критерий 1: платёж 25-го — проценты или нет",
+        "impact": "Тест падает на верной реализации, клиент может получить лишние проценты.",
+        "recommendation": "Привести критерий к Ф-3: проценты не начисляются.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      },
+      {
+        "a": "R-24",
+        "b": "R-42",
+        "subject": "Ответ для некредитной карты",
+        "same_subject": true,
+        "quote_a": "6. Если карта не кредитная, вернуть 200 с status = NOT_APPLICABLE.",
+        "line_a": 123,
+        "quote_b": "422. Ответ в случае, если карта не является кредитной.",
+        "line_b": 167,
+        "scenario": "GET по cardId дебетовой карты клиента",
+        "outcome_a": "200 со status NOT_APPLICABLE",
+        "outcome_b": "422 с сообщением",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "same_condition",
+        "kind": "status_conflict",
+        "title": "Некредитная карта: 200 NOT_APPLICABLE или 422",
+        "impact": "Приложение обработает ответ по-разному, тесты разойдутся.",
+        "recommendation": "Выбрать один исход и убрать другой.",
+        "question": "Для некредитной карты возвращать 200 NOT_APPLICABLE или 422?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-02"
+      },
+      {
+        "a": "R-03",
+        "b": "R-35",
+        "subject": "Единица daysLeft: календарные или рабочие дни",
+        "same_subject": true,
+        "quote_a": "за 3 календарных дня до окончания платёжного периода клиент получает push",
+        "line_a": 39,
+        "quote_b": "Количество рабочих дней до окончания платёжного периода",
+        "line_b": 157,
+        "scenario": "Сегодня 20 марта, окончание 25 марта, между ними выходные",
+        "outcome_a": "На экране календарные дни: 5",
+        "outcome_b": "API вернёт рабочие дни: 3",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "unit_mismatch",
+        "title": "Дни до окончания: календарные (Ф-4) и рабочие (API)",
+        "impact": "Клиент видит неверный остаток дней.",
+        "recommendation": "Зафиксировать календарные дни в API.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-03"
+      },
+      {
+        "a": "R-33",
+        "b": "R-39",
+        "subject": "Формат даты paymentDueDate",
+        "same_subject": true,
+        "quote_a": "paymentDueDate | string | ДД.ММ.ГГГГ | Дата окончания платёжного периода | due_date",
+        "line_a": 155,
+        "quote_b": "{\"status\":\"ACTIVE\",\"paymentDueDate\":\"2026-03-25\",\"graceAmount\":12000000,\"daysLeft\":9",
+        "line_b": 172,
+        "scenario": "Успешный ответ для даты 25 марта 2026",
+        "outcome_a": "\"25.03.2026\"",
+        "outcome_b": "\"2026-03-25\"",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "unit_mismatch",
+        "title": "Формат даты: таблица ответа и пример 200",
+        "impact": "Разбор даты в приложении сломается.",
+        "recommendation": "Единый формат даты в таблице и примере.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-04"
+      },
+      {
+        "a": "R-07",
+        "b": "R-26",
+        "subject": "База процентов при частичном погашении",
+        "same_subject": true,
+        "quote_a": "проценты начисляются на всю задолженность по покупкам расчётного периода с даты каждой покупки",
+        "line_a": 38,
+        "quote_b": "При частичном погашении прогноз процентов считается только на непогашенную часть суммы для погашения.",
+        "line_b": 127,
+        "scenario": "Долг 80 000 ₸, внесено 50 000 ₸ до 25-го",
+        "outcome_a": "Проценты на 80 000 ₸",
+        "outcome_b": "Прогноз на 30 000 ₸",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "event_conflict",
+        "title": "Ф-3 и особое правило 2: база процентов разная",
+        "impact": "Прогноз в приложении не совпадёт с фактическими процентами.",
+        "recommendation": "Считать прогноз по базе Ф-3 или явно развести понятия.",
+        "question": "Прогноз считать на весь долг или на непогашенную часть?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-05"
+      },
+      {
+        "a": "R-08",
+        "b": "R-13",
+        "subject": "Включение напоминания после 22-го числа",
+        "same_subject": true,
+        "quote_a": "за 3 календарных дня до окончания платёжного периода клиент получает push с датой окончания и оставшейся суммой",
+        "line_a": 39,
+        "quote_b": "Кредитный модуль передаёт в сервис уведомлений одно напоминание на карту за платёжный период.",
+        "line_b": 52,
+        "scenario": "Выключено до 22-го, клиент включил 23-го, долг не внесён",
+        "outcome_a": "Не сказано: срок 22-го прошёл",
+        "outcome_b": "Не сказано: напоминание не передавалось",
+        "one_condition": true,
+        "verdict": "undefined",
+        "basis": "none",
+        "kind": "incomplete",
+        "title": "Смена переключателя после момента напоминания не описана",
+        "impact": "Разное поведение у разработчиков, спор при приёмке.",
+        "recommendation": "Описать поведение при включении и выключении после 22-го.",
+        "question": "Отправлять ли напоминание, если включили после 22-го числа?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-06"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-05",
+        "verified_by": [],
+        "implemented_by": [
+          "R-12"
+        ],
+        "note": "Нет критерия на 55 дней"
+      },
+      {
+        "requirement_id": "R-06",
+        "verified_by": [
+          "R-17"
+        ],
+        "implemented_by": [
+          "R-22",
+          "R-34"
+        ],
+        "note": "Нет критерия на границу выписки"
+      },
+      {
+        "requirement_id": "R-07",
+        "verified_by": [
+          "R-14",
+          "R-15"
+        ],
+        "implemented_by": [
+          "R-12",
+          "R-36"
+        ],
+        "note": "противоречие: Особые правила, п. 2",
+        "conflicts_with": [
+          "R-14",
+          "R-26"
+        ]
+      },
+      {
+        "requirement_id": "R-08",
+        "verified_by": [
+          "R-16"
+        ],
+        "implemented_by": [
+          "R-13",
+          "R-38"
+        ],
+        "note": "Нет критерия на выключенный переключатель"
+      },
+      {
+        "requirement_id": "R-09",
+        "verified_by": [],
+        "implemented_by": [
+          "R-21",
+          "R-22"
+        ],
+        "note": "Нет критериев на возврат и покупки после выписки"
+      },
+      {
+        "requirement_id": "R-11",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет измеримых значений"
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [],
+        "implemented_by": [
+          "R-34",
+          "R-37"
+        ],
+        "note": "Нет поля даты платёжного периода"
+      },
+      {
+        "requirement_id": "R-13",
+        "verified_by": [],
+        "implemented_by": [
+          "R-18"
+        ],
+        "note": "Нет метода изменения напоминания"
+      },
+      {
+        "requirement_id": "R-19",
+        "verified_by": [],
+        "implemented_by": [
+          "R-40"
+        ],
+        "note": "Нет критерия на 401"
+      },
+      {
+        "requirement_id": "R-20",
+        "verified_by": [],
+        "implemented_by": [
+          "R-41",
+          "R-42"
+        ],
+        "note": "Нет критериев на 404 и 422"
+      },
+      {
+        "requirement_id": "R-21",
+        "verified_by": [],
+        "implemented_by": [
+          "R-10"
+        ],
+        "note": "Нет критерия приёмки"
+      },
+      {
+        "requirement_id": "R-22",
+        "verified_by": [],
+        "implemented_by": [
+          "R-35",
+          "R-34"
+        ],
+        "note": "Единица дней противоречива"
+      },
+      {
+        "requirement_id": "R-23",
+        "verified_by": [],
+        "implemented_by": [
+          "R-36"
+        ],
+        "note": "Нет критерия на прогноз процентов"
+      },
+      {
+        "requirement_id": "R-24",
+        "verified_by": [],
+        "implemented_by": [
+          "R-32"
+        ],
+        "note": "противоречие: Статус 422; Конфликт с кодом 422",
+        "conflicts_with": [
+          "R-42"
+        ]
+      },
+      {
+        "requirement_id": "R-25",
+        "verified_by": [],
+        "implemented_by": [
+          "R-34"
+        ],
+        "note": "Нет критерия на переплату"
+      },
+      {
+        "requirement_id": "R-26",
+        "verified_by": [],
+        "implemented_by": [
+          "R-36"
+        ],
+        "note": "противоречие: Ф-3; Нет критерия, конфликт с Ф-3",
+        "conflicts_with": [
+          "R-07"
+        ]
+      },
+      {
+        "requirement_id": "R-27",
+        "verified_by": [],
+        "implemented_by": [
+          "R-21"
+        ],
+        "note": "Нет критерия, неясен момент"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Компонент API кредитных карт",
+        "terms": [
+          {
+            "term": "API кредитных карт",
+            "line": 25
+          },
+          {
+            "term": "GraceController",
+            "line": 107
+          }
+        ],
+        "problem": "Неясно, один ли это компонент.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Сумма для погашения",
+        "terms": [
+          {
+            "term": "сумма для погашения без процентов",
+            "line": 28
+          },
+          {
+            "term": "оставшуюся сумму для погашения",
+            "line": 40
+          },
+          {
+            "term": "graceAmount",
+            "line": 156
+          }
+        ],
+        "problem": "Разные названия одной величины.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-03",
+        "concept": "Напоминание клиенту",
+        "terms": [
+          {
+            "term": "push-уведомление",
+            "line": 25
+          },
+          {
+            "term": "напоминание",
+            "line": 33
+          }
+        ],
+        "problem": "Разные имена одной сущности.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Ответ для некредитной карты",
+        "places": [
+          "R-24",
+          "R-42",
+          "R-20",
+          "R-31"
+        ]
+      },
+      {
+        "subject": "Платёж в последний день платёжного периода",
+        "places": [
+          "R-07",
+          "R-05"
+        ]
+      },
+      {
+        "subject": "База процентов при частичном погашении",
+        "places": [
+          "R-07",
+          "R-26",
+          "R-36"
+        ]
+      },
+      {
+        "subject": "Единица daysLeft",
+        "places": [
+          "R-03",
+          "R-08",
+          "R-35"
+        ]
+      },
+      {
+        "subject": "Формат paymentDueDate",
+        "places": [
+          "R-33",
+          "R-39"
+        ]
+      },
+      {
+        "subject": "Напоминание: срок и количество",
+        "places": [
+          "R-04",
+          "R-08",
+          "R-13"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

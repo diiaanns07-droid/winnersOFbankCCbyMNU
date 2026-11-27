@@ -20,6 +20,7 @@ import re
 import shlex
 import socket
 import sys
+import threading
 import time
 import urllib.request
 import webbrowser
@@ -34,6 +35,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 from .sheet import VERDICT as VERDICT_WORD, build_sheet, load_report, plural, read_source
 from .runner import (ALLOWED_EXT, FILES, MAX_UPLOAD, FixtureRunner, Job, JobStore, PipelineRunner, Worker,
                      check_provider, load_dotenv, provider_status)
+from . import onboarding as _onboarding  # №40: знакомство, /api/key, файлы BCC AI
 
 ASSETS = Path(__file__).with_name("assets")
 # №39: tokens.css — дизайн-система, шрифты Inter и JetBrains Mono (OFL); agent.* — BCC AI (№40), отдаются, когда файлы появятся
@@ -145,6 +147,20 @@ def _job_files(app: App, job: Job) -> list[tuple[str, str]]:
             if k not in ("json",) and (out / n).is_file()]
 
 
+# №54 (правка 49): AIshka 96 стоит на раскрытом листе главной, у строки вердикта — как над листом проверки
+_DESK_AISHKA = '<div class="desk-aishka" data-bcc-agent data-size="96" data-mood="idle" aria-hidden="true"></div>'
+
+
+def _ready_jobs(app: App) -> None:
+    """№54: готовые отчёты №43 кладутся в хранилище при открытии главной; ссылка /jobs/<готовый> после перезапуска
+    сервера (закладка, обновление страницы) открывается сразу, а не «Не найдено»."""
+    try:
+        from .gallery import ensure_ready
+        ensure_ready(app)
+    except Exception:  # noqa: BLE001 — №43 не влит или examples.json не читается: обычный 404
+        pass
+
+
 def _top_sheet(app: App) -> dict[str, Any] | None:
     """Раскрытый лист на столе: своя последняя готовая проверка, иначе первый готовый отчёт №43."""
     for j in app.store.recent():
@@ -204,6 +220,23 @@ def _margin_head(report: dict[str, Any]) -> str:
             f'<div class="b-legend">{legend}</div></div>')
 
 
+def _margin_questions(report: dict[str, Any], href: str, *, limit: int = 5) -> str:
+    """Вопросы владельцу на полях, под шапкой: чернилами, нажатие — место в листе в фокусе (первое замечание вопроса)."""
+    qs = [q for q in (report.get("questions") or []) if isinstance(q, dict) and str(q.get("question") or "").strip()]
+    if not qs:
+        return ""
+    items = []
+    for q in qs[:limit]:
+        fids = [f for f in (q.get("finding_ids") or []) if isinstance(f, str) and f]
+        label = " · ".join(x for x in (str(q.get("id") or ""), str(q.get("to") or "")) if x)
+        items.append(f'<button type="button" class="b-q" data-f="{e(fids[0] if fids else "")}">'
+                     f'<b>{e(label)}</b><span class="t">{e(str(q["question"]).strip())}</span></button>')
+    rest = len(qs) - limit
+    more = (f'<a class="b-q-more" href="{e(href)}#questions">ещё {rest} {plural(rest, "вопрос", "вопроса", "вопросов")}</a>'
+            if rest > 0 and href else "")
+    return f'<div class="b-margin-q"><div class="b-margin-sub">Вопросы владельцу</div>{"".join(items)}{more}</div>'
+
+
 def index_page(app: App, *, error: str = "", provider: str = "", model: str = "") -> str:
     provs = provider_status()
     ids = [p["id"] for p in provs]
@@ -261,38 +294,236 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
 <div class="desk" id="desk">
 <aside class="desk-stack" aria-label="Готовые листы">{stack}</aside>
 <aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
-<main class="desk-sheet">{sheet.html if sheet else ''}</main>
-<div class="desk-notes{' b-margin' if sheet and sheet.notes else ''}">{_margin_head(top["report"]) if top and sheet and sheet.notes else ''}</div>
+<main class="desk-sheet">{sheet.html if sheet else ''}{_DESK_AISHKA if sheet else ''}</main>
+<div class="desk-notes{' b-margin' if sheet and sheet.notes else ''}">{_margin_head(top["report"]) + _margin_questions(top["report"], href) if top and sheet and sheet.notes else ''}</div>
 </div>
 <div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>BCC AI сразу начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
     sub = (top or {}).get("name") or (f"Пример: {app.sample.name}" if app.sample else "")
     return _layout("BCC Review · Проверка требований", body, sub=sub)
 
 
-def job_page(job: Job) -> str:
-    links = "".join(f'<a class="dl" data-key="{k}" href="/jobs/{e(job.id)}/files/{n}" hidden>{lbl}</a>'
-                    for k, n, lbl, _ in FILES)
-    body = f"""<main class="jobwrap" data-job="{e(job.id)}">
-<section class="card prog" id="prog">
-  <div class="phead">
-    <div class="pinfo"><div class="pfile">{e(job.file_name)}</div>
-    <div class="pmeta">{e(job.provider)}{(" · " + e(job.model)) if job.model else ""} · <span id="elapsed">0 с</span> · <span id="pstate">в очереди</span><span id="vsum"></span></div></div>
-    <div class="dls"><span class="dll" id="dll" hidden>Скачать:</span>{links}
-    <a class="dl" id="newtab" href="/jobs/{e(job.id)}/files/report.html?inline=1" target="_blank" rel="noopener" hidden>Открыть отдельно ↗</a>
-    <form class="answers" id="answers" hidden title="Отметьте варианты во вкладке «Вопросы» отчёта, нажмите «Скачать ответы» и загрузите файл: агент перепроверит замечания и покажет вердикт «до и после» и исправленное ТЗ.">
-      <label class="dl ans">Загрузить ответы ↻<input type="file" name="answers" accept=".md,.txt,.json" hidden></label></form>
-    <a class="btn ghost" href="/">Новая проверка</a></div>
-  </div>
-  {f'<p class="parent">Повторная проверка с ответами владельца к <a href="/jobs/{e(job.parent)}">исходной проверке</a>.</p>' if job.parent else ''}
-  <ol class="stages" id="stages"></ol>
+# ─────────────────── страница задания: прогресс и отчёт (№41) ───────────────────
 
-  <div class="notice" id="notice" role="status" hidden></div>
-  <div class="error" id="err" hidden></div>
-  <details class="log"><summary>Журнал запуска</summary><pre id="log"></pre></details>
+_CALLS = re.compile(r"готово за .*?вызовов (\d+)")
+FILE_NOTE = {"html": "отчёт целиком, открывается без сервера", "md": "для Git и вики", "json": "для систем и CI",
+             "docx": "для согласования", "pdf": "для печати", "csv": "задачи в Jira",
+             "docx_annotated": "исходный документ с комментариями", "pdf_annotated": "исходный PDF с выделениями",
+             "revised": "ТЗ с правками по ответам"}
+EXTRA_TABS = [("clarify", "До и после"), ("tests", "Тест-кейсы"), ("checklist", "Чек-лист банка"),
+              ("checks", "Проверки"), ("segment", "Нарезка"), ("rejected", "Отклонённые"), ("passport", "Паспорт")]
+
+
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    n = abs(int(n))
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    return few if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else many
+
+
+def _dur(s: Any) -> str:
+    try:
+        s = max(0, round(float(s)))
+    except (TypeError, ValueError):
+        return ""
+    return f"{s} с" if s < 60 else f"{s // 60} мин {s % 60:02d} с"
+
+
+def job_calls(job: Job) -> int:
+    """Вызовы модели по журналу прогона («этап: готово за N с, вызовов K»); 0 — пока неизвестно."""
+    return sum(int(m.group(1)) for line in job.log for m in [_CALLS.search(line)] if m)
+
+
+def report_facts(app: App | None, job: Job) -> dict[str, Any] | None:
+    """Что показать над отчётом: вердикт, четыре числа, блокеры — из того же report.json, что и отчёт."""
+    if app is None or job.state != "done":
+        return None
+    try:
+        report = json.loads((app.store.dir(job.id) / "out" / "report.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    from bcc_review.v2.render import html as H
+    from bcc_review.v2.render import jsonout as J
+    from bcc_review.v2.render import markdown as M
+    findings = [f for f in report.get("findings") or [] if isinstance(f, dict)]
+    run = report.get("run") or {}
+    verdict = report.get("verdict") or {}
+    summary = report.get("summary") or J.compute_summary(report)
+    fs = summary.get("findings") or {}
+    ok, total = H._quotes_verified(report)
+    qv, qt = summary.get("quotes_verified"), summary.get("quotes_total")
+    if isinstance(qv, int) and isinstance(qt, int) and not isinstance(qv, bool) and qt >= qv >= 0:
+        ok, total = qv, qt
+    status = run.get("status", "")
+    # блокеры — те же и в том же порядке, что на первом экране Markdown-отчёта и в итоге терминала
+    ctx = M._Ctx(report)
+    bl = M._blockers(ctx)
+    order = M._first_screen_fix(ctx, bl)
+    blockers = []
+    for f in [f for f in order if f in bl] + [f for f in bl if f not in order]:
+        ev0 = (f.get("evidence") or [{}])[0]
+        sec = str(ev0.get("section") or "").split(" › ")[-1]
+        blockers.append({"id": f.get("id", ""), "title": f.get("title", ""), "blocks": f.get("blocks", ""),
+                         "where": H._lines_label(ev0) + (f" · {sec}" if sec else "")})
+    major = fs.get("major", sum(1 for f in J.open_findings(report) if H._sev(f) == "major"))
+    present = {"clarify": bool(report.get("clarification")),
+               "rewrites": bool(report.get("rewrites"))}
+    return {
+        "development": verdict.get("development", "") if status != "failed" else "",
+        "testing": verdict.get("testing", "") if status != "failed" else "",
+        "critical": len(blockers), "major": major, "findings": len(findings),
+        "questions": len(report.get("questions") or []), "quotes_ok": ok, "quotes_total": total,
+        "blockers": blockers, "status": status,
+        "model": ", ".join(run.get("models_used") or []) or run.get("model_requested") or "",
+        "duration": run.get("duration_s"), "calls": (run.get("calls") or {}).get("total"),
+        "counts": {"tests": len(report.get("test_cases") or []), "checklist": len(report.get("checklist") or []),
+                   "checks": len(report.get("acceptance_checks") or []) + len(report.get("pair_checks") or []),
+                   "segment": len(report.get("requirements") or []), "rejected": len(report.get("rejected") or [])},
+        "has": present,
+    }
+
+
+_SHEET_CACHE: dict[str, list[dict]] = {}
+
+
+def _sheet_lines(job: Job, limit: int = 400) -> list[dict]:
+    """Строки документа для листа на столе (нумерация — как в отчёте); не прочитался — пустой лист."""
+    if job.id in _SHEET_CACHE:
+        return _SHEET_CACHE[job.id]
+    lines: list[dict] = []
+    try:
+        from bcc_review.v2.render import html as H
+        lines = [ln for ln in (H.load_view(job.input_path) or {}).get("lines") or [] if isinstance(ln, dict)][:limit]
+    except Exception:  # noqa: BLE001 — лист без текста всё равно покажем, сканер идёт по пустым строкам
+        lines = []
+    _SHEET_CACHE[job.id] = lines
+    return lines
+
+
+def _table_rows(texts: list[str]) -> dict[int, tuple[list[str], int, bool]]:
+    """№54: строки таблиц ТЗ («Поле | Значение», подряд от двух) → {номер: (ячейки, колонок, шапка)}; пустая строка
+    внутри таблицы (бывший разделитель «|---|») таблицу не рвёт."""
+    piped = [bool(re.search(r"\S \|( |$)", t)) for t in texts]
+    out: dict[int, tuple[list[str], int, bool]] = {}
+    i = 0
+    while i < len(texts):
+        if not piped[i]:
+            i += 1
+            continue
+        block, j = [], i
+        while j < len(texts) and (piped[j] or (not texts[j].strip() and block)):
+            if piped[j]:
+                block.append(j)
+            j += 1
+        if len(block) > 1:
+            cells = {k: [c.strip() for c in texts[k].split("|")] for k in block}
+            for k, c in cells.items():
+                while len(c) > 1 and not c[-1]:  # «… | Да / Нет |» — хвостовая черта
+                    c.pop()
+            n = max(len(c) for c in cells.values())
+            for k, c in cells.items():
+                out[k] = (c + [""] * (n - len(c)), n, k == block[0] and k + 1 < len(texts) and not texts[k + 1].strip())
+        i = j
+    return out
+
+
+def _sheet_html(job: Job) -> str:
+    rows = []
+    lines = _sheet_lines(job)
+    table = _table_rows([str(ln.get("text") or "") for ln in lines])
+    for i, ln in enumerate(lines):
+        text = str(ln.get("text") or "")
+        cls = "ln" + (" h" if ln.get("heading") or ln.get("kind") == "heading" else "") + ("" if text.strip() else " blank")
+        if i in table:  # №54: таблица ТЗ — ячейками, без «|», как на главной
+            cells, n, head = table[i]
+            cols = "minmax(0, 2fr) minmax(0, 3fr)" if n == 2 else f"repeat({n}, minmax(0, 1fr))"
+            tds = "".join(f'<span class="td">{e(c)}</span>' for c in cells)
+            rows.append(f'<div class="{cls} trow{" thead" if head else ""}"><span class="no">{e(ln.get("n", ""))}</span>'
+                        f'<span class="tx" style="--cols:{cols}">{tds}</span></div>')
+            continue
+        rows.append(f'<div class="{cls}"><span class="no">{e(ln.get("n", ""))}</span><span class="tx">{e(text) or "&#8203;"}</span></div>')
+    if not rows:
+        rows = ['<div class="ln skel"><span class="no"></span><span class="tx"></span></div>'] * 24
+    return "".join(rows)
+
+
+def _dock_html(job: Job, f: dict) -> str:
+    """Единственное стекло на экране: правка, вопросы, исправленная редакция, ещё, выгрузить, свой документ."""
+    jid = e(job.id)
+    q = f["questions"]
+    files = "".join(f'<a role="menuitem" href="/jobs/{jid}/files/{n}" download><span>{e(lbl)}</span>'
+                    f'<small>{e(FILE_NOTE.get(k, ""))}</small></a>' for k, n, lbl, _ in FILES if k in job.files)
+    files += ('<button type="button" role="menuitem" data-act="answers-md"><span>Ответы на вопросы</span>'
+              '<small>файл для --answers</small></button>' if q else "")
+    files += (f'<a role="menuitem" href="/jobs/{jid}/files/report.html?inline=1" target="_blank" rel="noopener">'
+              f'<span>Открыть отчёт отдельно ↗</span><small>тот же лист, без сервера</small></a>' if "html" in job.files else "")
+    extra = "".join(f'<button type="button" role="menuitem" data-rtab="{k}"><span>{lbl}</span>'
+                    f'<small>{f["counts"].get(k, "")}</small></button>'
+                    for k, lbl in EXTRA_TABS if k != "clarify" or f["has"]["clarify"])
+    revised = "rewrites" if f["has"]["rewrites"] else ""
+    return f"""<nav class="b-dock jb-dock" id="dock" aria-label="Отчёт">
+  <a class="jb-d" href="/" title="Положить на стол свой документ">Свой документ</a><span class="jb-sep" aria-hidden="true"></span>
+  <button type="button" class="jb-d" data-view="findings" aria-pressed="true">Правка <span class="jb-n">{f["findings"]}</span></button>
+  <button type="button" class="jb-d" data-view="questions" aria-pressed="false"{"" if q else " disabled"}><span>Вопросы<span class="long"> владельцу</span></span> <span class="jb-n">{q}</span></button>
+  <button type="button" class="jb-d" data-view="revised" data-rt="{revised}" aria-pressed="false"><span class="long">Исправленная редакция</span><span class="short">Редакция</span></button>
+  <button type="button" class="jb-d" data-menu="more" aria-haspopup="menu" aria-expanded="false">Ещё ▾</button>
+  <span class="jb-sep" aria-hidden="true"></span>
+  <button type="button" class="jb-d" data-menu="files" aria-haspopup="menu" aria-expanded="false">Выгрузить ▾</button>
+  <button type="button" class="jb-d jb-go primary" id="recheck" hidden{"" if not job.answers_path else " disabled"}>Проверить заново</button>
+</nav>
+<div class="jb-menu" id="menu-more" role="menu" hidden>{extra}</div>
+<div class="jb-menu" id="menu-files" role="menu" hidden>{files}</div>
+<p class="jb-toast" id="toast" role="status" hidden></p>"""
+
+
+def result_html(job: Job, f: dict, *, agent: bool = True) -> str:
+    """Готовая правка: лист-отчёт на весь стол (HTML-отчёт в режиме встраивания) и стеклянная панель внизу.
+
+    Вердикт — печать на листе, блокеры — красные пометки и заметки на полях; здесь — только данные для BCC AI."""
+    jid = e(job.id)
+    first = f["blockers"][0]["id"] if f["blockers"] else ""
+    say = (f'Готово. {f["critical"]} {_plural(f["critical"], "блокер", "блокера", "блокеров")} — начните с {first}.'
+           if first else "Готово. Блокеров нет.")
+    mood = "speak" if f["critical"] else "happy"  # AIshka (№40): говорит о блокерах или радуется, что их нет
+    parent = (f'<p class="jb-parent jb-parent-done">Повторная проверка с ответами владельца — '
+              f'<a href="/jobs/{e(job.parent)}">исходная правка</a>.</p>' if job.parent else "")
+    # панель — раньше листа: Tab попадает сначала в панель, потом в лист
+    return (_dock_html(job, f) + parent +
+            f'\n<iframe class="jb-report" id="rframe" title="Правка документа" data-src="/jobs/{jid}/files/report.html?inline=1" '
+            f'data-mood="{mood}" data-say="{e(say)}"></iframe>')
+
+
+def job_page(job: Job, app: App | None = None) -> str:
+    facts = report_facts(app, job)
+    css = (ASSETS / "job.css").read_text(encoding="utf-8")
+    parent = (f'<p class="jb-parent">Повторная проверка с ответами владельца — <a href="/jobs/{e(job.parent)}">'
+              f'исходная правка</a>.</p>' if job.parent else "")
+    if facts:
+        inner = result_html(job, facts)
+    else:
+        inner = f"""{parent}<section class="jb-scan" id="scan" aria-live="polite" aria-label="Проверка документа">
+  <div class="jb-sheet" id="sheet"><div class="jb-beam" id="beam" aria-hidden="true"></div>{_sheet_html(job)}</div>
+  <div class="jb-pilot" id="pilot">
+    <div class="jb-agent" id="agent-home"><div data-bcc-agent data-size="96" data-mood="work" id="agent"></div></div>
+    <div class="jb-say"><b id="stage">{"жду очереди" if job.state == "queued" else "читаю"}</b>
+    <span id="pline"><span id="elapsed">0 с</span><span id="calls"></span> · {e(job.provider)}{(" · " + e(job.model)) if job.model else ""}</span></div>
+  </div>
+  <div class="jb-err" id="err" hidden><p class="jb-errline" id="errtext" role="alert"></p><p class="jb-todo" id="todo"></p>
+  <a class="jb-btn" href="/">Новая проверка</a></div>
+  <details class="jb-log"><summary>Журнал запуска</summary><pre id="log"></pre></details>
 </section>
-<section class="result" id="result" hidden><iframe id="frame" title="Отчёт ревью"></iframe></section>
+<section class="jb-result" id="result" hidden></section>"""
+    body = f"""<style>{css}</style>
+<main class="jb{" done" if facts else ""}" data-job="{e(job.id)}" data-state="{e(job.state)}">
+{inner}
 </main>"""
-    return _layout(f"Проверка: {job.file_name}", body, sub=job.file_name)
+    page = _layout(f"Проверка: {job.file_name}", body, sub=job.file_name)
+    # до вливания №39 _layout ещё без токенов — подключаем сами (после вливания ветка не срабатывает)
+    if "/assets/tokens.css" not in page:
+        page = page.replace('<link rel="stylesheet" href="/assets/app.css">',
+                            '<link rel="stylesheet" href="/assets/tokens.css"><link rel="stylesheet" href="/assets/app.css">')
+    if "<body>" in page:
+        page = page.replace("<body>", '<body class="b-root">', 1)
+    return page
 
 
 # ─────────────────────────────── обработчик ───────────────────────────────
@@ -320,10 +551,8 @@ class Handler(BaseHTTPRequestHandler):
     app: App
     server_version = "bcc-review-web/2"
 
-    def log_message(self, fmt: str, *args: Any) -> None:  # тише в консоли
-        if "/api/jobs/" in (args[0] if args else ""):
-            return
-        sys.stderr.write("%s %s\n" % (self.log_date_time_string(), fmt % args))
+    def log_message(self, fmt: str, *args: Any) -> None:  # №42: журнал — в <data-dir>/web.log, в консоль только 5xx
+        _log_request_line(self, fmt % args)
 
     # ── ответы ──
     def _send(self, code: int, body: bytes, ctype: str, headers: dict[str, str] | None = None) -> None:
@@ -352,9 +581,11 @@ class Handler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_GET(self) -> None:  # noqa: N802
+        if _onboarding.handle_get(self, urlsplit(self.path).path): return  # №40: /welcome, /assets/agent.*  # noqa: E701
         url = urlsplit(self.path)
         path = url.path
         if path.startswith("/examples/"): from . import gallery; return gallery.handle(self)  # №43  # noqa: E701,E702
+        if path.startswith("/jobs/00000000-000043-"): _ready_jobs(self.app)  # №54: готовый отчёт по ссылке после перезапуска  # noqa: E701
         if path == "/":
             return self._html(200, index_page(self.app))
         if path == "/healthz":
@@ -374,10 +605,13 @@ class Handler(BaseHTTPRequestHandler):
             if not job:
                 return self._not_found()
             rest = m.group("rest") or ""
-            if m.group(1):  # /api/jobs/<id>
-                return self._json(200, job.public())
-            if not rest:
-                return self._html(200, job_page(job))
+            if m.group(1):  # /api/jobs/<id>  # №41: + вызовы модели по журналу
+                return self._json(200, {**job.public(), "calls": job_calls(job)})
+            if not rest:  # №41: ?part=result — отчёт над рамкой, когда прогон закончился при открытой странице
+                if "part" in parse_qs(url.query):
+                    f = report_facts(self.app, job)
+                    return self._html(200 if f else 409, result_html(job, f, agent=False) if f else "")
+                return self._html(200, job_page(job, self.app))
             if rest.startswith("/files/"):
                 return self._file(job, rest[len("/files/"):], "inline" in parse_qs(url.query))
         return self._not_found()
@@ -403,6 +637,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── POST ──
     def do_POST(self) -> None:  # noqa: N802
+        if _onboarding.handle_post(self, urlsplit(self.path).path): return  # №40: POST /api/key  # noqa: E701
         path = urlsplit(self.path).path
         if path.startswith("/examples/"): from . import gallery; return gallery.handle(self)  # №43  # noqa: E701,E702
         m = JOB_PATH.match(path)
@@ -427,8 +662,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._fail(400, "Выберите файл требований.", provider, model)
         ext = Path(fname).suffix.lower()
         if ext not in ALLOWED_EXT:
-            return self._fail(400, f"Формат {ext or 'без расширения'} не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML.",
-                              provider, model)
+            msg = f"Формат {ext or 'без расширения'} не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML."
+            try:  # №57: та же фраза, что в командной строке («это изображение…», «это таблица…»)
+                from ..pipeline import unreadable_reason
+                msg = unreadable_reason(Path(fname), ValueError(msg[0].lower() + msg[1:]))
+            except Exception:  # noqa: BLE001
+                pass
+            return self._fail(400, msg, provider, model)
         problem = check_provider(provider, model)
         if problem:
             return self._fail(400, problem, provider, model)
@@ -471,6 +711,9 @@ class _Server(ThreadingHTTPServer):
         if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         super().server_bind()
+
+    def handle_error(self, request: Any, client_address: Any) -> None:  # №42: без трейсбэков в консоли
+        _server_error(self, client_address)
 
 
 def make_server(app: App, host: str = "127.0.0.1", port: int = 8014) -> ThreadingHTTPServer:
@@ -530,10 +773,239 @@ def build_app(data_dir: Path, *, provider: str = "auto", fixture: Path | None = 
     return App(store, Worker(store, runner, workers), default_provider=provider, sample=sample)
 
 
+PORTS = (8014, 8030)  # №42: порт по умолчанию и последний, который пробуем, если предыдущие заняты
+# №42: --check проверяет установку — эти модули должны импортироваться из окружения (requirements.txt)
+_CHECK_MODULES = ("jsonschema", "google.genai", "anthropic", "pymupdf", "docx", "yaml")
+_LOG_LOCK = threading.Lock()
+_LOG_MAX = 2 * 1024 * 1024  # web.log больше 2 МБ — в web.log.1, начинаем заново
+
+
+def _sysenv(name: str) -> str:
+    """Переменные терминала и системы (TERM, COLORTERM, NO_COLOR, DISPLAY…) — не настройки агента: в .env.example их нет."""
+    return os.environ.get(name, "")
+
+
+# ── консоль: журнал — в файл, на экран — только то, что нужно человеку ──
+
+def _log_to_file(root: Path | None, text: str) -> None:
+    if root is None:
+        return
+    path = Path(root) / "web.log"
+    try:
+        with _LOG_LOCK:
+            if path.is_file() and path.stat().st_size > _LOG_MAX:
+                path.replace(path.with_name("web.log.1"))
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {text}\n")
+    except OSError:
+        pass
+
+
+def _app_root(handler_cls: Any) -> Path | None:
+    store = getattr(getattr(handler_cls, "app", None), "store", None)
+    return getattr(store, "root", None)
+
+
+def _log_request_line(handler: BaseHTTPRequestHandler, text: str) -> None:
+    """№42: журнал запросов — в <data-dir>/web.log; в консоль — только ответы 5xx (ошибки сервера)."""
+    if any(k in text for k in ("/api/jobs/", "/healthz")):  # опрос прогресса и проверка живости — без шума
+        return
+    root = _app_root(handler)
+    _log_to_file(root, text)
+    if re.search(r'" 5\d\d ', text):
+        _say(f"Ошибка сервера: {text.strip()} — подробности в {Path(root or '.') / 'web.log'}", err=True)
+
+
+def _server_error(server: Any, client_address: Any) -> None:
+    """№42: обрыв соединения браузером (закрыл вкладку, ушёл со страницы) — не ошибка; прочее — в web.log."""
+    exc = sys.exc_info()[1]
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        return
+    import traceback
+
+    root = _app_root(getattr(server, "RequestHandlerClass", None))
+    _log_to_file(root, f"ошибка при обработке запроса от {client_address}:\n{traceback.format_exc()}")
+    _say(f"Ошибка при обработке запроса: {type(exc).__name__}: {exc} — подробности в "
+         f"{Path(root or '.') / 'web.log'}", err=True)
+
+
+def _enable_vt(stream: Any) -> bool:
+    """Windows 10+: включить разбор ANSI-последовательностей в консоли. Нельзя — без цвета."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        k32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        handle = k32.GetStdHandle(-12 if stream is sys.stderr else -11)
+        mode = wintypes.DWORD()
+        if not k32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return False
+        return bool(mode.value & 0x0004) or bool(k32.SetConsoleMode(handle, mode.value | 0x0004))
+    except Exception:  # noqa: BLE001 — старая консоль или не Windows
+        return False
+
+
+def _color_depth(stream: Any) -> int:
+    """0 — без цвета (не терминал, NO_COLOR, TERM=dumb), 256 или 16 млн (24 бита)."""
+    try:
+        tty = bool(stream.isatty())
+    except (AttributeError, ValueError):
+        tty = False
+    if not tty or "NO_COLOR" in os.environ or _sysenv("TERM") == "dumb":
+        return 0
+    if os.name == "nt" and not _enable_vt(stream):
+        return 0
+    truecolor = _sysenv("COLORTERM") in ("truecolor", "24bit") or _sysenv("WT_SESSION") or \
+        _sysenv("TERM_PROGRAM") in ("iTerm.app", "vscode", "WezTerm")
+    return 24 if truecolor else 256
+
+
+_GREEN = ((0, 133, 86), 29)     # BCC Green Strong #008556: читается и на белом терминале, и на тёмном
+_GOLD = ((220, 162, 98), 179)   # BCC Gold #DCA262
+_MUTED = ((139, 152, 165), 245)
+_RED = ((224, 95, 85), 167)
+
+
+def _paint(text: str, color: tuple[tuple[int, int, int], int] | None, depth: int, *, bold: bool = False,
+           underline: bool = False) -> str:
+    if not depth:
+        return text
+    codes = (["1"] if bold else []) + (["4"] if underline else [])
+    if color:
+        (r, g, b), c256 = color
+        codes.append(f"38;2;{r};{g};{b}" if depth == 24 else f"38;5;{c256}")
+    return f"\x1b[{';'.join(codes)}m{text}\x1b[0m" if codes else text
+
+
+def _say(text: str, *, err: bool = False, color: tuple[tuple[int, int, int], int] | None = None) -> None:
+    stream = sys.stderr if err else sys.stdout
+    depth = _color_depth(stream)
+    print(_paint(text, color or (_RED if err else None), depth), file=stream, flush=True)
+
+
+def _ready_line(url: str, note: str = "", depth: int = 0) -> str:
+    """Одна строка после знакомства: «Система открыта: http://127.0.0.1:8014 · остановить — Ctrl+C»."""
+    tail = f" · {note}" if note else ""
+    return (_paint("Система открыта: ", None, depth, bold=True) + _paint(url.rstrip("/"), _GREEN, depth, bold=True)
+            + _paint(f"{tail} · остановить — Ctrl+C", _MUTED, depth))
+
+
+def _set_title(title: str) -> None:
+    if _color_depth(sys.stdout):
+        sys.stdout.write(f"\x1b]0;{title}\x07")
+        sys.stdout.flush()
+
+
+def _shown_host(host: str) -> str:
+    return "127.0.0.1" if host in ("", "0.0.0.0", "::") else host
+
+
+def _get(url: str, timeout: float = 5.0) -> tuple[int, bytes]:
+    with urllib.request.urlopen(url, timeout=timeout) as r:  # noqa: S310 — только свой локальный адрес
+        return r.status, r.read()
+
+
+def _wait_ready(url: str, timeout: float = 15.0) -> bool:
+    """Ждём, пока сервер ответит на /healthz (браузер открываем только после этого)."""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        try:
+            if _get(url + "healthz", timeout=1.0) == (200, b"ok"):
+                return True
+        except Exception:  # noqa: BLE001 — ещё не поднялся
+            pass
+        time.sleep(0.1)
+    return False
+
+
+def _has_gui() -> bool:
+    """Linux без графики (ssh, сервер): webbrowser запустил бы текстовый lynx/w3m прямо в этом терминале."""
+    if sys.platform in ("win32", "darwin"):
+        return True
+    return bool(_sysenv("DISPLAY") or _sysenv("WAYLAND_DISPLAY"))
+
+
+def _env_path() -> Path:
+    """Куда знакомство в терминале запишет ключ: тот же .env, что читает load_dotenv (текущий каталог или корень)."""
+    for p in (Path.cwd() / ".env", REPO / ".env"):
+        if p.is_file():
+            return p
+    return Path.cwd() / ".env"
+
+
+_PROVIDER_ID = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
+
+
+def _use_aishka(tty_agent: Any) -> None:
+    """Владелец, 20:25: в терминале — яркий AIshka (`aishka.py`), а не тёмный дрон. Пока `tty_agent` (№40) рисует
+    дрона, подставляем ему отрисовку AIshka (тот же вызов `render(name, mode, small=…)`). Перейдёт сам — пусть
+    объявит `MASCOT = "aishka"`, и подмена не нужна."""
+    if getattr(tty_agent, "MASCOT", "") == "aishka" or not hasattr(tty_agent, "render"):
+        return
+    try:
+        from . import aishka
+
+        tty_agent.render = aishka.render
+    except Exception:  # noqa: BLE001 — останется прежний рисунок, знакомство не ломаем
+        pass
+
+
+def _greet(port: int, root: Path) -> str:
+    """№40 — BCC AI в терминале (`tty_agent.greet`): знакомство и ключ до браузера. Возвращает выбранного провайдера.
+
+    Модуля ещё нет (до вливания №40) или знакомство упало — ничего не спрашиваем, система открывается как есть
+    (ключ тогда спросит веб). Ctrl+C во время знакомства — выход.
+    """
+    try:
+        from . import tty_agent  # type: ignore[attr-defined]  # №40
+    except ImportError:
+        return ""
+    _use_aishka(tty_agent)
+    try:
+        got = tty_agent.greet(port, _env_path())
+    except KeyboardInterrupt:
+        raise
+    except Exception as exc:  # noqa: BLE001 — знакомство не должно мешать открыть систему
+        import traceback
+
+        _log_to_file(root, f"знакомство в терминале не удалось: {exc!r}\n{traceback.format_exc()}")
+        return ""
+    got = str(got or "").strip()
+    return got if _PROVIDER_ID.match(got) and got != "auto" else ""
+
+
+def _self_check(url: str) -> int:
+    """--check: /healthz и / отвечают, зависимости импортируются. 0 — всё в порядке."""
+    import importlib
+
+    problems: list[str] = []
+    for mod in _CHECK_MODULES:
+        try:
+            importlib.import_module(mod)
+        except Exception as exc:  # noqa: BLE001 — нужна причина, а не трейсбэк
+            problems.append(f"не импортируется {mod}: {type(exc).__name__}: {exc}")
+    if not _wait_ready(url):
+        problems.append(f"{url}healthz не ответил за 15 с")
+    else:
+        try:
+            code, body = _get(url)
+            if code != 200 or b"<html" not in body.lower():
+                problems.append(f"{url} ответил {code}, но не страницей")
+            else:
+                print(f"Проверка: {url}healthz — ok, {url} — 200 ({len(body) // 1024} КБ)", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            problems.append(f"{url} не открылся: {exc}")
+    for p in problems:
+        print(f"Проверка не прошла: {p}", file=sys.stderr, flush=True)
+    if not problems:
+        print("Установка в порядке: ./start.sh (Windows: START.cmd) откроет BCC Review в браузере.", flush=True)
+    return 1 if problems else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.web", description="Веб-демо ревью требований")
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8014)
+    ap.add_argument("--host", default="127.0.0.1", help="адрес; 0.0.0.0 — доступ из сети (только в Docker)")
+    ap.add_argument("--port", type=int, default=PORTS[0], help=f"порт; занят — следующий свободный до {PORTS[1]}")
     ap.add_argument("--provider", default="auto", help="провайдер по умолчанию в форме")
     ap.add_argument("--data-dir", default=".bcc_web", help="где хранить загрузки и отчёты")
     ap.add_argument("--sample", help="файл для кнопки «Проверить пример»")
@@ -543,30 +1015,66 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cache-dir", help="кэш ответов модели, общий для всех проверок (по умолчанию <data-dir>/cache)")
     ap.add_argument("--pace", type=float, default=0.0,
                     help="для съёмки демо: показывать этапы не быстрее раза в N секунд (анализ не замедляется)")
-    ap.add_argument("--open", action="store_true", help="открыть браузер")
+    ap.add_argument("--open", action="store_true", help="открыть браузер, когда сервер ответит")
+    ap.add_argument("--check", action="store_true",
+                    help="проверить установку: поднять сервер, получить /healthz и /, выйти (0 — в порядке)")
+    ap.add_argument("--no-tty", action="store_true",
+                    help="без знакомства в терминале (ключ не спрашивать): Docker, CI, запуск из скриптов")
     a = ap.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):  # непечатаемый символ — «?», а не UnicodeEncodeError
+        try:
+            stream.reconfigure(errors="replace")  # type: ignore[union-attr]
+        except (AttributeError, ValueError):
+            pass
     load_dotenv()
     app = build_app(Path(a.data_dir), provider=a.provider, fixture=Path(a.fixture) if a.fixture else None,
                     sample=Path(a.sample) if a.sample else None, workers=a.workers,
                     cache_dir=Path(a.cache_dir) if a.cache_dir else None, pace=a.pace,
                     extra_args=shlex.split(a.pipeline_args, posix=(os.name != "nt")))
-    srv, note = bind_server(app, a.host, a.port)
+    tries = max(0, PORTS[1] - a.port) if PORTS[0] <= a.port <= PORTS[1] else 20
+    srv, note = bind_server(app, a.host, a.port, tries=tries)
+    if srv is None and a.check and note.startswith("Веб-демо уже запущено"):
+        srv, note = bind_server(app, a.host, 0)  # проверяем эту установку, а не уже запущенное демо
     if srv is None:
         running = note.startswith("Веб-демо уже запущено")
         print(note, file=sys.stdout if running else sys.stderr, flush=True)
-        if running and a.open:
-            webbrowser.open(f"http://{'127.0.0.1' if a.host in ('', '0.0.0.0', '::') else a.host}:{a.port}/")
+        if running and a.open and _has_gui():
+            webbrowser.open(f"http://{_shown_host(a.host)}:{a.port}/")
         return 0 if running else 2
-    if note:
-        print(note, flush=True)
-    url = f"http://{a.host}:{srv.server_address[1]}/"
-    print(f"Веб-демо: {url}  (остановить — Ctrl+C)", flush=True)
-    if a.open:
-        webbrowser.open(url)
+    port = srv.server_address[1]
+    url = f"http://{_shown_host(a.host)}:{port}/"
+    serve = threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.25}, daemon=True)
+    serve.start()
+    if a.check:  # сервер — в фоне, проверка — здесь; знакомства и браузера нет
+        if note:
+            print(note, flush=True)
+        try:
+            return _self_check(url)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+    _set_title("BCC Review")
+    depth = _color_depth(sys.stdout)
+    pad = "  " if depth else ""  # в терминале — тот же отступ, что у реплик BCC AI; в журнале — без него
     try:
-        srv.serve_forever()
+        if not a.no_tty and a.provider == "auto" and not a.fixture:  # провайдер задан или показ — знакомиться незачем
+            chosen = _greet(port, app.store.root)
+            if chosen:
+                app.default_provider = chosen  # ключ введён в терминале — браузер сразу на главной
+        if not _wait_ready(url):
+            _say(f"{pad}Сервер не ответил на {url}healthz — откройте {url} вручную.", err=True)
+        busy = f"порт {a.port} занят другой программой" if port != a.port and a.port else ""
+        print(pad + _ready_line(url, busy, depth), flush=True)
+        if a.open and _has_gui():
+            try:
+                webbrowser.open(url)
+            except Exception:  # noqa: BLE001 — нет браузера: адрес уже напечатан
+                pass
+        while serve.is_alive():  # join с таймаутом: Ctrl+C на Windows срабатывает сразу
+            serve.join(0.5)
     except KeyboardInterrupt:
-        pass
+        _say(f"\n{pad}BCC Review остановлен.", color=_MUTED)
     finally:
+        srv.shutdown()
         srv.server_close()
     return 0

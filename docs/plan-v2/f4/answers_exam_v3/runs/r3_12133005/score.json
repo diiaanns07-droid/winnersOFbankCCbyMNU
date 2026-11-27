@@ -1,0 +1,264 @@
+{
+  "total": 28,
+  "n": 30,
+  "by_class": {
+    "contradictory": [
+      6,
+      8
+    ],
+    "normal": [
+      17,
+      17
+    ],
+    "ambiguous": [
+      5,
+      5
+    ]
+  },
+  "rows": [
+    {
+      "id": "INS-01",
+      "case": "insurance",
+      "class": "contradictory",
+      "type": "answer_vs_decision",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-02",
+      "case": "insurance",
+      "class": "contradictory",
+      "type": "answer_vs_decision",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-03",
+      "case": "insurance",
+      "class": "normal",
+      "type": "letter",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-04",
+      "case": "insurance",
+      "class": "normal",
+      "type": "defer",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-05",
+      "case": "insurance",
+      "class": "normal",
+      "type": "own_text_number",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-06",
+      "case": "insurance",
+      "class": "contradictory",
+      "type": "two_addressees",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-07",
+      "case": "insurance",
+      "class": "contradictory",
+      "type": "two_addressees",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-08",
+      "case": "insurance",
+      "class": "normal",
+      "type": "letter",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-09",
+      "case": "insurance",
+      "class": "ambiguous",
+      "type": "stale_number_vague_topic",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "INS-10",
+      "case": "insurance",
+      "class": "ambiguous",
+      "type": "unbound_decision",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-01",
+      "case": "capital",
+      "class": "normal",
+      "type": "letter",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-02",
+      "case": "capital",
+      "class": "contradictory",
+      "type": "answer_vs_doc",
+      "ok": false,
+      "miss": [
+        "нет нового дефекта на строках [127] (новые: [])"
+      ]
+    },
+    {
+      "id": "CAP-03",
+      "case": "capital",
+      "class": "ambiguous",
+      "type": "stale_number_clear_topic",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-04",
+      "case": "capital",
+      "class": "normal",
+      "type": "letter",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-05",
+      "case": "capital",
+      "class": "normal",
+      "type": "own_text_number",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-06",
+      "case": "capital",
+      "class": "normal",
+      "type": "partial",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-07",
+      "case": "capital",
+      "class": "contradictory",
+      "type": "two_addressees",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-08",
+      "case": "capital",
+      "class": "contradictory",
+      "type": "two_addressees",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-09",
+      "case": "capital",
+      "class": "ambiguous",
+      "type": "unknown_number",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "CAP-10",
+      "case": "capital",
+      "class": "normal",
+      "type": "new_rule_decision",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-01",
+      "case": "grace",
+      "class": "normal",
+      "type": "letter_injection",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-02",
+      "case": "grace",
+      "class": "normal",
+      "type": "letter",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-03",
+      "case": "grace",
+      "class": "normal",
+      "type": "cyrillic_letter",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-04",
+      "case": "grace",
+      "class": "ambiguous",
+      "type": "stale_number_vague",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-05",
+      "case": "grace",
+      "class": "contradictory",
+      "type": "answer_vs_doc",
+      "ok": false,
+      "miss": [
+        "нет нового дефекта на строках [36] (новые: ['D-24'])"
+      ]
+    },
+    {
+      "id": "GRC-06",
+      "case": "grace",
+      "class": "normal",
+      "type": "own_text",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-07",
+      "case": "grace",
+      "class": "normal",
+      "type": "letter_with_text",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-08",
+      "case": "grace",
+      "class": "normal",
+      "type": "defer",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-09",
+      "case": "grace",
+      "class": "normal",
+      "type": "new_rule_decision",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "GRC-10",
+      "case": "grace",
+      "class": "normal",
+      "type": "new_rule_decision",
+      "ok": true,
+      "miss": []
+    }
+  ]
+}

@@ -36,6 +36,7 @@ EXAMPLES = HERE / "examples" / "examples.json"
 REPO = HERE.parents[3]  # src/bcc_review/v2/web → корень репозитория
 PREFIX = "00000000-000043-"  # номер готового задания: проходит JOB_PATH сервера и не путается с настоящими
 NO_MODEL = ("mock", "offline")
+VIEW = "light-49.3"  # №54: вид HTML готового отчёта; сменился — готовое задание собирается заново
 
 _VERDICT = {"no": ("нельзя", "crit"), "conditional": ("с условиями", "major"), "yes": ("можно", "ok")}
 _NO_KEY = {"mock": "демо без модели", "offline": "только правила"}
@@ -173,6 +174,7 @@ def _build_job(store: Any, jid: str, rec: dict[str, Any], meta: dict[str, Any]) 
         src = rec.get(key)
         if isinstance(src, Path) and src.is_file():
             shutil.copy2(src, tmp / "out" / name)
+    _fresh_html(meta["report"], tmp / "input" / fname, tmp / "out" / "report.html")
     run = meta["run"]
     stages = {k: "done" for k, _ in R.STAGES}
     for k, v in (run.get("stages") or {}).items():
@@ -196,7 +198,7 @@ def _build_job(store: Any, jid: str, rec: dict[str, Any], meta: dict[str, Any]) 
                 log=[f"Готовый отчёт «{rec.get('title', rec['id'])}» из examples.json (№43)."],
                 summary=meta["summary"], notice=(notice + " " + extra).strip() if extra else notice)
     # не job.json: JobStore при старте не подхватывает готовые задания в «Последние проверки»; их возвращает ensure_ready
-    (tmp / "ready.json").write_text(json.dumps({"example": rec["id"], "digest": meta["digest"], "job": asdict(job)},
+    (tmp / "ready.json").write_text(json.dumps({"example": rec["id"], "digest": meta["digest"], "view": VIEW, "job": asdict(job)},
                                                ensure_ascii=False, indent=1), encoding="utf-8")
     shutil.rmtree(final, ignore_errors=True)
     tmp.replace(final)
@@ -207,12 +209,28 @@ def _build_job(store: Any, jid: str, rec: dict[str, Any], meta: dict[str, Any]) 
     return job
 
 
+def _fresh_html(report: dict[str, Any], source: Path, dst: Path) -> None:
+    """№54: HTML готового отчёта — тем же рендером, что у новой проверки (светлый лист по правке 49): готовые
+    отчёты могли быть сняты со старым видом. Содержание — из того же report.json, ни слова не меняется; рендер не
+    справился — остаётся HTML из записи."""
+    try:
+        from bcc_review.v2.render import html as H
+        try:
+            view = H.load_view(source)
+        except Exception:  # noqa: BLE001 — документ не разобран: лист соберётся из цитат отчёта
+            view = None
+        new = H.write(report, view, dst.with_name(dst.name + ".new"))
+        new.replace(dst)
+    except Exception:  # noqa: BLE001
+        dst.with_name(dst.name + ".new").unlink(missing_ok=True)
+
+
 def _from_disk(store: Any, jid: str, digest: str) -> R.Job | None:
     """Готовое задание, собранное при прошлом запуске сервера (файлы уже на месте) — без повторного копирования."""
     d = store.dir(jid)
     try:
         rec = json.loads((d / "ready.json").read_text(encoding="utf-8"))
-        if rec.get("digest") != digest or not (d / "out" / "report.html").is_file():
+        if rec.get("digest") != digest or rec.get("view") != VIEW or not (d / "out" / "report.html").is_file():
             return None
         job = R.Job(**{k: v for k, v in rec["job"].items() if k in R.Job.__dataclass_fields__})
         job.input_path = str(d / "input" / job.file_name)  # каталог данных могли перенести

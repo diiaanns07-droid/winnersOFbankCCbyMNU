@@ -1,0 +1,24 @@
+Документ: evaluation/v2/open2/grace_clean/source.md
+  segment: взят из grace_clean__clean
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 4
+  consistency: взят из grace_clean__clean
+  lens_analyst: запуск
+  lens_architect: взят из grace_clean__clean
+  lens_risk: взят из grace_clean__clean
+  lens_qa: взят из grace_clean__clean
+  lens_analyst: готово за 84 с, вызовов 1, кандидатов 6
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 24
+  judge: взят из grace_clean__clean
+  clarify: взят из grace_clean__clean
+Этап lens_analyst: ok, вызовов 1, 84.22 с, кандидатов 6
+Выход этапа: runs/20261127-205521-4a4c/stages/lens_analyst.json
+BCC Review: «Льготный период по кредитной карте» — 48 требований, 19 дефектов (критичных 0, существенных 0, незначительных 19), вопросов 5
+Разработка: можно · тестирование: можно — исправить первым:
+  D-01 Нет ID и приоритетов у пунктов требований и критериев
+  D-02 Карточный процессинг указан в ИС, но не в архитектуре
+  D-03 Цель «снизить долю потерь» без показателя и срока
+Прогон завершён полностью: 1 мин 24 с, 1 вызов модели, claude-haiku-5-5; цитат сверено 45 из 45
+Отчёт: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-grace_clean__clean/lens_analyst.json и evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-grace_clean__clean/lens_analyst.json
+HTML: evaluation/v2/measurements/w5_52_lens_analyst_ac9d2a52/clean_open2-grace_clean__clean/lens_analyst.html

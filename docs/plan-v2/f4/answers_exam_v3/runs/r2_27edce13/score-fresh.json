@@ -1,0 +1,100 @@
+{
+  "total": 10,
+  "n": 10,
+  "by_class": {
+    "normal": [
+      4,
+      4
+    ],
+    "contradictory": [
+      4,
+      4
+    ],
+    "ambiguous": [
+      2,
+      2
+    ]
+  },
+  "rows": [
+    {
+      "id": "F-01",
+      "case": "insurance_inject",
+      "class": "normal",
+      "type": "letter",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-02",
+      "case": "insurance_inject",
+      "class": "normal",
+      "type": "own_text_number",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-03",
+      "case": "insurance_inject",
+      "class": "contradictory",
+      "type": "two_addressees",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-04",
+      "case": "insurance_inject",
+      "class": "contradictory",
+      "type": "two_addressees",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-05",
+      "case": "insurance_inject",
+      "class": "contradictory",
+      "type": "answer_vs_decision",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-06",
+      "case": "insurance_inject",
+      "class": "contradictory",
+      "type": "answer_vs_decision",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-07",
+      "case": "insurance_inject",
+      "class": "normal",
+      "type": "partial",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-08",
+      "case": "insurance_inject",
+      "class": "normal",
+      "type": "defer",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-09",
+      "case": "insurance_inject",
+      "class": "ambiguous",
+      "type": "stale_number_vague_topic",
+      "ok": true,
+      "miss": []
+    },
+    {
+      "id": "F-10",
+      "case": "insurance_inject",
+      "class": "ambiguous",
+      "type": "unbound_decision",
+      "ok": true,
+      "miss": []
+    }
+  ]
+}
