@@ -253,6 +253,31 @@ def test_constraints_pin_everything_and_agree_with_requirements():
         assert name in locked, name
 
 
+def test_pyproject_extras_agree_with_pinned_versions():
+    """`pip install -e ".[all,dev]"` (так ставят разработчики) не уходит от версий жюри: зафиксированные версии
+    подходят под ограничения extras, а PyMuPDF — ветка 1.x (2.x тянет onnxruntime, ≈ +200 МБ; просьба №03)."""
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
+        pytest.skip("нет tomllib")
+    from packaging.requirements import Requirement
+
+    data = tomllib.loads(_read(ROOT / "pyproject.toml"))
+    locked = _pins(ROOT / "constraints.txt")
+    extras = data["project"].get("optional-dependencies", {})
+    checked = 0
+    for group in ("pdf", "all", "gemini", "anthropic", "docx"):
+        for spec in extras.get(group, []):
+            req = Requirement(spec)
+            name = re.sub(r"[-_.]+", "-", req.name).lower()
+            if name == "pymupdf":
+                assert not req.specifier.contains("2.0") and not req.specifier.contains("2.2"), f"{group}: {spec}"
+            if name in locked:
+                assert req.specifier.contains(locked[name]), f"{group}: {spec} не допускает {name}=={locked[name]}"
+                checked += 1
+    assert checked >= 5
+
+
 def test_cryptography_has_wheels_for_intel_mac():
     """В cryptography 49+ нет колёс для Intel Mac: pip собирал бы её из исходников (нужен Rust) и падал."""
     ver = _pins(ROOT / "constraints.txt").get("cryptography", "")

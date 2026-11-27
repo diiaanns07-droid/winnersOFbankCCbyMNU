@@ -1,0 +1,90 @@
+{
+ "_note": "haiku 27.11 12:45 (волна 3, сессия 2, №04): блоки «200. Successful» + тело — единственное описание кодов (перечня нет); вводная фраза «Метод возвращает…»",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "functional",
+   "summary": "Возврат выписки по счёту за период",
+   "line_start": 2,
+   "line_end": 2
+  },
+  {
+   "source_id": "Параметры запроса: accountId",
+   "kind": "api",
+   "summary": "Идентификатор счёта, обязательный параметр",
+   "line_start": 5,
+   "line_end": 5
+  },
+  {
+   "source_id": "Параметры запроса: dateFrom",
+   "kind": "api",
+   "summary": "Начало периода, обязательный параметр",
+   "line_start": 6,
+   "line_end": 6
+  },
+  {
+   "source_id": "Параметры запроса: pageSize",
+   "kind": "api",
+   "summary": "Число операций на странице, необязательный параметр",
+   "line_start": 7,
+   "line_end": 7
+  },
+  {
+   "source_id": "Параметры запроса: includeHolds",
+   "kind": "api",
+   "summary": "Показ заблокированных сумм, необязательный параметр",
+   "line_start": 8,
+   "line_end": 8
+  },
+  {
+   "source_id": "Статус 200",
+   "kind": "api",
+   "summary": "Успешный ответ с пустым списком операций",
+   "line_start": 10,
+   "line_end": 11
+  },
+  {
+   "source_id": "Статус 400",
+   "kind": "api",
+   "summary": "Некорректный диапазон дат в запросе",
+   "line_start": 12,
+   "line_end": 13
+  },
+  {
+   "source_id": "Статус 401",
+   "kind": "api",
+   "summary": "Отсутствие или недействительная авторизация",
+   "line_start": 14,
+   "line_end": 15
+  },
+  {
+   "source_id": "Статус 404",
+   "kind": "api",
+   "summary": "Счёт не найден",
+   "line_start": 16,
+   "line_end": 17
+  },
+  {
+   "source_id": "Статус 410",
+   "kind": "api",
+   "summary": "Счёт закрыт, выписка недоступна",
+   "line_start": 18,
+   "line_end": 19
+  },
+  {
+   "source_id": "Статус 500",
+   "kind": "api",
+   "summary": "Внутренняя ошибка сервера",
+   "line_start": 20,
+   "line_end": 21
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Шапка таблицы параметров запроса (Parameter | Format | Mandatory | Description)",
+   "line_start": 4,
+   "line_end": 4,
+   "reason": "Строка-шапка таблицы, не требование."
+  }
+ ]
+}

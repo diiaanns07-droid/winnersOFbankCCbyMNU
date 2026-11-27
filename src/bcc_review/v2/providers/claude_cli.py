@@ -354,12 +354,23 @@ class ClaudeCLIProvider:
                     pass
         seconds = time.monotonic() - started
         out = parse_cli_output(proc.stdout)
+        if out is None and proc.returncode == 0 and not (proc.stderr or "").strip():
+            # CLI завершился «успешно», но ничего не напечатал: не «молча пустой» ответ и не неизвестная ошибка,
+            # а ответ не по формату — LLMClient один раз переспросит модель
+            self._log({"model": model, "seconds": round(seconds, 1), "error": "invalid_output", "message": "пустой вывод"})
+            raise ProviderError("invalid_output", f"claude -p завершился без ответа (пустой вывод, модель {model}).",
+                                model=model)
         if out is None or out.get("is_error") or (proc.returncode != 0 and out.get("structured_output") is None):
             error = classify_cli_result(out, returncode=proc.returncode, stderr=proc.stderr or "", model=model)
             self._log({"model": model, "seconds": round(seconds, 1), "error": error.kind, "message": error.message[:300]})
             raise error
 
         data = out.get("structured_output")
+        if isinstance(data, str):   # некоторые версии CLI отдают structured_output строкой JSON
+            try:
+                data = json.loads(_strip_fence(data))
+            except ValueError:
+                data = None
         if data is None:
             try:
                 data = json.loads(_strip_fence(str(out.get("result") or "")))

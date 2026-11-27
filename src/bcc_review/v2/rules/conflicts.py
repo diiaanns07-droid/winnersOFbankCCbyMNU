@@ -74,14 +74,23 @@ def _emit(out: dict, rule: str, kind: str, a: Sent | Line, qa: str, b: Sent | Li
         qb = b.body
     extra = out.pop("_extra_ev", [])
     # у каждой пары свой source: судья №10 склеивает кандидатов одного правила в один кластер
+    base = rule
     rule = f"{rule}.L{min(la.n, lb.n)}-{max(la.n, lb.n)}"
     out["candidates"].append(candidate(
-        rule, title=title, kind=kind, criterion="set_consistent", severity="major", blocks="both",
+        rule, title=title, kind=kind, criterion="set_consistent", severity=CRITICAL_RULES.get(base, "major"),
+        blocks="both",
         evidence=[ev(la, qa), ev(lb, qb)] + extra, problem=problem, scenario=scenario,
         impact=("Разработчик реализует одно правило, тестировщик проверяет другое; исход для клиента зависит от "
                 "того, какое место документа прочитали."),
         recommendation=recommendation, question=question, conflict=True,
     ))
+
+
+# CONTRACT §5 (а): одно событие — два несовместимых исхода по двум правилам — critical (корпус event_conflict 5 из 5,
+# К2 открытого набора). Границы (правило ↔ код API, приёмка на границе) — major, как в корпусе range_boundary;
+# судья поднимает их по контексту.
+CRITICAL_RULES = {"conflicts.event_negation": "critical", "conflicts.event_condition": "critical",
+                  "conflicts.event_quantity": "critical", "conflicts.event_effective": "critical"}
 
 
 # --- event_conflict -------------------------------------------------------------------------------
@@ -114,6 +123,11 @@ TTL_AFTER = re.compile(r"^\s*(?:в\s+течение\s+)?(?:\d+|од(?:ин|ну|
                        r"пятнадцат\w*|тридцат\w*)\s+(?:секунд|минут|час|сут|дн|недел|месяц|год|лет)\w*", re.I)
 
 
+def _cond_text(body: str) -> str:
+    m = COND.match(body)
+    return m.group(1).strip() if m else body
+
+
 def rule_events(doc: Doc, out: dict) -> None:
     sents = sentences(doc)
     done: set[tuple[int, int]] = set()
@@ -136,8 +150,8 @@ def rule_events(doc: Doc, out: dict) -> None:
                       title=f"Противоположные исходы одного правила: «{sa} {va}» и «не {va}»",
                       problem=(f"В одном месте {quoted(pos.body)}, в другом — {quoted(neg.body)}. Для одного и того же "
                                "случая документ даёт противоположные исходы."),
-                      scenario=(f"Происходит событие «{sa}»: по одному месту документа «{va}» выполняется, по "
-                                "другому — нет."),
+                      scenario=(f"Наступает случай «{sa}»: по одному месту документа «{sa} {va}», по другому — "
+                                f"«{sa} не {va}»; реализация и тест выберут разные исходы."),
                       recommendation="Оставить одно правило и удалить или исправить второе; добавить критерий приёмки.",
                       question=f"Какое из двух правил для «{sa}» верное?")
     # 2. то же условие «Если …», противоположные следствия
@@ -164,8 +178,9 @@ def rule_events(doc: Doc, out: dict) -> None:
                           title="Одно и то же условие ведёт к противоположным исходам",
                           problem=(f"Условие одно и то же, а исходы противоположны: {quoted(na.body)} и "
                                    f"{quoted(nb.body)}."),
-                          scenario="Условие выполняется: по одному месту действие не происходит, по другому — "
-                                   "происходит, причём с другими последствиями для клиента.",
+                          scenario=(f"Выполняется условие {quoted(_cond_text(na.body))}: по одному месту "
+                                    f"{quoted(neg_txt.strip())}, по другому — {quoted(pos_txt.strip())}; "
+                                    "реализация и тест выберут разные исходы."),
                           recommendation="Выбрать один исход для этого условия, второе правило удалить или "
                                          "сделать отдельным случаем с явным отличающим условием.",
                           question="Какой исход верный при этом условии?")
@@ -265,7 +280,9 @@ class CMP:  # noqa: N801 — тот же интерфейс, что у re.Patter
                 continue
             res.append(_M(m.group(1), m.group(2), m.group(0), m.start(), m.end()))
         return sorted(res, key=lambda x: x.start())
-RANGE = re.compile(rf"\bот\s+({NUM})\s+до\s+({NUM})[^.;|]{{0,25}}?\bвключительно\b", re.I)
+# единица после числа («от 100 ₸ до 1 000 000 ₸ включительно», «от 1 до 6 месяцев включительно»)
+RANGE_UNIT = r"(?:\s*(?:₸|₽|\$|€|%|тенге|тиын\w*|руб\w*|коп\w*|сум\b))?"
+RANGE = re.compile(rf"\bот\s+({NUM}){RANGE_UNIT}\s+до\s+({NUM})[^.;|]{{0,25}}?\bвключительно\b", re.I)
 REJECT = re.compile(r"отклон\w*|\bне\s+выполня\w*|запрещ\w*|недопуст\w*|ошибк\w*|\b4\d\d\b|не\s+принима\w*", re.I)
 ALLOW = re.compile(r"(?<!не )\b(выполняется|выполняет|разрешается|допускается|проходит|принимается|"
                    r"пополняет|начисляется|списывает|отправляет|зачисляется)\b", re.I)
@@ -505,7 +522,7 @@ def rule_acceptance_bounds(doc: Doc, out: dict) -> None:
                     return
 
 
-BOUND_REASON = re.compile(r"превыша\w*|максим\w*|минимал\w*|меньше\s+минимал\w*|вне\s+диапазон\w*|"
+BOUND_REASON = re.compile(r"превыша\w*|превышен\w*|максим\w*|минимал\w*|меньше\s+минимал\w*|вне\s+диапазон\w*|"
                           r"больше\s+допустим\w*|за\s+пределами", re.I)
 
 

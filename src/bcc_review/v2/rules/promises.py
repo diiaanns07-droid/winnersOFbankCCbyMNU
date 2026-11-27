@@ -42,6 +42,14 @@ def _defined_names(doc: Doc, methods: list[Method]) -> set[str]:
 # слово «метод / вызов / операция» прямо перед именем; между ними — только другие имена списка («Методы X и Y»)
 METHOD_BEFORE = re.compile(r"(?:\bметод\w*|\bвызов\w*|\bendpoint\w*|\bоперац\w*)\s*[«\"`']?"
                            r"(?:\s*[A-Za-z_]\w*[»\"`']?\s*(?:,|\bи\b)\s*[«\"`']?)*\s*$", re.I)
+# последнее слово имени поля: refundUntil, transferDate, paymentAmount — поле, хотя первое слово похоже на глагол
+FIELD_TAIL = {"until", "date", "at", "time", "number", "no", "amount", "status", "type", "code", "count", "sum",
+              "flag", "mode", "period", "reason", "url", "name", "enabled", "disabled", "limit", "rate", "days"}
+# однозначные глаголы: getTransferLimit, setRate — метод и с «полевым» окончанием (refundUntil, transferDate — поля)
+STRONG_VERBS = {"get", "set", "save", "create", "update", "delete", "remove", "add", "edit", "change", "modify",
+                "replace", "reset", "enable", "disable", "cancel", "confirm", "activate", "deactivate", "block",
+                "unblock", "read", "list", "fetch", "find", "search", "check", "load", "calculate", "compute", "calc",
+                "estimate", "lookup", "register", "submit", "approve", "reject", "revoke", "withdraw", "renew", "extend"}
 ID_NAME = re.compile(r"(?<!By)(?:Id|ID|Ids|IDs)$")  # transferId, payoutCardId — поле; getCardById — метод
 
 
@@ -66,7 +74,8 @@ def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
             # имя метода, а не поле: «методом X», «Методы X и Y», «вызов X» прямо перед именем или глагол в начале
             # имени. «Метод возвращает currentMode», «вызов с qrId» — поле или параметр, а не метод
             verb_first = toks[0] in READ_TOKENS or toks[0] in MUTATING_TOKENS
-            if ID_NAME.search(name) or (not verb_first and not METHOD_BEFORE.search(t[:mm.start()])):
+            field_tail = toks[-1].lower() in FIELD_TAIL and toks[0].lower() not in STRONG_VERBS
+            if ID_NAME.search(name) or field_tail or (not verb_first and not METHOD_BEFORE.search(t[:mm.start()])):
                 continue
             if any(name.lower() == (m.name or "").lower() for m in methods):
                 continue
