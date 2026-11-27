@@ -70,6 +70,22 @@ def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]
     return out
 
 
+def same_code_scores(model: str, labels: list[str]) -> list[str]:
+    """score.json прошлых прогонов модели на том же коде, что прогоны этого раунда с метками ``labels``."""
+    from .gate import HISTORY, _read_jsonl, model_kind, same_code_rows
+
+    rows = [r for r in _read_jsonl(HISTORY) if r.get("version") == "v2"]
+    last = next((r for r in reversed(rows) if r.get("label") in labels), None)
+    if not last:
+        return []
+    out = []
+    for r in same_code_rows(rows, model_kind(last.get("provider"), last.get("model")), last):
+        p = ROOT / str(r.get("dir") or "") / "score.json"
+        if r.get("dir") and r.get("label") not in labels and p.exists() and str(p) not in out:
+            out.append(str(p))
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.round", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -140,14 +156,17 @@ def main(argv: list[str] | None = None) -> int:
     for name, p in procs.items():
         rcs[name] = p.wait()
         print(f"[{name}] rc={rcs[name]} ({(time.monotonic() - t0) / 60:.1f} мин)", flush=True)
-    # несколько прогонов одной модели — сводка стабильности
-    for m in sorted({m for m, _ in labels if a.official.count(m) > 1}):
+    # стабильность: прогоны модели в этом раунде и раньше на том же коде (деревья src/ по git, без повторов из кэша)
+    for m in sorted({m for m, _ in labels}):
         paths = [str(MEAS / slugify(lb) / "score.json") for mm, lb in labels if mm == m]
         paths = [p for p in paths if Path(p).exists()]
+        earlier = [p for p in same_code_scores(m, [lb for mm, lb in labels if mm == m]) if p not in paths]
+        paths = earlier + paths
         if len(paths) >= 2:
             dest = ROOT / "evaluation" / "v2" / "stability" / f"{slugify(a.name)}_{m}.json"
+            note = f" (с прошлыми на этом коде: {len(earlier)})" if earlier else ""
             subprocess.run([py, "-m", "evaluation.v2.aggregate", "stability", *paths, "--json", str(dest),
-                            "--label", f"{a.name}: {sha}, {m} ×{len(paths)}"], cwd=str(ROOT))
+                            "--label", f"{a.name}: {sha}, {m} ×{len(paths)}{note}"], cwd=str(ROOT))
     subprocess.run([py, "-m", "evaluation.v2.aggregate", "models", "--auto", "--write"], cwd=str(ROOT))
     subprocess.run([py, "-m", "evaluation.v2.gate", "--save"], cwd=str(ROOT))
     (logs / "round.json").write_text(json.dumps({"name": a.name, "commit": sha, "rc": rcs,

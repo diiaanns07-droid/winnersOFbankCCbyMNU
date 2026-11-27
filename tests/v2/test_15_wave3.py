@@ -584,3 +584,28 @@ def test_quota_runs_are_not_saved_and_rerun_with_reuse(tmp_path):
     msg = quota_refusal(rows, "сводку корпуса")
     assert msg.startswith("не сохраняю сводку корпуса: 2 из 3 прогонов упёрлись в лимит") and "--reuse" in msg
     assert quota_refusal([{"quota": False}], "сводку") == ""
+
+
+def test_round_stability_takes_earlier_runs_on_same_code(tmp_path, monkeypatch):
+    """Стабильность раунда — с прошлыми прогонами модели на том же коде (кандидат 868787d: ×2 в раунде + 17:46 = ×3);
+    прогон на другом коде, повтор из кэша и прогоны самого раунда в «прошлые» не попадают."""
+    import json as _json
+
+    from evaluation.v2 import round as rnd
+
+    def run(label, commit, calls=9):
+        d = tmp_path / label
+        d.mkdir()
+        (d / "score.json").write_text("{}", encoding="utf-8")
+        return {"version": "v2", "label": label, "commit": commit, "calls": calls, "model": "sonnet",
+                "provider": "claude_cli", "dir": str(d)}
+
+    rows = [run("old_other_code", "c2"), run("old_same_code", "c1"), run("replay", "c1", calls=0),
+            run("round_1", "c1b"), run("round_2", "c1b")]
+    hist = tmp_path / "history.jsonl"
+    hist.write_text("".join(_json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    monkeypatch.setattr(gate, "HISTORY", hist)
+    monkeypatch.setattr(gate, "code_tree", lambda c: {"c1": "T1", "c1b": "T1", "c2": "T2"}.get(c))
+    got = rnd.same_code_scores("sonnet", ["round_1", "round_2"])
+    assert [p.split("/")[-2] for p in got] == ["old_same_code"]
+    assert rnd.same_code_scores("sonnet", ["нет в истории"]) == []
