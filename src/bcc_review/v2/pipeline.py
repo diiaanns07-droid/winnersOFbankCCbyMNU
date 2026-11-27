@@ -299,7 +299,9 @@ class Pipeline:
                                     "выносится — проверьте, тот ли файл передан.")
             self.ctx = Context(view=view, llm=None, options={**opts, "input": str(self.input)},
                                run_dir=self.run.path, trace=self.run.trace)
-            return self._offline(view)
+            report = self._offline(view)
+            report.setdefault("run", {})["empty_input"] = True  # код выхода ≠ 0: плохой вход (__main__._exit_code)
+            return report
         try:
             llm, self.provider_name = make_llm(opts, self.run, self.input)
         except Exception as exc:  # noqa: BLE001 — нет ключа / не тот провайдер: отчёт правилами + объяснение
