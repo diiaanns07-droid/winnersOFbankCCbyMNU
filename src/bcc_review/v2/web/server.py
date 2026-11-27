@@ -188,7 +188,7 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "bcc-review-web/2"
 
     def log_message(self, fmt: str, *args: Any) -> None:  # тише в консоли
-        if "/api/jobs/" in (args[0] if args else ""):
+        if any(k in (args[0] if args else "") for k in ("/api/jobs/", "/healthz")):  # №42: /healthz — без шума
             return
         sys.stderr.write("%s %s\n" % (self.log_date_time_string(), fmt % args))
 
@@ -395,10 +395,71 @@ def build_app(data_dir: Path, *, provider: str = "auto", fixture: Path | None = 
     return App(store, Worker(store, runner, workers), default_provider=provider, sample=sample)
 
 
+PORTS = (8014, 8030)  # №42: порт по умолчанию и последний, который пробуем, если предыдущие заняты
+# №42: --check проверяет установку — эти модули должны импортироваться из окружения (requirements.txt)
+_CHECK_MODULES = ("jsonschema", "google.genai", "anthropic", "fitz", "docx", "yaml")
+
+
+def _shown_host(host: str) -> str:
+    return "127.0.0.1" if host in ("", "0.0.0.0", "::") else host
+
+
+def _get(url: str, timeout: float = 5.0) -> tuple[int, bytes]:
+    with urllib.request.urlopen(url, timeout=timeout) as r:  # noqa: S310 — только свой локальный адрес
+        return r.status, r.read()
+
+
+def _wait_ready(url: str, timeout: float = 15.0) -> bool:
+    """Ждём, пока сервер ответит на /healthz (браузер открываем только после этого)."""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        try:
+            if _get(url + "healthz", timeout=1.0) == (200, b"ok"):
+                return True
+        except Exception:  # noqa: BLE001 — ещё не поднялся
+            pass
+        time.sleep(0.1)
+    return False
+
+
+def _banner(url: str) -> str:
+    line = f"BCC Review работает: {url.rstrip('/')} — остановить: Ctrl+C"
+    bar = "═" * (len(line) + 4)
+    return f"\n╔{bar}╗\n║  {line}  ║\n╚{bar}╝\n"
+
+
+def _self_check(url: str) -> int:
+    """--check: /healthz и / отвечают, зависимости импортируются. 0 — всё в порядке."""
+    import importlib
+
+    problems: list[str] = []
+    for mod in _CHECK_MODULES:
+        try:
+            importlib.import_module(mod)
+        except Exception as exc:  # noqa: BLE001 — нужна причина, а не трейсбэк
+            problems.append(f"не импортируется {mod}: {type(exc).__name__}: {exc}")
+    if not _wait_ready(url):
+        problems.append(f"{url}healthz не ответил за 15 с")
+    else:
+        try:
+            code, body = _get(url)
+            if code != 200 or b"<html" not in body.lower():
+                problems.append(f"{url} ответил {code}, но не страницей")
+            else:
+                print(f"Проверка: {url}healthz — ok, {url} — 200 ({len(body) // 1024} КБ)", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            problems.append(f"{url} не открылся: {exc}")
+    for p in problems:
+        print(f"Проверка не прошла: {p}", file=sys.stderr, flush=True)
+    if not problems:
+        print("Установка в порядке: ./start.sh (Windows: START.cmd) откроет BCC Review в браузере.", flush=True)
+    return 1 if problems else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m bcc_review.v2.web", description="Веб-демо ревью требований")
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8014)
+    ap.add_argument("--host", default="127.0.0.1", help="адрес; 0.0.0.0 — доступ из сети (только в Docker)")
+    ap.add_argument("--port", type=int, default=PORTS[0], help=f"порт; занят — следующий свободный до {PORTS[1]}")
     ap.add_argument("--provider", default="auto", help="провайдер по умолчанию в форме")
     ap.add_argument("--data-dir", default=".bcc_web", help="где хранить загрузки и отчёты")
     ap.add_argument("--sample", help="файл для кнопки «Проверить пример»")
@@ -408,30 +469,53 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cache-dir", help="кэш ответов модели, общий для всех проверок (по умолчанию <data-dir>/cache)")
     ap.add_argument("--pace", type=float, default=0.0,
                     help="для съёмки демо: показывать этапы не быстрее раза в N секунд (анализ не замедляется)")
-    ap.add_argument("--open", action="store_true", help="открыть браузер")
+    ap.add_argument("--open", action="store_true", help="открыть браузер, когда сервер ответит")
+    ap.add_argument("--check", action="store_true",
+                    help="проверить установку: поднять сервер, получить /healthz и /, выйти (0 — в порядке)")
     a = ap.parse_args(argv)
     load_dotenv()
     app = build_app(Path(a.data_dir), provider=a.provider, fixture=Path(a.fixture) if a.fixture else None,
                     sample=Path(a.sample) if a.sample else None, workers=a.workers,
                     cache_dir=Path(a.cache_dir) if a.cache_dir else None, pace=a.pace,
                     extra_args=shlex.split(a.pipeline_args, posix=(os.name != "nt")))
-    srv, note = bind_server(app, a.host, a.port)
+    tries = max(0, PORTS[1] - a.port) if PORTS[0] <= a.port <= PORTS[1] else 20
+    srv, note = bind_server(app, a.host, a.port, tries=tries)
+    if srv is None and a.check and note.startswith("Веб-демо уже запущено"):
+        srv, note = bind_server(app, a.host, 0)  # проверяем эту установку, а не уже запущенное демо
     if srv is None:
         running = note.startswith("Веб-демо уже запущено")
         print(note, file=sys.stdout if running else sys.stderr, flush=True)
         if running and a.open:
-            webbrowser.open(f"http://{'127.0.0.1' if a.host in ('', '0.0.0.0', '::') else a.host}:{a.port}/")
+            webbrowser.open(f"http://{_shown_host(a.host)}:{a.port}/")
         return 0 if running else 2
     if note:
         print(note, flush=True)
-    url = f"http://{a.host}:{srv.server_address[1]}/"
-    print(f"Веб-демо: {url}  (остановить — Ctrl+C)", flush=True)
-    if a.open:
-        webbrowser.open(url)
+    url = f"http://{_shown_host(a.host)}:{srv.server_address[1]}/"
+
+    def announce() -> None:
+        if not _wait_ready(url):
+            print(f"Сервер не ответил на {url}healthz — откройте адрес вручную.", file=sys.stderr, flush=True)
+        print(_banner(url), flush=True)
+        if a.open:
+            try:
+                webbrowser.open(url)
+            except Exception:  # noqa: BLE001 — нет браузера (сервер, Docker): адрес уже напечатан
+                pass
+
+    import threading
+
+    if a.check:  # сервер — в фоне, проверка — здесь; браузер не открываем
+        threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.2}, daemon=True).start()
+        try:
+            return _self_check(url)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+    threading.Thread(target=announce, daemon=True).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
-        pass
+        print("\nОстановлено.", flush=True)
     finally:
         srv.server_close()
     return 0
