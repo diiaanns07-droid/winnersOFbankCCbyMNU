@@ -90,18 +90,18 @@
   function plural(n, a, b, c) { n = Math.abs(n) % 100; var k = n % 10; return n > 10 && n < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; }
 
   /* BCC AI (№40): режим меняем через экземпляр, если он есть, и всегда — через data-mood */
-  function agentEl() { return document.querySelector("[data-bcc-agent]"); }
-  function mood(m) {
+  function agentEl() { return document.querySelector(".jb-agent [data-bcc-agent]"); }
+  function mood(m, ms) {
     var el = agentEl();
-    if (!el || el.dataset.mood === m) return;
+    if (!el || (el.dataset.mood === m && !ms)) return;
     el.dataset.mood = m;
-    var a = el.bccAgent || el._bccAgent || el.agent || null;
-    if (!a && window.BCCAgent && typeof window.BCCAgent.get === "function") { try { a = window.BCCAgent.get(el); } catch (_) { a = null; } }
-    if (a && typeof a.mood === "function") { try { a.mood(m); } catch (_) {} }
+    var a = el.__bccAgent || null;
+    if (a && typeof a.mood === "function") { try { a.mood(m, ms); } catch (_) {} }
   }
+  /* итог: блокеров нет — verified; есть — alert на 1,5 с, затем idle (bcc-ui.md, раздел 7) */
   function finalMood(alert) {
-    mood(alert ? "alert" : "verified");
-    if (alert) setTimeout(function () { mood("idle"); }, 1500);
+    mood(alert ? "alert" : "verified", alert ? 1500 : 0);
+    if (alert) setTimeout(function () { var el = agentEl(); if (el && !el.__bccAgent) el.dataset.mood = "idle"; }, 1500);
   }
 
   /* ── прогресс: строки создаём один раз и дальше только меняем классы — точка пульсирует без рывков ── */
@@ -200,10 +200,11 @@
     function closeDrawer() { var d = rdoc(); if (d && d.body) d.body.dispatchEvent(new d.defaultView.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }
     /* страница встаёт так, чтобы вкладки были сверху, а рамка — сразу под ними (без вложенной прокрутки к ней) */
     function toFrame(force) {
-      var prev = $(".jb-block"), res = $("#result");
+      var prev = $(".jb-block"), res = $("#result"), hdr = $(".tb-wrap");
       if (!prev) return;
       var gap = parseFloat(getComputedStyle(res).rowGap) || 24;
-      var y = prev.getBoundingClientRect().bottom + window.scrollY + gap - 12;
+      var top = parseFloat(getComputedStyle($(".jb-tabbar")).top) || (hdr ? hdr.getBoundingClientRect().bottom + 10 : 12);
+      var y = prev.getBoundingClientRect().bottom + window.scrollY + gap - top;
       if (force ? Math.abs(window.scrollY - y) > 4 : window.scrollY > y + 4) window.scrollTo({ top: y, behavior: "smooth" });
     }
     function setView(v, rt) {
