@@ -287,119 +287,100 @@ def report_facts(app: App | None, job: Job) -> dict[str, Any] | None:
     }
 
 
-def _verdict_html(f: dict) -> str:
-    from bcc_review.v2.render.html import VERDICT_LABEL
-    parts = []
-    for key, label in (("development", "Разработка"), ("testing", "Тестирование")):
-        v = f.get(key, "")
-        cls = {"no": "no", "conditional": "cond", "yes": "yes"}.get(v, "none")
-        word = VERDICT_LABEL.get(v, "нет вердикта").lower()
-        parts.append(f'<span class="v v-{cls}">{label}: <b>{e(word)}</b></span>')
-    return '<span class="sep">·</span>'.join(parts)
+_SHEET_CACHE: dict[str, list[dict]] = {}
+
+
+def _sheet_lines(job: Job, limit: int = 400) -> list[dict]:
+    """Строки документа для листа на столе (нумерация — как в отчёте); не прочитался — пустой лист."""
+    if job.id in _SHEET_CACHE:
+        return _SHEET_CACHE[job.id]
+    lines: list[dict] = []
+    try:
+        from bcc_review.v2.render import html as H
+        lines = [ln for ln in (H.load_view(job.input_path) or {}).get("lines") or [] if isinstance(ln, dict)][:limit]
+    except Exception:  # noqa: BLE001 — лист без текста всё равно покажем, сканер идёт по пустым строкам
+        lines = []
+    _SHEET_CACHE[job.id] = lines
+    return lines
+
+
+def _sheet_html(job: Job) -> str:
+    rows = []
+    for ln in _sheet_lines(job):
+        text = str(ln.get("text") or "")
+        cls = "ln" + (" h" if ln.get("heading") or ln.get("kind") == "heading" else "") + ("" if text.strip() else " blank")
+        rows.append(f'<div class="{cls}"><span class="no">{e(ln.get("n", ""))}</span><span class="tx">{e(text) or "&#8203;"}</span></div>')
+    if not rows:
+        rows = ['<div class="ln skel"><span class="no"></span><span class="tx"></span></div>'] * 24
+    return "".join(rows)
+
+
+def _dock_html(job: Job, f: dict) -> str:
+    """Единственное стекло на экране: правка, вопросы, исправленная редакция, ещё, выгрузить, свой документ."""
+    jid = e(job.id)
+    q = f["questions"]
+    files = "".join(f'<a role="menuitem" href="/jobs/{jid}/files/{n}" download><span>{e(lbl)}</span>'
+                    f'<small>{e(FILE_NOTE.get(k, ""))}</small></a>' for k, n, lbl, _ in FILES if k in job.files)
+    files += ('<button type="button" role="menuitem" data-act="answers-md"><span>Ответы на вопросы</span>'
+              '<small>файл для --answers</small></button>' if q else "")
+    files += (f'<a role="menuitem" href="/jobs/{jid}/files/report.html?inline=1" target="_blank" rel="noopener">'
+              f'<span>Открыть отчёт отдельно ↗</span><small>тот же лист, без сервера</small></a>' if "html" in job.files else "")
+    extra = "".join(f'<button type="button" role="menuitem" data-rtab="{k}"><span>{lbl}</span>'
+                    f'<small>{f["counts"].get(k, "")}</small></button>'
+                    for k, lbl in EXTRA_TABS if k != "clarify" or f["has"]["clarify"])
+    revised = "rewrites" if f["has"]["rewrites"] else ""
+    return f"""<nav class="jb-dock" id="dock" aria-label="Отчёт">
+  <a class="jb-d" href="/" title="Положить на стол свой документ">Свой документ</a><span class="jb-sep" aria-hidden="true"></span>
+  <button type="button" class="jb-d" data-view="findings" aria-pressed="true">Правка <span class="jb-n">{f["findings"]}</span></button>
+  <button type="button" class="jb-d" data-view="questions" aria-pressed="false"{"" if q else " disabled"}>Вопросы владельцу <span class="jb-n">{q}</span></button>
+  <button type="button" class="jb-d" data-view="revised" data-rt="{revised}" aria-pressed="false">Исправленная редакция</button>
+  <button type="button" class="jb-d" data-menu="more" aria-haspopup="menu" aria-expanded="false">Ещё ▾</button>
+  <span class="jb-sep" aria-hidden="true"></span>
+  <button type="button" class="jb-d" data-menu="files" aria-haspopup="menu" aria-expanded="false">Выгрузить ▾</button>
+  <button type="button" class="jb-d jb-go" id="recheck" hidden{"" if not job.answers_path else " disabled"}>Проверить заново</button>
+</nav>
+<div class="jb-menu" id="menu-more" role="menu" hidden>{extra}</div>
+<div class="jb-menu" id="menu-files" role="menu" hidden>{files}</div>
+<p class="jb-toast" id="toast" role="status" hidden></p>"""
 
 
 def result_html(job: Job, f: dict, *, agent: bool = True) -> str:
-    """Отчёт над рамкой: вердикт, полоса из четырёх чисел, блокеры, вкладки-капсулы, рамка с HTML-отчётом."""
+    """Готовая правка: лист-отчёт на весь стол (HTML-отчёт в режиме встраивания) и стеклянная панель внизу.
+
+    Вердикт — печать на листе, блокеры — красные пометки и заметки на полях; здесь — только данные для BCC AI."""
     jid = e(job.id)
-    meta = [e(job.file_name), e(f.get("model") or job.provider)]
-    if f.get("duration") is not None:
-        meta.append(_dur(f["duration"]))
-    if f.get("calls"):
-        meta.append(f'{f["calls"]} {_plural(f["calls"], "вызов", "вызова", "вызовов")} модели')
+    first = f["blockers"][0]["id"] if f["blockers"] else ""
+    say = (f'Готово. {f["critical"]} {_plural(f["critical"], "блокер", "блокера", "блокеров")} — начните с {first}.'
+           if first else "Готово. Блокеров нет.")
     mood = "alert" if f["critical"] else "verified"
-    agent_html = (f'<div class="jb-agent" id="agent-slot"><div data-bcc-agent data-size="96" data-mood="{mood}"></div></div>'
-                  if agent else '<div class="jb-agent" id="agent-slot"></div>')
-    notice = (f'<p class="b-status stale" role="status">{e(job.notice)}</p>' if job.notice else "")
-    crit, major, q = f["critical"], f["major"], f["questions"]
-    ok, total = f["quotes_ok"], f["quotes_total"]
-    qcls = "ok" if total and ok == total else ("major" if total else "")
-    strip = (f'<div class="b-strip b-surface jb-strip b-rise" aria-label="Сводка">'
-             f'<div class="b-metric {"crit" if crit else "ok"}"><b>{crit}</b><span>{_plural(crit, "блокер", "блокера", "блокеров")}</span></div>'
-             f'<div class="b-metric {"major" if major else ""}"><b>{major}</b><span>{_plural(major, "существенное", "существенных", "существенных")}</span></div>'
-             f'<div class="b-metric {"major" if q else ""}"><b>{q}</b><span>{_plural(q, "вопрос владельцу", "вопроса владельцу", "вопросов владельцу")}</span></div>'
-             f'<div class="b-metric {qcls}"><b>{ok} из {total}</b><span>цитат сверено кодом</span></div></div>')
-    rows = []
-    for b in f["blockers"][:7]:
-        only = {"development": "только разработку", "testing": "только тестирование"}.get(b["blocks"], "")
-        rows.append(f'<li><a class="b-row jb-row" href="/jobs/{jid}/files/report.html?inline=1#{e(b["id"])}" data-goto="{e(b["id"])}">'
-                    f'<span class="jb-id">{e(b["id"])}</span><span class="jb-t">{e(b["title"])}</span>'
-                    + (f'<span class="b-badge plain jb-only">{only}</span>' if only else "")
-                    + f'<span class="jb-where">{e(b["where"])}</span><span class="jb-go" aria-hidden="true"></span></a></li>')
-    if len(f["blockers"]) > 7:
-        rows.append(f'<li class="b-row jb-more-b">и ещё {len(f["blockers"]) - 7} — во вкладке «Замечания»</li>')
-    if not rows:
-        rows.append('<li class="b-row jb-row ok"><span class="jb-id">✓</span><span class="jb-t">Блокеров нет — '
-                    'критичных замечаний не найдено</span></li>')
-    blockers = (f'<section class="b-surface jb-block b-rise" aria-labelledby="bh"><div class="jb-bhead">'
-                f'<h2 class="b-h2" id="bh">Блокеры</h2><p class="b-note">останавливают работу, исправить первыми</p></div>'
-                f'<ul class="b-list">{"".join(rows)}</ul></section>')
-    tabs = [("findings", "Замечания", f["findings"]), ("questions", "Вопросы", q), ("doc", "Документ", None),
-            ("revised", "Исправленная редакция", None), ("exports", "Выгрузки", None)]
-    nav = "".join(f'<button type="button" role="tab" data-view="{k}" aria-selected="{"true" if i == 0 else "false"}">'
-                  f'{lbl}{f" <span class=jb-cnt>{n}</span>" if n is not None else ""}</button>'
-                  for i, (k, lbl, n) in enumerate(tabs))
-    extra = "".join(f'<button type="button" data-rtab="{k}">{lbl}'
-                    f'<span class="jb-cnt">{f["counts"].get(k, "")}</span></button>'
-                    for k, lbl in EXTRA_TABS if k != "clarify" or f["has"]["clarify"])
-    files = "".join(f'<li class="b-row"><span class="jb-fmt">{e(lbl)}<span class="jb-fnote">{e(FILE_NOTE.get(k, ""))}</span></span>'
-                    + (f'<a class="b-button small quiet" href="/jobs/{jid}/files/{n}?inline=1" target="_blank" rel="noopener">Открыть ↗</a>'
-                       if k in ("html", "pdf", "pdf_annotated") else "")
-                    + f'<a class="b-button small" href="/jobs/{jid}/files/{n}" download>Скачать</a></li>'
-                    for k, n, lbl, _ in FILES if k in job.files)
-    answers = ("" if job.answers_path else
-               f'<label class="b-button quiet" title="Файл из «Скачать ответы»: агент перепроверит замечания и покажет «до и после»">'
-               f'<span>Загрузить ответы ↻</span><input type="file" name="answers" accept=".md,.txt,.json"></label>')
-    clar = ('<button type="button" class="b-button quiet" data-rtab="clarify">До и после</button>'
-            if f["has"]["clarify"] else "")
-    revised_ready = f["has"]["rewrites"]
-    return f"""<header class="jb-hero b-rise">
-  {agent_html}
-  <div class="jb-hmain"><h1 class="jb-verdict" id="verdict">{_verdict_html(f)}</h1>
-  <p class="jb-meta">{" · ".join(meta)}</p>{notice}</div>
-  <div class="jb-hact"><a class="b-button small" href="/">Новая проверка</a></div>
-</header>
-{strip}
-{blockers}
-<div class="jb-tabbar">
-  <nav class="b-segment b-glass jb-tabs" role="tablist" aria-label="Разделы отчёта" id="tabs">{nav}</nav>
-  <details class="jb-extra"><summary class="b-button small quiet">Ещё в отчёте</summary>
-  <div class="jb-extra-menu b-glass" role="menu">{extra}</div></details>
-</div>
-<form class="jb-qbar" id="qbar" hidden>
-  <p class="b-note">Отметьте варианты ниже, скачайте ответы и загрузите файл — агент перепроверит замечания.</p>
-  <button type="button" class="b-button primary" id="dlanswers">Скачать ответы</button>{answers}{clar}
-</form>
-<section class="b-surface jb-empty" id="revised-empty" hidden{' data-ready="1"' if revised_ready else ''}>
-  <h2 class="b-h2">Исправленная редакция</h2>
-  <p>Появится после ответов владельца: отметьте варианты во вкладке «Вопросы», скачайте ответы и загрузите файл —
-  агент перепроверит замечания и предложит правки текста ТЗ.</p>
-  <button type="button" class="b-button primary" data-view="questions">К вопросам</button>
-</section>
-<section class="b-surface jb-files" id="exports" hidden><ul class="b-list">{files}</ul></section>
-<div class="jb-frame" id="framebox"><iframe id="rframe" title="Отчёт ревью" data-src="/jobs/{jid}/files/report.html?inline=1"></iframe></div>"""
+    return (f'<iframe class="jb-report" id="rframe" title="Правка документа" data-src="/jobs/{jid}/files/report.html?inline=1" '
+            f'data-mood="{mood}" data-say="{e(say)}"></iframe>\n' + _dock_html(job, f))
 
 
 def job_page(job: Job, app: App | None = None) -> str:
     facts = report_facts(app, job)
     css = (ASSETS / "job.css").read_text(encoding="utf-8")
-    parent = (f'<p class="jb-parent">Повторная проверка с ответами владельца к '
-              f'<a href="/jobs/{e(job.parent)}">исходной проверке</a>.</p>' if job.parent else "")
-    prog = f"""<section class="b-surface jb-prog b-rise" id="prog" aria-live="polite"{" hidden" if facts else ""}>
-  <div class="jb-phead">
-    <div class="jb-agent" id="agent-home">{"" if facts else '<div data-bcc-agent data-size="96" data-mood="scanning" id="agent"></div>'}</div>
-    <div><h1 class="jb-ptitle">{e(job.file_name)}</h1>
-    <p class="jb-pline" id="pline"><span id="pstate">{"в очереди" if job.state == "queued" else "идёт проверка"}</span> · <span id="elapsed">0 с</span><span id="calls"></span> · {e(job.provider)}{(" · " + e(job.model)) if job.model else ""}</p></div>
+    parent = (f'<p class="jb-parent">Повторная проверка с ответами владельца — <a href="/jobs/{e(job.parent)}">'
+              f'исходная правка</a>.</p>' if job.parent else "")
+    if facts:
+        inner = result_html(job, facts)
+    else:
+        inner = f"""{parent}<section class="jb-scan" id="scan" aria-live="polite" aria-label="Проверка документа">
+  <div class="jb-sheet" id="sheet"><div class="jb-beam" id="beam" aria-hidden="true"></div>{_sheet_html(job)}</div>
+  <div class="jb-pilot" id="pilot">
+    <div class="jb-agent" id="agent-home"><div data-bcc-agent data-size="80" data-mood="scanning" id="agent"></div></div>
+    <div class="jb-say"><b id="stage">{"жду очереди" if job.state == "queued" else "читаю"}</b>
+    <span id="pline"><span id="elapsed">0 с</span><span id="calls"></span> · {e(job.provider)}{(" · " + e(job.model)) if job.model else ""}</span></div>
   </div>
-  <ol class="jb-stages" id="stages"></ol>
-  <div class="jb-err" id="err" hidden><p class="b-status error" id="errtext" role="alert"></p>
-  <p class="jb-todo" id="todo"></p><a class="b-button primary" href="/">Новая проверка</a></div>
+  <div class="jb-err" id="err" hidden><p class="jb-errline" id="errtext" role="alert"></p><p class="jb-todo" id="todo"></p>
+  <a class="jb-btn" href="/">Новая проверка</a></div>
+  <ol class="jb-stages" id="stages" hidden></ol>
   <details class="jb-log"><summary>Журнал запуска</summary><pre id="log"></pre></details>
-</section>"""
+</section>
+<section class="jb-result" id="result" hidden></section>"""
     body = f"""<style>{css}</style>
-<main class="b-wrap jb" data-job="{e(job.id)}" data-state="{e(job.state)}">
-{parent}
-{prog}
-<section class="jb-result" id="result"{"" if facts else " hidden"}>{result_html(job, facts) if facts else ""}</section>
+<main class="jb{" done" if facts else ""}" data-job="{e(job.id)}" data-state="{e(job.state)}">
+{inner}
 </main>"""
     page = _layout(f"Проверка: {job.file_name}", body, sub=job.file_name)
     # до вливания №39 _layout ещё без токенов — подключаем сами (после вливания ветка не срабатывает)

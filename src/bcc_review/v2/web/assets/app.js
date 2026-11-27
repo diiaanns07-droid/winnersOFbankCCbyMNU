@@ -76,20 +76,21 @@
     });
   }
 
-  /* ── страница задания (№41): прогресс, вердикт, вкладки, боковое окно с документом ── */
-  var wrap = document.querySelector("[data-job]");
+  /* ── страница задания (№41): лист на столе. Проверка — луч сканера и BCC AI над листом; готово — правка на листе ── */
+  var wrap = document.querySelector("main.jb[data-job]");
   if (!wrap) return;
   var id = wrap.dataset.job;
-  var STATE = { queued: "в очереди", running: "идёт проверка", done: "готово", failed: "ошибка" };
   var SCAN = { docview: 1, segment: 1, rules: 1, lens_analyst: 1, lens_qa: 1, lens_architect: 1, lens_risk: 1, consistency: 1, quotes: 1 };
+  var SAY = { docview: "читаю документ", segment: "нарезаю требования", rules: "проверяю правилами",
+    lenses: "4 ревьюера читают", quotes: "сверяю цитаты", judge: "судья взвешивает", clarify: "готовлю вопросы",
+    recheck: "перепроверяю по ответам", revise: "правлю текст", report: "собираю правку" };
   function fmt(s) {
     s = Math.max(0, Math.round(s));
     return s < 60 ? s + " с" : Math.floor(s / 60) + " мин " + String(s % 60).padStart(2, "0") + " с";
   }
-  function esc(t) { var d = document.createElement("div"); d.textContent = t == null ? "" : t; return d.innerHTML; }
   function plural(n, a, b, c) { n = Math.abs(n) % 100; var k = n % 10; return n > 10 && n < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; }
 
-  /* BCC AI (№40): режим меняем через экземпляр, если он есть, и всегда — через data-mood */
+  /* BCC AI (№40): режим — через экземпляр el.__bccAgent и всегда через data-mood */
   function agentEl() { return document.querySelector(".jb-agent [data-bcc-agent]"); }
   function mood(m, ms) {
     var el = agentEl();
@@ -98,25 +99,6 @@
     var a = el.__bccAgent || null;
     if (a && typeof a.mood === "function") { try { a.mood(m, ms); } catch (_) {} }
   }
-  /* итог: блокеров нет — verified; есть — alert на 1,5 с, затем idle (bcc-ui.md, раздел 7) */
-  function finalMood(alert) {
-    mood(alert ? "alert" : "verified", alert ? 1500 : 0);
-    if (alert) setTimeout(function () { var el = agentEl(); if (el && !el.__bccAgent) el.dataset.mood = "idle"; }, 1500);
-  }
-
-  /* ── прогресс: строки создаём один раз и дальше только меняем классы — точка пульсирует без рывков ── */
-  var rows = {};
-  function row(key, label) {
-    if (rows[key]) return rows[key];
-    var x = document.createElement("li");
-    x.className = "jb-stg pending";
-    x.innerHTML = '<span class="jb-ic" aria-hidden="true"></span><div class="jb-nm">' + esc(label) +
-      '<div class="jb-subs"></div></div><span class="jb-tm"></span>';
-    $("#stages").appendChild(x);
-    rows[key] = x;
-    return x;
-  }
-  function setState(x, st) { var c = "jb-stg " + st; if (x.className !== c) x.className = c; }
   function hint(err) {
     err = (err || "").toLowerCase();
     if (/ключ|api|401|403|quota|квот|лимит|модел/.test(err)) return "Что сделать: проверьте ключ модели в файле .env или выберите «Демо без модели» и запустите проверку снова.";
@@ -124,45 +106,64 @@
     if (/перезапущен/.test(err)) return "Что сделать: запустите проверку ещё раз — документ не потерян.";
     return "Что сделать: запустите проверку ещё раз; подробности — в журнале запуска ниже.";
   }
-  var shownState = "";
-  function render(j) {
-    $("#elapsed").textContent = fmt(j.elapsed);
-    $("#pstate").textContent = STATE[j.state] || j.state;
-    $("#calls").textContent = j.calls ? " · " + j.calls + " " + plural(j.calls, "вызов", "вызова", "вызовов") + " модели" : "";
-    var par = j.stage_list.filter(function (s) { return s.parallel; });
-    var running = null;
+
+  /* ── проверка: прогресс — это луч сканера, идущий по листу ── */
+  var shown = "", lastY = -1;
+  function units(j) {
+    var list = [], seen = false;
     j.stage_list.forEach(function (s) {
-      if (s.state === "running" && !running) running = s.id;
       if (s.parallel) {
-        if (s !== par[0]) return;
-        var x = row("lenses", "Ревьюеры параллельно");
-        var st = par.every(function (p) { return p.state === "done" || p.state === "skipped"; }) ? "done"
-          : par.some(function (p) { return p.state === "failed"; }) ? "failed"
-          : par.some(function (p) { return p.state === "running" || p.state === "done"; }) ? "running" : "pending";
-        setState(x, st);
-        var subs = x.querySelector(".jb-subs");
-        if (!subs.children.length) subs.innerHTML = par.map(function (p) { return '<span class="jb-sub" data-id="' + esc(p.id) + '">' + esc(p.label) + "</span>"; }).join("");
-        par.forEach(function (p) { var e2 = subs.querySelector('[data-id="' + p.id + '"]'); if (e2) e2.className = "jb-sub " + p.state; });
-        var tl = Math.max.apply(null, par.map(function (p) { return j.stage_times[p.id] || 0; }));
-        x.querySelector(".jb-tm").textContent = st === "done" && tl ? fmt(tl) : "";
+        if (seen) return;
+        seen = true;
+        var par = j.stage_list.filter(function (x) { return x.parallel; });
+        var st = par.every(function (x) { return x.state === "done" || x.state === "skipped"; }) ? "done"
+          : par.some(function (x) { return x.state === "running" || x.state === "done"; }) ? "running" : "pending";
+        list.push({ id: "lenses", state: st });
         return;
       }
-      var y = row(s.id, s.label);
-      setState(y, s.state);
-      var t = j.stage_times[s.id];
-      y.querySelector(".jb-tm").textContent = t ? fmt(t) : "";
+      list.push({ id: s.id, state: s.state });
     });
+    return list;
+  }
+  function render(j) {
+    var el = $("#elapsed");
+    if (el) el.textContent = fmt(j.elapsed);
+    var calls = $("#calls");
+    if (calls) calls.textContent = j.calls ? " · " + j.calls + " " + plural(j.calls, "вызов", "вызова", "вызовов") + " модели" : "";
+    var u = units(j), done = 0, cur = null;
+    u.forEach(function (x) { if (x.state === "done" || x.state === "skipped") done++; else if (!cur && x.state === "running") cur = x; });
+    if (!cur) cur = u.filter(function (x) { return x.state === "pending"; })[0] || null;
+    var frac = j.state === "done" ? 1 : Math.min(.97, (done + (cur && cur.state === "running" ? .5 : 0)) / Math.max(1, u.length));
+    var st = $("#stage");
+    if (st && j.state !== "failed") st.textContent = j.state === "queued" ? "жду очереди" : j.state === "done" ? "готово" : SAY[cur ? cur.id : ""] || "читаю документ";
+    moveBeam(frac);
     $("#log").textContent = (j.log || []).join("\n");
-    if (j.state === "running" || j.state === "queued") mood(running && !SCAN[running] ? "analyzing" : "scanning");
-    if (j.state === "failed" && shownState !== "failed") {
+    if (j.state === "running" || j.state === "queued") mood(cur && !SCAN[cur.id] && cur.id !== "lenses" ? "analyzing" : "scanning");
+    if (j.state === "failed" && shown !== "failed") {
       $("#err").hidden = false;
       $("#errtext").textContent = j.error || "Проверка завершилась с ошибкой.";
       $("#todo").textContent = hint(j.error);
+      if (st) st.textContent = "не получилось";
       mood("alert");
+      wrap.classList.add("finished");
     }
-    if (j.state === "done" && shownState !== "done") showResult(j);
-    shownState = j.state;
+    if (j.state === "done" && shown !== "done") showResult(j);
+    shown = j.state;
     return j.state === "done" || j.state === "failed";
+  }
+  function moveBeam(frac) {
+    var sheet = $("#sheet"), beam = $("#beam"), pilot = $("#pilot");
+    if (!sheet || !beam) return;
+    var top = 40, h = sheet.offsetHeight - 80;
+    var y = Math.round(top + frac * Math.max(0, h));
+    if (y === lastY) return;
+    lastY = y;
+    beam.style.top = y + "px";
+    if (pilot) pilot.style.top = y + "px";
+    document.querySelectorAll("#sheet .ln").forEach(function (ln) { if (ln.offsetTop + ln.offsetHeight < y) ln.classList.add("read"); });
+    /* лист длиннее экрана — страница плавно едет за лучом (считаем по месту, куда луч придёт) */
+    var at = sheet.getBoundingClientRect().top + y;
+    if (at > window.innerHeight * .7 || at < 90) window.scrollTo({ top: Math.max(0, at + window.scrollY - window.innerHeight * .45), behavior: "smooth" });
   }
   function poll() {
     fetch("/api/jobs/" + id, { headers: { Accept: "application/json" } })
@@ -171,139 +172,142 @@
       .catch(function () { setTimeout(poll, 3000); });
   }
 
-  /* ── прогон закончился при открытой странице: подгружаем отчёт и переносим BCC AI к вердикту ── */
-  function showResult(j) {
-    var res = $("#result");
-    if (!res.hidden && res.children.length) return;
+  /* прогон закончился при открытой странице: луч доходит до низа, лист сменяется правкой */
+  function showResult() {
+    wrap.classList.add("finished");
     fetch("/jobs/" + id + "?part=result").then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (html) {
-        res.innerHTML = html;
-        var ag = $("#agent-home > [data-bcc-agent]"), slot = $("#agent-slot");
-        if (ag && slot) slot.appendChild(ag);
-        $("#prog").hidden = true;
-        res.hidden = false;
-        initResult();
-        var s = j.summary || {};
-        finalMood((s.critical || 0) > 0);
-        window.scrollTo({ top: 0 });
+        setTimeout(function () {
+          wrap.innerHTML = html;
+          wrap.classList.add("done");
+          wrap.dataset.state = "done";
+          window.scrollTo({ top: 0 });
+          initResult();
+        }, 700);
       })
       .catch(function () { location.reload(); });
   }
 
-  /* ── отчёт: вкладки-капсулы над рамкой с HTML-отчётом ── */
+  /* ── готовая правка: лист-отчёт на весь стол и стеклянная панель ── */
   function initResult() {
-    var fr = $("#rframe"), box = $("#framebox");
+    var fr = $("#rframe"), dock = $("#dock");
     if (!fr) return;
-    var view = "findings", fdoc = null;
+    var hdr = document.querySelector(".tb-wrap, header");
+    var setTop = function () { var t = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 64; document.documentElement.style.setProperty("--jb-top", Math.max(0, t) + "px"); };
+    setTop();
+    window.addEventListener("resize", setTop);
+    var view = "findings";
     function rdoc() { try { return fr.contentDocument; } catch (_) { return null; } }
-    function rtab(name) { var d = rdoc(), t = d && d.getElementById("t-" + name); if (t) t.click(); return !!t; }
-    function closeDrawer() { var d = rdoc(); if (d && d.body) d.body.dispatchEvent(new d.defaultView.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }
-    /* страница встаёт так, чтобы вкладки были сверху, а рамка — сразу под ними (без вложенной прокрутки к ней) */
-    function toFrame(force) {
-      var prev = $(".jb-block"), res = $("#result"), hdr = $(".tb-wrap");
-      if (!prev) return;
-      var gap = parseFloat(getComputedStyle(res).rowGap) || 24;
-      var top = parseFloat(getComputedStyle($(".jb-tabbar")).top) || (hdr ? hdr.getBoundingClientRect().bottom + 10 : 12);
-      var y = prev.getBoundingClientRect().bottom + window.scrollY + gap - top;
-      if (force ? Math.abs(window.scrollY - y) > 4 : window.scrollY > y + 4) window.scrollTo({ top: y, behavior: "smooth" });
+    function rtab(name) { var d = rdoc(), t = d && d.getElementById("t-" + name); if (t) { t.click(); return true; } return false; }
+    function toast(msg) {
+      var t = $("#toast"); if (!t) return;
+      t.textContent = msg; t.hidden = false;
+      clearTimeout(toast.t); toast.t = setTimeout(function () { t.hidden = true; }, 2600);
+    }
+    function closeMenus() {
+      document.querySelectorAll(".jb-menu").forEach(function (m) { m.hidden = true; });
+      document.querySelectorAll("[data-menu]").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+    }
+    function press(v) {
+      document.querySelectorAll("#dock [data-view]").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.view === v ? "true" : "false"); });
+      var rc = $("#recheck");
+      if (rc) rc.hidden = v !== "questions";
     }
     function setView(v, rt) {
-      view = v;
-      document.querySelectorAll("#tabs [data-view]").forEach(function (b) { b.setAttribute("aria-selected", b.dataset.view === v ? "true" : "false"); });
-      var revisedReady = $("#revised-empty").hasAttribute("data-ready");
-      $("#qbar").hidden = v !== "questions";
-      $("#exports").hidden = v !== "exports";
-      $("#revised-empty").hidden = !(v === "revised" && !revisedReady);
-      box.hidden = v === "exports" || (v === "revised" && !revisedReady);
-      var d = rdoc();
-      if (d && d.documentElement) {
-        d.documentElement.setAttribute("data-view", v);
-        if (v === "doc") closeDrawer();
-        rtab(rt || { questions: "questions", revised: "rewrites" }[v] || "findings");
+      closeMenus();
+      if (v === "revised") {
+        var b = $('#dock [data-view="revised"]');
+        if (!b || !b.dataset.rt) { toast("Исправленная редакция появится после ответов на вопросы владельца."); v = "questions"; rt = "questions"; }
+        else rt = b.dataset.rt;
       }
+      view = v;
+      press(v);
+      rtab(rt || { questions: "questions" }[v] || "findings");
+    }
+    function answersText() {
+      var d = rdoc(); if (!d) return { n: 0, text: "" };
+      var data = {}; try { data = JSON.parse(d.getElementById("report-data").textContent); } catch (_) {}
+      var LET = "ABCDEFGH", md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
+        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.", ""], n = 0;
+      (data.questions || []).forEach(function (q) {
+        var pick = d.querySelector('input[name="' + q.id + '"]:checked'), own = d.querySelector('textarea[data-own="' + q.id + '"]');
+        var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
+        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
+        if (!val) return;
+        n++; md.push(q.id + (q.topic ? " [" + q.topic + "]" : "") + ": " + val);
+      });
+      return { n: n, text: md.join("\n") + "\n" };
     }
     function embed() {
       var d = rdoc();
-      if (!d || !d.documentElement || fdoc === d) return;
-      fdoc = d;
+      if (!d || !d.documentElement || d.documentElement.hasAttribute("data-embed")) return;
       var root = d.documentElement;
       root.setAttribute("data-embed", "");
-      root.dataset.theme = "light";
-      var head = d.querySelector(".dochead");
-      if (head && !d.getElementById("jbclose")) {
-        var x = d.createElement("button");
-        x.type = "button"; x.id = "jbclose"; x.className = "dclose"; x.setAttribute("aria-label", "Закрыть документ"); x.title = "Закрыть (Esc)";
-        x.addEventListener("click", closeDrawer);
-        head.appendChild(x);
+      /* BCC AI садится на край листа и говорит одной строкой (agent.js №40 — в том же окне листа) */
+      var pane = d.querySelector(".docpane");
+      if (pane && window.BCCAgent) {
+        var perch = d.createElement("div");
+        perch.className = "perch";
+        perch.setAttribute("data-bcc-agent", "");
+        perch.setAttribute("data-size", "80");
+        perch.setAttribute("data-mood", fr.dataset.mood || "idle");
+        pane.appendChild(perch);
+        var css = d.createElement("link"); css.rel = "stylesheet"; css.href = "/assets/agent.css"; d.head.appendChild(css);
+        var js = d.createElement("script"); js.src = "/assets/agent.js";
+        js.onload = function () {
+          var a = perch.__bccAgent || (d.defaultView.BCCAgent && d.defaultView.BCCAgent.mount(perch));
+          if (!a) return;
+          if (fr.dataset.mood === "alert") a.mood("alert", 1500); else a.mood("verified");
+          if (fr.dataset.say && a.say) setTimeout(function () { a.say(fr.dataset.say); }, 700);
+        };
+        d.body.appendChild(js);
       }
-      var sync = function () {
-        var open = !!d.querySelector(".card.active, .ln.rqsel");
-        if (open !== root.hasAttribute("data-drawer")) { if (open) root.setAttribute("data-drawer", ""); else root.removeAttribute("data-drawer"); }
-      };
-      var target = d.getElementById("p-findings");
-      if (target && window.MutationObserver) new MutationObserver(sync).observe(target, { subtree: true, attributes: true, attributeFilter: ["class"] });
-      setView(view);
-      setTimeout(function () { fr.classList.add("ready"); root.setAttribute("data-drawer-ready", ""); }, 60);
+      d.addEventListener("change", function () {
+        var rc = $("#recheck"); if (rc && !rc.hasAttribute("data-busy")) rc.disabled = !answersText().n;
+      });
+      d.addEventListener("click", function () { closeMenus(); });
+      press(view);
+      setTimeout(function () { fr.classList.add("ready"); }, 40);
     }
     fr.addEventListener("load", embed);
     if (!fr.getAttribute("src")) fr.src = fr.dataset.src;
-    document.querySelectorAll("[data-view]").forEach(function (b) {
-      if (b.closest("#tabs") || b.closest("#revised-empty")) b.addEventListener("click", function () { setView(b.dataset.view); toFrame(); });
-    });
-    var tabs = Array.prototype.slice.call(document.querySelectorAll("#tabs [data-view]"));
-    tabs.forEach(function (b, i) {
-      b.addEventListener("keydown", function (ev) {
-        var dd = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
-        if (!dd) return;
-        ev.preventDefault();
-        var n = tabs[(i + dd + tabs.length) % tabs.length]; n.focus(); setView(n.dataset.view);
+    if (!dock) return;
+    dock.querySelectorAll("[data-view]").forEach(function (b) { b.addEventListener("click", function () { setView(b.dataset.view); }); });
+    document.querySelectorAll("[data-menu]").forEach(function (b) {
+      b.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var m = $("#menu-" + b.dataset.menu), open = m.hidden;
+        closeMenus();
+        if (open) { m.hidden = false; b.setAttribute("aria-expanded", "true"); var f = m.querySelector("a, button"); if (f) f.focus(); }
       });
     });
-    var extra = $(".jb-extra");
     document.querySelectorAll("[data-rtab]").forEach(function (b) {
-      b.addEventListener("click", function () { setView("more", b.dataset.rtab); if (extra) extra.open = false; });
+      b.addEventListener("click", function () { closeMenus(); press(""); rtab(b.dataset.rtab); });
     });
-    document.addEventListener("click", function (ev) { if (extra && extra.open && !ev.target.closest(".jb-extra")) extra.open = false; });
-    /* блокер → замечание в рамке, документ открывается сбоку с подсвеченными строками */
-    document.querySelectorAll("[data-goto]").forEach(function (a) {
-      a.addEventListener("click", function (ev) {
-        var d = rdoc();
-        if (!d) return;
-        ev.preventDefault();
-        setView("findings");
-        toFrame(true);
-        var c = d.getElementById(a.dataset.goto);
-        if (c) {
-          c.click();
-          setTimeout(function () {  /* после того как окно с документом открылось и колонка карточек сузилась */
-            var w = d.defaultView, f = d.querySelector(".filters");
-            w.scrollTo({ top: Math.max(0, c.getBoundingClientRect().top + w.scrollY - (f ? f.offsetHeight : 0) - 12), behavior: "smooth" });
-          }, 30);
-        }
+    document.addEventListener("click", function (ev) { if (!ev.target.closest(".jb-menu, [data-menu]")) closeMenus(); });
+    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") closeMenus(); });
+    var am = document.querySelector('[data-act="answers-md"]');
+    if (am) am.addEventListener("click", function () {
+      closeMenus();
+      var d = rdoc(), b = d && d.getElementById("dlanswers");
+      if (b) { setView("questions"); b.click(); }
+    });
+    var rc = $("#recheck");
+    if (rc) {
+      rc.disabled = true;
+      rc.addEventListener("click", function () {
+        var a = answersText();
+        if (!a.n) { toast("Отметьте хотя бы один ответ на стикерах."); return; }
+        rc.setAttribute("data-busy", ""); rc.disabled = true; rc.textContent = "Проверяю заново…";
+        var fd = new FormData(); fd.append("answers_text", a.text);
+        fetch("/api/jobs/" + id + "/answers", { method: "POST", body: fd, headers: { Accept: "application/json" } })
+          .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, x: x }; }); })
+          .then(function (res) { if (res.ok) location.href = res.x.url; else throw new Error(res.x.error); })
+          .catch(function (err) { rc.removeAttribute("data-busy"); rc.disabled = false; rc.textContent = "Проверить заново"; toast(err.message); });
       });
-    });
-    /* ответы владельца: скачать (из отчёта в рамке) и загрузить → повторная проверка */
-    var dl = $("#dlanswers");
-    if (dl) dl.addEventListener("click", function () { var d = rdoc(), b = d && d.getElementById("dlanswers"); if (b) b.click(); });
-    var qbar = $("#qbar"), inp = qbar && qbar.querySelector("input[type=file]");
-    if (inp) inp.addEventListener("change", function () {
-      if (!inp.files.length) return;
-      var lbl = inp.parentNode.querySelector("span"), note = qbar.querySelector(".b-note");
-      lbl.textContent = "Пересчитываем…";
-      fetch("/api/jobs/" + id + "/answers", { method: "POST", body: new FormData(qbar), headers: { Accept: "application/json" } })
-        .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, x: x }; }); })
-        .then(function (res) { if (res.ok) location.href = res.x.url; else throw new Error(res.x.error); })
-        .catch(function (err) {
-          lbl.textContent = "Загрузить ответы ↻"; inp.value = "";
-          note.className = "b-status error"; note.textContent = err.message;
-        });
-    });
+    }
   }
 
-  if (wrap.dataset.state === "done" && !$("#result").hidden) {
-    initResult();
-    finalMood(!!document.querySelector(".jb-row:not(.ok)"));
-  } else {
-    poll();
-  }
+  if (wrap.classList.contains("done")) initResult();
+  else poll();
 })();

@@ -1,150 +1,132 @@
-/* Страница задания: прогресс и отчёт (№41). Токены и базовые классы .b-* — из tokens.css (№39);
- * здесь только раскладка этой страницы, префикс .jb-. Встраивается в job_page: отдельный маршрут не нужен. */
-.jb{padding-top:var(--b-gap);padding-bottom:calc(var(--b-gap)*2);display:flex;flex-direction:column;gap:var(--b-gap)}
-.jb [hidden]{display:none !important}
-
-/* ── BCC AI: слот 96 px. Плитку и маскота рисует agent.js (№40); пока его нет — тихая тёмная плитка ── */
-.jb-agent{flex:none;width:96px;height:96px;position:relative}
-.jb-agent:empty,.jb-agent>[data-bcc-agent]:not(.bcc-agent){
-  display:block;width:100%;height:100%;border-radius:27px;
-  background:radial-gradient(120% 120% at 30% 20%,#20395A 0%,#0F2841 55%,#070B16 100%);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),var(--b-shadow-2)}
-.jb-agent>.bcc-agent{display:block}
-
-/* ── прогресс ── */
-.jb-prog{max-width:760px;width:100%;margin:0 auto;padding:calc(var(--b-pad) + 4px)}
-.jb-phead{display:flex;align-items:center;gap:20px}
-.jb-ptitle{margin:0;font-size:28px;line-height:1.15;font-weight:700;letter-spacing:-.025em;overflow-wrap:anywhere}
-.jb-pline{margin:6px 0 0;font-size:15px;color:var(--b-ink-2);font-variant-numeric:tabular-nums}
-.jb-pline b{font-weight:600;color:var(--b-ink)}
-.jb-stages{list-style:none;margin:22px 0 0;padding:0}
-.jb-stg{display:flex;align-items:center;gap:14px;min-height:52px;padding:10px 4px;color:var(--b-ink-3);
-  transition:color var(--b-base) var(--b-ease)}
-.jb-stg+.jb-stg{box-shadow:0 -1px 0 var(--b-hair)}
-.jb-ic{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;position:relative;
-  box-shadow:inset 0 0 0 1.5px var(--b-hair-2);transition:background var(--b-base) var(--b-ease),box-shadow var(--b-base) var(--b-ease)}
-.jb-nm{flex:1;min-width:0;font-size:17px}
-.jb-tm{flex:none;font-size:15px;color:var(--b-ink-3);font-variant-numeric:tabular-nums}
-.jb-subs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.jb-subs:empty{display:none}
-.jb-sub{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:999px;font-size:15px;
-  color:var(--b-ink-3);background:rgba(15,40,65,.04);transition:background var(--b-base) var(--b-ease),color var(--b-base) var(--b-ease)}
-.jb-sub.running{color:var(--b-ink);background:var(--b-green-wash);box-shadow:inset 0 0 0 1px rgba(0,185,117,.28)}
-.jb-sub.done{color:var(--b-green-ink);background:var(--b-green-wash)}
-.jb-sub.done::before{content:"";width:9px;height:5px;border:solid var(--b-green);border-width:0 0 2px 2px;transform:translateY(-1px) rotate(-45deg)}
-.jb-sub.failed{color:var(--b-red);background:var(--b-red-tint)}
-.jb-stg.done{color:var(--b-ink)}
-.jb-stg.done .jb-ic{background:var(--b-green);box-shadow:none}
-.jb-stg.done .jb-ic::before{content:"";width:10px;height:6px;border:solid #fff;border-width:0 0 2.5px 2.5px;transform:translateY(-1px) rotate(-45deg)}
-.jb-stg.running{color:var(--b-ink)}
-.jb-stg.running .jb-nm{font-weight:600}
-.jb-stg.running .jb-ic{box-shadow:inset 0 0 0 1.5px rgba(0,185,117,.45)}
-.jb-stg.running .jb-ic::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--b-green);animation:jb-pulse 1.6s var(--b-ease) infinite}
-.jb-stg.failed{color:var(--b-red)}
-.jb-stg.failed .jb-ic{background:var(--b-red);box-shadow:none}
-.jb-stg.failed .jb-ic::before{content:"!";color:#fff;font-size:14px;font-weight:800;line-height:1}
-.jb-stg.skipped{color:var(--b-ink-3)}
-.jb-stg.skipped .jb-ic::before{content:"";width:10px;height:2px;border-radius:1px;background:var(--b-hair-2)}
-@keyframes jb-pulse{0%,100%{transform:scale(.7);opacity:.55;box-shadow:0 0 0 0 rgba(0,185,117,.35)}
-  50%{transform:scale(1);opacity:1;box-shadow:0 0 0 6px rgba(0,185,117,0)}}
-.jb-err{margin-top:18px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-.jb-todo{margin:0;font-size:15px;color:var(--b-ink-2)}
-.jb-log{margin-top:18px;font-size:15px;color:var(--b-ink-3)}
-.jb-log summary{cursor:pointer;width:max-content;border-radius:999px;padding:2px 0}
-.jb-log pre{margin:10px 0 0;max-height:260px;overflow:auto;padding:14px 16px;border-radius:var(--b-r-md);
-  background:var(--b-canvas);font:13px/1.55 var(--b-mono);color:var(--b-ink-2);white-space:pre-wrap;word-break:break-word}
-.jb-parent{margin:0;font-size:15px;color:var(--b-ink-2)}
-
-/* ── отчёт: вердикт ── */
-.jb-result{display:flex;flex-direction:column;gap:var(--b-gap)}
-.jb-hero{display:flex;align-items:center;gap:24px}
-.jb-hmain{flex:1;min-width:0}
-.jb-verdict{margin:0;font-size:clamp(30px,2.9vw,42px);line-height:1.12;font-weight:700;letter-spacing:-.035em;color:var(--b-ink)}
-.jb-verdict .v{white-space:nowrap}
-.jb-verdict .sep{color:var(--b-ink-3);font-weight:400;margin:0 .18em}
-.jb-verdict .v-no b{color:var(--b-red)}
-.jb-verdict .v-cond b{color:var(--b-gold-ink)}
-.jb-verdict .v-yes b{color:var(--b-green-ink)}
-.jb-verdict .v-none b{color:var(--b-ink-2)}
-.jb-verdict b{font-weight:700}
-.jb-meta{margin:8px 0 0;font-size:15px;color:var(--b-ink-3);overflow-wrap:anywhere}
-.jb-hero .b-status{margin-top:8px}
-.jb-hact{flex:none;display:flex;gap:8px;align-self:flex-start}
-
-/* полоса из четырёх чисел — .b-strip (№39); тут только подписи чуть плотнее */
-.jb-strip .b-metric>span{line-height:1.3}
-
-/* ── блокеры: одна поверхность, строки через тонкую линию ── */
-.jb-block{padding:0}
-.jb-bhead{display:flex;align-items:baseline;gap:12px;padding:20px var(--b-pad) 6px}
-.jb-bhead .b-note{margin:0}
-.jb-block .b-list{padding-bottom:6px}
-.jb-row{cursor:pointer;border-radius:12px}
-.jb-row .jb-id{flex:none;font:600 15px/1 var(--b-mono);color:var(--b-red);min-width:48px}
-.jb-row .jb-t{flex:1;min-width:0;font-weight:600;color:var(--b-ink)}
-.jb-row .jb-where{flex:none;max-width:42%;text-align:right;font-size:15px;color:var(--b-ink-3);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.jb-row .jb-only{flex:none}
-.jb-row .jb-go{flex:none;width:8px;height:8px;border:solid var(--b-ink-3);border-width:2px 2px 0 0;transform:rotate(45deg);
-  opacity:.5;transition:transform var(--b-fast) var(--b-ease),opacity var(--b-fast) var(--b-ease)}
-a.jb-row:hover .jb-t{color:var(--b-green-ink)}
-a.jb-row:hover .jb-go{opacity:1;transform:translateX(2px) rotate(45deg)}
-.jb-row.ok .jb-id{color:var(--b-green-ink)}
-.jb-more-b{font-size:15px;color:var(--b-ink-2)}
-
-/* ── вкладки и рамка отчёта ── */
-.jb-tabbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:84px;z-index:5}
-.jb-tabs{max-width:100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
-.jb-tabs::-webkit-scrollbar{display:none}
-.jb-tabs>button{flex:none}
-.jb-tabs.b-glass{background:rgba(234,240,238,.86)}
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .jb-tabs.b-glass{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(236,242,240,.56))}
+/* Страница задания (№41): тёмный стол, на нём белый лист документа. Во время проверки BCC AI летит над листом
+ * и ведёт зелёный луч сканера сверху вниз (это и есть прогресс); по готовности — тот же лист с правкой агента
+ * (HTML-отчёт в режиме встраивания) и одна стеклянная панель внизу. Встраивается в job_page, маршрут не нужен. */
+body:has(main.jb) { background: #0B1220; color: #E6ECF5; }
+body:has(main.jb)::before, body:has(main.jb)::after { display: none; }
+.jb {
+  --desk: #0B1220; --desk-ink: #E6ECF5; --desk-ink-2: #B4C0D2; --desk-ink-3: #8593A9; --desk-line: rgba(230, 236, 245, .12);
+  --ink: #0F2841; --ink-3: #5B6F84; --green: #00B975; --green-strong: #008556; --red-d: #FF8A7E;
+  --serif: "PT Serif", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, "DejaVu Sans Mono", monospace;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  position: relative; min-height: calc(100vh - 64px); padding: 36px 16px 120px; background: var(--desk); color: var(--desk-ink);
 }
-.jb-cnt{font-size:14px;font-weight:600;color:var(--b-ink-3);font-variant-numeric:tabular-nums}
-.jb-extra{position:relative;margin-left:auto}
-.jb-extra>summary{list-style:none}
-.jb-extra>summary::-webkit-details-marker{display:none}
-.jb-extra-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:20;min-width:240px;padding:8px;border-radius:var(--b-r-md);
-  display:flex;flex-direction:column;animation:b-rise var(--b-base) var(--b-ease) both}
-.jb-extra-menu button{display:flex;justify-content:space-between;gap:16px;min-height:44px;padding:0 14px;border:0;border-radius:10px;
-  background:transparent;font:inherit;font-size:16px;color:var(--b-ink);cursor:pointer;text-align:left}
-.jb-extra-menu button:hover{background:rgba(15,40,65,.05)}
-.jb-qbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.jb-qbar .b-note{flex:1 1 320px;margin:0}
-.jb-qbar label.b-button{position:relative}
-.jb-qbar input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-/* рамка — не бумага, а «окно» на фон: карточки отчёта внутри остаются бумагой (без плитки в плитке) */
-.jb-frame{padding:0;overflow:hidden;height:calc(100vh - 162px);min-height:520px;position:relative;border-radius:var(--b-r-lg);background:rgba(255,255,255,.34);box-shadow:inset 0 0 0 1px var(--b-hair)}
-.jb-frame iframe{display:block;width:100%;height:100%;border:0;background:transparent;opacity:0;
-  transition:opacity var(--b-slow) var(--b-ease)}
-.jb-frame iframe.ready{opacity:1}
-.jb-frame iframe:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:-3px;border-radius:var(--b-r-lg)}
-.jb-empty{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
-.jb-empty p{margin:0;color:var(--b-ink-2);max-width:62ch}
-.jb-files .jb-fmt{flex:1;min-width:0;font-weight:600}
-.jb-files .jb-fnote{font-size:15px;color:var(--b-ink-3);font-weight:400;margin-left:8px}
-.jb-files .b-row{flex-wrap:wrap}
+.jb [hidden] { display: none !important; }
+.jb-parent { max-width: 760px; margin: 0 auto 16px; font-size: 15px; color: var(--desk-ink-2); }
+.jb-parent a { color: #3DDC9A; }
 
-/* ── телефон ── */
-@media (max-width:720px){
-  .jb{padding-top:20px;gap:20px}
-  .jb-prog{padding:20px}
-  .jb-phead{gap:14px}
-  .jb-ptitle{font-size:22px}
-  .jb-hero{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;align-items:center}
-  .jb-hmain{grid-column:1/-1;grid-row:2}
-  .jb-verdict{font-size:26px}
-  .jb-verdict .sep{display:none}
-  .jb-verdict .v{display:block}
-  .jb-hact{grid-column:2;grid-row:1;justify-self:end;align-self:center}
-  .jb-row{display:grid;grid-template-columns:50px minmax(0,1fr);column-gap:10px;row-gap:4px;align-items:baseline}
-  .jb-row>*:not(.jb-id){grid-column:2}
-  .jb-row .jb-only{justify-self:start}
-  .jb-row .jb-where{max-width:none;text-align:left;white-space:normal}
-  .jb-row .jb-go{display:none}
-  .jb-tabbar{top:72px}
-  .jb-extra{margin-left:0}
-  .jb-frame{height:calc(100svh - 142px);min-height:460px;border-radius:var(--b-r-md)}
+/* ── лист документа ── */
+@keyframes jb-sheet-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.jb-scan { position: relative; max-width: 760px; margin: 0 auto; }
+.jb-sheet {
+  position: relative; background: #fff; color: var(--ink); border-radius: 3px; padding: 44px 56px 72px 0; overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .05), 0 10px 24px rgba(0, 0, 0, .32), 0 32px 90px rgba(0, 0, 0, .45);
+  font: 16.5px/1.6 var(--serif); animation: jb-sheet-in 360ms var(--ease);
 }
-@media (prefers-reduced-motion:reduce){.jb-stg.running .jb-ic::before{animation:none}}
+.jb-sheet .ln { display: grid; grid-template-columns: 64px minmax(0, 1fr); transition: color 600ms var(--ease); }
+.jb-sheet .no { text-align: right; padding-right: 20px; font: 12px/26.4px var(--mono); color: #8A98AA; user-select: none; }
+.jb-sheet .tx { white-space: pre-wrap; word-break: break-word; min-height: 26.4px; }
+.jb-sheet .h .tx { font-weight: 700; font-size: 19px; padding-top: 12px; }
+.jb-sheet .h .no { padding-top: 12px; }
+.jb-sheet .blank { min-height: 12px; }
+.jb-sheet .blank .tx, .jb-sheet .blank .no { min-height: 12px; font-size: 0; line-height: 12px; }
+.jb-sheet .skel .tx { height: 12px; min-height: 0; margin: 7px 0; border-radius: 6px; background: #EEF1F3; }
+.jb-sheet .skel:nth-child(3n) .tx { width: 70%; }
+/* прочитанное сканером — чуть тише непрочитанного */
+.jb-sheet .ln.read { color: #3A5068; }
+/* луч сканера: тонкая зелёная линия поперёк листа и мягкий след над ней */
+.jb-beam { position: absolute; z-index: 2; left: 0; right: 0; top: 40px; height: 2px; background: var(--green); pointer-events: none;
+  transition: top 900ms var(--ease), opacity 360ms var(--ease); }
+.jb-beam::before { content: ""; position: absolute; left: 0; right: 0; bottom: 2px; height: 64px;
+  background: linear-gradient(to bottom, rgba(0, 185, 117, 0), rgba(0, 185, 117, .09)); }
+.jb.finished .jb-beam { opacity: 0; }
+/* BCC AI летит у правого края листа вровень с лучом; подпись этапа — рядом, одной строкой */
+.jb-pilot { position: absolute; z-index: 3; left: calc(100% - 44px); top: 40px; display: flex; align-items: center; gap: 14px;
+  transform: translateY(-50%); transition: top 900ms var(--ease); pointer-events: none; }
+.jb-agent { flex: none; width: 80px; height: 80px; position: relative; }
+.jb-agent:empty, .jb-agent > [data-bcc-agent]:not(.bcc-agent) {
+  display: block; width: 100%; height: 100%; border-radius: 22px;
+  background: radial-gradient(120% 120% at 30% 20%, #20395A 0%, #0F2841 55%, #070B16 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), 0 10px 30px rgba(0, 0, 0, .45);
+}
+.jb-say { display: flex; flex-direction: column; gap: 2px; min-width: 210px; }
+.jb-say b { font-size: 16px; font-weight: 650; color: var(--desk-ink); }
+.jb-say span { font-size: 13.5px; color: var(--desk-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jb-err { margin: 28px auto 0; max-width: 760px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.jb-errline { margin: 0; display: flex; gap: 10px; align-items: baseline; color: var(--red-d); font-size: 16px; overflow-wrap: anywhere; }
+.jb-errline::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--red-d); transform: translateY(-1px); }
+.jb-todo { margin: 0; font-size: 15px; color: var(--desk-ink-2); }
+.jb-btn { display: inline-flex; align-items: center; height: 42px; padding: 0 20px; border-radius: 999px; background: var(--green-strong);
+  color: #fff !important; text-decoration: none; font-weight: 600; font-size: 15px; transition: transform 120ms var(--ease), background 120ms var(--ease); }
+.jb-btn:hover { background: #007A4F; }
+.jb-btn:active { transform: scale(.98); }
+.jb-log { max-width: 760px; margin: 22px auto 0; font-size: 13.5px; color: var(--desk-ink-3); }
+.jb-log summary { cursor: pointer; width: max-content; }
+.jb-log pre { margin: 10px 0 0; max-height: 240px; overflow: auto; padding: 12px 14px; border-radius: 10px; background: rgba(255, 255, 255, .04);
+  box-shadow: inset 0 0 0 1px var(--desk-line); font: 12.5px/1.55 var(--mono); color: var(--desk-ink-2); white-space: pre-wrap; }
+
+/* ── готовая правка: лист-отчёт на весь стол ── */
+.jb.done { padding: 0; min-height: 0; }
+body:has(main.jb.done) { overflow: hidden; }
+.jb-report { position: fixed; left: 0; right: 0; bottom: 0; top: var(--jb-top, 64px); width: 100%; height: calc(100vh - var(--jb-top, 64px));
+  border: 0; background: var(--desk); opacity: 0; transition: opacity 360ms var(--ease); }
+.jb-report.ready { opacity: 1; }
+
+/* ── единственное стекло: панель внизу ── */
+.jb-dock {
+  position: fixed; z-index: 30; left: 50%; bottom: 18px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 2px; padding: 6px; max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none;
+  border-radius: 999px; background: rgba(18, 27, 45, .88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 0 0 1px rgba(255, 255, 255, .07), 0 18px 50px rgba(0, 0, 0, .55);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .jb-dock { background: rgba(18, 27, 45, .62); -webkit-backdrop-filter: blur(24px) saturate(175%); backdrop-filter: blur(24px) saturate(175%); }
+}
+.jb-dock::-webkit-scrollbar { display: none; }
+.jb-d {
+  flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--desk-ink-2) !important; font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background 220ms var(--ease), color 220ms var(--ease), transform 120ms var(--ease);
+}
+.jb-d:hover { background: rgba(255, 255, 255, .07); color: var(--desk-ink) !important; }
+.jb-d:active { transform: scale(.98); }
+.jb-d[aria-pressed="true"], .jb-d[aria-expanded="true"] { background: #fff; color: var(--ink) !important; }
+.jb-d[disabled] { opacity: .45; cursor: default; }
+.jb-n { font-size: 13px; color: var(--desk-ink-3); font-variant-numeric: tabular-nums; }
+.jb-d[aria-pressed="true"] .jb-n { color: var(--ink-3); }
+.jb-go, .jb-go:hover { background: var(--green-strong); color: #fff !important; margin-left: 4px; }
+.jb-go:hover { background: #007A4F; }
+.jb-sep { flex: none; width: 1px; height: 22px; margin: 0 6px; background: rgba(230, 236, 245, .14); }
+.jb-menu {
+  position: fixed; z-index: 31; left: 50%; bottom: 84px; transform: translateX(-50%); width: min(360px, calc(100% - 24px));
+  max-height: calc(100vh - 160px); overflow: auto; padding: 8px; border-radius: 16px; background: #fff; color: var(--ink);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+}
+.jb-menu a, .jb-menu button {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px; width: 100%; min-height: 44px; padding: 10px 14px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--ink) !important; font: inherit; font-size: 15.5px; text-align: left;
+  text-decoration: none; cursor: pointer; transition: background 120ms var(--ease);
+}
+.jb-menu a:hover, .jb-menu button:hover { background: #F1F4F3; }
+.jb-menu small { font-size: 13px; color: var(--ink-3); text-align: right; }
+.jb-toast { position: fixed; z-index: 32; left: 50%; bottom: 84px; transform: translateX(-50%); margin: 0; padding: 10px 18px; border-radius: 999px;
+  background: #fff; color: var(--ink); font-size: 14.5px; font-weight: 600; box-shadow: 0 14px 40px rgba(0, 0, 0, .45); max-width: calc(100% - 24px); }
+
+/* ── телефон: лист во всю ширину, BCC AI — у правого края листа ── */
+@media (max-width: 720px) {
+  .jb { padding: 16px 0 110px; }
+  .jb-sheet { padding: 28px 16px 48px 0; font-size: 16px; border-radius: 0; }
+  .jb-sheet .ln { grid-template-columns: 40px minmax(0, 1fr); }
+  .jb-sheet .no { padding-right: 10px; font-size: 11px; }
+  .jb-pilot { left: auto; right: 8px; flex-direction: row-reverse; }
+  .jb-say { min-width: 0; align-items: flex-end; padding: 6px 10px; border-radius: 10px; background: rgba(11, 18, 32, .86); }
+  .jb-say span { font-size: 12px; }
+  .jb-err, .jb-log { padding: 0 16px; }
+  .jb-dock { bottom: 10px; }
+  .jb-d { padding: 0 13px; font-size: 14.5px; }
+  .jb-menu, .jb-toast { bottom: 72px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jb *, .jb *::before { animation: none !important; transition: none !important; }
+}
