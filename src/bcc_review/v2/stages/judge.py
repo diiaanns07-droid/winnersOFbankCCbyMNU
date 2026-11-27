@@ -1098,6 +1098,80 @@ _PLACEHOLDERS = {
 }
 
 
+# Параметры спецификации (адрес вызова, окружение, ссылка на описание API, переменная примера), оставленные
+# прочерком или заглушкой, — неполнота контракта, а не поле шаблона документа (промпт судьи, шаг 2). Слабый судья
+# кладёт их в общее «не заполнены поля шаблона», и код сводит его в одно minor — тогда пропуск адресов и описания API
+# прячется среди версии и согласующих (Gemini c3, 27.11: прочерки «адрес prod» и «описание API» ушли в шаблон).
+_SPEC_PARAM_RE = re.compile(
+    r"(?<![\w$])(?:prod|production|staging|stage|test|dev|uat|url|uri|host|endpoint|swagger|openapi|base[_ ]?url)(?!\w)|"
+    r"\$[A-Za-z_]{2,}|адрес\w*\s+(?:вызова|сервиса|метода|api)|окружени\w*|стенд\w*", re.I)
+_SPEC_PARAMS = {
+    "title": "Не заданы параметры спецификации: адрес вызова, окружение, описание API",
+    "problem": "Параметры, без которых метод нельзя вызвать и проверить, оставлены пустыми: ",
+    "impact": "Разработчик клиента и тестировщик не знают, куда отправлять запрос и по какому описанию API сверять "
+              "ответ.",
+    "recommendation": "Указать адрес вызова для каждого окружения и ссылку на описание API или записать, кто и когда их "
+                      "выдаст.",
+    "question": "Какие адреса окружений и какое описание API использовать?",
+}
+
+
+def _spec_param(c: dict) -> bool:
+    quotes = [_s(e.get("quote")) for e in c.get("evidence") or [] if _ev_ok(e)]
+    return bool(quotes) and all(_SPEC_PARAM_RE.search(q) for q in quotes)
+
+
+def _spec_params_apart(findings: list[dict], ctx: Any, warnings: list[str]) -> list[dict]:
+    """Заглушки параметров спецификации из minor-«полей шаблона» — отдельный дефект `api_contract` (major).
+    Если судья уже завёл такой дефект уровнем выше (major-заглушка из одних параметров), они уходят в него."""
+    out: list[dict] = []
+    spec_members: list[dict] = []
+    for f in findings:
+        if f["kind"] != "placeholder" or f["severity"] != "minor":
+            out.append(f)
+            continue
+        spec = [m for m in f["_members"] if _spec_param(m)]
+        rest = [m for m in f["_members"] if not _spec_param(m)]
+        spec_members += spec
+        if not rest:
+            continue
+        if spec:
+            f["_members"] = rest
+            f["candidate_ids"] = sorted((m["id"] for m in rest), key=_cid_num)
+            f["evidence"] = _pick_evidence(rest, None) or f["evidence"]
+            f["_first_line"] = f["evidence"][0]["line_start"]
+            f["sources"] = _sources(rest)
+        out.append(f)
+    if not spec_members:
+        return findings
+    home = next((f for f in out if f["kind"] in ("placeholder", "api_contract") and f["severity"] != "minor"
+                 and f["_members"] and all(_spec_param(m) for m in f["_members"])), None)
+    if home is not None:
+        home["_members"] = home["_members"] + spec_members
+        home["candidate_ids"] = sorted({*home["candidate_ids"], *(m["id"] for m in spec_members)}, key=_cid_num)
+        _warn(ctx, warnings, "судья: заглушки параметров спецификации присоединены к дефекту контракта")
+        return out
+    ev = _pick_evidence(spec_members, None)
+    if not ev:
+        return findings
+    quotes = "; ".join(f"«{_cut(e['quote'], 60)}» (строка {e['line_start']})" for e in ev[:4])
+    out.append({
+        "key": "SPEC", "candidate_ids": sorted((m["id"] for m in spec_members), key=_cid_num),
+        "title": _SPEC_PARAMS["title"], "kind": "api_contract", "criterion": "complete",
+        "standard_refs": list(STANDARD_REFS.get("complete", [])), "severity": "major",
+        "requirement_ids": list(dict.fromkeys(r for m in spec_members for r in m.get("requirement_ids") or [])),
+        "evidence": ev, "problem": _cut(_SPEC_PARAMS["problem"] + quotes + ".", 900), "scenario": "",
+        "impact": _SPEC_PARAMS["impact"], "recommendation": _SPEC_PARAMS["recommendation"], "rewrite": "",
+        "question": _SPEC_PARAMS["question"], "blocks": "testing", "priority": 0,
+        "sources": _sources(spec_members), "_members": spec_members, "_first_line": ev[0]["line_start"],
+        "_wish": False, "_basis": "м3: неполнота контракта", "_check_basis": "", "_model_sev": "major",
+        "_model_blocks": "testing",
+    })
+    _warn(ctx, warnings, f"судья: заглушки параметров спецификации ({len(spec_members)}) — отдельный дефект контракта, "
+                         "не поле шаблона")
+    return out
+
+
 def _lc_first(text: str) -> str:
     """Первая буква строчная, кроме аббревиатур и ID («ID», «Ф-2», «НФТ»)."""
     if len(text) > 1 and (text[1].isupper() or not text[1].isalpha()):
@@ -1142,6 +1216,32 @@ def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: lis
     out = [f for f in findings if id(f) not in drop]
     out.append(main)
     return out
+
+
+def _place_key(f: dict) -> str:
+    """Место дефекта для сведения пожеланий: первое требование, иначе первая строка цитаты."""
+    reqs = [r for r in f.get("requirement_ids") or [] if r]
+    return f"R:{sorted(reqs)[0]}" if reqs else f"L:{f['_first_line']}"
+
+
+def _wishes_by_place(findings: list[dict], ctx: Any, warnings: list[str]) -> list[dict]:
+    """Пожелания полноты (`wish`) сводятся по месту: одно minor на требование или строку, а не одно на документ.
+    Замер №12 (27.11, haiku, официальный документ, аналитик с описью полноты): одно minor на документ собрало
+    вместе экран, перечень исключённых операций и смену настройки — три разных дефекта, читатель и счётчик видят
+    один; по месту они остаются отдельными, а мелочи к одному пункту по-прежнему сводятся."""
+    pred = lambda f: f["_wish"] and f["severity"] != "critical"  # noqa: E731
+    groups: dict[str, list[int]] = {}
+    for f in findings:
+        if pred(f):
+            groups.setdefault(_place_key(f), []).append(id(f))
+    many = len(groups) > 1
+    for key, ids in groups.items():
+        spec = dict(_WISHES)
+        if many and len(ids) > 1:
+            line = min(f["_first_line"] for f in findings if id(f) in ids)
+            spec["title"] = f"{_WISHES['title']} (строка {line})"
+        findings = _consolidate(findings, lambda f, ids=set(ids): id(f) in ids, spec, ctx, warnings)
+    return findings
 
 
 def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
@@ -1419,10 +1519,11 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
 
     findings = _consolidate(findings, lambda f: bool(_NO_ID_RE.search(f["title"])) and (
         f["severity"] == "minor" or f["criterion"] in {"conforming", "ranked", "traceable"}), _NO_IDS, ctx, warnings)
-    findings = _consolidate(findings, lambda f: f["_wish"] and f["severity"] != "critical", _WISHES, ctx, warnings)
+    findings = _wishes_by_place(findings, ctx, warnings)
     for kind, spec in (("terminology", _TERMS), ("non_singular", _NONSINGULAR), ("duplicate", _DUPLICATES)):
         findings = _consolidate(findings, lambda f, k=kind: f["kind"] == k and f["severity"] == "minor",
                                 spec, ctx, warnings)
+    findings = _spec_params_apart(findings, ctx, warnings)
     findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] == "minor",
                             _PLACEHOLDERS, ctx, warnings)  # major-заглушки (параметры спецификации) — отдельно
     for f in findings:  # после слияния — доказательства и источники заново

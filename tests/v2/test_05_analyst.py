@@ -66,11 +66,12 @@ def test_postprocess_drops_no_evidence_and_duplicates():
 
 
 def test_postprocess_caps_critical_and_count():
-    pp = _load_stage().postprocess
+    mod = _load_stage()
+    pp = mod.postprocess
     cands = [_cand(f"K{i}", severity="critical", kind="event_conflict", lines=(i, 50 + i)) for i in range(1, 5)]
-    cands += [_cand(f"M{i}", severity="minor", lines=(100 + i,)) for i in range(12)]
+    cands += [_cand(f"M{i}", severity="minor", lines=(100 + i,)) for i in range(mod.MAX_CANDIDATES)]
     out = pp(cands)
-    assert len(out) == 12
+    assert len(out) == mod.MAX_CANDIDATES == 16  # опись полноты (№12): до 16 кандидатов
     assert [c["severity"] for c in out[:4]] == ["critical", "critical", "major", "major"]
     assert out[0]["title"] == "K1" and out[1]["title"] == "K2"
 
