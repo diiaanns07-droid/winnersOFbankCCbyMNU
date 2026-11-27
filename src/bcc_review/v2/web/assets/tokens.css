@@ -207,8 +207,8 @@ html{-webkit-text-size-adjust:100%;color-scheme:light;background:var(--b-canvas)
 .b-leaf:active{transform:scale(.98)}
 .b-leaf.on{box-shadow:0 0 0 1.5px var(--b-green),var(--b-shadow-1)}
 .b-leaf-t{font-size:15px;line-height:1.35;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.b-leaf .b-verdict{font-size:13.5px}
-.b-leaf .b-verdict>span+span::before{margin:0 6px}
+.b-leaf .b-verdict{flex-direction:column;align-items:flex-start;gap:1px;font-size:14px}
+.b-leaf .b-verdict>span+span::before{display:none}
 .b-leaf-m{font:12px/1.4 var(--b-mono);color:var(--b-ink-3)}
 
 /* ── кнопки, метки, поле, состояние ── */
@@ -256,6 +256,8 @@ html{-webkit-text-size-adjust:100%;color-scheme:light;background:var(--b-canvas)
   .b-line.h2 .b-tx{font-size:18.5px}
   .b-sheet-top{padding:18px 0 14px var(--b-gutter)}
   .b-verdict{font-size:14.5px}
+  .b-verdict>span:nth-child(3){flex-basis:100%}
+  .b-verdict>span:nth-child(3)::before{display:none}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none !important;transition:none !important;scroll-behavior:auto !important}

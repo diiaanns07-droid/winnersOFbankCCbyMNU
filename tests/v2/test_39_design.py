@@ -1,4 +1,4 @@
-"""№39: «Белый лист на тёмном столе» — стол, лист с номерами строк, правка, печать, карта, панель; без внешних ссылок."""
+"""№39: светлый лист ТЗ в центре — правка по листу, строка вердикта, поля, карта, стеклянные панели; без внешних ссылок."""
 from __future__ import annotations
 
 import json
@@ -20,7 +20,7 @@ FIX = ROOT / "tests" / "v2" / "fixtures" / "14_report_official.json"
 ASSETS = ROOT / "src" / "bcc_review" / "v2" / "web" / "assets"
 KEY_LINK = "https://aistudio.google.com/apikey"  # единственная разрешённая внешняя ссылка — получить ключ
 EXTERNAL = re.compile(r"https?://(?!127\.0\.0\.1|localhost)[^\s\"'<>)]+")
-FONTS = ("pt-serif-400.woff2", "pt-serif-700.woff2", "jetbrains-mono-400.woff2")
+FONTS = ("inter-400.woff2", "inter-600.woff2", "inter-700.woff2", "jetbrains-mono-400.woff2")
 
 
 @pytest.fixture()
@@ -69,8 +69,8 @@ def test_desk_shell(srv):
     assert '<link rel="stylesheet" href="/assets/tokens.css">' in html
     assert html.index("/assets/tokens.css") < html.index("/assets/app.css")
     assert 'class="b-desk"' in html and 'class="b-bar"' in html and 'class="b-dock"' in html
-    assert re.search(r'data-bcc-agent data-size="24" data-mood="idle"', html)
-    assert 'id="b-ink"' in html and "feTurbulence" in html  # чернила печати — фильтр, без картинок
+    assert re.search(r'data-bcc-agent data-size="48" data-mood="idle"', html)  # место AIshka, 48 px в шапке
+    assert "b-stamp" not in html and "feTurbulence" not in html  # печатей больше нет — вердикт строкой
     assert "BCC Review" in html and "Свой документ" in html
     assert "<select" not in html  # модель — в меню панели, не голый select и не таблетки на экране
     assert 'name="provider"' in html and 'name="file"' in html
@@ -89,15 +89,19 @@ def test_tokens_and_fonts_served(srv):
     code, css, h = _get(base + "/assets/tokens.css")
     css = css.decode()
     assert code == 200 and h["Content-Type"].startswith("text/css")
-    for tok in ("--b-desk:#0B1220", "--b-green:#00B975", "--b-gold:#DCA262", "--b-red:#C2362B", "--b-sheet-w:760px",
-                '"PT Serif",Georgia,"Times New Roman",serif', '"JetBrains Mono",ui-monospace,Consolas',
-                "--b-ease:cubic-bezier(.2,.8,.2,1)"):
+    for tok in ("--b-canvas:#F3F6F5", "--b-ink:#0F2841", "--b-green:#00B975", "--b-green-strong:#008556",
+                "--b-red:#C2362B", "--b-mark-major:#FBE1BA", "--b-sheet-w:760px", "--b-r-lg:22px",
+                "--b-font:Inter,", '"JetBrains Mono",ui-monospace,Consolas', "--b-ease:cubic-bezier(.2,.8,.2,1)",
+                "blur(24px) saturate(175%)"):
         assert tok in css, tok
-    for cls in (".b-desk", ".b-bar", ".b-sheet", ".b-line", ".b-ln", ".b-hl.crit", ".b-hl.major", ".b-hl.minor",
-                ".b-note", ".is-focus", ".b-stamp", ".b-stamp.ok", ".b-map", ".b-dock", ".b-menu", ".b-stack",
-                ".b-leaf", ".b-button", ".primary", ".b-badge", ".b-field", ".b-rise", "wavy"):
+    for cls in (".b-desk", ".b-bar", ".b-sheet", ".b-sheet-top", ".b-verdict", ".b-line", ".b-ln", ".b-hl.crit",
+                ".b-hl.major", ".b-hl.minor", ".b-margin", ".b-note", ".is-focus", ".b-map", ".b-dock", ".b-menu",
+                ".b-stack", ".b-leaf", ".b-surface", ".b-glass", ".b-button", ".primary", ".b-badge", ".b-field", ".b-rise"):
         assert cls in css, cls
     assert "prefers-reduced-motion" in css
+    # светло и мало цветов: ни тёмного стола, ни волнистых и синих отметок, ни печатей
+    for gone in ("#0B1220", "wavy", ".b-stamp", "PT Serif"):
+        assert gone not in css, gone
     total = 0
     for name in FONTS:
         code, data, h = _get(f"{base}/assets/{name}")
@@ -112,8 +116,9 @@ def test_desk_opens_last_report_as_sheet(srv):
     base, app = srv
     job = _done_job(app)
     html = _text(base + "/")
-    assert 'id="sheet"' in html and "b-stamp crit" in html and "Нельзя в разработку" in html and "5 блокеров" in html
-    assert "цитат сверено 39 из 39" in html
+    assert 'id="sheet"' in html and 'class="b-verdict"' in html
+    assert 'Разработка: <b class="no">нельзя</b>' in html and "5 блокеров" in html and "цитат сверено 39 из 39" in html
+    assert 'class="desk-notes b-margin"' in html
     assert f'href="/jobs/{job.id}#questions"' in html and f'href="/jobs/{job.id}#revised"' in html
     assert html.count('class="b-note ') == 20 and html.count('data-line="') == 20  # заметки и засечки карты
     assert "Выгрузить" in html and f"/jobs/{job.id}/files/report.html" in html
@@ -134,18 +139,20 @@ def test_sheet_marks_quotes_on_their_lines():
     assert 'id="L39"' in sh2.html and "На карту приходится" in sh2.html
 
 
-def test_plural_and_stamp_variants():
+def test_plural_and_verdict_variants():
     assert [SH.plural(n, "блокер", "блокера", "блокеров") for n in (1, 2, 5, 11, 21, 22)] == \
         ["блокер", "блокера", "блокеров", "блокеров", "блокер", "блокера"]
-    ok = SH.stamp_html({"verdict": {"development": "yes"}, "findings": [], "run": {"provider": "mock"}})
-    assert "b-stamp ok" in ok and "Можно в разработку" in ok and "блокеров нет" in ok
+    ok = SH.verdict_html({"verdict": {"development": "yes"}, "findings": [], "run": {"provider": "mock"}})
+    assert '<b class="yes">можно</b>' in ok and "блокеров нет" in ok
+    cond = SH.verdict_html({"verdict": {"development": "conditional"}, "findings": [{"severity": "critical"}]})
+    assert '<b class="cond">с условиями</b>' in cond and "1 блокер<" in cond
 
 
 def test_empty_desk_shows_sample_sheet(srv):
     base, _ = srv
     html = _text(base + "/")
-    assert 'id="sheet"' in html and "пример, ещё не проверен" in html and "Проверить пример" in html
-    assert "b-stamp " not in html  # не проверен — печати нет
+    assert 'id="sheet"' in html and "Ещё не проверен" in html and "Проверить пример" in html
+    assert "Проверить этот лист" in html and 'class="b-hl' not in html  # не проверен — правки нет
 
 
 def test_no_external_links_in_html_css_js(srv):
