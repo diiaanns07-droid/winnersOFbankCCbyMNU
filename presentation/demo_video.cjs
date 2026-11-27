@@ -2,6 +2,7 @@
 //
 //   node presentation/demo_video.cjs --base http://127.0.0.1:8014/ --file release/input/requirements.pdf \
 //        --out presentation [--provider claude_cli --model sonnet] [--title presentation/title.html] [--real "4 мин 40 с"]
+//        [--docx release/input/requirements.docx]   — плюс сегмент «тот же ТЗ в Word с комментариями» (веб с --workers 2)
 //
 // Веб лучше запустить с общим кэшем и темпом показа этапов, тогда сохранённый живой прогон повторяется без модели:
 //   python -m bcc_review.v2.web --cache-dir <кэш живого прогона> --pace 2.6
@@ -87,6 +88,10 @@ function srtTime(ms) {
       d.textContent = text; d.style.cssText = "background:#131820;color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.3);border-left:4px solid #2FB37E";
       box.append(d); setTimeout(() => d.remove(), 3800); }, text);
   }
+
+  // параллельно: тот же ТЗ в Word — задание через API, скачивание .annotated.docx и отрисовка LibreOffice
+  const docxPrep = args.docx ? prepareDocx(ctx.request, base, path.resolve(args.docx), provider, model, tmp).catch((e) => {
+    console.log("DOCX пропущен:", String(e.message || e).slice(0, 200)); return null; }) : Promise.resolve(null);
 
   // 0. титул команды
   say("STUPITS — ИИ-агент, который находит дефекты в техническом задании до первой строки кода");
@@ -244,6 +249,33 @@ print(sys.argv[2])`, pdfFile, path.join(tmp, "pdf_page.png")]).toString().trim()
     await pause(5200);
   }
 
+  // Word с комментариями: тот же документ, загруженный в DOCX
+  const docx = await docxPrep;
+  if (docx) {
+    await p.goto(docx.url);
+    await p.waitForSelector("#result:not([hidden])");
+    await cursor();
+    say("Тот же ТЗ в Word: агент возвращает исходный документ с комментариями на местах цитат");
+    await pause(1500);
+    const a = p.locator('.dl[data-key="docx_annotated"]');
+    if (await a.count()) {
+      const [d] = await Promise.all([p.waitForEvent("download"), click(a, { wait: 400 })]);
+      await d.saveAs(path.join(tmp, d.suggestedFilename()));
+      await toast(`Скачано: ${d.suggestedFilename()} · ${Math.max(1, Math.round(docx.size / 1024))} КБ`);
+      await pause(1600);
+    }
+    if (docx.png) {
+      say(`Комментарии Word на полях: ${docx.comments} — у каждого дефект, серьёзность и рекомендация`);
+      const img = fs.readFileSync(docx.png).toString("base64");
+      await p.setContent(`<html><body style="margin:0;background:#2b2f36;display:flex;justify-content:center;align-items:flex-start;height:100vh;overflow:hidden">
+        <img src="data:image/png;base64,${img}" style="width:${W - 120}px;margin-top:20px;box-shadow:0 10px 40px rgba(0,0,0,.5)"></body></html>`);
+      await cursor();
+      await pause(1500);
+      await p.evaluate(() => document.querySelector("img").animate([{ transform: "translateY(0)" }, { transform: "translateY(-300px)" }], { duration: 4500, fill: "forwards" }));
+      await pause(5000);
+    }
+  }
+
   // 8. паспорт прогона
   await p.goto(jobUrl);
   await p.waitForSelector("#result:not([hidden])");
@@ -297,4 +329,40 @@ function parseCsv(text) {
   }
   if (cell || row.length) { row.push(cell); rows.push(row); }
   return rows;
+}
+
+async function prepareDocx(request, base, file, provider, model, tmp) {
+  const r = await request.post(base + "api/jobs", { headers: { Accept: "application/json" },
+    multipart: { provider, model, file: { name: path.basename(file), mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer: fs.readFileSync(file) } } });
+  const j = await r.json();
+  if (!j.id) throw new Error(j.error || "задание не создано");
+  let st;
+  for (let i = 0; i < 900; i++) {
+    st = await (await request.get(base + "api/jobs/" + j.id)).json();
+    if (st.state === "done" || st.state === "failed") break;
+    await new Promise((res) => setTimeout(res, 1000));
+  }
+  if (st.state !== "done" || !("docx_annotated" in st.files)) throw new Error("нет .annotated.docx: " + (st.error || st.state));
+  const out = path.join(tmp, "word");
+  fs.mkdirSync(out, { recursive: true });
+  const docPath = path.join(out, "requirements.annotated.docx");
+  fs.writeFileSync(docPath, await (await request.get(base + "jobs/" + j.id + "/files/report.annotated.docx")).body());
+  let comments = 0;
+  try {
+    comments = Number(execFileSync("python3", ["-c", "import sys,zipfile,re; z=zipfile.ZipFile(sys.argv[1]); print(len(re.findall(r'<w:comment ', z.read('word/comments.xml').decode('utf-8'))) if 'word/comments.xml' in z.namelist() else 0)", docPath]).toString().trim()) || 0;
+  } catch (e) { comments = 0; }
+  let png = "";
+  try {
+    const filter = 'pdf:writer_pdf_Export:{"ExportNotesInMargin":{"type":"boolean","value":"true"}}';
+    await new Promise((res, rej) => require("child_process").execFile("soffice", ["--headless", "--convert-to", filter, "--outdir", out, docPath],
+      { timeout: 120000 }, (err) => (err ? rej(err) : res())));
+    const pdf = path.join(out, "requirements.annotated.pdf");
+    png = execFileSync("python3", ["-c", `
+import sys, pypdfium2 as P
+doc = P.PdfDocument(sys.argv[1])
+doc[min(1, len(doc) - 1)].render(scale=2).to_pil().save(sys.argv[2])
+print(sys.argv[2])`, pdf, path.join(out, "word_page.png")]).toString().trim();
+  } catch (e) { console.log("LibreOffice не отрисовал DOCX:", String(e.message || e).slice(0, 160)); }
+  const commentsText = comments ? `${comments} ${plural(comments, "комментарий", "комментария", "комментариев")}` : "комментарии к дефектам";
+  return { url: base + "jobs/" + j.id, png, comments: commentsText, size: fs.statSync(docPath).size };
 }
