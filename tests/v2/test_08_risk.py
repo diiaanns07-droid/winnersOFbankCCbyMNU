@@ -61,6 +61,14 @@ def test_critical_without_scenario_is_major():
     assert c["severity"] == "major"
 
 
+def test_role_terminology_becomes_security():
+    c = lens_risk.calibrate(_cand("Роль названа тремя терминами: держатель, владелец карты, клиент", "major",
+                                  "terminology", "conforming"))
+    assert (c["kind"], c["criterion"], c["severity"]) == ("security", "risk", "major")
+    c = lens_risk.calibrate(_cand("Компонент назван по-разному: учёт и сервис", "minor", "terminology", "conforming"))
+    assert c["kind"] == "terminology"
+
+
 def test_domain_critical_is_kept():
     c = lens_risk.calibrate(_cand("Не определено, что считается проведённой операцией", "critical"))
     assert c["severity"] == "critical"

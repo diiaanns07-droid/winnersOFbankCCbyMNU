@@ -36,6 +36,15 @@
     form.addEventListener("submit", function (ev) {
       var sample = ev.submitter && ev.submitter.name === "sample";
       if (!sample && !(file.files && file.files.length)) { ev.preventDefault(); pnote.textContent = "Выберите файл требований."; pnote.classList.add("bad"); return; }
+      if (!sample) {
+        var f0 = file.files[0];
+        var ext = (f0.name.split(".").pop() || "").toLowerCase();
+        var bad = f0.size > 20 * 1024 * 1024 ? "Файл " + (f0.size / 1048576).toFixed(1) + " МБ — больше 20 МБ. Сожмите PDF или загрузите только раздел требований."
+          : !f0.size ? "Файл пустой — в нём нет текста для проверки."
+          : ["pdf", "docx", "md", "markdown", "txt", "html", "htm"].indexOf(ext) < 0 ? "Формат ." + ext + " не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML."
+          : "";
+        if (bad) { ev.preventDefault(); pnote.textContent = bad; pnote.classList.add("bad"); return; }
+      }
       ev.preventDefault();
       var fd = new FormData(form);
       if (sample) fd.append("sample", "1");
@@ -94,6 +103,8 @@
     $("#log").textContent = (j.log || []).join("\n");
     var err = $("#err");
     if (j.state === "failed") { err.hidden = false; err.textContent = j.error || "Анализ завершился с ошибкой."; }
+    var nt = $("#notice");
+    if (nt && j.state === "done" && j.notice) { nt.hidden = false; nt.textContent = j.notice; }
     if (j.state === "done") {
       var af = $("#answers");
       if (af && af.hidden && !j.answers_path) {

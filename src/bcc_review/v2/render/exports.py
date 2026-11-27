@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import re
 import traceback
 from pathlib import Path
@@ -56,6 +57,7 @@ AUTHOR = "BCC Review"
 SUFFIX = {"jira": ".jira.csv", "docx_annotated": ".annotated.docx", "docx": ".docx", "pdf_annotated": ".annotated.pdf",
           "pdf": ".pdf"}
 FORMATS = ("jira", "docx", "pdf")
+os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")  # без совета про pymupdf_layout в stdout (№16)
 
 
 # --------------------------------------------------------------------------- общая точка вызова

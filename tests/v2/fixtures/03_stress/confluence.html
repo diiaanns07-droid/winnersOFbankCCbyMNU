@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Платёжные сервисы : ТЗ Пополнение депозита с карты</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" href="styles/site.css" type="text/css" />
+</head>
+<body class="theme-default aui-theme-default">
+<div id="page">
+<div id="main" class="aui-page-panel">
+<div id="main-header">
+<div id="breadcrumb-section">
+<ol id="breadcrumbs">
+<li class="first"><span><a href="index.html">Платёжные сервисы</a></span></li>
+<li><span><a href="Requirements_12345.html">Требования</a></span></li>
+</ol>
+</div>
+<h1 id="title-heading" class="pagetitle">
+<span id="title-text">Платёжные сервисы : ТЗ Пополнение депозита с карты</span>
+</h1>
+</div>
+<div id="content" class="view">
+<div class="page-metadata">
+Создатель <span class='author'> Иванова А.</span>, последнее изменение <span class='editor'> Петров Б.</span> 12.11.2026
+</div>
+<div id="main-content" class="wiki-content group">
+<p><span class="status-macro aui-lozenge aui-lozenge-current">ЧЕРНОВИК</span></p>
+<div class="toc-macro rbtoc1700000000000">
+<ul class="toc-indentation">
+<li><a href="#id-ТЗ-Цели">Цели</a></li>
+<li><a href="#id-ТЗ-Функциональныетребования">Функциональные требования</a></li>
+<li><a href="#id-ТЗ-API">API</a></li>
+</ul>
+</div>
+<h2 id="id-ТЗ-Цели">Цели</h2>
+<p>Клиент пополняет депозит с карты любого банка Казахстана без визита в отделение.</p>
+<div class="confluence-information-macro confluence-information-macro-warning">
+<span class="aui-icon aui-icon-small aui-iconfont-error confluence-information-macro-icon"></span>
+<div class="confluence-information-macro-body"><p>Пополнение депозита «Неснижаемый» запрещено условиями договора.</p></div>
+</div>
+<h2 id="id-ТЗ-Функциональныетребования">Функциональные требования</h2>
+<ol>
+<li>Клиент выбирает депозит и карту, вводит сумму от 1&nbsp;000 до 10&nbsp;000&nbsp;000&nbsp;₸.</li>
+<li>Комиссия за пополнение картой другого банка — 0,5&nbsp;% от суммы, не менее 200&nbsp;₸.</li>
+<li>Пополнение зачисляется на депозит в течение 5 минут после подтверждения 3-D Secure.</li>
+<li>При отказе эквайера сумма не списывается, клиент видит причину отказа.</li>
+</ol>
+<h2 id="id-ТЗ-API">API</h2>
+<div class="table-wrap"><table class="confluenceTable"><colgroup><col/><col/><col/></colgroup>
+<tbody>
+<tr><th class="confluenceTh">Параметр</th><th class="confluenceTh">Тип</th><th class="confluenceTh">Описание</th></tr>
+<tr><td class="confluenceTd"><code>depositId</code></td><td class="confluenceTd">string</td><td class="confluenceTd">Идентификатор депозита</td></tr>
+<tr><td class="confluenceTd"><code>amount</code></td><td class="confluenceTd">integer</td><td class="confluenceTd"><p>Сумма в тиынах</p></td></tr>
+<tr><td class="confluenceTd" colspan="2">Итого полей</td><td class="confluenceTd">2</td></tr>
+</tbody></table></div>
+<div class="code panel pdl conf-macro output-block" style="border-width: 1px;">
+<div class="codeHeader panelHeader pdl"><b>Пример ответа</b></div>
+<div class="codeContent panelContent pdl">
+<pre class="syntaxhighlighter-pre" data-syntaxhighlighter-params="brush: java; gutter: false" data-theme="Confluence">{"status":"ACCEPTED",
+ "operationId":"op-17"}</pre>
+</div></div>
+<p>Ответственный аналитик: <a class="confluence-userlink user-mention" href="/display/~ivanova">Иванова А.</a></p>
+</div>
+</div>
+<div class="pageSection group">
+<div class="pageSectionHeader"><h2 id="attachments" class="pageSectionTitle">Вложения:</h2></div>
+<div class="greybox" align="left">
+<img src="images/icons/bullet_blue.gif" height="8" width="8" alt=""/>
+<a href="attachments/12345/sequence.png">sequence.png</a> (image/png)<br/>
+</div>
+</div>
+</div>
+<div id="footer" role="contentinfo">
+<section class="footer-body">
+<p>Документ создан Confluence 12.11.2026 10:15</p>
+<div id="footer-logo"><a href="http://www.atlassian.com/">Atlassian</a></div>
+</section>
+</div>
+</div>
+</body>
+</html>

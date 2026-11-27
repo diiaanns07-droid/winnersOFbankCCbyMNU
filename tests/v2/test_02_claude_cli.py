@@ -235,3 +235,34 @@ def test_recorded_real_404_unknown_model():
             model="nonexistent-model-xyz", messages=MESSAGES, schema=SCHEMA, timeout_s=30)
     assert e.value.kind == "not_found" and e.value.status == 404
     assert "opus, sonnet или haiku" in e.value.message
+
+
+def test_stage_limit_never_lowers_cli_output_limit():
+    runner = FakeRunner(json.dumps(OK_OUT))
+    provider(runner).invoke(model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=8000)
+    assert runner.calls[0][1]["env"]["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "64000"
+    runner2 = FakeRunner(json.dumps(OK_OUT))
+    provider(runner2).invoke(model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=90000)
+    assert runner2.calls[0][1]["env"]["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "90000"
+    runner3 = FakeRunner(json.dumps(OK_OUT))
+    ClaudeCLIProvider(binary=["claude"], runner=runner3, env={"CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"}).invoke(
+        model="opus", messages=MESSAGES, schema=SCHEMA, timeout_s=30, max_output_tokens=8000)
+    assert runner3.calls[0][1]["env"]["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "64000"
+
+
+def test_cli_output_token_maximum_text_is_truncated():
+    out = error_out(None, "", "API Error: Claude's response exceeded the 16000 output token maximum. To configure "
+                              "this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.")
+    with pytest.raises(ProviderError) as e:
+        provider(FakeRunner(json.dumps(out), returncode=1)).invoke(model="haiku", messages=MESSAGES, schema=SCHEMA,
+                                                                    timeout_s=30)
+    assert e.value.kind == "truncated" and not e.value.transient
+
+
+def test_five_hour_limit_is_quota_with_reset_time():
+    out = error_out(429, "rate_limit_error", "You've hit your 5-hour limit · resets 9am (Asia/Almaty)")
+    with pytest.raises(ProviderError) as e:
+        provider(FakeRunner(json.dumps(out), returncode=1)).invoke(model="opus", messages=MESSAGES, schema=SCHEMA,
+                                                                    timeout_s=30)
+    assert e.value.kind == "quota" and not e.value.transient
+    assert "Сброс лимита: 9am (Asia/Almaty)" in e.value.message
