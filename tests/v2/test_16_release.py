@@ -504,3 +504,59 @@ def test_run_summary_gates(tmp_path):
     # без --check сводка только печатается
     assert _run_summary(str(partial)).returncode == 0
     assert _run_summary(str(tmp_path / "нет.json")).returncode == 1
+
+
+# --------------------------------------------------------------------------- команда жюри: неудобный путь отчёта
+
+
+def _review(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
+    import os
+
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    for key in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL"):
+        env.pop(key, None)
+    return subprocess.run([sys.executable, "-m", "bcc_review", *args, "--provider", "offline", "-q",
+                           "--runs-dir", str(tmp_path / "runs")],
+                          cwd=tmp_path, env=env, capture_output=True, timeout=300)
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): папка "
+                                        "вместо файла отчёта — трейсбэк IsADirectoryError")
+def test_output_folder_gets_report_named_after_input(tmp_path):
+    """`python -m bcc_review ТЗ.pdf reports/` — отчёт ложится в папку под именем входа, без трейсбэка."""
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    (tmp_path / "reports").mkdir()
+    proc = _review(tmp_path, str(ROOT / "release" / "input" / "requirements.md"), "reports")
+    text = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+    assert "Traceback" not in text, text[-1500:]
+    assert proc.returncode == 0, text[-1500:]
+    assert (tmp_path / "reports" / "requirements.md").is_file()
+    assert (tmp_path / "reports" / "requirements.json").is_file()
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): "
+                                        "недоступный для записи путь отчёта — трейсбэк")
+def test_unwritable_output_gives_plain_error(tmp_path):
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    blocker = tmp_path / "file_not_dir"
+    blocker.write_text("x", encoding="utf-8")
+    proc = _review(tmp_path, str(ROOT / "release" / "input" / "requirements.md"), str(blocker / "r.md"))
+    text = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+    assert "Traceback" not in text, text[-1500:]
+    assert proc.returncode == 2
+    assert "отчёт" in text.lower()
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): "
+                                        "отчёт с путём входа затирает ТЗ")
+def test_output_same_as_input_does_not_overwrite_source(tmp_path):
+    """Отчёт с тем же путём, что вход, не должен затереть ТЗ."""
+    if not _v2_cli_ready():
+        pytest.skip("нет v2")
+    src = tmp_path / "tz.md"
+    original = (ROOT / "release" / "input" / "requirements.md").read_bytes()
+    src.write_bytes(original)
+    _review(tmp_path, str(src), str(src))
+    assert src.read_bytes() == original
