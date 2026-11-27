@@ -686,7 +686,6 @@ def test_round_runs_official_first_and_skips_sets_after_quota(tmp_path, monkeypa
     monkeypatch.setattr(rnd.subprocess, "Popen", FakeProc)
     monkeypatch.setattr(rnd.subprocess, "run", lambda *a, **k: None)
     monkeypatch.setattr(rnd, "ROOT", tmp_path)
-    monkeypatch.setattr(rnd, "_build_jobs", fake_jobs, raising=False)
     for quota, expect in ((False, ["official_sonnet_1", "corpus", "clean20"]), (True, ["official_sonnet_1"])):
         started.clear()
         logs = tmp_path / ("q" if quota else "ok")

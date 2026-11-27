@@ -75,6 +75,29 @@ def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]
     return out
 
 
+def run_waves(jobs: list[tuple[str, list[str]]], logs: Path, together: bool = False) -> dict[str, int]:
+    """Запустить части раунда: сначала официальный документ (его прогоны — параллельно), затем наборы; с
+    ``together`` — всё сразу. Официальный упёрся в лимит подписки — наборы не запускаются (код 3)."""
+    t0 = time.monotonic()
+    first = [j for j in jobs if j[0].startswith("official_")]
+    waves = [jobs] if together or not first else [first, [j for j in jobs if j not in first]]
+    rcs: dict[str, int] = {}
+    for i, wave in enumerate(waves):
+        if not wave:
+            continue
+        if i and quota_in_logs(logs, [n for n, _ in waves[0]]):
+            print("агент упёрся в лимит подписки на официальном документе — наборы не запускаю: "
+                  + ", ".join(n for n, _ in wave), flush=True)
+            rcs.update({n: 3 for n, _ in wave})
+            break
+        procs = {name: subprocess.Popen(cmd, cwd=str(ROOT), stdout=(logs / f"{name}.log").open("w", encoding="utf-8"),
+                                        stderr=subprocess.STDOUT) for name, cmd in wave}
+        for name, proc in procs.items():
+            rcs[name] = proc.wait()
+            print(f"[{name}] rc={rcs[name]} ({(time.monotonic() - t0) / 60:.1f} мин)", flush=True)
+    return rcs
+
+
 def quota_in_logs(logs: Path, names: list[str]) -> bool:
     """В логе части раунда — отказ `measure` из-за лимита провайдера или сама ошибка лимита подписки агента."""
     for n in names:
@@ -169,20 +192,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.dry_run:
         return 0
     t0 = time.monotonic()
-    first = [j for j in jobs if j[0].startswith("official_")]
-    waves = [jobs] if a.together or not first else [first, [j for j in jobs if j not in first]]
-    rcs: dict[str, int] = {}
-    for i, wave in enumerate(waves):
-        if i and quota_in_logs(logs, [n for n, _ in waves[0]]):
-            print("агент упёрся в лимит подписки на официальном документе — наборы не запускаю: "
-                  + ", ".join(n for n, _ in wave), flush=True)
-            rcs.update({n: 3 for n, _ in wave})
-            break
-        procs = {name: subprocess.Popen(cmd, cwd=str(ROOT), stdout=(logs / f"{name}.log").open("w", encoding="utf-8"),
-                                        stderr=subprocess.STDOUT) for name, cmd in wave}
-        for name, p in procs.items():
-            rcs[name] = p.wait()
-            print(f"[{name}] rc={rcs[name]} ({(time.monotonic() - t0) / 60:.1f} мин)", flush=True)
+    rcs = run_waves(jobs, logs, a.together)
     # стабильность: прогоны модели в этом раунде и раньше на том же коде (деревья src/ по git, без повторов из кэша)
     for m in sorted({m for m, _ in labels}):
         paths = [str(MEAS / slugify(lb) / "score.json") for mm, lb in labels if mm == m]
