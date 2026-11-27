@@ -1,8 +1,31 @@
 diff --git a/src/bcc_review/v2/stages/segment.py b/src/bcc_review/v2/stages/segment.py
-index d2fd8e9c..3d69663a 100644
+index d2fd8e9c..40fa6571 100644
 --- a/src/bcc_review/v2/stages/segment.py
 +++ b/src/bcc_review/v2/stages/segment.py
-@@ -356,7 +356,7 @@ def _doc_latin(view: dict | None) -> set[str]:
+@@ -68,6 +68,22 @@ def _lines(view: dict) -> list[dict]:
+     return list(view.get("lines") or [])
+ 
+ 
++_BY_N_CACHE: dict[int, tuple[Any, dict[int, dict]]] = {}
++
++
++def _by_n(view: dict) -> dict[int, dict]:
++    """Строки документа по номеру — один словарь на документ (только для чтения), а не новый на каждое требование:
++    на ТЗ в 6 000 строк и 2 500 требований это секунды. Кэш узнаёт документ по самому списку `view["lines"]`."""
++    lines = view.get("lines") or []
++    hit = _BY_N_CACHE.get(id(view))
++    if hit and hit[0] is lines:
++        return hit[1]
++    by_n = {int(x["n"]): x for x in lines}
++    _BY_N_CACHE.clear()
++    _BY_N_CACHE[id(view)] = (lines, by_n)
++    return by_n
++
++
+ def _text(line: dict) -> str:
+     return str(line.get("text") or "")
+ 
+@@ -356,7 +372,7 @@ def _doc_latin(view: dict | None) -> set[str]:
      """Латинские слова документа (в нижнем регистре, и целиком, и частями camelCase)."""
      if not view:
          return set()
@@ -11,3 +34,282 @@ index d2fd8e9c..3d69663a 100644
      hit = _LAT_VOCAB_CACHE.get(id(view))
      if hit and hit[0] is lines:
          return hit[1]
+@@ -440,7 +456,7 @@ def _clamp_range(item: dict, n_max: int) -> tuple[int, int]:
+ 
+ 
+ def _first_content_line(view: dict, a: int, b: int) -> int:
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     for n in range(a, b + 1):
+         if n in by_n and not is_trivial(_text(by_n[n])):
+             return n
+@@ -452,7 +468,7 @@ def normalize_requirement(view: dict, r: dict) -> dict | None:
+     lines = _lines(view)
+     if not lines:
+         return None
+-    by_n = {int(x["n"]): x for x in lines}
++    by_n = _by_n(view)
+     n_max = max(by_n)
+     a, b = _clamp_range(r, n_max)
+     quote = str(r.get("quote") or "").strip()
+@@ -621,7 +637,7 @@ _SID_SEP = re.compile(r"^(?:,\s+|:\s+|\.\s+|\s+[—–-]\s+|\s+›\s+|\s+)")
+ 
+ def _heading_texts(view: dict) -> list[str]:
+     """Названия разделов документа (с номером и без), длинные первыми."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     heads: set[str] = set()
+     for n in heading_lines(view):
+         t = re.sub(r"\s+", " ", _MD_DECOR.sub("", _text(by_n.get(n) or {}))).strip().rstrip(":")
+@@ -672,7 +688,7 @@ def _strip_heading_prefix(sid: str, parts: list[str], heads: list[str]) -> str:
+ def _lead_status_code(view: dict, r: dict) -> str | None:
+     """Код ответа, с которого начинается требование: строка таблицы с кодом в первой ячейке или пункт
+     «**404.** Ответ…», «Ответ 200: …», если в пункте нет других кодов. Иначе None."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     a, b = int(r["line_start"]), int(r["line_end"])
+     t = _MD_DECOR.sub("", _text(by_n.get(_first_content_line(view, a, b)) or {})).strip()
+     t = re.sub(r"^\s*(?:[-*•]\s+|\|\s*)", "", t)
+@@ -698,7 +714,7 @@ _GLOSSARY_WORDS = ("термин", "глоссар", "определени", "п
+ def _own_id(view: dict, r: dict) -> str | None:
+     """Собственный номер пункта из самого документа: «Ф-1.» в начале пункта или «ФТ-01» в первой ячейке строки
+     таблицы. Им source_id задаётся всегда — что бы ни написала модель («Функциональные требования, п. 1»)."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     t = _MD_DECOR.sub("", _text(by_n.get(_first_content_line(view, int(r["line_start"]), int(r["line_end"])))
+                                 or {})).strip()
+     t = re.sub(r"^\s*(?:[-*•]\s+|\|\s*)", "", t)
+@@ -770,7 +786,7 @@ def _heading_item_id(view: dict, r: dict, requirements: list[dict], parts: list[
+     m = _HEAD_ITEM_ID.match(_strip_num(parts[-1]))
+     if not m:
+         return ""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     first = by_n.get(int(r["line_start"])) or {}
+     if first.get("kind") == "list_item" or _is_row(_text(first)) or re.match(r"^\s*[-*•]\s", _text(first)):
+         return ""
+@@ -815,7 +831,7 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
+     * «Статус N» снимается, если требование описывает несколько кодов ответа.
+     """
+     from collections import Counter
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     fmt = str(view.get("format") or "").lower()
+     starts = Counter(int(r["line_start"]) for r in requirements)
+     doc_heads = _heading_texts(view)
+@@ -900,7 +916,7 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
+ 
+ def extend_table_requirements(view: dict, requirements: list[dict], uncovered: list[int]) -> tuple[list[dict], list[int]]:
+     """Непокрытая строка таблицы сразу под многострочным требованием-таблицей (паспорт метода) — его хвост."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     rest = []
+     for n in sorted(uncovered):
+         if not _is_row(_text(by_n.get(n) or {})):
+@@ -920,7 +936,7 @@ def extend_table_requirements(view: dict, requirements: list[dict], uncovered: l
+ 
+ def merge_same_source_ids(requirements: list[dict], view: dict) -> list[dict]:
+     """Соседние требования с одним непустым source_id (часть пункта пришла из дозапроса) — одно требование."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     out: list[dict] = []
+     for r in sorted(requirements, key=lambda x: (x["line_start"], x["line_end"])):
+         prev = out[-1] if out else None
+@@ -939,7 +955,7 @@ def merge_paragraph_lines(view: dict, requirements: list[dict]) -> list[dict]:
+ 
+     Склеиваются только обычные абзацы без своего ID (не пункты списка, не строки таблицы, не коды ответа):
+     перечень кодов «**200.** …» / «**400.** …» — тоже один абзац Markdown, но по требованию на код."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     out: list[dict] = []
+     for r in sorted(requirements, key=lambda x: (x["line_start"], x["line_end"])):
+         prev = out[-1] if out else None
+@@ -959,7 +975,7 @@ def merge_paragraph_lines(view: dict, requirements: list[dict]) -> list[dict]:
+ 
+ def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
+     """Требование из голого кода ответа («404» под фразой «…возвращается 404…») склеивается с соседом выше."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     out: list[dict] = []
+     for r in sorted(requirements, key=lambda x: (x["line_start"], x["line_end"])):
+         code = _text(by_n.get(int(r["line_start"])) or {}).strip().strip("*").strip().rstrip(".")
+@@ -1003,7 +1019,7 @@ def absorb_bare_code_blocks(view: dict, requirements: list[dict], excluded: list
+     стоит сразу за требованием (между ними — только пустые строки, не больше двух) и состоит из голого кода, уже
+     названного в требовании, и строк кода (тело, JSON). Заголовков внутри блока нет."""
+     headings = headings or set()
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+ 
+     def content(a: int, b: int) -> list[int]:
+         return [n for n in range(a, b + 1) if not is_trivial(_text(by_n.get(n) or {}))]
+@@ -1048,7 +1064,7 @@ def split_status_lists(view: dict, requirements: list[dict]) -> list[dict]:
+     """Перечень кодов ответа, который читатель DOCX/PDF отдал одной строкой («200. Ответ… 400. Ответ…» — в MD это
+     отдельные строки), — по требованию «Статус N» на каждый код, как в MD: на одной строке несколько требований
+     со своими цитатами. Строка таблицы и пункт, где код один, не меняются."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     out: list[dict] = []
+     for r in requirements:
+         a, b = int(r["line_start"]), int(r["line_end"])
+@@ -1074,7 +1090,7 @@ def split_status_lists(view: dict, requirements: list[dict]) -> list[dict]:
+ def status_item_quotes(view: dict, requirements: list[dict]) -> list[dict]:
+     """Цитата «Статус N» на строке с несколькими кодами — пункт этого кода («404. Ответ в случае…»), а не начало
+     строки («200. Ответ…»): иначе в отчёте у кода 404 цитата про 200. Цитата не выходит за свою строку view."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     for r in requirements:
+         m = _STATUS_SID.fullmatch(r.get("source_id") or "")
+         if not m:
+@@ -1150,7 +1166,7 @@ def acceptance_summaries(view: dict, requirements: list[dict]) -> list[dict]:
+     написал «Покупка 31 января учитывается в январе» к строке, где счётчик растёт в феврале, — а строка приёмки
+     чаще всего и есть место противоречия. Длинная ячейка (> 60 знаков) — формулировка модели остаётся."""
+     lines = _lines(view)
+-    by_n = {int(x["n"]): x for x in lines}
++    by_n = _by_n(view)
+     heads = sorted(table_header_lines(view))
+     for r in requirements:
+         a = int(r["line_start"])
+@@ -1181,7 +1197,7 @@ def settle_kinds(view: dict, requirements: list[dict]) -> list[dict]:
+     серьёзность у набора №09: цель и нефункциональное — «мягкие»):
+     * раздел «Нефункциональные требования» или номер NFR-/НФТ- — nonfunctional (haiku давал data, constraint);
+     * «цель» у пункта со своим номером вне раздела цели («US-1. Как клиент, я хочу…») — functional."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     for r in requirements:
+         first = by_n.get(int(r["line_start"])) or {}
+         tail = _strip_num(_section_tail(first)).lower()
+@@ -1233,7 +1249,7 @@ _CODEISH = re.compile(r"^\s*[\[{<]|^\s*(curl|GET|POST|PUT|DELETE|PATCH)\s", re.I
+ 
+ def fill_gaps(view: dict, requirements: list[dict], excluded: list[dict], uncovered: list[int]) -> tuple[list, list]:
+     """Последний рубеж покрытия: непокрытые строки становятся требованиями без номера или примерами."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     new_r, new_e = [], []
+     for n in uncovered:
+         t = _text(by_n[n])
+@@ -1306,7 +1322,7 @@ def auto_exclude(view: dict, uncovered: list[int]) -> tuple[list[dict], list[int
+     if not uncovered:
+         return [], []
+     headers = table_header_lines(view)
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     excl, rest = [], []
+     for n in uncovered:
+         t = _text(by_n[n])
+@@ -1432,7 +1448,7 @@ def _system(ctx: Any) -> str:
+ def build_user(view: dict, start: int, end: int, task: str, total: int | None = None) -> str:
+     head = ""
+     if total and (start > 1 or end < total):
+-        by_n = {int(x["n"]): x for x in _lines(view)}
++        by_n = _by_n(view)
+         sec = str((by_n.get(start) or {}).get("section") or "")
+         where = f" Раздел в начале фрагмента: «{sec}»." if sec else ""
+         head = f"Фрагмент документа: строки {start}–{end} из {total}.{where} Разбери только эти строки.\n"
+@@ -1492,7 +1508,7 @@ def section_blocks(view: dict, start: int, end: int) -> list[tuple[int, int]]:
+ 
+ 
+ def _followup_text(view: dict, uncovered: list[int]) -> str:
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     rows = []
+     for n in uncovered[:FOLLOWUP_MAX_LINES]:
+         x = by_n[n]
+@@ -1747,7 +1763,7 @@ _KV_HEADER = re.compile(r"^(поле|параметр|атрибут|field|name|
+ 
+ def _collapse_key_value_tables(view: dict, reqs: list[dict]) -> list[dict]:
+     """Таблица «поле | значение» (паспорт метода) — одно требование на таблицу, как в промпте."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     headers = [n for n in sorted(table_header_lines(view)) if _KV_HEADER.match(_text(by_n[n]).strip().strip("|").strip())]
+     if not headers:
+         return reqs
+@@ -1836,7 +1852,7 @@ def _trim_table_header(r: dict, view: dict, headers: set[int]) -> dict:
+     a, b = _int(r.get("line_start"), 0), _int(r.get("line_end"), 0)
+     if a not in headers or b <= a:
+         return r
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     nxt = next((n for n in range(a + 1, b + 1) if not is_trivial(_text(by_n.get(n) or {}))), None)
+     if nxt is None or not _is_row(_text(by_n.get(nxt) or {})):
+         return r
+@@ -1851,7 +1867,7 @@ def _trim_edges(r: dict, view: dict, headings: set[int]) -> dict:
+     a, b = _int(r.get("line_start"), 0), _int(r.get("line_end"), 0)
+     if a <= 0 or b <= a:
+         return r
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     triv = lambda n: is_trivial(_text(by_n.get(n) or {}))  # noqa: E731
+     a0, b0 = a, b
+     while a < b and triv(a):
+@@ -1888,7 +1904,7 @@ def promote_response_bodies(view: dict, requirements: list[dict],
+                             excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+     """Абзац «Ответ 200: {…}» — описание ответа метода (часто единственное), а не пример к другому требованию:
+     всегда требование без номера. Модели решают это по-разному (haiku исключает, sonnet выделяет)."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     covered = _covered(requirements)
+     new = []
+     for e in excluded:
+@@ -1919,7 +1935,7 @@ def promote_body_descriptions(view: dict, requirements: list[dict],
+     """Описание тела запроса («Content-Type: application/json.», «Тело не используется.») под заголовком
+     «Request body» — требование без номера (промпт, тип api). Модели решают по-разному: haiku выделяет,
+     sonnet иногда исключает как «описание тела запроса»."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     covered = _covered(requirements)
+     new = []
+     for e in excluded:
+@@ -1966,7 +1982,7 @@ def demote_open_questions(view: dict, requirements: list[dict],
+                           excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+     """Пункт раздела «Открытые вопросы» с вопросом («Нужно ли SMS-напоминание?») — не требование: в excluded
+     (haiku исключает, sonnet и офлайн-нарезка выделяли)."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     keep, moved = [], []
+     for r in requirements:
+         a, b = int(r["line_start"]), int(r["line_end"])
+@@ -1989,7 +2005,7 @@ def demote_non_requirements(view: dict, requirements: list[dict],
+                             excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+     """То, что модели то выделяют, то исключают, код решает одинаково: заглушка («Не предъявляются.») и пункт
+     раздела «Общие сведения» без обязательства (наименование системы, основание, сроки) — в excluded."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     keep, moved = [], []
+     for r in requirements:
+         a, b = int(r["line_start"]), int(r["line_end"])
+@@ -2034,7 +2050,7 @@ def injection_lines(view: dict) -> set[int]:
+         injection.run(doc, out)
+     except Exception:  # noqa: BLE001 — без детектора нарезка как раньше
+         return set()
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     hits = {int(s["line"]) for s in out["signals"]}
+     for c in out["candidates"]:
+         hits.update(int(e["line"]) for e in c.get("evidence") or [] if isinstance(e.get("line"), int))
+@@ -2048,7 +2064,7 @@ def demote_injections(view: dict, requirements: list[dict],
+     inj = injection_lines(view)
+     if not inj:
+         return requirements, excluded
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     keep, moved = [], []
+     for r in requirements:
+         a, b = int(r["line_start"]), int(r["line_end"])
+@@ -2067,7 +2083,7 @@ def demote_injections(view: dict, requirements: list[dict],
+ def demote_examples(view: dict, requirements: list[dict], excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+     """Абзац «Пример ответа: {…}» при уже выделенных строках того же раздела (таблица полей ответа) — пример к ним,
+     а не требование: в excluded. Единственное описание ответа (других требований в разделе нет) остаётся."""
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     keep, moved = [], []
+     for r in requirements:
+         a, b = int(r["line_start"]), int(r["line_end"])
+@@ -2092,7 +2108,7 @@ def _heading_only(r: dict, view: dict, headings: set[int]) -> bool:
+     не считаются: первый склеит `merge_bare_codes`, второе — требование, оформленное заголовком.
+     """
+     a, b = _int(r.get("line_start"), 0), _int(r.get("line_end"), 0)
+-    by_n = {int(x["n"]): x for x in _lines(view)}
++    by_n = _by_n(view)
+     # номера строк от модели — не дальше документа: line_end = 10**9 иначе даёт миллиард итераций (минуты)
+     a, b = max(a, min(by_n, default=1)), min(b, max(by_n, default=0))
+     content = [n for n in range(a, b + 1) if not is_trivial(_text(by_n.get(n) or {}))]
