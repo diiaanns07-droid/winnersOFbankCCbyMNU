@@ -247,6 +247,26 @@ def test_coverage_severity_from_share_of_checked_requirements():
     assert lens_qa.postprocess({"candidates": [cover]})["candidates"][0]["severity"] == "major"
 
 
+def test_verifiability_severity_numeric_target_and_goals():
+    """Проверяемость: числовой норматив без условий замера и цель продукта — minor; размытые слова — major."""
+    reqs = [{"id": "R-01", "kind": "goal", "line_start": 5, "line_end": 5},
+            {"id": "R-02", "kind": "nonfunctional", "line_start": 20, "line_end": 20}]
+    base = {"title": "НФТ", "problem": "p", "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "",
+            "question": "", "blocks": "testing", "severity": "major", "kind": "unverifiable", "criterion": "verifiable",
+            "requirement_ids": ["R-02"]}
+
+    def sev(quote, line=20, ids=("R-02",)):
+        c = dict(base, evidence=[{"quote": quote, "line": line}], requirement_ids=list(ids))
+        return lens_qa.postprocess({"candidates": [c]}, reqs)["candidates"][0]["severity"]
+
+    assert sev("Методы отвечают не дольше 2 с для 95 % запросов.") == "minor"
+    assert sev("Ответ приходит мгновенно.") == "major"
+    assert sev("Ответ быстрый, доступность 99,9 %.") == "major"  # размытое слово рядом с числом
+    assert sev("Сообщение отправляется в течение минуты после события.") == "major"
+    assert sev("Снизить число ошибок.", line=5, ids=("R-01",)) == "minor"  # цель продукта
+    assert sev("Снизить число ошибок.", line=20, ids=("R-01",)) == "major"  # цитата из НФТ — не только цель
+
+
 @pytest.mark.parametrize("model", ["sonnet", "haiku"])
 def test_official_coverage_stays_major(model):
     """Официальный документ: 3 строки приёмки на 11 функциональных требований — набор неполон, major."""

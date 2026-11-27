@@ -9,7 +9,8 @@
 
 Код (:func:`postprocess`) превращает ``conflict`` в critical-кандидата с цитатами правила и строки,
 ``undefined`` — в major, убирает дубли модели по тем же строкам, нумерует тест-кейсы ``T-01…`` и
-отмечает строки приёмки, которые модель пропустила.
+отмечает строки приёмки, которые модель пропустила. Серьёзность замечаний о покрытии приёмкой и о
+проверяемости код уточняет по фактам (доля проверенных функциональных требований; числовой норматив в цитате).
 """
 from __future__ import annotations
 
@@ -438,6 +439,36 @@ def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs:
             c["problem"] = f"{c['problem']} {fact}".strip()
 
 
+# Норматив задан числом с единицей (время, доля, частота) — требование проверяемо, не хватает только условий
+# замера (нагрузка, точка отсчёта, окно выборки): это уточнение, minor. Размытые слова без числа — major.
+_NUMERIC_TARGET = re.compile(r"\d[\d\s]*(?:[.,]\d+)?\s*(?:%|мс\b|с\b|сек|минут|мин\b|час|ч\b|сут|дн|раз\b|раза\b|запрос)",
+                             re.I)
+_VAGUE = re.compile(r"быстр|мгновенн|моментальн|своевременн|оперативн|удобн|понятн|всегда|как можно|по возможности|"
+                    r"высок\w* нагрузк|надёжн|надежн", re.I)
+
+
+def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) -> None:
+    """Серьёзность замечания о проверяемости: ``minor``, если (а) оно только о целях продукта (цель не
+    тестируется напрямую — её проверяют через требования), или (б) в цитатах есть числовой норматив и нет
+    размытых слов — тест написать можно, не хватает условий замера. Иначе — как у модели (major)."""
+    kinds = {r.get("id"): r.get("kind") for r in reqs}
+
+    def kinds_at(line: int | None) -> set:
+        return {r.get("kind") for r in reqs if line and (r.get("line_start") or 0) <= line <= (r.get("line_end") or 0)}
+
+    for c in cands:
+        if c.get("kind") != "unverifiable" or c["severity"] == "minor":
+            continue
+        ids = [i for i in c["requirement_ids"] if i in kinds]
+        cited = set().union(*(kinds_at(e.get("line")) for e in c["evidence"])) if c["evidence"] else set()
+        only_goals = bool(ids) and all(kinds[i] == "goal" for i in ids) and cited <= {"goal"}
+        quotes = [e["quote"] for e in c["evidence"]]
+        measured = any(_NUMERIC_TARGET.search(q) for q in quotes) and not any(_VAGUE.search(q) for q in quotes)
+        if only_goals or measured:
+            c.setdefault("severity_hint", c["severity"])
+            c["severity"] = "minor"
+
+
 def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None) -> dict:
     """Ответ модели → ``{"candidates", "acceptance_checks", "test_cases", "warnings"}``.
 
@@ -481,6 +512,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
     kept, dropped = limit_other_candidates(kept)
     calibrate_coverage(kept, checks, reqs)
+    calibrate_verifiability(kept, reqs)
     if len(kept) > MAX_MODEL_CANDIDATES:
         warnings.append(f"{STAGE}: кандидатов модели {len(kept)}, оставлено {MAX_MODEL_CANDIDATES}")
         rank = {"critical": 0, "major": 1, "minor": 2}
