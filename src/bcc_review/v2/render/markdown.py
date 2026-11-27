@@ -1338,7 +1338,8 @@ def _segmentation(c: _Ctx) -> list[str]:
     rows = []
     qlen = 70 if c.level < 3 else 45
     for q in reqs:
-        rows.append([f"<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}", cell(q.get("source_id") or "—"),
+        # «Критерии приемки, строка 1» → «критерий приёмки №1»: «строка» в отчёте — всегда строка документа
+        rows.append([f"<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}", cell(doc_label(q) or q.get("source_id") or "—"),
                      REQ_KIND.get(q.get("kind"), cell(q.get("kind"))), cell(q.get("summary")),
                      quote_md(q.get("quote"), qlen, in_table=True) if q.get("quote") else "—", cell(place(q))])
     out += table(["ID в отчёте", "ID в документе", "Вид", "Краткая формулировка", "Цитата", "Где"], rows)
@@ -1572,10 +1573,15 @@ def _and_list(items: list[str]) -> str:
 def _card_places(c: _Ctx, f: dict) -> list[str]:
     """Места и цитаты карточки: цитаты из одного пункта документа — одной строкой («Часть B › Общие параметры,
     строки 104 и 109: «…» · «…»»), чтобы пять цитат одного раздела не занимали пять строк."""
-    prefer = f.get("requirement_ids") or []
+    return _places(c, f.get("evidence") or [], f.get("requirement_ids") or [])
+
+
+def _places(c: _Ctx, evidence: list, prefer, one_limit: int = CARD_QUOTE, many_limit: int = 90) -> list[str]:
     groups: dict[str, list[dict]] = {}
     loose: list[dict] = []
-    for ev in f.get("evidence") or []:
+    for ev in evidence:
+        if not isinstance(ev, dict):
+            continue
         label = c.ev_label(ev, prefer) if isinstance(ev.get("line_start"), int) else ""
         if label:
             groups.setdefault(label, []).append(ev)
@@ -1589,15 +1595,15 @@ def _card_places(c: _Ctx, f: dict) -> list[str]:
     out = []
     for label, evs in groups.items():
         if len(evs) == 1:
-            out.append(f"{esc(c.ev_place(evs[0], prefer))}: {one(evs[0], CARD_QUOTE)}")
+            out.append(f"{esc(c.ev_place(evs[0], prefer))}: {one(evs[0], one_limit)}")
             continue
         evs = sorted(evs, key=lambda e: e["line_start"])
         lns = list(dict.fromkeys(e["line_start"] for e in evs))
         pages = list(dict.fromkeys(e.get("page") for e in evs if e.get("page")))
         where = (f"с. {', '.join(map(str, pages))}, " if pages else "") + (
             f"{plural(len(lns), 'строка', 'строки', 'строки')} {_and_list(lns)}")
-        out.append(f"{esc(label)}, {where}: " + " · ".join(one(e, 90) for e in evs))
-    out += [f"{esc(c.ev_place(ev, prefer))}: {one(ev, CARD_QUOTE)}" for ev in loose]
+        out.append(f"{esc(label)}, {where}: " + " · ".join(one(e, many_limit) for e in evs))
+    out += [f"{esc(c.ev_place(ev, prefer))}: {one(ev, one_limit)}" for ev in loose]
     return out
 
 
@@ -2013,8 +2019,7 @@ def _appendix_questions(c: _Ctx) -> list[str]:
         evs = [e for e in q.get("evidence") or [] if isinstance(e, dict) and e.get("quote")]
         if evs:
             prefer = [r for fid in q.get("finding_ids") or [] for r in (c.f_by_id.get(fid) or {}).get("requirement_ids") or []]
-            lines.append("Где: " + "; ".join(f"{esc(c.ev_place(e, prefer))}: {quote_md(e.get('quote'), 90)}"
-                                             for e in evs[:3]))
+            lines.append("Где: " + "; ".join(_places(c, evs[:3], prefer, 90, 70)))
         opts = [o for o in q.get("options") or [] if str(o).strip()]
         tail = []
         if q.get("why"):
