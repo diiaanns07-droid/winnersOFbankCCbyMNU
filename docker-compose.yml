@@ -12,7 +12,8 @@ services:
       - -c
       - BCC_AGENT_COMMIT="$${BCC_AGENT_COMMIT:-$$(cat /app/AGENT_COMMIT)}" exec python -m bcc_review.v2.web "$$@"
       - bcc-review-web
-    command: ["--host", "0.0.0.0", "--port", "8014", "--data-dir", "/app/.bcc_web"]
+    # без знакомства в терминале: у `docker compose up` нет ввода — ключ спросит браузер (или он уже в .env)
+    command: ["--host", "0.0.0.0", "--port", "8014", "--data-dir", "/app/.bcc_web", "--no-tty"]
     ports:
       - "127.0.0.1:8014:8014"
     env_file:

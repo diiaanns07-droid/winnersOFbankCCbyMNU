@@ -13,8 +13,25 @@ export PYTHONUTF8=1 PYMUPDF_SUGGEST_LAYOUT_ANALYZER=0 PIP_DISABLE_PIP_VERSION_CH
 # код агента — из этой копии (без `pip install -e .`: ему нужен setuptools из интернета)
 export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
-say() { printf '%s\n' "$*"; }
-fail() { printf '%s\n' "$*" >&2; exit 1; }
+# Экран: в терминале — одна тихая строка, которая обновляется на месте; в журнале (не терминал) — обычные строки
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
+  TTY=1 DIM=$'\033[38;5;245m' RED=$'\033[38;5;167m' OFF=$'\033[0m' CLR=$'\r\033[K'
+  printf '\033]0;BCC Review\007'   # заголовок окна терминала
+else
+  TTY=0 DIM="" RED="" OFF="" CLR=""
+fi
+COLS="$( (tput cols) 2>/dev/null || echo 80)"
+case "$COLS" in ''|*[!0-9]*) COLS=80 ;; esac
+
+status() {  # строка состояния: в терминале — поверх прежней, без переноса
+  if [ "$TTY" = 1 ]; then
+    text="$*"
+    [ "$COLS" -lt 80 ] && text="${text:0:$((COLS - 1))}"
+    printf '%s%s%s%s' "$CLR" "$DIM" "$text" "$OFF"
+  fi
+}
+say() { printf '%s%s%s%s\n' "$CLR" "$DIM" "$*" "$OFF"; }
+fail() { printf '%s' "$CLR"; printf '%s%s%s\n' "$RED" "$*" "$OFF" >&2; exit 1; }
 
 os="$(uname -s 2>/dev/null || echo unknown)"
 if [ "$os" = "Darwin" ]; then
@@ -32,7 +49,7 @@ good_python() {  # $1 — команда; 0, если это Python 3.11–3.15
 
 PY="$ROOT/.venv/bin/python"
 if [ -e .venv ] && ! "$PY" -c 'import sys' >/dev/null 2>&1; then
-  say "Окружение .venv повреждено или создано другим Python — создаю заново."
+  say "BCC Review · окружение .venv повреждено или создано другим Python — создаю заново"
   rm -rf .venv
 fi
 
@@ -53,7 +70,8 @@ if [ ! -x "$PY" ]; then
     fi
   fi
   ver="$("$base" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
-  say "Создаю окружение .venv (Python $ver)…"
+  if [ "$TTY" = 1 ]; then status "BCC Review · первый запуск: создаю окружение (Python $ver)"
+  else say "BCC Review · первый запуск: создаю окружение .venv (Python $ver)"; fi
   if ! "$base" -m venv .venv >/dev/null 2>"$ROOT/.venv-error.log"; then
     rm -rf .venv
     cat "$ROOT/.venv-error.log" >&2
@@ -69,18 +87,30 @@ stamp=".venv/.bcc-req"
 if [ ! -f "$stamp" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$want" ]; then
   log=".venv/pip.log"
   t0=$(date +%s)
-  "$PY" -m pip install -q -r requirements.txt >"$log" 2>&1 &
+  [ "$TTY" = 1 ] || say "BCC Review · первый запуск: ставлю зависимости (1–3 минуты)"
+  "$PY" -m pip install -r requirements.txt >"$log" 2>&1 &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
-    printf '\rУстанавливаю зависимости (только при первом запуске, 1–3 минуты)… %s с ' "$(( $(date +%s) - t0 ))"
+    if [ "$TTY" = 1 ]; then
+      # какой пакет сейчас: последняя строка pip «Collecting …» / «Downloading …»
+      step="$(grep -E '^(Collecting |[[:space:]]*Downloading |Installing collected|Successfully installed)' "$log" 2>/dev/null | tail -n 1)"
+      case "$step" in
+        Collecting*) step="$(printf '%s' "$step" | sed -E 's/^Collecting ([A-Za-z0-9_.-]+).*/\1/')" ;;
+        *Downloading*) step="$(printf '%s' "$step" | sed -E 's/^ *Downloading ([A-Za-z0-9_.]+)-[0-9].*/\1/')" ;;
+        Installing*) step="раскладываю пакеты" ;;
+        Successfully*) step="почти готово" ;;
+        *) step="" ;;
+      esac
+      status "BCC Review · первый запуск: ставлю зависимости${step:+ · ${step:0:28}} · $(( $(date +%s) - t0 )) с"
+    fi
     sleep 1
   done
   if ! wait "$pid"; then
-    printf '\n'
-    tail -n 25 "$log" >&2
+    printf '%s' "$CLR"
+    if grep -qE 'ERROR|error:' "$log"; then grep -E 'ERROR|error:' "$log" | tail -n 15 >&2; else tail -n 15 "$log" >&2; fi
     fail "Установка зависимостей не удалась (полный журнал: .venv/pip.log). Проверьте интернет и запустите ./start.sh ещё раз."
   fi
-  printf '\rЗависимости установлены за %s с.%40s\n' "$(( $(date +%s) - t0 ))" ""
+  say "BCC Review · зависимости установлены за $(( $(date +%s) - t0 )) с"
   printf '%s' "$want" > "$stamp"
 fi
 

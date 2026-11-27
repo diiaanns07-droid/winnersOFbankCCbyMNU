@@ -134,7 +134,7 @@ def test_start_sh_installs_once_then_skips_pip(tmp_path):
     r = _run_start(d, "--check")
     assert r.returncode == 0, r.stderr
     calls = log.read_text().splitlines()
-    assert any(c.startswith("-m pip install -q -r requirements.txt") for c in calls), calls
+    assert any(c.startswith("-m pip install -r requirements.txt") for c in calls), calls
     assert calls[-1] == "-m bcc_review.v2.web --open --check"
     want = hashlib.sha256((d / "requirements.txt").read_bytes() + (d / "constraints.txt").read_bytes()).hexdigest()
     assert (d / ".venv" / ".bcc-req").read_text() == want
@@ -144,7 +144,7 @@ def test_start_sh_installs_once_then_skips_pip(tmp_path):
     assert r.returncode == 0, r.stderr
     calls = log.read_text().splitlines()
     assert not any("pip" in c for c in calls), f"повторный запуск снова звал pip: {calls}"
-    assert "Устанавливаю зависимости" not in r.stdout
+    assert "ставлю зависимости" not in r.stdout
 
     with open(d / "constraints.txt", "a", encoding="utf-8") as f:  # изменились версии — ставим заново
         f.write("\n# new\n")
@@ -456,7 +456,7 @@ def test_docker_compose():
     yaml = pytest.importorskip("yaml")
     svc = yaml.safe_load(text)["services"]["web"]
     assert svc["ports"] == ["127.0.0.1:8014:8014"]
-    assert svc["command"][:2] == ["--host", "0.0.0.0"] and "8014" in svc["command"]
+    assert svc["command"][:2] == ["--host", "0.0.0.0"] and "8014" in svc["command"] and "--no-tty" in svc["command"]
     assert "python -m bcc_review.v2.web" in " ".join(svc["entrypoint"])
     assert svc["env_file"] == [{"path": ".env", "required": False}], "без .env compose не должен падать"
 
