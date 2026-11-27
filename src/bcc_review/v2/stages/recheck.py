@@ -115,6 +115,20 @@ _SENT = re.compile(r"(?<=[.!?;])\s+")
 _BUT = re.compile(r",?\s+(?:но|однако|а)\s+(?=[а-яё])", re.I)
 
 
+def _opt_key(s: str) -> str:
+    s = re.sub(r"^\s*(?:\*\*)?[A-DА-Г1-4](?:\*\*)?\s*[).:—-]\s+", "", str(s or ""))  # «B) …», «Б — …»
+    return re.sub(r"[\s.;,!]+$", "", _cl._norm(s))
+
+
+def _option_index(text: str, options: list) -> int | None:
+    """Номер варианта, если текст ответа совпадает с текстом варианта (без учёта регистра, кавычек, точки)."""
+    key = _opt_key(text)
+    if len(key) < 3:
+        return None
+    hits = [i for i, o in enumerate(options) if _opt_key(str(o)) == key]
+    return hits[0] if len(hits) == 1 else None
+
+
 def _soft(part: str) -> bool:
     """Предложение не задаёт правила: откладывает решение или отсылает к «как обычно», «по ситуации»."""
     return bool(_DEFER.search(part) or _VAGUE.search(part))
@@ -242,12 +256,18 @@ def parse_answers_json(data: Any) -> dict:
                 add(qid, v)
             return
         if isinstance(val, dict):
-            choice = val.get("choice", val.get("option"))
             text = str(val.get("text") or val.get("answer") or "")
             comment = str(val.get("comment") or "")
             topic = str(val.get("topic") or "")
+            idx = val.get("option_index")
+            if isinstance(idx, int) and not isinstance(idx, bool) and idx >= 0:
+                # веб-демо №14 (``bcc-review/answers-1``): номер варианта с нуля; свой текст — оговорка к нему
+                answers.append({"id": _qid(qid), "topic_hint": topic, "choice": idx, "text": "",
+                                "comment": (text + " " + comment).strip()})
+                return
+            choice = val.get("choice", val.get("option"))
             parsed = _parse_value(str(choice)) if choice not in (None, "") else _parse_value(text)
-            if choice not in (None, "") and text and parsed["choice"] is not None:
+            if choice not in (None, "") and text:  # «option» — буква или текст варианта, «text» — оговорка
                 comment = (comment + " " + text).strip()
             answers.append({"id": _qid(qid), "topic_hint": topic, "choice": parsed["choice"],
                             "text": parsed["text"], "comment": (parsed["comment"] + " " + comment).strip()})
@@ -444,6 +464,10 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         else:
             text, deferred = split_deferred(a.get("text", ""))
             label = ""
+            # владелец скопировал текст варианта вместо буквы — это выбор варианта, а не «свой ответ»
+            pick = _option_index(text, q.get("options") or [])
+            if pick is not None:
+                text, label = q["options"][pick], _cl.option_label(pick)
         # свой текст уже разобран по предложениям (split_deferred); «как обычно» в варианте модели — не правило
         if not text or (label and _VAGUE.search(text)) or len(text) < 3:
             why = "откладывает решение" if deferred else "не задаёт правила"
@@ -454,6 +478,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         comment, later = split_deferred(a.get("comment") or "")
         if a.get("comment") and not comment and not later:
             comment = a["comment"]
+        if comment and _opt_key(comment) == _opt_key(text):  # «B) 48 часов» — оговорка повторяет сам вариант
+            comment = ""
         # «Б, но что после срока — решим позже»: буква — правило, отложенная оговорка — не правило
         deferred = deferred + [re.sub(r"^(?:но|однако|а)\s+", "", x, flags=re.I) for x in later]
         full = text + (f" ({comment})" if comment else "")

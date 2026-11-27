@@ -431,3 +431,38 @@ def test_vague_sentence_keeps_rule_part():
                                   "Статус платежа неизвестен — возвращаем 202 и опрашиваем процессинг."])
 def test_rules_near_soft_words_stay(rule):
     assert recheck.split_deferred(rule) == (rule, [])
+
+
+# --------------------------------------------------------------------------- текст варианта вместо буквы
+def test_option_text_is_recognized_as_choice():
+    a = recheck.resolve_answers(QS, recheck.load_answers("Q-03: 48 часов.\n"))["answered"][0]
+    assert a["choice"] == "B" and a["answer"] == "48 часов"
+
+
+def test_two_addressees_pasting_different_options_conflict():
+    resp = _resp([{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "срок задан"}])
+    text = "Q-03: 24 часа\nQ-03: B) 48 часов\n"
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), text)["clarification"]
+    ch = next(c for c in clar["changes"] if c["finding_id"] == "D-03")
+    assert ch["status"] == "open" and ch["answer_conflict"] == ["Q-03.1", "Q-03.2"]
+
+
+@pytest.mark.parametrize("item,choice,comment", [
+    ({"question_id": "Q-03", "option_index": 1, "option": "48 часов", "text": ""}, "B", ""),
+    ({"question_id": "Q-03", "option_index": 0, "text": "от первого запроса"}, "A", "от первого запроса"),
+    ({"question_id": "Q-03", "option": "48 часов", "text": "от первого запроса"}, "B", "от первого запроса"),
+])
+def test_web_answers_schema(item, choice, comment):
+    data = {"schema": "bcc-review/answers-1", "answers": [item]}
+    a = recheck.resolve_answers(QS, recheck.load_answers(data))["answered"][0]
+    assert a["choice"] == choice and a["answer"] == QS[2]["options"]["AB".index(choice)] + (f" ({comment})" if comment else "")
+
+
+def test_own_text_longer_than_option_stays_own():
+    a = recheck.resolve_answers(QS, recheck.load_answers("Q-03: 48 часов, но только для карт в тенге\n"))["answered"][0]
+    assert a["choice"] == "" and a["answer"].startswith("48 часов, но только")
+
+
+def test_letter_with_repeated_option_text_has_no_duplicate():
+    a = recheck.resolve_answers(QS, recheck.load_answers("Q-03: B) 48 часов\n"))["answered"][0]
+    assert a["answer"] == "48 часов"
