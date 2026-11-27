@@ -484,7 +484,7 @@ def _color_depth(stream: Any) -> int:
     return 24 if truecolor else 256
 
 
-_GREEN = ((0, 185, 117), 36)    # BCC Green #00B975 (256 цветов — ближайший)
+_GREEN = ((0, 133, 86), 29)     # BCC Green Strong #008556: читается и на белом терминале, и на тёмном
 _GOLD = ((220, 162, 98), 179)   # BCC Gold #DCA262
 _MUTED = ((139, 152, 165), 245)
 _RED = ((224, 95, 85), 167)
@@ -560,6 +560,20 @@ def _env_path() -> Path:
 _PROVIDER_ID = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 
 
+def _use_aishka(tty_agent: Any) -> None:
+    """Владелец, 20:25: в терминале — яркий AIshka (`aishka.py`), а не тёмный дрон. Пока `tty_agent` (№40) рисует
+    дрона, подставляем ему отрисовку AIshka (тот же вызов `render(name, mode, small=…)`). Перейдёт сам — пусть
+    объявит `MASCOT = "aishka"`, и подмена не нужна."""
+    if getattr(tty_agent, "MASCOT", "") == "aishka" or not hasattr(tty_agent, "render"):
+        return
+    try:
+        from . import aishka
+
+        tty_agent.render = aishka.render
+    except Exception:  # noqa: BLE001 — останется прежний рисунок, знакомство не ломаем
+        pass
+
+
 def _greet(port: int, root: Path) -> str:
     """№40 — BCC AI в терминале (`tty_agent.greet`): знакомство и ключ до браузера. Возвращает выбранного провайдера.
 
@@ -570,6 +584,7 @@ def _greet(port: int, root: Path) -> str:
         from . import tty_agent  # type: ignore[attr-defined]  # №40
     except ImportError:
         return ""
+    _use_aishka(tty_agent)
     try:
         got = tty_agent.greet(port, _env_path())
     except KeyboardInterrupt:

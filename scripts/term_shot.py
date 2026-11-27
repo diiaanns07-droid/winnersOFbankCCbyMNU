@@ -25,6 +25,13 @@ OTHER_ESC = re.compile(r"\x1b(\][^\x07]*\x07|\[[0-9;?]*[A-Za-z])")
 BASE16 = ["#0c0c0c", "#c50f1f", "#13a10e", "#c19c00", "#0037da", "#881798", "#3a96dd", "#cccccc",
           "#767676", "#e74856", "#16c60c", "#f9f1a5", "#3b78ff", "#b4009e", "#61d6d6", "#f2f2f2"]
 FG, BG = "#d7dee7", "#0e1420"
+# светлое окно, как «Basic» в Терминале macOS: белый лист, чернила, серые кнопки окна (без цветных «светофоров»)
+THEMES = {
+    "light": {"fg": "#1d1d1f", "bg": "#ffffff", "bar": "#f3f3f5", "bar_fg": "#6e6e73", "dot": "#d6d6db",
+              "line": "rgba(0,0,0,.08)", "page": "#f3f6f5"},
+    "dark": {"fg": FG, "bg": BG, "bar": "#1b2332", "bar_fg": "#9aa7b6", "dot": "#3a4556",
+             "line": "rgba(255,255,255,.06)", "page": "#e9edf1"},
+}
 
 
 def c256(n: int) -> str:
@@ -113,14 +120,15 @@ def to_html(screen: str) -> str:
 
 
 PAGE = """<!doctype html><meta charset="utf-8"><style>
-html,body{{margin:0;background:#e9edf1}}
-.win{{display:inline-block;margin:24px;border-radius:10px;overflow:hidden;background:{bg};
-  box-shadow:0 18px 50px rgba(11,18,32,.28),0 0 0 1px rgba(11,18,32,.18)}}
-.bar{{height:34px;display:flex;align-items:center;justify-content:center;position:relative;background:#1b2332;
-  color:#9aa7b6;font:600 13px/1 -apple-system,"Segoe UI",system-ui,sans-serif;letter-spacing:.01em}}
+html,body{{margin:0;background:{page}}}
+.win{{display:inline-block;margin:28px;border-radius:12px;overflow:hidden;background:{bg};
+  box-shadow:0 22px 60px rgba(15,40,65,.16),0 2px 8px rgba(15,40,65,.08),0 0 0 1px rgba(15,40,65,.10)}}
+.bar{{height:36px;display:flex;align-items:center;justify-content:center;position:relative;background:{bar};
+  border-bottom:1px solid {line};color:{bar_fg};font:600 13px/1 -apple-system,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  letter-spacing:.01em}}
 .dots{{position:absolute;left:14px;top:12px;display:flex;gap:8px}}
-.dots i{{width:11px;height:11px;border-radius:50%;background:#3a4556;display:block}}
-pre{{margin:0;padding:14px 18px 18px;color:{fg};font:15px/1.2 "DejaVu Sans Mono","Cascadia Mono",Menlo,Consolas,monospace;
+.dots i{{width:12px;height:12px;border-radius:50%;background:{dot};display:block}}
+pre{{margin:0;padding:16px 20px 20px;color:{fg};font:15px/1.2 "DejaVu Sans Mono","SF Mono",Menlo,Consolas,monospace;
   font-variant-ligatures:none;white-space:pre;width:{cols}ch}}
 </style><div class="win"><div class="bar"><span class="dots"><i></i><i></i><i></i></span>{title}</div><pre>{body}</pre></div>"""
 
@@ -157,6 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--send", help="после --until нажать клавиши (tmux send-keys), например Enter")
     ap.add_argument("--then", default="", help="после --send ждать эту строку и снимать уже её")
     ap.add_argument("--path", help="PATH внутри терминала (например, без claude — как у жюри)")
+    ap.add_argument("--theme", choices=sorted(THEMES), default="light", help="окно: light (как Терминал macOS) или dark")
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = argv[argv.index("--") + 1:] if "--" in argv else []
     a = ap.parse_args(argv[:argv.index("--")] if "--" in argv else argv)
@@ -166,14 +175,16 @@ def main(argv: list[str] | None = None) -> int:
     name = f"shot{os.getpid()}"
     shown = " ".join(cmd)
     inner = f"printf '%s%s\\n' {shlex_quote(a.prompt)} {shlex_quote(shown)}; {' '.join(shlex_quote(c) for c in cmd)}; sleep 3600"
-    extra = ["-e", f"PATH={a.path}"] if a.path else []
+    if a.path:  # «-e PATH=» tmux не всегда применяет — задаём в самой команде
+        inner = f"export PATH={shlex_quote(a.path)}; {inner}"
+    extra: list[str] = []
     tmux("new-session", "-d", "-s", name, "-x", str(a.cols), "-y", str(a.rows), "-c", str(Path(a.cwd).resolve()),
          "-e", "COLORTERM=truecolor", "-e", "LANG=C.UTF-8", *extra, "sh", "-c", inner)
 
     def wait_for(pattern: str) -> bool:
         end = time.monotonic() + a.timeout
         while time.monotonic() < end:
-            if re.search(pattern or r"\S", tmux("capture-pane", "-p", "-t", name)):
+            if re.search(pattern or r"\S", tmux("capture-pane", "-p", "-t", name), re.M):
                 time.sleep(a.settle)
                 return True
             time.sleep(0.3)
@@ -204,7 +215,8 @@ def _render(png: str, screen: str, a: argparse.Namespace) -> None:
     body = to_html(screen)
     with tempfile.TemporaryDirectory() as d:
         page = Path(d) / "term.html"
-        page.write_text(PAGE.format(bg=BG, fg=FG, cols=a.cols, title=html.escape(a.title), body=body), encoding="utf-8")
+        th = THEMES[a.theme]
+        page.write_text(PAGE.format(cols=a.cols, title=html.escape(a.title), body=body, **th), encoding="utf-8")
         js = Path(d) / "shot.js"
         js.write_text(NODE, encoding="utf-8")
         root = subprocess.run(["npm", "root", "-g"], capture_output=True, text=True).stdout.strip()

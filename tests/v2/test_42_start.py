@@ -262,9 +262,9 @@ def test_ready_line():
     busy = S._ready_line("http://127.0.0.1:8015/", "порт 8014 занят другой программой")
     assert busy == "Система открыта: http://127.0.0.1:8015 · порт 8014 занят другой программой · остановить — Ctrl+C"
     colored = S._ready_line("http://127.0.0.1:8014/", "", 24)
-    assert "\x1b[1;38;2;0;185;117mhttp://127.0.0.1:8014\x1b[0m" in colored  # адрес — BCC Green
+    assert "\x1b[1;38;2;0;133;86mhttp://127.0.0.1:8014\x1b[0m" in colored  # адрес — BCC Green Strong
     assert re.sub(r"\x1b\[[0-9;]*m", "", colored) == plain
-    assert "38;5;36m" in S._ready_line("http://127.0.0.1:8014/", "", 256)
+    assert "38;5;29m" in S._ready_line("http://127.0.0.1:8014/", "", 256)
 
 
 def test_no_color_when_not_a_terminal(monkeypatch):
@@ -494,3 +494,64 @@ def test_readme_quickstart_block():
 
 def test_web_data_dir_ignored():
     assert "/.bcc_web/" in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+
+# ── AIshka в терминале (владелец, 20:25: яркий маскот вместо тёмного дрона) ──
+
+def test_aishka_frames_size_and_moods():
+    from bcc_review.v2.web import aishka as A
+
+    assert (A.W, A.H) == (35, 38)  # 35 колонок × 19 строк полублоками
+    for name, rows in A.FRAMES.items():
+        assert len(rows) == A.H and all(len(r) == A.W for r in rows), name
+        assert set("".join(rows)) <= set(".ABCDEFGHIJKLMNOP"), name
+    # все настроения знакомства (tty_agent №40) — в кадры AIshka
+    for mood in ("idle", "blink", "look", "verified", "happy", "alert", *(f"analyzing{i}" for i in range(6))):
+        assert A.frame_name(mood) in A.FRAMES, mood
+    assert A.frame_name("look") == "wink" and A.frame_name("verified") == "tenge" and A.frame_name("alert") == "oops"
+    assert A.FRAMES["blink"] != A.FRAMES["idle"] and A.FRAMES["tenge"] != A.FRAMES["happy"]
+    assert A.PALETTE[0] == "#161E31"  # контур — INK титульного слайда; тёмного дрона в палитре нет
+    assert "#121826" not in A.PALETTE
+
+
+def test_aishka_render_modes():
+    from bcc_review.v2.web import aishka as A
+
+    lines = A.render("idle", "truecolor")
+    assert len(lines) == 19 and all(ln.startswith("  ") for ln in lines)
+    plain = [re.sub(r"\x1b\[[0-9;]*m", "", ln) for ln in lines]
+    assert max(len(p) for p in plain) == 2 + 35 and "▀" in "".join(plain)
+    assert "38;2;255;255;255" in "".join(lines)  # белый корпус
+    assert "38;5;" in "".join(A.render("work3", "256")) and "38;2;" not in "".join(A.render("work3", "256"))
+    ascii_lines = A.render("verified", "ascii")
+    "".join(ascii_lines).encode("ascii")
+    assert "TT" in "".join(ascii_lines)  # глаза-тенге
+
+
+def test_greet_draws_aishka_instead_of_dark_drone(tmp_path, monkeypatch, capsys):
+    from bcc_review.v2.web import aishka
+
+    seen: list = []
+
+    def greet(port, env_path):
+        seen.append(len(mod.render("idle", "truecolor")))
+        return "offline"
+
+    import types
+
+    mod = types.ModuleType("bcc_review.v2.web.tty_agent")
+    mod.greet = greet
+    mod.render = lambda name, mode, small=False, indent=2: ["тёмный дрон"]
+    monkeypatch.setitem(sys.modules, "bcc_review.v2.web.tty_agent", mod)
+    import bcc_review.v2.web as web_pkg
+
+    monkeypatch.setattr(web_pkg, "tty_agent", mod, raising=False)
+    with _Run(monkeypatch, tmp_path) as run:
+        pass
+    assert mod.render is aishka.render and seen == [19]
+    assert run.apps[0].default_provider == "offline"
+
+    mod.MASCOT = "aishka"  # №40 перешёл на AIshka сам — не подменяем
+    own = mod.render = lambda name, mode, small=False, indent=2: ["свой AIshka"]
+    S._use_aishka(mod)
+    assert mod.render is own
