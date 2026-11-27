@@ -1006,6 +1006,20 @@ def _critical_support(members: list[dict], run_has_critical: bool = True) -> boo
     return fams >= 3 or (not run_has_critical and fams >= 2)
 
 
+def _confirmed_critical(f: dict, members: list[dict], all_cands: list[dict] | None) -> bool:
+    """Подтверждение critical двумя ревьюерами (см. ``_confirmed``). Для противоречия строже: оно утверждает, что
+    два места дают разные исходы, поэтому его подтверждает только другой ревьюер, тоже увидевший противоречие в тех
+    же строках, или исполненная строка приёмки. Попарная сверка набора сама себя не подтверждает (как и для major),
+    а сосед другого вида по тем же строкам («порядок погашения не описан») — не второе мнение о противоречии.
+    Живой haiku на релизе: ложные critical на чистых grace_v2 («платёж до выписки: Ф-2 против шага 3», сосед —
+    пропуск по тем же строкам) и insurance_v2 («отказ после досрочного погашения: Ф-4 против 409», только
+    попарная сверка). Неопределённое ключевое событие (К4/К5) по-прежнему подтверждается соседом по строкам."""
+    if f.get("kind") not in CONFLICT_KINDS:
+        return _confirmed(f, members, all_cands)
+    conflicts = [c for c in all_cands or [] if _s(c.get("kind")) in CONFLICT_KINDS]
+    return _confirmed(f, members, conflicts, MAJOR_STRUCTURED_ORIGINS)
+
+
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0,
                all_cands: list[dict] | None = None, req_maps: tuple[dict, dict] | None = None,
                run_has_critical: bool = True, critical_support: bool = False) -> None:
@@ -1030,7 +1044,7 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "дефект ничего не блокирует"
         elif f["kind"] in CONFLICT_KINDS and len({e["line_start"] for e in f["evidence"]}) < 2:
             why = "противоречие подтверждено цитатой только одного места"
-        elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed(f, members, all_cands):
+        elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed_critical(f, members, all_cands):
             why = "critical подтвердил только один ревьюер"
         elif critical_support and not _critical_support(members, run_has_critical):
             why = "подъём до critical без опоры: ни один ревьюер не предложил critical, нет строки приёмки, " \

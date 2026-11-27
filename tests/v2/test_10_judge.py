@@ -615,8 +615,11 @@ def test_single_reviewer_critical_is_major_unless_structured():
     fs[1]["title"] = "Ответ на ошибку: ERROR в ответе 200 против кода 400"  # предмет обеих цитат
     res = judge.run(Ctx(FakeLLM(response(fs + [finding("F04", ["C-004"])]))), cs)
     sev = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
-    assert sev["C-001"] == "major" and sev["C-003"] == "major"        # один ревьюер
-    assert sev["C-002"] == "critical"                                  # попарная сверка по сценарию
+    # без critical в документе major одного ревьюера становятся minor (_confirm_majors)
+    assert sev["C-001"] != "critical" and sev["C-003"] != "critical"  # один ревьюер
+    # попарная сверка набора — мнение одного ревьюера: противоречие из неё одной critical не держит
+    # (ложный critical haiku на чистом insurance_v2, релиз 27.11); тест P1 — test_10_judge_p1.py
+    assert sev["C-002"] != "critical"
 
 
 def test_conflict_critical_with_odd_criterion_keeps_level():
