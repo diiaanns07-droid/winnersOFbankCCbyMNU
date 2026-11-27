@@ -362,7 +362,8 @@ def rule_content_type_without_body(doc: Doc, methods: list[Method], out: dict) -
         label = f" метода {m.label}" if m and m.label else ""
         out["candidates"].append(candidate(
             "api.content_type_without_body",
-            title=(f"Content-Type указан{label if '/' not in label else ''}, хотя тела запроса нет"),
+            title=(f"Заголовок Content-Type указан{(' у' + label) if label and '/' not in label else ''}, "
+                   "хотя тела запроса нет"),
             kind="api_contract", criterion="set_consistent", severity="minor", blocks="development",
             evidence=[ev(ct, ct_frag), ev(nb, nb_frag)],
             problem=(f"В описании запроса{label} одновременно указано {quoted(ct_frag)} и {quoted(nb_frag)}. "

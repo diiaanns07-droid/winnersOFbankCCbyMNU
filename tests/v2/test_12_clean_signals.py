@@ -168,3 +168,37 @@ def test_injection_polite_and_infinitive_forms(text: str) -> None:
 @pytest.mark.parametrize("text", NOT_INJECTIONS_PLURAL)
 def test_injection_polite_lookalikes_ignored(text: str) -> None:
     assert not _inj([text]), text
+
+
+# --- «метод X упомянут, но не описан»: поле или параметр рядом со словом «метод» — не метод ---
+API_TAIL = [
+    ("Часть B › Метод", "REST type | POST"),
+    ("Часть B › Метод", "Request URL | https://api.bank.local/qr/transfer"),
+    ("Часть B › Метод", "Controller | QrTransferController"),
+]
+
+
+def _named(lines: list[tuple[str, str]]) -> set[str]:
+    out = rules.run(_view(lines + API_TAIL))
+    return {c["source"].split(".", 2)[2] for c in out["candidates"] if c["source"].startswith("rules:promises.named_method.")}
+
+
+def test_field_next_to_method_word_is_not_a_method() -> None:
+    sec = "Часть A › Интеграция"
+    got = _named([
+        (sec, "Метод возвращает currentMode и nextMode для экрана способа выплаты."),
+        (sec, "Вызов с qrId и amount создаёт перевод."),
+        (sec, "Ответ метода содержит transferId при статусе DONE."),
+        (sec, "Операция перевода хранит requestId как ключ идемпотентности."),
+    ])
+    assert got == set(), got
+
+
+def test_named_method_still_found() -> None:
+    sec = "Часть A › Интеграция"
+    got = _named([
+        (sec, "Приложение читает лимит методом getTransferLimit и меняет его методом setTransferLimit."),
+        (sec, "Методы cancelQr и refundQr описаны в части B."),
+        (sec, "Карточка открывается вызовом getCardById."),
+    ])
+    assert got == {"getTransferLimit", "setTransferLimit", "cancelQr", "refundQr", "getCardById"}, got

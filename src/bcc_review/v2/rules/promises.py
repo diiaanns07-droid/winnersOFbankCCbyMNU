@@ -36,6 +36,12 @@ def _defined_names(doc: Doc, methods: list[Method]) -> set[str]:
     return names
 
 
+# слово «метод / вызов / операция» прямо перед именем; между ними — только другие имена списка («Методы X и Y»)
+METHOD_BEFORE = re.compile(r"(?:\bметод\w*|\bвызов\w*|\bendpoint\w*|\bоперац\w*)\s*[«\"`']?"
+                           r"(?:\s*[A-Za-z_]\w*[»\"`']?\s*(?:,|\bи\b)\s*[«\"`']?)*\s*$", re.I)
+ID_NAME = re.compile(r"(?<!By)(?:Id|ID|Ids|IDs)$")  # transferId, payoutCardId — поле; getCardById — метод
+
+
 def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
     if not methods:
         return set()
@@ -54,10 +60,10 @@ def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
             toks = split_camel(name)
             if len(toks) < 2 or name.lower() in defined:
                 continue
-            # имя метода, а не поле: «методом X», «Методы X и Y», «вызов X» рядом или глагол в начале имени
-            before = " ".join(re.findall(r"[\wА-Яа-яЁё]+", t[:mm.start()])[-3:])
-            if not (re.search(r"метод\w*|вызов\w*|endpoint|операци\w*", before, re.I)
-                    or toks[0] in READ_TOKENS or toks[0] in MUTATING_TOKENS):
+            # имя метода, а не поле: «методом X», «Методы X и Y», «вызов X» прямо перед именем или глагол в начале
+            # имени. «Метод возвращает currentMode», «вызов с qrId» — поле или параметр, а не метод
+            verb_first = toks[0] in READ_TOKENS or toks[0] in MUTATING_TOKENS
+            if ID_NAME.search(name) or (not verb_first and not METHOD_BEFORE.search(t[:mm.start()])):
                 continue
             if any(name.lower() == (m.name or "").lower() for m in methods):
                 continue
