@@ -114,6 +114,8 @@ body:has(main.jb.done) { overflow: hidden; }
   .jb-sheet .ln { grid-template-columns: 40px minmax(0, 1fr); }
   .jb-sheet .no { padding-right: 10px; font-size: 11px; }
   .jb-say span { font-size: 12px; }
+  /* №54: на телефоне BCC AI с подписью этапа — внизу экрана поверх стекла, а не на строках листа */
+  .jb-pilot { position: fixed; top: auto !important; bottom: 12px; right: 12px; transform: none; z-index: 40; }
   .jb { padding-bottom: 150px; }
   /* №54: как на главной — панель в две строки с короткими подписями, без прокрутки вбок */
   .jb-dock { bottom: 10px; flex-wrap: wrap; justify-content: center; overflow: visible; }
