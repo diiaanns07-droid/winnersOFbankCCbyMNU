@@ -1,0 +1,37 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.pdf /tmp/claude-0/s53/head/evaluation/v2/measurements/w5_53_pdf_ec2418f_sonnet_1/report.md --provider claude_cli --model sonnet --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 33 дефекта (критичных 5, существенных 13, незначительных 15), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, каждый останавливает разработку и тестирование:
+  D-01 Ф-3 ограничивает push одним в месяц, Ф-4 снимает ограничение
+  D-02 Не определено, какое событие процессинга считается проведённой покупкой
+  D-03 Критерий приёмки №2 противоречит правилу Ф-2 о месяце
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 2 мин 52 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 88 из 88
+Отчёт: /tmp/claude-0/s53/head/evaluation/v2/measurements/w5_53_pdf_ec2418f_sonnet_1/report.md и /tmp/claude-0/s53/head/evaluation/v2/measurements/w5_53_pdf_ec2418f_sonnet_1/report.json
+  ! судья: из 'Отклонённая сумма: код 200 с ERROR против кода 400' выделен отдельный дефект 'Ветка…
+  ! судья: 'Возврат после отправленного push: исход не описан' — не пожелание: случай назван в…
+HTML: /tmp/claude-0/s53/head/evaluation/v2/measurements/w5_53_pdf_ec2418f_sonnet_1/report.html
+
+--- stderr
+Документ: release/input/requirements.pdf
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_risk: запуск
+  lens_analyst: запуск
+  lens_qa: запуск
+  segment: готово за 17 с, вызовов 1
+  lens_analyst: готово за 42 с, вызовов 1, кандидатов 9
+  consistency: готово за 52 с, вызовов 1, кандидатов 15
+  lens_risk: готово за 55 с, вызовов 1, кандидатов 8
+  lens_qa: готово за 55 с, вызовов 1, кандидатов 7
+  lens_architect: готово за 61 с, вызовов 1, кандидатов 11
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 65
+  judge: запуск
+  judge: готово за 103 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
