@@ -47,7 +47,7 @@
       var fd = new FormData(form);
       if (sample) { fd.delete("file"); fd.append("sample", "1"); }
       veil.hidden = false; veil.classList.add("busy");
-      veil.querySelector("b").textContent = "Кладём лист на стол…";
+      veil.querySelector("b").textContent = "Загружаем…";
       fetch("/api/jobs", { method: "POST", body: fd, headers: { Accept: "application/json" } })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
         .then(function (res) {

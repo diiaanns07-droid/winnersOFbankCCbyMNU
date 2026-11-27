@@ -31,14 +31,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlsplit
 
-from .sheet import build_sheet, load_report, read_source
+from .sheet import VERDICT as VERDICT_WORD, build_sheet, load_report, plural, read_source
 from .runner import (ALLOWED_EXT, FILES, MAX_UPLOAD, FixtureRunner, Job, JobStore, PipelineRunner, Worker,
                      check_provider, load_dotenv, provider_status)
 
 ASSETS = Path(__file__).with_name("assets")
-# №39: tokens.css — дизайн-система, шрифты листа (OFL); agent.* — BCC AI (№40), отдаются, когда файлы появятся
+# №39: tokens.css — дизайн-система, шрифты Inter и JetBrains Mono (OFL); agent.* — BCC AI (№40), отдаются, когда файлы появятся
 ASSET_NAMES = ("app.css", "app.js", "tokens.css", "agent.css", "agent.js",
-               "pt-serif-400.woff2", "pt-serif-700.woff2", "jetbrains-mono-400.woff2", "fonts-OFL.txt")
+               "inter-400.woff2", "inter-600.woff2", "inter-700.woff2", "jetbrains-mono-400.woff2", "fonts-OFL.txt")
 ASSET_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".woff2": "font/woff2",
                ".txt": "text/plain; charset=utf-8"}
 REPO = Path(__file__).resolve().parents[4]
@@ -67,25 +67,17 @@ class App:
 
 # ─────────────────────────────── страницы ───────────────────────────────
 
-# ── №39: знак продукта (свой, не логотип банка) — для favicon; в шапке живёт дрон BCC AI (№40) ──
+# ── №39: знак продукта (свой, не логотип банка): лист с отметкой и зелёной галочкой «сверено» ──
 _MARK = ('<svg viewBox="0 0 32 32" width="{s}" height="{s}" aria-hidden="true" focusable="false">'
-         '<rect width="32" height="32" rx="7" fill="#0B1220"/>'
-         '<path d="M9 7.5h10.5l4 4V24a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z" fill="#fff"/>'
-         '<path d="M11 13h7M11 16.5h9M11 20h5" stroke="#B9C3CF" stroke-width="1.4" stroke-linecap="round"/>'
-         '<path d="M11 16.5h9" stroke="#DCA262" stroke-width="2.6" stroke-linecap="round" opacity=".75"/>'
-         '<circle cx="23.5" cy="22.5" r="4.6" fill="#00B975"/>'
-         '<path d="M21.4 22.6l1.5 1.5 2.8-3" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" '
+         '<rect width="32" height="32" rx="9" fill="#008556"/>'
+         '<path d="M9.5 7h10l4 4v13.5a1.5 1.5 0 0 1-1.5 1.5H9.5A1.5 1.5 0 0 1 8 24.5v-16A1.5 1.5 0 0 1 9.5 7z" fill="#fff"/>'
+         '<path d="M11.5 13h7M11.5 20h5" stroke="#C9D3DC" stroke-width="1.5" stroke-linecap="round"/>'
+         '<path d="M11.5 16.5h9" stroke="#FBE1BA" stroke-width="3" stroke-linecap="round"/>'
+         '<circle cx="23.2" cy="23.2" r="4.8" fill="#00B975" stroke="#fff" stroke-width="1.4"/>'
+         '<path d="M21.1 23.3l1.5 1.5 2.7-3" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" '
          'stroke-linejoin="round"/></svg>')
 _FAVICON = "data:image/svg+xml," + quote(_MARK.format(s=32).replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ', 1),
                                           safe="")
-# чернила печати: неровная кромка и непрокрас (feTurbulence), без картинок
-_INK = ('<svg class="b-defs" width="0" height="0" aria-hidden="true" focusable="false" '
-        'style="position:absolute;width:0;height:0;overflow:hidden"><filter id="b-ink" x="-6%" y="-12%" '
-        'width="112%" height="124%"><feTurbulence type="fractalNoise" baseFrequency=".95" numOctaves="2" seed="11" '
-        'result="grain"/><feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.2 2.45" '
-        'result="holes"/><feComposite in="SourceGraphic" in2="holes" operator="in" result="inked"/>'
-        '<feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="4" result="warp"/>'
-        '<feDisplacementMap in="inked" in2="warp" scale="2.6" xChannelSelector="R" yChannelSelector="G"/></filter></svg>')
 
 # короткие имена провайдеров
 _SHORT = {"auto": "Авто", "claude_cli": "Claude Code", "gemini": "Gemini", "anthropic": "Claude API",
@@ -118,17 +110,16 @@ def _layout(title: str, body: str, *, sub: str = "") -> str:
     st = f'<span class="b-status {mod}" id="pstatus" title="{e(status)}">{e(status)}</span>' if status else ""
     return f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0B1220">
+<meta name="theme-color" content="#F3F6F5">
 <title>{e(title)}</title>
 <link rel="icon" href="{_FAVICON}">
-<link rel="preload" href="/assets/pt-serif-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/inter-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/tokens.css">
 <link rel="stylesheet" href="/assets/app.css">
 {agent_css}
 </head><body class="b-desk">
-{_INK}
 <header class="b-bar">
-  <a class="b-bar-brand" href="/" aria-label="BCC Review — на стол"><div class="b-bar-agent" data-bcc-agent data-size="24" data-mood="idle"></div>BCC Review</a>{doc}
+  <a class="b-bar-brand" href="/" aria-label="BCC Review — на главную"><div class="b-bar-agent" data-bcc-agent data-size="48" data-mood="idle"></div><span class="b-bar-mark">{_MARK.format(s=34)}</span><span class="b-bar-name">BCC Review</span></a>{doc}
   <div class="b-bar-end">{st}</div>
 </header>
 {body}
@@ -178,19 +169,22 @@ def _top_sheet(app: App) -> dict[str, Any] | None:
     return None
 
 
-def _leaf(j: Job) -> str:
+def _leaf(j: Job, *, on: bool = False) -> str:
     s = j.summary or {}
-    if j.state == "done":
-        v = (j.summary or {}).get("development", "")
-        cls, word = {"no": ("crit", "Нельзя"), "conditional": ("cond", "Условно"), "yes": ("ok", "Можно")}.get(v, ("cond", "—"))
-        stamp = f'<span class="b-stamp mini {cls}">{word}</span>'
-        meta = f'{s.get("critical", 0)} блок. · {s.get("major", 0)} сущ.'
-    else:
-        stamp = ""
-        meta = {"queued": "в очереди", "running": "идёт проверка", "failed": "ошибка прогона"}.get(j.state, j.state)
     when = time.strftime("%d.%m %H:%M", time.localtime(j.created))
-    return (f'<a class="b-leaf" href="/jobs/{e(j.id)}"><span class="b-leaf-t">{e(Path(j.file_name).stem)}</span>'
-            f'<span class="b-leaf-m">{e(when)} · {e(meta)}</span>{stamp}</a>')
+    if j.state == "done":
+        cls, word = VERDICT_WORD.get(s.get("development", ""), ("cond", "нет вердикта"))
+        crit = int(s.get("critical") or 0)
+        line = (f'<div class="b-verdict"><span class="main">Разработка: <b class="{cls}">{e(word)}</b></span>'
+                f'<span>{crit} {plural(crit, "блокер", "блокера", "блокеров")}</span></div>' if crit else
+                f'<div class="b-verdict"><span class="main">Разработка: <b class="{cls}">{e(word)}</b></span>'
+                f'<span>блокеров нет</span></div>')
+    else:
+        label = {"queued": "в очереди", "running": "идёт проверка", "failed": "ошибка прогона"}.get(j.state, j.state)
+        line = f'<div class="b-verdict"><span>{e(label)}</span></div>'
+    return (f'<a class="b-leaf{" on" if on else ""}" href="/jobs/{e(j.id)}"{" aria-current=\"page\"" if on else ""}>'
+            f'<span class="b-leaf-t">{e(Path(j.file_name).stem)}</span>{line}'
+            f'<span class="b-leaf-m">{e(when)} · {e(_SHORT.get(j.provider, j.provider))}</span></a>')
 
 
 def index_page(app: App, *, error: str = "", provider: str = "", model: str = "") -> str:
@@ -211,8 +205,8 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
     top = _top_sheet(app)
     sheet = build_sheet(top["report"], top["raw"], file_name=top["name"]) if top else None
     if sheet is None and app.sample:  # проверок ещё нет: на столе чистый лист примера
-        sheet = build_sheet(None, read_source(app.sample), file_name=f"{app.sample.name} · пример, ещё не проверен")
-    leaves = [_leaf(j) for j in app.store.recent()[:6] if not top or j.id != top.get("id")][:4]
+        sheet = build_sheet(None, read_source(app.sample), file_name=app.sample.name)
+    leaves = [_leaf(j, on=bool(top) and j.id == top.get("id")) for j in app.store.recent()[:5]]
     stack = _gallery(app) + (f'<div class="b-stack">{"".join(leaves)}</div>' if leaves else "")
     sample = (f'<button type="submit" class="pv-sample" name="sample" value="1" formnovalidate>'
               f'Проверить пример: {e(app.sample.name)}</button>') if app.sample else ""
@@ -248,12 +242,12 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
   </details>
 </form>
 <div class="desk" id="desk">
-<aside class="desk-stack" aria-label="Стопка листов">{stack}</aside>
+<aside class="desk-stack" aria-label="Готовые листы">{stack}</aside>
 <aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
 <main class="desk-sheet">{sheet.html if sheet else ''}</main>
-<div class="desk-notes" aria-hidden="true"></div>
+<div class="desk-notes b-margin" aria-hidden="true"></div>
 </div>
-<div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>лист ляжет на стол, и BCC AI начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
+<div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>BCC AI сразу начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
     sub = (top or {}).get("name") or (f"Пример: {app.sample.name}" if app.sample else "")
     return _layout("BCC Review · Проверка требований", body, sub=sub)
 
