@@ -167,12 +167,18 @@ def test_first_screen(sample):
     brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
-    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+); блокирует (.+)\.$", brief, re.M)
-    assert len(blockers) == 5  # блокер — одна строка: что, где, что блокирует
-    assert all("строк" in where for where, _ in blockers) and blockers[0][0] == "Ф-3 (строка 39), Ф-4 (строка 40)"
+    # все блокеры останавливают одно и то же — это сказано один раз в заголовке, строка блокера: что и где
+    assert "**Блокеры (5)** — каждый останавливает разработку и тестирование; что не так и где:" in brief
+    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+)\.$", brief, re.M)
+    assert len(blockers) == 5
+    assert all("строк" in where for where in blockers) and blockers[0] == "Ф-3 (строка 39), Ф-4 (строка 40)"
+    assert "ещё 1 место" not in brief
     assert "**Почему.**" in brief and "**Исправить первым**" in brief
     fix = brief[brief.find("**Исправить первым**"):]
-    assert fix.count(" → ") >= 7  # у каждого пункта — что сделать
+    items = re.findall(r"^\d\. (\S+) \[(D-\d+)\]", fix, re.M)
+    assert 5 <= len(items) <= 5 and all(icon == "🔴" for icon, _ in items[:5])  # сначала блокеры, не больше 5
+    assert fix.count(" → ") >= 5  # у каждого пункта — что сделать
+    assert "на 5 нужен ответ до начала работы" in brief
     assert len(brief.split("\n")) <= 40
     text = re.sub(r"\]\(#[^)]*\)", "]", brief)
     assert not re.search(r"\bR-\d", text) and "коммит" not in text and "кандидат" not in text

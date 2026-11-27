@@ -211,6 +211,10 @@ def _lref(m: re.Match) -> str:
     nums = f"{a}–{rng}" if rng else (f"{a} {conj} {second}" if second else a)
     if low.startswith("строк"):  # «строки L10–L12» → «строки 10–12»: слово модель уже написала
         return f"{prep} {nums}"
+    if prep and low not in _LCASE and re.search(r"строк\w*\s+\S+\s*$", m.string[max(0, m.start() - 30):m.start()
+                                                                                 + len(prep) + 1], re.I):
+        # «строка приёмки L064»: слово «строка» уже стоит рядом в другом смысле — номер в скобках
+        return f"{prep} ({'строки' if (rng or second) else 'строка'} {nums})"
     if low in _LCASE:
         one, many = _LCASE[low]
     elif prep and low not in _LNOM and len(low) >= 3:
@@ -704,7 +708,8 @@ def _counts_line(c: _Ctx) -> str:
     if qs:
         blocking = sum(1 for q in qs if q.get("blocking"))
         parts.append(f"**{len(qs)}** {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')} владельцу"
-                     + (f" ({_q_word(c, 'many')} — {blocking})" if blocking else ""))
+                     + ((f", на {blocking} нужен ответ до начала работы" if _blockers(c)
+                         else f", на {blocking} — ответить в первую очередь") if blocking else ""))
     return " · ".join(parts)
 
 
@@ -802,19 +807,25 @@ def _brief(c: _Ctx) -> list[str]:
     out += _before_after(c)
     blockers = _blockers(c)
     if blockers:
-        out += [f"**{'Блокер' if len(blockers) == 1 else f'Блокеры ({len(blockers)})'}** — что не так, где и что "
-                f"блокирует:", ""]
+        same = len({f.get("blocks") for f in blockers}) == 1
+        what = BLOCKS.get(blockers[0].get("blocks"), "—")
+        head = "Блокер" if len(blockers) == 1 else f"Блокеры ({len(blockers)})"
+        if same:
+            verb = "останавливает" if len(blockers) == 1 else "каждый останавливает"
+            out += [f"**{head}** — {verb} {what}; что не так и где:", ""]
+        else:
+            out += [f"**{head}** — что не так, где и что останавливает:", ""]
         for i, f in enumerate(blockers, 1):
             out.append(f"{i}. {SEV_ICON.get(f.get('severity'), '')} [{f['id']}](#{anchor(f['id'])}) "
-                       f"**{prose(f.get('title'))}** — {prose(c.where_short(f))}; блокирует "
-                       f"{BLOCKS.get(f.get('blocks'), '—')}.")
+                       f"**{prose(f.get('title'))}** — {prose(c.where_short(f, limit=5))}"
+                       + ("." if same else f"; останавливает {BLOCKS.get(f.get('blocks'), '—')}."))
         out.append("")
     elif c.run.get("status") != "failed" and "блокирующ" not in str(v.get("summary") or "").lower():
         out += ["Блокирующих дефектов не найдено.", ""]
-    first = _fix_first(c)
+    first = _first_screen_fix(c, blockers)
     if first:
         shown = {f["id"] for f in blockers}
-        out += ["**Исправить первым**", ""]
+        out += ["**Исправить первым**" + (" — сначала блокеры" if shown and len(first) > len(shown) else ""), ""]
         for i, f in enumerate(first, 1):
             what = "" if f["id"] in shown else f" {prose(shorten(f.get('title'), 90))}"
             act = _action(f)
@@ -825,6 +836,19 @@ def _brief(c: _Ctx) -> list[str]:
         out += [f"{i}. {prose(step)}" for i, step in enumerate(off["how_to_full"], 1)] + [""]
     out += _how_obtained(c)
     return out
+
+
+FIRST_SCREEN_FIX = 5
+
+
+def _first_screen_fix(c: _Ctx, blockers: list[dict], limit: int = FIRST_SCREEN_FIX) -> list[dict]:
+    """«Исправить первым»: сначала блокеры (в порядке судьи), затем остальные из «исправить первым»; на первом
+    экране — не больше limit пунктов (полный список — в разделе 6, в том же порядке)."""
+    order = _fix_first(c)
+    rank = {f["id"]: i for i, f in enumerate(order)}
+    bl = sorted(blockers, key=lambda f: (rank.get(f["id"], 99), f.get("priority") or 99, _id_num(f.get("id"))))
+    rest = [f for f in order if f["id"] not in {b["id"] for b in bl}]
+    return (bl + rest)[:max(limit, len(bl))]
 
 
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z«])")
@@ -854,6 +878,9 @@ def _why(c: _Ctx, limit: int = 420) -> str:
             out = f"{out} {s}".strip()
         return out or shorten(text, limit)
     prio = next((s for s in sents if _PRIORITY.match(s)), "")
+    first_id = re.search(r"\bD-\d{2,4}\b", prio)
+    if first_id and first_id.group(0) not in {f["id"] for f in _blockers(c)}:
+        prio = ""  # судья начинает не с блокера — список «Исправить первым» ниже начинается с блокеров
     why = _auto_why(c)
     return why + (f" {shorten(prio, limit)}" if prio else "")
 
@@ -1614,7 +1641,7 @@ def _conclusion(c: _Ctx) -> list[str]:
                   ["тестирование", f"**{READINESS.get(v.get('testing'), '—')}**"]]) + [""]
     reason = v.get("summary") or _auto_reason(c)
     out += [f"**Обоснование.** {prose(reason)}", ""]
-    first = _fix_first(c)
+    first = _first_screen_fix(c, _blockers(c), limit=7)
     if first:
         out += ["**Что исправить в первую очередь**", ""]
         for i, f in enumerate(first, 1):
