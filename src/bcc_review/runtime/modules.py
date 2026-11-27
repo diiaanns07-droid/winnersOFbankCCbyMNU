@@ -48,6 +48,8 @@ SLOTS: dict[str, tuple[str, Optional[str]]] = {
     "anthropic": ("bcc_review.providers.anthropic:AnthropicAdapter",
                   "bcc_review.runtime.fallback.anthropic:AnthropicAdapter"),
     "gemini": ("bcc_review.providers.gemini:GeminiAdapter", "bcc_review.runtime.fallback.gemini:GeminiAdapter"),
+    # Claude Code CLI (`claude -p`) без API-ключа: адаптер v2/02 с тем же invoke(model, messages, schema, timeout_s)
+    "claude_cli": ("bcc_review.v2.providers.claude_cli:ClaudeCLIProvider", None),
 }
 
 

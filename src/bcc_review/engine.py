@@ -30,8 +30,8 @@ from .runtime.modules import Modules
 from .runtime.verdict import build_summary, build_verdict, default_blocks
 
 READERS = {".md": "read_text", ".markdown": "read_text", ".txt": "read_text", ".pdf": "read_pdf", ".docx": "read_docx"}
-DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "gemini": "gemini-2.5-flash", "mock": "mock-1"}
-MODEL_ENV = {"anthropic": "ANTHROPIC_MODEL", "gemini": "GEMINI_MODEL"}
+DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "gemini": "gemini-2.5-flash", "mock": "mock-1", "claude_cli": "opus"}
+MODEL_ENV = {"anthropic": "ANTHROPIC_MODEL", "gemini": "GEMINI_MODEL", "claude_cli": "CLAUDE_CLI_MODEL"}
 LLM_STAGES = ("individual", "cross", "verify_meaning", "questions", "bank")
 SLEEP: Callable[[float], None] = time.sleep  # тесты подменяют, чтобы не ждать Retry-After
 # отметки производителя у кандидатов: source модуля (№05, правила) или origin/confirmed_by (№06: facts — сверка фактов)
@@ -190,7 +190,7 @@ class Engine:
         o = self.opts
         self.provider = "none" if o.offline_lint else o.provider
         if self.provider not in C.PROVIDERS:
-            raise UsageError(f"неизвестный провайдер {self.provider!r}: anthropic | gemini | mock")
+            raise UsageError(f"неизвестный провайдер {self.provider!r}: anthropic | gemini | claude_cli | mock")
         self.requested_model = None
         self.adapter = None
         self.adapter_label = None
