@@ -1382,22 +1382,29 @@ def run_stamp(run: dict) -> str:
 
 
 def _report_paths(c: _Ctx):
-    """Имена для команд паспорта: отчёт .json — по пути, куда пишется Markdown (если он известен), документ — по
-    имени файла из отчёта."""
-    from pathlib import PurePath
+    """Пути для воспроизведения отчёта. В абсолютных путях публикуется только имя файла."""
+    from pathlib import PureWindowsPath
+
+    # PureWindowsPath читает оба разделителя и распознаёт корень POSIX, диск Windows и UNC
+    # на любой машине. Отчёт можно повторно собрать на другой ОС.
     out = getattr(c, "out_path", None)
-    out_json = PurePath(str(out)).with_suffix(".json") if out else None
-    json_arg = (out_json.as_posix() if out_json and not out_json.is_absolute() else out_json.name if out_json
-                else "отчёт.json")
-    # документ — по пути, как его указали в командной строке (относительный: команду можно скопировать и
-    # выполнить из той же папки); абсолютный путь машины в отчёт не пишется — только имя файла
+    out_json = PureWindowsPath(str(out)).with_suffix(".json") if out else None
+    json_arg = "отчёт.json"
+    if out_json:
+        json_arg = out_json.name if out_json.anchor else out_json.as_posix()
+
     given = getattr(c, "doc_path", None)
-    given = PurePath(str(given)) if given else None
-    doc = (given.as_posix() if given and not given.is_absolute() and given.name == PurePath(
-        str(c.doc.get("file") or given.name)).name else str(c.doc.get("file") or "документ"))
-    doc_arg = doc if re.fullmatch(r"[\w./\\:-]+", doc) else f'"{doc}"'
-    clean = lambda x: str(x).replace("`", "").replace("|", "\\|")  # noqa: E731
-    return out_json, clean(json_arg), clean(doc_arg)
+    source = PureWindowsPath(str(given)) if given else None
+    recorded = c.doc.get("file")
+    doc = PureWindowsPath(str(recorded)).name if recorded else (source.name if source else "документ")
+    if source and not source.anchor and source.name == doc:
+        doc = source.as_posix()
+
+    def argument(value: str) -> str:
+        value = value.replace("\x60", "").replace("|", "\\|")
+        return value if re.fullmatch(r"[\w./\\:-]+", value) else f'"{value}"'
+
+    return out_json, argument(json_arg), argument(doc)
 
 
 def _passport(c: _Ctx) -> list[str]:
