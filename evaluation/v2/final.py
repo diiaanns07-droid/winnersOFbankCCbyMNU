@@ -123,8 +123,9 @@ def gate_lines(sha: str, checks: list[dict] | None = None) -> list[str]:
                 f"⏳ {sum(1 for c in cs if c['ok'] is None)}")
 
     L = ["", f"**Ворота WAVE3 сейчас** ({_rows(len(checks))}, `python -m evaluation.v2.gate`): на этом коде "
-         f"{len(on)} — {score(on)}; на другом коде {len(other)} — {score(other)}; "
-         f"без замера {len(checks) - len(on) - len(other)}."]
+         f"{len(on)} — {score(on)}; " + (f"на другом коде {len(other)} — {score(other)}; " if other else
+                                          "на другом коде — ни одной; ")
+         + f"без замера {len(checks) - len(on) - len(other)}."]
     red = [c for c in on if c["ok"] is False]
     if red:
         L += ["", "| Красное на этом коде | Факт (цель) | Кому |", "| :--- | :--- | :--- |"]

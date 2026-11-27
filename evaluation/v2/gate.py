@@ -544,7 +544,7 @@ def render(checks: list[dict]) -> str:
     return "\n".join(L) + "\n"
 
 
-def render_summary(checks: list[dict], at: str) -> str:
+def render_summary(checks: list[dict], at: str, history: list[dict] | None = None) -> str:
     """Итог ворот для начала RESULTS.md: счёт и красное с владельцами одной таблицей (полностью — GATE.md)."""
     gate = [c for c in checks if not c.get("info")]
     red = [c for c in gate if c["ok"] is False]
@@ -559,7 +559,39 @@ def render_summary(checks: list[dict], at: str) -> str:
             L.append(f"| {c['name']} | {c['fact']} ({c['target']}) | {c.get('source') or '—'} | {owners} |")
     if wait:
         L += ["", "Без замера: " + "; ".join(c["name"] for c in wait) + "."]
+    hist = history_line(history)
+    if hist:
+        L += ["", hist]
     return "\n".join(L) + "\n"
+
+
+_SHA = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,8}\b")
+
+
+def codes_of(checks: list[dict]) -> list[str]:
+    """Коммиты кода из меток замеров, на которых стоят ворота (`… c6aa9b5, haiku`)."""
+    return sorted({m for c in checks if not c.get("info") for m in _SHA.findall(str(c.get("source") or ""))})
+
+
+def history_line(rows: list[dict] | None, last: int = 6) -> str:
+    """Ворота по времени из gate_history.jsonl: подряд одинаковый счёт — одна запись (последняя), код — если записан
+    (в записях до 16:56 27.11 кода нет)."""
+    out: list[dict] = []
+    for r in rows or []:
+        key = (r.get("green"), len(r.get("red") or []), len(r.get("waiting") or []))
+        if out and out[-1]["_key"] == key:
+            out[-1] = {**r, "_key": key}
+        else:
+            out.append({**r, "_key": key})
+    if len(out) < 2:
+        return ""
+    parts = []
+    for r in out[-last:]:
+        codes = r.get("codes") or []
+        code = (" на " + ", ".join(f"`{c}`" for c in codes[:3]) + (" …" if len(codes) > 3 else "")) if codes else ""
+        parts.append(f"{str(r.get('at', ''))[-5:]}{code} — {r.get('green')}/{len(r.get('red') or [])}/"
+                     f"{len(r.get('waiting') or [])}")
+    return "Ворота за день (зелёных/красных/без замера): " + "; ".join(parts) + "."
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -578,12 +610,15 @@ def main(argv: list[str] | None = None) -> int:
         (V2 / "GATE.md").write_text(text, encoding="utf-8")
         from .common import put_results_block
 
-        put_results_block(V2 / "RESULTS.md", "gate", render_summary(checks, f"Ворота WAVE3, {sc.astana_now()}"),
-                          "Итог ворот")
-        with (V2 / "gate_history.jsonl").open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"at": sc.astana_now(), "green": sum(1 for c in checks if c["ok"]),
-                                 "red": [c["name"] for c in checks if c["ok"] is False and not c.get("info")],
-                                 "waiting": [c["name"] for c in checks if c["ok"] is None]}, ensure_ascii=False) + "\n")
+        hist_path = V2 / "gate_history.jsonl"
+        entry = {"at": sc.astana_now(), "green": sum(1 for c in checks if c["ok"]),
+                 "red": [c["name"] for c in checks if c["ok"] is False and not c.get("info")],
+                 "waiting": [c["name"] for c in checks if c["ok"] is None], "codes": codes_of(checks)}
+        with hist_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        history = [json.loads(x) for x in hist_path.read_text(encoding="utf-8").splitlines() if x.strip()]
+        put_results_block(V2 / "RESULTS.md", "gate",
+                          render_summary(checks, f"Ворота WAVE3, {entry['at']}", history), "Итог ворот")
     gate_checks = [c for c in checks if not c.get("info")]
     red = any(c["ok"] is False for c in gate_checks) or (a.strict and any(c["ok"] is None for c in gate_checks))
     return 1 if red else 0

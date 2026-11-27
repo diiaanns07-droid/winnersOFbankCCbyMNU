@@ -348,3 +348,24 @@ def test_final_code_note_flags_runs_on_other_code(monkeypatch):
     assert bad.startswith("⚠") and "`ccc3333`" in bad and "aaa1111" not in bad
     assert "git не знает: ddd4444" in final.code_note("abc1234", [[{"commit": "ddd4444"}, {"commit": "aaa1111"}]])
     assert final.code_note("abc1234", [[{"label": "без коммита"}]]) == ""
+
+
+def test_gate_history_line_and_codes():
+    """Итог ворот в RESULTS — с историей за день (повторы счёта схлопнуты) и кодом, на котором стоят ворота."""
+    from evaluation.v2 import gate
+
+    checks = [{"name": "a", "ok": True, "source": "W4-07 после заморозки: 28fe64f, sonnet (16:32)"},
+              {"name": "b", "ok": False, "source": "стабильность Opus: e2f2cba, opus #1 (08:34)"},
+              {"name": "c", "ok": True, "info": True, "source": "справка: 1234567"},
+              {"name": "d", "ok": None, "source": "чистые №20, haiku, deadbee? нет — только слова"}]
+    assert gate.codes_of(checks) == ["28fe64f", "e2f2cba"]
+    rows = [{"at": "2026-11-27 15:30", "green": 35, "red": ["x"] * 16, "waiting": ["w", "w"]},
+            {"at": "2026-11-27 16:24", "green": 39, "red": ["x"] * 12, "waiting": ["w", "w"]},
+            {"at": "2026-11-27 16:25", "green": 39, "red": ["x"] * 12, "waiting": ["w", "w"]},
+            {"at": "2026-11-27 16:55", "green": 44, "red": ["x"] * 8, "waiting": ["w"]},
+            {"at": "2026-11-27 16:56", "green": 44, "red": ["x"] * 8, "waiting": ["w"], "codes": ["28fe64f"]}]
+    line = gate.history_line(rows)
+    assert line.endswith("15:30 — 35/16/2; 16:25 — 39/12/2; 16:56 на `28fe64f` — 44/8/1.")
+    assert gate.history_line(rows[:1]) == ""
+    text = gate.render_summary([{"name": "a", "ok": True}], "Ворота WAVE3, 16:55", rows)
+    assert "Ворота за день" in text and text.index("Ворота за день") > text.index("зелёных 1")
