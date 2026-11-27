@@ -364,3 +364,19 @@ def test_decisions_only_make_one_call(findings, questions):
     res = recheck.run(FakeCtx(llm), findings, "## Решения\n- Общее правило для всех.\n", questions)
     assert len(llm.calls) == 1
     assert {g["id"]: g["recheck"] for g in res["findings"]}[target["id"]]["status"] == "resolved"
+
+
+def test_topic_binding_uses_answer_text():
+    qs = [{"id": "Q-01", "topic": "Повторное уведомление после смены лимита", "finding_ids": ["D-01"],
+           "question": "Отправлять ли второе уведомление в месяце после смены лимита?",
+           "options": ["Нет, одно в месяц", "Да, после каждой смены"]},
+          {"id": "Q-02", "topic": "Возврат после отправленного уведомления", "finding_ids": ["D-02"],
+           "question": "Уменьшает ли возврат покупки сумму месяца, если уведомление уже отправлено?",
+           "options": ["Уменьшает, уведомление не отзывается", "Не уменьшает"]}]
+    text = ("Q-05 [возвраты и повторное уведомление]: Возврат покупки уменьшает сумму месяца исходной покупки, "
+            "уже отправленное уведомление не отзывается.\n"
+            "Q-06 [лимит уведомлений при изменении лимита]: Не более одного уведомления в месяц, в том числе "
+            "после смены лимита.\n")
+    res = recheck.resolve_answers(qs, recheck.load_answers(text))
+    got = {a["question_id"]: a["answer"] for a in res["answered"]}
+    assert got["Q-02"].startswith("Возврат покупки") and got["Q-01"].startswith("Не более одного")

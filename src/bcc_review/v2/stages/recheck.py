@@ -241,11 +241,16 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         if not hint:
             continue
         for x in questions:
-            sc = _topic_score(hint, x) + 0.25 * _text_score(a.get("text", ""), x) + (0.01 if x["id"] == a["id"] else 0)
-            pairs.append((sc, k, x["id"]))
+            # свой текст ответа — такой же признак, как тема: «возвраты и повторный push» по теме ближе к вопросу
+            # о повторном push, а по тексту ответа — к вопросу о возвратах. Ответ буквой — только по теме.
+            if a.get("text"):
+                sc, need = 0.5 * _topic_score(hint, x) + 0.5 * _text_score(a["text"], x), 0.3
+            else:
+                sc, need = _topic_score(hint, x), 0.4
+            pairs.append((sc + (0.01 if x["id"] == a["id"] else 0), need, k, x["id"]))
     taken: set[str] = set()
-    for sc, k, qid in sorted(pairs, key=lambda t: -t[0]):
-        if sc < 0.4 or k in bound or qid in taken:
+    for sc, need, k, qid in sorted(pairs, key=lambda t: -t[0]):
+        if sc < need or k in bound or qid in taken:
             continue
         bound[k] = by_id[qid]
         taken.add(qid)
