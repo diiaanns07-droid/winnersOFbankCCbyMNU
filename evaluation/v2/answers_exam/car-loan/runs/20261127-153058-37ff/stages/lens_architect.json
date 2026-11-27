@@ -1,0 +1,355 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 51.62,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 73,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Плата за перенос: бесплатно по Д-6, 1 500 ₸ по М-2",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-17",
+          "R-40",
+          "R-41",
+          "R-60"
+        ],
+        "evidence": [
+          {
+            "quote": "Д-6. Перенос бесплатный для клиента. При подтверждении плата по текущему счёту не начисляется и не списывается.",
+            "line": 40
+          },
+          {
+            "quote": "Кредитный учёт при подтверждении списывает с текущего счёта заемщика плату за перенос в размере 1 500 ₸.",
+            "line": 92
+          },
+          {
+            "quote": "Для предусмотренного списания не хватает доступного остатка | 422 BALANCE_LOW",
+            "line": 134
+          }
+        ],
+        "problem": "Д-6 запрещает списание платы при подтверждении, а М-2 требует списать 1 500 ₸ в той же транзакции и вводит код BALANCE_LOW.",
+        "scenario": "Подтверждение при остатке на счёте 0 ₸: по Д-6 успех 201 без списания, по М-2 и таблице ошибок — 422 BALANCE_LOW.",
+        "impact": "Клиента могут ошибочно списать плату или отказать в бесплатной услуге; тесты расходятся.",
+        "recommendation": "Решить, платный перенос или нет, и убрать лишнее: либо плату и BALANCE_LOW, либо Д-6.",
+        "rewrite": "Д-6. Плата за перенос: <уточнить: бесплатно или сумма и счёт списания>.",
+        "question": "Перенос платный или бесплатный?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Пример квитанции без обязательного поля revision",
+        "kind": "api_contract",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-43",
+          "R-46",
+          "R-49",
+          "R-67"
+        ],
+        "evidence": [
+          {
+            "quote": "Поля квитанции обязательны для ответа как при подтверждении, так и при последующем чтении.",
+            "line": 102
+          },
+          {
+            "quote": "{\"changeId\":\"ch-51\",\"loanId\":\"loan-7\",\"day\":18,\"acceptedAt\":\"2026-11-26T06:00:00Z\"}",
+            "line": 114
+          }
+        ],
+        "problem": "В таблице квитанции revision обязательно, а в примере ответа его нет; П-3 и П-4 ждут редакцию 8 в квитанции.",
+        "scenario": "Клиент читает GET квитанции по примеру: поля revision нет, а приёмка П-4 требует редакцию 8.",
+        "impact": "Клиент и тесты неверно разбирают ответ; номер редакции не подтвердить.",
+        "recommendation": "Добавить revision в пример и согласовать с П-3 и П-4.",
+        "rewrite": "{\"changeId\":\"ch-51\",\"loanId\":\"loan-7\",\"revision\":8,\"day\":18,\"acceptedAt\":\"2026-11-26T06:00:00Z\"}",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Ветка логики без ответа: просрочка, возникшая после расчёта",
+        "kind": "placeholder",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-41",
+          "R-15",
+          "R-54"
+        ],
+        "evidence": [
+          {
+            "quote": "Порядок работы с просрочкой, впервые возникшей после расчёта предложения, подлежит согласованию с сопровождением кредита.",
+            "line": 91
+          },
+          {
+            "quote": "Недоступный тип или статус договора, просрочка при расчёте | 422 INELIGIBLE",
+            "line": 128
+          }
+        ],
+        "problem": "Для подтверждения исход при просрочке не задан: таблица ошибок упоминает просрочку только при расчёте.",
+        "scenario": "Расчёт сделан без просрочки, затем просрочка возникла, приходит подтверждение: 201 или 422 INELIGIBLE — неизвестно.",
+        "impact": "Реализации разойдутся; возможна смена графика по просроченному кредиту.",
+        "recommendation": "Зафиксировать проверку просрочки при подтверждении и её код.",
+        "rewrite": "При подтверждении при просрочке > 0 возвращается 422 INELIGIBLE <уточнить: код и порядок проверки>.",
+        "question": "Что делать, если просрочка возникла после расчёта?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Нет операции чтения графика и процентов «до» изменения",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-32",
+          "R-35",
+          "R-72"
+        ],
+        "evidence": [
+          {
+            "quote": "5. Клиент видит обе даты каждого взноса и суммы процентов до и после изменения.",
+            "line": 66
+          },
+          {
+            "quote": "8. После успеха показываются новая редакция графика и квитанция о принятой заявке.",
+            "line": 69
+          },
+          {
+            "quote": "О-2. Владелец может прочитать актуальный график через действующий экран договора сразу после подтверждения.",
+            "line": 160
+          }
+        ],
+        "problem": "Ни одна операция не возвращает действующий график, проценты до изменения и график новой редакции; квитанция содержит только revision и day.",
+        "scenario": "После 201 приложение должно показать график редакции 8, но получить его нечем.",
+        "impact": "Клиентский разработчик додумывает источник данных.",
+        "recommendation": "Описать операцию чтения графика или включить данные в ответы.",
+        "rewrite": "GET /loans/{loanId}/schedule <уточнить: путь, поля revision и installments>.",
+        "question": "Откуда приложение берёт действующий график?",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "/loans/{loanId}/payment-day/previews",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 80
+        },
+        {
+          "name": "/loans/{loanId}/payment-day/changes",
+          "method": "POST",
+          "purpose": "создание, изменение",
+          "line": 88
+        },
+        {
+          "name": "/loans/{loanId}/payment-day/changes/{changeId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 101
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать все строки графика до подтверждения",
+          "line": 53,
+          "operation": "/loans/{loanId}/payment-day/previews"
+        },
+        {
+          "what": "показать суммы процентов до и после изменения",
+          "line": 66,
+          "operation": ""
+        },
+        {
+          "what": "показать новую редакцию графика после успеха",
+          "line": 69,
+          "operation": ""
+        },
+        {
+          "what": "прочитать актуальный график после подтверждения",
+          "line": 160,
+          "operation": ""
+        },
+        {
+          "what": "показать квитанцию",
+          "line": 69,
+          "operation": "/loans/{loanId}/payment-day/changes/{changeId}"
+        }
+      ],
+      "codes": [
+        {
+          "code": "401 SESSION_REQUIRED",
+          "lines": [
+            126
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404 NOT_FOUND",
+          "lines": [
+            127,
+            155
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 INELIGIBLE",
+          "lines": [
+            128
+          ],
+          "described": true,
+          "note": "просрочка только при расчёте"
+        },
+        {
+          "code": "422 DAY_INVALID",
+          "lines": [
+            129
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 TOO_LATE",
+          "lines": [
+            130,
+            149
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 CHANGE_LIMIT",
+          "lines": [
+            131
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "410 PREVIEW_EXPIRED",
+          "lines": [
+            132,
+            154
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "409 REVISION_CHANGED",
+          "lines": [
+            97,
+            133,
+            153
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422 BALANCE_LOW",
+          "lines": [
+            134
+          ],
+          "described": true,
+          "note": "плата не начисляется по Д-6"
+        },
+        {
+          "code": "503 RETRY_LATER",
+          "lines": [
+            135
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "409 REQUEST_CHANGED",
+          "lines": [
+            119
+          ],
+          "described": false,
+          "note": "нет в таблице ошибок"
+        },
+        {
+          "code": "201",
+          "lines": [
+            94,
+            152
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "200",
+          "lines": [
+            82,
+            150
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "revision",
+          "places": "квитанция, обязательное; пример L114 без поля"
+        },
+        {
+          "name": "baseRevision",
+          "places": "запрос и ответ расчёта, целое"
+        },
+        {
+          "name": "requestId",
+          "places": "запрос подтверждения; журнал; ключ повтора"
+        },
+        {
+          "name": "expiresAt",
+          "places": "ответ расчёта, UTC"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "changes",
+          "step": "проверка принадлежности предложения и повтора requestId",
+          "line": 89,
+          "outcome": "404 NOT_FOUND / сохранённые код и квитанция"
+        },
+        {
+          "operation": "changes",
+          "step": "просрочка, возникшая после расчёта",
+          "line": 91,
+          "outcome": ""
+        },
+        {
+          "operation": "changes",
+          "step": "недостаток остатка для списания платы",
+          "line": 134,
+          "outcome": "422 BALANCE_LOW"
+        },
+        {
+          "operation": "changes",
+          "step": "другое тело под занятым ключом",
+          "line": 119,
+          "outcome": "409 REQUEST_CHANGED"
+        },
+        {
+          "operation": "changes",
+          "step": "устаревшая редакция",
+          "line": 97,
+          "outcome": "409 REVISION_CHANGED"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}
