@@ -623,3 +623,57 @@ def test_mixed_script_words_fixed_in_summary(official_view):
 def test_excluded_reason_never_empty(official_view):
     e = sg.normalize_excluded(official_view, {"what": "", "line_start": 57, "line_end": 57, "reason": ""})
     assert e["what"] and e["reason"]
+
+
+def test_own_id_in_document_wins_over_model_numbering():
+    """sonnet однажды дал «Функциональные требования, п. 1» пункту «Ф-1.» — ID документа теряется в отчёте."""
+    lines = ["Функциональные требования", "Ф-1. Клиент выбирает срок от 1 до 12 месяцев.",
+             "ТР-7 Система хранит журнал три года.", "Параметр | Тип", "", "ФТ-01 | Текст"]
+    sec = ["Функциональные требования"] * 6
+    view = _view(lines, sections=sec)
+    view["lines"][1]["kind"] = view["lines"][2]["kind"] = "list_item"
+    reqs = [{"source_id": "Функциональные требования, п. 1", "line_start": 2, "line_end": 2},
+            {"source_id": "", "line_start": 3, "line_end": 3},
+            {"source_id": "Функциональные требования, строка 1", "line_start": 6, "line_end": 6}]
+    assert [r["source_id"] for r in sg.canonical_source_ids(view, reqs)] == ["Ф-1", "ТР-7", "ФТ-01"]
+    # «ISO-8601 формат» — не номер пункта
+    assert sg._OWN_LEAD.match("ISO-8601 формат даты") is None
+
+
+def test_paragraph_gets_no_section_prefixed_id():
+    """haiku дал абзацу «Устройство считается новым…» ID «Как это должно работать: новое устройство»."""
+    lines = ["Как это должно работать", "Устройство считается новым, если его не было 180 дней.",
+             "Термины", "Сутки — интервал с 00:00 до 23:59."]
+    sec = ["Как это должно работать"] * 2 + ["Термины"] * 2
+    view = _view(lines, sections=sec)
+    for x in view["lines"]:
+        x["kind"] = "paragraph"
+    reqs = [{"source_id": "Как это должно работать: новое устройство", "line_start": 2, "line_end": 2},
+            {"source_id": "Термины: Сутки", "line_start": 4, "line_end": 4}]
+    assert [r["source_id"] for r in sg.canonical_source_ids(view, reqs)] == ["", "Термины: Сутки"]
+
+
+def test_range_edges_trimmed_and_placeholder_part_cut():
+    lines = ["Метод", "", "Подключение настройки.", "", "Path-параметры", "Не используются.", "", "Request body",
+             "Content-Type: application/json."]
+    view = _view(lines)
+    heads = {1, 5, 8}
+    assert sg._trim_edges({"line_start": 2, "line_end": 4}, view, heads)["line_start"] == 3
+    r = sg._trim_edges({"line_start": 6, "line_end": 9}, view, heads)
+    assert (r["line_start"], r["line_end"]) == (9, 9)
+    excl, rest = sg.auto_exclude(view, [6])
+    assert rest == [] and excl[0]["what"] == "Заглушка"
+
+
+def test_example_paragraph_with_other_requirements_in_section_is_excluded():
+    lines = ["Ответ 200", "category | string | Код", "accrued | string | Сумма",
+             "Пример ответа для первого критерия: {\"category\":\"TAXI\"}."]
+    view = _view(lines, sections=["Ответ 200"] * 4)
+    reqs = [{"source_id": "Ответ 200: category", "line_start": 2, "line_end": 2, "quote": "a"},
+            {"source_id": "Ответ 200: accrued", "line_start": 3, "line_end": 3, "quote": "b"},
+            {"source_id": "", "line_start": 4, "line_end": 4, "quote": "c"}]
+    keep, excl = sg.demote_examples(view, reqs, [])
+    assert [r["line_start"] for r in keep] == [2, 3] and excl[0]["line_start"] == 4
+    # единственное описание ответа остаётся требованием
+    keep, excl = sg.demote_examples(view, reqs[2:], [])
+    assert [r["line_start"] for r in keep] == [4] and not excl
