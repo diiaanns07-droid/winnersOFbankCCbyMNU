@@ -546,3 +546,29 @@ def test_output_path_that_is_a_directory(tmp_path):
     code = main([str(OFFICIAL), str(out_dir), "--provider", "offline", "--runs-dir", str(tmp_path / "runs"), "-q"])
     assert code in (0, 2)
     assert code == 2 or any(p.suffix == ".md" for p in out_dir.iterdir())
+
+
+@_bug("01", "одинаковые прогоны дают разный Markdown: порядок ролей в «Как получено» и в таблице этапов — порядок "
+            "завершения параллельных линз (pipeline._parallel_reviewers пишет self.stages по as_completed)")
+def test_same_input_gives_same_markdown(tmp_path):
+    import re
+    import time
+
+    from bcc_review.v2.stages import lens
+    real = lens.run_named
+
+    def jitter(ctx, name):          # линзы завершаются в разном порядке, как у живой модели
+        time.sleep({"analyst": 0.03, "qa": 0.0, "architect": 0.02, "risk": 0.01}.get(name, 0) * (1 + jitter.k % 2))
+        return real(ctx, name)
+
+    texts = []
+    for k in range(2):
+        jitter.k = k
+        lens.run_named = jitter
+        try:
+            _, written, _ = _review(tmp_path, OFFICIAL, name=f"det{k}", provider="mock")
+        finally:
+            lens.run_named = real
+        md = Path(written["md"]).read_text(encoding="utf-8")
+        texts.append(re.sub(r"\d", "0", re.sub(r"20\d{6}-\d{6}-[0-9a-f]{4}", "RUN", md)))
+    assert texts[0] == texts[1]
