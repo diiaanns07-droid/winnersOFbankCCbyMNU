@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import threading
@@ -132,10 +133,10 @@ def test_cards_only_for_existing_files(tmp_path):
     assert [r["id"] for r in ex["reports"] if r["ok"]] == ["have"]
     app = _app(tmp_path)
     html = G.reports_block(app, ex)
-    assert html.count('class="g43-leaf" href="/examples/') == 1
+    assert len(re.findall(r'class="g43-leaf(?: on)?" href="/examples/', html)) == 1
     assert "Есть отчёт" in html and "Нет json" not in html and "Нет документа" not in html
     assert "Демо без модели · 27.11" in html
-    assert 'Разработка: <b class="no">нельзя</b>&nbsp;· 5&nbsp;блокеров' in html  # цветом — только слово
+    assert '<span class="main">Разработка: <b class="no">нельзя</b></span><span>5 блокеров</span>' in html
     assert "Уведомление о расходах по карте" not in html  # doc.md — свой заголовок «ТЗ»
     assert ">ТЗ<" in html
     btns = G.documents_block(ex)
@@ -146,9 +147,10 @@ def test_gallery_block_on_real_examples(tmp_path):
     app = _app(tmp_path)
     html = G.gallery_block(app)
     ok = [r for r in G.load_examples()["reports"] if r["ok"]]
-    assert html.count('class="g43-leaf" href="/examples/') == len(ok) >= 1
+    assert len(re.findall(r'class="g43-leaf(?: on)?" href="/examples/', html)) == len(ok) >= 1
     assert "Готовые отчёты" in html and "/examples/mock" in html
     assert "Свой документ" in html and 'for="file"' in html  # «Свой документ» — в той же стопке
+    assert html.count('aria-current="page"') == 1  # своих проверок нет — раскрыт первый готовый лист
     assert "/examples/check/official" in html and "демо, без ключа" in html and "только правила" in html
     # правка 20:25: без штампов и цветных плашек; из цветов — нейтральные, зелёный акцент и красное «нельзя»
     assert "b-stamp" not in html and "b-badge" not in html and "b-surface" not in html
@@ -206,12 +208,12 @@ def test_ready_job_survives_restart_and_refreshes(tmp_path):
 
 def test_verdict_line_and_own_leaf(tmp_path):
     assert G.verdict_html({"development": "no", "critical": 5}) == \
-        'Разработка: <b class="no">нельзя</b>&nbsp;· 5&nbsp;блокеров'
-    assert G.verdict_html({"development": "no", "critical": 1}).endswith("1&nbsp;блокер")
-    assert G.verdict_html({"development": "no", "critical": 3}).endswith("3&nbsp;блокера")
-    assert G.verdict_html({"development": "no", "critical": 11}).endswith("11&nbsp;блокеров")
+        '<span class="main">Разработка: <b class="no">нельзя</b></span><span>5 блокеров</span>'
+    assert G.verdict_html({"development": "no", "critical": 1}).endswith("<span>1 блокер</span>")
+    assert G.verdict_html({"development": "no", "critical": 3}).endswith("<span>3 блокера</span>")
+    assert G.verdict_html({"development": "no", "critical": 11}).endswith("<span>11 блокеров</span>")
     assert '<b class="yes">можно</b>' in G.verdict_html({"development": "yes", "critical": 0})
-    assert "без&nbsp;блокеров" in G.verdict_html({"development": "yes", "critical": 0})
+    assert "блокеров нет" in G.verdict_html({"development": "yes", "critical": 0})
     assert '<b class="cond">с условиями</b>' in G.verdict_html({"development": "conditional", "critical": 0})
     app = _app(tmp_path)
     job = app.store.create("Моё ТЗ.md", "# Перевод по QR\n\ntext\n".encode("utf-8"), "gemini", "")

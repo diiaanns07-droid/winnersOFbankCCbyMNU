@@ -296,8 +296,8 @@ _CSS = """<style>
 .g43{display:flex;flex-direction:column;gap:20px;min-width:0;color:var(--b-ink,#0F2841)}
 .g43-sec{min-width:0}
 .g43-cap{margin:0 0 10px 2px;font-size:13px;line-height:1.3;font-weight:600;letter-spacing:.02em;color:var(--b-ink-2,#3A5068)}
-.g43-pile{--h:146px;--band:86px;display:flex;flex-direction:column;min-width:0}
-.g43-pile.docs{--h:112px;--band:58px}
+.g43-pile{--h:140px;--band:84px;display:flex;flex-direction:column;min-width:0}
+.g43-pile.docs{--h:108px;--band:56px}
 .g43-slot{position:relative;height:var(--h);min-width:0;
   transition:margin-top var(--b-base,220ms) var(--b-ease,cubic-bezier(.2,.8,.2,1));
   animation:g43-in var(--b-slow,360ms) var(--b-ease,cubic-bezier(.2,.8,.2,1)) both;animation-delay:calc(var(--i,0) * 40ms)}
@@ -315,6 +315,7 @@ _CSS = """<style>
 .g43-leaf:hover{box-shadow:0 0 0 1px rgba(15,40,65,.08),0 2px 6px rgba(15,40,65,.05),0 16px 40px rgba(15,40,65,.10)}
 .g43-leaf:active{transform:scale(.985)}
 .g43-leaf:focus-visible{outline:3px solid rgba(0,185,117,.55);outline-offset:2px}
+.g43-leaf.on{box-shadow:0 0 0 1.5px var(--b-green,#00B975),0 1px 2px rgba(15,40,65,.05),0 8px 22px rgba(15,40,65,.07)}
 .g43-leaf>*{flex-shrink:0}
 .g43-pv{flex:1 1 0;min-height:0;overflow:hidden;margin-bottom:6px;font-size:13px;line-height:1.35;
   color:var(--b-ink-2,#3A5068);transition:opacity var(--b-base,220ms) var(--b-ease,ease)}
@@ -324,20 +325,19 @@ _CSS = """<style>
 .g43-slot+.g43-slot:hover .g43-pv,.g43-slot+.g43-slot:focus-within .g43-pv{opacity:1}
 .g43-slot+.g43-slot:hover .g43-meta,.g43-slot+.g43-slot:focus-within .g43-meta{opacity:1}
 .g43-pile.docs .g43-slot .g43-meta{opacity:1}
-.g43-meta{font-size:13px;line-height:1.35;color:var(--b-ink-2,#3A5068);font-variant-numeric:tabular-nums;
+.g43-meta{font:12px/1.4 var(--b-mono,ui-monospace,Consolas,monospace);color:var(--b-ink-3,#5B6F84);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g43-t{font-size:15px;line-height:1.35;font-weight:600;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.g43-v{font-size:15px;line-height:1.35;color:var(--b-ink,#0F2841);font-variant-numeric:tabular-nums}
-.g43-v b{font-weight:650}
+.g43-v{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font-size:14px;line-height:1.4;
+  color:var(--b-ink-2,#3A5068);font-variant-numeric:tabular-nums}
+.g43-v .main{color:var(--b-ink,#0F2841);font-weight:600}
+.g43-v b{font-weight:700}
 .g43-v b.no{color:var(--b-red,#C2362B)} .g43-v b.yes{color:var(--b-green-ink,#00704A)}
 .g43-v b.cond,.g43-v b.none{color:var(--b-ink,#0F2841)}
 .g43-own{justify-content:flex-start;padding:13px 14px}
-.g43-own .g43-meta{white-space:normal}
+.g43-own .g43-meta{white-space:normal;font:13px/1.35 var(--b-font,inherit);color:var(--b-ink-2,#3A5068)}
+.g43-pile.docs .g43-leaf:not(.g43-own) .g43-meta{font:13px/1.35 var(--b-font,inherit);color:var(--b-ink-2,#3A5068)}
 .g43-own .g43-t{color:var(--b-green-ink,#00704A)}
-@media (min-width:761px){
-  .g43{max-height:calc(100vh - 108px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
-    padding:4px 8px 18px;margin:-4px -8px 0}
-}
 @media (max-width:760px){
   .g43{gap:14px}
   .g43-pile,.g43-pile.docs{flex-direction:row;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;
@@ -358,11 +358,14 @@ _MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 
 
 def verdict_html(summary: dict[str, Any]) -> str:
-    """«Разработка: <b>нельзя</b> · 5 блокеров» — цветом только слово (для своих листов №39 — та же строка)."""
-    word, cls = _VWORD.get(str(summary.get("development") or ""), ("не вынесен", "none"))
+    """Строка вердикта листа в две строки, как у листов №39: «Разработка: <b>нельзя</b>» и «5 блокеров».
+
+    Цветом — только слово (красное «нельзя», зелёное «можно»).
+    """
+    word, cls = _VWORD.get(str(summary.get("development") or ""), ("нет вердикта", "none"))
     crit = int(summary.get("critical") or 0)
-    tail = f"{crit} {_plural(crit, 'блокер', 'блокера', 'блокеров')}" if crit else "без блокеров"
-    return f'Разработка: <b class="{cls}">{e(word)}</b>&nbsp;· {e(tail).replace(" ", "&nbsp;", 1)}'
+    tail = f"{crit} {_plural(crit, 'блокер', 'блокера', 'блокеров')}" if crit else "блокеров нет"
+    return f'<span class="main">Разработка: <b class="{cls}">{e(word)}</b></span><span>{e(tail)}</span>'
 
 
 def _plural(n: int, one: str, few: str, many: str) -> str:
@@ -426,8 +429,10 @@ def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = N
     ex = examples if examples is not None else load_examples()
     ready = ensure_ready(app, ex)
     recs = [r for r in ex["reports"] if r["id"] in ready]
+    own_done = any(j.state == "done" for j in app.store.recent())
     leaves = []
     for i, rec in enumerate(recs):
+        on = i == 0 and not own_done  # этот лист №39 раскрывает на столе, пока своих проверок нет
         m = report_meta(rec["json"])
         date = m["date"][:5] if m["date"] else ""
         meta = " · ".join(x for x in (rec.get("subtitle") or m["model"], date) if x)
@@ -435,7 +440,8 @@ def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = N
         title = rec.get("title") or rec["id"]
         leaves.append(
             f'<div class="g43-slot" style="z-index:{len(recs) - i};--i:{i}">'
-            f'<a class="g43-leaf" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}" '
+            f'<a class="g43-leaf{" on" if on else ""}" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}" '
+            f'{"aria-current=\"page\" " if on else ""}'
             f'title="{e(meta)}{" · " + e(quotes) if quotes else ""}" '
             f'aria-label="{e(title)}: разработка — {e(m["verdict"])}, {e(m["line"].split(", ", 1)[-1])}; {e(meta)}">'
             f'{_pv(preview_lines(rec["source"]))}<span class="g43-meta">{e(meta)}</span>'
