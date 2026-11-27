@@ -595,7 +595,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     by_id = {g["id"]: g for g in out_findings}
     valid = answer_labels(resolved)
     keep = _cl.doc_codes(getattr(ctx, "view", None))
-    for d in raw.get("decisions") or []:
+    for d in _one_decision_per_finding(raw.get("decisions") or []):
         g = by_id.get(str(d.get("finding_id", "")).strip())
         if g is None:
             continue
@@ -737,6 +737,22 @@ def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", sl
         if words and len(words & theirs) / len(words) >= 0.4:
             return str(f.get("id", ""))
     return ""
+
+
+def _one_decision_per_finding(decisions: list) -> list[dict]:
+    """Модель (или два пакета ``ask_items``) дала по дефекту несколько решений — берём самое осторожное:
+    с конфликтом ответов, затем open, changed, resolved. Порядок дефектов сохраняется."""
+    rank = {"resolved": 0, "changed": 1, "open": 2}
+    best: dict[str, dict] = {}
+    for d in decisions:
+        if not isinstance(d, dict):
+            continue
+        fid = str(d.get("finding_id", "")).strip()
+        key = (len(d.get("conflicting_answers") or []) >= 2, rank.get(d.get("status"), 2))
+        prev = best.get(fid)
+        if prev is None or key > (len(prev.get("conflicting_answers") or []) >= 2, rank.get(prev.get("status"), 2)):
+            best[fid] = d
+    return list(best.values())
 
 
 def _force_choice_conflicts(result: dict) -> None:

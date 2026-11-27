@@ -244,3 +244,11 @@ def test_json_two_replies(data):
 def test_json_soft_refusal():
     r = recheck.resolve_answers(QS, recheck.load_answers({"Q-02": {"text": "пока не знаю, решим после встречи"}}))
     assert r["answered"] == [] and r["postponed"][0]["question_id"] == "Q-02"
+
+
+def test_duplicate_model_decisions_most_cautious_wins():
+    resp = _resp([{"finding_id": "D-01", "status": "open", "conflicting_answers": ["Q-01"], "reason": "ответы расходятся"},
+                  {"finding_id": "D-01", "status": "resolved", "by": ["Q-01"], "reason": "снят ответом Q-01"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), TWO)["clarification"]
+    ch = next(c for c in clar["changes"] if c["finding_id"] == "D-01")
+    assert ch["status"] == "open" and ch["answer_conflict"] == ["Q-01.1", "Q-01.2"]
