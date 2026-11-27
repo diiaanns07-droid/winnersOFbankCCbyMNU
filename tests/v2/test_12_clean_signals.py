@@ -386,3 +386,17 @@ def test_event_conflict_is_critical() -> None:
     assert ev_c and all(c["severity"] == "critical" for c in ev_c)
     out = rules.run(fallback_load(CORPUS / "cashback.range_boundary.cap_strict" / "source.md"))
     assert all(c["severity"] == "major" for c in out["candidates"] if "boundary" in c["source"] or "range" in c["source"])
+
+
+def test_change_request_old_new_table_is_not_conflict() -> None:
+    """Доработка с таблицей «было → стало»: старое и новое значение одной величины — не противоречие."""
+    from bcc_review.v2 import docview
+    from bcc_review.v2.stages import segment
+    view = docview.load(STYLES / "wave3b_change_clean.md")
+    for seg in (None, segment.heuristic_segment(view)):
+        out = rules.run(view, seg)
+        assert out["candidates"] == [], [(c["source"], c["title"]) for c in out["candidates"]]
+        assert _defect_signals(out) == []
+    out = rules.run(fallback_load(STYLES / "wave3b_change_defects.md"))
+    src = {c["source"].split(".L")[0] for c in out["candidates"]}
+    assert {"rules:conflicts.range_acceptance", "rules:api.status_400"} <= src, src

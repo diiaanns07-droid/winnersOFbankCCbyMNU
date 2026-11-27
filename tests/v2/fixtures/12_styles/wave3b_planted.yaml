@@ -23,3 +23,7 @@ wave3b_holiday_defects.md:
   - {lines: [48], severity: major, kind: api_contract, what: "отзыв заявки — GET", rules: yes}
   - {lines: [17, 52], severity: major, kind: unit_mismatch, what: "рассмотрение 3 рабочих дня в КК-4, 3 календарных дня в разделе API", rules: yes}
   - {lines: [14], severity: minor, kind: ambiguity, what: "открытый перечень видов кредитов «и т. п.»", rules: yes}
+wave3b_change_defects.md:
+  - {lines: [65], severity: major, kind: status_conflict, what: "в логике осталось старое 400, в перечне статусов — новое 422", rules: yes}
+  - {lines: [30, 42], severity: critical, kind: boundary_conflict, what: "новый максимум 1 000 000 ₸ допустим по Ф-1, критерий приёмки ждёт отказ", rules: yes}
+  - {lines: [31, 60], severity: major, kind: incorrect, what: "временный лимит: 7 календарных дней в Ф-2, 3 календарных дня (старое значение) в API", rules: no}
