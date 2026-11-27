@@ -249,3 +249,13 @@ def test_table_style_inline_endpoints_and_adjacent_tables() -> None:
     assert {"rules:promises.read_operation", "rules:api.status_409", "rules:api.get_mutation",
             "rules:api.field_types"} <= src, src
     _quotes_ok(path, out)
+
+
+@pytest.mark.parametrize("case", ["insurance", "capital", "grace", "insurance_clean"])
+def test_rules_same_in_md_pdf_docx(case: str) -> None:
+    """Паритет форматов: те же правила в MD, PDF и DOCX (в PDF объявление статуса переносится на строку)."""
+    from bcc_review.v2 import docview
+    base = ROOT / "evaluation" / "v2" / "open2" / case / "source"
+    res = {ext: {c["source"] for c in rules.run(docview.load(f"{base}.{ext}"))["candidates"]}
+           for ext in ("md", "pdf", "docx")}
+    assert res["pdf"] == res["md"] and res["docx"] == res["md"], res

@@ -432,6 +432,26 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
         for m in DECL_INLINE.finditer(x.text):  # «… Ответ 400 — поле отсутствует: {…}» внутри строки
             if m.start() > 0:
                 decls.append(Status(int(m.group(1)), x, "inline"))
+    # PDF/DOCX: объявление переносится на следующую строку («422. Ответ в случае, если клиент не» / «подходит по
+    # возрасту.») — условие нужно целиком, иначе тот же случай под другим кодом не сравнить
+    idx = {x.n: i for i, x in enumerate(doc.lines)}
+    for d in decls:
+        if d.kind != "list":
+            continue
+        t = d.text.rstrip()
+        i = idx.get(d.line.n)
+        if i is None or i + 1 >= len(doc.lines) or re.search(r"[.!?:;»)]$", t) or len(t) < 12:
+            continue
+        if not d.line.joined.rstrip().endswith(t[-20:]):
+            continue  # объявление не в конце строки — переноса нет
+        nx = doc.lines[i + 1]
+        if nx.text and nx.cells is None and not nx.is_heading and not nx.is_code and nx.text[:1].islower() \
+                and not DECL_LIST.match(nx.text):
+            k = DECL_LIST_INLINE.search(nx.text)
+            tail = nx.text[:k.start(1)] if k else nx.text
+            e = tail.find(". ")
+            tail = tail[:e + 1] if e != -1 else tail
+            d.seg = f"{t} {tail.strip()}"
     mentions: list[tuple[int, Line, str]] = []
     for x in doc.lines:
         if not x.text or x.is_code:
