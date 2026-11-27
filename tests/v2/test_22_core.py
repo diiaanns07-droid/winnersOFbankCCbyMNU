@@ -328,3 +328,10 @@ def test_interactive_no_answers_keeps_report(tmp_path, monkeypatch):
                  "--runs-dir", str(tmp_path / "runs")]) == 0
     assert not (tmp_path / "r.answers.md").exists()
     assert not json.loads((tmp_path / "r.json").read_text(encoding="utf-8")).get("clarification")
+
+
+def test_runs_cost_limit_counts_all_passes(tmp_path):
+    report, _, _ = _run(tmp_path, runs=2, max_tokens=10**9)
+    lim = report["run"]["cost_limit"]
+    assert lim["spent_tokens"] == sum(report["stability"]["tokens_total"].values())
+    assert lim["hit"] is False
