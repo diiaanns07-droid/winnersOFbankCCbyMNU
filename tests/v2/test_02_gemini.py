@@ -222,3 +222,11 @@ def test_schema_rejected_retries_same_model_with_schema_as_text():
     assert '"required": ["answer"]' in s.last_messages[0]["content"]      # схема текстом в system
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
     assert s.modes.count(("gemini-3.8-flash", "text")) == 1               # режим запомнен, адаптер переиспользуется
+
+
+def test_stage_limit_never_lowers_gemini_output_limit():
+    p, s, _ = make({})
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=8000)
+    assert s.last_max_tokens == 32000
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=60000)
+    assert s.last_max_tokens == 60000

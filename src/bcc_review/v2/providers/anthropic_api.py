@@ -121,7 +121,7 @@ class AnthropicProvider:
                timeout_s: float, max_output_tokens: int | None = None, **_: Any) -> dict[str, Any]:
         model = (model or self.default_model).strip()
         wire = to_cached_messages(messages)
-        max_tokens = int(max_output_tokens or self.max_tokens)
+        max_tokens = max(int(max_output_tokens or 0), self.max_tokens)   # лимит этапа не опускает лимит провайдера
         for _attempt in range(3):
             adapter = self._adapter(max_tokens)
             try:

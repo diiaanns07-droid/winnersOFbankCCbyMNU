@@ -21,9 +21,14 @@ code; пусто у пустой строки), ``level`` (уровень заг
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from pathlib import Path
 from typing import Any, Iterable
+
+# PyMuPDF без пакета pymupdf_layout печатает в stdout совет его поставить — это засоряет вывод агента
+# (просьба №16). Переменная проверяется в момент разбора страницы, поэтому достаточно задать её здесь.
+os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")
 
 SECTION_SEP = " › "
 FORMATS = {".md": "md", ".markdown": "md", ".txt": "txt", ".pdf": "pdf", ".docx": "docx",
@@ -69,7 +74,8 @@ def load(path: str | Path) -> dict:
         text = data.decode("utf-8-sig", errors="replace")
         lines = _text_lines(text, doc)
     else:
-        lines = _block_lines(doc or {})
+        sizes = _page_sizes(p) if fmt == "pdf" else {}
+        lines = _block_lines(doc or {}, sizes, warnings)
     title = _title(doc, lines, p)
     _strip_title_from_sections(lines, title)
     pages = None
@@ -251,24 +257,169 @@ def _list_prefix(b: dict) -> str:
 
 
 # --------------------------------------------------------------------------- PDF / DOCX
-def _block_lines(doc: dict) -> list[dict]:
-    """По строке на блок читателя; многострочный блок — несколько строк с одним block_id."""
+def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = None) -> list[dict]:
+    """По строке на блок читателя; многострочный блок — несколько строк с одним block_id.
+
+    PDF: порядок чтения на страницах в две колонки восстанавливается по колонкам; повторяющиеся колонтитулы
+    (верх/низ страницы, одинаковый текст на большинстве страниц, номер страницы не в счёт) убираются.
+    DOCX: у пунктов автонумерации Word в начало строки ставится номер («1.», «2.1.»), как его видит читатель.
+    """
+    blocks = [b for b in doc.get("blocks") or [] if isinstance(b, dict)]
+    warnings = warnings if warnings is not None else []
+    if sizes:
+        blocks, two_col = _reorder_columns(blocks, sizes)
+        if two_col:
+            what = (f"Страница {two_col[0]} свёрстана" if len(two_col) == 1
+                    else f"Страницы {_pages_list(two_col)} свёрстаны")
+            warnings.append(f"{what} в две колонки: порядок чтения восстановлен по колонкам "
+                            "(сначала левая, затем правая).")
+        before = len(blocks)
+        blocks, dropped = _drop_running(blocks, sizes)
+        if dropped:
+            n = before - len(blocks)
+            word = "строка" if n % 10 == 1 and n % 100 != 11 else (
+                "строки" if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else "строк")
+            sample = "; ".join(f"«{t}»" for t in dropped[:3])
+            warnings.append(f"Колонтитулы убраны из текста ({n} {word}): {sample}.")
     out: list[dict] = []
-    for b in doc.get("blocks") or []:
+    for b in blocks:
         loc = b.get("loc") or {}
         page = loc.get("page")
         page = int(page) if isinstance(page, int) or (isinstance(page, str) and page.isdigit()) else None
         sec = _section(b)
         parts = str(b.get("text") or "").splitlines() or [""]
+        label = _list_label(b)
         for i, part in enumerate(parts):
             t = part
             if b.get("kind") == "list_item" and i == 0:
                 t = _BULLET_GLYPH.sub("", t.lstrip())
+                if label and not t.startswith(label):
+                    t = f"{label} {t}"
             out.append({"n": len(out) + 1, "text": _clean(t), "page": page, "section": sec,
                         "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
                         "level": _level(b) if b.get("kind") == "heading" else 0,
                         "heading": b.get("kind") == "heading"})
     return out
+
+
+def _list_label(b: dict) -> str:
+    """Номер пункта автонумерации DOCX («1.», «2.1.», «а)»), маркеры «•» не ставим."""
+    lst = (b.get("loc") or {}).get("list") or {}
+    if b.get("kind") != "list_item" or not isinstance(lst, dict) or "num_id" not in lst:
+        return ""
+    label = str(lst.get("label") or "").strip()
+    return label if label and any(ch.isalnum() for ch in label) and len(label) <= 12 else ""
+
+
+def _page_sizes(path: Path) -> dict[int, tuple[float, float]]:
+    try:
+        import pymupdf
+    except Exception:  # noqa: BLE001
+        return {}
+    try:
+        with pymupdf.open(str(path)) as d:
+            return {i + 1: (pg.rect.width, pg.rect.height) for i, pg in enumerate(d) if pg.rotation == 0}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _bbox(b: dict) -> list[float] | None:
+    bb = (b.get("loc") or {}).get("bbox")
+    if isinstance(bb, (list, tuple)) and len(bb) == 4 and all(isinstance(x, (int, float)) for x in bb):
+        return [float(x) for x in bb]
+    return None
+
+
+def _page_of(b: dict) -> int | None:
+    pg = (b.get("loc") or {}).get("page")
+    return int(pg) if isinstance(pg, int) else None
+
+
+def _pages_list(pages: list[int]) -> str:
+    pages = sorted(set(pages))
+    if len(pages) > 2 and pages[-1] - pages[0] == len(pages) - 1:
+        return f"{pages[0]}–{pages[-1]}"
+    return ", ".join(str(p) for p in pages)
+
+
+def _reorder_columns(blocks: list[dict], sizes: dict) -> tuple[list[dict], list[int]]:
+    """Страница в две колонки: блоки во всю ширину делят страницу на полосы; в полосе — левая колонка сверху вниз,
+    затем правая. Страницы в одну колонку не трогаются."""
+    by_page: dict[int, list[int]] = {}
+    for i, b in enumerate(blocks):
+        pg = _page_of(b)
+        if pg is not None and _bbox(b) and pg in sizes:
+            by_page.setdefault(pg, []).append(i)
+    order = list(range(len(blocks)))
+    two_col: list[int] = []
+    for pg, idxs in by_page.items():
+        w = sizes[pg][0]
+        left = [i for i in idxs if _bbox(blocks[i])[2] <= w * 0.55]
+        right = [i for i in idxs if _bbox(blocks[i])[0] >= w * 0.45]
+        if len(left) < 3 or len(right) < 3:
+            continue
+        if max(_bbox(blocks[i])[2] for i in left) > min(_bbox(blocks[i])[0] for i in right) + 2:
+            continue  # колонки перекрываются — это не вёрстка в две колонки
+        if any(blocks[i].get("kind") in ("table_row", "table_header") for i in left + right):
+            continue
+        full = sorted((i for i in idxs if i not in left and i not in right), key=lambda i: _bbox(blocks[i])[1])
+        new: list[int] = []
+        top = -1e9
+        for cut in [*full, None]:
+            bottom = _bbox(blocks[cut])[1] if cut is not None else 1e9
+            band_l = sorted((i for i in left if top <= _bbox(blocks[i])[1] < bottom), key=lambda i: _bbox(blocks[i])[1])
+            band_r = sorted((i for i in right if top <= _bbox(blocks[i])[1] < bottom), key=lambda i: _bbox(blocks[i])[1])
+            new += band_l + band_r
+            if cut is not None:
+                new.append(cut)
+                top = _bbox(blocks[cut])[3]
+        if sorted(new) != sorted(idxs) or new == idxs:
+            continue
+        positions = sorted(order.index(i) for i in idxs)
+        for pos, i in zip(positions, new):
+            order[pos] = i
+        two_col.append(pg)
+    return [blocks[i] for i in order], sorted(two_col)
+
+
+def _running_key(text: str) -> str:
+    t = re.sub(r"\d+", "#", text.casefold())
+    return re.sub(r"\s+", " ", t).strip()
+
+
+_PAGE_NO = re.compile(r"^\s*(?:стр(?:аница)?\.?\s*|page\s*|[-–—]\s*)?\d{1,4}"
+                      r"(?:\s*(?:из|/|of)\s*\d{1,4})?\s*[-–—]?\s*$", re.IGNORECASE)
+
+
+def _drop_running(blocks: list[dict], sizes: dict) -> tuple[list[dict], list[str]]:
+    """Убрать колонтитулы: блок в верхних или нижних 9 % страницы, текст которого (без цифр) повторяется на
+    большинстве страниц, или одиночный номер страницы. Строки таблиц не трогаются."""
+    pages = sorted({p for p in (_page_of(b) for b in blocks) if p is not None})
+    if len(pages) < 2:
+        return blocks, []
+    edge: dict[int, str] = {}
+    for i, b in enumerate(blocks):
+        pg, bb = _page_of(b), _bbox(b)
+        if pg not in sizes or not bb or b.get("kind") in ("table_row", "table_header"):
+            continue
+        h = sizes[pg][1]
+        if bb[3] <= h * 0.09 or bb[1] >= h * 0.91:
+            edge[i] = _running_key(str(b.get("text") or ""))
+    seen: dict[str, set[int]] = {}
+    for i, key in edge.items():
+        if key:
+            seen.setdefault(key, set()).add(_page_of(blocks[i]))
+    need = max(2, (len(pages) + 1) // 2)
+    drop = {i for i, key in edge.items()
+            if key and (len(seen[key]) >= need or _PAGE_NO.match(str(blocks[i].get("text") or "")))}
+    if not drop:
+        return blocks, []
+    texts = []
+    for i in sorted(drop):
+        t = " ".join(str(blocks[i].get("text") or "").split())
+        if t not in texts:
+            texts.append(t)
+    return [b for i, b in enumerate(blocks) if i not in drop], texts
 
 
 # --------------------------------------------------------------------------- общее
@@ -350,10 +501,11 @@ def _doc_warnings(doc: dict | None) -> list[str]:
             out.append(msg)
     ext = doc.get("extraction") or {}
     unread = ext.get("pages_unread") or []
-    if unread:
+    said = " ".join(out).casefold()
+    if unread and "не прочитаны страниц" not in said and "нет текстового слоя" not in said:
         out.append("Не прочитаны страницы: " + ", ".join(str(p) for p in unread) + " (скан или нечитаемый шрифт).")
     ocr = ext.get("pages_ocr") or []
-    if ocr:
+    if ocr and "ocr" not in said:
         out.append("Страницы распознаны OCR, возможны ошибки текста: " + ", ".join(str(p) for p in ocr) + ".")
     return out
 
