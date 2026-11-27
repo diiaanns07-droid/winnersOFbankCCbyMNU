@@ -250,7 +250,7 @@ def clarity_of(findings: list[dict], vocab) -> dict:
 
 
 def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_dir: str | None = None,
-                 arbiter: str = "off", cache_path: Path = DEFAULT_CACHE) -> dict:
+                 arbiter: str = "off", cache_path: Path = DEFAULT_CACHE, displaced: bool = True) -> dict:
     t0 = time.monotonic()
     doc_path = ROOT / gold["document"]
     lines = load_doc(doc_path)
@@ -306,15 +306,34 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
         найденным никем, засчитывается за этот пункт. focus() отбрасывает такую пару, когда соседний пункт по общей
         строке набирает больше (С15 ↔ С3 на строке 156, С14 ↔ К4 на строке 52, просьба №07) — и замечание о другом
         дефекте уходило в дубли. Только если заголовок замечания говорит о теме пункта (ключевые слова пункта в
-        заголовке): иначе настоящий дубль К1 «доставался» бы соседнему М8. Порядок: критичные первыми, по оценке."""
+        заголовке): иначе настоящий дубль К1 «доставался» бы соседнему М8. Порядок: критичные первыми, по оценке.
+
+        «Вытесненная» пара (С15, просьба №26, `displaced`): условие о заголовке снимается, если лучший пункт этого
+        замечания уже занят другим замечанием с большей оценкой — тогда замечание точно не дубль своего лучшего
+        пункта, и строгая пара (опоры + ключевые слова) того же вида дефекта (`kinds` пункта) говорит, о чём оно
+        (haiku: D-18 «тело ответа» → С15, а не дубль С3, занятого D-19 3,9 > 3,6). Без совпадения вида
+        «противоречие цели и задержки» доставалось бы М1 по слову «бюджет». Настоящий дубль с лучшей оценкой, чем
+        у хозяина пункта, — не вытеснен."""
         used = set(assignment.values())
+        g2f = dict(assignment)
+
+        def pushed_out(fid: str) -> bool:
+            if not displaced:
+                return False
+            mine = [(sc, g) for (g, f), sc in e_all.items() if f == fid]
+            if not mine:
+                return False
+            top, g_best = max(mine, key=lambda x: (x[0], x[1]))
+            owner = g2f.get(g_best)
+            return owner is not None and owner != fid and e_all.get((g_best, owner), -9.0) > top
         for it in sorted(items, key=lambda it: (LEVEL_ORDER.get(it["level"], 3), items.index(it))):
             gid = it["id"]
             if gid in assignment:
                 continue
             cand = sorted(((sc, fid) for (g, fid), sc in e_all.items()
                            if g == gid and fid not in used and pairs.get((g, fid), {}).get("status") == "match"
-                           and pairs[(g, fid)].get("title_hits")),  # заголовок замечания — о теме этого пункта
+                           and (pairs[(g, fid)].get("title_hits")  # заголовок замечания — о теме этого пункта
+                                or (pushed_out(fid) and pairs[(g, fid)].get("kind_ok")))),  # или вытеснена
                           key=lambda x: (-x[0], x[1]))
             if cand:
                 assignment[gid] = cand[0][1]
