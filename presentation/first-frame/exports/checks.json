@@ -1,0 +1,822 @@
+{
+  "generated_at": "2026-11-26T18:37:01.073Z",
+  "safe_area_px": {
+    "x": 96,
+    "y": 54
+  },
+  "min_text_px_1080": 26,
+  "frames": {
+    "a": {
+      "items": [
+        {
+          "text": "Кейс банка · месячный порог расходов по карте",
+          "voice": "team",
+          "el": "kicker",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 1101,
+            "t": 72,
+            "r": 1824,
+            "b": 108
+          },
+          "lines": 1
+        },
+        {
+          "text": "Январь. На",
+          "voice": "team",
+          "el": "headline",
+          "font": "Inter",
+          "px": 88,
+          "weight": 600,
+          "px720": 58.7,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 96,
+            "t": 206,
+            "r": 580,
+            "b": 312
+          },
+          "lines": 1
+        },
+        {
+          "text": "50 000 ₸",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 88,
+          "weight": 600,
+          "px720": 58.7,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 580,
+            "t": 206,
+            "r": 954,
+            "b": 312
+          },
+          "lines": 1
+        },
+        {
+          "text": "пришёл push.",
+          "voice": "team",
+          "el": "headline",
+          "font": "Inter",
+          "px": 88,
+          "weight": 600,
+          "px720": 58.7,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 954,
+            "t": 206,
+            "r": 1553,
+            "b": 312
+          },
+          "lines": 1
+        },
+        {
+          "text": "Клиент поднимает порог до",
+          "voice": "team",
+          "el": "lead",
+          "font": "Inter",
+          "px": 44,
+          "weight": 400,
+          "px720": 29.3,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 96,
+            "t": 334,
+            "r": 714,
+            "b": 388
+          },
+          "lines": 1
+        },
+        {
+          "text": "80 000 ₸",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 44,
+          "weight": 400,
+          "px720": 29.3,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 714,
+            "t": 334,
+            "r": 909,
+            "b": 388
+          },
+          "lines": 1
+        },
+        {
+          "text": "и продолжает платить картой.",
+          "voice": "team",
+          "el": "lead",
+          "font": "Inter",
+          "px": 44,
+          "weight": 400,
+          "px720": 29.3,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 909,
+            "t": 334,
+            "r": 1578,
+            "b": 388
+          },
+          "lines": 1
+        },
+        {
+          "text": "порог",
+          "voice": "team",
+          "el": "thr__cap",
+          "font": "Inter",
+          "px": 28,
+          "weight": 500,
+          "px720": 18.7,
+          "contrast": 6.93,
+          "contrast_projector": 4.74,
+          "box": {
+            "l": 1196,
+            "t": 488,
+            "r": 1276,
+            "b": 522
+          },
+          "lines": 1
+        },
+        {
+          "text": "50 000 ₸",
+          "voice": "team",
+          "el": "thr__num num",
+          "font": "Inter",
+          "px": 52,
+          "weight": 700,
+          "px720": 34.7,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 1196,
+            "t": 520,
+            "r": 1423,
+            "b": 583
+          },
+          "lines": 1
+        },
+        {
+          "text": "новый порог",
+          "voice": "team",
+          "el": "thr__cap",
+          "font": "Inter",
+          "px": 28,
+          "weight": 500,
+          "px720": 18.7,
+          "contrast": 6.93,
+          "contrast_projector": 4.74,
+          "box": {
+            "l": 1649,
+            "t": 488,
+            "r": 1824,
+            "b": 522
+          },
+          "lines": 1
+        },
+        {
+          "text": "80 000 ₸",
+          "voice": "team",
+          "el": "thr__num num",
+          "font": "Inter",
+          "px": 52,
+          "weight": 700,
+          "px720": 34.7,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 1597,
+            "t": 520,
+            "r": 1824,
+            "b": 583
+          },
+          "lines": 1
+        },
+        {
+          "text": "48 500 ₸ за январь",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 32,
+          "weight": 600,
+          "px720": 21.3,
+          "contrast": 18.15,
+          "contrast_projector": 8.31,
+          "box": {
+            "l": 124,
+            "t": 629,
+            "r": 431,
+            "b": 668
+          },
+          "lines": 1
+        },
+        {
+          "text": "расходы растут →",
+          "voice": "team",
+          "el": "span",
+          "font": "Inter",
+          "px": 28,
+          "weight": 500,
+          "px720": 18.7,
+          "contrast": 7.5,
+          "contrast_projector": 4.74,
+          "box": {
+            "l": 1372,
+            "t": 631,
+            "r": 1628,
+            "b": 665
+          },
+          "lines": 1
+        },
+        {
+          "text": "+1 500 ₸",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 28,
+          "weight": 600,
+          "px720": 18.7,
+          "contrast": 5.68,
+          "contrast_projector": 4.16,
+          "box": {
+            "l": 874,
+            "t": 718,
+            "r": 998,
+            "b": 752
+          },
+          "lines": 1
+        },
+        {
+          "text": "покупка",
+          "voice": "team",
+          "el": "below below--buy",
+          "font": "Inter",
+          "px": 28,
+          "weight": 600,
+          "px720": 18.7,
+          "contrast": 5.68,
+          "contrast_projector": 4.16,
+          "box": {
+            "l": 1010,
+            "t": 718,
+            "r": 1126,
+            "b": 752
+          },
+          "lines": 1
+        },
+        {
+          "text": "push пришёл",
+          "voice": "team",
+          "el": "badge badge--done",
+          "font": "Inter",
+          "px": 30,
+          "weight": 600,
+          "px720": 20,
+          "contrast": 6.17,
+          "contrast_projector": 4.55,
+          "box": {
+            "l": 1254,
+            "t": 728,
+            "r": 1450,
+            "b": 764
+          },
+          "lines": 1
+        },
+        {
+          "text": "push?",
+          "voice": "team",
+          "el": "badge badge--open",
+          "font": "Inter",
+          "px": 30,
+          "weight": 600,
+          "px720": 20,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 1711,
+            "t": 728,
+            "r": 1799,
+            "b": 764
+          },
+          "lines": 1
+        },
+        {
+          "text": "Числа 48 500, 1 500 и 50 000 ₸ — из первого критерия приёмки",
+          "voice": "team",
+          "el": "footnote",
+          "font": "Inter",
+          "px": 26,
+          "weight": 400,
+          "px720": 17.3,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 96,
+            "t": 830,
+            "r": 1678,
+            "b": 861
+          },
+          "lines": 1
+        },
+        {
+          "text": "Имя спикера",
+          "voice": "speaker",
+          "el": "speaker__name",
+          "font": "Inter",
+          "px": 34,
+          "weight": 600,
+          "px720": 22.7,
+          "contrast": 17.51,
+          "contrast_projector": 8.04,
+          "box": {
+            "l": 128,
+            "t": 927,
+            "r": 350,
+            "b": 968
+          },
+          "lines": 1
+        },
+        {
+          "text": "MNU AI Club",
+          "voice": "speaker",
+          "el": "speaker__role",
+          "font": "Inter",
+          "px": 28,
+          "weight": 500,
+          "px720": 18.7,
+          "contrast": 9.63,
+          "contrast_projector": 5.96,
+          "box": {
+            "l": 128,
+            "t": 970,
+            "r": 300,
+            "b": 1004
+          },
+          "lines": 1
+        }
+      ],
+      "issues": [],
+      "fonts": {
+        "Inter": true
+      },
+      "missingLogos": [
+        "assets/logos/bcc-hub-full.png",
+        "assets/logos/mnu-ai-club.webp"
+      ],
+      "words": {
+        "team": 63,
+        "speaker": 5
+      },
+      "quotes": [],
+      "min_px_1080": 26,
+      "min_px_720": 17.3,
+      "min_contrast_projector": 4.16,
+      "reading_seconds_all_text": 22.7
+    },
+    "b": {
+      "items": [
+        {
+          "text": "Кейс банка · месячный порог расходов по карте",
+          "voice": "team",
+          "el": "kicker",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 1101,
+            "t": 72,
+            "r": 1824,
+            "b": 108
+          },
+          "lines": 1
+        },
+        {
+          "text": "Январь",
+          "voice": "team",
+          "el": "recap__l0",
+          "font": "Inter",
+          "px": 28,
+          "weight": 500,
+          "px720": 18.7,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 96,
+            "t": 200,
+            "r": 196,
+            "b": 234
+          },
+          "lines": 1
+        },
+        {
+          "text": "push уже был на",
+          "voice": "team",
+          "el": "recap__l50",
+          "font": "Inter",
+          "px": 28,
+          "weight": 500,
+          "px720": 18.7,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 798,
+            "t": 200,
+            "r": 1036,
+            "b": 234
+          },
+          "lines": 1
+        },
+        {
+          "text": "50 000 ₸",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 28,
+          "weight": 600,
+          "px720": 18.7,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 1036,
+            "t": 200,
+            "r": 1160,
+            "b": 234
+          },
+          "lines": 1
+        },
+        {
+          "text": "порог поднят, расходы дошли до",
+          "voice": "team",
+          "el": "recap__l80",
+          "font": "Inter",
+          "px": 28,
+          "weight": 500,
+          "px720": 18.7,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 1232,
+            "t": 200,
+            "r": 1700,
+            "b": 234
+          },
+          "lines": 1
+        },
+        {
+          "text": "80 000 ₸",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 28,
+          "weight": 600,
+          "px720": 18.7,
+          "contrast": 15.93,
+          "contrast_projector": 7.36,
+          "box": {
+            "l": 1700,
+            "t": 200,
+            "r": 1824,
+            "b": 234
+          },
+          "lines": 1
+        },
+        {
+          "text": "A",
+          "voice": "ref",
+          "el": "tag",
+          "font": "Inter",
+          "px": 28,
+          "weight": 700,
+          "px720": 18.7,
+          "contrast": 6.82,
+          "contrast_projector": 4.86,
+          "box": {
+            "l": 153,
+            "t": 304,
+            "r": 173,
+            "b": 338
+          },
+          "lines": 1
+        },
+        {
+          "text": "ТЗ банка · Ф-3 · строка 39",
+          "voice": "ref",
+          "el": "doc__ref",
+          "font": "JetBrains Mono",
+          "px": 26,
+          "weight": 500,
+          "px720": 17.3,
+          "contrast": 9.98,
+          "contrast_projector": 6.16,
+          "box": {
+            "l": 202,
+            "t": 303,
+            "r": 608,
+            "b": 338
+          },
+          "lines": 1
+        },
+        {
+          "text": "На карту приходится максимум один такой push за календарный ",
+          "voice": "doc",
+          "el": "doc__quote",
+          "font": "PT Serif",
+          "px": 44,
+          "weight": 400,
+          "px720": 29.3,
+          "contrast": 18.15,
+          "contrast_projector": 8.31,
+          "box": {
+            "l": 140,
+            "t": 362,
+            "r": 820,
+            "b": 534
+          },
+          "lines": 3
+        },
+        {
+          "text": "Клиенту на",
+          "voice": "team",
+          "el": "outcome__lead",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 100,
+            "t": 644,
+            "r": 275,
+            "b": 680
+          },
+          "lines": 1
+        },
+        {
+          "text": "80 000 ₸",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 275,
+            "t": 644,
+            "r": 408,
+            "b": 680
+          },
+          "lines": 1
+        },
+        {
+          "text": ":",
+          "voice": "team",
+          "el": "outcome__lead",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 408,
+            "t": 644,
+            "r": 417,
+            "b": 680
+          },
+          "lines": 1
+        },
+        {
+          "text": "push не придёт",
+          "voice": "team",
+          "el": "outcome__res",
+          "font": "Inter",
+          "px": 52,
+          "weight": 700,
+          "px720": 34.7,
+          "contrast": 5.99,
+          "contrast_projector": 4.31,
+          "box": {
+            "l": 166,
+            "t": 679,
+            "r": 561,
+            "b": 742
+          },
+          "lines": 1
+        },
+        {
+          "text": "B",
+          "voice": "ref",
+          "el": "tag",
+          "font": "Inter",
+          "px": 28,
+          "weight": 700,
+          "px720": 18.7,
+          "contrast": 7.39,
+          "contrast_projector": 5.13,
+          "box": {
+            "l": 1042,
+            "t": 304,
+            "r": 1060,
+            "b": 338
+          },
+          "lines": 1
+        },
+        {
+          "text": "ТЗ банка · Ф-4 · строка 40",
+          "voice": "ref",
+          "el": "doc__ref",
+          "font": "JetBrains Mono",
+          "px": 26,
+          "weight": 500,
+          "px720": 17.3,
+          "contrast": 9.98,
+          "contrast_projector": 6.16,
+          "box": {
+            "l": 1090,
+            "t": 303,
+            "r": 1496,
+            "b": 338
+          },
+          "lines": 1
+        },
+        {
+          "text": "Если она ниже нового порога, следующее достижение вызывает p",
+          "voice": "doc",
+          "el": "doc__quote",
+          "font": "PT Serif",
+          "px": 44,
+          "weight": 400,
+          "px720": 29.3,
+          "contrast": 18.15,
+          "contrast_projector": 8.31,
+          "box": {
+            "l": 1028,
+            "t": 362,
+            "r": 1724,
+            "b": 590
+          },
+          "lines": 4
+        },
+        {
+          "text": "Клиенту на",
+          "voice": "team",
+          "el": "outcome__lead",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 988,
+            "t": 644,
+            "r": 1163,
+            "b": 680
+          },
+          "lines": 1
+        },
+        {
+          "text": "80 000 ₸",
+          "voice": "team",
+          "el": "num",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 1163,
+            "t": 644,
+            "r": 1296,
+            "b": 680
+          },
+          "lines": 1
+        },
+        {
+          "text": ":",
+          "voice": "team",
+          "el": "outcome__lead",
+          "font": "Inter",
+          "px": 30,
+          "weight": 500,
+          "px720": 20,
+          "contrast": 8.76,
+          "contrast_projector": 5.46,
+          "box": {
+            "l": 1296,
+            "t": 644,
+            "r": 1305,
+            "b": 680
+          },
+          "lines": 1
+        },
+        {
+          "text": "придёт второй push",
+          "voice": "team",
+          "el": "outcome__res",
+          "font": "Inter",
+          "px": 52,
+          "weight": 700,
+          "px720": 34.7,
+          "contrast": 6.49,
+          "contrast_projector": 4.55,
+          "box": {
+            "l": 1054,
+            "t": 679,
+            "r": 1568,
+            "b": 742
+          },
+          "lines": 1
+        },
+        {
+          "text": "Вопрос владельцу продукта",
+          "voice": "team",
+          "el": "ask__label",
+          "font": "Inter",
+          "px": 28,
+          "weight": 600,
+          "px720": 18.7,
+          "contrast": 11,
+          "contrast_projector": 5.26,
+          "box": {
+            "l": 140,
+            "t": 823,
+            "r": 642,
+            "b": 857
+          },
+          "lines": 1
+        },
+        {
+          "text": "После смены порога присылаем второй push в том же месяце?",
+          "voice": "team",
+          "el": "ask__q",
+          "font": "Inter",
+          "px": 56,
+          "weight": 600,
+          "px720": 37.3,
+          "contrast": 18.15,
+          "contrast_projector": 8.31,
+          "box": {
+            "l": 140,
+            "t": 862,
+            "r": 1043,
+            "b": 992
+          },
+          "lines": 2
+        }
+      ],
+      "issues": [],
+      "fonts": {
+        "Inter": true,
+        "JetBrains Mono": true,
+        "PT Serif": true
+      },
+      "missingLogos": [
+        "assets/logos/bcc-hub-full.png",
+        "assets/logos/mnu-ai-club.webp"
+      ],
+      "words": {
+        "team": 48,
+        "ref": 12,
+        "doc": 24
+      },
+      "quotes": [
+        {
+          "line": 39,
+          "text": "На карту приходится максимум один такой push за календарный месяц."
+        },
+        {
+          "line": 40,
+          "text": "Если она ниже нового порога, следующее достижение вызывает push независимо от истории предыдущей настройки."
+        }
+      ],
+      "min_px_1080": 26,
+      "min_px_720": 17.3,
+      "min_contrast_projector": 4.31,
+      "reading_seconds_all_text": 28,
+      "words_quotes_and_question": 34,
+      "reading_seconds_quotes_and_question": 11.3
+    }
+  }
+}

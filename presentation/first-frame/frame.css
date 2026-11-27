@@ -1,0 +1,314 @@
+/*
+  Первый экран: кадр A (финансовая ситуация) → кадр B (две цитаты ТЗ и вопрос владельцу).
+  Холст 1920×1080. Все цвета, кегли и поля — в токенах ниже: правьте здесь, а не в разметке.
+
+  Три голоса на экране, у каждого свой шрифт и своё место:
+    • слова документа  — PT Serif в белой «бумажной» карточке, адрес в документе моноширинным;
+    • текст команды    — Inter прямо на фоне (заголовок, исходы для клиента, вопрос);
+    • подпись спикера  — плашка в левом нижнем углу кадра A, только Inter, без цитат рядом.
+*/
+
+@font-face { font-family: "Inter"; font-weight: 400; font-display: block; src: url("assets/fonts/Inter-Regular.subset.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 500; font-display: block; src: url("assets/fonts/Inter-Medium.subset.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 600; font-display: block; src: url("assets/fonts/Inter-SemiBold.subset.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 700; font-display: block; src: url("assets/fonts/Inter-Bold.subset.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: block; src: url("assets/fonts/JetBrainsMono-Regular.subset.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: block; src: url("assets/fonts/JetBrainsMono-Medium.subset.woff2") format("woff2"); }
+@font-face { font-family: "PT Serif"; font-weight: 400; font-display: block; src: url("assets/fonts/pt-serif-cyrillic-400-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "PT Serif"; font-weight: 400; font-display: block; src: url("assets/fonts/pt-serif-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "PT Serif"; font-weight: 700; font-display: block; src: url("assets/fonts/pt-serif-cyrillic-700-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "PT Serif"; font-weight: 700; font-display: block; src: url("assets/fonts/pt-serif-latin-700-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+:root {
+  /* холст и поля: 5 % от края под overscan проектора */
+  --w: 1920px;
+  --h: 1080px;
+  --pad-x: 96px;
+  --pad-top: 60px;
+  --pad-bottom: 60px;
+
+  /* цвет */
+  --bg: #f3f0e8;          /* фон кадра */
+  --paper: #ffffff;       /* карточка с текстом документа */
+  --paper-line: #d3cbb9;
+  --ink: #12161c;         /* основной текст */
+  --ink-2: #3b4350;       /* второстепенный текст команды */
+  --ink-3: #4a525e;       /* подписи шкалы */
+  --rule: #c9c1ae;
+  --bar-ahead: #e4dfd3;   /* будущие расходы на шкале */
+  --buy: #9c4409;         /* покупка 1 500 ₸ на шкале */
+  --side-a: #a2361a;      /* сторона A: Ф-3 */
+  --side-b: #0e5e6d;      /* сторона B: Ф-4 */
+  --ask-bg: #12161c;      /* блок вопроса */
+  --ask-ink: #ffffff;
+  --ask-label: #c3cad5;
+  --done: #1f6f3f;        /* push уже пришёл */
+
+  /* шрифты */
+  --f-team: "Inter", system-ui, sans-serif;
+  --f-doc: "PT Serif", Georgia, serif;
+  --f-ref: "JetBrains Mono", ui-monospace, monospace;
+
+  /* кегли (px при 1080p; в копии 720p умножайте на 2/3) */
+  --fs-kicker: 30px;
+  --fs-headline: 88px;
+  --fs-lead: 44px;
+  --fs-num: 52px;
+  --fs-cap: 28px;
+  --fs-bar: 32px;
+  --fs-badge: 30px;
+  --fs-note: 26px;
+  --fs-speaker: 34px;
+  --fs-speaker-role: 28px;
+  --fs-recap: 28px;
+  --fs-ref: 26px;
+  --fs-quote: 44px;
+  --fs-outcome-lead: 30px;
+  --fs-outcome: 52px;
+  --fs-ask-label: 28px;
+  --fs-ask: 56px;
+
+  /* логотипы */
+  --logo-h: 60px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #0b0d10;
+  color: var(--ink);
+  font-family: var(--f-team);
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+}
+
+/* ───────── показ: один кадр по центру окна, масштаб подгоняет frame.js ───────── */
+
+.deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.stage {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: var(--w); height: var(--h);
+  margin-left: calc(var(--w) / -2);
+  margin-top: calc(var(--h) / -2);
+  transform: scale(var(--fit, 1));
+  transform-origin: 50% 50%;
+  background: var(--bg);
+  overflow: hidden;
+  display: none;
+}
+.deck[data-frame="a"] #a,
+.deck[data-frame="b"] #b { display: block; }
+
+/* экспорт: окно ровно 1920×1080, без масштаба */
+html.export, html.export body { width: var(--w); height: var(--h); overflow: hidden; }
+html.export .deck { width: var(--w); height: var(--h); }
+html.export .stage { --fit: 1; }
+
+/* ───────── общие элементы ───────── */
+
+.brand {
+  position: absolute;
+  left: var(--pad-x); top: var(--pad-top);
+  height: var(--logo-h);
+  display: flex; align-items: center; gap: 28px;
+}
+.brand__divider { width: 2px; height: calc(var(--logo-h) * 0.8); background: var(--rule); }
+.logo { height: var(--logo-h); width: auto; display: block; }
+.logo-slot {
+  height: var(--logo-h);
+  min-width: 230px;
+  padding: 0 20px;
+  border: 2px dashed var(--rule);
+  border-radius: 10px;
+  display: flex; flex-direction: column; justify-content: center;
+  color: var(--ink-3);
+  font: 500 18px/1.2 var(--f-ref);
+}
+.logo-slot b { font: 600 22px/1.2 var(--f-team); color: var(--ink-2); }
+
+.kicker {
+  position: absolute;
+  right: var(--pad-x); top: var(--pad-top);
+  height: var(--logo-h);
+  display: flex; align-items: center;
+  font-size: var(--fs-kicker); font-weight: 500; color: var(--ink-2);
+}
+
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ───────── кадр A ───────── */
+
+.headline {
+  position: absolute;
+  left: var(--pad-x); right: var(--pad-x); top: 214px;
+  font-size: var(--fs-headline); font-weight: 600;
+  line-height: 1.04; letter-spacing: -0.022em;
+}
+.lead {
+  position: absolute;
+  left: var(--pad-x); right: var(--pad-x); top: 334px;
+  font-size: var(--fs-lead); font-weight: 400; line-height: 1.25;
+  color: var(--ink-2);
+}
+
+/* шкала расходов месяца; позиции — доли от --max */
+.meter {
+  --max: 80000;
+  position: absolute;
+  left: var(--pad-x); right: var(--pad-x);
+  top: 488px; height: 320px;
+}
+.meter__track {
+  position: absolute; left: 0; right: 0; top: 118px; height: 84px;
+  border-radius: 14px; overflow: hidden;
+  background: var(--bar-ahead);
+}
+.seg {
+  position: absolute; top: 0; bottom: 0;
+  left: calc(var(--from) / var(--max) * 100%);
+  width: calc((var(--to) - var(--from)) / var(--max) * 100%);
+  display: flex; align-items: center;
+}
+.seg--spent { background: var(--ink); color: #fff; padding-left: 28px; font-size: var(--fs-bar); font-weight: 600; }
+.seg--buy { background: var(--buy); }
+.seg--ahead {
+  background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(18,22,28,.07) 14px 28px);
+  justify-content: center;
+  font-size: var(--fs-cap); font-weight: 500; color: var(--ink-2);
+}
+
+.tick {
+  position: absolute; top: 96px; height: 128px; width: 4px;
+  left: calc(var(--at) / var(--max) * 100% - 2px);
+  background: var(--ink); border-radius: 2px;
+}
+.tick--open { background: repeating-linear-gradient(180deg, var(--ink) 0 10px, transparent 10px 18px); }
+
+.thr {
+  position: absolute; top: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.thr__cap { font-size: var(--fs-cap); font-weight: 500; color: var(--ink-3); }
+.thr__num { font-size: var(--fs-num); font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
+.thr--at50 { left: calc(50000 / var(--max) * 100% + 20px); }
+.thr--at80 { right: 0; text-align: right; align-items: flex-end; }
+
+.below { position: absolute; top: 230px; display: flex; align-items: center; gap: 12px; }
+.below--buy { right: calc(100% - 48500 / var(--max) * 100% + 18px); font-size: var(--fs-cap); font-weight: 600; color: var(--buy); }
+.below--push { left: calc(50000 / var(--max) * 100% + 20px); }
+.below--open { right: 0; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 12px;
+  height: 56px; padding: 0 22px 0 16px;
+  border-radius: 999px;
+  font-size: var(--fs-badge); font-weight: 600; white-space: nowrap;
+}
+.badge svg { width: 30px; height: 30px; flex: none; }
+.badge--done { background: var(--done); color: #fff; }
+.badge--open { background: transparent; color: var(--ink); border: 3px solid var(--ink); }
+
+.footnote {
+  position: absolute;
+  left: var(--pad-x); right: var(--pad-x); top: 828px;
+  font-size: var(--fs-note); line-height: 1.35; color: var(--ink-2);
+}
+
+/* подпись спикера: своё место, свой стиль, рядом нет текста документа */
+.speaker {
+  position: absolute;
+  left: var(--pad-x); bottom: var(--pad-bottom);
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 16px 28px 16px 24px;
+  border-left: 8px solid var(--ink);
+  background: rgba(255,255,255,.72);
+  border-radius: 0 12px 12px 0;
+}
+.speaker__name { font-size: var(--fs-speaker); font-weight: 600; }
+.speaker__role { font-size: var(--fs-speaker-role); font-weight: 500; color: var(--ink-2); }
+
+/* ───────── кадр B ───────── */
+
+.recap {
+  --max: 80000;
+  position: absolute;
+  left: var(--pad-x); right: var(--pad-x); top: 168px; height: 72px;
+}
+.recap__track {
+  position: absolute; left: 0; right: 0; top: 0; height: 18px;
+  border-radius: 9px; overflow: hidden; background: var(--bar-ahead);
+}
+.recap__track .seg--spent { padding: 0; }
+.recap .tick { top: -8px; height: 34px; width: 3px; }
+.recap__labels { position: absolute; left: 0; right: 0; top: 32px; font-size: var(--fs-recap); font-weight: 500; color: var(--ink-2); }
+.recap__labels span { position: absolute; top: 0; white-space: nowrap; }
+.recap__l0 { left: 0; }
+.recap__l50 { right: calc(100% - 50000 / var(--max) * 100% + 16px); }
+.recap__l80 { right: 0; }
+.recap__labels b { color: var(--ink); font-weight: 600; }
+
+.sides {
+  position: absolute;
+  left: var(--pad-x); right: var(--pad-x); top: 270px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 48px;
+}
+.side { display: flex; flex-direction: column; gap: 22px; }
+
+.doc {
+  background: var(--paper);
+  border: 2px solid var(--paper-line);
+  border-left: 12px solid var(--side);
+  border-radius: 6px 14px 14px 6px;
+  padding: 26px 36px 32px 32px;
+  height: 352px;
+  box-shadow: 0 2px 0 rgba(18,22,28,.04), 0 18px 40px -24px rgba(18,22,28,.35);
+  display: flex; flex-direction: column; gap: 20px;
+}
+.side--a { --side: var(--side-a); }
+.side--b { --side: var(--side-b); }
+
+.doc__ref {
+  display: flex; align-items: center; gap: 16px;
+  font: 500 var(--fs-ref)/1.2 var(--f-ref);
+  color: var(--ink-2);
+}
+.tag {
+  display: inline-grid; place-items: center;
+  width: 46px; height: 46px; border-radius: 8px;
+  background: var(--side); color: #fff;
+  font: 700 28px/1 var(--f-team);
+}
+.doc__quote {
+  font-family: var(--f-doc);
+  font-size: var(--fs-quote); line-height: 1.28;
+  color: var(--ink);
+  hanging-punctuation: first;
+}
+.doc__quote::before { content: "«"; }
+.doc__quote::after { content: "»"; }
+
+.outcome { display: flex; flex-direction: column; gap: 2px; padding-left: 4px; }
+.outcome__lead { font-size: var(--fs-outcome-lead); font-weight: 500; color: var(--ink-2); }
+.outcome__res {
+  display: flex; align-items: center; gap: 16px;
+  font-size: var(--fs-outcome); font-weight: 700; letter-spacing: -0.012em;
+  color: var(--side); line-height: 1.1;
+}
+.outcome__res svg { width: 50px; height: 50px; flex: none; }
+
+.ask {
+  position: absolute;
+  left: var(--pad-x); right: var(--pad-x); bottom: var(--pad-bottom);
+  min-height: 168px;
+  background: var(--ask-bg); color: var(--ask-ink);
+  border-radius: 16px;
+  padding: 24px 44px 30px;
+  display: flex; flex-direction: column; justify-content: center; gap: 8px;
+}
+.ask__label { font-size: var(--fs-ask-label); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ask-label); }
+.ask__q { font-size: var(--fs-ask); font-weight: 600; line-height: 1.12; letter-spacing: -0.012em; text-wrap: balance; }
+
+/* ───────── обзор обоих кадров рядом (?all) ───────── */
+.deck[data-frame="all"] { display: grid; place-items: center; }
+.deck[data-frame="all"] .stage { display: block; position: absolute; }
