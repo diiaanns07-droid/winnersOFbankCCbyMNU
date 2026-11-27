@@ -103,11 +103,42 @@ def test_stage_timeout_and_rpm():
                     rpm=30, sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
     llm.ask("s", "a", "1", SCHEMA)
     llm.ask("s", "a", "2", SCHEMA)
-    assert t[0] == pytest.approx(2.0)  # 30 в минуту — пауза 2 с между запросами
+    assert t[0] == pytest.approx(0.0)  # 30 в минуту — окно: два запроса без пауз
     t[0] += 200
     with pytest.raises(BudgetExceeded):
         llm.ask("s", "a", "3", SCHEMA)
     assert llm.ask("other", "a", "4", SCHEMA) == {"items": []}
+
+
+def test_rpm_sliding_window_burst_then_waits():
+    """rpm=3: три запроса сразу (параллельные рецензенты не ждут), четвёртый — когда первый выйдет из окна 60 с."""
+    t = [0.0]
+    sleeps: list[float] = []
+
+    def sleep(s):
+        sleeps.append(s)
+        t[0] += s
+
+    llm = LLMClient(FakeProvider([{"items": []}] * 6), model="m", provider_name="fake", rpm=3,
+                    sleep=sleep, clock=lambda: t[0])
+    for i in range(3):
+        llm.ask("s", "a", f"{i}", SCHEMA)
+    assert sleeps == []
+    t[0] = 10.0
+    llm.ask("s", "a", "3", SCHEMA)
+    assert sleeps == [pytest.approx(50.0)] and t[0] == pytest.approx(60.0)
+    t[0] = 200.0
+    llm.ask("s", "a", "4", SCHEMA)  # окно пустое — без паузы
+    assert len(sleeps) == 1
+
+
+def test_rpm_below_one_keeps_even_spacing():
+    t = [0.0]
+    llm = LLMClient(FakeProvider([{"items": []}] * 3), model="m", provider_name="fake", rpm=0.5,
+                    sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+    llm.ask("s", "a", "1", SCHEMA)
+    llm.ask("s", "a", "2", SCHEMA)
+    assert t[0] == pytest.approx(120.0)
 
 
 def test_truncated_retries_with_bigger_limit_then_raises():

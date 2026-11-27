@@ -109,9 +109,13 @@ class LLMClient:
         self.trace = trace
         self.max_split_depth = max_split_depth  # не больше одного деления на этап: каскад делений съедает время
         self.stage_timeout_s = float(stage_timeout_s or 0)  # 0 — без лимита времени этапа
-        self.min_interval_s = 60.0 / float(rpm) if rpm and float(rpm) > 0 else 0.0  # темп запросов (RPM)
+        # Темп запросов (RPM) — скользящее окно: не больше ``rpm`` запросов за любые 60 с. Раньше запросы
+        # разносились на 60/rpm с, и при rpm=10 пять параллельных рецензентов стартовали с шагом 6 с (последний —
+        # через 24 с); окно даёт тот же лимит без пауз, пока за минуту меньше ``rpm`` запросов (9 за прогон).
+        self.rpm = int(float(rpm)) if rpm and float(rpm) >= 1 else 0
+        self.min_interval_s = 60.0 / float(rpm) if rpm and float(rpm) > 0 else 0.0
+        self._window: list[float] = []  # моменты старта запросов за последние 60 с
         self._stage_t0: dict[str, float] = {}
-        self._next_slot = 0.0
         self._sleep, self._clock = sleep, clock
         self._t0 = clock()
         self._lock = threading.Lock()
@@ -183,9 +187,16 @@ class LLMClient:
             wait = 0.0
             if self.min_interval_s:
                 now = self._clock()
-                slot = max(now, self._next_slot)
-                self._next_slot = slot + self.min_interval_s
-                wait = slot - now
+                if self.rpm:
+                    self._window = [x for x in self._window if x > now - 60.0]
+                    # слот: сейчас, если в окне меньше rpm запросов; иначе — когда из окна выйдет rpm-й с конца
+                    slot = now if len(self._window) < self.rpm else self._window[-self.rpm] + 60.0
+                    self._window.append(slot)
+                    self._window.sort()
+                else:  # меньше одного запроса в минуту — равные интервалы
+                    slot = max(now, self._window[-1] + self.min_interval_s) if self._window else now
+                    self._window = [slot]
+                wait = max(0.0, slot - now)
         if wait > 0:
             self._emit({"stage": stage, "event": "rpm_wait", "seconds": round(wait, 1)})
             self._sleep(wait)

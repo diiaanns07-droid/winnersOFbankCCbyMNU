@@ -38,6 +38,8 @@ DEFAULTS: dict[str, Any] = {
 }
 # Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
 DEFAULT_RPM = {"gemini": 10}
+# Линзы от самой долгой к самой короткой (замер 27.11 09:00: haiku architect 102 с, analyst 66, risk 51, qa 50).
+LONGEST_FIRST = ["architect", "analyst", "risk", "qa"]
 
 
 # --------------------------------------------------------------------------- вспомогательное
@@ -360,10 +362,13 @@ class Pipeline:
 
     def _parallel_reviewers(self, ctx: Context) -> dict[str, dict]:
         jobs: dict[str, Callable[[], dict]] = {}
-        for name in self.opts.get("lenses") or LENSES:
-            jobs[f"lens_{name}"] = (lambda n=name: self._lens(ctx, n))
+        # Самый долгий рецензент — первым: при паузах темпа (--rpm) или parallel < 5 ждут короткие этапы.
+        # Порядок кандидатов в отчёте от этого не зависит (_collect идёт по фиксированному списку).
         if self.opts.get("consistency", True):
             jobs["consistency"] = lambda: self._consistency(ctx)
+        names = list(self.opts.get("lenses") or LENSES)
+        for name in sorted(names, key=lambda n: (LONGEST_FIRST.index(n) if n in LONGEST_FIRST else 99)):
+            jobs[f"lens_{name}"] = (lambda n=name: self._lens(ctx, n))
         for name in [f"lens_{x}" for x in LENSES] + ["consistency"]:
             if name not in jobs:
                 self.stages[name] = "skipped"
