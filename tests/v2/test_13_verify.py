@@ -83,11 +83,20 @@ def test_verdict_must_follow_rule(sample):
     assert any(e["code"] == "verdict" for e in res["errors"])
 
 
-def test_commit_required(sample):
+def test_commit_checked(sample):
     bad = copy.deepcopy(sample)
-    bad["run"]["commit"] = ""
+    bad["run"]["commit"] = "не коммит"
     res = verify.verify_report(bad, SOURCE)
     assert any(e["code"] == "commit" for e in res["errors"])
+    # архив без .git (№16): коммита нет — предупреждение, отчёт проходит
+    for value in ("", "unknown"):
+        zip_run = copy.deepcopy(sample)
+        zip_run["run"]["commit"] = value
+        res = verify.verify_report(zip_run, SOURCE)
+        assert res["ok"] and any("коммит агента не записан" in w for w in res["warnings"]), res["errors"][:2]
+    tagged = copy.deepcopy(sample)
+    tagged["run"]["commit"] = "v2.0.0"
+    assert verify.verify_report(tagged, SOURCE)["ok"]
 
 
 def test_dangling_references(sample):
@@ -147,7 +156,7 @@ def test_pdf_pages_checked_with_docview(tmp_path):
               "requirements": [], "findings": findings, "verdict": {}}
     jsonout.finalize(report)
     assert verify.verify_report(report, pdf)["ok"]
-    assert f"стр. {picked[0]['page']}" in markdown.render(report)
+    assert f"с. {picked[0]['page']}, строка" in markdown.render(report)
     report["findings"][0]["evidence"][0]["page"] = picked[0]["page"] + 1
     res = verify.verify_report(report, pdf)
     assert not res["ok"] and "страница" in res["errors"][0]["message"]

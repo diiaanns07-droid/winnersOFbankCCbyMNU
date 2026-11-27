@@ -135,7 +135,7 @@ _ADVICE: dict[tuple[str, str], str] = {
     ("gemini", "quota"): ("Квота ключа исчерпана. Минутный лимит сбрасывается через минуту, дневной — в полночь по "
                           "тихоокеанскому времени. Можно задать другую модель (GEMINI_MODEL) или другой ключ."),
     ("gemini", "rate_limit"): ("Слишком много запросов в минуту для бесплатного ключа. Подождите минуту и повторите; "
-                               "можно уменьшить параллельность: GEMINI_CONCURRENCY=2."),
+                               "если у ключа меньше 10 запросов в минуту — задайте темп GEMINI_RPM=5 в .env."),
     ("gemini", "not_found"): ("Модель недоступна этому ключу. Список доступных моделей покажет "
                               "«python -m bcc_review doctor»; затем задайте GEMINI_MODEL=<модель>."),
     ("anthropic", "not_configured"): ANTHROPIC_KEY_HELP,
@@ -227,7 +227,7 @@ def headline(exc: BaseException, provider: str | None = None) -> str:
             wait = getattr(exc, "retry_after_s", None)
             when = f" через {int(wait) + 1} с" if isinstance(wait, (int, float)) and wait > 0 else " через минуту"
             return (f"Превышен лимит запросов в минуту бесплатного ключа Gemini (агент уже ждал и повторял). Повторите"
-                    f"{when}; можно уменьшить параллельность: GEMINI_CONCURRENCY=2 в .env.")
+                    f"{when}; если у ключа меньше 10 запросов в минуту — задайте темп GEMINI_RPM=5 в .env.")
         if kind == "not_found":
             return ("Модели Gemini из цепочки недоступны этому ключу. Список доступных моделей: python -m bcc_review "
                     "doctor; затем GEMINI_MODEL=<модель> в .env.")
