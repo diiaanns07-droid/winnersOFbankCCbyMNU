@@ -16,12 +16,12 @@ import re
 import sys
 from pathlib import Path
 
-TIME_KEYS = {"run_id", "started_at", "finished_at", "duration_s", "seconds"}
+TIME_KEYS = {"run_id", "started_at", "finished_at", "duration_s", "seconds", "model_seconds"}
 # в --content: поля паспорта, которые честно различаются у прогона без кэша и из кэша
 PASSPORT_KEYS = {"calls", "tokens", "cost_usd", "stage_stats", "models_used", "commit", "dirty", "warnings"}
 MD_TIME = [
     re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?(?:[+-]\d{2}:\d{2}|Z)?"),  # ISO (HTML, JSON внутри)
-    re.compile(r'"(?:duration_s|seconds)": ?[0-9.]+'),
+    re.compile(r'"(?:duration_s|seconds|model_seconds)": ?[0-9.]+'),
     re.compile(r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}(?:–\d{2}:\d{2})?(?: \(UTC[+-]\d+\))?"),
     re.compile(r"\b\d+ мин(?: \d+ с)?\b|\b\d+(?:[.,]\d+)? с\b"),
     re.compile(r"\b\d{8}-\d{6}-[0-9a-f]{4}\b"),

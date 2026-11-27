@@ -17,13 +17,14 @@ dependencies = [
 anthropic = ["anthropic==2.14.0"]
 # Воспроизводимый запасной профиль (№12): Google Gen AI SDK
 gemini = ["google-genai>=3.6,<4"]
-# Чтение PDF (№02) и PDF с выделениями (№14)
-pdf = ["pymupdf>=1.24", "fonttools>=4.40"]
+# Чтение PDF (№02) и PDF с выделениями (№14). Ветка 1.x: в 2.x PyMuPDF тянет pymupdf_layout и onnxruntime
+# (≈ +200 МБ), агенту они не нужны (просьба №03); точные версии — requirements.txt + constraints.txt
+pdf = ["pymupdf>=1.24,<2", "fonttools>=4.40"]
 # Чтение DOCX и комментарии Word (№03)
 docx = ["python-docx>=1.1"]
 # Инструменты оценки (№16): рендер корпуса
 eval = ["pdfplumber>=0.11", "reportlab>=4.0"]
-all = ["anthropic==2.14.0", "google-genai>=3.6,<4", "pymupdf>=1.24", "fonttools>=4.40", "python-docx>=1.1"]
+all = ["anthropic==2.14.0", "google-genai>=3.6,<4", "pymupdf>=1.24,<2", "fonttools>=4.40", "python-docx>=1.1"]
 dev = ["pytest>=8", "pdfplumber>=0.11", "reportlab>=4.0"]
 
 [project.scripts]

@@ -37,6 +37,9 @@ jobs:
             python: "3.13"
           - os: ubuntu-latest
             python: "3.14"
+          # python.org сейчас ставит 3.14 по умолчанию — так будет у жюри на Windows (проверено Max вручную)
+          - os: windows-latest
+            python: "3.14"
     steps:
       - uses: actions/checkout@v4
 
