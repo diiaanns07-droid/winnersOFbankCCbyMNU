@@ -258,6 +258,9 @@ def test_banner():
     assert "BCC Review работает: http://127.0.0.1:8014 — остановить: Ctrl+C" in b
     lines = [ln for ln in b.splitlines() if ln]
     assert len(lines) == 3 and len({len(ln) for ln in lines}) == 1  # ровная рамка
+    ascii_frame = S._banner("http://127.0.0.1:8014/", "cp1251")  # вывод в файл на русской Windows
+    ascii_frame.encode("cp1251")
+    assert "BCC Review работает: http://127.0.0.1:8014" in ascii_frame and "+===" in ascii_frame
 
 
 def test_open_browser_only_after_server_answers(tmp_path, monkeypatch, capsys):

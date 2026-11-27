@@ -422,10 +422,15 @@ def _wait_ready(url: str, timeout: float = 15.0) -> bool:
     return False
 
 
-def _banner(url: str) -> str:
+def _banner(url: str, encoding: str | None = None) -> str:
     line = f"BCC Review работает: {url.rstrip('/')} — остановить: Ctrl+C"
-    bar = "═" * (len(line) + 4)
-    return f"\n╔{bar}╗\n║  {line}  ║\n╚{bar}╝\n"
+    h, v, (a, b, c, d) = "═", "║", "╔╗╚╝"
+    try:  # консоль Windows с выводом в файл (cp1251) рамку не напечатает — тогда рамка ASCII
+        (line + h + v + a + b + c + d).encode(encoding or getattr(sys.stdout, "encoding", None) or "utf-8")
+    except (UnicodeEncodeError, LookupError):
+        h, v, (a, b, c, d) = "=", "|", "++++"
+    bar = h * (len(line) + 4)
+    return f"\n{a}{bar}{b}\n{v}  {line}  {v}\n{c}{bar}{d}\n"
 
 
 def _self_check(url: str) -> int:
@@ -473,6 +478,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--check", action="store_true",
                     help="проверить установку: поднять сервер, получить /healthz и /, выйти (0 — в порядке)")
     a = ap.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):  # непечатаемый символ — «?», а не UnicodeEncodeError
+        try:
+            stream.reconfigure(errors="replace")  # type: ignore[union-attr]
+        except (AttributeError, ValueError):
+            pass
     load_dotenv()
     app = build_app(Path(a.data_dir), provider=a.provider, fixture=Path(a.fixture) if a.fixture else None,
                     sample=Path(a.sample) if a.sample else None, workers=a.workers,
