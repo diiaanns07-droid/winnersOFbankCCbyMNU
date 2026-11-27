@@ -1,0 +1,408 @@
+{
+  "commit": "d013c123b984b3a2d519fa8b9c6c06871ed7e3eb",
+  "model": "claude-haiku-5-5",
+  "upstream_stages_compared": 8,
+  "documents": {
+    "capital": {
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "severity": {
+        "major": 2,
+        "minor": 14
+      },
+      "changed_upstream_fields": {
+        "rules": [
+          "signals"
+        ]
+      },
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 25
+    },
+    "capital-defect": {
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "severity": {
+        "critical": 3,
+        "major": 6,
+        "minor": 8
+      },
+      "changed_upstream_fields": {},
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 40,
+      "matched": {
+        "К1": {
+          "severity": "critical",
+          "finding": "D-03",
+          "ok": true
+        },
+        "К2": {
+          "severity": "critical",
+          "finding": "D-02",
+          "ok": true
+        },
+        "К3": {
+          "severity": "critical",
+          "finding": "D-01",
+          "ok": true
+        },
+        "К4": {
+          "severity": "major",
+          "finding": "D-04",
+          "ok": false
+        },
+        "С1": {
+          "severity": "major",
+          "finding": "D-09",
+          "ok": true
+        },
+        "С2": {
+          "severity": "major",
+          "finding": "D-05",
+          "ok": true
+        },
+        "С3": {
+          "severity": "minor",
+          "finding": "D-12",
+          "ok": false
+        },
+        "С4": {
+          "severity": "major",
+          "finding": "D-08",
+          "ok": true
+        },
+        "С5": {
+          "severity": "major",
+          "finding": "D-06",
+          "ok": true
+        }
+      },
+      "differences": {
+        "К3": [
+          {
+            "severity": "major",
+            "finding": "D-05",
+            "ok": false
+          },
+          {
+            "severity": "critical",
+            "finding": "D-01",
+            "ok": true
+          }
+        ],
+        "С1": [
+          {
+            "severity": "critical",
+            "finding": "D-03",
+            "ok": true
+          },
+          {
+            "severity": "major",
+            "finding": "D-09",
+            "ok": true
+          }
+        ],
+        "С5": [
+          {
+            "severity": "minor",
+            "finding": "D-11",
+            "ok": false
+          },
+          {
+            "severity": "major",
+            "finding": "D-06",
+            "ok": true
+          }
+        ]
+      }
+    },
+    "grace": {
+      "verdict": {
+        "development": "yes",
+        "testing": "yes"
+      },
+      "severity": {
+        "major": 2,
+        "minor": 15
+      },
+      "changed_upstream_fields": {},
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 26
+    },
+    "grace-defect": {
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "severity": {
+        "critical": 5,
+        "major": 7,
+        "minor": 8
+      },
+      "changed_upstream_fields": {},
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 43,
+      "matched": {
+        "К1": {
+          "severity": "critical",
+          "finding": "D-01",
+          "ok": true
+        },
+        "К2": {
+          "severity": "critical",
+          "finding": "D-05",
+          "ok": true
+        },
+        "К3": {
+          "severity": "critical",
+          "finding": "D-03",
+          "ok": true
+        },
+        "К4": {
+          "severity": "critical",
+          "finding": "D-04",
+          "ok": true
+        },
+        "С1": {
+          "severity": "critical",
+          "finding": "D-02",
+          "ok": true
+        },
+        "С2": {
+          "severity": "major",
+          "finding": "D-07",
+          "ok": true
+        },
+        "С3": {
+          "severity": "major",
+          "finding": "D-12",
+          "ok": true
+        },
+        "С4": {
+          "severity": "major",
+          "finding": "D-10",
+          "ok": true
+        },
+        "С5": {
+          "severity": "minor",
+          "finding": "D-16",
+          "ok": false
+        }
+      },
+      "differences": {
+        "С4": [
+          {
+            "severity": "minor",
+            "finding": "D-16",
+            "ok": false
+          },
+          {
+            "severity": "major",
+            "finding": "D-10",
+            "ok": true
+          }
+        ]
+      }
+    },
+    "insurance": {
+      "verdict": {
+        "development": "conditional",
+        "testing": "no"
+      },
+      "severity": {
+        "critical": 1,
+        "major": 10,
+        "minor": 13
+      },
+      "changed_upstream_fields": {
+        "rules": [
+          "signals"
+        ]
+      },
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 30
+    },
+    "insurance-defect": {
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "severity": {
+        "critical": 4,
+        "major": 9,
+        "minor": 11
+      },
+      "changed_upstream_fields": {},
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 47,
+      "matched": {
+        "К1": {
+          "severity": "critical",
+          "finding": "D-02",
+          "ok": true
+        },
+        "К2": {
+          "severity": "critical",
+          "finding": "D-01",
+          "ok": true
+        },
+        "К3": {
+          "severity": "critical",
+          "finding": "D-04",
+          "ok": true
+        },
+        "К4": {
+          "severity": "major",
+          "finding": "D-06",
+          "ok": false
+        },
+        "С1": {
+          "severity": "critical",
+          "finding": "D-03",
+          "ok": true
+        },
+        "С2": {
+          "severity": "major",
+          "finding": "D-05",
+          "ok": true
+        },
+        "С3": {
+          "severity": "major",
+          "finding": "D-12",
+          "ok": true
+        },
+        "С4": {
+          "severity": "minor",
+          "finding": "D-20",
+          "ok": false
+        },
+        "С5": {
+          "severity": "major",
+          "finding": "D-09",
+          "ok": true
+        }
+      },
+      "differences": {
+        "С2": [
+          {
+            "severity": "critical",
+            "finding": "D-02",
+            "ok": true
+          },
+          {
+            "severity": "major",
+            "finding": "D-05",
+            "ok": true
+          }
+        ],
+        "С5": [
+          {
+            "severity": "minor",
+            "finding": "D-19",
+            "ok": false
+          },
+          {
+            "severity": "major",
+            "finding": "D-09",
+            "ok": true
+          }
+        ]
+      }
+    },
+    "qr": {
+      "verdict": {
+        "development": "conditional",
+        "testing": "yes"
+      },
+      "severity": {
+        "major": 3,
+        "minor": 14
+      },
+      "changed_upstream_fields": {
+        "rules": [
+          "signals"
+        ]
+      },
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 28
+    },
+    "qr-defect": {
+      "verdict": {
+        "development": "no",
+        "testing": "no"
+      },
+      "severity": {
+        "critical": 6,
+        "major": 13,
+        "minor": 7
+      },
+      "changed_upstream_fields": {},
+      "same_requirements_and_judged_candidates": true,
+      "verified_candidates": 55,
+      "matched": {
+        "К1": {
+          "severity": "critical",
+          "finding": "D-01",
+          "ok": true
+        },
+        "К2": {
+          "severity": "critical",
+          "finding": "D-02",
+          "ok": true
+        },
+        "К3": {
+          "severity": "critical",
+          "finding": "D-03",
+          "ok": true
+        },
+        "К4": {
+          "severity": "critical",
+          "finding": "D-05",
+          "ok": true
+        },
+        "С1": {
+          "severity": "major",
+          "finding": "D-07",
+          "ok": true
+        },
+        "С2": {
+          "severity": "critical",
+          "finding": "D-06",
+          "ok": true
+        },
+        "С3": {
+          "severity": "major",
+          "finding": "D-10",
+          "ok": true
+        },
+        "С4": {
+          "severity": "major",
+          "finding": "D-16",
+          "ok": true
+        },
+        "С5": {
+          "severity": "major",
+          "finding": "D-15",
+          "ok": true
+        }
+      },
+      "differences": {
+        "С2": [
+          {
+            "severity": "major",
+            "finding": "D-06",
+            "ok": true
+          },
+          {
+            "severity": "critical",
+            "finding": "D-06",
+            "ok": true
+          }
+        ]
+      }
+    }
+  }
+}
