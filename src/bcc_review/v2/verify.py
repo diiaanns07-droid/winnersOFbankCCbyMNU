@@ -217,9 +217,13 @@ def verify_report(report: dict | str | Path, source: str | Path) -> dict:
             err("verdict", f"verdict.{k}", f"записано «{verdict.get(k)}», по правилу кода «{rule[k]}»")
 
     # 6. коммит
-    commit = str(run.get("commit") or "")
-    if not re.fullmatch(r"[0-9a-f]{7,40}", commit):
-        err("commit", "run.commit", f"коммит агента не записан или некорректен: «{commit}»")
+    commit = str(run.get("commit") or "").strip()
+    if commit.lower() in ("", "unknown", "none", "—"):
+        # запуск из архива без .git (№16): версия есть, коммита нет — это не порча отчёта
+        warnings.append(f"коммит агента не записан (запуск не из git-клона); версия агента: "
+                        f"{run.get('version') or 'не указана'}")
+    elif not re.fullmatch(r"[0-9a-f]{7,40}|v?\d+(?:\.\d+){1,3}(?:[-+.][\w.]+)?", commit):
+        err("commit", "run.commit", f"коммит агента некорректен: «{commit}»")
     if run.get("dirty"):
         warnings.append("отчёт построен на рабочей копии с незакоммиченными изменениями")
     if run.get("status") != "complete":

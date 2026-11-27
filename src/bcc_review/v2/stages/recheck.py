@@ -66,10 +66,13 @@ SCHEMA: dict = {
     "properties": {
         "decisions": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
-            "required": ["finding_id", "status", "reason", "severity", "title", "problem"],
+            "required": ["finding_id", "status", "by", "conflicting_answers", "reason", "severity", "title",
+                         "problem"],
             "properties": {
                 "finding_id": {"type": "string"},
                 "status": {"type": "string", "enum": list(STATUSES)},
+                "by": {"type": "array", "items": {"type": "string"}},
+                "conflicting_answers": {"type": "array", "items": {"type": "string"}},
                 "reason": {"type": "string"},
                 "severity": {"type": "string", "enum": list(SEVERITIES)},
                 "title": {"type": "string"},
@@ -349,6 +352,27 @@ def _format_answers(resolved: dict) -> str:
     return "\n".join(rows) or "—"
 
 
+def answer_labels(resolved: dict) -> set[str]:
+    """ID ответов, на которые модель может сослаться в ``by``: Q-… с ответом и Решение-1…N."""
+    return {a["question_id"] for a in resolved["answered"]} | \
+        {f"Решение-{i}" for i in range(1, len(resolved["decisions"]) + 1)}
+
+
+_LABEL = re.compile(r"(Q\s*-?\s*\d{1,3})|(Решени\w*\s*-?\s*\d{1,3})", re.I)
+
+
+def norm_labels(items: Iterable[str], valid: set[str]) -> list[str]:
+    """«q-3», «Q-03», «решение 2» → «Q-03», «Решение-2»; только существующие ответы."""
+    out: list[str] = []
+    for raw in items or []:
+        for m in _LABEL.finditer(str(raw)):
+            num = re.sub(r"\D", "", m.group(2) or "")
+            lab = _qid(m.group(1)) if m.group(1) else ("Решение-" + str(int(num)) if num else "")
+            if lab in valid and lab not in out:
+                out.append(lab)
+    return out
+
+
 def _next_candidate_number(report: dict | None, findings: list[dict]) -> int:
     nums = [0]
     pools = list(findings) + list((report or {}).get("rejected") or [])
@@ -376,11 +400,14 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     for a in resolved["answered"]:
         for fid in a["finding_ids"]:
             q_by_finding.setdefault(fid, []).append(a["question_id"])
+    # затронутые — дефекты вопросов, на которые дан ответ: по каждому модель решает и объясняет.
+    # Остальные модель видит кратко и называет только те, что ответ или общее решение прямо закрывает или
+    # меняет (раньше общее решение отправляло на разбор все critical и major — до 23 тыс. токенов ответа).
     affected_ids = set(q_by_finding)
-    if resolved["decisions"]:  # общее решение может касаться любого существенного дефекта
-        affected_ids |= {f["id"] for f in findings if f.get("severity") in ("critical", "major")}
     affected = [f for f in findings if f.get("id") in affected_ids]
     others = [f for f in findings if f.get("id") not in affected_ids]
+    open_to_decisions = {f["id"] for f in others if f.get("severity") in ("critical", "major")} \
+        if (resolved["decisions"] or resolved["answered"]) else set()
 
     out_findings = []
     for f in findings:
@@ -390,13 +417,13 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
                         "affected": f.get("id") in affected_ids}
         out_findings.append(g)
     result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings}
-    if not affected:
+    if not affected and not resolved["decisions"]:
         for g in out_findings:
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
         return _finish(ctx, result)
 
     block = _format_answers(resolved)
-    others_block = _cl.format_findings(others, full=False) or "—"
+    others_block = _cl.format_findings([f for f in others if f["id"] in open_to_decisions], full=False) or "—"
 
     def build(items: list) -> tuple[str, str]:
         fb = _cl.format_findings(items)
@@ -419,20 +446,50 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         return _finish(ctx, result)
 
     by_id = {g["id"]: g for g in out_findings}
+    valid = answer_labels(resolved)
+    keep = _cl.doc_codes(getattr(ctx, "view", None))
     for d in raw.get("decisions") or []:
         g = by_id.get(str(d.get("finding_id", "")).strip())
-        if g is None or not g["recheck"]["affected"]:
+        if g is None:
             continue
         status = d.get("status") if d.get("status") in STATUSES else "open"
+        if not g["recheck"]["affected"]:
+            # дефект вне вопросов с ответом: учитываем, только если ответ его прямо закрывает или меняет
+            if g["id"] not in open_to_decisions or status == "open":
+                continue
+            g["recheck"]["affected"] = True
         rc = g["recheck"]
-        rc["status"], rc["reason"] = status, str(d.get("reason", "")).strip()
+        # причина — для владельца: без номеров строк L… и ID требований (ID дефектов и ответов остаются ссылками)
+        rc["status"], rc["reason"] = status, _plain_reason(str(d.get("reason", "")).strip(), keep)
+        # два ответа противоречат друг другу — дефект остаётся открытым, владелец выбирает один ответ
+        clash = norm_labels(list(d.get("conflicting_answers") or []), valid)
+        if len(clash) >= 2:
+            rc["answer_conflict"] = clash
+            if status != "open":
+                rc["status"], status = "open", "open"
+                rc["reason"] = (f"ответы {' и '.join(clash)} противоречат друг другу: " + rc["reason"]).strip(": ")
+        # дефект снимает только ответ, который модель назвала прямо (в by или в тексте причины)
+        by = norm_labels(list(d.get("by") or []), valid) if status != "open" else []
+        if status != "open" and not by:
+            by = norm_labels([rc["reason"]], valid)
+        if status != "open" and not by:
+            rc["status"], status = "open", "open"
+            rc["reason"] = ("не назван ответ, который снимает дефект: " + rc["reason"]).strip(": ")
+        if by:
+            rc["answer_ids"] = by
+            closing = [x for x in by if x.startswith("Q-")]
+            rc["linked_question_ids"] = list(rc["question_ids"])
+            rc["question_ids"] = closing
         if status == "changed":
             sev = d.get("severity") if d.get("severity") in SEVERITIES else g.get("severity")
+            # частичный ответ на противоречие снимает его не для всех входов: critical остаётся critical
+            if g.get("severity") == "critical" and g.get("kind") in _cl.CONFLICT_KINDS:
+                sev = "critical"
             rc["severity_after"] = sev
             if str(d.get("title", "")).strip():
-                rc["title_after"] = str(d["title"]).strip()
+                rc["title_after"] = _cl.plain_text(str(d["title"]).strip(), keep)
             if str(d.get("problem", "")).strip():
-                rc["problem_after"] = str(d["problem"]).strip()
+                rc["problem_after"] = _cl.plain_text(str(d["problem"]).strip(), keep)
         elif status == "resolved":
             rc["severity_after"] = ""
     for g in out_findings:
@@ -451,10 +508,53 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             result["rejected"].append({"candidate_id": cand["id"], "title": cand.get("title", ""),
                                        "reason": "цитата не найдена", "source": "recheck"})
             continue
+        twin = duplicate_of(ev, findings, str(cand.get("title", "")))
+        if twin:  # прежний дефект модель описала заново — это не новый конфликт от ответа
+            result["rejected"].append({"candidate_id": cand["id"], "title": cand.get("title", ""),
+                                       "reason": f"повторяет дефект {twin}", "source": "recheck"})
+            continue
         cand["evidence"] = ev
         cand["line_start"], cand["line_end"] = ev[0]["line_start"], ev[0]["line_end"]
         result["new_candidates"].append(cand)
     return _finish(ctx, result)
+
+
+def _plain_reason(text: str, keep: set[str]) -> str:
+    """Причина решения: номера строк «L064» → «стр. 64»; «Q-03», «D-05», «R-12» и «Решение-1»
+    остаются — это ссылки на вопросы и дефекты отчёта, по ним видно, какой ответ снял дефект."""
+    protected: dict[str, str] = {}
+
+    def hide(m: re.Match) -> str:
+        key = f"\x00{len(protected)}\x00"
+        protected[key] = m.group(0)
+        return key
+    s = re.sub(r"\b(?:Q|D|R)-\d{1,3}\b", hide, text)
+    s = _cl.plain_text(s, keep)
+    for key, val in protected.items():
+        s = s.replace(key, val)
+    return s
+
+
+def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", slack: int = 1) -> str:
+    """ID прежнего дефекта, который новый кандидат описывает заново, иначе пустая строка.
+
+    Новый конфликт от ответа цитирует место, которое теперь противоречит ответу. Если все его цитаты —
+    строки одного прежнего дефекта (±``slack``), это тот же дефект (закрытый ответом или оставшийся открытым):
+    для двух и более строк хватает совпадения строк, для одной строки нужна ещё та же суть в заголовке."""
+    cand = {int(e["line_start"]) for e in evidence if e.get("line_start")}
+    if not cand:
+        return ""
+    words = _tokens(_cl.plain_text(title))
+    for f in findings:
+        own = {int(x) for x in _cl.finding_lines(f)}
+        if not own or not all(any(abs(c - o) <= slack for o in own) for c in cand):
+            continue
+        if len(cand) >= 2:
+            return str(f.get("id", ""))
+        theirs = _tokens(f"{f.get('title', '')} {f.get('problem', '')}")
+        if words and len(words & theirs) / len(words) >= 0.4:
+            return str(f.get("id", ""))
+    return ""
 
 
 def _finish(ctx: Any, result: dict) -> dict:
@@ -498,7 +598,11 @@ def _judge_new(ctx: Any, candidates: list[dict], start_n: int, warnings: list[st
                   "rewrite": c.get("rewrite", ""), "question": c.get("question", ""), "blocks": c.get("blocks", "both"),
                   "priority": 0, "sources": ["recheck"]} for c in candidates]
         rejected = []
+    keep = _cl.doc_codes(getattr(ctx, "view", None))
     for i, f in enumerate(found):
+        for key in ("title", "problem", "scenario", "impact", "recommendation", "question"):
+            if isinstance(f.get(key), str):
+                f[key] = _cl.plain_text(f[key], keep)
         f["id"] = f"D-{start_n + i:02d}"
         f.setdefault("sources", ["recheck"])
         if "recheck" not in f["sources"]:
@@ -534,7 +638,9 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
             continue
         changes.append({"finding_id": g["id"], "title": g.get("title", ""), "severity_before": r["severity_before"],
                         "status": r["status"], "severity_after": r["severity_after"], "reason": r["reason"],
-                        "question_ids": r["question_ids"], "title_after": r.get("title_after", "")})
+                        "question_ids": r["question_ids"], "answer_ids": r.get("answer_ids", []),
+                        "answer_conflict": r.get("answer_conflict", []),
+                        "title_after": r.get("title_after", "")})
     order = {"resolved": 0, "changed": 1, "open": 2}
     changes.sort(key=lambda c: (order.get(c["status"], 3), SEVERITIES.index(c["severity_before"] or "minor")))
     # вопрос без прямого ответа, все дефекты которого сняты общими решениями, — не «без ответа»
@@ -550,6 +656,8 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "closed_by_decisions": closed,
         "changes": changes,
         "new_findings": [f["id"] for f in new_found],
+        "answer_conflicts": [{"finding_id": c["finding_id"], "answers": c["answer_conflict"], "reason": c["reason"]}
+                             for c in changes if c.get("answer_conflict")],
         "before": {"verdict": v_before, "findings": severity_counts(findings)},
         "after": {"verdict": {"development": after_rule["development"], "testing": after_rule["testing"],
                               "fix_first": after_rule.get("fix_first", [])},
@@ -594,6 +702,11 @@ def render_markdown(clar: dict, findings_after: list[dict] | None = None) -> str
             lines.append(f"| {c['finding_id']} {c['title'].replace('|', '/')} | {_S.get(c['severity_before'], '—')} | "
                          f"{_ST.get(c['status'], c['status'])} | {_S.get(c['severity_after'] or '', '—')} | {reason} | "
                          f"{', '.join(c['question_ids']) or 'общее решение'} |")
+        lines.append("")
+    if clar.get("answer_conflicts"):
+        lines.append("Ответы, которые противоречат друг другу (выберите один):")
+        for c in clar["answer_conflicts"]:
+            lines.append(f"* {' ↔ '.join(c['answers'])} — {c['finding_id']}: {c['reason']}")
         lines.append("")
     if clar["new_findings"] and findings_after:
         by_id = {f["id"]: f for f in findings_after}

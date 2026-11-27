@@ -63,7 +63,8 @@ def test_defaults():
     cfg = settings({})
     assert cfg["model"] == DEFAULT_MODEL == "gemini-3.8-flash"
     assert cfg["fallback_models"] == list(DEFAULT_FALLBACKS) == ["gemini-3.6-flash", "gemini-3.5-flash-lite"]
-    assert cfg["max_output_tokens"] == 32000
+    assert cfg["max_output_tokens"] is None                       # по профилю модели
+    assert settings({"GEMINI_MAX_OUTPUT_TOKENS": "20000"})["max_output_tokens"] == 20000
     assert settings({"GEMINI_FALLBACK_MODELS": "off"})["fallback_models"] == []
     assert settings({"GEMINI_FALLBACK_MODELS": "a, models/b,a"})["fallback_models"] == ["a", "b"]
     assert settings({"GOOGLE_API_KEY": "g"})["api_key"] == "g"
@@ -75,11 +76,13 @@ def test_success_first_model_normalized():
     assert r["data"] == {"answer": "да"}
     assert r["model"] == "gemini-3.8-flash-001"           # фактическая версия модели — в паспорт
     assert r["stop_reason"] == "end_turn"
-    assert r["usage"] == {"input_tokens": 100, "output_tokens": 25, "thinking_tokens": 5, "cache_read_input_tokens": 0}
+    assert {k: r["usage"][k] for k in ("input_tokens", "output_tokens", "thinking_tokens", "cache_read_input_tokens")} \
+        == {"input_tokens": 100, "output_tokens": 25, "thinking_tokens": 5, "cache_read_input_tokens": 0}
+    assert r["usage"]["thinking"] == "medium"                     # уровень рассуждения — в трассу
     assert r["meta"]["fallback_used"] is False and r["meta"]["requested_model"] == "gemini-3.8-flash"
     assert s.calls == ["gemini-3.8-flash"] and sleeps == []
     assert s.last_messages == [{"role": "system", "content": "S"}, {"role": "user", "content": "U"}]
-    assert s.last_max_tokens == 32000
+    assert s.last_max_tokens == 65536                             # потолок Gemini 3: рассуждения в том же лимите
 
 
 def test_503_three_retries_2_5_10_then_next_model():
@@ -219,7 +222,8 @@ def test_schema_rejected_retries_same_model_with_schema_as_text():
     assert s.calls == ["gemini-3.8-flash"] * 2 and sleeps == []
     assert ("gemini-3.8-flash", "text") in s.modes
     assert r["meta"]["schema_mode"] == "text"
-    assert '"required": ["answer"]' in s.last_messages[0]["content"]      # схема текстом в system
+    assert s.last_messages[0] == {"role": "system", "content": "S"}       # общий префикс для кэша не тронут
+    assert '"required": ["answer"]' in s.last_messages[-1]["content"]     # схема текстом — в конце user
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
     assert s.modes.count(("gemini-3.8-flash", "text")) == 1               # режим запомнен, адаптер переиспользуется
 
@@ -227,9 +231,26 @@ def test_schema_rejected_retries_same_model_with_schema_as_text():
 def test_stage_limit_never_lowers_gemini_output_limit():
     p, s, _ = make({})
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=8000)
-    assert s.last_max_tokens == 32000
+    assert s.last_max_tokens == 65536
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=60000)
-    assert s.last_max_tokens == 60000
+    assert s.last_max_tokens == 65536
+    p2, s2, _ = make({}, max_output_tokens=20000)                 # явный лимит (GEMINI_MAX_OUTPUT_TOKENS) главный…
+    p2.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=8000)
+    assert s2.last_max_tokens == 20000
+    p2.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, max_output_tokens=32000)
+    assert s2.last_max_tokens == 32000                            # …но лимит этапа его не опускает
+
+
+def test_old_model_gets_small_limit_and_rejected_limit_is_lowered():
+    p, s, _ = make({"gemini-2.0-flash": [ok("gemini-2.0-flash")]})
+    p.invoke(model="gemini-2.0-flash", messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert s.last_max_tokens == 8192
+    p, s, sleeps = make({"gemini-3.8-flash": [err("bad_request", 400, message="max_output_tokens must be <= 32768"),
+                                              ok("gemini-3.8-flash")]})
+    r = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert r["data"] == {"answer": "да"} and s.calls == ["gemini-3.8-flash"] * 2 and s.last_max_tokens == 32768
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert s.last_max_tokens == 32768 and len(s.calls) == 3       # потолок запомнен для модели
 
 
 def test_total_budget_is_call_timeout_plus_slack():
