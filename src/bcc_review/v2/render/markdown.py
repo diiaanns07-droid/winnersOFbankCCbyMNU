@@ -547,7 +547,8 @@ class _Ctx:
         self.edits = _applied_edits(report)
         self.verdict = report.get("verdict", {}) or {}
         self.offline = self.run.get("provider") == "offline" or (
-            not self.run.get("models_used") and self.run.get("provider") not in ("mock",))
+            not self.run.get("models_used") and self.run.get("provider") not in ("mock",)
+            and not (self.run.get("calls") or {}).get("cached"))  # ответы из кэша — тоже ответы модели
 
     def req_label(self, rid: str, link: bool = True) -> str:
         q = self.req_by_id.get(rid, {})
