@@ -10,6 +10,7 @@
     "architect"
    ],
    "id": "S-01",
+   "covered": false,
    "lines": [
     39
    ],
@@ -25,6 +26,7 @@
     "architect"
    ],
    "id": "S-02",
+   "covered": false,
    "lines": [
     56
    ],
@@ -41,6 +43,7 @@
     "qa"
    ],
    "id": "S-03",
+   "covered": false,
    "lines": [
     98
    ],
