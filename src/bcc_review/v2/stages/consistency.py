@@ -121,7 +121,8 @@ PART_A = ("subjects", "pair_checks")
 PART_B = ("glossary", "trace", "candidates")
 _PART_NOTE = {
     PART_A: ("\n\n### Твоя часть\nВыполни только шаги 1, 2 и 2б: ответ — `subjects` и `pair_checks`. Глоссарий, "
-             "трассировку и дефекты набора проверяет другой ревьюер."),
+             "трассировку и дефекты набора проверяет другой ревьюер: обещанную, но не описанную операцию (метод, поле, "
+             "экран без источника данных), цель и схемы в pair_checks не пиши."),
     PART_B: ("\n\n### Твоя часть\nВыполни только шаги 3, 4 и 5: ответ — `glossary`, `trace` и `candidates`. Предметы и "
              "попарную сверку (шаги 1, 2, 2б) выполняет другой ревьюер: противоречия пар в candidates не пиши."),
 }
@@ -366,7 +367,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         acc_texts = [_line_text(view, ev) for ev in (ev_a, ev_b) if _in_acceptance(ev, known)]
         if _replay_only(pair["quote_a"], pair["quote_b"]):
             pair.update(verdict="compatible", basis="none", resolved_by="replay")
-        elif acc_texts and pair["kind"] == "unit_mismatch":
+        elif acc_texts and pair["kind"] == "unit_mismatch" and _display_currency(pair, ev_a, ev_b, known):
             pair.update(verdict="compatible", basis="none", resolved_by="acceptance_units")
         elif (acc_texts and pair["kind"] == "event_conflict"
               and not any(_MOMENT.search(t) for t in acc_texts)):
@@ -468,6 +469,20 @@ def _in_acceptance(ev: dict, known: dict[str, dict] | None) -> bool:
                and b <= (r.get("line_end") or r.get("line_start") or 0) for r in (known or {}).values())
 
 
+_MINOR_UNIT = re.compile(r"тиын", re.I)
+_MAJOR_UNIT = re.compile(r"₸|тенге|(?<![A-Za-z])KZT(?![A-Za-z])", re.I)
+
+
+def _display_currency(pair: dict, ev_a: dict, ev_b: dict, known: dict[str, dict] | None) -> bool:
+    """Строка приёмки пишет сумму в тенге, другое место хранит или отдаёт её в тиынах: это единица отображения
+    теста, а не расхождение (расхождение периода «за час» ↔ «за сутки» сюда не попадает)."""
+    for ev, q, other_q in ((ev_a, pair["quote_a"], pair["quote_b"]), (ev_b, pair["quote_b"], pair["quote_a"])):
+        if _in_acceptance(ev, known) and _MAJOR_UNIT.search(q) and not _MINOR_UNIT.search(q) \
+                and _MINOR_UNIT.search(other_q):
+            return True
+    return False
+
+
 def _line_text(view: Any, ev: dict) -> str:
     """Полный текст строк, где найдена цитата."""
     a, b = _span(ev)
@@ -528,7 +543,13 @@ def _humanizer(known: dict[str, dict] | None, labels: dict[str, str]):
         rid = m.group(0)
         return labels.get(rid) or _quoted(place_label(rid, None, known))
 
-    return lambda text: _RID.sub(sub, _s(text)) if text else ""
+    def human(text: Any) -> str:
+        if not text:
+            return ""
+        t = _RID.sub(sub, _s(text))
+        return re.sub(r"(?<![A-Za-z])L0*(\d{1,4})\b", r"строка \1", t)  # «L038» — внутренняя запись строки
+
+    return human
 
 
 def _phrase(s: str) -> str:
@@ -563,7 +584,7 @@ def _short(s: str, n: int) -> str:
     return " ".join(w[:n]) + (" …" if len(w) > n else "")
 
 
-_LINE_REF = re.compile(r"\s*\((?:L\d{1,4}|строк[аи]?\s*\d)[^)]*\)|\s*\(L\d{1,4}\s*(?:и|,|–|-)\s*L?\d{1,4}\)")
+_LINE_REF = re.compile(r"\s*\((?:L\d{1,4}|строк[аи]?\s*\d|стр\.?\s*\d)[^)]*\)|\s*\(L\d{1,4}\s*(?:и|,|–|-)\s*L?\d{1,4}\)")
 
 
 def _clean_title(t: str) -> str:
@@ -576,6 +597,12 @@ def _clean_title(t: str) -> str:
 def _has_variants(q: str) -> bool:
     """Вопрос уже предлагает варианты («… или …»)."""
     return bool(re.search(r"(?<![а-яё])или(?![а-яё])", q or "", re.I))
+
+
+def _check_order(pair: dict, kind: str) -> bool:
+    """Две заданные проверки для двух разных условий, а запрос нарушает обе: вопрос порядка проверок.
+    Молчание одного места о правиле другого (``incomplete``) — не порядок проверок, а неполнота."""
+    return pair["verdict"] == "undefined" and not pair["one_condition"] and kind == "ambiguity"
 
 
 def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict | None:
@@ -619,7 +646,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
             kind = "ambiguity"
         # Два разных условия в одном запросе (неверный параметр и неподходящее состояние) — вопрос порядка
         # проверок: реализации разойдутся только кодом ошибки, основной процесс не страдает — minor.
-        severity = "major" if pair["one_condition"] else "minor"
+        severity = "minor" if _check_order(pair, kind) else "major"
     criterion = "unambiguous" if kind in ("boundary_conflict", "unit_mismatch", "ambiguity") else "set_consistent"
     if pair["verdict"] == "undefined" and kind == "incomplete":
         criterion = "set_complete"
@@ -637,7 +664,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         fallback = f"{qa_} и {qb_} дают разный результат: {_short(subject, 8)}"
         problem = (f"{_cap(qa_)} и {qb_} по-разному решают один случай — {subject}. "
                    f"Ни одно из мест не объявлено исключением из другого.")
-    elif not pair["one_condition"]:
+    elif _check_order(pair, kind):
         fallback = f"Порядок проверок не задан: {qa_} или {qb_} — {_short(subject, 6)}"
         problem = (f"{_cap(qa_)} и {qb_} задают разные проверки, а один запрос может нарушить обе — {subject}. "
                    f"Порядок проверок не задан, поэтому неясно, какой результат вернуть.")
@@ -658,7 +685,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     if pair["verdict"] == "conflict" and oa and ob and not _has_variants(question):
         # Вопрос владельцу с двумя вариантами: какой из двух исходов сценария верный.
         question = f"{_cap(_short(subject, 12))}: какой результат верный — «{oa}» (как в {qa_}) или «{ob}» (как в {qb_})?"
-    elif pair["verdict"] == "undefined" and not pair["one_condition"] and oa and ob and not _has_variants(question):
+    elif pair["verdict"] == "undefined" and _check_order(pair, kind) and oa and ob and not _has_variants(question):
         question = f"Какая проверка идёт первой: по {qa_} («{oa}») или по {qb_} («{ob}»)?"
     return {
         "title": title, "kind": kind, "criterion": criterion, "severity": severity,
@@ -780,7 +807,7 @@ def glossary_to_candidate(g: dict) -> dict | None:
     found = [t for t in g["terms"] if t["verified"] != "missing"]
     if len(found) < 2:
         return None
-    names = ", ".join(f"«{t['term']}» (L{t['line']:03d})" for t in found)
+    names = ", ".join(f"«{t['term']}» (строка {t['line']})" for t in found)
     first = found[0]["term"]
     severity = "major" if g["severity"] == "major" else "minor"
     problem = g["problem"] or "Одно понятие названо в документе по-разному, и по тексту не понять, одно ли это."
@@ -833,7 +860,7 @@ def minor_glossary_candidate(entries: list[dict]) -> dict | None:
         return None
     evidence, parts = [], []
     for g, ts in found:
-        parts.append(f"{g['concept']}: " + ", ".join(f"«{t['term']}» (L{t['line']:03d})" for t in ts[:4]))
+        parts.append(f"{g['concept']}: " + ", ".join(f"«{t['term']}» (строка {t['line']})" for t in ts[:4]))
         for t in ts[:2]:
             if len(evidence) < 6:
                 evidence.append({"quote": t["term"], "line": t["line"], "verified": t["verified"]})
@@ -1017,6 +1044,18 @@ def _duplicates_pair(cand: dict, pair_cands: list[dict]) -> bool:
     return False
 
 
+def _covered_by_promise(pc: dict, model_cands: list[dict]) -> bool:
+    """Кандидат пары (неопределённость), все найденные цитаты которого стоят на строках critical-кандидата
+    «обещано, но не описано» (±1 строка)."""
+    if pc["kind"] not in ("incomplete", "ambiguity"):
+        return False
+    mine = [e for e in pc["evidence"] if _found(e)]
+    return bool(mine) and any(
+        mc["severity"] == "critical" and mc["kind"] == "missing_element"
+        and all(any(_overlap(e, me, 1) for me in mc["evidence"] if _found(me)) for e in mine)
+        for mc in model_cands)
+
+
 def normalize_trace(raw: list[dict], requirements: list[dict]) -> list[dict]:
     known = _req_index(requirements)
     acceptance = {rid for rid, r in known.items() if r.get("kind") == "acceptance"}
@@ -1108,6 +1147,14 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     pair_cands = merge_conflicts(pair_cands, requirements)
     for c in pair_cands:
         c.pop("_subject", None)
+    model_cands = []
+    for raw in (data.get("candidates") or [])[:MAX_MODEL_CANDIDATES]:
+        c = normalize_candidate(raw, view, known, requirements)
+        if c and not _duplicates_pair(c, pair_cands):
+            model_cands.append(c)
+    # Неопределённость пары, которая повторяет critical «обещано, но не описано» (те же строки), — тот же дефект
+    # в слабой форме: остаётся одно замечание, critical.
+    pair_cands = [c for c in pair_cands if not _covered_by_promise(c, model_cands)]
     candidates.extend(pair_cands)
 
     glossary = [g for g in (normalize_glossary(g, view) for g in (data.get("glossary") or [])[:MAX_GLOSSARY]) if g]
@@ -1119,10 +1166,7 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
     if c:
         candidates.append(c)
 
-    for raw in (data.get("candidates") or [])[:MAX_MODEL_CANDIDATES]:
-        c = normalize_candidate(raw, view, known, requirements)
-        if c and not _duplicates_pair(c, pair_cands):
-            candidates.append(c)
+    candidates.extend(model_cands)
 
     trace = normalize_trace(data.get("trace") or [], requirements)
     mark_trace_conflicts(trace, pairs, known)

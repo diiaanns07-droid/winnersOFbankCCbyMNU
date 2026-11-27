@@ -175,3 +175,30 @@ def test_single_call_by_default():
     llm = _FakeLLM()
     C.run(_Ctx(llm, split=False))
     assert len(llm.calls) == 1 and set(C.SCHEMA["properties"]) == llm.calls[0][1]
+
+
+def test_period_mismatch_with_acceptance_row_stays_conflict():
+    # «за один час» в правиле и «за текущие сутки» в строке приёмки — разные периоды одного лимита, не единица показа
+    doc = ["* **А-5.** За один час выполняется не больше трёх пополнений.",
+           "| Три пополнения за текущие сутки | Баланс ниже порога | Пополнение не выполнено |"]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    reqs = [{"id": "R-01", "source_id": "А-5", "kind": "functional", "line_start": 1, "line_end": 1},
+            {"id": "R-02", "source_id": "Критерии приёмки, строка 1", "kind": "acceptance", "line_start": 2,
+             "line_end": 2}]
+    p = pair(a="R-01", b="R-02", quote_a=doc[0][10:], line_a=1, quote_b="Три пополнения за текущие сутки", line_b=2,
+             kind="unit_mismatch", basis="value_mismatch", outcome_a="четвёртое в сутки разрешено",
+             outcome_b="четвёртое в сутки отклонено")
+    out = C.postprocess(answer(pair_checks=[p]), view, reqs)
+    assert out["pair_checks"][0]["verdict"] == "conflict" and len(out["candidates"]) == 1
+
+
+def test_silence_with_two_conditions_is_incompleteness_not_check_order():
+    # «шаг логики не проверяет условие правила» — неполнота (major), даже если модель сказала «два условия»
+    p = pair(a="R-01", b="R-02", quote_a=DOC[1][10:], line_a=2, quote_b=DOC[2][3:], line_b=3, verdict="undefined",
+             basis="none", kind="incomplete", one_condition=False, outcome_a="второй раз — отказ",
+             outcome_b="код не назван")
+    [c] = run(p)["candidates"]
+    assert c["severity"] == "major" and c["kind"] == "incomplete"
+    p2 = dict(p, kind="ambiguity")
+    [c2] = run(p2)["candidates"]
+    assert c2["severity"] == "minor" and "Порядок проверок" in c2["problem"]
