@@ -1,0 +1,8 @@
+Этап judge: ok, вызовов 2, 104.18 с, кандидатов 0
+Выход этапа: /tmp/w/runs/20261127-210008-bcbb/stages/judge.json
+BCC Review: «Заказ выписки по счёту в PDF» — 97 требований, 16 дефектов (критичных 1, существенных 6, незначительных 9), вопросов 5
+Разработка: нельзя · тестирование: нельзя — блокер 1, останавливает разработку и тестирование:
+  D-01 Срок ссылки при fileExpiresAt: Ф-6 и строка приёмки 22 расходятся
+Прогон завершён полностью: 1 мин 46 с, 2 вызова модели, claude-haiku-5-5; цитат сверено 34 из 34
+Отчёт: evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_haiku_2/statement/report.md и evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_haiku_2/statement/report.json
+HTML: evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_haiku_2/statement/report.html

@@ -1,0 +1,9 @@
+Этап judge: ok, вызовов 2, 85.94 с, кандидатов 0
+Выход этапа: /tmp/w/runs/20261127-210008-0e4a/stages/judge.json
+BCC Review: «Копилка с округлением покупок по карте» — 82 требования, 12 дефектов (критичных 1, существенных 4, незначительных 7), вопросов 3
+Разработка: нельзя · тестирование: нельзя — блокер 1, останавливает разработку и тестирование:
+  D-01 Выключение копилки: Ф-8 и особое правило 2 расходятся
+Прогон завершён полностью: 1 мин 27 с, 2 вызова модели, claude-haiku-5-5; цитат сверено 28 из 28
+Отчёт: evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_haiku_3/roundup/report.md и evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_haiku_3/roundup/report.json
+  ! судья: 3 дефекта (пожелания полноты) сведены в одно незначительное
+HTML: evaluation/v2/measurements/w5_51_judge_9ff713ee/clean_haiku_3/roundup/report.html
