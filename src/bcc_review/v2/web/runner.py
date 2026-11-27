@@ -65,30 +65,49 @@ FILES = [  # (ключ, имя файла в out/, подпись, mime)
 
 # ─────────────────────────────── провайдеры ───────────────────────────────
 
-def load_dotenv(path: Path = Path(".env")) -> None:
-    """Прочитать .env (KEY=VALUE) без перезаписи уже заданных переменных."""
+def load_dotenv(path: Path | None = None) -> None:
+    """Прочитать .env (KEY=VALUE) без перезаписи уже заданных переменных — тем же загрузчиком, что CLI.
+
+    Блокнот пишет UTF-8 с BOM, PowerShell 5.1 (`echo … > .env`) — UTF-16: раньше веб в первом случае не видел
+    ключ, во втором падал трейсбэком, а CLI оба файла читал. Как и CLI, без .env в текущем каталоге берём .env
+    из корня репозитория.
+    """
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
+        from bcc_review.v2.providers import doctor
+    except Exception:  # noqa: BLE001 — без провайдеров веб всё равно покажет «Демо без модели»
         return
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        k = k.strip().removeprefix("export ").strip()
-        v = v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
+    for p in ([Path(path)] if path is not None else [Path(".env"), Path(__file__).resolve().parents[4] / ".env"]):
+        try:
+            if doctor.load_dotenv(p):
+                return
+        except (OSError, UnicodeError):
+            return
+
+
+def _auto_choice(env: Any) -> str:
+    """Какой провайдер выберет `--provider auto` у CLI (тот же порядок: Gemini, Claude API, свой сервер, Claude CLI)."""
+    try:
+        from bcc_review.v2.providers.doctor import resolve_auto
+        return resolve_auto(env)[0]
+    except Exception:  # noqa: BLE001
+        return "offline"
+
+
+def _have_claude_cli(env: Any) -> bool:
+    try:
+        from bcc_review.v2.providers.claude_cli import find_cli
+        return bool(find_cli(env))
+    except Exception:  # noqa: BLE001
+        return bool(shutil.which("claude"))
 
 
 def provider_status() -> list[dict[str, Any]]:
     """Какие провайдеры доступны прямо сейчас и почему нет, если нет."""
     env = os.environ
-    have_claude = bool(shutil.which("claude"))
-    gem = bool(env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY"))
-    ant = bool(env.get("ANTHROPIC_API_KEY"))
-    oai = bool(env.get("OPENAI_BASE_URL"))
+    have_claude = _have_claude_cli(env)
+    gem = bool((env.get("GEMINI_API_KEY") or "").strip() or (env.get("GOOGLE_API_KEY") or "").strip())
+    ant = bool((env.get("ANTHROPIC_API_KEY") or "").strip())
+    oai = bool((env.get("OPENAI_BASE_URL") or "").strip())
     out = [
         {"id": "claude_cli", "label": "Claude через Claude Code CLI", "ok": have_claude,
          "note": "без API-ключа, по подписке Claude Code" if have_claude else "команда «claude» не найдена",
@@ -107,7 +126,9 @@ def provider_status() -> list[dict[str, Any]]:
         {"id": "offline", "label": "Без модели: только правила", "ok": True,
          "note": "быстро, но находит только формальные дефекты", "models": []},
     ]
-    first = next((p["id"] for p in out[:4] if p["ok"]), "offline")
+    first = _auto_choice(env)
+    if not any(p["id"] == first and p["ok"] for p in out):
+        first = next((p["id"] for p in out[:4] if p["ok"]), "offline")
     label = next(p["label"] for p in out if p["id"] == first)
     out.insert(0, {"id": "auto", "label": f"Автовыбор: {label}", "ok": True, "note": "первый доступный провайдер",
                    "models": [], "resolved": first})
