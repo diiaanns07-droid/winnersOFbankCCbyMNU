@@ -210,6 +210,72 @@ def coverage(items: Any) -> list[dict]:
     return out[:MAX_COVERAGE]
 
 
+_WORD = re.compile(r"[а-яёa-z0-9]{4,}", re.I)
+_STOP = frozenset("""если когда какой какая какое какие каком которая который которые описан описано описаны указан
+указано указаны определён определено определены задан задано заданы ли для при или это этот документ документе
+требовани правило правила""".split())
+_SENT = re.compile(r"(?<=[.!?;])\s+")
+MAX_GAPS = 6
+_CONFLICT_Q = re.compile(r"^\s*(совпада|согласован|противореч|расход|пересека|запрещает ли|разрешает ли)", re.I)
+
+
+def _stems(text: str) -> set[str]:
+    return {w.lower()[:5] for w in _WORD.findall(text or "") if w.lower() not in _STOP}
+
+
+def _line_text(view: Any, n: int) -> str:
+    for ln in (view or {}).get("lines") or [] if isinstance(view, dict) else []:
+        if isinstance(ln, dict) and ln.get("n") == n:
+            return str(ln.get("text") or "")
+    return ""
+
+
+def _best_sentence(text: str, question: str) -> str:
+    sents = [x.strip() for x in _SENT.split(text) if len(x.strip()) >= 8] or [text.strip()]
+    q = _stems(question)
+    return max(sents, key=lambda x: (len(_stems(x) & q), -sents.index(x)))[:300]
+
+
+def coverage_gaps(cov: list[dict], candidates: list[dict], view: Any, *, limit: int = MAX_GAPS) -> list[dict]:
+    """Строки описи без ответа документа, для которых модель не написала кандидата, — кандидаты кода.
+
+    Слабая модель (Flash) находит в описи 7–12 мест, где документ молчит, но пишет 5–6 кандидатов. Кандидат кода:
+    заголовок — вопрос описи, цитата — фраза строки места, серьёзность `minor` (уровень решает судья).
+    Не берутся: строки с ответом, темы Т1–Т2 (расхождение требует двух цитат и сценария), строки, у которых
+    есть кандидат на той же строке с общими словами вопроса."""
+    out: list[dict] = []
+    seen: set[tuple] = set()
+    for row in cov or []:
+        q, n = row.get("question", ""), row.get("line") or 0
+        if row.get("answer") or not q or n <= 0 or str(row.get("topic")).strip() in ("Т1", "Т2", "T1", "T2") \
+                or _CONFLICT_Q.search(q):
+            continue
+        qs = _stems(q)
+        if any(n in {e.get("line_start", e.get("line")) for e in c.get("evidence") or []}
+               and len(qs & _stems(str(c.get("title", "")) + " " + str(c.get("problem", "")))) >= 2
+               for c in candidates):
+            continue
+        text = _line_text(view, n)
+        if not text.strip():
+            continue
+        quote = _best_sentence(text, q)
+        key = (n, quote)
+        if key in seen:
+            continue
+        seen.add(key)
+        title = q.strip().rstrip("?").strip()
+        out.append({
+            "title": title[:1].upper() + title[1:] + "?", "kind": "incomplete", "criterion": "complete",
+            "severity": "minor", "requirement_ids": [], "evidence": [{"quote": quote, "line": n}],
+            "problem": f"Документ не отвечает на вопрос: {q.strip()}", "scenario": "", "impact": "",
+            "recommendation": "Дописать ответ в требование или явно исключить случай из объёма.", "rewrite": "",
+            "question": q.strip(), "blocks": "none", "origin": "coverage",
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
 def run(ctx, lens_run=None) -> dict:
     """Запуск линзы с постобработкой. `lens_run(ctx, name)` — общий запуск из `stages/lens.py` (№01);
     он сам берёт `MAX_OUTPUT_TOKENS` из этого модуля."""
@@ -220,5 +286,9 @@ def run(ctx, lens_run=None) -> dict:
     out = dict(lens_run(ctx, "analyst"))
     out["candidates"] = postprocess(out.get("candidates") or [], mature=m["mature"])
     out["coverage"] = coverage(out.get("coverage"))
+    if not m["mature"]:  # вычитанный документ — только расхождения (см. `postprocess`), пробелы описи не добираем
+        gaps = coverage_gaps(out["coverage"], out["candidates"], getattr(ctx, "view", None))
+        out["candidates"] += gaps
+        out["coverage_gaps"] = len(gaps)
     out["document_maturity"] = m
     return out

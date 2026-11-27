@@ -83,3 +83,38 @@ def test_spec_parameter_regex_is_not_template_field():
     no = ["Версия: —", "Дата: —", "Согласующие: —", "Jira: —", "Автор: —"]
     assert all(judge._SPEC_PARAM_RE.search(x) for x in yes)
     assert not any(judge._SPEC_PARAM_RE.search(x) for x in no)
+
+
+def _view(lines: dict[int, str]) -> dict:
+    return {"lines": [{"n": n, "text": t} for n, t in sorted(lines.items())]}
+
+
+def test_unanswered_coverage_rows_become_code_candidates():
+    view = _view({29: "На экране видны переключатель и поле ввода. При ошибке ввода сообщение появляется под полем.",
+                  38: "Учитываются покупки. Переводы и снятие наличных исключаются.",
+                  40: "После смены значения следующее срабатывание вызывает реакцию."})
+    cov = [{"topic": "Т10", "line": 29, "question": "Какое сообщение видит клиент при ошибке сервера?", "answer": ""},
+           {"topic": "Т9", "line": 38, "question": "Закрыт ли перечень исключённых операций?", "answer": ""},
+           {"topic": "Т2", "line": 40, "question": "Запрещает ли ограничение реакцию после смены значения?",
+            "answer": ""},
+           {"topic": "Т5", "line": 37, "question": "Определено ли активное состояние?", "answer": "L037: «…»"}]
+    have = [{"title": "Перечень исключённых операций открыт", "problem": "", "evidence": [{"line": 38, "quote": "x"}]}]
+    gaps = lens_analyst.coverage_gaps(cov, have, view)
+    assert [g["evidence"][0]["line"] for g in gaps] == [29]     # Т9 уже есть кандидат, Т2 — расхождение, Т5 — ответ
+    g = gaps[0]
+    assert g["title"] == "Какое сообщение видит клиент при ошибке сервера?" and g["severity"] == "minor"
+    assert g["evidence"][0]["quote"] == "При ошибке ввода сообщение появляется под полем."
+    assert g["origin"] == "coverage" and g["question"].startswith("Какое сообщение")
+
+
+def test_mature_document_gets_no_coverage_gaps():
+    def fake(ctx, name):
+        return {"coverage": [{"topic": "Т10", "line": 2, "question": "Какое сообщение при ошибке?", "answer": ""}],
+                "candidates": []}
+    lines = ["Термины", "Экран: сообщение при ошибке ввода.", "Версия 1.2", "Время — UTC+5."]
+    view = {"lines": [{"n": i, "text": t} for i, t in enumerate(lines, 1)]}
+    mature = lens_analyst.run(type("C", (), {"view": view})(), lens_run=fake)
+    assert lens_analyst.maturity(view)["mature"] and mature["candidates"] == []
+    raw = {"lines": [{"n": 2, "text": "Экран: сообщение при ошибке ввода."}]}
+    out = lens_analyst.run(type("C", (), {"view": raw})(), lens_run=fake)
+    assert len(out["candidates"]) == 1 and out["coverage_gaps"] == 1
