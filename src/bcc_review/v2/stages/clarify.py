@@ -98,14 +98,18 @@ _LEADING_LABEL = re.compile(r"^\s*(?:[A-DА-Г]|[1-4])\s*[).:\-—–]\s+", re.I
 
 
 def _evidence_schema() -> dict:
-    return {"type": "array", "minItems": 1, "maxItems": 3, "items": {
+    # цитаты сверяет код: без цитаты модели берутся сверенные цитаты дефекта, лишние отрезаются до 3. Строгие
+    # границы в схеме стоили лишнего вызова «починки» (+16 с) из-за 0 или 4 цитат (просьба №02).
+    return {"type": "array", "maxItems": 6, "items": {
         "type": "object", "additionalProperties": False, "required": ["quote", "line"],
         "properties": {"quote": {"type": "string"}, "line": {"type": "integer"}}}}
 
 
 SCHEMA: dict = {
     "type": "object", "additionalProperties": False, "required": ["questions"],
-    "properties": {"questions": {"type": "array", "maxItems": 10, "items": {
+    # вопросов код оставляет не больше question_cap (8 / 5), вариантов — не больше 4 (clean_options): схема
+    # шире, чтобы 11 вопросов или 5 вариантов не стоили модели повторного ответа
+    "properties": {"questions": {"type": "array", "maxItems": 16, "items": {
         "type": "object", "additionalProperties": False,
         "required": ["topic", "finding_ids", "to", "blocking", "question", "evidence", "options", "why"],
         "properties": {
@@ -115,7 +119,7 @@ SCHEMA: dict = {
             "blocking": {"type": "boolean"},
             "question": {"type": "string"},
             "evidence": _evidence_schema(),
-            "options": {"type": "array", "minItems": 2, "maxItems": 4, "items": {"type": "string"}},
+            "options": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"type": "string"}},
             "why": {"type": "string"},
         }}}},
 }
