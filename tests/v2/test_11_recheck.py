@@ -317,3 +317,13 @@ def test_single_line_twin_needs_same_essence(findings):
     ev = [{"line_start": old["evidence"][0]["line_start"]}]
     assert recheck.duplicate_of(ev, [old], "Ответ противоречит примеру ответа API") == ""
     assert recheck.duplicate_of(ev, [old], old["title"]) == "D-04"
+
+
+def test_partial_answer_keeps_critical_conflict(findings, questions):
+    crit = next(f for f in findings if f["severity"] == "critical" and f["kind"] in clarify.CONFLICT_KINDS)
+    q = next(x for x in questions if crit["id"] in x["finding_ids"])
+    resp = _resp([{"finding_id": crit["id"], "status": "changed", "by": [q["id"]], "severity": "major",
+                   "reason": "закрыта только одна граница", "title": "Осталась верхняя граница"}])
+    res = recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q['id']}: A\n", questions)
+    rc = {g["id"]: g["recheck"] for g in res["findings"]}[crit["id"]]
+    assert rc["status"] == "changed" and rc["severity_after"] == "critical"

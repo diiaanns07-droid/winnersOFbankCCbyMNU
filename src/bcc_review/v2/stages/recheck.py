@@ -472,6 +472,9 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
             rc["question_ids"] = closing
         if status == "changed":
             sev = d.get("severity") if d.get("severity") in SEVERITIES else g.get("severity")
+            # частичный ответ на противоречие снимает его не для всех входов: critical остаётся critical
+            if g.get("severity") == "critical" and g.get("kind") in _cl.CONFLICT_KINDS:
+                sev = "critical"
             rc["severity_after"] = sev
             if str(d.get("title", "")).strip():
                 rc["title_after"] = str(d["title"]).strip()
