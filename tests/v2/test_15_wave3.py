@@ -266,3 +266,27 @@ def test_cleantable_tilde_times_are_older_and_open2_edition():
     assert ct._set_of("evaluation/v2/clean/fx/source.md") == "чистые ТЗ №20"
     assert ct._set_of("evaluation/v2/open2/qr_clean/source.md", ["нет-такого"], "2026-11-27 15:35").endswith("(2-я редакция)")
     assert ct._set_of("evaluation/v2/open2/qr_clean/source.md", [], "2026-11-27 05:20").endswith("(1-я редакция)")
+
+
+def test_final_numbers_collects_runs_by_commit(tmp_path, monkeypatch):
+    import json as _json
+
+    from evaluation.v2 import final
+
+    v2 = tmp_path / "evaluation" / "v2"
+    (v2 / "measurements" / "m1").mkdir(parents=True)
+    (v2 / "measurements" / "m1" / "score.json").write_text(_json.dumps({"clarity": {"n": 10, "passed": 9}}),
+                                                          encoding="utf-8")
+    rows = [{"label": "замер: abc1234, sonnet", "model": "sonnet", "status": "complete", "K": 5, "K_as_critical": 5,
+             "C": 18, "findings": 29, "duplicates": 1, "critical_false": 0, "duration_s": 180, "calls": 9,
+             "cost_usd": 0.8, "dir": "evaluation/v2/measurements/m1", "C_missed": ["С15", "С17"]},
+            {"label": "замер: abc1234, sonnet #2", "model": "sonnet", "status": "complete", "K": 5, "K_as_critical": 4,
+             "C": 19, "findings": 31, "duplicates": 0, "critical_false": 0, "duration_s": 170, "calls": 9,
+             "cost_usd": 0.7, "dir": "нет", "C_missed": ["С17"]},
+            {"label": "другой: fff0000, haiku", "model": "haiku"}]
+    (v2 / "history.jsonl").write_text("\n".join(_json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
+    monkeypatch.setattr(final, "V2", v2)
+    monkeypatch.setattr(final, "ROOT", tmp_path)
+    text = final.render("abc1234", "abc1234", "")
+    assert "| sonnet | 2 | 2 | 5/5 | 4–5 | 18–19 | 29–31 | 0–1 | 0 | 2.8–3.0 | 9 | 90 % | 0.70–0.80 |" in text
+    assert "sonnet — С15 (1 из 2), С17 (2 из 2)" in text and "haiku" not in text
