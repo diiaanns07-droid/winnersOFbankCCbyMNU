@@ -96,7 +96,7 @@ def resolve_auto(env: Mapping[str, str] | None = None,
                  which: Callable[[str], str | None] | None = None) -> tuple[str, str]:
     """(имя провайдера, причина выбора) по правилу ``auto``."""
     env = os.environ if env is None else env
-    which = which or shutil.which
+    which = which or shutil.which  # в момент вызова, а не объявления: иначе подмена в тестах не действует
     if _has(env, "GEMINI_API_KEY", "GOOGLE_API_KEY"):
         return "gemini", "задан GEMINI_API_KEY" if _has(env, "GEMINI_API_KEY") else "задан GOOGLE_API_KEY"
     if _has(env, "ANTHROPIC_API_KEY"):
@@ -354,10 +354,11 @@ def _attempt_lines(attempts: Sequence[Mapping[str, Any]]) -> list[str]:
 
 def run_doctor(*, live: bool = False, provider: str | None = None, model: str | None = None, timeout_s: float = 120.0,
                env: Mapping[str, str] | None = None, out: Callable[[str], None] = print,
-               which: Callable[[str], str | None] = shutil.which,
+               which: Callable[[str], str | None] | None = None,
                factory: Callable[..., Any] | None = None, list_models: bool = True) -> int:
     """Печатает диагностику. Код: 0 — можно запускать; 1 — нет рабочего провайдера; 2 — пробный вызов не прошёл."""
     env = os.environ if env is None else env
+    which = which or shutil.which
     factory = factory or make_provider
     problems: list[str] = []
     out("Диагностика bcc_review")
