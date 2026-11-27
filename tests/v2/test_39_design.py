@@ -148,11 +148,24 @@ def test_plural_and_verdict_variants():
     assert '<b class="cond">с условиями</b>' in cond and "1 блокер<" in cond
 
 
-def test_empty_desk_shows_sample_sheet(srv):
+def test_empty_desk_shows_sample_sheet(srv, monkeypatch):
     base, _ = srv
+    # №54: с готовыми отчётами №43 раскрыт первый из них (см. ниже); здесь — стол совсем без отчётов
+    from bcc_review.v2.web import gallery
+    monkeypatch.setattr(gallery, "load_examples", lambda *a, **k: {"reports": [], "documents": []})
     html = _text(base + "/")
     assert 'id="sheet"' in html and "Ещё не проверен" in html and "Проверить пример" in html
     assert "Проверить этот лист" in html and 'class="b-hl' not in html  # не проверен — правки нет
+
+
+def test_desk_opens_first_ready_report(srv):
+    """№54: своих проверок нет, готовые отчёты №43 есть — на столе раскрыт первый из них с правкой."""
+    from bcc_review.v2.web import gallery
+    ready = [r for r in gallery.load_examples()["reports"] if r.get("ok")]
+    if not ready:
+        pytest.skip("готовых отчётов нет")
+    html = _text(srv[0] + "/")
+    assert 'id="sheet"' in html and 'class="b-hl' in html and f'href="/examples/{ready[0]["id"]}"' in html
 
 
 def test_no_external_links_in_html_css_js(srv):
