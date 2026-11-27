@@ -14,7 +14,8 @@
 * ``truncated_json`` — finishReason STOP, но JSON оборван; ``empty`` — кандидат без текста;
 * ``no_candidates`` — пустой список кандидатов; ``max_tokens`` — finishReason MAX_TOKENS;
 * ``403_proxy`` — 403 от прокси сети (HTML, не JSON Google); ``407`` — прокси требует пароль;
-* ``safety`` — promptFeedback.blockReason=SAFETY; ``finish_safety`` — finishReason SAFETY.
+* ``safety`` — promptFeedback.blockReason=SAFETY; ``finish_safety`` / ``finish_recitation`` / ``finish_spii`` —
+  ответ остановлен фильтром на выходе (finishReason).
 
 Задержка ответа ``latency`` (с, на каждый успешный ответ, можно по этапам) — для замера времени прогона.
 Запуск вручную: ``python tests/v2/fixtures/24_gemini/fake_gemini.py --port 8765 --latency 20``.
@@ -203,8 +204,8 @@ class FakeGemini:
             payload = ""
         elif kind == "max_tokens":
             payload, finish = payload[: len(payload) // 2], "MAX_TOKENS"
-        elif kind == "finish_safety":
-            payload, finish = "", "SAFETY"
+        elif kind.startswith("finish_"):   # finish_safety, finish_recitation, finish_spii
+            payload, finish = "", kind[len("finish_"):].upper()
         usage = {"promptTokenCount": len(text) // 3, "candidatesTokenCount": len(payload) // 3,
                  "thoughtsTokenCount": 100, "totalTokenCount": len(text) // 3 + len(payload) // 3 + 100}
         if kind == "safety":

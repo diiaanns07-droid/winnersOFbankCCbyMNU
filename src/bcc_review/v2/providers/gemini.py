@@ -87,7 +87,17 @@ NEXT_MODEL = frozenset({"not_found", "quota"})
 # «Пустой» ответ модели (нет текста, не JSON, нечитаемый, необычный finish_reason): один повтор, затем другая модель
 EMPTY_SUBKINDS = frozenset({"empty_candidates", "empty_text", "not_json", "unreadable_response"})
 EMPTY_RETRIES = 1
+# Остановка ответа фильтром на выходе (finishReason RECITATION/SAFETY/SPII) зависит от выборки: повтор той же модели
+# часто проходит, у запасной модели — свои пороги. Блок запроса (promptFeedback) — от входа, его не повторяем.
+# Не больше STOP_TRIES запросов на одно обращение: стойкий отказ не съедает суточную квоту всей цепочки.
+SAMPLED_STOPS = frozenset({"finish_recitation", "finish_safety", "finish_spii"})
+STOP_TRIES = 3
 _OFF = ("off", "none", "no", "0", "false", "disable", "disabled")
+
+
+def is_sampled_stop(exc: ProviderError) -> bool:
+    """Ответ остановлен фильтром на выходе — повтор может пройти (в отличие от блока самого запроса)."""
+    return exc.kind == "refusal" and str(getattr(exc, "subkind", "") or "") in SAMPLED_STOPS
 
 
 def is_empty_answer(exc: ProviderError) -> bool:
@@ -454,6 +464,7 @@ class GeminiProvider:
         clean = [{"role": m.get("role"), "content": m.get("content")} for m in messages]
         schema_key = _schema_key(schema)
 
+        stops = 0                                # остановки фильтром на выходе за это обращение (все модели)
         quota_exc: ProviderError | None = None   # дневная квота — главное объяснение, если не ответит никто
         reserved = False
         idx = 0
@@ -509,6 +520,13 @@ class GeminiProvider:
                                 reserved = True
                                 self._add_reserve(chain, idx)
                         break
+                    if is_sampled_stop(exc):
+                        stops += 1
+                        if stops >= STOP_TRIES:
+                            raise self._final(exc, chain, attempts) from None
+                        if stops == 1:
+                            continue   # та же модель ещё раз
+                        break          # вторая остановка — запасная модель
                     if is_empty_answer(exc):
                         if empty < EMPTY_RETRIES:
                             empty += 1

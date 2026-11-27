@@ -112,6 +112,13 @@ def test_judge_blocked_by_safety_is_partial_not_yes(tmp_path):
     assert verdict["development"] in ("no", "none")
 
 
+def test_lens_recitation_stop_once_recovers(tmp_path):
+    """v2.1: одна остановка RECITATION у линзы — повтор, прогон complete (было: partial, линза потеряна)."""
+    code, text, data, log = jury_run(tmp_path, [{"kind": "finish_recitation", "stage": "lens_risk"}])
+    status, verdict = assert_honest(code, text, data)
+    assert status == "complete" and verdict["development"] == "no"
+
+
 def test_lens_safety_stop_is_partial_with_reason(tmp_path):
     code, text, data, log = jury_run(tmp_path, [{"kind": "finish_safety", "stage": "lens_risk", "times": 99}])
     status, verdict = assert_honest(code, text, data)
