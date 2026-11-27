@@ -705,3 +705,23 @@ def test_round_runs_official_first_and_skips_sets_after_quota(tmp_path, monkeypa
         rcs = rnd.run_waves(fake_jobs(), logs, together=False)
         assert started == expect
         assert (rcs["corpus"] == 3) is quota
+
+
+def test_viewdiff_rules_on_clean_docs_summary():
+    """--rules: правила без модели на чистых документах до и после — суммы, где лучше и где хуже; чистых документов
+    оценки 20 (8 №20, 4 open2, 8 корпуса без пустого)."""
+    from evaluation.v2 import viewdiff as vd
+
+    ra = {"a/fx/source.md": {"critical": 2, "major": 0, "minor": 1}, "a/st/source.md": {"critical": 0, "major": 4, "minor": 0},
+          "a/qr/source.md": {"critical": 0, "major": 0, "minor": 0}, "a/x/source.md": {"error": "rc=1"}}
+    rb = {"a/fx/source.md": {"critical": 0, "major": 0, "minor": 1}, "a/st/source.md": {"critical": 0, "major": 4, "minor": 0},
+          "a/qr/source.md": {"critical": 0, "major": 1, "minor": 0}, "a/x/source.md": {"critical": 0, "major": 0, "minor": 0}}
+    s = vd.rules_summary(ra, rb)
+    assert s["total"] == {"critical": [2, 0], "major": [4, 5], "minor": [1, 1]}
+    assert s["better"] == ["a/fx/source.md"] and s["worse"] == ["a/qr/source.md"] and s["errors"] == ["a/x/source.md"]
+    line = vd.rules_line(s)
+    assert line.startswith("Правила без модели на 4 чистых документах: critical 2 → 0, major 4 → 5")
+    assert "лучше — fx" in line and "**хуже — qr**" in line and "не прогнались — 1" in line
+    docs = vd.clean_docs()
+    assert len(docs) == 20 and "evaluation/v2/clean/fx/source.md" in docs
+    assert all("edge.empty" not in d for d in docs) and any(d.endswith("autopay.base/source.md") for d in docs)

@@ -295,8 +295,9 @@ def clean_docs() -> list[str]:
     return [p for p in dict.fromkeys(out) if (ROOT / p).exists()]
 
 
-def rules_at(sha: str, docs: list[str], timeout: int = 300) -> dict:
-    """Находки правил без модели (`--provider offline`) кодом коммита: {документ: {severity: n, "top": [...]}}."""
+def rules_at(sha: str, docs: list[str], timeout: int = 300, keep: bool = False) -> dict:
+    """Находки правил без модели (`--provider offline`) кодом коммита: {документ: {severity: n, "top": [...]}};
+    с ``keep`` — и весь report.json (для счёта по эталону)."""
     import os
 
     out: dict[str, dict] = {}
@@ -317,11 +318,29 @@ def rules_at(sha: str, docs: list[str], timeout: int = 300) -> dict:
             if not rj.exists():
                 out[doc] = {"error": f"rc={r.returncode}: {(r.stderr or r.stdout)[-200:]}"}
                 continue
-            fs = json.loads(rj.read_text(encoding="utf-8")).get("findings") or []
+            rep = json.loads(rj.read_text(encoding="utf-8"))
+            fs = rep.get("findings") or []
             sev = {s: sum(1 for f in fs if f.get("severity") == s) for s in ("critical", "major", "minor")}
             out[doc] = {**sev, "top": [f"{f.get('severity')}: {str(f.get('title') or '')[:80]}" for f in fs
                                        if f.get("severity") in ("critical", "major")][:5]}
+            if keep:
+                out[doc]["report"] = rep
     return out
+
+
+def official_rules_recall(sha: str) -> dict:
+    """Правила без модели на официальном документе, счёт по эталону (текущий счётчик, арбитр выключен): что
+    правила находят сами — К и С, которые не зависят от модели."""
+    from . import score as sc
+
+    gold = sc.load_gold(sc.DEFAULT_GOLD)
+    doc = str(gold.get("document") or "release/input/requirements.md")
+    r = rules_at(sha, [doc], keep=True).get(doc) or {}
+    if "report" not in r:
+        return {"error": r.get("error", "нет отчёта")}
+    res = sc.score_report(sc.as_report(r["report"], gold), gold, arbiter="off")
+    return {"findings": len(r["report"].get("findings") or []), "K": res["recall"]["critical"]["found"],
+            "C": sorted(res["recall"]["major"]["found"], key=lambda x: int(x[1:]))}
 
 
 def rules_summary(ra: dict, rb: dict) -> dict:
@@ -365,7 +384,8 @@ def main(argv: list[str] | None = None) -> int:
     if a.rules:
         docs = clean_docs()
         ra, rb = rules_at(res["a"], docs), rules_at(res["b"], docs)
-        res["rules"] = {"a": ra, "b": rb, **rules_summary(ra, rb)}
+        res["rules"] = {"a": ra, "b": rb, **rules_summary(ra, rb),
+                        "official": [official_rules_recall(res["a"]), official_rules_recall(res["b"])]}
     if a.json:
         Path(a.json).parent.mkdir(parents=True, exist_ok=True)
         Path(a.json).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -373,6 +393,14 @@ def main(argv: list[str] | None = None) -> int:
     if res.get("rules"):
         rs = res["rules"]
         sys.stdout.write("\n" + rules_line(rs) + "\n")
+        oa, ob = rs.get("official") or [{}, {}]
+        if "error" not in oa and "error" not in ob:
+            lost = [x for x in oa["K"] + oa["C"] if x not in ob["K"] + ob["C"]]
+            new = [x for x in ob["K"] + ob["C"] if x not in oa["K"] + oa["C"]]
+            sys.stdout.write(f"На официальном правила без модели находят: {', '.join(oa['K'] + oa['C']) or '—'} → "
+                             f"{', '.join(ob['K'] + ob['C']) or '—'} (замечаний {oa['findings']} → {ob['findings']})"
+                             + (f"; **потеряны: {', '.join(lost)}**" if lost else "; ничего не потеряно")
+                             + (f"; новые: {', '.join(new)}" if new else "") + ".\n")
         for d in sorted(set(rs["a"]) | set(rs["b"])):
             x, y = rs["a"].get(d) or {}, rs["b"].get(d) or {}
             if (x.get("critical"), x.get("major")) != (y.get("critical"), y.get("major")):
