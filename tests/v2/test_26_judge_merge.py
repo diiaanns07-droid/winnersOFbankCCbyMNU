@@ -254,3 +254,46 @@ def test_short_shared_name_is_not_same_place():
     resp["findings"].append(finding("F03", ["C-004"], kind="terminology"))
     res = _run(resp, cs)
     assert _by(res, "C-002") is not _by(res, "C-004") and len(res["findings"]) == 4
+
+
+# --- critical-противоречие не поглощает неописанную ветку того же ревьюера ------------------------------
+
+def _conflict_and_branch(branch_source="lens:architect", branch_title="Ветка логики без ответа: отказ возвращает "
+                                                                       "прежнее состояние"):
+    cs = [_c("C-001", 121, "Неверная сумма — ответ 400", API, kind="status_conflict", severity="critical",
+             title="Неверная сумма: код 200 с ошибкой или код 400", reqs=("R-30",),
+             extra=[(163, "200 с телом ERROR")]),
+          _c("C-002", 121, "Неверная сумма — ответ 400", API, source=branch_source, kind="api_contract",
+             title=branch_title, reqs=("R-30",), extra=[(156, "Возвращается прежнее состояние")]),
+          _c("C-003", 163, "200 с телом ERROR", STATUS, source="rules:api.success_with_error",
+             kind="status_conflict", reqs=("R-30",))]
+    f = finding("F01", ["C-001", "C-002", "C-003"], severity="critical", kind="status_conflict",
+                title="Неверная сумма: 200 с ошибкой или 400", scenario="Сумма 0: 400 или 200 ERROR.",
+                impact="Разные клиенты.")
+    return cs, response([f])
+
+
+def test_conflict_does_not_absorb_undescribed_branch_of_same_reviewer():
+    cs, resp = _conflict_and_branch()
+    res = _run(resp, cs)
+    all_placed(res, ["C-001", "C-002", "C-003"])
+    crit, branch = _by(res, "C-001"), _by(res, "C-002")
+    assert crit is not branch and crit["severity"] == "critical" and crit["candidate_ids"] == ["C-001", "C-003"]
+    assert branch["severity"] == "major" and branch["title"].startswith("Ветка логики без ответа")
+
+
+def test_conflict_keeps_same_subject_or_other_reviewer():
+    cs, resp = _conflict_and_branch(branch_title="Неверная сумма: код 200 или код 400 без тела")
+    assert len(_run(resp, cs)["findings"]) == 1
+    cs, resp = _conflict_and_branch(branch_source="lens:qa")
+    assert len(_run(resp, cs)["findings"]) == 1
+
+
+def test_missing_critical_keeps_its_consequences():
+    """Critical «обещано, но не описано» (не противоречие) законно собирает следствия из разных мест."""
+    cs, resp = _conflict_and_branch()
+    resp["findings"][0]["kind"] = "missing_element"
+    for c in cs:
+        c["kind"] = "missing_element"
+    cs[1]["kind"] = "api_contract"
+    assert len(_run(resp, cs)["findings"]) == 1

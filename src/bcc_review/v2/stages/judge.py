@@ -1581,6 +1581,13 @@ def _split_places(drafts: list[dict], by_id: dict[str, dict], ctx: Any, warnings
     for d in drafts:
         f = d["raw"]
         members = [by_id[x] for x in d["ids"]]
+        strays = _conflict_strays(f, members, by_id)
+        if strays:
+            stray_ids = {m["id"] for m in strays}
+            out.append({"key": d["key"], "raw": f, "ids": [x for x in d["ids"] if x not in stray_ids]})
+            for n, m in enumerate(strays, 1):
+                pending.append((d, f, n, [m], "major"))
+            continue
         if (len(members) < 2 or _s(f.get("severity")) == "critical"
                 or any(_s(m.get("severity")) == "critical" for m in members)):
             out.append(d)
@@ -1633,6 +1640,30 @@ def _split_places(drafts: list[dict], by_id: dict[str, dict], ctx: Any, warnings
         _warn(ctx, warnings, f"судья: из {_cut(_s(f.get('title')) or sub.get('title'), 60)!r} выделен отдельный "
                              f"дефект {_cut(sub.get('title'), 60)!r} — другое место документа, другая правка")
     return out
+
+
+_STRAY_KINDS = MISSING_KINDS | {"api_contract"}
+
+
+def _conflict_strays(f: dict, members: list[dict], by_id: dict[str, dict]) -> list[dict]:
+    """Critical-противоречие (два места дают разный исход) не поглощает неописанную ветку или неполный контракт:
+    «противоречие и неописанный случай — два дефекта» (шаг 2 промпта). Отделяется кандидат ревьюера-модели не
+    critical, вида «пропуск» или «контракт», если тот же ревьюер прислал в этот дефект отдельный кандидат о
+    противоречии, а заголовки называют разные предметы (< 2 общих опорных слов)."""
+    kind = _s(f.get("kind")) if _s(f.get("kind")) in KINDS else _s((by_id.get(_s(f.get("base"))) or {}).get("kind"))
+    if _s(f.get("severity")) != "critical" or kind not in CONFLICT_KINDS or len(members) < 2:
+        return []
+    out = []
+    for m in members:
+        src = _s(m.get("source"))
+        if (not src or src.startswith("rules:") or _s(m.get("severity")) == "critical"
+                or _s(m.get("kind")) not in _STRAY_KINDS or m["id"] == _s(f.get("base"))):
+            continue
+        mates = [o for o in members if o is not m and _s(o.get("source")) == src
+                 and _s(o.get("kind")) in CONFLICT_KINDS]
+        if mates and all(len(_subject_tokens(m.get("title")) & _subject_tokens(o.get("title"))) < 2 for o in mates):
+            out.append(m)
+    return out if len(out) < len(members) else []
 
 
 _HOST_QUOTE_MIN = 30  # общий фрагмент цитаты, а не имя компонента или поля
