@@ -646,6 +646,21 @@ _ANAPHORA = re.compile(r"^\W*(?:после\s+чего|в\s+этом\s+случа
 # Номер-ссылка на место документа («метод 3», «п. 2», «шаг 4», «строка 12») — не значение.
 _REF_NUM = re.compile(r"(?<![а-яё])(?:метод\w*|п\.|пункт\w*|шаг\w*|раздел\w*|строк\w*|част\w*|глав\w*|"
                       r"рисун\w*|таблиц\w*)\s*№?\s*\d+", re.I)
+# Слова момента и порядка: если ими различаются цитаты («следующего» ↔ «текущего» месяца), исходы разные.
+_MOMENT_WORD = re.compile(r"^(?:следующ|текущ|предыдущ|прошл|после|через|сразу|немедлен|раньш|ранее|позж|позднее|"
+                          r"начал|конц|конец|перв|последн|накануне|завтр|вчер|сегодн)", re.I)
+_MOMENT_SHORT = {"до", "с", "со", "по", "от"}
+
+
+def _moment_differs(qa: str, qb: str) -> bool:
+    """Цитаты различаются словом момента или порядка (оно есть только в одной из них)."""
+    wa = {w.lower() for w in _WORD.findall(qa)}
+    wb = {w.lower() for w in _WORD.findall(qb)}
+    sa, sb = {_stem(w) for w in wa}, {_stem(w) for w in wb}
+    diff = {w for w in wa if _stem(w) not in sb} | {w for w in wb if _stem(w) not in sa}
+    return any(w in _MOMENT_SHORT or _MOMENT_WORD.match(w) for w in diff)
+
+
 _ONLY = re.compile(r"(?<![а-яё])(?:только|кроме|исключ\w*|лишь)(?![а-яё])", re.I)
 _ERR_TOKEN = re.compile(r"(?<![A-Za-z_])[A-Z]+(?:_[A-Z]+)+(?![A-Za-z_])")
 # Общие части кодов ошибок: остаётся объект («ACCOUNT», «QUOTE»).
@@ -731,7 +746,7 @@ def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str
     if kind == "event_conflict" and pair["basis"] != "limit_removed" and not any(
             _REFUSAL.search(q) or _LIMIT.search(q) or _ONLY.search(q) for q in quotes):
         na, nb = (set(re.findall(r"\d+", _REF_NUM.sub("", _BARE_ID.sub("", _ITEM_NO.sub("", q))))) for q in quotes)
-        if na and na == nb:
+        if na and na == nb and not _moment_differs(qa, qb):
             return "same_outcome"
     # Граница срока: строка приёмки с конкретным временем против «действует N минут» без «включительно».
     if kind == "boundary_conflict":
