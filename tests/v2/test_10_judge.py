@@ -397,7 +397,8 @@ def test_texts_fall_back_to_base_candidate():
     res = judge.run(Ctx(FakeLLM(response([f]))), cs)
     d = res["findings"][0]
     assert d["title"] == "Заголовок кандидата"
-    assert d["recommendation"] == "Исправить C-001." and d["scenario"] == "Вход X даёт два исхода."
+    assert d["recommendation"].startswith("Исправить") and d["scenario"] == "Вход X даёт два исхода."
+    assert "C-001" not in d["recommendation"]   # внутренний код кандидата читателю не показываем
 
 
 def test_compute_verdict_rule():
@@ -637,3 +638,69 @@ def test_major_spec_placeholder_stays_separate():
     res = judge.run(Ctx(FakeLLM(response(fs))), cs)
     titles = sorted(f["title"] for f in res["findings"])
     assert titles == ["Адрес вызова в бою не указан", "Не заполнены поля и разделы шаблона документа"]
+
+
+# --- третья волна: понятность текстов реестра ---------------------------------------------------
+
+
+def test_internal_requirement_ids_become_document_ids():
+    names = judge._req_names([{"id": "R-06", "source_id": "Ф-2"}, {"id": "R-14", "source_id": "Критерии приемки, строка 2"},
+                              {"id": "R-20", "source_id": ""}])
+    t = judge._doc_ids("По R-06 (Ф-2) январь, по R-14 (Критерии приемки, строка 2) — февраль; см. R-06 и R-20.", names)
+    assert t == "По Ф-2 январь, по «Критерии приемки, строка 2» — февраль; см. Ф-2 и R-20."
+
+
+def test_long_title_is_cut_at_colon_only_when_head_is_meaningful():
+    long = "Перечень кодов успеха и ошибок открыт и неполон: «и далее», 201 без описания, 404 под заголовком 403"
+    assert judge._short_title(long, []) == "Перечень кодов успеха и ошибок открыт и неполон"
+    keep = "Не определён исход, когда расходы уже не ниже порога при включении или смене порога"
+    assert judge._short_title(keep, []) == keep            # первая часть не называет проблему — не режем
+    assert judge._nwords("Поле result отсутствует в ответах 400, 401, 403, 500") == 5
+
+
+def test_merged_finding_takes_scenario_and_fix_from_other_member():
+    cs = [cand("C-001", 39, "максимум один такой push за календарный месяц", scenario="", kind="contradiction"),
+          cand("C-002", 40, "следующее достижение вызывает push независимо от истории", kind="contradiction",
+               scenario="Push 10.03, смена порога 12.03, достижение 15.03: Ф-3 — нет, Ф-4 — да.")]
+    cs[1]["rewrite"] = "Ф-4. … лимит push за месяц сохраняется."
+    f = finding("F01", ["C-001", "C-002"], kind="contradiction")
+    res = judge.run(Ctx(FakeLLM(response([f]))), cs)
+    d = res["findings"][0]
+    assert "15.03" in d["scenario"] and d["rewrite"].startswith("Ф-4")
+
+
+def test_same_kind_minors_become_one_per_document():
+    cs = [cand(f"C-00{i}", ln, q, kind="terminology", severity="minor", criterion="set_comprehensible")
+          for i, (ln, q) in enumerate([(26, "Сервис настроек"), (43, "Сервис push"), (130, "Хранилище настроек")], 1)]
+    fs = [finding(f"F0{i}", [c["id"]], kind="terminology", criterion="set_comprehensible", severity="minor",
+                  blocks="none") for i, c in enumerate(cs, 1)]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    assert len(res["findings"]) == 1
+    d = res["findings"][0]
+    assert d["severity"] == "minor" and set(d["candidate_ids"]) == {"C-001", "C-002", "C-003"}
+    assert "строка 26" in d["problem"] and (d["rewrite"] or d["question"])
+
+
+def test_no_priorities_and_no_ids_are_one_minor():
+    cs = [cand("C-001", 36, "Функциональные требования", kind="other", criterion="ranked", severity="minor",
+               title="У требований нет приоритетов"),
+          cand("C-002", 46, "передаётся на отправку", kind="other", criterion="conforming", severity="major",
+               title="У НФТ и данных нет ID")]
+    fs = [finding("F01", ["C-001"], kind="other", criterion="ranked", severity="minor", title="У требований нет приоритетов"),
+          finding("F02", ["C-002"], kind="other", criterion="conforming", severity="major", title="У НФТ и данных нет ID")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    assert len(res["findings"]) == 1 and res["findings"][0]["severity"] == "minor"
+
+
+def test_clarity_rubric_flags_codes_latin_and_missing_fix():
+    good = {"title": "Критерий приёмки №2 относит покупку к другому месяцу", "severity": "critical",
+            "kind": "event_conflict", "evidence": [{"line_start": 64, "quote": "q"}],
+            "problem": "Ф-2 относит покупку 31 января к январю, а критерий приёмки №2 — к февралю.",
+            "scenario": "Покупка 4 000 ₸ 31.01 в 23:58: по Ф-2 — январь, по критерию — февраль.",
+            "impact": "Реализация по правилу не пройдёт приёмку, тестировщик и разработчик разойдутся.",
+            "recommendation": "Выбрать один исход.", "rewrite": "", "question": "Какой месяц верен: январь или февраль?"}
+    assert judge.clarity_issues(good) == []
+    bad = dict(good, problem=good["problem"] + " См. C-010 от lens:qa.", question="", impact="",
+               title="Проблема with the implementation")
+    issues = " ".join(judge.clarity_issues(bad))
+    assert "внутренний код" in issues and "латиница" in issues and "исправление" in issues and "последствие" in issues
