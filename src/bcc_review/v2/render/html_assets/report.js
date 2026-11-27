@@ -8,6 +8,56 @@
   var cardsBox = $("#cards");
   var cards = $$(".card", cardsBox || document);
 
+  /* ── таблицы ТЗ на листе (№54): строки «Поле | Значение» — ячейками, без «|»; метки цитат режутся по ячейкам.
+     Текст и метки те же; не разобралось — строка остаётся как есть. Идёт до подсчёта мест заметок (№41). ── */
+  function tableRows(box) {
+    if (!box) return;
+    var piped = function (ln) { return !ln.classList.contains("blank") && /\S \|( |$)/.test((ln.querySelector(".tx") || {}).textContent || ""); };
+    var lines = $$(".ln", box), blocks = [], cur = [];
+    lines.forEach(function (ln) {
+      if (piped(ln)) cur.push(ln);
+      else if (!(ln.classList.contains("blank") && cur.length)) { if (cur.length > 1) blocks.push(cur); cur = []; }
+    });
+    if (cur.length > 1) blocks.push(cur);
+    blocks.forEach(function (rows) {
+      var split = rows.map(function (ln) { try { return cells(ln.querySelector(".tx")); } catch (_) { return null; } });
+      var n = Math.max.apply(null, split.map(function (c) { return c ? c.length : 0; }));
+      if (n < 2) return;
+      rows.forEach(function (ln, i) {
+        var c = split[i], tx = ln.querySelector(".tx");
+        if (!c) return;
+        while (c.length < n) c.push(document.createDocumentFragment());
+        tx.textContent = "";
+        c.forEach(function (f) { var td = document.createElement("span"); td.className = "td"; td.appendChild(f); tx.appendChild(td); });
+        tx.style.setProperty("--cols", n === 2 ? "minmax(0, 2fr) minmax(0, 3fr)" : "repeat(" + n + ", minmax(0, 1fr))");
+        ln.classList.add("trow");
+        var next = ln.nextElementSibling;
+        if (i === 0 && next && next.classList.contains("blank")) ln.classList.add("thead");
+      });
+    });
+  }
+  function cells(tx) {
+    var out = [document.createDocumentFragment()];
+    (function walk(node, chain) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (ch) {
+        if (ch.nodeType === 1) return walk(ch, chain.concat([ch]));
+        if (ch.nodeType !== 3) return;
+        var parts = ch.nodeValue.split("|");
+        parts.forEach(function (t, k) {
+          if (k > 0) { out.push(document.createDocumentFragment()); t = t.replace(/^\s+/, ""); }
+          if (k < parts.length - 1) t = t.replace(/\s+$/, "");
+          if (!t) return;
+          var x = document.createTextNode(t);
+          for (var j = chain.length - 1; j >= 0; j--) { var w = chain[j].cloneNode(false); w.appendChild(x); x = w; }
+          out[out.length - 1].appendChild(x);
+        });
+      });
+    })(tx, []);
+    if (out.length > 1 && !out[out.length - 1].textContent.trim()) out.pop();  // «… | Да / Нет |» — хвостовая черта
+    return out.length > 1 ? out : null;
+  }
+  tableRows(doc);
+
   function store(k, v) {
     try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; }
     return null;

@@ -399,11 +399,47 @@ def _sheet_lines(job: Job, limit: int = 400) -> list[dict]:
     return lines
 
 
+def _table_rows(texts: list[str]) -> dict[int, tuple[list[str], int, bool]]:
+    """№54: строки таблиц ТЗ («Поле | Значение», подряд от двух) → {номер: (ячейки, колонок, шапка)}; пустая строка
+    внутри таблицы (бывший разделитель «|---|») таблицу не рвёт."""
+    piped = [bool(re.search(r"\S \|( |$)", t)) for t in texts]
+    out: dict[int, tuple[list[str], int, bool]] = {}
+    i = 0
+    while i < len(texts):
+        if not piped[i]:
+            i += 1
+            continue
+        block, j = [], i
+        while j < len(texts) and (piped[j] or (not texts[j].strip() and block)):
+            if piped[j]:
+                block.append(j)
+            j += 1
+        if len(block) > 1:
+            cells = {k: [c.strip() for c in texts[k].split("|")] for k in block}
+            for k, c in cells.items():
+                while len(c) > 1 and not c[-1]:  # «… | Да / Нет |» — хвостовая черта
+                    c.pop()
+            n = max(len(c) for c in cells.values())
+            for k, c in cells.items():
+                out[k] = (c + [""] * (n - len(c)), n, k == block[0] and k + 1 < len(texts) and not texts[k + 1].strip())
+        i = j
+    return out
+
+
 def _sheet_html(job: Job) -> str:
     rows = []
-    for ln in _sheet_lines(job):
+    lines = _sheet_lines(job)
+    table = _table_rows([str(ln.get("text") or "") for ln in lines])
+    for i, ln in enumerate(lines):
         text = str(ln.get("text") or "")
         cls = "ln" + (" h" if ln.get("heading") or ln.get("kind") == "heading" else "") + ("" if text.strip() else " blank")
+        if i in table:  # №54: таблица ТЗ — ячейками, без «|», как на главной
+            cells, n, head = table[i]
+            cols = "minmax(0, 2fr) minmax(0, 3fr)" if n == 2 else f"repeat({n}, minmax(0, 1fr))"
+            tds = "".join(f'<span class="td">{e(c)}</span>' for c in cells)
+            rows.append(f'<div class="{cls} trow{" thead" if head else ""}"><span class="no">{e(ln.get("n", ""))}</span>'
+                        f'<span class="tx" style="--cols:{cols}">{tds}</span></div>')
+            continue
         rows.append(f'<div class="{cls}"><span class="no">{e(ln.get("n", ""))}</span><span class="tx">{e(text) or "&#8203;"}</span></div>')
     if not rows:
         rows = ['<div class="ln skel"><span class="no"></span><span class="tx"></span></div>'] * 24

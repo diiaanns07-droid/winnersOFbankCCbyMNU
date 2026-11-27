@@ -206,3 +206,15 @@ def test_facts_follow_markdown_after_owner_answers(tmp_path):
     html = S.result_html(job, f)
     assert "Блокеров нет" in html and 'data-mood="happy"' in html
     assert 'data-rt="rewrites"' in html and 'data-rtab="clarify"' in html
+
+
+def test_tz_tables_drawn_as_cells():
+    """№54: таблицы ТЗ на листе — ячейками без «|», как на главной; пустая строка (бывший «|---|») не рвёт таблицу."""
+    from bcc_review.v2.web import server as S2
+    t = ["Поле | Значение", "", "A | B", "C | D", "", "текст", "P | Q | R", "1 | 2 |", "одна | строка"]
+    rows = S2._table_rows(t)
+    assert rows[0] == (["Поле", "Значение"], 2, True) and rows[3] == (["C", "D"], 2, False)
+    assert rows[7] == (["1", "2", ""], 3, False) and 5 not in rows
+    assert S2._table_rows(["одна | строка", "просто текст"]) == {}  # одна строка с «|» — не таблица
+    js = (Path(S2.__file__).resolve().parents[1] / "render" / "html_assets" / "report.js").read_text(encoding="utf-8")
+    assert "function tableRows(" in js and "tableRows(doc);" in js

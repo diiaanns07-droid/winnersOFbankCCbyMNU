@@ -170,6 +170,10 @@ main { padding: 28px 16px 40px; }
 .ln .tx { white-space: pre-wrap; word-break: break-word; min-height: 28px; }
 .ln.blank { min-height: 12px; }
 .ln.blank .tx, .ln.blank .no { min-height: 12px; line-height: 12px; font-size: 0; }
+/* таблицы ТЗ (№54): ячейки вместо «|», волосяная линия между строками */
+.ln.trow .tx { display: grid; grid-template-columns: var(--cols); column-gap: 20px; padding: 0 0 4px; box-shadow: inset 0 -1px 0 var(--hair); }
+.ln.trow .td { min-width: 0; }
+.ln.thead .tx { font-weight: 600; }
 .ln.h .tx { font-weight: 650; font-size: 19px; letter-spacing: -.01em; padding-top: 12px; }
 .ln.h .no { padding-top: 12px; }
 .fms, .fmore { display: none; }
