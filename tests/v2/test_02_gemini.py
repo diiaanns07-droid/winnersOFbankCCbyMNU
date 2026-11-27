@@ -199,11 +199,29 @@ def test_deadline_stops_retries():
     assert len(script.calls) <= 3
 
 
-def test_missing_key_is_not_configured():
-    p = GeminiProvider(env={})
+def test_missing_key_is_not_configured_at_creation():
+    """Без ключа провайдер не создаётся (как Claude API): конвейер объясняет причину первой строкой."""
     with pytest.raises(ProviderError) as e:
-        p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+        GeminiProvider(env={})
     assert e.value.kind == "not_configured" and "aistudio.google.com" in e.value.message
+
+
+def test_pipeline_without_gemini_key_explains_first_and_does_not_fail_each_stage(tmp_path, monkeypatch, capsys):
+    from bcc_review.v2 import __main__ as cli
+    from pathlib import Path
+    doc = Path(__file__).resolve().parents[2] / "release" / "input" / "requirements.md"
+    monkeypatch.chdir(tmp_path)
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    code = cli.main([str(doc), str(tmp_path / "r.md"), "--provider", "gemini", "--no-html"])
+    out = capsys.readouterr()
+    report = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+    assert code == 3
+    assert report["run"]["warnings"][0].startswith("Не задан ключ Gemini"), report["run"]["warnings"][:2]
+    assert "aistudio.google.com/apikey" in report["run"]["warnings"][0]
+    text = out.out + out.err
+    assert "СБОЙ" not in text                                     # этапы не «падают» по очереди
+    assert report["findings"]                                     # отчёт построен правилами
 
 
 def test_thinking_for():

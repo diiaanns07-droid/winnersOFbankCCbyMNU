@@ -277,6 +277,16 @@ class GeminiProvider:
         self.retry_delays = tuple(retry_delays)
         self.network_delays = tuple(network_delays)
         self._factory = adapter_factory or self._v1_adapter
+        if adapter_factory is None:
+            # Нет ключа или пакета — ошибка сразу, при создании (как у Claude API): конвейер покажет объяснение
+            # первой строкой и построит отчёт правилами, а не будет по очереди «ронять» каждый этап.
+            if not self._api_key:
+                raise ProviderError("not_configured", f"Не задан GEMINI_API_KEY. {KEY_HELP}")
+            try:
+                import google.genai  # noqa: F401
+            except ImportError:
+                raise ProviderError("not_configured", "Не установлен пакет google-genai: выполните "
+                                                      "«pip install -r requirements.txt» и повторите.") from None
         self._sleep = sleep
         self._clock = clock
         self._lock = threading.Lock()
