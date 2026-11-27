@@ -486,10 +486,16 @@ def stage_key(name: str) -> str:
     return n
 
 
+RULE_FAMILY = {"api": "контракт API", "conflicts": "противоречия", "injection": "вставки в текст",
+               "language": "размытые слова", "placeholder": "заглушки и шаблон", "placeholders": "заглушки и шаблон",
+               "promises": "обещанные операции", "units": "единицы измерения", "terms": "термины"}
+
+
 def source_name(src: str) -> str:
     s = str(src or "")
     if s.startswith("rules:"):
-        return f"правило «{s.split(':', 1)[1]}»"
+        fam = s.split(":", 1)[1].split(".", 1)[0]
+        return f"правило «{RULE_FAMILY[fam]}»" if fam in RULE_FAMILY else "правило без модели"
     if s in SOURCES or stage_key(s) in SOURCES:
         return SOURCES.get(stage_key(s), SOURCES.get(s))
     if s.startswith("lens"):

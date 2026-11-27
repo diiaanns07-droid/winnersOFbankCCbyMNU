@@ -382,7 +382,8 @@ def test_line_refs_from_model_text_become_russian():
         "по строке 151 и в строках 38–40, из строк 7–9; Сервер по строке 121"
     assert markdown.cell("a | L7") == "a \\| строка 7"
     assert markdown.source_name("lens:что-то") == "проверка ролью"
-    assert markdown.source_name("rules:units") == "правило «units»"
+    assert markdown.source_name("rules:units.time_mix.ttl") == "правило «единицы измерения»"
+    assert markdown.source_name("rules:new_family.x") == "правило без модели"
 
 
 def test_revise_edits_rendered(sample):
