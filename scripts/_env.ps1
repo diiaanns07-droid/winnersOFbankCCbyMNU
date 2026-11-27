@@ -45,7 +45,8 @@ if (-not (Test-Path $Py)) {
 }
 
 $stamp = Join-Path (Split-Path -Parent (Split-Path -Parent $Py)) ".bcc_requirements"
-$want = (Get-FileHash requirements.txt -Algorithm SHA256).Hash
+# метка установки — requirements.txt и constraints.txt вместе: изменился любой — ставим заново
+$want = ((Get-FileHash requirements.txt -Algorithm SHA256).Hash + (Get-FileHash constraints.txt -Algorithm SHA256).Hash)
 $have = if (Test-Path $stamp) { (Get-Content $stamp -Raw).Trim() } else { "" }
 & $Py -c "import bcc_review" *> $null
 if ($have -ne $want -or $LASTEXITCODE -ne 0) {

@@ -28,11 +28,25 @@ def test_cached_messages_strip_service_fields_and_mark_document_prefix():
     assert all(set(m) == {"role", "content"} for m in wire)       # нет поля cache и прочих
     assert wire[0] == {"role": "system", "content": "Системный промпт"}
     blocks = wire[1]["content"]
-    assert isinstance(blocks, list) and len(blocks) == 2
-    assert blocks[0]["cache_control"] == {"type": "ephemeral"}
-    assert blocks[0]["text"].endswith("</требования>")
-    assert blocks[1]["text"].startswith("Задание этапа") and "cache_control" not in blocks[1]
-    assert blocks[0]["text"] + "\n\n" + blocks[1]["text"] == USER
+    # две точки кэша: документ (общий для всех этапов) и таблица требований (общая для линз, судьи, вопросов)
+    assert isinstance(blocks, list) and len(blocks) == 3
+    assert blocks[0]["cache_control"] == {"type": "ephemeral"} and blocks[0]["text"].endswith("</документ>")
+    assert blocks[1]["cache_control"] == {"type": "ephemeral"} and blocks[1]["text"].startswith("<требования>")
+    assert blocks[1]["text"].endswith("</требования>")
+    assert blocks[2]["text"].startswith("Задание этапа") and "cache_control" not in blocks[2]
+    import re
+    joined = " ".join(b["text"] for b in blocks)
+    assert re.sub(r"\s+", " ", joined) == re.sub(r"\s+", " ", USER)   # текст не потерян
+
+
+def test_cache_points_skip_per_lens_signals_and_segment_has_one():
+    lens = DOC + "\n<требования>\nR-01 …\n</требования>\n\n<сигналы>\nS-1 …\n</сигналы>\n\nЗадание линзы."
+    blocks = to_cached_messages([{"role": "system", "content": "S"}, {"role": "user", "content": lens}])[1]["content"]
+    cached = [b["text"].splitlines()[-1] for b in blocks if b.get("cache_control")]
+    assert cached == ["</документ>", "</требования>"]            # сигналы у каждой линзы свои — не кэшируем
+    assert blocks[-1]["text"].startswith("<сигналы>")
+    seg = to_cached_messages([{"role": "user", "content": DOC + "\nЗадание нарезки."}])[0]["content"]
+    assert [b.get("cache_control") is not None for b in seg] == [True, False]
 
 
 def test_short_user_message_not_split():
