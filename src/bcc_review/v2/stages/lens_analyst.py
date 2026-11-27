@@ -278,8 +278,12 @@ def _demote(c: dict) -> dict:
 def merge_views(first: list[dict], second: list[dict], lines_first: list[set[int]], lines_second: list[set[int]],
                 max_candidates: int = MAX_CANDIDATES) -> list[dict]:
     """Объединить два просмотра. Совпадение — общая строка цитаты (строки — по сверке с документом). Совпавший
-    кандидат берётся из первого просмотра с его серьёзностью; найденный одним просмотром — `minor`
-    (`severity_hint` — прежняя серьёзность). Порядок: critical → major → minor, внутри — первый просмотр, затем второй."""
+    кандидат берётся из первого просмотра с меньшей из двух серьёзностей (на чистых ТЗ ложный critical одного
+    просмотра другой видел как major); найденный одним просмотром — `minor`
+    (`severity_hint` — прежняя серьёзность). Найденное только вторым просмотром берётся, лишь если там оно было
+    major или critical: одиночный minor второго просмотра — шум (замер haiku на текущем промпте: на 4 чистых ТЗ №18
+    minor 17 → 23 с ними и 17 → 19 без них, на официальном те же +2 пункта С). Порядок: critical → major → minor,
+    внутри — первый просмотр, затем второй."""
     used: set[int] = set()
     out: list[dict] = []
     for i, c in enumerate(first):
@@ -290,8 +294,13 @@ def merge_views(first: list[dict], second: list[dict], lines_first: list[set[int
             out.append(_demote(c))
         else:
             used.add(j)
-            out.append({**c, "views": 2})
-    out += [_demote(c) for j, c in enumerate(second) if j not in used]
+            x = {**c, "views": 2}
+            other = second[j].get("severity")
+            if _RANK.get(other, 2) > _RANK.get(c.get("severity"), 2):  # совпали — меньшая из двух серьёзностей
+                x.setdefault("severity_hint", c.get("severity"))
+                x["severity"] = other
+            out.append(x)
+    out += [_demote(c) for j, c in enumerate(second) if j not in used and c.get("severity") in ("critical", "major")]
     order = sorted(range(len(out)), key=lambda k: (_RANK.get(out[k].get("severity"), 2), k))
     return [out[k] for k in order][:max_candidates]
 
