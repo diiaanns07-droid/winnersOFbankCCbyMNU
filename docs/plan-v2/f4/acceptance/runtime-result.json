@@ -1,0 +1,54 @@
+{
+  "commit": "3e7133c2",
+  "provider": "mock",
+  "verify_exit": {
+    "original": 0,
+    "quote": 4,
+    "fingerprint": 4,
+    "counter": 4,
+    "blocker_gate": 2
+  },
+  "judge_replay": {
+    "findings": true,
+    "rejected": true,
+    "verdict": true
+  },
+  "journal_stages": [
+    "clarify",
+    "consistency",
+    "judge",
+    "lens_analyst",
+    "lens_architect",
+    "lens_qa",
+    "lens_risk",
+    "quotes",
+    "rules",
+    "segment"
+  ],
+  "requirements": 40,
+  "findings": 29,
+  "verified_quotes": 82,
+  "exports": {
+    "docx": {
+      "status": "complete",
+      "annotation_types": {
+        "Word comment": 105
+      },
+      "annotated_ids": 29,
+      "findings": 29,
+      "verified": true,
+      "source_unchanged": true
+    },
+    "pdf": {
+      "status": "partial",
+      "annotation_types": {
+        "Highlight": 33,
+        "Text": 1
+      },
+      "annotated_ids": 12,
+      "findings": 12,
+      "verified": true,
+      "source_unchanged": true
+    }
+  }
+}

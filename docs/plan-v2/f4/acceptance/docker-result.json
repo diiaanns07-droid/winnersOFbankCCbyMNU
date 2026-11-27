@@ -1,0 +1,25 @@
+{
+  "commit": "3e7133c2",
+  "platform": "linux/amd64",
+  "image_built": true,
+  "outputs": {
+    "requirements.md": {
+      "provider": "mock",
+      "status": "complete",
+      "citations": 82,
+      "findings": 29,
+      "development": "no",
+      "testing": "no",
+      "verified": true
+    },
+    "requirements.pdf": {
+      "provider": "offline",
+      "status": "complete",
+      "citations": 34,
+      "findings": 15,
+      "development": "no",
+      "testing": "no",
+      "verified": true
+    }
+  }
+}
