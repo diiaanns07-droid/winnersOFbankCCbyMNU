@@ -166,7 +166,6 @@ def test_document_warnings_reach_report(tmp_path):
     assert "скан" in out.read_text(encoding="utf-8")
 
 
-@_bug("01", "отчёт затирает исходный файл: вход tz.html и отчёт tz.md → tz.html перезаписан HTML-отчётом")
 def test_report_never_overwrites_input(tmp_path):
     src = tmp_path / "tz.html"
     src.write_text("<html><body><h1>ТЗ</h1><p>Ф-1. Система должна блокировать карту за 5 секунд.</p></body></html>",
@@ -261,8 +260,6 @@ def test_one_stage_fault_does_not_break_others(tmp_path, monkeypatch, fault):
     assert report["findings"]
 
 
-@_bug("01", "невалидный JSON от провайдера (ProviderError invalid_output: Gemini not_json/schema_mismatch, "
-            "claude -p без JSON) не получает попытки починки — этап сразу падает")
 def test_provider_invalid_json_gets_one_repair():
     class P:
         name, handles_retries = "p", False
@@ -280,7 +277,6 @@ def test_provider_invalid_json_gets_one_repair():
     assert llm.ask("lens_qa", "s", "u", SCHEMA) == {"items": ["ok"]}
 
 
-@_bug("01", "invalid_output на одном вызове каждого этапа роняет весь прогон в failed")
 def test_one_bad_json_per_stage_still_completes(tmp_path, monkeypatch):
     report, _, _ = _faulty_run(tmp_path, monkeypatch,
                                lambda s, k: ProviderError("invalid_output", "не JSON") if k == 1 else None)
@@ -305,8 +301,6 @@ class _NeedTokens:
         return {"data": {"items": ["x"] * n}, "usage": {}, "model": "m", "stop_reason": "end_turn"}
 
 
-@_bug("01", "ask_split: после неудачи с лимитом 32 000 половины пакета просят с 16 000 и без расширения — "
-            "деление пакета, которому нужно > 32 000, гарантированно падает (llm.py, ask_split)")
 def test_split_halves_get_expanded_output_limit():
     p = _NeedTokens()
     llm = LLMClient(p, model="m", sleep=lambda s: None)
@@ -341,8 +335,6 @@ def test_long_document_600_lines_completes_within_budget(tmp_path, monkeypatch):
     assert not any("бюджет" in w for w in run["warnings"])
 
 
-@_bug("04", "длинный документ (≈ 2000 строк, 60 страниц): нарезка тратит 11 из 16 вызовов, судье и вопросам "
-            "бюджета не остаётся — реестр без отсева, прогон partial (segment.plan_chunks + общий --max-calls)")
 def test_long_document_leaves_budget_for_judge(tmp_path, monkeypatch):
     report, _, _ = _faulty_run(tmp_path, monkeypatch, lambda s, k: None, doc=_long_doc(tmp_path, 10))
     st = report["run"]["stage_stats"]
@@ -352,8 +344,6 @@ def test_long_document_leaves_budget_for_judge(tmp_path, monkeypatch):
 
 # --------------------------------------------------------------------------- настройка провайдера
 
-@_bug("02", "Gemini без ключа: провайдер создаётся, ключ проверяется только при вызове — вместо отчёта правилами "
-            "с объяснением (как у anthropic) прогон идёт до failed (GeminiProvider.__init__)")
 def test_gemini_without_key_gives_rules_report(tmp_path, monkeypatch):
     for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
         monkeypatch.delenv(k, raising=False)
@@ -544,8 +534,6 @@ def test_unwritable_runs_dir_still_gives_report(tmp_path):
     assert out.is_file() and report["findings"]
 
 
-@_bug("01", "путь отчёта — существующая папка (python -m bcc_review тз.md out/) → трейсбэк IsADirectoryError "
-            "(pipeline.write_outputs:639 пишет .md прямо в путь каталога)")
 def test_output_path_that_is_a_directory(tmp_path):
     from bcc_review.v2.__main__ import main
     out_dir = tmp_path / "out"
@@ -555,8 +543,6 @@ def test_output_path_that_is_a_directory(tmp_path):
     assert code == 2 or any(p.suffix == ".md" for p in out_dir.iterdir())
 
 
-@_bug("01", "одинаковые прогоны дают разный Markdown: порядок ролей в «Как получено» и в таблице этапов — порядок "
-            "завершения параллельных линз (pipeline._parallel_reviewers пишет self.stages по as_completed)")
 def test_same_input_gives_same_markdown(tmp_path):
     """Два прогона, в которых линзы завершаются в разном порядке (как у живой модели), дают один Markdown."""
     import re
@@ -599,9 +585,6 @@ def test_fatal_error_mid_run_sets_model_error(tmp_path, monkeypatch):
     assert report["run"]["warnings"][0] == report["run"]["model_error"]
 
 
-@_bug("01", "ранние вопросы: часы этапа clarify стартуют вместе с судьёй; если ранний вызов не удался, а судья шёл "
-            "дольше --stage-timeout, повторный вызов по итоговым дефектам сразу получает «исчерпан лимит времени "
-            "этапа» — вопросов 0 (без раннего запуска при тех же условиях — 8)")
 def test_failed_early_questions_survive_slow_judge(tmp_path, monkeypatch):
     import time
 
@@ -616,9 +599,6 @@ def test_failed_early_questions_survive_slow_judge(tmp_path, monkeypatch):
     assert report["questions"], [w for w in report["run"]["warnings"] if "clarify" in w]
 
 
-@_bug("01", "один сбой записи файла этапа runs/<id>/stages/*.json (Windows: файл держит антивирус или веб-демо читает "
-            "прогресс → PermissionError в os.replace) роняет весь прогон: failed, 0 замечаний (pipeline.stage — "
-            "save_stage вне try; runs.save_stage без повтора)")
 def test_transient_stage_file_write_error_does_not_abort_run(tmp_path, monkeypatch):
     from bcc_review.v2 import runs
     real = runs.RunDir.save_stage
