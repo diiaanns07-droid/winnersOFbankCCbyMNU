@@ -151,12 +151,52 @@ def _is_conflict(c: dict) -> bool:
     return len({n for n in lines if isinstance(n, int)}) >= 2
 
 
+_API_SECTION = re.compile(r"\bAPI\b|\bREST\b", re.I)
+
+
+def api_lines(view: Any) -> set[int]:
+    """Строки раздела описания API (заголовок раздела по docview называет API или REST): поля, коды, логика метода."""
+    lines = view.get("lines") if isinstance(view, dict) else None
+    out: set[int] = set()
+    for x in lines or []:
+        if isinstance(x, dict) and isinstance(x.get("n"), int) and _API_SECTION.search(str(x.get("section") or "")):
+            out.add(x["n"])
+    return out
+
+
+def touches_api(view: Any, candidates: list[dict], api: set[int]) -> list[bool]:
+    """По кандидату: есть ли цитата из раздела API. Строка цитаты — по сверке с документом (как у этапа quotes;
+    у модели номер бывает сбит), ненайденная цитата — по номеру модели."""
+    try:
+        from bcc_review.v2 import quotes
+    except ImportError:  # pragma: no cover
+        quotes = None
+    out = []
+    for c in candidates or []:
+        hit = False
+        for ev in (c.get("evidence") if isinstance(c, dict) else None) or []:
+            if not isinstance(ev, dict):
+                continue
+            n = ev.get("line")
+            if quotes is not None and isinstance(view, dict):
+                try:
+                    m = quotes.verify_quote(view, ev.get("quote"), n)
+                except Exception:  # noqa: BLE001 — уточнение строки не условие работы линзы
+                    m = None
+                n = m.get("line_start") if m else n
+            hit = hit or (isinstance(n, int) and n in api)
+        out.append(hit)
+    return out
+
+
 def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_candidates: int = MAX_CANDIDATES,
-                max_critical: int = MAX_CRITICAL) -> list[dict[str, Any]]:
-    """Применить правила линзы к ответу модели. Не меняет входной список."""
+                max_critical: int = MAX_CRITICAL, api_flags: list[bool] | None = None) -> list[dict[str, Any]]:
+    """Применить правила линзы к ответу модели. Не меняет входной список. `api_flags` — по входному кандидату, есть
+    ли у него цитата из раздела описания API (`touches_api`): critical с такой цитатой понижается до major (расхождение бизнес-правила и контракта или логики метода —
+    зона архитектора и проверки набора; на чистых ТЗ №18 все ложные critical линзы были такими)."""
     seen: set[tuple] = set()
     kept: list[dict] = []
-    for raw in candidates or []:
+    for i, raw in enumerate(candidates or []):
         if not isinstance(raw, dict) or not _has_evidence(raw):
             continue
         c = dict(raw)
@@ -172,6 +212,9 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
                                   or not str(c.get("impact", "")).strip()
                                   or c.get("blocks", "none") == "none"):
             sev = "major"
+        if sev == "critical" and api_flags and i < len(api_flags) and api_flags[i]:
+            sev = "major"
+            c["severity_hint"] = "critical"  # модель считала critical: подсказка судье, в вердикт не идёт
         c["severity"] = sev
         c["title"] = _russian_title(c)
         kept.append(c)
@@ -210,8 +253,10 @@ def run(ctx, lens_run=None) -> dict:
     if lens_run is None:
         from . import lens as _lens  # каркас №01
         lens_run = _lens.run
-    m = maturity(getattr(ctx, "view", None))
+    view = getattr(ctx, "view", None)
+    m = maturity(view)
     out = dict(lens_run(ctx, "analyst"))
-    out["candidates"] = postprocess(out.get("candidates") or [], mature=m["mature"])
+    cands = out.get("candidates") or []
+    out["candidates"] = postprocess(cands, mature=m["mature"], api_flags=touches_api(view, cands, api_lines(view)))
     out["document_maturity"] = m
     return out
