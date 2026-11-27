@@ -191,24 +191,28 @@ def _enable_vt(stream: Any) -> bool:
         return False
 
 
+# системные переменные терминала (как TERM у любой консольной программы), не настройки агента для .env.example
+_TERM_VARS = ("TERM", "COLORTERM", "NO_COLOR", "TERM_PROGRAM", "WT_SESSION")
+
+
 def color_mode(stream: Any = None, env: Mapping[str, str] | None = None) -> str:
     """'truecolor', '256' или 'ascii'."""
     stream = stream or sys.stdout
     env = os.environ if env is None else env
+    v = {name: (env.get(name) or "") for name in _TERM_VARS}
     try:
         "▀▄█⠋✓—…".encode(getattr(stream, "encoding", None) or "ascii")
     except (UnicodeEncodeError, LookupError):
         return "ascii"
-    term = (env.get("TERM") or "").lower()
-    if env.get("NO_COLOR") or term == "dumb":
+    if v["NO_COLOR"] or v["TERM"].lower() == "dumb":
         return "ascii"
     if os.name == "nt":
         if not _enable_vt(stream):
             return "ascii"
         return "truecolor"          # Windows Terminal и консоль Windows 10+ понимают 24 бита
-    if (env.get("COLORTERM") or "").lower() in ("truecolor", "24bit") or env.get("WT_SESSION"):
+    if v["COLORTERM"].lower() in ("truecolor", "24bit") or v["WT_SESSION"]:
         return "truecolor"
-    if env.get("TERM_PROGRAM") in ("iTerm.app", "vscode", "WezTerm", "ghostty"):
+    if v["TERM_PROGRAM"] in ("iTerm.app", "vscode", "WezTerm", "ghostty"):
         return "truecolor"
     return "256"
 

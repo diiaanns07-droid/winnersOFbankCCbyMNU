@@ -448,11 +448,12 @@
     }
     if (el.hasAttribute('data-bcc-scan')) {
       var p = fly(el), v = el.getAttribute('data-bcc-scan'), st = el.getAttribute('data-stage'), sy = el.getAttribute('data-say');
-      if (el.hasAttribute('data-progress') && v !== 'land' && v !== 'done') p.progress(parseFloat(el.getAttribute('data-progress')) || 0);
-      if (st != null) p.stage(st);
+      var landing = v === 'land' || v === 'done';
+      if (el.hasAttribute('data-progress') && !landing) p.progress(parseFloat(el.getAttribute('data-progress')) || 0);
+      if (st != null && !landing) p.stage(st);
       if (sy != null && sy !== p._said) p.say(sy);
       if (el.hasAttribute('data-mood') && p.state === 'scan') p.mood(el.getAttribute('data-mood'));
-      if (v === 'land' || v === 'done') p.land();
+      if (landing) p.land();
     }
   }
   function mountAll(root) {

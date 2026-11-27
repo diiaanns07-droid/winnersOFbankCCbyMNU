@@ -431,7 +431,7 @@ PAGE_JS = r"""
           open.focus();
         } else {
           bad(r.message||'Ключ не подошёл.'); status.textContent=r.message||'';
-          if (P) { P.mood('alert'); P.say('Не подошёл. Что сделать — на полях.'); }
+          if (P) { P.mood('alert'); P.say('Не подошёл. Что сделать — написал рядом с ключом.'); }
           key.focus();
         }
       });
