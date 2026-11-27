@@ -208,7 +208,22 @@ def finalize(report: dict) -> dict:
     if not fix:
         fix = [f["id"] for f in open_findings(report) if f.get("severity") in ("critical", "major")][:5]
     verdict["fix_first"] = fix
+    _verdict_texts(report)
     return report
+
+
+def _verdict_texts(report: dict) -> None:
+    """`verdict.why` (первый экран, «Почему») и `verdict.reason` («Итог», обоснование) — тексты кода по финальным
+    уровням, те же, что в Markdown: HTML и другие потребители берут их вместо `summary` судьи (в нём судья мог назвать
+    блокером дефект, который калибровка понизила). `summary` не меняется."""
+    try:
+        from . import markdown as _md
+        c = _md._Ctx(_md._clean_report(report))
+        why, reason = _md._why(c), _md._final_reason(c)
+    except Exception:  # noqa: BLE001 — тексты для показа не должны мешать записи отчёта
+        return
+    report["verdict"]["why"] = str(why or "")
+    report["verdict"]["reason"] = str(reason or "")
 
 
 # ---------------------------------------------------------------- запись

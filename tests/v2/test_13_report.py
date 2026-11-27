@@ -859,3 +859,13 @@ def test_rewrite_of_new_rule_not_paired_with_fragment_or_example(sample):
     f["evidence"] = [{"quote": "Prod: —", "line_start": 108, "verified": "exact"}]
     f["rewrite"] = "Prod: <уточнить: значение>; Swagger: <уточнить: значение>"
     assert markdown._rewrite_from(f)["line_start"] == 108
+
+
+def test_json_carries_code_verdict_texts(sample):
+    """`verdict.why` и `verdict.reason` — те же тексты, что «Почему» и «Обоснование» в Markdown (для HTML №14)."""
+    r = copy.deepcopy(sample)
+    jsonout.finalize(r)
+    assert r["verdict"]["why"] and r["verdict"]["reason"]
+    assert not jsonout.validate(r)
+    md = markdown.render(r)
+    assert markdown.prose(r["verdict"]["why"]) in md and markdown.prose(r["verdict"]["reason"]) in md
