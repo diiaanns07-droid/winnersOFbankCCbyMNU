@@ -198,7 +198,9 @@ _LCASE = {**dict.fromkeys(("по", "к", "ко"), ("строке", "строка
 # после союза или служебного слова — именительный («строка 38 и строка 64»), после прочего слова — родительный
 # («к маршруту строки 136», «текст строки 45»)
 _LNOM = {"и", "или", "а", "но", "либо", "что", "где", "когда", "как", "также", "тогда", "это", "см", "т", "е", "есть",
-         "вот", "здесь", "там", "даже", "только", "ни", "не"}
+         "вот", "здесь", "там", "даже", "только", "ни", "не", "хотя", "если", "однако", "поскольку", "причём", "причем",
+         "зато", "тоже", "лишь", "уже", "ещё", "еще", "потом", "затем", "иначе", "поэтому", "значит", "именно",
+         "например", "далее", "ведь", "чтобы", "пока", "ибо", "тогда", "сначала", "сейчас", "так", "раз"}
 
 
 def _lref(m: re.Match) -> str:
@@ -906,18 +908,51 @@ def _why(c: _Ctx, limit: int = 420) -> str:
         return _auto_why(c)
     sents = _SENT_SPLIT.split(text)
     if not _blockers(c):
-        out = ""
+        # вердикт называет код (судья мог написать другой — «с условиями» при «можно»); из текста судьи — только
+        # предложения без собственного вердикта: что именно стоит поправить
+        out = _verdict_sentence(c)
         for s in sents:
-            if out and len(out) + len(s) + 1 > limit:
+            if _VERDICT_WORDS.search(s):
+                continue
+            if len(out) + len(s) + 1 > limit:
                 break
             out = f"{out} {s}".strip()
-        return out or shorten(text, limit)
+        return out
     prio = next((s for s in sents if _PRIORITY.match(s)), "")
     first_id = re.search(r"\bD-\d{2,4}\b", prio)
     if first_id and first_id.group(0) not in {f["id"] for f in _blockers(c)}:
         prio = ""  # судья начинает не с блокера — список «Исправить первым» ниже начинается с блокеров
     why = _auto_why(c)
     return why + (f" {shorten(prio, limit)}" if prio else "")
+
+
+_VERDICT_WORDS = re.compile(r"можно\s+(?:начинать|начать|приступ)|начинать\s+можно|нельзя|с\s+условиями|"
+                            r"не\s+готов|готов\w*\s+к\s+(?:разработке|тестированию)|блокир", re.I)
+
+
+def _verdict_sentence(c: _Ctx) -> str:
+    """Вердикт без блокеров одной фразой — по тем же числам, что правило кода."""
+    v = c.verdict
+    majors = {t: sum(1 for f in c.findings if f.get("severity") == "major" and f.get("blocks") in BLOCK_SETS[t])
+              for t in ("development", "testing")}
+    total_major = sum(1 for f in c.findings if f.get("severity") == "major")
+    tail = " Проверка неполная, поэтому возможны и другие дефекты." if c.run.get("status") == "partial" else ""
+    d, t = v.get("development"), v.get("testing")
+    if d == t == "conditional":
+        n = max(majors.values())
+        return (f"Критичных дефектов нет, но существенных, мешающих работе, — {n}: начинать можно с условием "
+                f"исправить их параллельно.") + tail
+    if d == t == "yes":
+        return ("Критичных дефектов нет" + (f"; существенных {total_major}, но работу они не останавливают — "
+                                            "начинать можно, исправляя их параллельно." if total_major else
+                                            " и существенных нет — начинать можно.")) + tail
+    names = {"development": "разработку", "testing": "тестирование"}
+    parts = [f"{names[k]} — {READINESS_PLAIN.get(v.get(k), '—')}" for k in ("development", "testing")]
+    return ("Критичных дефектов нет; " + ", ".join(parts) + " (существенных, мешающих разработке, — "
+            f"{majors['development']}, тестированию — {majors['testing']}).") + tail
+
+
+BLOCK_SETS = {"development": {"development", "both"}, "testing": {"testing", "both"}}
 
 
 def _auto_why(c: _Ctx) -> str:

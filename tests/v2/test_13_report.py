@@ -583,3 +583,17 @@ def test_unreadable_input_report_names_the_cause():
     bad = copy.deepcopy(r)
     bad["run"]["status"] = "complete"
     assert any("sha256" in e for e in jsonout.validate(bad))  # пустой хеш допустим только у сбоя
+
+
+def test_why_never_contradicts_verdict_without_blockers(sample):
+    """Без блокеров вердикт в «Почему» называет код; фраза судьи с другим вердиктом не попадает на первый экран."""
+    r = copy.deepcopy(sample)
+    for f in r["findings"]:
+        if f["severity"] == "critical":
+            f["severity"] = "minor"
+        f["blocks"] = "none"
+    r["verdict"] = {"summary": "Разработку можно начинать только с условиями. Первым исправить D-01."}
+    jsonout.finalize(r)
+    assert r["verdict"]["development"] == "yes"
+    why = next(ln for ln in markdown.render(r).split("\n") if ln.startswith("**Почему.**"))
+    assert "с условиями" not in why and "начинать можно" in why and "Первым исправить [D-01](#d-01)." in why
