@@ -291,17 +291,51 @@ def test_saved_live_answers_keep_key_event(path):
     assert k5, "ключевое событие процессинга не найдено как critical"
 
 
+def test_repeat_conflict_critical_capped_at_major():
+    """Расхождение двух мест об исходе повтора запроса — эксплуатация, не выше major; ключевое событие — critical."""
+    rep = _cand("Повтор с тем же ключом: «результат первого запроса» против ответа 410", "critical",
+                kind="contradiction", criterion="set_consistent")
+    assert lens_risk.calibrate(rep)["severity"] == "major"
+    key = _cand("Не определено, какой этап операции запускает уведомление: авторизация или проведение", "critical",
+                kind="ambiguity", criterion="unambiguous")
+    assert lens_risk.calibrate(key)["severity"] == "critical"
+
+
+REPEAT_FIXTURES = sorted(p for p in FIXTURES.glob("official_*_v2[5-9]*_stage.json"))
+
+
+@pytest.mark.parametrize("path", REPEAT_FIXTURES, ids=lambda p: p.stem)
+def test_saved_answers_keep_repeat_guarantee(path):
+    """С v25: обещание «повтор события сохраняет итог» без признака повтора — major линзы (С14), не снято."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    view = (ROOT / "release" / "input" / "requirements.md").read_text(encoding="utf-8")
+    kept, _ = lens_risk.postprocess(data["candidates"], view)
+    rep = [c for c in kept if re.search(r"повтор|дедуплик", c["title"], re.I)]
+    assert rep and rep[0]["severity"] == "major", [(c["severity"], c["title"]) for c in kept]
+    assert any("Повторная доставка" in e["quote"] for e in rep[0]["evidence"])
+
+
+def test_prompt_repeat_guarantee_is_a_hook():
+    text = PROMPT.read_text(encoding="utf-8") if hasattr(PROMPT, "read_text") else PROMPT
+    assert "признак, по которому повтор узнаётся" in text
+    assert "замечания нет" in text.split("признак, по которому повтор узнаётся", 1)[1][:900]
+
+
 @pytest.mark.parametrize("path", sorted(FIXTURES.glob("clean_*.json")), ids=lambda p: p.stem)
 def test_saved_live_answers_on_clean_bases(path):
     """Сохранённые живые ответы на чистых базах корпуса после постобработки: 0 critical; major — не больше 2
     у sonnet (цель линзы) и не больше 4 у haiku (слабая модель, остаток отсеивает судья)."""
     case = path.stem.removeprefix("clean_").rsplit("_", 2)[0]
     doc = (ROOT / "evaluation" / "dev" / "corpus" / "cases" / f"{case}.base" / "source.md").read_text(encoding="utf-8")
-    kept, _ = lens_risk.postprocess(json.loads(path.read_text(encoding="utf-8"))["candidates"], doc)
+    seg = ROOT / "tests" / "v2" / "fixtures" / f"{case}.base" / "segment.json"
+    reqs = json.loads(seg.read_text(encoding="utf-8")).get("requirements", []) if seg.exists() else []
+    acc = [r["id"] for r in reqs if r.get("kind") == "acceptance"]  # как в run(ctx): критерии приёмки из нарезки
+    kept, _ = lens_risk.postprocess(json.loads(path.read_text(encoding="utf-8"))["candidates"], doc,
+                                    acceptance_ids=acc)
     sev = [c["severity"] for c in kept]
     limit = 2 if "sonnet" in path.stem else 4
     assert sev.count("critical") == 0 and sev.count("major") <= limit, sev
-    if path.stem.endswith(("_v19",)):  # вторая волна: ≤ 1 замечания линзы на чистый документ
+    if path.stem.endswith(("_v19", "sonnet_v25")):  # вторая волна: ≤ 1 замечания линзы на чистый документ
         assert len(kept) <= (1 if "sonnet" in path.stem else 2), [c["title"] for c in kept]
 
 

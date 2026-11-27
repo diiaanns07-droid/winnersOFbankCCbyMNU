@@ -295,6 +295,9 @@ def payout_closed_question(c: dict, doc_text: str) -> str | None:
     return None
 
 
+_REPEAT_CRIT_RE = re.compile(r"повтор|дедуплик|дубл[ья]|идемпотент", re.I)
+
+
 def calibrate(candidate: dict) -> dict:
     """Приводит серьёзность к шкале контракта; возвращает копию кандидата."""
     c = dict(candidate)
@@ -323,7 +326,10 @@ def calibrate(candidate: dict) -> dict:
         is_risk_only = c.get("kind") in ("security", "ops_risk") and c.get("criterion") == "risk"
         weak = not str(c.get("scenario", "")).strip() or not str(c.get("impact", "")).strip() \
             or c.get("blocks") in (None, "", "none")
-        if is_risk_only or weak:
+        # обработка повторов (ответ на повтор, ключ повтора) — эксплуатация: основную функцию можно построить,
+        # не выбрав исход повтора, поэтому не выше major (шкала линзы), даже если два места расходятся
+        repeat = not _is_key_event(c) and _REPEAT_CRIT_RE.search(str(c.get("title", "")))
+        if is_risk_only or weak or repeat:
             c["severity"] = "major"
     if c["severity"] in ("critical", "major") and c.get("blocks") in (None, ""):
         c["blocks"] = "development"
