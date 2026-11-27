@@ -158,9 +158,13 @@ def test_timing_summary_and_render(tmp_path):
 
 
 def test_measured_stage_profile_sonnet_and_gemini():
-    """Принятые замером отступления: нарезка и вопросы — low; линзы, набор, судья — по умолчанию."""
-    for fam in ("sonnet", "gemini-flash"):
-        assert profiles.STAGE_EFFORT[fam] == {"segment": "low", "clarify": "low"}, fam
+    """Принятые замером отступления: нарезка и вопросы — low; линзы и судья — по умолчанию; набор на Gemini
+    Flash — high (замер 27.11: на medium 3.6 Flash теряет К2 и К3 официального документа)."""
+    assert profiles.STAGE_EFFORT["sonnet"] == {"segment": "low", "clarify": "low"}
+    assert profiles.STAGE_EFFORT["gemini-flash"] == {"segment": "low", "clarify": "low", "consistency": "high"}
+    assert profiles.gemini_thinking("gemini-3.6-flash", "consistency") == {"thinking_level": "high"}
+    assert profiles.gemini_thinking("gemini-3.6-flash", "lens_qa") == {"thinking_level": "medium"}
+    assert profiles.gemini_thinking("gemini-3.5-flash-lite", "consistency") == {"thinking_level": "medium"}
     p = ClaudeCLIProvider(model="sonnet", env={}, binary="claude")
     for stage, effort in (("segment", "low"), ("clarify", "low"), ("judge", None), ("consistency", None),
                           ("lens_qa", None)):

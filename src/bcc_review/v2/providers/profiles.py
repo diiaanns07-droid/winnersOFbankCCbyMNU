@@ -53,13 +53,16 @@ PROFILES: dict[str, dict[str, Any]] = {
 #   judge low — отклонён: К5 понижен до major (ворота «все критичными»); judge medium: 86 → 80 с — в пределах шума;
 #   consistency low — отклонён: 59 → 20 с, но потеряно 4 из 13 кандидатов (в т. ч. Ф-2 ↔ приёмка).
 # Gemini Flash — по тем же этапам (нарезка — извлечение, вопросы — короткий текст; haiku со всеми этапами
-# на low держит К 5/5); линзы, набор и судья — medium.
+# на low держит К 5/5); линзы и судья — medium.
+# Набор (consistency) на Flash — high: замер 27.11 (3.6 Flash, stage на сохранённых входах официального документа,
+# по одному запросу): medium — 8 кандидатов, из критичных только К1 и К4, нет списка предметов «повторный push после
+# смены порога» (К2 терялся во всех четырёх прогонах жюри 13:00); high — 13 кандидатов, К1–К4, этап 40 → 86 с.
 _FAST = {"segment": "low", "clarify": "low"}
 STAGE_EFFORT: dict[str, dict[str, str]] = {
     "sonnet": dict(_FAST),
-    "gemini-flash": dict(_FAST),
+    "gemini-flash": {**_FAST, "consistency": "high"},
     "gemini-flash-lite": dict(_FAST),
-    "gemini": dict(_FAST),
+    "gemini": {**_FAST, "consistency": "high"},
 }
 GEMINI25_BUDGET = {"low": 1024, "medium": 4096, "high": 8192}   # Gemini 2.5: уровень → бюджет рассуждений
 
