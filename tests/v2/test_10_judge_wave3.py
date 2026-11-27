@@ -155,3 +155,64 @@ def test_basis_letter_parsing():
     assert judge.critical_basis({"_basis": "", "_check_basis": "(в) обещано в L052"}) == "в"
     assert judge.critical_basis({"_basis": "", "kind": "status_conflict"}) == "а"
     assert judge.critical_basis({"_basis": "", "kind": "missing_element"}) == "в"
+
+
+# --- волна 3, сессия №10: major в документе без critical требует двух ревьюеров ------------------------
+
+
+def _three_sources():
+    return [cand("C-001", 10, "Правило начисления", source="lens:analyst"),
+            cand("C-002", 10, "Правило начисления", source="lens:qa"),
+            cand("C-003", 20, "Платёж от 31-го", source="lens:architect"),
+            cand("C-004", 30, "Ответ сервиса", source="consistency")]
+
+
+def test_single_reviewer_major_in_document_without_critical_becomes_minor():
+    cs = _three_sources()
+    res, ctx = run([finding("F01", ["C-001", "C-002"], severity="major"),
+                    finding("F02", ["C-003"], severity="major"),
+                    finding("F03", ["C-004"], severity="major")], cs)
+    by_title = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert by_title == {"C-001": "major", "C-003": "minor", "C-004": "minor"}
+    assert all(f["blocks"] == "none" and f["priority"] == 0 for f in res["findings"] if f["severity"] == "minor")
+    assert any("найденных одним ревьюером" in w for w in ctx.warnings)
+    verdict = judge.compute_verdict(res["findings"])
+    assert (verdict["development"], verdict["testing"]) == ("yes", "yes")
+
+
+def test_single_reviewer_major_kept_when_document_has_critical():
+    cs = _three_sources() + [pair("C-005", RULE, ACCEPT, source="lens:qa"),
+                             pair("C-006", RULE, ACCEPT, source="consistency")]
+    res, _ = run([crit("F01", ["C-005", "C-006"], "(а) период начисления: L010 ↔ L020",
+                       title="Приёмка относит платёж к другому периоду, чем правило начисления"),
+                  finding("F02", ["C-003"], severity="major")], cs)
+    assert sorted(sev(res)) == ["critical", "major"]
+
+
+def test_single_reviewer_major_confirmed_by_structured_origin_or_same_lines():
+    cs = _three_sources()
+    cs[2]["origin"] = "acceptance_check"
+    cs.append(cand("C-005", 30, "Ответ сервиса", source="lens:risk"))  # те же строки, другой ревьюер
+    cs.append(cand("C-006", 50, "Отдельное правило", source="lens:analyst"))
+    res, _ = run([finding("F01", ["C-003"], severity="major"),
+                  finding("F02", ["C-004"], severity="major"),
+                  finding("F03", ["C-005"], severity="minor"),
+                  finding("F04", ["C-006"], severity="major")], cs)
+    by_title = {f["candidate_ids"][0]: f["severity"] for f in res["findings"]}
+    assert by_title["C-003"] == "major"  # строка приёмки исполнена линзой
+    assert by_title["C-006"] == "minor"
+    # F02 подтверждён кандидатом другого ревьюера на тех же строках в соседнем дефекте
+    assert by_title["C-004"] == "major"
+
+
+def test_major_rule_needs_three_sources_and_can_be_switched_off():
+    cs = [cand("C-001", 10, "Правило начисления", source="lens:analyst"),
+          cand("C-002", 20, "Платёж от 31-го", source="lens:qa")]
+    res, _ = run([finding("F01", ["C-001"]), finding("F02", ["C-002"])], cs)
+    assert sev(res) == ["major", "major"]
+    cs = _three_sources()
+    ctx = Ctx(None, requirements=REQS)
+    ctx.options = {"judge_confirm_majors": False}
+    res = judge.assemble(response([finding("F01", ["C-003"])]), cs, [[c["id"]] for c in cs], requirements=REQS,
+                         ctx=ctx, warnings=[])
+    assert sev(res) == ["major"]

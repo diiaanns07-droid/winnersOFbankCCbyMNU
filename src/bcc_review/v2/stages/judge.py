@@ -915,6 +915,26 @@ def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
                          f"{len(crit) - MAX_CRITICAL} наименее приоритетных понижены до major")
 
 
+def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: int, ctx: Any,
+                    warnings: list[str]) -> None:
+    """В документе без критичных дефектов существенные дефекты решают вердикт («можно» или «с условиями»),
+    поэтому major остаётся major, только если его подтвердили два разных ревьюера (или кандидат вывел исход
+    строкой приёмки или попарной сверкой) — как critical. Найденное одним ревьюером — minor с предупреждением.
+    Если в документе есть critical, правило не действует: его вердикт и так «нельзя», а все существенные
+    дефекты нужны для исправления."""
+    if run_sources < MIN_SOURCES_FOR_CONSENSUS or any(f["severity"] == "critical" for f in findings):
+        return
+    lowered = 0
+    for f in findings:
+        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates):
+            continue
+        f["severity"], f["blocks"], f["priority"] = "minor", "none", 0
+        lowered += 1
+    if lowered:
+        _warn(ctx, warnings, f"судья: критичных дефектов нет; {lowered} существенных, найденных одним "
+                             "ревьюером, понижены до незначительных")
+
+
 def _assign_priorities(findings: list[dict]) -> None:
     """priority 1…7 без повторов: сначала то, что указал судья, затем недостающие critical."""
     for f in findings:  # minor ничего не блокирует — в «исправить первым» не идёт
@@ -1120,6 +1140,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             f["sources"] = _sources(f["_members"])
             f["_first_line"] = f["evidence"][0]["line_start"]
     _cap_critical(findings, ctx, warnings)
+    if _option(ctx, "judge_confirm_majors", True):
+        _confirm_majors(findings, candidates, run_sources, ctx, warnings)
     _assign_priorities(findings)
 
     # 5. номера D-xx: серьёзность → приоритет → строка
