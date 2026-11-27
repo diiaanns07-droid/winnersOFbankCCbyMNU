@@ -234,6 +234,7 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
     body = f"""<form class="b-dock" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
   {err}
   <label class="primary" id="pick"><input class="vh" type="file" name="file" id="file" accept=".pdf,.docx,.md,.markdown,.txt,.html,.htm" required>Свой документ</label>
+  <noscript><button type="submit">Проверить</button></noscript>
   {acts}
   <span class="sep" aria-hidden="true"></span>
   <details class="b-menu" id="pmenu"><summary id="pcur">{e(_SHORT.get(cur["id"], cur["label"]))}</summary>
