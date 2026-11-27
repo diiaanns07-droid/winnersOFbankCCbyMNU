@@ -16,6 +16,9 @@ from typing import Any, Iterable
 
 SCHEMA_ID = "bcc-review/2"
 SEVERITIES = ("critical", "major", "minor")
+OWNER_ASSESSMENT = ("Предварительная оценка по ответам владельца. "
+                    "Готовность новой редакции подтверждает отдельная проверка исправленного текста.")
+
 _SCHEMA_CACHE: dict | None = None
 
 
