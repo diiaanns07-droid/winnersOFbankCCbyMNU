@@ -261,6 +261,17 @@ def _words_cut(text: str, limit: int) -> str:
     return " ".join(words) if len(words) <= limit else " ".join(words[:limit]).rstrip(",;:") + "…"
 
 
+def _fallback_title(f: dict, base: dict) -> str:
+    """Заголовок, если его не дали ни судья, ни кандидат (схема допускает пустую строку): первая фраза проблемы,
+    иначе место. Пустой заголовок нарушает contracts/v2.json, и отчёт не прошёл бы verify."""
+    problem = _s(f.get("problem")) or _s(base.get("problem"))
+    first = re.split(r"(?<=[.!?])\s", problem, maxsplit=1)[0].rstrip(".") if problem else ""
+    if first:
+        return _words_cut(first, 12)
+    line = _first_line(base)
+    return f"Замечание к строке {line}" if line < 10 ** 6 else "Замечание без заголовка"
+
+
 def _cid_num(cid: str) -> int:
     m = re.search(r"(\d+)", cid or "")
     return int(m.group(1)) if m else 10 ** 6
@@ -1157,7 +1168,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         item = {
             "key": d["key"],
             "candidate_ids": sorted(d["ids"], key=_cid_num),
-            "title": _cut(_s(f.get("title")) or _s(base.get("title")), 180),
+            "title": _cut(_s(f.get("title")) or _s(base.get("title")) or _fallback_title(f, base), 180),
             "kind": kind,
             "criterion": crit,
             "standard_refs": list(STANDARD_REFS.get(crit, [])),
