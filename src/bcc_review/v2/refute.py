@@ -20,6 +20,7 @@ from .pipeline import DEFAULTS, make_llm
 from .providers import doctor
 from .quotes import verify_quote
 from .render import jsonout
+from .rules.injection import ADDRESSEE, OVERRIDE
 from .stages.judge import CONFLICT_KINDS
 from .types import INT, STR, obj
 
@@ -43,6 +44,13 @@ EXPLICIT_OVERRIDE = re.compile(
     r"при (?:пересечении|расхождении|конфликте)|приоритет\s+(?:над|перед)|преимущество\s+перед|"
     r"отменяет (?:правило|действие)|вместо (?:правила|пункта)|несмотря на (?:правило|пункт)|"
     r"takes precedence over|overrides? (?:rule|section)", re.I)
+UNRESOLVED_PRECEDENCE = re.compile(
+    r"(?:приоритет|порядок)\w*[^.!?\n]{0,70}?(?:не (?:определ[её]н|установлен|задан|выбран|согласован)|"
+    r"подлежит согласованию|предстоит определить)|(?:не (?:определ[её]н|установлен|задан)|отсутствует)"
+    r"[^.!?\n]{0,30}?приоритет|(?:правила|исходы) равнозначны|(?:priority|precedence) (?:is )?"
+    r"(?:undefined|unspecified|unresolved|not (?:defined|set))", re.I)
+STOP_SUBJECT = frozenset("для при если когда после перед тогда должен должна должно может только каждого "
+                         "каждый этого такой такая with when then the shall must".split())
 
 
 def _words(s: str) -> str:
@@ -53,9 +61,11 @@ def _protect(finding: dict, pairs: set[str]) -> bool:
     if finding["id"] in pairs:
         return True
     evidence = {e.get("quote", "").strip() for e in finding.get("evidence", []) if e.get("quote")}
+    description = " ".join(str(finding.get(k, "")) for k in ("title", "problem", "scenario"))
+    conflict = re.search(r"противореч|несовместим|взаимоисключ|два (?:разных )?(?:исхода|ответа)|"
+                         r"conflict|incompatible|contradict", description, re.I)
     return len(evidence) >= 2 and (finding.get("kind") in CONFLICT_KINDS
-                                   or finding.get("criterion") == "set_consistent"
-                                   or bool(re.search(r"противореч|несовместим", str(finding.get("title", "")), re.I)))
+                                   or finding.get("criterion") == "set_consistent" or bool(conflict))
 
 
 def _proof(view: dict, finding: dict, d: dict, protected: bool) -> tuple[dict | None, str]:
@@ -68,13 +78,18 @@ def _proof(view: dict, finding: dict, d: dict, protected: bool) -> tuple[dict | 
     if (not match or match["line_start"] != d["line"] or match["verified"] == "fuzzy"
             or q not in _words(docview.text_of(view, match["line_start"], match["line_end"]))):
         return None, "Дословная непрерывная цитата в указанном месте не найдена."
+    context = docview.text_of(view, match["line_start"], match["line_end"])
+    if OVERRIDE.search(context) or ADDRESSEE.search(context):
+        return None, "Адресованное проверяющему указание не определяет поведение системы."
     sides = [_words(e.get("quote", "")).casefold() for e in finding.get("evidence", [])]
     claim = " ".join([*sides, *(str(finding.get(k, "")) for k in ("title", "problem", "scenario", "impact"))]).casefold()
-    terms = re.findall(r"[^\W_]+", subject.casefold())
-    if not any(t[:5] in claim for t in terms if len(t) >= 2):
+    terms = re.findall(r"[^\W_]+", subject)
+    if not any(t.casefold()[:5] in claim for t in terms if t.casefold() not in STOP_SUBJECT
+               and (len(t) >= 3 or t.isupper() or t.isdigit())):
         return None, "Предмет процитированной нормы не привязан к исходному замечанию."
     if protected:
-        if (d["basis"] != "precedence" or not PRECEDENCE.search(q) or len(outcome) < 2
+        if (d["basis"] != "precedence" or not PRECEDENCE.search(q) or UNRESOLVED_PRECEDENCE.search(q)
+                or (len(outcome) < 2 and not outcome.isdigit())
                 or not any(subject.casefold() in side for side in sides)
                 or not any(outcome.casefold() in side for side in sides)
                 or all(outcome.casefold() in side for side in sides)
