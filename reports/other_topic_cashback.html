@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Разработка: Можно; тестирование: Можно; критичных 0, существенных 0, незначительных 6.">
+<meta name="generator" content="BCC Review 2.0.0-dev">
+<title>Ревью: Кэшбэк в выбранной категории</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7C55'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem("bccr-theme");if(t)document.documentElement.dataset.theme=t}catch(_){}</script>
+<style>
+/* HTML-отчёт v2: один файл, без внешних шрифтов и библиотек (№14). Вид (№41) — «лист с правкой», светло и мягко,
+ * как «Зерде»: светлый фон BCC с двумя мягкими пятнами, белый лист документа в центре, заметки и вопросы — на второй
+ * белой бумаге справа, стекло — только верхняя строка и нижняя панель. Цвет — только где это смысл: критичное —
+ * тонкая красная черта и красная точка у заметки, существенное — бледный золотой маркер, незначительное — серый
+ * пунктир, единственный акцент — зелёный BCC (сверено, можно). Вердикт — спокойная строка в шапке листа.
+ * Внутри веба (<html data-embed>) шапку и панель даёт страница задания. Содержание отчёта CSS не меняет. */
+:root {
+  color-scheme: light;
+  /* фон и бумага (bcc-ui.md, разделы 2–4) */
+  --canvas: #F3F6F5;
+  --paper: #FFFFFF;
+  --paper-2: #F6F8F7;
+  --ink: #0F2841;
+  --ink-2: #3A5068;
+  --ink-3: #5B6F84;
+  --ink-4: #8795A5;
+  --hair: rgba(15, 40, 65, .08);
+  --hair-2: rgba(15, 40, 65, .14);
+  --line: rgba(15, 40, 65, .08);
+  --line-2: rgba(15, 40, 65, .14);
+  --shadow-1: 0 0 0 1px rgba(15, 40, 65, .06), 0 1px 2px rgba(15, 40, 65, .04), 0 6px 18px rgba(15, 40, 65, .06);
+  --shadow-2: 0 0 0 1px rgba(15, 40, 65, .06), 0 2px 6px rgba(15, 40, 65, .05), 0 16px 40px rgba(15, 40, 65, .10);
+  --glass: linear-gradient(180deg, rgba(255, 255, 255, .76), rgba(255, 255, 255, .56));
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, .95), 0 0 0 1px rgba(15, 40, 65, .06);
+  /* единственный акцент — зелёный BCC */
+  --accent: #00B975;
+  --brand: #008556;
+  --ok: #00704A;
+  --link: #00704A;
+  --green-wash: #F1FBF5;
+  /* смысл: красный — только критичное и «нельзя»; золото — только бледный маркер; незначительное — серым */
+  --crit: #C2362B;
+  --crit-acc: #C2362B;
+  --major: #3A5068;
+  --major-acc: #E8C08C;
+  --major-mark: #FBE1BA;
+  --minor: #5B6F84;
+  --minor-acc: #A3AEBA;
+  --font: Inter, "Suisse Int'l", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  --sans: var(--font);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --r-lg: 22px;
+  --r-md: 14px;
+  --sheet-w: 760px;
+  --notes-w: 380px;
+  --gutter: 64px;
+  --top-h: 60px;
+  --dock-h: 64px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-padding-top: calc(var(--top-h) + 24px); background: var(--canvas); }
+body {
+  margin: 0; position: relative; isolation: isolate;
+  background: var(--canvas); color: var(--ink);
+  font: 16px/1.55 var(--font); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  padding-bottom: calc(var(--dock-h) + 40px);
+}
+/* два очень мягких пятна BCC: зелёное слева сверху, золотое справа; стоят на месте */
+body::before, body::after { content: ""; position: fixed; z-index: -1; pointer-events: none; border-radius: 50%; filter: blur(110px); }
+body::before { width: 680px; height: 680px; left: -240px; top: -280px; background: rgba(0, 185, 117, .11); }
+body::after { width: 620px; height: 620px; right: -220px; top: -240px; background: rgba(220, 162, 98, .15); }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+code, .mono { font-family: var(--mono); font-size: .9em; }
+h1, h2, h3 { margin: 0; line-height: 1.25; }
+.muted { color: var(--ink-3); }
+:focus-visible { outline: 3px solid rgba(0, 185, 117, .55); outline-offset: 2px; }
+::selection { background: rgba(0, 185, 117, .2); }
+
+/* ── стекло: верхняя строка ──────────────────────────────────── */
+.top {
+  position: sticky; top: 0; z-index: 30; height: var(--top-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 max(16px, calc((100% - 1180px) / 2));
+  background: rgba(255, 255, 255, .92); box-shadow: 0 1px 0 var(--hair);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .top { background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(175%); backdrop-filter: blur(24px) saturate(175%); }
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--brand); position: relative; box-shadow: 0 2px 8px rgba(0, 133, 86, .25); }
+.logo::after { content: ""; position: absolute; left: 9px; top: 5px; width: 6px; height: 11px; border: solid #fff; border-width: 0 2.2px 2.2px 0; transform: rotate(45deg); }
+.brand > div { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.bname { font-size: 0; font-weight: 700; letter-spacing: -.02em; color: var(--ink); white-space: nowrap; }
+.bname::after { content: "BCC Review"; font-size: 16px; }
+.dname { font-size: 15px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw; padding-left: 12px; box-shadow: inset 1px 0 0 var(--hair-2); }
+.actions { display: flex; gap: 6px; flex: none; }
+#theme { display: none; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px;
+  border-radius: 999px; border: 0; cursor: pointer; white-space: nowrap; font-size: 15px; font-weight: 600;
+  background: var(--brand); color: #fff; transition: background 120ms var(--ease), transform 120ms var(--ease), box-shadow 120ms var(--ease);
+}
+.btn:hover { background: #007A4F; transform: translateY(-1px); }
+.btn:active { transform: scale(.98); }
+.btn.ghost, .top .btn { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 1px var(--hair-2), 0 1px 2px rgba(15, 40, 65, .04); }
+.btn.ghost:hover, .top .btn:hover { box-shadow: 0 0 0 1px var(--hair-2), var(--shadow-2); }
+
+/* ── сводка: на экране её заменяют строка вердикта и заметки; остаются предупреждения и итог ── */
+.hero { max-width: calc(var(--sheet-w) + var(--notes-w) + 32px); margin: 0 auto; padding: 20px 16px 0; }
+.hero-grid, .fixfirst { display: none; }
+.eyebrow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.banner { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; font-size: 15px; color: var(--ink-2); }
+.banner::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; transform: translateY(-1px); background: var(--minor-acc); }
+.banner.warn::before { background: var(--major-acc); }
+.hero-text { max-width: var(--sheet-w); }
+.vsummary { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink-2); }
+.runmeta { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-3); }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--minor-acc); }
+.sev-critical .dot, .sev-critical.dot { background: var(--crit-acc); }
+.sev-major .dot, .sev-major.dot { background: var(--major-acc); }
+.sev-minor .dot, .sev-minor.dot { background: var(--minor-acc); }
+.fid { font-family: var(--mono); font-size: 12.5px; font-weight: 500; color: var(--ink-4); white-space: nowrap; }
+
+/* ── стекло: нижняя плавающая панель разделов ─────────────────── */
+.tabs {
+  position: fixed; z-index: 40; left: 50%; bottom: 18px; transform: translateX(-50%);
+  display: flex; gap: 2px; padding: 6px; max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none;
+  border-radius: 999px; background: rgba(255, 255, 255, .92); box-shadow: var(--glass-edge), var(--shadow-2);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tabs { background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(175%); backdrop-filter: blur(24px) saturate(175%); }
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none; height: 40px; padding: 0 16px; border: 0; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  background: transparent; color: var(--ink-2); font-size: 15px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: background 220ms var(--ease), color 220ms var(--ease), box-shadow 220ms var(--ease);
+}
+.tab:hover { color: var(--ink); background: rgba(15, 40, 65, .05); }
+.tab[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: inset 0 1px 0 #fff, 0 0 0 1px var(--hair), 0 2px 8px rgba(15, 40, 65, .10); }
+.cnt { font-size: 13px; font-weight: 600; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+
+main { padding: 28px 16px 40px; }
+.panel > .ph { display: none; }
+.sub { font-size: 22px; font-weight: 650; letter-spacing: -.015em; margin: 36px 0 12px; color: var(--ink); }
+.panel > .sub:first-child, .panel > .ph + .sub { margin-top: 0; }
+.lead { color: var(--ink-2); margin: 0 0 16px; max-width: 72ch; }
+.none { color: var(--ink-3); padding: 12px 0; }
+
+/* ── лист документа ───────────────────────────────────────────── */
+/* только transform без fill-mode: после анимации у листа нет transform — карта листа (fixed) не «прилипает» к нему */
+@keyframes sheet-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.split { position: relative; display: grid; grid-template-columns: minmax(0, var(--sheet-w)) var(--notes-w); column-gap: 32px; justify-content: center; align-items: start; }
+.split > * { min-width: 0; }
+.docpane {
+  position: relative; background: var(--paper); color: var(--ink); border-radius: var(--r-lg); box-shadow: var(--shadow-2);
+  animation: sheet-in 360ms var(--ease);
+}
+.dochead { display: block; padding: 28px 40px 20px var(--gutter); box-shadow: inset 0 -1px 0 var(--hair); }
+.doctitle { font: 600 12.5px/1.5 var(--font); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doctitle small { margin-left: 10px; font-weight: 500; letter-spacing: .02em; text-transform: none; color: var(--ink-4); }
+.doctools { display: none; }
+/* вердикт — спокойная строка статуса в шапке листа */
+.verdict-line { margin-top: 8px; font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+.verdict-line b { font-weight: 650; color: var(--ink); }
+.verdict-line b.v-no { color: var(--crit); }
+.verdict-line b.v-yes { color: var(--ok); }
+.verdict-line .sep { margin: 0 .15em; color: var(--ink-4); }
+.verdict-line .vp { white-space: nowrap; }
+.docbody { position: relative; }
+.doc { padding: 18px 48px 64px 0; font: 17px/1.65 var(--font); color: var(--ink); }
+.doc-empty { padding: 24px 48px 48px var(--gutter); color: var(--ink-2); font-size: 15px; }
+.ln { display: grid; grid-template-columns: var(--gutter) minmax(0, 1fr); align-items: start; position: relative; transition: opacity 220ms var(--ease), background 360ms var(--ease); border-radius: 6px; }
+.ln .no { position: relative; text-align: right; padding-right: 20px; font: 400 12px/28px var(--mono); color: var(--ink-4); user-select: none; }
+.ln .tx { white-space: pre-wrap; word-break: break-word; min-height: 28px; }
+.ln.blank { min-height: 12px; }
+.ln.blank .tx, .ln.blank .no { min-height: 12px; line-height: 12px; font-size: 0; }
+/* таблицы ТЗ (№54): ячейки вместо «|», волосяная линия между строками */
+.ln.trow .tx { display: grid; grid-template-columns: var(--cols); column-gap: 20px; padding: 0 0 4px; box-shadow: inset 0 -1px 0 var(--hair); }
+.ln.trow .td { min-width: 0; }
+.ln.thead .tx { font-weight: 600; }
+.ln.h .tx { font-weight: 650; font-size: 19px; letter-spacing: -.01em; padding-top: 12px; }
+.ln.h .no { padding-top: 12px; }
+.fms, .fmore { display: none; }
+.pgbreak { margin: 18px 48px 10px var(--gutter); padding-top: 8px; box-shadow: 0 -1px 0 var(--hair-2); font-size: 12.5px; color: var(--ink-4); }
+/* зелёная галочка «сверено» на полях у каждой строки с цитатой */
+.ln.hl .no::after { content: ""; position: absolute; left: 14px; top: 10px; width: 7px; height: 4px; border: solid var(--accent); border-width: 0 0 1.7px 1.7px; transform: rotate(-45deg); }
+.ln.hl { cursor: pointer; }
+.ln.hl:hover { background: rgba(15, 40, 65, .025); }
+/* пометки по тексту: тонкая красная черта, бледный золотой маркер, серый пунктир — рисуются по порядку чтения */
+mark.q {
+  color: inherit; background-color: transparent; background-repeat: no-repeat; background-position: 0 0;
+  box-decoration-break: clone; -webkit-box-decoration-break: clone; border-radius: 3px; padding: 1px 0;
+  text-decoration-thickness: 1.5px; text-underline-offset: 5px; text-decoration-skip-ink: none;
+  transition: opacity 220ms var(--ease);
+}
+mark.q.sev-critical { text-decoration-line: underline; text-decoration-style: solid; text-decoration-color: var(--crit); }
+mark.q.sev-major { background-image: linear-gradient(var(--major-mark), var(--major-mark)); background-size: 100% 100%; }
+mark.q.sev-minor { text-decoration-line: underline; text-decoration-style: dashed; text-decoration-color: var(--minor-acc); }
+:root.ink mark.q { animation: pen 520ms var(--ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+@keyframes pen { from { background-size: 0% 100%; text-decoration-color: transparent; } to { background-size: 100% 100%; } }
+/* строка с цитатой, где точное место в строке не найдено, — та же пометка на всю строку */
+.ln.hl.sev-critical:not(:has(mark.q)) .tx { text-decoration: underline 1.5px solid var(--crit); text-underline-offset: 5px; }
+.ln.hl.sev-major:not(:has(mark.q)) .tx { background: var(--major-mark); border-radius: 3px; }
+.ln.hl.sev-minor:not(:has(mark.q)) .tx { text-decoration: underline 1.5px dashed var(--minor-acc); text-underline-offset: 5px; }
+/* фокус: выбранная правка — в полный цвет, остальное приглушено */
+.doc.focus .ln:not(.sel):not(.blank) { opacity: .36; }
+.doc.focus .ln.sel { opacity: 1; background: rgba(15, 40, 65, .025); }
+.ln.sel .no { color: var(--ink); font-weight: 600; }
+.ln.flash { animation: flash 1.6s var(--ease); }
+@keyframes flash { from { box-shadow: inset 0 0 0 999px rgba(0, 185, 117, .10); } to { box-shadow: inset 0 0 0 999px transparent; } }
+.ln.rqsel { background: var(--green-wash); }
+.rtag { display: none; font: 600 11px/18px var(--mono); color: var(--ok); background: var(--green-wash); border-radius: 4px; padding: 0 5px; margin-right: 6px; vertical-align: 2px; }
+.doc.showreq .rtag { display: inline-block; }
+.doc.showreq .ln.ex { opacity: .5; }
+.doc.onlyhl .ln:not(.hl):not(.h) { display: none; }
+.legend { display: none; }
+
+/* ── карта листа слева: засечки там, где правка ───────────────── */
+.minimap {
+  position: fixed; z-index: 20; top: calc(var(--top-h) + 24px); bottom: calc(var(--dock-h) + 40px);
+  left: max(10px, calc(50% - (var(--sheet-w) + var(--notes-w) + 32px) / 2 - 30px)); width: 8px;
+  border-radius: 4px; background: rgba(15, 40, 65, .05);
+}
+.minimap i { position: absolute; left: 0; right: 0; min-height: 3px; border-radius: 2px; cursor: pointer; background: var(--minor-acc); transition: transform 120ms var(--ease); }
+.minimap i:hover { transform: scaleX(1.5); }
+.minimap i.sev-critical { background: var(--crit-acc); }
+.minimap i.sev-major { background: var(--major-acc); }
+.minimap .vw { position: absolute; left: -3px; right: -3px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(15, 40, 65, .22); pointer-events: none; }
+
+/* ── вторая бумага справа: итог агента, фильтр и заметки на полях ── */
+.flist { position: relative; background: var(--paper); color: var(--ink); border-radius: var(--r-lg); box-shadow: var(--shadow-1); padding: 22px 20px 26px; animation: sheet-in 360ms var(--ease) 60ms both; }
+.filters { margin: 0 0 16px; }
+.frow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.frow:not(:first-child) { display: none; }
+.filters .frow:first-child { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 2px; padding: 3px; border-radius: 19px; background: rgba(15, 40, 65, .05); box-shadow: inset 0 0 0 1px var(--hair); }
+.sevchip {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 600; white-space: nowrap;
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px var(--hair), 0 2px 6px rgba(15, 40, 65, .08);
+  transition: background 220ms var(--ease), color 220ms var(--ease), box-shadow 220ms var(--ease);
+}
+.sevchip b { font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.sevchip[aria-pressed="false"] { background: transparent; color: var(--ink-4); box-shadow: none; }
+.sevchip[aria-pressed="false"] .dot { background: var(--hair-2); }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--link); cursor: pointer; font-weight: 600; font-size: inherit; }
+.resolution { margin: 0 0 18px; padding: 0 0 18px; box-shadow: 0 1px 0 var(--hair); }
+.resolution .rl { font: 600 12px/1 var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
+.resolution .vsummary { font-size: 14.5px; color: var(--ink-2); }
+.cards { position: relative; display: flex; flex-direction: column; gap: 8px; }
+@media (min-width: 1001px) { .cards { display: block; } .cards > .card { position: absolute; left: 0; right: 0; } }
+.empty { padding: 16px 0; color: var(--ink-3); }
+/* заметка: точка смысла, D-01 моноширинным бледно, суть одной строкой — чернилами */
+.card {
+  position: relative; min-width: 0; padding: 4px 8px 4px 20px; cursor: pointer; color: var(--ink); border-radius: 10px;
+  transition: opacity 220ms var(--ease), background 220ms var(--ease), top 360ms var(--ease);
+  scroll-margin-top: calc(var(--top-h) + 120px); outline-offset: 2px;
+}
+.card::before { content: ""; position: absolute; left: 6px; top: 13px; width: 7px; height: 7px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1.5px var(--minor-acc); }
+.card.sev-critical::before { background: var(--crit-acc); box-shadow: none; }
+.card.sev-major::before { background: var(--major-acc); box-shadow: none; }
+.card:hover { background: var(--paper-2); }
+.card:not(.active) { display: flex; align-items: baseline; gap: 10px; }
+.card:not(.active) .ch { flex: none; }
+.ch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ch .badge, .ch .prio { display: none; }
+.ct { margin: 0; font-size: 14.5px; line-height: 1.5; font-weight: 500; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .meta, .card .evs, .card .problem, .card .more, .card .cf { display: none; }
+.cards:has(.card.active) .card:not(.active) { opacity: .42; }
+/* раскрытая заметка — всё содержание замечания, на той же бумаге */
+.card.active { background: var(--paper-2); padding: 16px 16px 14px 20px; z-index: 3; cursor: default; box-shadow: 0 0 0 1px var(--hair); }
+.card.active::before { top: 24px; }
+.card.active .ch .badge, .card.active .ch .prio { display: inline-flex; }
+.card.active .ct { font-size: 17px; font-weight: 650; line-height: 1.4; letter-spacing: -.01em; display: block; overflow: visible; white-space: normal; margin: 8px 0; }
+.card.active .meta { display: flex; }
+.card.active .evs { display: flex; }
+.card.active .problem { display: block; }
+.card.active .more { display: block; }
+.card.active .cf { display: flex; }
+.badge { align-items: center; height: 22px; font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 0 9px; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--hair-2); }
+.badge.sev-critical { color: var(--crit); box-shadow: inset 0 0 0 1px rgba(194, 54, 43, .3); }
+.badge.sev-major { background: var(--major-mark); box-shadow: none; color: var(--ink); }
+.prio { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--ink-2); border-radius: 999px; padding: 1px 9px; box-shadow: inset 0 0 0 1px var(--hair-2); }
+.meta { flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip { font-size: 12.5px; border-radius: 999px; padding: 1px 9px; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--hair-2); }
+.chip.blk { color: var(--crit); box-shadow: inset 0 0 0 1px rgba(194, 54, 43, .3); }
+.evs { list-style: none; margin: 0 0 10px; padding: 0; flex-direction: column; gap: 4px; }
+.ev {
+  width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer; padding: 7px 10px;
+  border: 0; border-radius: 10px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--hair); font-size: 14px; line-height: 1.45; color: var(--ink);
+  transition: background 120ms var(--ease), box-shadow 120ms var(--ease);
+}
+.ev:hover { background: var(--green-wash); box-shadow: inset 0 0 0 1px rgba(0, 185, 117, .3); }
+.evl { flex: none; font: 500 12px/1.6 var(--mono); color: var(--ink-4); white-space: nowrap; }
+.ev q { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; quotes: "«" "»"; }
+.vf { flex: none; font-weight: 800; font-size: 13px; }
+.vf.ok { color: var(--accent); }
+.vf.fuzzy { color: var(--ink-3); }
+.vf.miss { color: var(--crit); }
+.problem { margin: 0 0 8px; font-size: 15px; line-height: 1.55; }
+.more { margin: 4px 0 4px; box-shadow: 0 -1px 0 var(--hair); padding-top: 8px; }
+.more summary { cursor: pointer; color: var(--link); font-weight: 600; font-size: 14px; list-style: none; width: max-content; }
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 8px 2px 1px; border: solid currentColor; border-width: 0 1.8px 1.8px 0; transform: rotate(-45deg); transition: transform 220ms var(--ease); }
+.more[open] summary::before { transform: rotate(45deg); }
+.dl { margin-top: 10px; }
+.dt { font-size: 12.5px; font-weight: 600; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+.dd { margin-top: 2px; white-space: pre-wrap; font-size: 14.5px; line-height: 1.55; }
+.dl.rw .dd { background: var(--green-wash); border-radius: 10px; padding: 8px 12px; }
+.dl.qq .dd { font-style: italic; }
+.copy { border: 0; background: var(--paper); box-shadow: inset 0 0 0 1px var(--hair-2); border-radius: 999px; font-size: 12px; padding: 0 9px; cursor: pointer; font-weight: 600; color: var(--ink-2); }
+.cf { flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+.cf b { color: var(--ink-2); font-weight: 600; margin-right: 3px; }
+.rref, .fref, .lnref { font: 500 12px/1.6 var(--mono); text-decoration: none; border-radius: 6px; padding: 0 5px; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--hair-2); white-space: nowrap; transition: color 120ms var(--ease), box-shadow 120ms var(--ease); }
+.rref:hover, .fref:hover, .lnref:hover { color: var(--link); box-shadow: inset 0 0 0 1px var(--accent); }
+.fref.sev-critical { color: var(--crit); }
+.ans { display: inline-block; font-weight: 600; font-size: 12.5px; padding: 1px 9px; border-radius: 999px; white-space: nowrap; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--hair-2); }
+.a-yes { color: var(--ok); box-shadow: inset 0 0 0 1px rgba(0, 185, 117, .35); }
+.a-no { color: var(--crit); box-shadow: inset 0 0 0 1px rgba(194, 54, 43, .3); }
+.card:not(.active) .ans { padding: 0; box-shadow: none; }
+/* тонкие линии от заметки к её месту на листе (рисует report.js) — волосяные, без цвета */
+svg.links { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 1; }
+svg.links path { fill: none; stroke: rgba(15, 40, 65, .16); stroke-width: 1; transition: stroke 220ms var(--ease); }
+svg.links path.on { stroke: rgba(15, 40, 65, .55); stroke-width: 1.25; }
+svg.links.focus path:not(.on) { stroke: rgba(15, 40, 65, .06); }
+
+/* ── остальные разделы — тоже белые листы ─────────────────────── */
+.panel:not(#p-findings) {
+  max-width: 1000px; margin: 0 auto; background: var(--paper); color: var(--ink); border-radius: var(--r-lg);
+  padding: 44px 52px 52px; box-shadow: var(--shadow-2); animation: sheet-in 360ms var(--ease);
+}
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 12px 14px; border-bottom: 1px solid var(--hair); }
+thead th { font-size: 13px; font-weight: 600; color: var(--ink-3); }
+tbody tr:last-child td { border-bottom: 0; }
+.deriv { margin-top: 4px; font-size: 13.5px; color: var(--ink-3); }
+.warnmark { font-weight: 600; color: var(--ink-2); }
+table.cl td:first-child { width: 42%; }
+table.kv th { width: 230px; font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.hash { word-break: break-all; font-size: 12.5px; }
+.pgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr); gap: 32px; align-items: start; }
+.stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 18px; }
+.st { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 14.5px; }
+.st b { font-size: 13px; }
+.st small { display: block; color: var(--ink-3); font-size: 12.5px; }
+.st-ok b { color: var(--ok); }
+.st-partial b { color: var(--ink-2); }
+.st-failed b { color: var(--crit); }
+.warns { margin: 0; padding-left: 18px; color: var(--ink-2); }
+.was { color: #8E2F26; text-decoration: line-through; text-decoration-color: rgba(194, 54, 43, .7); white-space: pre-wrap; }
+.became { background: var(--green-wash); padding: 1px 4px; border-radius: 4px; white-space: pre-wrap; }
+table.rw td:nth-child(4), table.rw td:nth-child(5) { min-width: 220px; }
+.why { margin: 10px 0 0; color: var(--ink-2); font-size: 15px; }
+
+/* исправленная редакция: тот же лист в режиме правки юриста (собирает report.js) */
+.redline { margin: -12px -52px 28px; }
+.redline .rl-head { padding: 0 52px 14px var(--gutter); font-size: 14.5px; color: var(--ink-3); }
+.redline .rl-head .lead { margin: 0; }
+.redline .doc { padding-bottom: 24px; }
+.redline del { color: #8E2F26; text-decoration: line-through; text-decoration-color: var(--crit); text-decoration-thickness: 1.5px; }
+.redline ins { color: var(--ink); text-decoration: none; background: rgba(0, 185, 117, .13); border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.redline .ln.ed .no::after { content: ""; position: absolute; right: 8px; top: 8px; width: 2px; height: 13px; border-radius: 1px; background: var(--accent); }
+@media screen { #p-rewrites:has(.redline) > .lead, #p-rewrites:has(.redline) > .tw { display: none; } }
+
+/* ── вопросы владельцу — на белой бумаге, чернилами ───────────── */
+.qtools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 6px; flex-wrap: wrap; }
+.qtools p { margin: 0; color: var(--ink-2); max-width: 70ch; font-size: 15px; }
+.qlist { display: block; }
+.qcard { position: relative; min-width: 0; overflow-wrap: anywhere; padding: 24px 0 22px; box-shadow: 0 -1px 0 var(--hair); }
+.qcard:first-child { margin-top: 18px; }
+.qcard .to { font-size: 13.5px; color: var(--ink-3); }
+.qcard .to b { color: var(--ink-2); font-weight: 600; }
+.qlinks { margin-left: auto; display: flex; gap: 4px; }
+.topic { font: 600 12px/1.4 var(--font); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-top: 10px; }
+.qcard .ct { display: block; overflow: visible; white-space: normal; font-size: 18px; font-weight: 650; line-height: 1.4; letter-spacing: -.01em; margin: 6px 0 4px; }
+.qcard .evs { display: flex; margin-top: 10px; }
+.opts { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.opts label { display: flex; align-items: flex-start; gap: 10px; padding: 9px 14px; border-radius: 12px; cursor: pointer; font-size: 15px; transition: background 120ms var(--ease), box-shadow 120ms var(--ease); }
+.opts label:hover { background: var(--paper-2); }
+.opts input { margin: 4px 0 0; accent-color: var(--brand); }
+.opts label:has(input:checked) { background: var(--green-wash); box-shadow: inset 0 0 0 1.5px rgba(0, 185, 117, .45); }
+.ol { flex: none; font-weight: 700; color: var(--ink-3); min-width: 14px; }
+.own { display: block; font-size: 13px; color: var(--ink-3); font-weight: 600; margin-top: 6px; }
+.own textarea { display: block; width: 100%; margin-top: 4px; border: 0; border-radius: 12px; padding: 10px 14px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--hair-2); resize: vertical; font-weight: 400; font-size: 15px; }
+.own textarea:focus { outline: 0; box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(0, 185, 117, .25); }
+.foot { max-width: calc(var(--sheet-w) + var(--notes-w) + 32px); margin: 0 auto; padding: 8px 16px 24px; color: var(--ink-3); font-size: 13px; }
+.toast { position: fixed; left: 50%; bottom: calc(var(--dock-h) + 34px); transform: translateX(-50%); background: var(--paper); color: var(--ink); padding: 10px 18px; border-radius: 999px; font-size: 14.5px; font-weight: 600; z-index: 50; box-shadow: var(--shadow-2); }
+
+/* ── встраивание в веб: шапку, фон и стеклянную панель даёт страница задания ── */
+:root[data-embed] .top, :root[data-embed] .tabs, :root[data-embed] .foot, :root[data-embed] #dlanswers { display: none !important; }
+:root[data-embed] { --top-h: 0px; background: transparent; }
+:root[data-embed] body { background: transparent; padding-bottom: calc(var(--dock-h) + 48px); }
+:root[data-embed] body::before, :root[data-embed] body::after { display: none; }
+:root[data-embed] .hero { padding-top: 12px; }
+:root[data-embed] main { padding-top: 64px; }
+/* BCC AI (agent.js №40) стоит на краю листа, с мягкой тенью; страница задания добавляет его в окно листа */
+:root[data-embed] .perch { position: absolute; z-index: 4; left: 18px; top: -78px; width: max-content; max-width: 560px; }
+
+/* ── узкие экраны: лист во всю ширину, заметки — под строкой ──── */
+@media (max-width: 1220px) {
+  :root { --notes-w: 300px; } .split { column-gap: 24px; } .minimap { display: none; }
+  .filters .frow:first-child { flex-wrap: wrap; border-radius: 18px; }
+}
+@media (max-width: 1000px) {
+  :root { --gutter: 44px; }
+  .split { display: block; }
+  .docpane { max-width: var(--sheet-w); margin: 0 auto; }
+  .flist { max-width: var(--sheet-w); margin: 20px auto 0; }
+  .dochead { padding: 22px 20px 16px var(--gutter); }
+  .doc { padding: 12px 18px 40px 0; font-size: 16.5px; }
+  .ln .no { padding-right: 12px; font-size: 11px; }
+  .ln.hl .no::after { left: 4px; }
+  /* заметка под своей строкой — врезка на листе */
+  .doc .card { margin: 4px 0 10px var(--gutter); background: var(--paper-2); padding: 8px 12px 8px 22px; border-radius: 12px; }
+  .doc .card .ct { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .doc .card:not(.active) { display: block; }
+  .doc .card.active { background: var(--paper); box-shadow: 0 0 0 1px var(--hair-2), var(--shadow-1); }
+  .doc .card.active .ct { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .panel:not(#p-findings) { padding: 28px 20px 32px; }
+  .redline { margin: -8px -20px 24px; }
+  .pgrid { grid-template-columns: 1fr; }
+  :root[data-embed] .perch { left: auto; right: 10px; top: -74px; max-width: 86vw; flex-direction: row-reverse; }
+}
+@media (max-width: 600px) {
+  /* таблицы ТЗ (№54): на телефоне ячейки друг под другом — слова не рвутся */
+  .ln.trow .tx { display: block; } .ln.trow .td { display: block; } .ln.trow .td:first-child { font-weight: 600; }
+  .dname { display: none; }
+  .tab { padding: 0 12px; font-size: 14px; }
+  .ev { flex-wrap: wrap; gap: 2px 10px; }
+  .ev q { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ── печать: всё содержание на белом ──────────────────────────── */
+@page { size: A4; margin: 14mm 12mm 16mm; }
+@media print {
+  html, body { background: #fff; }
+  body { font-size: 10.5pt; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body::before, body::after { display: none; }
+  .top { position: static; background: #fff; box-shadow: none; padding: 0 0 8px; backdrop-filter: none; }
+  .actions, .tabs, .filters, .minimap, .kbd, .copy, .qtools button, .own, .toast, svg.links, .resolution { display: none !important; }
+  .hero { padding: 0; max-width: none; }
+  .hero-grid { display: block; }
+  .fixfirst { display: block; margin-top: 10px; }
+  main { padding: 0; }
+  .panel { display: block !important; margin-top: 14px; animation: none; box-shadow: none !important; padding: 0 !important; max-width: none !important; }
+  .panel > .ph { display: block; font-size: 15pt; margin: 6px 0 10px; padding-bottom: 4px; border-bottom: 2px solid #0F2841; }
+  #p-questions, #p-checklist, #p-passport { break-before: page; }
+  .split { display: block; }
+  .docpane { display: none; }
+  .flist { box-shadow: none; padding: 0; }
+  .card { position: static !important; top: auto !important; padding: 8px 0; break-inside: avoid; }
+  .card .ct { display: block; white-space: normal; }
+  .card .meta, .card .evs, .card .problem, .card .more, .card .cf { display: block; }
+  .card .ch .badge, .card .ch .prio { display: inline-block; }
+  .more summary { display: none; }
+  .qcard { break-inside: avoid; }
+  .opts input { display: none; }
+  table { font-size: 9.5pt; }
+  a { text-decoration: none; }
+}
+
+</style>
+</head>
+<body data-file="source">
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span><div><div class="bname">Ревью требований</div>
+  <h1 class="dname" title="Кэшбэк в выбранной категории">Кэшбэк в выбранной категории</h1></div></div>
+  <div class="actions">
+    <button type="button" class="btn ghost" id="theme" title="Светлая или тёмная тема" aria-label="Сменить тему"><span class="i-theme"></span></button>
+    <button type="button" class="btn ghost" id="dljson" title="Скачать report.json">JSON</button>
+    <button type="button" class="btn" id="print" title="Печать или сохранение в PDF">PDF / печать</button>
+  </div>
+</header>
+
+<section class="hero" aria-label="Итог ревью">
+  
+  <div class="hero-grid">
+    <div class="verdict">
+      <h2 class="eyebrow">Можно ли начинать</h2>
+      <div class="vcards"><div class="vcard v-yes"><div class="vlabel">Разработка</div><div class="vword">Можно</div><div class="vhint">блокирующих дефектов нет</div></div><div class="vcard v-yes"><div class="vlabel">Тестирование</div><div class="vword">Можно</div><div class="vhint">блокирующих дефектов нет</div></div></div>
+    </div>
+    <div class="stats">
+      <h2 class="eyebrow">Замечания</h2>
+      <div class="tiles"><button class="tile t-critical" data-sevonly="critical" title="Показать только: критичные"><span class="tnum">0</span><span class="tlab">Критичных</span></button><button class="tile t-major" data-sevonly="major" title="Показать только: существенные"><span class="tnum">0</span><span class="tlab">Существенных</span></button><button class="tile t-minor" data-sevonly="minor" title="Показать только: незначительные"><span class="tnum">6</span><span class="tlab">Незначительных</span></button><div class="tile t-neutral"><span class="tnum">28</span><span class="tlab">требований<small>13 без замечаний</small></span></div><div class="tile t-ok" title="Каждая цитата найдена в документе программой, номер строки посчитан кодом"><span class="tnum">100 %</span><span class="tlab">цитат сверено кодом<small>13 из 13 цитат</small></span></div></div>
+    </div>
+  </div>
+  <div class="hero-text">
+    <p class="vsummary">Разработку и тестирование можно начинать: критичных и существенных дефектов нет; незначительные замечания можно закрыть по ходу работы.</p>
+    <p class="runmeta">модель claude-sonnet-5-5 · время 1 мин 11 с · 8 вызовов модели · 2026-11-27 22:13</p>
+  </div>
+  <div class="fixfirst"><h2>Исправить первым</h2><ol><li><a href="#D-01" data-goto="D-01" class="fix sev-minor"><span class="fixn">1</span><span class="dot"></span><span class="fid">D-01</span><span class="fixt">Одни и те же понятия названы по-разному</span><span class="fixl">строка 22</span></a></li><li><a href="#D-02" data-goto="D-02" class="fix sev-minor"><span class="fixn">2</span><span class="dot"></span><span class="fid">D-02</span><span class="fixt">У функциональных требований нет приоритетов</span><span class="fixl">строка 24</span></a></li><li><a href="#D-03" data-goto="D-03" class="fix sev-minor"><span class="fixn">3</span><span class="dot"></span><span class="fid">D-03</span><span class="fixt">Не определено, какую категорию возвращает getCashback после смены</span><span class="fixl">строка 25</span></a></li><li><a href="#D-04" data-goto="D-04" class="fix sev-minor"><span class="fixn">4</span><span class="dot"></span><span class="fid">D-04</span><span class="fixt">КБ-6 не определяет возврат покупки без начисленного кэшбэка</span><span class="fixl">строка 26</span></a></li><li><a href="#D-05" data-goto="D-05" class="fix sev-minor"><span class="fixn">5</span><span class="dot"></span><span class="fid">D-05</span><span class="fixt">Данные не позволяют применить возврат покупки по КБ-6</span><span class="fixl">строка 30</span></a></li><li><a href="#D-06" data-goto="D-06" class="fix sev-minor"><span class="fixn">6</span><span class="dot"></span><span class="fid">D-06</span><span class="fixt">Ответ 200 метода saveCategory отсылает к несуществующему описанию</span><span class="fixl">строка 70</span></a></li></ol></div>
+</section>
+<nav class="tabs" role="tablist" aria-label="Разделы отчёта"><button type="button" role="tab" class="tab" id="t-findings" aria-controls="p-findings" aria-selected="true" data-tab="findings">Замечания<span class=cnt>6</span></button><button type="button" role="tab" class="tab" id="t-questions" aria-controls="p-questions" aria-selected="false" data-tab="questions">Вопросы<span class=cnt>1</span></button><button type="button" role="tab" class="tab" id="t-tests" aria-controls="p-tests" aria-selected="false" data-tab="tests">Тест-кейсы<span class=cnt>12</span></button><button type="button" role="tab" class="tab" id="t-checklist" aria-controls="p-checklist" aria-selected="false" data-tab="checklist">Чек-лист банка<span class=cnt>14</span></button><button type="button" role="tab" class="tab" id="t-checks" aria-controls="p-checks" aria-selected="false" data-tab="checks">Проверки<span class=cnt>6</span></button><button type="button" role="tab" class="tab" id="t-segment" aria-controls="p-segment" aria-selected="false" data-tab="segment">Нарезка<span class=cnt>28</span></button><button type="button" role="tab" class="tab" id="t-rejected" aria-controls="p-rejected" aria-selected="false" data-tab="rejected">Отклонённые<span class=cnt>1</span></button><button type="button" role="tab" class="tab" id="t-passport" aria-controls="p-passport" aria-selected="false" data-tab="passport">Паспорт</button></nav>
+<main><section class="panel" role="tabpanel" id="p-findings" aria-labelledby="t-findings"><h2 class="ph">Замечания</h2>
+<div class="split">
+  <aside class="docpane" aria-label="Документ">
+    <div class="dochead">
+      <div class="doctitle" title="Кэшбэк в выбранной категории">Кэшбэк в выбранной категории<small>93 строки</small></div>
+      <div class="doctools">
+        <label class="tg"><input type="checkbox" id="onlyhl"> только с замечаниями</label>
+        <label class="tg"><input type="checkbox" id="showreq"> нарезка</label>
+      </div>
+    </div>
+    <div class="docbody"><div class="doc" id="doc" tabindex="0"><div class="ln h" id="L1" data-n="1"><span class="no">1</span><span class="tx">Кэшбэк в выбранной категории</span></div>
+<div class="ln blank" id="L2" data-n="2"><span class="no">2</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L3" data-n="3" data-ex="Служебное пояснение о документе: Пояснение о самом документе"><span class="no">3</span><span class="tx">Открытый учебный документ корпуса bcc-eval. Семейство cashback.</span></div>
+<div class="ln blank" id="L4" data-n="4"><span class="no">4</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L5" data-n="5"><span class="no">5</span><span class="tx">Часть A. Бизнес-требования</span></div>
+<div class="ln blank" id="L6" data-n="6"><span class="no">6</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L7" data-n="7"><span class="no">7</span><span class="tx">Общие сведения</span></div>
+<div class="ln blank" id="L8" data-n="8"><span class="no">8</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L9" data-n="9" data-ex="Таблица общих сведений: Метаданные, включая версию и ссылку на задачу"><span class="no">9</span><span class="tx">Поле | Значение</span></div>
+<div class="ln blank ex" id="L10" data-n="10" data-ex="Таблица общих сведений: Метаданные, включая версию и ссылку на задачу"><span class="no">10</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L11" data-n="11" data-ex="Таблица общих сведений: Метаданные, включая версию и ссылку на задачу"><span class="no">11</span><span class="tx">Наименование задачи | Кэшбэк в выбранной категории</span></div>
+<div class="ln ex" id="L12" data-n="12" data-ex="Таблица общих сведений: Метаданные, включая версию и ссылку на задачу"><span class="no">12</span><span class="tx">Продукт | Мобильный банк</span></div>
+<div class="ln ex" id="L13" data-n="13" data-ex="Таблица общих сведений: Метаданные, включая версию и ссылку на задачу"><span class="no">13</span><span class="tx">Задача в Jira | EVAL-101</span></div>
+<div class="ln ex" id="L14" data-n="14" data-ex="Таблица общих сведений: Метаданные, включая версию и ссылку на задачу"><span class="no">14</span><span class="tx">Версия документа | 1.0 от 01.11.2026</span></div>
+<div class="ln blank" id="L15" data-n="15"><span class="no">15</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L16" data-n="16"><span class="no">16</span><span class="tx">Цели</span></div>
+<div class="ln rq" id="L17" data-n="17" data-r="R-01"><span class="no">17</span><span class="tx"><span class="rtag">R-01</span>Клиент выбирает одну категорию покупок на месяц и получает кэшбэк за покупки в этой категории.</span></div>
+<div class="ln blank" id="L18" data-n="18"><span class="no">18</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L19" data-n="19"><span class="no">19</span><span class="tx">Термины</span></div>
+<div class="ln rq" id="L20" data-n="20" data-r="R-02"><span class="no">20</span><span class="tx"><span class="rtag">R-02</span>Месяц — календарный месяц по времени UTC+5 (Asia/Almaty).</span></div>
+<div class="ln rq" id="L21" data-n="21" data-r="R-03"><span class="no">21</span><span class="tx"><span class="rtag">R-03</span>Покупка — операция оплаты картой, которую карточный процессинг передал со статусом «проведена».</span></div>
+<div class="ln hl sev-minor rq" id="L22" data-n="22" data-f="D-01" data-r="R-04"><span class="no">22</span><span class="tx"><span class="rtag">R-04</span><mark class="q sev-minor" data-f="D-01">Категория</mark> — одна из категорий «Кафе» (CAFE), «Такси» (TAXI), «Аптеки» (PHARMACY).</span><span class="fms"><a class="fm sev-minor" href="#D-01" data-goto="D-01">D-01</a></span></div>
+<div class="ln blank" id="L23" data-n="23"><span class="no">23</span><span class="tx">&#8203;</span></div>
+<div class="ln h hl sev-minor" id="L24" data-n="24" data-f="D-02"><span class="no">24</span><span class="tx"><mark class="q sev-minor" data-f="D-02">Функциональные требования</mark></span><span class="fms"><a class="fm sev-minor" href="#D-02" data-goto="D-02">D-02</a></span></div>
+<div class="ln hl sev-minor rq" id="L25" data-n="25" data-f="D-03" data-r="R-05"><span class="no">25</span><span class="tx"><span class="rtag">R-05</span>КБ-1. Клиент выбирает категорию до конца текущего месяца. <mark class="q sev-minor" data-f="D-03">Выбор действует с первого дня следующего месяца</mark>.</span><span class="fms"><a class="fm sev-minor" href="#D-03" data-goto="D-03">D-03</a></span></div>
+<div class="ln hl sev-minor rq" id="L26" data-n="26" data-f="D-04" data-r="R-06"><span class="no">26</span><span class="tx"><span class="rtag">R-06</span>КБ-2. <mark class="q sev-minor" data-f="D-04">Кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно</mark>.</span><span class="fms"><a class="fm sev-minor" href="#D-04" data-goto="D-04">D-04</a></span></div>
+<div class="ln rq" id="L27" data-n="27" data-r="R-07"><span class="no">27</span><span class="tx"><span class="rtag">R-07</span>КБ-3. Ставка кэшбэка составляет 5 % от суммы покупки.</span></div>
+<div class="ln rq" id="L28" data-n="28" data-r="R-08"><span class="no">28</span><span class="tx"><span class="rtag">R-08</span>КБ-4. Сумма кэшбэка за месяц не превышает 10 000 ₸.</span></div>
+<div class="ln rq" id="L29" data-n="29" data-r="R-09"><span class="no">29</span><span class="tx"><span class="rtag">R-09</span>КБ-5. Кэшбэк за месяц зачисляется на карту 5-го числа следующего месяца.</span></div>
+<div class="ln hl sev-minor rq" id="L30" data-n="30" data-f="D-04 D-05" data-r="R-10"><span class="no">30</span><span class="tx"><span class="rtag">R-10</span><mark class="q sev-minor" data-f="D-05">КБ-6. </mark><mark class="q sev-minor" data-f="D-04 D-05">Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата</mark><mark class="q sev-minor" data-f="D-05">. Возврат после зачисления уменьшает следующее зачисление на ту же величину</mark>.</span><span class="fms"><a class="fm sev-minor" href="#D-04" data-goto="D-04">D-04</a><a class="fm sev-minor" href="#D-05" data-goto="D-05">D-05</a></span></div>
+<div class="ln rq" id="L31" data-n="31" data-r="R-11"><span class="no">31</span><span class="tx"><span class="rtag">R-11</span>КБ-7. Приложение показывает выбранную категорию и кэшбэк текущего месяца.</span></div>
+<div class="ln blank" id="L32" data-n="32"><span class="no">32</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L33" data-n="33"><span class="no">33</span><span class="tx">Нефункциональные требования</span></div>
+<div class="ln rq" id="L34" data-n="34" data-r="R-12"><span class="no">34</span><span class="tx"><span class="rtag">R-12</span>НФ-1. Методы getCashback и saveCategory отвечают не дольше 500 мс для 95 % запросов при нагрузке до 50 запросов в секунду.</span></div>
+<div class="ln blank" id="L35" data-n="35"><span class="no">35</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L36" data-n="36"><span class="no">36</span><span class="tx">Требования к данным</span></div>
+<div class="ln hl sev-minor rq" id="L37" data-n="37" data-f="D-05" data-r="R-13"><span class="no">37</span><span class="tx"><span class="rtag">R-13</span><mark class="q sev-minor" data-f="D-05">Хранить идентификатор карты, месяц, код категории, сумму каждой покупки в тиынах и кэшбэк месяца в тиынах. 1 ₸ = 100 тиынов, кэшбэк округляется вниз до целого тиына</mark>.</span><span class="fms"><a class="fm sev-minor" href="#D-05" data-goto="D-05">D-05</a></span></div>
+<div class="ln blank" id="L38" data-n="38"><span class="no">38</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L39" data-n="39"><span class="no">39</span><span class="tx">Требования к интеграции</span></div>
+<div class="ln hl sev-minor rq" id="L40" data-n="40" data-f="D-01" data-r="R-14"><span class="no">40</span><span class="tx"><span class="rtag">R-14</span>Приложение читает <mark class="q sev-minor" data-f="D-01">настройки</mark> методом getCashback и сохраняет категорию методом saveCategory. Оба метода описаны в части B.</span><span class="fms"><a class="fm sev-minor" href="#D-01" data-goto="D-01">D-01</a></span></div>
+<div class="ln blank" id="L41" data-n="41"><span class="no">41</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L42" data-n="42"><span class="no">42</span><span class="tx">Критерии приёмки</span></div>
+<div class="ln blank" id="L43" data-n="43"><span class="no">43</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L44" data-n="44" data-ex="Шапка таблицы критериев приёмки: Строка-шапка таблицы"><span class="no">44</span><span class="tx">Исходные условия | Действие | Ожидаемый результат</span></div>
+<div class="ln blank" id="L45" data-n="45"><span class="no">45</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-minor rq" id="L46" data-n="46" data-f="D-01" data-r="R-15"><span class="no">46</span><span class="tx"><span class="rtag">R-15</span>Категория «Такси», <mark class="q sev-minor" data-f="D-01">кэшбэк месяца</mark> 0 ₸ | Провести покупку «Такси» на 2 000 ₸ | Кэшбэк месяца 100 ₸</span><span class="fms"><a class="fm sev-minor" href="#D-01" data-goto="D-01">D-01</a></span></div>
+<div class="ln rq" id="L47" data-n="47" data-r="R-16"><span class="no">47</span><span class="tx"><span class="rtag">R-16</span>Категория «Такси», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 500 ₸ | Кэшбэк месяца 25 ₸</span></div>
+<div class="ln rq" id="L48" data-n="48" data-r="R-17"><span class="no">48</span><span class="tx"><span class="rtag">R-17</span>Категория «Такси», кэшбэк месяца 9 900 ₸ | Провести покупку «Такси» на 4 000 ₸ | Кэшбэк месяца 10 000 ₸</span></div>
+<div class="ln rq" id="L49" data-n="49" data-r="R-18"><span class="no">49</span><span class="tx"><span class="rtag">R-18</span>Категория «Кафе», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 1 000 ₸ | Кэшбэк месяца 0 ₸</span></div>
+<div class="ln blank" id="L50" data-n="50"><span class="no">50</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L51" data-n="51"><span class="no">51</span><span class="tx">Часть B. REST API</span></div>
+<div class="ln blank" id="L52" data-n="52"><span class="no">52</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L53" data-n="53"><span class="no">53</span><span class="tx">Метод getCashback</span></div>
+<div class="ln blank" id="L54" data-n="54"><span class="no">54</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L55" data-n="55" data-ex="Шапка таблицы метода getCashback: Строка-шапка таблицы"><span class="no">55</span><span class="tx">Поле | Значение</span></div>
+<div class="ln blank" id="L56" data-n="56"><span class="no">56</span><span class="tx">&#8203;</span></div>
+<div class="ln rq" id="L57" data-n="57" data-r="R-19"><span class="no">57</span><span class="tx"><span class="rtag">R-19</span>REST type | GET</span></div>
+<div class="ln rq" id="L58" data-n="58" data-r="R-19"><span class="no">58</span><span class="tx">Request URL | /cashback/{cardId}</span></div>
+<div class="ln rq" id="L59" data-n="59" data-r="R-19"><span class="no">59</span><span class="tx">Authorization | Bearer, сессия клиента — владельца карты</span></div>
+<div class="ln blank" id="L60" data-n="60"><span class="no">60</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L61" data-n="61"><span class="no">61</span><span class="tx">Ответ 200</span></div>
+<div class="ln blank" id="L62" data-n="62"><span class="no">62</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L63" data-n="63" data-ex="Шапка таблицы параметров ответа: Строка-шапка таблицы"><span class="no">63</span><span class="tx">Parameter | Format | Description</span></div>
+<div class="ln blank" id="L64" data-n="64"><span class="no">64</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-minor rq" id="L65" data-n="65" data-f="D-03" data-r="R-20"><span class="no">65</span><span class="tx"><span class="rtag">R-20</span>category | string | <mark class="q sev-minor" data-f="D-03">Код выбранной категории: CAFE, TAXI или PHARMACY</mark></span><span class="fms"><a class="fm sev-minor" href="#D-03" data-goto="D-03">D-03</a></span></div>
+<div class="ln hl sev-minor rq" id="L66" data-n="66" data-f="D-01" data-r="R-21"><span class="no">66</span><span class="tx"><span class="rtag">R-21</span><mark class="q sev-minor" data-f="D-01">accrued</mark> | string | Кэшбэк текущего месяца в тенге с двумя знаками после точки</span><span class="fms"><a class="fm sev-minor" href="#D-01" data-goto="D-01">D-01</a></span></div>
+<div class="ln blank" id="L67" data-n="67"><span class="no">67</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L68" data-n="68" data-ex="Пример ответа getCashback: Пример к первому критерию приёмки и ответу 200 getCashback"><span class="no">68</span><span class="tx">Пример ответа для первого критерия приёмки: {&quot;category&quot;:&quot;TAXI&quot;,&quot;accrued&quot;:&quot;100.00&quot;}.</span></div>
+<div class="ln blank" id="L69" data-n="69"><span class="no">69</span><span class="tx">&#8203;</span></div>
+<div class="ln h hl sev-minor" id="L70" data-n="70" data-f="D-06"><span class="no">70</span><span class="tx"><mark class="q sev-minor" data-f="D-06">Метод saveCategory</mark></span><span class="fms"><a class="fm sev-minor" href="#D-06" data-goto="D-06">D-06</a></span></div>
+<div class="ln blank" id="L71" data-n="71"><span class="no">71</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L72" data-n="72" data-ex="Шапка таблицы метода saveCategory: Строка-шапка таблицы"><span class="no">72</span><span class="tx">Поле | Значение</span></div>
+<div class="ln blank" id="L73" data-n="73"><span class="no">73</span><span class="tx">&#8203;</span></div>
+<div class="ln rq" id="L74" data-n="74" data-r="R-22"><span class="no">74</span><span class="tx"><span class="rtag">R-22</span>REST type | POST</span></div>
+<div class="ln rq" id="L75" data-n="75" data-r="R-22"><span class="no">75</span><span class="tx">Request URL | /cashback/{cardId}/category</span></div>
+<div class="ln rq" id="L76" data-n="76" data-r="R-22"><span class="no">76</span><span class="tx">Authorization | Bearer, сессия клиента — владельца карты</span></div>
+<div class="ln rq" id="L77" data-n="77" data-r="R-22"><span class="no">77</span><span class="tx">Content-Type | application/json</span></div>
+<div class="ln blank" id="L78" data-n="78"><span class="no">78</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L79" data-n="79"><span class="no">79</span><span class="tx">Тело запроса</span></div>
+<div class="ln blank" id="L80" data-n="80"><span class="no">80</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L81" data-n="81" data-ex="Шапка таблицы тела запроса: Строка-шапка таблицы"><span class="no">81</span><span class="tx">Parameter | Format | Mandatory | Logic | Description</span></div>
+<div class="ln blank" id="L82" data-n="82"><span class="no">82</span><span class="tx">&#8203;</span></div>
+<div class="ln rq" id="L83" data-n="83" data-r="R-23"><span class="no">83</span><span class="tx"><span class="rtag">R-23</span>category | string | Да | CAFE, TAXI или PHARMACY | Код категории</span></div>
+<div class="ln blank" id="L84" data-n="84"><span class="no">84</span><span class="tx">&#8203;</span></div>
+<div class="ln h" id="L85" data-n="85"><span class="no">85</span><span class="tx">Статусы</span></div>
+<div class="ln blank" id="L86" data-n="86"><span class="no">86</span><span class="tx">&#8203;</span></div>
+<div class="ln ex" id="L87" data-n="87" data-ex="Шапка таблицы статусов: Строка-шапка таблицы"><span class="no">87</span><span class="tx">Код | Когда возвращается | Тело ответа</span></div>
+<div class="ln blank" id="L88" data-n="88"><span class="no">88</span><span class="tx">&#8203;</span></div>
+<div class="ln hl sev-minor rq" id="L89" data-n="89" data-f="D-06" data-r="R-24"><span class="no">89</span><span class="tx"><span class="rtag">R-24</span><mark class="q sev-minor" data-f="D-06">200 | Запрос выполнен | Описано в разделе метода</mark></span><span class="fms"><a class="fm sev-minor" href="#D-06" data-goto="D-06">D-06</a></span></div>
+<div class="ln rq" id="L90" data-n="90" data-r="R-25"><span class="no">90</span><span class="tx"><span class="rtag">R-25</span>400 | Код категории не из списка CAFE, TAXI, PHARMACY | {&quot;message&quot;:&quot;Неизвестная категория&quot;}</span></div>
+<div class="ln rq" id="L91" data-n="91" data-r="R-26"><span class="no">91</span><span class="tx"><span class="rtag">R-26</span>401 | Нет действующей сессии | {&quot;message&quot;:&quot;Требуется вход&quot;}</span></div>
+<div class="ln rq" id="L92" data-n="92" data-r="R-27"><span class="no">92</span><span class="tx"><span class="rtag">R-27</span>404 | Карта не найдена или не принадлежит клиенту | {&quot;message&quot;:&quot;Карта не найдена&quot;}</span></div>
+<div class="ln rq" id="L93" data-n="93" data-r="R-28"><span class="no">93</span><span class="tx"><span class="rtag">R-28</span>500 | Внутренняя ошибка сервиса | {&quot;message&quot;:&quot;Ошибка сервиса&quot;}</span></div></div><div class="minimap" id="minimap" aria-hidden="true"></div></div>
+    <div class="legend"><span class="lg sev-critical"></span>критичный<span class="lg sev-major"></span>существенный<span class="lg sev-minor"></span>незначительный</div>
+  </aside>
+  <div class="flist">
+    <div class="filters" role="search">
+      <div class="frow"><button type="button" class="sevchip sev-critical" aria-pressed="true" data-sev="critical"><span class="dot"></span>Критичные <b>0</b></button><button type="button" class="sevchip sev-major" aria-pressed="true" data-sev="major"><span class="dot"></span>Существенные <b>0</b></button><button type="button" class="sevchip sev-minor" aria-pressed="true" data-sev="minor"><span class="dot"></span>Незначительные <b>6</b></button></div>
+      <div class="frow">
+        <input type="search" id="q" placeholder="Поиск по замечаниям, цитатам, ID…" aria-label="Поиск">
+        <select id="fkind" aria-label="Вид дефекта"><option value="">Все виды</option><option value="api_contract">Контракт API</option><option value="ambiguity">Неоднозначность</option><option value="missing_element">Обещанное не описано</option><option value="terminology">Терминология</option></select>
+        <select id="fsrc" aria-label="Кто нашёл"><option value="">Все линзы</option><option value="lens:architect">Архитектор</option><option value="consistency">Набор целиком</option></select>
+      </div>
+      <div class="frow small"><span id="fcount" aria-live="polite"></span>
+        <label class="sortl">Порядок <select id="fsort" class="mini"><option value="prio">по приоритету</option><option value="line">по месту в документе</option><option value="sev">по серьёзности</option></select></label>
+        <button type="button" class="linkbtn" id="toggleall">Развернуть все</button><span class="kbd" title="Клавиши">↑ ↓ — по карточкам</span></div>
+    </div>
+    <div class="cards" id="cards"><article class="card sev-minor" id="D-01" tabindex="0" data-idx="0" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="22" data-kind="terminology"
+ data-resolved="0" data-src="consistency" data-blocks="none" data-lines="22 40 46 66" data-search="d-01 одни и те же понятия названы по-разному выбранная категория названа «настройки» (l040) и «категория» (l022). кэшбэк текущего месяца назван «кэшбэк месяца» (l046) и «accrued» (l066). глоссария соответствия нет. документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое. добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия. какой термин оставить для каждого из перечисленных понятий? категория настройки кэшбэк месяца accrued r-14 r-04 r-15 r-21 терминология">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-01</span></header>
+  <h3 class="ct">Одни и те же понятия названы по-разному</h3>
+  <div class="meta"><span class="chip kind">Терминология</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5">Соответствие шаблону</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="22" data-le="22" title="Показать в документе"><span class="evl">строка 22</span><q>Категория</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="40" data-le="40" title="Показать в документе"><span class="evl">строка 40</span><q>настройки</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="46" data-le="46" title="Показать в документе"><span class="evl">строка 46</span><q>кэшбэк месяца</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="66" data-le="66" title="Показать в документе"><span class="evl">строка 66</span><q>accrued</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Выбранная категория названа «настройки» (строка 40) и «Категория» (строка 22). Кэшбэк текущего месяца назван «кэшбэк месяца» (строка 46) и «accrued» (строка 66). Глоссария соответствия нет.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Последствия</div><div class="dd">Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Какой термин оставить для каждого из перечисленных понятий?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L40" data-req="R-14" data-ls="40" data-le="40" title="Приложение использует getCashback и saveCategory">R-14</a> <a class="rref" href="#L22" data-req="R-04" data-ls="22" data-le="22" title="Термины: Категория · Категории: Кафе, Такси, Аптеки">R-04</a> <a class="rref" href="#L46" data-req="R-15" data-ls="46" data-le="46" title="Критерии приёмки, строка 1 · Кэшбэк месяца 100 ₸">R-15</a> <a class="rref" href="#L66" data-req="R-21" data-ls="66" data-le="66" title="Ответ 200: accrued · Кэшбэк текущего месяца строкой в тенге">R-21</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-02" tabindex="0" data-idx="1" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="24" data-kind="missing_element"
+ data-resolved="0" data-src="consistency" data-blocks="none" data-lines="24" data-search="d-02 у функциональных требований нет приоритетов требования кб-1…кб-7 в разделе «функциональные требования» (l024) не имеют приоритета. при нехватке ресурсов непонятно, что делать первым. спор о порядке реализации. добавить приоритет каждому требованию. какие id и приоритеты присвоить перечисленным требованиям? функциональные требования r-05 r-06 r-07 r-08 r-09 r-10 r-11 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-02</span></header>
+  <h3 class="ct">У функциональных требований нет приоритетов</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="IEEE 830-1998 п. 4.3.5">Ранжирование</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="24" data-le="24" title="Показать в документе"><span class="evl">строка 24</span><q>Функциональные требования</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Требования КБ-1…КБ-7 в разделе «Функциональные требования» (строка 24) не имеют приоритета.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">При нехватке ресурсов непонятно, что делать первым.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Спор о порядке реализации.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить приоритет каждому требованию.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Какие ID и приоритеты присвоить перечисленным требованиям?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L25" data-req="R-05" data-ls="25" data-le="25" title="КБ-1 · Выбор категории до конца месяца, действует со следующего">R-05</a> <a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a> <a class="rref" href="#L27" data-req="R-07" data-ls="27" data-le="27" title="КБ-3 · Ставка кэшбэка 5 % от суммы">R-07</a> <a class="rref" href="#L28" data-req="R-08" data-ls="28" data-le="28" title="КБ-4 · Лимит кэшбэка за месяц 10 000 ₸">R-08</a> <a class="rref" href="#L29" data-req="R-09" data-ls="29" data-le="29" title="КБ-5 · Зачисление кэшбэка 5-го числа следующего месяца">R-09</a> <a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a> <a class="rref" href="#L31" data-req="R-11" data-ls="31" data-le="31" title="КБ-7 · Показ категории и кэшбэка текущего месяца">R-11</a></span><span class="fl"><b>Стандарт</b> IEEE 830-1998 п. 4.3.5</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-03" tabindex="0" data-idx="2" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="25" data-kind="ambiguity"
+ data-resolved="0" data-src="consistency" data-blocks="none" data-lines="25 65" data-search="d-03 не определено, какую категорию возвращает getcashback после смены кб-1 вводит выбор с первого дня следующего месяца, а в ответе getcashback поле category названо «код выбранной категории». не сказано, возвращается новая или действующая категория. 15 ноября действует taxi, клиент сохранил cafe, вызван getcashback. одна реализация вернёт cafe, другая taxi. приложение покажет не ту категорию, по которой идёт начисление. приложение покажет не ту категорию, по которой идёт начисление. зафиксировать, возвращает ли метод действующую или выбранную категорию, и дату вступления. показывать действующую категорию или новую с датой вступления? выбор действует с первого дня следующего месяца код выбранной категории: cafe, taxi или pharmacy r-05 r-20 r-11 неоднозначность">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-03</span></header>
+  <h3 class="ct">Не определено, какую категорию возвращает getCashback после смены</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="25" data-le="25" title="Показать в документе"><span class="evl">строка 25</span><q>Выбор действует с первого дня следующего месяца</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="65" data-le="65" title="Показать в документе"><span class="evl">строка 65</span><q>Код выбранной категории: CAFE, TAXI или PHARMACY</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">КБ-1 вводит выбор с первого дня следующего месяца, а в ответе getCashback поле category названо «Код выбранной категории». Не сказано, возвращается новая или действующая категория.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">15 ноября действует TAXI, клиент сохранил CAFE, вызван getCashback. Одна реализация вернёт CAFE, другая TAXI. Приложение покажет не ту категорию, по которой идёт начисление.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Приложение покажет не ту категорию, по которой идёт начисление.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Зафиксировать, возвращает ли метод действующую или выбранную категорию, и дату вступления.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Показывать действующую категорию или новую с датой вступления?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L25" data-req="R-05" data-ls="25" data-le="25" title="КБ-1 · Выбор категории до конца месяца, действует со следующего">R-05</a> <a class="rref" href="#L65" data-req="R-20" data-ls="65" data-le="65" title="Ответ 200: category · Код выбранной категории">R-20</a> <a class="rref" href="#L31" data-req="R-11" data-ls="31" data-le="31" title="КБ-7 · Показ категории и кэшбэка текущего месяца">R-11</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-04" tabindex="0" data-idx="3" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="26" data-kind="ambiguity"
+ data-resolved="0" data-src="consistency" data-blocks="none" data-lines="26 30" data-search="d-04 кб-6 не определяет возврат покупки без начисленного кэшбэка кб-6 уменьшает кэшбэк на 5 % от суммы возврата, а кб-2 не начисляет кэшбэк за покупки меньше 500 ₸. кб-4 ограничивает кэшбэк лимитом. для возврата таких покупок поведение не задано. покупка 400 ₸ без кэшбэка, затем возврат 400 ₸. по кб-6 кэшбэк уменьшается на 20 ₸, по кб-2 уменьшать нечего. один разработчик спишет 20 ₸ у других покупок, другой не спишет ничего. клиент недополучит кэшбэк или уйдёт в минус при возврате. определить уменьшение для покупок ниже порога, при лимите и сверх начисленного. уменьшать ли кэшбэк за возврат покупки, по которой он не начислялся или был урезан лимитом? кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата r-10 r-06 r-08 неоднозначность">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-04</span></header>
+  <h3 class="ct">КБ-6 не определяет возврат покупки без начисленного кэшбэка</h3>
+  <div class="meta"><span class="chip kind">Неоднозначность</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2">Однозначность</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="26" data-le="26" title="Показать в документе"><span class="evl">строка 26</span><q>Кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="30" data-le="30" title="Показать в документе"><span class="evl">строка 30</span><q>Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">КБ-6 уменьшает кэшбэк на 5 % от суммы возврата, а КБ-2 не начисляет кэшбэк за покупки меньше 500 ₸. КБ-4 ограничивает кэшбэк лимитом. Для возврата таких покупок поведение не задано.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Покупка 400 ₸ без кэшбэка, затем возврат 400 ₸. По КБ-6 кэшбэк уменьшается на 20 ₸, по КБ-2 уменьшать нечего. Один разработчик спишет 20 ₸ у других покупок, другой не спишет ничего.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Клиент недополучит кэшбэк или уйдёт в минус при возврате.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Определить уменьшение для покупок ниже порога, при лимите и сверх начисленного.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Уменьшать ли кэшбэк за возврат покупки, по которой он не начислялся или был урезан лимитом?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a> <a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a> <a class="rref" href="#L28" data-req="R-08" data-ls="28" data-le="28" title="КБ-4 · Лимит кэшбэка за месяц 10 000 ₸">R-08</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.5; IEEE 830-1998 п. 4.3.2</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article>
+<article class="card sev-minor" id="D-05" tabindex="0" data-idx="4" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="30" data-kind="missing_element"
+ data-resolved="0" data-src="lens:architect" data-blocks="none" data-lines="30 37" data-search="d-05 данные не позволяют применить возврат покупки по кб-6 кб-6 различает возврат до и после зачисления и меняет кэшбэк месяца покупки. в требованиях к данным (l037) нет возвратов, связи со ссылкой на исходную покупку и признака или даты зачисления. возврат 2 000 ₸ приходит 7-го числа за покупку прошлого месяца. без признака зачисления и связи с покупкой сервис не определит, уменьшать кэшбэк прошлого месяца или следующее зачисление. правило возврата нельзя реализовать однозначно, клиент получит неверную сумму кэшбэка. добавить в перечень данных возврат (сумма, связь с исходной покупкой), а для кэшбэка месяца — признак и дату зачисления. хранить: идентификатор карты, месяц, код категории, сумму каждой покупки и возврата в тиынах, ссылку возврата на исходную покупку, кэшбэк месяца в тиынах, признак и дату зачисления кэшбэка месяца &lt;уточнить: имена полей&gt;. где хранится признак зачисления кэшбэка месяца и связь возврата с покупкой? кб-6. возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата. возврат после зачисления уменьшает следующее зачисление на ту же величину хранить идентификатор карты, месяц, код категории, сумму каждой покупки в тиынах и кэшбэк месяца в тиынах. 1 ₸ = 100 тиынов, кэшбэк округляется вниз до целого тиына r-10 r-13 обещанное не описано">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-05</span></header>
+  <h3 class="ct">Данные не позволяют применить возврат покупки по КБ-6</h3>
+  <div class="meta"><span class="chip kind">Обещанное не описано</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3">Полнота набора</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="30" data-le="30" title="Показать в документе"><span class="evl">строка 30</span><q>КБ-6. Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата. Возврат после зачисления уменьшает следующее зачисление на ту же величину</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="37" data-le="37" title="Показать в документе"><span class="evl">строка 37</span><q>Хранить идентификатор карты, месяц, код категории, сумму каждой покупки в тиынах и кэшбэк месяца в тиынах. 1 ₸ = 100 тиынов, кэшбэк округляется вниз до целого тиына</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">КБ-6 различает возврат до и после зачисления и меняет кэшбэк месяца покупки. В требованиях к данным (строка 37) нет возвратов, связи со ссылкой на исходную покупку и признака или даты зачисления.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Возврат 2 000 ₸ приходит 7-го числа за покупку прошлого месяца. Без признака зачисления и связи с покупкой сервис не определит, уменьшать кэшбэк прошлого месяца или следующее зачисление.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Правило возврата нельзя реализовать однозначно, клиент получит неверную сумму кэшбэка.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Добавить в перечень данных возврат (сумма, связь с исходной покупкой), а для кэшбэка месяца — признак и дату зачисления.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Хранить: идентификатор карты, месяц, код категории, сумму каждой покупки и возврата в тиынах, ссылку возврата на исходную покупку, кэшбэк месяца в тиынах, признак и дату зачисления кэшбэка месяца &lt;уточнить: имена полей&gt;.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Где хранится признак зачисления кэшбэка месяца и связь возврата с покупкой?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a> <a class="rref" href="#L37" data-req="R-13" data-ls="37" data-le="37" title="Хранимые данные, суммы в тиынах, округление вниз">R-13</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Архитектор</span></footer>
+</article>
+<article class="card sev-minor" id="D-06" tabindex="0" data-idx="5" data-sev="minor"
+ data-rank="1" data-prio="0" data-line="70" data-kind="api_contract"
+ data-resolved="0" data-src="consistency" data-blocks="none" data-lines="70 89" data-search="d-06 ответ 200 метода savecategory отсылает к несуществующему описанию таблица статусов (l089) говорит «описано в разделе метода», но в разделе savecategory (l070) нет описания ответа 200: ни тела, ни полей. клиент сохранил категорию cafe. приложение ждёт тело ответа, формат не определён, и тест успешного сохранения нельзя написать. разработчики приложения и сервиса реализуют ответ 200 по-разному, тест не проверить. описать тело ответа 200 savecategory или явно указать пустое тело. ответ 200: &lt;уточнить: пустое тело или поля category и дата вступления в силу&gt;. что savecategory возвращает при успехе? метод savecategory 200 | запрос выполнен | описано в разделе метода r-24 r-22 контракт api">
+  <header class="ch"><span class="badge sev-minor">Незначительный</span><span class="fid">D-06</span></header>
+  <h3 class="ct">Ответ 200 метода saveCategory отсылает к несуществующему описанию</h3>
+  <div class="meta"><span class="chip kind">Контракт API</span><span class="chip crit" title="ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3">Полнота набора</span></div>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="70" data-le="70" title="Показать в документе"><span class="evl">строка 70</span><q>Метод saveCategory</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="89" data-le="89" title="Показать в документе"><span class="evl">строка 89</span><q>200 | Запрос выполнен | Описано в разделе метода</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <p class="problem">Таблица статусов (строка 89) говорит «Описано в разделе метода», но в разделе saveCategory (строка 70) нет описания ответа 200: ни тела, ни полей.</p>
+  <details class="more"><summary>Сценарий, последствия и исправление</summary><div class="dl "><div class="dt">Сценарий</div><div class="dd">Клиент сохранил категорию CAFE. Приложение ждёт тело ответа, формат не определён, и тест успешного сохранения нельзя написать.</div></div><div class="dl "><div class="dt">Последствия</div><div class="dd">Разработчики приложения и сервиса реализуют ответ 200 по-разному, тест не проверить.</div></div><div class="dl "><div class="dt">Что сделать</div><div class="dd">Описать тело ответа 200 saveCategory или явно указать пустое тело.</div></div><div class="dl rw"><div class="dt">Предлагаемая формулировка<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button></div><div class="dd">Ответ 200: &lt;уточнить: пустое тело или поля category и дата вступления в силу&gt;.</div></div><div class="dl qq"><div class="dt">Вопрос владельцу</div><div class="dd">Что saveCategory возвращает при успехе?</div></div></details>
+  <footer class="cf"><span class="fl"><b>Требования</b> <a class="rref" href="#L89" data-req="R-24" data-ls="89" data-le="89" title="Статус 200 · Код 200 — успешное выполнение запроса">R-24</a> <a class="rref" href="#L74" data-req="R-22" data-ls="74" data-le="77" title="Метод saveCategory · POST /cashback/{cardId}/category, JSON, Bearer">R-22</a></span><span class="fl"><b>Стандарт</b> ISO/IEC/IEEE 29148:2018 п. 5.2.6; IEEE 830-1998 п. 4.3.3</span><span class="fl"><b>Нашли</b> Набор целиком</span></footer>
+</article><div class="empty" hidden>Под фильтр не попало ни одного замечания. <button type="button" class="linkbtn" data-reset>Сбросить фильтры</button></div></div>
+  </div>
+</div></section><section class="panel" role="tabpanel" id="p-questions" aria-labelledby="t-questions" hidden><h2 class="ph">Вопросы</h2><div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p><button type="button" class="btn" id="dlanswers">Скачать ответы</button></div><div class="qlist"><article class="qcard" data-q="Q-01" data-topic="Хранение возвратов и признака зачисления">
+  <header class="ch"><span class="fid">Q-01</span><span class="to">Кому: <b>Архитектор</b></span><span class="qlinks"><a class="fref sev-minor" href="#D-05" data-goto="D-05" title="Данные не позволяют применить возврат покупки по КБ-6">D-05</a></span></header>
+  <div class="topic">Хранение возвратов и признака зачисления</div><h3 class="ct">Правило возврата покупки требует знать, к какой покупке и какому месяцу относится возврат и зачислен ли уже кэшбэк этого месяца. В перечне хранимых данных возвратов, связи с исходной покупкой и признака зачисления нет. Какие данные хранить?</h3>
+  <ul class="evs"><li><button type="button" class="ev" data-ls="30" data-le="30" title="Показать в документе"><span class="evl">строка 30</span><q>КБ-6. Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата. Возврат после зачисления уменьшает следующее зачисление на ту же величину.</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li><li><button type="button" class="ev" data-ls="37" data-le="37" title="Показать в документе"><span class="evl">строка 37</span><q>Хранить идентификатор карты, месяц, код категории, сумму каждой покупки в тиынах и кэшбэк месяца в тиынах.</q><span class="vf ok" title="Цитата найдена в документе дословно">✓</span></button></li></ul>
+  <ol class="opts"><li><label><input type="radio" name="Q-01" value="0"><span class="ol">A</span>Хранить каждый возврат: идентификатор карты, ссылку на исходную покупку, сумму возврата в тиынах и дату возврата; у кэшбэка месяца хранить признак и дату зачисления</label></li><li><label><input type="radio" name="Q-01" value="1"><span class="ol">B</span>Хранить возврат без ссылки на покупку, но с картой, суммой в тиынах, датой возврата и месяцем исходной покупки; у кэшбэка месяца хранить признак и дату зачисления</label></li><li><label><input type="radio" name="Q-01" value="2"><span class="ol">C</span>Не хранить возвраты отдельно: уменьшать сумму покупки и пересчитывать кэшбэк месяца; хранить признак и дату зачисления у кэшбэка месяца</label></li></ol>
+  <label class="own">Свой ответ<textarea rows="2" data-own="Q-01" placeholder="Если ни один вариант не подходит"></textarea></label>
+  <p class="why"><b>Зачем:</b> Без этих данных нельзя определить, уменьшать кэшбэк месяца покупки или следующее зачисление. Две команды реализуют возврат на границе 5-го числа по-разному.</p>
+</article></div></section><section class="panel" role="tabpanel" id="p-tests" aria-labelledby="t-tests" hidden><h2 class="ph">Тест-кейсы</h2><p class="lead">Черновик для раздела «Тестирование требований»: проверки, которых не хватает в критериях приёмки. Где ожидаемый результат нельзя вывести из текста, это отмечено.</p><div class="tw"><table class="tc"><thead><tr><th>ID</th><th>Требования</th><th>Проверка</th><th>Дано</th><th>Когда</th><th>Тогда</th><th>Чего нет в приёмке</th></tr></thead><tbody><tr><td><span class="fid">T-01</span></td><td><a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a> <a class="rref" href="#L27" data-req="R-07" data-ls="27" data-le="27" title="КБ-3 · Ставка кэшбэка 5 % от суммы">R-07</a></td><td><b>Покупка 499,99 ₸ сразу за границей порога</b></td><td>Выбрана «Такси», кэшбэк месяца 0 ₸</td><td>Провести покупку «Такси» на 499,99 ₸</td><td>Кэшбэк не начисляется, кэшбэк месяца 0 ₸ (КБ-2: порог от 500 ₸ включительно).</td><td>Значение сразу за нижней границей не покрыто приёмкой.</td></tr><tr><td><span class="fid">T-02</span></td><td><a class="rref" href="#L28" data-req="R-08" data-ls="28" data-le="28" title="КБ-4 · Лимит кэшбэка за месяц 10 000 ₸">R-08</a></td><td><b>Кэшбэк ровно на лимите 10 000 ₸</b></td><td>Выбрана «Такси», кэшбэк месяца 9 900 ₸</td><td>Провести покупку «Такси» на 2 000 ₸</td><td>Кэшбэк месяца 10 000 ₸ (КБ-3: +100 ₸, КБ-4: не более 10 000 ₸).</td><td>Точное достижение границы лимита не покрыто.</td></tr><tr><td><span class="fid">T-03</span></td><td><a class="rref" href="#L28" data-req="R-08" data-ls="28" data-le="28" title="КБ-4 · Лимит кэшбэка за месяц 10 000 ₸">R-08</a></td><td><b>Покупка после достижения лимита</b></td><td>Выбрана «Такси», кэшбэк месяца 10 000 ₸</td><td>Провести покупку «Такси» на 1 000 ₸</td><td>Кэшбэк месяца остаётся 10 000 ₸ (КБ-4).</td><td>Покупка сверх лимита не покрыта.</td></tr><tr><td><span class="fid">T-04</span></td><td><a class="rref" href="#L25" data-req="R-05" data-ls="25" data-le="25" title="КБ-1 · Выбор категории до конца месяца, действует со следующего">R-05</a></td><td><b>Смена категории действует со следующего месяца</b></td><td>Текущий месяц, выбрана «Кафе»</td><td>saveCategory с TAXI, затем покупка «Такси» на 1 000 ₸ в том же месяце</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Выбор действует с первого дня следующего месяца (КБ-1). Не определено требованиями: что показывает getCashback в category до смены и начисляется ли кэшбэк за «Такси» в текущем месяце.</td><td>Смена настроек и переход периода не покрыты; неясно, действует ли старая категория до конца месяца.</td></tr><tr><td><span class="fid">T-05</span></td><td><a class="rref" href="#L25" data-req="R-05" data-ls="25" data-le="25" title="КБ-1 · Выбор категории до конца месяца, действует со следующего">R-05</a> <a class="rref" href="#L31" data-req="R-11" data-ls="31" data-le="31" title="КБ-7 · Показ категории и кэшбэка текущего месяца">R-11</a></td><td><b>Клиент без выбранной категории открывает кэшбэк</b></td><td>Клиент никогда не выбирал категорию, текущий месяц</td><td>Вызвать getCashback</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: значение category и accrued; КБ-1 даёт выбор только со следующего месяца, действующая категория для первого месяца не задана.</td><td>Начальное состояние не описано.</td></tr><tr><td><span class="fid">T-06</span></td><td><a class="rref" href="#L29" data-req="R-09" data-ls="29" data-le="29" title="КБ-5 · Зачисление кэшбэка 5-го числа следующего месяца">R-09</a></td><td><b>Зачисление кэшбэка 5-го числа</b></td><td>Кэшбэк месяца 100 ₸ за октябрь</td><td>Наступает 5 ноября</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> 100 ₸ зачисляется на карту (КБ-5). Не определено требованиями: время суток и показ после зачисления.</td><td>Зачисление не покрыто приёмкой.</td></tr><tr><td><span class="fid">T-07</span></td><td><a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a></td><td><b>Возврат покупки до зачисления</b></td><td>Покупка «Такси» на 2 000 ₸, кэшбэк месяца 100 ₸, зачисление не было</td><td>Процессинг передал возврат на 2 000 ₸</td><td>Кэшбэк месяца покупки 0 ₸ (КБ-6: −5 % от суммы возврата).</td><td>Возврат не покрыт приёмкой.</td></tr><tr><td><span class="fid">T-08</span></td><td><a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a></td><td><b>Возврат после зачисления кэшбэка</b></td><td>Кэшбэк 100 ₸ за покупку 2 000 ₸ уже зачислен</td><td>Возврат покупки на 2 000 ₸</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Следующее зачисление уменьшается на 100 ₸ (КБ-6). Не определено требованиями: что делать, если следующее зачисление меньше 100 ₸.</td><td>Возврат после зачисления не покрыт; остаток при недостаточном кэшбэке не описан.</td></tr><tr><td><span class="fid">T-09</span></td><td><a class="rref" href="#L28" data-req="R-08" data-ls="28" data-le="28" title="КБ-4 · Лимит кэшбэка за месяц 10 000 ₸">R-08</a> <a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a></td><td><b>Возврат при кэшбэке на лимите</b></td><td>Кэшбэк месяца 10 000 ₸ (лимит), из них начислено сверх лимита 200 ₸</td><td>Возврат покупки на 4 000 ₸ до зачисления</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Не определено требованиями: уменьшается ли кэшбэк на 200 ₸ (КБ-6) или лимит учитывается после возврата (КБ-4).</td><td>Взаимодействие КБ-4 и КБ-6 не описано.</td></tr><tr><td><span class="fid">T-10</span></td><td><a class="rref" href="#L20" data-req="R-02" data-ls="20" data-le="20" title="Термины: Месяц · Месяц — календарный по UTC+5">R-02</a> <a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a></td><td><b>Покупка на границе месяца по UTC+5</b></td><td>Выбрана «Такси»</td><td>Покупка проведена 30 числа в 23:30 UTC+5, а по UTC уже 31 число</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Покупка относится к текущему месяцу по UTC+5 (термин «Месяц»). Не определено требованиями: какой момент (авторизация или проведение) определяет месяц.</td><td>Переход периода не покрыт; момент отнесения не задан.</td></tr><tr><td><span class="fid">T-11</span></td><td><a class="rref" href="#L90" data-req="R-25" data-ls="90" data-le="90" title="Статус 400 · Код 400 — неизвестный код категории">R-25</a> <a class="rref" href="#L83" data-req="R-23" data-ls="83" data-le="83" title="Тело запроса: category · Код категории, обязательный">R-23</a></td><td><b>saveCategory с неизвестным кодом категории</b></td><td>Валидная сессия владельца карты</td><td>POST /cashback/{cardId}/category с category=FOOD</td><td>Код 400, тело {&quot;message&quot;:&quot;Неизвестная категория&quot;}.</td><td>Ошибки API не покрыты приёмкой.</td></tr><tr><td><span class="fid">T-12</span></td><td><a class="rref" href="#L89" data-req="R-24" data-ls="89" data-le="89" title="Статус 200 · Код 200 — успешное выполнение запроса">R-24</a> <a class="rref" href="#L74" data-req="R-22" data-ls="74" data-le="77" title="Метод saveCategory · POST /cashback/{cardId}/category, JSON, Bearer">R-22</a></td><td><b>Успешный saveCategory: тело ответа 200</b></td><td>Валидная сессия, карта клиента</td><td>POST category=PHARMACY</td><td><span class="warnmark" title="Ожидаемый результат нельзя вывести из ТЗ">⚠ не определён в ТЗ</span> Код 200. Не определено требованиями: тело ответа — «Описано в разделе метода», но в разделе saveCategory оно не описано.</td><td>Успешный ответ saveCategory не описан.</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checklist" aria-labelledby="t-checklist" hidden><h2 class="ph">Чек-лист банка</h2><p class="lead">Чек-лист «Ревью требований» банка, заполненный по результатам проверки.</p><div class="tw"><table class="cl"><thead><tr><th>Проверка</th><th>Ответ</th><th>Комментарий</th><th>Замечания</th></tr></thead><tbody><tr><td>Техническое требование зафиксировано и покрывает бизнес-требование</td><td><span class="ans a-part">Частично</span></td><td>Бизнес-требования КБ-1…КБ-7 есть, но возврат КБ-6 не подкреплён данными (строка 37) и не определён для покупок без кэшбэка.</td><td><a class="fref sev-minor" href="#D-05" data-goto="D-05" title="Данные не позволяют применить возврат покупки по КБ-6">D-05</a> <a class="fref sev-minor" href="#D-04" data-goto="D-04" title="КБ-6 не определяет возврат покупки без начисленного кэшбэка">D-04</a></td></tr><tr><td>Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)</td><td><span class="ans a-no">Нет</span></td><td>Спецификация методов структурирована, но ответ 200 метода saveCategory отсутствует (строка 89), а смысл category неоднозначен (строка 65).</td><td><a class="fref sev-minor" href="#D-06" data-goto="D-06" title="Ответ 200 метода saveCategory отсылает к несуществующему описанию">D-06</a> <a class="fref sev-minor" href="#D-03" data-goto="D-03" title="Не определено, какую категорию возвращает getCashback после смены">D-03</a></td></tr><tr><td>Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений</td><td><span class="ans a-no">Нет</span></td><td>Диаграмм взаимодействия нет, хотя есть обмен с карточным процессингом и зачисление 5-го числа.</td><td></td></tr><tr><td>Требование покрывает спецификацию UX/UI дизайна</td><td><span class="ans a-part">Частично</span></td><td>КБ-7 описывает показ категории и кэшбэка, макета нет, а возвращаемая категория неоднозначна (строка 65).</td><td><a class="fref sev-minor" href="#D-03" data-goto="D-03" title="Не определено, какую категорию возвращает getCashback после смены">D-03</a></td></tr><tr><td>Реализация задачи/проекта предусматривает схему отката решений</td><td><span class="ans a-no">Нет</span></td><td>Схемы отката и способа выключить функцию в документе нет.</td><td></td></tr><tr><td>Требование может быть протестировано</td><td><span class="ans a-no">Нет</span></td><td>Тест успешного ответа saveCategory и возврата покупки меньше 500 ₸ нельзя написать: ожидаемый результат не определён.</td><td><a class="fref sev-minor" href="#D-04" data-goto="D-04" title="КБ-6 не определяет возврат покупки без начисленного кэшбэка">D-04</a> <a class="fref sev-minor" href="#D-06" data-goto="D-06" title="Ответ 200 метода saveCategory отсылает к несуществующему описанию">D-06</a></td></tr><tr><td>Требование предусматривает модель данных или поток, содержит описание</td><td><span class="ans a-no">Нет</span></td><td>Раздел данных (строка 37) не содержит возвратов, связи с покупкой и признака зачисления, нужных для КБ-6.</td><td><a class="fref sev-minor" href="#D-05" data-goto="D-05" title="Данные не позволяют применить возврат покупки по КБ-6">D-05</a></td></tr><tr><td>Требование не имеет противоречий или явных показателей операционных рисков</td><td><span class="ans a-no">Нет</span></td><td>КБ-6 при возврате покупки без кэшбэка и выбор категории после смены толкуются по-разному.</td><td><a class="fref sev-minor" href="#D-04" data-goto="D-04" title="КБ-6 не определяет возврат покупки без начисленного кэшбэка">D-04</a> <a class="fref sev-minor" href="#D-03" data-goto="D-03" title="Не определено, какую категорию возвращает getCashback после смены">D-03</a></td></tr><tr><td>Требование содержит архитектуру и согласовано с архитекторами</td><td><span class="ans a-na">Не требуется</span></td><td>Архитектурных решений документ не содержит, отдельного раздела об архитектуре нет.</td><td></td></tr><tr><td>Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами</td><td><span class="ans a-na">Не требуется</span></td><td>Изменений в других продуктах и системах документ не описывает.</td><td></td></tr><tr><td>Структура требований не несёт изменений и рисков информационной безопасности</td><td><span class="ans a-yes">Да</span></td><td>Методы требуют Bearer-сессию владельца карты (строка 59, строка 76), коды 401 и 404 описаны, рисков ИБ в тексте нет.</td><td></td></tr><tr><td>В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки</td><td><span class="ans a-no">Нет</span></td><td>Схемы полного бизнес-процесса (покупка, начисление, зачисление, возврат) в документе нет.</td><td></td></tr><tr><td>Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия</td><td><span class="ans a-part">Частично</span></td><td>Методы API описаны с кодами ответов, но ответ 200 saveCategory не описан (строка 89), обмен с процессингом не показан.</td><td><a class="fref sev-minor" href="#D-06" data-goto="D-06" title="Ответ 200 метода saveCategory отсылает к несуществующему описанию">D-06</a></td></tr><tr><td>Поддерживается версионность документа / зафиксирована</td><td><span class="ans a-part">Частично</span></td><td>Версия и дата указаны (строка 14), но истории изменений и согласований нет; приоритетов требований тоже нет.</td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02" title="У функциональных требований нет приоритетов">D-02</a></td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-checks" aria-labelledby="t-checks" hidden><h2 class="ph">Проверки</h2><h3 class="sub">Исполнение критериев приёмки</h3><p class="lead">Ожидаемый результат выведен из правил документа и сравнён с тем, что записано в критерии.</p><div class="tw"><table class=""><thead><tr><th>Критерий</th><th>Условия</th><th>Правила</th><th>По правилам</th><th>В критерии</th><th>Итог</th></tr></thead><tbody><tr><td><a class="rref" href="#L46" data-req="R-15" data-ls="46" data-le="46" title="Критерии приёмки, строка 1 · Кэшбэк месяца 100 ₸">R-15</a></td><td>Выбрана категория «Такси», кэшбэк месяца 0 ₸. Проведена покупка «Такси» на 2 000 ₸.</td><td><a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a> <a class="rref" href="#L27" data-req="R-07" data-ls="27" data-le="27" title="КБ-3 · Ставка кэшбэка 5 % от суммы">R-07</a></td><td>Кэшбэк месяца 100 ₸<div class="deriv">2 000 ≥ 500, покупка подходит. 2 000 × 5 % = 100 ₸. Лимит 10 000 не достигнут.</div></td><td>Кэшбэк месяца 100 ₸</td><td><span class="ans a-yes">Совпадает</span></td></tr><tr><td><a class="rref" href="#L47" data-req="R-16" data-ls="47" data-le="47" title="Критерии приёмки, строка 2 · Кэшбэк месяца 25 ₸">R-16</a></td><td>Категория «Такси», кэшбэк 0 ₸, покупка на 500 ₸ — ровно на границе.</td><td><a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a> <a class="rref" href="#L27" data-req="R-07" data-ls="27" data-le="27" title="КБ-3 · Ставка кэшбэка 5 % от суммы">R-07</a></td><td>Кэшбэк месяца 25 ₸<div class="deriv">500 включена в диапазон. 500 × 5 % = 25 ₸.</div></td><td>Кэшбэк месяца 25 ₸</td><td><span class="ans a-yes">Совпадает</span></td></tr><tr><td><a class="rref" href="#L48" data-req="R-17" data-ls="48" data-le="48" title="Критерии приёмки, строка 3 · Кэшбэк месяца 10 000 ₸">R-17</a></td><td>Кэшбэк месяца 9 900 ₸, покупка «Такси» на 4 000 ₸.</td><td><a class="rref" href="#L27" data-req="R-07" data-ls="27" data-le="27" title="КБ-3 · Ставка кэшбэка 5 % от суммы">R-07</a> <a class="rref" href="#L28" data-req="R-08" data-ls="28" data-le="28" title="КБ-4 · Лимит кэшбэка за месяц 10 000 ₸">R-08</a></td><td>Кэшбэк месяца 10 000 ₸<div class="deriv">4 000 × 5 % = 200 ₸. 9 900 + 200 = 10 100 &gt; 10 000, значит ограничение до 10 000 ₸.</div></td><td>Кэшбэк месяца 10 000 ₸</td><td><span class="ans a-yes">Совпадает</span></td></tr><tr><td><a class="rref" href="#L49" data-req="R-18" data-ls="49" data-le="49" title="Критерии приёмки, строка 4 · Кэшбэк месяца 0 ₸">R-18</a></td><td>Выбрана «Кафе», покупка в «Такси» на 1 000 ₸.</td><td><a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a></td><td>Кэшбэк месяца 0 ₸<div class="deriv">Категория покупки не совпадает с выбранной, начисления нет, остаётся 0 ₸.</div></td><td>Кэшбэк месяца 0 ₸</td><td><span class="ans a-yes">Совпадает</span></td></tr></tbody></table></div><h3 class="sub">Попарная сверка требований</h3><div class="tw"><table class=""><thead><tr><th>Пара</th><th>Общий предмет</th><th>Сценарий</th><th>Исход A</th><th>Исход B</th><th>Итог</th></tr></thead><tbody><tr><td><a class="rref" href="#L25" data-req="R-05" data-ls="25" data-le="25" title="КБ-1 · Выбор категории до конца месяца, действует со следующего">R-05</a> ↔ <a class="rref" href="#L65" data-req="R-20" data-ls="65" data-le="65" title="Ответ 200: category · Код выбранной категории">R-20</a></td><td>Какая категория считается выбранной: новая или действующая</td><td>15 ноября действует TAXI, клиент выбрал CAFE, затем вызван getCashback.</td><td>До 1 декабря действует TAXI.</td><td>Возвращается «выбранная» категория, возможно CAFE.</td><td><span class="ans a-part">Не определено</span></td></tr><tr><td><a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a> ↔ <a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a></td><td>Возврат покупки меньше 500 ₸ или при достигнутом лимите</td><td>Покупка 400 ₸ без кэшбэка, затем возврат 400 ₸.</td><td>Кэшбэк уменьшается на 20 ₸.</td><td>Кэшбэк не начислялся, уменьшать нечего.</td><td><span class="ans a-part">Не определено</span></td></tr></tbody></table></div><h3 class="sub">Трассировка</h3><div class="tw"><table class=""><thead><tr><th>Требование</th><th>Проверяется</th><th>Реализуется</th><th>Примечание</th></tr></thead><tbody><tr><td><a class="rref" href="#L25" data-req="R-05" data-ls="25" data-le="25" title="КБ-1 · Выбор категории до конца месяца, действует со следующего">R-05</a></td><td><span class="muted">нет</span></td><td><a class="rref" href="#L74" data-req="R-22" data-ls="74" data-le="77" title="Метод saveCategory · POST /cashback/{cardId}/category, JSON, Bearer">R-22</a> <a class="rref" href="#L83" data-req="R-23" data-ls="83" data-le="83" title="Тело запроса: category · Код категории, обязательный">R-23</a></td><td>Нет критерия на смену категории</td></tr><tr><td><a class="rref" href="#L26" data-req="R-06" data-ls="26" data-le="26" title="КБ-2 · Кэшбэк за покупки от 500 ₸ в категории">R-06</a></td><td><a class="rref" href="#L47" data-req="R-16" data-ls="47" data-le="47" title="Критерии приёмки, строка 2 · Кэшбэк месяца 25 ₸">R-16</a> <a class="rref" href="#L49" data-req="R-18" data-ls="49" data-le="49" title="Критерии приёмки, строка 4 · Кэшбэк месяца 0 ₸">R-18</a></td><td><a class="rref" href="#L37" data-req="R-13" data-ls="37" data-le="37" title="Хранимые данные, суммы в тиынах, округление вниз">R-13</a></td><td>Нет строки на 499 ₸</td></tr><tr><td><a class="rref" href="#L27" data-req="R-07" data-ls="27" data-le="27" title="КБ-3 · Ставка кэшбэка 5 % от суммы">R-07</a></td><td><a class="rref" href="#L46" data-req="R-15" data-ls="46" data-le="46" title="Критерии приёмки, строка 1 · Кэшбэк месяца 100 ₸">R-15</a> <a class="rref" href="#L47" data-req="R-16" data-ls="47" data-le="47" title="Критерии приёмки, строка 2 · Кэшбэк месяца 25 ₸">R-16</a></td><td><a class="rref" href="#L37" data-req="R-13" data-ls="37" data-le="37" title="Хранимые данные, суммы в тиынах, округление вниз">R-13</a></td><td></td></tr><tr><td><a class="rref" href="#L28" data-req="R-08" data-ls="28" data-le="28" title="КБ-4 · Лимит кэшбэка за месяц 10 000 ₸">R-08</a></td><td><a class="rref" href="#L48" data-req="R-17" data-ls="48" data-le="48" title="Критерии приёмки, строка 3 · Кэшбэк месяца 10 000 ₸">R-17</a></td><td><a class="rref" href="#L37" data-req="R-13" data-ls="37" data-le="37" title="Хранимые данные, суммы в тиынах, округление вниз">R-13</a></td><td></td></tr><tr><td><a class="rref" href="#L29" data-req="R-09" data-ls="29" data-le="29" title="КБ-5 · Зачисление кэшбэка 5-го числа следующего месяца">R-09</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>Нет критерия и описания зачисления</td></tr><tr><td><a class="rref" href="#L30" data-req="R-10" data-ls="30" data-le="30" title="КБ-6 · Корректировка кэшбэка при возврате покупки">R-10</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>Нет критерия на возврат</td></tr><tr><td><a class="rref" href="#L31" data-req="R-11" data-ls="31" data-le="31" title="КБ-7 · Показ категории и кэшбэка текущего месяца">R-11</a></td><td><span class="muted">нет</span></td><td><a class="rref" href="#L57" data-req="R-19" data-ls="57" data-le="59" title="Метод getCashback · GET /cashback/{cardId}, Bearer владельца карты">R-19</a> <a class="rref" href="#L65" data-req="R-20" data-ls="65" data-le="65" title="Ответ 200: category · Код выбранной категории">R-20</a> <a class="rref" href="#L66" data-req="R-21" data-ls="66" data-le="66" title="Ответ 200: accrued · Кэшбэк текущего месяца строкой в тенге">R-21</a></td><td>Нет критерия приёмки на экран</td></tr><tr><td><a class="rref" href="#L34" data-req="R-12" data-ls="34" data-le="34" title="НФ-1 · Время ответа методов до 500 мс">R-12</a></td><td><span class="muted">нет</span></td><td><a class="rref" href="#L57" data-req="R-19" data-ls="57" data-le="59" title="Метод getCashback · GET /cashback/{cardId}, Bearer владельца карты">R-19</a> <a class="rref" href="#L74" data-req="R-22" data-ls="74" data-le="77" title="Метод saveCategory · POST /cashback/{cardId}/category, JSON, Bearer">R-22</a></td><td>Нет метода проверки нагрузки</td></tr><tr><td><a class="rref" href="#L37" data-req="R-13" data-ls="37" data-le="37" title="Хранимые данные, суммы в тиынах, округление вниз">R-13</a></td><td><span class="muted">нет</span></td><td><span class="muted">—</span></td><td>Нет проверки хранения</td></tr><tr><td><a class="rref" href="#L40" data-req="R-14" data-ls="40" data-le="40" title="Приложение использует getCashback и saveCategory">R-14</a></td><td><span class="muted">нет</span></td><td><a class="rref" href="#L57" data-req="R-19" data-ls="57" data-le="59" title="Метод getCashback · GET /cashback/{cardId}, Bearer владельца карты">R-19</a> <a class="rref" href="#L74" data-req="R-22" data-ls="74" data-le="77" title="Метод saveCategory · POST /cashback/{cardId}/category, JSON, Bearer">R-22</a></td><td>Ответ 200 saveCategory не описан</td></tr></tbody></table></div><h3 class="sub">Глоссарий: один смысл — разные слова</h3><div class="tw"><table class=""><thead><tr><th>Понятие</th><th>Термины в документе</th><th>Проблема</th></tr></thead><tbody><tr><td><b>Выбранная категория в API</b></td><td>настройки <a class="lnref" href="#L40" data-line="40">строка 40</a>, Категория <a class="lnref" href="#L22" data-line="22">строка 22</a></td><td>Категория названа настройками, состав настроек неясен.</td></tr><tr><td><b>Кэшбэк текущего месяца</b></td><td>кэшбэк месяца <a class="lnref" href="#L46" data-line="46">строка 46</a>, accrued <a class="lnref" href="#L66" data-line="66">строка 66</a></td><td>Разные названия одной величины в бизнес-части и API.</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-segment" aria-labelledby="t-segment" hidden><h2 class="ph">Нарезка</h2><p class="lead">Агент выделил 28 требований и присвоил им ID; номер строки — по исходному документу.</p><div class="tw"><table class="seg"><thead><tr><th>ID</th><th>В документе</th><th>Вид</th><th>Кратко</th><th>Строки</th><th>Замечания</th></tr></thead><tbody><tr><td><span class="fid">R-01</span></td><td></td><td>Цель</td><td>Выбор категории на месяц и кэшбэк за неё</td><td><a class="lnref" href="#L17" data-line="17" data-le="17">17</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-02</span></td><td>Термины: Месяц</td><td>Прочее</td><td>Месяц — календарный по UTC+5</td><td><a class="lnref" href="#L20" data-line="20" data-le="20">20</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-03</span></td><td>Термины: Покупка</td><td>Прочее</td><td>Покупка — проведённая карточная оплата</td><td><a class="lnref" href="#L21" data-line="21" data-le="21">21</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-04</span></td><td>Термины: Категория</td><td>Прочее</td><td>Категории: Кафе, Такси, Аптеки</td><td><a class="lnref" href="#L22" data-line="22" data-le="22">22</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-05</span></td><td>КБ-1</td><td>Функциональное</td><td>Выбор категории до конца месяца, действует со следующего</td><td><a class="lnref" href="#L25" data-line="25" data-le="25">25</a></td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-03" data-goto="D-03">D-03</a></td></tr><tr><td><span class="fid">R-06</span></td><td>КБ-2</td><td>Функциональное</td><td>Кэшбэк за покупки от 500 ₸ в категории</td><td><a class="lnref" href="#L26" data-line="26" data-le="26">26</a></td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-04" data-goto="D-04">D-04</a></td></tr><tr><td><span class="fid">R-07</span></td><td>КБ-3</td><td>Функциональное</td><td>Ставка кэшбэка 5 % от суммы</td><td><a class="lnref" href="#L27" data-line="27" data-le="27">27</a></td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a></td></tr><tr><td><span class="fid">R-08</span></td><td>КБ-4</td><td>Ограничение</td><td>Лимит кэшбэка за месяц 10 000 ₸</td><td><a class="lnref" href="#L28" data-line="28" data-le="28">28</a></td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-04" data-goto="D-04">D-04</a></td></tr><tr><td><span class="fid">R-09</span></td><td>КБ-5</td><td>Функциональное</td><td>Зачисление кэшбэка 5-го числа следующего месяца</td><td><a class="lnref" href="#L29" data-line="29" data-le="29">29</a></td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a></td></tr><tr><td><span class="fid">R-10</span></td><td>КБ-6</td><td>Функциональное</td><td>Корректировка кэшбэка при возврате покупки</td><td><a class="lnref" href="#L30" data-line="30" data-le="30">30</a></td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-04" data-goto="D-04">D-04</a> <a class="fref sev-minor" href="#D-05" data-goto="D-05">D-05</a></td></tr><tr><td><span class="fid">R-11</span></td><td>КБ-7</td><td>Интерфейс</td><td>Показ категории и кэшбэка текущего месяца</td><td><a class="lnref" href="#L31" data-line="31" data-le="31">31</a></td><td><a class="fref sev-minor" href="#D-02" data-goto="D-02">D-02</a> <a class="fref sev-minor" href="#D-03" data-goto="D-03">D-03</a></td></tr><tr><td><span class="fid">R-12</span></td><td>НФ-1</td><td>Нефункциональное</td><td>Время ответа методов до 500 мс</td><td><a class="lnref" href="#L34" data-line="34" data-le="34">34</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-13</span></td><td></td><td>Данные</td><td>Хранимые данные, суммы в тиынах, округление вниз</td><td><a class="lnref" href="#L37" data-line="37" data-le="37">37</a></td><td><a class="fref sev-minor" href="#D-05" data-goto="D-05">D-05</a></td></tr><tr><td><span class="fid">R-14</span></td><td></td><td>Интеграция</td><td>Приложение использует getCashback и saveCategory</td><td><a class="lnref" href="#L40" data-line="40" data-le="40">40</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-15</span></td><td>Критерии приёмки, строка 1</td><td>Критерий приёмки</td><td>Кэшбэк месяца 100 ₸</td><td><a class="lnref" href="#L46" data-line="46" data-le="46">46</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-16</span></td><td>Критерии приёмки, строка 2</td><td>Критерий приёмки</td><td>Кэшбэк месяца 25 ₸</td><td><a class="lnref" href="#L47" data-line="47" data-le="47">47</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-17</span></td><td>Критерии приёмки, строка 3</td><td>Критерий приёмки</td><td>Кэшбэк месяца 10 000 ₸</td><td><a class="lnref" href="#L48" data-line="48" data-le="48">48</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-18</span></td><td>Критерии приёмки, строка 4</td><td>Критерий приёмки</td><td>Кэшбэк месяца 0 ₸</td><td><a class="lnref" href="#L49" data-line="49" data-le="49">49</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-19</span></td><td>Метод getCashback</td><td>API</td><td>GET /cashback/{cardId}, Bearer владельца карты</td><td><a class="lnref" href="#L57" data-line="57" data-le="59">57–59</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-20</span></td><td>Ответ 200: category</td><td>API</td><td>Код выбранной категории</td><td><a class="lnref" href="#L65" data-line="65" data-le="65">65</a></td><td><a class="fref sev-minor" href="#D-03" data-goto="D-03">D-03</a></td></tr><tr><td><span class="fid">R-21</span></td><td>Ответ 200: accrued</td><td>API</td><td>Кэшбэк текущего месяца строкой в тенге</td><td><a class="lnref" href="#L66" data-line="66" data-le="66">66</a></td><td><a class="fref sev-minor" href="#D-01" data-goto="D-01">D-01</a></td></tr><tr><td><span class="fid">R-22</span></td><td>Метод saveCategory</td><td>API</td><td>POST /cashback/{cardId}/category, JSON, Bearer</td><td><a class="lnref" href="#L74" data-line="74" data-le="77">74–77</a></td><td><a class="fref sev-minor" href="#D-06" data-goto="D-06">D-06</a></td></tr><tr><td><span class="fid">R-23</span></td><td>Тело запроса: category</td><td>API</td><td>Код категории, обязательный</td><td><a class="lnref" href="#L83" data-line="83" data-le="83">83</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-24</span></td><td>Статус 200</td><td>API</td><td>Код 200 — успешное выполнение запроса</td><td><a class="lnref" href="#L89" data-line="89" data-le="89">89</a></td><td><a class="fref sev-minor" href="#D-06" data-goto="D-06">D-06</a></td></tr><tr><td><span class="fid">R-25</span></td><td>Статус 400</td><td>API</td><td>Код 400 — неизвестный код категории</td><td><a class="lnref" href="#L90" data-line="90" data-le="90">90</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-26</span></td><td>Статус 401</td><td>API</td><td>Код 401 — нет действующей сессии</td><td><a class="lnref" href="#L91" data-line="91" data-le="91">91</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-27</span></td><td>Статус 404</td><td>API</td><td>Код 404 — карта не найдена или чужая</td><td><a class="lnref" href="#L92" data-line="92" data-le="92">92</a></td><td><span class="muted">—</span></td></tr><tr><td><span class="fid">R-28</span></td><td>Статус 500</td><td>API</td><td>Код 500 — внутренняя ошибка сервиса</td><td><a class="lnref" href="#L93" data-line="93" data-le="93">93</a></td><td><span class="muted">—</span></td></tr></tbody></table></div><h3 class="sub">Не требования (исключено из проверки)</h3><div class="tw"><table class=""><thead><tr><th>Фрагмент</th><th>Строки</th><th>Почему</th></tr></thead><tbody><tr><td>Служебное пояснение о документе</td><td><a class="lnref" href="#L3" data-line="3" data-le="3">3</a></td><td>Пояснение о самом документе</td></tr><tr><td>Таблица общих сведений</td><td><a class="lnref" href="#L9" data-line="9" data-le="14">9–14</a></td><td>Метаданные, включая версию и ссылку на задачу</td></tr><tr><td>Шапка таблицы критериев приёмки</td><td><a class="lnref" href="#L44" data-line="44" data-le="44">44</a></td><td>Строка-шапка таблицы</td></tr><tr><td>Шапка таблицы метода getCashback</td><td><a class="lnref" href="#L55" data-line="55" data-le="55">55</a></td><td>Строка-шапка таблицы</td></tr><tr><td>Шапка таблицы параметров ответа</td><td><a class="lnref" href="#L63" data-line="63" data-le="63">63</a></td><td>Строка-шапка таблицы</td></tr><tr><td>Пример ответа getCashback</td><td><a class="lnref" href="#L68" data-line="68" data-le="68">68</a></td><td>Пример к первому критерию приёмки и ответу 200 getCashback</td></tr><tr><td>Шапка таблицы метода saveCategory</td><td><a class="lnref" href="#L72" data-line="72" data-le="72">72</a></td><td>Строка-шапка таблицы</td></tr><tr><td>Шапка таблицы тела запроса</td><td><a class="lnref" href="#L81" data-line="81" data-le="81">81</a></td><td>Строка-шапка таблицы</td></tr><tr><td>Шапка таблицы статусов</td><td><a class="lnref" href="#L87" data-line="87" data-le="87">87</a></td><td>Строка-шапка таблицы</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-rejected" aria-labelledby="t-rejected" hidden><h2 class="ph">Отклонённые</h2><p class="lead">Кандидаты, которые линзы предложили, а судья не включил в отчёт, — с причиной. Так видно, что точность важнее количества.</p><div class="tw"><table class=""><thead><tr><th>Кандидат</th><th>Что предлагалось</th><th>Кто</th><th>Где</th><th>Почему отклонено</th></tr></thead><tbody><tr><td><span class="fid"></span></td><td>Критерии приёмки проверяют 3 из 7 функциональных требований</td><td>Тестировщик</td><td>строка 46, строка 30</td><td>снято линзой тестировщика: документ вычитан (термины, версия, явный часовой пояс, нет заглушек) — таблица приёмки в нём сознательная выборка ключевых сценариев; непокрытые ветки — в черновике тест-кейсов отчёта, а не дефект требований</td></tr></tbody></table></div></section><section class="panel" role="tabpanel" id="p-passport" aria-labelledby="t-passport" hidden><h2 class="ph">Паспорт</h2><div class="pgrid"><div class="tw"><table class="kv"><tr><th>Агент</th><td>BCC Review 2.0.0-dev</td></tr><tr><th>Коммит</th><td>0a30c67a</td></tr><tr><th>Статус прогона</th><td>полный</td></tr><tr><th>Начало / конец</th><td>2026-11-27 22:12:03+05:00 — 2026-11-27 22:13:14+05:00</td></tr><tr><th>Длительность</th><td>1 мин 11 с</td></tr><tr><th>Провайдер</th><td>claude_cli</td></tr><tr><th>Модель (запрошена)</th><td>sonnet</td></tr><tr><th>Модели (фактически)</th><td>claude-sonnet-5-5</td></tr><tr><th>Вызовы модели</th><td>8 всего · 0 из кэша · 0 с ошибкой · 0 делений пакета</td></tr><tr><th>Токены</th><td>194 192 на входе · 20 793 на выходе</td></tr><tr><th>Сверка цитат кодом</th><td>13 из 13 цитат всех кандидатов найдены в документе <span class="muted">(дословно 13)</span></td></tr><tr><th>Кандидаты</th><td>6 от ревьюеров → 6 с найденными цитатами → судье; отклонено 0</td></tr><tr><th>Стоимость</th><td>$0.68</td></tr><tr><th>Документ</th><td>Кэшбэк в выбранной категории <span class="muted">(source.md, md)</span></td></tr><tr><th>Строк / страниц</th><td>93 / —</td></tr><tr><th>SHA-256 документа</th><td><code class="hash">da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f</code></td></tr><tr><th>Схема отчёта</th><td>bcc-review/2</td></tr></table></div><div><h3 class="sub">Этапы</h3><ul class="stages"><li class="st st-ok"><span>Нарезка требований<small>13 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Правила<small>&lt; 1 с</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Аналитик»<small>12 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Тестировщик»<small>37 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Архитектор»<small>25 с · 1 вызов · 1 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Линза «Риски»<small>13 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Набор целиком<small>34 с · 1 вызов · 5 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Сверка цитат<small>&lt; 1 с · 6 канд.</small></span><b>готово</b></li><li class="st st-ok"><span>Судья<small>26 с · 1 вызов</small></span><b>готово</b></li><li class="st st-ok"><span>Вопросы<small>&lt; 1 с · 1 вызов</small></span><b>готово</b></li></ul><h3 class="sub">Предупреждения</h3><ul class="warns"><li>судья: критичных дефектов нет; 4 существенных, найденных одним ревьюером, понижены до незначительных</li><li>судья: уровни изменены кодом — обоснование вердикта собрано кодом</li></ul><h3 class="sub">Как проверить отчёт</h3><p class="lead">Каждая цитата в замечаниях найдена в документе программой, номер строки посчитан кодом, а не моделью. Повторная сверка: <code>python -m bcc_review.v2.verify report.json документ</code>.</p></div></div></section></main>
+<footer class="foot">Сформировано агентом BCC Review 2.0.0-dev · статическое ревью по ISO/IEC/IEEE 29148:2018 и IEEE 830-1998 ·
+цитаты сверены с документом программой</footer>
+<script type="application/json" id="report-data">{"schema": "bcc-review/2", "run": {"agent": "BCC Review", "version": "2.0.0-dev", "commit": "0a30c67a", "dirty": false, "run_id": "20261127-221203-4cdf", "started_at": "2026-11-27T22:12:03+05:00", "finished_at": "2026-11-27T22:13:14+05:00", "duration_s": 71.0, "provider": "claude_cli", "model_requested": "sonnet", "models_used": ["claude-sonnet-5-5"], "calls": {"total": 8, "cached": 0, "failed": 0, "split": 0}, "tokens": {"input": 194192, "output": 20793}, "cost_usd": 0.6825, "status": "complete", "stages": {"segment": "ok", "rules": "ok", "lens_analyst": "ok", "lens_qa": "ok", "lens_architect": "ok", "lens_risk": "ok", "consistency": "ok", "quotes": "ok", "judge": "ok", "clarify": "ok"}, "stage_stats": {"segment": {"calls": 1, "seconds": 12.86, "candidates": 0}, "rules": {"calls": 0, "seconds": 0.01, "candidates": 0}, "lens_analyst": {"calls": 1, "seconds": 12.4, "candidates": 0}, "lens_qa": {"calls": 1, "seconds": 36.7, "candidates": 0}, "lens_architect": {"calls": 1, "seconds": 24.77, "candidates": 1}, "lens_risk": {"calls": 1, "seconds": 12.86, "candidates": 0}, "consistency": {"calls": 1, "seconds": 34.21, "candidates": 5}, "quotes": {"calls": 0, "seconds": 0.0, "candidates": 6}, "judge": {"calls": 1, "seconds": 25.82, "candidates": 0}, "clarify": {"calls": 1, "seconds": 0.0, "candidates": 0, "early": true, "model_seconds": 5.3}}, "warnings": ["судья: критичных дефектов нет; 4 существенных, найденных одним ревьюером, понижены до незначительных", "судья: уровни изменены кодом — обоснование вердикта собрано кодом"], "options": {"max_calls": 16, "passes": 1, "lenses": ["analyst", "qa", "architect", "risk"], "export": ["jira", "docx"], "revise": false, "answers": false}, "fast_start": true}, "document": {"title": "Кэшбэк в выбранной категории", "file": "source.md", "format": "md", "sha256": "da763550475e9948a50865622aff02ccca6008f79fa6035c7a8572eec6d8b13f", "lines": 93, "pages": null, "warnings": []}, "requirements": [{"id": "R-01", "source_id": "", "kind": "goal", "section": "Часть A. Бизнес-требования › Цели", "summary": "Выбор категории на месяц и кэшбэк за неё", "quote": "Клиент выбирает одну категорию покупок на месяц и получает кэшбэк за покупки в этой категории.", "line_start": 17, "line_end": 17, "page": null}, {"id": "R-02", "source_id": "Термины: Месяц", "kind": "other", "section": "Часть A. Бизнес-требования › Термины", "summary": "Месяц — календарный по UTC+5", "quote": "Месяц — календарный месяц по времени UTC+5 (Asia/Almaty).", "line_start": 20, "line_end": 20, "page": null}, {"id": "R-03", "source_id": "Термины: Покупка", "kind": "other", "section": "Часть A. Бизнес-требования › Термины", "summary": "Покупка — проведённая карточная оплата", "quote": "Покупка — операция оплаты картой, которую карточный процессинг передал со статусом «проведена».", "line_start": 21, "line_end": 21, "page": null}, {"id": "R-04", "source_id": "Термины: Категория", "kind": "other", "section": "Часть A. Бизнес-требования › Термины", "summary": "Категории: Кафе, Такси, Аптеки", "quote": "Категория — одна из категорий «Кафе» (CAFE), «Такси» (TAXI), «Аптеки» (PHARMACY).", "line_start": 22, "line_end": 22, "page": null}, {"id": "R-05", "source_id": "КБ-1", "kind": "functional", "section": "Часть A. Бизнес-требования › Функциональные требования", "summary": "Выбор категории до конца месяца, действует со следующего", "quote": "КБ-1. Клиент выбирает категорию до конца текущего месяца. Выбор действует с первого дня следующего месяца.", "line_start": 25, "line_end": 25, "page": null}, {"id": "R-06", "source_id": "КБ-2", "kind": "functional", "section": "Часть A. Бизнес-требования › Функциональные требования", "summary": "Кэшбэк за покупки от 500 ₸ в категории", "quote": "КБ-2. Кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно.", "line_start": 26, "line_end": 26, "page": null}, {"id": "R-07", "source_id": "КБ-3", "kind": "functional", "section": "Часть A. Бизнес-требования › Функциональные требования", "summary": "Ставка кэшбэка 5 % от суммы", "quote": "КБ-3. Ставка кэшбэка составляет 5 % от суммы покупки.", "line_start": 27, "line_end": 27, "page": null}, {"id": "R-08", "source_id": "КБ-4", "kind": "constraint", "section": "Часть A. Бизнес-требования › Функциональные требования", "summary": "Лимит кэшбэка за месяц 10 000 ₸", "quote": "КБ-4. Сумма кэшбэка за месяц не превышает 10 000 ₸.", "line_start": 28, "line_end": 28, "page": null}, {"id": "R-09", "source_id": "КБ-5", "kind": "functional", "section": "Часть A. Бизнес-требования › Функциональные требования", "summary": "Зачисление кэшбэка 5-го числа следующего месяца", "quote": "КБ-5. Кэшбэк за месяц зачисляется на карту 5-го числа следующего месяца.", "line_start": 29, "line_end": 29, "page": null}, {"id": "R-10", "source_id": "КБ-6", "kind": "functional", "section": "Часть A. Бизнес-требования › Функциональные требования", "summary": "Корректировка кэшбэка при возврате покупки", "quote": "КБ-6. Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата. Возврат после зачисления уменьшает следующее", "line_start": 30, "line_end": 30, "page": null}, {"id": "R-11", "source_id": "КБ-7", "kind": "ui", "section": "Часть A. Бизнес-требования › Функциональные требования", "summary": "Показ категории и кэшбэка текущего месяца", "quote": "КБ-7. Приложение показывает выбранную категорию и кэшбэк текущего месяца.", "line_start": 31, "line_end": 31, "page": null}, {"id": "R-12", "source_id": "НФ-1", "kind": "nonfunctional", "section": "Часть A. Бизнес-требования › Нефункциональные требования", "summary": "Время ответа методов до 500 мс", "quote": "НФ-1. Методы getCashback и saveCategory отвечают не дольше 500 мс для 95 % запросов при нагрузке до 50 запросов в секунду.", "line_start": 34, "line_end": 34, "page": null}, {"id": "R-13", "source_id": "", "kind": "data", "section": "Часть A. Бизнес-требования › Требования к данным", "summary": "Хранимые данные, суммы в тиынах, округление вниз", "quote": "Хранить идентификатор карты, месяц, код категории, сумму каждой покупки в тиынах и кэшбэк месяца в тиынах. 1 ₸ = 100 тиынов, кэшбэк округляется вниз", "line_start": 37, "line_end": 37, "page": null}, {"id": "R-14", "source_id": "", "kind": "integration", "section": "Часть A. Бизнес-требования › Требования к интеграции", "summary": "Приложение использует getCashback и saveCategory", "quote": "Приложение читает настройки методом getCashback и сохраняет категорию методом saveCategory. Оба метода описаны в части B.", "line_start": 40, "line_end": 40, "page": null}, {"id": "R-15", "source_id": "Критерии приёмки, строка 1", "kind": "acceptance", "section": "Часть A. Бизнес-требования › Критерии приёмки", "summary": "Кэшбэк месяца 100 ₸", "quote": "Категория «Такси», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 2 000 ₸ | Кэшбэк месяца 100 ₸", "line_start": 46, "line_end": 46, "page": null}, {"id": "R-16", "source_id": "Критерии приёмки, строка 2", "kind": "acceptance", "section": "Часть A. Бизнес-требования › Критерии приёмки", "summary": "Кэшбэк месяца 25 ₸", "quote": "Категория «Такси», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 500 ₸ | Кэшбэк месяца 25 ₸", "line_start": 47, "line_end": 47, "page": null}, {"id": "R-17", "source_id": "Критерии приёмки, строка 3", "kind": "acceptance", "section": "Часть A. Бизнес-требования › Критерии приёмки", "summary": "Кэшбэк месяца 10 000 ₸", "quote": "Категория «Такси», кэшбэк месяца 9 900 ₸ | Провести покупку «Такси» на 4 000 ₸ | Кэшбэк месяца 10 000 ₸", "line_start": 48, "line_end": 48, "page": null}, {"id": "R-18", "source_id": "Критерии приёмки, строка 4", "kind": "acceptance", "section": "Часть A. Бизнес-требования › Критерии приёмки", "summary": "Кэшбэк месяца 0 ₸", "quote": "Категория «Кафе», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 1 000 ₸ | Кэшбэк месяца 0 ₸", "line_start": 49, "line_end": 49, "page": null}, {"id": "R-19", "source_id": "Метод getCashback", "kind": "api", "section": "Часть B. REST API › Метод getCashback", "summary": "GET /cashback/{cardId}, Bearer владельца карты", "quote": "REST type | GET", "line_start": 57, "line_end": 59, "page": null}, {"id": "R-20", "source_id": "Ответ 200: category", "kind": "api", "section": "Часть B. REST API › Метод getCashback › Ответ 200", "summary": "Код выбранной категории", "quote": "category | string | Код выбранной категории: CAFE, TAXI или PHARMACY", "line_start": 65, "line_end": 65, "page": null}, {"id": "R-21", "source_id": "Ответ 200: accrued", "kind": "api", "section": "Часть B. REST API › Метод getCashback › Ответ 200", "summary": "Кэшбэк текущего месяца строкой в тенге", "quote": "accrued | string | Кэшбэк текущего месяца в тенге с двумя знаками после точки", "line_start": 66, "line_end": 66, "page": null}, {"id": "R-22", "source_id": "Метод saveCategory", "kind": "api", "section": "Часть B. REST API › Метод saveCategory", "summary": "POST /cashback/{cardId}/category, JSON, Bearer", "quote": "REST type | POST", "line_start": 74, "line_end": 77, "page": null}, {"id": "R-23", "source_id": "Тело запроса: category", "kind": "api", "section": "Часть B. REST API › Метод saveCategory › Тело запроса", "summary": "Код категории, обязательный", "quote": "category | string | Да | CAFE, TAXI или PHARMACY | Код категории", "line_start": 83, "line_end": 83, "page": null}, {"id": "R-24", "source_id": "Статус 200", "kind": "api", "section": "Часть B. REST API › Статусы", "summary": "Код 200 — успешное выполнение запроса", "quote": "200 | Запрос выполнен | Описано в разделе метода", "line_start": 89, "line_end": 89, "page": null}, {"id": "R-25", "source_id": "Статус 400", "kind": "api", "section": "Часть B. REST API › Статусы", "summary": "Код 400 — неизвестный код категории", "quote": "400 | Код категории не из списка CAFE, TAXI, PHARMACY | {\"message\":\"Неизвестная категория\"}", "line_start": 90, "line_end": 90, "page": null}, {"id": "R-26", "source_id": "Статус 401", "kind": "api", "section": "Часть B. REST API › Статусы", "summary": "Код 401 — нет действующей сессии", "quote": "401 | Нет действующей сессии | {\"message\":\"Требуется вход\"}", "line_start": 91, "line_end": 91, "page": null}, {"id": "R-27", "source_id": "Статус 404", "kind": "api", "section": "Часть B. REST API › Статусы", "summary": "Код 404 — карта не найдена или чужая", "quote": "404 | Карта не найдена или не принадлежит клиенту | {\"message\":\"Карта не найдена\"}", "line_start": 92, "line_end": 92, "page": null}, {"id": "R-28", "source_id": "Статус 500", "kind": "api", "section": "Часть B. REST API › Статусы", "summary": "Код 500 — внутренняя ошибка сервиса", "quote": "500 | Внутренняя ошибка сервиса | {\"message\":\"Ошибка сервиса\"}", "line_start": 93, "line_end": 93, "page": null}], "excluded": [{"what": "Служебное пояснение о документе", "line_start": 3, "line_end": 3, "reason": "Пояснение о самом документе"}, {"what": "Таблица общих сведений", "line_start": 9, "line_end": 14, "reason": "Метаданные, включая версию и ссылку на задачу"}, {"what": "Шапка таблицы критериев приёмки", "line_start": 44, "line_end": 44, "reason": "Строка-шапка таблицы"}, {"what": "Шапка таблицы метода getCashback", "line_start": 55, "line_end": 55, "reason": "Строка-шапка таблицы"}, {"what": "Шапка таблицы параметров ответа", "line_start": 63, "line_end": 63, "reason": "Строка-шапка таблицы"}, {"what": "Пример ответа getCashback", "line_start": 68, "line_end": 68, "reason": "Пример к первому критерию приёмки и ответу 200 getCashback"}, {"what": "Шапка таблицы метода saveCategory", "line_start": 72, "line_end": 72, "reason": "Строка-шапка таблицы"}, {"what": "Шапка таблицы тела запроса", "line_start": 81, "line_end": 81, "reason": "Строка-шапка таблицы"}, {"what": "Шапка таблицы статусов", "line_start": 87, "line_end": 87, "reason": "Строка-шапка таблицы"}], "findings": [{"id": "D-01", "candidate_ids": ["C-004"], "title": "Одни и те же понятия названы по-разному", "kind": "terminology", "criterion": "conforming", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5"], "severity": "minor", "requirement_ids": ["R-14", "R-04", "R-15", "R-21"], "evidence": [{"quote": "Категория", "line_start": 22, "line_end": 22, "page": null, "section": "Часть A. Бизнес-требования › Термины", "verified": "exact"}, {"quote": "настройки", "line_start": 40, "line_end": 40, "page": null, "section": "Часть A. Бизнес-требования › Требования к интеграции", "verified": "exact"}, {"quote": "кэшбэк месяца", "line_start": 46, "line_end": 46, "page": null, "section": "Часть A. Бизнес-требования › Критерии приёмки", "verified": "exact"}, {"quote": "accrued", "line_start": 66, "line_end": 66, "page": null, "section": "Часть B. REST API › Метод getCashback › Ответ 200", "verified": "exact"}], "problem": "Выбранная категория названа «настройки» (L040) и «Категория» (L022). Кэшбэк текущего месяца назван «кэшбэк месяца» (L046) и «accrued» (L066). Глоссария соответствия нет.", "scenario": "", "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.", "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.", "rewrite": "", "question": "Какой термин оставить для каждого из перечисленных понятий?", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-02", "candidate_ids": ["C-006"], "title": "У функциональных требований нет приоритетов", "kind": "missing_element", "criterion": "ranked", "standard_refs": ["IEEE 830-1998 п. 4.3.5"], "severity": "minor", "requirement_ids": ["R-05", "R-06", "R-07", "R-08", "R-09", "R-10", "R-11"], "evidence": [{"quote": "Функциональные требования", "line_start": 24, "line_end": 24, "page": null, "section": "Часть A. Бизнес-требования › Функциональные требования", "verified": "exact"}], "problem": "Требования КБ-1…КБ-7 в разделе «Функциональные требования» (L024) не имеют приоритета.", "scenario": "При нехватке ресурсов непонятно, что делать первым.", "impact": "Спор о порядке реализации.", "recommendation": "Добавить приоритет каждому требованию.", "rewrite": "", "question": "Какие ID и приоритеты присвоить перечисленным требованиям?", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-03", "candidate_ids": ["C-002"], "title": "Не определено, какую категорию возвращает getCashback после смены", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-05", "R-20", "R-11"], "evidence": [{"quote": "Выбор действует с первого дня следующего месяца", "line_start": 25, "line_end": 25, "page": null, "section": "Часть A. Бизнес-требования › Функциональные требования", "verified": "exact"}, {"quote": "Код выбранной категории: CAFE, TAXI или PHARMACY", "line_start": 65, "line_end": 65, "page": null, "section": "Часть B. REST API › Метод getCashback › Ответ 200", "verified": "exact"}], "problem": "КБ-1 вводит выбор с первого дня следующего месяца, а в ответе getCashback поле category названо «Код выбранной категории». Не сказано, возвращается новая или действующая категория.", "scenario": "15 ноября действует TAXI, клиент сохранил CAFE, вызван getCashback. Одна реализация вернёт CAFE, другая TAXI. Приложение покажет не ту категорию, по которой идёт начисление.", "impact": "Приложение покажет не ту категорию, по которой идёт начисление.", "recommendation": "Зафиксировать, возвращает ли метод действующую или выбранную категорию, и дату вступления.", "rewrite": "", "question": "Показывать действующую категорию или новую с датой вступления?", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-04", "candidate_ids": ["C-003"], "title": "КБ-6 не определяет возврат покупки без начисленного кэшбэка", "kind": "ambiguity", "criterion": "unambiguous", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.5", "IEEE 830-1998 п. 4.3.2"], "severity": "minor", "requirement_ids": ["R-10", "R-06", "R-08"], "evidence": [{"quote": "Кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно", "line_start": 26, "line_end": 26, "page": null, "section": "Часть A. Бизнес-требования › Функциональные требования", "verified": "exact"}, {"quote": "Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата", "line_start": 30, "line_end": 30, "page": null, "section": "Часть A. Бизнес-требования › Функциональные требования", "verified": "exact"}], "problem": "КБ-6 уменьшает кэшбэк на 5 % от суммы возврата, а КБ-2 не начисляет кэшбэк за покупки меньше 500 ₸. КБ-4 ограничивает кэшбэк лимитом. Для возврата таких покупок поведение не задано.", "scenario": "Покупка 400 ₸ без кэшбэка, затем возврат 400 ₸. По КБ-6 кэшбэк уменьшается на 20 ₸, по КБ-2 уменьшать нечего. Один разработчик спишет 20 ₸ у других покупок, другой не спишет ничего.", "impact": "Клиент недополучит кэшбэк или уйдёт в минус при возврате.", "recommendation": "Определить уменьшение для покупок ниже порога, при лимите и сверх начисленного.", "rewrite": "", "question": "Уменьшать ли кэшбэк за возврат покупки, по которой он не начислялся или был урезан лимитом?", "blocks": "none", "priority": 0, "sources": ["consistency"]}, {"id": "D-05", "candidate_ids": ["C-001"], "title": "Данные не позволяют применить возврат покупки по КБ-6", "kind": "missing_element", "criterion": "set_complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.3"], "severity": "minor", "requirement_ids": ["R-10", "R-13"], "evidence": [{"quote": "КБ-6. Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата. Возврат после зачисления уменьшает следующее зачисление на ту же величину", "line_start": 30, "line_end": 30, "page": null, "section": "Часть A. Бизнес-требования › Функциональные требования", "verified": "exact"}, {"quote": "Хранить идентификатор карты, месяц, код категории, сумму каждой покупки в тиынах и кэшбэк месяца в тиынах. 1 ₸ = 100 тиынов, кэшбэк округляется вниз до целого тиына", "line_start": 37, "line_end": 37, "page": null, "section": "Часть A. Бизнес-требования › Требования к данным", "verified": "exact"}], "problem": "КБ-6 различает возврат до и после зачисления и меняет кэшбэк месяца покупки. В требованиях к данным (L037) нет возвратов, связи со ссылкой на исходную покупку и признака или даты зачисления.", "scenario": "Возврат 2 000 ₸ приходит 7-го числа за покупку прошлого месяца. Без признака зачисления и связи с покупкой сервис не определит, уменьшать кэшбэк прошлого месяца или следующее зачисление.", "impact": "Правило возврата нельзя реализовать однозначно, клиент получит неверную сумму кэшбэка.", "recommendation": "Добавить в перечень данных возврат (сумма, связь с исходной покупкой), а для кэшбэка месяца — признак и дату зачисления.", "rewrite": "Хранить: идентификатор карты, месяц, код категории, сумму каждой покупки и возврата в тиынах, ссылку возврата на исходную покупку, кэшбэк месяца в тиынах, признак и дату зачисления кэшбэка месяца \u003cуточнить: имена полей\u003e.", "question": "Где хранится признак зачисления кэшбэка месяца и связь возврата с покупкой?", "blocks": "none", "priority": 0, "sources": ["lens:architect"]}, {"id": "D-06", "candidate_ids": ["C-005"], "title": "Ответ 200 метода saveCategory отсылает к несуществующему описанию", "kind": "api_contract", "criterion": "set_complete", "standard_refs": ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.3"], "severity": "minor", "requirement_ids": ["R-24", "R-22"], "evidence": [{"quote": "Метод saveCategory", "line_start": 70, "line_end": 70, "page": null, "section": "Часть B. REST API › Метод saveCategory", "verified": "exact"}, {"quote": "200 | Запрос выполнен | Описано в разделе метода", "line_start": 89, "line_end": 89, "page": null, "section": "Часть B. REST API › Статусы", "verified": "exact"}], "problem": "Таблица статусов (L089) говорит «Описано в разделе метода», но в разделе saveCategory (L070) нет описания ответа 200: ни тела, ни полей.", "scenario": "Клиент сохранил категорию CAFE. Приложение ждёт тело ответа, формат не определён, и тест успешного сохранения нельзя написать.", "impact": "Разработчики приложения и сервиса реализуют ответ 200 по-разному, тест не проверить.", "recommendation": "Описать тело ответа 200 saveCategory или явно указать пустое тело.", "rewrite": "Ответ 200: \u003cуточнить: пустое тело или поля category и дата вступления в силу\u003e.", "question": "Что saveCategory возвращает при успехе?", "blocks": "none", "priority": 0, "sources": ["consistency"]}], "rejected": [{"candidate_id": "", "title": "Критерии приёмки проверяют 3 из 7 функциональных требований", "source": "lens:qa", "reason_code": "lens_dropped", "reason": "снято линзой тестировщика: документ вычитан (термины, версия, явный часовой пояс, нет заглушек) — таблица приёмки в нём сознательная выборка ключевых сценариев; непокрытые ветки — в черновике тест-кейсов отчёта, а не дефект требований", "line": 46, "severity": "minor", "kind": "missing_element", "problem": "Строки приёмки проверяют 3 из 7 функциональных требований. Четыре строки проверяют только начисление в одном месяце. Не покрыты: сумма 499,99 ₸ (сразу за границей КБ-2), ровно 10 000 ₸ и повторная покупка после лимита (КБ-4), возврат до и после зачисления (КБ-6), смена категории и вступление в силу со следующего месяца (КБ-1), зачисление 5-го числа (КБ-5), граница месяца по UTC+5, экран КБ-7, коды 400/401/404/500 saveCategory, статус не «проведена».", "evidence": [{"quote": "Категория «Такси», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 2 000 ₸ | Кэшбэк месяца 100 ₸", "line": 46}, {"quote": "КБ-6. Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата.", "line": 30}]}], "acceptance_checks": [{"row_requirement_id": "R-15", "row_quote": "Категория «Такси», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 2 000 ₸", "row_line": 46, "row_facts": "Выбрана категория «Такси», кэшбэк месяца 0 ₸. Проведена покупка «Такси» на 2 000 ₸.", "assumptions": "Выбор «Такси» уже действует в текущем месяце; покупка передана процессингом со статусом «проведена».", "rule_requirement_ids": ["R-06", "R-07"], "rule_evidence": [{"quote": "КБ-2. Кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно.", "line": 26}, {"quote": "КБ-3. Ставка кэшбэка составляет 5 % от суммы покупки.", "line": 27}], "derivation": "2 000 ≥ 500, покупка подходит. 2 000 × 5 % = 100 ₸. Лимит 10 000 не достигнут.", "expected_by_rules": "Кэшбэк месяца 100 ₸", "stated": "Кэшбэк месяца 100 ₸", "stated_line": 46, "verdict": "match", "conflict_kind": "none", "explanation": "По КБ-2 и КБ-3 получается 100 ₸, совпадает.", "fix": "", "finding_ids": []}, {"row_requirement_id": "R-16", "row_quote": "Категория «Такси», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 500 ₸", "row_line": 47, "row_facts": "Категория «Такси», кэшбэк 0 ₸, покупка на 500 ₸ — ровно на границе.", "assumptions": "Выбор уже действует.", "rule_requirement_ids": ["R-06", "R-07"], "rule_evidence": [{"quote": "на сумму от 500 ₸ включительно", "line": 26}, {"quote": "Ставка кэшбэка составляет 5 % от суммы покупки.", "line": 27}], "derivation": "500 включена в диапазон. 500 × 5 % = 25 ₸.", "expected_by_rules": "Кэшбэк месяца 25 ₸", "stated": "Кэшбэк месяца 25 ₸", "stated_line": 47, "verdict": "match", "conflict_kind": "none", "explanation": "Граница 500 ₸ включена по КБ-2, 5 % даёт 25 ₸.", "fix": "", "finding_ids": []}, {"row_requirement_id": "R-17", "row_quote": "Категория «Такси», кэшбэк месяца 9 900 ₸ | Провести покупку «Такси» на 4 000 ₸", "row_line": 48, "row_facts": "Кэшбэк месяца 9 900 ₸, покупка «Такси» на 4 000 ₸.", "assumptions": "Лимит применяется к итогу месяца, лишнее отсекается.", "rule_requirement_ids": ["R-07", "R-08"], "rule_evidence": [{"quote": "КБ-4. Сумма кэшбэка за месяц не превышает 10 000 ₸.", "line": 28}, {"quote": "Ставка кэшбэка составляет 5 % от суммы покупки.", "line": 27}], "derivation": "4 000 × 5 % = 200 ₸. 9 900 + 200 = 10 100 \u003e 10 000, значит ограничение до 10 000 ₸.", "expected_by_rules": "Кэшбэк месяца 10 000 ₸", "stated": "Кэшбэк месяца 10 000 ₸", "stated_line": 48, "verdict": "match", "conflict_kind": "none", "explanation": "КБ-4 ограничивает месяц 10 000 ₸, совпадает.", "fix": "", "finding_ids": []}, {"row_requirement_id": "R-18", "row_quote": "Категория «Кафе», кэшбэк месяца 0 ₸ | Провести покупку «Такси» на 1 000 ₸", "row_line": 49, "row_facts": "Выбрана «Кафе», покупка в «Такси» на 1 000 ₸.", "assumptions": "Выбор «Кафе» действует в текущем месяце.", "rule_requirement_ids": ["R-06"], "rule_evidence": [{"quote": "Кэшбэк начисляется за покупки в выбранной категории", "line": 26}], "derivation": "Категория покупки не совпадает с выбранной, начисления нет, остаётся 0 ₸.", "expected_by_rules": "Кэшбэк месяца 0 ₸", "stated": "Кэшбэк месяца 0 ₸", "stated_line": 49, "verdict": "match", "conflict_kind": "none", "explanation": "КБ-2: начисление только за выбранную категорию.", "fix": "", "finding_ids": []}], "test_cases": [{"id": "T-01", "requirement_ids": ["R-06", "R-07"], "title": "Покупка 499,99 ₸ сразу за границей порога", "given": "Выбрана «Такси», кэшбэк месяца 0 ₸", "when": "Провести покупку «Такси» на 499,99 ₸", "then": "Кэшбэк не начисляется, кэшбэк месяца 0 ₸ (КБ-2: порог от 500 ₸ включительно).", "gap": "Значение сразу за нижней границей не покрыто приёмкой.", "expected_defined": true}, {"id": "T-02", "requirement_ids": ["R-08"], "title": "Кэшбэк ровно на лимите 10 000 ₸", "given": "Выбрана «Такси», кэшбэк месяца 9 900 ₸", "when": "Провести покупку «Такси» на 2 000 ₸", "then": "Кэшбэк месяца 10 000 ₸ (КБ-3: +100 ₸, КБ-4: не более 10 000 ₸).", "gap": "Точное достижение границы лимита не покрыто.", "expected_defined": true}, {"id": "T-03", "requirement_ids": ["R-08"], "title": "Покупка после достижения лимита", "given": "Выбрана «Такси», кэшбэк месяца 10 000 ₸", "when": "Провести покупку «Такси» на 1 000 ₸", "then": "Кэшбэк месяца остаётся 10 000 ₸ (КБ-4).", "gap": "Покупка сверх лимита не покрыта.", "expected_defined": true}, {"id": "T-04", "requirement_ids": ["R-05"], "title": "Смена категории действует со следующего месяца", "given": "Текущий месяц, выбрана «Кафе»", "when": "saveCategory с TAXI, затем покупка «Такси» на 1 000 ₸ в том же месяце", "then": "Выбор действует с первого дня следующего месяца (КБ-1). Не определено требованиями: что показывает getCashback в category до смены и начисляется ли кэшбэк за «Такси» в текущем месяце.", "gap": "Смена настроек и переход периода не покрыты; неясно, действует ли старая категория до конца месяца.", "expected_defined": false}, {"id": "T-05", "requirement_ids": ["R-05", "R-11"], "title": "Клиент без выбранной категории открывает кэшбэк", "given": "Клиент никогда не выбирал категорию, текущий месяц", "when": "Вызвать getCashback", "then": "Не определено требованиями: значение category и accrued; КБ-1 даёт выбор только со следующего месяца, действующая категория для первого месяца не задана.", "gap": "Начальное состояние не описано.", "expected_defined": false}, {"id": "T-06", "requirement_ids": ["R-09"], "title": "Зачисление кэшбэка 5-го числа", "given": "Кэшбэк месяца 100 ₸ за октябрь", "when": "Наступает 5 ноября", "then": "100 ₸ зачисляется на карту (КБ-5). Не определено требованиями: время суток и показ после зачисления.", "gap": "Зачисление не покрыто приёмкой.", "expected_defined": false}, {"id": "T-07", "requirement_ids": ["R-10"], "title": "Возврат покупки до зачисления", "given": "Покупка «Такси» на 2 000 ₸, кэшбэк месяца 100 ₸, зачисление не было", "when": "Процессинг передал возврат на 2 000 ₸", "then": "Кэшбэк месяца покупки 0 ₸ (КБ-6: −5 % от суммы возврата).", "gap": "Возврат не покрыт приёмкой.", "expected_defined": true}, {"id": "T-08", "requirement_ids": ["R-10"], "title": "Возврат после зачисления кэшбэка", "given": "Кэшбэк 100 ₸ за покупку 2 000 ₸ уже зачислен", "when": "Возврат покупки на 2 000 ₸", "then": "Следующее зачисление уменьшается на 100 ₸ (КБ-6). Не определено требованиями: что делать, если следующее зачисление меньше 100 ₸.", "gap": "Возврат после зачисления не покрыт; остаток при недостаточном кэшбэке не описан.", "expected_defined": false}, {"id": "T-09", "requirement_ids": ["R-08", "R-10"], "title": "Возврат при кэшбэке на лимите", "given": "Кэшбэк месяца 10 000 ₸ (лимит), из них начислено сверх лимита 200 ₸", "when": "Возврат покупки на 4 000 ₸ до зачисления", "then": "Не определено требованиями: уменьшается ли кэшбэк на 200 ₸ (КБ-6) или лимит учитывается после возврата (КБ-4).", "gap": "Взаимодействие КБ-4 и КБ-6 не описано.", "expected_defined": false}, {"id": "T-10", "requirement_ids": ["R-02", "R-06"], "title": "Покупка на границе месяца по UTC+5", "given": "Выбрана «Такси»", "when": "Покупка проведена 30 числа в 23:30 UTC+5, а по UTC уже 31 число", "then": "Покупка относится к текущему месяцу по UTC+5 (термин «Месяц»). Не определено требованиями: какой момент (авторизация или проведение) определяет месяц.", "gap": "Переход периода не покрыт; момент отнесения не задан.", "expected_defined": false}, {"id": "T-11", "requirement_ids": ["R-25", "R-23"], "title": "saveCategory с неизвестным кодом категории", "given": "Валидная сессия владельца карты", "when": "POST /cashback/{cardId}/category с category=FOOD", "then": "Код 400, тело {\"message\":\"Неизвестная категория\"}.", "gap": "Ошибки API не покрыты приёмкой.", "expected_defined": true}, {"id": "T-12", "requirement_ids": ["R-24", "R-22"], "title": "Успешный saveCategory: тело ответа 200", "given": "Валидная сессия, карта клиента", "when": "POST category=PHARMACY", "then": "Код 200. Не определено требованиями: тело ответа — «Описано в разделе метода», но в разделе saveCategory оно не описано.", "gap": "Успешный ответ saveCategory не описан.", "expected_defined": false}], "pair_checks": [{"a": "R-05", "b": "R-20", "subject": "Какая категория считается выбранной: новая или действующая", "same_subject": true, "quote_a": "Выбор действует с первого дня следующего месяца.", "line_a": 25, "quote_b": "Код выбранной категории: CAFE, TAXI или PHARMACY", "line_b": 65, "scenario": "15 ноября действует TAXI, клиент выбрал CAFE, затем вызван getCashback.", "outcome_a": "До 1 декабря действует TAXI.", "outcome_b": "Возвращается «выбранная» категория, возможно CAFE.", "one_condition": true, "verdict": "undefined", "basis": "none", "kind": "ambiguity", "title": "КБ-1 и getCashback: какая категория возвращается после смены", "impact": "Приложение покажет не ту категорию, по которой идёт начисление.", "recommendation": "Зафиксировать, возвращает ли метод действующую или выбранную категорию, и дату вступления.", "question": "Показывать действующую категорию или новую с датой вступления?", "verified_a": "exact", "verified_b": "exact", "id": "P-01", "finding_ids": ["D-03"]}, {"a": "R-10", "b": "R-06", "subject": "Возврат покупки меньше 500 ₸ или при достигнутом лимите", "same_subject": true, "quote_a": "Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата.", "line_a": 30, "quote_b": "Кэшбэк начисляется за покупки в выбранной категории на сумму от 500 ₸ включительно.", "line_b": 26, "scenario": "Покупка 400 ₸ без кэшбэка, затем возврат 400 ₸.", "outcome_a": "Кэшбэк уменьшается на 20 ₸.", "outcome_b": "Кэшбэк не начислялся, уменьшать нечего.", "one_condition": true, "verdict": "undefined", "basis": "none", "kind": "ambiguity", "title": "КБ-6 и КБ-2, КБ-4: возврат покупки без начисленного кэшбэка", "impact": "Клиент недополучит кэшбэк или уйдёт в минус при возврате.", "recommendation": "Определить уменьшение для покупок ниже порога, при лимите и сверх начисленного.", "question": "Уменьшать ли кэшбэк за возврат покупки, по которой он не начислялся или был урезан лимитом?", "verified_a": "exact", "verified_b": "exact", "id": "P-02", "finding_ids": ["D-04"]}], "trace": [{"requirement_id": "R-05", "verified_by": [], "implemented_by": ["R-22", "R-23"], "note": "Нет критерия на смену категории"}, {"requirement_id": "R-06", "verified_by": ["R-16", "R-18"], "implemented_by": ["R-13"], "note": "Нет строки на 499 ₸"}, {"requirement_id": "R-07", "verified_by": ["R-15", "R-16"], "implemented_by": ["R-13"], "note": ""}, {"requirement_id": "R-08", "verified_by": ["R-17"], "implemented_by": ["R-13"], "note": ""}, {"requirement_id": "R-09", "verified_by": [], "implemented_by": [], "note": "Нет критерия и описания зачисления"}, {"requirement_id": "R-10", "verified_by": [], "implemented_by": [], "note": "Нет критерия на возврат"}, {"requirement_id": "R-11", "verified_by": [], "implemented_by": ["R-19", "R-20", "R-21"], "note": "Нет критерия приёмки на экран"}, {"requirement_id": "R-12", "verified_by": [], "implemented_by": ["R-19", "R-22"], "note": "Нет метода проверки нагрузки"}, {"requirement_id": "R-13", "verified_by": [], "implemented_by": [], "note": "Нет проверки хранения"}, {"requirement_id": "R-14", "verified_by": [], "implemented_by": ["R-19", "R-22"], "note": "Ответ 200 saveCategory не описан"}], "glossary": [{"id": "G-01", "concept": "Выбранная категория в API", "terms": [{"term": "настройки", "line": 40}, {"term": "Категория", "line": 22}], "problem": "Категория названа настройками, состав настроек неясен.", "severity": "minor", "finding_ids": ["D-01"]}, {"id": "G-02", "concept": "Кэшбэк текущего месяца", "terms": [{"term": "кэшбэк месяца", "line": 46}, {"term": "accrued", "line": 66}], "problem": "Разные названия одной величины в бизнес-части и API.", "severity": "minor", "finding_ids": ["D-01"]}], "questions": [{"id": "Q-01", "topic": "Хранение возвратов и признака зачисления", "finding_ids": ["D-05"], "to": "Архитектор", "blocking": false, "question": "Правило возврата покупки требует знать, к какой покупке и какому месяцу относится возврат и зачислен ли уже кэшбэк этого месяца. В перечне хранимых данных возвратов, связи с исходной покупкой и признака зачисления нет. Какие данные хранить?", "evidence": [{"quote": "КБ-6. Возврат покупки до зачисления кэшбэка уменьшает кэшбэк месяца покупки на 5 % от суммы возврата. Возврат после зачисления уменьшает следующее зачисление на ту же величину.", "line_start": 30, "line_end": 30, "page": null, "section": "Часть A. Бизнес-требования › Функциональные требования", "verified": "exact"}, {"quote": "Хранить идентификатор карты, месяц, код категории, сумму каждой покупки в тиынах и кэшбэк месяца в тиынах.", "line_start": 37, "line_end": 37, "page": null, "section": "Часть A. Бизнес-требования › Требования к данным", "verified": "exact"}], "options": ["Хранить каждый возврат: идентификатор карты, ссылку на исходную покупку, сумму возврата в тиынах и дату возврата; у кэшбэка месяца хранить признак и дату зачисления", "Хранить возврат без ссылки на покупку, но с картой, суммой в тиынах, датой возврата и месяцем исходной покупки; у кэшбэка месяца хранить признак и дату зачисления", "Не хранить возвраты отдельно: уменьшать сумму покупки и пересчитывать кэшбэк месяца; хранить признак и дату зачисления у кэшбэка месяца"], "why": "Без этих данных нельзя определить, уменьшать кэшбэк месяца покупки или следующее зачисление. Две команды реализуют возврат на границе 5-го числа по-разному."}], "checklist": [{"item": "Техническое требование зафиксировано и покрывает бизнес-требование", "answer": "Частично", "comment": "Бизнес-требования КБ-1…КБ-7 есть, но возврат КБ-6 не подкреплён данными (L037) и не определён для покупок без кэшбэка.", "finding_ids": ["D-05", "D-04"]}, {"item": "Функциональная спецификация имеет структурированное описание (по стандарту, шаблону)", "answer": "Нет", "comment": "Спецификация методов структурирована, но ответ 200 метода saveCategory отсутствует (L089), а смысл category неоднозначен (L065).", "finding_ids": ["D-06", "D-03"]}, {"item": "Sequence-диаграммы, предусмотрены взаимодействия систем, компонентов и решений", "answer": "Нет", "comment": "Диаграмм взаимодействия нет, хотя есть обмен с карточным процессингом и зачисление 5-го числа.", "finding_ids": []}, {"item": "Требование покрывает спецификацию UX/UI дизайна", "answer": "Частично", "comment": "КБ-7 описывает показ категории и кэшбэка, макета нет, а возвращаемая категория неоднозначна (L065).", "finding_ids": ["D-03"]}, {"item": "Реализация задачи/проекта предусматривает схему отката решений", "answer": "Нет", "comment": "Схемы отката и способа выключить функцию в документе нет.", "finding_ids": []}, {"item": "Требование может быть протестировано", "answer": "Нет", "comment": "Тест успешного ответа saveCategory и возврата покупки меньше 500 ₸ нельзя написать: ожидаемый результат не определён.", "finding_ids": ["D-04", "D-06"]}, {"item": "Требование предусматривает модель данных или поток, содержит описание", "answer": "Нет", "comment": "Раздел данных (L037) не содержит возвратов, связи с покупкой и признака зачисления, нужных для КБ-6.", "finding_ids": ["D-05"]}, {"item": "Требование не имеет противоречий или явных показателей операционных рисков", "answer": "Нет", "comment": "КБ-6 при возврате покупки без кэшбэка и выбор категории после смены толкуются по-разному.", "finding_ids": ["D-04", "D-03"]}, {"item": "Требование содержит архитектуру и согласовано с архитекторами", "answer": "Не требуется", "comment": "Архитектурных решений документ не содержит, отдельного раздела об архитектуре нет.", "finding_ids": []}, {"item": "Все изменения, влияющие на иные продукты/системы в требовании, согласованы с ответственными лицами", "answer": "Не требуется", "comment": "Изменений в других продуктах и системах документ не описывает.", "finding_ids": []}, {"item": "Структура требований не несёт изменений и рисков информационной безопасности", "answer": "Да", "comment": "Методы требуют Bearer-сессию владельца карты (L059, L076), коды 401 и 404 описаны, рисков ИБ в тексте нет.", "finding_ids": []}, {"item": "В требовании присутствует схема полного бизнес-процесса и часть реализуемой доработки", "answer": "Нет", "comment": "Схемы полного бизнес-процесса (покупка, начисление, зачисление, возврат) в документе нет.", "finding_ids": []}, {"item": "Требование носит интеграционный характер и имеет четкую постановку реализации интеграционного взаимодействия", "answer": "Частично", "comment": "Методы API описаны с кодами ответов, но ответ 200 saveCategory не описан (L089), обмен с процессингом не показан.", "finding_ids": ["D-06"]}, {"item": "Поддерживается версионность документа / зафиксирована", "answer": "Частично", "comment": "Версия и дата указаны (L014), но истории изменений и согласований нет; приоритетов требований тоже нет.", "finding_ids": ["D-02"]}], "verdict": {"development": "yes", "testing": "yes", "summary": "Разработку и тестирование можно начинать: критичных и существенных дефектов нет; незначительные замечания можно закрыть по ходу работы.", "fix_first": ["D-01", "D-02", "D-03", "D-04", "D-05", "D-06"], "why": "Критичных дефектов нет и существенных нет — начинать можно.", "reason": "Критичных дефектов нет и существенных нет — начинать можно."}, "checklist_source": "bank", "signals": [{"rule": "promises.read", "kind": "inventory", "line": 31, "quote": "Приложение показывает выбранную категорию и кэшбэк текущего месяца.", "message": "Справка для описи, не дефект: обещанный показ данных читают операции getCashback.", "audience": ["architect"], "id": "S-01", "covered": false, "lines": [31], "note": "Справка для описи, не дефект: обещанный показ данных читают операции getCashback."}, {"rule": "api.methods", "kind": "inventory", "line": 57, "quote": "REST type | GET", "message": "Описанные методы API: getCashback (GET, чтение); saveCategory (POST, изменение).", "audience": ["architect"], "id": "S-02", "covered": false, "lines": [57], "note": "Описанные методы API: getCashback (GET, чтение); saveCategory (POST, изменение)."}, {"rule": "api.status_inventory", "kind": "inventory", "line": 89, "quote": "200 | Запрос выполнен | Описано в разделе метода", "message": "Перечень статусов: 200, 400, 401, 404 и 500; упомянуты в тексте: 200.", "audience": ["architect", "qa"], "id": "S-03", "covered": false, "lines": [89], "note": "Перечень статусов: 200, 400, 401, 404 и 500; упомянуты в тексте: 200."}], "quote_stats": {"quotes": 13, "verified": 13, "exact": 13, "normalized": 0, "fuzzy": 0, "missing": 0, "candidates_in": 6, "candidates_kept": 6, "candidates_rejected": 0, "share_verified": 1.0}, "summary": {"requirements": 28, "findings": {"critical": 0, "major": 0, "minor": 6}, "requirements_without_findings": 13, "quotes_verified": 13, "quotes_total": 13, "questions": 1}}</script>
+<script>
+/* HTML-отчёт v2 (№14): фильтры, подсветка, вкладки, тема, печать. Без библиотек. */
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var root = document.documentElement;
+  var doc = $("#doc");
+  var cardsBox = $("#cards");
+  var cards = $$(".card", cardsBox || document);
+
+  /* ── таблицы ТЗ на листе (№54): строки «Поле | Значение» — ячейками, без «|»; метки цитат режутся по ячейкам.
+     Текст и метки те же; не разобралось — строка остаётся как есть. Идёт до подсчёта мест заметок (№41). ── */
+  function tableRows(box) {
+    if (!box) return;
+    var piped = function (ln) { return !ln.classList.contains("blank") && /\S \|( |$)/.test((ln.querySelector(".tx") || {}).textContent || ""); };
+    var lines = $$(".ln", box), blocks = [], cur = [];
+    lines.forEach(function (ln) {
+      if (piped(ln)) cur.push(ln);
+      else if (!(ln.classList.contains("blank") && cur.length)) { if (cur.length > 1) blocks.push(cur); cur = []; }
+    });
+    if (cur.length > 1) blocks.push(cur);
+    blocks.forEach(function (rows) {
+      var split = rows.map(function (ln) { try { return cells(ln.querySelector(".tx")); } catch (_) { return null; } });
+      var n = Math.max.apply(null, split.map(function (c) { return c ? c.length : 0; }));
+      if (n < 2) return;
+      rows.forEach(function (ln, i) {
+        var c = split[i], tx = ln.querySelector(".tx");
+        if (!c) return;
+        while (c.length < n) c.push(document.createDocumentFragment());
+        tx.textContent = "";
+        c.forEach(function (f) { var td = document.createElement("span"); td.className = "td"; td.appendChild(f); tx.appendChild(td); });
+        tx.style.setProperty("--cols", n === 2 ? "minmax(0, 2fr) minmax(0, 3fr)" : "repeat(" + n + ", minmax(0, 1fr))");
+        ln.classList.add("trow");
+        var next = ln.nextElementSibling;
+        if (i === 0 && next && next.classList.contains("blank")) ln.classList.add("thead");
+      });
+    });
+  }
+  function cells(tx) {
+    var out = [document.createDocumentFragment()];
+    (function walk(node, chain) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (ch) {
+        if (ch.nodeType === 1) return walk(ch, chain.concat([ch]));
+        if (ch.nodeType !== 3) return;
+        var parts = ch.nodeValue.split("|");
+        parts.forEach(function (t, k) {
+          if (k > 0) { out.push(document.createDocumentFragment()); t = t.replace(/^\s+/, ""); }
+          if (k < parts.length - 1) t = t.replace(/\s+$/, "");
+          if (!t) return;
+          var x = document.createTextNode(t);
+          for (var j = chain.length - 1; j >= 0; j--) { var w = chain[j].cloneNode(false); w.appendChild(x); x = w; }
+          out[out.length - 1].appendChild(x);
+        });
+      });
+    })(tx, []);
+    if (out.length > 1 && !out[out.length - 1].textContent.trim()) out.pop();  // «… | Да / Нет |» — хвостовая черта
+    return out.length > 1 ? out : null;
+  }
+  tableRows(doc);
+
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; }
+    return null;
+  }
+
+  function toast(msg) {
+    var t = document.createElement("div");
+    t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 1800);
+  }
+
+  /* ── тема ── */
+  function currentTheme() {
+    if (root.dataset.theme) return root.dataset.theme;
+    return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  $("#theme").addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    root.dataset.theme = next; store("bccr-theme", next);
+  });
+
+  /* ── вкладки ── */
+  var tabs = $$(".tab");
+  function showTab(name, focus) {
+    tabs.forEach(function (t) {
+      var on = t.dataset.tab === name;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      $("#p-" + t.dataset.tab).hidden = !on;
+      if (on && focus) t.focus();
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () {
+      showTab(t.dataset.tab);
+      history.replaceState(null, "", "#" + t.dataset.tab);
+      window.scrollTo({ top: 0 });  /* панель разделов внизу (№41): новый раздел — с начала листа */
+    });
+    t.addEventListener("keydown", function (ev) {
+      var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+      if (d) { ev.preventDefault(); showTab(tabs[(i + d + tabs.length) % tabs.length].dataset.tab, true); }
+    });
+  });
+
+  /* ── документ: прокрутка и подсветка ── */
+  function lineEl(n) { return doc ? doc.querySelector('.ln[data-n="' + n + '"]') : null; }
+  function scrollDocTo(n, n2) {
+    if (!doc) return;
+    var el = lineEl(n);
+    if (!el) return;
+    if (doc.classList.contains("onlyhl") && !el.classList.contains("hl")) { $("#onlyhl").checked = false; doc.classList.remove("onlyhl"); }
+    if (doc.scrollHeight > doc.clientHeight + 4) {
+      doc.scrollTo({ top: Math.max(0, el.offsetTop - doc.clientHeight / 3), behavior: "smooth" });
+    } else {  /* лист на столе (№41): прокручивается страница, строка встаёт на треть экрана */
+      window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3), behavior: "smooth" });
+    }
+    var last = parseInt(n2 || n, 10);
+    for (var k = parseInt(n, 10); k <= last; k++) {
+      var x = lineEl(k);
+      if (x) { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); }
+    }
+  }
+  function clearSel() {
+    $$(".ln.sel, .ln.rqsel, mark.q.on").forEach(function (x) { x.classList.remove("sel", "rqsel", "on"); });
+    $$(".card.active").forEach(function (x) { x.classList.remove("active"); });
+    if (doc) doc.classList.remove("focus");
+  }
+
+  function selectFinding(id, opts) {
+    opts = opts || {};
+    var card = document.getElementById(id);
+    if (!card || !card.classList.contains("card")) return;
+    showTab("findings");
+    clearSel();
+    card.classList.add("active");
+    if (doc) doc.classList.add("focus");
+    if (card.hidden) { resetFilters(); }
+    var lines = (card.dataset.lines || "").split(" ").filter(Boolean);
+    if (doc) {
+      $$('.ln[data-f]', doc).forEach(function (x) {
+        if ((" " + x.dataset.f + " ").indexOf(" " + id + " ") >= 0) x.classList.add("sel");
+      });
+      $$("mark.q", doc).forEach(function (m) {
+        if ((" " + m.dataset.f + " ").indexOf(" " + id + " ") >= 0) m.classList.add("on");
+      });
+    }
+    if (lines.length && !opts.noDocScroll) scrollDocTo(lines[0]);
+    if (opts.scrollCard) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", "#" + id);
+  }
+
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest("[data-goto]");
+    if (a) { ev.preventDefault(); selectFinding(a.dataset.goto, { scrollCard: true }); return; }
+    var evb = ev.target.closest(".ev");
+    if (evb) {
+      var c = evb.closest(".card");
+      if (c) selectFinding(c.id, { noDocScroll: true });
+      scrollDocTo(evb.dataset.ls, evb.dataset.le);
+      return;
+    }
+    var r = ev.target.closest("[data-req]");
+    if (r) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var k = +r.dataset.ls; k <= +(r.dataset.le || r.dataset.ls); k++) { var x = lineEl(k); if (x) x.classList.add("rqsel"); }
+      scrollDocTo(r.dataset.ls, r.dataset.le);
+      return;
+    }
+    var l = ev.target.closest("[data-line]");
+    if (l && !l.closest(".card")) {
+      ev.preventDefault(); showTab("findings"); clearSel();
+      for (var m = +l.dataset.line; m <= +(l.dataset.le || l.dataset.line); m++) { var y = lineEl(m); if (y) y.classList.add("rqsel"); }
+      scrollDocTo(l.dataset.line, l.dataset.le);
+      return;
+    }
+    var cp = ev.target.closest("[data-copy]");
+    if (cp) {
+      var txt = cp.closest(".dl").querySelector(".dd").textContent;
+      try { navigator.clipboard.writeText(txt).then(function () { toast("Формулировка скопирована"); }); } catch (_) { toast("Не удалось скопировать"); }
+      return;
+    }
+    var card = ev.target.closest(".card");
+    if (card && !ev.target.closest("a, button, summary, input, select, textarea") && !String(window.getSelection())) {
+      selectFinding(card.id);
+      return;
+    }
+    var ln = ev.target.closest(".ln.hl");
+    if (ln && !ev.target.closest("a")) {
+      var ids = ln.dataset.f.split(" ");
+      var cur = $(".card.active");
+      var i = cur ? ids.indexOf(cur.id) : -1;
+      selectFinding(ids[(i + 1) % ids.length], { scrollCard: true, noDocScroll: true });
+    }
+  });
+
+  if (doc) {
+    $("#onlyhl").addEventListener("change", function (ev) { doc.classList.toggle("onlyhl", ev.target.checked); });
+    $("#showreq").addEventListener("change", function (ev) { doc.classList.toggle("showreq", ev.target.checked); });
+    $$(".ln.ex", doc).forEach(function (x) { x.title = "Не требование — " + x.dataset.ex; });
+  }
+
+  /* ── мини-карта: где в документе замечания ── */
+  var mm = $("#minimap");
+  function drawMap() {
+    if (!doc || !mm || !doc.scrollHeight) return;
+    mm.innerHTML = "";
+    var H = doc.scrollHeight, h = mm.clientHeight;
+    $$(".ln.hl", doc).forEach(function (x) {
+      if (!x.offsetHeight) return;
+      var t = document.createElement("i");
+      t.className = (x.className.match(/sev-\w+/) || [""])[0];
+      t.style.top = (x.offsetTop / H * h) + "px";
+      t.style.height = Math.max(3, x.offsetHeight / H * h) + "px";
+      t.title = "Строка " + x.dataset.n + ": " + x.dataset.f;
+      t.addEventListener("click", function () { selectFinding(x.dataset.f.split(" ")[0], { scrollCard: true }); });
+      mm.appendChild(t);
+    });
+    var vw = document.createElement("div");
+    vw.className = "vw";
+    mm.appendChild(vw);
+    var upd = function () {
+      vw.style.top = (doc.scrollTop / H * h) + "px";
+      vw.style.height = Math.max(8, doc.clientHeight / H * h) + "px";
+    };
+    upd();
+    doc.onscroll = upd;
+  }
+  if (doc && mm) {
+    setTimeout(drawMap, 60);
+    addEventListener("resize", function () { clearTimeout(drawMap.t); drawMap.t = setTimeout(drawMap, 150); });
+    ["onlyhl", "showreq"].forEach(function (k) { $("#" + k).addEventListener("change", function () { setTimeout(drawMap, 30); }); });
+  }
+
+  /* ── фильтры ── */
+  var chips = $$(".sevchip");
+  var openOnly = $("#openonly");
+  var q = $("#q"), fkind = $("#fkind"), fsrc = $("#fsrc"), fsort = $("#fsort"), fcount = $("#fcount");
+  function applyFilters() {
+    if (!cardsBox) return;
+    var sev = {};
+    chips.forEach(function (c) { sev[c.dataset.sev] = c.getAttribute("aria-pressed") === "true"; });
+    var words = (q.value || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = sev[c.dataset.sev] !== false;
+      if (ok && openOnly && openOnly.checked) ok = c.dataset.resolved !== "1";
+      if (ok && fkind.value) ok = c.dataset.kind === fkind.value;
+      if (ok && fsrc.value) ok = (" " + c.dataset.src + " ").indexOf(" " + fsrc.value + " ") >= 0;
+      if (ok && words.length) {
+        var s = c.dataset.search;
+        ok = words.every(function (w) { return s.indexOf(w) >= 0; });
+      }
+      c.hidden = !ok;
+      if (ok) shown++;
+    });
+    fcount.textContent = "Показано " + shown + " из " + cards.length;
+    var empty = $(".empty[hidden], .empty", cardsBox);
+    if (empty && cards.length) empty.hidden = shown !== 0;
+  }
+  function sortCards() {
+    var key = fsort.value;
+    var sorted = cards.slice().sort(function (a, b) {
+      var A = a.dataset, B = b.dataset;
+      if (key === "line") return (+A.line - +B.line) || (+B.rank - +A.rank);
+      if (key === "sev") return (+B.rank - +A.rank) || (+A.line - +B.line);
+      var pa = +A.prio || 999, pb = +B.prio || 999;
+      return (pa - pb) || (+B.rank - +A.rank) || (+A.line - +B.line);
+    });
+    var empty = $(".empty", cardsBox);
+    sorted.forEach(function (c) { cardsBox.insertBefore(c, empty); });
+  }
+  function resetFilters() {
+    chips.forEach(function (c) { c.setAttribute("aria-pressed", "true"); });
+    q.value = ""; fkind.value = ""; fsrc.value = "";
+    if (openOnly) openOnly.checked = false;
+    applyFilters();
+  }
+  if (cardsBox) {
+    chips.forEach(function (c) {
+      c.addEventListener("click", function () {
+        c.setAttribute("aria-pressed", c.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        applyFilters();
+      });
+    });
+    q.addEventListener("input", applyFilters);
+    if (openOnly) openOnly.addEventListener("change", applyFilters);
+    fkind.addEventListener("change", applyFilters);
+    fsrc.addEventListener("change", applyFilters);
+    fsort.addEventListener("change", sortCards);
+    $$("[data-reset]").forEach(function (b) { b.addEventListener("click", resetFilters); });
+    $$("[data-sevonly]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var s = b.dataset.sevonly;
+        if (openOnly) openOnly.checked = true;
+        chips.forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.sev === s ? "true" : "false"); });
+        showTab("findings"); applyFilters();
+        var t = $(".tabs"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 60, behavior: "smooth" });
+      });
+    });
+    var allOpen = false;
+    $("#toggleall").addEventListener("click", function (ev) {
+      allOpen = !allOpen;
+      $$(".card .more").forEach(function (d) { d.open = allOpen; });
+      ev.target.textContent = allOpen ? "Свернуть все" : "Развернуть все";
+    });
+    applyFilters();
+  }
+
+  /* ── клавиатура: ↑/↓ или j/k по карточкам ── */
+  document.addEventListener("keydown", function (ev) {
+    if (ev.target.closest("input, textarea, select") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key === "Escape") { clearSel(); history.replaceState(null, "", location.pathname); return; }
+    var d = (ev.key === "ArrowDown" || ev.key === "j") ? 1 : (ev.key === "ArrowUp" || ev.key === "k") ? -1 : 0;
+    if (!d || $("#p-findings").hidden || ev.target.closest(".doc")) return;
+    var vis = $$(".card", cardsBox).filter(function (c) { return !c.hidden; });
+    if (!vis.length) return;
+    ev.preventDefault();
+    var cur = $(".card.active");
+    var i = cur ? vis.indexOf(cur) : -1;
+    var next = vis[Math.min(vis.length - 1, Math.max(0, i + d))];
+    selectFinding(next.id, { scrollCard: true });
+  });
+
+  /* ── печать и скачивание ── */
+  var opened = [];
+  window.addEventListener("beforeprint", function () {
+    opened = $$("details").filter(function (d) { return !d.open; });
+    opened.forEach(function (d) { d.open = true; });
+  });
+  window.addEventListener("afterprint", function () { opened.forEach(function (d) { d.open = false; }); opened = []; });
+  $("#print").addEventListener("click", function () { window.print(); });
+
+  function download(name, text, type) {
+    var blob = new Blob([text], { type: type });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  var base = document.body.dataset.file || "report";
+  $("#dljson").addEventListener("click", function () {
+    download(base + ".report.json", $("#report-data").textContent, "application/json");
+  });
+
+  var dla = $("#dlanswers");
+  if (dla) {
+    dla.addEventListener("click", function () {
+      var data = JSON.parse($("#report-data").textContent);
+      var LET = "ABCDEFGH";
+      var md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
+        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.",
+        "> Передайте файл агенту: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers этот_файл.md", ""];
+      var n = 0;
+      (data.questions || []).forEach(function (qq) {
+        var pick = $('input[name="' + qq.id + '"]:checked');
+        var own = $('textarea[data-own="' + qq.id + '"]');
+        var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
+        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
+        if (!val) return;
+        n++;
+        md.push(qq.id + (qq.topic ? " [" + qq.topic + "]" : "") + ": " + val);
+      });
+      if (!n) { toast("Отметьте хотя бы один ответ"); return; }
+      download(base + ".answers.md", md.join("\n") + "\n", "text/markdown");
+      toast("Ответов в файле: " + n);
+    });
+  }
+
+  /* ── адрес страницы: #D-02 или #questions ── */
+  function fromHash() {
+    var h = decodeURIComponent(location.hash.slice(1));
+    if (!h) return;
+    if (document.getElementById("p-" + h)) { showTab(h); return; }
+    var el = document.getElementById(h);
+    if (el && el.classList.contains("card")) selectFinding(h, { scrollCard: true });
+    else if (/^L\d+$/.test(h)) { showTab("findings"); scrollDocTo(h.slice(1)); }
+  }
+  window.addEventListener("hashchange", fromHash);
+  fromHash();
+})();
+
+/* ── лист с правкой (№41): строка вердикта, заметки на полях с линиями к строкам, карта листа,
+ *    исправленная редакция «как у юриста», пометки рисуются по порядку чтения. Содержание отчёта не меняется. ── */
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var root = document.documentElement;
+  var NS = "http://www.w3.org/2000/svg";
+  var data = {};
+  try { data = JSON.parse(($("#report-data") || {}).textContent || "{}"); } catch (_) { data = {}; }
+  var split = $(".split"), pane = $(".docpane"), doc = $("#doc"), box = $("#cards"), flist = $(".flist");
+  var cards = box ? $$(".card", box) : [];
+  var LBL = { no: "нельзя", conditional: "с условиями", yes: "можно", undetermined: "не определён" };
+  function plural(n, a, b, c) { var m = Math.abs(n) % 100, k = m % 10; return m > 10 && m < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; }
+  function esc(t) { var d = document.createElement("div"); d.textContent = t == null ? "" : String(t); return d.innerHTML; }
+  function el(tag, cls, html) { var x = document.createElement(tag); if (cls) x.className = cls; if (html != null) x.innerHTML = html; return x; }
+  function resolved(f) { return f.status === "resolved" || f.status_after_answers === "resolved"; }
+
+  /* вердикт — спокойная строка в шапке листа: те же вердикт и блокеры, что в Markdown и в итоге терминала */
+  function verdictLine() {
+    var head = pane && $(".dochead", pane);
+    if (!head || $(".verdict-line", head)) return;
+    var run = data.run || {}, v = data.verdict || {}, s = data.summary || {};
+    var offline = run.provider === "offline";
+    var bl = (data.findings || []).filter(function (f) {
+      return !resolved(f) && ["development", "testing", "both"].indexOf(f.blocks) >= 0 &&
+        (f.severity === "critical" || (offline && f.rule_conflict));
+    });
+    var failed = run.status === "failed";
+    var dev = failed ? "" : (v.development || ""), test = failed ? "" : (v.testing || "");
+    var ok = 0, total = 0;
+    if (typeof s.quotes_verified === "number" && typeof s.quotes_total === "number" && s.quotes_verified % 1 === 0) {
+      ok = s.quotes_verified; total = s.quotes_total;
+    } else {
+      (data.findings || []).forEach(function (f) {
+        (f.evidence || []).forEach(function (e) { total++; if (["exact", "normalized", "fuzzy"].indexOf(e.verified) >= 0) ok++; });
+      });
+    }
+    var n = bl.length, cls = { no: "v-no", yes: "v-yes" }[dev] || "";
+    var parts = ['Разработка: <b class="' + cls + '">' + esc(LBL[dev] || "вердикт не вынесен") + "</b>"];
+    if (test && test !== dev) parts.push("тестирование: " + esc(LBL[test] || test));
+    parts.push(n ? n + " " + plural(n, "блокер", "блокера", "блокеров") : "блокеров нет");
+    if (total) parts.push("цитат сверено " + ok + " из " + total);
+    var line = el("div", "verdict-line", parts.map(function (x) { return '<span class="vp">' + x + "</span>"; }).join(' <span class="sep">·</span> '));
+    line.setAttribute("role", "status");
+    head.appendChild(line);
+  }
+
+  /* итог агента — на второй бумаге над заметками */
+  function resolution() {
+    var ht = $(".hero-text");
+    if (!ht || !flist || $(".resolution", flist)) return;
+    var r = el("div", "resolution", '<div class="rl">Итог агента</div>');
+    r.appendChild(ht);
+    flist.insertBefore(r, flist.firstChild);
+  }
+
+  /* заметки на полях: каждая — напротив своей строки, тонкая линия к месту; на узком экране — под строкой */
+  var wide = window.matchMedia ? window.matchMedia("(min-width: 1001px)") : { matches: true };
+  var svg = null, raf = 0, inlined = false;
+  function lineOf(c) { return doc ? doc.querySelector('.ln[data-n="' + (c.dataset.line || (c.dataset.lines || "").split(" ")[0]) + '"]') : null; }
+  function setInline(on) {
+    if (on === inlined || !doc || !box) return;
+    inlined = on;
+    if (on) {
+      var last = {};
+      cards.forEach(function (c) {
+        var ln = lineOf(c);
+        if (!ln) return;
+        var after = last[ln.dataset.n] || ln;
+        after.parentNode.insertBefore(c, after.nextSibling);
+        last[ln.dataset.n] = c;
+        c.style.top = "";
+      });
+    } else {
+      var empty = $(".empty", box);
+      cards.forEach(function (c) { box.insertBefore(c, empty); });
+    }
+  }
+  function layout() {
+    raf = 0;
+    if (!split || !doc || !box || !pane || !pane.offsetParent) return;
+    if (!wide.matches) { setInline(true); box.style.height = ""; if (svg) svg.innerHTML = ""; return; }
+    setInline(false);
+    var base = box.getBoundingClientRect().top;
+    var items = cards.filter(function (c) { return !c.hidden; }).map(function (c) {
+      var ln = lineOf(c);
+      return { c: c, ln: ln, y: ln ? ln.getBoundingClientRect().top - base : 0 };
+    }).sort(function (a, b) { return a.y - b.y || (+b.c.dataset.rank - +a.c.dataset.rank); });
+    var cur = 0, gap = 6;
+    var seq = function (list) { list.forEach(function (it) { it.top = Math.max(it.y - 3, cur); cur = it.top + it.c.offsetHeight + gap; }); };
+    var ai = -1;
+    items.forEach(function (it, i) { if (it.c.classList.contains("active")) ai = i; });
+    if (ai < 0) {
+      seq(items);
+    } else {  /* раскрытая заметка стоит напротив своей строки, соседние расступаются вверх и вниз */
+      var A = items[ai], lim;
+      A.top = Math.max(0, A.y - 3);
+      lim = A.top - gap;
+      for (var i = ai - 1; i >= 0; i--) { items[i].top = Math.min(items[i].y - 3, lim - items[i].c.offsetHeight); lim = items[i].top - gap; }
+      if (ai > 0 && items[0].top < 0) { cur = 0; seq(items.slice(0, ai)); A.top = Math.max(A.top, cur); }
+      cur = A.top + A.c.offsetHeight + gap;
+      seq(items.slice(ai + 1));
+    }
+    items.forEach(function (it) { it.c.style.top = Math.round(it.top) + "px"; });
+    box.style.height = Math.max(cur, 0) + "px";
+    links(items);
+  }
+  function links(items) {
+    if (!svg) { svg = document.createElementNS(NS, "svg"); svg.setAttribute("class", "links"); svg.setAttribute("aria-hidden", "true"); split.appendChild(svg); }
+    var sr = split.getBoundingClientRect(), pr = pane.getBoundingClientRect();
+    svg.setAttribute("width", Math.round(sr.width));
+    svg.setAttribute("height", Math.round(Math.max(split.scrollHeight, sr.height)));
+    var x1 = pr.right - sr.left, out = [], any = false;
+    items.forEach(function (it) {
+      if (!it.ln) return;
+      var lr = it.ln.getBoundingClientRect(), cr = it.c.getBoundingClientRect();
+      var y1 = lr.top - sr.top + Math.min(13, lr.height / 2), x2 = cr.left - sr.left + 2, y2 = cr.top - sr.top + 15;
+      var on = it.c.classList.contains("active");
+      any = any || on;
+      var k = Math.max(16, (x2 - x1) / 2);
+      out.push('<path class="' + (on ? "on " : "") + "sev-" + it.c.dataset.sev + '" d="M' + x1.toFixed(1) + " " + y1.toFixed(1) +
+        " C" + (x1 + k).toFixed(1) + " " + y1.toFixed(1) + " " + (x2 - k).toFixed(1) + " " + y2.toFixed(1) + " " + x2.toFixed(1) + " " + y2.toFixed(1) + '"/>');
+    });
+    svg.innerHTML = out.join("");
+    svg.setAttribute("class", "links" + (any ? " focus" : ""));
+  }
+  function relayout() { if (!raf) raf = requestAnimationFrame(layout); }
+
+  /* карта листа: рамка видимой части едет вместе со страницей */
+  function mapView() {
+    var mm = $("#minimap"), vw = mm && $(".vw", mm);
+    if (!vw || !doc || !mm.clientHeight) return;
+    var r = doc.getBoundingClientRect(), H = r.height || 1, h = mm.clientHeight;
+    vw.style.top = (Math.min(H, Math.max(0, -r.top + 60)) / H * h) + "px";
+    vw.style.height = Math.max(10, Math.min(H, window.innerHeight) / H * h) + "px";
+  }
+
+  /* исправленная редакция: тот же лист, вычеркнутое красным, вставленное зелёным */
+  function redline() {
+    var p = $("#p-rewrites"), rws = data.rewrites || [];
+    if (!p || !rws.length || !doc || $(".redline", p)) return;
+    var edits = [];
+    rws.forEach(function (r) {
+      if (r.edits && r.edits.length) {
+        r.edits.forEach(function (e) { edits.push({ line: +e.line, before: e.was || "", after: e.became || "", act: e.action || "" }); });
+      } else if (r.after || r.before) {
+        edits.push({ line: +(r.line_start || r.line || 0), before: r.before || "", after: r.after || "", act: r.action || "" });
+      }
+    });
+    if (!edits.length) return;
+    var clone = el("div", "doc");
+    $$(".ln, .pgbreak", doc).forEach(function (ln) {
+      var x = ln.cloneNode(true);
+      x.removeAttribute("id"); x.removeAttribute("data-f");
+      x.className = ln.className.split(" ").filter(function (c) { return c === "ln" || c === "h" || c === "blank" || c === "pgbreak"; }).join(" ");
+      $$(".fms, .rtag, .card", x).forEach(function (m) { m.remove(); });
+      $$("mark", x).forEach(function (m) { m.replaceWith(document.createTextNode(m.textContent)); });
+      clone.appendChild(x);
+    });
+    var byLine = {};
+    edits.forEach(function (e) { (byLine[e.line] = byLine[e.line] || []).push(e); });
+    Object.keys(byLine).forEach(function (n) {
+      var ln = clone.querySelector('.ln[data-n="' + n + '"]');
+      if (!ln) return;
+      var tx = $(".tx", ln), text = tx.textContent.replace(/​/g, ""), cuts = [], extra = [];
+      byLine[n].forEach(function (e) {
+        var at = e.before ? text.indexOf(e.before) : -1;
+        var free = at >= 0 && cuts.every(function (c) { return at >= c.b || at + e.before.length <= c.a; });
+        if (free) cuts.push({ a: at, b: at + e.before.length, e: e }); else extra.push(e);
+      });
+      cuts.sort(function (x, y) { return x.a - y.a; });
+      var html = "", pos = 0;
+      cuts.forEach(function (c) {
+        html += esc(text.slice(pos, c.a)) + "<del>" + esc(c.e.before) + "</del>" + (c.e.after ? "<ins>" + esc(c.e.after) + "</ins>" : "");
+        pos = c.b;
+      });
+      if (cuts.length) { tx.innerHTML = html + esc(text.slice(pos)); ln.classList.add("ed"); }
+      var at = ln;
+      extra.forEach(function (e) {
+        if (!e.after) return;
+        var add = el("div", "ln add ed", '<span class="no"></span><span class="tx"><ins>' + esc(e.after) + "</ins></span>");
+        at.parentNode.insertBefore(add, at.nextSibling);
+        at = add;
+      });
+    });
+    var wrap = el("div", "redline");
+    var lead = $(".lead", p);
+    var head = el("div", "rl-head");
+    if (lead) head.appendChild(lead.cloneNode(true));
+    wrap.appendChild(head);
+    wrap.appendChild(clone);
+    p.insertBefore(wrap, p.firstChild);
+  }
+
+  /* пометки рисуются по порядку чтения, шаг 30 мс */
+  function ink() {
+    if (!doc) return;
+    $$("mark.q", doc).forEach(function (m, i) { m.style.setProperty("--i", Math.min(i, 70)); });
+    requestAnimationFrame(function () { root.classList.add("ink"); });
+  }
+
+  if (!split || !doc || !$(".ln", doc)) { redline(); return; }
+  verdictLine();
+  resolution();
+  redline();
+  ink();
+  layout();
+  window.addEventListener("resize", relayout);
+  window.addEventListener("scroll", mapView, { passive: true });
+  if (window.MutationObserver) {
+    var mo = new MutationObserver(relayout);
+    if (box) mo.observe(box, { subtree: true, attributes: true, attributeFilter: ["class", "hidden"] });
+    var pf = $("#p-findings");
+    if (pf) mo.observe(pf, { attributes: true, attributeFilter: ["hidden"] });
+    mo.observe(doc, { attributes: true, attributeFilter: ["class"] });
+  }
+  document.addEventListener("toggle", relayout, true);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { relayout(); window.dispatchEvent(new Event("resize")); });
+  setTimeout(function () { relayout(); mapView(); }, 120);
+  /* щелчок по столу — снять фокус с правки */
+  document.addEventListener("click", function (ev) {
+    var t = ev.target;
+    if (t === document.body || t === split || t === flist || t === box || (t.tagName === "MAIN")) {
+      if ($(".card.active")) document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    }
+  });
+})();
+
+</script>
+</body>
+</html>

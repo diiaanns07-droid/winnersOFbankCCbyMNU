@@ -16,7 +16,11 @@ python -m bcc_review verify reports/requirements.json release/input/requirements
 раздел 5) счётчиком `python -m evaluation.v2.score` в строгом счёте: без модели-арбитра, спорное не засчитывается.
 
 <!-- таблица прогонов: начало (scripts/reports_table.py) -->
-Отчёты появятся после финальной сборки 27.11.
+| Отчёт | Вход | Провайдер | Модель | Статус | Время | Вызовов (из кэша) | Требований | Замечаний крит./сущ./незн. | Разработка / тестирование | Эталон кейса | Коммит | verify |
+| :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | :--- | :--- | :--- | :--- | :--- |
+| [other_topic_cashback.md](other_topic_cashback.md) | `evaluation/dev/corpus/cases/cashback.base/source.md` | claude_cli | claude-sonnet-5-5 | полный | 1,2 мин | 8 (0) | 28 | 0/0/6 | можно / можно | — | `0a30c67` | OK |
+| [requirements.md](requirements.md) | `release/input/requirements.md` | claude_cli | claude-sonnet-5-5 | полный | 2,8 мин | 9 (0) | 40 | 5/12/16 | нельзя / нельзя | К 5/5 (крит. 5) · С 20/20 · ложных крит. 0 | `0a30c67` | OK |
+| [requirements_pdf.md](requirements_pdf.md) | `release/input/requirements.pdf` | claude_cli | claude-sonnet-5-5 | полный | 3,4 мин | 9 (0) | 40 | 5/11/16 | нельзя / нельзя | К 5/5 (крит. 5) · С 18/20 · ложных крит. 0 | `0a30c67` | OK |
 <!-- таблица прогонов: конец -->
 
 ## Как повторить
