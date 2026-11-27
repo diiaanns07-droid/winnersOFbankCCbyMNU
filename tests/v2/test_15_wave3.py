@@ -930,6 +930,33 @@ def test_cleantable_verdict_table_shows_history_and_hides_superseded_sets():
     assert "Не показаны заменённые наборы (№18: чистые версии (1-я редакция))" in text
 
 
+def test_cleantable_repeat_share_counts_last_run_complaints_seen_before(monkeypatch):
+    """Доля повторов: замечание последнего прогона считается повтором, если та же жалоба (другими словами, любой
+    серьёзности) была на этом документе в прошлом прогоне; в воротах — строкой у красного «на чистых»."""
+    from evaluation.v2 import cleantable as ct
+
+    def f(sev, title):
+        return {"severity": sev, "title": title, "sources": ["consistency"]}
+
+    yes = {"development": "yes", "testing": "yes"}
+    rows = [ct._row("чистые ТЗ №20", "haiku", "прогон 12:53", "2026-11-27 12:53", "repay", {}, yes, 9,
+                    [f("minor", "Цель 50 % по каналу не имеет признака учёта"), f("major", "Нет схемы отката")]),
+            ct._row("чистые ТЗ №20", "haiku", "прогон 19:03", "2026-11-27 19:03", "repay", {}, yes, 9,
+                    [f("major", "Цель 50 % мобильных погашений не имеет признака учёта канала"),
+                     f("minor", "Термины без глоссария"), f("major", "Схема отката не описана")]),
+            ct._row("чистые ТЗ №20", "haiku", "прогон 19:03", "2026-11-27 19:03", "fx", {}, yes, 9,
+                    [f("major", "Один прогон — не повтор")])]
+    assert ct.repeat_share(rows, "чистые ТЗ №20", "haiku") == {"total": 3, "repeated": 2, "runs": 2,
+                                                                "at": "2026-11-27 19:03"}
+    assert ct.repeat_share(rows, "чистые ТЗ №20", "haiku", ("critical", "major"))["repeated"] == 2
+    monkeypatch.setattr(ct, "_newtz_rows", lambda: rows)
+    d = {"model": "haiku", "label": "голова", "at": "2026-11-27 19:03"}
+    assert gate._repeat_note("чистые ТЗ №20", d, ("critical", "major")) == (
+        "; повторяются 2 из 2 critical и major (та же жалоба на том же документе в прошлых прогонах haiku — "
+        "систематика или неясность документа, `RESULTS.md`)")
+    assert gate._repeat_note("чистые ТЗ №20", {**d, "at": "2026-11-27 16:54"}) == ""  # ворота не на последнем прогоне
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final

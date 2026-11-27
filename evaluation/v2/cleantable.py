@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from .common import ROOT, cluster_by_title, put_results_block
+from .common import ROOT, cluster_by_title, put_results_block, source_owner
 
 V2 = ROOT / "evaluation" / "v2"
 RESULTS = V2 / "RESULTS.md"
@@ -44,11 +44,12 @@ def _kind(model: str | None, label: str | None = "") -> str:
 def _row(set_name: str, model: str, label: str, at: str, case: str, sev: dict, verdict: dict | None,
          calls: int | None = None, findings: list[dict] | None = None) -> dict:
     """`calls` — вызовов модели в прогоне документа: 0 у модели — повтор ответов из кэша (не новая выборка).
-    `findings` — ложные замечания документа (critical и major: серьёзность, заголовок, источники, владельцы); None —
-    в сводке прогона их нет."""
+    `findings` — ложные замечания документа (серьёзность, заголовок, источники, владельцы); None — в сводке прогона
+    их нет."""
     keep = None if findings is None else [
-        {k: f.get(k) for k in ("severity", "title", "sources", "owners")} for f in findings
-        if isinstance(f, dict) and f.get("severity") in ("critical", "major")]
+        {"severity": f.get("severity"), "title": f.get("title"), "sources": f.get("sources") or [],
+         "owners": f.get("owners") or sorted({source_owner(x) for x in f.get("sources") or []})}
+        for f in findings if isinstance(f, dict)]
     return {"set": set_name, "model": _kind(model, label), "label": label, "at": at or "", "case": case,
             "critical": int(sev.get("critical") or 0), "major": int(sev.get("major") or 0),
             "minor": int(sev.get("minor") or 0), "verdict": verdict or {}, "calls": calls, "findings": keep}
@@ -62,7 +63,8 @@ def _corpus_rows() -> list[dict]:
             if c.get("expected") != "clean" or c.get("status") in (None, "failed") or c["case_id"] == "edge.empty":
                 continue
             out.append(_row("корпус: базы и перефразы", d.get("model"), d.get("label", p.parent.name), d.get("at", ""),
-                            c["case_id"], c.get("by_severity") or {}, c.get("verdict"), c.get("calls")))
+                            c["case_id"], c.get("by_severity") or {}, c.get("verdict"), c.get("calls"),
+                            c.get("items") if isinstance(c.get("items"), list) else None))
     return out
 
 
@@ -292,7 +294,7 @@ def render_stability(rows: list[dict]) -> str:
     return "\n".join(L) + "\n"
 
 
-def recurring(rows: list[dict], min_runs: int = 2) -> list[dict]:
+def recurring(rows: list[dict], min_runs: int = 2, severities: tuple[str, ...] = ("critical", "major")) -> list[dict]:
     """Повторяющиеся ложные замечания (critical и major) на чистом документе: одна и та же жалоба в ≥ `min_runs`
     прогонах модели (выборка — как в `stability`). Жалобы склеиваются по заголовку (`common.cluster_by_title`) —
     модель каждый раз формулирует её чуть иначе."""
@@ -302,7 +304,8 @@ def recurring(rows: list[dict], min_runs: int = 2) -> list[dict]:
             rs = [r for r in rs if r.get("findings") is not None]
             if len(rs) < min_runs:
                 continue
-            for c in cluster_by_title([(i, f) for i, r in enumerate(rs) for f in r["findings"]]):
+            for c in cluster_by_title([(i, f) for i, r in enumerate(rs) for f in r["findings"]
+                                       if f.get("severity") in severities]):
                 runs = sorted({i for i, _ in c})
                 if len(runs) < min_runs:
                     continue
@@ -320,6 +323,29 @@ def recurring(rows: list[dict], min_runs: int = 2) -> list[dict]:
     out.sort(key=lambda x: (ORDER.index(x["set"]) if x["set"] in ORDER else 9, x["model"],
                             -("critical" in x["severity"]), -x["runs"], x["case"]))
     return out
+
+
+def repeat_share(rows: list[dict], set_name: str, model: str,
+                 severities: tuple[str, ...] = ("critical", "major", "minor")) -> dict:
+    """Сколько замечаний последнего прогона модели на наборе (серьёзности `severities`) — та же жалоба на том же
+    документе и в прошлом прогоне (в прошлом — любой серьёзности): {"total", "repeated", "runs", "at"}. Документы без
+    прошлых прогонов в счёт не идут."""
+    docs = stability(rows).get((set_name, model)) or {}
+    hist = {c: [r for r in rs if r.get("findings") is not None] for c, rs in docs.items()}
+    last_at = max((rs[-1]["at"] for rs in hist.values() if rs), default="")
+    total = repeated = 0
+    runs = set()
+    for case, rs in hist.items():
+        runs |= {r["at"] for r in rs}
+        if len(rs) < 2 or rs[-1]["at"] != last_at:
+            continue
+        last = len(rs) - 1
+        for c in cluster_by_title([(i, f) for i, r in enumerate(rs) for f in r["findings"]]):
+            k = sum(1 for i, f in c if i == last and f.get("severity") in severities)
+            total += k
+            if k and any(i != last for i, _ in c):
+                repeated += k
+    return {"total": total, "repeated": repeated, "runs": len(runs), "at": last_at}
 
 
 def render_recurring(rows: list[dict]) -> str:

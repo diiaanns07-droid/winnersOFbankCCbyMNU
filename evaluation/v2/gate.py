@@ -360,7 +360,8 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
         out.append(_check(f"{title}: на чистом ≤ {t['clean_max_findings']} замечания",
                           "0 документов сверх", "—" if over is None else
                           f"{over} из {c['measured']} (максимум {c.get('max_findings')}{sev})",
-                          None if over is None else over == 0, _clean_owners(d)))
+                          None if over is None else over == 0,
+                          _clean_owners(d) + _repeat_note("корпус: базы и перефразы", d)))
     out.append(_check(f"{title}: critical на чистых", "0", f"{c['critical']} (документов {c['docs_with_critical']})",
                       c["critical"] == 0, _clean_owners(d, "critical") + "; №10 (серьёзность)"))
     if "clean_verdict_no" in t:
@@ -516,7 +517,10 @@ def newtz_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list
         over = [f"{k} {v}" for k, v in sorted(per.items(), key=lambda kv: -kv[1]) if v > t["clean_major_per_doc"]]
         out.append(_check(f"{title}: major на чистом ≤ {t['clean_major_per_doc']}", "0 документов сверх",
                           f"{len(over)} из {c['n']} (максимум {worst}; всего major {c.get('major', 0)})",
-                          not over, ("; ".join(over) + " → " + _clean_owners(d, "major")) if over else ""))
+                          not over, ("; ".join(over) + " → " + _clean_owners(d, "major")
+                                     + _repeat_note("чистые ТЗ №20" if _newtz_set(d) == "№20"
+                                                    else "№18: чистые версии (2-я редакция)", d,
+                                                    ("critical", "major"))) if over else ""))
     for x in out:
         x["source"] = src
     return out
@@ -539,6 +543,25 @@ def _outside_note(d: dict, tp: int, fp: int) -> str:
     alt = f"; если они настоящие — precision {100 * (tp + k) / (tp + fp):.0f} %" if tp + fp else ""
     return (f"; вне эталона {rec['last_total']}: та же жалоба и в прошлых прогонах {kind} — {k} (кандидаты в эталон → "
             f"№18 или систематика линз, `RESULTS.md`), только здесь — {rec['last_total'] - k}{alt}")
+
+
+def _repeat_note(set_name: str, d: dict, severities: tuple[str, ...] = ("critical", "major", "minor")) -> str:
+    """«; повторяются 34 из 50 (та же жалоба в прошлых прогонах haiku — систематика или неясность документа)» — доля
+    замечаний последнего прогона на чистых, которые модель уже делала на этом документе (`cleantable.repeat_share`).
+    `severities` — какие замечания последнего прогона считать (у строки major — critical и major)."""
+    from . import cleantable as ct
+
+    kind = ct._kind(d.get("model"), d.get("label"))
+    try:
+        rows = ct._corpus_rows() if set_name.startswith("корпус") else ct._newtz_rows()
+        r = ct.repeat_share(rows, set_name, kind, severities)
+    except (OSError, ValueError):
+        return ""
+    if not r["total"] or r["at"] != d.get("at") or not r["repeated"]:
+        return ""
+    what = "" if len(severities) == 3 else " " + " и ".join(severities)
+    return (f"; повторяются {r['repeated']} из {r['total']}{what} (та же жалоба на том же документе в прошлых прогонах "
+            f"{kind} — систематика или неясность документа, `RESULTS.md`)")
 
 
 def _runs_note(d: dict, what: str) -> str:
