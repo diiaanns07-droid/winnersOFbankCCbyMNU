@@ -43,6 +43,7 @@ def pair(**kw):
             "quote_a": "Вклад можно пополнять не более трёх раз в квартал.", "line_a": 3,
             "quote_b": "Пополнение через кассу доступно всегда", "line_b": 4,
             "scenario": "В квартале три пополнения онлайн, клиент пополняет в кассе.",
+            "one_condition": True,
             "outcome_a": "четвёртое пополнение запрещено", "outcome_b": "пополнение разрешено",
             "verdict": "conflict", "basis": "limit_removed", "kind": "event_conflict", "title": "", "impact": "",
             "recommendation": "",
@@ -254,7 +255,7 @@ def test_prompt_has_no_words_of_official_document():
 def test_prompt_is_russian():
     text = PROMPT.read_text(encoding="utf-8")
     words = re.findall(r"[A-Za-z][A-Za-z_]{3,}", text)
-    allowed = {"subjects", "places", "subject", "pair_checks", "same_subject", "quote_a", "line_a", "quote_b",
+    allowed = {"one_condition", "subjects", "places", "subject", "pair_checks", "same_subject", "quote_a", "line_a", "quote_b",
                "line_b", "scenario", "outcome_a", "outcome_b", "verdict", "conflict", "compatible", "undefined",
                "kind", "event_conflict", "status_conflict", "boundary_conflict", "unit_mismatch", "contradiction",
                "ambiguity", "incomplete", "title", "impact", "recommendation", "question", "glossary", "concept",
@@ -537,3 +538,23 @@ def test_conflict_between_two_schemas_is_major():
     reqs[1]["kind"], reqs[2]["kind"] = "architecture", "process"
     out = C.postprocess(answer(pair_checks=[pair()]), VIEW, reqs)
     assert out["candidates"][0]["severity"] == "major"
+
+
+def test_conflict_from_two_different_conditions_is_undefined():
+    p = pair(one_condition=False)
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"][0]["verdict"] == "undefined"
+    assert out["candidates"][0]["severity"] == "major"
+    assert "one_condition" in C.PAIR_SCHEMA["properties"]
+
+
+def test_internal_service_action_is_not_a_promise_of_interface_operation():
+    doc = ["Сервис учёта получает номер договора от партнёра.", "На экране: номер договора и дата.",
+           "Методы описаны в части B."]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    out = C.postprocess(answer(candidates=[_missing([(doc[0], 1), (doc[1], 2)])]), view, [])
+    assert out["candidates"][0]["severity"] == "major"
+    doc[0] = "Приложение получает номер договора через дочерний документ."
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    out = C.postprocess(answer(candidates=[_missing([("получает номер договора через дочерний документ", 1)])]), view, [])
+    assert out["candidates"][0]["severity"] == "critical"  # подлежащее «Приложение» — в строке, вне цитаты

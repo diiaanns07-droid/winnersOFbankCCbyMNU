@@ -81,7 +81,7 @@ CANDIDATE_SCHEMA = _obj({
 PAIR_SCHEMA = _obj({
     "a": _S, "b": _S, "subject": _S, "same_subject": {"type": "boolean"},
     "quote_a": _S, "line_a": _I, "quote_b": _S, "line_b": _I,
-    "scenario": _S, "outcome_a": _S, "outcome_b": _S,
+    "scenario": _S, "outcome_a": _S, "outcome_b": _S, "one_condition": {"type": "boolean"},
     "verdict": {"type": "string", "enum": VERDICTS},
     "basis": {"type": "string", "enum": BASES},
     "kind": {"type": "string", "enum": PAIR_KINDS},
@@ -261,6 +261,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         "quote_a": _s(p.get("quote_a")), "line_a": _int(p.get("line_a")) or 0,
         "quote_b": _s(p.get("quote_b")), "line_b": _int(p.get("line_b")) or 0,
         "scenario": _s(p.get("scenario")), "outcome_a": _s(p.get("outcome_a")), "outcome_b": _s(p.get("outcome_b")),
+        "one_condition": p.get("one_condition") is not False,  # нет поля (старые ответы) — одно условие
         "verdict": p.get("verdict") if p.get("verdict") in VERDICTS else "undefined",
         "basis": p.get("basis") if p.get("basis") in BASES else "",
         "kind": p.get("kind") if p.get("kind") in PAIR_KINDS else "event_conflict",
@@ -282,6 +283,9 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     side_kinds = [(known or {}).get(x, {}).get("kind") for x in (pair["a"], pair["b"])]
     if any(k in SOFT_KINDS for k in side_kinds) and pair["kind"] not in ("unit_mismatch", "boundary_conflict"):
         pair["verdict"], pair["basis"] = "compatible", "none"
+    # Исходы вызваны двумя разными условиями, соединёнными в один сценарий, — это порядок проверок, не конфликт.
+    if pair["verdict"] == "conflict" and not pair["one_condition"]:
+        pair["basis"] = "none"
     # Конфликт без названного основания (модель сама не нашла ни одного из трёх) — неопределённость.
     if pair["verdict"] == "conflict" and pair["basis"] == "none":
         pair["verdict"] = "undefined"
@@ -289,7 +293,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
             pair["kind"] = "ambiguity"
     # Обратная ошибка слабой модели: одна сторона ограничивает действие («максимум», «не более»), другая прямо
     # снимает ограничение («независимо от», «без ограничения»), а вердикт — «не определено». Это limit_removed.
-    elif (pair["verdict"] == "undefined" and pair["same_subject"] and _found(ev_a) and _found(ev_b)
+    elif (pair["verdict"] == "undefined" and pair["same_subject"] and pair["one_condition"] and _found(ev_a) and _found(ev_b)
           and not _overlap(ev_a, ev_b) and _removes_limit(pair["quote_a"], pair["quote_b"])):
         pair.update(verdict="conflict", basis="limit_removed", kind="event_conflict")
     return pair
@@ -615,16 +619,28 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
     # Если ни одна цитируемая строка не обещает действие словами (экран с элементом, перечень систем, пример ответа),
     # обещания нет, есть только догадка модели — тоже не critical.
     if cand["severity"] == "critical" and cand["kind"] == "missing_element" and (
-            _all_named_described(evidence, view) or not _PROMISE.search(" ".join(_s(e.get("quote")) for e in evidence))):
+            _all_named_described(evidence, view) or not _promises(" ".join(_s(e.get("quote")) for e in evidence))
+            and not _PROMISE_SUBJ.search(" ".join(_cited_texts(evidence, view)))):
         cand["severity"] = "major"
     return cand
 
 
 _IDENT = re.compile(r"\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
 # Глаголы обещанного действия (основы, с начала слова): читает, получает, отдаёт, возвращает, сохраняет, показывает…
-_PROMISE = re.compile(r"(?<![а-яё])(чита|получа|получ|отда|возвра|верн|сохран|показ|отобра|вызыв|отправ|запраш|"
-                      r"переда|хран|меня|измен|удал|созда|отмен|отзыв|включ|выключ|рассчит|подключ|оформл|"
-                      r"выполн|формир|загруж|обновл|блокир|разблокир|приходит|присыла)", re.I)
+_VERB = (r"(?<![а-яё])(?:чита|получа|получ|отда|возвра|верн|сохран|показ|отобра|вызыв|отправ|запраш|"
+         r"переда|хран|меня|измен|удал|созда|отмен|отзыв|включ|выключ|рассчит|подключ|оформл|"
+         r"выполн|формир|загруж|обновл|блокир|разблокир|приходит|присыла)")
+_PROMISE = re.compile(_VERB, re.I)
+# Обещание интерфейса: действие приложения, клиента, экрана — в одной фразе с глаголом; или шаг логики («вернуть 409»).
+_PROMISE_SUBJ = re.compile(r"(?<![а-яё])(?:приложени|клиент|экран|интерфейс|пользовател|мобильн)\w*[^.;|]{0,80}?"
+                           + _VERB, re.I)
+_PROMISE_STEP = re.compile(r"(?<![а-яё])(?:вернуть|возвращать|отдать|отдавать|передать|отправить|показать|"
+                           r"сохранить|вызвать)(?![а-яё])", re.I)
+
+
+def _promises(text: str) -> bool:
+    """Цитаты содержат обещание операции интерфейса (а не действие внутреннего сервиса или элемент экрана)."""
+    return bool(_PROMISE_SUBJ.search(text) or _PROMISE_STEP.search(text))
 
 
 def _headings(view: Any) -> list[str]:

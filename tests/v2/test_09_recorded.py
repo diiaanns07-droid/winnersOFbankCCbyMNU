@@ -88,7 +88,7 @@ def test_negative_control_clean_base_has_no_conflicts(model):
             assert not ({25, 26} <= lines_of(c)), c["title"]
 
 
-WAVE2 = ["haiku_w2_1", "haiku_w2_2", "haiku_w2_3"]  # промпт с шагом 2б, `stage consistency`, 1 вызов без обрезки
+WAVE2 = [f"haiku_w2_{i}" for i in range(1, 7)]  # шаг 2б, `stage consistency` (effort low), 1 вызов без обрезки
 
 
 @pytest.mark.parametrize("model", WAVE2)
