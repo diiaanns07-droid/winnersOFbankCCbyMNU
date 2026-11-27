@@ -1,12 +1,12 @@
-// Скриншоты для README и слайдов (№14): node presentation/shots.cjs <report.html> <out_dir> [web_url]
+// Скриншоты для README и слайдов (№14): node presentation/shots.cjs <report.html> <out_dir> [web_url] [файл] [провайдер] [модель]
 //   report_first.png — первый экран HTML-отчёта; report_card.png — карточка критичного дефекта с подсветкой
 //   в документе; report_dark.png — тёмная тема; web_upload.png / web_progress.png / web_report.png — веб-демо
-//   (если передан адрес запущенного `python -m bcc_review.v2.web`, загрузка идёт с провайдером mock).
+//   (если передан адрес запущенного `python -m bcc_review.v2.web`, загрузка идёт с указанным провайдером, по умолчанию mock).
 const { chromium } = require("playwright");
 const path = require("path");
 
 (async () => {
-  const [report, outDir, webUrl, uploadFile] = process.argv.slice(2);
+  const [report, outDir, webUrl, uploadFile, provider = "mock", model = ""] = process.argv.slice(2);
   const out = (n) => path.join(outDir, n);
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: "light" });
@@ -50,10 +50,14 @@ const path = require("path");
     const w = await ctx.newPage();
     await w.goto(webUrl);
     if (uploadFile) await w.setInputFiles("#file", uploadFile);
-    await w.selectOption("#provider", "mock");
+    await w.selectOption("#provider", provider);
+    if (model) await w.fill("#model", model);
     await w.screenshot({ path: out("web_upload.png") });
     if (uploadFile) await w.click("#go"); else await w.click('button[name="sample"]');
     await w.waitForURL(/\/jobs\//);
+    // момент, когда ревьюеры работают параллельно (иначе — через 1,6 с)
+    await w.waitForFunction(() => [...document.querySelectorAll(".stg")].some((x) => /Ревьюеры/.test(x.textContent) && /running/.test(x.className)),
+      null, { timeout: 120000 }).catch(() => {});
     await w.waitForTimeout(1600);
     await w.screenshot({ path: out("web_progress.png") });
     await w.waitForSelector("#result:not([hidden])", { timeout: 600000 });
