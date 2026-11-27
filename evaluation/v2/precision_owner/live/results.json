@@ -1,5 +1,111 @@
 [
   {
+    "kind": "answered",
+    "variant": "base",
+    "case": "qr",
+    "model_requested": "sonnet",
+    "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+    "status": "complete",
+    "seconds": 222.1,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 12,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 263486,
+      "output": 55499
+    },
+    "dirty": false,
+    "verdict": [
+      "yes",
+      "yes"
+    ],
+    "open": {
+      "major": 2,
+      "minor": 7
+    },
+    "critical": [],
+    "owner": {
+      "rewrite_count": 25,
+      "revise_stats": {
+        "replaced": 21,
+        "inserted": 5,
+        "not_applied": 0,
+        "pending": 3,
+        "findings": 14,
+        "decisions": 2,
+        "with_rewrite": 15,
+        "without_rewrite": [
+          "D-07"
+        ],
+        "check_fixes": 1,
+        "check_edits": 1
+      },
+      "needs_confirmation": 0
+    },
+    "revision_sha256": "189a91f250103108097847819ad9ba84c0009701118751c49731c7f84d7fa2f3"
+  },
+  {
+    "kind": "answered",
+    "variant": "patch",
+    "case": "qr",
+    "model_requested": "sonnet",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 247.9,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 13,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 291686,
+      "output": 60877
+    },
+    "dirty": false,
+    "verdict": [
+      "yes",
+      "yes"
+    ],
+    "open": {
+      "major": 1,
+      "minor": 7
+    },
+    "critical": [],
+    "owner": {
+      "rewrite_count": 23,
+      "revise_stats": {
+        "replaced": 19,
+        "inserted": 9,
+        "not_applied": 0,
+        "pending": 1,
+        "findings": 12,
+        "decisions": 2,
+        "with_rewrite": 13,
+        "without_rewrite": [
+          "D-07"
+        ],
+        "check_fixes": 1,
+        "check_edits": 1
+      },
+      "needs_confirmation": 0
+    },
+    "revision_sha256": "fff053b17fe58a22bcee8824e5315f5e3e1809124f6bcff2bf9d264e719a7f13"
+  },
+  {
     "kind": "judge",
     "variant": "base",
     "case": "car-loan",

@@ -1,0 +1,926 @@
+{
+  "stage": "consistency",
+  "status": "ok",
+  "seconds": 49.58,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 48,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Срок QR без суммы: Ф-2 и особое правило 1 API",
+        "kind": "event_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-06",
+          "R-29"
+        ],
+        "evidence": [
+          {
+            "quote": "QR-код действует 15 минут с момента создания.",
+            "line": 38,
+            "line_start": 38,
+            "line_end": 38,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "QR-код без суммы действует до конца календарного дня создания.",
+            "line": 131,
+            "line_start": 131,
+            "line_end": 131,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-2 и «Особые правила, п. 1» по-разному решают один случай — срок действия QR без суммы: 15 минут против конца дня. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "QR без суммы создан в 10:00, отсканирован в 10:30, перевод 5 000 ₸. Ф-2: срок истёк, отказ. Особые правила, п. 1: перевод выполнен до 23:59.",
+        "impact": "Банк принимает платежи по просроченным QR; тесты расходятся.",
+        "recommendation": "Зафиксировать единый срок QR без суммы.",
+        "rewrite": "",
+        "question": "QR без суммы действует 15 минут или до конца дня?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-01"
+        ]
+      },
+      {
+        "title": "Истёкший QR: 410 в логике и 400 в статусах",
+        "kind": "status_conflict",
+        "criterion": "set_consistent",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-24",
+          "R-44"
+        ],
+        "evidence": [
+          {
+            "quote": "Если срок истёк или QR-код отменён, вернуть 410.",
+            "line": 124,
+            "line_start": 124,
+            "line_end": 124,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          },
+          {
+            "quote": "400. Ответ в случае, если параметры запроса заполнены неверно или срок действия QR-кода истёк.",
+            "line": 168,
+            "line_start": 168,
+            "line_end": 168,
+            "page": null,
+            "section": "Часть B. REST API › Статусы",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«Логика работы метода, п. 4» и «Статус 400» по-разному решают один случай — код ответа при истёкшем сроке QR: 410 или 400. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "QR создан в 10:00, запрос перевода в 10:16. Логика работы метода, п. 4: вернуть 410. Статус 400: вернуть 400 со сроком истёк.",
+        "impact": "Клиент по-разному обрабатывает ошибку, тесты расходятся.",
+        "recommendation": "Назначить один код для истёкшего QR во всех местах.",
+        "rewrite": "",
+        "question": "Истёкший QR возвращает 400 или 410?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-02"
+        ]
+      },
+      {
+        "title": "Ф-1: 500 000 допустимо, приёмка отклоняет",
+        "kind": "boundary_conflict",
+        "criterion": "unambiguous",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-05",
+          "R-17"
+        ],
+        "evidence": [
+          {
+            "quote": "с суммой от 100 до 500 000 ₸ включительно",
+            "line": 37,
+            "line_start": 37,
+            "line_end": 37,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          },
+          {
+            "quote": "Перевод отклонён: сумма превышает максимальную",
+            "line": 67,
+            "line_start": 67,
+            "line_end": 67,
+            "page": null,
+            "section": "Часть A. Новый функционал › Критерии приемки",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Ф-1 и «критерий приёмки, строка 3» по-разному решают один случай — максимальная сумма QR 500 000 ₸ включительно. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "QR на ровно 500 000 ₸, подтверждение перевода. Ф-1: сумма допустима, перевод выполняется. Критерий приёмки, строка 3: перевод отклонён как превышение.",
+        "impact": "Допустимый перевод отклонят или приёмка провалится.",
+        "recommendation": "Исправить строку приёмки: 500 000 — успех, 500 001 — отказ.",
+        "rewrite": "",
+        "question": "Что верно: «сумма допустима, перевод выполняется» (как в Ф-1) или «перевод отклонён как превышение» (как в «критерий приёмки, строка 3»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-03"
+        ]
+      },
+      {
+        "title": "ttl хранится в минутах, проверяется в секундах",
+        "kind": "unit_mismatch",
+        "criterion": "unambiguous",
+        "severity": "major",
+        "requirement_ids": [
+          "R-13",
+          "R-24"
+        ],
+        "evidence": [
+          {
+            "quote": "срок действия ttl в минутах",
+            "line": 51,
+            "line_start": 51,
+            "line_end": 51,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к данным",
+            "verified": "exact"
+          },
+          {
+            "quote": "текущее время не позже времени создания QR-кода + ttl секунд",
+            "line": 124,
+            "line_start": 124,
+            "line_end": 124,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«требования к данным, строка 51» и «Логика работы метода, п. 4» по-разному решают один случай — единица ttl: минуты или секунды. Ни одно из мест не объявлено исключением из другого.",
+        "scenario": "Хранится ttl = 15, проверка при запросе через 20 минут. Требования к данным, строка 51: 15 минут, срок истёк. Логика работы метода, п. 4: 15 секунд, истёк раньше.",
+        "impact": "QR истекает в 60 раз раньше или позже.",
+        "recommendation": "Задать единую единицу ttl в данных и логике.",
+        "rewrite": "",
+        "question": "Что верно: «15 минут, срок истёк» (как в «требования к данным, строка 51») или «15 секунд, истёк раньше» (как в «Логика работы метода, п. 4»)?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-04"
+        ]
+      },
+      {
+        "title": "Код ответа для оплаченного QR не определён (п. 6 API)",
+        "kind": "incomplete",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-26",
+          "R-47"
+        ],
+        "evidence": [
+          {
+            "quote": "6. Проверить, что QR-код с суммой ещё не оплачен.",
+            "line": 126,
+            "line_start": 126,
+            "line_end": 126,
+            "page": null,
+            "section": "Часть B. REST API › Логика работы метода",
+            "verified": "exact"
+          },
+          {
+            "quote": "410. Ответ в случае, если QR-код отменён получателем.",
+            "line": 171,
+            "line_start": 171,
+            "line_end": 171,
+            "page": null,
+            "section": "Часть B. REST API › Статусы",
+            "verified": "exact"
+          }
+        ],
+        "problem": "«Логика работы метода, п. 6» и «Статус 410» касаются одного случая — код ответа API для уже оплаченного QR с суммой, — но результат по ним не определить: документ не говорит, что делать.",
+        "scenario": "QR с суммой 7 000 ₸ оплачен, второй отправитель шлёт новый requestId. Логика работы метода, п. 6: проверка есть, код не задан. Статус 410: 410 только для отменённого.",
+        "impact": "Приложение не покажет «QR-код недействителен» единообразно.",
+        "recommendation": "Назначить код и message для оплаченного QR в таблице статусов.",
+        "rewrite": "",
+        "question": "Какой код и текст возвращать при повторной оплате QR с суммой?",
+        "blocks": "both",
+        "source": "consistency",
+        "origin": "pair_check",
+        "pair_ids": [
+          "P-05"
+        ]
+      },
+      {
+        "title": "Терминология не едина, глоссария нет: «Отправитель перевода», «Срок действия QR-кода», «Сумма перевода»",
+        "kind": "terminology",
+        "criterion": "conforming",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "quote": "Отправитель",
+            "line": 29,
+            "line_start": 29,
+            "line_end": 29,
+            "verified": "normalized"
+          },
+          {
+            "quote": "плательщику",
+            "line": 122,
+            "line_start": 122,
+            "line_end": 122,
+            "verified": "normalized"
+          },
+          {
+            "quote": "срок действия ttl в минутах",
+            "line": 51,
+            "line_start": 51,
+            "line_end": 51,
+            "verified": "normalized"
+          },
+          {
+            "quote": "ttl секунд",
+            "line": 124,
+            "line_start": 124,
+            "line_end": 124,
+            "verified": "normalized"
+          },
+          {
+            "quote": "Сумма",
+            "line": 28,
+            "line_start": 28,
+            "line_end": 28,
+            "verified": "normalized"
+          },
+          {
+            "quote": "сумму в тенге",
+            "line": 51,
+            "line_start": 51,
+            "line_end": 51,
+            "verified": "normalized"
+          }
+        ],
+        "problem": "Одни и те же понятия названы в разных частях документа по-разному. Отправитель перевода: «Отправитель» (строка 29), «плательщику» (строка 122), «клиента-отправителя» (строка 109); Срок действия QR-кода: «срок действия ttl в минутах» (строка 51), «ttl секунд» (строка 124); Сумма перевода: «Сумма» (строка 28), «сумму в тенге» (строка 51), «amount_kzt» (строка 151).",
+        "scenario": "",
+        "impact": "Документ труднее читать и искать по нему; при изменениях легко поправить одно название и пропустить другое.",
+        "recommendation": "Добавить в документ глоссарий и использовать в каждой части одно название для каждого понятия.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "glossary",
+        "glossary_ids": [
+          "G-01",
+          "G-02",
+          "G-03"
+        ]
+      },
+      {
+        "title": "Обещанные методы создания, получения данных и отмены QR не описаны",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "critical",
+        "requirement_ids": [
+          "R-14",
+          "R-11",
+          "R-09",
+          "R-07"
+        ],
+        "evidence": [
+          {
+            "quote": "Приложения создают QR-код, получают данные QR-кода перед подтверждением и выполняют перевод через дочерний документ «Перевод по QR-коду — REST API».",
+            "line": 54,
+            "line_start": 54,
+            "line_end": 54,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          },
+          {
+            "quote": "Приложение отправителя → сервис QR-кодов: получить данные QR-кода.",
+            "line": 45,
+            "line_start": 45,
+            "line_end": 45,
+            "page": null,
+            "section": "Часть A. Новый функционал › Sequence Diagram",
+            "verified": "exact"
+          },
+          {
+            "quote": "QR-код показывается с таймером обратного отсчёта и кнопкой «Отменить».",
+            "line": 28,
+            "line_start": 28,
+            "line_end": 28,
+            "page": null,
+            "section": "Часть A. Новый функционал › Дизайн процесса UI",
+            "verified": "exact"
+          },
+          {
+            "quote": "Description | Выполнение перевода по QR-коду",
+            "line": 107,
+            "line_start": 107,
+            "line_end": 107,
+            "page": null,
+            "section": "Часть B. REST API › Общие параметры",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Дочерний документ описывает только перевод; создание QR, получение данных и отмена не описаны нигде.",
+        "scenario": "Разработчик приложения получателя нажимает «Создать QR» или «Отменить»: контракта метода нет.",
+        "impact": "Экраны создания, подтверждения и отмены нельзя подключить, Ф-5 нельзя реализовать и проверить.",
+        "recommendation": "Добавить в часть B спецификации методов создания, получения данных и отмены QR-кода.",
+        "rewrite": "Добавить методы: POST /qr (создать), GET /qr/{qrId} (данные: маскированное имя, сумма, статус, срок), POST /qr/{qrId}/cancel (отменить) с кодами ответов.",
+        "question": "",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Схемы по-разному показывают путь вызова сервиса переводов",
+        "kind": "other",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-02",
+          "R-11",
+          "R-31"
+        ],
+        "evidence": [
+          {
+            "quote": "Приложение отправителя → сервис QR-кодов → сервис переводов → антифрод.",
+            "line": 25,
+            "line_start": 25,
+            "line_end": 25,
+            "page": null,
+            "section": "Часть A. Новый функционал › Архитектура решения",
+            "verified": "exact"
+          },
+          {
+            "quote": "Приложение отправителя → сервис переводов: выполнить перевод по QR-коду.",
+            "line": 45,
+            "line_start": 45,
+            "line_end": 45,
+            "page": null,
+            "section": "Часть A. Новый функционал › Sequence Diagram",
+            "verified": "exact"
+          },
+          {
+            "quote": "Приложение отправителя → QrTransferController → сервис QR-кодов → сервис переводов (антифрод, списание, зачисление)",
+            "line": 136,
+            "line_start": 136,
+            "line_end": 136,
+            "page": null,
+            "section": "Часть B. REST API › Схема",
+            "verified": "exact"
+          }
+        ],
+        "problem": "В последовательности приложение вызывает сервис переводов напрямую, в архитектуре и схеме API — через сервис QR-кодов.",
+        "scenario": "Команды реализуют вызов по разным схемам, интеграция не стыкуется.",
+        "impact": "Неверная реализация маршрута и контроля QR-кода.",
+        "recommendation": "Привести три схемы к единому маршруту вызова и показать сервис уведомлений в схеме API.",
+        "rewrite": "",
+        "question": "Вызывает ли приложение сервис переводов напрямую или через сервис QR-кодов?",
+        "blocks": "development",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Правило идемпотентности записано в двух местах",
+        "kind": "duplicate",
+        "criterion": "modifiable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-14",
+          "R-30"
+        ],
+        "evidence": [
+          {
+            "quote": "Повторный запрос перевода с тем же requestId не создаёт второй перевод.",
+            "line": 54,
+            "line_start": 54,
+            "line_end": 54,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к интеграции",
+            "verified": "exact"
+          },
+          {
+            "quote": "Повторный запрос с тем же requestId возвращает результат первого запроса.",
+            "line": 132,
+            "line_start": 132,
+            "line_end": 132,
+            "page": null,
+            "section": "Часть B. REST API › Особые правила",
+            "verified": "exact"
+          }
+        ],
+        "problem": "Одно правило повтора сформулировано дважды разными словами; при изменении разойдётся.",
+        "scenario": "Меняют срок хранения ключа только в одном месте.",
+        "impact": "Расхождение реализации и тестов.",
+        "recommendation": "Оставить правило в одном месте, в другом дать ссылку.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нет приоритетов и признаков важности требований",
+        "kind": "missing_element",
+        "criterion": "ranked",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-05",
+          "R-06",
+          "R-12"
+        ],
+        "evidence": [
+          {
+            "quote": "Ф-4. Комиссия за перевод по QR-коду не взимается.",
+            "line": 40,
+            "line_start": 40,
+            "line_end": 40,
+            "page": null,
+            "section": "Часть A. Новый функционал › Требования к изменениям › Функциональные требования",
+            "verified": "exact"
+          }
+        ],
+        "problem": "У требований нет приоритета и стабильности.",
+        "scenario": "При нехватке сроков неясно, что откладывать.",
+        "impact": "Спор о составе релиза.",
+        "recommendation": "Добавить приоритет каждому требованию.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      },
+      {
+        "title": "Нет идентификаторов у большинства пунктов, версия не указана",
+        "kind": "traceability",
+        "criterion": "traceable",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-12",
+          "R-13",
+          "R-14",
+          "R-21"
+        ],
+        "evidence": [
+          {
+            "quote": "Документ (версия/дата) в источнике не заполнен.",
+            "line": 72,
+            "line_start": 72,
+            "line_end": 72,
+            "page": null,
+            "section": "Часть A. Новый функционал › Ревью требований",
+            "verified": "exact"
+          }
+        ],
+        "problem": "ID есть только у Ф-1…Ф-6; у остальных пунктов и версии нет.",
+        "scenario": "Тест-кейс нельзя привязать к пункту.",
+        "impact": "Трассировка невозможна.",
+        "recommendation": "Присвоить ID всем пунктам и указать версию документа.",
+        "rewrite": "",
+        "question": "",
+        "blocks": "none",
+        "source": "consistency",
+        "origin": "model"
+      }
+    ],
+    "pair_checks": [
+      {
+        "a": "R-06",
+        "b": "R-29",
+        "subject": "Срок действия QR без суммы: 15 минут против конца дня",
+        "same_subject": true,
+        "quote_a": "QR-код действует 15 минут с момента создания.",
+        "line_a": 38,
+        "quote_b": "QR-код без суммы действует до конца календарного дня создания.",
+        "line_b": 131,
+        "scenario": "QR без суммы создан в 10:00, отсканирован в 10:30, перевод 5 000 ₸.",
+        "outcome_a": "Срок истёк, отказ",
+        "outcome_b": "Перевод выполнен до 23:59",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "event_conflict",
+        "title": "Срок QR без суммы: Ф-2 и особое правило 1 API",
+        "impact": "Банк принимает платежи по просроченным QR; тесты расходятся.",
+        "recommendation": "Зафиксировать единый срок QR без суммы.",
+        "question": "QR без суммы действует 15 минут или до конца дня?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-01"
+      },
+      {
+        "a": "R-24",
+        "b": "R-44",
+        "subject": "Код ответа при истёкшем сроке QR: 410 или 400",
+        "same_subject": true,
+        "quote_a": "Если срок истёк или QR-код отменён, вернуть 410.",
+        "line_a": 124,
+        "quote_b": "400. Ответ в случае, если параметры запроса заполнены неверно или срок действия QR-кода истёк.",
+        "line_b": 168,
+        "scenario": "QR создан в 10:00, запрос перевода в 10:16.",
+        "outcome_a": "Вернуть 410",
+        "outcome_b": "Вернуть 400 со сроком истёк",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "same_condition",
+        "kind": "status_conflict",
+        "title": "Истёкший QR: 410 в логике и 400 в статусах",
+        "impact": "Клиент по-разному обрабатывает ошибку, тесты расходятся.",
+        "recommendation": "Назначить один код для истёкшего QR во всех местах.",
+        "question": "Истёкший QR возвращает 400 или 410?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-02"
+      },
+      {
+        "a": "R-05",
+        "b": "R-17",
+        "subject": "Максимальная сумма QR 500 000 ₸ включительно",
+        "same_subject": true,
+        "quote_a": "с суммой от 100 до 500 000 ₸ включительно",
+        "line_a": 37,
+        "quote_b": "Перевод отклонён: сумма превышает максимальную",
+        "line_b": 67,
+        "scenario": "QR на ровно 500 000 ₸, подтверждение перевода.",
+        "outcome_a": "Сумма допустима, перевод выполняется",
+        "outcome_b": "Перевод отклонён как превышение",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "boundary_conflict",
+        "title": "Ф-1: 500 000 допустимо, приёмка отклоняет",
+        "impact": "Допустимый перевод отклонят или приёмка провалится.",
+        "recommendation": "Исправить строку приёмки: 500 000 — успех, 500 001 — отказ.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-03"
+      },
+      {
+        "a": "R-13",
+        "b": "R-24",
+        "subject": "Единица ttl: минуты или секунды",
+        "same_subject": true,
+        "quote_a": "срок действия ttl в минутах",
+        "line_a": 51,
+        "quote_b": "текущее время не позже времени создания QR-кода + ttl секунд",
+        "line_b": 124,
+        "scenario": "Хранится ttl = 15, проверка при запросе через 20 минут.",
+        "outcome_a": "15 минут, срок истёк",
+        "outcome_b": "15 секунд, истёк раньше",
+        "one_condition": true,
+        "verdict": "conflict",
+        "basis": "value_mismatch",
+        "kind": "unit_mismatch",
+        "title": "ttl хранится в минутах, проверяется в секундах",
+        "impact": "QR истекает в 60 раз раньше или позже.",
+        "recommendation": "Задать единую единицу ttl в данных и логике.",
+        "question": "",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-04"
+      },
+      {
+        "a": "R-26",
+        "b": "R-47",
+        "subject": "Код ответа API для уже оплаченного QR с суммой",
+        "same_subject": true,
+        "quote_a": "6. Проверить, что QR-код с суммой ещё не оплачен.",
+        "line_a": 126,
+        "quote_b": "410. Ответ в случае, если QR-код отменён получателем.",
+        "line_b": 171,
+        "scenario": "QR с суммой 7 000 ₸ оплачен, второй отправитель шлёт новый requestId.",
+        "outcome_a": "Проверка есть, код не задан",
+        "outcome_b": "410 только для отменённого",
+        "one_condition": false,
+        "verdict": "undefined",
+        "basis": "none",
+        "kind": "incomplete",
+        "title": "Код ответа для оплаченного QR не определён (п. 6 API)",
+        "impact": "Приложение не покажет «QR-код недействителен» единообразно.",
+        "recommendation": "Назначить код и message для оплаченного QR в таблице статусов.",
+        "question": "Какой код и текст возвращать при повторной оплате QR с суммой?",
+        "verified_a": "exact",
+        "verified_b": "exact",
+        "id": "P-05"
+      }
+    ],
+    "trace": [
+      {
+        "requirement_id": "R-05",
+        "verified_by": [
+          "R-17"
+        ],
+        "implemented_by": [
+          "R-25",
+          "R-35"
+        ],
+        "note": "противоречие: критерий приёмки, строка 3; Нет метода создания QR; приёмка границы ошибочна",
+        "conflicts_with": [
+          "R-17"
+        ]
+      },
+      {
+        "requirement_id": "R-06",
+        "verified_by": [
+          "R-15",
+          "R-16",
+          "R-18"
+        ],
+        "implemented_by": [
+          "R-24",
+          "R-26",
+          "R-29"
+        ],
+        "note": "противоречие: Особые правила, п. 1",
+        "conflicts_with": [
+          "R-29"
+        ]
+      },
+      {
+        "requirement_id": "R-07",
+        "verified_by": [],
+        "implemented_by": [
+          "R-41"
+        ],
+        "note": "Нет метода получения данных, нет критерия приёмки"
+      },
+      {
+        "requirement_id": "R-08",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет критерия приёмки на отсутствие комиссии"
+      },
+      {
+        "requirement_id": "R-09",
+        "verified_by": [
+          "R-19"
+        ],
+        "implemented_by": [
+          "R-47"
+        ],
+        "note": "Нет метода отмены"
+      },
+      {
+        "requirement_id": "R-10",
+        "verified_by": [
+          "R-15"
+        ],
+        "implemented_by": [
+          "R-02"
+        ],
+        "note": "Push не описан в API; нет push отправителю в приёмке"
+      },
+      {
+        "requirement_id": "R-12",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "Нет измеримых значений и критериев"
+      },
+      {
+        "requirement_id": "R-13",
+        "verified_by": [],
+        "implemented_by": [
+          "R-33"
+        ],
+        "note": "противоречие: Логика работы метода, п. 4; номер карты в QR",
+        "conflicts_with": [
+          "R-24"
+        ]
+      },
+      {
+        "requirement_id": "R-14",
+        "verified_by": [],
+        "implemented_by": [
+          "R-20",
+          "R-36"
+        ],
+        "note": "Описан один метод из трёх; нет теста повтора"
+      },
+      {
+        "requirement_id": "R-21",
+        "verified_by": [],
+        "implemented_by": [
+          "R-45"
+        ],
+        "note": "Нет критерия приёмки"
+      },
+      {
+        "requirement_id": "R-22",
+        "verified_by": [],
+        "implemented_by": [
+          "R-34"
+        ],
+        "note": "Не задан код ответа и критерий"
+      },
+      {
+        "requirement_id": "R-23",
+        "verified_by": [],
+        "implemented_by": [
+          "R-46"
+        ],
+        "note": "Нет критерия приёмки"
+      },
+      {
+        "requirement_id": "R-24",
+        "verified_by": [
+          "R-16"
+        ],
+        "implemented_by": [
+          "R-44",
+          "R-47"
+        ],
+        "note": "противоречие: требования к данным, строка 51",
+        "conflicts_with": [
+          "R-44",
+          "R-13"
+        ]
+      },
+      {
+        "requirement_id": "R-25",
+        "verified_by": [
+          "R-17"
+        ],
+        "implemented_by": [
+          "R-35"
+        ],
+        "note": "Нет критерия про игнор amount"
+      },
+      {
+        "requirement_id": "R-26",
+        "verified_by": [
+          "R-18"
+        ],
+        "implemented_by": [],
+        "note": "Код ответа для оплаченного QR не задан"
+      },
+      {
+        "requirement_id": "R-27",
+        "verified_by": [],
+        "implemented_by": [
+          "R-38",
+          "R-43"
+        ],
+        "note": "Нет критерия на отказ антифрода"
+      },
+      {
+        "requirement_id": "R-28",
+        "verified_by": [
+          "R-15"
+        ],
+        "implemented_by": [
+          "R-31"
+        ],
+        "note": "Механизм списания не расписан"
+      },
+      {
+        "requirement_id": "R-29",
+        "verified_by": [],
+        "implemented_by": [],
+        "note": "противоречие: Ф-2",
+        "conflicts_with": [
+          "R-06"
+        ]
+      },
+      {
+        "requirement_id": "R-30",
+        "verified_by": [],
+        "implemented_by": [
+          "R-36"
+        ],
+        "note": "Нет критерия приёмки на повтор"
+      }
+    ],
+    "glossary": [
+      {
+        "id": "G-01",
+        "concept": "Отправитель перевода",
+        "terms": [
+          {
+            "term": "Отправитель",
+            "line": 29
+          },
+          {
+            "term": "плательщику",
+            "line": 122
+          },
+          {
+            "term": "клиента-отправителя",
+            "line": 109
+          }
+        ],
+        "problem": "Разные названия одной роли мешают поиску и проверке карты.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-02",
+        "concept": "Срок действия QR-кода",
+        "terms": [
+          {
+            "term": "срок действия ttl в минутах",
+            "line": 51
+          },
+          {
+            "term": "ttl секунд",
+            "line": 124
+          }
+        ],
+        "problem": "Одна величина названа и измеряется по-разному.",
+        "severity": "minor"
+      },
+      {
+        "id": "G-03",
+        "concept": "Сумма перевода",
+        "terms": [
+          {
+            "term": "Сумма",
+            "line": 28
+          },
+          {
+            "term": "сумму в тенге",
+            "line": 51
+          },
+          {
+            "term": "amount_kzt",
+            "line": 151
+          }
+        ],
+        "problem": "Разные названия суммы, значения не путаются.",
+        "severity": "minor"
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Срок действия QR без суммы",
+        "places": [
+          "R-06",
+          "R-29",
+          "R-24"
+        ]
+      },
+      {
+        "subject": "Код ответа при истёкшем QR",
+        "places": [
+          "R-24",
+          "R-44",
+          "R-47"
+        ]
+      },
+      {
+        "subject": "Максимальная сумма 500 000",
+        "places": [
+          "R-05",
+          "R-07",
+          "R-25",
+          "R-35"
+        ]
+      },
+      {
+        "subject": "Единица ttl",
+        "places": [
+          "R-13",
+          "R-24"
+        ]
+      },
+      {
+        "subject": "Оплаченный QR с суммой",
+        "places": [
+          "R-06",
+          "R-26",
+          "R-09"
+        ]
+      },
+      {
+        "subject": "Идемпотентность по requestId",
+        "places": [
+          "R-14",
+          "R-30",
+          "R-36"
+        ]
+      },
+      {
+        "subject": "Отказ антифрода: код 200",
+        "places": [
+          "R-27",
+          "R-37",
+          "R-43"
+        ]
+      }
+    ],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

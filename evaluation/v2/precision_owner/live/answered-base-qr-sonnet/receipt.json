@@ -1,0 +1,22 @@
+{
+  "job": [
+    "answered",
+    "base",
+    "qr",
+    "sonnet"
+  ],
+  "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+  "code": 0,
+  "at": "2026-11-27T20:08:08+05:00",
+  "duration_s": 222.1,
+  "status": "complete",
+  "models": [
+    "claude-sonnet-5-5"
+  ],
+  "cache": 0,
+  "critical": 3,
+  "development": "yes",
+  "testing": "yes",
+  "verify": 0,
+  "quota": false
+}
