@@ -1,5 +1,78 @@
 [
   {
+    "kind": "generalization",
+    "variant": "patch",
+    "case": "aligned",
+    "model_requested": "sonnet",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 61.9,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 8,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 146344,
+      "output": 17905
+    },
+    "dirty": false,
+    "verdict": [
+      "yes",
+      "yes"
+    ],
+    "open": {
+      "minor": 9
+    },
+    "critical": []
+  },
+  {
+    "kind": "generalization",
+    "variant": "patch",
+    "case": "clash",
+    "model_requested": "sonnet",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 67.4,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 9,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 126462,
+      "output": 17734
+    },
+    "dirty": false,
+    "verdict": [
+      "no",
+      "no"
+    ],
+    "open": {
+      "critical": 1,
+      "major": 1,
+      "minor": 6
+    },
+    "critical": [
+      {
+        "id": "D-01",
+        "title": "Лимит перевода: 12 700 в ФТ-1, 24 500 в методе API"
+      }
+    ]
+  },
+  {
     "kind": "answered",
     "variant": "base",
     "case": "qr",

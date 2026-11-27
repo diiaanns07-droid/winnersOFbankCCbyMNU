@@ -1,0 +1,23 @@
+{
+  "case": "clash",
+  "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+  "exit": 0,
+  "seconds": 67.4,
+  "status": "complete",
+  "models": [
+    "claude-sonnet-5-5"
+  ],
+  "verify": 0,
+  "sha": "d296ea13471da1e5094ed8991a2eaf42bb4d41bc20b3f74d2a8ec85d3b534e9c",
+  "severity": [
+    "critical",
+    "major",
+    "minor",
+    "minor",
+    "minor",
+    "minor",
+    "minor",
+    "minor"
+  ],
+  "verdict": "no"
+}

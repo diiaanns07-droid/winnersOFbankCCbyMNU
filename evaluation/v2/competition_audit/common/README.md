@@ -12,3 +12,5 @@ python -m bcc_review verify out/f4-common/clash.json "$pair/aligned.md"
 ```
 
 [Обе проверки с хешами и кодами возврата](bcc-mock.json)
+
+После сброса лимита полный BCC Review с Sonnet прочитал обе редакции. Согласованная получила «можно / можно», изменённая — «нельзя / нельзя» по причине в строках 5, 11 и 17. [Полный отчёт при согласованных границах](../../precision_owner/live/generalization-patch-aligned-sonnet/report.md) · [Полный отчёт с противоречием](../../precision_owner/live/generalization-patch-clash-sonnet/report.md)

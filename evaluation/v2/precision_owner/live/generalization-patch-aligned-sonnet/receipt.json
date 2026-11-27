@@ -1,0 +1,24 @@
+{
+  "case": "aligned",
+  "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+  "exit": 0,
+  "seconds": 61.9,
+  "status": "complete",
+  "models": [
+    "claude-sonnet-5-5"
+  ],
+  "verify": 0,
+  "sha": "1afedacecd479c98a28e4a80b8aed067065cffbf5ad3a25cdd525d420b981b51",
+  "severity": [
+    "minor",
+    "minor",
+    "minor",
+    "minor",
+    "minor",
+    "minor",
+    "minor",
+    "minor",
+    "minor"
+  ],
+  "verdict": "yes"
+}
