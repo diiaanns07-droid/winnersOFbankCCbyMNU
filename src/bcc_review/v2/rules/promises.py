@@ -24,6 +24,10 @@ READ_PROMISE = re.compile(
 # «показывается сообщение «PIN-код изменён»», «выводит подсказку» — отклик интерфейса, а не показ данных
 UI_FEEDBACK = re.compile(r"^\s*(?:\w+\s+){0,2}?(?:сообщени|надпис|подсказк|уведомлени|ошибк|предупреждени|"
                          r"окн[оа]\b|диалог|баннер|анимаци|индикатор|кнопк|экран\w*\s+(?:успех|ошибк|подтвержд))", re.I)
+# «показывает текст поля `message`», «показывает значение поля из ответа» — показ ответа уже описанного метода,
+# а не чтение данных отдельной операцией
+RESPONSE_SHOW = re.compile(r"^\s*(?:\w+\s+){0,2}?(?:текст\w*\s+пол|значени\w*\s+пол|пол[еяю]\s+[`'\"«]?[A-Za-z]|"
+                           r"[^.;]{0,40}?\bиз\s+ответа|[^.;]{0,40}?\bответ\w*\s+(?:метод|сервис|на\s+запрос))", re.I)
 INTEGRATION_CTX = re.compile(r"дочерн\w+\s+документ\w*|через\s+api|rest\s+api|метод\w*", re.I)
 ACTOR = re.compile(r"приложени\w*|экран\w*|интерфейс\w*|клиент\w*|пользовател\w*|фронт\w*|ui\b|api|"
                    r"документ\w*|функциональн\w+\s+требовани\w*", re.I)
@@ -113,6 +117,15 @@ def _sentence(text: str, needle: str) -> str:
     e = text.find(".", k + len(needle))
     frag = text[s0:e + 1 if e != -1 else len(text)].strip()
     return frag if len(frag) <= 200 else text[k:k + 150]
+
+
+def _sentence_at(text: str, a: int, b: int) -> str:
+    """Предложение вокруг совпадения [a, b) — по его месту, а не по первому вхождению слова («показывает» внутри
+    «показывается» раньше по строке)."""
+    s0 = max(text.rfind(".", 0, a) + 1, text.rfind("|", 0, a) + 1, 0)
+    e = text.find(".", b)
+    frag = text[s0:e + 1 if e != -1 else len(text)].strip()
+    return frag if len(frag) <= 200 else text[a:a + 150]
 
 
 # --- обещанные операции во фразе интеграции -----------------------------------------------------
@@ -346,10 +359,11 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
         if not x.text or x.is_code or x.is_heading:
             continue
         t = x.joined
-        m = next((r for r in READ_PROMISE.finditer(t) if not UI_FEEDBACK.match(t[r.end():])), None)
+        m = next((r for r in READ_PROMISE.finditer(t) if not UI_FEEDBACK.match(t[r.end():])
+                  and not RESPONSE_SHOW.match(t[r.end():])), None)
         if not m or not (ACTOR.search(t) or INTEGRATION_CTX.search(t)):
             continue
-        promises.append((x, _sentence(t, m.group(0))))
+        promises.append((x, _sentence_at(t, m.start(), m.end())))
     if not promises:
         return
     if reads:
