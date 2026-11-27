@@ -44,6 +44,8 @@ __all__ = ["ClaudeCLIProvider", "classify_cli_result", "find_cli", "parse_cli_ou
 PROVIDER = "claude_cli"
 DEFAULT_MODEL = "opus"
 DEFAULT_TIMEOUT_FLOOR_S = 600.0
+_CLI_LIMIT_VAR = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"   # переменная самого claude -p: лимит ответа
+MIN_OUTPUT_TOKENS = 64000  # рассуждения входят в лимит: haiku на линзе — 31 тыс. ток., из них 22 тыс. рассуждения
 EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 INSTALL_HELP = ("Установите Claude Code (https://claude.com/claude-code): «npm install -g @anthropic-ai/claude-code», "
                 "затем один раз выполните «claude» и войдите в аккаунт.")
@@ -141,16 +143,21 @@ def classify_cli_result(out: Mapping[str, Any] | None, *, returncode: int, stder
         return ProviderError(kind, f"{message} [claude -p, модель {model}: {tail}]" if tail else message,
                              retry_after_s=retry_after, status=status, request_id=out.get("session_id"), model=model)
 
-    if ("usage limit" in low or "hit your limit" in low or "limit reached" in low or "out of extra usage" in low
-            or "credit balance is too low" in low):
+    if ("output token maximum" in low or "exceeded the" in low and "output token" in low
+            or "max output tokens" in low or out.get("stop_reason") == "max_tokens"):
+        return err("truncated", "Ответ модели обрезан по лимиту выходных токенов (claude -p).")
+    if ("usage limit" in low or re.search(r"hit your [\w\- ]*limit", low) or "limit reached" in low
+            or "out of extra usage" in low or "credit balance is too low" in low):
         retry = None
         m = _RESET_RE.search(result)
         if m:
             ts = int(m.group(1))
             ts = ts / 1000 if ts > 10**11 else ts
             retry = max(0.0, ts - time.time())
-        return err("quota", "Исчерпан лимит подписки Claude Code. Дождитесь сброса лимита или выберите другого "
-                            "провайдера (--provider gemini с GEMINI_API_KEY).", retry)
+        reset = re.search(r"resets? (?:at )?([^\]\n·|]{1,40})", result, flags=re.IGNORECASE)
+        when = f" Сброс лимита: {reset.group(1).strip()}." if reset else ""
+        return err("quota", f"Исчерпан лимит подписки Claude Code.{when} До сброса выберите другую модель "
+                            "(--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY).", retry)
     if status == 401 or status == 403 or etype in ("authentication_error", "permission_error") or any(
             s in low for s in ("invalid api key", "please run /login", "not logged in", "oauth token", "/login")):
         return err("auth", "Claude Code не авторизован. Выполните «claude» в терминале и войдите в аккаунт "
@@ -307,8 +314,10 @@ class ClaudeCLIProvider:
         timeout = max(float(timeout_s or 0), self.timeout_floor_s)
 
         child_env = dict(self._env)
-        if max_output_tokens:
-            child_env.setdefault("CLAUDE_CODE_MAX_OUTPUT_TOKENS", str(int(max_output_tokens)))
+        # Лимит этапа не опускает лимит CLI: обрезка дороже лишних токенов (рассуждения тоже в лимите).
+        # Переменная самого Claude Code CLI: наш код её не читает, только задаёт, если пользователь не задал сам.
+        if _CLI_LIMIT_VAR not in child_env or not str(child_env[_CLI_LIMIT_VAR]).strip():
+            child_env[_CLI_LIMIT_VAR] = str(max(int(max_output_tokens or 0), MIN_OUTPUT_TOKENS))
         tmp_path = None
         if system:
             fd, tmp_path = tempfile.mkstemp(prefix="bcc_sys_", suffix=".md")
