@@ -14,7 +14,8 @@
 * ``truncated_json`` — finishReason STOP, но JSON оборван; ``empty`` — кандидат без текста;
 * ``no_candidates`` — пустой список кандидатов; ``max_tokens`` — finishReason MAX_TOKENS;
 * ``403_proxy`` — 403 от прокси сети (HTML, не JSON Google); ``407`` — прокси требует пароль;
-* ``safety`` — promptFeedback.blockReason=SAFETY; ``finish_safety`` — finishReason SAFETY.
+* ``safety`` — promptFeedback.blockReason=SAFETY; ``finish_safety`` / ``finish_recitation`` / ``finish_spii`` —
+  ответ остановлен фильтром на выходе (finishReason).
 
 Задержка ответа ``latency`` (с, на каждый успешный ответ, можно по этапам) — для замера времени прогона.
 Запуск вручную: ``python tests/v2/fixtures/24_gemini/fake_gemini.py --port 8765 --latency 20``.
@@ -51,6 +52,14 @@ def _markers() -> list[tuple[str, str]]:
                 out.append((ln, stem))
                 break
     return out
+
+
+def _schema_after_hint(text: str) -> dict:
+    """Схема, которую провайдер дописал текстом после подсказки (режим без структурированного вывода)."""
+    try:
+        return json.JSONDecoder().raw_decode(text.split(_HINT, 1)[1].lstrip())[0]
+    except (IndexError, ValueError):
+        return {}
 
 
 PROXY_PAGE = "<html><body><h1>Access denied</h1>Blocked by network policy</body></html>"
@@ -144,10 +153,7 @@ class FakeGemini:
         cfg = body.get("generationConfig") or {}
         schema = cfg.get("responseJsonSchema") or cfg.get("response_json_schema") or {}
         if not schema and _HINT in text:   # режим «схема текстом»: провайдер дописал её в конец запроса
-            try:
-                schema = json.loads(text.split(_HINT, 1)[1].strip())
-            except ValueError:
-                schema = {}
+            schema = _schema_after_hint(text)
         fault = self._fault(stage, model)
         kind = (fault or {}).get("kind", "ok")
         rec = {"t": time.monotonic(), "model": model, "stage": stage, "kind": kind,
@@ -198,8 +204,8 @@ class FakeGemini:
             payload = ""
         elif kind == "max_tokens":
             payload, finish = payload[: len(payload) // 2], "MAX_TOKENS"
-        elif kind == "finish_safety":
-            payload, finish = "", "SAFETY"
+        elif kind.startswith("finish_"):   # finish_safety, finish_recitation, finish_spii
+            payload, finish = "", kind[len("finish_"):].upper()
         usage = {"promptTokenCount": len(text) // 3, "candidatesTokenCount": len(payload) // 3,
                  "thoughtsTokenCount": 100, "totalTokenCount": len(text) // 3 + len(payload) // 3 + 100}
         if kind == "safety":
@@ -286,6 +292,59 @@ class FakeGemini:
                         pass
                     return
                 self._send(code, headers, data)
+
+        return Handler
+
+
+class FakeOpenAI(FakeGemini):
+    """Поддельный OpenAI-совместимый сервер (Ollama, vLLM): ``POST /v1/chat/completions``.
+
+    Причуды локальных моделей: ``reject_json_schema`` — 400 на ``response_format: json_schema`` (старые Ollama,
+    LM Studio), ``think`` — блок ``<think>…</think>`` перед JSON (qwen3, deepseek-r1), ``fence`` — JSON в ```json.
+    """
+
+    def __init__(self, *, reject_json_schema: bool = False, think: bool = False, fence: bool = False,
+                 **kw: Any) -> None:
+        super().__init__(**kw)
+        self.reject_json_schema, self.think, self.fence = reject_json_schema, think, fence
+
+    def chat(self, body: dict) -> tuple[int, dict]:
+        text = "\n".join(str(m.get("content") or "") for m in body.get("messages") or [])
+        stage = self.stage_of(text)
+        fmt = body.get("response_format") or {}
+        with self.lock:
+            self.log.append({"t": time.monotonic(), "model": body.get("model"), "stage": stage,
+                             "kind": fmt.get("type") or "none", "schema_mode": fmt.get("type") or "text"})
+        if fmt.get("type") == "json_schema" and self.reject_json_schema:
+            return 400, {"error": {"message": "response_format json_schema is not supported", "type": "invalid"}}
+        schema = (fmt.get("json_schema") or {}).get("schema") or _schema_after_hint(text)
+        delay = self._delay(stage)
+        if delay:
+            time.sleep(delay)
+        content = json.dumps(self.data_for(stage, schema), ensure_ascii=False)
+        if self.fence:
+            content = f"Вот ответ:\n```json\n{content}\n```"
+        if self.think:
+            content = f"<think>Сначала разберу требования по порядку.</think>\n{content}"
+        return 200, {"id": f"chatcmpl-{len(self.log)}", "object": "chat.completion", "model": body.get("model"),
+                     "choices": [{"index": 0, "finish_reason": "stop",
+                                  "message": {"role": "assistant", "content": content}}],
+                     "usage": {"prompt_tokens": len(text) // 3, "completion_tokens": len(content) // 3}}
+
+    def _handler(self) -> type:
+        base = super()._handler()
+        fake = self
+
+        class Handler(base):  # type: ignore[misc, valid-type]
+            def do_POST(self) -> None:
+                if not self.path.rstrip("/").endswith("/chat/completions"):
+                    return super().do_POST()
+                n = int(self.headers.get("Content-Length") or 0)
+                code, data = fake.chat(json.loads(self.rfile.read(n) or b"{}"))
+                self._send(code, {}, data)
+
+            def do_GET(self) -> None:
+                self._send(200, {}, {"object": "list", "data": [{"id": "qwen3:8b", "object": "model"}]})
 
         return Handler
 

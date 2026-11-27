@@ -83,6 +83,8 @@ def test_every_transient_fault_recovers_to_complete(tmp_path):
     assert status == "complete", text[-2000:]
     assert verdict["development"] == "no"
     fired = {(r["stage"], r["kind"]) for r in log}
+    # 400 «схема» у архитектора не уводит остальные этапы в режим «схема текстом» (v2.1: было 8 этапов, стало 1)
+    assert {r["stage"] for r in log if r["schema_mode"] == "text"} == {"lens_architect"}
     assert {(f["stage"], f["kind"]) for f in faults} <= fired   # каждый отказ действительно случился
     assert code == 0
 
@@ -108,6 +110,13 @@ def test_judge_blocked_by_safety_is_partial_not_yes(tmp_path):
     status, verdict = assert_honest(code, text, data)
     assert status == "partial"
     assert verdict["development"] in ("no", "none")
+
+
+def test_lens_recitation_stop_once_recovers(tmp_path):
+    """v2.1: одна остановка RECITATION у линзы — повтор, прогон complete (было: partial, линза потеряна)."""
+    code, text, data, log = jury_run(tmp_path, [{"kind": "finish_recitation", "stage": "lens_risk"}])
+    status, verdict = assert_honest(code, text, data)
+    assert status == "complete" and verdict["development"] == "no"
 
 
 def test_lens_safety_stop_is_partial_with_reason(tmp_path):

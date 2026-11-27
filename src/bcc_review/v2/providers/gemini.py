@@ -88,7 +88,17 @@ NEXT_MODEL = frozenset({"not_found", "quota"})
 # «Пустой» ответ модели (нет текста, не JSON, нечитаемый, необычный finish_reason): один повтор, затем другая модель
 EMPTY_SUBKINDS = frozenset({"empty_candidates", "empty_text", "not_json", "unreadable_response"})
 EMPTY_RETRIES = 1
+# Остановка ответа фильтром на выходе (finishReason RECITATION/SAFETY/SPII) зависит от выборки: повтор той же модели
+# часто проходит, у запасной модели — свои пороги. Блок запроса (promptFeedback) — от входа, его не повторяем.
+# Не больше STOP_TRIES запросов на одно обращение: стойкий отказ не съедает суточную квоту всей цепочки.
+SAMPLED_STOPS = frozenset({"finish_recitation", "finish_safety", "finish_spii"})
+STOP_TRIES = 3
 _OFF = ("off", "none", "no", "0", "false", "disable", "disabled")
+
+
+def is_sampled_stop(exc: ProviderError) -> bool:
+    """Ответ остановлен фильтром на выходе — повтор может пройти (в отличие от блока самого запроса)."""
+    return exc.kind == "refusal" and str(getattr(exc, "subkind", "") or "") in SAMPLED_STOPS
 
 
 def is_empty_answer(exc: ProviderError) -> bool:
@@ -261,6 +271,13 @@ def _attempt_note(a: Mapping[str, Any]) -> str:
     return f"{a.get('model')}{status} {what}".strip()
 
 
+def _schema_key(schema: Mapping[str, Any]) -> str:
+    import hashlib
+    import json
+    raw = json.dumps(schema, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+
 class _PassValidator:
     """Валидатор без нарушений: адаптер v1 отдаёт ответ, проверку по схеме делает ``LLMClient`` (с починкой)."""
 
@@ -346,7 +363,9 @@ class GeminiProvider:
         self._adapters: dict[tuple[str, tuple], Any] = {}
         self._dead: dict[str, ProviderError] = {}       # модели, отключённые до конца прогона (404, квота)
         self._no_thinking: set[tuple] = set()            # (модель, настройка рассуждений), которую модель отвергла
-        self._text_schema: set[str] = set()              # модели, отвергшие схему ответа (слишком сложная)
+        # (модель, схема), которую модель отвергла как слишком сложную: текстом идёт только эта схема, остальные
+        # этапы той же модели сохраняют ограниченное схемой декодирование (раньше — вся модель до конца прогона)
+        self._text_schema: set[tuple[str, str]] = set()
 
     # ------------------------------------------------------------------ adapters
 
@@ -371,11 +390,11 @@ class GeminiProvider:
                    temperature=self.temperature, max_output_tokens=self.max_output_tokens,
                    thinking_budget=thinking.get("thinking_budget"), thinking_level=thinking.get("thinking_level"))
 
-    def _adapter(self, model: str, stage: str = "") -> tuple[Any, dict[str, Any], str]:
+    def _adapter(self, model: str, stage: str = "", schema_key: str = "") -> tuple[Any, dict[str, Any], str]:
         thinking = thinking_for(model, self.thinking_level, self.thinking_budget, stage)
         if (model, tuple(sorted(thinking.items()))) in self._no_thinking:
             thinking = {}   # отвергнута именно эта настройка: другой уровень (low у нарезки) остаётся в силе
-        mode = "text" if model in self._text_schema else "native"
+        mode = "text" if (model, schema_key) in self._text_schema else "native"
         key = (model, tuple(sorted(thinking.items())), mode)
         with self._lock:
             if key not in self._adapters:
@@ -460,7 +479,9 @@ class GeminiProvider:
         last: ProviderError | None = None
         stage_limit = int(max_output_tokens or 0)
         clean = [{"role": m.get("role"), "content": m.get("content")} for m in messages]
+        schema_key = _schema_key(schema)
 
+        stops = 0                                # остановки фильтром на выходе за это обращение (все модели)
         quota_exc: ProviderError | None = None   # дневная квота — главное объяснение, если не ответит никто
         reserved = False
         idx = 0
@@ -484,7 +505,7 @@ class GeminiProvider:
                     raise self._final(last or ProviderError("timeout", f"Бюджет времени вызова Gemini ({total:.0f} с) "
                                                                        "исчерпан.", model=current), chain, attempts)
                 try:
-                    adapter, thinking, mode = self._adapter(current, stage)
+                    adapter, thinking, mode = self._adapter(current, stage, schema_key)
                 except ProviderError as exc:
                     raise self._final(exc, chain, attempts) from None
                 sent = _with_schema_text(clean, schema) if mode == "text" else clean
@@ -516,6 +537,13 @@ class GeminiProvider:
                                 reserved = True
                                 self._add_reserve(chain, idx)
                         break
+                    if is_sampled_stop(exc):
+                        stops += 1
+                        if stops >= STOP_TRIES:
+                            raise self._final(exc, chain, attempts) from None
+                        if stops == 1:
+                            continue   # та же модель ещё раз
+                        break          # вторая остановка — запасная модель
                     if is_empty_answer(exc):
                         if empty < EMPTY_RETRIES:
                             empty += 1
@@ -559,7 +587,7 @@ class GeminiProvider:
                         self._no_thinking.add((current, tuple(sorted(thinking.items()))))
                         continue
                     if kind == "bad_request" and mode == "native" and ("schema" in low or "too many states" in low):
-                        self._text_schema.add(current)
+                        self._text_schema.add((current, schema_key))
                         continue
                     raise self._final(exc, chain, attempts) from None
                 self._cooling.pop(current, None)
