@@ -243,7 +243,7 @@
       var target = d.getElementById("p-findings");
       if (target && window.MutationObserver) new MutationObserver(sync).observe(target, { subtree: true, attributes: true, attributeFilter: ["class"] });
       setView(view);
-      setTimeout(function () { fr.classList.add("ready"); }, 30);
+      setTimeout(function () { fr.classList.add("ready"); root.setAttribute("data-drawer-ready", ""); }, 60);
     }
     fr.addEventListener("load", embed);
     if (!fr.getAttribute("src")) fr.src = fr.dataset.src;
