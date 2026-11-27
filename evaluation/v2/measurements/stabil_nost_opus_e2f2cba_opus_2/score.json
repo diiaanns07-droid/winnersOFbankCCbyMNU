@@ -417,12 +417,12 @@
   },
   "clarity": {
     "n": 32,
-    "passed": 21,
-    "share": 0.656,
+    "passed": 22,
+    "share": 0.688,
     "by_check": {
       "заголовок": 1,
       "место": 0,
-      "проблема": 3,
+      "проблема": 2,
       "сценарий": 3,
       "последствие": 0,
       "исправление": 4,
@@ -479,15 +479,6 @@
         ]
       },
       {
-        "id": "D-05",
-        "title": "Неверная сумма: успешный 200 с ERROR или отказ 400",
-        "severity": "critical",
-        "source": "lens:architect, lens:qa, consistency, rules:api.success_with_error",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
         "id": "D-06",
         "title": "Расходы хранятся в тиынах, порог — в тенге, правила пересчёта нет",
         "severity": "major",
@@ -521,6 +512,15 @@
         "source": "consistency, rules:placeholder.tbd, rules:placeholder.checklist, rules:placeholder.version, rules:placeholder.approvals",
         "fails": [
           "исправление"
+        ]
+      },
+      {
+        "id": "D-25",
+        "title": "Схемы архитектуры, процесса и sequence расходятся по составу связей",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "сценарий"
         ]
       }
     ]
@@ -1159,7 +1159,7 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "21/32",
+      "value": "22/32",
       "ok": false
     },
     {
@@ -1191,7 +1191,7 @@
     "pending": 3,
     "model": ""
   },
-  "seconds": 0.14,
+  "seconds": 0.16,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_opus/runs/20261127-082851-a80e",
-  "rescored_at": "2026-11-27 17:26"
+  "rescored_at": "2026-11-27 18:44"
 }

@@ -427,12 +427,12 @@
   },
   "clarity": {
     "n": 29,
-    "passed": 18,
-    "share": 0.621,
+    "passed": 19,
+    "share": 0.655,
     "by_check": {
       "заголовок": 2,
       "место": 0,
-      "проблема": 1,
+      "проблема": 0,
       "сценарий": 3,
       "последствие": 0,
       "исправление": 5,
@@ -487,15 +487,6 @@
         ]
       },
       {
-        "id": "D-07",
-        "title": "Перечень кодов ответа противоречив и неполон: 403/404, 201, «и далее»",
-        "severity": "major",
-        "source": "lens:architect, consistency, rules:api.status_404, rules:api.status_201, rules:language.open_list",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
         "id": "D-08",
         "title": "Не определено, нужен ли push при включении уведомления или смене порога, если расходы уже не ниже порога",
         "severity": "major",
@@ -527,6 +518,15 @@
         "title": "Одни и те же понятия названы по-разному, глоссария нет",
         "severity": "minor",
         "source": "consistency, lens:architect",
+        "fails": [
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-24",
+        "title": "У требований нет ID (кроме Ф-1…Ф-4) и приоритетов",
+        "severity": "minor",
+        "source": "consistency",
         "fails": [
           "исправление"
         ]
@@ -1120,7 +1120,7 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "18/29",
+      "value": "19/29",
       "ok": false
     },
     {
@@ -1152,7 +1152,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.12,
+  "seconds": 0.15,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_sonnet/runs/20261127-082406-3d91",
-  "rescored_at": "2026-11-27 17:26"
+  "rescored_at": "2026-11-27 18:44"
 }

@@ -424,12 +424,12 @@
   },
   "clarity": {
     "n": 30,
-    "passed": 22,
-    "share": 0.733,
+    "passed": 23,
+    "share": 0.767,
     "by_check": {
       "заголовок": 0,
       "место": 0,
-      "проблема": 5,
+      "проблема": 4,
       "сценарий": 2,
       "последствие": 0,
       "исправление": 0,
@@ -461,15 +461,6 @@
         "source": "lens:architect, consistency",
         "fails": [
           "сценарий"
-        ]
-      },
-      {
-        "id": "D-17",
-        "title": "Адрес Prod и ссылка на Swagger не заполнены",
-        "severity": "major",
-        "source": "lens:architect, rules:placeholder.dash",
-        "fails": [
-          "проблема"
         ]
       },
       {
@@ -1242,7 +1233,7 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "22/30",
+      "value": "23/30",
       "ok": false
     },
     {
@@ -1274,7 +1265,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.47,
+  "seconds": 0.48,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_30/runs/20261127-153049-9a4d",
-  "rescored_at": "2026-11-27 17:26"
+  "rescored_at": "2026-11-27 18:44"
 }

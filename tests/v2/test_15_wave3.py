@@ -725,3 +725,16 @@ def test_viewdiff_rules_on_clean_docs_summary():
     docs = vd.clean_docs()
     assert len(docs) == 20 and "evaluation/v2/clean/fx/source.md" in docs
     assert all("edge.empty" not in d for d in docs) and any(d.endswith("autopay.base/source.md") for d in docs)
+
+
+def test_clarity_sentence_split_ignores_dots_inside_quotes():
+    """«проблема» в 1–2 предложения: точка внутри цитаты документа («400. Ответ в случае…») предложение не
+    заканчивает (haiku на 3e7133c: D-03 и D-06 падали в рубрике из-за перечня кодов в кавычках)."""
+    from evaluation.v2.score import _sentences
+
+    prob = ("L163 «400. Ответ в случае, если параметры запроса заполнены неверно» против L171 с result ERROR под "
+            "статусом 200 (L165). L151 считает 200 успехом, 400 отказом, поэтому одна ошибка даёт разный исход.")
+    assert len(_sentences(prob)) == 2
+    assert len(_sentences('Цитата "200. Успех" расходится с L12. Второе.')) == 2
+    assert len(_sentences("Ф-2 (стр. 38) относит покупку к месяцу. Критерий №2 — к другому. Третье.")) == 3
+    assert len(_sentences("Открытая «цитата. Без конца")) == 1  # незакрытая кавычка — один кусок, не три

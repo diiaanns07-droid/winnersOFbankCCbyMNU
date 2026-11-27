@@ -1207,13 +1207,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 23.8,
-    "cost_usd": 0.22728359999999997,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 24.43,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_17_50/runs/20261127-174400-1352"
+  "seconds": 0.41,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_17_50/runs/20261127-174400-1352",
+  "rescored_at": "2026-11-27 18:44"
 }

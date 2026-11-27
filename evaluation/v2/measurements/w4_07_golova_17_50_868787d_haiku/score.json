@@ -440,27 +440,18 @@
   },
   "clarity": {
     "n": 33,
-    "passed": 31,
-    "share": 0.939,
+    "passed": 32,
+    "share": 0.97,
     "by_check": {
       "заголовок": 0,
       "место": 0,
-      "проблема": 1,
+      "проблема": 0,
       "сценарий": 1,
       "последствие": 0,
       "исправление": 0,
       "язык": 0
     },
     "worst": [
-      {
-        "id": "D-22",
-        "title": "Чужая карта: 403 по статусам, 404 по правилу",
-        "severity": "major",
-        "source": "lens:architect, consistency, rules:api.status_404",
-        "fails": [
-          "проблема"
-        ]
-      },
       {
         "id": "D-27",
         "title": "Документ не рассматривает ряд случаев",
@@ -1178,7 +1169,7 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "31/33",
+      "value": "32/33",
       "ok": true
     },
     {
@@ -1203,13 +1194,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 42.599999999999994,
-    "cost_usd": 0.2614664,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 1,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 43.13,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_17_50/runs/20261127-174400-c46e"
+  "seconds": 0.46,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_17_50/runs/20261127-174400-c46e",
+  "rescored_at": "2026-11-27 18:44"
 }

@@ -405,12 +405,12 @@
   },
   "clarity": {
     "n": 31,
-    "passed": 23,
-    "share": 0.742,
+    "passed": 24,
+    "share": 0.774,
     "by_check": {
       "заголовок": 1,
       "место": 0,
-      "проблема": 1,
+      "проблема": 0,
       "сценарий": 2,
       "последствие": 0,
       "исправление": 4,
@@ -425,15 +425,6 @@
         "fails": [
           "сценарий",
           "исправление"
-        ]
-      },
-      {
-        "id": "D-04",
-        "title": "Сумма вне диапазона: ответ 200 с ERROR или 400 — разные исходы",
-        "severity": "critical",
-        "source": "lens:architect, consistency, rules:api.success_with_error",
-        "fails": [
-          "проблема"
         ]
       },
       {
@@ -1118,7 +1109,7 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "23/31",
+      "value": "24/31",
       "ok": false
     },
     {
@@ -1152,5 +1143,5 @@
   },
   "seconds": 0.14,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_13_00/runs/20261127-123332-e545",
-  "rescored_at": "2026-11-27 17:26"
+  "rescored_at": "2026-11-27 18:44"
 }

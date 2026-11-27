@@ -414,12 +414,12 @@
   },
   "clarity": {
     "n": 36,
-    "passed": 30,
-    "share": 0.833,
+    "passed": 31,
+    "share": 0.861,
     "by_check": {
       "заголовок": 1,
       "место": 0,
-      "проблема": 2,
+      "проблема": 1,
       "сценарий": 2,
       "последствие": 0,
       "исправление": 1,
@@ -442,15 +442,6 @@
         "source": "lens:architect",
         "fails": [
           "заголовок"
-        ]
-      },
-      {
-        "id": "D-20",
-        "title": "Код 201 признан успешным, но в перечне статусов не описан",
-        "severity": "major",
-        "source": "rules:api.status_201, consistency",
-        "fails": [
-          "проблема"
         ]
       },
       {
@@ -1256,7 +1247,7 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "30/36",
+      "value": "31/36",
       "ok": false
     },
     {
@@ -1288,7 +1279,7 @@
     "pending": 1,
     "model": ""
   },
-  "seconds": 0.63,
+  "seconds": 0.5,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_20/runs/20261127-152134-0c4c",
-  "rescored_at": "2026-11-27 17:26"
+  "rescored_at": "2026-11-27 18:44"
 }

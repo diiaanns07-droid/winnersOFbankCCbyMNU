@@ -416,12 +416,12 @@
   },
   "clarity": {
     "n": 34,
-    "passed": 30,
-    "share": 0.882,
+    "passed": 32,
+    "share": 0.941,
     "by_check": {
       "заголовок": 0,
       "место": 0,
-      "проблема": 2,
+      "проблема": 0,
       "сценарий": 2,
       "последствие": 0,
       "исправление": 0,
@@ -435,24 +435,6 @@
         "source": "lens:architect",
         "fails": [
           "сценарий"
-        ]
-      },
-      {
-        "id": "D-18",
-        "title": "Описание метода называет его и чтением, и сохранением",
-        "severity": "major",
-        "source": "lens:analyst",
-        "fails": [
-          "проблема"
-        ]
-      },
-      {
-        "id": "D-22",
-        "title": "Перечень кодов ответа противоречив, неполон и открыт",
-        "severity": "major",
-        "source": "consistency, rules:api.status_201, rules:language.open_list",
-        "fails": [
-          "проблема"
         ]
       },
       {
@@ -1232,8 +1214,8 @@
     },
     {
       "metric": "рубрика понятности",
-      "value": "30/34",
-      "ok": false
+      "value": "32/34",
+      "ok": true
     },
     {
       "metric": "английские слова",
@@ -1264,7 +1246,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.53,
+  "seconds": 0.48,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_posle_zamorozki/runs/20261127-162858-9c2a",
-  "rescored_at": "2026-11-27 17:26"
+  "rescored_at": "2026-11-27 18:44"
 }

@@ -1245,13 +1245,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 31.4,
-    "cost_usd": 0.2407936,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 32.01,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_kandidat_868787d/runs/20261127-175457-88ae"
+  "seconds": 0.39,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_kandidat_868787d/runs/20261127-175457-88ae",
+  "rescored_at": "2026-11-27 18:44"
 }
