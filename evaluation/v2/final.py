@@ -221,16 +221,25 @@ def view_line(sha: str, nsha: str) -> str:
 
 
 def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newer: list[str] | None = None,
-           extra: list[str] | None = None, view_check: bool = True) -> str:
+           extra: list[str] | None = None, view_check: bool = True, sets_sha: str | None = None) -> str:
+    """Блок «Финальные цифры». ``sets_sha`` — корпус, новые ТЗ и чистые наборы с этого кода (на коде релиза их не
+    мерили: лимит подписки, нет времени), с пометкой и строкой «вход модели»; официальный — всегда на ``sha``."""
+    sets_sha = sets_sha or sha
     L = [f"Код: `{sha}`" + (f" ({note})" if note else "") + ". Все числа — из готовых замеров с этим коммитом в "
          "метке; пересчитать — `python -m evaluation.v2.final --commit " + ref
-         + "".join(f" --newer {n}" for n in newer or []) + " --write`.", ""]
+         + "".join(f" --newer {n}" for n in newer or [])
+         + (f" --sets-from {sets_sha}" if sets_sha != sha else "") + " --write`.", ""]
     for x in extra or []:
         L += [x, ""]
     off = official(sha)
     L += ["**Официальный документ** (каждая модель — все прогоны на этом коде, разброс min–max):", ""]
     L += official_table(off)
-    corp = _summaries(V2 / "corpus_results", sha)
+    corp = _summaries(V2 / "corpus_results", sets_sha)
+    nz = _summaries(V2 / "newtz_results", sets_sha)
+    if sets_sha != sha and (corp or nz):
+        L += ["", f"**Наборы ниже — на коде `{sets_sha}`**, не на `{sha}`: на коде релиза корпус, новые ТЗ и чистые "
+              "не мерились. " + (view_line(sets_sha, sha) if view_check else
+                                 f"Код отличается: {code_diff(sets_sha, sha)}.")]
     if corp:
         L += ["", "**Корпус `evaluation/dev`** (строгий счётчик `evaluation/harness`):", "",
               "| Прогон | Модель | Кейсов (не измерено) | TP | FP | FN | Precision | Recall | F1 | critical на чистых | "
@@ -243,7 +252,6 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newe
                      f"{h.get('tp')} | {h.get('fp')} | {h.get('fn')} | {f(h.get('precision'))} | {f(h.get('recall'))} | "
                      f"{f(h.get('f1'))} | {c.get('critical')} | {c.get('verdict_no')} из {c.get('measured')} | "
                      f"{_calls(d)} |")
-    nz = _summaries(V2 / "newtz_results", sha)
     if nz:
         L += ["", "**Новые ТЗ №18 и чистые наборы:**", "",
               "| Прогон | Модель | Документов (сбоев) | Recall по эталону | Precision | Чистых: critical / major / «нельзя» "
@@ -262,9 +270,13 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newe
     if not (off or corp or nz):
         L += ["", f"Замеров с `{sha}` в метке нет — `python -m evaluation.v2.round … --label-commit {sha}`."]
     else:
-        note_code = code_note(sha, [off, corp, nz])
+        note_code = code_note(sha, [off, corp, nz] if sets_sha == sha else [off])
         if note_code:
             L[1:1] = ["", note_code]
+        if sets_sha != sha:
+            note_sets = code_note(sets_sha, [corp, nz]).replace("Код прогонов сверен", "Код прогонов наборов сверен", 1)
+            if note_sets:
+                L[3 if note_code else 1:3 if note_code else 1] = ["", note_sets]
         L += newer_lines(sha, newer or [], view_check)
         L += gate_lines(sha, checks)
     return "\n".join(L) + "\n"
@@ -279,6 +291,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="ещё и официальный документ на более новом коде (исправления после замера), с разницей кода")
     ap.add_argument("--no-view", action="store_true",
                     help="не сверять вход модели (вид документов оценки и промпты) на другом коде — `viewdiff`")
+    ap.add_argument("--sets-from", metavar="SHA",
+                    help="корпус, новые ТЗ и чистые наборы — с этого кода (на коде релиза не мерили), с пометкой")
     ap.add_argument("--write", action="store_true", help="записать блок «Финальные цифры» в RESULTS.md")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
@@ -293,7 +307,8 @@ def main(argv: list[str] | None = None) -> int:
             note += f": отличаются {code_diff(sha, tag_sha)}"
             if not a.no_view:
                 extra.append(view_line(sha, tag_sha))
-    text = render(a.commit, sha, note, newer=a.newer, extra=extra, view_check=not a.no_view)
+    sets_sha = resolve(a.sets_from)[0] if a.sets_from else None
+    text = render(a.commit, sha, note, newer=a.newer, extra=extra, view_check=not a.no_view, sets_sha=sets_sha)
     print(text)
     if a.write:
         put_results_block(RESULTS, "final", text, "Финальные цифры релиза (W4-07)")

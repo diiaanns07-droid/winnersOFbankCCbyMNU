@@ -609,3 +609,29 @@ def test_round_stability_takes_earlier_runs_on_same_code(tmp_path, monkeypatch):
     got = rnd.same_code_scores("sonnet", ["round_1", "round_2"])
     assert [p.split("/")[-2] for p in got] == ["old_same_code"]
     assert rnd.same_code_scores("sonnet", ["нет в истории"]) == []
+
+
+def test_final_sets_from_other_code_are_marked(monkeypatch):
+    """--sets-from: официальный — на коде релиза, корпус и наборы — с названного кода, с пометкой и «входом модели»;
+    код прогонов наборов сверяется со своим кодом, а не с кодом релиза."""
+    from evaluation.v2 import final
+
+    off = {"rel1234": [{"label": "кандидат: rel1234, sonnet", "model": "sonnet", "status": "complete", "K": 5,
+                        "K_as_critical": 5, "C": 18, "findings": 29, "duplicates": 0, "critical_false": 0,
+                        "duration_s": 150, "calls": 9, "cost_usd": 0.8, "clarity": {}, "commit": "rel1234"}]}
+    corp = {"frz5678": [{"label": "после заморозки: frz5678, haiku", "model": "haiku", "cases": 33, "failed": 0,
+                         "harness": {"tp": 27, "fp": 202, "fn": 1, "precision": 0.12, "recall": 0.96, "f1": 0.21},
+                         "clean": {"critical": 0, "verdict_no": 0, "measured": 8}, "time": {"calls": 244, "cost_usd": 1.6},
+                         "commit": ["frz5678"]}]}
+    monkeypatch.setattr(final, "official", lambda sha: off.get(sha, []))
+    monkeypatch.setattr(final, "_summaries", lambda folder, sha: corp.get(sha, []) if "corpus" in str(folder) else [])
+    monkeypatch.setattr(final, "same_code", lambda a, b: a == b)
+    monkeypatch.setattr(final, "view_line", lambda a, b: f"Вход модели ({a} → {b}): вид документов оценки не изменился.")
+    monkeypatch.setattr(final, "gate_lines", lambda sha, checks=None: [])
+    text = final.render("v2.0.0", "rel1234", "", sets_sha="frz5678")
+    assert "**Наборы ниже — на коде `frz5678`**, не на `rel1234`" in text and "Вход модели (frz5678 → rel1234)" in text
+    assert "--sets-from frz5678 --write" in text and "| после заморозки: frz5678, haiku | haiku | 33 (0) | 27 | 202 |" in text
+    assert "как у `rel1234`" in text and "Код прогонов наборов сверен" in text and "как у `frz5678`" in text
+    assert "⚠" not in text  # без --sets-from прогоны frz5678 стояли бы как «код не совпадает»
+    plain = final.render("v2.0.0", "rel1234", "")
+    assert "Наборы ниже" not in plain and "Корпус" not in plain
