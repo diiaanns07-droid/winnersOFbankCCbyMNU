@@ -1043,19 +1043,23 @@ def _plain_reason(text: str, keep: set[str]) -> str:
 def duplicate_of(evidence: list[dict], findings: list[dict], title: str = "", slack: int = 1) -> str:
     """ID прежнего дефекта, который новый кандидат описывает заново, иначе пустая строка.
 
-    Новый конфликт от ответа цитирует место, которое теперь противоречит ответу. Если все его цитаты —
-    строки одного прежнего дефекта (±``slack``), это тот же дефект (закрытый ответом или оставшийся открытым):
-    для двух и более строк хватает совпадения строк, для одной строки нужна ещё та же суть в заголовке."""
+    Общее место — только повод сравнить формулировки: одна строка может задавать несколько правил.
+    Узнаём старую причину по совпадению текста цитат из разных строк или по смыслу заголовка."""
     cand = {int(e["line_start"]) for e in evidence if e.get("line_start")}
     if not cand:
         return ""
     words = _tokens(_cl.plain_text(title))
+    fragments = {(int(e["line_start"]), _cl._norm(e["quote"])) for e in evidence
+                 if e.get("line_start") and e.get("quote")}
     for f in findings:
         own = {int(x) for x in _cl.finding_lines(f)}
         if not own or not all(any(abs(c - o) <= slack for o in own) for c in cand):
             continue
-        if len(cand) >= 2:
-            return str(f.get("id", ""))
+        if len(cand) >= 2 and len({line for line, _ in fragments}) == len(cand):
+            old_fragments = {(int(e["line_start"]), _cl._norm(e["quote"])) for e in f.get("evidence") or []
+                             if e.get("line_start") and e.get("quote")}
+            if fragments <= old_fragments:
+                return str(f.get("id", ""))
         theirs = _tokens(f"{f.get('title', '')} {f.get('problem', '')}")
         if words and len(words & theirs) / len(words) >= 0.4:
             return str(f.get("id", ""))
