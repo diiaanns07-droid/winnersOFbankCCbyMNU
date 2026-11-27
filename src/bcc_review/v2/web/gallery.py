@@ -112,6 +112,14 @@ def _ts(v: Any) -> float | None:
         return None
 
 
+def _date(v: Any) -> str:
+    """Дата прогона так, как она записана в отчёте (его часовой пояс), а не по часам сервера (в Docker — UTC)."""
+    try:
+        return datetime.fromisoformat(str(v)).strftime("%d.%m.%Y")
+    except (TypeError, ValueError):
+        return ""
+
+
 def report_meta(json_path: Path) -> dict[str, Any]:
     """Сведения для карточки и задания из report.json (с кэшем по времени изменения файла)."""
     st = json_path.stat()
@@ -133,7 +141,7 @@ def report_meta(json_path: Path) -> dict[str, Any]:
         "digest": hashlib.sha1(data).hexdigest(),
         "report": report, "run": run, "summary": s,
         "model": model_label(run),
-        "date": time.strftime("%d.%m.%Y", time.localtime(started)) if started else "",
+        "date": _date(run.get("started_at")),
         "started": started, "finished": finished,
         "verdict": verdict, "verdict_cls": cls, "critical": crit,
         "line": f"вердикт: {verdict}, " + (f"блокеров {crit}" if crit else "блокеров нет"),
