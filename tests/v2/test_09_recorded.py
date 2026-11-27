@@ -140,7 +140,8 @@ def test_official_all_critical_conflicts_on_weak_model_with_one_condition_field(
 def test_official_half_specified_condition_is_reported_as_undefined(model):
     """С8: Ф-4 задаёт исход только для «накопленная сумма ниже нового порога»; другая ветвь не определена."""
     out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
-    assert any(c["severity"] == "major" and c["origin"] == "pair_check" and 40 in lines_of(c) for c in out["candidates"])
+    # №27: неопределённость — minor; С8 по-прежнему есть среди кандидатов этапа
+    assert any(c["severity"] == "minor" and c["origin"] == "pair_check" and 40 in lines_of(c) for c in out["candidates"])
 
 
 @pytest.mark.parametrize("model", ["haiku_w2_2", "haiku_w2_12", "haiku_w2_13", "haiku_w3_2"])
