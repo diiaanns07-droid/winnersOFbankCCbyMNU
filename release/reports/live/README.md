@@ -5,7 +5,8 @@
 `ant`. Обращений к модели не было (0 физических вызовов), отчёта онлайн-прогона нет. Офлайн-результаты
 этой же версии лежат в `../offline/` и помечены `rules_only`.
 
-**Версия агента для прогона:** `70d26174e7f448eb2f061f6268b2c566baacf7c1` (сборка), контракт Report v1.0.
+**Версия агента для прогона:** `f84f730` или новее на `bcc/integration` (в `70d2617` и раньше живой Claude отвечал
+400 на лишнее поле `cache` в сообщении — исправлено в `f84f730`), контракт Report v1.0.
 **Вход:** `release/input/requirements.md`, SHA-256 `e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381`.
 **Модель:** из конфигурации адаптера №11 — `ANTHROPIC_MODEL`, по умолчанию `claude-opus-5-5`, усилие `high`.
 
@@ -31,7 +32,7 @@ $env:ANTHROPIC_API_KEY = "<командный ключ>"   # или строка
 
 * `run.mode = "rules_plus_llm"`, `run.status = "complete"`, `run.incomplete_stages = []`;
 * `run.model` — фактическая модель из ответа, `run.calls.physical > 0`, `run.calls.cache_hits = 0`;
-* `run.agent_commit` = SHA сборки без `-dirty`;
+* `run.agent_commit` — `f84f730` или новее, без `-dirty`;
 * `verify` печатает `OK`.
 
 Если статус `partial`, отчёт не сдавать как итоговый: причины и незавершённые этапы — в
