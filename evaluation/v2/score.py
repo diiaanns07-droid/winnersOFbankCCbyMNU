@@ -855,6 +855,8 @@ def main(argv: list[str] | None = None) -> int:
                 md = str(cand)
                 break
     res = score_report(report, gold, report_md=md, run_dir=a.run_dir, arbiter=a.arbiter, cache_path=Path(a.cache))
+    if a.run_dir and not res.get("run_dir"):
+        res["run_dir"] = str(Path(a.run_dir).resolve())
     text = render_md(res, a.label)
     if a.lens:
         text += render_lens(res, gold, a.lens)
