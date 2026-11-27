@@ -448,8 +448,6 @@ def test_markup_in_model_text_is_escaped_in_html(tmp_path):
     assert not re.search(r"(?<!\\)<script>", md) and not re.search(r"(?<!\\)<img src=x", md)   # только \<…
 
 
-@_bug("10", "кандидат с пустым заголовком даёт дефект с пустым title: отчёт не проходит contracts/v2.json и verify "
-            "(stages/judge.py:983 — запасного заголовка нет; так же code_only_response:1251)")
 def test_empty_title_candidate_still_gives_valid_report(tmp_path):
     from bcc_review.v2 import verify
     empty = _cand(title="")
