@@ -139,8 +139,9 @@ class Table:
 
     def col(self, *names: str) -> int | None:
         for i, c in enumerate(self.cols):
+            c2 = c.replace(" ", "")  # PDF: «Form at»
             for nm in names:
-                if c == nm or c.startswith(nm):
+                if c == nm or c.startswith(nm) or c2 == nm or c2.startswith(nm):
                     return i
         return None
 
