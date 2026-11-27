@@ -284,7 +284,11 @@ def merge_items(requirements: list[dict], excluded: list[dict]) -> tuple[list[di
     reqs = sorted(requirements, key=lambda r: (r["line_start"], -(r["line_end"] - r["line_start"])))
     kept: list[dict] = []
     for r in reqs:
-        dup = next((k for k in kept if (k["line_start"], k["line_end"]) == (r["line_start"], r["line_end"])), None)
+        dup = next((k for k in kept if (k["line_start"], k["line_end"]) == (r["line_start"], r["line_end"])
+                    and (not k["source_id"] or not r["source_id"] or k["source_id"] == r["source_id"]
+                         or _norm(k["quote"]) == _norm(r["quote"]))), None)
+        # одна строка view может нести несколько пунктов (абзац с переносами в DOCX/PDF): разные source_id и
+        # цитаты на одном диапазоне — разные требования
         if dup is not None:
             if not dup["source_id"] and r["source_id"]:
                 dup["source_id"] = r["source_id"]
@@ -337,8 +341,10 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
     * у строки таблицы — «…, строка N», у пункта списка или абзаца — «…, п. N»;
     * «Статус N» снимается, если требование описывает несколько кодов ответа.
     """
+    from collections import Counter
     by_n = {int(x["n"]): x for x in _lines(view)}
     fmt = str(view.get("format") or "").lower()
+    starts = Counter(int(r["line_start"]) for r in requirements)
     for r in requirements:
         sid = r.get("source_id") or ""
         if not sid:
@@ -352,13 +358,16 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
         if not sid:
             r["source_id"] = ""
             continue
-        m = re.match(r"^(?P<pre>.+?)(?P<sep>: |, п\. |, строка )(?P<rest>.+)$", sid)
+        m = re.match(r"^(?P<pre>.+?)(?P<sep>: |, п\. |, строка |, )(?P<rest>.+)$", sid)
+        own = _ID_RE.match(re.sub(r"^\s*[-*•]\s+", "", _text(first)))
+        if m and own and m.group("rest").strip().rstrip(".") == own.group("id"):
+            sid, m = own.group("id"), None  # «Функциональные требования, Ф-1» → собственный номер пункта «Ф-1»
+        if m and m.group("sep") == ", ":
+            m = None  # запятая без «п.»/«строка» — часть самого идентификатора
         if m:
             pre = m.group("pre").strip()
-            for head in reversed(parts):
-                if pre != head and _strip_num(pre).lower() == _strip_num(head).lower():
-                    pre = head
-                    break
+            if parts and any(_strip_num(pre).lower() == _strip_num(h).lower() for h in parts):
+                pre = parts[-1]  # префикс — всегда ближайший заголовок (таблица под «A › B» → «B: …»)
             sep, rest = m.group("sep"), m.group("rest")
             if sep in (", п. ", ", строка ") and rest.isdigit():
                 sep = ", строка " if _is_row(_text(first)) else ", п. "
@@ -366,7 +375,8 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
             if (sep == ", п. " and fmt in ("md", "txt", "markdown") and first.get("kind") == "list_item"
                     and not re.match(r"^\s*\d{1,3}[.)]\s", _text(first))):
                 sid = ""  # пункт маркированного списка: своего номера в документе нет
-        if re.fullmatch(r"Статус [1-5]\d\d", sid):
+        if re.fullmatch(r"Статус [1-5]\d\d", sid) and starts[int(r["line_start"])] == 1:
+            # один пункт на абзац с несколькими кодами — это не описание одного кода
             text = " ".join(_text(by_n[n]) for n in range(int(r["line_start"]), int(r["line_end"]) + 1) if n in by_n)
             if len(set(_CODE_RE.findall(text))) >= 2 and not _is_row(_text(first)):
                 sid = ""

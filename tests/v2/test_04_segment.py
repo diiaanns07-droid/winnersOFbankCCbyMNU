@@ -447,3 +447,13 @@ def test_duplicate_source_ids_qualified_by_section():
     sids = [r["source_id"] for r in h["requirements"] if r["source_id"]]
     assert len(sids) == len(set(sids))
     assert any(s.endswith(": Статус 200") for s in sids)
+
+
+def test_several_requirements_on_one_line_kept():
+    v = _view(["Статусы", "200. Успех. 400. Неверные параметры. 404. Не найдено."], sections=["Статусы", "Статусы"])
+    raw = {"requirements": [
+        {"source_id": f"Статус {c}", "kind": "api", "summary": "к", "quote": q, "line_start": 2, "line_end": 2}
+        for c, q in (("200", "200. Успех."), ("400", "400. Неверные параметры."), ("404", "404. Не найдено."))],
+        "excluded": []}
+    out = sg.segment_from_response(v, raw)
+    assert [r["source_id"] for r in out["requirements"]] == ["Статус 200", "Статус 400", "Статус 404"]
