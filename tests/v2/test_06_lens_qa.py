@@ -651,3 +651,39 @@ def test_stated_part_of_expected_is_match():
                  stated="Итог 15 ₸ и один push")
     c = lens_qa.normalize_check(raw)
     assert c["verdict"] == "match" and c["partial_match"]
+
+
+def test_nfr_check_rounding_rule_is_not_performance():
+    """Правило вычисления в разделе НФТ («округляются до тиына») — не норматив времени: доля и нагрузка ему не нужны."""
+    reqs = [{"id": "R-02", "kind": "nonfunctional", "line_start": 20, "line_end": 20}]
+    rnd = {"requirement_id": "R-02", "quote": "Ежедневные проценты округляются до тиына по математическому правилу",
+           "line": 20, "metric": "округление до тиына (0,01 ₸)", "start_end": "", "share": "", "load": "",
+           "vague_words": "", "rewrite": ""}
+    assert not lens_qa.postprocess({"nfr_checks": [rnd]}, reqs)["candidates"]
+    slow = dict(rnd, quote="Сервис передаёт сообщение в течение минуты после события", metric="в течение 1 минуты")
+    c = lens_qa.postprocess({"nfr_checks": [slow]}, reqs)["candidates"]
+    assert len(c) == 1 and c[0]["severity"] == "major"
+    ok = dict(slow, quote="Методы отвечают не дольше 1 с для 95 % запросов", metric="не дольше 1 с", share="95 %")
+    assert not lens_qa.postprocess({"nfr_checks": [ok]}, reqs)["candidates"]
+    vague = dict(rnd, quote="Проценты считаются точно и без ошибок округления", metric="")
+    assert lens_qa.postprocess({"nfr_checks": [vague]}, reqs)["candidates"][0]["severity"] == "major"
+
+
+def test_nfr_conditions_only_for_nonfunctional_and_shared_in_requirement():
+    """Срок у функционального требования — жёсткий предел (проверяем); доля и нагрузка из соседней фразы того же НФТ
+    относятся ко всему требованию; одиночное НФТ без доли и нагрузки — major."""
+    reqs = [{"id": "R-02", "kind": "nonfunctional", "line_start": 20, "line_end": 20},
+            {"id": "R-05", "kind": "functional", "line_start": 28, "line_end": 28}]
+    blk = {"requirement_id": "R-05", "quote": "Блокировка вступает в силу не позднее 10 секунд после ответа 200",
+           "line": 28, "metric": "не позднее 10 секунд", "start_end": "после ответа 200", "share": "", "load": "",
+           "vague_words": "", "rewrite": ""}
+    assert not lens_qa.postprocess({"nfr_checks": [blk]}, reqs)["candidates"]
+    a = dict(blk, requirement_id="R-02", line=20, quote="Метод отвечает не дольше 1 с для 95 % запросов при нагрузке "
+             "до 300 запросов в секунду", metric="не дольше 1 с", share="95 %", load="до 300 запросов в секунду")
+    b = dict(blk, requirement_id="R-02", line=20, quote="Сведения учитывают платежи не позднее чем за 5 минут до запроса",
+             metric="не позднее чем за 5 минут")
+    assert not lens_qa.postprocess({"nfr_checks": [a, b]}, reqs)["candidates"]
+    one = lens_qa.postprocess({"nfr_checks": [b]}, reqs)["candidates"]
+    assert len(one) == 1 and one[0]["severity"] == "major"
+    vague = dict(blk, quote="Блокировка вступает в силу мгновенно", metric="")
+    assert lens_qa.postprocess({"nfr_checks": [vague]}, reqs)["candidates"][0]["severity"] == "major"

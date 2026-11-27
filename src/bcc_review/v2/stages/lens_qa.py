@@ -733,6 +733,8 @@ def calibrate_verifiability(cands: list[dict], reqs: list[Mapping[str, Any]]) ->
 
 # ---------------------------------------------------------------- нефункциональные требования
 
+_PERF = re.compile(r"\d\s*(?:мс|с|сек\w*|минут\w*|мин|час\w*|ч)\b|в течение|не дольше|не позднее|не позже|в срок|"
+                   r"доступн|запрос|нагрузк|отклик|время ответа|отвеча|\brps\b|\btps\b|в секунду|перцентил", re.I)
 _NFR_FIELDS = [("metric", "числовой норматив"), ("start_end", "точки начала и конца замера"),
                ("share", "доля событий или запросов (перцентиль)"), ("load", "нагрузка")]
 _EMPTY = re.compile(r"^(?:-|—|<\s*уточнить|нет|отсутству\w*|не\s+(?:указ|зада|назван|определ|опис)\w*|n/?a)", re.I)
@@ -768,8 +770,61 @@ def normalize_nfr_check(raw: Mapping[str, Any]) -> dict:
     # записаны НФТ аккуратных документов («не дольше 1 с для 95 % запросов»).
     throughput = re.search(r"в\s+(?:секунду|минуту|час)|/\s*с\b|\brps\b|\btps\b", c["metric"], re.I)
     no_conditions = not c["share"] and not c["load"] and "%" not in c["metric"] and not throughput
-    c["unverifiable"] = bool(c["quote"]) and (bool(c["vague_words"]) or not c["metric"] or no_conditions)
+    # Доля и нагрузка нужны только нормативу времени, скорости, доступности или пропускной способности; правило
+    # вычисления («округляются до тиына»), формат или точность хранения проверяются обычным тестом (haiku на
+    # чистом ТЗ записал «округление до тиына» в nfr_checks — ложное «нельзя проверить: нет доли и нагрузки»).
+    perf = _PERF.search(f"{c['quote']} {c['metric']}")
+    c["no_conditions"] = bool(perf) and bool(c["metric"]) and no_conditions
+    c["unverifiable"] = bool(c["quote"]) and (bool(c["vague_words"]) or bool(perf) and (not c["metric"] or no_conditions))
     return c
+
+
+def calibrate_nfr_checks(checks: list[dict], reqs: list[Mapping[str, Any]]) -> None:
+    """Условия замера (доля, нагрузка) спрашиваются только у нефункционального требования и только если они не
+    названы в нём же: (а) срок у функционального требования («блокировка вступает в силу не позднее 10 с после
+    ответа») — жёсткий предел для каждого события, его проверяет функциональный тест (на чистой базе корпуса
+    haiku без НФТ в нарезке взял такую фразу — ложное «нет доли и нагрузки»); (б) доля и нагрузка, названные в
+    соседней фразе того же требования («не дольше 1 с для 95 % запросов при нагрузке до 300 запросов в
+    секунду. Сведения учитывают платежи не позднее чем за 5 минут»), относятся ко всему требованию. Размытая
+    оценка и отсутствие числа — непроверяемость в любом случае."""
+    if not reqs:
+        return
+    index = _req_index(reqs)
+
+    def kind(c: Mapping[str, Any]) -> str | None:
+        r = index.get(c.get("requirement_id") or "")
+        if r:
+            return r.get("kind")
+        n = c.get("line")
+        for r in reqs:
+            lo = _int(r.get("line_start"))
+            if n and lo and lo <= n <= (_int(r.get("line_end")) or lo):
+                return r.get("kind")
+        return None
+
+    def key(c: Mapping[str, Any]):
+        return c.get("requirement_id") or c.get("line")
+
+    given = {key(c) for c in checks if c.get("share") or c.get("load")}
+    for c in checks:
+        if not c.get("unverifiable") or c.get("vague_words") or not c.get("no_conditions"):
+            continue
+        k = kind(c)
+        if (k and k != "nonfunctional") or key(c) in given:
+            c["unverifiable"] = False
+            c["conditions_from"] = "functional" if k and k != "nonfunctional" else "same_requirement"
+
+
+_METRIC_IN_QUOTE = re.compile(r"(?:в течение|не дольше|не позднее|не позже|не более|не менее|не ниже)\s+[^,.;]{1,25}?"
+                              r"(?=\s+(?:после|для|при|с момента|от|до|на)\b|[,.;]|$)", re.I)
+
+
+def _doc_metric(c: Mapping[str, Any]) -> str:
+    """Норматив словами документа: метрика модели, если она есть в цитате дословно, иначе фраза срока из цитаты."""
+    if _norm(c["metric"]) in _norm(c["quote"]):
+        return c["metric"]
+    m = _METRIC_IN_QUOTE.search(c["quote"])
+    return m.group(0).strip() if m else ""
 
 
 def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[str, Any]]) -> dict | None:
@@ -782,8 +837,8 @@ def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[s
     where = f" (строка {first['line']})" if first["line"] else ""
     if src and _DOC_ID.fullmatch(src):
         name = src
-    elif first["metric"] and not first["vague_words"]:
-        name = f"Норматив «{first['metric']}»{where}"
+    elif first["metric"] and not first["vague_words"] and _doc_metric(first):
+        name = f"Норматив «{_doc_metric(first)}»{where}"  # слова документа, а не пересказ модели («не дольше 60 с»)
     else:
         name = f"Нефункциональное требование{where}"
     names = dict(_NFR_FIELDS)
@@ -801,8 +856,9 @@ def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[s
         short = {"metric": "норматива", "start_end": "точек замера", "share": "доли событий", "load": "нагрузки"}
         gaps = [short[k] for k in first["missing"] if k in ("share", "load")] or [short[k] for k in first["missing"]]
         title = f"{name} нельзя проверить: нет {' и '.join(gaps[:2])}{more}"
-        what = f"норматив «{first['metric']}» без условий замера" if first["metric"] else "нет числового норматива"
-        scenario = (f"Нагрузочный тест: 95 % событий уложились в норматив «{first['metric'] or '—'}», 5 % — нет; "
+        dm = _doc_metric(first) or first["metric"]
+        what = f"норматив «{dm}» без условий замера" if dm else "нет числового норматива"
+        scenario = (f"Нагрузочный тест: 95 % событий уложились в норматив «{dm or '—'}», 5 % — нет; "
                     "доля и нагрузка в документе не названы — нельзя решить, пройден ли тест.")
     rest = "; ".join(f"«{c['quote']}»" for c in bad[1:3])
     problem = (f"«{first['quote']}» — {what}"
@@ -871,6 +927,7 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
             flagged.add(c["row_requirement_id"])
 
     nfr_checks = [normalize_nfr_check(x) for x in data.get("nfr_checks") or [] if isinstance(x, Mapping)]
+    calibrate_nfr_checks(nfr_checks, reqs)
     nfr = nfr_candidate(nfr_checks, index)
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
     for c in model_cands:  # тексты для читателя: «L040» → «строка 40», ID нарезки → номер документа (рубрика, п. 7)
