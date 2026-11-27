@@ -199,7 +199,7 @@ def cmd_official(a) -> int:
     """К1–К5 этапа на записанных ответах по официальному документу текущим кодом разбора (без модели)."""
     view = load_view(OFFICIAL)
     labels: dict = {}
-    tot = {"k": 0, "kcr": 0, "n": 0, "fcr": 0}
+    tot = {"k": 0, "kcr": 0, "n": 0, "fcr": 0, "c": 0, "cands": 0}
     for name, raw, reqs in official_recorded():
         out = consistency.postprocess(raw, view, reqs)
         row = SB.score_file({"case": "official", "seconds": 0, "error": "", "output": out}, labels)
@@ -210,7 +210,10 @@ def cmd_official(a) -> int:
         tot["k"] += int(row["k"].split("/")[0])
         tot["kcr"] += int(row["k"].split("cr ")[1].rstrip(")"))
         tot["fcr"] += len(row["false_crit"])
-    print(f"Итого ответов {tot['n']}: К найдено {tot['k']}, критичными {tot['kcr']}, ложных critical {tot['fcr']}")
+        tot["c"] += sum(1 for x in row["found"] if x.startswith("С"))
+        tot["cands"] += len(out["candidates"])
+    print(f"Итого ответов {tot['n']}: К найдено {tot['k']}, критичными {tot['kcr']}, ложных critical {tot['fcr']}, "
+          f"С найдено {tot['c']}, кандидатов {tot['cands']}")
     return 0
 
 
