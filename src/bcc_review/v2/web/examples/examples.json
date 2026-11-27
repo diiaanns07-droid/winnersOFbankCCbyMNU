@@ -27,7 +27,7 @@
     },
     {
       "id": "mock",
-      "title": "Официальный ТЗ · демо без модели",
+      "title": "Официальный ТЗ · демо",
       "json": "src/bcc_review/v2/web/examples/mock/requirements.json",
       "html": "src/bcc_review/v2/web/examples/mock/requirements.html",
       "md": "src/bcc_review/v2/web/examples/mock/requirements.md",

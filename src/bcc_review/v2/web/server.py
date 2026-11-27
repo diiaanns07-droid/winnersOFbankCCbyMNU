@@ -221,6 +221,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         url = urlsplit(self.path)
         path = url.path
+        if path.startswith("/examples/"): from . import gallery; return gallery.handle(self)  # №43  # noqa: E701,E702
         if path == "/":
             return self._html(200, index_page(self.app))
         if path == "/healthz":
@@ -270,6 +271,7 @@ class Handler(BaseHTTPRequestHandler):
     # ── POST ──
     def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
+        if path.startswith("/examples/"): from . import gallery; return gallery.handle(self)  # №43  # noqa: E701,E702
         m = JOB_PATH.match(path)
         if m and m.group(1) and m.group("rest") == "/answers":
             return self._answers(m.group("id"))
