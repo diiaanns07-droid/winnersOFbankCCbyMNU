@@ -620,7 +620,8 @@ def annotate_pdf(report: dict, view: dict, input_path: Path, output_path: Path) 
                 continue
             page = doc[int(page_no) - 1]
             bbox = _area(view, rects, int(n), int(ev.get("line_end") or n), int(page_no)) if n else None
-            quads = _find_quads(page, str(ev.get("quote") or ""), bbox)
+            quads = _find_quads(page, str(ev.get("quote") or ""), bbox) or \
+                _word_quads(page, str(ev.get("quote") or ""), bbox)
             if not quads:
                 missed.append(fid)
                 continue
@@ -702,6 +703,43 @@ def _find_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
         if found:
             return found
     return []
+
+
+def _word_quads(page: Any, quote: str, bbox: list[float] | None) -> list:
+    """Запасной поиск по словам: фрагменты строки в PDF могут лежать не по порядку (другой шрифт у цифр и точек),
+    и search_for не находит фразу. Слова в рамке блока раскладываются по строкам слева направо и сравниваются
+    с цитатой без пробелов. Не нашлось — выделяется весь блок (место дефекта всё равно видно)."""
+    import pymupdf
+    from bcc_review.v2.quotes import normalize
+    area = pymupdf.Rect(bbox) + (-2, -2, 2, 2) if bbox else None
+    words = page.get_text("words", clip=area) if area is not None else page.get_text("words")
+    if not words:
+        return []
+    words = sorted(words, key=lambda w: (w[1] + w[3]) / 2)
+    lines: list[list] = []
+    for w in words:
+        mid, h = (w[1] + w[3]) / 2, w[3] - w[1]
+        if lines and abs(mid - lines[-1][0]) <= max(h, 1) * 0.5:
+            lines[-1][1].append(w)
+        else:
+            lines.append([mid, [w]])
+    ordered = [w for _, ws in lines for w in sorted(ws, key=lambda w: w[0])]
+    chars, owner = [], []
+    for k, w in enumerate(ordered):
+        t = normalize(w[4]).replace(" ", "")
+        chars.append(t)
+        owner += [k] * len(t)
+    text = "".join(chars)
+    first = quote.split(" … ")[0]
+    needle = normalize(first).replace(" ", "").strip('".,;:')
+    pos = text.find(needle) if len(needle) >= 4 else -1
+    if pos >= 0:
+        sel = ordered[owner[pos]:owner[pos + len(needle) - 1] + 1]
+    elif area is not None:
+        sel = ordered
+    else:
+        return []
+    return [pymupdf.Rect(w[:4]).quad for w in sel]
 
 
 def _summary_note(page: Any, report: dict, findings: list[dict], anchored: set[str]) -> None:

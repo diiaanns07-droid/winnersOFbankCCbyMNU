@@ -222,3 +222,29 @@ def test_demo_samples_open():
     rows = list(csv.DictReader((SAMPLES / "official.jira.csv").open(encoding="utf-8-sig", newline="")))
     assert len(rows) >= 20 and rows[0]["Priority"] == "Highest"
     assert len(list((SAMPLES / "png").glob("*.png"))) >= 3
+
+
+@needs_pdf
+def test_pdf_highlight_when_spans_out_of_order(tmp_path):
+    """PDF из LibreOffice: «10» и «-1.» лежат отдельными фрагментами не по порядку, search_for не находит фразу —
+    выделение ставится по словам в рамке блока."""
+    import pymupdf
+    src = ROOT / "tests/v2/fixtures/03_stress/toc.pdf"
+    view = dv.load(src)
+    cands = [{"id": "D-01", "title": "Выпуск", "severity": "major",
+              "evidence": [{"quote": "ВК-1. Выпуск бесплатный", "line": 7}]},
+             {"id": "D-02", "title": "Срок", "severity": "minor",
+              "evidence": [{"quote": "Карта выпущена за 10 секунд", "line": 9}]}]
+    res = Q.verify_candidates(view, cands)
+    report = {"document": dv.summary(view), "findings": res["candidates"], "verdict": {}}
+    out = E.export(report, view, src, tmp_path / "r", ["pdf"])[0]
+    assert out["status"] == "written" and out["anchored"] == 2
+    with pymupdf.open(out["path"]) as d:
+        got = {}
+        for a in d[0].annots():
+            if a.type[0] == pymupdf.PDF_ANNOT_HIGHLIGHT:
+                v = a.vertices
+                got[a.info["subject"][:4]] = " ".join(
+                    d[0].get_textbox(pymupdf.Quad(v[i:i + 4]).rect).strip() for i in range(0, len(v), 4))
+    assert got["D-01"].replace(" ", "") == "ВК-1.Выпускбесплатный"
+    assert got["D-02"].replace(" ", "") == "Картавыпущеназа10секунд"
