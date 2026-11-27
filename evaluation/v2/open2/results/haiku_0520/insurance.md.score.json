@@ -1,0 +1,905 @@
+{
+ "schema": "bcc-v2-score/1",
+ "gold": {
+  "path": "evaluation/v2/open2/insurance/gold.yaml",
+  "document": "evaluation/v2/open2/insurance/source.md",
+  "sha256": "ae4347e577501cafe454289e1153f58abf7002294b83aaf16229fa00b618c91d"
+ },
+ "report": {
+  "version": "v2",
+  "same_doc": true,
+  "document": {
+   "file": "source.md",
+   "format": "md",
+   "sha256": "ae4347e577501cafe454289e1153f58abf7002294b83aaf16229fa00b618c91d",
+   "lines": 212
+  },
+  "status": "complete",
+  "provider": "claude_cli",
+  "model": "haiku",
+  "models_used": [
+   "claude-haiku-5-5"
+  ],
+  "commit": "79b0fa1",
+  "duration_s": 364.6,
+  "calls": {
+   "total": 9,
+   "cached": 0,
+   "failed": 0,
+   "split": 0
+  },
+  "tokens": {
+   "input": 430944,
+   "output": 164971
+  },
+  "cost_usd": 0.1332
+ },
+ "counts": {
+  "findings": 39,
+  "by_severity": {
+   "critical": 6,
+   "major": 13,
+   "minor": 20
+  },
+  "duplicates": 7,
+  "outside_gold": {
+   "total": 19,
+   "real": 0,
+   "partial": 0,
+   "false": 0,
+   "duplicate": 0,
+   "gold": 0,
+   "unknown": 19
+  },
+  "report_md_lines": 835
+ },
+ "recall": {
+  "critical": {
+   "found": [
+    "К1",
+    "К2",
+    "К3",
+    "К4"
+   ],
+   "n": 4,
+   "of": 5,
+   "as_critical": [
+    "К1",
+    "К2",
+    "К3"
+   ],
+   "lenient": [
+    "К1",
+    "К2",
+    "К3",
+    "К4"
+   ]
+  },
+  "major": {
+   "found": [
+    "С1",
+    "С2",
+    "С3",
+    "С4",
+    "С5"
+   ],
+   "n": 5,
+   "of": 20,
+   "lenient": [
+    "С1",
+    "С2",
+    "С3",
+    "С4",
+    "С5"
+   ]
+  },
+  "minor": {
+   "found_parents": [
+    "М1",
+    "М2",
+    "М3",
+    "М5"
+   ],
+   "of": 5,
+   "parts_found": [
+    "М5",
+    "М1",
+    "М2",
+    "М3"
+   ]
+  },
+  "key_25": {
+   "n": 9,
+   "of": 25,
+   "lenient": 9,
+   "loose_any_edge": 9
+  },
+  "all_items": {
+   "n": 13,
+   "of": 14
+  },
+  "parents": {
+   "n": 13,
+   "of": 14
+  }
+ },
+ "precision": {
+  "matched": 13,
+  "duplicates": 7,
+  "outside_real": 0,
+  "outside_false": 0,
+  "outside_unknown": 19,
+  "outside_partial": 0,
+  "precision_useful": 0.333,
+  "precision_gold": 0.333
+ },
+ "severity": {
+  "pairs": 13,
+  "ok": 10,
+  "exact": 7,
+  "accuracy_ok": 0.769,
+  "accuracy_exact": 0.538,
+  "critical_false": [
+   {
+    "finding": "D-06",
+    "title": "Пересчёт условий после изменения суммы против отказа 409 для подписанной заявки",
+    "reason": "вне эталона"
+   }
+  ],
+  "rows": [
+   {
+    "gold": "К1",
+    "level": "critical",
+    "finding": "D-03",
+    "severity": "critical",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "К2",
+    "level": "critical",
+    "finding": "D-05",
+    "severity": "critical",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "К3",
+    "level": "critical",
+    "finding": "D-02",
+    "severity": "critical",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "К4",
+    "level": "critical",
+    "finding": "D-07",
+    "severity": "major",
+    "ok": false,
+    "exact": false
+   },
+   {
+    "gold": "С1",
+    "level": "major",
+    "finding": "D-04",
+    "severity": "critical",
+    "ok": true,
+    "exact": false
+   },
+   {
+    "gold": "С2",
+    "level": "major",
+    "finding": "D-01",
+    "severity": "critical",
+    "ok": true,
+    "exact": false
+   },
+   {
+    "gold": "С3",
+    "level": "major",
+    "finding": "D-33",
+    "severity": "minor",
+    "ok": false,
+    "exact": false
+   },
+   {
+    "gold": "С4",
+    "level": "major",
+    "finding": "D-32",
+    "severity": "minor",
+    "ok": false,
+    "exact": false
+   },
+   {
+    "gold": "С5",
+    "level": "major",
+    "finding": "D-14",
+    "severity": "major",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М5",
+    "level": "minor",
+    "finding": "D-08",
+    "severity": "major",
+    "ok": true,
+    "exact": false
+   },
+   {
+    "gold": "М1",
+    "level": "minor",
+    "finding": "D-36",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М2",
+    "level": "minor",
+    "finding": "D-38",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   },
+   {
+    "gold": "М3",
+    "level": "minor",
+    "finding": "D-34",
+    "severity": "minor",
+    "ok": true,
+    "exact": true
+   }
+  ]
+ },
+ "quotes": {
+  "total": 82,
+  "missing": 0,
+  "fuzzy": 0,
+  "line_mismatch": 0,
+  "verified_field_missing": 0,
+  "findings_without_evidence": [],
+  "missing_list": []
+ },
+ "language": {
+  "generic": [],
+  "english": [
+   {
+    "finding": "Q-01",
+    "field": "options",
+    "word": "CANCELLED"
+   },
+   {
+    "finding": "Q-01",
+    "field": "options",
+    "word": "action"
+   },
+   {
+    "finding": "Q-01",
+    "field": "options",
+    "word": "cancel"
+   },
+   {
+    "finding": "Q-01",
+    "field": "options",
+    "word": "CANCELLED"
+   }
+  ],
+  "english_report_md": [
+   "CANCELLED",
+   "FAILED",
+   "action",
+   "cancel"
+  ]
+ },
+ "report_sections": {
+  "паспорт прогона": true,
+  "нарезка требований": true,
+  "проверка каждого требования": true,
+  "проверка набора": true,
+  "сводка": true,
+  "итог": true
+ },
+ "verdict": {
+  "got": {
+   "development": "no",
+   "testing": "no"
+  },
+  "expected": {
+   "development": "no",
+   "testing": "no"
+  }
+ },
+ "assignment": [
+  {
+   "gold": "К1",
+   "finding": "D-03",
+   "title": "Критерий приёмки №2 противоречит Ф-4: возврат 90 % против 100 % премии",
+   "severity": "critical",
+   "sources": [
+    "lens:qa",
+    "lens:risk"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "К2",
+   "finding": "D-05",
+   "title": "Ф-4 повышает ставку после отказа, особое правило 3 запрещает менять условия договора",
+   "severity": "critical",
+   "sources": [
+    "consistency"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "К3",
+   "finding": "D-02",
+   "title": "Метод отказа от страхования не описан, хотя часть A обещает отказ через REST API",
+   "severity": "critical",
+   "sources": [
+    "lens:architect",
+    "consistency",
+    "lens:risk"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "К4",
+   "finding": "D-07",
+   "title": "Не определено, от какой даты отсчитываются 14 дней отказа",
+   "severity": "major",
+   "sources": [
+    "lens:analyst"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "С1",
+   "finding": "D-04",
+   "title": "Клиент старше 65 лет: 200 DECLINED в логике и 422 в таблице кодов",
+   "severity": "critical",
+   "sources": [
+    "consistency",
+    "lens:qa",
+    "lens:architect"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "С2",
+   "finding": "D-01",
+   "title": "Срок term: в API указан в днях, в Ф-1 и Ф-2 — в месяцах",
+   "severity": "critical",
+   "sources": [
+    "lens:qa",
+    "lens:analyst",
+    "lens:architect",
+    "consistency",
+    "lens:risk"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "С3",
+   "finding": "D-33",
+   "title": "Не описано маскирование анкеты здоровья в журналах",
+   "severity": "minor",
+   "sources": [
+    "lens:risk"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "С4",
+   "finding": "D-32",
+   "title": "Нефункциональные требования «моментально» и «удобный» не измеримы",
+   "severity": "minor",
+   "sources": [
+    "lens:analyst",
+    "lens:qa",
+    "lens:architect",
+    "lens:risk"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "С5",
+   "finding": "D-14",
+   "title": "Досрочное погашение в первые дни: Ф-4 даёт полный возврат, Ф-5 — частичный",
+   "severity": "major",
+   "sources": [
+    "lens:risk",
+    "consistency"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М5",
+   "finding": "D-08",
+   "title": "Анкета здоровья передаётся в СК, но её источник и шаг заполнения не описаны",
+   "severity": "major",
+   "sources": [
+    "lens:analyst",
+    "lens:architect"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М1",
+   "finding": "D-36",
+   "title": "Чек-лист ревью не заполнен: в 14 пунктах не отмечено Да или Нет",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.checklist"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М2",
+   "finding": "D-38",
+   "title": "Блок согласующих пуст",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.approvals"
+   ],
+   "how": "детерминированно"
+  },
+  {
+   "gold": "М3",
+   "finding": "D-34",
+   "title": "Раздел тестирования оставлен заглушкой",
+   "severity": "minor",
+   "sources": [
+    "rules:placeholder.tbd"
+   ],
+   "how": "детерминированно"
+  }
+ ],
+ "duplicates": [
+  {
+   "finding": "D-09",
+   "gold": "К3",
+   "title": "Экраны условий и полиса не имеют операций чтения данных",
+   "sources": [
+    "lens:architect"
+   ]
+  },
+  {
+   "finding": "D-10",
+   "gold": "К3",
+   "title": "Отказ от страхования до выдачи кредита не описан",
+   "sources": [
+    "lens:analyst"
+   ]
+  },
+  {
+   "finding": "D-13",
+   "gold": "К4",
+   "title": "Граница 14 дней для отказа не определена: включается ли 14-й день",
+   "sources": [
+    "lens:qa"
+   ]
+  },
+  {
+   "finding": "D-17",
+   "gold": "К3",
+   "title": "В последовательности и схеме нет ответа СК с номером полиса",
+   "sources": [
+    "consistency"
+   ]
+  },
+  {
+   "finding": "D-19",
+   "gold": "М5",
+   "title": "Отказ СК в предварительной проверке не описан",
+   "sources": [
+    "lens:architect"
+   ]
+  },
+  {
+   "finding": "D-28",
+   "gold": "К4",
+   "title": "Часовой пояс для 14 дней и полных месяцев не задан",
+   "sources": [
+    "lens:risk"
+   ]
+  },
+  {
+   "finding": "D-37",
+   "gold": "М1",
+   "title": "Не указаны версия документа и дата",
+   "sources": [
+    "rules:placeholder.version"
+   ]
+  }
+ ],
+ "outside": [
+  {
+   "finding": "D-06",
+   "severity": "critical",
+   "kind": "contradiction",
+   "title": "Пересчёт условий после изменения суммы против отказа 409 для подписанной заявки",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-11",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Не описано, что делать, если полис не выпущен после выдачи и премия уже списана",
+   "sources": [
+    "lens:risk",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-12",
+   "severity": "major",
+   "kind": "ambiguity",
+   "title": "Термин «действующие условия» в повторном вызове не определён после отказа",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-15",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "После отказа повторный вызов не имеет результата и не описано повторное подключение",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-16",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Нижняя граница 18 лет из Ф-6 не проверяется в логике метода",
+   "sources": [
+    "lens:risk",
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-18",
+   "severity": "major",
+   "kind": "incomplete",
+   "title": "Критерии приёмки не покрывают границы, ошибки и особые правила",
+   "sources": [
+    "lens:qa"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-20",
+   "severity": "minor",
+   "kind": "terminology",
+   "title": "Одни понятия названы по-разному, глоссария нет",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-21",
+   "severity": "minor",
+   "kind": "ambiguity",
+   "title": "Цель без измеримого значения и базы",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-22",
+   "severity": "minor",
+   "kind": "terminology",
+   "title": "Заявка и заявление на страхование названы по-разному в проверке 409",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-23",
+   "severity": "minor",
+   "kind": "other",
+   "title": "Несколько самостоятельных правил в одном пункте",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-24",
+   "severity": "minor",
+   "kind": "other",
+   "title": "Приоритет требований не указан",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-25",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Округление премии до тенге не задано",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-26",
+   "severity": "minor",
+   "kind": "missing_element",
+   "title": "Схема отката и скрытия функции при списании премий не описана",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-27",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Нет уведомления СК и клиента о прекращении полиса при отказе и досрочном погашении",
+   "sources": [
+    "lens:risk"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-29",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Возврат при досрочном погашении: не указаны точка отсчёта месяцев и счёт возврата",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-30",
+   "severity": "minor",
+   "kind": "incomplete",
+   "title": "Нижняя граница возраста 18 лет не привязана к дате",
+   "sources": [
+    "lens:analyst"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-31",
+   "severity": "minor",
+   "kind": "terminology",
+   "title": "Компонент API назван по-разному в последовательности и схеме",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-35",
+   "severity": "minor",
+   "kind": "traceability",
+   "title": "Пункты логики и параметры API не имеют идентификаторов",
+   "sources": [
+    "consistency"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  },
+  {
+   "finding": "D-39",
+   "severity": "minor",
+   "kind": "placeholder",
+   "title": "Пример вызова использует неопределённые переменные $BASE и $TOKEN",
+   "sources": [
+    "lens:architect"
+   ],
+   "verdict": "unknown",
+   "reason": ""
+  }
+ ],
+ "misses": [
+  {
+   "gold": "М4",
+   "level": "minor",
+   "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+   "where": "есть близкое замечание, но не та проблема или не те строки",
+   "owners": [
+    "rules",
+    "analyst",
+    "judge"
+   ],
+   "near": [
+    {
+     "finding": "D-24",
+     "status": "disputed",
+     "score": 1.3,
+     "arbiter": ""
+    }
+   ],
+   "seen_in": []
+  }
+ ],
+ "stage_recall": {
+  "consistency": {
+   "candidates": 14,
+   "K": [
+    "К2",
+    "К3",
+    "К4"
+   ],
+   "C": [
+    "С1",
+    "С2"
+   ],
+   "only_here": [
+    "К2"
+   ]
+  },
+  "lens:analyst": {
+   "candidates": 12,
+   "K": [
+    "К3",
+    "К4"
+   ],
+   "C": [
+    "С2",
+    "С4"
+   ],
+   "only_here": []
+  },
+  "lens:architect": {
+   "candidates": 9,
+   "K": [
+    "К3"
+   ],
+   "C": [
+    "С1",
+    "С2",
+    "С4"
+   ],
+   "only_here": []
+  },
+  "lens:qa": {
+   "candidates": 6,
+   "K": [
+    "К1",
+    "К4"
+   ],
+   "C": [
+    "С1",
+    "С2",
+    "С4"
+   ],
+   "only_here": []
+  },
+  "lens:risk": {
+   "candidates": 11,
+   "K": [
+    "К1",
+    "К3",
+    "К4"
+   ],
+   "C": [
+    "С2",
+    "С3",
+    "С4"
+   ],
+   "only_here": [
+    "С3"
+   ]
+  },
+  "rules": {
+   "candidates": 4,
+   "K": [],
+   "C": [],
+   "only_here": []
+  }
+ },
+ "gates": [
+  {
+   "metric": "К1–К5 найдены",
+   "value": "4/5",
+   "ok": true
+  },
+  {
+   "metric": "из них критичными",
+   "value": "3/5",
+   "ok": true
+  },
+  {
+   "metric": "С1–С20 найдены",
+   "value": "5/20",
+   "ok": true
+  },
+  {
+   "metric": "критичных ложных",
+   "value": "1",
+   "ok": false
+  },
+  {
+   "metric": "всего замечаний",
+   "value": "39",
+   "ok": true
+  },
+  {
+   "metric": "цитаты найдены в документе",
+   "value": "82/82",
+   "ok": true
+  },
+  {
+   "metric": "строк отчёта",
+   "value": "835",
+   "ok": true
+  },
+  {
+   "metric": "разделы п. 6 ТЗ",
+   "value": "6/6",
+   "ok": true
+  },
+  {
+   "metric": "общие фразы",
+   "value": "0",
+   "ok": true
+  },
+  {
+   "metric": "английские слова",
+   "value": "8",
+   "ok": false
+  },
+  {
+   "metric": "вердикт разработка/тестирование",
+   "value": "no/no",
+   "ok": true
+  },
+  {
+   "metric": "время, мин",
+   "value": "6.1",
+   "ok": true
+  },
+  {
+   "metric": "вызовов модели",
+   "value": "9",
+   "ok": true
+  }
+ ],
+ "arbiter": {
+  "mode": "off",
+  "calls": 0,
+  "seconds": 0.0,
+  "cost_usd": 0.0,
+  "pending": 58,
+  "model": ""
+ },
+ "seconds": 0.09
+}
