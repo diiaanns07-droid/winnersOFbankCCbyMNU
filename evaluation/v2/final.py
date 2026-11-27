@@ -111,6 +111,8 @@ def _calls(d: dict) -> str:
     t = d.get("time") or {}
     if "calls" not in t:
         return "—"
+    if d.get("provider") == "offline":
+        return "0 — без модели (правила)"
     if not t["calls"] and (d.get("runs") or d.get("cases")):
         return "0 — повтор из кэша"
     return f"{t['calls']}, ${t.get('cost_usd') or 0:.2f}"
@@ -200,7 +202,9 @@ def newer_lines(sha: str, newer: list[str], view_check: bool = True) -> list[str
         L += ["", f"**Проверка на более новом коде `{nsha}`** — официальный документ"
               + (f"; код отличается от `{sha}`: {diff}" if diff else "; `src/` тот же") + ":", ""]
         L += official_table(rows)
-        note_code = code_note(nsha, [rows])
+        corp_n, nz_n = _summaries(V2 / "corpus_results", nsha), _summaries(V2 / "newtz_results", nsha)
+        L += sets_tables(corp_n, nz_n)
+        note_code = code_note(nsha, [rows, corp_n, nz_n])
         L += ["", note_code] if note_code else []
         if view_check and diff:
             L += ["", view_line(sha, nsha)]
@@ -227,26 +231,9 @@ def view_line(sha: str, nsha: str) -> str:
     return line
 
 
-def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newer: list[str] | None = None,
-           extra: list[str] | None = None, view_check: bool = True, sets_sha: str | None = None) -> str:
-    """Блок «Финальные цифры». ``sets_sha`` — корпус, новые ТЗ и чистые наборы с этого кода (на коде релиза их не
-    мерили: лимит подписки, нет времени), с пометкой и строкой «вход модели»; официальный — всегда на ``sha``."""
-    sets_sha = sets_sha or sha
-    L = [f"Код: `{sha}`" + (f" ({note})" if note else "") + ". Все числа — из готовых замеров с этим коммитом в "
-         "метке; пересчитать — `python -m evaluation.v2.final --commit " + ref
-         + "".join(f" --newer {n}" for n in newer or [])
-         + (f" --sets-from {sets_sha}" if sets_sha != sha else "") + " --write`.", ""]
-    for x in extra or []:
-        L += [x, ""]
-    off = official(sha)
-    L += ["**Официальный документ** (каждая модель — все прогоны на этом коде, разброс min–max):", ""]
-    L += official_table(off)
-    corp = _summaries(V2 / "corpus_results", sets_sha)
-    nz = _summaries(V2 / "newtz_results", sets_sha)
-    if sets_sha != sha and (corp or nz):
-        L += ["", f"**Наборы ниже — на коде `{sets_sha}`**, не на `{sha}`: на коде релиза корпус, новые ТЗ и чистые "
-              "не мерились. " + (view_line(sets_sha, sha) if view_check else
-                                 f"Код отличается: {code_diff(sets_sha, sha)}.")]
+def sets_tables(corp: list[dict], nz: list[dict]) -> list[str]:
+    """Корпус и новые ТЗ / чистые наборы — таблицами (для кода релиза и для проверки новых голов)."""
+    L: list[str] = []
     if corp:
         L += ["", "**Корпус `evaluation/dev`** (строгий счётчик `evaluation/harness`):", "",
               "| Прогон | Модель | Кейсов (не измерено) | TP | FP | FN | Precision | Recall | F1 | critical на чистых | "
@@ -274,6 +261,30 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newe
             ij = f"{inj.get('flagged')} из {inj.get('n')}" if inj.get("n") else "—"
             L.append(f"| {d.get('label')} | {d.get('model')} | {d.get('runs', d.get('cases'))} ({d.get('failed') or 0}) | "
                      f"{rec} | {prec} | {cl} | {ij} | {_calls(d)} |")
+    return L
+
+
+def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newer: list[str] | None = None,
+           extra: list[str] | None = None, view_check: bool = True, sets_sha: str | None = None) -> str:
+    """Блок «Финальные цифры». ``sets_sha`` — корпус, новые ТЗ и чистые наборы с этого кода (на коде релиза их не
+    мерили: лимит подписки, нет времени), с пометкой и строкой «вход модели»; официальный — всегда на ``sha``."""
+    sets_sha = sets_sha or sha
+    L = [f"Код: `{sha}`" + (f" ({note})" if note else "") + ". Все числа — из готовых замеров с этим коммитом в "
+         "метке; пересчитать — `python -m evaluation.v2.final --commit " + ref
+         + "".join(f" --newer {n}" for n in newer or [])
+         + (f" --sets-from {sets_sha}" if sets_sha != sha else "") + " --write`.", ""]
+    for x in extra or []:
+        L += [x, ""]
+    off = official(sha)
+    L += ["**Официальный документ** (каждая модель — все прогоны на этом коде, разброс min–max):", ""]
+    L += official_table(off)
+    corp = _summaries(V2 / "corpus_results", sets_sha)
+    nz = _summaries(V2 / "newtz_results", sets_sha)
+    if sets_sha != sha and (corp or nz):
+        L += ["", f"**Наборы ниже — на коде `{sets_sha}`**, не на `{sha}`: на коде релиза корпус, новые ТЗ и чистые "
+              "не мерились. " + (view_line(sets_sha, sha) if view_check else
+                                 f"Код отличается: {code_diff(sets_sha, sha)}.")]
+    L += sets_tables(corp, nz)
     if not (off or corp or nz):
         L += ["", f"Замеров с `{sha}` в метке нет — `python -m evaluation.v2.round … --label-commit {sha}`."]
     else:

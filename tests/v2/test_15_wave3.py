@@ -760,3 +760,12 @@ def test_gate_corpus_f1_notes_rules_only_run(tmp_path, monkeypatch):
                                                      "support": 28, "f1": 0.98 if name == "new" else 0.2}}), encoding="utf-8")
     monkeypatch.setattr(gate, "V2", tmp_path)
     assert gate._rules_only_note() == "; правила без модели (3e7133c): TP 27, FP 0, F1 0.98 — ложные добавляют этапы модели"
+
+
+def test_final_calls_offline_rules_are_not_cache_replay():
+    """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
+    from evaluation.v2 import final
+
+    assert final._calls({"provider": "offline", "cases": 33, "time": {"calls": 0}}) == "0 — без модели (правила)"
+    assert final._calls({"provider": "claude_cli", "cases": 8, "time": {"calls": 0}}) == "0 — повтор из кэша"
+    assert final._calls({"provider": "claude_cli", "cases": 8, "time": {"calls": 75, "cost_usd": 1.06}}) == "75, $1.06"
