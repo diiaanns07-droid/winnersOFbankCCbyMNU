@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
   "run": {
-    "run_id": "20261126T192048Z-fbca9c82-928c",
+    "run_id": "20261127T042052Z-fbca9c82-4b1d",
     "parent_run_id": null,
     "source_sha256": "fbca9c8282f440754d43c2ec689a27a9ccc32ac07a1c4b30a7ca22c21d7e4de2",
     "source_name": "requirements.pdf",
     "agent_version": "0.1.0",
-    "agent_commit": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+    "agent_commit": "12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3",
     "provider": "none",
     "model": null,
     "requested_model": null,
@@ -20,9 +20,9 @@
       "questions: вопросы построены по правилам без модели",
       "bank: чек-лист размечен по правилам без модели"
     ],
-    "started_at": "2026-11-26T19:20:48Z",
-    "finished_at": "2026-11-26T19:20:52Z",
-    "duration_s": 3.516,
+    "started_at": "2026-11-27T04:20:52Z",
+    "finished_at": "2026-11-27T04:20:59Z",
+    "duration_s": 6.234,
     "calls": {
       "physical": 0,
       "cache_hits": 0,
@@ -50,7 +50,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 2.563,
+        "duration_s": 4.922,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.readers.pdf:read_pdf"
@@ -63,7 +63,7 @@
         "retries": 0,
         "model": null,
         "reason": "движок добавил требований из блоков, пропущенных нарезкой: 4",
-        "duration_s": 0.046,
+        "duration_s": 0.047,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.inventory:build_inventory"
@@ -89,7 +89,7 @@
         "retries": 0,
         "model": null,
         "reason": "модель не вызывалась: режим --offline-lint (только детерминированные правила)",
-        "duration_s": 0.094,
+        "duration_s": 0.157,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.individual:review_individual"
@@ -102,7 +102,7 @@
         "retries": 0,
         "model": null,
         "reason": "модель не вызывалась: режим --offline-lint (только детерминированные правила)",
-        "duration_s": 0.14,
+        "duration_s": 0.125,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.cross:review_set"
@@ -115,7 +115,7 @@
         "retries": 0,
         "model": null,
         "reason": null,
-        "duration_s": 0.015,
+        "duration_s": 0.032,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.evidence:resolve_candidate"
@@ -140,7 +140,7 @@
         "retries": 0,
         "model": null,
         "reason": "кандидатов 34 → замечаний 25",
-        "duration_s": 0.015,
+        "duration_s": 0.0,
         "input_tokens": 0,
         "output_tokens": 0
       },
@@ -152,7 +152,7 @@
         "retries": 0,
         "model": null,
         "reason": "фактов: 0",
-        "duration_s": 0.016,
+        "duration_s": 0.031,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.analysis.facts:reconcile_facts"
@@ -165,7 +165,7 @@
         "retries": 0,
         "model": null,
         "reason": "вопросы построены по правилам без модели",
-        "duration_s": 0.063,
+        "duration_s": 0.031,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.decisions.clarify:build_questions"
@@ -178,7 +178,7 @@
         "retries": 0,
         "model": null,
         "reason": "чек-лист размечен по правилам без модели",
-        "duration_s": 0.187,
+        "duration_s": 0.157,
         "input_tokens": 0,
         "output_tokens": 0,
         "implementation": "team:bcc_review.bank.checklist:build_bank_pack"
@@ -32727,7 +32727,8 @@
           "F-002",
           "F-004",
           "F-007"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -32881,7 +32882,8 @@
           "F-017",
           "F-018"
         ],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -32977,7 +32979,8 @@
         "value": "unknown",
         "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -33089,7 +33092,8 @@
         ],
         "blocking_finding_ids": [
           "F-002"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -33280,7 +33284,8 @@
         "value": "no",
         "basis": "проверять нечего: описания нет",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -33405,7 +33410,8 @@
           "F-014",
           "F-016"
         ],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -33516,7 +33522,8 @@
         ],
         "blocking_finding_ids": [
           "F-004"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -33645,7 +33652,8 @@
           "F-008",
           "F-003",
           "F-010"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -33748,7 +33756,8 @@
         "value": "unknown",
         "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": {
         "required": true,
@@ -33916,7 +33925,8 @@
           "F-002",
           "F-004",
           "F-007"
-        ]
+        ],
+        "resolved": []
       },
       "approval": {
         "required": true,
@@ -34048,7 +34058,8 @@
         ],
         "blocking_finding_ids": [
           "F-005"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -34155,7 +34166,8 @@
         "value": "unknown",
         "basis": "семантическая проверка выполнена не полностью (или без модели) — положительный вывод не делается",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -34384,7 +34396,8 @@
           "F-004",
           "F-007",
           "F-010"
-        ]
+        ],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -34588,7 +34601,8 @@
         "value": "no",
         "basis": "проверять нечего: описания нет",
         "finding_ids": [],
-        "blocking_finding_ids": []
+        "blocking_finding_ids": [],
+        "resolved": []
       },
       "approval": null,
       "not_required_basis": null,
@@ -34679,6 +34693,7 @@
       "values": {
         "input": 999,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo-1",
         "range": [
           1000,
@@ -34746,6 +34761,7 @@
       "values": {
         "input": 1000,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo",
         "range": [
           1000,
@@ -34813,6 +34829,7 @@
       "values": {
         "input": 1000000,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi",
         "range": [
           1000,
@@ -34888,6 +34905,7 @@
       "values": {
         "input": 1000001,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi+1",
         "range": [
           1000,
@@ -34963,6 +34981,7 @@
       "values": {
         "input": 1000.5,
         "unit": "₸",
+        "step": 1,
         "boundary": "fraction",
         "range": [
           1000,
@@ -36385,6 +36404,7 @@
       "values": {
         "input": 1000,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo",
         "range": [
           1000,
@@ -36504,6 +36524,7 @@
       "values": {
         "input": 1000000,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi",
         "range": [
           1000,
@@ -36743,6 +36764,7 @@
       "values": {
         "input": 999,
         "unit": "₸",
+        "step": 1,
         "boundary": "lo-1",
         "range": [
           1000,
@@ -36941,6 +36963,7 @@
       "values": {
         "input": 1000001,
         "unit": "₸",
+        "step": 1,
         "boundary": "hi+1",
         "range": [
           1000,
@@ -37139,6 +37162,7 @@
       "values": {
         "input": 1000.5,
         "unit": "₸",
+        "step": 1,
         "boundary": "fraction",
         "range": [
           1000,
@@ -38335,7 +38359,7 @@
   ],
   "rejected": [],
   "exports": {
-    "html": "C:\\t\\gen2\\requirements_pdf.html",
-    "jira": "requirements_pdf.jira.csv"
+    "html": "C:\\bcc-release-v1-18\\release\\reports\\offline\\requirements_pdf.html",
+    "jira": "release\\reports\\offline\\requirements_pdf.jira.csv"
   }
 }
