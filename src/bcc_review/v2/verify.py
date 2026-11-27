@@ -145,7 +145,7 @@ def check_markdown(report: dict, md: str) -> tuple[list[str], list[str]]:
     m = _MD_SUMMARY.search(md[md.find('id="s5"'):md.find('id="s6"')] if 'id="s5"' in md else md)
     if not m or [int(x) for x in m.groups()] != want:
         errors.append(f"«Сводка»: дефектов {list(m.groups()) if m else 'не найдено'}, в JSON {want}")
-    open_ids = {f.get("id") for f in jsonout.open_findings(report)}
+    open_ids = {jsonout._key(f.get("id")) for f in jsonout.open_findings(report)} - {None}
     anchors = re.findall(r'<a id="(d-\d+)"></a>', md)
     shown = {x.upper() for x in anchors}
     if shown != {str(i).upper() for i in open_ids}:
@@ -163,7 +163,56 @@ def check_markdown(report: dict, md: str) -> tuple[list[str], list[str]]:
     ok, total = s["quotes_verified"], s["quotes_total"]
     if total and f"{ok} из {total}" not in md and f"все {total} цитат" not in md:
         errors.append(f"число сверенных цитат ({ok} из {total}) в Markdown не указано")
+    errors += _check_markdown_more(report, md, brief, s)
     return errors, []
+
+
+def _section(md: str, a: str, b: str | None) -> str:
+    i = md.find(f'id="{a}"')
+    if i < 0:
+        return ""
+    j = md.find(f'id="{b}"', i) if b else -1
+    return md[i:j] if j > i else md[i:]
+
+
+def _check_markdown_more(report: dict, md: str, brief: str, s: dict) -> list[str]:
+    """Вердикт, блокеры, требования и кандидаты — одни и те же в «Кратко», сводке, итоге, приложении Д и JSON."""
+    from .render import markdown as M
+
+    errors: list[str] = []
+    v = report.get("verdict") if isinstance(report.get("verdict"), dict) else {}
+    want = [M.READINESS.get(v.get(k) if isinstance(v.get(k), str) else None, "—") for k in ("development", "testing")]
+    m = re.search(r"\| \*\*(.+?)\*\* \| \*\*(.+?)\*\* \|", brief)
+    if m and list(m.groups()) != want:
+        errors.append(f"«Кратко»: вердикт {list(m.groups())}, в JSON {want}")
+    final = _section(md, "s6", "pa")
+    got = re.findall(r"^\| (?:разработку|тестирование) \| \*\*(.+?)\*\* \|", final, re.M)
+    if got and got != want:
+        errors.append(f"«Итог»: вердикт {got}, в JSON {want}")
+    try:
+        ctx = M._Ctx(M._clean_report(report))
+        n_block = len(M._blockers(ctx))
+    except Exception:  # noqa: BLE001 — сверка не должна падать на неполном отчёте
+        n_block = None
+    m = re.search(r"\*\*Блокер(?:ы \((\d+)\))?\*\*", brief)
+    if n_block is not None and m and (int(m.group(1)) if m.group(1) else 1) != n_block:
+        errors.append(f"«Кратко»: блокеров {m.group(1) or 1}, по дефектам JSON {n_block}")
+    if n_block and not m:
+        errors.append(f"«Кратко»: блокеров по JSON {n_block}, а списка блокеров нет")
+    summ = _section(md, "s5", "s6")
+    for label, key in (("Требований выделено", "requirements"), ("Без замечаний", "requirements_without_findings")):
+        m = re.search(rf"^\| {label} \| (\d[\d\s ]*) \|", summ, re.M)
+        if m and int(re.sub(r"\D", "", m.group(1))) != s.get(key):
+            errors.append(f"«Сводка»: «{label}» {m.group(1).strip()}, в JSON {s.get(key)}")
+    m = re.search(r"✅ Без замечаний \((\d+)\)", _section(md, "s3", "s4"))
+    if m and int(m.group(1)) != s.get("requirements_without_findings"):
+        errors.append(f"«3. Проверка каждого требования»: без замечаний {m.group(1)}, в JSON "
+                      f"{s.get('requirements_without_findings')}")
+    m1 = re.search(r"найдено ([\d  ]+) возможн\w+ дефект", brief)
+    m2 = re.search(r"Кандидатов в дефекты: ([\d  ]+)", _section(md, "pd", "pe"))
+    if m1 and m2 and re.sub(r"\D", "", m1.group(1)) != re.sub(r"\D", "", m2.group(1)):
+        errors.append(f"«Как получено»: возможных дефектов {m1.group(1)}, в приложении Д {m2.group(1)}")
+    return errors
 
 
 def verify_report(report: dict | str | Path, source: str | Path, *, markdown: str | Path | None = None) -> dict:
@@ -194,12 +243,21 @@ def verify_report(report: dict | str | Path, source: str | Path, *, markdown: st
     # 2. исходник
     data = src.read_bytes()
     sha = hashlib.sha256(data).hexdigest()
-    if doc.get("sha256") != sha:
+    if run.get("status") == "failed" and not doc.get("sha256"):
+        warnings.append("прогон завершился сбоем, документ не был прочитан — SHA-256 в отчёте не записан")
+    elif doc.get("sha256") != sha:
         err("sha256", "document.sha256",
             f"SHA-256 исходника {sha[:12]}… не совпадает с записанным {str(doc.get('sha256'))[:12]}…")
     if doc.get("file") and Path(doc["file"]).name != src.name:
         warnings.append(f"имя файла в отчёте «{doc['file']}», проверяется «{src.name}»")
-    lines, pages = load_lines(src)
+    try:
+        lines, pages = load_lines(src)
+    except (OSError, ValueError, RuntimeError, ImportError) as exc:
+        if run.get("status") != "failed" or jsonout.open_findings(report):
+            raise
+        # отчёт о сбое на нечитаемом входе: утверждений о документе в нём нет — сверять нечего
+        warnings.append(f"документ не читается ({exc}); отчёт сообщает о сбое и не содержит цитат")
+        lines, pages = [], []
     if doc.get("lines") not in (None, len(lines)):
         warnings.append(f"в отчёте {doc.get('lines')} строк документа, при чтении — {len(lines)}")
 
@@ -330,6 +388,11 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_VERIFY_FAILED
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif result["ok"] and any(w.startswith("прогон завершился сбоем") for w in result["warnings"]):
+        print("verify: OK — отчёт о сбое прогона: утверждений о документе в нём нет, числа и вердикт («не вынесен») "
+              "сходятся")
+        for w in result["warnings"][:10]:
+            print(f"  ! {w}")
     elif result["ok"]:
         c = result["counts"]
         print(f"verify: OK — исходник совпадает (SHA-256 {result['sha256'][:12]}…), цитат на своих строках "

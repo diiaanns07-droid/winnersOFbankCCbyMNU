@@ -1,0 +1,214 @@
+{
+ "_note": "haiku 27.11 12:45 (волна 3, сессия 2, №04): абзацы критериев без номера — модель дала «Критерии приёмки, п. N»; вводная фраза «Клиент получает…»",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Цель: кэшбэк за оплату коммунальных услуг картой",
+   "line_start": 2,
+   "line_end": 2
+  },
+  {
+   "source_id": "КУ-1",
+   "kind": "functional",
+   "summary": "Размер кэшбэка и месячный лимит",
+   "line_start": 4,
+   "line_end": 4
+  },
+  {
+   "source_id": "КУ-2",
+   "kind": "functional",
+   "summary": "Отбор платежей по категории коммунальных услуг",
+   "line_start": 5,
+   "line_end": 5
+  },
+  {
+   "source_id": "КУ-3",
+   "kind": "functional",
+   "summary": "Срок зачисления кэшбэка на карту",
+   "line_start": 6,
+   "line_end": 6
+  },
+  {
+   "source_id": "КУ-4",
+   "kind": "functional",
+   "summary": "Исключение платежей, отменённых поставщиком",
+   "line_start": 7,
+   "line_end": 7
+  },
+  {
+   "source_id": "",
+   "kind": "nonfunctional",
+   "summary": "Пакетный расчёт кэшбэка за месяц по времени",
+   "line_start": 9,
+   "line_end": 9
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Состав хранимых данных о кэшбэке",
+   "line_start": 11,
+   "line_end": 11
+  },
+  {
+   "source_id": "Критерии приёмки, п. 1",
+   "kind": "acceptance",
+   "summary": "Зачисление кэшбэка с платежа электроэнергии до срока",
+   "line_start": 13,
+   "line_end": 13
+  },
+  {
+   "source_id": "Критерии приёмки, п. 2",
+   "kind": "acceptance",
+   "summary": "Ограничение кэшбэка месячным лимитом при большом обороте",
+   "line_start": 14,
+   "line_end": 14
+  },
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Цель: кэшбэк за оплату коммунальных услуг картой (раздел 2)",
+   "line_start": 16,
+   "line_end": 16
+  },
+  {
+   "source_id": "КУ-21",
+   "kind": "functional",
+   "summary": "Размер кэшбэка и месячный лимит",
+   "line_start": 19,
+   "line_end": 19
+  },
+  {
+   "source_id": "КУ-22",
+   "kind": "functional",
+   "summary": "Отбор платежей по категории коммунальных услуг",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "source_id": "КУ-23",
+   "kind": "functional",
+   "summary": "Срок зачисления кэшбэка на карту",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "КУ-24",
+   "kind": "functional",
+   "summary": "Исключение платежей, отменённых поставщиком",
+   "line_start": 22,
+   "line_end": 22
+  },
+  {
+   "source_id": "",
+   "kind": "nonfunctional",
+   "summary": "Пакетный расчёт кэшбэка за месяц по времени (раздел 2)",
+   "line_start": 24,
+   "line_end": 24
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Состав хранимых данных о кэшбэке (раздел 2)",
+   "line_start": 26,
+   "line_end": 26
+  },
+  {
+   "source_id": "Критерии приёмки — раздел 2, п. 1",
+   "kind": "acceptance",
+   "summary": "Зачисление кэшбэка с платежа электроэнергии до срока",
+   "line_start": 28,
+   "line_end": 28
+  },
+  {
+   "source_id": "Критерии приёмки — раздел 2, п. 2",
+   "kind": "acceptance",
+   "summary": "Ограничение кэшбэка месячным лимитом при большом обороте",
+   "line_start": 29,
+   "line_end": 29
+  },
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Цель: кэшбэк за оплату коммунальных услуг картой (раздел 3)",
+   "line_start": 31,
+   "line_end": 31
+  },
+  {
+   "source_id": "КУ-31",
+   "kind": "functional",
+   "summary": "Размер кэшбэка и месячный лимит",
+   "line_start": 34,
+   "line_end": 34
+  },
+  {
+   "source_id": "КУ-32",
+   "kind": "functional",
+   "summary": "Отбор платежей по категории коммунальных услуг",
+   "line_start": 35,
+   "line_end": 35
+  },
+  {
+   "source_id": "КУ-33",
+   "kind": "functional",
+   "summary": "Срок зачисления кэшбэка на карту",
+   "line_start": 36,
+   "line_end": 36
+  },
+  {
+   "source_id": "КУ-34",
+   "kind": "functional",
+   "summary": "Исключение платежей, отменённых поставщиком",
+   "line_start": 37,
+   "line_end": 37
+  },
+  {
+   "source_id": "",
+   "kind": "nonfunctional",
+   "summary": "Пакетный расчёт кэшбэка за месяц по времени (раздел 3)",
+   "line_start": 39,
+   "line_end": 39
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Состав хранимых данных о кэшбэке (раздел 3)",
+   "line_start": 41,
+   "line_end": 41
+  },
+  {
+   "source_id": "Критерии приёмки — раздел 3, п. 1",
+   "kind": "acceptance",
+   "summary": "Зачисление кэшбэка с платежа электроэнергии до срока",
+   "line_start": 43,
+   "line_end": 43
+  },
+  {
+   "source_id": "Критерии приёмки — раздел 3, п. 2",
+   "kind": "acceptance",
+   "summary": "Ограничение кэшбэка месячным лимитом при большом обороте",
+   "line_start": 44,
+   "line_end": 44
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Название документа «Кэшбэк за оплату коммунальных услуг»",
+   "line_start": 1,
+   "line_end": 1,
+   "reason": "Название документа, не требование."
+  },
+  {
+   "what": "Строка «— раздел 2»",
+   "line_start": 18,
+   "line_end": 18,
+   "reason": "Служебная пометка номера раздела под заголовком «Функциональные требования», не задаёт поведения."
+  },
+  {
+   "what": "Строка «— раздел 3»",
+   "line_start": 33,
+   "line_end": 33,
+   "reason": "Служебная пометка номера раздела под заголовком «Функциональные требования», не задаёт поведения."
+  }
+ ]
+}

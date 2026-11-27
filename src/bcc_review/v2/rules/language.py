@@ -49,7 +49,10 @@ CHECKLIST = re.compile(r"\bДа\s*/\s*Нет\b", re.I)
 NUMBER = re.compile(r"\d")
 # «X считается Y в момент Z», «отказ считается оформленным в момент, когда …» — определение момента событием, а не
 # размытый срок; «узнать в момент покупки» (обещание реакции без допуска) остаётся сигналом
-DEFINES_MOMENT = re.compile(r"\b(?:счита\w+|признаё\w+|признае\w+|определя\w+|фиксиру\w+)\b", re.I)
+# «снимок / остаток / курс / состояние в момент Y» — какое значение данных берётся, тоже определение момента
+DEFINES_MOMENT = re.compile(r"\b(?:счита\w+|признаё\w+|признае\w+|определя\w+|фиксиру\w+|снимо?к\w*|"
+                            r"состояни\w*|значени\w*|остат\w*|курс\w*|сальдо|баланс\w*)\b", re.I)
+CONDITION = re.compile(r"(?:^|[\s,(])(?:если|когда|при)\s", re.I)
 # раздел целей: «Снизить число обращений» — бизнес-цель, а не проверяемое требование
 GOAL_SECTION = re.compile(r"(?:^|›\s*)(?:\d+[.)]?\s*)?(?:цел[иья]\b|бизнес-цел|goals?\b|objectives?\b)", re.I)
 
@@ -124,13 +127,18 @@ def _nfr_candidate(doc: Doc, out: dict) -> None:
         return
     x, words = hits[0]
     allw = [w for _, ws in hits for w in ws]
+    one = len(hits) == 1
+    # говорим о конкретных строках: числа в соседних НФТ не делают эти строки проверяемыми
+    where = (f"В нефункциональном требовании {quoted(x.joined)} нет измеримого значения"
+             if one else f"В {len(hits)} нефункциональных требованиях нет измеримого значения, например {quoted(x.joined)}")
     out["candidates"].append(candidate(
         "language.nfr_unverifiable",
-        title=f"Нефункциональные требования непроверяемы: {', '.join(quoted(w) for w in allw[:3])} без чисел",
+        title=(f"Нефункциональное требование без числа: {', '.join(quoted(w) for w in allw[:3])}" if one else
+               f"Нефункциональные требования без чисел: {', '.join(quoted(w) for w in allw[:3])}"),
         kind="unverifiable", criterion="verifiable", severity="major", blocks="testing",
         evidence=[ev(h[0]) for h in hits[:3]],
-        problem=(f"В нефункциональных требованиях нет ни одного измеримого значения: {quoted(x.joined)}. "
-                 f"Слова {', '.join(quoted(w) for w in allw[:4])} нельзя проверить тестом."),
+        problem=(f"{where}. Слова {', '.join(quoted(w) for w in allw[:4])} нельзя проверить тестом: не сказано, "
+                 "какое время, доля запросов или нагрузка считаются выполнением."),
         scenario="Нагрузочный тест показывает 3 секунды на 95-й перцентили: одна сторона считает это «быстро», другая — нет.",
         impact="Требование нельзя принять или отклонить; эксплуатационные риски не ограничены договорённостью.",
         recommendation=("Задать измеримые значения: время ответа и доля запросов (например, p95), нагрузка, "
@@ -150,6 +158,10 @@ def run(doc: Doc, out: dict, requirements: list[dict] | None = None, excluded: l
                 word = text[m.start():m.end()].strip()
                 if cat == "comparison" and (NUMBER.search(text) or GOAL_SECTION.search(x.section or "")):
                     continue
+                if cat == "indefinite" and m.group(0).lower().startswith("нескольк"):
+                    c0 = max(masked.rfind(";", 0, m.start()), masked.rfind(".", 0, m.start())) + 1
+                    if CONDITION.search(masked[c0:m.start()]):
+                        continue  # «если номер привязан к нескольким картам» — «больше одной», а не размытое число
                 if cat == "vague_time" and "момент" in m.group(0).lower():
                     c0 = max(masked.rfind(";", 0, m.start()), masked.rfind(".", 0, m.start())) + 1
                     if DEFINES_MOMENT.search(masked[c0:m.start()]):

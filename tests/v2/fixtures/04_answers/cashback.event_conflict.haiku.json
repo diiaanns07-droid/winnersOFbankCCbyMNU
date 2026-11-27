@@ -1,0 +1,271 @@
+{
+ "_note": "haiku 27.11 12:30 (волна 3, сессия 2, №04): строка параметра ответа с ID «accrued» без таблицы, соседняя — «Метод getCashback: category»",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Выбор одной категории покупок на месяц для кэшбэка",
+   "line_start": 17,
+   "line_end": 17
+  },
+  {
+   "source_id": "Термины: Месяц",
+   "kind": "other",
+   "summary": "Календарный месяц по времени UTC+5",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "source_id": "Термины: Покупка",
+   "kind": "other",
+   "summary": "Операция оплаты картой со статусом проведена",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "Термины: Категория",
+   "kind": "other",
+   "summary": "Одна из трёх категорий кэшбэка",
+   "line_start": 22,
+   "line_end": 22
+  },
+  {
+   "source_id": "КБ-1",
+   "kind": "functional",
+   "summary": "Выбор категории до конца месяца, действует со следующего",
+   "line_start": 25,
+   "line_end": 25
+  },
+  {
+   "source_id": "КБ-2",
+   "kind": "constraint",
+   "summary": "Порог суммы покупки для начисления кэшбэка",
+   "line_start": 26,
+   "line_end": 26
+  },
+  {
+   "source_id": "КБ-3",
+   "kind": "functional",
+   "summary": "Ставка кэшбэка от суммы покупки",
+   "line_start": 27,
+   "line_end": 27
+  },
+  {
+   "source_id": "КБ-4",
+   "kind": "constraint",
+   "summary": "Лимит кэшбэка за месяц",
+   "line_start": 28,
+   "line_end": 28
+  },
+  {
+   "source_id": "КБ-5",
+   "kind": "functional",
+   "summary": "Дата зачисления кэшбэка месяца",
+   "line_start": 29,
+   "line_end": 29
+  },
+  {
+   "source_id": "КБ-6",
+   "kind": "functional",
+   "summary": "Уменьшение кэшбэка при возврате покупки",
+   "line_start": 30,
+   "line_end": 30
+  },
+  {
+   "source_id": "КБ-7",
+   "kind": "ui",
+   "summary": "Показ категории и кэшбэка в приложении",
+   "line_start": 31,
+   "line_end": 31
+  },
+  {
+   "source_id": "КБ-8",
+   "kind": "functional",
+   "summary": "Применение категории с момента сохранения",
+   "line_start": 32,
+   "line_end": 32
+  },
+  {
+   "source_id": "НФ-1",
+   "kind": "nonfunctional",
+   "summary": "Время ответа методов getCashback и saveCategory",
+   "line_start": 35,
+   "line_end": 35
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Хранимые данные и округление кэшбэка",
+   "line_start": 38,
+   "line_end": 38
+  },
+  {
+   "source_id": "",
+   "kind": "integration",
+   "summary": "Чтение и сохранение настроек через методы API",
+   "line_start": 41,
+   "line_end": 41
+  },
+  {
+   "source_id": "Критерии приёмки, строка 1",
+   "kind": "acceptance",
+   "summary": "Базовое начисление за покупку такси",
+   "line_start": 47,
+   "line_end": 47
+  },
+  {
+   "source_id": "Критерии приёмки, строка 2",
+   "kind": "acceptance",
+   "summary": "Начисление за покупку на границе порога",
+   "line_start": 48,
+   "line_end": 48
+  },
+  {
+   "source_id": "Критерии приёмки, строка 3",
+   "kind": "acceptance",
+   "summary": "Начисление, упирающееся в лимит месяца",
+   "line_start": 49,
+   "line_end": 49
+  },
+  {
+   "source_id": "Критерии приёмки, строка 4",
+   "kind": "acceptance",
+   "summary": "Покупка другой категории не даёт кэшбэк",
+   "line_start": 50,
+   "line_end": 50
+  },
+  {
+   "source_id": "Метод getCashback",
+   "kind": "api",
+   "summary": "Метод получения кэшбэка: GET, адрес, авторизация",
+   "line_start": 56,
+   "line_end": 60
+  },
+  {
+   "source_id": "Метод getCashback: Статус 200",
+   "kind": "api",
+   "summary": "Успешный ответ с категорией и кэшбэком",
+   "line_start": 62,
+   "line_end": 62
+  },
+  {
+   "source_id": "Метод getCashback: category",
+   "kind": "api",
+   "summary": "Код выбранной категории в ответе",
+   "line_start": 66,
+   "line_end": 66
+  },
+  {
+   "source_id": "accrued",
+   "kind": "api",
+   "summary": "Кэшбэк месяца в ответе строкой с двумя знаками",
+   "line_start": 67,
+   "line_end": 67
+  },
+  {
+   "source_id": "Метод saveCategory",
+   "kind": "api",
+   "summary": "Метод сохранения категории: POST, адрес, авторизация, Content-Type",
+   "line_start": 73,
+   "line_end": 78
+  },
+  {
+   "source_id": "Метод saveCategory: category",
+   "kind": "api",
+   "summary": "Код категории в теле запроса, обязательный",
+   "line_start": 84,
+   "line_end": 84
+  },
+  {
+   "source_id": "Метод saveCategory: Статус 200",
+   "kind": "api",
+   "summary": "Успешное сохранение категории",
+   "line_start": 90,
+   "line_end": 90
+  },
+  {
+   "source_id": "Статус 400",
+   "kind": "api",
+   "summary": "Категория не из допустимого списка",
+   "line_start": 91,
+   "line_end": 91
+  },
+  {
+   "source_id": "Статус 401",
+   "kind": "api",
+   "summary": "Отсутствие действующей сессии",
+   "line_start": 92,
+   "line_end": 92
+  },
+  {
+   "source_id": "Статус 404",
+   "kind": "api",
+   "summary": "Карта не найдена или не принадлежит клиенту",
+   "line_start": 93,
+   "line_end": 93
+  },
+  {
+   "source_id": "Статус 500",
+   "kind": "api",
+   "summary": "Внутренняя ошибка сервиса",
+   "line_start": 94,
+   "line_end": 94
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Название документа",
+   "line_start": 1,
+   "line_end": 1,
+   "reason": "Название документа, не требование."
+  },
+  {
+   "what": "Служебное пояснение о документе",
+   "line_start": 3,
+   "line_end": 3,
+   "reason": "Пояснение о принадлежности документа к учебному корпусу bcc-eval, не требование."
+  },
+  {
+   "what": "Строка-шапка таблицы метаданных",
+   "line_start": 9,
+   "line_end": 9,
+   "reason": "Строка-шапка таблицы общих сведений."
+  },
+  {
+   "what": "Таблица общих сведений: наименование, продукт, задача в Jira, версия",
+   "line_start": 11,
+   "line_end": 14,
+   "reason": "Метаданные: наименование, продукт, ссылка на задачу EVAL-101, версия документа 1.0."
+  },
+  {
+   "what": "Строка-шапка таблицы критериев приёмки",
+   "line_start": 45,
+   "line_end": 45,
+   "reason": "Строка-шапка таблицы критериев приёмки."
+  },
+  {
+   "what": "Строка-шапка таблицы параметров ответа 200",
+   "line_start": 64,
+   "line_end": 64,
+   "reason": "Строка-шапка таблицы параметров ответа метода getCashback."
+  },
+  {
+   "what": "Пример ответа для первого критерия приёмки",
+   "line_start": 69,
+   "line_end": 69,
+   "reason": "Пример к коду 200 метода getCashback (параметры category и accrued, строки 66–67) и к первому критерию приёмки (строка 47); не единственное описание ответа."
+  },
+  {
+   "what": "Строка-шапка таблицы параметров тела запроса",
+   "line_start": 82,
+   "line_end": 82,
+   "reason": "Строка-шапка таблицы параметров тела запроса saveCategory."
+  },
+  {
+   "what": "Строка-шапка таблицы статусов",
+   "line_start": 88,
+   "line_end": 88,
+   "reason": "Строка-шапка таблицы статусов saveCategory."
+  }
+ ]
+}

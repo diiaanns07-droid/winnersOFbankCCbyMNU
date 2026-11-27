@@ -104,7 +104,7 @@ def test_rpm_window_is_sliding_and_per_model():
 
 def test_rpm_from_profile_and_env_and_off():
     clock = Clock()
-    assert provider(clock).rpm_for("gemini-3.8-flash") == 10
+    assert provider(clock).rpm_for("gemini-3.8-flash") == 5   # бесплатный 3.8 Flash: 5 в минуту, 20 в сутки
     assert provider(clock).rpm_for("gemini-3.5-flash-lite") == 15
     assert provider(clock, env={"GEMINI_RPM": "4"}).rpm_for("gemini-3.8-flash") == 4
     off = provider(clock, env={"GEMINI_RPM": "0"})
@@ -204,3 +204,22 @@ def test_timing_clarify_parallel_with_judge_by_timestamps(tmp_path):
     assert s["critical_path_s"] == 30 + 60 + 90          # вопросы спрятаны за судьёй
     assert s["model_wall_s"] == 190
     assert "параллельно" in timing.render(tmp_path, s)
+
+
+def test_timing_fast_start_does_not_add_segment_to_critical_path(tmp_path):
+    """Быстрый старт: рецензенты стартуют через 8 с после нарезки, не дожидаясь её (haiku 27.11 14:05: нарезка 62 с,
+    набор 110 с, судья 170 с — путь 288 с, а не 342)."""
+    rows = [
+        {"t": "2026-11-27T10:01:02+05:00", "stage": "segment", "model": "m", "seconds": 62, "usage": {}},
+        {"t": "2026-11-27T10:01:10+05:00", "stage": "lens_qa", "model": "m", "seconds": 62, "usage": {}},
+        {"t": "2026-11-27T10:01:58+05:00", "stage": "consistency", "model": "m", "seconds": 110, "usage": {}},
+        {"t": "2026-11-27T10:02:24+05:00", "stage": "clarify", "model": "m", "seconds": 25, "usage": {}},
+        {"t": "2026-11-27T10:04:31+05:00", "stage": "judge", "model": "m", "seconds": 153, "usage": {}},
+        {"t": "2026-11-27T10:04:48+05:00", "stage": "judge", "model": "m", "seconds": 17, "usage": {}},
+    ]
+    (tmp_path / "trace.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    s = timing.summary(timing.load(tmp_path))
+    assert s["fast_start"] is True and s["critical"]["start_delay"] == 8
+    assert s["critical_path_s"] == 8 + 110 + 170
+    assert s["model_wall_s"] == 288
+    assert "быстрый старт" in timing.render(tmp_path, s)
