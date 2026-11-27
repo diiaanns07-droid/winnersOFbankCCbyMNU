@@ -3,39 +3,48 @@
   "use strict";
   var $ = function (s) { return document.querySelector(s); };
 
-  /* ── страница загрузки ── */
+  /* ── страница загрузки (№39) ── */
   var form = $("#form");
   if (form) {
     var drop = $("#drop"), file = $("#file"), fname = $("#fname");
-    var prov = $("#provider"), pnote = $("#pnote"), model = $("#model"), models = $("#models");
-    var showName = function () { fname.textContent = file.files && file.files[0] ? file.files[0].name : ""; };
+    var pnote = $("#pnote"), model = $("#model"), models = $("#models"), pmore = $("#pmore");
+    var radios = form.querySelectorAll('input[name="provider"]');
+    var note = function (html, bad) { pnote.innerHTML = html; pnote.classList.toggle("bad", !!bad); pnote.classList.remove("err"); };
+    var fail = function (text) { pnote.textContent = text; pnote.classList.remove("bad"); pnote.classList.add("err"); };
+    var showName = function () {
+      var f = file.files && file.files[0];
+      fname.textContent = f ? f.name : "";
+      drop.classList.toggle("has", !!f);
+    };
     file.addEventListener("change", showName);
-    ["dragenter", "dragover"].forEach(function (t) {
-      drop.addEventListener(t, function (ev) { ev.preventDefault(); drop.classList.add("over"); });
-    });
-    ["dragleave", "drop"].forEach(function (t) {
-      drop.addEventListener(t, function () { drop.classList.remove("over"); });
-    });
+    var depth = 0;
+    drop.addEventListener("dragenter", function (ev) { ev.preventDefault(); depth++; drop.classList.add("over"); });
+    drop.addEventListener("dragover", function (ev) { ev.preventDefault(); });
+    drop.addEventListener("dragleave", function () { if (--depth <= 0) { depth = 0; drop.classList.remove("over"); } });
     drop.addEventListener("drop", function (ev) {
-      ev.preventDefault();
+      ev.preventDefault(); depth = 0; drop.classList.remove("over");
       if (ev.dataTransfer && ev.dataTransfer.files.length) { file.files = ev.dataTransfer.files; showName(); }
     });
+    var current = function () { return form.querySelector('input[name="provider"]:checked') || radios[0]; };
     var syncProv = function () {
-      var o = prov.options[prov.selectedIndex];
-      pnote.textContent = o.dataset.note || "";
-      pnote.classList.toggle("bad", o.dataset.ok !== "1");
+      var o = current();
+      if (!o) return;
+      note(o.dataset.note || "", o.dataset.ok !== "1");
       models.innerHTML = "";
       (o.dataset.models || "").split(",").filter(Boolean).forEach(function (m) {
         var x = document.createElement("option"); x.value = m; models.appendChild(x);
       });
-      model.disabled = !o.dataset.models && o.value !== "openai";
-      if (model.disabled) model.value = "";
+      var off = !o.dataset.models && o.value !== "openai";
+      model.disabled = off;
+      if (off) model.value = "";
+      pmore.hidden = off;
     };
-    prov.addEventListener("change", syncProv);
+    radios.forEach(function (r) { r.addEventListener("change", syncProv); });
     syncProv();
+    var go = $("#go"), goText = go.textContent;
     form.addEventListener("submit", function (ev) {
       var sample = ev.submitter && ev.submitter.name === "sample";
-      if (!sample && !(file.files && file.files.length)) { ev.preventDefault(); pnote.textContent = "Выберите файл требований."; pnote.classList.add("bad"); return; }
+      if (!sample && !(file.files && file.files.length)) { ev.preventDefault(); fail("Выберите файл требований."); return; }
       if (!sample) {
         var f0 = file.files[0];
         var ext = (f0.name.split(".").pop() || "").toLowerCase();
@@ -43,14 +52,14 @@
           : !f0.size ? "Файл пустой — в нём нет текста для проверки."
           : ["pdf", "docx", "md", "markdown", "txt", "html", "htm"].indexOf(ext) < 0 ? "Формат ." + ext + " не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML."
           : "";
-        if (bad) { ev.preventDefault(); pnote.textContent = bad; pnote.classList.add("bad"); return; }
+        if (bad) { ev.preventDefault(); fail(bad); return; }
       }
       ev.preventDefault();
       var fd = new FormData(form);
       if (sample) fd.append("sample", "1");
       var btns = form.querySelectorAll("button");
       btns.forEach(function (b) { b.disabled = true; });
-      $("#go").textContent = "Загружаем…";
+      go.textContent = "Загружаем…";
       fetch("/api/jobs", { method: "POST", body: fd, headers: { Accept: "application/json" } })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
         .then(function (res) {
@@ -59,9 +68,9 @@
         })
         .catch(function (err) {
           btns.forEach(function (b) { b.disabled = false; });
-          $("#go").textContent = "Проверить требования";
-          var box = form.querySelector(".error");
-          if (!box) { box = document.createElement("div"); box.className = "error"; box.setAttribute("role", "alert"); form.prepend(box); }
+          go.textContent = goText;
+          var box = form.querySelector(".home-err");
+          if (!box) { box = document.createElement("p"); box.className = "home-err"; box.setAttribute("role", "alert"); form.querySelector(".home-act").before(box); }
           box.textContent = err.message;
         });
     });

@@ -63,79 +63,148 @@ class App:
 
 # ─────────────────────────────── страницы ───────────────────────────────
 
+# ── №39: знак продукта (свой, не логотип банка): лист ТЗ с галочкой и золотой точкой «сверено» ──
+_MARK = ('<svg viewBox="0 0 32 32" width="{s}" height="{s}" aria-hidden="true" focusable="false">'
+         '<rect width="32" height="32" rx="9" fill="#008556"/>'
+         '<path d="M10 9.5h8.5l3.5 3.5v9.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 9 22.5v-11.5A1.5 1.5 0 0 1 10.5 9.5z" '
+         'fill="#fff" opacity=".96"/>'
+         '<path d="M12.6 17.4l2.4 2.4 4.6-4.9" stroke="#008556" stroke-width="2.2" fill="none" '
+         'stroke-linecap="round" stroke-linejoin="round"/>'
+         '<circle cx="23.5" cy="9" r="3.6" fill="#DCA262" stroke="#008556" stroke-width="1.6"/></svg>')
+_FAVICON = "data:image/svg+xml," + quote(_MARK.format(s=32).replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ', 1),
+                                          safe="")
+
+# короткие имена провайдеров для сегмента и строки состояния
+_SHORT = {"auto": "Авто", "claude_cli": "Claude Code", "gemini": "Gemini", "anthropic": "Claude API",
+          "openai": "Свой сервер", "mock": "Демо", "offline": "Только правила"}
+_NO_MODEL = ("mock", "offline")
+_HINT = {"gemini": 'Нет ключа. Он бесплатный: <a href="https://aistudio.google.com/apikey" target="_blank" '
+                   'rel="noopener">получить за минуту</a>, затем GEMINI_API_KEY=… в файле .env.',
+         "anthropic": "Нет ключа: добавьте ANTHROPIC_API_KEY=… в файл .env.",
+         "openai": "Нет адреса: добавьте OPENAI_BASE_URL=http://localhost:11434/v1 (Ollama) в файл .env.",
+         "claude_cli": "Не найден: установите Claude Code и войдите в аккаунт."}
+
+
+def _provider_line(provs: list[dict[str, Any]]) -> tuple[str, str]:
+    """Строка состояния в шапке: (текст, модификатор класса .b-status)."""
+    first = provs[0].get("resolved", "offline") if provs else "offline"
+    if first in _NO_MODEL:
+        return "Без ключа: только правила и готовые отчёты", "stale"
+    note = {"claude_cli": "по подписке", "openai": "свой сервер"}.get(first, "ключ найден")
+    return f"{_SHORT.get(first, first)} · {note}", ""
+
+
 def _layout(title: str, body: str, *, sub: str = "") -> str:
+    try:
+        status, mod = _provider_line(provider_status())
+    except Exception:  # noqa: BLE001 — шапка не должна падать из-за проверки провайдеров
+        status, mod = "", ""
+    agent_css = '<link rel="stylesheet" href="/assets/agent.css">' if (ASSETS / "agent.css").is_file() else ""
+    agent_js = '<script src="/assets/agent.js" defer></script>' if (ASSETS / "agent.js").is_file() else ""
+    crumb = f'<span class="tb-sub" title="{e(sub)}">{e(sub)}</span>' if sub else ""
+    st = f'<span class="b-status {mod}" id="pstatus" title="{e(status)}">{e(status)}</span>' if status else ""
     return f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F3F6F5">
 <title>{e(title)}</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7C55'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="{_FAVICON}">
+<link rel="stylesheet" href="/assets/tokens.css">
 <link rel="stylesheet" href="/assets/app.css">
-</head><body>
-<header class="top"><a class="brand" href="/"><span class="logo" aria-hidden="true"></span><span><span class="bname">Ревью требований</span>
-<span class="bsub">{e(sub or "ИИ-агент статического ревью ТЗ · BCC-HUB × MNU")}</span></span></a></header>
+{agent_css}
+</head><body class="b-root">
+<header class="tb-wrap"><div class="tb b-glass">
+  <a class="tb-brand" href="/" aria-label="BCC Review — на главную">{_MARK.format(s=30)}<span class="tb-name">BCC Review</span></a>{crumb}
+  <div class="tb-end">{st}<div class="tb-agent" data-bcc-agent data-size="40" data-mood="idle"></div></div>
+</div></header>
 {body}
 <script src="/assets/app.js"></script>
+{agent_js}
 </body></html>"""
+
+
+def _gallery(app: App) -> str:
+    try:  # №43 — готовые отчёты; до его вливания блока нет
+        from .gallery import gallery_block
+    except ImportError:
+        return ""
+    try:
+        return gallery_block(app) or ""
+    except Exception:  # noqa: BLE001 — главная открывается, даже если галерея сломалась
+        return ""
 
 
 def index_page(app: App, *, error: str = "", provider: str = "", model: str = "") -> str:
     provs = provider_status()
-    sel = provider or app.default_provider
-    opts = []
+    ids = [p["id"] for p in provs]
+    sel = provider if provider in ids else (app.default_provider if app.default_provider in ids else "auto")
+    caps = []
     for p in provs:
-        mark = "" if p["ok"] else " — недоступен"
-        opts.append(f'<option value="{e(p["id"])}" data-ok="{1 if p["ok"] else 0}" data-note="{e(p["note"])}" '
-                    f'data-models="{e(",".join(p["models"]))}"{" selected" if p["id"] == sel else ""}>'
-                    f'{e(p["label"])}{mark}</option>')
+        ok = bool(p["ok"])
+        what = e(p["note"]) if ok else _HINT.get(p["id"], e(p["note"]))
+        if p["id"] == "auto":
+            res = next((q for q in provs if q["id"] == p.get("resolved")), None)
+            what = e(f'Сейчас — «{res["label"]}»: {res["note"]}') if res else what
+        caps.append(f'<label class="pv{"" if ok else " off"}" title="{e(p["label"])}">'
+                    f'<input type="radio" name="provider" value="{e(p["id"])}"{" checked" if p["id"] == sel else ""} '
+                    f'data-ok="{1 if ok else 0}" data-models="{e(",".join(p["models"]))}" data-label="{e(p["label"])}" '
+                    f'data-note="{e(what)}"><i aria-hidden="true"></i>{e(_SHORT.get(p["id"], p["label"]))}</label>')
     sample = ""
     if app.sample:
-        sample = (f'<button type="submit" class="btn ghost" name="sample" value="1" formnovalidate>'
-                  f'Проверить пример: {e(app.sample.name)}</button>')
+        sample = (f'<button type="submit" class="b-button quiet" name="sample" value="1" formnovalidate '
+                  f'title="{e(app.sample.name)}">Проверить пример</button>')
     rows = []
-    for j in app.store.recent():
+    for j in app.store.recent()[:5]:
         s = j.summary or {}
-        v = VERDICT.get(s.get("development", ""), ("—", "none"))
-        state = {"queued": "в очереди", "running": "идёт анализ", "done": "готово", "failed": "ошибка"}.get(j.state, j.state)
-        counts = (f'<span class="c crit">{s.get("critical", 0)}</span><span class="c major">{s.get("major", 0)}</span>'
-                  f'<span class="c minor">{s.get("minor", 0)}</span>') if j.state == "done" else ""
-        rows.append(f'<tr><td><a href="/jobs/{e(j.id)}">{e(j.file_name)}</a></td>'
-                    f'<td>{e(time.strftime("%d.%m %H:%M", time.localtime(j.created)))}</td>'
-                    f'<td>{e(j.provider)}{(" · " + e(j.model)) if j.model else ""}</td>'
-                    f'<td><span class="st st-{e(j.state)}">{e(state)}</span></td>'
-                    f'<td>{f"<span class=vd-{v[1]}>{e(v[0])}</span>" if j.state == "done" else ""}</td><td>{counts}</td></tr>')
-    recent = (f'<section class="card recent"><h2>Последние проверки</h2><div class="tw"><table><thead><tr><th>Файл</th>'
-              f'<th>Когда</th><th>Провайдер</th><th>Статус</th><th>Разработка</th><th>Замечания</th></tr></thead>'
-              f'<tbody>{"".join(rows)}</tbody></table></div></section>') if rows else ""
-    err = f'<div class="error" role="alert">{e(error)}</div>' if error else ""
-    body = f"""<main class="wrap">
-<section class="intro">
-  <h1>Проверка требований до начала разработки</h1>
-  <p>Загрузите техническое задание — агент найдёт противоречия, пробелы и непроверяемые формулировки.
-  Каждое замечание — с дословной цитатой и номером строки, которые проверены программой.</p>
+        if j.state == "done":
+            v = VERDICT.get(s.get("development", ""), ("—", "none"))
+            cls = {"no": "crit", "cond": "major", "yes": "ok"}.get(v[1], "plain")
+            badge = f'<span class="b-badge {cls}">Разработка: {e(v[0].lower())}</span>'
+        else:
+            label = {"queued": "в очереди", "running": "идёт анализ", "failed": "ошибка"}.get(j.state, j.state)
+            badge = f'<span class="b-badge {"crit" if j.state == "failed" else "plain"}">{e(label)}</span>'
+        when = time.strftime("%d.%m %H:%M", time.localtime(j.created))
+        rows.append(f'<li><a class="b-row" href="/jobs/{e(j.id)}"><span class="rc-name">{e(j.file_name)}</span>'
+                    f'<span class="b-note rc-meta">{e(when)} · {e(_SHORT.get(j.provider, j.provider))}</span>{badge}</a></li>')
+    recent = (f'<section class="home-sec b-rise"><h2 class="b-h2">Последние проверки</h2>'
+              f'<ul class="b-surface b-list">{"".join(rows)}</ul></section>') if rows else ""
+    err = (f'<p class="home-err" role="alert">{e(error)}</p>') if error else ""
+    body = f"""<main class="b-wrap home">
+<section class="home-head b-rise">
+  <h1 class="b-title">Проверка ТЗ до разработки</h1>
+  <p class="b-lead">Агент найдёт противоречия и пробелы — каждое замечание с цитатой и номером строки.</p>
 </section>
-<form class="card upload" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
-  {err}
+<form class="home-form b-surface b-rise" id="form" method="post" action="/api/jobs" enctype="multipart/form-data">
   <label class="drop" id="drop">
     <input type="file" name="file" id="file" accept=".pdf,.docx,.md,.markdown,.txt,.html,.htm" required>
-    <span class="dicon" aria-hidden="true"></span>
-    <span class="dtitle">Перетащите файл требований сюда или <u>выберите на компьютере</u></span>
-    <span class="dsub">PDF, Word (DOCX), Markdown, TXT, HTML · до 20 МБ</span>
-    <span class="fname" id="fname"></span>
+    <span class="drop-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 16V5m0 0l-4.5 4.5M12 5l4.5 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 15v2.5A1.5 1.5 0 0 0 6.5 19h11a1.5 1.5 0 0 0 1.5-1.5V15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></span>
+    <span class="drop-t">Перетащите файл или <u>выберите</u></span>
+    <span class="b-note">PDF, Word, Markdown, TXT, HTML · до 20 МБ</span>
+    <span class="drop-f" id="fname" aria-live="polite"></span>
   </label>
-  <div class="row">
-    <label class="fld">Модель<select name="provider" id="provider">{"".join(opts)}</select></label>
-    <label class="fld narrow">Вариант модели<input name="model" id="model" list="models" value="{e(model)}" placeholder="по умолчанию" autocomplete="off"><datalist id="models"></datalist></label>
+  <div class="home-side">
+    <fieldset class="pv-set"><legend class="b-label">Модель</legend>
+      <div class="b-segment pv-seg" id="provider" role="radiogroup">{"".join(caps)}</div>
+    </fieldset>
+    <p class="pv-note" id="pnote" aria-live="polite"></p>
+    <details class="pv-more" id="pmore"><summary>Вариант модели</summary>
+      <input class="b-field" name="model" id="model" list="models" value="{e(model)}" placeholder="по умолчанию" autocomplete="off" aria-label="Вариант модели"><datalist id="models"></datalist>
+    </details>
+    {err}
+    <div class="home-act"><button type="submit" class="b-button primary" id="go">Проверить</button>{sample}</div>
   </div>
-  <p class="pnote" id="pnote"></p>
-  <div class="actions"><button type="submit" class="btn big" id="go">Проверить требования</button>{sample}</div>
 </form>
+{_gallery(app)}
 {recent}
-<section class="how">
-  <div><b>1. Документ</b><span>Читаем PDF, Word, Markdown; нумеруем строки, нарезаем требования и присваиваем им ID.</span></div>
-  <div><b>2. Четыре ревьюера</b><span>Аналитик, тестировщик, архитектор и риски смотрят параллельно, отдельно — согласованность набора.</span></div>
-  <div><b>3. Судья</b><span>Убирает дубли и ложные срабатывания, ставит критичность и выносит вердикт: можно ли начинать.</span></div>
-</section>
+<details class="home-how b-rise"><summary>Как это работает</summary>
+  <ol>
+    <li><b>Документ.</b> Читаем PDF, Word, Markdown; нумеруем строки и нарезаем требования.</li>
+    <li><b>Четыре ревьюера.</b> Аналитик, тестировщик, архитектор и риски смотрят параллельно.</li>
+    <li><b>Судья.</b> Убирает дубли и ложные срабатывания, ставит критичность и выносит вердикт.</li>
+    <li><b>Сверка.</b> Каждая цитата и номер строки проверяются программой по исходному тексту.</li>
+  </ol>
+</details>
 </main>"""
-    return _layout("Ревью требований", body)
+    return _layout("Проверка требований · BCC Review", body)
 
 
 # ─────────────────── страница задания: прогресс и отчёт (№41) ───────────────────
