@@ -143,9 +143,10 @@ html{-webkit-text-size-adjust:100%;color-scheme:light}
 /* ── список: одна поверхность, строки через тонкую линию ── */
 .b-list{list-style:none;margin:0;padding:0 var(--b-pad)}
 .b-row{display:flex;align-items:center;gap:14px;min-height:52px;padding:12px 0;color:inherit;text-decoration:none}
-.b-row+.b-row{box-shadow:0 -1px 0 var(--b-hair)}
+.b-row+.b-row,.b-list>li+li{box-shadow:0 -1px 0 var(--b-hair)}
+.b-root a.b-row{color:var(--b-ink)}
 a.b-row,button.b-row{transition:color var(--b-fast) var(--b-ease)}
-a.b-row:hover{color:var(--b-green-ink)}
+.b-root a.b-row:hover{color:var(--b-green-ink)}
 
 /* ── метки ── */
 .b-badge{

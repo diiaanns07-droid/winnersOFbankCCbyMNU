@@ -9,7 +9,8 @@
     var drop = $("#drop"), file = $("#file"), fname = $("#fname");
     var pnote = $("#pnote"), model = $("#model"), models = $("#models"), pmore = $("#pmore");
     var radios = form.querySelectorAll('input[name="provider"]');
-    var note = function (html, bad) { pnote.innerHTML = html; pnote.classList.toggle("bad", !!bad); };
+    var note = function (html, bad) { pnote.innerHTML = html; pnote.classList.toggle("bad", !!bad); pnote.classList.remove("err"); };
+    var fail = function (text) { pnote.textContent = text; pnote.classList.remove("bad"); pnote.classList.add("err"); };
     var showName = function () {
       var f = file.files && file.files[0];
       fname.textContent = f ? f.name : "";
@@ -43,7 +44,7 @@
     var go = $("#go"), goText = go.textContent;
     form.addEventListener("submit", function (ev) {
       var sample = ev.submitter && ev.submitter.name === "sample";
-      if (!sample && !(file.files && file.files.length)) { ev.preventDefault(); note("Выберите файл требований.", true); return; }
+      if (!sample && !(file.files && file.files.length)) { ev.preventDefault(); fail("Выберите файл требований."); return; }
       if (!sample) {
         var f0 = file.files[0];
         var ext = (f0.name.split(".").pop() || "").toLowerCase();
@@ -51,7 +52,7 @@
           : !f0.size ? "Файл пустой — в нём нет текста для проверки."
           : ["pdf", "docx", "md", "markdown", "txt", "html", "htm"].indexOf(ext) < 0 ? "Формат ." + ext + " не поддерживается: загрузите PDF, DOCX, MD, TXT или HTML."
           : "";
-        if (bad) { ev.preventDefault(); note(bad, true); return; }
+        if (bad) { ev.preventDefault(); fail(bad); return; }
       }
       ev.preventDefault();
       var fd = new FormData(form);

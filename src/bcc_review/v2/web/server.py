@@ -78,11 +78,11 @@ _FAVICON = "data:image/svg+xml," + quote(_MARK.format(s=32).replace("<svg ", '<s
 _SHORT = {"auto": "Авто", "claude_cli": "Claude Code", "gemini": "Gemini", "anthropic": "Claude API",
           "openai": "Свой сервер", "mock": "Демо", "offline": "Только правила"}
 _NO_MODEL = ("mock", "offline")
-_HINT = {"gemini": 'Ключ бесплатный: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">'
-                   'получить за минуту</a>, затем строка GEMINI_API_KEY=… в файле .env.',
-         "anthropic": "Добавьте строку ANTHROPIC_API_KEY=… в файл .env.",
-         "openai": "Укажите OPENAI_BASE_URL=http://localhost:11434/v1 (Ollama) в файле .env.",
-         "claude_cli": "Установите Claude Code и войдите в аккаунт."}
+_HINT = {"gemini": 'Нет ключа. Он бесплатный: <a href="https://aistudio.google.com/apikey" target="_blank" '
+                   'rel="noopener">получить за минуту</a>, затем GEMINI_API_KEY=… в файле .env.',
+         "anthropic": "Нет ключа: добавьте ANTHROPIC_API_KEY=… в файл .env.",
+         "openai": "Нет адреса: добавьте OPENAI_BASE_URL=http://localhost:11434/v1 (Ollama) в файл .env.",
+         "claude_cli": "Не найден: установите Claude Code и войдите в аккаунт."}
 
 
 def _provider_line(provs: list[dict[str, Any]]) -> tuple[str, str]:
@@ -140,10 +140,10 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
     caps = []
     for p in provs:
         ok = bool(p["ok"])
-        what = p["note"] if ok else f'{p["note"]}. {_HINT.get(p["id"], "")}'.strip()
+        what = e(p["note"]) if ok else _HINT.get(p["id"], e(p["note"]))
         if p["id"] == "auto":
             res = next((q for q in provs if q["id"] == p.get("resolved")), None)
-            what = f'Сейчас: {res["label"]} — {res["note"]}' if res else what
+            what = e(f'Сейчас — «{res["label"]}»: {res["note"]}') if res else what
         caps.append(f'<label class="pv{"" if ok else " off"}" title="{e(p["label"])}">'
                     f'<input type="radio" name="provider" value="{e(p["id"])}"{" checked" if p["id"] == sel else ""} '
                     f'data-ok="{1 if ok else 0}" data-models="{e(",".join(p["models"]))}" data-label="{e(p["label"])}" '
