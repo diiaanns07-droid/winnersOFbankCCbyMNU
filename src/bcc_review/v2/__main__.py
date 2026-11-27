@@ -149,6 +149,8 @@ def _print_summary(report: dict, written: dict) -> None:
 
 
 def _exit_code(report: dict, fail_on: str | None) -> int:
+    if report.get("run", {}).get("empty_input"):
+        return 2  # в документе нет текста (пустой файл, скан без распознавания): отчёт есть, но проверки не было
     status = report.get("run", {}).get("status")
     if status == "failed" or report.get("run", {}).get("model_error"):
         return 3
