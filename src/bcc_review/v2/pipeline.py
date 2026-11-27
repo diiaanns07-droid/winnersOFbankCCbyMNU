@@ -302,6 +302,25 @@ class Pipeline:
             report = self._offline(view)
             report.setdefault("run", {})["empty_input"] = True  # код выхода ≠ 0: плохой вход (__main__._exit_code)
             return report
+        gate = _intake(view)
+        if gate.get("kind") in ("not_requirements", "too_short"):
+            # не ТЗ (рецепт, новость, договор аренды, резюме) или одна строка: модель не зовём — на таком входе она
+            # выдумывает дефекты и ставит «нельзя»; вердикт не выносится, код выхода 2 (как у пустого документа)
+            self.log(gate["reason"])
+            self.warnings.insert(0, gate["reason"])
+            self.ctx = Context(view=view, llm=None, options={**opts, "input": str(self.input)},
+                               run_dir=self.run.path, trace=self.run.trace)
+            report = self._offline(view, note=True)
+            run = report.setdefault("run", {})
+            run["empty_input"] = True
+            run["input_check"] = {k: gate[k] for k in ("kind", "words", "signals")}
+            report["verdict"] = _no_verdict(report.get("verdict") or {}, gate["reason"])
+            report["title"] = ("Вход не проверялся: слишком мало текста" if gate["kind"] == "too_short"
+                               else "Вход не проверялся: документ не похож на требования")
+            if isinstance(report.get("offline"), dict):
+                report["offline"]["how_to_full"] = []
+            run["warnings"] = _uniq([gate["reason"]] + list(run.get("warnings") or []))
+            return report
         try:
             llm, self.provider_name = make_llm(opts, self.run, self.input)
         except Exception as exc:  # noqa: BLE001 — нет ключа / не тот провайдер: отчёт правилами + объяснение
@@ -771,9 +790,10 @@ class Pipeline:
             report["quote_stats"] = qstats
         return report
 
-    def _offline(self, view: dict) -> dict:
-        self.log("Модель не настроена: предварительная проверка правилами (offline)")
-        if (self.opts.get("provider") or "auto") == "auto":
+    def _offline(self, view: dict, note: bool = False) -> dict:
+        if not note:
+            self.log("Модель не настроена: предварительная проверка правилами (offline)")
+        if not note and (self.opts.get("provider") or "auto") == "auto":
             self.log("Для полного отчёта впишите ключ в .env в корне репозитория: GEMINI_API_KEY=<ключ> (бесплатно: "
                      "https://aistudio.google.com/apikey) и запустите снова; проверка — python -m bcc_review doctor")
         from .rules import offline
@@ -786,6 +806,26 @@ class Pipeline:
         run["provider"] = "offline"
         run.setdefault("status", "complete")
         return report
+
+
+def _intake(view: dict) -> dict:
+    try:
+        from . import intake
+        return intake.assess(view)
+    except Exception:  # noqa: BLE001 — приёмка не должна ронять прогон: при сбое проверяем как обычно
+        return {"kind": "ok"}
+
+
+def _no_verdict(verdict: dict, reason: str) -> dict:
+    """Вердикт «не выносится»: ни «можно», ни «нельзя» — проверять было нечего."""
+    v = dict(verdict)
+    for k in ("development", "testing"):
+        if v.get(k) in ("yes", "no", "conditional"):
+            v[k] = "undetermined"
+    for k in ("summary", "reason", "why"):
+        if k in v or k == "summary":
+            v[k] = reason
+    return v
 
 
 class _StageFailed(Exception):
