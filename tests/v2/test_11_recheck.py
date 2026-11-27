@@ -337,3 +337,30 @@ def test_reason_without_line_codes(findings, questions):
     rc = {g["id"]: g["recheck"] for g in recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q1['id']}: A\n",
                                                      questions)["findings"]}[fid]
     assert "L064" not in rc["reason"] and "L171" not in rc["reason"] and q1["id"] in rc["reason"]
+
+
+def test_others_only_closures_count(findings, questions):
+    q1 = questions[0]
+    linked = set(q1["finding_ids"])
+    other = next(f for f in findings if f["severity"] == "major" and f["id"] not in linked
+                 and not any(f["id"] in q["finding_ids"] for q in questions[:1]))
+    minor = next(f for f in findings if f["severity"] == "minor")
+    third = next(f for f in findings if f["severity"] == "major" and f["id"] not in linked | {other["id"]})
+    resp = _resp([{"finding_id": other["id"], "status": "resolved", "by": ["Решение-1"], "reason": "закрыто"},
+                  {"finding_id": third["id"], "status": "open", "reason": "не касается"},
+                  {"finding_id": minor["id"], "status": "resolved", "by": ["Решение-1"], "reason": "minor"}])
+    llm = FakeLLM(resp)
+    res = recheck.run(FakeCtx(llm), findings, f"{q1['id']}: A\n\n## Решения\n- Правило.\n", questions)
+    rc = {g["id"]: g["recheck"] for g in res["findings"]}
+    assert rc[other["id"]]["status"] == "resolved" and rc[other["id"]]["affected"]
+    assert not rc[third["id"]]["affected"]  # «open» по дефекту вне вопросов не превращает его в затронутый
+    assert rc[minor["id"]]["status"] == "open" and not rc[minor["id"]]["affected"]
+    assert other["title"] in llm.calls[0]["user"] and minor["title"] not in llm.calls[0]["user"].split("<остальные_дефекты>")[1]
+
+
+def test_decisions_only_make_one_call(findings, questions):
+    target = next(f for f in findings if f["severity"] == "major")
+    llm = FakeLLM(_resp([{"finding_id": target["id"], "status": "resolved", "by": ["Решение-1"], "reason": "ok"}]))
+    res = recheck.run(FakeCtx(llm), findings, "## Решения\n- Общее правило для всех.\n", questions)
+    assert len(llm.calls) == 1
+    assert {g["id"]: g["recheck"] for g in res["findings"]}[target["id"]]["status"] == "resolved"

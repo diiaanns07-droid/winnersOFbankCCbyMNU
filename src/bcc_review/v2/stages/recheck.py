@@ -400,11 +400,14 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     for a in resolved["answered"]:
         for fid in a["finding_ids"]:
             q_by_finding.setdefault(fid, []).append(a["question_id"])
+    # затронутые — дефекты вопросов, на которые дан ответ: по каждому модель решает и объясняет.
+    # Остальные модель видит кратко и называет только те, что ответ или общее решение прямо закрывает или
+    # меняет (раньше общее решение отправляло на разбор все critical и major — до 23 тыс. токенов ответа).
     affected_ids = set(q_by_finding)
-    if resolved["decisions"]:  # общее решение может касаться любого существенного дефекта
-        affected_ids |= {f["id"] for f in findings if f.get("severity") in ("critical", "major")}
     affected = [f for f in findings if f.get("id") in affected_ids]
     others = [f for f in findings if f.get("id") not in affected_ids]
+    open_to_decisions = {f["id"] for f in others if f.get("severity") in ("critical", "major")} \
+        if (resolved["decisions"] or resolved["answered"]) else set()
 
     out_findings = []
     for f in findings:
@@ -414,13 +417,13 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
                         "affected": f.get("id") in affected_ids}
         out_findings.append(g)
     result = {"findings": out_findings, "new_candidates": [], "rejected": [], "answers": resolved, "warnings": warnings}
-    if not affected:
+    if not affected and not resolved["decisions"]:
         for g in out_findings:
             g["recheck"]["reason"] = "ответа на связанный вопрос нет" if not resolved["answered"] else ""
         return _finish(ctx, result)
 
     block = _format_answers(resolved)
-    others_block = _cl.format_findings(others, full=False) or "—"
+    others_block = _cl.format_findings([f for f in others if f["id"] in open_to_decisions], full=False) or "—"
 
     def build(items: list) -> tuple[str, str]:
         fb = _cl.format_findings(items)
@@ -447,9 +450,14 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
     keep = _cl.doc_codes(getattr(ctx, "view", None))
     for d in raw.get("decisions") or []:
         g = by_id.get(str(d.get("finding_id", "")).strip())
-        if g is None or not g["recheck"]["affected"]:
+        if g is None:
             continue
         status = d.get("status") if d.get("status") in STATUSES else "open"
+        if not g["recheck"]["affected"]:
+            # дефект вне вопросов с ответом: учитываем, только если ответ его прямо закрывает или меняет
+            if g["id"] not in open_to_decisions or status == "open":
+                continue
+            g["recheck"]["affected"] = True
         rc = g["recheck"]
         # причина — для владельца: без номеров строк L… и ID требований (ID дефектов и ответов остаются ссылками)
         rc["status"], rc["reason"] = status, _plain_reason(str(d.get("reason", "")).strip(), keep)
