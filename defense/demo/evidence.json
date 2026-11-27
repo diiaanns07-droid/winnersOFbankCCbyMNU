@@ -1,0 +1,109 @@
+{
+  "case_id": "demo-terms",
+  "corpus_version": "post-benchmark-demonstration",
+  "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "actual_model": null,
+  "source_sha256": "334e664c3a559e08f44f56bacefa4d6667c5343c9d975945d79db7d91c1eee2d",
+  "before_report_sha256": "cb6c8fbc624ee2b47ecd35b6266ec3f6a2955394f3db7dbc195336d259b0a069",
+  "question": "Как трактовать: Размытый срок «немедленно» в требовании А-1?",
+  "model_proposed_options": [
+    "A. Уточнить формулировку — Разработка и тест-кейсы опираются на правило владельца; проверка даёт однозначный вердикт.",
+    "B. Оставить как есть, риск принят — Поведение определит реализация; приёмка по этому месту не даст однозначного вердикта."
+  ],
+  "source_lines": [
+    7,
+    13
+  ],
+  "citations": [
+    {
+      "block_id": "b0004",
+      "start": 57,
+      "end": 67,
+      "quote": "немедленно",
+      "loc": "строка 7 · блок b0004 · символы 57–67 · раздел «Квитанция о закрытии вклада / Часть A. Обслуживание в отделении / А-1. Срок выдачи»",
+      "finding_id": "F-001"
+    }
+  ],
+  "before_checklist": [
+    {
+      "id": "CL-01",
+      "text": "Возможность тестирования срока выдачи",
+      "available": "unknown",
+      "checked": "no",
+      "note": "Не выполнено: подтверждённые замечания F-001",
+      "finding_ids": [
+        "F-001"
+      ],
+      "evidence": [
+        {
+          "block_id": "b0010",
+          "start": 0,
+          "end": 37,
+          "quote": "Возможность тестирования срока выдачи"
+        }
+      ]
+    }
+  ],
+  "owner_choices": [
+    {
+      "choice": "A",
+      "entered_by": "synthetic_owner",
+      "wording": "После регистрации заявления банк должен выдать квитанцию не позднее чем через 30 секунд.",
+      "source_sha256": "9496892646c39fa1e05cf299ae942960eb5d8f49e29c081c0c6b50bd8bfd3fcc",
+      "wording_present": true,
+      "checks": [
+        {
+          "id": "CL-01",
+          "text": "Возможность тестирования срока выдачи",
+          "available": "unknown",
+          "checked": "unknown",
+          "note": "Разметка без модели: подтверждённых замечаний по пункту нет, решение за аналитиком",
+          "finding_ids": [],
+          "evidence": [
+            {
+              "block_id": "b0010",
+              "start": 0,
+              "end": 37,
+              "quote": "Возможность тестирования срока выдачи"
+            }
+          ]
+        }
+      ],
+      "answers_verify_exit": 4,
+      "verify_diagnostic": "verify: найдено расхождений: 1\n  - dangling_reference decisions[0].question_id: ссылка на несуществующий id: 'Q-01' нет в questions",
+      "recheck_verify_exit": 0,
+      "recheck_sha256": "1ec7b38905344addf3771e26742c25968d362ea492bc51158bd1208a8aa7fd89",
+      "primary_report_sha256": "afc3c3edc5e362152310552e8ddc88984c017ade6e788794656dc51df95ef975"
+    },
+    {
+      "choice": "B",
+      "entered_by": "synthetic_owner",
+      "wording": "После регистрации заявления банк должен выдать квитанцию не позднее чем через 120 секунд.",
+      "source_sha256": "f4475f0fa29142b3aecbb005d9deed6918a6dea44487a5774a6bce8216585cee",
+      "wording_present": true,
+      "checks": [
+        {
+          "id": "CL-01",
+          "text": "Возможность тестирования срока выдачи",
+          "available": "unknown",
+          "checked": "unknown",
+          "note": "Разметка без модели: подтверждённых замечаний по пункту нет, решение за аналитиком",
+          "finding_ids": [],
+          "evidence": [
+            {
+              "block_id": "b0010",
+              "start": 0,
+              "end": 37,
+              "quote": "Возможность тестирования срока выдачи"
+            }
+          ]
+        }
+      ],
+      "answers_verify_exit": 4,
+      "verify_diagnostic": "verify: найдено расхождений: 1\n  - dangling_reference decisions[0].question_id: ссылка на несуществующий id: 'Q-01' нет в questions",
+      "recheck_verify_exit": 0,
+      "recheck_sha256": "39a89f15d03aa3019d06f2745e99e7dc217a367cb4a082ffcc7f88cf2038ae5a",
+      "primary_report_sha256": "ae9e53a91061d6b9c8870df3402aaa8352f0e20e3e5279477cdc8df80b0529e7"
+    }
+  ]
+}

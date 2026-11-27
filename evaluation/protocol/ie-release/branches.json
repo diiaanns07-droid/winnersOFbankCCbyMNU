@@ -1,0 +1,242 @@
+{
+  "timestamp_utc": "2026-11-26T19:05:48.860625+00:00",
+  "remote_branches": 34,
+  "local_branches": 3,
+  "branches": [
+    {
+      "scope": "remotes",
+      "name": "bcc/eval-independent",
+      "sha": "1fc26424e4b0b8fc40f590ba6b434b3166d1f1e6",
+      "subject": "eval: report blind PV-1 results for the official banking review build"
+    },
+    {
+      "scope": "remotes",
+      "name": "bcc/integration",
+      "sha": "08d3af55446ef37d8d61d077848e63c292a47207",
+      "subject": "release: офлайн-отчёты сборки 8e8e95f, статус официального онлайн-прогона, HANDOFF"
+    },
+    {
+      "scope": "remotes",
+      "name": "bcc/p03-word",
+      "sha": "05130b3105b0b8b66eceee3c401cd02f338c6ba9",
+      "subject": "p03: две одинаковые суммы в таблице, счётчик пропусков опор"
+    },
+    {
+      "scope": "remotes",
+      "name": "bcc/p07-evidence",
+      "sha": "82c09047710ae4bd95ef8a50c6b21513b8a1cc4d",
+      "subject": "p07: повторы цитат сводятся к исходным местам, выбор ячейки проверяется признаком отчёта"
+    },
+    {
+      "scope": "remotes",
+      "name": "bcc/p09-versions",
+      "sha": "cddf0d9ed5a3fd2bb1554827c8c77e3b4af69abb",
+      "subject": "p09: повторное ревью при перестановке пунктов — части сгруппированной находки и честная ничья"
+    },
+    {
+      "scope": "remotes",
+      "name": "bcc/p14-annotated-pdf",
+      "sha": "3ed0ba2baec8e69b037aa4e0686415c717b3254f",
+      "subject": "p14: PDF для ревью на комплекте релиза, независимая сквозная проверка"
+    },
+    {
+      "scope": "remotes",
+      "name": "bcc/p17-reports",
+      "sha": "419f86ce5cf3b29b73e4a7b69217d9edb82113e2",
+      "subject": "p17: короткое резюме первого экрана и сверка Jira CSV с тем же Report"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/amazing-cerf-1hd1xi",
+      "sha": "b9610677ba071a0d809d3aeea414a497a81fff63",
+      "subject": "p11: адаптер Claude API (Messages, JSON outputs) и тесты без ключа"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/anthropic-adapter-errors-v5roi9",
+      "sha": "e90c3ae2213b248657667554b4964cf812d4245a",
+      "subject": "p11: invoke возвращает stop_reason по контракту ProviderAdapter; что движок видит об одном ответе"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/bcc-hub-hackathon-solutions-5o4h1p",
+      "sha": "c5d1493ed9d29cbcb5b2ff599e8377780825c531",
+      "subject": "docs: новые команды-конкуренты BCC-HUB × MNU (поиск 26.11.2026)"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/compassionate-cannon-xc9gxg",
+      "sha": "557c0b1ae879867318dc23493cefa51517773f3e",
+      "subject": "p08: два вопроса к разным сторонам одного противоречия; «нужно уточнить»; повторный импорт"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/compassionate-sagan-qm4td0",
+      "sha": "2d396120e8b3fa399fac80c8e400f110321dd100",
+      "subject": "p01: перенос строки внутри `кода` даёт пробел — метод остаётся одной фразой"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/cool-cannon-aeden9",
+      "sha": "b57f055e59b4a5804b411db8ee30a241c7ac8e33",
+      "subject": "p15: длинный запуск — одна форма, один run, одно задание, одна обработка"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/dazzling-meitner-ptmc1o",
+      "sha": "9a79c20730314c5415f2567ed9db6c0b055a8cb2",
+      "subject": "p01: UTF-8 с единичными битыми байтами остаётся UTF-8 (decode_error), а не cp1251"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/determined-thompson-xk1ay2",
+      "sha": "05130b3105b0b8b66eceee3c401cd02f338c6ba9",
+      "subject": "p03: две одинаковые суммы в таблице, счётчик пропусков опор"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/elegant-fermi-5vbfxc",
+      "sha": "a51a21722ee49b45c96d02b56346de2e480a4ed0",
+      "subject": "p02: границы порога 1 000 ₸ из PDF — знак, значение, единица шапки; decode_error указывает блок"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/eloquent-pascal-p7ukvk",
+      "sha": "cddf0d9ed5a3fd2bb1554827c8c77e3b4af69abb",
+      "subject": "p09: повторное ревью при перестановке пунктов — части сгруппированной находки и честная ничья"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/epic-mccarthy-uhlsri",
+      "sha": "2cdb9d3278cf811dde0d49753a074218c564ba6f",
+      "subject": "№06: сквозной сценарий через настоящий Asker на записанном транспорте"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/gallant-wozniak-e9i4q8",
+      "sha": "fd0b1e5aa853b872fe286c852436b3f49d25abc3",
+      "subject": "p15: путь аналитика на интеграции — формулировка №08, изменённый пункт, надписи"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/happy-dijkstra-5r5emb",
+      "sha": "4e7477e73ac6dc71afa5f5dd737a96d40fc5fbc9",
+      "subject": "presentation: убрать __pycache__ из first-frame, .gitignore"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/inspiring-carson-qntp94",
+      "sha": "9de54c849a69c712addbddec7c2e2246e16e1bcd",
+      "subject": "№06: пары 4×2 (единицы, событие, граница, статус) и имя величины у текстовой границы"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/inspiring-heisenberg-optydp",
+      "sha": "44565c51f2262e993de341b7a3e27cee6dab9ca9",
+      "subject": "p03: «за сутки» в объединённой шапке — заголовок из всех строк, связь шапка → ячейка"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/jolly-dijkstra-oakxea",
+      "sha": "11a8f1f01b7674dbd9959f0bc98a9a484b3562a9",
+      "subject": "bank: blocking_finding_ids в порядке значимости — первым идёт ключевое замечание"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/kind-dijkstra-e32j8v",
+      "sha": "6fd8d2de311204a574cc4f5cafbcdd867f437e7d",
+      "subject": "p04: ссылка из текста критерия не становится его номером; критерий → правило"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/kind-johnson-tu7ps7",
+      "sha": "9901fd041cb729b5bd2a6e4a0d88ac8942c51fa3",
+      "subject": "p13: первый экран аналитика — вердикт, статус прогона и переход к цитатам"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/modest-noether-1dyn5q",
+      "sha": "fb5007d4746a689f1eb3ed35aff8a2a593c6e6ed",
+      "subject": "p04: реестр MD и PDF сопоставим; у близких условий своя опора"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/nice-edison-gpkcfl",
+      "sha": "76ab9768df577d4a45a9e2e57b73de90537aed96",
+      "subject": "docs: разбор задачи хакатона и стратегия"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/practical-ride-4z65ch",
+      "sha": "975142e1a75c420930893f4626f15c55334c74d3",
+      "subject": "fix(p05): серьёзность на пограничных формулировках, четыре пары банковских правил"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/sleepy-gates-1zbw4l",
+      "sha": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+      "subject": "p16: контроли на открытом корпусе, матрица TP/FP/FN и одна команда для закрытого набора"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/sweet-brahmagupta-ow1jn1",
+      "sha": "82c09047710ae4bd95ef8a50c6b21513b8a1cc4d",
+      "subject": "p07: повторы цитат сводятся к исходным местам, выбор ячейки проверяется признаком отчёта"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/vigilant-sagan-xjr7yo",
+      "sha": "ecba6abb757607b36fa4f56f1d9e365c284ef7b3",
+      "subject": "docs(p12): состояние D (кандидат + p12 + патч asker) в таблице пути жюри"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/wonderful-carson-3a62ep",
+      "sha": "ace6b1afc8c33faafd7a7b6c1ab8a1ad19dc6a8a",
+      "subject": "p07: подпись замечания по производящему этапу — трасса, verify, правка движка для Max"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/youthful-gates-h0mvp2",
+      "sha": "3ed0ba2baec8e69b037aa4e0686415c717b3254f",
+      "subject": "p14: PDF для ревью на комплекте релиза, независимая сквозная проверка"
+    },
+    {
+      "scope": "remotes",
+      "name": "claude/youthful-mayer-67swfl",
+      "sha": "6383421681b128260b0e09b2d9647f43bff7b76e",
+      "subject": "p02: перенесённая строка таблицы и шапка под жирным заголовком — точная строка и ячейка"
+    },
+    {
+      "scope": "local",
+      "name": "bcc/eval-independent",
+      "sha": "1fc26424e4b0b8fc40f590ba6b434b3166d1f1e6",
+      "subject": "eval: report blind PV-1 results for the official banking review build"
+    },
+    {
+      "scope": "local",
+      "name": "bcc/integration",
+      "sha": "08d3af55446ef37d8d61d077848e63c292a47207",
+      "subject": "release: офлайн-отчёты сборки 8e8e95f, статус официального онлайн-прогона, HANDOFF"
+    },
+    {
+      "scope": "local",
+      "name": "claude/nice-edison-gpkcfl",
+      "sha": "76ab9768df577d4a45a9e2e57b73de90537aed96",
+      "subject": "docs: разбор задачи хакатона и стратегия"
+    }
+  ],
+  "changed_since_prior": {
+    "bcc/eval-independent": {
+      "before": "d4e46d6cb83d39b3f9ccf620b5de03d1376baf33",
+      "after": "1fc26424e4b0b8fc40f590ba6b434b3166d1f1e6"
+    }
+  },
+  "release_handoff": "08d3af55446ef37d8d61d077848e63c292a47207",
+  "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+  "harness_sha": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+  "closed_source_digests": 79,
+  "zip_blobs_checked": 0,
+  "returned_closed_reports": [],
+  "report_search_scope": "Tracked Report JSON/JSONL and JSON/JSONL members of versioned ZIP archives at these branch heads."
+}

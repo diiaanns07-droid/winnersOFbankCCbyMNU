@@ -1,0 +1,41 @@
+{
+  "case_id": "open1+open2",
+  "corpus_version": "public-example",
+  "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "actual_model": null,
+  "pre_run_expected": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 1,
+    "duplicates": 1,
+    "clean_alarms": 1,
+    "empty_denominator": null
+  },
+  "harness": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 1,
+    "duplicates": 1,
+    "precision": 0.6666666666666666,
+    "recall": 0.6666666666666666,
+    "f1": 0.6666666666666666,
+    "precision_strict": 0.5,
+    "support": 3,
+    "predicted": 4,
+    "pending_adjudication": 0,
+    "new_real_defects": 0,
+    "clean_false_alarms": 1,
+    "control_hits": 0,
+    "fp_background": 0,
+    "tp_parent_level": 1,
+    "tp_adjudicated": 0
+  },
+  "exact_string_identity_detected_labels": 0,
+  "token_span_detected_labels": 2,
+  "clean_zero_predictions": {
+    "precision": null,
+    "recall": null,
+    "f1": null
+  },
+  "human_decision": null
+}

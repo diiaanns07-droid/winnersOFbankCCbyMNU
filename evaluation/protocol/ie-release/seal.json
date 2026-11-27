@@ -1,0 +1,40 @@
+{
+  "protocol": "IE-1.0",
+  "corpus_version": "IE-corpus-1",
+  "corpus_index_sha256": "e6e1a6dd221376fa68baf7e8b078163f606e7d2504b7c2181aa3920e41d10b5d",
+  "gold_sha256": "d63e503ba17c650828e3eca64d71f4e43b50136d889acf98451543dff8267113",
+  "main_gold_sha256": "d4f83332e15792baff7da2204f9f9abb330d9b7f1dc6b6cb6a7a0d35fda3df62",
+  "main_manifest_sha256": "cb1c53414c71b58d02bf602f589677422e62b85e57e62be86b2621e19239074f",
+  "panel_manifest_sha256": "ef3e588cba1734ac2165b721fe222474e44a26bcdc8e3e0636cbe1a903c1c5c4",
+  "panel_gold_sha256": "a70027b941f6f76fec2f6ded9fa5c20612757b1ee05a009889da1a1d09dee5a5",
+  "full_manifest_sha256": "4ee0b200844510261771afd06a58e8f11ad080652fc44436b230383f1e2584d6",
+  "comparison_panel": [
+    "i01",
+    "i08",
+    "i15",
+    "i22",
+    "i05",
+    "i06"
+  ],
+  "family_count": 4,
+  "primary_documents": 24,
+  "physical_representations": 31,
+  "frozen_utc": "2026-11-26T19:05:48.860625+00:00",
+  "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+  "old_agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "scorer_sha": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+  "release_handoff": "08d3af55446ef37d8d61d077848e63c292a47207",
+  "provider_adapter": "team",
+  "live_allowed": false,
+  "reference_1_1": {
+    "all": "eca4c60c639312f248346053d6ef675cbefe91f8b17831c50d8f2b5968cf7fdc",
+    "main": "9d03cfcf3ada5a64d2b9f842210e81443fabd6d4f0e86f283147b57a63989565",
+    "panel": "7ed852555adffe28c40e3550e268c6b23c3d998ee0c095b2a0faccdc78bfaf26"
+  },
+  "preregistration_sha256": "19cc23594d984b9168107db203b9d781b1937804ace996fab4e50750fa63c2dd",
+  "source_scan": {
+    "files": 655,
+    "phrases": 38,
+    "direct_matches": 0
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "protocol": "IE-1.0",
+  "corpus_version": "IE-corpus-1",
+  "sealed_utc": "2026-11-26T18:12:21.953261+00:00",
+  "protocol_commit": "57bd19cb07039230f12dccb4c58cb312d6bf73aa",
+  "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "corpus_index_sha256": "e6e1a6dd221376fa68baf7e8b078163f606e7d2504b7c2181aa3920e41d10b5d",
+  "gold_sha256": "d63e503ba17c650828e3eca64d71f4e43b50136d889acf98451543dff8267113",
+  "main_gold_sha256": "d4f83332e15792baff7da2204f9f9abb330d9b7f1dc6b6cb6a7a0d35fda3df62",
+  "main_manifest_sha256": "cb1c53414c71b58d02bf602f589677422e62b85e57e62be86b2621e19239074f",
+  "panel_manifest_sha256": "ef3e588cba1734ac2165b721fe222474e44a26bcdc8e3e0636cbe1a903c1c5c4",
+  "panel_gold_sha256": "a70027b941f6f76fec2f6ded9fa5c20612757b1ee05a009889da1a1d09dee5a5",
+  "full_manifest_sha256": "4ee0b200844510261771afd06a58e8f11ad080652fc44436b230383f1e2584d6",
+  "family_count": 4,
+  "primary_documents": 24,
+  "comparison_panel": [
+    "i01",
+    "i08",
+    "i15",
+    "i22",
+    "i05",
+    "i06"
+  ],
+  "extra_controls": 2,
+  "extra_choice_documents": 2,
+  "physical_representations": 31,
+  "gold_annotator": "independent_AI",
+  "human_reviewer": null,
+  "prior_knowledge": "Previous public development-set result was known; responses on this corpus were unseen.",
+  "leakcheck_public_dev": {
+    "schema": "bcc-eval-leakcheck/1",
+    "leak": false,
+    "source_sha256_overlap": 0,
+    "case_id_overlap": 0,
+    "closed_quote_ngrams_in_dev_text": 0,
+    "closed_doc_shingle_share_in_dev": 0.0,
+    "doc_overlap_warning": false,
+    "note": "Выводятся только количества; закрытые тексты и цитаты не печатаются."
+  },
+  "exact_phrase_scan": {
+    "expressions": 38,
+    "files_by_extension": {
+      ".json": 113,
+      ".md": 93,
+      ".py": 221,
+      ".docx": 12,
+      ".pdf": 17,
+      ".jsonl": 4,
+      ".toml": 1,
+      ".js": 3,
+      ".txt": 4,
+      ".cjs": 1,
+      ".html": 1,
+      ".csv": 4
+    },
+    "overlaps": 0,
+    "scope": "frozen product src, tests, examples, public dev, contract examples; MD, JSON, code and extractable Word/PDF text"
+  }
+}

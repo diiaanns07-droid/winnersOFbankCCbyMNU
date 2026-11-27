@@ -1,0 +1,1198 @@
+{
+  "protocol": "PV-1",
+  "scorer_sha": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+  "independent_evaluator": "AI, source-level review",
+  "human_reviews": 0,
+  "unique_documents": 16,
+  "independent_topics": 4,
+  "renderings_per_document": 3,
+  "seeded_defects": 8,
+  "clean_controls": 8,
+  "results": [
+    {
+      "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "presentation": "primary",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 16,
+      "families": 4,
+      "technical_success": {
+        "numerator": 2,
+        "denominator": 16,
+        "value": 0.125
+      },
+      "reported_failed": 14,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 16,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 2,
+      "critical": {
+        "planned": 2,
+        "matched": 0,
+        "measured": 0,
+        "missed_on_measured": 0,
+        "unmeasured": 2
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "PV-1.1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        }
+      },
+      "harness": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 2,
+        "duplicates": 0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "quoted_findings": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 40.777,
+        "median": 1.284,
+        "n": 16
+      },
+      "human_reviews": 0
+    },
+    {
+      "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "presentation": "order",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 16,
+      "families": 4,
+      "technical_success": {
+        "numerator": 2,
+        "denominator": 16,
+        "value": 0.125
+      },
+      "reported_failed": 14,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 16,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 2,
+      "critical": {
+        "planned": 2,
+        "matched": 0,
+        "measured": 0,
+        "missed_on_measured": 0,
+        "unmeasured": 2
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "PV-1.1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        }
+      },
+      "harness": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 2,
+        "duplicates": 0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "quoted_findings": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 41.463,
+        "median": 1.294,
+        "n": 16
+      },
+      "human_reviews": 0
+    },
+    {
+      "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "presentation": "wording",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 16,
+      "families": 4,
+      "technical_success": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "reported_failed": 0,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 16,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 0,
+      "critical": {
+        "planned": 2,
+        "matched": 0,
+        "measured": 2,
+        "missed_on_measured": 2,
+        "unmeasured": 0
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 8,
+          "measured_gold": 8,
+          "tp": 2,
+          "fp": 18,
+          "fn": 6,
+          "duplicates": 2,
+          "precision": {
+            "numerator": 2,
+            "denominator": 20,
+            "value": 0.1
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 22,
+            "value": 0.09090909090909091
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 8,
+          "clean_alarms": 10,
+          "clean_with_alarm": {
+            "numerator": 8,
+            "denominator": 8,
+            "value": 1.0
+          }
+        },
+        "PV-1.1": {
+          "gold": 12,
+          "measured_gold": 12,
+          "tp": 6,
+          "fp": 14,
+          "fn": 6,
+          "duplicates": 2,
+          "precision": {
+            "numerator": 6,
+            "denominator": 20,
+            "value": 0.3
+          },
+          "recall": {
+            "numerator": 6,
+            "denominator": 12,
+            "value": 0.5
+          },
+          "strict_precision": {
+            "numerator": 6,
+            "denominator": 22,
+            "value": 0.2727272727272727
+          },
+          "delivered_across_plan": {
+            "numerator": 6,
+            "denominator": 12,
+            "value": 0.5
+          },
+          "clean_planned": 6,
+          "clean_measured": 6,
+          "clean_alarms": 8,
+          "clean_with_alarm": {
+            "numerator": 6,
+            "denominator": 6,
+            "value": 1.0
+          }
+        }
+      },
+      "harness": {
+        "tp": 2,
+        "fp": 20,
+        "fn": 6,
+        "duplicates": 0,
+        "precision": 0.09090909090909091,
+        "recall": 0.25
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 8,
+        "denominator": 16,
+        "value": 0.5
+      },
+      "quoted_findings": {
+        "numerator": 22,
+        "denominator": 22,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 46,
+        "denominator": 46,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 4,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 4,
+        "denominator": 4,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 41.563,
+        "median": 1.376,
+        "n": 16
+      },
+      "human_reviews": 0
+    },
+    {
+      "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+      "presentation": "live",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 8,
+      "families": 4,
+      "technical_success": {
+        "numerator": 1,
+        "denominator": 8,
+        "value": 0.125
+      },
+      "reported_failed": 7,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 8,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 8,
+        "denominator": 8,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 1,
+      "critical": {
+        "planned": 1,
+        "matched": 0,
+        "measured": 0,
+        "missed_on_measured": 0,
+        "unmeasured": 1
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 4,
+          "measured_gold": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 1,
+            "denominator": 4,
+            "value": 0.25
+          },
+          "clean_planned": 4,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "PV-1.1": {
+          "gold": 4,
+          "measured_gold": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 1,
+            "denominator": 4,
+            "value": 0.25
+          },
+          "clean_planned": 4,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        }
+      },
+      "harness": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 1,
+        "duplicates": 0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "quoted_findings": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 30.819,
+        "median": 1.536,
+        "n": 8
+      },
+      "human_reviews": 0
+    },
+    {
+      "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "presentation": "primary",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 16,
+      "families": 4,
+      "technical_success": {
+        "numerator": 2,
+        "denominator": 16,
+        "value": 0.125
+      },
+      "reported_failed": 14,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 16,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 2,
+      "critical": {
+        "planned": 2,
+        "matched": 0,
+        "measured": 0,
+        "missed_on_measured": 0,
+        "unmeasured": 2
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "PV-1.1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        }
+      },
+      "harness": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 2,
+        "duplicates": 0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "quoted_findings": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 11.251,
+        "median": 0.679,
+        "n": 16
+      },
+      "human_reviews": 0
+    },
+    {
+      "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "presentation": "order",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 16,
+      "families": 4,
+      "technical_success": {
+        "numerator": 2,
+        "denominator": 16,
+        "value": 0.125
+      },
+      "reported_failed": 14,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 16,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 2,
+      "critical": {
+        "planned": 2,
+        "matched": 0,
+        "measured": 0,
+        "missed_on_measured": 0,
+        "unmeasured": 2
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "PV-1.1": {
+          "gold": 8,
+          "measured_gold": 2,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        }
+      },
+      "harness": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 2,
+        "duplicates": 0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "quoted_findings": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 2,
+        "denominator": 2,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 11.19,
+        "median": 0.665,
+        "n": 16
+      },
+      "human_reviews": 0
+    },
+    {
+      "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "presentation": "wording",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 16,
+      "families": 4,
+      "technical_success": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "reported_failed": 0,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 16,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 16,
+        "denominator": 16,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 0,
+      "critical": {
+        "planned": 2,
+        "matched": 0,
+        "measured": 2,
+        "missed_on_measured": 2,
+        "unmeasured": 0
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 8,
+          "measured_gold": 8,
+          "tp": 2,
+          "fp": 18,
+          "fn": 6,
+          "duplicates": 2,
+          "precision": {
+            "numerator": 2,
+            "denominator": 20,
+            "value": 0.1
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "strict_precision": {
+            "numerator": 2,
+            "denominator": 22,
+            "value": 0.09090909090909091
+          },
+          "delivered_across_plan": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "clean_planned": 8,
+          "clean_measured": 8,
+          "clean_alarms": 10,
+          "clean_with_alarm": {
+            "numerator": 8,
+            "denominator": 8,
+            "value": 1.0
+          }
+        },
+        "PV-1.1": {
+          "gold": 12,
+          "measured_gold": 12,
+          "tp": 6,
+          "fp": 14,
+          "fn": 6,
+          "duplicates": 2,
+          "precision": {
+            "numerator": 6,
+            "denominator": 20,
+            "value": 0.3
+          },
+          "recall": {
+            "numerator": 6,
+            "denominator": 12,
+            "value": 0.5
+          },
+          "strict_precision": {
+            "numerator": 6,
+            "denominator": 22,
+            "value": 0.2727272727272727
+          },
+          "delivered_across_plan": {
+            "numerator": 6,
+            "denominator": 12,
+            "value": 0.5
+          },
+          "clean_planned": 6,
+          "clean_measured": 6,
+          "clean_alarms": 8,
+          "clean_with_alarm": {
+            "numerator": 6,
+            "denominator": 6,
+            "value": 1.0
+          }
+        }
+      },
+      "harness": {
+        "tp": 2,
+        "fp": 20,
+        "fn": 6,
+        "duplicates": 0,
+        "precision": 0.09090909090909091,
+        "recall": 0.25
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 8,
+        "denominator": 16,
+        "value": 0.5
+      },
+      "quoted_findings": {
+        "numerator": 22,
+        "denominator": 22,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 46,
+        "denominator": 46,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 4,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 4,
+        "denominator": 4,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 12.204,
+        "median": 0.712,
+        "n": 16
+      },
+      "human_reviews": 0
+    },
+    {
+      "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+      "presentation": "live",
+      "mode": "rules_only",
+      "actual_model": null,
+      "cases": 8,
+      "families": 4,
+      "technical_success": {
+        "numerator": 1,
+        "denominator": 8,
+        "value": 0.125
+      },
+      "reported_failed": 7,
+      "full_semantic": {
+        "numerator": 0,
+        "denominator": 8,
+        "value": 0.0
+      },
+      "verify": {
+        "numerator": 8,
+        "denominator": 8,
+        "value": 1.0
+      },
+      "clean_raw_rows_even_if_failed": 1,
+      "critical": {
+        "planned": 1,
+        "matched": 0,
+        "measured": 0,
+        "missed_on_measured": 0,
+        "unmeasured": 1
+      },
+      "metrics": {
+        "PV-1": {
+          "gold": 4,
+          "measured_gold": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 1,
+            "denominator": 4,
+            "value": 0.25
+          },
+          "clean_planned": 4,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "PV-1.1": {
+          "gold": 4,
+          "measured_gold": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "duplicates": 0,
+          "precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "strict_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0
+          },
+          "delivered_across_plan": {
+            "numerator": 1,
+            "denominator": 4,
+            "value": 0.25
+          },
+          "clean_planned": 4,
+          "clean_measured": 0,
+          "clean_alarms": 0,
+          "clean_with_alarm": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        }
+      },
+      "harness": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 1,
+        "duplicates": 0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "accuracy_documents_on_eligible": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "quoted_findings": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "physical_citations": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "questions_pass": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0.0
+      },
+      "questions_located": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "physical_calls": 0,
+      "agent_wall_seconds": {
+        "sum": 5.848,
+        "median": 0.686,
+        "n": 8
+      },
+      "human_reviews": 0
+    }
+  ],
+  "gemini": {
+    "agent_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+    "mode": "rules_plus_llm",
+    "planned": 8,
+    "planned_defects": 4,
+    "clean": 4,
+    "attempted": 0,
+    "actual_model": null,
+    "technical_success": null,
+    "tp": null,
+    "fp": null,
+    "fn": null,
+    "duplicates": null,
+    "precision": null,
+    "recall": null,
+    "accuracy_documents": null
+  }
+}

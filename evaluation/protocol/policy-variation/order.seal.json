@@ -1,0 +1,48 @@
+{
+  "protocol": "PV-1",
+  "corpus_version": "PV-1",
+  "presentation": "order",
+  "sealed_utc": "2026-11-26T18:37:11.944549+00:00",
+  "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "scorer_sha": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+  "protocol_sha256": "44eccfa4d8c251932a64144dc2b9ca79a835c5cefc1411746767e4b34bd9865a",
+  "panel_manifest_sha256": "5eaf582c35a4ff567237d71990cc2ed8cb3a0634ab7a37f54287bd6ddad44865",
+  "panel_gold_sha256": "e5e14a82bf0bbc6f1f8b6f9c6c0a3414dfd6411adb32c4d2a9cf579e314f7f92",
+  "documents": 16,
+  "families": 4,
+  "clean": 8,
+  "present": 8,
+  "severity": {
+    "critical": 2,
+    "major": 6
+  },
+  "live_allowed": false,
+  "case_ids": [
+    "v0dbddca55",
+    "v1745b61dd",
+    "v1746e50b1",
+    "v5548a9f79",
+    "v736f9a653",
+    "v7549353e7",
+    "v92ea02089",
+    "v9bd7d92f8",
+    "va38340f78",
+    "vaa15ae8f2",
+    "vb02e01a87",
+    "vbe92a5f15",
+    "vd1d58086c",
+    "vd72dd2af9",
+    "vddb7b05a2",
+    "vfdc01ade3"
+  ],
+  "leakcheck": {
+    "schema": "bcc-eval-leakcheck/1",
+    "leak": false,
+    "source_sha256_overlap": 0,
+    "case_id_overlap": 0,
+    "closed_quote_ngrams_in_dev_text": 0,
+    "closed_doc_shingle_share_in_dev": 0.0,
+    "doc_overlap_warning": false,
+    "note": "Выводятся только количества; закрытые тексты и цитаты не печатаются."
+  }
+}

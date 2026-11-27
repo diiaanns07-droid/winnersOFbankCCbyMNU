@@ -1,0 +1,14 @@
+{
+  "candidate_sha": "8e8e95f4bb8a65bdd10d7e4599dd4747ffe8c803",
+  "source_receipt": "08d3af55446ef37d8d61d077848e63c292a47207",
+  "prior_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+  "index_sha256": "d5620312e810fcd8c3c5118165618b4a728e76bd367f7d57c736aaf8c5e296fa",
+  "protocol_sha256": "44eccfa4d8c251932a64144dc2b9ca79a835c5cefc1411746767e4b34bd9865a",
+  "timestamp_utc": "2026-11-26T18:48:02.491467+00:00",
+  "wording_secondary_reference_sha256": "0348977e5b527801396d9a06ae3fbbf462362cec0b5580ce55d18274a4557e6f",
+  "secondary_added_minor": 4,
+  "latest_files_scanned": 655,
+  "normalized_seed_anchors": 26,
+  "whole_seed_anchor_hits": 0,
+  "actual_live_runs": 0
+}

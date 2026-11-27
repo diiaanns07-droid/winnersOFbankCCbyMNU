@@ -1,0 +1,40 @@
+[
+  {
+    "case_id": "i03",
+    "reference_choice_case": "i27",
+    "corpus_version": "IE-corpus-1",
+    "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+    "actual_model": null,
+    "base_source_sha256": "ac20ca808a9e7842aa7dcadc391e44c805a034a668ba94a78048dfa1c4e9deac",
+    "source_sha256": "3a6b3fd58222b85788ef51503cea958e3d1d82a5f064d04e4422ad622705ffae",
+    "response_option": "A",
+    "own_wording_applied": true,
+    "matching_business_question_offered": false,
+    "observed_question_id": "Q-03",
+    "two_sides_consistent_in_product_revision": false,
+    "two_sides_consistent_in_preregistered_revision": true,
+    "applied_report_verify_exit": 0,
+    "fresh_report_verify_exit": 0,
+    "human_decision": null,
+    "evidence": "answers/hidden/A"
+  },
+  {
+    "case_id": "i03",
+    "reference_choice_case": "i28",
+    "corpus_version": "IE-corpus-1",
+    "agent_sha": "f91d3b6f485e883d316c94fc5e032f1a8d6c2553",
+    "actual_model": null,
+    "base_source_sha256": "ac20ca808a9e7842aa7dcadc391e44c805a034a668ba94a78048dfa1c4e9deac",
+    "source_sha256": "d2693ca190ae051edd4c3d1e66fb1989910992494150a84e512e29c616f3470a",
+    "response_option": "B",
+    "own_wording_applied": true,
+    "matching_business_question_offered": false,
+    "observed_question_id": "Q-03",
+    "two_sides_consistent_in_product_revision": true,
+    "two_sides_consistent_in_preregistered_revision": true,
+    "applied_report_verify_exit": 4,
+    "fresh_report_verify_exit": 0,
+    "human_decision": null,
+    "evidence": "answers/hidden/B"
+  }
+]
