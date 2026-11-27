@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import logging
 import os
 import stat
@@ -296,7 +297,10 @@ def _greet(asked, answers=("д",), **kw):
     kw.setdefault("interactive", True)
     kw.setdefault("mode", "truecolor")
     r = T.greet(8014, O.ENV_FILE, stdout=out, ask_secret=ask_secret, ask=ask, **kw)
-    return r, out.text(), prompts
+    raw = out.text()
+    # AIshka говорит, пока печатает: кадры рта — между «запомнить курсор» и «вернуть курсор»; текст — без них
+    assert raw.count("\x1b7") == raw.count("\x1b8")
+    return r, re.sub(r"\x1b7.*?\x1b8(?:\x1b\[[0-9;]*m)*", "", raw, flags=re.S), prompts
 
 
 def test_greet_without_tty_asks_nothing(tty):

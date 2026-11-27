@@ -417,20 +417,31 @@ class _Screen:
         buf.append(f"\x1b[{self.below}E" if self.below else "")
         self.write("".join(buf))
 
-    def say(self, text: str, *, style: str = "", typing: bool = True, end: str = "\n") -> None:
+    def say(self, text: str, *, style: str = "", typing: bool = True, end: str = "\n", talk: str = "") -> None:
+        """Строка реплики. talk — пока печатает, AIshka говорит (рот двигается), потом принимает этот кадр."""
         body = "  " + text
         if self.live and typing and self.mode != "ascii":
             self.write(style)
-            for ch in body:
+            for i, ch in enumerate(body):
                 self.write(ch)
+                if talk and i % 4 == 2:
+                    self._mouth(f"speak{(i // 4) % 4}", style)
                 if ch not in " ":
                     _sleep(0.012)
+            if talk:
+                self._mouth(talk, style)
             self.write(self.reset if style else "")
         else:
             self.write(f"{style}{body}{self.reset if style else ''}")
         self.write(end)
         if end.endswith("\n"):
             self.below += self._rows_of(body)
+
+    def _mouth(self, name: str, style: str) -> None:
+        """Сменить кадр посреди печати: запомнить курсор (ESC 7), перерисовать AIshka, вернуться (ESC 8)."""
+        self.write("\x1b7")
+        self.swap(name)
+        self.write("\x1b8" + style)
 
     def input_line(self, prompt: str) -> None:
         """Строка ввода заняла столько-то строк экрана (ввод и Enter — на ней же)."""
@@ -550,13 +561,13 @@ def greet(port: int = 8014, env_path: str | Path | None = None, *, stdin: TextIO
         scr.swap("idle")
         if ready:
             hello = "С возвращением!" if ready in ("gemini", "anthropic", "openai") else "Здравствуйте! Я BCC AI."
-            scr.say(f"{hello} {where[0].upper() + where[1:]}.")
+            scr.say(f"{hello} {where[0].upper() + where[1:]}.", talk="wink")
             scr.say("Открываю систему…", style=scr.dim, typing=False)
             return ready
-        scr.say("Здравствуйте! Я BCC AI — проверяю ТЗ до начала разработки.", style=scr.bold)
+        scr.say("Здравствуйте! Я BCC AI — проверяю ТЗ до начала разработки.", style=scr.bold, talk="idle")
         _sleep(0.2)
         scr.swap("look")
-        scr.say("Вставьте ключ Gemini или Claude. Enter — без ключа.")
+        scr.say("Вставьте ключ Gemini или Claude. Enter — без ключа.", talk="look")
         scr.say(f"Бесплатный ключ Gemini, за минуту: {KEY_URL}", style=scr.dim, typing=False)
         for attempt in range(tries):
             scr.swap("idle")
@@ -570,6 +581,7 @@ def greet(port: int = 8014, env_path: str | Path | None = None, *, stdin: TextIO
             scr.cursor(False)
             if not key:
                 onboarding.SKIP_WELCOME = True
+                scr.swap("wink")
                 scr.say("Хорошо, без ключа: только правила и готовые отчёты. Ключ можно вставить позже.",
                         style=scr.dim)
                 return "offline"
@@ -606,6 +618,7 @@ def greet(port: int = 8014, env_path: str | Path | None = None, *, stdin: TextIO
             else:
                 scr.say("Ключ — только на этот запуск. Открываю систему…")
             return provider
+        scr.swap("wink")
         scr.say(f"Продолжу без ключа. Ключ можно вставить в браузере: {url}/welcome", style=scr.dim)
         return "offline"
     except KeyboardInterrupt:

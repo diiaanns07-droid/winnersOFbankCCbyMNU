@@ -37,14 +37,14 @@
 }
 
 /* ── AIshka над листом ── */
-.bcc-pilot{ position:absolute; inset:0; pointer-events:none; z-index:6 }
+.bcc-pilot{ position:absolute; inset:0; pointer-events:none }            /* без своего слоя: луч — под текстом листа */
 .bcc-pilot__line{
-  position:absolute; top:0; left:var(--bcc-pilot-pad-l,48px); right:var(--bcc-pilot-pad-r,32px); height:1px;
-  background:rgba(0,185,117,.5); transform:translate3d(0,-9999px,0); transition:opacity 220ms cubic-bezier(.2,.8,.2,1);
+  position:absolute; top:0; left:var(--bcc-pilot-pad-l,48px); right:var(--bcc-pilot-pad-r,32px); height:2px; z-index:-1;
+  border-radius:1px; background:rgba(0,185,117,.42); transform:translate3d(0,-9999px,0); transition:opacity 220ms cubic-bezier(.2,.8,.2,1);
 }
 .bcc-pilot__wash{ display:none }                 /* без заливки и свечения: только тонкая линия */
 .bcc-pilot.is-landed .bcc-pilot__line{ opacity:0 }
-.bcc-pilot__craft{ position:absolute; left:0; top:0; will-change:transform }
+.bcc-pilot__craft{ position:absolute; left:0; top:0; z-index:6; will-change:transform }
 .bcc-pilot__talk{
   position:absolute; left:100%; top:40%; margin-left:6px; z-index:2;
   display:flex; flex-direction:column; align-items:flex-start; gap:4px; width:max-content; max-width:min(62ch,72vw);

@@ -318,6 +318,7 @@
     if (sheet.__bccPilot) return sheet.__bccPilot;
     opts = opts || {};
     if (getComputedStyle(sheet).position === 'static') sheet.style.position = 'relative';
+    sheet.style.isolation = 'isolate';   // луч идёт под текстом, как линейка на бумаге, а не зачёркивает строку
     var b = backing(+(opts.size || sheet.getAttribute('data-size') || 96), false), S = b.css;
     var layer = node('div', 'bcc-pilot'), wash = node('div', 'bcc-pilot__wash'), line = node('div', 'bcc-pilot__line');
     var craft = node('div', 'bcc-pilot__craft'), cv = node('canvas', 'bcc-pilot__cv');

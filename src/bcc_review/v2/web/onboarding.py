@@ -361,7 +361,7 @@ letter-spacing:.02em;padding:0}
 text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--hair2)}
 .w-show:hover{color:var(--ink)}
 .w-field.is-bad{border-bottom-color:var(--red);box-shadow:0 1px 0 var(--red)}
-.w-field.is-checking::after{content:"";position:absolute;left:0;bottom:-1px;width:28%;height:1px;background:var(--green);
+.w-field.is-checking::after{content:"";position:absolute;left:0;bottom:-1.5px;width:28%;height:2px;border-radius:1px;background:var(--green);
 animation:w-scan 1.1s var(--ease) infinite alternate}
 @keyframes w-scan{from{left:0}to{left:72%}}
 .w-hint{font:400 15px/1.6 var(--sans);color:var(--ink3);margin-top:12px}
@@ -458,7 +458,7 @@ PAGE_JS = r"""
         open.focus();
       } else {
         bad(r.message||'Ключ не подошёл.'); status.textContent=r.message||''; show('bad', '<b>не подошёл</b>');
-        if (P) { P.mood('oops'); P.say(line('Не подошёл. Что сделать — написал рядом с ключом.', 'Не подошёл. Подсказка — под ключом.')); }
+        if (P) { P.mood('oops'); P.say(line('Не подошёл. Что сделать — написал рядом с ключом.', 'Подсказка — под ключом.')); }
         key.focus();
       }
     }).catch(function(){
