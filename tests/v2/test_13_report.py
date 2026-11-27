@@ -730,3 +730,69 @@ def test_line_after_infinitive_is_accusative():
     assert markdown.prose("привести L025 и L136 к маршруту") == "привести строки 25 и 136 к маршруту"
     assert markdown.prose("часть L040 описывает") == "часть строки 40 описывает"
     assert markdown.prose("из L052 и L103") == "из строк 52 и 103"
+
+
+# ---------------------------------------------------------------- разбор GPT Pro (F4, `eval/blind-v2`, jury.md)
+
+def test_final_reason_lists_blockers_from_final_levels(sample):
+    """Правка 1: перечень блокеров — по финальным уровням, а не по тексту судьи (у судьи пять ID при счётчике
+    четыре). Фразы судьи о не-блокере остаются только как порядок работ («Затем …»)."""
+    r = copy.deepcopy(sample)
+    blockers = [f["id"] for f in r["findings"] if f["severity"] == "critical" and f.get("blocks") != "none"]
+    major = next(f["id"] for f in r["findings"] if f["severity"] == "major")
+    r["verdict"]["summary"] = (f"Начинать нельзя. Блокируют {', '.join(blockers)} и {major}. "
+                               f"{major}: метод чтения не описан. Затем описать метод чтения ({major}).")
+    md = markdown.render(r)
+    final = md[md.find('id="s6"'):md.find('id="pa"')]
+    reason = next(ln for ln in final.splitlines() if ln.startswith("**Обоснование.**"))
+    shown = re.findall(r"\[(D-\d+)\]", reason.split(". ")[0] + ". ")
+    assert shown == blockers, (shown, blockers)
+    assert f"Блокируют" not in reason and f"[{major}](#{major.lower()}): метод чтения" not in reason
+    assert f"Затем описать метод чтения ([{major}](#{major.lower()}))" in reason
+    brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
+    why = next(ln for ln in brief.splitlines() if ln.startswith("**Почему.**"))
+    assert major not in why
+
+
+def test_tooltip_keeps_comparison_signs():
+    """Правка 7: в подсказке-названии требования знак «>» пропадал — «отказ в 65 лет» вместо «старше 65»."""
+    c = markdown._Ctx({"requirements": [{"id": "R-01", "summary": "Возраст > 65 лет — отказ, ≤ 18 — тоже"}]})
+    assert '"Возраст больше 65 лет — отказ, не больше 18 — тоже"' in c.req_label("R-01")
+
+
+def test_passport_commands_name_real_files(sample):
+    """Правка 5: в паспорте команды с настоящими именами файлов: проверка сохранённого отчёта и повтор анализа."""
+    md = markdown.render(sample, out_path="out/official.md")
+    passport = md[md.find('id="s1"'):md.find('id="s2"')]
+    assert "`python -m bcc_review verify out/official.json requirements.md`" in passport
+    assert "`python -m bcc_review requirements.md out/repeat.md --provider claude_cli --model" in passport
+    assert "--no-cache`" in passport and "`official.json`" in passport
+    assert "отчёт.json документ" not in passport
+
+
+def test_matrix_names_criteria_in_full(sample):
+    """Сравнение с ERA216 (F4): в 3.1 — нарушенные критерии полными названиями, без столбцов-сокращений."""
+    md = markdown.render(sample)
+    m31 = md[md.find("### 3.1."):md.find("### 3.2.")]
+    assert "| Требование | Итог | Нарушенные критерии | Дефекты |" in m31
+    assert "Нб —" not in m31 and "| Од |" not in m31
+    assert re.search(r"\| 🔴 \| 🔴 согласованность", m31)
+
+
+def test_rejected_duplicate_points_to_kept_card(sample):
+    """Сравнение с azekowka (F4): снятый как дубль кандидат ведёт к карточке, которая осталась."""
+    r = copy.deepcopy(sample)
+    kept = next(f for f in r["findings"] if f["severity"] == "critical")
+    line = kept["evidence"][0]["line_start"]
+    r["rejected"] = [{"candidate_id": "", "source": "lens:risk", "reason_code": "lens_dropped",
+                      "title": f"То же противоречие (строка {line})", "reason": "зона тестировщика (дубль)"},
+                     {"candidate_id": "C-099", "source": "rules:api", "reason_code": "misread",
+                      "title": "Ложное", "reason": f"строка {line} описывает успешный повтор без ошибки", "line": line}]
+    md = markdown.render(r)
+    app = md[md.find('id="pd"'):md.find('id="pe"')]
+    assert f"зона тестировщика (дубль) → вошёл в [{kept['id']}](#{kept['id'].lower()})" in app
+    assert "успешный повтор без ошибки → вошёл" not in app
+
+
+def test_code_spans_not_nested():
+    assert markdown.prose("GET /savings/{accountId}/interest описан") == "GET `/savings/{accountId}/interest` описан"
