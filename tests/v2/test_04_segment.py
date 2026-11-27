@@ -1151,3 +1151,34 @@ def test_bare_parameter_id_gets_table_prefix():
     assert _keys(out["requirements"]) == _keys(sg.heuristic_segment(view)["requirements"])
     sids = {r["line_start"]: r["source_id"] for r in out["requirements"]}
     assert sids[66] == "Ответ 200: category" and sids[67] == "Ответ 200: accrued"
+
+
+STRESS = FIX / "03_stress"
+
+
+@pytest.mark.parametrize("doc", ["api_narrow.pdf", "docx_merged.docx", "two_columns.pdf", "word_export.docx"])
+def test_stress_formats_offline_equals_model(doc):
+    """Стресс-набор №03 (выгрузки Word, PDF в две колонки, узкая таблица API): офлайн-нарезка (быстрый старт) =
+    нарезке haiku по ID и строкам. Было: блоки «200. Successful» + тело без перечня кодов офлайн шли в примеры
+    (модель — «Статус N»); вводная фраза «Метод возвращает…» до первого раздела — в пояснения; подсписок под
+    «Уточнения к пункту 2:» получал дубли «Функциональные требования, п. 1»; «Документ описывает …» посреди
+    выгрузки — требование; у абзацев критериев без номера в PDF модель выдумывала «Критерии приёмки, п. N»."""
+    view = sg.load_view(str(STRESS / doc))
+    raw = json.loads((ANSWERS / f"stress_{doc.replace('.', '_')}.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw, sg._replay_followup(raw))
+    heur = sg.heuristic_segment(view)
+    assert _keys(out["requirements"]) == _keys(heur["requirements"])
+    assert out["coverage"]["uncovered"] == []
+    sids = [r["source_id"] for r in out["requirements"] if r["source_id"]]
+    assert len(sids) == len(set(sids))  # без дублей ID
+
+
+def test_status_blocks_without_code_list_are_requirements_only_then():
+    """Блок «404. Unsuccessful — Not found» + тело — требование «Статус 404», только если перечня кодов нет
+    (официальный: перечень есть — блоки остаются примерами, 40 требований = фикстуре)."""
+    out = sg.heuristic_segment(sg.load_view(str(STRESS / "api_narrow.pdf")))
+    codes = [r["source_id"] for r in out["requirements"] if r["source_id"].startswith("Статус")]
+    assert codes == ["Статус 200", "Статус 400", "Статус 401", "Статус 404", "Статус 410", "Статус 500"]
+    off = sg.heuristic_segment(sg.load_view(str(OFFICIAL_MD)))["requirements"]
+    ref = json.loads((FIX / "official" / "segment.json").read_text(encoding="utf-8"))["requirements"]
+    assert _keys(off) == _keys(ref)

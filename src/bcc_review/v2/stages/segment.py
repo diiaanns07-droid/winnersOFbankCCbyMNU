@@ -783,6 +783,15 @@ def _heading_item_id(view: dict, r: dict, requirements: list[dict], parts: list[
     return m.group("id")
 
 
+def _invented_item_number(fmt: str, first: dict, sid: str) -> bool:
+    """«Критерии приёмки, п. 2» у абзаца без номера в PDF/MD/TXT: номер пункта в тексте таких форматов виден
+    (в DOCX/HTML автонумерация списка в текст не попадает — там номер модели не трогаем)."""
+    if fmt not in ("pdf", "md", "txt", "markdown") or not re.search(r",\s+п\.\s+\d{1,3}$", sid):
+        return False
+    t = _MD_DECOR.sub("", _text(first)).strip()
+    return not _is_row(t) and not re.match(r"^(?:[-*•]\s+)?\d{1,3}[.)]\s", t)
+
+
 def _invented_bullet_number(first: dict, sid: str) -> bool:
     """«US-1, критерий 2», «Сценарий, шаг 3» у пункта маркированного списка — номер, которого нет в документе."""
     if not sid or not re.fullmatch(r".+,\s+[^\d,]{2,20}\s+\d{1,3}", sid) or re.search(r",\s+(?:п\.|строка)\s+\d", sid):
@@ -822,7 +831,8 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
         if head_id:
             r["source_id"] = head_id  # «### US-1. Запись на время» + абзац истории под ним — требование US-1
             continue
-        if _invented_bullet_number(first, str(r.get("source_id") or "")):
+        if _invented_bullet_number(first, str(r.get("source_id") or "")) or _invented_item_number(fmt, first, str(
+                r.get("source_id") or "")):
             r["source_id"] = ""  # «US-1, критерий 2» у пункта маркированного списка: такого номера в документе нет
             continue
         if parts and _passport_table(by_n, r):
@@ -1560,6 +1570,12 @@ def heuristic_segment(view: dict) -> dict:
     fmt_src = str(view.get("format") or "").lower() in ("md", "txt", "markdown")
     caption, caption_line, table_name = "", 0, ""
     counts = _word_counts(view) if str(view.get("format") or "").lower() == "pdf" else {}
+    # коды из перечня статусов («200. Ответ в случае…», строка таблицы «404 | …», пусть и одной строкой DOCX/PDF):
+    # блок «404. Unsuccessful» + тело под заголовком — тогда пример к ним, а не отдельное требование
+    listed_codes = {c for x in lines if int(x["n"]) not in headings and not _CODEISH.match(_text(x))
+                    for c in ([m.group(1) for m in _CODE_ITEM.finditer(_MD_DECOR.sub("", _text(x)))]
+                              + [m.group("code") for m in [_STATUS_RE.match(_MD_DECOR.sub("", _text(x)).strip()
+                                                                            .strip("|").strip())] if m])}
     for i, ln in enumerate(lines):
         n, t = int(ln["n"]), _text(ln).strip()
         if (n in headings and re.fullmatch(r"[1-5]\d\d\.?", t) and reqs and t[:3] in reqs[-1]["quote"]
@@ -1587,7 +1603,8 @@ def heuristic_segment(view: dict) -> dict:
                 and _CONTINUES.match(t) and last_excl and not _SENT_END.search(last_excl)):
             excl[-1]["line_end"] = n  # пояснение о документе продолжается на следующей строке PDF
             continue
-        if (not section and n < first_sectioned) or _DOC_NOTE.match(t):
+        if ((not section and n < first_sectioned and not _ACTOR_LEAD.match(t)) or _DOC_NOTE.match(t)
+                or (_META_LINE.match(t) and not is_row)):
             excl.append({"what": "Служебное пояснение", "line_start": n, "line_end": n,
                          "reason": "Пояснение о самом документе"})
             continue
@@ -1619,6 +1636,19 @@ def heuristic_segment(view: dict) -> dict:
                     and all(is_trivial(_text(by_line.get(k) or {})) for k in range(reqs[-1]["line_end"] + 1, n))):
                 reqs[-1]["line_end"] = n  # «…возвращается 404» + «404» + тело ответа — одно описание кода
                 continue
+            prev = next((k for k in range(n - 1, max(0, n - 3), -1) if not is_trivial(_text(by_line.get(k) or {}))), 0)
+            hm = re.match(r"^\**([1-5]\d\d)\b\.?\**\s*(.*)$", _text(by_line.get(prev) or {}).strip()) if prev in headings \
+                else None
+            if hm and hm.group(1) not in listed_codes:
+                # блок «200. Successful» + тело — единственное описание кода (перечня кодов в документе нет)
+                rest = re.sub(r"^(?:successful|unsuccessful)\s*[—–-]?\s*", "", hm.group(2), flags=re.I).strip(" .—–-")
+                r = normalize_requirement(view, {"source_id": f"Статус {hm.group(1)}", "kind": "api", "section": section,
+                                                 "summary": f"Код {hm.group(1)}" + (f" — {rest}" if rest else ""),
+                                                 "line_start": n, "line_end": n})
+                if r:
+                    r["_bare"], r["_block"] = True, ln.get("block_id") or ""
+                    reqs.append(r)
+                    continue
             excl.append({"what": "Пример", "line_start": n, "line_end": n, "reason": "Пример данных или кода"})
             continue
         if re.fullmatch(r"(или|либо|or)\.?", t, re.I):
@@ -1660,7 +1690,11 @@ def heuristic_segment(view: dict) -> dict:
         elif (m := _STATUS_RE.match(clean)):
             sid, kind = f"Статус {m.group('code')}", "api"
         elif (m := _NUM_RE.match(clean)) and not is_row:
-            sid = f"{tail}, п. {m.group('n')}" if tail else f"п. {m.group('n')}"
+            under_caption = caption_line and caption_line < n and all(
+                is_trivial(_text(by_line.get(k) or {})) or _NUM_RE.match(re.sub(r"^\s*[-*•]\s+", "", _text(by_line[k])))
+                for k in range(caption_line + 1, n) if k in by_line)
+            head = caption if under_caption and caption else tail  # «Уточнения к пункту 2:» + «1. …» — свой перечень
+            sid = f"{head}, п. {m.group('n')}" if head else f"п. {m.group('n')}"
         elif is_row:
             cells = [c.strip() for c in clean.strip("| ").split(" | ")]
             first_cell = join_split_words(cells[0], counts) if counts else cells[0]
@@ -1695,8 +1729,17 @@ def heuristic_segment(view: dict) -> dict:
 
 
 # пояснение о самом документе: «Дочерний документ части A: …», «Комплект из двух документов», «Документ подготовлен…»
+# вводная фраза до первого раздела, которая говорит о системе, а не о документе: «Метод возвращает выписку…»,
+# «Клиент получает кэшбэк…» — требование (модели выделяют), а «Комплект из двух документов…» — пояснение
+_ACTOR_LEAD = re.compile(r"^(?:клиент|пользователь|система|сервис|метод|банк|приложение|модуль)\s+[а-яё]+(?:ет|ит|ют|ят|ется|ится)\b",
+                         re.I)
 _DOC_NOTE = re.compile(r"^(?:дочерний документ|комплект из|настоящий документ|документ подготовлен|текст требований "
-                       r"не вычитывался|документ \(версия)", re.I)
+                       r"не вычитывался|документ \(версия|документ описывает|в (?:этом|настоящем) документе описан)",
+                       re.I)
+# служебная строка о людях и версии: «Ответственный аналитик: Иванова А.», «Автор: …», «Версия 0.3 от …»
+_META_LINE = re.compile(r"^(?:ответственн\w*(?:\s+\w+)?|автор\w*|составил\w*|согласовал\w*|утвердил\w*|"
+                        r"владелец(?:\s+продукта)?|версия(?:\s+документа)?|дата(?:\s+(?:создания|изменения))?)"
+                        r"\s*:\s*\S.{0,60}$", re.I)
 
 
 _KV_HEADER = re.compile(r"^(поле|параметр|атрибут|field|name|key)\s*\|\s*(значение|value|описание)$", re.I)
@@ -1959,6 +2002,10 @@ def demote_non_requirements(view: dict, requirements: list[dict],
         if body and all(_PLACEHOLDER.match(re.sub(r"^\s*[-*•]\s+", "", t)) for t in [bare]):
             moved.append({"what": "Заглушка", "line_start": a, "line_end": b,
                           "reason": "Раздел без содержания: «не используется», «не предъявляются» или «заполняется позже»"})
+            continue
+        if body and len(body) == 1 and not _is_row(body[0]) and (_DOC_NOTE.match(bare) or _META_LINE.match(bare)):
+            moved.append({"what": "Служебное пояснение", "line_start": a, "line_end": b,
+                          "reason": "Пояснение о самом документе (назначение, автор, версия), а не требование"})
             continue
         if "общие сведения" in sec and not _OBLIGATION.search(text) and r.get("kind") not in ("goal",):
             moved.append({"what": "Общие сведения", "line_start": a, "line_end": b,
