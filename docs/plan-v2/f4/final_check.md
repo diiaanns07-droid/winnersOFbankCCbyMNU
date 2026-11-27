@@ -1,6 +1,8 @@
 # Финальная проверка F4
 
-**Состояние на 19:14 по Астане.** В 19:07 появилась ветка `release` на `3e7133c2`. На ней ещё отсутствуют файлы `reports/requirements.md` и `reports/requirements.json`. Тег `v2.0.0` не опубликован. Финальные показатели blind3 остаются неизмеренными, ключ у F4. [Релизный каталог в проверенной версии](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/3e7133c2/reports) · [Слепой протокол](blind-protocol.md).
+**Состояние на 19:46 по Астане.** В 19:07 появилась ветка `release` на `3e7133c2`. На ней ещё отсутствуют файлы `reports/requirements.md` и `reports/requirements.json`. Тег `v2.0.0` не опубликован. Финальные показатели blind3 остаются неизмеренными, ключ у F4. [Релизный каталог в проверенной версии](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/tree/3e7133c2/reports) · [Слепой протокол](blind-protocol.md).
+
+В 19:44 интеграцию релиза принял №46. Ветка `release` в 19:46 указывает на `4930e950`. №36 запланировал первый комплект живых отчётов на финальном коде примерно на 21:05 по Астане. Это заявленное время подготовки. На 19:46 файлов отчёта и тега по-прежнему нет. Для №15 доступны [десять проверок релизной сборки](acceptance/README.md) и [полный разбор дорелизных карточек](answers_exam/merged/official/CARD_REVIEW.md). [Передача интеграции №46](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/blob/4930e950/docs/plan-v2/status/46.md) · [Расписание владельца отчётов](https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/blob/df427e99/docs/plan-v2/status/36.md).
 
 ## Для №01 и интегратора №11 до выхода тега
 
