@@ -120,7 +120,8 @@ def load(path: str | Path) -> dict:
         sizes = _page_sizes(p) if fmt == "pdf" else {}
         lines = _block_lines(doc or {}, sizes, warnings)
     title = _title(doc, lines, p)
-    _strip_title_from_sections(lines, title)
+    if fmt == "pdf" or _single_root(lines, title, doc):  # в PDF уровни заголовков — по кеглю, почти все первые
+        _strip_title_from_sections(lines, title)
     pages = None
     if fmt == "pdf":
         ext = (doc or {}).get("extraction") or {}
@@ -128,6 +129,10 @@ def load(path: str | Path) -> dict:
     warnings += _doc_warnings(doc)
     if fmt == "docx":
         warnings += _docx_revisions(data)
+        try:
+            _docx_bold_headings(data, doc or {}, lines)
+        except Exception:  # noqa: BLE001 — подзаголовки жирным необязательны
+            pass
         try:
             lines, boxes = _docx_textboxes(data, lines)
         except Exception:  # noqa: BLE001 — надписи необязательны
@@ -241,6 +246,65 @@ def _docx_textboxes(data: bytes, lines: list[dict]) -> tuple[list[dict], int]:
     for i, ln in enumerate(out, 1):
         ln["n"] = i
     return out, added
+
+
+_BOLD_HEAD_MAX_WORDS = 10
+_BODY_P = re.compile(r"^/w:document/w:body/w:p\[(\d+)\]$")
+
+
+def _docx_bold_headings(data: bytes, doc: dict, lines: list[dict]) -> int:
+    """Подзаголовок, оформленный жирным абзацем, а не стилем («Требования к данным» жирным): короткий (до 10 слов),
+    целиком жирный абзац вне таблицы, без точки в конце, за ним — обычный текст. Становится заголовком уровнем ниже
+    последнего настоящего; раздел следующих строк уточняется до следующего заголовка. Возвращает число таких строк."""
+    import io
+    import xml.etree.ElementTree as ET
+    import zipfile
+    blocks = {b.get("id"): b for b in doc.get("blocks") or [] if isinstance(b, dict)}
+    cand: dict[int, int] = {}   # индекс строки view → номер абзаца тела
+    for i, ln in enumerate(lines):
+        if ln.get("kind") != "paragraph" or not ln["text"].strip():
+            continue
+        m = _BODY_P.match(str(((blocks.get(ln.get("block_id")) or {}).get("loc") or {}).get("path") or ""))
+        t = ln["text"].strip()
+        if m and len(t.split()) <= _BOLD_HEAD_MAX_WORDS and len(t) <= 90 and not re.search(r"[.;,!?…]$", t):
+            cand[i] = int(m.group(1))
+    if not cand:
+        return 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        body = ET.fromstring(z.read("word/document.xml")).find(f"{_W}body")
+    paras = [el for el in body if el.tag == f"{_W}p"] if body is not None else []
+
+    def all_bold(p) -> bool:
+        runs = [r for r in p.iter(f"{_W}r") if "".join(t.text or "" for t in r.iter(f"{_W}t")).strip()]
+        if not runs:
+            return False
+        for r in runs:
+            b = r.find(f"{_W}rPr/{_W}b")
+            if b is None or b.get(f"{_W}val") in ("0", "false"):
+                return False
+        return True
+
+    found = 0
+    level = 0
+    for i, ln in enumerate(lines):
+        if ln.get("heading"):
+            level = ln.get("level") or level
+            continue
+        if i not in cand or not (1 <= cand[i] <= len(paras)) or not all_bold(paras[cand[i] - 1]):
+            continue
+        nxt = next((x for x in lines[i + 1:] if x["text"].strip()), None)
+        if nxt is None or nxt.get("heading"):
+            continue
+        parent = ln.get("section", "")
+        title = ln["text"].strip().rstrip(":").strip()
+        sec = f"{parent}{SECTION_SEP}{title}" if parent else title
+        ln.update({"kind": "heading", "heading": True, "level": min(level + 1, 6), "section": sec})
+        for x in lines[i + 1:]:
+            if x.get("heading") or x.get("section", "") != parent:
+                break
+            x["section"] = sec
+        found += 1
+    return found
 
 
 def _norm_key(t: str) -> str:
@@ -1314,6 +1378,24 @@ def _section(b: dict) -> str:
         if head and (not sec or sec[-1] != head):
             sec.append(head)
     return SECTION_SEP.join(sec)
+
+
+_TITLE_STYLES = {"title", "название", "заголовок", "subject", "titre"}
+
+
+def _single_root(lines: list[dict], title: str, doc: dict | None = None) -> bool:
+    """Заголовок-название — единственный на своём уровне (или оформлен стилем Word «Название»). Если первый
+    заголовок верхнего уровня («Часть A…») не единственный (дальше «Часть B…» того же уровня), это раздел, а не
+    название: из путей его не вырезаем, иначе у части A раздел «Функциональные требования», а у части B — «Часть B › …»."""
+    heads = [ln for ln in lines if ln.get("heading") and ln["text"].strip()]
+    root = next((ln for ln in heads if _clean(ln["text"]).strip() == title), None)
+    if root is None:
+        return True
+    blocks = {b.get("id"): b for b in (doc or {}).get("blocks") or [] if isinstance(b, dict)}
+    style = str(((blocks.get(root.get("block_id")) or {}).get("loc") or {}).get("style") or "").strip().lower()
+    if style in _TITLE_STYLES:
+        return True
+    return sum(1 for ln in heads if ln.get("level") == root.get("level")) <= 1
 
 
 def _strip_title_from_sections(lines: list[dict], title: str) -> None:

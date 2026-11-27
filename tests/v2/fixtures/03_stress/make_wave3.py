@@ -10,6 +10,8 @@
 
 * ``cell_paragraphs.docx`` — Word: в ячейке критерия приёмки абзац и маркированный список; строка таблицы должна
   остаться одной строкой («Итог 50 000 ₸; Один push; Счётчик не сбрасывается»).
+* ``ru_styles.docx`` — Word без заголовка-названия: части A и B — стилем «Заголовок 1» (уровень структуры), свой
+  стиль «МойЗаголовок», подзаголовок «Требования к данным» — просто жирным абзацем.
 * ``textbox.docx`` — Word: требование в надписи (текстовом поле, ``w:txbxContent`` с запасной копией VML),
   вложенная таблица, комментарий рецензента, гиперссылка. Читатель v1 надписи не видит — ``docview`` их добавляет.
 
@@ -132,7 +134,35 @@ def make_cell_paragraphs(path: Path) -> None:
     d.save(path)
 
 
+def make_ru_styles(path: Path) -> None:
+    from docx import Document
+    from docx.enum.style import WD_STYLE_TYPE
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+    d = Document()
+
+    def style(name: str, lvl: int):
+        st = d.styles.add_style(name, WD_STYLE_TYPE.PARAGRAPH)
+        st.font.size, st.font.bold = Pt(16 - 2 * lvl), True
+        o = OxmlElement("w:outlineLvl")
+        o.set(qn("w:val"), str(lvl))
+        st.element.get_or_add_pPr().append(o)
+        return st
+    h1, h2, own = style("Заголовок 1", 0), style("Заголовок 2", 1), style("МойЗаголовок", 1)
+    d.add_paragraph("Часть A. Новый функционал", style=h1)
+    d.add_paragraph("Функциональные требования", style=h2)
+    d.add_paragraph("Ф-1. Порог от 1 000 до 1 000 000 ₸.")
+    d.add_paragraph("Часть B. REST API", style=h1)
+    d.add_paragraph("Логика метода", style=own)
+    d.add_paragraph("1. Проверить сессию.")
+    d.add_paragraph("Требования к данным").runs[0].bold = True
+    d.add_paragraph("Хранить идентификатор карты.")
+    d.save(path)
+
+
 def main() -> int:
+    make_ru_styles(HERE / "ru_styles.docx")
     make_textbox_docx(HERE / "textbox.docx")
     make_cell_paragraphs(HERE / "cell_paragraphs.docx")
     md = HERE / "borderless.md"

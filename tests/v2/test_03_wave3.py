@@ -472,3 +472,21 @@ def test_plain_txt_tab_separated_table(tmp_path):
     assert "Т-1. Лимит действует с 00:00 по Астане." in texts  # табуляция в начале строки — не ячейка
     row = next(ln for ln in v["lines"] if ln["text"].startswith("Продукт"))
     assert row["kind"] == "table_row" and row["n"] == 4
+
+
+# --------------------------------------------------------------------------- DOCX: разделы без названия, жирные подзаголовки
+@pytest.mark.skipif(not _has("docx"), reason="нет python-docx")
+def test_docx_parts_and_bold_subheading():
+    """Без заголовка-названия «Часть A» не вырезается из путей (иначе A и B несогласованы); подзаголовок жирным
+    абзацем — заголовок, раздел следующей строки уточнён."""
+    view = dv.load(ROOT / "tests/v2/fixtures/03_stress/ru_styles.docx")
+    by = {ln["text"]: ln for ln in view["lines"]}
+    assert by["Ф-1. Порог от 1 000 до 1 000 000 ₸."]["section"] == \
+        "Часть A. Новый функционал › Функциональные требования"
+    assert by["1. Проверить сессию."]["section"] == "Часть B. REST API › Логика метода"
+    head = by["Требования к данным"]
+    assert head["heading"] and head["kind"] == "heading" and head["level"] == 3
+    assert by["Хранить идентификатор карты."]["section"].endswith("› Требования к данным")
+    # название стилем Word «Название» по-прежнему вырезается из путей
+    tb = dv.load(ROOT / "tests/v2/fixtures/03_stress/textbox.docx")
+    assert next(ln for ln in tb["lines"] if ln["text"].startswith("Ф-1."))["section"] == "1. Часть A. Бизнес-требования"
