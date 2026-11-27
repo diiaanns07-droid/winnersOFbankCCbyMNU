@@ -374,7 +374,7 @@ def _dock_html(job: Job, f: dict) -> str:
                     f'<small>{f["counts"].get(k, "")}</small></button>'
                     for k, lbl in EXTRA_TABS if k != "clarify" or f["has"]["clarify"])
     revised = "rewrites" if f["has"]["rewrites"] else ""
-    return f"""<nav class="jb-dock" id="dock" aria-label="Отчёт">
+    return f"""<nav class="b-dock jb-dock" id="dock" aria-label="Отчёт">
   <a class="jb-d" href="/" title="Положить на стол свой документ">Свой документ</a><span class="jb-sep" aria-hidden="true"></span>
   <button type="button" class="jb-d" data-view="findings" aria-pressed="true">Правка <span class="jb-n">{f["findings"]}</span></button>
   <button type="button" class="jb-d" data-view="questions" aria-pressed="false"{"" if q else " disabled"}>Вопросы владельцу <span class="jb-n">{q}</span></button>

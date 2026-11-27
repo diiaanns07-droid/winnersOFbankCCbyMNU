@@ -107,7 +107,7 @@ def test_job_page_is_the_sheet_with_glass_dock(srv):
     for name in ("report.html", "report.json"):
         assert f'href="/jobs/{jid}/files/{name}" download' in page, name
     assert set(st["files"]) >= {"html", "json"}
-    assert page.count('class="jb-dock"') == 1  # одно стекло
+    assert page.count('class="b-dock jb-dock"') == 1  # одно стекло внизу — .b-dock №39
 
 
 def test_result_fragment_for_live_page(srv):
@@ -128,7 +128,7 @@ def test_progress_is_the_document_sheet_with_scanner(tmp_path):
     assert '<span class="no">3</span><span class="tx">Первая строка требований</span>' in page
     assert '<div data-bcc-agent data-size="96" data-mood="work" id="agent"></div>' in page
     assert 'id="errtext"' in page and "Что сделать" in (ROOT / "src/bcc_review/v2/web/assets/app.js").read_text(encoding="utf-8")
-    assert "/assets/tokens.css" in page and 'class="b-root"' in page
+    assert "/assets/tokens.css" in page and re.search(r'<body class="b-(root|desk)"', page)
 
 
 def test_api_reports_model_calls_from_log(tmp_path):
@@ -175,7 +175,6 @@ def test_marks_on_the_sheet_follow_the_meaning_of_colour():
     job = JOB_CSS.read_text(encoding="utf-8")
     for text, name in ((css, "report.css"), (job, "job.css")):
         assert not any(b.lower() in text.lower() for b in BLUES), name
-    assert "rgba(255, 255, 255, .76)" in job and "blur(24px)" in job  # стекло — по рецепту раздела 2
     js = REPORT_JS.read_text(encoding="utf-8")
     assert "verdict-line" in js and "feTurbulence" not in js  # вердикт — строкой, без печати
 

@@ -69,16 +69,8 @@ body:has(main.jb.done) { overflow: hidden; }
   border: 0; background: transparent; opacity: 0; transition: opacity 360ms var(--ease); }
 .jb-report.ready { opacity: 1; }
 
-/* ── стекло: нижняя плавающая панель действий ── */
-.jb-dock {
-  position: fixed; z-index: 30; left: 50%; bottom: 18px; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 2px; padding: 6px; max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none;
-  border-radius: 999px; background: rgba(255, 255, 255, .92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), 0 0 0 1px rgba(15, 40, 65, .06), 0 2px 6px rgba(15, 40, 65, .05), 0 16px 40px rgba(15, 40, 65, .12);
-}
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .jb-dock { background: linear-gradient(180deg, rgba(255, 255, 255, .76), rgba(255, 255, 255, .56)); -webkit-backdrop-filter: blur(24px) saturate(175%); backdrop-filter: blur(24px) saturate(175%); }
-}
+/* ── стекло: нижняя плавающая панель действий — .b-dock (tokens.css №39); здесь только прокрутка на узком экране ── */
+.jb-dock { max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none; }
 .jb-dock::-webkit-scrollbar { display: none; }
 .jb-d {
   flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px;
