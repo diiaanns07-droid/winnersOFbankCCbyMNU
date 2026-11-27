@@ -397,9 +397,22 @@ def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
     answered = answered or []
     decisions = answers.get("decisions") or []
     rows, by_finding = [], {}
+    # несколько реплик на вопрос — согласованное правило, только если пересмотр снял по ним дефект без конфликта
+    agreed = {c.get("finding_id") for c in answers.get("changes") or []
+              if c.get("status") in ("resolved", "changed") and not c.get("answer_conflict")}
     for a in answered:
-        rows.append(f"{a.get('question_id')} ({a.get('topic', '')}) → {', '.join(a.get('finding_ids', []))}: "
-                    f"{a.get('answer', '')}")
+        fids = a.get("finding_ids", [])
+        replies = a.get("replies") or []
+        head = f"{a.get('question_id')} ({a.get('topic', '')}) → {', '.join(fids)}: "
+        if len(replies) > 1 and not agreed & set(fids):
+            # ответы адресатов расходятся: правило не согласовано, значение не выбирать — маркер <уточнить: …>
+            rows.append(head + "ответы расходятся, владелец не выбрал одно правило — значение не вписывай, "
+                               "поставь маркер <уточнить: …> с обоими вариантами: "
+                        + " / ".join(r.get("text", "") for r in replies))
+        else:
+            rows.append(head + f"{a.get('answer', '')}")
+        for part in a.get("deferred") or []:
+            rows.append(f"  не решено владельцем (не вписывай как правило, поставь маркер <уточнить: …>): {part}")
         for fid in a.get("finding_ids", []):
             by_finding.setdefault(fid, []).append(a.get("question_id"))
     rows += [f"Общее решение владельца: {d}" for d in decisions]

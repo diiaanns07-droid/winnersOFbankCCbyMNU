@@ -91,6 +91,46 @@ _QLINE = re.compile(
 _CHOICE = re.compile(r"^\s*(?:\*\*)?([A-DА-ГABCDС1-4])(?:\*\*)?\s*(?:$|[).,;:—–-]\s*(.*)$|\s+[—–-]\s*(.*)$)", re.I)
 _NO_ANSWER = re.compile(r"^\s*(?:\?+|-+|—|нет ответа|не знаю|tbd|todo|позже|потом|обсудим\b.*)\s*$", re.I)
 _VAGUE = re.compile(r"\b(как обычно|по ситуации|на усмотрение|решим позже|обсудим позже|уточним позже)\b", re.I)
+# мягкий отказ: «не знаю», «решим позже», «примем после встречи», «ещё решаем», «пока открыт» — это не правило
+_DEFER = re.compile(
+    r"(?:\bне\s+знаю\b|\bне\s+(?:решили|решил|решила|решено|определились|согласовали|договорились)\b"
+    r"|\b(?:пока|ещё|еще)\s+(?:не\s+(?:знаю|решили|решил|решила|решено|определились|согласовали|договорились|ясно"
+    r"|понятно)\b|решаем|обсуждаем|думаем|выясняем|согласуем|неясно|непонятно|под\s+вопросом"
+    r"|открыт\w*(?=\s*(?:[.!?;,]|$)))"
+    r"|\b(?:решим|обсудим|уточним|договоримся|согласуем|определимся|вернёмся|вернемся|примем|разберёмся"
+    r"|разберемся|подумаем)\b[^.!?;]*?\b(?:позже|потом|отдельно|после|завтра|следующ\w*)\b"
+    r"|\b(?:позже|потом|отдельно)\s+(?:решим|обсудим|уточним|договоримся|согласуем|определимся|скажем)\b"
+    r"|\bоткрыт\w*\s+вопрос|\bвопрос\s+(?:пока\s+|ещё\s+|еще\s+)?открыт|\bна\s+обсуждении\b|\btbd\b|\btodo\b)",
+    re.I)
+_SENT = re.compile(r"(?<=[.!?;])\s+")
+_BUT = re.compile(r",?\s+(?:но|однако|а)\s+(?=[а-яё])", re.I)
+
+
+def split_deferred(text: str) -> tuple[str, list[str]]:
+    """Ответ → (правило, отложенные части). Предложение с мягким отказом правилом не считается.
+
+    «Не знаю, примем после встречи» → ("", [...]): ответа нет. «410 при истечении срока. Что возвращать на
+    оплаченный код, ещё решаем.» → ("410 при истечении срока.", ["Что возвращать…"]): правило — только первая часть.
+    """
+    rule, deferred = [], []
+    for part in _SENT.split(str(text or "").strip()):
+        part = part.strip()
+        if not part:
+            continue
+        if not _DEFER.search(part):
+            rule.append(part)
+            continue
+        # «Порог 100 ₸, но формат уточним позже»: правило до «но» остаётся, отложенная часть — отдельно
+        for clause in _BUT.split(part):
+            clause = clause.strip(" ,")
+            if clause:
+                (deferred if _DEFER.search(clause) or len(_tokens(clause)) < 3 else rule).append(clause)
+    body = " ".join(rule).strip()
+    if deferred and len(_tokens(body)) < 3:  # «Хороший вопрос. Решим позже.» — правила в остатке нет
+        deferred, body = [*rule, *deferred], ""
+    return body, deferred
+
+
 _DECISION_HEAD = re.compile(r"^\s*#{1,6}\s*(решени|общие решени|дополнительн)", re.I)
 
 
@@ -226,33 +266,53 @@ def _topic_score(hint: str, q: dict) -> float:
 
 
 def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | None = None) -> dict:
-    """Ответы → решения по вопросам этого прогона. Возвращает ``answered``, ``unanswered``, ``decisions``."""
+    """Ответы → решения по вопросам этого прогона. Возвращает ``answered``, ``unanswered``, ``decisions``.
+
+    Несколько реплик на один вопрос (например, два адресата) не склеиваются и не уходят в общие решения:
+    у ответа появляется ``replies`` с метками ``Q-02.1``, ``Q-02.2`` — пересмотр сверяет их между собой.
+    Мягкий отказ («не знаю», «решим позже») ответом не считается; отложенная часть частичного ответа — в ``deferred``.
+    """
     warnings = warnings if warnings is not None else []
     by_id = {q["id"]: q for q in questions}
     answered: dict[str, dict] = {}
-    extra: list[str] = list(parsed.get("decisions") or [])
+    extra: list[str] = []
+    for d in parsed.get("decisions") or []:
+        body, deferred = split_deferred(d)
+        if body:
+            extra.append(d)
+        else:
+            warnings.append(f"recheck: общее решение «{str(d)[:60]}» откладывает решение — не учтено")
     entries = list(parsed.get("answers") or [])
     # номера вопросов от прогона к прогону меняются: ответ с темой в скобках привязывается по теме.
-    # Сопоставление глобальное: сначала самые уверенные пары «ответ — вопрос», каждый вопрос — одному ответу.
-    bound: dict[int, dict | None] = {}
-    pairs = []
+    # Реплики с одним номером и одной темой — это ответы разных адресатов на один вопрос: они привязываются
+    # вместе, как одна единица. Сопоставление глобальное: сначала самые уверенные пары «ответ — вопрос»,
+    # каждый вопрос — одной единице.
+    groups: dict[tuple, list[int]] = {}
     for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
-        if not hint:
-            continue
+        if hint:
+            groups.setdefault((a.get("id"), " ".join(sorted(_tokens(hint)))), []).append(k)
+    bound: dict[int, dict | None] = {}
+    pairs = []
+    for gk, members in groups.items():
+        hint = entries[members[0]].get("topic_hint") or ""
+        text = " ".join(entries[k].get("text") or "" for k in members).strip()
         for x in questions:
             # свой текст ответа — такой же признак, как тема: «возвраты и повторный push» по теме ближе к вопросу
             # о повторном push, а по тексту ответа — к вопросу о возвратах. Ответ буквой — только по теме.
-            if a.get("text"):
-                sc, need = 0.5 * _topic_score(hint, x) + 0.5 * _text_score(a["text"], x), 0.3
+            if text:
+                sc, need = 0.5 * _topic_score(hint, x) + 0.5 * _text_score(text, x), 0.3
             else:
                 sc, need = _topic_score(hint, x), 0.4
-            pairs.append((sc + (0.01 if x["id"] == a["id"] else 0), need, k, x["id"]))
+            pairs.append((sc + (0.01 if x["id"] == gk[0] else 0), need, gk, x["id"]))
     taken: set[str] = set()
-    for sc, need, k, qid in sorted(pairs, key=lambda t: -t[0]):
-        if sc < need or k in bound or qid in taken:
+    done: set[tuple] = set()
+    for sc, need, gk, qid in sorted(pairs, key=lambda t: -t[0]):
+        if sc < need or gk in done or qid in taken:
             continue
-        bound[k] = by_id[qid]
+        for k in groups[gk]:
+            bound[k] = by_id[qid]
+        done.add(gk)
         taken.add(qid)
     for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
@@ -268,12 +328,17 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 q = None
         if q is None:
             if a.get("text"):
+                body, _deferred = split_deferred(a["text"])
+                if not body:
+                    warnings.append(f"recheck: {a['id']}: ответ откладывает решение — не учтён")
+                    continue
                 extra.append(a["text"] + (f" ({hint})" if hint else ""))
                 why = "тема не совпала ни с одним вопросом прогона" if hint else "такого вопроса нет в прогоне"
                 warnings.append(f"recheck: {a['id']}: {why} — ответ учтён как общее решение")
             else:
                 warnings.append(f"recheck: {a['id']} нет среди вопросов прогона — ответ пропущен")
             continue
+        deferred: list[str] = []
         if a.get("choice") is not None:
             opts = q.get("options") or []
             if a["choice"] >= len(opts):
@@ -282,24 +347,33 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             text = opts[a["choice"]]
             label = _cl.option_label(a["choice"])
         else:
-            text, label = a.get("text", ""), ""
+            text, deferred = split_deferred(a.get("text", ""))
+            label = ""
         if not text or _VAGUE.search(text) or len(text) < 3:
-            warnings.append(f"recheck: ответ на {q['id']} не задаёт правила — вопрос остаётся открытым")
+            why = "откладывает решение" if deferred else "не задаёт правила"
+            warnings.append(f"recheck: ответ на {q['id']} {why} — вопрос остаётся открытым")
             continue
         comment = a.get("comment") or ""
-        if q["id"] in answered:  # второй ответ на тот же вопрос дополняет первый
+        full = text + (f" ({comment})" if comment else "")
+        if q["id"] in answered:  # ещё одна реплика на тот же вопрос — отдельно, пересмотр сверяет их
             prev = answered[q["id"]]
-            prev["answer"] = prev["answer"] + "; " + text + (f" ({comment})" if comment else "")
+            if any(r["text"] == full for r in prev["replies"]):
+                continue
+            prev["replies"].append({"label": f"{q['id']}.{len(prev['replies']) + 1}", "choice": label, "text": full,
+                                    "deferred": deferred})
+            prev["answer"] = " / ".join(f"{r['label']}: {r['text']}" for r in prev["replies"])
             prev["choice"] = prev["choice"] if prev["choice"] == label else ""
+            prev["deferred"] = prev["deferred"] + deferred
+            warnings.append(f"recheck: на {q['id']} несколько ответов ({len(prev['replies'])}) — сверяются при пересмотре")
             continue
         answered[q["id"]] = {"question_id": q["id"], "topic": q.get("topic", ""), "question": q.get("question", ""),
-                             "choice": label, "answer": text + (f" ({comment})" if comment else ""),
+                             "choice": label, "answer": full, "deferred": deferred,
+                             "replies": [{"label": f"{q['id']}.1", "choice": label, "text": full, "deferred": deferred}],
                              "finding_ids": list(q.get("finding_ids") or [])}
     unanswered = [q["id"] for q in questions if q["id"] not in answered]
     return {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra}
 
 
-# --------------------------------------------------------------------------- вердикт
 def severity_counts(findings: Iterable[dict]) -> dict:
     out = {"critical": 0, "major": 0, "minor": 0}
     for f in findings:
@@ -349,9 +423,19 @@ def shared_verdict(findings: list[dict], run_status: str = "complete") -> dict:
 def _format_answers(resolved: dict) -> str:
     rows = []
     for a in resolved["answered"]:
-        label = f"вариант {a['choice']}: " if a["choice"] else "свой ответ: "
-        rows.append(f"{a['question_id']} ({a['topic']}) → дефекты {', '.join(a['finding_ids'])}\n"
-                    f"  вопрос: {a['question']}\n  ответ, {label}{a['answer']}")
+        head = f"{a['question_id']} ({a['topic']}) → дефекты {', '.join(a['finding_ids'])}\n  вопрос: {a['question']}"
+        replies = a.get("replies") or []
+        if len(replies) > 1:
+            rows.append(head + f"\n  ответов несколько ({len(replies)}, разные адресаты) — сверь их между собой; "
+                               f"если на одном входе исходы разные, перечисли их ID в conflicting_answers:")
+            for r in replies:
+                label = f"вариант {r['choice']}: " if r["choice"] else "свой ответ: "
+                rows.append(f"  {r['label']}, {label}{r['text']}")
+        else:
+            label = f"вариант {a['choice']}: " if a["choice"] else "свой ответ: "
+            rows.append(head + f"\n  ответ, {label}{a['answer']}")
+        for part in a.get("deferred") or []:
+            rows.append(f"  владелец не решил (это не правило, дефект по этой части не снимает): {part}")
     for i, d in enumerate(resolved["decisions"], 1):
         rows.append(f"Решение-{i} (общее решение владельца, без номера вопроса): {d}")
     return "\n".join(rows) or "—"
@@ -360,11 +444,24 @@ def _format_answers(resolved: dict) -> str:
 def answer_labels(resolved: dict) -> set[str]:
     """ID ответов, на которые модель может сослаться в ``by``: Q-… с ответом и Решение-1…N."""
     return {a["question_id"] for a in resolved["answered"]} | \
+        {r["label"] for a in resolved["answered"] if len(a.get("replies") or []) > 1 for r in a["replies"]} | \
         {f"Решение-{i}" for i in range(1, len(resolved["decisions"]) + 1)}
 
 
+def _expand(labels: list[str], resolved: dict) -> list[str]:
+    """«Q-02» с несколькими репликами → «Q-02.1», «Q-02.2»: каждая реплика — отдельный ответ."""
+    multi = {a["question_id"]: [r["label"] for r in a["replies"]]
+             for a in resolved["answered"] if len(a.get("replies") or []) > 1}
+    out: list[str] = []
+    for lab in labels:
+        for x in multi.get(lab, [lab]):
+            if x not in out:
+                out.append(x)
+    return out
+
+
 _CLASH = re.compile(r"противореч|расходятся|несовместим|взаимоисключ|разн\w* исход", re.I)
-_LABEL = re.compile(r"(Q\s*-?\s*\d{1,3})|(Решени\w*\s*-?\s*\d{1,3})", re.I)
+_LABEL = re.compile(r"(Q\s*-?\s*\d{1,3}(?:\.\d{1,2})?)|(Решени\w*\s*-?\s*\d{1,3})", re.I)
 
 
 def norm_labels(items: Iterable[str], valid: set[str]) -> list[str]:
@@ -373,7 +470,13 @@ def norm_labels(items: Iterable[str], valid: set[str]) -> list[str]:
     for raw in items or []:
         for m in _LABEL.finditer(str(raw)):
             num = re.sub(r"\D", "", m.group(2) or "")
-            lab = _qid(m.group(1)) if m.group(1) else ("Решение-" + str(int(num)) if num else "")
+            if m.group(1):
+                base, _, sub = m.group(1).partition(".")
+                lab = _qid(base) + (f".{int(sub)}" if sub else "")
+                if lab not in valid and sub:
+                    lab = _qid(base)
+            else:
+                lab = "Решение-" + str(int(num)) if num else ""
             if lab in valid and lab not in out:
                 out.append(lab)
     return out
@@ -468,9 +571,9 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         # причина — для владельца: без номеров строк L… и ID требований (ID дефектов и ответов остаются ссылками)
         rc["status"], rc["reason"] = status, _plain_reason(str(d.get("reason", "")).strip(), keep)
         # два ответа противоречат друг другу — дефект остаётся открытым, владелец выбирает один ответ
-        clash = norm_labels(list(d.get("conflicting_answers") or []), valid)
+        clash = _expand(norm_labels(list(d.get("conflicting_answers") or []), valid), resolved)
         if len(clash) < 2 and _CLASH.search(rc["reason"]):  # модель описала противоречие ответов только в причине
-            clash = norm_labels([rc["reason"]], valid)
+            clash = _expand(norm_labels([rc["reason"]], valid), resolved)
         if len(clash) >= 2:
             rc["answer_conflict"] = clash
             if status != "open":
@@ -483,9 +586,17 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         if status != "open" and not by:
             rc["status"], status = "open", "open"
             rc["reason"] = ("не назван ответ, который снимает дефект: " + rc["reason"]).strip(": ")
+        by = _expand(by, resolved)
+        # дефект снимает одна реплика, а другая реплика на тот же вопрос не учтена — исход не согласован
+        skipped = [r["label"] for a in resolved["answered"] if len(a.get("replies") or []) > 1
+                   and any(r["label"] in by for r in a["replies"]) for r in a["replies"] if r["label"] not in by]
+        if status != "open" and skipped:
+            rc["status"], status = "open", "open"
+            rc["reason"] = (f"не учтён другой ответ на тот же вопрос ({', '.join(skipped)}): " + rc["reason"]).strip(": ")
+            by = []
         if by:
             rc["answer_ids"] = by
-            closing = [x for x in by if x.startswith("Q-")]
+            closing = list(dict.fromkeys(x.split(".")[0] for x in by if x.startswith("Q-")))
             rc["linked_question_ids"] = list(rc["question_ids"])
             rc["question_ids"] = closing
         if status == "changed":
