@@ -54,6 +54,8 @@ REASON_PHRASES = [
 
 CODE = r"[1-5]\d\d"
 UNIT_AFTER = re.compile(
+    # «возврат 250,00 ₸», «120 300 ₸» — число с дробной частью или разрядами, а не код ответа
+    r"^(?:[,.]\d|\s\d{3}\b)|"
     r"^\s*(?:мс|ms|сек\w*|мин\w*|час\w*|₸|тенге|тиын\w*|руб\w*|коп\w*|%|запрос\w*|шт|раз\b|"
     r"символ\w*|знак\w*|бит|bit|байт|kb|кб|мб|mb|гб|gb|rps|tps|дн\w*|сут\w*|₽|\$|usd|eur|kzt)", re.I)
 MENTION = re.compile(
@@ -127,6 +129,7 @@ class Method:
     desc_line: Line | None = None
     curl_line: Line | None = None
     lines: list[Line] = field(default_factory=list)
+    col: int = 1  # столбец таблицы общих параметров: «Поле | Метод 1 | Метод 2» — у каждого метода свой
 
     @property
     def label(self) -> str:
@@ -154,9 +157,9 @@ class Method:
         return bool(toks and toks[0] in READ_TOKENS)
 
 
-def _kv(line: Line) -> tuple[str, str] | None:
+def _kv(line: Line, col: int = 1) -> tuple[str, str] | None:
     if line.cells and len(line.cells) >= 2:
-        return norm(line.cells[0]).rstrip(":"), line.cells[1]
+        return norm(line.cells[0]).rstrip(":"), line.cells[col if len(line.cells) > col else 1]
     m = re.match(r"^([A-Za-zА-Яа-яЁё \-]{2,30}):\s*(.+)$", line.text)
     if m:
         return norm(m.group(1)), m.group(2)
@@ -168,6 +171,9 @@ VERB_PATH = re.compile(r"^(GET|HEAD|POST|PUT|PATCH|DELETE)\s+(/\S*)")
 # метод в строке текста: «Эндпоинт сохранения: PUT /cards/{id}/limit», «Метод: GET /x — …»
 INLINE_METHOD = re.compile(r"^(?P<lead>[^:|]{0,60}?(?:эндпоинт|endpoint|метод|операци\w*|адрес|запрос)\w*[^:|]{0,40}):\s*"
                            r"(?P<verb>GET|HEAD|POST|PUT|PATCH|DELETE)\s+(?P<url>/[\w\-{}/.]*[\w}])", re.I)
+# «Метод 2. GET /path (…)», «Метод 2 — GET /path»: номер метода, затем тип запроса и путь
+NUMBERED_METHOD = re.compile(r"^(?P<lead>(?:метод|method|операция|эндпоинт|endpoint)\s*№?\s*\d+)\s*[.:)—–-]\s*"
+                             r"(?P<verb>GET|HEAD|POST|PUT|PATCH|DELETE)\s+(?P<url>/[\w\-{}/.]*[\w}])", re.I)
 
 
 def find_methods(doc: Doc) -> list[Method]:
@@ -189,7 +195,7 @@ def find_methods(doc: Doc) -> list[Method]:
             if m and x.cells is None and not x.is_code:
                 verb = m.group(1).upper()
         if verb is None and x.cells is None:
-            im = INLINE_METHOD.match(x.text)
+            im = INLINE_METHOD.match(x.text) or NUMBERED_METHOD.match(x.text)
             if im and not any(mm.verb == im.group("verb").upper() and mm.url == im.group("url") for mm in methods):
                 rest = x.text[im.end():].strip(" .—–-")
                 meth = Method(verb=im.group("verb").upper(), verb_line=x, start=x.n, url=im.group("url"), url_line=x,
@@ -221,6 +227,14 @@ def find_methods(doc: Doc) -> list[Method]:
                 elif not (L[j].is_sep or (not L[j].text and j > 0 and L[j - 1].cells is not None)):
                     break
                 j -= 1
+        # «REST type | POST | POST» под заголовком «Поле | Метод 1 | Метод 2»: по методу на столбец
+        cols = [ci for ci, c in enumerate(x.cells or [])
+                if ci > 0 and re.match(r"^\s*(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)\b", c.strip(), re.I)]
+        if len(cols) >= 2 and kv is not None:
+            for ci in cols:
+                cv = re.match(r"^\s*(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)\b", x.cells[ci].strip(), re.I)
+                methods.append(Method(verb=cv.group(1).upper(), verb_line=x, start=start, col=ci))
+            continue
         meth = Method(verb=verb, verb_line=x, start=start)
         if x.cells is None:
             vm = VERB_PATH.match(x.text)
@@ -244,9 +258,11 @@ def find_methods(doc: Doc) -> list[Method]:
                 if not METHOD_HEADING.match(L[k].text):
                     pass
         methods.append(meth)
-    methods.sort(key=lambda m: m.start)
-    for a, b in zip(methods, methods[1:]):
-        a.end = b.start - 1
+    methods.sort(key=lambda m: (m.start, m.col))
+    for i, a in enumerate(methods):  # методы одной таблицы (по столбцам) делят блок до следующего метода
+        nxt = next((b.start for b in methods[i + 1:] if b.start > a.start), None)
+        if nxt is not None:
+            a.end = nxt - 1
     if row_methods:  # блок метода из текста заканчивается перед сводной таблицей методов
         first_row = min(r.start for r in row_methods)
         for m in methods:
@@ -258,7 +274,7 @@ def find_methods(doc: Doc) -> list[Method]:
         m.lines = [y for y in L if m.start <= y.n <= m.end]
         # общие параметры метода — строки «ключ | значение» в таблице с типом запроса
         for y in m.lines:
-            kv = _kv(y)
+            kv = _kv(y, m.col)
             if not kv:
                 if "curl" in y.text.lower() and m.curl_line is None:
                     m.curl_line = y
@@ -419,6 +435,23 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
         for r in t.rows:
             if r.cells and re.fullmatch(CODE, r.cells[0].strip()):
                 decls.append(Status(int(r.cells[0]), r, "table"))
+    # сводная таблица методов («Метод | REST type и URL | … | Ответ 200 | Ошибки»): коды в заголовке «Ответ NNN» и в
+    # столбце ошибок — объявления статусов этих методов
+    for t in tables(doc):
+        if not any(r.cells and any(ci > 0 and VERB_PATH.match(c.strip()) for ci, c in enumerate(r.cells))
+                   for r in t.rows):
+            continue
+        for c in t.header.cells or []:
+            hm = re.match(rf"^\s*(?:ответ|response|код\s+ответа)\s+({CODE})\b", c, re.I)
+            if hm:
+                decls.append(Status(int(hm.group(1)), t.header, "table", c.strip()))
+        ecols = [i for i, c in enumerate(t.cols) if re.match(r"(?:ошибк|errors?|коды|статус|отказ)", c)]
+        for r in t.rows:
+            for i in ecols:
+                cell = (r.cells or [])[i] if r.cells and len(r.cells) > i else ""
+                for part in re.split(r";\s*", cell):
+                    for cm in re.finditer(rf"\b({CODE})\b", part):
+                        decls.append(Status(int(cm.group(1)), r, "table", part.strip()))
     for x in doc.lines:
         if not x.text or x.is_code or x.cells is not None:
             continue
@@ -489,6 +522,9 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
     return decls, mentions
 
 
+# коды шлюза и недоступности: обычно их отдаёт смежная система или шлюз; код этого API — только если сказано, что
+# метод его возвращает
+UPSTREAM_CODES = {502, 503, 504}
 NOT_USED = re.compile(r"^[\s,—–-]*(?:метод\w*\s+)?(?:не\s+(?:использу|применя|возвраща|предусмотрен|поддержива)\w*|"
                       r"не\s+бывает|исключен\w*)", re.I)
 
@@ -531,6 +567,9 @@ def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method |
         named = {w.lower() for w in re.findall(r"\b[a-z]+[A-Z]\w*\b", d.line.joined)} & names
         if named and (method is None or (method.name or "").lower() not in named):
             continue
+        owner = next((m for m in methods or [] if m.verb_line is d.line and m.end == m.start), None)
+        if owner is not None and owner is not method:
+            continue  # строка сводной таблицы другого метода — его случай, а не этого
         k = len(st & _stems(re.sub(CODE, " ", d.text)))
         if k > score:
             best, score = d, k
@@ -542,6 +581,7 @@ def _short(text: str, limit: int = 110) -> str:
     return t if len(t) <= limit else t[:limit].rsplit(" ", 1)[0] + "…"
 
 
+ERR_NAME = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")  # имя кода ошибки: «ORDER_NOT_FOUND»
 COND_MARK = re.compile(r"\b(?:если|при|в\s+случае|иначе|когда)\b", re.I)
 
 
@@ -578,6 +618,9 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
             continue
         if re.search(rf"\b{other.code}\b", frag):
             continue  # тот же шаг сам разводит случаи по кодам {code} и {other.code} — расхождения нет
+        e1, e2 = set(ERR_NAME.findall(frag)), set(ERR_NAME.findall(other.text))
+        if e1 and e2 and not e1 & e2:
+            continue  # у случаев разные коды ошибки («DAILY_LIMIT_EXCEEDED» ≠ «IDEMPOTENCY_KEY_CONFLICT») — это разные случаи
         own = [d for d in decls if d.code == code and d.kind in ("table", "list")]
         cst = _stems(re.sub(CODE, " ", context))
         if any(len(cst & _stems(re.sub(CODE, " ", d.text))) >= len(cst & _stems(re.sub(CODE, " ", other.text)))
@@ -612,6 +655,8 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
         return problems.setdefault(code, {"mentions": [], "foreign": [], "reason": []})
 
     for code, line, frag in mentions:
+        if code in UPSTREAM_CODES and not re.search(r"возвра|верн", frag, re.I):
+            continue  # «попытка перевода завершилась ответом 503» — ответ смежной системы, а не этого API
         if code not in declared:
             slot(code)["mentions"].append((line, frag))
     # код в разделе другого кода
@@ -623,8 +668,10 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
     for d in decls:
         if d.kind not in ("list", "otvet"):
             continue
+        # подпись ответа — начало его объявления, без примеров тела и имён кодов ошибки («UNAUTHORIZED» в JSON)
+        head = re.sub(r"`[^`]*`|\{[^}]*\}|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b", " ", d.text)[:80]
         for rx, rcode in REASON_PHRASES:
-            mm = rx.search(d.line.text)
+            mm = rx.search(head)
             if mm and rcode != d.code:
                 slot(rcode)["reason"].append((d, mm.group(0)))
     decl_list = fmt_list([str(c) for c in declared])
