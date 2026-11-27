@@ -955,8 +955,38 @@ def rule_inventory(doc: Doc, methods: list[Method], out: dict) -> None:
                                  "Описанные методы API: " + "; ".join(parts) + ".", ("architect",), "inventory"))
 
 
+# --- идемпотентный повтор: «повторный запрос с тем же requestId возвращает результат первого» ---------------
+# Справка для линз, а не дефект: повтор с тем же ключом — не новый запрос, шаги проверки логики (вернуть 410, 409,
+# 422) к нему не применяются. Без справки модели раз за разом пишут critical «повтор: результат первого или ошибка
+# шага N» — на исправленных ТЗ это ложная тревога (вопрос, где в шагах стоит проверка ключа, — minor).
+IDEM_REPLAY = re.compile(
+    r"\bповторн\w*\s+(?:запрос|вызов|обращени)\w*\s+с\s+(?:тем\s+же|таким\s+же|тем\s+же\s+самым)\s+"
+    r"(?:ключ\w*\s+(?:идемпотентност\w*|запроса)\s*)?[`\"«]?([A-Za-z][\w-]*(?:[Ii]d|ID|[Kk]ey))[`\"»]?"
+    r".{0,60}?\b(?:возвращает|возвращается|отдаёт|отдает|даёт|дает|получает)\s+(?:тот\s+же\s+(?:самый\s+)?"
+    r"(?:результат|ответ)|(?:сохранённ\w+\s+|сохраненн\w+\s+)?(?:результат|ответ)\w*\s+(?:первого|исходного|"
+    r"первоначального|предыдущего))", re.I)
+
+
+def rule_idempotent_replay(doc: Doc, out: dict) -> None:
+    for x in doc.lines:
+        if not x.text or x.is_code:
+            continue
+        m = IDEM_REPLAY.search(x.joined)
+        if not m:
+            continue
+        frag = x.joined[m.start():].split(".")[0].strip()
+        out["signals"].append(signal(
+            "api.idempotent_replay", x, frag,
+            f"Справка, не дефект: повтор с тем же {m.group(1)} — идемпотентный повтор, а не новый запрос; документ "
+            "задаёт исход — результат первого запроса. Шаги проверки логики относятся к новому запросу, поэтому "
+            "«результат первого или ошибка шага» — не противоречие и не critical; уточнить можно только, где в шагах "
+            "стоит проверка ключа (minor).", ("consistency", "qa", "architect", "risk", "analyst"), "inventory"))
+        return
+
+
 def run(doc: Doc, out: dict) -> None:
     methods = find_methods(doc)
+    rule_idempotent_replay(doc, out)
     out.setdefault("_methods", methods)
     rule_get_mutation(doc, methods, out)
     rule_content_type_without_body(doc, methods, out)

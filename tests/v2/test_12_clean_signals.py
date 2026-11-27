@@ -24,7 +24,7 @@ OFFICIAL = ROOT / "release" / "input" / "requirements.md"
 CORPUS = ROOT / "evaluation" / "dev" / "corpus" / "cases"
 STYLES = ROOT / "tests" / "v2" / "fixtures" / "12_styles"
 # справка для описи (не подсказка о дефекте) — допустима на любом документе
-INFO = {"api.methods", "api.status_inventory", "promises.read"}
+INFO = {"api.methods", "api.status_inventory", "promises.read", "api.idempotent_replay"}
 CLEAN_OPEN2 = ["grace_clean", "qr_clean", "capital_clean", "insurance_clean"]
 
 
@@ -202,3 +202,29 @@ def test_named_method_still_found() -> None:
         (sec, "Карточка открывается вызовом getCardById."),
     ])
     assert got == {"getTransferLimit", "setTransferLimit", "cancelQr", "refundQr", "getCardById"}, got
+
+
+# --- идемпотентный повтор: справка линзам, чтобы «результат первого или ошибка шага» не стал critical ---
+@pytest.mark.parametrize("text", [
+    "2. Повторный запрос с тем же `requestId` возвращает результат первого запроса.",
+    "Повторный вызов с тем же Idempotency-Key возвращает сохранённый ответ первого вызова.",
+    "Повторный запрос с тем же ключом идемпотентности operationId возвращает тот же результат.",
+    "Повторное обращение с тем же X-Request-ID получает ответ исходного запроса без повторного списания.",
+])
+def test_idempotent_replay_hint(text: str) -> None:
+    out = rules.run(_view([("Часть B › Особые правила", text)]))
+    got = _sig(out, "api.idempotent_replay")
+    assert len(got) == 1 and "не дефект" in got[0]["message"] and "consistency" in got[0]["audience"], text
+    assert not [c for c in out["candidates"] if "idempotent" in c["source"]]  # справка, не кандидат судье
+
+
+@pytest.mark.parametrize("text", [
+    "Повторный запрос с тем же requestId возвращает 409.",
+    "Повторный вызов с теми же суммой и сроком возвращает действующие условия страхования.",
+    "Повторный запрос перевода с тем же requestId не создаёт второй перевод.",
+    "Повторная доставка одного события процессинга сохраняет исходный итог.",
+    "Повторный вызов с тем же cardId создаёт новую блокировку.",
+])
+def test_idempotent_replay_lookalikes(text: str) -> None:
+    out = rules.run(_view([("Часть B › Особые правила", text)]))
+    assert not _sig(out, "api.idempotent_replay"), text
