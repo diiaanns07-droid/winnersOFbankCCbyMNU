@@ -381,6 +381,9 @@ def test_line_refs_from_model_text_become_russian():
     assert markdown.prose("по L151 и в L38-L40, из L7–L9; Сервер по L121") == \
         "по строке 151 и в строках 38–40, из строк 7–9; Сервер по строке 121"
     assert markdown.cell("a | L7") == "a \\| строка 7"
+    assert markdown.prose("Привести L045 к маршруту L136") == "Привести строки 45 к маршруту строки 136"
+    assert markdown.prose("L038 и L064 расходятся") == "строка 38 и строка 64 расходятся"
+    assert markdown.prose("Строки L10-L12 описывают") == "Строки 10–12 описывают"
     assert markdown.source_name("lens:что-то") == "проверка ролью"
     assert markdown.source_name("rules:units.time_mix.ttl") == "правило «единицы измерения»"
     assert markdown.source_name("rules:new_family.x") == "правило без модели"
