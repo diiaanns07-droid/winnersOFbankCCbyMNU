@@ -150,6 +150,9 @@ def rule_verdict(report: dict) -> dict:
             value = "yes"
         if status == "partial" and value == "yes":
             value = "conditional"
+        if run.get("incomplete_stages") and value != "no":
+            # упали линза, набор целиком или судья (№22): «можно» / «с условиями» был бы ложным вердиктом
+            value = "undetermined"
         out[target] = value
     return out
 
