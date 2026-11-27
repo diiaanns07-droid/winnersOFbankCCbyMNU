@@ -1013,6 +1013,32 @@ def test_final_set_key_tells_release_code_sets_apart():
     assert final._set_key({"rows": [{"doc": "evaluation/v2/open2/qr_clean/source.md"}]}) == ("newtz", "open2")
 
 
+def test_gate_stability_keeps_full_sample_and_flags_misses_in_newer_partial(tmp_path, monkeypatch):
+    """Стабильность: новая неполная сводка (×2 на новой голове) не заменяет полную ×3, но идёт строкой; пропуск К в
+    ней — красное сразу."""
+    import json as _json
+
+    def put(name, at, n, k4):
+        items = {f"К{i}": {"found": n, "owners": ["lens_qa"]} for i in range(1, 6)}
+        items["К4"]["found"] = k4
+        d = {"at": at, "n": n, "models": ["sonnet"], "label": name, "per_item": items,
+             "K_all_runs": [k for k, v in items.items() if v["found"] == n], "findings": {}}
+        (tmp_path / "stability" / f"{name}.json").write_text(_json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+    (tmp_path / "stability").mkdir()
+    put("кандидат ×3", "2026-11-27 18:00", 3, 3)
+    put("стабильность ×2", "2026-11-27 19:50", 2, 2)
+    monkeypatch.setattr(gate, "V2", tmp_path)
+    monkeypatch.setattr(gate, "STABILITY_MODELS", ("sonnet",))
+    row = gate.stability_gates({})[0]
+    assert (row["ok"], row["source"]) == (True, "кандидат ×3")
+    assert row["fact"] == "5 пунктов (n = 3); новее — стабильность ×2: К1–К5 во всех 2"
+    put("стабильность ×2", "2026-11-27 19:50", 2, 1)
+    row = gate.stability_gates({})[0]
+    assert row["ok"] is False and row["fact"].endswith("новее — стабильность ×2: К4 1/2")
+    assert row["owners"] == "на новом коде: К4 1/2 (lens_qa)"
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final

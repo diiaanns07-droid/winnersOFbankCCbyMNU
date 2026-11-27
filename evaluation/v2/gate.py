@@ -428,29 +428,52 @@ def _background_note(d: dict) -> str:
             "семейства (убрать на чистых — уйдут и там)")
 
 
+def _weak_k(d: dict) -> list[str]:
+    """Пункты К, найденные не во всех прогонах сводки стабильности."""
+    n = d.get("n") or 0
+    return [i for i, v in (d.get("per_item") or {}).items() if i.startswith("К") and v["found"] < n]
+
+
 def stability_gates(gold: dict) -> list[dict]:
+    """Стабильность — по последней полной сводке (n ≥ 3). Более новая неполная (n < 3, например второй прогон на
+    новой голове) её не заменяет, но идёт строкой в «Кому», а пропуск К в ней — красное: нестабильность на новом коде
+    видна сразу, а не после третьего прогона. Полной нет — последняя (красное «мало прогонов»)."""
     out = []
     files = list((V2 / "stability").glob("*.json"))
     for kind in STABILITY_MODELS:
-        best = None
+        mine = []
         for p in files:
             d = json.loads(p.read_text(encoding="utf-8"))
-            # последняя сводка; в одну минуту — с большим числом прогонов (×3 по двум раундам после ×2 раунда)
-            if model_kind(None, " ".join(d.get("models") or [])) == kind and (
-                    not best or (d["at"], d.get("n") or 0) > (best["at"], best.get("n") or 0)):
-                best = d
+            if model_kind(None, " ".join(d.get("models") or [])) == kind:
+                mine.append(d)
+        # по времени; в одну минуту — с большим числом прогонов (×3 по двум раундам после ×2 раунда)
+        mine.sort(key=lambda d: (d["at"], d.get("n") or 0))
         title = f"Стабильность, {'Opus' if kind == 'opus' else kind}"
-        if not best:
+        if not mine:
             if kind != "gemini":  # Gemini — по возможности (ключа в облаке нет); haiku его заменяет
                 out.append(_check(f"{title}: К1–К5 в 3 из 3", "3 прогона", "нет замера", None, "№15"))
             continue
+        full = [d for d in mine if (d.get("n") or 0) >= 3]
+        best = full[-1] if full else mine[-1]
+        newer = mine[-1] if mine[-1] is not best else None
         n = best["n"]
-        weak = [i for i, v in best["per_item"].items() if i.startswith("К") and v["found"] < n]
+        weak = _weak_k(best)
         own = "; ".join(f"{i} {best['per_item'][i]['found']}/{n} ("
                         f"{', '.join(sc.OWNER_NO.get(o, o) for o in best['per_item'][i]['owners'])})" for i in weak)
-        out.append({**_check(f"{title}: К1–К5 в {n} из {n}", "5 пунктов, n ≥ 3",
-                             f"{len(best['K_all_runs'])} пунктов (n = {n})", n >= 3 and not weak, own or "№15: мало прогонов"),
-                    "source": best["label"]})
+        ok = n >= 3 and not weak
+        fact = f"{len(best['K_all_runs'])} пунктов (n = {n})"
+        if newer:
+            nw = _weak_k(newer)
+            nn = newer.get("n") or 0
+            fact += f"; новее — {newer['label']}: " + (", ".join(f"{i} {newer['per_item'][i]['found']}/{nn}" for i in nw)
+                                                       if nw else f"К1–К5 во всех {nn}")
+            if nw:
+                ok = False
+                own = "; ".join(x for x in (own, "на новом коде: " + "; ".join(
+                    f"{i} {newer['per_item'][i]['found']}/{nn} ("
+                    f"{', '.join(sc.OWNER_NO.get(o, o) for o in newer['per_item'][i]['owners'])})" for i in nw)) if x)
+        out.append({**_check(f"{title}: К1–К5 в {n} из {n}", "5 пунктов, n ≥ 3", fact, ok,
+                             own or "№15: мало прогонов"), "source": best["label"]})
         f = best.get("findings") or {}
         if f.get("mean"):
             spread = (f["max"] - f["min"]) / f["mean"]
