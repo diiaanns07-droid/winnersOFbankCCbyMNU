@@ -125,8 +125,13 @@ def _nfr_share(doc: Doc, out: dict) -> None:
     """НФТ со сроком, а доли операций нет ни в одном НФТ документа: «в течение минуты после получения события» — для
     каждой операции, в среднем или для 99 %? Если доля где-то задана, отдельные сроки (тайм-ауты) не трогаем."""
     hits = []
-    nfr = [x for x in doc.lines if x.text and not x.is_code and not x.is_heading
-           and (NFR_SECTION.search(x.section or "") or NFR_ID.match(x.text))]
+    nfr, in_nfr = [], False
+    for x in doc.lines:  # раздел НФТ — по полю section или по заголовку (у «сырого» вида документа section пуст)
+        if x.is_heading:
+            in_nfr = bool(NFR_SECTION.search(x.text))
+            continue
+        if x.text and not x.is_code and (in_nfr or NFR_SECTION.search(x.section or "") or NFR_ID.match(x.text)):
+            nfr.append(x)
     if any(NFR_SHARE.search(x.joined) for x in nfr):
         return  # доля операций где-то задана — отдельные сроки (тайм-ауты, свежесть данных) судим не по этому правилу
     for x in nfr:

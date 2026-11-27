@@ -288,15 +288,25 @@ def render_brief(report: dict) -> str:
     out += [f"{i}. {step}" for i, step in enumerate(off.get("how_to_full") or HOW_TO_FULL, 1)]
     out += ["", "Полная проверка добавляет: смысловые противоречия требований и критериев приёмки, неполноту правил "
             "основной функции, вопросы владельцу с вариантами ответа, черновик тест-кейсов и заполненный чек-лист.", ""]
-    if f:
+    major = [x for x in f if x.get("severity") != "minor"]
+    minor = [x for x in f if x.get("severity") == "minor"]
+    if major:
         out += ["## Замечания без модели", ""]
-        for x in f:
+        for x in major:
             ev0 = x.get("evidence") or []
             out += [f"### {SEV_ICON.get(x.get('severity'), '')} {x['id']}. {x['title']}", ""]
             for e in ev0[:3]:
                 out.append(f"* {_place(e)}: «{e.get('quote', '')}»")
             out += ["", f"**Почему это проблема.** {_md(_first_sentence(x.get('problem', ''), 480))}", "",
                     f"**Что сделать.** {_md(_first_sentence(x.get('recommendation', ''), 320))}", ""]
+    if minor:  # незначительные — строкой: место и что сделать
+        out += ["## Незначительные замечания", ""]
+        for x in minor:
+            e = (x.get("evidence") or [{}])[0]
+            place = f" ({_place(e)})" if e else ""
+            out.append(f"* {SEV_ICON.get('minor', '')} {x['id']}. {x['title']}{place}. "
+                       f"{_md(_first_sentence(x.get('recommendation', ''), 200))}")
+        out.append("")
     # подсказки для человека: без сводок, без служебных указаний модели и без дублей замечаний
     noted = {str(x.get("sources", [""])[0]).split(":", 1)[-1] for x in f}
     sig = [g for g in report.get("signals") or [] if g.get("kind") not in ("inventory", "security")
