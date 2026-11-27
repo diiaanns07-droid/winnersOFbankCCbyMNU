@@ -1,0 +1,117 @@
+{
+  "stage": "rules",
+  "status": "ok",
+  "seconds": 0.1,
+  "calls": 0,
+  "error": "",
+  "input": {},
+  "output": {
+    "signals": [
+      {
+        "rule": "terms.component_names",
+        "kind": "terminology",
+        "line": 20,
+        "quote": "Мобильное приложение",
+        "message": "Похоже, один компонент назван по-разному: «Мобильное приложение», «Приложение» и «сервиса приложением» (строки 20, 42, 44). Проверьте, один ли это компонент.",
+        "audience": [
+          "consistency",
+          "architect"
+        ],
+        "id": "S-01",
+        "covered": false,
+        "lines": [
+          20
+        ],
+        "note": "Похоже, один компонент назван по-разному: «Мобильное приложение», «Приложение» и «сервиса приложением» (строки 20, 42, 44). Проверьте, один ли это компонент."
+      },
+      {
+        "rule": "promises.read",
+        "kind": "inventory",
+        "line": 26,
+        "quote": "При ответе 500 или отсутствии ответа за 30 с показывается «Не удалось получить результат» и кнопка «Повторить», которая отправляет тот же запрос с тем же ключом идемпотентности.",
+        "message": "Справка для описи, не дефект: обещанный показ данных читают операции /loans/{loanId}/early-repayments/terms.",
+        "audience": [
+          "architect"
+        ],
+        "id": "S-02",
+        "covered": false,
+        "lines": [
+          26
+        ],
+        "note": "Справка для описи, не дефект: обещанный показ данных читают операции /loans/{loanId}/early-repayments/terms."
+      },
+      {
+        "rule": "api.idempotent_replay",
+        "kind": "inventory",
+        "line": 50,
+        "quote": "повторный вызов с тем же operationId возвращает результат первого); GET /abs/prepayments/{operationId} — статус операции: проведена (с результатом проведения), в обработке, не найдена",
+        "message": "Справка, не дефект: повтор с тем же operationId — идемпотентный повтор, а не новый запрос; документ задаёт исход — результат первого запроса. Шаги проверки логики относятся к новому запросу, поэтому «результат первого или ошибка шага» — не противоречие и не critical; уточнить можно только, где в шагах стоит проверка ключа (minor).",
+        "audience": [
+          "consistency",
+          "qa",
+          "architect",
+          "risk",
+          "analyst"
+        ],
+        "id": "S-03",
+        "covered": false,
+        "lines": [
+          50
+        ],
+        "note": "Справка, не дефект: повтор с тем же operationId — идемпотентный повтор, а не новый запрос; документ задаёт исход — результат первого запроса. Шаги проверки логики относятся к новому запросу, поэтому «результат первого или ошибка шага» — не противоречие и не critical; уточнить можно только, где в шагах стоит проверка ключа (minor)."
+      },
+      {
+        "rule": "language.vague_quality",
+        "kind": "ambiguity",
+        "line": 56,
+        "quote": "2027 по Астане, на источнике списания достаточно средств.",
+        "message": "Субъективная оценка: «достаточно» — оценочное слово: не сказано, что именно считать выполнением.",
+        "audience": [
+          "analyst",
+          "qa"
+        ],
+        "id": "S-04",
+        "covered": false,
+        "lines": [
+          56
+        ],
+        "note": "Субъективная оценка: «достаточно» — оценочное слово: не сказано, что именно считать выполнением."
+      },
+      {
+        "rule": "api.methods",
+        "kind": "inventory",
+        "line": 116,
+        "quote": "REST type | POST",
+        "message": "Описанные методы API: /loans/{loanId}/early-repayments (POST, изменение); /loans/{loanId}/early-repayments/terms (GET, чтение); /loans/{loanId}/early-repayments/calculations (POST, изменение).",
+        "audience": [
+          "architect"
+        ],
+        "id": "S-05",
+        "covered": false,
+        "lines": [
+          116
+        ],
+        "note": "Описанные методы API: /loans/{loanId}/early-repayments (POST, изменение); /loans/{loanId}/early-repayments/terms (GET, чтение); /loans/{loanId}/early-repayments/calculations (POST, изменение)."
+      },
+      {
+        "rule": "api.status_inventory",
+        "kind": "inventory",
+        "line": 197,
+        "quote": "Метод | REST type и URL | Параметры | Ответ 200 | Ошибки",
+        "message": "Перечень статусов: 200, 400, 401, 404, 409, 422 и 500; упомянуты в тексте: 200, 400, 401, 404, 409, 422 и 500.",
+        "audience": [
+          "architect",
+          "qa"
+        ],
+        "id": "S-06",
+        "covered": false,
+        "lines": [
+          197
+        ],
+        "note": "Перечень статусов: 200, 400, 401, 404, 409, 422 и 500; упомянуты в тексте: 200, 400, 401, 404, 409, 422 и 500."
+      }
+    ],
+    "candidates": []
+  },
+  "warnings": []
+}

@@ -1,0 +1,238 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 61.58,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 48,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Прогноз процентов не вычисляется из данных метода 1",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-23",
+          "R-26",
+          "R-36",
+          "R-21",
+          "R-12"
+        ],
+        "evidence": [
+          {
+            "line": 122,
+            "quote": "5. Вернуть сведения о льготном периоде и прогноз процентов на случай частичного погашения."
+          },
+          {
+            "line": 120,
+            "quote": "3. Получить из кредитного модуля последнюю выписку и платежи после даты выписки."
+          },
+          {
+            "line": 38,
+            "quote": "Если внесено меньше, проценты начисляются на всю задолженность по покупкам расчётного периода с даты отражения каждой покупки на счёте."
+          },
+          {
+            "line": 49,
+            "quote": "Хранить идентификатор карты, расчётный период, дату выписки, дату окончания платёжного периода, общую задолженность в тиынах, сумму для погашения в тиынах"
+          }
+        ],
+        "problem": "Поле interestForecast (тиыны) обещано как прогноз процентов по покупкам с дат отражения каждой покупки, но шаг 3 получает только выписку и платежи, а перечень данных не содержит покупок с датами и суммами, и нигде не указана процентная ставка.",
+        "scenario": "Запрос GET /cards/{cardId}/grace: шаг 3 вернул выписку и платежи без покупок; по шагу 5 и особому правилу 2 прогноз считать не из чего. Разработчик не может реализовать поле interestForecast без догадок о источнике покупок и ставки.",
+        "impact": "Поле interestForecast нельзя реализовать и проверить по тексту: разные разработчики возьмут разные источники данных и дадут разные суммы.",
+        "recommendation": "Добавить в шаг 3 получение покупок расчётного периода с датой отражения и суммой и указать источник процентной ставки; добавить эти атрибуты в перечень хранимых данных или описать событие/запрос, откуда они приходят.",
+        "rewrite": "Шаг 3: получить из кредитного модуля выписку, платежи после даты выписки, покупки расчётного периода (дата отражения, сумма) и процентную ставку <уточнить: источник и поле ставки>.",
+        "question": "Откуда кредитный модуль отдаёт процентную ставку и список покупок для прогноза interestForecast?",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "/cards/{cardId}/grace",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 109
+        },
+        {
+          "name": "/cards/{cardId}/grace/reminder",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 202
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать дату окончания, сумму для погашения и дни до окончания",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "показать переключатель «Напоминать о платеже» (признак включения)",
+          "line": 28,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "получать сведения о льготном периоде",
+          "line": 52,
+          "operation": "/cards/{cardId}/grace"
+        },
+        {
+          "what": "включать и выключать напоминание",
+          "line": 52,
+          "operation": "/cards/{cardId}/grace/reminder"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            150,
+            164,
+            170,
+            212
+          ],
+          "described": true,
+          "note": "метод 1 и метод 2"
+        },
+        {
+          "code": "400",
+          "lines": [
+            212
+          ],
+          "described": true,
+          "note": "только метод 2, с телом"
+        },
+        {
+          "code": "401",
+          "lines": [
+            150,
+            165,
+            175
+          ],
+          "described": true,
+          "note": "с телом"
+        },
+        {
+          "code": "404",
+          "lines": [
+            150,
+            166,
+            180
+          ],
+          "described": true,
+          "note": "с телом"
+        },
+        {
+          "code": "422",
+          "lines": [
+            123,
+            150,
+            167,
+            185
+          ],
+          "described": true,
+          "note": "с телом"
+        },
+        {
+          "code": "500",
+          "lines": [
+            150,
+            168,
+            190
+          ],
+          "described": true,
+          "note": "с телом"
+        }
+      ],
+      "fields": [
+        {
+          "name": "cardId",
+          "places": "path, string 1–64 (L141, L209); card_id"
+        },
+        {
+          "name": "status",
+          "places": "ответ, string ACTIVE/LOST (L154); grace_status"
+        },
+        {
+          "name": "paymentDueDate",
+          "places": "ответ, string ГГГГ-ММ-ДД (L155); due_date"
+        },
+        {
+          "name": "graceAmount",
+          "places": "ответ, integer тиыны (L156); grace_amount"
+        },
+        {
+          "name": "daysLeft",
+          "places": "ответ, integer (L157)"
+        },
+        {
+          "name": "interestForecast",
+          "places": "ответ, integer тиыны (L158)"
+        },
+        {
+          "name": "totalDebt",
+          "places": "ответ, integer тиыны (L159); total_debt"
+        },
+        {
+          "name": "reminderEnabled",
+          "places": "ответ boolean (L160), ответ метода 2 (L212); reminder_enabled"
+        },
+        {
+          "name": "enabled",
+          "places": "тело метода 2, boolean, обязательно (L210); reminder_enabled"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "1. Проверить сессию клиента",
+          "line": 118,
+          "outcome": "401 {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "2. Карта принадлежит клиенту и кредитная",
+          "line": 119,
+          "outcome": "404 {\"message\":\"Карта не найдена\"}; 422 {\"message\":\"Для этой карты льготный период не предусмотрен\"}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "3. Получить из кредитного модуля выписку и платежи",
+          "line": 120,
+          "outcome": ""
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "5. Вернуть сведения и прогноз процентов",
+          "line": 122,
+          "outcome": "200 с полями ответа"
+        },
+        {
+          "operation": "/cards/{cardId}/grace",
+          "step": "Особое правило 3: выписки ещё нет",
+          "line": 128,
+          "outcome": "возвращаются сведения по предыдущему периоду"
+        },
+        {
+          "operation": "/cards/{cardId}/grace/reminder",
+          "step": "Сохранить enabled и вернуть сохранённое значение",
+          "line": 205,
+          "outcome": "200 {\"reminderEnabled\":false}"
+        },
+        {
+          "operation": "/cards/{cardId}/grace/reminder",
+          "step": "enabled отсутствует или не boolean",
+          "line": 212,
+          "outcome": "400 {\"message\":\"Некорректный запрос\"}"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

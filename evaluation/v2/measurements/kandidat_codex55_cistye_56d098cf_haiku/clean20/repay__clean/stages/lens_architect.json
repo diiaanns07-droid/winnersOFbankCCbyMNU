@@ -1,0 +1,562 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 124.48,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 100,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Ф-3 для первого периода требует дату выдачи, которой нет в данных АБС",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-012",
+          "R-024"
+        ],
+        "evidence": [
+          {
+            "quote": "а если погашений не было — дата выдачи кредита",
+            "line": 34
+          },
+          {
+            "quote": "АБС: GET /abs/loans/{loanId} — номер договора, статус, остаток основного долга, ставка, дата предыдущего погашения",
+            "line": 50
+          }
+        ],
+        "problem": "Для кредита без погашений число дней начисления процентов считается от даты выдачи, но GET /abs/loans/{loanId} не возвращает дату выдачи, а поле дата предыдущего погашения для такого кредита не определено.",
+        "scenario": "Кредит выдан, погашений не было: сервис получает от АБС пустую дату предыдущего погашения и не может посчитать проценты по Ф-3.",
+        "impact": "Расчёт процентов и сумма полного погашения для первого периода невычислимы по тексту.",
+        "recommendation": "Добавить в ответ GET /abs/loans/{loanId} дату выдачи кредита и указать, какое поле используется, если погашений не было.",
+        "rewrite": "GET /abs/loans/{loanId} — ... дата выдачи кредита (YYYY-MM-DD), дата предыдущего погашения (YYYY-MM-DD; если погашений не было — <уточнить: null или дата выдачи>) ...",
+        "question": "Возвращает ли АБС дату выдачи и как обозначено отсутствие погашений?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Ожидание предыдущего запроса по кредиту не определено для UNKNOWN",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-062",
+          "R-049",
+          "R-050"
+        ],
+        "evidence": [
+          {
+            "quote": "Запросы метода 1 по одному кредиту обрабатываются последовательно: следующий ждёт завершения предыдущего.",
+            "line": 140
+          },
+          {
+            "quote": "Операции в статусе UNKNOWN сверяет с АБС методом GET /abs/prepayments/{operationId} каждые 5 минут до получения статуса",
+            "line": 48
+          }
+        ],
+        "problem": "Не определено, что считается завершением предыдущего запроса: ответ 500 (UNKNOWN) или окончательный статус после сверки; нет и предела ожидания следующего запроса.",
+        "scenario": "Первый запрос получил 500 и остался UNKNOWN на 5 минут; второй запрос с новым ключом по другому расчёту по этому кредиту ждёт или получает ответ сразу — документ не говорит.",
+        "impact": "Параллельные погашения одного кредита могут проводиться в разном порядке, а тест на последовательность не имеет критерия.",
+        "recommendation": "Указать, что следующий запрос ждёт окончательного статуса предыдущей операции (DONE или REJECTED) и какой максимальный срок ожидания до ответа.",
+        "rewrite": "Запрос метода 1 ждёт окончательного статуса предыдущей операции по этому кредиту (DONE или REJECTED), не дольше <уточнить: секунды>; иначе — 500 INTERNAL_ERROR.",
+        "question": "Ждёт ли запрос сверку UNKNOWN-операции и каков предел ожидания?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "ABS проведение: формат ответа и причины отказа не описаны",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-024",
+          "R-058",
+          "R-086",
+          "R-096",
+          "R-097"
+        ],
+        "evidence": [
+          {
+            "quote": "POST /abs/loans/{loanId}/prepayments — проведение с operationId (списание, погашение, пересчёт графика или закрытие кредита; повторный вызов с тем же operationId возвращает результат первого)",
+            "line": 50
+          },
+          {
+            "quote": "Отказ АБС из-за источника списания — 422 SOURCE_UNAVAILABLE, из-за доступного остатка — 422 INSUFFICIENT_FUNDS",
+            "line": 135
+          }
+        ],
+        "problem": "Документ требует от сервиса различать отказ АБС из-за источника и из-за остатка, но ответ АБС на проведение (тело успеха и коды отказа) не описан ни в разделе интеграции, ни в спецификации.",
+        "scenario": "АБС возвращает отказ при недостатке средств; сервис не знает, по какому полю или коду отличить его от отказа по счёту (шаг 7 логики метода), и выдаст клиенту не тот errorCode.",
+        "impact": "Клиент получит неверное сообщение об ошибке, а интеграция с АБС нельзя реализовать и проверить без догадок.",
+        "recommendation": "Добавить в раздел интеграции описание ответа POST /abs/loans/{loanId}/prepayments: тело успеха с полями результата и перечень кодов отказа АБС с соответствием SOURCE_UNAVAILABLE и INSUFFICIENT_FUNDS.",
+        "rewrite": "POST /abs/loans/{loanId}/prepayments — 200: {операция-результат: <уточнить: поля результата проведения>}; отказ: <уточнить: код АБС> → SOURCE_UNAVAILABLE, <уточнить: код АБС> → INSUFFICIENT_FUNDS.",
+        "question": "Какие поля и коды отказа возвращает АБС при проведении погашения?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Ответ АБС на расчёт не описан, поля метода 3 не выводятся",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-024",
+          "R-099",
+          "R-100"
+        ],
+        "evidence": [
+          {
+            "quote": "POST /abs/loans/{loanId}/prepayments/calculate — расчёт по Ф-3–Ф-6 на дату погашения",
+            "line": 50
+          },
+          {
+            "quote": "{\"calculationId\":\"b7d4e1a0-5c3f-4e8a-9b2d-1f6a7c8e9d01\",\"type\":\"PARTIAL_REDUCE_PAYMENT\",\"amount\":207200,\"interestAmount\":7200",
+            "line": 200
+          }
+        ],
+        "problem": "Метод 3 должен вернуть interestAmount, principalAmount, principalBalanceAfter, monthlyPayment, paymentsLeft и даты, но формат ответа АБС на расчёт не описан, и правило переноса его полей в ответ метода 3 не задано.",
+        "scenario": "Разработчик сервиса получает от АБС расчёт без описанных полей и не знает, какое поле АБС соответствует paymentsLeft или lastPaymentDate в ответе метода 3.",
+        "impact": "Метод 3 нельзя реализовать по тексту; приёмочные значения (например, 20 платежей при уменьшении срока) не воспроизвести.",
+        "recommendation": "Описать ответ POST /abs/loans/{loanId}/prepayments/calculate полями и соответствие каждому полю ответа метода 3.",
+        "rewrite": "POST /abs/loans/{loanId}/prepayments/calculate — 200: {<уточнить: поля расчёта АБС>}; соответствие: interestAmount ← <уточнить>, paymentsLeft ← <уточнить>, lastPaymentDate ← <уточнить>.",
+        "question": "Какие поля возвращает АБС на расчёт и как их сопоставить с полями метода 3?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Тело запроса POST /notifications/push не описано",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-018",
+          "R-025"
+        ],
+        "evidence": [
+          {
+            "quote": "Сервис уведомлений: POST /notifications/push — отправка push клиенту.",
+            "line": 51
+          },
+          {
+            "quote": "сервис → сервис уведомлений: push (асинхронно)",
+            "line": 42
+          }
+        ],
+        "problem": "Операция отправки push указана без параметров: не сказано, какие поля передаются (идентификатор клиента, текст, тип шаблона) и что возвращает сервис уведомлений.",
+        "scenario": "Сервис досрочного погашения должен передать текст по Ф-9 с номером договора и суммами, но формат тела запроса не определён.",
+        "impact": "Интеграция с сервисом уведомлений и проверка доставки push не реализуемы без уточнения контракта.",
+        "recommendation": "Описать тело POST /notifications/push: идентификатор клиента, тип сообщения и поля шаблона Ф-9, а также код и тело ответа.",
+        "rewrite": "POST /notifications/push — тело: {clientId: <уточнить>, template: <уточнить: тип из Ф-9>, params: {номер договора, amount, monthlyPayment, nextPaymentDate, paymentsLeft, lastPaymentDate}}; 200 — <уточнить: тело ответа>.",
+        "question": "Какой формат тела и ответа у сервиса уведомлений?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "UNKNOWN при «не найдена»: статус REJECTED или повторная обработка",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-049",
+          "R-050",
+          "R-061"
+        ],
+        "evidence": [
+          {
+            "quote": "или «не найдена» (операция → REJECTED)",
+            "line": 48
+          },
+          {
+            "quote": "«не найдена» — запрос обрабатывается заново с тем же operationId",
+            "line": 139
+          },
+          {
+            "quote": "«не найдена» — погашение проводится с тем же operationId",
+            "line": 80
+          }
+        ],
+        "problem": "Для одной и той же ситуации (операция UNKNOWN, АБС: не найдена) фоновая сверка переводит операцию в REJECTED, а повтор с тем же ключом проводит погашение заново с тем же operationId.",
+        "scenario": "После 500 сверка через 5 минут ставит REJECTED, затем клиент нажимает «Повторить» с тем же ключом: по строке 139 запрос обрабатывается заново и погашение проводится, хотя операция уже REJECTED.",
+        "impact": "Статус операции и фактическое списание могут разойтись; спор о том, проведено ли погашение, не разрешается по документу.",
+        "recommendation": "Указать единое поведение: REJECTED — финальный статус, повтор с тем же ключом возвращает 422 или новое проведение с новым operationId; либо сверка не выставляет REJECTED до истечения повтора.",
+        "rewrite": "Если АБС возвращает «не найдена» для UNKNOWN-операции — операция → REJECTED; повтор с тем же Idempotency-Key для REJECTED-операции — <уточнить: 422 или новое проведение с новым operationId>.",
+        "question": "Может ли операция, переведённая в REJECTED сверкой, быть проведена повтором с тем же ключом?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "REJECTED после 422 и 200 при повторе с тем же ключом",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-067",
+          "R-086",
+          "R-062"
+        ],
+        "evidence": [
+          {
+            "quote": "При кодах 400, 401, 404, 409 и 422 погашение по этому запросу не проведено",
+            "line": 158
+          },
+          {
+            "quote": "после 422 или 500 сервис запрашивает статус операции в АБС (GET /abs/prepayments/{operationId}): «проведена» — 200 с результатом этой операции",
+            "line": 139
+          },
+          {
+            "quote": "При ответе 422 операция получает статус REJECTED, при ответе 500 — UNKNOWN",
+            "line": 140
+          }
+        ],
+        "problem": "После ответа 422 документ говорит, что погашение не проведено и операция REJECTED, но правило повтора при статусе АБС «проведена» возвращает 200 с результатом проведения.",
+        "scenario": "Первый запрос вернул 422 INSUFFICIENT_FUNDS, но АБС в итоге провела погашение; повтор с тем же ключом даёт 200 и push, хотя клиент уже видел отказ.",
+        "impact": "Клиент видит отказ, а деньги списаны; без правила решения спор при приёмке неразрешим.",
+        "recommendation": "Определить, что при 422 сервис не обращается к АБС, или что при статусе АБС «проведена» операция переводится в DONE и результат 200 — единое правило для обоих мест.",
+        "rewrite": "При ответе 422 операция REJECTED и повтор с тем же ключом: АБС «проведена» → операция DONE, 200 с результатом (строка 139 исключает 422 из этого правила либо явно заменяет строку 158) — <уточнить: выбранное правило>.",
+        "question": "Допустимо ли, что после 422 АБС показывает проведённое погашение?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Флаг сервера для кнопки не имеет операции получения",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-003"
+        ],
+        "evidence": [
+          {
+            "quote": "кнопка показывается для кредита в статусе «активен», если функциональность включена флагом сервера мобильного банка",
+            "line": 22
+          }
+        ],
+        "problem": "Приложение должно знать состояние флага, но ни один из перечисленных методов не возвращает его.",
+        "scenario": "Флаг выключен на сервере; приложение не получает признак и продолжает показывать кнопку.",
+        "impact": "Откат решения флагом (строка 89) нельзя проверить клиентом по описанному контракту.",
+        "recommendation": "Указать, каким методом приложение получает признак включения функции.",
+        "rewrite": "<уточнить: метод и поле признака включения досрочного погашения, например в ответе GET /loans>.",
+        "question": "Какой метод возвращает признак включения флага?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Компонент «Мобильное приложение» назван по-разному",
+        "kind": "terminology",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-002",
+          "R-019"
+        ],
+        "evidence": [
+          {
+            "quote": "Мобильное приложение → сервер мобильного банка",
+            "line": 20
+          },
+          {
+            "quote": "Приложение → сервис досрочного погашения: условия (метод 2)",
+            "line": 42
+          },
+          {
+            "quote": "ожидание ответа сервиса приложением — не более 30 с",
+            "line": 44
+          }
+        ],
+        "problem": "Один и тот же клиентский компонент назван «Мобильное приложение» и «Приложение».",
+        "scenario": "Интегратор читает «Приложение» в последовательности и не находит его в архитектуре как отдельный компонент.",
+        "impact": "Небольшая путаница при сопоставлении схем.",
+        "recommendation": "Использовать одно имя компонента во всех разделах.",
+        "rewrite": "Во всех схемах и текстах: «Мобильное приложение».",
+        "question": "",
+        "blocks": "none",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Метод 3: тело ответа 400 не описано",
+        "kind": "api_contract",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-100",
+          "R-082"
+        ],
+        "evidence": [
+          {
+            "quote": "400: нет type или он неизвестен, нет amount для частичного погашения, amount не целое положительное число или передан для FULL",
+            "line": 200
+          },
+          {
+            "quote": "ответы 401 и 404 — как у метода 1, 500 — при внутренней ошибке сервиса или ошибке АБС, с тем же телом",
+            "line": 196
+          }
+        ],
+        "problem": "Для метода 3 условие 400 описано, но тело не указано: в тексте о «том же теле» перечислены 401, 404 и 500, а 400 не упомянут.",
+        "scenario": "Клиент получает 400 при amount = 17200.5 и не знает, есть ли у ответа поля errorCode и message.",
+        "impact": "Разбор ошибки в приложении может не совпасть с тестом (например, INVALID_REQUEST в строке 65).",
+        "recommendation": "Добавить 400 в список ответов с тем же телом, что у метода 1.",
+        "rewrite": "Метод 3, 400: тело {\"errorCode\":\"INVALID_REQUEST\",\"message\":\"Некорректный запрос\"}.",
+        "question": "",
+        "blocks": "testing",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /loans/{loanId}/early-repayments (метод 1, проведение)",
+          "method": "POST",
+          "purpose": "создание, изменение",
+          "line": 121
+        },
+        {
+          "name": "GET /loans/{loanId}/early-repayments/terms (метод 2, условия)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "POST /loans/{loanId}/early-repayments/calculations (метод 3, расчёт)",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 200
+        },
+        {
+          "name": "GET /loans, GET /accounts, GET /loans/{loanId}/schedule (существующие методы сервера мобильного банка)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 49
+        },
+        {
+          "name": "GET /abs/loans/{loanId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 50
+        },
+        {
+          "name": "POST /abs/loans/{loanId}/prepayments/calculate",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 50
+        },
+        {
+          "name": "POST /abs/loans/{loanId}/prepayments",
+          "method": "POST",
+          "purpose": "создание, изменение",
+          "line": 50
+        },
+        {
+          "name": "GET /abs/prepayments/{operationId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 50
+        },
+        {
+          "name": "POST /notifications/push",
+          "method": "POST",
+          "purpose": "уведомление",
+          "line": 51
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать условия экрана (остаток, проценты, minPartialAmount/maxPartialAmount, partialAvailable)",
+          "line": 23,
+          "operation": "GET /loans/{loanId}/early-repayments/terms (метод 2, условия)"
+        },
+        {
+          "what": "показать остаток основного долга после погашения, ежемесячный платёж и даты на экране «Подтверждение»",
+          "line": 24,
+          "operation": "POST /loans/{loanId}/early-repayments/calculations (метод 3, расчёт)"
+        },
+        {
+          "what": "показать список счетов и карт для «Списать с»",
+          "line": 24,
+          "operation": "GET /loans, GET /accounts, GET /loans/{loanId}/schedule (существующие методы сервера мобильного банка)"
+        },
+        {
+          "what": "показать кнопку «Досрочное погашение» по флагу сервера мобильного банка",
+          "line": 22,
+          "operation": ""
+        },
+        {
+          "what": "вернуть клиента на экран с обновлёнными условиями при CALCULATION_OUTDATED",
+          "line": 26,
+          "operation": "GET /loans/{loanId}/early-repayments/terms (метод 2, условия)"
+        },
+        {
+          "what": "сверить статус UNKNOWN-операции с АБС",
+          "line": 48,
+          "operation": "GET /abs/prepayments/{operationId}"
+        },
+        {
+          "what": "получить расчёт в АБС для метода 3",
+          "line": 50,
+          "operation": "POST /abs/loans/{loanId}/prepayments/calculate"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            121,
+            139,
+            158,
+            175
+          ],
+          "described": true,
+          "note": "условие и тело примера есть"
+        },
+        {
+          "code": "400",
+          "lines": [
+            130,
+            158,
+            176,
+            200
+          ],
+          "described": true,
+          "note": "метод 1 — тело в строке 176; метод 3 — условие в строке 200, тело не указано"
+        },
+        {
+          "code": "401",
+          "lines": [
+            129,
+            177,
+            196
+          ],
+          "described": true,
+          "note": "тело в строке 177"
+        },
+        {
+          "code": "404",
+          "lines": [
+            131,
+            178,
+            196
+          ],
+          "described": true,
+          "note": "тело в строке 178"
+        },
+        {
+          "code": "409",
+          "lines": [
+            132,
+            139,
+            179
+          ],
+          "described": true,
+          "note": "тело в строке 179"
+        },
+        {
+          "code": "422",
+          "lines": [
+            133,
+            134,
+            135,
+            158,
+            180,
+            199,
+            200
+          ],
+          "described": true,
+          "note": "тело — общее в строке 180, причины в таблице 183–194"
+        },
+        {
+          "code": "500",
+          "lines": [
+            135,
+            139,
+            158,
+            181,
+            196
+          ],
+          "described": true,
+          "note": "тело в строке 181"
+        }
+      ],
+      "fields": [
+        {
+          "name": "calculationId",
+          "places": "строка 155 string 36 UUID обязательный; строка 175 и 200 — ответ метода 3 UUID"
+        },
+        {
+          "name": "amount",
+          "places": "строка 200 integer ₸ запрос метода 3 (обязателен для частичного); строка 164 integer ₸ ответ метода 1"
+        },
+        {
+          "name": "monthlyPayment",
+          "places": "строка 168 integer/null ₸; строка 200 ответ метода 3 integer ₸"
+        },
+        {
+          "name": "nextPaymentDate",
+          "places": "строка 170 string/null YYYY-MM-DD; строка 199 ответ метода 2 YYYY-MM-DD"
+        },
+        {
+          "name": "expiresAt",
+          "places": "строка 200 ответ метода 3 ISO 8601 +05:00"
+        },
+        {
+          "name": "Idempotency-Key",
+          "places": "строка 118 string 36 UUID, DB idempotency_key"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "шаг 4: проверка ключа идемпотентности",
+          "line": 132,
+          "outcome": "409 IDEMPOTENCY_KEY_REUSED — строка 179"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "шаг 5: расчёт не найден или для другого кредита",
+          "line": 133,
+          "outcome": "422 CALCULATION_NOT_FOUND — строка 180 (тело общее)"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "шаг 5: расчёт не действует по Ф-7",
+          "line": 133,
+          "outcome": "422 CALCULATION_OUTDATED — строка 180 (тело общее)"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "шаг 7: отказ АБС из-за источника списания",
+          "line": 135,
+          "outcome": "422 SOURCE_UNAVAILABLE — строка 180 (тело общее)"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "шаг 7: ошибка АБС или нет ответа за 10 с",
+          "line": 135,
+          "outcome": "500 INTERNAL_ERROR — строка 181"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "шаг 8: перевести в DONE и вернуть 200",
+          "line": 136,
+          "outcome": "200 — строка 175"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments/calculations",
+          "step": "amount передан для FULL или не целое",
+          "line": 200,
+          "outcome": "400 — тело не указано"
+        },
+        {
+          "operation": "GET /loans/{loanId}/early-repayments/terms",
+          "step": "проверки LOAN_NOT_ACTIVE, OVERDUE_DEBT, SCHEDULED_PAYMENT_DAY",
+          "line": 199,
+          "outcome": "422 с errorCode — строка 180 (тело общее)"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

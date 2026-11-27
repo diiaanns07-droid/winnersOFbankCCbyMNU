@@ -1,0 +1,339 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 56.89,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 52,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Ключ requestId и результат первого запроса не хранятся",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-30",
+          "R-36",
+          "R-14"
+        ],
+        "evidence": [
+          {
+            "line": 51,
+            "quote": "Хранить идентификатор QR-кода, идентификатор клиента-получателя, карту зачисления, сумму в тенге"
+          },
+          {
+            "line": 152,
+            "quote": "requestId | string | 36 | Да | UUID | Ключ идемпотентности | request_id"
+          },
+          {
+            "line": 132,
+            "quote": "2. Повторный запрос с тем же requestId возвращает результат первого запроса."
+          }
+        ],
+        "problem": "Поле request_id пишется в хранилище, но в перечне хранимых данных его нет; нет и хранения результата первого перевода (статус, transferId, сумма, маскированное имя).",
+        "scenario": "Повтор POST /qr/transfer с тем же requestId после таймаута: по перечню данных сервис не знает, что перевод с этим ключом уже создан, и не может вернуть результат первого запроса (шаг 8 логики, строка 128, создаст второй перевод).",
+        "impact": "Повторный запрос может создать второе списание/зачисление или не вернуть результат первого запроса.",
+        "recommendation": "Добавить в перечень хранимых данных request_id и результат первого запроса (status, transferId, amount, recipientName) с привязкой к переводу.",
+        "rewrite": "Хранить для перевода по QR-коду: ключ идемпотентности request_id (UUID), статус перевода, transferId, сумму в тенге и маскированное имя получателя, возвращаемые при повторном запросе с тем же requestId.",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Отправитель вызывает сервис переводов напрямую или через контроллер",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-11",
+          "R-14",
+          "R-31"
+        ],
+        "evidence": [
+          {
+            "line": 45,
+            "quote": "Приложение отправителя → сервис переводов: выполнить перевод по QR-коду"
+          },
+          {
+            "line": 136,
+            "quote": "Приложение отправителя → QrTransferController → сервис QR-кодов → сервис переводов"
+          }
+        ],
+        "problem": "В последовательности приложение вызывает сервис переводов напрямую; в схеме метода и в API вызов идёт в QrTransferController, затем в сервис QR-кодов.",
+        "scenario": "Интегратор мобильного банка по последовательности вызывает сервис переводов напрямую, а по дочернему документу — POST /qr/transfer через QrTransferController; сервис QR-кодов в прямом вызове не участвует.",
+        "impact": "Разные реализации клиента и сервера: прямой вызов обходит проверку QR-кода и idempotency, или сервер не принимает вызов по последовательности.",
+        "recommendation": "Привести последовательность к схеме метода: выполнение перевода идёт через POST /qr/transfer контроллера QrTransferController, затем сервис QR-кодов и сервис переводов.",
+        "rewrite": "Приложение отправителя → POST /qr/transfer (QrTransferController) → сервис QR-кодов → сервис переводов: выполнить перевод по QR-коду.",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Идемпотентность не представлена шагом логики метода",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-30"
+        ],
+        "evidence": [
+          {
+            "line": 121,
+            "quote": "1. Проверить сессию отправителя."
+          },
+          {
+            "line": 132,
+            "quote": "2. Повторный запрос с тем же requestId возвращает результат первого запроса."
+          }
+        ],
+        "problem": "В восьми шагах логики метода нет шага проверки requestId; особое правило задаёт результат, но не место проверки.",
+        "scenario": "Разработчик не знает, проверять ли requestId до шага 2 (проверка карты) или после шага 8 (сохранение перевода).",
+        "impact": "Разный порядок проверок даёт разные ответы на повтор запроса с просроченным QR-кодом.",
+        "recommendation": "Добавить в логику метода шаг 0 о проверке requestId перед шагом 1.",
+        "rewrite": "0. Проверить requestId: если перевод с таким requestId уже создан, вернуть его результат без повторной обработки шагов 1–8.",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /qr/transfer",
+          "method": "POST",
+          "purpose": "создание (перевод по QR-коду)",
+          "line": 108
+        },
+        {
+          "name": "POST /qr",
+          "method": "POST",
+          "purpose": "создание (QR-код)",
+          "line": 210
+        },
+        {
+          "name": "GET /qr/{qrId}",
+          "method": "GET",
+          "purpose": "чтение (данные QR-кода)",
+          "line": 211
+        },
+        {
+          "name": "DELETE /qr/{qrId}",
+          "method": "DELETE",
+          "purpose": "изменение (отмена QR-кода)",
+          "line": 212
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать получателю таймер обратного отсчёта QR-кода",
+          "line": 28,
+          "operation": "POST /qr"
+        },
+        {
+          "what": "показать отправителю маскированное имя получателя и сумму перед подтверждением",
+          "line": 29,
+          "operation": "GET /qr/{qrId}"
+        },
+        {
+          "what": "создать QR-код",
+          "line": 54,
+          "operation": "POST /qr"
+        },
+        {
+          "what": "отменить QR-код",
+          "line": 54,
+          "operation": "DELETE /qr/{qrId}"
+        },
+        {
+          "what": "получить данные QR-кода перед подтверждением",
+          "line": 54,
+          "operation": "GET /qr/{qrId}"
+        },
+        {
+          "what": "выполнить перевод по QR-коду",
+          "line": 54,
+          "operation": "POST /qr/transfer"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            127,
+            155,
+            167,
+            176
+          ],
+          "described": true,
+          "note": "перевод DONE или REJECTED; для DELETE — CANCELLED"
+        },
+        {
+          "code": "400",
+          "lines": [
+            122,
+            155,
+            168,
+            181,
+            210
+          ],
+          "described": true,
+          "note": "в таблице методов 2 — без тела, тело общее"
+        },
+        {
+          "code": "401",
+          "lines": [
+            155,
+            169,
+            186,
+            206
+          ],
+          "described": true,
+          "note": "общий для методов 2–4"
+        },
+        {
+          "code": "404",
+          "lines": [
+            123,
+            155,
+            170,
+            191,
+            210,
+            211,
+            212
+          ],
+          "described": true,
+          "note": "для карты в POST /qr тело общее «QR-код не найден»"
+        },
+        {
+          "code": "410",
+          "lines": [
+            123,
+            124,
+            126,
+            155,
+            171,
+            196,
+            211,
+            212
+          ],
+          "described": true,
+          "note": "условия согласованы"
+        },
+        {
+          "code": "500",
+          "lines": [
+            128,
+            155,
+            172,
+            201,
+            206
+          ],
+          "described": true,
+          "note": "общий"
+        }
+      ],
+      "fields": [
+        {
+          "name": "qrId",
+          "places": "запрос L149 string 1–36 обязательный; путь L211 string 1–36; пример L113"
+        },
+        {
+          "name": "cardId",
+          "places": "запрос L150 string 1–64; POST /qr L210 string 1–64"
+        },
+        {
+          "name": "amount",
+          "places": "запрос L151 integer 32 bit 100–500 000; ответ L161 integer; GET L211 integer или null; POST /qr L210 integer"
+        },
+        {
+          "name": "requestId",
+          "places": "запрос L152 string 36 UUID, DB request_id; пример L113"
+        },
+        {
+          "name": "status",
+          "places": "ответ L159 string DONE/REJECTED; DELETE L212 CANCELLED"
+        },
+        {
+          "name": "transferId",
+          "places": "ответ L160 string при DONE"
+        },
+        {
+          "name": "recipientName",
+          "places": "ответ L162 «Имя Ф.»; GET L211 «Айгерим С.»"
+        },
+        {
+          "name": "expiresAt",
+          "places": "POST /qr L210 и GET L211 строка с +05:00"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /qr/transfer",
+          "step": "проверить сессию отправителя",
+          "line": 121,
+          "outcome": "401 по L169"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "карта списания не принадлежит, не активна или не в тенге — 400",
+          "line": 122,
+          "outcome": "400 Некорректный запрос"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "QR не найден — 404; карта зачисления закрыта — 410",
+          "line": 123,
+          "outcome": "404 QR-код не найден; 410 QR-код недействителен"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "срок истёк или QR отменён — 410",
+          "line": 124,
+          "outcome": "410 QR-код недействителен"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "без суммы в QR и amount вне диапазона — 400",
+          "line": 125,
+          "outcome": "400 Некорректный запрос"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "QR с суммой уже оплачен — 410",
+          "line": 126,
+          "outcome": "410 QR-код недействителен"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "отказ антифрода — 200 REJECTED",
+          "line": 127,
+          "outcome": "200 с status REJECTED и message"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "сбой списания/зачисления — 500",
+          "line": 128,
+          "outcome": "500 Ошибка сервиса"
+        },
+        {
+          "operation": "POST /qr/transfer",
+          "step": "повтор с тем же requestId возвращает результат первого запроса",
+          "line": 132,
+          "outcome": "результат первого запроса (без шага проверки ключа)"
+        },
+        {
+          "operation": "DELETE /qr/{qrId}",
+          "step": "отмена не получателем — 404; оплачен/в обработке/отменён/истёк — 410",
+          "line": 212,
+          "outcome": "404 или 410 с описанием"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

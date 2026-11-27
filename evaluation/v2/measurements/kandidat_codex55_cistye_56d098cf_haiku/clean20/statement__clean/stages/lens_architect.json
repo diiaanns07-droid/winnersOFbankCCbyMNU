@@ -1,0 +1,270 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 120.73,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 97,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /statements/orders",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 121
+        },
+        {
+          "name": "GET /statements/orders",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 196
+        },
+        {
+          "name": "GET /statements/orders/{orderId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 197
+        },
+        {
+          "name": "POST /statements/orders/{orderId}/link",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 198
+        },
+        {
+          "name": "GET /statements/files/{token}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "GET /accounts (сервис счетов)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 47
+        },
+        {
+          "name": "GET /accounts/{accountId} (сервис счетов)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 47
+        },
+        {
+          "name": "GET /abs/v1/accounts/{accountId}/turnovers (АБС)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 47
+        }
+      ],
+      "promises": [
+        {
+          "what": "список заказов клиента за 30 суток",
+          "line": 23,
+          "operation": "GET /statements/orders"
+        },
+        {
+          "what": "статус заказа с опросом каждые 5 секунд",
+          "line": 24,
+          "operation": "GET /statements/orders/{orderId}"
+        },
+        {
+          "what": "новая ссылка на скачивание при нажатии Скачать",
+          "line": 25,
+          "operation": "POST /statements/orders/{orderId}/link"
+        },
+        {
+          "what": "открытие файла выписки по ссылке",
+          "line": 25,
+          "operation": "GET /statements/files/{token}"
+        },
+        {
+          "what": "создание заказа методом 1",
+          "line": 46,
+          "operation": "POST /statements/orders"
+        },
+        {
+          "what": "проверка владельца, статуса и даты открытия счёта",
+          "line": 47,
+          "operation": "GET /accounts/{accountId}"
+        },
+        {
+          "what": "получение данных счёта и операций из АБС",
+          "line": 47,
+          "operation": "GET /abs/v1/accounts/{accountId}/turnovers"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            194
+          ],
+          "described": true,
+          "note": "успешный код методов 2–5 в заголовке таблицы"
+        },
+        {
+          "code": "202",
+          "lines": [
+            58,
+            160,
+            175
+          ],
+          "described": true,
+          "note": "заказ принят"
+        },
+        {
+          "code": "400",
+          "lines": [
+            134,
+            160,
+            176
+          ],
+          "described": true,
+          "note": "VALIDATION_ERROR"
+        },
+        {
+          "code": "401",
+          "lines": [
+            133,
+            160,
+            177,
+            192
+          ],
+          "described": true,
+          "note": "UNAUTHORIZED"
+        },
+        {
+          "code": "404",
+          "lines": [
+            67,
+            136,
+            178,
+            197,
+            198,
+            199
+          ],
+          "described": true,
+          "note": "ACCOUNT_NOT_FOUND, ORDER_NOT_FOUND, LINK_NOT_FOUND"
+        },
+        {
+          "code": "409",
+          "lines": [
+            135,
+            160,
+            179
+          ],
+          "described": true,
+          "note": "IDEMPOTENCY_KEY_CONFLICT"
+        },
+        {
+          "code": "410",
+          "lines": [
+            79,
+            198,
+            199
+          ],
+          "described": true,
+          "note": "FILE_EXPIRED у метода 4, LINK_EXPIRED у метода 5; в общем перечне ответа метода 1 не указан"
+        },
+        {
+          "code": "422",
+          "lines": [
+            83,
+            137,
+            138,
+            160,
+            180,
+            198
+          ],
+          "described": true,
+          "note": "коды бизнес-правил, ORDER_NOT_READY у метода 4"
+        },
+        {
+          "code": "500",
+          "lines": [
+            160,
+            181,
+            192
+          ],
+          "described": true,
+          "note": "INTERNAL_ERROR"
+        }
+      ],
+      "fields": [
+        {
+          "name": "accountId",
+          "places": "строка 155 запрос, строка 165 ответ, строка 1–64 только в запросе"
+        },
+        {
+          "name": "dateFrom",
+          "places": "строка 156 запрос, строка 167 ответ, тип date YYYY-MM-DD"
+        },
+        {
+          "name": "fileExpiresAt",
+          "places": "строка 172 ответ, date-time или null, строка 197 пример"
+        },
+        {
+          "name": "urlExpiresAt",
+          "places": "строка 198 ответ, date-time"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /statements/orders",
+          "step": "проверка сессии",
+          "line": 133,
+          "outcome": "401 UNAUTHORIZED, message"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "проверка Idempotency-Key и тела",
+          "line": 134,
+          "outcome": "400 VALIDATION_ERROR"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "повтор ключа с другими параметрами",
+          "line": 135,
+          "outcome": "409 IDEMPOTENCY_KEY_CONFLICT"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "счёт не найден или чужой",
+          "line": 136,
+          "outcome": "404 ACCOUNT_NOT_FOUND"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "счёт CLOSED",
+          "line": 136,
+          "outcome": "422 ACCOUNT_CLOSED"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "проверка периода",
+          "line": 137,
+          "outcome": "422 с кодом нарушения"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "суточный предел",
+          "line": 138,
+          "outcome": "422 DAILY_LIMIT_EXCEEDED"
+        },
+        {
+          "operation": "POST /statements/orders",
+          "step": "создание заказа и 202",
+          "line": 139,
+          "outcome": "202"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

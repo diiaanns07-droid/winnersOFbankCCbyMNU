@@ -1,0 +1,365 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 109.75,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 75,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Перевод в сервис переводов: тело запроса и формат результата не описаны",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "line": 54,
+            "quote": "Сервис копилки → сервис переводов: POST /transfers/v1/internal с ключом идемпотентности roundup-{cardId}-{YYYY-MM-DD} (дата суток), таймаут ответа 30 с"
+          },
+          {
+            "line": 45,
+            "quote": "Сервис копилки → сервис переводов: перевод с карточного счёта на сберегательный счёт; сервис переводов → сервис копилки: результат."
+          }
+        ],
+        "problem": "И-4 называет вызов POST /transfers/v1/internal и ключ, но не описывает тело запроса (карта, счёт, сумма) и формат успешного ответа. Признак «выполнен» берётся только из отказов с кодами.",
+        "scenario": "Разработчик сервиса копилки отправляет перевод 820,00 ₸ по строке 54: имена полей суммы и счёта не заданы, ответ 200 без тела не определён как успех, статус выполнения придётся угадывать.",
+        "impact": "Интеграция с сервисом переводов нельзя реализовать и проверить заглушкой без догадок о полях и статусе результата.",
+        "recommendation": "Добавить к И-4 описание тела запроса и ответа POST /transfers/v1/internal с полями и признаком выполнения.",
+        "rewrite": "POST /transfers/v1/internal: тело — cardId (string), savingsAccountId (string), <уточнить: имя поля суммы, decimal(12,2), тенге>; ответ 200 — <уточнить: признак выполнено/не выполнено и идентификатор перевода>; отказ — код причины из И-4.",
+        "question": "Какие поля тела и ответа возвращает сервис переводов в своём контракте?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Момент получения события не хранится, а Ф-4 и Ф-6 сравнивают с ним",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "line": 37,
+            "quote": "по событиям, полученным раньше этого момента"
+          },
+          {
+            "line": 39,
+            "quote": "если событие о возврате получено раньше фиксации суммы к переводу за эти сутки"
+          },
+          {
+            "line": 54,
+            "quote": "postedAt (со смещением)"
+          },
+          {
+            "line": 51,
+            "quote": "Участвующие покупки (roundup_purchase: operationId, карта, время проведения, сумма покупки"
+          }
+        ],
+        "problem": "Правила Ф-4 и Ф-6 отделяют события по моменту получения сервисом копилки, но событие несёт только postedAt, а Д-2 хранит только время проведения. Момент получения нигде не фиксируется.",
+        "scenario": "Покупка проведена 05.05, событие получено 06.05 в 00:40 (строка 76); без времени получения нельзя решить, входит ли сумма округления в фиксацию 00:30.",
+        "impact": "Фиксация 00:30 и исключение по возврату не воспроизводимы: одна и та же запись даёт разный результат в зависимости от того, по какому времени её сравнивают.",
+        "recommendation": "Добавить в Д-2 момент получения события сервисом копилки со смещением UTC+5 и указать, что Ф-4 и Ф-6 сравнивают с ним.",
+        "rewrite": "Д-2, roundup_purchase и возвраты: добавить поле <уточнить: имя поля> — момент получения события сервисом копилки, время по Астане с указанием смещения UTC+5.",
+        "question": "Какой момент считать получением события: время прихода в сервис копилки или postedAt?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Push о невыполненном переводе: состав сообщения не описан",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "line": 54,
+            "quote": "Сервис копилки → сервис уведомлений: POST /notifications/v1/push."
+          },
+          {
+            "line": 40,
+            "quote": "клиент получает push «Не удалось перевести N ₸ в копилку: причина»"
+          }
+        ],
+        "problem": "Вызов POST /notifications/v1/push назван без тела: не указано, как передаётся получатель и текст push, хотя текст задан в Ф-7.",
+        "scenario": "Сервис копилки отправляет push по строке 40 без описания полей получателя и текста, их формат приходится выбирать самостоятельно.",
+        "impact": "Разработчики сервисов уведомлений и копилки могут разойтись по составу запроса.",
+        "recommendation": "Описать тело POST /notifications/v1/push: получатель, текст сообщения по Ф-7.",
+        "rewrite": "POST /notifications/v1/push: тело — <уточнить: имя поля получателя (клиент или cardId)>, текст — «Не удалось перевести N ₸ в копилку: причина» с N в формате 1 250,00.",
+        "question": "Нужен ли в теле push идентификатор клиента или достаточно cardId?",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "PUT /roundup/v1/cards/{cardId}/settings",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 137
+        },
+        {
+          "name": "GET /roundup/v1/cards/{cardId}/settings",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "GET /processing/v1/cards/{cardId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "card.operations.posted",
+          "method": "событие",
+          "purpose": "уведомление",
+          "line": 54
+        },
+        {
+          "name": "GET /accounts/v1/clients/me/accounts?type=SAVINGS&currency=KZT",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "GET /accounts/v1/accounts/{accountId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "POST /transfers/v1/internal",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 54
+        },
+        {
+          "name": "POST /notifications/v1/push",
+          "method": "POST",
+          "purpose": "уведомление",
+          "line": 54
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать сохранённые настройки копилки на экране",
+          "line": 27,
+          "operation": "GET /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "показать накопленную сумму, переведённое за месяц и остаток предела",
+          "line": 27,
+          "operation": "GET /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "показать список сберегательных счетов клиента для выбора",
+          "line": 27,
+          "operation": "GET /accounts/v1/clients/me/accounts?type=SAVINGS&currency=KZT"
+        },
+        {
+          "what": "сохранить настройки копилки кнопкой «Сохранить»",
+          "line": 27,
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "перевести сумму к переводу с карточного счёта на сберегательный счёт",
+          "line": 54,
+          "operation": "POST /transfers/v1/internal"
+        },
+        {
+          "what": "отправить push о невыполненном переводе",
+          "line": 54,
+          "operation": "POST /notifications/v1/push"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            178,
+            191
+          ],
+          "described": true,
+          "note": "условие и пример тела есть"
+        },
+        {
+          "code": "400",
+          "lines": [
+            147,
+            178,
+            192
+          ],
+          "described": true,
+          "note": "условие и пример тела есть"
+        },
+        {
+          "code": "401",
+          "lines": [
+            146,
+            193
+          ],
+          "described": true,
+          "note": "условие и пример тела есть"
+        },
+        {
+          "code": "404",
+          "lines": [
+            148,
+            194,
+            199
+          ],
+          "described": true,
+          "note": "условие и пример тела есть; метод 2 ссылается на метод 1"
+        },
+        {
+          "code": "422",
+          "lines": [
+            149,
+            178,
+            195
+          ],
+          "described": true,
+          "note": "errorCode по каждому условию"
+        },
+        {
+          "code": "500",
+          "lines": [
+            148,
+            149,
+            196,
+            199
+          ],
+          "described": true,
+          "note": "условие и пример тела есть"
+        },
+        {
+          "code": "503",
+          "lines": [
+            81
+          ],
+          "described": false,
+          "note": "только ответ сервиса переводов в тестовом критерии, не код метода"
+        }
+      ],
+      "fields": [
+        {
+          "name": "enabled",
+          "places": "запрос L172 boolean обязательно; ответ L182 boolean; DB is_enabled"
+        },
+        {
+          "name": "roundingStep",
+          "places": "запрос L173 integer, обязательно при enabled=true; ответ L183 integer или null; DB rounding_step"
+        },
+        {
+          "name": "savingsAccountId",
+          "places": "запрос L174 string 1–64; ответ L184 string или null; DB savings_account_id"
+        },
+        {
+          "name": "monthlyLimit",
+          "places": "запрос L175 integer тенге; ответ L185 integer или null; DB monthly_limit"
+        },
+        {
+          "name": "cardId",
+          "places": "путь L164 string 1–64; путь L137"
+        },
+        {
+          "name": "accruedToday",
+          "places": "ответ L186 number, два знака"
+        },
+        {
+          "name": "transferredThisMonth",
+          "places": "ответ L187 number, два знака"
+        },
+        {
+          "name": "limitRemaining",
+          "places": "ответ L188 number, два знака, null при monthlyLimit null"
+        },
+        {
+          "name": "operationId",
+          "places": "событие L54 строка; Д-2 L51 roundup_purchase"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "нет или истекла сессия клиента",
+          "line": 146,
+          "outcome": "401, message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "тело не соответствует схеме",
+          "line": 147,
+          "outcome": "400, message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "карта не найдена или чужая",
+          "line": 148,
+          "outcome": "404, message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "процессинг не ответил",
+          "line": 148,
+          "outcome": "500, message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "карта не eligible при enabled=true",
+          "line": 149,
+          "outcome": "422, errorCode CARD_NOT_ELIGIBLE"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг не 100/500/1000",
+          "line": 149,
+          "outcome": "422, errorCode STEP_NOT_ALLOWED"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "предел вне диапазона",
+          "line": 149,
+          "outcome": "422, errorCode LIMIT_OUT_OF_RANGE"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "счёт не eligible",
+          "line": 149,
+          "outcome": "422, errorCode ACCOUNT_NOT_ELIGIBLE"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "сервис счетов не ответил",
+          "line": 149,
+          "outcome": "500, message"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "значения изменились — сохранить и вернуть состояние",
+          "line": 150,
+          "outcome": "200, состояние копилки"
+        },
+        {
+          "operation": "GET /roundup/v1/cards/{cardId}/settings",
+          "step": "копилка не настраивалась",
+          "line": 199,
+          "outcome": "200, enabled false и null-поля"
+        },
+        {
+          "operation": "GET /roundup/v1/cards/{cardId}/settings",
+          "step": "ошибки как у метода 1",
+          "line": 199,
+          "outcome": "401, 404, 500"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

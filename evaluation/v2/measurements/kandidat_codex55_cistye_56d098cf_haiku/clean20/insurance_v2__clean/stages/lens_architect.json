@@ -1,0 +1,510 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 105.81,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 52,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Повторный вызов с 400/422 снимает страхование без ответа и без указания исполнителя",
+        "kind": "api_contract",
+        "criterion": "correct",
+        "severity": "major",
+        "requirement_ids": [
+          "R-28",
+          "R-36",
+          "R-41",
+          "R-45",
+          "R-51"
+        ],
+        "evidence": [
+          {
+            "line": 132,
+            "quote": "если повторный вызов вернул 400 или 422, ранее подключённое страхование снимается с заявки."
+          },
+          {
+            "line": 225,
+            "quote": "4. Снятие страхования с заявки | DELETE /loans/applications/{applicationId}/insurance"
+          }
+        ],
+        "problem": "Особое правило 2 говорит, что при 400/422 на повторный вызов страхование снимается, но не сказано, кто снимает: сервер как побочный эффект ошибочного POST или приложение через DELETE. Тела 400/422 содержат только message и не сообщают новое состояние.",
+        "scenario": "Клиент меняет срок на 70 месяцев, POST метода 1 возвращает 400 (строка 169). По строке 132 страхование снято, по строке 225 снятие требует отдельного DELETE. Приложение не знает, показывать ли 24 % или 27 %, и заявка может остаться со страхованием.",
+        "impact": "Разные реализации дадут разное состояние заявки и ставку после одного и того же ответа об ошибке.",
+        "recommendation": "Указать в методе 1, что при 400/422 на повторный вызов сервер снимает страхование атомарно, и добавить в тело ошибки состояние; явно решить, нужен ли DELETE.",
+        "rewrite": "POST /loans/applications/{applicationId}/insurance: при повторном вызове с 400 или 422 страхование снимается с заявки в той же операции; тело ошибки: {\"message\":\"...\",\"status\":\"REMOVED\",\"rate\":27.0}; <уточнить: приложение дополнительно вызывает DELETE или нет>",
+        "question": "Снимает ли сервер страхование сам при ошибке повторного вызова или приложение должно вызвать DELETE?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Полное досрочное погашение не имеет события или запроса для сервиса страхования",
+        "kind": "missing_element",
+        "criterion": "set_complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-09",
+          "R-19",
+          "R-39",
+          "R-50",
+          "R-52"
+        ],
+        "evidence": [
+          {
+            "line": 41,
+            "quote": "При полном досрочном погашении кредита страхование прекращается, клиенту возвращается часть премии за полные неиспользованные месяцы."
+          },
+          {
+            "line": 45,
+            "quote": "Кредитный конвейер → сервис страхования: кредит выдан, выпустить полис."
+          },
+          {
+            "line": 224,
+            "quote": "409 — прошло больше 14 дней, отказ уже оформлен или страхование прекращено полным досрочным погашением"
+          }
+        ],
+        "problem": "Правило прекращения страхования и возврата при полном погашении не имеет описанного источника: единственное событие в последовательности — выдача кредита. Сервис страхования не может узнать о погашении, а метод отказа ссылается на состояние «прекращено полным досрочным погашением».",
+        "scenario": "Кредит 1 000 000 ₸ на 24 месяца полностью погашен через 10 месяцев (строка 68). Сервис страхования не получает ни события, ни запроса, поэтому полис остаётся ACTIVE в GET строки 226, возврат 21 000 ₸ не рассчитывается, а отказ после погашения не может вернуть 409 по описанному состоянию.",
+        "impact": "Возврат премии по Ф-5 и статус полиса не реализуемы по тексту документа.",
+        "recommendation": "Добавить в последовательность и в раздел интеграции событие полного погашения с идентификатором кредита и датой, и описать переход статуса полиса.",
+        "rewrite": "Кредитный конвейер → сервис страхования: событие «кредит погашен полностью» с полями loanId (string 1–64) и датой погашения <уточнить: формат даты и часовой пояс>; сервис переводит полис в статус <уточнить: значение статуса> и рассчитывает возврат по Ф-5.",
+        "question": "Какой системой и каким событием передаётся факт полного досрочного погашения?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Статусы страхования не перечислены: состояния после отказа и погашения не заданы",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-37",
+          "R-51",
+          "R-52"
+        ],
+        "evidence": [
+          {
+            "line": 162,
+            "quote": "status | string | CONNECTED | Результат подключения | insurance_status"
+          },
+          {
+            "line": 226,
+            "quote": "{\"status\":\"ACTIVE\",\"policyNumber\":\"LI-2026-000123\",\"startDate\":\"2026-03-01\"}"
+          },
+          {
+            "line": 224,
+            "quote": "{\"refund\":36000,\"refundUntil\":\"2026-03-19\",\"newRate\":27.0}"
+          }
+        ],
+        "problem": "В документе встречаются статусы CONNECTED, REMOVED и ACTIVE, но полный перечень не задан. Ответ отказа не содержит status, а GET метода 5 не описывает значение статуса и policyNumber после отказа и после полного погашения.",
+        "scenario": "Клиент оформил отказ (строка 224), затем приложение вызывает GET /loans/{loanId}/insurance (строка 226). Документ не говорит, вернёт ли метод ACTIVE, другой статус или null в policyNumber, поэтому экран «Страхование» (строка 29) покажет разное в разных сборках.",
+        "impact": "Приложение и сервер по-разному интерпретируют состояние полиса после отказа и погашения.",
+        "recommendation": "Перечислить все значения статуса для поля status метода 5 и insurance_status с переходами между ними.",
+        "rewrite": "GET /loans/{loanId}/insurance: status — строка, допустимые значения: ACTIVE (полис действует), <уточнить: статус после отказа>, <уточнить: статус после полного погашения>; policyNumber — строка или null до выпуска полиса.",
+        "question": "Какие статусы полиса существуют и что возвращает метод 5 после отказа от страхования?",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Поля, записываемые в хранилище, отсутствуют в перечне данных",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-13",
+          "R-35",
+          "R-33",
+          "R-34",
+          "R-37"
+        ],
+        "evidence": [
+          {
+            "line": 51,
+            "quote": "Хранить идентификатор заявки и кредита, признак подключения страхования"
+          },
+          {
+            "line": 155,
+            "quote": "consentPd | boolean | — | Да | true | Согласие клиента на передачу персональных данных страховой компании-партнёру | pd_consent_at"
+          }
+        ],
+        "problem": "Перечень данных не содержит pd_consent_at, loan_amount, loan_term и insurance_status, хотя метод 1 пишет их в хранилище по колонкам DB field. Значения приходят в запросе, и правила от них не зависят напрямую.",
+        "scenario": "Разработчик хранения создаёт таблицу только по перечню строки 51 и не имеет колонки для времени согласия на передачу ПД, которое документ сам связывает с колонкой pd_consent_at.",
+        "impact": "Расхождение между моделью данных и интерфейсом; аудит согласия на передачу ПД может не иметь подтверждающего поля.",
+        "recommendation": "Дополнить перечень хранимых данных полями из DB field-колонок метода 1.",
+        "rewrite": "Хранить также: сумму кредита (loan_amount), срок кредита (loan_term), дату и время согласия на передачу ПД (pd_consent_at, <уточнить: часовой пояс>), статус страхования (insurance_status).",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Повтор с теми же суммой и сроком для подписанной заявки: 200 или 409",
+        "kind": "api_contract",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-27",
+          "R-44"
+        ],
+        "evidence": [
+          {
+            "line": 131,
+            "quote": "1. Повторный вызов с теми же суммой и сроком возвращает действующие условия страхования."
+          },
+          {
+            "line": 172,
+            "quote": "409. Ответ в случае, если заявка уже подписана."
+          }
+        ],
+        "problem": "Особое правило 1 задаёт исход повтора без оговорок, а код 409 описан для любого вызова подписанной заявки. Для подписанной заявки и тех же суммы и срока документ даёт два исхода; уточнение нужно, но это не основной сценарий.",
+        "scenario": "Заявка подписана, приложение повторно вызывает POST с суммой 1 000 000 и сроком 24. По строке 131 — 200 с условиями, по строке 172 — 409.",
+        "impact": "Разные реализации по-разному ответят на повтор после подписания.",
+        "recommendation": "Уточнить в особом правиле 1, что повтор после подписания обрабатывается по коду 409.",
+        "rewrite": "1. Повторный вызов с теми же суммой и сроком до подписания заявки возвращает действующие условия страхования; для подписанной заявки возвращается 409 (строка 172). <уточнить: нужен ли 200 с текущими условиями>",
+        "question": "",
+        "blocks": "testing",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /loans/applications/{applicationId}/insurance",
+          "method": "POST",
+          "purpose": "создание, изменение",
+          "line": 114
+        },
+        {
+          "name": "GET /loans/insurance/quote",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 223
+        },
+        {
+          "name": "POST /loans/{loanId}/insurance/refusal",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 224
+        },
+        {
+          "name": "DELETE /loans/applications/{applicationId}/insurance",
+          "method": "DELETE",
+          "purpose": "удаление",
+          "line": 225
+        },
+        {
+          "name": "GET /loans/{loanId}/insurance",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 226
+        },
+        {
+          "name": "Кредитный конвейер → сервис страхования: кредит выдан, выпустить полис",
+          "method": "событие",
+          "purpose": "создание",
+          "line": 45
+        },
+        {
+          "name": "Сервис страхования → сервис уведомлений: полис выпущен",
+          "method": "событие",
+          "purpose": "уведомление",
+          "line": 45
+        },
+        {
+          "name": "Сервис страхования → страховая компания-партнёр: предварительная проверка клиента",
+          "method": "вызов",
+          "purpose": "чтение",
+          "line": 45
+        }
+      ],
+      "promises": [
+        {
+          "what": "рассчитывает стоимость страхования",
+          "line": 54,
+          "operation": "GET /loans/insurance/quote"
+        },
+        {
+          "what": "подключает страхование к заявке",
+          "line": 54,
+          "operation": "POST /loans/applications/{applicationId}/insurance"
+        },
+        {
+          "what": "снимает страхование с заявки до подписания",
+          "line": 54,
+          "operation": "DELETE /loans/applications/{applicationId}/insurance"
+        },
+        {
+          "what": "показывает сведения о полисе",
+          "line": 54,
+          "operation": "GET /loans/{loanId}/insurance"
+        },
+        {
+          "what": "оформляет отказ от страхования",
+          "line": 54,
+          "operation": "POST /loans/{loanId}/insurance/refusal"
+        },
+        {
+          "what": "показывает стоимость страхования и обе ставки на экране условий",
+          "line": 48,
+          "operation": "GET /loans/insurance/quote"
+        },
+        {
+          "what": "показывает номер полиса и дату начала действия",
+          "line": 29,
+          "operation": "GET /loans/{loanId}/insurance"
+        },
+        {
+          "what": "кнопка «Отказаться от страхования» оформляет отказ",
+          "line": 29,
+          "operation": "POST /loans/{loanId}/insurance/refusal"
+        },
+        {
+          "what": "передаёт ИИН, ФИО, дату рождения и телефон страховой компании-партнёру",
+          "line": 51,
+          "operation": "POST /loans/applications/{applicationId}/insurance"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            158,
+            168,
+            179
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "400",
+          "lines": [
+            158,
+            169,
+            184,
+            223
+          ],
+          "described": true,
+          "note": "в перечне кодов метода 2 описан только 400"
+        },
+        {
+          "code": "401",
+          "lines": [
+            158,
+            170,
+            189,
+            219
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404",
+          "lines": [
+            158,
+            171,
+            194,
+            224,
+            225,
+            226
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "409",
+          "lines": [
+            158,
+            172,
+            199,
+            224,
+            225
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422",
+          "lines": [
+            158,
+            173,
+            204
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "500",
+          "lines": [
+            158,
+            174,
+            209,
+            219
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "502",
+          "lines": [
+            158,
+            175,
+            214
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "places": "L153 integer, 300 000–5 000 000, тенге, обязателен; L223 query integer 300 000–5 000 000"
+        },
+        {
+          "name": "term",
+          "places": "L154 integer 1–2 знака, 6–60 месяцев; L223 query integer 6–60 месяцев"
+        },
+        {
+          "name": "premium",
+          "places": "L163 integer ≥0 ₸; L179 36000; L223 integer"
+        },
+        {
+          "name": "rate",
+          "places": "L164 number % годовых; L179 24.0; L223 rateWithInsurance / rateWithoutInsurance number"
+        },
+        {
+          "name": "status",
+          "places": "L162 string CONNECTED; L225 REMOVED; L226 ACTIVE; статусы после отказа не заданы"
+        },
+        {
+          "name": "applicationId",
+          "places": "L146 string 1–64 path; L225 path string 1–64"
+        },
+        {
+          "name": "loanId",
+          "places": "L224 string 1–64 path; L226 path string 1–64"
+        },
+        {
+          "name": "policyNumber",
+          "places": "L226 string или null до выпуска"
+        },
+        {
+          "name": "startDate",
+          "places": "L226 дата 2026-03-01"
+        },
+        {
+          "name": "consentPd",
+          "places": "L155 boolean обязателен, значение true, хранится как pd_consent_at"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "1. Проверить сессию клиента",
+          "line": 123,
+          "outcome": "401 {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "2. Проверить принадлежность заявки и неподписание",
+          "line": 124,
+          "outcome": "404 {\"message\":\"Заявка не найдена\"}; 409 {\"message\":\"Заявка уже подписана\"}"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "3. Проверить сумму и срок",
+          "line": 125,
+          "outcome": "400 {\"message\":\"Сумма или срок вне допустимого диапазона\"}"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "4. Проверить возраст клиента, при несоответствии вернуть 422",
+          "line": 126,
+          "outcome": "422 {\"message\":\"Страхование недоступно по возрасту\"}"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "5. Рассчитать премию и ставку",
+          "line": 127,
+          "outcome": ""
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "6. Если consentPd не равно true, вернуть 400",
+          "line": 128,
+          "outcome": "400 {\"message\":\"Сумма или срок вне допустимого диапазона\"}"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "6. Отказ страховой компании при предварительной проверке — 422",
+          "line": 128,
+          "outcome": "422 {\"message\":\"Страхование недоступно по возрасту\"}"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "6. Страховая компания не ответила",
+          "line": 128,
+          "outcome": "502 {\"message\":\"Страховая компания недоступна\"}"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "Особое правило 1: повтор с теми же суммой и сроком возвращает действующие условия",
+          "line": 131,
+          "outcome": "200 действующие условия страхования"
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "Особое правило 2: повторный вызов вернул 400 или 422, страхование снимается с заявки",
+          "line": 132,
+          "outcome": ""
+        },
+        {
+          "operation": "POST /loans/applications/{applicationId}/insurance",
+          "step": "Успешное подключение",
+          "line": 179,
+          "outcome": "200 {\"status\":\"CONNECTED\",\"premium\":36000,\"rate\":24.0}"
+        },
+        {
+          "operation": "POST /loans/{loanId}/insurance/refusal",
+          "step": "Отказ после 14 дней или при уже оформленном отказе",
+          "line": 224,
+          "outcome": "409 (без тела в описании)"
+        },
+        {
+          "operation": "POST /loans/{loanId}/insurance/refusal",
+          "step": "Кредит или чужой кредит не найден",
+          "line": 224,
+          "outcome": "404 (без тела в описании)"
+        },
+        {
+          "operation": "DELETE /loans/applications/{applicationId}/insurance",
+          "step": "Заявка не найдена или чужая",
+          "line": 225,
+          "outcome": "404 (без тела в описании)"
+        },
+        {
+          "operation": "DELETE /loans/applications/{applicationId}/insurance",
+          "step": "Заявка уже подписана",
+          "line": 225,
+          "outcome": "409 (без тела в описании)"
+        },
+        {
+          "operation": "GET /loans/{loanId}/insurance",
+          "step": "Кредит не найден или чужой",
+          "line": 226,
+          "outcome": "404 (без тела в описании)"
+        },
+        {
+          "operation": "GET /loans/insurance/quote",
+          "step": "Сумма или срок вне диапазона",
+          "line": 223,
+          "outcome": "400 (без тела в описании)"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}
