@@ -696,5 +696,15 @@
       "calls": 0,
       "cost_usd": 0.0
     }
-  ]
+  ],
+  "background": {
+    "fp_mutant": 3,
+    "same_complaint": 0,
+    "same_place": 0,
+    "own": 0,
+    "no_base": 3,
+    "strict": 0,
+    "by_owner_same": {},
+    "examples": []
+  }
 }

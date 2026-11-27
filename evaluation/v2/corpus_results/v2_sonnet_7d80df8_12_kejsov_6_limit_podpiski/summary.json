@@ -2802,5 +2802,47 @@
       "calls": 1,
       "cost_usd": 0.0
     }
-  ]
+  ],
+  "background": {
+    "fp_mutant": 53,
+    "same_complaint": 30,
+    "same_place": 19,
+    "own": 4,
+    "no_base": 0,
+    "strict": 13,
+    "by_owner_same": {
+      "№05": 12,
+      "№06": 10,
+      "№08": 8,
+      "№09": 7,
+      "№07": 7
+    },
+    "examples": [
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "title": "Приём уведомления оператора, запускающего автопополнение, не описан",
+        "base_title": "Подлинность уведомления оператора, запускающего списание, не определена"
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "title": "Не определён сбой пополнения после списания и изменение настройки",
+        "base_title": "Не описан сбой пополнения номера после списания с карты"
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "title": "НФ-1: не определены конец замера 5 минут и условия измерения",
+        "base_title": "НФ-1: не определены конец интервала, нагрузка и период расчёта 99 %"
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "title": "Не определено, к каким суткам относится пополнение для лимита АП-5",
+        "base_title": "АП-5: не определено, к каким суткам и какие попытки считаются в лимите"
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "title": "Тело ответа createAutopay и логика deleteAutopay не описаны",
+        "base_title": "Тело успешного ответа createAutopay не описано, хотя таблица отсылает к методу"
+      }
+    ]
+  }
 }

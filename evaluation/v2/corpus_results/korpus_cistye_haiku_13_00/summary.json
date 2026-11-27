@@ -1752,5 +1752,15 @@
       "calls": 9,
       "cost_usd": 0.0548
     }
-  ]
+  ],
+  "background": {
+    "fp_mutant": 0,
+    "same_complaint": 0,
+    "same_place": 0,
+    "own": 0,
+    "no_base": 0,
+    "strict": 0,
+    "by_owner_same": {},
+    "examples": []
+  }
 }

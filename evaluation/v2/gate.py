@@ -347,7 +347,7 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
                           "—" if f1 is None else f"{f1:.2f} (P {prec or 0:.2f}, R {rec or 0:.2f})",
                           None if f1 is None else f1 >= t["f1"],
                           ((_recall_owners(d_rec) + "; " if rec is not None and rec < 0.9 else "")
-                           + "ложные на мутантах и чистых → " + _clean_owners(d_rec)) if h
+                           + "ложные на мутантах и чистых → " + _clean_owners(d_rec) + _background_note(d_rec)) if h
                           else f"{missing_owner}: нет прогона корпуса с дефектами"))
         out[-1]["_src"] = rec_src
     if "clean_max_findings" in t:
@@ -369,6 +369,15 @@ def corpus_gates(title: str, d: dict | None, t: dict, missing_owner: str,
     for x in out:
         x["source"] = x.pop("_src", src)
     return out
+
+
+def _background_note(d: dict) -> str:
+    """«; на мутантах 50 из 152 — те же жалобы, что на чистой базе» — из сводки корпуса (`corpus.background`)."""
+    b = d.get("background") or {}
+    if not b.get("fp_mutant"):
+        return ""
+    return (f"; на мутантах {b['same_complaint']} из {b['fp_mutant']} ложных — те же жалобы, что на чистой базе "
+            "семейства (убрать на чистых — уйдут и там)")
 
 
 def stability_gates(gold: dict) -> list[dict]:

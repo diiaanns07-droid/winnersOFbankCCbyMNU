@@ -47,3 +47,5 @@ Recall по типам: boundary_conflict 0/5, event_conflict 0/5, missing_eleme
 | transfer_limit.range_boundary.reaching_rejects | defects | complete | 0 (0/0/0) | undetermined/undetermined |
 | transfer_limit.two_statuses.range_200_error | defects | complete | 1 (0/1/0) | no/no |
 | transfer_limit.unit_change.api_limit_in_tiyn | defects | complete | 1 (0/1/0) | no/no |
+
+Ложные на мутантах (3) по происхождению: та же жалоба, что на чистой базе семейства — 0 (0 %), то же место с другой жалобой — 0, только у мутанта — 0, без базы в прогоне — 3; строгий фон счётчика — 0. Ложная жалоба чистой базы повторяется на мутантах: убрать её на чистых — уйдут и эти.

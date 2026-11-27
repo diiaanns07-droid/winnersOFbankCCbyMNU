@@ -537,3 +537,25 @@ def test_gate_official_rows_show_spread_on_same_code(monkeypatch):
     assert gate.spread(peers[:1], "C") == "" and gate.spread([rows[0], rows[0]], "C") == " (на этом коде так во всех 2)"
     trees.clear()  # код не сверить (коммита нет в git) — только сам последний прогон
     assert gate.same_code_rows(rows, "sonnet", rows[-1]) == [rows[-1]]
+
+
+def test_corpus_background_splits_mutant_false_positives_by_origin():
+    """Ложные на мутантах корпуса 28fe64f (haiku): та же жалоба, что на чистой базе, — 50 из 152; то же место —
+    65; только у мутанта — 37. Ни одна верная находка не «та же жалоба» (калибровка порогов)."""
+    import json as _json
+
+    from evaluation.v2 import corpus as cp
+    from evaluation.v2.common import ROOT
+
+    d = ROOT / "evaluation/v2/corpus_results/w4_07_posle_zamorozki_28fe64f_haiku"
+    matrix = [_json.loads(x) for x in (d / "matrix.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+    per_case = _json.loads((d / "summary.json").read_text(encoding="utf-8"))["per_case"]
+    b = cp.background(d / "predictions.jsonl", matrix, per_case)
+    assert (b["fp_mutant"], b["same_complaint"], b["same_place"], b["own"], b["no_base"]) == (152, 50, 65, 37, 0)
+    assert b["strict"] <= b["same_complaint"] and list(b["by_owner_same"])[0] == "№09"
+    tp_as_fp = [{**m, "outcome": "FP"} for m in matrix if m["outcome"] == "TP"]
+    assert cp.background(d / "predictions.jsonl", tp_as_fp)["same_complaint"] == 0
+    line = cp.background_line(b)
+    assert line.startswith("Ложные на мутантах (152) по происхождению") and "— 50 (33 %" in line
+    assert cp._quote_close("Сумма списания не больше лимита", "сумма списания не больше лимита в сутки")
+    assert not cp._quote_close("лимит", "лимит")  # меньше трёх слов — не место

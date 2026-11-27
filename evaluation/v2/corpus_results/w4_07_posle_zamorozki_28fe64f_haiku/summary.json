@@ -6641,5 +6641,47 @@
       "calls": 8,
       "cost_usd": 0.0532
     }
-  ]
+  ],
+  "background": {
+    "fp_mutant": 152,
+    "same_complaint": 50,
+    "same_place": 65,
+    "own": 37,
+    "no_base": 0,
+    "strict": 14,
+    "by_owner_same": {
+      "№09": 24,
+      "№06": 21,
+      "№07": 8,
+      "№08": 2,
+      "№05": 1
+    },
+    "examples": [
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "title": "Критерии приёмки покрывают малую часть требований",
+        "base_title": "Критерии приёмки покрывают малую часть функциональных требований"
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "title": "Критерии приёмки покрывают не все функциональные требования",
+        "base_title": "Критерии приёмки покрывают малую часть функциональных требований"
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "title": "Одни понятия названы разными терминами, глоссария нет",
+        "base_title": "Одни и те же понятия названы по-разному, глоссария не задан"
+      },
+      {
+        "case_id": "autopay.event_conflict.insufficient_funds_credit",
+        "title": "Цель «баланс не ниже порога» расходится с правилами АП-6, АП-5",
+        "base_title": "Цель «не опускается ниже порога» не согласуется с лимитом и НФ-1"
+      },
+      {
+        "case_id": "autopay.range_boundary.trigger_at_threshold",
+        "title": "Критерии приёмки покрывают малую часть требований и кодов",
+        "base_title": "Критерии приёмки покрывают малую часть функциональных требований"
+      }
+    ]
+  }
 }

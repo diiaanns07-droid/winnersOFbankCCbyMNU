@@ -264,6 +264,8 @@ python -m evaluation.v2.antifit
 | 27.11 17:49 | W4-07 голова 17:50: 868787d, haiku | v2, claude_cli / haiku | complete | 5/5 | 4 | 20/20 | 25/25 | 5/8 | 33 (4/18/11) | 1 | 0/0 | 97 % | 0 | 0/82 | 3 | 0 | 795 | 4.7 | 9 |
 | 27.11 17:58 | W4-07 кандидат 868787d: 868787d, sonnet #1 | v2, claude_cli / sonnet | complete | 5/5 | 5 | 17/20 | 22/25 | 5/8 | 28 (5/13/10) | 0 | 0/0 | 100 % | 0 | 0/79 | 0 | 0 | 741 | 2.9 | 9 |
 | 27.11 17:58 | W4-07 кандидат 868787d: 868787d, sonnet #2 | v2, claude_cli / sonnet | complete | 5/5 | 5 | 17/20 | 22/25 | 4/8 | 29 (5/12/12) | 0 | 1/0 | 100 % | 0 | 0/81 | 0 | 0 | 728 | 3.3 | 9 |
+| 27.11 18:00 | W4-07 кандидат 868787d: 868787d, haiku #2 | v2, claude_cli / haiku | complete | 5/5 | 5 | 17/20 | 22/25 | 2/8 | 32 (5/18/9) | 2 | 0/0 | 94 % | 0 | 0/84 | 0 | 0 | 814 | 4.9 | 9 |
+| 27.11 18:00 | W4-07 кандидат 868787d: 868787d, haiku #1 | v2, claude_cli / haiku | complete | 5/5 | 5 | 17/20 | 22/25 | 5/8 | 33 (5/17/11) | 3 | 0/0 | 91 % | 0 | 0/91 | 0 | 0 | 801 | 5.4 | 9 |
 <!-- history:end -->
 
 Цели (ворота плана, Opus): К 5/5 и критичными ≥ 4; С ≥ 16/20; критичных ложных 0; замечаний 25–45;
@@ -280,16 +282,16 @@ python -m evaluation.v2.corpus run --out out/corpus --provider claude_cli --mode
 ```
 
 <!-- corpus:start -->
-| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Recall кандидатов | Тревог на 8 чистых | Чистых с > 1 замечанием | critical / major на чистых | Вердикт «нельзя» на чистых | Recall по типам | Мин на кейс | Вызовов на кейс |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: |
-| v2 офлайн-правила (09f0dfb) | 33 (0) | 12 | 3 | 16 | 0 | 0.800 | 0.429 | 0.558 | — | 0 | — | 0 / 0 | 0 | boundary_conflict 0/5, event_conflict 0/5, missing_element 5/6, status_conflict 3/6, unit_mismatch 4/6 | 0.0 | 0.0 |
-| v2 haiku, 0f3d9dd (22 кейса) + 7d80df8 (11) | 33 (0) | 26 | 478 | 2 | 0 | 0.052 | 0.929 | 0.098 | 0.964 | 128 | 8 | 4 / 61 | 4 | boundary_conflict 4/5, event_conflict 5/5, missing_element 6/6, status_conflict 6/6, unit_mismatch 5/6 | 8.9 | 8.8 |
-| v2 sonnet, 7d80df8, 12 кейсов (6 — лимит подписки) | 12 (6) | 4 | 82 | 0 | 1 | 0.047 | 1.000 | 0.089 | 0.750 | 29 | 2 | 0 / 12 | 0 | boundary_conflict 1/1, event_conflict 1/1, status_conflict 1/1, unit_mismatch 1/1 | 2.4 | 12.7 |
-| замер 08:30: 6d03683, haiku | 33 (20) | 10 | 100 | 1 | 2 | 0.091 | 0.909 | 0.165 | 1.000 | 31 | 4 | 0 / 18 | 0 | boundary_conflict 1/1, event_conflict 2/2, missing_element 3/3, status_conflict 2/2, unit_mismatch 2/3 | 2.8 | 10.1 |
-| корпус чистые, haiku 13:00 | 8 (0) | 0 | 55 | 0 | 0 | 0.000 | — | 0.000 | — | 55 | 8 | 1 / 25 | 1 |  | 2.2 | 8.4 |
-| v2 офлайн-правила (fda4d7ca) | 33 (0) | 27 | 0 | 1 | 0 | 1.000 | 0.964 | 0.982 | — | 0 | 0 | 0 / 0 | 0 | boundary_conflict 5/5, event_conflict 5/5, missing_element 5/6, status_conflict 6/6, unit_mismatch 6/6 | 0.0 | 0.0 |
-| W4-07 заморозка: c6aa9b5, haiku | 33 (0) | 27 | 192 | 1 | 0 | 0.123 | 0.964 | 0.219 | 1.000 | 58 | 8 | 0 / 3 | 0 | boundary_conflict 5/5, event_conflict 5/5, missing_element 6/6, status_conflict 5/6, unit_mismatch 6/6 | 2.1 | 8.4 |
-| W4-07 после заморозки: 28fe64f, haiku | 33 (0) | 27 | 202 | 1 | 0 | 0.118 | 0.964 | 0.210 | 1.000 | 50 | 8 | 0 / 4 | 0 | boundary_conflict 5/5, event_conflict 5/5, missing_element 6/6, status_conflict 5/6, unit_mismatch 6/6 | 1.9 | 7.4 |
+| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Recall кандидатов | Тревог на 8 чистых | Ложных на мутантах: та же жалоба, что на чистой базе | Чистых с > 1 замечанием | critical / major на чистых | Вердикт «нельзя» на чистых | Recall по типам | Мин на кейс | Вызовов на кейс |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | :--- | ---: | ---: |
+| v2 офлайн-правила (09f0dfb) | 33 (0) | 12 | 3 | 16 | 0 | 0.800 | 0.429 | 0.558 | — | 0 | 0 из 3 | — | 0 / 0 | 0 | boundary_conflict 0/5, event_conflict 0/5, missing_element 5/6, status_conflict 3/6, unit_mismatch 4/6 | 0.0 | 0.0 |
+| v2 haiku, 0f3d9dd (22 кейса) + 7d80df8 (11) | 33 (0) | 26 | 478 | 2 | 0 | 0.052 | 0.929 | 0.098 | 0.964 | 128 | 126 из 350 | 8 | 4 / 61 | 4 | boundary_conflict 4/5, event_conflict 5/5, missing_element 6/6, status_conflict 6/6, unit_mismatch 5/6 | 8.9 | 8.8 |
+| v2 sonnet, 7d80df8, 12 кейсов (6 — лимит подписки) | 12 (6) | 4 | 82 | 0 | 1 | 0.047 | 1.000 | 0.089 | 0.750 | 29 | 30 из 53 | 2 | 0 / 12 | 0 | boundary_conflict 1/1, event_conflict 1/1, status_conflict 1/1, unit_mismatch 1/1 | 2.4 | 12.7 |
+| замер 08:30: 6d03683, haiku | 33 (20) | 10 | 100 | 1 | 2 | 0.091 | 0.909 | 0.165 | 1.000 | 31 | 19 из 69 | 4 | 0 / 18 | 0 | boundary_conflict 1/1, event_conflict 2/2, missing_element 3/3, status_conflict 2/2, unit_mismatch 2/3 | 2.8 | 10.1 |
+| корпус чистые, haiku 13:00 | 8 (0) | 0 | 55 | 0 | 0 | 0.000 | — | 0.000 | — | 55 | — | 8 | 1 / 25 | 1 |  | 2.2 | 8.4 |
+| v2 офлайн-правила (fda4d7ca) | 33 (0) | 27 | 0 | 1 | 0 | 1.000 | 0.964 | 0.982 | — | 0 | — | 0 | 0 / 0 | 0 | boundary_conflict 5/5, event_conflict 5/5, missing_element 5/6, status_conflict 6/6, unit_mismatch 6/6 | 0.0 | 0.0 |
+| W4-07 заморозка: c6aa9b5, haiku | 33 (0) | 27 | 192 | 1 | 0 | 0.123 | 0.964 | 0.219 | 1.000 | 58 | 23 из 134 | 8 | 0 / 3 | 0 | boundary_conflict 5/5, event_conflict 5/5, missing_element 6/6, status_conflict 5/6, unit_mismatch 6/6 | 2.1 | 8.4 |
+| W4-07 после заморозки: 28fe64f, haiku | 33 (0) | 27 | 202 | 1 | 0 | 0.118 | 0.964 | 0.210 | 1.000 | 50 | 50 из 152 | 8 | 0 / 4 | 0 | boundary_conflict 5/5, event_conflict 5/5, missing_element 6/6, status_conflict 5/6, unit_mismatch 6/6 | 1.9 | 7.4 |
 <!-- corpus:end -->
 
 Для сравнения, v1 (ветка `bcc/eval-independent`, `docs/plan-v2/ref/BCC-quality-08d3af5.md`): правила — 0 из 28

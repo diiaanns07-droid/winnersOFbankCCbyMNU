@@ -440,18 +440,21 @@ def corpus_table() -> str:
         rows.append(d)
     rows.sort(key=lambda d: d.get("at", ""))
     L = ["| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Recall кандидатов | "
-         "Тревог на 8 чистых | Чистых с > 1 замечанием | critical / major на чистых | Вердикт «нельзя» на чистых | "
-         "Recall по типам | Мин на кейс | Вызовов на кейс |",
-         "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: |"]
+         "Тревог на 8 чистых | Ложных на мутантах: та же жалоба, что на чистой базе | Чистых с > 1 замечанием | "
+         "critical / major на чистых | Вердикт «нельзя» на чистых | Recall по типам | Мин на кейс | Вызовов на кейс |",
+         "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | :--- "
+         "| ---: | ---: |"]
     for d in rows:
         h, c = d["harness"], d["clean"]
         types = ", ".join(f"{k} {v.get('tp', 0)}/{(v.get('tp') or 0) + (v.get('fn') or 0)}"
                           for k, v in sorted(d.get("per_issue_type", {}).items()) if (v.get('tp') or 0) + (v.get('fn') or 0))
         n = max(1, d["cases"] - d["failed"])
         cand = (d.get("candidates") or {}).get("recall")
+        bg = d.get("background") or {}
+        bg_txt = f"{bg['same_complaint']} из {bg['fp_mutant']}" if bg.get("fp_mutant") else "—"
         L.append(f"| {d['label']} | {d['cases']} ({d['failed']}) | {h.get('tp')} | {h.get('fp')} | {h.get('fn')} | "
                  f"{h.get('duplicates')} | {_f(h.get('precision'))} | {_f(h.get('recall'))} | {_f(h.get('f1'))} | "
-                 f"{_f(cand)} | {h.get('clean_false_alarms')} | {c.get('docs_over_1_finding', '—')} | "
+                 f"{_f(cand)} | {h.get('clean_false_alarms')} | {bg_txt} | {c.get('docs_over_1_finding', '—')} | "
                  f"{c['critical']} / {c['major']} | {c['verdict_no']} | {types} | "
                  f"{d['time']['total_s'] / 60 / n:.1f} | {d['time']['calls'] / n:.1f} |")
     return "\n".join(L)
@@ -498,8 +501,32 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("report")
     p.add_argument("source")
     p.add_argument("--mode", default="rules_plus_llm")
+    p = sub.add_parser("background", help="ложные на мутантах по происхождению — в сводки готовых прогонов")
+    p.add_argument("dirs", nargs="+", help="evaluation/v2/corpus_results/<метка> или --out прогона")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
+
+    if a.action == "background":
+        for d in map(Path, a.dirs):
+            mp = next((x for x in (d / "matrix.jsonl", d / "harness" / "matrix.jsonl") if x.exists()), None)
+            sp = d / "summary.json"
+            if not mp or not (d / "predictions.jsonl").exists() or not sp.exists():
+                print(f"{d}: нет matrix.jsonl, predictions.jsonl или summary.json — пропускаю")
+                continue
+            matrix = [json.loads(x) for x in mp.read_text(encoding="utf-8").splitlines() if x.strip()]
+            s = json.loads(sp.read_text(encoding="utf-8"))
+            s["background"] = background(d / "predictions.jsonl", matrix, s.get("per_case"))
+            sp.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+            line = background_line(s["background"])
+            md = d / "summary.md"
+            if md.exists() and line and "по происхождению" not in md.read_text(encoding="utf-8"):
+                txt = md.read_text(encoding="utf-8")
+                anchor = "Вклад источников"
+                txt = txt.replace(anchor, line + "\n\n" + anchor, 1) if anchor in txt else txt + "\n" + line + "\n"
+                md.write_text(txt, encoding="utf-8")
+            print(f"{d}: {line or 'ложных на мутантах нет'}")
+        update_results()
+        return 0
 
     if a.action == "adapt":
         rep = json.loads(Path(a.report).read_text(encoding="utf-8"))

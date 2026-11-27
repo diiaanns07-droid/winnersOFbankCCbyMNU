@@ -14124,5 +14124,47 @@
       "calls": 9,
       "cost_usd": 0.1466
     }
-  ]
+  ],
+  "background": {
+    "fp_mutant": 350,
+    "same_complaint": 126,
+    "same_place": 203,
+    "own": 21,
+    "no_base": 0,
+    "strict": 48,
+    "by_owner_same": {
+      "№08": 50,
+      "№05": 41,
+      "№07": 41,
+      "№06": 22,
+      "№09": 20
+    },
+    "examples": [
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "title": "АП-1 и АП-4 объединяют несколько независимых правил в одном пункте",
+        "base_title": "Пункты АП-1, АП-4 и требования интеграции объединяют несколько независимых правил"
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "title": "Тело успешного ответа createAutopay не описано",
+        "base_title": "Тело успешного ответа createAutopay не описано, хотя статусы отсылают к разделу метода"
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "title": "Условие карты KZT из АП-1 не проверяется в логике createAutopay",
+        "base_title": "Проверка валюты карты KZT из АП-1 не описана в логике createAutopay и в кодах"
+      },
+      {
+        "case_id": "autopay.combo.unit_change-limit_per_hour+drop_promised-no_409_status",
+        "title": "Источник и подлинность уведомления о балансе не описаны, от него идут списания",
+        "base_title": "Канал получения уведомления о балансе и подлинность отправителя не описаны"
+      },
+      {
+        "case_id": "autopay.drop_promised.no_409_status",
+        "title": "НФ-1: не названо конечное событие пополнения — списание или зачисление",
+        "base_title": "НФ-1: не определено, какое событие считается выполнением пополнения и период для 99 %"
+      }
+    ]
+  }
 }
