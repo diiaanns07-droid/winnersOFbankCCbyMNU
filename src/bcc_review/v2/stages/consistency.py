@@ -30,8 +30,8 @@ SHORT_MODE = ("\n\n### Краткий режим\nПредыдущий отве�
               "если всего хватает, candidates — до 5; каждое текстовое поле — одна фраза.")
 
 MAX_PAIRS = 15
-MAX_UNDEFINED_CANDIDATES = 3
-MAX_MODEL_CANDIDATES = 8
+MAX_UNDEFINED_CANDIDATES = 2
+MAX_MODEL_CANDIDATES = 6
 MAX_GLOSSARY = 8
 
 # Требования, для которых строится трассировка (CONTRACT 2.2, поле kind).
@@ -283,7 +283,23 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         pair["verdict"] = "undefined"
         if pair["kind"] in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
             pair["kind"] = "ambiguity"
+    # Обратная ошибка слабой модели: одна сторона ограничивает действие («максимум», «не более»), другая прямо
+    # снимает ограничение («независимо от», «без ограничения»), а вердикт — «не определено». Это limit_removed.
+    elif (pair["verdict"] == "undefined" and pair["same_subject"] and _found(ev_a) and _found(ev_b)
+          and not _overlap(ev_a, ev_b) and _removes_limit(pair["quote_a"], pair["quote_b"])):
+        pair.update(verdict="conflict", basis="limit_removed", kind="event_conflict")
     return pair
+
+
+_LIMIT_REMOVED = re.compile(r"независимо от|вне зависимости от|без ограничени|в любом случае", re.I)
+_LIMIT = re.compile(r"\b(не более|не больше|не чаще|максимум|не свыше|только один|только одн|один раз|"
+                    r"не превыша\w*|не может превышать)\b", re.I)
+
+
+def _removes_limit(qa: str, qb: str) -> bool:
+    """Одна цитата снимает ограничение, другая его задаёт (без слов снятия)."""
+    return any(_LIMIT_REMOVED.search(x) and _LIMIT.search(y) and not _LIMIT_REMOVED.search(y)
+               for x, y in ((qa, qb), (qb, qa)))
 
 
 # Виды требований, конфликт с которыми не блокирует сам по себе: цель — намерение, а не правило;
@@ -309,6 +325,9 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         # Разные единицы одной величины обычно снимаются правилом пересчёта — major; судья может поднять.
         severity = "critical" if two_places and not soft and kind not in MAJOR_CONFLICT_KINDS else "major"
     else:  # undefined
+        # Строка приёмки сверяется только на противоречие (шаг 2б); её неполноту проверяет линза тестировщика.
+        if any((known or {}).get(x, {}).get("kind") == "acceptance" for x in (pair["a"], pair["b"])):
+            return None
         if kind in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
             kind = "ambiguity"
         severity = "major"

@@ -480,3 +480,29 @@ def test_link_trace_points_rows_to_findings_about_the_requirement():
     C.link_findings([], [], [], findings, trace)
     assert trace[0]["finding_ids"] == ["D-01", "D-02"]  # критичный первым, дефект «обо всём» не ссылается
     assert "finding_ids" not in trace[1]
+
+
+def test_undefined_pair_where_one_side_removes_the_other_limit_becomes_conflict():
+    p = pair(verdict="undefined", basis="none", kind="ambiguity",
+             quote_a="Вклад можно пополнять не более трёх раз в квартал.",
+             quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"][0]["verdict"] == "conflict" and out["pair_checks"][0]["basis"] == "limit_removed"
+    c = out["candidates"][0]
+    assert c["severity"] == "critical" and c["kind"] == "event_conflict"
+
+
+def test_undefined_pair_without_limit_words_stays_undefined():
+    p = pair(verdict="undefined", basis="none", kind="incomplete",
+             quote_a="Минимальная сумма вклада — 10 000.", line_a=5,
+             quote_b="Пополнение через кассу доступно всегда, независимо от числа предыдущих пополнений.")
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"][0]["verdict"] == "undefined"
+    assert out["candidates"][0]["severity"] == "major"
+
+
+def test_undefined_pair_with_acceptance_row_gives_no_candidate():
+    p = pair(b="R-07", verdict="undefined", basis="none", kind="incomplete",
+             quote_b="| Сумма 10 000 | Пополнить на 1 000 | Сумма 11 000 |", line_b=8)
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    assert out["pair_checks"] and out["candidates"] == []
