@@ -662,3 +662,51 @@ def test_empty_test_cases_are_dropped(tmp_path):
     qa["test_cases"] = [tc, tc]
     report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", mock_dir=str(_mock_dir(tmp_path, lens_qa=qa)))
     assert all(t.get("title") or t.get("when") for t in report["test_cases"]), report["test_cases"][:2]
+
+
+def test_hostile_judge_answer_is_sanitized(tmp_path):
+    """Враждебный, но валидный по схеме ответ судьи: дубли ключей, кандидат и в дефекте, и в отклонённых, ссылки на
+    несуществующих кандидатов, приоритеты −3 и 99, critical без сценария или с blocks=none, чек-лист с n=0 и 999.
+    Код должен всё поправить: каждый кандидат ровно в одном месте, verify проходит."""
+    from bcc_review.v2 import verify
+    from bcc_review.v2.stages import judge as J
+    q = {"A": ("Месяц определяется по дате совершения покупки в Алматы", 38),
+         "B": ("Возврат уменьшает расходы месяца исходной покупки", 38),
+         "C": ("Февральский счётчик вырос на 4 000", 64), "D": ("По умолчанию уведомление выключено", 37)}
+    lens = {"candidates": [_cand(title=k, evidence=[{"quote": v[0], "line": v[1]}],
+                                 severity="critical" if k == "C" else "major") for k, v in q.items()]}
+    schema = J.response_schema()["properties"]["findings"]["items"]["properties"]
+
+    def f(key, ids, **kw):
+        base = {k: ("" if v.get("type") == "string" else 0 if v.get("type") == "integer" else False
+                    if v.get("type") == "boolean" else []) for k, v in schema.items()}
+        if "enum" in schema.get("kind", {}):
+            base["kind"] = "ambiguity"
+        if "enum" in schema.get("criterion", {}):
+            base["criterion"] = "unambiguous"
+        base.update(key=key, candidate_ids=ids, base=ids[0] if ids else "", title="T" + key, severity="major",
+                    blocks="both", priority=0)
+        base.update(kw)
+        return {k: v for k, v in base.items() if k in schema}
+
+    code = J._MODEL_REJECT_CODES[0]
+    judge_ans = {"findings": [f("K1", ["C-001", "C-002"], priority=1), f("K1", ["C-001"], priority=1),
+                              f("K2", ["C-003"], severity="critical", priority=-3), f("K3", [], title="", priority=99),
+                              f("K4", ["C-404"], severity="critical"),
+                              f("K5", ["C-004"], severity="critical", scenario="s", blocks="none")],
+                 "rejected": [{"candidate_id": "C-002", "reason_code": code, "reason": "ложный", "line": 38},
+                              {"candidate_id": "C-777", "reason_code": code, "reason": "?", "line": -1}],
+                 "checklist": [], "verdict_summary": ""}
+    mock = _mock_dir(tmp_path, lens_analyst=lens, judge=judge_ans)
+    report, written, _ = _review(tmp_path, OFFICIAL, provider="mock", mock_dir=str(mock), judge_check=False,
+                                 clarify=False)
+    warns = " ".join(report["run"]["warnings"])
+    assert "C-404" in warns and "судья недоступен" not in warns, warns[:300]   # ответ судьи принят, а не запасной
+    cids = [c for x in report["findings"] for c in x["candidate_ids"]]
+    assert len(cids) == len(set(cids)), cids
+    assert all(x["evidence"] and x["title"] for x in report["findings"])
+    assert all(0 <= int(x.get("priority") or 0) <= 7 for x in report["findings"])
+    crit = [x for x in report["findings"] if x["severity"] == "critical"]
+    assert all(x.get("blocks") not in ("", "none") for x in crit)
+    res = verify.verify_report(Path(written["json"]), OFFICIAL)
+    assert res["ok"], res["errors"][:3]
