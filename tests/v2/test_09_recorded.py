@@ -88,7 +88,7 @@ def test_negative_control_clean_base_has_no_conflicts(model):
             assert not ({25, 26} <= lines_of(c)), c["title"]
 
 
-WAVE2 = [f"haiku_w2_{i}" for i in range(1, 10)]  # шаг 2б, `stage consistency` (effort low), 1 вызов без обрезки
+WAVE2 = [f"haiku_w2_{i}" for i in range(1, 13)]  # шаг 2б, `stage consistency` (effort low), 1 вызов без обрезки
 
 
 @pytest.mark.parametrize("model", WAVE2)
@@ -125,7 +125,7 @@ def test_official_document_set_level_findings(model):
     assert all(lines_of(c) for c in out["candidates"])
 
 
-@pytest.mark.parametrize("model", ["haiku_w2_7", "haiku_w2_8", "haiku_w2_9"])
+@pytest.mark.parametrize("model", [f"haiku_w2_{i}" for i in (7, 8, 9, 10, 11, 12)])
 def test_official_all_critical_conflicts_on_weak_model_with_one_condition_field(model):
     """Промпт с полем one_condition, haiku с effort low: К1–К4 critical в каждом прогоне."""
     out = run_recorded(ROOT / "release" / "input" / "requirements.md", "09_official", model)
