@@ -135,3 +135,92 @@ def test_auto_without_anything_is_offline(monkeypatch, tmp_path):
     monkeypatch.setattr(shutil, "which", lambda *a, **k: None)
     auto = R.provider_status()[0]
     assert auto["resolved"] == "offline" and "только правила" in auto["label"]
+
+
+# ── следующий круг ответов в вебе ──
+
+import json  # noqa: E402
+import time  # noqa: E402
+import urllib.error  # noqa: E402
+import urllib.parse  # noqa: E402
+import urllib.request  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import pytest  # noqa: E402
+
+_ROOT = Path(__file__).resolve().parents[2]
+_DOC = _ROOT / "release" / "input" / "requirements.md"
+_SAMPLE = _ROOT / "tests" / "v2" / "fixtures" / "14_report_official.json"
+
+
+@pytest.fixture()
+def web(tmp_path, monkeypatch):
+    for k in _KEYS:
+        monkeypatch.setenv(k, "x")
+        monkeypatch.delenv(k)
+    app = S.build_app(tmp_path / "data", fixture=_SAMPLE, step_s=0.01, sample=_DOC)
+    httpd = S.make_server(app, "127.0.0.1", 0)
+    th = threading.Thread(target=httpd.serve_forever, daemon=True)
+    th.start()
+    yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    httpd.shutdown()
+    httpd.server_close()
+
+
+def _req(url: str, data: bytes | None = None, ctype: str = "") -> tuple[int, bytes]:
+    headers = {"Accept": "application/json"}
+    if ctype:
+        headers["Content-Type"] = ctype
+    req = urllib.request.Request(url, data=data, method="POST" if data is not None else "GET", headers=headers)
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read()
+
+
+def _form(fields: dict[str, str]) -> tuple[bytes, str]:
+    b = "b34" + str(int(time.time() * 1000))
+    body = "".join(f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n' for k, v in fields.items())
+    return (body + f"--{b}--\r\n").encode("utf-8"), f"multipart/form-data; boundary={b}"
+
+
+def _done(base: str, jid: str) -> dict:
+    for _ in range(300):
+        st = json.loads(_req(f"{base}/api/jobs/{jid}")[1])
+        if st["state"] in ("done", "failed"):
+            return st
+        time.sleep(0.05)
+    raise AssertionError("задание не завершилось")
+
+
+def test_recalc_from_report_and_next_round(web):
+    body, ctype = _form({"sample": "1", "provider": "mock"})
+    code, raw = _req(web + "/api/jobs", body, ctype)
+    first = json.loads(raw)["id"]
+    assert _done(web, first)["state"] == "done"
+    page = _req(f"{web}/jobs/{first}")[1].decode("utf-8")
+    assert 'id="recalc"' in page and "Пересчитать с ответами ↻" in page and "Загрузить файл ответов" in page
+    # «Пересчитать с ответами» шлёт текст из вкладки «Вопросы» полем answers_text
+    text = "Q-01 [Лимит]: A\n\n## Решения\n\n- Все суммы в тиынах\n"
+    body, ctype = _form({"answers_text": text})
+    code, raw = _req(f"{web}/api/jobs/{first}/answers", body, ctype)
+    assert code == 201
+    second = json.loads(raw)["id"]
+    st = _done(web, second)
+    assert st["parent"] == first and st["answers_path"] is True
+    # у проверки с ответами — следующий круг: та же кнопка, другой текст
+    page2 = _req(f"{web}/jobs/{second}")[1].decode("utf-8")
+    assert "Следующий круг ↻" in page2 and 'data-key="answers_next"' in page2
+    body, ctype = _form({"answers_text": "Q-02 [Дата]: B\n"})
+    code, raw = _req(f"{web}/api/jobs/{second}/answers", body, ctype)
+    assert code == 201 and _done(web, json.loads(raw)["id"])["parent"] == second
+    # пустые ответы — подсказка, что нажать
+    body, ctype = _form({"answers_text": "  "})
+    code, raw = _req(f"{web}/api/jobs/{first}/answers", body, ctype)
+    assert code == 400 and "Пересчитать с ответами" in json.loads(raw)["error"]
+
+
+def test_answers_next_file_is_served():
+    keys = {k: n for k, n, _, _ in R.FILES}
+    assert keys["answers_next"] == "report.answers-next.md"

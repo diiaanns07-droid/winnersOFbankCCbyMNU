@@ -314,7 +314,8 @@ class Handler(BaseHTTPRequestHandler):
         fields, files = _parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
         data = files.get("answers", ("", b""))[1] or (fields.get("answers_text") or "").encode("utf-8")
         if not data.strip():
-            return self._json(400, {"error": "Загрузите файл ответов (кнопка «Скачать ответы» во вкладке «Вопросы» отчёта)."})
+            return self._json(400, {"error": "Отметьте ответы во вкладке «Вопросы» отчёта и нажмите «Пересчитать с ответами» "
+                                             "или загрузите файл ответов (кнопка «Скачать ответы» в отчёте)."})
         problem = check_provider(parent.provider, parent.model)
         if problem:
             return self._json(400, {"error": problem})
