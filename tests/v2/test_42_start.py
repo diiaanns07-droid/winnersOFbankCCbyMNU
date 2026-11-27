@@ -118,7 +118,7 @@ def _fake_venv(d: Path, log: Path) -> None:
 
 
 def _run_start(d: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(["bash", str(d / "start.sh"), *args], cwd=d, capture_output=True, text=True, timeout=60,
+    return subprocess.run([shutil.which("bash") or "bash", str(d / "start.sh"), *args], cwd=d, capture_output=True, text=True, timeout=60,
                           env=env or dict(os.environ))
 
 
@@ -200,8 +200,8 @@ def test_check_starts_server_and_exits_zero(tmp_path, capsys, no_browser):
     assert code == 0
     assert f"http://127.0.0.1:{port}/healthz — ok" in out and "— 200" in out
     assert no_browser == [], "--check не открывает браузер"
-    with socket.socket() as s:  # сервер остановлен, порт свободен
-        s.bind(("127.0.0.1", port))
+    with pytest.raises(OSError), socket.create_connection(("127.0.0.1", port), timeout=2):
+        pass  # сервер остановлен
 
 
 def test_check_fails_when_dependency_missing(tmp_path, capsys, no_browser, monkeypatch):
