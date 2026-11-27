@@ -133,6 +133,27 @@ def heading_lines(view: dict) -> set[int]:
         tail = _section_tail(ln)
         if tail and _norm_heading(_text(ln)) == _norm_heading(tail):
             out.add(n)
+    return out | numbered_heading_lines(view)
+
+
+_NUM_HEAD = re.compile(r"^\s*(?P<num>\d{1,2}(?:\.\d{1,2}){0,3})\.?\s+(?P<title>[A-ZА-ЯЁ].*)$")
+
+
+def numbered_heading_lines(view: dict) -> set[int]:
+    """Нумерованный заголовок раздела в тексте без разметки (TXT, PDF): «2. Требования к функциональности»,
+    за которым идут пункты «2.1. …». Признаки: короткая строка без точки в конце, а следующая непустая строка —
+    пункт с номером глубже того же раздела. Пункт списка «1. Проверить сессию.» под ним не попадает."""
+    out: set[int] = set()
+    lines = [x for x in _lines(view) if _text(x).strip()]
+    for i, ln in enumerate(lines[:-1]):
+        t = _MD_DECOR.sub("", _text(ln)).strip()
+        m = _NUM_HEAD.match(t)
+        if not m or len(t) > 80 or len(m.group("title").split()) > 8 or _SENT_END.search(t) or " | " in t:
+            continue
+        nxt = _NUM_HEAD.match(_MD_DECOR.sub("", _text(lines[i + 1])).strip()) or re.match(
+            r"^\s*(?P<num>\d{1,2}(?:\.\d{1,2}){1,4})\.?\s", _text(lines[i + 1]))
+        if nxt and nxt.group("num").startswith(m.group("num") + "."):
+            out.add(int(ln["n"]))
     return out
 
 
@@ -731,6 +752,38 @@ def _param_name(first: dict, rest: str) -> str:
     return rest
 
 
+_HEAD_ITEM_ID = re.compile(r"^(?P<id>" + r"[A-ZА-ЯЁ]{1,8}\d{0,3}[-‑–_]\d+(?:\.\d+)*[a-zа-я]?" + r")(?:[.):]\s*|\s+[—–-]\s+|\s+)\S")
+
+
+def _heading_item_id(view: dict, r: dict, requirements: list[dict], parts: list[str]) -> str:
+    """Номер пункта в заголовке раздела («US-1. Запись на время», «ФТ-3 Перевод»), а под заголовком — первый абзац
+    без своего номера: это и есть пункт. Пункты списка и строки таблицы под ним номер заголовка не получают."""
+    if not parts:
+        return ""
+    m = _HEAD_ITEM_ID.match(_strip_num(parts[-1]))
+    if not m:
+        return ""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    first = by_n.get(int(r["line_start"])) or {}
+    if first.get("kind") == "list_item" or _is_row(_text(first)) or re.match(r"^\s*[-*•]\s", _text(first)):
+        return ""
+    same = [q for q in requirements if str((by_n.get(int(q["line_start"])) or {}).get("section") or "")
+            == str(first.get("section") or "")]
+    if not same or min(same, key=lambda q: q["line_start"]) is not r:
+        return ""
+    if any(str(q.get("source_id") or "") == m.group("id") for q in requirements if q is not r):
+        return ""
+    return m.group("id")
+
+
+def _invented_bullet_number(first: dict, sid: str) -> bool:
+    """«US-1, критерий 2», «Сценарий, шаг 3» у пункта маркированного списка — номер, которого нет в документе."""
+    if not sid or not re.fullmatch(r".+,\s+[^\d,]{2,20}\s+\d{1,3}", sid) or re.search(r",\s+(?:п\.|строка)\s+\d", sid):
+        return False
+    t = _text(first)
+    return first.get("kind") == "list_item" and not re.match(r"^\s*\d{1,3}[.)]\s", t) and sid not in t
+
+
 def _passport_table(by_n: dict, r: dict) -> bool:
     """Требование — таблица «поле | значение» из нескольких строк (паспорт метода: Description, REST type, URL…)."""
     rows = [_text(by_n[n]) for n in range(int(r["line_start"]), int(r["line_end"]) + 1)
@@ -757,6 +810,13 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
         own_id = _own_id(view, r)
         if own_id:
             r["source_id"] = own_id  # номер пункта в документе — ровно как в документе, при любой модели
+            continue
+        head_id = _heading_item_id(view, r, requirements, parts)
+        if head_id:
+            r["source_id"] = head_id  # «### US-1. Запись на время» + абзац истории под ним — требование US-1
+            continue
+        if _invented_bullet_number(first, str(r.get("source_id") or "")):
+            r["source_id"] = ""  # «US-1, критерий 2» у пункта маркированного списка: такого номера в документе нет
             continue
         if parts and _passport_table(by_n, r):
             r["source_id"] = parts[-1]  # паспорт метода — название раздела, в котором он стоит (промпт, правило 3)
@@ -1416,6 +1476,8 @@ def heuristic_segment(view: dict) -> dict:
     row_no = 0
     # вводный текст до первого раздела — пояснение о самом документе (если разделы в документе вообще есть)
     first_sectioned = next((int(x["n"]) for x in lines if x.get("section")), 0)
+    if not first_sectioned:  # TXT без разметки: разделы — нумерованные заголовки «1. Общие положения»
+        first_sectioned = min(numbered_heading_lines(view), default=0)
     by_line = {int(x["n"]): x for x in lines}
     fmt_src = str(view.get("format") or "").lower() in ("md", "txt", "markdown")
     caption, caption_line, table_name = "", 0, ""
@@ -1547,6 +1609,7 @@ def heuristic_segment(view: dict) -> dict:
     reqs, excl = merge_items(reqs, excl)
     reqs, excl = demote_examples(view, reqs, excl)
     reqs, excl = demote_injections(view, reqs, excl)
+    reqs, excl = demote_open_questions(view, reqs, excl)
     reqs = split_status_lists(view, reqs)
     reqs = status_item_quotes(view, canonical_source_ids(view, reqs))
     return {"requirements": assign_ids(uniquify_source_ids(code_in_summary(reqs))), "excluded": excl}
@@ -1766,6 +1829,40 @@ _OBLIGATION = re.compile(r"долж|обязан|обеспечива|необх
                          re.I)
 
 
+def _is_question_row(body: list[str]) -> bool:
+    """Строка таблицы «№ | Вопрос? | Ответственный» — открытый вопрос (ячейка с вопросительным знаком в конце)."""
+    if len(body) != 1 or not _is_row(body[0]):
+        return False
+    cells = [c.strip() for c in body[0].strip("| ").split(" | ")]
+    return any(c.endswith("?") and len(c.split()) >= 3 for c in cells[:3])
+
+
+_QUESTION_SECTION = re.compile(r"(?:открыт\w*|нерешённ\w*|нерешенн\w*)\s+вопрос|^вопросы$", re.I)
+
+
+def demote_open_questions(view: dict, requirements: list[dict],
+                          excluded: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Пункт раздела «Открытые вопросы» с вопросом («Нужно ли SMS-напоминание?») — не требование: в excluded
+    (haiku исключает, sonnet и офлайн-нарезка выделяли)."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    keep, moved = [], []
+    for r in requirements:
+        a, b = int(r["line_start"]), int(r["line_end"])
+        body = [_MD_DECOR.sub("", _text(by_n[n])).strip() for n in range(a, b + 1)
+                if n in by_n and not is_trivial(_text(by_n[n]))]
+        text = " ".join(body)
+        tail = _strip_num(_section_tail(by_n.get(a) or {})).lower()
+        if body and _QUESTION_SECTION.search(tail) and (text.rstrip(" |").rstrip().endswith("?")
+                                                        or _is_question_row(body)):
+            moved.append({"what": "Открытый вопрос", "line_start": a, "line_end": b,
+                          "reason": "Вопрос к владельцу документа, а не требование: поведение по нему не определено"})
+            continue
+        keep.append(r)
+    if not moved:
+        return requirements, excluded
+    return merge_items(keep, excluded + moved)
+
+
 def demote_non_requirements(view: dict, requirements: list[dict],
                             excluded: list[dict]) -> tuple[list[dict], list[dict]]:
     """То, что модели то выделяют, то исключают, код решает одинаково: заглушка («Не предъявляются.») и пункт
@@ -1935,6 +2032,7 @@ def segment_from_response(view: dict, raw: dict,
     reqs, excl = demote_examples(view, reqs, excl)
     reqs, excl = demote_non_requirements(view, reqs, excl)
     reqs, excl = demote_injections(view, reqs, excl)
+    reqs, excl = demote_open_questions(view, reqs, excl)
     reqs = merge_bare_codes(view, reqs)
     reqs = merge_paragraph_lines(view, reqs)
     reqs, excl = absorb_bare_code_blocks(view, reqs, excl, headings)

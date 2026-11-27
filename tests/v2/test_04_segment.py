@@ -1036,3 +1036,53 @@ def test_reader_text_has_no_english_or_internal_codes():
     raw = {"requirements": [{"source_id": "", "kind": "api", "summary": "Field cardId, required",
                              "line_start": 1, "line_end": 1}], "excluded": []}
     assert sg.segment_from_response(view, raw)["requirements"][0]["summary"] == "Поле cardId, обязательный"
+
+
+# ---- волна 3, сессия 2: документы другой структуры (истории, TXT без разметки, таблица REQ) ----------------
+
+STRUCT = FIX / "04_structures"
+
+
+@pytest.mark.parametrize("doc,stem,expected", [
+    ("stories.md", "stories", ["", "US-1", "", "", "US-2", "", "", "US-3", "NFR-1", "NFR-2", "NFR-3", "", ""]),
+    ("numbered.txt", "numbered_txt", ["1.1", "1.2", "2.1", "2.2", "2.3", "2.4", "2.5", "3.1", "3.2", "4.1", "5.1",
+                                      "5.2"]),
+    ("req_table.md", "req_table", ["", "REQ-001", "REQ-002", "REQ-003", "REQ-004", "REQ-005", "3.1", "3.2", "4.1",
+                                   "4.2"]),
+])
+def test_other_structures_haiku_sonnet_offline_agree(doc, stem, expected):
+    """haiku, sonnet и офлайн-нарезка дают одни ID и строки: номер истории из заголовка «### US-1. …» у абзаца
+    истории (sonnet и haiku), без выдуманных «US-1, критерий 2» у пунктов маркированного списка (sonnet);
+    открытые вопросы — в «не вошло» (haiku исключал, sonnet и офлайн выделяли); в TXT «2. Требования к …» —
+    заголовок, а не требование и не повод для дозапроса (обе модели их пропускали, код звал дозапрос и добавлял
+    5 мусорных требований); подзаголовок титула TXT — не требование."""
+    view = sg.load_view(str(STRUCT / doc))
+    heur = sg.heuristic_segment(view)
+    assert [r["source_id"] for r in heur["requirements"]] == expected
+    for model in ("haiku", "sonnet"):
+        raw = json.loads((ANSWERS / f"{stem}.{model}.json").read_text(encoding="utf-8"))
+        out = sg.segment_from_response(view, raw)  # без дозапроса: он больше не нужен
+        assert _keys(out["requirements"]) == _keys(heur["requirements"]), model
+        assert out["coverage"]["uncovered"] == [] and out["coverage"]["followup_calls"] == 0
+        assert out["coverage"]["auto_added"] == 0
+
+
+def test_numbered_headings_in_plain_text():
+    view = _view(["1. Общие положения", "1.1. Документ описывает доработку.", "",
+                  "2. Требования к функциональности", "2.1. Клиент подключает услугу.",
+                  "3. Проверить сессию клиента.", "4. Вернуть результат"], fmt="txt")
+    # заголовок — короткая строка без точки, за которой идёт пункт глубже того же номера
+    assert sg.numbered_heading_lines(view) == {1, 4}
+
+
+def test_open_questions_excluded_only_in_question_section():
+    view = _view(["| 1 | Нужно ли SMS-напоминание за день до визита? | Владелец |",
+                  "Клиент видит вопрос «Отменить запись?» и две кнопки."],
+                 sections=["Открытые вопросы", "Требования к экрану"])
+    raw = {"requirements": [{"source_id": "Открытые вопросы, строка 1", "kind": "other", "summary": "Вопрос про SMS",
+                             "line_start": 1, "line_end": 1},
+                            {"source_id": "", "kind": "ui", "summary": "Диалог отмены записи",
+                             "line_start": 2, "line_end": 2}], "excluded": []}
+    out = sg.segment_from_response(view, raw)
+    assert [r["line_start"] for r in out["requirements"]] == [2]
+    assert out["excluded"][0]["what"] == "Открытый вопрос" and out["excluded"][0]["reason"]
